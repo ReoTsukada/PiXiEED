@@ -15,8 +15,8 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20260930-shared-canvas-5';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20260930-ux-fix-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-2';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261001-components-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -701,7 +701,7 @@ async function prepareCaptureDownload(frozen) {
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.png`;
-    $('#saveLabel').textContent = 'PNGを保存';
+    $('#saveLabel').textContent = '画像を保存（PNG）';
     updateSaveLinkState();
     sayToast('撮影しました。PNGを保存できます。');
     if (!audioCameraRequest) resultView.show({ title: '撮影できました', preview: view, controls: $('#resultControls') });
@@ -1276,7 +1276,7 @@ async function prepareGifDownload(frames) {
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.gif`;
-    $('#saveLabel').textContent = 'GIFを保存';
+    $('#saveLabel').textContent = '動画を保存（GIF）';
     root.dataset.gifFrames = String(frames.length);
     root.dataset.gifBytes = String(bytes.length);
     updateSaveLinkState();
@@ -1420,6 +1420,7 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
       invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = false;
       state.result = null;
       setMode('idle');
+      if (!audioCameraInvalid) { setMode('loading'); resumeCameraIfVisible(); }
       return;
     }
     sharedImageColorCount = countSharedImageColors(image, SHARED_CANVAS_PREMIUM_MAX_COLORS);

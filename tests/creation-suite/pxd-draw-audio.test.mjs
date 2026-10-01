@@ -181,7 +181,7 @@ test('linked editing rejects sustained legacy notes without normalizing or chang
   assert.deepEqual(readPxdAudioState(project).tracks[0].clips[0].notes[0].durationTicks, 240);
 });
 
-test('shared Audio links the exact main RGBA image and keeps distinct source cells even when rows map to the same pitch', async () => {
+test('shared Audio stores an exact independent audio image and keeps distinct source cells when rows share pitch', async () => {
   const image = { width: 20, height: 18, rgba: new Uint8Array(20 * 18 * 4) };
   image.rgba.set([231, 84, 69, 255], (4 * image.width + 2) * 4);
   image.rgba.set([231, 84, 69, 255], (12 * image.width + 2) * 4);
@@ -192,7 +192,7 @@ test('shared Audio links the exact main RGBA image and keeps distinct source cel
   assert.deepEqual(sounding.map((note) => note.sourceCell), [{ x: 2, y: 4 }, { x: 2, y: 12 }]);
   assert.equal(sounding[0].pitch, sounding[1].pitch);
   assert.equal(sounding[0].startTick, sounding[1].startTick);
-  assert.equal(plan.link.imageRole, 'main');
+  assert.equal(plan.link.imageRole, 'audio');
   assert.equal(plan.link.width, image.width); assert.equal(plan.link.height, image.height);
   assert.deepEqual(plan.link.rowPitchMap, rowPitchMap);
 
@@ -201,12 +201,12 @@ test('shared Audio links the exact main RGBA image and keeps distinct source cel
   const savedImage = await readPxdSharedImage(project);
   assert.equal(savedImage.width, 20); assert.equal(savedImage.height, 18);
   assert.deepEqual(savedImage.rgba, image.rgba);
-  assert.equal(await readPxdImage(project, 'audio'), null);
+  assert.deepEqual((await readPxdImage(project, 'audio')).rgba, image.rgba);
   assert.deepEqual(getPxdJson(project, 'audio/link.json').rowPitchMap, rowPitchMap);
   assert.deepEqual(readPxdAudioState(project).tracks.find((track) => track.instrument === 'triangle').clips[0].notes.map((note) => note.sourceCell), [{ x: 2, y: 4 }, { x: 2, y: 12 }]);
 });
 
-test('Draw sync reprojects changed shared main pixels and leaves new colors silent until mapped', async () => {
+test('Audio sync reprojects changed audio pixels and leaves new colors silent until mapped', async () => {
   const image = { width: 24, height: 12, rgba: new Uint8Array(24 * 12 * 4) };
   image.rgba.set([76, 130, 195, 255], (3 * image.width + 5) * 4);
   const plan = prepareSharedAudioImageImport(createAudioSong({ songId: 'song-shared-sync' }), image, {
@@ -216,16 +216,17 @@ test('Draw sync reprojects changed shared main pixels and leaves new colors sile
   project = await writePxdAudioState(project, plan.song, { image, link: plan.link });
   const after = { ...image, rgba: new Uint8Array(image.rgba) };
   after.rgba.set([17, 34, 51, 255], (3 * image.width + 5) * 4);
-  project = await synchronizeLinkedAudioImage(project, after, 'main');
+  project = await synchronizeLinkedAudioImage(project, after, 'audio');
   const song = readPxdAudioState(project); const link = getPxdJson(project, 'audio/link.json');
-  assert.equal(link.imageRole, 'main'); assert.equal(link.colorToSlot['rgba-112233ff'], null);
+  assert.equal(link.imageRole, 'audio'); assert.equal(link.colorToSlot['rgba-112233ff'], null);
   assert.equal(song.tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes)).some((note) => note.sourceCell?.x === 5 && note.sourceCell?.y === 3), false);
-  assert.deepEqual((await readPxdSharedImage(project)).rgba, after.rgba);
+  assert.deepEqual((await readPxdSharedImage(project)).rgba, image.rgba);
+  assert.deepEqual((await readPxdImage(project, 'audio')).rgba, after.rgba);
   const mapped = assignPxdAudioColor(song, after, link, 'rgba-112233ff', 'triangle');
   assert.ok(mapped.song.tracks.find((track) => track.instrument === 'triangle').clips[0].notes.some((note) => note.sourceCell?.x === 5 && note.sourceCell?.y === 3));
 });
 
-test('Draw sync updates shared link dimensions and remaps notes after a main canvas resize', async () => {
+test('Audio sync updates audio link dimensions and remaps notes after an audio canvas resize', async () => {
   const before = { width: 20, height: 18, rgba: new Uint8Array(20 * 18 * 4) };
   before.rgba.set([76, 130, 195, 255], (3 * before.width + 5) * 4);
   const plan = prepareSharedAudioImageImport(createAudioSong({ songId: 'song-shared-resize' }), before, {
@@ -235,13 +236,14 @@ test('Draw sync updates shared link dimensions and remaps notes after a main can
   project = await writePxdAudioState(project, plan.song, { image: before, link: plan.link });
   const after = { width: 16, height: 9, rgba: new Uint8Array(16 * 9 * 4) };
   after.rgba.set([76, 130, 195, 255], (2 * after.width + 4) * 4);
-  project = await synchronizeLinkedAudioImage(project, after, 'main');
+  project = await synchronizeLinkedAudioImage(project, after, 'audio');
   const link = getPxdJson(project, 'audio/link.json'); const song = readPxdAudioState(project);
   assert.deepEqual([link.width, link.height, link.rowPitchMap.length], [16, 9, 9]);
   assert.deepEqual(link.colorToSlot, { 'rgba-4c82c3ff': 'square' });
   assert.ok(song.tracks.find((track) => track.instrument === 'square').clips[0].notes.some((note) => note.sourceCell?.x === 4 && note.sourceCell?.y === 2));
-  const main = await readPxdSharedImage(project);
-  assert.deepEqual([main.width, main.height], [16, 9]); assert.deepEqual(main.rgba, after.rgba);
+  const audio = await readPxdImage(project, 'audio');
+  assert.deepEqual([audio.width, audio.height], [16, 9]); assert.deepEqual(audio.rgba, after.rgba);
+  assert.deepEqual([...(await readPxdSharedImage(project)).rgba], [...before.rgba]);
 });
 
 test('Audio paints and erases one shared source coordinate while preserving every other image pixel', () => {
@@ -258,4 +260,31 @@ test('Audio paints and erases one shared source coordinate while preserving ever
   assert.deepEqual([...erased.image.rgba.slice((12 * 32 + 9) * 4, (12 * 32 + 9) * 4 + 4)], [0, 0, 0, 0]);
   assert.equal(erased.song.tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes)).some((note) => note.sourceCell?.x === 9 && note.sourceCell?.y === 12), false);
   assert.deepEqual(erased.image.rgba, before);
+});
+
+test('an unassigned shared-image color can paint a visible pixel without creating a note', async () => {
+  const image = { width: 16, height: 16, rgba: new Uint8Array(16 * 16 * 4) };
+  image.rgba.set([224, 91, 47, 255], 0);
+  const plan = prepareSharedAudioImageImport(createAudioSong({ songId: 'silent-color' }), image, {
+    colorToSlot: { 'rgba-e05b2fff': null }
+  });
+  const painted = setSharedAudioCell(plan.song, plan.image, plan.link, { x: 2, y: 3, slotId: null, colorId: 'rgba-e05b2fff' });
+  assert.deepEqual([...painted.image.rgba.slice((3 * 16 + 2) * 4, (3 * 16 + 2) * 4 + 4)], [224, 91, 47, 255]);
+  assert.equal(painted.link.colorToSlot['rgba-e05b2fff'], null);
+  assert.equal(painted.song.tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes)).some((note) => note.sourceCell?.x === 2 && note.sourceCell?.y === 3), false);
+  assert.throws(() => setSharedAudioCell(painted.song, painted.image, painted.link, { x: 4, y: 3, slotId: 'square', colorId: 'rgba-e05b2fff' }), /描く色/);
+  let project = await putPxdSharedImage(createPxdProject({ projectId: 'project-silent-color', revisionId: 'revision-silent-color' }), painted.image);
+  project = await writePxdAudioState(project, painted.song, { image: painted.image, link: painted.link });
+  assert.deepEqual((await readPxdSharedImage(project)).rgba, painted.image.rgba);
+});
+
+test('a newly added silent palette color remains available before it is painted', async () => {
+  const image = { width: 16, height: 16, rgba: new Uint8Array(16 * 16 * 4) };
+  const song = createAudioSong({ songId: 'unused-silent-color' });
+  const added = prepareSharedAudioImageImport(song, image, { colorToSlot: { 'rgba-5e9ed2ff': null } });
+  assert.equal(added.link.colorToSlot['rgba-5e9ed2ff'], null);
+  let project = await putPxdSharedImage(createPxdProject({ projectId: 'project-unused-color', revisionId: 'revision-unused-color' }), image);
+  project = await writePxdAudioState(project, added.song, { image, link: added.link });
+  const reopened = prepareSharedAudioImageImport(readPxdAudioState(project), await readPxdSharedImage(project), { colorToSlot: getPxdJson(project, 'audio/link.json').colorToSlot });
+  assert.equal(reopened.link.colorToSlot['rgba-5e9ed2ff'], null);
 });

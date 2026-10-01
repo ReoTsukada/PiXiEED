@@ -1,12 +1,15 @@
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
-import { createPxdStore } from './pxd-store.mjs?rev=20260930-shared-canvas-5';
-import { createProjectSession } from './project-session.mjs?rev=20260930-shared-canvas-5';
+import { createPxdStore } from './pxd-store.mjs?rev=20261001-components-1';
+import { createProjectSession } from './project-session.mjs?rev=20261001-components-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20260930-shared-canvas-5';
 import { pxdToolUrl, pxdImageRoles, primaryPxdImageRole, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20260930-shared-canvas-5';
 import { hasPass, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs';
+import { componentImageRole, freezeProjectComponents, replaceProjectComponentImage, putProjectComponentImage } from './project-components.mjs?rev=20261001-components-1';
+import { createProjectComponentShelf } from './project-components-ui.mjs?rev=20261001-components-1';
+import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',
@@ -28,7 +31,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const store = createPxdStore(); const main = document.querySelector('#main') || document.querySelector('main');
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20260930-ux-fix-1'; document.head.append(css);
+  let listEpoch = 0; let cardContextCleanups = [];
+  let activeCanvas = null;
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261001-components-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'プロジェクトと制作モード');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
@@ -39,9 +44,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const modeGroup = node('div', 'project-modes'); modeGroup.setAttribute('role', 'group'); modeGroup.setAttribute('aria-label', '同じ作品の制作モード');
   for (const [target, label] of modes) {
     const el = button('', `project-mode-${target}`, () => void transact(async () => {
-      const project = await save(); const roles = pxdImageRoles(project);
-      const role = project.manifest.sharedCanvas ? 'main' : target === 'draw' && tool === 'audio' && roles.includes('audio') ? 'audio' : target === 'draw' && roles.includes('draw') ? 'draw' : primaryPxdImageRole(project);
-      location.assign(pxdToolUrl(target, project, role));
+      const project = await save();
+      location.assign(pxdToolUrl(target, project, componentImageRole(project, target)));
     }));
     el.innerHTML = `${icon(target)}<span>${label}</span>`; el.setAttribute('aria-pressed', String(target === tool)); modeGroup.append(el);
   }
@@ -50,14 +54,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const dialog = node('dialog', 'project-sheet'); dialog.id = 'pxd-panel'; dialog.setAttribute('aria-labelledby', 'project-sheet-title');
   const heading = node('div', 'project-sheet__heading'); const title = node('h2', '', 'プロジェクト'); title.id = 'project-sheet-title';
   const close = button('', 'project-close', () => dialog.close()); close.innerHTML = icon('close'); close.setAttribute('aria-label', 'プロジェクト一覧を閉じる'); heading.append(title, close);
-  const note = node('p', 'project-sheet__note', 'この端末の作品。同じ絵を描く・撮る・作曲・パズルで使えます。');
+  const note = node('p', 'project-sheet__note', 'このブラウザーに保存します。続きはプロジェクト一覧から開けます。');
   const currentRow = node('div', 'project-sheet__current'); const titleLabel = node('label', '', '作品名'); titleLabel.htmlFor = 'project-title';
   const titleInput = node('input'); titleInput.id = 'project-title'; titleInput.maxLength = 60; titleInput.autocomplete = 'off';
   const rename = button('名前を保存', 'project-rename', () => { const name = titleInput.value; void transact(async () => { session.rename(name); await save(); await refreshList(); }, { close: false }); });
   currentRow.append(titleLabel, titleInput, rename);
   const actions = node('div', 'project-sheet__actions');
   const newButton = button('＋ 新規', 'project-new', () => void transact(async () => {
-    if (!initialSelectionPending) await save();
+    if (session.persisted || editedSinceOpen) await save();
     await session.adopt(blankProject(), { persisted: false, apply: true }); resetPointer(); initialSelectionPending = false;
     dialog.close(); say('新しいプロジェクトを作りました。');
   }, { close: false }));
@@ -67,7 +71,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     catch (error) {
       if (error?.code !== 'PXD_STORE_CONFLICT') throw error;
       // Keep this tab's edits as a new project instead of overwriting the other tab.
-      source = await getProject(structuredClone(session.currentProject));
+      source = await getProject(await freezeProjectComponents(structuredClone(session.currentProject)));
       await assertOwnPublicSources([...getPxdPublicSources(source), ...getPublicSources()]);
       source.manifest.editorState = { ...source.manifest.editorState, [tool]: structuredClone(getEditorState()) };
     }
@@ -75,31 +79,31 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     // Apply validates the editable components before this copy becomes active.
     await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別のプロジェクトとして複製しました。');
   }));
-  const saveButton = button('保存', 'pxd-save', () => void transact(async () => { await save(); say('この端末に保存しました。'); await refreshList(); }, { close: false }));
-  actions.append(newButton, duplicate, saveButton);
+  const saveButton = button('プロジェクトを保存', 'pxd-save', () => void transact(async () => { await save(); say('この端末に保存しました。'); await refreshList(); }, { close: false }));
+  actions.append(duplicate, saveButton);
   const message = node('p', 'project-sheet__status'); message.id = 'pxd-file-status'; message.setAttribute('role', 'status');
   const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存したプロジェクト');
-  const files = node('details', 'project-files'); const filesSummary = node('summary', '', 'ファイル'); const fileActions = node('div', 'project-sheet__actions');
+  const trash = node('details', 'project-files project-trash'); const trashSummary = node('summary', '', '削除したプロジェクト');
+  const trashList = node('div', 'project-trash__list'); trash.append(trashSummary, trashList);
+  const files = node('details', 'project-files'); const filesSummary = node('summary', '', 'バックアップ・読み込み'); const fileActions = node('div', 'project-sheet__actions');
+  const filesNote = node('p', 'project-sheet__note project-files__note', '絵・音楽・パズルをまとめた編集用ファイル。別の端末への移動やバックアップに。');
   const input = node('input'); input.type = 'file'; input.accept = '.pxd,application/octet-stream'; input.id = 'pxd-file-input'; input.hidden = true;
-  fileActions.append(button('PXDを開く', 'pxd-open', () => input.click()), button('PXDを書き出す', 'pxd-export', () => void transact(async () => {
+  fileActions.append(button('バックアップを開く（PXD）', 'pxd-open', () => input.click()), button('バックアップを保存（PXD）', 'pxd-export', () => void transact(async () => {
     const project = await save(); download(await encodePxd(project), `${sanitizeProjectTitle(project.manifest.title) || 'pixieed'}.pxd`); say('PXDを書き出しました。');
   })));
+  const linksHeading = node('h3', 'project-sheet__links-heading', 'このプロジェクト');
   const links = node('div', 'project-sheet__actions project-sheet__links');
-  links.setAttribute('role', 'group'); links.setAttribute('aria-label', '同じ作品をほかのツールで使う');
-  for (const [target, label] of modes) {
-    if (target === tool) continue;
-    links.append(button(label, `pxd-to-${target}`, () => void transact(async () => { const project = await save(); location.assign(pxdToolUrl(target, project, primaryPxdImageRole(project))); })));
-  }
+  links.hidden = true;
   const working = button('音楽の絵を描く', 'pxd-to-audio-image', () => void transact(async () => { location.assign(pxdToolUrl('draw', await save(), 'audio')); })); links.append(working);
   const roleLinks = [['spot-after', 'pxd-to-spot-after', '変更後の絵を描く'], ['hidden', 'pxd-to-hidden-image', 'もの探しの絵を描く'], ['draw', 'pxd-to-draw-image', '描画用の絵を開く']].map(([role, id, label]) => {
     const el = button(label, id, () => void transact(async () => { location.assign(pxdToolUrl('draw', await save(), role)); })); links.append(el); return { role, el };
   });
-  const original = button('旧PXDの原本を書き出す', 'pxd-export-original', () => void transact(async () => {
+  const original = button('読み込んだ旧PXDを保存', 'pxd-export-original', () => void transact(async () => {
     const project = await save(); const entry = project.entries.find(({ path }) => path === 'legacy/original.pxd');
     if (!entry) throw new Error('旧PXDの原本が見つかりません。'); download(entry.bytes, 'pixieed-original.pxd');
   })); fileActions.append(original);
   const canvasSettings = node('details', 'project-files project-canvas-settings'); const canvasSummary = node('summary', '', 'キャンバス・色数');
-  const canvasDescription = node('p', 'project-sheet__note', '全ツールで同じサイズと色を使います。通常128px・16色、特典で256px・32色。');
+  const canvasDescription = node('p', 'project-sheet__note', '開いている絵だけを変更します。通常128px・16色、特典で256px・32色。');
   const canvasFields = node('div', 'project-canvas-fields');
   const widthInput = node('input'); const heightInput = node('input');
   for (const [label, field, id] of [['幅', widthInput, 'project-canvas-width'], ['高さ', heightInput, 'project-canvas-height']]) {
@@ -112,26 +116,73 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const width = Number(widthInput.value); const height = Number(heightInput.value); const maxColors = Number(colorsSelect.value);
     if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= 256)) throw new Error('幅と高さは1〜256pxで指定してください。');
     if ((Math.max(width, height) > 128 || maxColors > 16) && !await requestPass({ perk: 'project.canvas-expanded' })) return;
-    const project = await save(); const image = await readPxdSharedImage(project) || await readPxdImage(project, primaryPxdImageRole(project));
+    const project = await freezeProjectComponents(await save());
+    const role = tool === 'draw' ? getEditorState().imageRole || componentImageRole(project, tool) : componentImageRole(project, tool);
+    const image = await readPxdImage(project, role);
     if (!image) throw new Error('先に絵を描くか、画像を読み込んでください。');
     const prepared = prepareSharedCanvasImage(image, { passActive: hasPass(), width, height, maxColors, fit: 'contain' });
     if (prepared.changed) {
       const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20260930-ux-fix-1');
-      if (!await confirmPxdConversion({ image, document: prepared.image, title: '共通キャンバスを確認', applyLabel: 'このサイズ・色を使う', message: `${width}×${height}px・${prepared.colorCount}色に変更します。絵の比率は保ち、余白で収めます。変更前の保存版は保持します。` })) return;
+      if (!await confirmPxdConversion({ image, document: prepared.image, title: 'キャンバスを確認', applyLabel: 'このサイズ・色を使う', message: `${width}×${height}px・${prepared.colorCount}色に変更します。ほかの絵・曲・パズルは変わりません。パズルの絵を変更する場合は正解を再確認してください。` })) return;
     }
-    const { synchronizeLinkedAudioImage } = await import('./pxd-draw-audio.mjs?rev=20260930-audio-timebase-1');
-    const synced = await synchronizeLinkedAudioImage(project, prepared.image, 'main');
-    const candidate = await putPxdSharedImage(synced, prepared.image);
-    await session.replace(candidate, { apply: true }); await save(); say('共通キャンバスを変更しました。');
+    const { synchronizeLinkedAudioImage } = await import('./pxd-draw-audio.mjs?rev=20261001-components-1');
+    const synced = await synchronizeLinkedAudioImage(project, prepared.image, role);
+    const candidate = await putProjectComponentImage(synced, tool, prepared.image, role);
+    await session.replace(candidate, { apply: true }); await save(); say('開いている絵のキャンバスを変更しました。'); await refreshComponents();
   }, { close: false }));
   canvasSettings.append(canvasSummary, canvasDescription, canvasFields, applyCanvas);
-  files.append(filesSummary, fileActions, input); dialog.append(heading, note, currentRow, actions, message, links, canvasSettings, list, files); document.body.append(dialog);
+  const componentNote = node('p', 'project-components-note', '編集するものを選ぶ。ほかの絵や曲はそのまま。');
+  const shelf = createProjectComponentShelf({ tool,
+    onOpen: (target) => void transact(async () => { const project = await save(); location.assign(pxdToolUrl(target, project, componentImageRole(project, target))); }),
+    onEditImage: (target) => void transact(async () => { const project = await save(); location.assign(pxdToolUrl('draw', project, componentImageRole(project, target))); }),
+    onReplace: (target) => void replaceComponent(target)
+  });
+  const tabs = node('div', 'project-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'プロジェクトの操作');
+  const currentPane = node('section', 'project-pane'); currentPane.id = 'project-current-pane';
+  const libraryPane = node('section', 'project-pane'); libraryPane.id = 'project-library-pane';
+  const currentTab = button('この作品', 'project-tab-current', () => selectPane('current'));
+  const libraryTab = button('作品を開く', 'project-tab-library', () => selectPane('library'));
+  for (const [tab, pane] of [[currentTab, currentPane], [libraryTab, libraryPane]]) {
+    tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', pane.id);
+    pane.setAttribute('role', 'tabpanel'); pane.setAttribute('aria-labelledby', tab.id);
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault(); const other = tab === currentTab ? libraryTab : currentTab;
+      selectPane(event.key === 'Home' ? 'current' : event.key === 'End' ? 'library' : other === currentTab ? 'current' : 'library');
+      (currentPane.hidden ? libraryTab : currentTab).focus();
+    });
+  }
+  tabs.append(currentTab, libraryTab);
+  const toolbar = node('div', 'project-sheet__toolbar'); toolbar.append(tabs, newButton);
+  const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存したプロジェクトを作品名で探す');
+  const count = node('p', 'project-library-count'); count.setAttribute('role', 'status');
+  const noMatches = node('p', 'project-list__empty', 'この名前の作品は見つかりません。'); noMatches.hidden = true;
+  function filterList() {
+    const query = search.value.trim().normalize('NFKC').toLocaleLowerCase('ja-JP'); let visible = 0;
+    const rows = [...list.querySelectorAll('.project-list__row')];
+    for (const row of rows) { row.hidden = Boolean(query && !row.dataset.name.includes(query)); if (!row.hidden) visible++; }
+    noMatches.hidden = !rows.length || visible > 0;
+    count.textContent = rows.length ? `${query ? `${visible} / ${rows.length}` : rows.length}作品 · 最近保存した順` : '';
+    libraryTab.textContent = rows.length ? `作品を開く · ${rows.length}` : '作品を開く';
+  }
+  search.addEventListener('input', filterList);
+  function selectPane(name) {
+    const current = name === 'current'; currentPane.hidden = !current; libraryPane.hidden = current;
+    currentTab.setAttribute('aria-selected', String(current)); libraryTab.setAttribute('aria-selected', String(!current));
+    currentTab.tabIndex = current ? 0 : -1; libraryTab.tabIndex = current ? -1 : 0;
+    dialog.scrollTop = 0;
+  }
+  const header = node('div', 'project-sheet__header'); header.append(heading, toolbar);
+  currentPane.append(currentRow, actions, linksHeading, componentNote, shelf.element, links, canvasSettings);
+  libraryPane.append(search, count, list, noMatches, trash);
+  files.append(filesSummary, filesNote, fileActions, input);
+  dialog.append(header, message, currentPane, libraryPane, files, note); selectPane('library'); document.body.append(dialog);
   dialog.addEventListener('close', () => { canvasSettings.open = false; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
   onPassChange(() => update());
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
-    capture(base) {
-      const state = structuredClone(getEditorState()); const captured = getProject(base);
+    async capture(base) {
+      const state = structuredClone(getEditorState()); const safe = await freezeProjectComponents(base); const captured = getProject(safe);
       return Promise.resolve(captured).then((candidate) => {
         candidate.manifest = { ...candidate.manifest, lastMode: tool, editorState: { ...candidate.manifest.editorState, [tool]: state } }; return candidate;
       });
@@ -140,7 +191,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       await assertOwnPublicSources(getPxdPublicSources(project));
       const previousState = structuredClone(getEditorState());
       const previous = session.currentProject ? await getProject(structuredClone(session.currentProject)) : null;
-      try { await openProject(project); restoreEditorState(project.manifest.editorState?.[tool]); }
+      try {
+        await openProject(await freezeProjectComponents(project)); restoreEditorState(project.manifest.editorState?.[tool]);
+        const role = tool === 'draw' ? getEditorState().imageRole || componentImageRole(project, tool) : componentImageRole(project, tool);
+        activeCanvas = await readPxdImage(project, role);
+      }
       catch (error) {
         // A renderer failure after assignment must restore the old content too,
         // not only the coordinator's project ID.
@@ -158,7 +213,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const project = session?.currentProject;
     dialog.dataset.startup = String(initialSelectionPending);
     title.textContent = initialSelectionPending ? 'プロジェクトを選ぶ' : 'プロジェクト';
-    note.textContent = initialSelectionPending ? '保存した作品を開くか、新しい作品を始めてください。' : 'この端末の作品。同じ絵を描く・撮る・作曲・パズルで使えます。';
+    note.textContent = initialSelectionPending ? '保存した作品を開くか、新しい作品を始めてください。' : 'このブラウザーに保存します。続きはプロジェクト一覧から開けます。';
     newButton.textContent = initialSelectionPending ? '＋ 新しい作品' : '＋ 新規';
     bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true' || getPublicSources().length > 0;
     const name = initialized ? sanitizeProjectTitle(project?.manifest.title) : '開いています…';
@@ -168,15 +223,16 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     launcher.setAttribute('aria-label', `${name}・${state}。プロジェクトを開く`); launcher.title = `${name} · ${state}`;
     for (const el of bar.querySelectorAll('button')) el.disabled = locked || el.getAttribute('aria-pressed') === 'true';
     for (const el of dialog.querySelectorAll('button')) el.disabled = locked;
+    shelf.setBusy(locked);
     if (!titleInput.matches(':focus')) titleInput.value = name;
     working.hidden = !project || Boolean(project.manifest.sharedCanvas) || !pxdImageRoles(project).includes('audio');
     for (const { role, el } of roleLinks) el.hidden = !project || Boolean(project.manifest.sharedCanvas) || !pxdImageRoles(project).includes(role);
     original.hidden = !project?.entries.some(({ path }) => path === 'legacy/original.pxd');
-    const shared = project?.manifest.sharedCanvas;
-    if (!canvasSettings.open) { widthInput.value = String(shared?.width || 16); heightInput.value = String(shared?.height || 16); colorsSelect.value = String(shared?.colorCount > 16 ? 32 : 16); }
+    const shared = activeCanvas || project?.manifest.sharedCanvas;
+    if (!canvasSettings.open) { widthInput.value = String(shared?.width || 16); heightInput.value = String(shared?.height || 16); colorsSelect.value = String((shared?.colorCount ?? shared?.colors?.length ?? 0) > 16 ? 32 : 16); }
     if (shared) {
       const policy = evaluateSharedCanvasPolicy(shared, { passActive: hasPass() });
-      canvasDescription.textContent = `${shared.width}×${shared.height}px・${shared.colorCount}色。${!policy.supported ? '表示・保存できます。編集するには共通上限内に合わせてください。' : policy.locked ? '特典時間を追加すると編集・新しい再生を再開できます。保存はいつでもできます。' : '同じ絵をすべての制作ツールで使います。'}`;
+      canvasDescription.textContent = '開いている絵だけを変更します。通常128px・16色、特典で256px・32色。';
     }
   }
   async function save() {
@@ -186,7 +242,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (project.projectId !== session.currentProject?.projectId) throw new Error('保存中に作品が切り替わりました。今の作品の保存先は変更していません。');
       failed = false; remember(project); update(); return project;
     }
-    catch (error) { failed = true; update(); throw error; }
+    catch (error) { failed = true; operationError = error.message || '保存できませんでした。編集内容は残っています。'; say(operationError); update(); throw error; }
   }
   function remember(project) {
     failed = false;
@@ -204,18 +260,20 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     finally { locked = false; main.inert = false; main.setAttribute('aria-busy', 'false'); update(); }
   }
   async function refreshList() {
+    const version = ++listEpoch;
+    for (const cleanup of cardContextCleanups) cleanup(); cardContextCleanups = [];
     list.replaceChildren(node('p', '', '作品を読み込んでいます…'));
     try {
-      const { projects, errors } = await store.listProjects(); list.replaceChildren();
+      const { projects, errors } = await store.listProjects(); if (version !== listEpoch) return; list.replaceChildren();
       if (!projects.length) list.append(node('p', 'project-list__empty', 'まだ保存した作品はありません。描き始めると自動で保存されます。'));
       for (const item of projects) {
-        const card = button('', `project-${item.projectId}`, () => void transact(async () => {
+        const openCard = () => void transact(async () => {
           let keptCopy = false;
-          if (!initialSelectionPending) {
+          if (session.persisted || editedSinceOpen) {
             try { await save(); }
             catch (error) {
               if (error?.code !== 'PXD_STORE_CONFLICT') throw error;
-              const source = await getProject(structuredClone(session.currentProject));
+              const source = await getProject(await freezeProjectComponents(structuredClone(session.currentProject)));
               await assertOwnPublicSources([...getPxdPublicSources(source), ...getPublicSources()]);
               source.manifest.editorState = { ...source.manifest.editorState, [tool]: structuredClone(getEditorState()) };
               const copy = forkProject(source, { title: `${source.manifest.title || '作品'}・別タブの編集` });
@@ -226,7 +284,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
           await session.adopt(project, { persisted: true, apply: true }); resetPointer(); remember(session.currentProject);
           initialSelectionPending = false; dialog.close();
           say(keptCopy ? 'このタブの編集は別のプロジェクトに保存し、選んだ作品を開きました。' : 'プロジェクトを開きました。');
-        }, { close: false }));
+        }, { close: false });
+        const card = button('', `project-${item.projectId}`, openCard);
         card.className = 'project-card'; card.dataset.projectId = item.projectId; card.setAttribute('aria-current', String(item.projectId === session.currentProject?.projectId));
         const sample = item.summary.thumbnail; const canvas = node('canvas'); canvas.width = sample?.width || 28; canvas.height = sample?.height || 28; canvas.setAttribute('aria-hidden', 'true');
         if (sample) { const pixels = new Uint8ClampedArray(sample.width * sample.height * 4); for (let i = 0; i < sample.width * sample.height; i++) { pixels.set(sample.rgb.slice(i * 3, i * 3 + 3), i * 4); pixels[i * 4 + 3] = 255; } canvas.getContext('2d').putImageData(new ImageData(pixels, sample.width, sample.height), 0, 0); }
@@ -234,28 +293,127 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         const lastMode = modes.find(([mode]) => mode === item.summary.lastMode)?.[1];
         info.append(node('span', '', [item.summary.width && `${item.summary.width} × ${item.summary.height}`, lastMode && `前回: ${lastMode}`, item.summary.hasAudio ? '音楽あり' : 'ドット絵'].filter(Boolean).join(' · ')));
         const date = item.updatedAt ? new Date(item.updatedAt) : null; info.append(node('time', '', date && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '保存した作品'));
-        card.append(canvas, info); list.append(card);
+        const row = node('div', 'project-list__row'); row.dataset.name = (item.summary.name || '無題の作品').normalize('NFKC').toLocaleLowerCase('ja-JP');
+        const remove = button('', `project-delete-${item.projectId}`, () => void deleteProject(item));
+        remove.className = 'project-card__delete'; remove.setAttribute('aria-label', `${item.summary.name || '無題の作品'}をプロジェクトごと削除`);
+        remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';
+        card.append(canvas, info); row.append(card, remove); list.append(row);
+        cardContextCleanups.push(bindContextAction(card, () => showCardActions(item, card, openCard)));
+        card.addEventListener('keydown', (event) => {
+          if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+          event.preventDefault(); showCardActions(item, card, openCard);
+        });
       }
+      filterList();
       if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
-    } catch (error) { list.replaceChildren(node('p', '', '作品一覧を読み出せませんでした。保存内容は変更していません。')); say(error.message); }
+    } catch (error) { if (version !== listEpoch) return; list.replaceChildren(node('p', '', '作品一覧を読み出せませんでした。保存内容は変更していません。')); say(error.message); }
+  }
+  async function confirmDelete(name) {
+    const confirmation = node('dialog', 'project-delete-dialog'); confirmation.setAttribute('aria-labelledby', 'project-delete-title');
+    const heading = node('h2', '', 'プロジェクトを削除しますか？'); heading.id = 'project-delete-title';
+    const text = node('p', '', `「${name}」の絵・曲・パズルをまとめて削除します。削除したプロジェクトから戻せます。公開済みの投稿は残ります。`);
+    const controls = node('div', 'project-sheet__actions');
+    return new Promise((resolve) => {
+      let finished = false;
+      const finish = (value) => { if (finished) return; finished = true; confirmation.close(); confirmation.remove(); resolve(value); };
+      controls.append(button('やめる', 'project-delete-cancel', () => finish(false)), button('削除する', 'project-delete-confirm', () => finish(true)));
+      confirmation.append(heading, text, controls); document.body.append(confirmation);
+      confirmation.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); }); confirmation.showModal();
+    });
+  }
+  function showCardActions(item, card, openCard) {
+    if (locked || document.querySelector('.project-card-actions')) return false;
+    const sheet = node('dialog', 'project-delete-dialog project-card-actions');
+    sheet.setAttribute('aria-labelledby', 'project-card-actions-title');
+    const title = node('h2', '', item.summary.name || '無題の作品'); title.id = 'project-card-actions-title';
+    const preview = node('div', 'project-card-actions__preview');
+    const source = card.querySelector('canvas');
+    if (source) { const canvas = node('canvas'); canvas.width = source.width; canvas.height = source.height; canvas.getContext('2d').drawImage(source, 0, 0); preview.append(canvas); }
+    const controls = node('div', 'project-card-actions__controls');
+    const close = () => { sheet.close(); sheet.remove(); card.focus(); };
+    const open = button('開く', 'project-card-actions-open', () => { close(); openCard(); });
+    open.innerHTML = `${icon('folder')}<span>続きを開く</span>`;
+    const copy = button('複製', 'project-card-actions-copy', () => {
+      close(); void transact(async () => {
+        if (session.persisted || editedSinceOpen) await save();
+        const original = await store.load(item.projectId); if (!original) throw new Error('このプロジェクトは削除されたか、保存先に見つかりません。');
+        const project = forkProject(original, { title: `${original.manifest.title || '作品'} のコピー` });
+        await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別のプロジェクトとして複製しました。');
+      });
+    });
+    const remove = button('削除', 'project-card-actions-delete', () => { close(); void deleteProject(item); });
+    remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>プロジェクトを削除</span>';
+    controls.append(open, copy, remove, button('閉じる', 'project-card-actions-close', close));
+    sheet.append(preview, title, controls); document.body.append(sheet);
+    sheet.addEventListener('cancel', (event) => { event.preventDefault(); close(); }); sheet.showModal();
+  }
+  async function deleteProject(item) {
+    await transact(async () => {
+      if (!await confirmDelete(item.summary.name || '無題の作品')) return;
+      const current = item.projectId === session.currentProject?.projectId;
+      const selected = current ? await save() : item;
+      await store.deleteProject(item.projectId, { expectedRevisionId: selected.revisionId });
+      if (current) {
+        await session.adopt(blankProject(), { persisted: false, apply: true }); resetPointer(); initialSelectionPending = false;
+      }
+      await Promise.all([refreshList(), refreshTrash(), refreshComponents()]); say('プロジェクトを削除しました。削除したプロジェクトから戻せます。');
+    }, { close: false });
+  }
+  async function refreshTrash() {
+    const { projects } = await store.listProjects({ includeDeleted: true });
+    const deleted = projects.filter((item) => item.deletedAt); trash.hidden = !deleted.length; trashList.replaceChildren();
+    for (const item of deleted) {
+      const row = node('div', 'project-trash__row'); const label = node('span', '', item.summary.name || '無題の作品');
+      row.append(label, button('戻す', `project-restore-${item.projectId}`, () => void transact(async () => {
+        await store.restoreProject(item.projectId, { expectedRevisionId: item.revisionId });
+        await Promise.all([refreshList(), refreshTrash()]); say('プロジェクトを戻しました。カードから続きを開けます。');
+      }, { close: false }))); trashList.append(row);
+    }
   }
   async function showProjects() {
     if (locked) return; modePicker.open = false; for (const el of main.querySelectorAll('details[open]')) el.open = false;
-    if (!dialog.open) dialog.showModal(); update();
+    if (!dialog.open) { selectPane(session.persisted || editedSinceOpen ? 'current' : 'library'); dialog.showModal(); } update();
     if (!session.currentProject?.manifest.sharedCanvas) {
       const image = await readPxdSharedImage(session.currentProject);
       if (image) { widthInput.value = String(Math.min(256, image.width)); heightInput.value = String(Math.min(256, image.height)); }
     }
-    message.textContent = operationError || '作品ごとに独立した保存先を使います。'; await refreshList();
+    message.textContent = operationError || ''; await Promise.all([refreshList(), refreshComponents(), refreshTrash()]);
+  }
+  async function refreshComponents() {
+    shelf.element.hidden = componentNote.hidden = initialSelectionPending;
+    if (!initialSelectionPending) {
+      try {
+        const project = await freezeProjectComponents(await getProject(await freezeProjectComponents(structuredClone(session.currentProject))));
+        await shelf.refresh(project);
+        if (!canvasSettings.open) {
+          const role = tool === 'draw' ? getEditorState().imageRole || componentImageRole(project, tool) : componentImageRole(project, tool);
+          const image = await readPxdImage(project, role);
+          activeCanvas = image;
+          if (image) { widthInput.value = String(image.width); heightInput.value = String(image.height); colorsSelect.value = String((image.colorCount ?? image.colors?.length ?? 0) > 16 ? 32 : 16); }
+        }
+      } catch (error) { say(error.message); }
+    }
+  }
+  async function replaceComponent(target) {
+    await transact(async () => {
+      const project = await save(); const source = await readPxdImage(project, componentImageRole(project, 'draw'));
+      const before = await readPxdImage(project, componentImageRole(project, target));
+      if (!source || !before) throw new Error('使う絵を確認できません。');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-components-1');
+      const message = target === 'audio' ? 'プロジェクトの絵で音符を作り直します。テンポと楽器の設定は残します。ほかの作品と公開済みの作品は変わりません。' : 'プロジェクトの絵で作り直します。正解やピースの配置はリセットされます。公開済みの作品は変わりません。';
+      if (!await confirmPxdConversion({ image: before, document: source, title: 'この絵を使いますか？', applyLabel: '絵を差し替える', message })) return;
+      const candidate = await replaceProjectComponentImage(project, target, source);
+      await session.replace(candidate, { apply: true }); await save(); await refreshComponents(); say('選んだ作品の絵を差し替えました。');
+    }, { close: false });
   }
   input.addEventListener('change', () => { const file = input.files?.[0]; input.value = ''; if (!file) return; void transact(async () => {
     if (file.size > 64 * 1024 * 1024) throw new Error('PXDは64MBまで読み込めます。');
-    const original = await decodePxd(new Uint8Array(await file.arrayBuffer())); if (!initialSelectionPending) await save();
+    const original = await decodePxd(new Uint8Array(await file.arrayBuffer())); if (session.persisted || editedSinceOpen) await save();
     const project = forkProject(original); project.manifest.importedFrom = { projectId: original.projectId };
     await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); initialSelectionPending = false; dialog.close(); say('PXDを別のプロジェクトとして開きました。');
   }, { close: false }); });
   const ready = (async () => {
-    await session.initialize(blankProject(), { persisted: false, apply: false }); main.inert = true;
+    await session.initialize(blankProject(), { persisted: false, apply: tool !== 'camera' }); main.inert = true;
     try {
       const params = new URLSearchParams(location.search); let pointer;
       if (tool !== 'camera' && history.state?.projectWorkspaceSelection && params.has('pxd')) resetPointer();
@@ -266,9 +424,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (pointer) { const project = await store.load(pointer.projectId, pointer.revisionId); if (!project) throw new Error('指定した作品をこの端末で見つけられません。プロジェクト一覧またはPXDから開いてください。'); await session.adopt(project, { persisted: true, apply: true }); remember(project); say('プロジェクトを開きました。'); }
     } catch (error) { operationError = error.message; say(operationError); }
     finally {
-      initialSelectionPending = tool !== 'camera' && !new URLSearchParams(location.search).has('camera') && !session.persisted;
+      initialSelectionPending = false;
       locked = false; initialized = true; main.inert = false; main.setAttribute('aria-busy', 'false'); update();
-      if (initialSelectionPending) void showProjects();
     }
     return session.persisted;
   })();

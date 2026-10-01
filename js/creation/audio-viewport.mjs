@@ -1,4 +1,5 @@
 /** Viewing transforms never resample notes or change the logical dot canvas. */
+import { wheelZoomFactor } from './viewport-wheel.mjs';
 export function audioViewportGeometry({ width, height, hostWidth, hostHeight, zoom = 1, x = 0, y = 0 }) {
   const base = Math.max(1, Math.floor(Math.min((hostWidth - 12) / width, (hostHeight - 12) / height)));
   const cell = Math.max(1, Math.floor(base * Math.max(1, Math.min(16, zoom))));
@@ -49,7 +50,7 @@ export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, on
   };
   for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, end, { capture: true });
   host.addEventListener('wheel', (event) => {
-    event.preventDefault(); const next = Math.max(1, Math.min(16, zoom * Math.exp(-event.deltaY * .006)));
+    event.preventDefault(); const next = Math.max(1, Math.min(16, zoom * wheelZoomFactor(event.deltaY, event.deltaMode, host.clientHeight)));
     const ratio = next / zoom, bounds = host.getBoundingClientRect();
     x = x * ratio + (1 - ratio) * (event.clientX - bounds.left - bounds.width / 2);
     y = y * ratio + (1 - ratio) * (event.clientY - bounds.top - bounds.height / 2);

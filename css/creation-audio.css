@@ -38,6 +38,8 @@
 .audio-palette-row{display:grid;grid-template-columns:26px 44px minmax(0,1fr);align-items:center;gap:8px;min-width:0;font-size:.72rem}
 .audio-palette-row input[type=color]{width:44px;height:44px;padding:3px;border:1px solid #193b4a26;border-radius:10px;background:#fff}.audio-palette-row select{min-width:0;width:100%;padding:4px 6px;font-size:.78rem}
 .audio-perk-button{width:100%;margin-top:12px;background:#f3db912e!important;font-weight:700!important;font-size:.8rem!important}
+.audio-instrument-legend{margin:0 0 8px;color:#57707a;font-size:.75rem;line-height:1.4}
+.audio-palette-close{position:sticky;top:0;float:right;z-index:1;width:44px;height:44px;min-width:44px;min-height:44px;padding:0!important;font-size:1.5rem!important;line-height:1!important}
 .audio-tempo{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-size:.84rem}.audio-tempo output{font-variant-numeric:tabular-nums;font-weight:800}.audio-tempo input{grid-column:1/-1;width:100%;min-height:44px;accent-color:#ce654d}
 .audio-size-label{display:block;margin:12px 0 8px;font-weight:700}#audio-canvas-size{width:100%;padding:7px 12px}.audio-setting-note{margin:10px 0 0;font-size:.74rem;color:#57707a}
 .audio-tools .px-pass-chip{padding:0 6px;font-size:.65rem}.audio-tool-body .app-tabs button{touch-action:manipulation}

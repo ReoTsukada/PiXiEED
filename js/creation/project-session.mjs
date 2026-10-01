@@ -65,7 +65,8 @@ export function createProjectSession({ store, capture, apply = async () => {}, b
         if (typeof store.load === 'function') {
           const latest = await store.load(boundId);
           if (epoch !== boundEpoch || current?.projectId !== boundId) throw sessionError('PROJECT_SESSION_STALE');
-          if (!latest || latest.revisionId !== saved.revisionId) {
+          if (!latest) throw Object.assign(new Error('このプロジェクトは削除されたか、保存先に見つかりません。編集内容は残っています。プロジェクト一覧から確認してください。'), { code: 'PXD_PROJECT_UNAVAILABLE' });
+          if (latest.revisionId !== saved.revisionId) {
             throw Object.assign(new Error('別のタブで更新されています。編集中の内容は残っています。複製して保存するか最新の作品を開いてください。'), { code: 'PXD_STORE_CONFLICT' });
           }
         }

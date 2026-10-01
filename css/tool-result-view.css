@@ -34,9 +34,7 @@ body[data-tool-result-open] :is(.audio-header-actions,.lc-zoom-stops,#cameraCont
 }
 .px-tool-result .px-display-ad { box-sizing: border-box; align-self: stretch; width: 100%; height: var(--px-display-ad-reserved-height,145px); min-height: var(--px-display-ad-reserved-height,145px); margin: 0; }
 .px-tool-result :is(button,a):focus-visible { outline: 3px solid #357bb3; outline-offset: 3px; }
-.app-tabs button[data-tool-result-return] > :not(.px-tool-result__nav-label) { display: none !important; }
-.app-tabs button[data-tool-result-return] { font-size: 0 !important; }
-.app-tabs .px-tool-result__nav-label { font: 750 13px/1 system-ui,-apple-system,sans-serif; }
+.app-tabs .px-tool-result__nav-icon { display: block; place-self: center; width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 body[data-tool-result-open] footer { display: none; }
 body[data-tool-result-open] > .site-header { display: block !important; }
 

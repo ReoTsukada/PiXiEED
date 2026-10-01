@@ -31,7 +31,7 @@ test('each photo starts a separate project and its exact colors reach Draw and M
   assert.equal(Object.keys(music.link.colorToSlot)[0], 'rgba-1464b4ff');
 });
 
-test('one shared PXD image flows Draw → Music → Hidden/Jigsaw/Spot without image copies', async () => {
+test('one project keeps Draw, Music and puzzle images isolated with exact pixels and colors', async () => {
   let revision = 0;
   const store = createPxdStore({ adapter: createMemoryPxdAdapter(), idFactory: (id) => `integration-${id}-${++revision}` });
   const editor = { draw: null, song: null, audioImage: null, audioLink: null };
@@ -65,7 +65,7 @@ test('one shared PXD image flows Draw → Music → Hidden/Jigsaw/Spot without i
   assert.deepEqual((await readPxdSharedImage(head)).rgba, targetPixels);
   assert.deepEqual(head.entries.filter(({ path }) => path.endsWith('/pixels.rgba')).map(({ path }) => path), ['images/main/pixels.rgba']);
 
-  // Music derives notes from the same main bytes; its link/state contain no image payload.
+  // Music starts with exact source bytes, then owns its working image.
   const sharedImage = await readPxdSharedImage(head);
   const plan = prepareSharedAudioImageImport(createAudioSong({ songId: 'shared-song' }), sharedImage);
   editor.song = setAudioTempo(plan.song, 60);
@@ -73,13 +73,13 @@ test('one shared PXD image flows Draw → Music → Hidden/Jigsaw/Spot without i
   editor.audioImage = sharedImage; editor.audioLink = plan.link;
   await session.save(); head = await store.load('shared-integration');
   const audioLink = readPxdAudioLink(head);
-  assert.equal(audioLink.imageRole, 'main'); assert.equal(audioLink.rulesVersion, 'shared-canvas-v1');
+  assert.equal(audioLink.imageRole, 'audio'); assert.equal(audioLink.rulesVersion, 'shared-canvas-v1');
   assert.equal(readPxdAudioState(head).tempo, 60);
   assert.equal(readPxdAudioState(head).pixelPalette.find(({ slotId }) => slotId === 'square').instrument, 'warm-pad');
   validatePxdAudioBinding(readPxdAudioState(head), await readPxdSharedImage(head), audioLink);
-  assert.equal(head.entries.some(({ path }) => path.startsWith('images/audio/')), false);
+  assert.deepEqual((await readPxdImage(head, 'audio')).rgba, sharedImage.rgba);
 
-  // Puzzle roles point at main; only Spot's intentional before snapshot is stored separately.
+  // Each puzzle keeps the exact source it was created with.
   const draw = await readPxdDrawDocument(head, 'main'); const ref = sourceRef('shared');
   const hiddenDocument = createHiddenObjectDraft({ gameId: 'shared-hidden', source: ref, width: 32, height: 16, targets: [] });
   head = await writePxdPuzzle(head, { tool: 'hidden_object', document: hiddenDocument, sourceDrawDocuments: { hidden: draw } });
@@ -98,9 +98,9 @@ test('one shared PXD image flows Draw → Music → Hidden/Jigsaw/Spot without i
     assert.deepEqual(result.images[role].rgba, canonical.rgba);
     assert.deepEqual(result.images[role].drawDocument && documentRgba(result.images[role].drawDocument), canonical.rgba);
   }
-  assert.equal(reopened.entries.some(({ path }) => path.startsWith('images/hidden/')), false);
-  assert.equal(reopened.entries.some(({ path }) => path.startsWith('images/jigsaw-main/')), false);
-  assert.equal(reopened.entries.some(({ path }) => path.startsWith('images/spot-after/')), false);
+  assert.equal(reopened.entries.some(({ path }) => path.startsWith('images/hidden/')), true);
+  assert.equal(reopened.entries.some(({ path }) => path.startsWith('images/jigsaw-main/')), true);
+  assert.equal(reopened.entries.some(({ path }) => path.startsWith('images/spot-after/')), true);
   assert.equal(reopened.entries.some(({ path }) => path === 'images/spot-before/pixels.rgba'), true);
   assert.equal((await readPxdImage(reopened, 'main')).rgba.length, canonical.rgba.length);
   assert.deepEqual(reopened.entries.find(({ path }) => path === 'future/opaque.json').bytes, new TextEncoder().encode('{"keep":true}'));

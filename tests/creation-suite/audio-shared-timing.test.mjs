@@ -49,7 +49,7 @@ test('an older compressed shared song is re-timed without changing its picture o
   validatePxdAudioBinding(opened.song, before, opened.link);
 
   const wider = image(64, [24, 40]);
-  const synchronized = await synchronizeLinkedAudioImage(project, wider);
+  const synchronized = await synchronizeLinkedAudioImage(project, wider, 'audio');
   const synchronizedSong = readPxdAudioState(synchronized);
   assert.equal(synchronizedSong.loopTicks, 7680);
   assert.deepEqual(notes(synchronizedSong).map((note) => note.startTick), [24 * 120, 40 * 120]);

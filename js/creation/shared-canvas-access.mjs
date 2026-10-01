@@ -1,10 +1,14 @@
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { hasPass, requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
+import { getPxdJson } from './pxd-codec.mjs';
 
 let pending = false;
 /** Check at the start of an edit; saving and already-started finite jobs never use this guard. */
-export function requireSharedCanvasAccess(project, notify = () => {}) {
-  const canvas = project?.manifest?.sharedCanvas;
+export function requireSharedCanvasAccess(project, notify = () => {}, tool = '') {
+  const role = { hidden_object: 'hidden', spot_difference: 'spot-after' }[tool];
+  const path = role && `images/${role}/meta.json`;
+  const meta = path && project?.entries?.some((entry) => entry.path === path) ? getPxdJson(project, path) : null;
+  const canvas = meta ? { width: meta.width, height: meta.height, colorCount: meta.colorCount ?? meta.colors?.length } : project?.manifest?.sharedCanvas;
   if (!canvas) return true;
   const policy = evaluateSharedCanvasPolicy(canvas, { passActive: hasPass() });
   if (policy.supported && !policy.locked) return true;

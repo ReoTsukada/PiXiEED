@@ -8,7 +8,7 @@ import { confirmDifferenceCandidates, detectDifferenceCandidates } from '../../j
 import { confirmHiddenObjectTargets, createHiddenObjectDraft, resolveLocalDrawRevision as resolveHiddenRevision } from '../../js/creation/hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { resolveLocalDrawRevision as resolveSpotRevision } from '../../js/creation/spot-difference-core.mjs?rev=20260927-spot-difference-1';
 import { createJigsawLayout, createJigsawWorkspace } from '../../js/creation/jigsaw-workspace.mjs?rev=20260928-jigsaw-workspace-1';
-import { createPxdPuzzleFromMain, materializePxdPuzzle, readPxdPuzzle, writePxdPuzzle } from '../../js/creation/pxd-puzzles.mjs';
+import { createPxdPuzzleFromMain, freezePxdPuzzleImages, materializePxdPuzzle, readPxdPuzzle, writePxdPuzzle } from '../../js/creation/pxd-puzzles.mjs';
 
 const hash = (char) => char.repeat(64);
 function sourceRef(revisionId, contentHash) { return { draftId: 'source-draft', assetId: 'source-asset', revisionId, contentHash, hashScheme: 'sha256-canonical-v1' }; }
@@ -114,7 +114,7 @@ test('own Jigsaw file stores one exact RGBA image and rebuilds the existing file
   assert.equal(result.document.source.fingerprint, hash('f'));
 });
 
-test('source image edits invalidate Spot confirmation and Hidden answer, while wrong dimensions fail closed', async () => {
+test('source image edits invalidate Spot confirmation and Hidden answer, while changed dimensions reset puzzle state', async () => {
   const spot = fixtureSpot();
   const changedAfter = structuredClone(spot.after); changedAfter.palette.push('#f2b84b'); strokePixels(changedAfter, { x: 8, y: 8 }, { x: 8, y: 8 }, changedAfter.palette.length - 1);
   const spotProject = await writePxdPuzzle(null, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': spot.after } });
@@ -133,11 +133,29 @@ test('source image edits invalidate Spot confirmation and Hidden answer, while w
   assert.deepEqual(hiddenResult.document.targets, hidden.document.targets);
 
   const wrongSize = structuredClone(spot.after); wrongSize.width = 32; wrongSize.height = 32; wrongSize.pixels = Array(1024).fill(-1);
-  const invalid = await writePxdPuzzle(spotProject, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': wrongSize } });
+  const invalid = await writePxdPuzzle(spotProject, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': wrongSize }, sourceChanged: false });
   const invalidRead = await readPxdPuzzle(invalid, 'spot_difference');
   let writes = 0;
   await assert.rejects(() => materializePxdPuzzle(invalidRead, { tool: 'spot_difference', store: { save: async () => { writes += 1; } } }), /サイズ/);
-  assert.equal(writes, 0, 'invalid dimensions are rejected before local draft writes');
+  assert.equal(writes, 0);
+  const resizedProject = await writePxdPuzzle(spotProject, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': wrongSize }, sourceChanged: true });
+  const resized = await materializePxdPuzzle(await readPxdPuzzle(resizedProject, 'spot_difference'), { tool: 'spot_difference', store: storeFor() });
+  assert.equal(resized.document.width, 32); assert.equal(resized.document.height, 32);
+  assert.equal(resized.document.confirmed, false); assert.deepEqual(resized.document.candidates, []);
+});
+
+test('editing an owned Jigsaw image invalidates and rebuilds only that Jigsaw layout', async () => {
+  const { document: source, game } = fixtureJigsaw();
+  let project = await writePxdPuzzle(null, { tool: 'jigsaw', document: game, sourceDrawDocuments: { 'jigsaw-main': source } });
+  const spot = fixtureSpot();
+  project = await writePxdPuzzle(project, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': spot.after } });
+  const changed = drawDocument('#27336b');
+  project = await putPxdDrawDocument(project, changed, 'jigsaw-main');
+  const loadedJigsaw = await readPxdPuzzle(project, 'jigsaw');
+  assert.equal(loadedJigsaw.sourceChanged, true);
+  const rebuilt = await materializePxdPuzzle(loadedJigsaw, { tool: 'jigsaw', store: storeFor() });
+  assert.equal(rebuilt.document.groups.every((group) => group.inTray && group.x === 0 && group.y === 0 && group.pieceIds.length === 1), true);
+  assert.equal((await readPxdPuzzle(project, 'spot_difference')).sourceChanged, false);
 });
 
 test('PXD public Jigsaw must not import unless current publication is revalidated', async () => {
@@ -180,6 +198,35 @@ test('audio-only PXD selects its existing image role as the primary local puzzle
   assert.equal(project.entries.some((entry) => entry.path === 'puzzles/hidden_object.json'), false, 'opening a tool does not mutate the imported project');
 });
 
+test('new puzzle components honor an explicit existing PXD image role instead of falling back to main', async () => {
+  const main = drawDocument('#e75445');
+  let project = await putPxdDrawDocument(createPxdProject(), main, 'main');
+  const cases = [
+    { tool: 'jigsaw', role: 'jigsaw-main', color: '#3d83c7' },
+    { tool: 'spot_difference', role: 'spot-after', color: '#58a66d' },
+    { tool: 'hidden_object', role: 'hidden', color: '#a05bb8' }
+  ];
+  const selected = new Map();
+  for (const item of cases) {
+    const image = drawDocument(item.color);
+    selected.set(item.role, image);
+    project = await putPxdDrawDocument(project, image, item.role);
+  }
+  for (const item of cases) {
+    const imported = await createPxdPuzzleFromMain(project, { tool: item.tool, store: storeFor(), preferredRole: item.role });
+    const fixed = item.tool === 'spot_difference' ? imported.bindings.before.drawDocument : imported.bindings.source.drawDocument;
+    assert.deepEqual(documentRgba(fixed), documentRgba(selected.get(item.role)), `${item.tool} uses ${item.role}`);
+  }
+  await assert.rejects(
+    () => createPxdPuzzleFromMain(project, { tool: 'hidden_object', store: storeFor(), preferredRole: 'absent-role' }),
+    /画像部品|画像|role|PXD/i
+  );
+  await assert.rejects(
+    () => createPxdPuzzleFromMain(project, { tool: 'hidden_object', store: storeFor(), preferredRole: 42 }),
+    /画像部品/
+  );
+});
+
 test('32x16 audio image materialises into strict rectangular Spot and Hidden source revisions', async () => {
   const width = 32; const height = 16; const rgba = new Uint8Array(width * height * 4);
   for (let index = 0; index < width * height; index += 1) rgba.set(index % 5 === 0 ? [231, 84, 69, 255] : [38, 50, 56, 255], index * 4);
@@ -214,96 +261,84 @@ test('32x16 audio image materialises into strict rectangular Spot and Hidden sou
   assert.deepEqual(documentRgba(hiddenRoundTrip.bindings.source.drawDocument), rgba);
 });
 
-test('shared main image is referenced by Hidden, Jigsaw, and Spot-after without role image copies', async () => {
+test('new puzzle writes own fixed image roles even when the PXD has a shared canvas', async () => {
   const source = drawDocument();
   let project = await putPxdSharedImage(createPxdProject(), { width: 16, height: 16, rgba: documentRgba(source) });
   const hidden = fixtureHidden();
   project = await writePxdPuzzle(project, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: source } });
-  assert.equal(getPxdJson(project, 'puzzles/hidden_object.json').imageRoles.hidden, 'main');
-  assert.equal(project.entries.some((entry) => entry.path.startsWith('images/hidden/')), false);
+  assert.equal(getPxdJson(project, 'puzzles/hidden_object.json').imageRoles.hidden, 'hidden');
+  assert.equal(project.entries.some((entry) => entry.path.startsWith('images/hidden/')), true);
   assert.deepEqual(documentRgba((await readPxdPuzzle(project, 'hidden_object')).images.hidden.drawDocument), documentRgba(source));
 
   const { game } = fixtureJigsaw();
   project = await writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments: { 'jigsaw-main': source } });
-  assert.equal(getPxdJson(project, 'puzzles/jigsaw.json').imageRoles['jigsaw-main'], 'main');
-  assert.equal(project.entries.some((entry) => entry.path.startsWith('images/jigsaw-main/')), false);
+  assert.equal(getPxdJson(project, 'puzzles/jigsaw.json').imageRoles['jigsaw-main'], 'jigsaw-main');
+  assert.equal(project.entries.some((entry) => entry.path.startsWith('images/jigsaw-main/')), true);
 
   const spot = fixtureSpot();
   project = await putPxdSharedImage(project, { width: 16, height: 16, rgba: documentRgba(spot.after) });
   project = await writePxdPuzzle(project, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': spot.after } });
-  assert.equal(getPxdJson(project, 'puzzles/spot_difference.json').imageRoles['spot-after'], 'main');
+  assert.equal(getPxdJson(project, 'puzzles/spot_difference.json').imageRoles['spot-after'], 'spot-after');
   assert.equal(project.entries.some((entry) => entry.path === 'images/spot-before/pixels.rgba'), true);
-  assert.equal(project.entries.some((entry) => entry.path.startsWith('images/spot-after/')), false);
+  assert.equal(project.entries.some((entry) => entry.path.startsWith('images/spot-after/')), true);
   const loaded = await readPxdPuzzle(project, 'spot_difference');
   assert.deepEqual(documentRgba(loaded.images['spot-after'].drawDocument), documentRgba(spot.after));
 });
 
-test('a changed shared main invalidates Hidden and Spot and resets Jigsaw layout on materialization', async () => {
-  const spot = fixtureSpot(); const source = spot.after;
-  let project = await putPxdSharedImage(createPxdProject(), { width: 16, height: 16, rgba: documentRgba(source) });
-  const hidden = fixtureHidden();
-  project = await writePxdPuzzle(project, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: source } });
+test('editing main and audio image roles leaves puzzle pixels and answers unchanged', async () => {
+  const hidden = fixtureHidden(); const spot = fixtureSpot();
+  let project = await putPxdSharedImage(createPxdProject(), { width: 16, height: 16, rgba: documentRgba(hidden.source) });
+  project = await putPxdImage(project, { width: 16, height: 16, rgba: documentRgba(hidden.source) }, 'audio');
+  project = await writePxdPuzzle(project, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: hidden.source } });
   project = await writePxdPuzzle(project, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': spot.after } });
-  const { game: jigsawGame } = fixtureJigsaw(); const game = structuredClone(jigsawGame);
-  game.groups[0] = { ...game.groups[0], x: 77, y: 88, inTray: false };
-  project = await writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments: { 'jigsaw-main': source } });
-
-  const changed = structuredClone(source); changed.palette.push('#27336b'); strokePixels(changed, { x: 12, y: 12 }, { x: 12, y: 12 }, changed.palette.length - 1);
-  project = await putPxdSharedImage(project, { width: 16, height: 16, rgba: documentRgba(changed) });
-  const loadedHidden = await readPxdPuzzle(project, 'hidden_object');
-  assert.equal(loadedHidden.sourceChanged, true);
-  const hiddenResult = await materializePxdPuzzle(loadedHidden, { tool: 'hidden_object', store: storeFor() });
-  assert.equal(hiddenResult.document.confirmed, false); assert.equal(hiddenResult.document.hitBoxes, null);
-  const loadedSpot = await readPxdPuzzle(project, 'spot_difference');
-  assert.equal(loadedSpot.sourceChanged, true);
-  const spotResult = await materializePxdPuzzle(loadedSpot, { tool: 'spot_difference', store: storeFor() });
-  assert.equal(spotResult.document.confirmed, false);
-  const loadedJigsaw = await readPxdPuzzle(project, 'jigsaw');
-  assert.equal(loadedJigsaw.sourceChanged, true);
-  const jigsawResult = await materializePxdPuzzle(loadedJigsaw, { tool: 'jigsaw', store: storeFor() });
-  assert.equal(jigsawResult.document.groups.every((group) => group.inTray && group.x === 0 && group.y === 0 && group.pieceIds.length === 1), true);
+  const expectedHidden = documentRgba(hidden.source); const expectedAfter = documentRgba(spot.after);
+  const edited = drawDocument('#27336b');
+  project = await putPxdDrawDocument(project, edited, 'main');
+  project = await putPxdImage(project, { width: 16, height: 16, rgba: documentRgba(edited) }, 'audio');
+  const reopenedHidden = await readPxdPuzzle(project, 'hidden_object'); const reopenedSpot = await readPxdPuzzle(project, 'spot_difference');
+  assert.deepEqual(documentRgba(reopenedHidden.images.hidden.drawDocument), expectedHidden);
+  assert.deepEqual(documentRgba(reopenedSpot.images['spot-after'].drawDocument), expectedAfter);
+  assert.deepEqual(reopenedHidden.document.targets, hidden.document.targets);
+  assert.deepEqual(reopenedSpot.document.candidates, spot.document.candidates);
+  assert.equal(reopenedHidden.sourceChanged, false); assert.equal(reopenedSpot.sourceChanged, false);
 });
 
-test('reshaping shared main rebuilds all puzzle dimensions and preserves only Hidden target names', async () => {
-  const spot = fixtureSpot(); const original = spot.after;
-  let project = await putPxdSharedImage(createPxdProject(), { width: 16, height: 16, rgba: documentRgba(original) });
+test('resizing the Draw canvas does not resize a saved puzzle source', async () => {
   const hidden = fixtureHidden();
-  project = await writePxdPuzzle(project, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: original } });
-  const { game } = fixtureJigsaw();
-  project = await writePxdPuzzle(project, { tool: 'jigsaw', document: game, sourceDrawDocuments: { 'jigsaw-main': original } });
-  project = await writePxdPuzzle(project, { tool: 'spot_difference', document: spot.document, sourceDrawDocuments: { 'spot-before': spot.before, 'spot-after': original } });
+  let project = await writePxdPuzzle(null, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: hidden.source } });
+  const resized = createDrawDocument(32);
+  project = await putPxdDrawDocument(project, resized, 'main');
+  const loaded = await readPxdPuzzle(project, 'hidden_object');
+  assert.equal(loaded.images.hidden.width, 16); assert.equal(loaded.document.width, 16);
+  assert.deepEqual(loaded.document.targets, hidden.document.targets);
+});
 
-  const resized = new Uint8Array(32 * 16 * 4);
-  for (let offset = 0; offset < resized.length; offset += 4) resized.set([39, 51, 107, 255], offset);
-  project = await putPxdSharedImage(project, { width: 32, height: 16, rgba: resized });
+test('legacy main aliases freeze from a matching hash or restore by original reference, and fail closed otherwise', async () => {
+  const hidden = fixtureHidden(); const image = { width: 16, height: 16, rgba: documentRgba(hidden.source) };
+  let project = await putPxdSharedImage(createPxdProject(), image);
+  project = await writePxdPuzzle(project, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: hidden.source } });
+  project = mergePxdJson(project, 'puzzles/hidden_object.json', { imageRoles: { hidden: 'main' } });
+  project = await freezePxdPuzzleImages(project);
+  assert.equal(getPxdJson(project, 'puzzles/hidden_object.json').imageRoles.hidden, 'hidden');
+  assert.deepEqual(documentRgba((await readPxdPuzzle(project, 'hidden_object')).images.hidden.drawDocument), image.rgba);
 
-  const hiddenRead = await readPxdPuzzle(project, 'hidden_object');
-  const hiddenResult = await materializePxdPuzzle(hiddenRead, { tool: 'hidden_object', store: storeFor() });
-  assert.equal(hiddenResult.document.width, 32); assert.equal(hiddenResult.document.height, 16);
-  assert.equal(hiddenResult.document.confirmed, false); assert.equal(hiddenResult.document.hitBoxes, null);
-  assert.deepEqual(hiddenResult.document.targets, []);
-  assert.deepEqual(hiddenResult.document.targetNames, hidden.document.targets.map(({ id, name }) => ({ id, name })));
-  assert.equal(hiddenResult.preservedPayload.document.width, 32);
+  let legacy = await putPxdSharedImage(createPxdProject(), image);
+  legacy = await writePxdPuzzle(legacy, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: hidden.source } });
+  legacy = mergePxdJson(legacy, 'puzzles/hidden_object.json', { imageRoles: { hidden: 'main' } });
+  const changed = drawDocument('#27336b');
+  legacy = await putPxdDrawDocument(legacy, changed, 'main');
+  await assert.rejects(freezePxdPuzzleImages(legacy), /原画を復元できません/);
+  legacy = await freezePxdPuzzleImages(legacy, { resolveSourceImage: async () => image });
+  assert.equal(getPxdJson(legacy, 'puzzles/hidden_object.json').imageRoles.hidden, 'hidden');
+  assert.deepEqual(documentRgba((await readPxdPuzzle(legacy, 'hidden_object')).images.hidden.drawDocument), image.rgba);
 
-  const jigsawRead = await readPxdPuzzle(project, 'jigsaw');
-  const jigsawResult = await materializePxdPuzzle(jigsawRead, { tool: 'jigsaw', store: storeFor() });
-  assert.equal(jigsawResult.document.layout.width, 32); assert.equal(jigsawResult.document.layout.height, 16);
-  assert.equal(jigsawResult.preservedPayload.document.layout.width, 32);
-
-  const spotRead = await readPxdPuzzle(project, 'spot_difference');
-  const spotResult = await materializePxdPuzzle(spotRead, { tool: 'spot_difference', store: storeFor() });
-  assert.equal(spotResult.document.width, 32); assert.equal(spotResult.document.height, 16);
-  assert.equal(spotResult.document.confirmed, false); assert.deepEqual(spotResult.document.candidates, []);
-  assert.deepEqual(documentRgba(spotResult.bindings.before.drawDocument), resized);
-  assert.deepEqual(documentRgba(spotResult.bindings.after.drawDocument), resized);
-  assert.deepEqual(spotResult.preservedPayload.portable.originalRefs, spotResult.portableOriginalRefs);
-  const reset = await writePxdPuzzle(project, {
-    tool: 'spot_difference', document: spotResult.document,
-    sourceDrawDocuments: { 'spot-before': spotResult.bindings.before.drawDocument, 'spot-after': spotResult.bindings.after.drawDocument },
-    portableOriginalRefs: spotResult.portableOriginalRefs, preservedPayload: spotResult.preservedPayload, sourceChanged: false
-  });
-  assert.equal((await readPxdPuzzle(reset, 'spot_difference')).document.width, 32);
-  assert.deepEqual((await readPxdSharedImage(reset)).rgba, resized);
+  let reshapedLegacy = await putPxdSharedImage(createPxdProject(), image);
+  reshapedLegacy = await writePxdPuzzle(reshapedLegacy, { tool: 'hidden_object', document: hidden.document, sourceDrawDocuments: { hidden: hidden.source } });
+  reshapedLegacy = mergePxdJson(reshapedLegacy, 'puzzles/hidden_object.json', { imageRoles: { hidden: 'main' } });
+  reshapedLegacy = await putPxdSharedImage(reshapedLegacy, { width: 8, height: 32, rgba: image.rgba });
+  await assert.rejects(freezePxdPuzzleImages(reshapedLegacy), /原画を復元できません/);
+  reshapedLegacy = await freezePxdPuzzleImages(reshapedLegacy, { resolveSourceImage: async () => image });
+  assert.equal((await readPxdPuzzle(reshapedLegacy, 'hidden_object')).images.hidden.width, 16);
 });
 
 test('unknown puzzle fields survive reading and writing into a new PXD (別名保存・別ツールへ)', async () => {

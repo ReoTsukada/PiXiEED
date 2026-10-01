@@ -9,7 +9,7 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
 import { confirmPxdConversion } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20260930-ux-fix-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-components-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20260930-shared-canvas-5';
@@ -17,9 +17,10 @@ import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-ro
 import { encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
 import { requestPass, hasPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
-import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20260930-photo-project-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-3';
+import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-components-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
+import { wheelZoomFactor } from './viewport-wheel.mjs';
 
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
@@ -254,7 +255,7 @@ function updateCanvasView() {
 function placeOverlays() {
   const board = $('.draw-board'); const grid = $('.draw-grid'); if (!board || !grid) return;
   const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect();
-  Object.assign(grid.style, { left: `${r.left - b.left}px`, top: `${r.top - b.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  Object.assign(grid.style, { left: `${r.left - b.left - board.clientLeft}px`, top: `${r.top - b.top - board.clientTop}px`, width: `${r.width}px`, height: `${r.height}px` });
   for (const node of [grid, canvas]) { node.style.setProperty('--cols', documentData.width); node.style.setProperty('--rows', documentData.height); }
   grid.classList.toggle('is-fine', r.width / documentData.width < 6);
 }
@@ -263,12 +264,12 @@ function showCursor(event) {
   if (event.pointerType === 'touch' && !drawing) { cursor.hidden = true; return; }
   const p = pointFromEvent(event);
   if (p.x < 0 || p.y < 0 || p.x >= documentData.width || p.y >= documentData.height) { cursor.hidden = true; return; }
-  const board = $('.draw-board').getBoundingClientRect(); const r = canvas.getBoundingClientRect(); const cw = r.width / documentData.width; const ch = r.height / documentData.height;
-  Object.assign(cursor.style, { left: `${r.left - board.left + p.x * cw}px`, top: `${r.top - board.top + p.y * ch}px`, width: `${cw}px`, height: `${ch}px` });
+  const board = $('.draw-board'); const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect(); const cw = r.width / documentData.width; const ch = r.height / documentData.height;
+  Object.assign(cursor.style, { left: `${r.left - b.left - board.clientLeft + p.x * cw}px`, top: `${r.top - b.top - board.clientTop + p.y * ch}px`, width: `${cw}px`, height: `${ch}px` });
   cursor.style.setProperty('--draw-color', tool === 'eraser' || selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor] || 'transparent');
   cursor.dataset.tool = tool; cursor.hidden = false;
   const twin = $('.draw-cursor-twin');
-  if (mirror && twin) { Object.assign(twin.style, { left: `${r.left - board.left + (documentData.width - 1 - p.x) * cw}px`, top: cursor.style.top, width: cursor.style.width, height: cursor.style.height }); twin.hidden = false; } else if (twin) twin.hidden = true;
+  if (mirror && twin) { Object.assign(twin.style, { left: `${r.left - b.left - board.clientLeft + (documentData.width - 1 - p.x) * cw}px`, top: cursor.style.top, width: cursor.style.width, height: cursor.style.height }); twin.hidden = false; } else if (twin) twin.hidden = true;
 }
 canvas.addEventListener('pointerleave', () => { if (!drawing) { $('.draw-cursor').hidden = true; const twin = $('.draw-cursor-twin'); if (twin) twin.hidden = true; } });
 // ---- short messages float over the canvas and fade (the status line keeps the full text for screen readers) ----
@@ -439,7 +440,7 @@ addEventListener('keyup', (event) => { if (event.key === ' ') { spaceHeld = fals
 // wheel / trackpad pinch zooms about the cursor
 $('.draw-board').addEventListener('wheel', (event) => {
   event.preventDefault();
-  const factor = Math.exp(-event.deltaY * (event.ctrlKey ? 0.01 : 0.0025));
+  const factor = wheelZoomFactor(event.deltaY, event.deltaMode, $('.draw-board').clientHeight);
   zoomAt(zoom * factor, event.clientX, event.clientY);
 }, { passive: false });
 // the zoom chip puts the whole picture back
@@ -558,6 +559,11 @@ if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden
 if (store) mountPictureShelf($('#draw-shelf'), { tool: 'draw', adapter: drawAdapter, onBrought: async ({ from }) => { await loadLastDraft(); status.textContent = `${from.label}の絵を持ってきました`; }, onError: (error) => { status.textContent = `持ってこられませんでした：${error.message}`; } });
 paint();
 
+$('#draw-output [data-output-project]')?.addEventListener('click', () => {
+  closeColorEditor(); editorUi.closePanels();
+  void pxdBridge?.showProjects();
+});
+
 // ---- saving: the picture leaves PiXiEED enlarged (crisp dots, about 2048px), on phones via the share sheet ----
 $('#draw-export').addEventListener('click', async () => {
   closeColorEditor(); editorUi.closePanels();
@@ -669,6 +675,7 @@ pxdBridge = mountPxdTools({
   projectWorkspace: true,
   getEditorState: () => ({ selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror, showGrid, imageRole: pxdImageRole }),
   restoreEditorState(state) {
+    if (state?.imageRole && state.imageRole !== pxdImageRole) state = {};
     if (!readOnlyImage) {
       const originalPalette = [...documentData.palette];
       const brushes = (state?.brushColors || []).filter((color) => typeof color === 'string' && /^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color));
@@ -690,7 +697,7 @@ pxdBridge = mountPxdTools({
     if (!project.entries.length) { pxdImageRole = 'main'; replaceDocument(createDrawDocument(), { type: 'hand_drawn', assetId: null, revisionId: null }, { fromPxd: true }); return; }
     const roles = pxdImageRoles(project);
     const rememberedRole = project.manifest.editorState?.draw?.imageRole;
-    let role = project.manifest.sharedCanvas ? 'main' : requestedRole || (roles.includes(rememberedRole) ? rememberedRole : roles.includes('draw') ? 'draw' : roles.includes('main') ? 'main' : roles[0]);
+    let role = requestedRole || (roles.includes(rememberedRole) ? rememberedRole : roles.includes('main') ? 'main' : roles.includes('draw') ? 'draw' : roles[0]);
     let nextDocument;
     {
       try { nextDocument = await readPxdDrawDocument(project, role); }

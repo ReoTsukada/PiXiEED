@@ -21,7 +21,7 @@ body.pixfind-is-playing>.site-footer,body.pixfind-is-playing>.site-header{displa
 .pixfind-compare{min-height:25px;padding:3px 9px;border:1px solid #c5cbbd;border-radius:999px;background:rgba(255,255,255,.88);color:inherit;font:inherit;cursor:pointer}
 .pixfind-compare:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
 .pixfind-play-area{width:100%;height:100%;max-height:none;aspect-ratio:auto!important;border-radius:8px;background:#171a16;touch-action:manipulation}
-.pixfind-play-area img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.pixfind-play-area img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:contain}
 .pixfind-play-area img[hidden]{display:none!important}
 .pixfind-found-list{max-height:48px;align-content:flex-start;gap:4px;overflow:auto;margin:0;padding:0;scrollbar-width:none}
 .pixfind-found-list li{flex:none;font-size:.62rem;line-height:1.2}
@@ -40,6 +40,8 @@ body.pixfind-is-playing>.site-footer,body.pixfind-is-playing>.site-header{displa
 .pixfind-hint:active{transform:translateY(3px);box-shadow:none}
 .pixfind-hint{position:relative;flex:none;width:44px;height:44px}
 .pixfind-hint::after{content:attr(data-hint-short);position:absolute;right:-4px;bottom:-4px;min-width:20px;height:15px;padding:0 2px;border:1px solid #fff;border-radius:8px;background:#49643c;color:#fff;font-size:.52rem;font-weight:800;line-height:13px;text-align:center}
+.pixfind-hint[data-hint-short="パス"]::after{content:"🔒";background:#15202b;font-size:10px}
+html[data-pass=active] .pixfind-hint[data-hint-short="パス"]::after{content:"★";background:#ffd35a;color:#15202b;font-size:11px}
 .pixfind-hint:disabled{opacity:.65;cursor:default}
 /* The arcade HUD adds a fifth row: leave the flexible row to the artwork. */
 .pixfind-page--playing{display:flex;flex-direction:column}
@@ -59,6 +61,11 @@ body.pixfind-is-playing>.site-footer,body.pixfind-is-playing>.site-header{displa
   .pixfind-page--playing .pixfind-images--comparison{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:6px}
 }
 .pixfind-game--comparison .pixfind-back{width:44px;height:44px;min-width:44px;min-height:44px}
+.pixfind-game .pixfind-game-status:not([data-visible="true"]){height:0;min-height:0;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pixfind-game .pixfind-image #pixfind-image-label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pixfind-game--comparison .pixfind-image{position:relative;grid-template-rows:minmax(0,1fr)}
+.pixfind-game--comparison .pixfind-image figcaption{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pixfind-game--comparison .pixfind-play-area{touch-action:none}
 @media(max-height:620px){.pixfind-game--comparison .pixfind-game__identity p{display:none}}
 @media(orientation:landscape) and (max-height:500px){
   body[data-puzzle-mode="spot-difference"].pixfind-is-playing>.site-header{display:none!important}
@@ -66,6 +73,9 @@ body.pixfind-is-playing>.site-footer,body.pixfind-is-playing>.site-header{displa
   .pixfind-game--comparison>.arc-hud{display:none!important}
   .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison{grid-template-rows:auto auto minmax(0,1fr)}
 }
+
+/* The player handles pinch zoom and image panning with pointer events. */
+#pixfind-play-area,#pixfind-changed-area{touch-action:none}
 
 /* Object targets belong to the play surface, but must clear the bottom navigation. */
 body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-page--playing{bottom:calc(5.25rem + env(safe-area-inset-bottom,0px))}

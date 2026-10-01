@@ -42,12 +42,9 @@ function sourceRoles(tool, document) {
   return [];
 }
 
-function sharedRoleReferences(project, tool, document) {
-  if (project?.manifest?.sharedCanvas?.schemaVersion !== 1) return {};
-  if (tool === 'hidden_object') return { hidden: 'main' };
-  if (tool === 'jigsaw' && document.source.type !== 'public') return { 'jigsaw-main': 'main' };
-  if (tool === 'spot_difference') return { 'spot-after': 'main' };
-  return {};
+function sourceDimensions(tool, role, document) {
+  if (tool === 'jigsaw') return { width: document.layout.width, height: document.layout.height };
+  return { width: document.width, height: document.height };
 }
 
 async function imageFingerprint(image) {
@@ -101,27 +98,26 @@ export async function writePxdPuzzle(project, { tool, document, sourceDrawDocume
   const previousPayload = project?.entries?.some((entry) => entry.path === puzzlePath(tool)) ? getPxdJson(project, puzzlePath(tool)) : null;
   let next = project || createPxdProject();
   const roles = sourceRoles(tool, document);
-  const imageRoles = sharedRoleReferences(next, tool, document);
-  const sharedMain = Object.keys(imageRoles).length ? await readPxdSharedImage(next) : null;
-  if (Object.keys(imageRoles).length && !sharedMain) throw new TypeError('PXDの共通画像が見つかりません。元画像は変更していません。');
+  const imageRoles = Object.fromEntries(roles.map((role) => [role, role]));
   for (const role of roles) {
-    if (imageRoles[role] === 'main') {
-      const drawDocument = sourceDrawDocuments[role]; const candidate = sourceImages[role] || (drawDocument ? pxdImageFromDrawDocument(drawDocument) : null);
-      if (candidate && (candidate.width !== sharedMain.width || candidate.height !== sharedMain.height || !bytesEqual(candidate.rgba, sharedMain.rgba))) throw new TypeError('固定画像と共通画像が一致しません。共通画像は変更していません。');
-      continue;
-    }
     const drawDocument = sourceDrawDocuments[role];
     const image = sourceImages[role] || (drawDocument ? pxdImageFromDrawDocument(drawDocument) : null);
     if (!image) throw new TypeError(`PXDに必要な固定画像がありません: ${role}`);
     next = drawDocument ? await putPxdDrawDocument(next, drawDocument, role) : await putPxdImage(next, image, role);
   }
-  const changedBySourceEdit = next.entries.some((entry) => entry.path === puzzlePath(tool)) ? getPxdJson(next, puzzlePath(tool)).sourceChanged === true : previousPayload?.sourceChanged === true;
+  const imageHashes = Object.fromEntries(await Promise.all(roles.map(async (role) => {
+    const image = sourceImages[role] || pxdImageFromDrawDocument(sourceDrawDocuments[role]);
+    return [role, await imageFingerprint(image)];
+  })));
+  const roleImageChanged = Boolean(previousPayload && roles.some((role) => previousPayload.imageHashes?.[role] !== imageHashes[role]));
+  const changedBySourceEdit = (next.entries.some((entry) => entry.path === puzzlePath(tool)) ? getPxdJson(next, puzzlePath(tool)).sourceChanged === true : previousPayload?.sourceChanged === true) || roleImageChanged;
   const payload = {
     schemaVersion: 1,
     tool,
     document: portableDocument(tool, document),
     portable: { originalRefs: clone(portableOriginalRefs || originalRefs(tool, document)) },
-    ...(Object.keys(imageRoles).length ? { imageRoles, imageHashes: Object.fromEntries(await Promise.all(Object.entries(imageRoles).map(async ([role]) => [role, await imageFingerprint(sharedMain)]))) } : {}),
+    imageRoles: roles.length ? imageRoles : null,
+    imageHashes: roles.length ? imageHashes : null,
     sourceChanged: typeof sourceChanged === 'boolean' ? sourceChanged : changedBySourceEdit
   };
   // Writing into a PXD that has no copy of this puzzle yet (別名保存, moving to another PXD):
@@ -149,14 +145,13 @@ export async function readPxdPuzzle(project, tool) {
   assertOriginalRefs(tool, document, payload.portable.originalRefs);
   const images = {};
   let sourceChanged = payload.sourceChanged === true;
+  const sourceEditRecorded = payload.sourceChanged === true;
   for (const role of sourceRoles(tool, payload.document)) {
     const imageRole = payload.imageRoles?.[role] === 'main' ? 'main' : role;
     const image = imageRole === 'main' ? await readPxdSharedImage(project) : await readPxdImage(project, imageRole);
     if (!image) throw new TypeError('PXD内の固定画像が見つかりません。');
-    if (imageRole === 'main') {
-      const expectedHash = payload.imageHashes?.[role];
-      if (!/^[a-f0-9]{64}$/.test(expectedHash || '') || await imageFingerprint(image) !== expectedHash) sourceChanged = true;
-    }
+    const expectedHash = payload.imageHashes?.[role];
+    if (!/^[a-f0-9]{64}$/.test(expectedHash || '') || await imageFingerprint(image) !== expectedHash) sourceChanged = true;
     let drawDocument = null;
     try { drawDocument = await readPxdDrawDocument(project, imageRole); } catch (error) {
       if (tool !== 'jigsaw' || !(error instanceof RangeError)) throw error;
@@ -164,7 +159,39 @@ export async function readPxdPuzzle(project, tool) {
     if (drawDocument && (image.width !== drawDocument.width || image.height !== drawDocument.height || !bytesEqual(image.rgba, documentRgba(drawDocument)))) throw new TypeError('PXDの固定画像とDrawデータが一致しません。');
     images[role] = { width: image.width, height: image.height, rgba: new Uint8Array(image.rgba), drawDocument };
   }
-  return { payload: clone(payload), document, images, portableOriginalRefs: clone(payload.portable.originalRefs), sourceChanged };
+  return { payload: clone(payload), document, images, portableOriginalRefs: clone(payload.portable.originalRefs), sourceChanged, sourceEditRecorded };
+}
+
+/** Convert legacy `main` aliases into owned puzzle images before another tool edits the canvas. */
+export async function freezePxdPuzzleImages(project, { resolveSourceImage } = {}) {
+  let next = project;
+  for (const tool of Object.keys(PXD_PUZZLE_PATHS)) {
+    if (!hasPxdPuzzle(next, tool)) continue;
+    const payload = getPxdJson(next, puzzlePath(tool));
+    const roles = sourceRoles(tool, payload.document || {});
+    let imageRoles = { ...(payload.imageRoles || {}) };
+    let changed = false;
+    for (const role of roles) {
+      if (imageRoles[role] !== 'main') continue;
+      let image = await readPxdSharedImage(next);
+      const expected = payload.imageHashes?.[role];
+      const dimensions = sourceDimensions(tool, role, payload.document || {});
+      if (!image || image.width !== dimensions.width || image.height !== dimensions.height || !/^[a-f0-9]{64}$/.test(expected || '') || await imageFingerprint(image) !== expected) {
+        const refs = payload.portable?.originalRefs || {};
+        const ref = tool === 'spot_difference' ? refs[role === 'spot-before' ? 'before' : 'after'] : tool === 'hidden_object' ? refs.source : refs.source;
+        if (typeof resolveSourceImage !== 'function' || !ref) throw new TypeError('共有画像が変更され、パズル原画を復元できません。元画像の参照から復元してから続行してください。');
+        image = await resolveSourceImage(clone(ref));
+        if (!image || image.width !== dimensions.width || image.height !== dimensions.height || !Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height) || !(image.rgba instanceof Uint8Array || image.rgba instanceof Uint8ClampedArray) || image.rgba.length !== image.width * image.height * 4 || await imageFingerprint(image) !== expected) throw new TypeError('元画像の参照が保存時のパズル原画と一致しません。誤った画像での続行を停止しました。');
+      }
+      const draw = await readPxdDrawDocument(next, 'main').catch(() => null);
+      const matchingDraw = draw && draw.width === image.width && draw.height === image.height && bytesEqual(documentRgba(draw), image.rgba) ? draw : null;
+      next = matchingDraw ? await putPxdDrawDocument(next, matchingDraw, role) : await putPxdImage(next, image, role);
+      imageRoles[role] = role;
+      changed = true;
+    }
+    if (changed) next = mergePxdJson(next, puzzlePath(tool), { imageRoles });
+  }
+  return next;
 }
 
 function bytesEqual(left, right) {
@@ -203,8 +230,8 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
   if (tool === 'jigsaw') {
     const image = images['jigsaw-main'];
     const dimensionsChanged = image && (image.width !== document.layout.width || image.height !== document.layout.height);
-    const sharedReshape = readResult.sourceChanged && readResult.payload.imageRoles?.['jigsaw-main'] === 'main';
-    if (document.source.type !== 'public' && (!image || dimensionsChanged && !sharedReshape)) throw new TypeError('PXD画像サイズと保存済みジグソー盤面が一致しません。端末内の作品は変更していません。');
+    const sourceReconfirmed = readResult.sourceEditRecorded === true || readResult.payload.imageRoles?.['jigsaw-main'] === 'main' && readResult.sourceChanged === true;
+    if (document.source.type !== 'public' && (!image || dimensionsChanged && !sourceReconfirmed)) throw new TypeError('PXD画像サイズと保存済みジグソー盤面が一致しません。端末内の作品は変更していません。');
     if (document.source.type === 'public') {
       if (typeof verifyPublicSource !== 'function') throw new TypeError('公開作品を再確認できません。PXDの参照は権限を引き継ぎません。');
       await verifyPublicSource(document.source);
@@ -235,10 +262,10 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
     let beforeImage = images['spot-before']; const afterImage = images['spot-after'];
     if (!beforeImage?.drawDocument || !afterImage?.drawDocument) throw new TypeError('PXDの比較画像をDrawデータへ正確に変換できません。端末内の作品は変更していません。');
     const dimensionsChanged = beforeImage.width !== afterImage.width || beforeImage.height !== afterImage.height || document.width !== beforeImage.width || document.height !== beforeImage.height;
-    const sharedReshape = readResult.sourceChanged && readResult.payload.imageRoles?.['spot-after'] === 'main';
-    if (dimensionsChanged && !sharedReshape) throw new TypeError('PXDの比較画像サイズが間違い探しと一致しません。端末内の作品は変更していません。');
+    const sourceReconfirmed = readResult.sourceEditRecorded === true || readResult.payload.imageRoles?.['spot-after'] === 'main' && readResult.sourceChanged === true;
+    if (dimensionsChanged && !sourceReconfirmed) throw new TypeError('PXDの比較画像サイズが間違い探しと一致しません。端末内の作品は変更していません。');
     if (dimensionsChanged) {
-      // A canvas reshape starts a new comparison set from the current shared main image.
+      // A source resize starts a new comparison set from the changed puzzle image.
       beforeImage = afterImage;
       document.width = afterImage.width; document.height = afterImage.height;
       document.candidates = []; document.confirmed = false; document.publication = 'draft'; document.published = false;
@@ -260,8 +287,8 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
   } else if (tool === 'hidden_object') {
     if (!images.hidden?.drawDocument) throw new TypeError('PXD画像をDrawデータへ正確に変換できません。端末内の作品は変更していません。');
     const dimensionsChanged = document.width !== images.hidden.width || document.height !== images.hidden.height;
-    const sharedReshape = readResult.sourceChanged && readResult.payload.imageRoles?.hidden === 'main';
-    if (dimensionsChanged && !sharedReshape) throw new TypeError('PXD画像サイズがもの探しの保存版と一致しません。端末内の作品は変更していません。');
+    const sourceReconfirmed = readResult.sourceEditRecorded === true || readResult.payload.imageRoles?.hidden === 'main' && readResult.sourceChanged === true;
+    if (dimensionsChanged && !sourceReconfirmed) throw new TypeError('PXD画像サイズがもの探しの保存版と一致しません。端末内の作品は変更していません。');
     if (dimensionsChanged) {
       document.width = images.hidden.width; document.height = images.hidden.height;
       document.targetNames = document.targets.map(({ id, name }) => ({ id, name }));
@@ -287,10 +314,11 @@ export async function materializePxdPuzzle(readResult, { tool, store, verifyPubl
 
 /** Create a fresh, unconfirmed puzzle from the PXD's owned `main` image when that tool's
  * puzzle component does not exist yet. Existing document/image components are never replaced. */
-export async function createPxdPuzzleFromMain(project, { tool, store, encodeJigsawFileImage }) {
+export async function createPxdPuzzleFromMain(project, { tool, store, encodeJigsawFileImage, preferredRole } = {}) {
   puzzlePath(tool);
   if (!store?.save) throw new TypeError('端末内保存を利用できません。');
-  const imageRole = primaryPxdImageRole(project);
+  if (preferredRole !== undefined && typeof preferredRole !== 'string') throw new TypeError('指定した画像部品を確認できません。');
+  const imageRole = preferredRole === undefined ? primaryPxdImageRole(project) : primaryPxdImageRole(project, preferredRole);
   if (!imageRole) throw new TypeError('このPXDには編集可能な元画像がありません。原本は保持しています。');
   const image = await readPxdImage(project, imageRole);
   if (!image) throw new TypeError('このPXDには編集可能な元画像がありません。原本は保持しています。');

@@ -69,10 +69,15 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
   function prepareNav() {
     navButton = doc.querySelector('.app-tabs button');
     if (!navButton) return;
-    navState = { label: navButton.getAttribute('aria-label'), title: navButton.getAttribute('title'), disabled: navButton.disabled };
+    navState = { label: navButton.getAttribute('aria-label'), title: navButton.getAttribute('title'), disabled: navButton.disabled, children: [...navButton.childNodes] };
     navButton.dataset.toolResultReturn = ''; navButton.disabled = false;
     navButton.setAttribute('aria-label', returnLabel); navButton.title = returnLabel;
-    const label = element('span', 'px-tool-result__nav-label', '戻る'); navButton.append(label);
+    const icon = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.classList.add('px-tool-result__nav-icon'); icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
+    const arrow = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arrow.setAttribute('d', 'M13 5 6 12l7 7M6 12h12'); icon.append(arrow);
+    navButton.replaceChildren(icon);
     navButton.addEventListener('click', interceptNav, true);
     navButton.addEventListener('pointerdown', interceptNav, true);
   }
@@ -81,7 +86,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
     navButton.removeEventListener('click', interceptNav, true);
     navButton.removeEventListener('pointerdown', interceptNav, true);
     delete navButton.dataset.toolResultReturn;
-    navButton.querySelector('.px-tool-result__nav-label')?.remove();
+    navButton.replaceChildren(...navState.children);
     for (const [name, value] of [['aria-label', navState.label], ['title', navState.title]]) {
       if (value == null) navButton.removeAttribute(name); else navButton.setAttribute(name, value);
     }

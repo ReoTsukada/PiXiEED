@@ -4,10 +4,11 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs';
 import { requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-2';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
+import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
@@ -290,12 +291,12 @@ function mount() {
   const statusGame = document.querySelector('#pixfind-game-status'); const progress = document.querySelector('#pixfind-progress');
   const foundList = document.querySelector('#pixfind-found-list');
   let cell = 1;
+  let viewport = { zoom: 1, x: 0, y: 0 }; let baseScale = 1;
+  const activePointers = new Map();
+  const viewportAreas = () => [playArea, ...(changedArea && changedFigure && !changedFigure.hidden ? [changedArea] : [])].filter((area) => area && !area.hidden).map((area) => ({ width: area.clientWidth, height: area.clientHeight }));
   // The art is shown at a whole number of device pixels per dot, as large as the play area allows.
   const geometry = (area = playArea) => {
-    const w = area.clientWidth; const h = area.clientHeight; const ratio = devicePixelRatio || 1;
-    const fit = wholePixelFit(original.naturalWidth / cell, original.naturalHeight / cell, w, h, { devicePixelRatio: ratio });
-    const snap = (value) => Math.round(value * ratio) / ratio;
-    return { scale: fit.width / original.naturalWidth, xoff: snap((w - fit.width) / 2), yoff: snap((h - fit.height) / 2), width: fit.width, height: fit.height };
+    return pixfindViewportGeometry({ width: original.naturalWidth, height: original.naturalHeight, areaWidth: area.clientWidth, areaHeight: area.clientHeight, baseScale, viewport });
   };
   const placeImages = () => {
     if (!original) return;
@@ -403,7 +404,7 @@ function mount() {
       ? `local:${puzzle.mode || 'puzzle'}:${String(puzzle.id || 'draft')}:${String(puzzle.hintRevision || 'revision-unknown')}`
       : `public:${puzzle.mode || 'puzzle'}:${String(puzzle.id || puzzle.slug || 'puzzle')}`;
     hintController.setProblem(`pixfind:${hintIdentity}`);
-    selected = puzzle; found = new Set(); regions = []; cursorX = NaN; cursorY = NaN; readOnly = false; authoritativeAnswers = false; answerInstruction = ''; primary.disabled = false; statusGame.textContent = '絵を準備しています。';
+    selected = puzzle; found = new Set(); regions = []; cursorX = NaN; cursorY = NaN; viewport = { zoom: 1, x: 0, y: 0 }; activePointers.clear(); readOnly = false; authoritativeAnswers = false; answerInstruction = ''; primary.disabled = false; statusGame.dataset.visible = 'true'; statusGame.textContent = '絵を準備しています。';
     originalNode.hidden = false; changedNode.hidden = puzzle.mode === 'hidden-object';
     if (changedFigure) changedFigure.hidden = puzzle.mode !== 'spot-difference';
     if (compareButton) { compareButton.hidden = puzzle.mode === 'hidden-object' || Boolean(changedArea); compareButton.setAttribute('aria-pressed', 'false'); compareButton.textContent = '変化後を見る'; }
@@ -430,6 +431,9 @@ function mount() {
       const base = imageData(original); const layer = puzzle.localHiddenOnly || (puzzle.publicPostOnly && puzzle.mode === 'hidden-object') ? null : imageData(changed);
       // Older puzzles may be saved enlarged; count their dots, not their pixels, when sizing the view.
       cell = layer ? gcd(detectPixelScale(base), detectPixelScale(layer)) : detectPixelScale(base);
+      updateBaseScale();
+      const metrics = viewportAreas();
+      viewport = clampPixfindViewport(viewport, original.naturalWidth, original.naturalHeight, baseScale, metrics);
       placeImages();
       let result; let viewMessage = '';
       if (puzzle.localOnly) {
@@ -473,7 +477,7 @@ function mount() {
       playArea.style.aspectRatio = `${original.naturalWidth}/${original.naturalHeight}`;
       if (changedArea) changedArea.style.aspectRatio = playArea.style.aspectRatio;
       if (readOnly) { primary.disabled = true; primary.setAttribute('aria-label', '正解位置未確認のためプレイできません'); progress.textContent = '閲覧のみ'; foundList.replaceChildren(); statusGame.textContent = viewMessage; }
-      else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); updateProgress(); }
+      else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; updateProgress(); }
     } catch (error) {
       statusGame.textContent = error.message || '問題を読み込めませんでした。'; primary.disabled = true;
       if (puzzle.publicPostOnly) {
@@ -520,11 +524,71 @@ function mount() {
   };
   const locate = (clientX, clientY, area = playArea) => {
     if (!original || !regions.length || readOnly) return;
-    const rect = area.getBoundingClientRect(); const { scale, xoff, yoff } = geometry(area);
-    const x = (clientX - rect.left - xoff) / scale; const y = (clientY - rect.top - yoff) / scale;
-    markAt(x, y);
+    const rect = area.getBoundingClientRect();
+    const point = mapPixfindPoint(clientX, clientY, rect, geometry(area));
+    markAt(point.x, point.y);
   };
-  for (const area of [playArea, changedArea].filter(Boolean)) area.addEventListener('pointerdown', (event) => { if (event.button > 0) return; event.preventDefault(); locate(event.clientX, event.clientY, area); });
+  const constrainViewport = () => { viewport = clampPixfindViewport(viewport, original.naturalWidth, original.naturalHeight, baseScale, viewportAreas()); };
+  const viewportInteractionEnabled = () => Boolean(original && selected && ['spot-difference', 'hidden-object'].includes(selected.mode));
+  const updateBaseScale = () => {
+    const metrics = viewportAreas();
+    if (!metrics.length || !metrics.every(({ width, height }) => width > 0 && height > 0)) return;
+    const fitWidth = Math.min(...metrics.map(({ width }) => width)); const fitHeight = Math.min(...metrics.map(({ height }) => height));
+    const fit = wholePixelFit(original.naturalWidth / cell, original.naturalHeight / cell, fitWidth, fitHeight, { devicePixelRatio: devicePixelRatio || 1 });
+    baseScale = fit.width / original.naturalWidth;
+  };
+  const pointerDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  let pinch = null;
+  for (const area of [playArea, changedArea].filter(Boolean)) {
+    area.addEventListener('wheel', (event) => {
+      if (!viewportInteractionEnabled()) return;
+      event.preventDefault(); const rect = area.getBoundingClientRect(); const factor = pixfindWheelZoomFactor(event.deltaY, event.deltaMode, area.clientHeight);
+      viewport = zoomPixfindViewport(viewport, factor, event.clientX - rect.left, event.clientY - rect.top, area.clientWidth / 2, area.clientHeight / 2, baseScale);
+      constrainViewport(); paint();
+    }, { passive: false });
+    area.addEventListener('pointerdown', (event) => {
+      if (event.button > 0) return;
+      event.preventDefault(); area.setPointerCapture?.(event.pointerId);
+      activePointers.set(event.pointerId, { area, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false });
+      if (activePointers.size === 2 && viewportInteractionEnabled()) {
+        const [a, b] = [...activePointers.values()];
+        if (a.area !== b.area) return;
+        const rect = area.getBoundingClientRect();
+        pinch = { ids: [...activePointers.keys()], distance: Math.max(1, pointerDistance(a, b)), viewport: { ...viewport }, area,
+          startX: (a.x + b.x) / 2 - rect.left, startY: (a.y + b.y) / 2 - rect.top };
+        for (const state of activePointers.values()) state.moved = true;
+      }
+    });
+    area.addEventListener('pointermove', (event) => {
+      const state = activePointers.get(event.pointerId); if (!state) return;
+      state.x = event.clientX; state.y = event.clientY;
+      if (pinch && pinch.ids.every((id) => activePointers.has(id))) {
+        const [a, b] = pinch.ids.map((id) => activePointers.get(id)); const rect = pinch.area.getBoundingClientRect();
+        const midpointX = (a.x + b.x) / 2 - rect.left; const midpointY = (a.y + b.y) / 2 - rect.top;
+        viewport = pinchPixfindViewport(pinch.viewport, pointerDistance(a, b) / pinch.distance,
+          pinch.startX, pinch.startY, midpointX, midpointY, pinch.area.clientWidth / 2, pinch.area.clientHeight / 2, baseScale);
+        constrainViewport(); paint(); return;
+      }
+      const canPan = viewportInteractionEnabled();
+      if (canPan && Math.hypot(state.x - state.startX, state.y - state.startY) > 6) state.moved = true;
+      if (canPan && state.moved) {
+        viewport.x += state.x - (state.lastX ?? state.startX); viewport.y += state.y - (state.lastY ?? state.startY);
+        state.lastX = state.x; state.lastY = state.y; constrainViewport(); paint();
+      }
+    });
+    const finishPointer = (event, canceled = false) => {
+      const state = activePointers.get(event.pointerId); if (!state) return;
+      const wasPinching = Boolean(pinch); activePointers.delete(event.pointerId);
+      if (pinch && pinch.ids.includes(event.pointerId)) pinch = null;
+      if (!canceled && !state.moved && !wasPinching) locate(event.clientX, event.clientY, state.area);
+      if (wasPinching) for (const remaining of activePointers.values()) {
+        remaining.moved = true; remaining.lastX = remaining.x; remaining.lastY = remaining.y;
+      }
+    };
+    area.addEventListener('pointerup', (event) => finishPointer(event));
+    area.addEventListener('pointercancel', (event) => finishPointer(event, true));
+    area.addEventListener('lostpointercapture', (event) => finishPointer(event, true));
+  }
   for (const area of [playArea, changedArea].filter(Boolean)) area.addEventListener('keydown', (event) => {
     if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key) && original) {
       event.preventDefault(); const step = Math.max(1, Math.round(Math.min(original.naturalWidth, original.naturalHeight) / 24));
@@ -534,7 +598,7 @@ function mount() {
       paint(); statusGame.textContent = '矢印キーで場所を選び、Enter または Space で調べます。';
     } else if ((event.key === 'Enter' || event.key === ' ') && original && Number.isFinite(cursorX)) { event.preventDefault(); markAt(cursorX, cursorY); }
   });
-  window.addEventListener('resize', paint);
+  window.addEventListener('resize', () => { if (!original) return; updateBaseScale(); constrainViewport(); paint(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; }
     else if (hint) animateHint();

@@ -117,6 +117,16 @@ test('unchanged content still detects a newer tab head and preserves the open co
   assert.equal(env.session.persistedProject.revisionId, original.revisionId);
 });
 
+test('a deleted unchanged session refuses to save and cannot silently fork when opening another project', async () => {
+  const env = setup(); const original = await env.store.save(project('deleted-session'));
+  await env.session.initialize(original, { persisted: true });
+  await env.store.deleteProject(original.projectId, { expectedRevisionId: original.revisionId });
+  await assert.rejects(env.session.save(), { code: 'PXD_PROJECT_UNAVAILABLE' });
+  assert.equal(await env.store.load(original.projectId), null);
+  assert.equal(env.session.currentProject.projectId, original.projectId);
+  assert.equal((await env.store.listProjects()).projects.length, 0);
+});
+
 test('shared canvas setting writes the same project ID with CAS and keeps the prior revision readable', async () => {
   let sequence = 0;
   const store = createPxdStore({ adapter: createMemoryPxdAdapter(), idFactory: (id) => `canvas-revision-${id}-${++sequence}` });

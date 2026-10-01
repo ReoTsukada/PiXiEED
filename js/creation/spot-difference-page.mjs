@@ -4,10 +4,12 @@ import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
-import { requireSharedCanvasAccess } from './shared-canvas-access.mjs';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-components-1';
+import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261001-components-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260930-shared-canvas-5';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
+import { wheelZoomFactor } from './viewport-wheel.mjs';
+import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
 
 const LAST_KEY = 'pixieed:creation:spot-difference:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -141,7 +143,7 @@ async function loadSourceOptions() {
     // 間違い探し keeps its own picture; versions come from its own draft only.
     const { draftId: ownId, versions: revisions } = await listOwnVersions('spot-difference', { adapter });
     sourceDraftId = ownId;
-    if (!revisions.length) { beforeSelect.add(new Option('まだ絵がありません', '')); afterSelect.add(new Option('まだ絵がありません', '')); $('#spot-start').disabled = true; message('上の「持ってくる」から絵を選んでください。'); return; }
+    if (!revisions.length) { beforeSelect.add(new Option('まだ絵がありません', '')); afterSelect.add(new Option('まだ絵がありません', '')); $('#spot-start').disabled = true; message('上のフォルダーからプロジェクトを選ぶか、描くモードで新しい絵を作れます。'); return; }
     revisions.forEach((revision, index) => { beforeSelect.add(new Option(revisionLabel(revision, index), revision.revisionId)); afterSelect.add(new Option(revisionLabel(revision, index), revision.revisionId)); });
     if (revisions.length > 1) {
       beforeSelect.value = revisions.at(-2).revisionId;
@@ -211,9 +213,11 @@ async function resume() {
 async function openPxdSpot(project) {
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
   if (!project.entries.length) { draft = null; beforeRevision = afterRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; editor.hidden = true; setup.hidden = false; return; }
+  const params = new URLSearchParams(location.search);
+  const preferredRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : undefined;
   const imported = hasPxdPuzzle(project, 'spot_difference')
     ? await materializePxdPuzzle(await readPxdPuzzle(project, 'spot_difference'), { tool: 'spot_difference', store })
-    : await createPxdPuzzleFromMain(project, { tool: 'spot_difference', store });
+    : await createPxdPuzzleFromMain(project, { tool: 'spot_difference', store, preferredRole });
   const nextBefore = imported.bindings.before.revision; const nextAfter = imported.bindings.after.revision;
   if (nextBefore.document.width !== nextAfter.document.width || nextBefore.document.height !== nextAfter.document.height) throw new Error('PXDの比較画像サイズが一致しません。');
   beforeRevision = nextBefore; afterRevision = nextAfter; sourceDraftId = imported.bindings.before.draftId; afterDraftId = imported.bindings.after.draftId;
@@ -229,7 +233,7 @@ function mountPxdSpot() {
   if (!store) return null;
   return mountPxdTools({
     tool: 'spot_difference', projectWorkspace: true, setStatus: message, hasContent: () => Boolean(draft), openProject: openPxdSpot,
-    getProject: async (project) => draft ? writePxdPuzzle(project.manifest.sharedCanvas ? project : putPxdSharedImage(project, { width: afterRevision.document.width, height: afterRevision.document.height, rgba: documentRgba(afterRevision.document) }), {
+    getProject: async (project) => draft ? writePxdPuzzle(project.manifest.sharedCanvas ? project : await putPxdSharedImage(project, { width: afterRevision.document.width, height: afterRevision.document.height, rgba: documentRgba(afterRevision.document) }), {
       tool: 'spot_difference', document: draft,
       sourceDrawDocuments: { 'spot-before': beforeRevision?.document, 'spot-after': afterRevision?.document },
       portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
@@ -252,10 +256,10 @@ $('#spot-split-mode').addEventListener('click', (event) => {
   splitMode = !splitMode; event.currentTarget.setAttribute('aria-pressed', String(splitMode));
   $('#spot-edit-hint').textContent = splitMode ? '選んだ候補の中をなぞって分割範囲を指定' : '色のついた場所をタップして選択 · ピンチで拡大';
 });
-$('#spot-merge').addEventListener('click', () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message)) return; try { draft.candidates = mergeDifferenceCandidates(draft.candidates, [...selectedIds], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補をまとめました。'); } catch (error) { message(error.message); } });
+$('#spot-merge').addEventListener('click', () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message, 'spot_difference')) return; try { draft.candidates = mergeDifferenceCandidates(draft.candidates, [...selectedIds], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補をまとめました。'); } catch (error) { message(error.message); } });
 $('#spot-split').addEventListener('click', () => { try { const id = [...selectedIds][0]; draft.candidates = splitDifferenceCandidate(draft.candidates, id, [...splitPixels], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ画素を別の候補に分けました。'); } catch (error) { message(error.message); } });
 $('#spot-exclude').addEventListener('click', () => { try { const id = [...selectedIds][0]; draft.candidates = excludeDifferenceCandidate(draft.candidates, id, draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補を正解候補から除外しました。'); } catch (error) { message(error.message); } });
-$('#spot-confirm').addEventListener('click', async () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message)) return; try { draft = confirmDifferenceCandidates(draft); $('#spot-confirmed').hidden = false; updateActions(); await save(); } catch (error) { message(error.message); } });
+$('#spot-confirm').addEventListener('click', async () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message, 'spot_difference')) return; try { draft = confirmDifferenceCandidates(draft); $('#spot-confirmed').hidden = false; updateActions(); await save(); } catch (error) { message(error.message); } });
 function cancelTouchEdit() {
   if (!touchEditSnapshot) return;
   selectedIds.clear(); for (const id of touchEditSnapshot.selectedIds) selectedIds.add(id);
@@ -273,7 +277,8 @@ canvas.addEventListener('pointerdown', (event) => {
       cancelTouchEdit();
       activePointer = null; previousPixel = null;
       const [first, second] = [...touchPoints.values()];
-      pinchStart = { distance: Math.hypot(second.x - first.x, second.y - first.y) || 1, centerX: (first.x + second.x) / 2, centerY: (first.y + second.y) / 2, scale: viewScale, panX: viewPanX, panY: viewPanY };
+      const center = previewCenter();
+      pinchStart = { distance: Math.hypot(second.x - first.x, second.y - first.y) || 1, centerX: (first.x + second.x) / 2, centerY: (first.y + second.y) / 2, viewportCenterX: center.x, viewportCenterY: center.y, scale: viewScale, panX: viewPanX, panY: viewPanY };
       event.preventDefault(); return;
     }
   }
@@ -289,11 +294,12 @@ canvas.addEventListener('pointermove', (event) => {
     if (touchPoints.size >= 2 && pinchStart) {
       const [first, second] = [...touchPoints.values()]; const distance = Math.hypot(second.x - first.x, second.y - first.y);
       const centerX = (first.x + second.x) / 2; const centerY = (first.y + second.y) / 2;
-      viewScale = Math.min(4, Math.max(1, pinchStart.scale * distance / pinchStart.distance));
+      const next = zoomCanvasViewportAt(pinchStart, distance / pinchStart.distance, pinchStart.centerX, pinchStart.centerY, centerX, centerY, pinchStart.viewportCenterX, pinchStart.viewportCenterY);
+      viewScale = next.scale;
       const maxX = Math.max(0, (canvas.clientWidth * viewScale - editor.clientWidth) / 2);
       const maxY = Math.max(0, (canvas.clientHeight * viewScale - editor.clientHeight) / 2);
-      viewPanX = Math.min(maxX, Math.max(-maxX, pinchStart.panX + centerX - pinchStart.centerX));
-      viewPanY = Math.min(maxY, Math.max(-maxY, pinchStart.panY + centerY - pinchStart.centerY));
+      viewPanX = Math.min(maxX, Math.max(-maxX, next.panX));
+      viewPanY = Math.min(maxY, Math.max(-maxY, next.panY));
       applyCanvasView(); event.preventDefault(); return;
     }
   }
@@ -302,6 +308,17 @@ canvas.addEventListener('pointermove', (event) => {
   if (previousPixel !== null && pixel !== previousPixel) paintSplitLine(previousPixel, pixel);
   previousPixel = pixel;
 });
+function previewCenter() {
+  const rect = $('.spot-preview').getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+canvas.addEventListener('wheel', (event) => {
+  if (!draft || editor.hidden) return;
+  event.preventDefault();
+  const center = previewCenter(); const rect = $('.spot-preview').getBoundingClientRect();
+  const next = zoomCanvasViewportAt({ scale: viewScale, panX: viewPanX, panY: viewPanY }, wheelZoomFactor(event.deltaY, event.deltaMode, rect.height), event.clientX, event.clientY, event.clientX, event.clientY, center.x, center.y);
+  viewScale = next.scale; viewPanX = next.panX; viewPanY = next.panY; applyCanvasView();
+}, { passive: false });
 function finishPointer(event) {
   const wasTouch = touchPoints.delete(event.pointerId);
   if (wasTouch && event.type === 'pointercancel') cancelTouchEdit();

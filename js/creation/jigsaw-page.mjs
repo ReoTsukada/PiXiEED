@@ -13,13 +13,14 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-components-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260930-shared-canvas-5';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260929-compact-results-2';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
+import { wheelZoomFactor } from './viewport-wheel.mjs';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -748,6 +749,8 @@ async function openPxdJigsaw(project) {
   setSourcePreview(null);
   let publicRgba = null;
   let materialized;
+  const params = new URLSearchParams(location.search);
+  const preferredRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : undefined;
   if (hasPxdPuzzle(project, 'jigsaw')) {
     const loaded = await readPxdPuzzle(project, 'jigsaw');
     materialized = await materializePxdPuzzle(loaded, {
@@ -762,7 +765,7 @@ async function openPxdJigsaw(project) {
       },
       encodeJigsawFileImage: encodePxdJigsawImage
     });
-  } else materialized = await createPxdPuzzleFromMain(project, { tool: 'jigsaw', store: draftStore, encodeJigsawFileImage: encodePxdJigsawImage });
+  } else materialized = await createPxdPuzzleFromMain(project, { tool: 'jigsaw', store: draftStore, encodeJigsawFileImage: encodePxdJigsawImage, preferredRole });
   const nextGame = validateJigsawWorkspace(materialized.document);
   const nextLayout = createJigsawLayout(nextGame.layout);
   let sourcePixels;
@@ -881,7 +884,7 @@ workspaceElement.addEventListener('keydown', (event) => {
 });
 workspaceElement.addEventListener('wheel', (event) => {
   if (!game || event.deltaY === 0) return; event.preventDefault();
-  const factor = event.deltaY < 0 ? 1.12 : 0.89;
+  const factor = wheelZoomFactor(event.deltaY, event.deltaMode, workspaceElement.clientHeight);
   scaleViewAt(view.scale * factor, event.clientX, event.clientY); queuePaint();
 }, { passive: false });
 window.addEventListener('resize', () => { if (game) queuePaint(); });

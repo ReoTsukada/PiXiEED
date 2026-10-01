@@ -26,7 +26,7 @@ function copyRecord(record) {
         : null };
     } catch { summary = undefined; }
   }
-  return { ...record, bytes, ...(summary === undefined ? {} : { summary }) };
+  return { ...record, bytes, ...(summary === undefined ? {} : { summary }), ...(Number.isFinite(record.deletedAt) ? { deletedAt: record.deletedAt } : {}) };
 }
 
 function recordDate(value) {
@@ -65,23 +65,35 @@ export function createMemoryPxdAdapter({ failWrites = false } = {}) {
   return {
     async read(projectId, revisionId) {
       const row = rows.get(projectId);
-      if (!row) return null;
+      if (!row || row.deletedAt) return null;
       if (revisionId === undefined) return copyRecord(row.history.at(-1));
       return copyRecord(row.history.find((record) => record.revisionId === revisionId));
     },
     async listLatest() {
       return [...rows.entries()].flatMap(([projectId, row]) => {
         const latest = copyRecord(row.history.at(-1));
-        return latest ? [{ ...latest, projectId }] : [];
+        return latest ? [{ ...latest, projectId, ...(row.deletedAt ? { deletedAt: row.deletedAt } : {}) }] : [];
       });
     },
     async compareAndSwap(projectId, expectedRevisionId, record) {
       if (failWrites) throw new PxdStoreError('PXD_STORE_WRITE_FAILED');
       const row = rows.get(projectId); const actual = row?.history.at(-1)?.revisionId ?? null;
+      if (row?.deletedAt) throw new PxdStoreError('PXD_PROJECT_DELETED', 'このPXDプロジェクトは削除済みです。復元してから保存してください。');
       if (actual !== expectedRevisionId) throw new PxdStoreConflictError();
       if (row?.history.some((item) => item.revisionId === record.revisionId)) throw new PxdStoreError('PXD_REVISION_DUPLICATE');
       const history = [...(row?.history ?? []), copyRecord(record)];
       rows.set(projectId, { history });
+    },
+    async setDeleted(projectId, expectedRevisionId, deletedAt, restoreRecord = null) {
+      const row = rows.get(projectId); const actual = row?.history.at(-1)?.revisionId ?? null;
+      if (!row || actual !== expectedRevisionId) throw new PxdStoreConflictError();
+      if (deletedAt === null && !row.deletedAt) throw new PxdStoreError('PXD_PROJECT_NOT_DELETED');
+      const next = { ...row };
+      if (deletedAt === null) {
+        if (!restoreRecord || restoreRecord.projectId !== projectId || row.history.some((item) => item.revisionId === restoreRecord.revisionId)) throw new PxdStoreError('PXD_REVISION_DUPLICATE');
+        next.history = [...row.history, copyRecord(restoreRecord)]; delete next.deletedAt;
+      } else next.deletedAt = deletedAt;
+      rows.set(projectId, next);
     },
     async listRevisionIds(projectId) { return (rows.get(projectId)?.history ?? []).map((item) => item.revisionId); }
   };
@@ -113,7 +125,7 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
         let result = null;
         request.onsuccess = () => {
           const row = request.result;
-          const record = !row ? null : revisionId === undefined ? row.history?.at(-1) : row.history?.find((item) => item.revisionId === revisionId);
+          const record = !row || row.deletedAt ? null : revisionId === undefined ? row.history?.at(-1) : row.history?.find((item) => item.revisionId === revisionId);
           result = copyRecord(record);
         };
         request.onerror = () => reject(new PxdStoreError('PXD_IDB_READ_FAILED'));
@@ -130,7 +142,7 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
         request.onsuccess = () => {
           result = (request.result ?? []).flatMap((row) => {
             const latest = copyRecord(row.history?.at(-1));
-            return latest ? [{ ...latest, projectId: row.projectId }] : [];
+            return latest ? [{ ...latest, projectId: row.projectId, ...(Number.isFinite(row.deletedAt) ? { deletedAt: row.deletedAt } : {}) }] : [];
           });
         };
         request.onerror = () => reject(new PxdStoreError('PXD_IDB_READ_FAILED'));
@@ -143,10 +155,11 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
       return new Promise((resolve, reject) => {
         const transaction = database.transaction(STORE_NAME, 'readwrite');
         const store = transaction.objectStore(STORE_NAME); const request = store.get(projectId);
-        let conflict = false; let failure = false;
+        let conflict = false; let failure = false; let deleted = false;
         request.onsuccess = () => {
           const row = request.result; const current = row?.history?.at(-1)?.revisionId ?? null;
           if (current !== expectedRevisionId) { conflict = true; transaction.abort(); return; }
+          if (row?.deletedAt) { deleted = true; transaction.abort(); return; }
           try {
             if (row?.history?.some((item) => item.revisionId === record.revisionId)) { failure = true; transaction.abort(); return; }
             const history = [...(row?.history ?? []), copyRecord(record)];
@@ -155,8 +168,29 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
         };
         request.onerror = () => { failure = true; transaction.abort(); };
         transaction.oncomplete = () => resolve();
-        transaction.onabort = () => reject(conflict ? new PxdStoreConflictError() : new PxdStoreError('PXD_IDB_WRITE_FAILED'));
+        transaction.onabort = () => reject(conflict ? new PxdStoreConflictError() : deleted ? new PxdStoreError('PXD_PROJECT_DELETED', 'このPXDプロジェクトは削除済みです。復元してから保存してください。') : new PxdStoreError('PXD_IDB_WRITE_FAILED'));
         transaction.onerror = () => { failure = true; };
+      });
+    },
+    async setDeleted(projectId, expectedRevisionId, deletedAt, restoreRecord = null) {
+      const database = await db();
+      return new Promise((resolve, reject) => {
+        const transaction = database.transaction(STORE_NAME, 'readwrite'); const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(projectId); let conflict = false; let notDeleted = false; let failure = false;
+        request.onsuccess = () => {
+          const row = request.result; const current = row?.history?.at(-1)?.revisionId ?? null;
+          if (!row || current !== expectedRevisionId) { conflict = true; transaction.abort(); return; }
+          if (deletedAt === null && !row.deletedAt) { notDeleted = true; transaction.abort(); return; }
+          const next = { ...row };
+          if (deletedAt === null) {
+            if (!restoreRecord || restoreRecord.projectId !== projectId || row.history?.some((item) => item.revisionId === restoreRecord.revisionId)) { failure = true; transaction.abort(); return; }
+            next.history = [...(row.history ?? []), copyRecord(restoreRecord)]; delete next.deletedAt;
+          } else next.deletedAt = deletedAt;
+          store.put(next);
+        };
+        request.onerror = () => { failure = true; transaction.abort(); };
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(conflict ? new PxdStoreConflictError() : notDeleted ? new PxdStoreError('PXD_PROJECT_NOT_DELETED') : failure ? new PxdStoreError('PXD_REVISION_DUPLICATE') : new PxdStoreError('PXD_IDB_WRITE_FAILED'));
       });
     }
   };
@@ -187,7 +221,33 @@ export function createPxdStore({ adapter, idFactory = randomRevisionId } = {}) {
       await persistence.compareAndSwap(project.projectId, expectedRevisionId, { projectId: project.projectId, revisionId, bytes, updatedAt: Date.now(), summary });
       return { ...savedProject, entries: savedProject.entries.map((entry) => ({ ...entry, bytes: new Uint8Array(entry.bytes) })) };
     },
-    async listProjects() {
+    async deleteProject(projectId, { expectedRevisionId } = {}) {
+      assertProjectId(projectId);
+      assertProjectId(expectedRevisionId);
+      if (typeof persistence.setDeleted !== 'function') throw new PxdStoreError('PXD_STORE_DELETE_UNAVAILABLE');
+      await persistence.setDeleted(projectId, expectedRevisionId, Date.now());
+      return true;
+    },
+    async restoreProject(projectId, { expectedRevisionId } = {}) {
+      assertProjectId(projectId);
+      assertProjectId(expectedRevisionId);
+      if (typeof persistence.setDeleted !== 'function') throw new PxdStoreError('PXD_STORE_DELETE_UNAVAILABLE');
+      if (typeof persistence.listLatest !== 'function') throw new PxdStoreError('PXD_STORE_DELETE_UNAVAILABLE');
+      const records = await persistence.listLatest();
+      const record = records.find((item) => item?.projectId === projectId);
+      if (!record || !Number.isFinite(record.deletedAt)) throw new PxdStoreError('PXD_PROJECT_NOT_DELETED');
+      if (record.revisionId !== expectedRevisionId) throw new PxdStoreConflictError();
+      const project = await decodePxd(record.bytes);
+      if (project.projectId !== projectId || project.revisionId !== expectedRevisionId) throw new PxdStoreError('PXD_STORE_RECORD_INVALID');
+      const revisionId = idFactory(projectId);
+      assertProjectId(revisionId);
+      if (revisionId === expectedRevisionId) throw new PxdStoreError('PXD_REVISION_DUPLICATE');
+      const restoredProject = { ...project, revisionId };
+      const restoreRecord = { projectId, revisionId, bytes: await encodePxd(restoredProject), updatedAt: Date.now(), summary: await summarizeProject(restoredProject) };
+      await persistence.setDeleted(projectId, expectedRevisionId, null, restoreRecord);
+      return { projectId, revisionId };
+    },
+    async listProjects({ includeDeleted = false } = {}) {
       if (typeof persistence.listLatest !== 'function') throw new PxdStoreError('PXD_STORE_LIST_UNAVAILABLE');
       const records = await persistence.listLatest();
       if (!Array.isArray(records)) throw new PxdStoreError('PXD_STORE_LIST_INVALID');
@@ -203,7 +263,9 @@ export function createPxdStore({ adapter, idFactory = randomRevisionId } = {}) {
           if (project.projectId !== projectId || project.revisionId !== record.revisionId) throw new PxdStoreError('PXD_STORE_RECORD_INVALID');
           const summary = validSummary(record.summary) ? record.summary : await summarizeProject(project);
           const updatedAt = recordDate(record.updatedAt) ?? summary.createdAt ?? 0;
+          if (!includeDeleted && Number.isFinite(record.deletedAt)) continue;
           projects.push({ projectId, revisionId: record.revisionId, updatedAt,
+            ...(Number.isFinite(record.deletedAt) ? { deletedAt: record.deletedAt } : {}),
             summary: { ...summary, thumbnail: summary.thumbnail
               ? { ...summary.thumbnail, rgb: new Uint8Array(summary.thumbnail.rgb) }
               : null } });

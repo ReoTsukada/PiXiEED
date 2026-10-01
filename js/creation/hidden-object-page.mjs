@@ -4,10 +4,12 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
-import { requireSharedCanvasAccess } from './shared-canvas-access.mjs';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-components-1';
+import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261001-components-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20260930-shared-canvas-5';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
+import { wheelZoomFactor } from './viewport-wheel.mjs';
+import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -132,7 +134,7 @@ async function loadSources() {
     // もの探し keeps its own picture; versions come from its own draft only.
     const { draftId: ownId, versions: revisions } = await listOwnVersions('hidden-object', { adapter });
     sourceDraftId = ownId;
-    if (!revisions.length) { sourceSelect.add(new Option('まだ絵がありません', '')); $('#hidden-start').disabled = true; setStatus('上の「持ってくる」から絵を選んでください。'); return; }
+    if (!revisions.length) { sourceSelect.add(new Option('まだ絵がありません', '')); $('#hidden-start').disabled = true; setStatus('上のフォルダーからプロジェクトを選ぶか、描くモードで新しい絵を作れます。'); return; }
     revisions.forEach((revision, index) => sourceSelect.add(new Option(revisionText(revision, index), revision.revisionId)));
     sourceSelect.value = revisions.at(-1).revisionId;
     $('#hidden-start').disabled = false;
@@ -198,9 +200,11 @@ async function resume() {
 async function openPxdHidden(project) {
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
   if (!project.entries.length) { draft = null; sourceRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; maskSets.clear(); editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); return; }
+  const params = new URLSearchParams(location.search);
+  const preferredRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : undefined;
   const imported = hasPxdPuzzle(project, 'hidden_object')
     ? await materializePxdPuzzle(await readPxdPuzzle(project, 'hidden_object'), { tool: 'hidden_object', store })
-    : await createPxdPuzzleFromMain(project, { tool: 'hidden_object', store });
+    : await createPxdPuzzleFromMain(project, { tool: 'hidden_object', store, preferredRole });
   pxdOriginalRefs = imported.portableOriginalRefs; pxdPreservedPayload = imported.preservedPayload || null;
   installRevision(imported.bindings.source.revision, imported.bindings.source.draftId, imported.document);
   draftId = null; savedConfirmedDraftId = null;
@@ -211,7 +215,7 @@ function mountPxdHidden() {
   if (!store) return null;
   return mountPxdTools({
     tool: 'hidden_object', projectWorkspace: true, setStatus, hasContent: () => Boolean(draft), openProject: openPxdHidden,
-    getProject: async (project) => draft && sourceRevision ? writePxdPuzzle(project.manifest.sharedCanvas ? project : putPxdSharedImage(project, { width: sourceRevision.document.width, height: sourceRevision.document.height, rgba: documentRgba(sourceRevision.document) }), {
+    getProject: async (project) => draft && sourceRevision ? writePxdPuzzle(project.manifest.sharedCanvas ? project : await putPxdSharedImage(project, { width: sourceRevision.document.width, height: sourceRevision.document.height, rgba: documentRgba(sourceRevision.document) }), {
       tool: 'hidden_object', document: portableMaskModel(), sourceDrawDocuments: { hidden: sourceRevision.document },
       portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
     }) : project
@@ -219,7 +223,7 @@ function mountPxdHidden() {
 }
 
 function addTarget() {
-  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
   if (!draft || draft.confirmed) return;
   const name = $('#hidden-name').value.trim();
   if (!name) { setStatus('見つけるものの名前を入力してください。'); $('#hidden-name').focus(); return; }
@@ -231,7 +235,7 @@ function addTarget() {
 }
 
 function removeTarget() {
-  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
   if (!currentTarget() || draft.confirmed) return;
   const name = currentTarget().name; totalMaskPixels -= maskSets.get(selectedTargetId)?.size || 0; draft.targets = draft.targets.filter((target) => target.id !== selectedTargetId); maskSets.delete(selectedTargetId); selectedTargetId = draft.targets[0]?.id || null; renderTargets(); requestDraw(); pxdBridge?.markDirty(); setStatus(`${name}を削除しました。`);
 }
@@ -272,12 +276,13 @@ canvas.addEventListener('pointerdown', (event) => {
       cancelTouchStroke();
       activePointer = null; previousPoint = null;
       const [first, second] = [...touchPoints.values()];
-      pinchStart = { distance: Math.hypot(second.x - first.x, second.y - first.y) || 1, centerX: (first.x + second.x) / 2, centerY: (first.y + second.y) / 2, scale: viewScale, panX: viewPanX, panY: viewPanY };
+      const center = previewCenter();
+      pinchStart = { distance: Math.hypot(second.x - first.x, second.y - first.y) || 1, centerX: (first.x + second.x) / 2, centerY: (first.y + second.y) / 2, viewportCenterX: center.x, viewportCenterY: center.y, scale: viewScale, panX: viewPanX, panY: viewPanY };
       event.preventDefault(); return;
     }
   }
   if (!currentTarget()) { setStatus('先に名前を付けた対象を選んでください。'); return; }
-  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
   if (event.pointerType === 'touch') touchStrokeSnapshot = { targetId: selectedTargetId, pixels: new Set(maskSets.get(selectedTargetId)), totalMaskPixels };
   const pixel = canvasPoint(event); if (pixel === null) return;
   event.preventDefault(); activePointer = event.pointerId; previousPoint = pixel; canvas.setPointerCapture(event.pointerId); setPixel(pixel);
@@ -289,11 +294,12 @@ canvas.addEventListener('pointermove', (event) => {
       const [first, second] = [...touchPoints.values()];
       const distance = Math.hypot(second.x - first.x, second.y - first.y);
       const centerX = (first.x + second.x) / 2; const centerY = (first.y + second.y) / 2;
-      viewScale = Math.min(4, Math.max(1, pinchStart.scale * distance / pinchStart.distance));
+      const next = zoomCanvasViewportAt(pinchStart, distance / pinchStart.distance, pinchStart.centerX, pinchStart.centerY, centerX, centerY, pinchStart.viewportCenterX, pinchStart.viewportCenterY);
+      viewScale = next.scale;
       const maxX = Math.max(0, (canvas.clientWidth * viewScale - editor.clientWidth) / 2);
       const maxY = Math.max(0, (canvas.clientHeight * viewScale - editor.clientHeight) / 2);
-      viewPanX = Math.min(maxX, Math.max(-maxX, pinchStart.panX + centerX - pinchStart.centerX));
-      viewPanY = Math.min(maxY, Math.max(-maxY, pinchStart.panY + centerY - pinchStart.centerY));
+      viewPanX = Math.min(maxX, Math.max(-maxX, next.panX));
+      viewPanY = Math.min(maxY, Math.max(-maxY, next.panY));
       applyCanvasView(); event.preventDefault(); return;
     }
   }
@@ -306,6 +312,17 @@ canvas.addEventListener('pointermove', (event) => {
   if (changed) { updateSummary(); requestDraw(); }
   previousPoint = pixel;
 });
+function previewCenter() {
+  const rect = $('.hidden-preview').getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+canvas.addEventListener('wheel', (event) => {
+  if (!draft || editor.hidden) return;
+  event.preventDefault();
+  const center = previewCenter(); const rect = $('.hidden-preview').getBoundingClientRect();
+  const next = zoomCanvasViewportAt({ scale: viewScale, panX: viewPanX, panY: viewPanY }, wheelZoomFactor(event.deltaY, event.deltaMode, rect.height), event.clientX, event.clientY, event.clientX, event.clientY, center.x, center.y);
+  viewScale = next.scale; viewPanX = next.panX; viewPanY = next.panY; applyCanvasView();
+}, { passive: false });
 function finishPointer(event) {
   const wasTouch = touchPoints.delete(event.pointerId);
   if (wasTouch && event.type === 'pointercancel') cancelTouchStroke();
@@ -317,7 +334,7 @@ canvas.addEventListener('pointerup', finishPointer); canvas.addEventListener('po
 canvas.addEventListener('keydown', (event) => {
   if (!draft || draft.confirmed) return;
   const x = cursorPixel % draft.width; const y = Math.floor(cursorPixel / draft.width); let nextX = x; let nextY = y;
-  if (event.key === 'ArrowLeft') nextX = Math.max(0, x - 1); else if (event.key === 'ArrowRight') nextX = Math.min(draft.width - 1, x + 1); else if (event.key === 'ArrowUp') nextY = Math.max(0, y - 1); else if (event.key === 'ArrowDown') nextY = Math.min(draft.height - 1, y + 1); else if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus) && setPixel(cursorPixel)) pxdBridge?.markDirty(); return; } else return;
+  if (event.key === 'ArrowLeft') nextX = Math.max(0, x - 1); else if (event.key === 'ArrowRight') nextX = Math.min(draft.width - 1, x + 1); else if (event.key === 'ArrowUp') nextY = Math.max(0, y - 1); else if (event.key === 'ArrowDown') nextY = Math.min(draft.height - 1, y + 1); else if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object') && setPixel(cursorPixel)) pxdBridge?.markDirty(); return; } else return;
   event.preventDefault(); cursorPixel = nextY * draft.width + nextX; requestDraw();
 });
 canvas.addEventListener('focus', requestDraw); canvas.addEventListener('blur', requestDraw);
@@ -333,7 +350,7 @@ publishButton.addEventListener('click', async () => {
 $('#hidden-add').addEventListener('click', addTarget); $('#hidden-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addTarget(); } }); $('#hidden-remove').addEventListener('click', removeTarget);
 document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.addEventListener('click', () => { editMode = button.dataset.hiddenMode; document.querySelectorAll('[data-hidden-mode]').forEach((option) => option.setAttribute('aria-pressed', String(option === button))); }));
 $('#hidden-confirm').addEventListener('click', async () => {
-  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus)) return;
+  if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
   try { await verifyCurrentSource(); draft = confirmHiddenObjectTargets(modelWithMasks()); $('#hidden-confirmed').hidden = false; renderTargets(); setStatus(`作者指定の${draft.targets.length}対象を確定しました。短い画面でも押せる正解範囲を確保しました。`); await save(); }
   catch (error) { setStatus(`確定できませんでした：${error.message}`); }
 });

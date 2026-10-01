@@ -3,7 +3,7 @@ import { createPxdStore } from './pxd-store.mjs';
 import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20260930-ux-fix-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261001-components-1';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {
@@ -16,7 +16,7 @@ function errorMessage(error) {
 }
 function style() {
   if (document.querySelector('[data-pxd-css]')) return;
-  const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/css/pxd-tools.css?rev=20260928-pxd-1'; link.dataset.pxdCss = ''; document.head.append(link);
+  const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/css/pxd-tools.css?rev=20261001-output-copy-1'; link.dataset.pxdCss = ''; document.head.append(link);
 }
 function button(text, id, run) { const node = document.createElement('button'); node.type = 'button'; node.textContent = text; node.id = id; node.addEventListener('click', run); return node; }
 function download(bytes, name) {
@@ -60,18 +60,20 @@ export function mountPxdTools(options) {
   style(); const store = createPxdStore(); const uncommitted = new Set(); let current = null; let held = null; let opening = null; let queue = Promise.resolve(); let busy = false;
   let savePermission = true; let permissionEpoch = 0;
   const details = document.createElement('details'); details.className = 'pxd-tools'; details.id = 'pxd-tools';
-  const summary = document.createElement('summary'); summary.setAttribute('aria-label', '作品ファイルとツールの連携'); summary.setAttribute('aria-controls', 'pxd-panel'); summary.setAttribute('aria-expanded', 'false'); summary.title = '作品ファイル';
-  summary.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg><span>PXD</span>';
+  const summary = document.createElement('summary'); summary.setAttribute('aria-label', 'プロジェクトとバックアップ'); summary.setAttribute('aria-controls', 'pxd-panel'); summary.setAttribute('aria-expanded', 'false'); summary.title = 'プロジェクトとバックアップ';
+  summary.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg><span>作品</span>';
   const panel = document.createElement('div'); panel.className = 'pxd-panel'; panel.id = 'pxd-panel'; panel.hidden = true; panel.setAttribute('aria-label', '作品ファイル');
   const title = document.createElement('strong'); title.textContent = '作品をつなぐ';
-  const message = document.createElement('p'); message.className = 'pxd-note'; message.id = 'pxd-file-status'; message.setAttribute('role', 'status'); message.textContent = '絵・音楽・パズルを、ひとつのPXDに。';
+  const message = document.createElement('p'); message.className = 'pxd-note'; message.id = 'pxd-file-status'; message.setAttribute('role', 'status'); message.textContent = '絵・音楽・パズルを、ひとつの作品に。';
+  const filesNote = document.createElement('p'); filesNote.className = 'pxd-note pxd-files-note'; filesNote.textContent = '絵・音楽・パズルをまとめた編集用ファイル。別の端末への移動やバックアップに。';
   const input = document.createElement('input'); input.type = 'file'; input.accept = '.pxd,application/octet-stream'; input.id = 'pxd-file-input'; input.hidden = true;
   const actions = document.createElement('div'); actions.className = 'pxd-actions';
-  const openButton = button('PXDを開く', 'pxd-open', () => input.click());
-  const saveButton = button('端末に保存', 'pxd-save', () => run(async () => { say('作品を保存しています…'); await save(); say('作品をこの端末に保存しました。'); }));
-  const exportButton = button('PXDを書き出す', 'pxd-export', () => run(async () => { const project = await save(); download(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`); say('PXDを書き出しました。ほかの端末でも開けます。'); }));
+  const openButton = button('バックアップを開く（PXD）', 'pxd-open', () => input.click());
+  const saveButton = button('プロジェクトを保存', 'pxd-save', () => run(async () => { say('作品を保存しています…'); await save(); say('作品をこの端末に保存しました。'); }));
+  const exportButton = button('バックアップを保存（PXD）', 'pxd-export', () => run(async () => { const project = await save(); download(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`); say('PXDを書き出しました。ほかの端末でも開けます。'); }));
   actions.append(openButton, saveButton, exportButton);
-  const links = document.createElement('div'); links.className = 'pxd-links'; links.setAttribute('aria-label', '同じ作品をほかのツールで開く');
+  const linksHeading = document.createElement('h3'); linksHeading.className = 'pxd-links-heading'; linksHeading.textContent = '同じ作品をほかのツールで使う';
+  const links = document.createElement('div'); links.className = 'pxd-links'; links.setAttribute('aria-label', '同じ作品をほかのツールで使う');
   for (const [target, label] of Object.entries(labels)) {
     if (target === tool) continue;
     links.append(button(label, `pxd-to-${target}`, () => run(async () => {
@@ -84,14 +86,14 @@ export function mountPxdTools(options) {
   const afterButton = button('変更後の絵を描く', 'pxd-to-spot-after', () => run(async () => { const project = await save(); location.assign(pxdToolUrl('draw', project, 'spot-after')); }));
   const hiddenImageButton = button('もの探しの絵を描く', 'pxd-to-hidden-image', () => run(async () => { const project = await save(); location.assign(pxdToolUrl('draw', project, 'hidden')); }));
   const drawingImageButton = button('描画用の絵を開く', 'pxd-to-draw-image', () => run(async () => { const project = await save(); location.assign(pxdToolUrl('draw', project, 'draw')); }));
-  const originalButton = button('旧PXDの原本を書き出す', 'pxd-export-original', () => run(async () => {
+  const originalButton = button('読み込んだ旧PXDを保存', 'pxd-export-original', () => run(async () => {
     await assertCanSave();
     const original = (held || current)?.entries.find((entry) => entry.path === 'legacy/original.pxd');
     if (!original) throw new Error('旧PXDの原本が見つかりません。');
     download(original.bytes, 'pixieed-original.pxd'); say('旧PXDの原本を変更せず書き出しました。');
   }));
   workingButton.hidden = afterButton.hidden = hiddenImageButton.hidden = drawingImageButton.hidden = originalButton.hidden = true; links.append(workingButton, afterButton, hiddenImageButton, drawingImageButton, originalButton);
-  panel.append(title, message, input, actions, links); details.append(summary);
+  panel.append(title, message, filesNote, input, actions, linksHeading, links); details.append(summary);
   const host = mount || document.querySelector(tool === 'audio' ? '.audio-more__actions' : tool === 'draw' ? '.draw-import__options' : tool === 'camera' ? '#resultControls' : '.header-inner') || document.querySelector('main');
   host?.append(details);
   // Keep the sheet outside filtered/scrolling workspaces, which create a different

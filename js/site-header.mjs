@@ -2,6 +2,7 @@ import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass
 import { derivePassGauge } from './pass-gauge.mjs?rev=20260929-tool-ui-1';
 import './site-analytics.mjs?rev=20260930-analytics-review-1';
 import { hasPassButtonMarkup, passButtonMarkup, renderPassButton } from './pass-button.mjs?rev=20260930-pass-button-1';
+import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 
 const brandedLink = () => {
   const link = document.createElement('a');
@@ -109,6 +110,8 @@ function refresh() {
 
 /** Preserve each page's own controls and its central navigation action. */
 export function mountSiteHeader() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return null;
+  installSiteInteractions({ document, window });
   if (window.top !== window.self || document.body.hasAttribute('data-admin-page')) return null;
   let header = document.querySelector('.site-header, .audio-heading, .lc-top');
   if (!header) {

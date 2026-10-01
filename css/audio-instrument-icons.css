@@ -63,3 +63,38 @@ body.creation-editor[data-page="audio"] .audio-palette-settings > summary:focus-
   body.creation-editor[data-page="audio"] .audio-track-choice { min-height: 50px !important; }
   body.creation-editor[data-page="audio"] .audio-track-choice__mark { width: 38px; height: 38px; }
 }
+/* Use the same single-row, 44px color shelf as the simple pixel editor. */
+body.creation-editor[data-page="audio"] .audio-tracks {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 44px; grid-template-columns: none;
+  justify-content: start; gap: 8px; width: 100%; max-width: none; min-width: 0;
+  max-height: 58px; padding: 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice {
+  position: relative; display: grid; place-items: center; width: 44px; height: 44px;
+  min-width: 44px; min-height: 44px !important; padding: 0 !important;
+  border: 0 !important; border-radius: 10px; background: transparent; box-shadow: none;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice__mark {
+  width: 40px; height: 40px; min-width: 40px; margin: 0; border-radius: 8px;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice[aria-pressed="true"] {
+  border: 0 !important; background: transparent !important;
+  box-shadow: 0 0 0 3px #ffd35a !important;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice__silent {
+  padding: 2px 3px; border-radius: 4px; background: #15202bd9; color: white;
+  font: 800 9px/1 system-ui,sans-serif;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice[data-perk]::after {
+  position: absolute; top: -3px; right: -3px; display: grid; place-items: center;
+  width: 17px; height: 17px; border-radius: 5px; background: #15202b; color: #fff;
+  content: "★"; font: 900 11px/1 system-ui,sans-serif; box-shadow: 0 1px 3px #0006;
+}
+body.creation-editor[data-page="audio"] .audio-track-choice[data-perk="locked"]::after { content: "🔒"; font-size: 10px; }
+body.creation-editor[data-page="audio"] .audio-track-choice--add {
+  border: 1px dashed #b8c0c2 !important; background: #26323b !important; color: #fff;
+  font: 800 25px/1 system-ui,sans-serif;
+}
+body.creation-editor[data-page="audio"] .audio-add-color-input {
+  position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+}

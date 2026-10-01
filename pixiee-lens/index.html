@@ -2256,13 +2256,9 @@
       user-select: none;
     }
   </style>
-  <script id="interaction-guard-js">
-    document.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-    });
-    document.addEventListener('dragstart', (event) => {
-      event.preventDefault();
-    });
+  <script id="interaction-guard-js" type="module">
+    import { installSiteInteractions } from '/js/site-interactions.mjs?rev=20261001-interactions-1';
+    installSiteInteractions();
   </script>
 
 
