@@ -4,8 +4,8 @@ import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, OUTPUT_SIZES, sharedFrameRatios, sha
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260930-distinct-colors-1';
 import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-pass-1';
-import { GIF_FPS, GIF_MAX_MS } from './gif.mjs?v=20260928-rewards-1';
-import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
+import { GIF_FPS, GIF_MAX_MS } from './gif.mjs?v=20261001-animation-1';
+import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
 import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { cameraPostDataUrl } from './camera-post.mjs';
@@ -15,7 +15,7 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20260930-shared-canvas-5';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261001-components-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261001-independent-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
 
 const $ = (selector) => document.querySelector(selector);

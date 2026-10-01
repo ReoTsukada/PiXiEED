@@ -156,7 +156,8 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .globe-stage.has-selection .sky-hud { display: none; }
 
 @media (max-width: 760px) {
-  .selection-panel { top: 88px; right: 10px; max-width: min(340px, calc(100% - 20px)); }
+  /* Keep the selected cell beside the compact time control and above the view switch. */
+  .selection-panel { top: 14px; right: 10px; max-width: min(340px, calc(100% - 170px)); gap: 8px; padding-left: 12px; }
 }
 
 /* On short landscape screens the parent app navigation rises over the map.

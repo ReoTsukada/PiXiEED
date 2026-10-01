@@ -209,6 +209,20 @@ export function createPxdStore({ adapter, idFactory = randomRevisionId } = {}) {
       if (project.projectId !== projectId || project.revisionId !== record.revisionId) throw new PxdStoreError('PXD_STORE_RECORD_INVALID');
       return project;
     },
+    /** Read one stored revision, including a deleted latest revision for capability checks. */
+    async inspectProject(projectId, { revisionId, includeDeleted = false } = {}) {
+      assertProjectId(projectId);
+      if (revisionId !== undefined) assertProjectId(revisionId);
+      let record = null;
+      if (includeDeleted && typeof persistence.listLatest === 'function') {
+        record = (await persistence.listLatest()).find((item) => item?.projectId === projectId) ?? null;
+        if (record && revisionId !== undefined && record.revisionId !== revisionId) record = null;
+      } else record = await persistence.read(projectId, revisionId);
+      if (!record) return null;
+      const project = await decodePxd(record.bytes);
+      if (project.projectId !== projectId || project.revisionId !== record.revisionId) throw new PxdStoreError('PXD_STORE_RECORD_INVALID');
+      return { project, revisionId: record.revisionId, ...(Number.isFinite(record.deletedAt) ? { deletedAt: record.deletedAt } : {}) };
+    },
     async save(project, { expectedRevisionId = null } = {}) {
       assertProjectId(project?.projectId);
       if (expectedRevisionId !== null) assertProjectId(expectedRevisionId);

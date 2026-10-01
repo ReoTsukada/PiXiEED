@@ -77,10 +77,15 @@ export async function summarizeProject(project) {
   const lastMode = typeof project.manifest.lastMode === 'string'
     ? Array.from(project.manifest.lastMode).slice(0, 32).join('')
     : null;
+  const stamp = project.manifest.toolProject;
+  const toolProject = stamp && typeof stamp.tool === 'string' && stamp.schemaVersion === 1
+    ? { tool: stamp.tool, schemaVersion: 1 }
+    : null;
   return {
     name: sanitizeProjectTitle(project.manifest.title),
     createdAt: safeTimestamp(project.manifest.createdAt),
     lastMode,
+    toolProject,
     width: image?.width ?? null,
     height: image?.height ?? null,
     hasDrawing,

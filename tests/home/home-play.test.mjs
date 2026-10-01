@@ -63,12 +63,17 @@ test('home hero: each colour is its own instrument — drawing, landing and clea
   assert.match(source, /play\(row\[x\],/, 'a cleared row plays its colours');
 });
 
-test('home hero: a finer grid (letters about 4 dots thick) and more to find — shooting star, cat, the pile as a score, tilt and shake', () => {
+test('home hero: a finer grid (letters about 4 dots thick), shooting star and pile score', () => {
   const source = read('js/home-play.mjs');
   assert.match(source, /const scale = Math\.max\(2, Math\.min\(4,/);
   assert.match(source, /const BR = 2;/);
-  for (const fn of ['catchShooter', 'catchCat', 'playPile', 'shake', 'askMotion', 'takeStar']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
+  for (const fn of ['catchShooter', 'playPile', 'shake', 'takeStar']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
   assert.match(source, /one burst catches at most three stars/);
-  assert.match(source, /DeviceOrientationEvent\?\.requestPermission/);
+  assert.match(source, /createHomeMotion/);
+  assert.doesNotMatch(source, /catchCat|nextCat|wordTop|wordBottom|CAT\s*=/);
   assert.match(source, /ctx\.putImageData\(img, 0, 0\)/, 'drawn through one ImageData');
+  const html = read('index.html');
+  assert.match(html, /id="hpGyro"[^>]*aria-pressed="false"[^>]*aria-busy="false"/);
+  assert.match(html, /id="hpGyroStatus" aria-live="polite"/);
+  assert.doesNotMatch(html, /猫|ネコ|ねこ/);
 });

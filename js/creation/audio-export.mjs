@@ -2,6 +2,9 @@ import { AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } fro
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
+export const AUDIO_EXPORT_MAX_SECONDS = 120;
+export const AUDIO_EXPORT_MAX_WAV_BYTES = 64 * 1024 * 1024;
+
 /** Integer scaling preserves every dot and never includes the playhead or controls. */
 export function audioImageExportSize(width, height, longEdge = 2048) {
   if (![width, height, longEdge].every(Number.isInteger) || width < 1 || height < 1 || longEdge < 1 || longEdge > 4096) throw new RangeError('画像サイズが不正です');
@@ -36,7 +39,12 @@ export function audioExportLoops(song, { minSeconds = 8, maxLoops = 8 } = {}) {
 
 /** 16-bit PCM WAV from an AudioBuffer-like { numberOfChannels, sampleRate, length, getChannelData }. */
 export function encodeWav(buffer) {
-  const channels = buffer.numberOfChannels; const frames = buffer.length; const bytes = new ArrayBuffer(44 + frames * channels * 2); const view = new DataView(bytes);
+  const channels = buffer.numberOfChannels; const frames = buffer.length;
+  if (!Number.isInteger(channels) || channels < 1 || channels > 2 || !Number.isInteger(buffer.sampleRate) || buffer.sampleRate < 8000 || buffer.sampleRate > 48000
+      || !Number.isSafeInteger(frames) || frames < 0 || 44 + frames * channels * 2 > AUDIO_EXPORT_MAX_WAV_BYTES) {
+    throw new RangeError('WAVは2分・64MBまでです。短い範囲を書き出してください。');
+  }
+  const bytes = new ArrayBuffer(44 + frames * channels * 2); const view = new DataView(bytes);
   const text = (offset, value) => { for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i)); };
   text(0, 'RIFF'); view.setUint32(4, 36 + frames * channels * 2, true); text(8, 'WAVE'); text(12, 'fmt ');
   view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true); view.setUint32(24, buffer.sampleRate, true);
@@ -56,8 +64,13 @@ export function encodeWav(buffer) {
 export async function renderAudioWav(song, { loops = audioExportLoops(song), sampleRate = 44100, OfflineContext = globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext } = {}) {
   if (!collectAudioEvents(song).length) throw new Error('まだ音がありません。');
   if (!OfflineContext) throw new Error('この端末では音を書き出せません。');
+  if (!Number.isInteger(loops) || loops < 1 || loops > 8 || !Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 48000) throw new RangeError('音の書き出し設定が不正です。');
   const loopSeconds = song.loopTicks * 60 / song.tempo / AUDIO_PPQ; const seconds = loopSeconds * loops + 1.2;
-  const offline = new OfflineContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+  const frameCount = Math.ceil(seconds * sampleRate);
+  if (!Number.isFinite(seconds) || seconds > AUDIO_EXPORT_MAX_SECONDS || 44 + frameCount * 4 > AUDIO_EXPORT_MAX_WAV_BYTES) {
+    throw new RangeError('この曲は長いためWAVへ書き出せません。曲を120秒以内にしてください。プロジェクト保存と再生は続けられます。');
+  }
+  const offline = new OfflineContext(2, frameCount, sampleRate);
   let clock = 0; let nextCycle = null;
   const context = new Proxy(offline, { get(target, key) {
     if (key === 'currentTime') return clock;

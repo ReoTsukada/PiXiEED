@@ -117,9 +117,35 @@ export function createProjectSession({ store, capture, apply = async () => {}, b
   }
 
   function markDirty() { mutation += 1; isDirty = true; notify(); }
+  /** Explicitly refresh a source from the latest project while retaining non-conflicting local edits. */
+  function refreshLatest(merge) {
+    if (typeof merge !== 'function' || !current) return Promise.reject(sessionError('PROJECT_SESSION_EMPTY'));
+    const boundId = current.projectId; const boundEpoch = epoch;
+    busyCount += 1; notify();
+    const task = queue.then(async () => {
+      const boundMutation = mutation;
+      if (epoch !== boundEpoch || current?.projectId !== boundId) throw sessionError('PROJECT_SESSION_STALE');
+      if (!isPersisted || !saved) return copyProject(current);
+      const local = await capture(copyProject(current));
+      assertIdentity(local, boundId);
+      const latest = await store.load(boundId);
+      if (!latest) throw Object.assign(new Error('このプロジェクトは削除されたか、保存先に見つかりません。編集内容は残っています。'), { code: 'PXD_PROJECT_UNAVAILABLE' });
+      assertIdentity(latest, boundId);
+      const candidate = copyProject(await merge(copyProject(saved), copyProject(local), copyProject(latest)));
+      assertIdentity(candidate, boundId);
+      await authorize(copyProject(candidate));
+      if (epoch !== boundEpoch || mutation !== boundMutation || current?.projectId !== boundId) throw sessionError('PROJECT_SESSION_STALE');
+      await apply(copyProject(candidate));
+      current = candidate; saved = copyProject(latest); isPersisted = true;
+      isDirty = !sameContent(saved, candidate); epoch += 1; mutation += 1; notify();
+      return copyProject(current);
+    });
+    queue = task.catch(() => {});
+    return task.catch((error) => { notify(error); throw error; }).finally(() => { busyCount -= 1; notify(); });
+  }
   async function wait() { await queue; }
   return {
     get currentProject() { return current; }, get persistedProject() { return saved; }, get persisted() { return isPersisted; }, get dirty() { return isDirty; }, get busy() { return busyCount > 0; },
-    initialize, save, adopt, replace, reset, rename, markDirty, wait
+    initialize, save, adopt, replace, reset, rename, markDirty, refreshLatest, wait
   };
 }

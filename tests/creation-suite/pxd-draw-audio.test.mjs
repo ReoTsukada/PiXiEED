@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson } from '../../js/creation/pxd-codec.mjs';
 import { imageToDrawDocument, putPxdImage, putPxdSharedImage, readPxdImage, readPxdSharedImage } from '../../js/creation/pxd-project.mjs';
 import { createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { addAnimationFrame, createAnimation, removeAnimationFrame } from '../../js/creation/animation-core.mjs';
+import { createAudioAnimationLink } from '../../js/creation/audio-animation.mjs';
 import {
-  assignPxdAudioColor, audioCellLink, audioSongImage, pxdImageToAudioDocument, preparePxdAudioImageImport, prepareSharedAudioImageImport, readPxdAudioState,
-  readPxdDrawDocument, resizePxdAudioWorkingImage, setSharedAudioCell, synchronizeLinkedAudioImage, validatePxdAudioBinding, writePxdAudioState, writePxdDrawDocument
+  assignPxdAudioColor, audioCellLink, audioSongImage, pxdImageToAudioDocument, preparePxdAudioImageImport, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState,
+  readPxdDrawDocument, resizePxdAudioWorkingImage, setSharedAudioCell, synchronizeLinkedAudioImage, updatePxdAudioAnimationLink, validatePxdAudioBinding, writePxdAudioState, writePxdDrawDocument
 } from '../../js/creation/pxd-draw-audio.mjs';
 
 function fixtureDocument() {
@@ -287,4 +289,21 @@ test('a newly added silent palette color remains available before it is painted'
   project = await writePxdAudioState(project, added.song, { image, link: added.link });
   const reopened = prepareSharedAudioImageImport(readPxdAudioState(project), await readPxdSharedImage(project), { colorToSlot: getPxdJson(project, 'audio/link.json').colorToSlot });
   assert.equal(reopened.link.colorToSlot['rgba-5e9ed2ff'], null);
+});
+
+test('an external audio-role frame edit updates link metadata without changing music until refresh', async () => {
+  const baseSong = setAudioPixel(createAudioSong({ songId: 'audio-animation-link', tempo: 132 }), { trackId: 'track-square', pitch: 84, startTick: 0, noteId: 'stale-projection' });
+  let animation = createAnimation({ width: 16, height: 16, palette: ['#ff0000'] });
+  const removedFrameId = animation.frames[0].id;
+  animation = addAnimationFrame(animation, { sourceFrameId: removedFrameId });
+  const song = { ...baseSong, tracks: baseSong.tracks.map((track) => track.trackId === 'track-square' ? { ...track, clips: track.clips.map((clip) => ({ ...clip, notes: clip.notes.map((note) => ({ ...note, sourceCell: { kind: 'audio-animation', frameId: removedFrameId, frameIndex: 0, x: 0, localX: 0, y: 0 } })) })) } : track) };
+  const link = createAudioAnimationLink(song, animation, { colorToSlot: { 'rgba-ff0000ff': 'square' } });
+  let project = await writePxdAudioState(createPxdProject({ projectId: 'audio-animation-link-project' }), song, { link, animation });
+  animation = removeAnimationFrame(animation, removedFrameId);
+  project = await updatePxdAudioAnimationLink(project, animation);
+  assert.equal(readPxdAudioState(project).tempo, 132);
+  assert.equal(readPxdAudioLink(project).projectionReady, false);
+  assert.deepEqual(readPxdAudioLink(project).frameIds, animation.frames.map(({ id }) => id));
+  assert.equal(readPxdAudioLink(project).colorToSlot['rgba-ff0000ff'], 'square');
+  assert.equal(readPxdAudioState(project).tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes)).length, 1);
 });

@@ -3,6 +3,7 @@ import { getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1
 
 const VIDEO_FRAME_LONG_EDGE = 1024;
 const VIDEO_FRAME_MAX_EDGE = 1024;
+export const AUDIO_VIDEO_MAX_SECONDS = 120;
 
 export function audioVideoFrameSize(width, height, { longEdge = VIDEO_FRAME_LONG_EDGE, maxEdge = VIDEO_FRAME_MAX_EDGE } = {}) {
   if (![width, height, longEdge, maxEdge].every(Number.isInteger) || width < 1 || height < 1 || longEdge < 1 || maxEdge < longEdge || maxEdge > 2048) throw new RangeError('動画の画像サイズが不正です。');
@@ -28,7 +29,7 @@ export function chooseAudioVideoMimeType(MediaRecorderImpl = globalThis.MediaRec
   }, {}) || null;
 }
 
-function makeVideoCanvas(documentRef, image, frameSize) {
+function makeVideoCanvas(documentRef, image, frameSize, frameImages = [image], frameTicks = 0, loopTicks = 1) {
   const source = documentRef.createElement('canvas');
   source.width = image.width; source.height = image.height;
   const sourceContext = source.getContext('2d', { alpha: true });
@@ -40,7 +41,15 @@ function makeVideoCanvas(documentRef, image, frameSize) {
   canvas.width = frameSize.width; canvas.height = frameSize.height;
   const context = canvas.getContext('2d', { alpha: false });
   context.imageSmoothingEnabled = false;
+  let lastFrame = -1;
   const draw = (progress) => {
+    const frameIndex = Math.min(frameImages.length - 1, frameTicks > 0
+      ? Math.floor(Math.max(0, Math.min(0.999999, progress)) * loopTicks / frameTicks)
+      : Math.floor(Math.max(0, Math.min(0.999999, progress)) * frameImages.length));
+    if (frameIndex !== lastFrame) {
+      const frame = frameImages[frameIndex];
+      const pixels = sourceContext.createImageData(frame.width, frame.height); pixels.data.set(frame.rgba); sourceContext.putImageData(pixels, 0, 0); lastFrame = frameIndex;
+    }
     context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(source, 0, 0, canvas.width, canvas.height);
     const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(canvas.width * progress)));
@@ -73,6 +82,8 @@ export async function renderAudioVideo(song, image, {
   playerFactory = createAudioPlayer,
   signal,
   onProgress = () => {},
+  frameImages = null,
+  frameTicks = null,
   setTimeoutImpl = globalThis.setTimeout.bind(globalThis),
   clearTimeoutImpl = globalThis.clearTimeout.bind(globalThis),
   setIntervalImpl = globalThis.setInterval.bind(globalThis),
@@ -81,6 +92,7 @@ export async function renderAudioVideo(song, image, {
   const events = collectAudioEvents(song);
   if (!events.length) throw new Error('まだ音符がありません。');
   if (!image || !Number.isInteger(image.width) || !Number.isInteger(image.height) || image.width < 1 || image.height < 1 || !(image.rgba instanceof Uint8Array || image.rgba instanceof Uint8ClampedArray) || image.rgba.length !== image.width * image.height * 4) throw new TypeError('動画に使う絵を読み込めませんでした。');
+  if (frameImages && (!Array.isArray(frameImages) || frameImages.length < 1 || frameImages.length > 128 || frameImages.some((frame) => frame.width !== image.width || frame.height !== image.height || !(frame.rgba instanceof Uint8Array || frame.rgba instanceof Uint8ClampedArray) || frame.rgba.length !== image.width * image.height * 4))) throw new TypeError('動画のコマを読み込めませんでした。');
   if (!MediaRecorderImpl || !AudioContextImpl || !MediaStreamImpl || !documentRef?.createElement) throw new Error('このブラウザーでは音付き動画を作れません。PNGとWAVは引き続き保存できます。');
   const mime = chooseAudioVideoMimeType(MediaRecorderImpl);
   if (!mime) throw new Error('このブラウザーは音付き動画の保存に対応していません。PNGとWAVは引き続き保存できます。');
@@ -88,6 +100,7 @@ export async function renderAudioVideo(song, image, {
 
   const frameSize = audioVideoFrameSize(image.width, image.height);
   const loopSeconds = song.loopTicks * 60 / song.tempo / AUDIO_PPQ;
+  if (!Number.isFinite(loopSeconds) || loopSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('この曲は長いため動画にできません。曲を120秒以内にしてください。プロジェクト保存と再生は続けられます。');
   const releaseSeconds = Math.max(0, ...events.map(({ instrument }) => getAudioInstrument(instrument)?.release || 0));
   const tailMs = Math.ceil(releaseSeconds * 1000) + 80;
   const chunks = []; const allTracks = new Set();
@@ -115,7 +128,7 @@ export async function renderAudioVideo(song, image, {
   const abortListener = () => finishError(abortError());
 
   try {
-    ({ canvas, source, draw } = makeVideoCanvas(documentRef, image, frameSize));
+    ({ canvas, source, draw } = makeVideoCanvas(documentRef, image, frameSize, frameImages || [image], frameTicks, song.loopTicks));
     if (typeof canvas.captureStream !== 'function') throw new Error('このブラウザーでは映像を記録できません。PNGとWAVは引き続き保存できます。');
     canvasStream = canvas.captureStream(24);
     audioContext = new AudioContextImpl();

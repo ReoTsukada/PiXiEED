@@ -27,6 +27,28 @@ test('GIF has the header, looping block, one image per frame and the trailer', (
   assert.equal(bytes[bytes.length - 1], 0x3b);
 });
 
+test('each animation frame can override the global delay and rounds to GIF centiseconds', () => {
+  const frames = [frame(1, 1, () => [255, 0, 0]), frame(1, 1, () => [0, 0, 255])];
+  frames[0].delayMs = 25;
+  const bytes = encodeGif(frames, { delayMs: 60 });
+  const controls = [];
+  for (let index = 0; index < bytes.length - 7; index += 1) if (bytes[index] === 0x21 && bytes[index + 1] === 0xf9 && bytes[index + 2] === 4) {
+    controls.push({ packed: bytes[index + 3], delay: bytes[index + 4] | bytes[index + 5] << 8 });
+  }
+  assert.deepEqual(controls.map(({ delay }) => delay), [3, 6]);
+  assert.deepEqual(controls.map(({ packed }) => packed), [0x04, 0x04]);
+  frames[0].delayMs = 19;
+  assert.throws(() => encodeGif(frames, { delayMs: 60 }), /20〜655350ms/);
+});
+
+test('transparent animation frames use a transparent background and disposal-to-background', () => {
+  const first = frame(2, 1, (x) => x ? [255, 0, 0] : [0, 0, 0]); first.data[3] = 0;
+  const second = frame(2, 1, (x) => x ? [0, 0, 255] : [0, 0, 0]); second.data[3] = 0;
+  const bytes = encodeGif([first, second]); const controls = [];
+  for (let index = 0; index < bytes.length - 7; index += 1) if (bytes[index] === 0x21 && bytes[index + 1] === 0xf9 && bytes[index + 2] === 4) controls.push(bytes[index + 3]);
+  assert.deepEqual(controls, [0x09, 0x09]);
+});
+
 test('GIF scale keeps dots sharp at about 1024px', () => {
   assert.equal(gifScale(256, 192), 4);
   assert.equal(gifScale(64, 64), 16);

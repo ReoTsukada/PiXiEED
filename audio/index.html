@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-perk-icons-1">
   <link rel="stylesheet" href="/css/site.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/creation-audio.css?rev=20260930-audio-palette-1">
+  <link rel="stylesheet" href="/css/creation-animation.css?rev=20261001-animation-1">
   <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
@@ -44,6 +45,9 @@
           <button id="audio-current" class="audio-current" type="button" aria-label="選択中の色と音色を設定" aria-expanded="false" aria-controls="audio-palette-settings"><span class="audio-current__swatch" aria-hidden="true"></span></button>
           <div id="audio-tracks" class="audio-tracks" role="group" aria-label="描く色を選ぶ"></div>
         </div>
+        <section id="audio-animation-panel" class="audio-animation-panel" aria-label="アニメーション操作" hidden>
+          <div id="audio-animation-controls" class="animation-controls-host"></div>
+        </section>
         <div class="audio-tools creation-editor__tools-row" role="group" aria-label="音符を描く道具">
           <button id="audio-tool-pen" type="button" aria-pressed="true" aria-label="ペン"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg></button>
           <button id="audio-tool-eraser" type="button" aria-pressed="false" aria-label="消しゴム"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4 15l9-9 6 6-7 7H8z"/><path d="M9 10l6 6"/></svg></button>
@@ -63,9 +67,6 @@
             <div class="audio-popover-body audio-more__actions">
               <button id="audio-save" type="button">プロジェクトを保存</button>
               <div class="creation-output__project-help">曲と絵をこの端末のプロジェクトに保存します。</div>
-              <button id="audio-resume" type="button" hidden>前回の曲を開く</button>
-              <div id="audio-shelf" hidden></div>
-              <button id="audio-from-camera" type="button" hidden>前のカメラ画像から</button>
             </div>
           </details>
         </div>
@@ -78,7 +79,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/audio-page.mjs?rev=20261001-components-1"></script>
+  <script type="module" src="/js/creation/audio-entry.mjs?rev=20261001-independent-editors-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261001-context-1"></script>
 </body>
 </html>

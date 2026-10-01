@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { audioVideoFrameSize, chooseAudioVideoMimeType, renderAudioVideo } from '../../js/creation/audio-video.mjs';
-import { createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { AUDIO_MAX_LOOP_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
 
 test('video frame sizing preserves the source aspect ratio and stays bounded', () => {
   assert.deepEqual(audioVideoFrameSize(16, 16), { width: 1024, height: 1024, scale: 64 });
@@ -108,4 +108,22 @@ test('recorder startup errors clean up streams and audio resources', async () =>
   const harness = makeHarness({ failRecorder: true }); const { song, image } = fixture();
   await assert.rejects(renderAudioVideo(song, image, harness.dependencies), /recorder failed/);
   assert.ok(harness.audioTracks[0].stopped); assert.ok(harness.videoTracks[0].stopped); assert.ok(harness.contexts[0].closed);
+});
+
+test('long video requests are rejected before creating media or canvas resources', async () => {
+  const harness = makeHarness();
+  const song = setAudioPixel(createAudioSong({ loopTicks: AUDIO_MAX_LOOP_TICKS }), {
+    trackId: 'track-square', pitch: 84, startTick: 0, noteId: 'long-video-note'
+  });
+  const image = { width: 16, height: 16, rgba: new Uint8Array(16 * 16 * 4) };
+  await assert.rejects(renderAudioVideo(song, image, harness.dependencies), /120秒以内/);
+  assert.equal(harness.contexts.length, 0);
+  assert.equal(harness.recorder, undefined);
+  assert.equal(harness.draws.length, 0);
+});
+
+test('invalid animation video frames are rejected before recording resources are created', async () => {
+  const harness = makeHarness(); const { song, image } = fixture();
+  await assert.rejects(renderAudioVideo(song, image, { ...harness.dependencies, frameImages: [{ ...image, width: 1 }] }), /動画のコマ/);
+  assert.equal(harness.contexts.length, 0); assert.equal(harness.draws.length, 0);
 });

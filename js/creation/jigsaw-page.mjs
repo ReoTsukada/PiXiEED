@@ -13,7 +13,7 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-components-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-independent-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
@@ -31,6 +31,9 @@ const resumeButton = $('#jigsaw-resume'); const saveButton = $('#jigsaw-save');
 const setupSection = $('#jigsaw-setup'); const playSection = $('#jigsaw-play');
 const boardElement = $('#jigsaw-board'); const workspaceElement = $('#jigsaw-workspace'); const trayElement = $('#jigsaw-tray');
 const previewPanel = $('#jigsaw-preview'); const previewCanvas = $('#jigsaw-preview-canvas'); const previewToggle = $('#jigsaw-preview-toggle');
+const previewDragHandle = previewPanel?.querySelector('.jigsaw-preview__head');
+const JIGSAW_PREVIEW_POSITION_KEY = 'pixieed:jigsaw:preview-position:v1';
+let previewDrag = null;
 const completionMessage = $('#jigsaw-complete'); const sourceLabel = $('#jigsaw-source-label');
 const trayPrev = $('#jigsaw-tray-prev'); const trayNext = $('#jigsaw-tray-next'); const trayPageLabel = $('#jigsaw-tray-page');
 const interactionEffects = createInteractionEffects();
@@ -412,6 +415,38 @@ function closeSourcePreview() {
   if (previewPanel) previewPanel.hidden = true;
   previewToggle?.setAttribute('aria-pressed', 'false');
   previewToggle?.setAttribute('aria-label', '完成図を表示');
+}
+function clampPreviewPosition(left, top) {
+  if (!previewPanel) return null;
+  const margin = 8;
+  const rect = previewPanel.getBoundingClientRect();
+  return {
+    left: Math.max(margin, Math.min(window.innerWidth - rect.width - margin, left)),
+    top: Math.max(margin, Math.min(window.innerHeight - rect.height - margin, top))
+  };
+}
+function placePreview(left, top, remember = true) {
+  if (!previewPanel) return;
+  const position = clampPreviewPosition(left, top);
+  if (!position) return;
+  previewPanel.style.left = `${position.left}px`;
+  previewPanel.style.top = `${position.top}px`;
+  previewPanel.style.right = 'auto';
+  if (remember) {
+    try { localStorage.setItem(JIGSAW_PREVIEW_POSITION_KEY, JSON.stringify(position)); } catch {}
+  }
+}
+function persistPreviewPosition() {
+  if (!previewPanel) return;
+  const rect = previewPanel.getBoundingClientRect();
+  try { localStorage.setItem(JIGSAW_PREVIEW_POSITION_KEY, JSON.stringify({ left: rect.left, top: rect.top })); } catch {}
+}
+function restorePreviewPosition() {
+  if (!previewPanel) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(JIGSAW_PREVIEW_POSITION_KEY) || 'null');
+    if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) placePreview(saved.left, saved.top, false);
+  } catch {}
 }
 function setSourcePreview(image) {
   renderSourcePreview(image);
@@ -823,10 +858,49 @@ startButton.addEventListener('click', startGame);
 // The reference window is independent of the table's drag/pinch capture.
 previewPanel?.addEventListener('pointerdown', (event) => event.stopPropagation());
 previewPanel?.addEventListener('wheel', (event) => event.stopPropagation(), { passive: true });
+previewDragHandle?.addEventListener('pointerdown', (event) => {
+  if (event.target.closest('button') || event.button !== 0) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const rect = previewPanel.getBoundingClientRect();
+  previewDrag = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
+  try { previewDragHandle.setPointerCapture(event.pointerId); } catch {}
+  placePreview(rect.left, rect.top, false);
+});
+previewDragHandle?.addEventListener('pointermove', (event) => {
+  if (!previewDrag || event.pointerId !== previewDrag.pointerId) return;
+  event.preventDefault();
+  placePreview(event.clientX - previewDrag.offsetX, event.clientY - previewDrag.offsetY, false);
+});
+const finishPreviewDrag = (event) => {
+  if (previewDrag && event.pointerId === previewDrag.pointerId) {
+    previewDrag = null;
+    persistPreviewPosition();
+  }
+};
+previewDragHandle?.addEventListener('pointerup', finishPreviewDrag);
+previewDragHandle?.addEventListener('pointercancel', finishPreviewDrag);
+previewDragHandle?.addEventListener('lostpointercapture', finishPreviewDrag);
+previewDragHandle?.addEventListener('keydown', (event) => {
+  if (event.target.closest('button')) return;
+  const step = event.shiftKey ? 32 : 16;
+  const directions = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+  const direction = directions[event.key];
+  if (!direction) return;
+  event.preventDefault();
+  const rect = previewPanel.getBoundingClientRect();
+  placePreview(rect.left + direction[0], rect.top + direction[1]);
+});
+window.addEventListener('resize', () => {
+  if (!previewPanel || previewPanel.hidden || !previewPanel.style.left) return;
+  const rect = previewPanel.getBoundingClientRect();
+  placePreview(rect.left, rect.top);
+});
 previewToggle?.addEventListener('click', () => {
   if (!sourcePixels) return;
   const opening = previewPanel.hidden;
   previewPanel.hidden = !opening;
+  if (opening) restorePreviewPosition();
   previewToggle.setAttribute('aria-pressed', String(opening));
   previewToggle.setAttribute('aria-label', opening ? '完成図を閉じる' : '完成図を表示');
 });

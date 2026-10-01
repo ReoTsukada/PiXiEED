@@ -6,7 +6,9 @@ export const AUDIO_PIXEL_COLUMNS = 16;
 export const AUDIO_PIXEL_PITCHES = Object.freeze([84, 81, 79, 76, 74, 72, 69, 67, 64, 62, 60, 57, 55, 52, 50, 48]);
 export const AUDIO_PIXEL_COLUMN_OPTIONS = Object.freeze([16, 32, 64, 128]);
 export const AUDIO_BAR_TICKS = AUDIO_PPQ * 4;
-export const AUDIO_MAX_LOOP_TICKS = AUDIO_BAR_TICKS * 16;
+// Animation sequences can span 128 frames at 256 columns per frame (2048 bars).
+export const AUDIO_MAX_LOOP_TICKS = AUDIO_BAR_TICKS * 2048;
+export const AUDIO_MAX_PLAYBACK_EVENTS = 100_000;
 export const AUDIO_MIN_TEMPO = 60;
 export const AUDIO_MAX_TEMPO = 180;
 export const AUDIO_SHARED_IMAGE_MAX_DIMENSION = 256;
@@ -79,10 +81,12 @@ export function resizeAudioCanvas(song, columns) {
 }
 
 /** Give each shared-image column one 16th note, without shortening existing music. */
-export function extendAudioLoopForImage(song, width) {
+export function extendAudioLoopForImage(song, width, { frameCount = 1 } = {}) {
   validateAudioSong(song);
   if (!Number.isInteger(width) || width < 1 || width > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('画像の横幅は1〜256列です');
-  const requiredTicks = Math.ceil(width * AUDIO_PIXEL_TICKS / AUDIO_BAR_TICKS) * AUDIO_BAR_TICKS;
+  if (!Number.isInteger(frameCount) || frameCount < 1 || frameCount > 128) throw new RangeError('音楽に取り込むコマは1〜128枚です');
+  const requiredTicks = Math.ceil(width * frameCount * AUDIO_PIXEL_TICKS / AUDIO_BAR_TICKS) * AUDIO_BAR_TICKS;
+  if (requiredTicks > AUDIO_MAX_LOOP_TICKS) throw new RangeError('アニメーションを取り込む曲が長すぎます');
   return resizeAudioLoop(song, Math.max(song.loopTicks, requiredTicks));
 }
 
@@ -300,7 +304,9 @@ export function collectAudioEvents(song, { joinAdjacent = false } = {}) {
         if (current && current.colorId === event.colorId && current.velocity === event.velocity
           && current.startTick + current.durationTicks === event.startTick
           && Boolean(current.sourceCell) === Boolean(event.sourceCell)
-          && (!event.sourceCell || current.sourceCell.x + 1 === event.sourceCell.x)) {
+          && (!event.sourceCell || (current.sourceCell.kind === 'audio-animation'
+            ? current.sourceCell.x + current.durationTicks / AUDIO_PIXEL_TICKS === event.sourceCell.x
+            : current.sourceCell.x + 1 === event.sourceCell.x))) {
           current.durationTicks += event.durationTicks;
           if (event.sourceCell) current.sourceCell = event.sourceCell;
         } else { current = { ...event }; audible.push(current); }
@@ -361,8 +367,24 @@ function makeInstrumentSource(context, profile, waveform, duty, frequency, onset
   return source;
 }
 
+function estimateOverlapCounts(events) {
+  const heap = [];
+  const push = (value) => { let index = heap.length; heap.push(value); while (index > 0) { const parent = (index - 1) >> 1; if (heap[parent] <= value) break; heap[index] = heap[parent]; index = parent; } heap[index] = value; };
+  const pop = () => { const first = heap[0]; const last = heap.pop(); if (heap.length) { let index = 0; while (true) { const left = index * 2 + 1; const right = left + 1; if (left >= heap.length) break; const child = right < heap.length && heap[right] < heap[left] ? right : left; if (heap[child] >= last) break; heap[index] = heap[child]; index = child; } heap[index] = last; } return first; };
+  const counts = new Array(events.length); let index = 0;
+  while (index < events.length) {
+    const onset = events[index].onsetTick; let end = index + 1;
+    while (end < events.length && events[end].onsetTick === onset) end += 1;
+    while (heap.length && heap[0] <= onset) pop();
+    const overlaps = heap.length + end - index;
+    for (let cursor = index; cursor < end; cursor += 1) { counts[cursor] = overlaps; push(events[cursor].endTick); }
+    index = end;
+  }
+  return counts;
+}
+
 export function createAudioPlayer({ audioContextFactory = () => new globalThis.AudioContext(), schedule = globalThis.setTimeout, cancel = globalThis.clearTimeout, onStateChange = () => {} } = {}) {
-  let context = null; let loopTimer = null; let playing = false; let starting = false; let stopAtLoopEnd = false; let token = 0; let previewToken = 0; let cycleStartAt = null; let cycleLoopTicks = null; let cycleSecondsPerTick = null; const activeNodes = new Set(); const previewNodes = new Set();
+  let context = null; let loopTimer = null; let lookaheadTimer = null; let playing = false; let starting = false; let stopAtLoopEnd = false; let token = 0; let previewToken = 0; let cycleStartAt = null; let cycleLoopTicks = null; let cycleSecondsPerTick = null; const activeNodes = new Set(); const previewNodes = new Set();
 
   function notify() { onStateChange(playing, starting); }
   function disposeNode(node) {
@@ -387,6 +409,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
     starting = false;
     cycleStartAt = null; cycleLoopTicks = null; cycleSecondsPerTick = null;
     if (loopTimer !== null) { cancel(loopTimer); loopTimer = null; }
+    if (lookaheadTimer !== null) { cancel(lookaheadTimer); lookaheadTimer = null; }
     const now = context?.currentTime ?? 0;
     for (const node of [...activeNodes]) {
       try { node.stop(now); } catch {}
@@ -406,14 +429,28 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
 
   function scheduleCycle(song, cycleToken) {
     if (!playing || cycleToken !== token || !context) return;
-    const events = collectAudioEvents(song, { joinAdjacent: true }); const startAt = context.currentTime + 0.035;
+    const events = collectAudioEvents(song, { joinAdjacent: true });
+    if (events.length > AUDIO_MAX_PLAYBACK_EVENTS) throw new RangeError(`再生できる音符数は${AUDIO_MAX_PLAYBACK_EVENTS.toLocaleString()}個までです。絵を曲に反映し直すか、音符を減らしてください。`);
+    const startAt = context.currentTime + 0.035;
     const secondsPerTick = 60 / song.tempo / AUDIO_PPQ;
     cycleStartAt = startAt; cycleLoopTicks = song.loopTicks; cycleSecondsPerTick = secondsPerTick;
     const scheduled = events.map((event) => {
       const instrument = getAudioInstrument(event.instrument);
       return { event, instrument, onsetTick: event.startTick, endTick: event.startTick + event.durationTicks + (instrument?.release || 0) / secondsPerTick };
     });
-    for (const { event, instrument, endTick } of scheduled) {
+    const playable = scheduled.map((item, index) => ({ ...item, index })).filter(({ instrument }) => instrument);
+    const playableCounts = estimateOverlapCounts(playable);
+    const overlapCounts = new Array(scheduled.length).fill(1);
+    playable.forEach(({ index }, position) => { overlapCounts[index] = playableCounts[position]; });
+    let eventIndex = 0;
+    const scheduleWindow = () => {
+      if (!playing || cycleToken !== token || !context) return;
+      const windowEnd = context.currentTime + 1; let batch = 0;
+      while (eventIndex < scheduled.length && batch < 256) {
+      const item = scheduled[eventIndex];
+      if (startAt + item.onsetTick * secondsPerTick > windowEnd) break;
+      eventIndex += 1; batch += 1;
+      const { event, instrument } = item;
       if (!instrument) continue;
       const onset = startAt + event.startTick * secondsPerTick;
       const frequency = midiFrequency(event.pitch);
@@ -423,7 +460,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       const decayEnd = Math.min(gateEnd, onset + instrument.attack + instrument.decay);
       // Scale only dense passages. Count notes whose gated or release sound
       // overlaps this note's audible window, including tails from earlier cells.
-      const overlaps = scheduled.filter((candidate) => candidate.instrument && candidate.onsetTick < endTick && candidate.endTick > event.startTick).length;
+      const overlaps = overlapCounts[eventIndex - 1] || 1;
       const peak = event.velocity / 127 * 0.18 / Math.sqrt(Math.max(1, overlaps));
       const sum = context.createGain();
       let output = sum;
@@ -463,13 +500,17 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
         activeNodes.add(source); source.start(onset); source.stop(soundEnd);
       });
       activeNodes.add(sum); activeNodes.add(gain);
-    }
+      }
+      if (eventIndex < scheduled.length) lookaheadTimer = schedule(() => { lookaheadTimer = null; scheduleWindow(); }, 25);
+    };
     loopTimer = schedule(() => {
       loopTimer = null;
+      if (lookaheadTimer !== null) { cancel(lookaheadTimer); lookaheadTimer = null; }
       if (!stopAtLoopEnd) { scheduleCycle(song, cycleToken); return; }
       const releaseMs = Math.max(0, ...events.map(({ instrument: id }) => getAudioInstrument(id)?.release || 0)) * 1000;
       loopTimer = schedule(stop, releaseMs + 60);
     }, song.loopTicks * secondsPerTick * 1000);
+    scheduleWindow();
   }
 
   async function preview({ instrument: instrumentId, pitch, velocity = 80, duration = 0.12 } = {}) {

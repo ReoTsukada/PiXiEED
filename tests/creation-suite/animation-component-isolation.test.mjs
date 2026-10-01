@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createAnimationFromDraw, addAnimationFrame, writeAnimationCel, composeAnimationFrame } from '../../js/creation/animation-core.mjs';
+import { createPxdProject, setPxdJson, getPxdJson } from '../../js/creation/pxd-codec.mjs';
+import { readPxdAnimation, writePxdAnimation } from '../../js/creation/pxd-animation.mjs';
+import { writePxdAudioState, writePxdDrawDocument, readPxdAudioState, readPxdAudioLink } from '../../js/creation/pxd-draw-audio.mjs';
+import { createAudioSong } from '../../js/creation/audio-core.mjs';
+import { replaceProjectComponentImage, putProjectComponentImage } from '../../js/creation/project-components.mjs';
+test('explicit project-shelf music refresh transfers all frames and preserves source, tempo and unrelated puzzle', async () => {
+  const doc = { schemaVersion: 1, width: 16, height: 16, palette: ['#e75445'], pixels: Array(256).fill(-1) }; doc.pixels[4] = 0;
+  let animation = addAnimationFrame(createAnimationFromDraw(doc));
+  let project = await writePxdDrawDocument(createPxdProject(), doc, 'main');
+  project = await writePxdAnimation(project, animation);
+  project = await writePxdAudioState(project, createAudioSong({ tempo: 93 }));
+  project = setPxdJson(project, 'custom/puzzle-snapshot.json', { answer: [4, 5], revision: 'published-fixed' });
+  const next = await replaceProjectComponentImage(project, 'audio', { width: 16, height: 16, rgba: new Uint8Array(1024) });
+  const audio = await readPxdAnimation(next, 'audio');
+  assert.equal(audio.frames.length, 2); assert.equal(readPxdAudioState(next).tempo, 93);
+  assert.deepEqual(composeAnimationFrame(await readPxdAnimation(next), animation.frames[0].id), doc);
+  assert.deepEqual(getPxdJson(next, 'custom/puzzle-snapshot.json'), getPxdJson(project, 'custom/puzzle-snapshot.json'));
+  assert.equal(readPxdAudioLink(next).projectionReady, true);
+  animation = writeAnimationCel(audio, audio.frames[0].id, audio.layers[0].id, { width: 16, height: 16, pixels: new Uint8Array(256) });
+  assert.equal(composeAnimationFrame(await readPxdAnimation(next), audio.frames[0].id).pixels[4], 0);
+  assert.equal(composeAnimationFrame(animation, audio.frames[0].id).pixels[4], -1);
+});
+test('generic static canvas conversion refuses overwriting an animated image role', async () => {
+  const doc = { schemaVersion: 1, width: 16, height: 16, palette: ['#000000'], pixels: Array(256).fill(-1) };
+  const project = await writePxdAnimation(createPxdProject(), createAnimationFromDraw(doc));
+  await assert.rejects(putProjectComponentImage(project, 'draw', { width: 16, height: 16, rgba: new Uint8Array(1024) }, 'main'), /アニメーション/);
+  assert.equal((await readPxdAnimation(project)).width, 16);
+});

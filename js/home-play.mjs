@@ -7,6 +7,7 @@
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
+import { createHomeMotion } from './home-motion.mjs?rev=20261001-gyro-1';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced';
@@ -158,11 +159,11 @@ function hero() {
   //  ・描く — drag to draw; let go and the drawing drops as one piece; a full row clears like Tetris
   //  ・文字 — dragging through PiXiEED knocks letters loose, a tap bursts one; flying dots catch stars they hit
   //  ・星 — tap a star to catch it; a shooting star is worth five
-  //  ・ねこ — now and then a cat peeks out between the stars; tap it before it hides
   //  ・楽譜 — a light sweeps the pile left to right and plays it: height is pitch, colour is instrument
-  //  ・傾ける / 振る — on a phone the sand flows with the tilt, and a shake knocks the pile loose
+  //  ・ジャイロ — turn it on to pour the sand sideways; shaking loosens the pile
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
+  const gyroButton = document.getElementById('hpGyro'); const gyroStatus = document.getElementById('hpGyroStatus');
   // (older markup has neither the score nor the new hint: supply them)
   let score = document.getElementById('hpScore');
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
@@ -179,8 +180,8 @@ function hero() {
   let dots = [];                  // letter dots with physics
   let stars = []; let caught = 0; let bursts = []; let combo = 0; let lastCatch = 0;
   let pieces = []; let flashes = []; let lines = 0; let grains = 0; // dropped drawings, rows being cleared
-  let shooter = null; let nextShooter = 0; let cat = null; let nextCat = 0; let beats = [];
-  let tilt = 0; let wordTop = 0; let wordBottom = 0; let burstNo = 0; const burstCatches = new Map();
+  let shooter = null; let nextShooter = 0; let beats = [];
+  let tilt = 0; let burstNo = 0; const burstCatches = new Map();
   let drawing = false; let last = null; let downAt = null;
   // what this visitor seems to enjoy: after enough of one play, the matching tool is offered once
   const interest = { ink: 0, letters: 0 };
@@ -227,7 +228,6 @@ function hero() {
       }));
       x0 += (FONT[ch][0].length + 1) * scale;
     });
-    wordTop = y0; wordBottom = y0 + 5 * scale;
     stars = Array.from({ length: Math.max(14, Math.min(40, Math.round(W * H / 380))) }, newStar);
   }
   const isSolid = (x, y) => y >= F || (x >= 0 && x < W && y >= 0 && sand[y * W + x] > 0);
@@ -283,21 +283,6 @@ function hero() {
     sparkle(sx, sy, GOLD, 24, 20); [0, 2, 4, 7, 9].forEach((n, i) => setTimeout(() => play(1, n + 10, { volume: 0.04 }), i * 60));
     return true;
   }
-  // ---- a cat that peeks out between the stars ----
-  const CAT = sprite(['o.....o', 'oo...oo', 'ooooooo', 'okoooko', 'ooopooo', '.ooooo.']).map((row) => row.map((c) => c && rgb(c)));
-  function catchCat(x, y) {
-    if (!cat || cat.seen) return false;
-    const m = reach(10); const s = cat.scale;
-    if (x < cat.x - m || x > cat.x + 7 * s + m || y < cat.y - m || y > cat.y + 6 * s + m) return false;
-    cat.seen = performance.now();
-    for (let k = 0; k < 30; k++) { const a = Math.random() * 6.28; const sp = (8 + Math.random() * 18) * K; bursts.push({ x: cat.x + 3.5 * s, y: cat.y + 3 * s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 6 * K, life: 1.2, color: RGB[k % RGB.length] }); }
-    try { // にゃ: a little falling glide
-      if (soundOn) { audio ??= new AudioContext(); const t = audio.currentTime; const o = audio.createOscillator(); const g = audio.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(880, t); o.frequency.exponentialRampToValueAtTime(560, t + 0.28); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32); o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.35); }
-    } catch { /* no audio */ }
-    invite('find');
-    return true;
-  }
-
   // ---- the pile is a score: a light sweeps it and plays each column's top grain ----
   const STEPS = 16; const BAR_MS = 4000; let lastStep = -1;
   function playPile(now) {
@@ -314,21 +299,13 @@ function hero() {
   }
 
   // ---- phones: tilt to pour the sand sideways, shake to knock the pile loose ----
-  let askedMotion = false; let lastShake = 0;
-  function listenMotion() {
-    addEventListener('deviceorientation', (e) => { if (e.gamma != null) tilt = Math.max(-1, Math.min(1, e.gamma / 35)); });
-    let prev = null;
-    addEventListener('devicemotion', (e) => {
-      const a = e.accelerationIncludingGravity; if (!a || a.x == null) return;
-      if (prev) { const jolt = Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z); const now = performance.now(); if (jolt > 28 && now - lastShake > 600) { lastShake = now; shake(); } }
-      prev = { x: a.x, y: a.y, z: a.z };
-    });
-  }
-  function askMotion() { // iOS asks once, and only from a gesture; elsewhere the events just flow
-    if (askedMotion) return; askedMotion = true;
-    const ask = globalThis.DeviceOrientationEvent?.requestPermission;
-    if (typeof ask === 'function') ask.call(DeviceOrientationEvent).then((r) => { if (r === 'granted') { globalThis.DeviceMotionEvent?.requestPermission?.call(DeviceMotionEvent).catch(() => {}); listenMotion(); } }).catch(() => {});
-    else listenMotion();
+  const gyro = createHomeMotion({ button: gyroButton, status: gyroStatus, onTilt: (value) => { tilt = value; }, onShake: shake,
+    isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
+  let stageVisible = true;
+  if (typeof IntersectionObserver === 'function') {
+    stageVisible = false;
+    const motionVisibility = new IntersectionObserver(([entry]) => { stageVisible = Boolean(entry?.isIntersecting); gyro.setVisible(); }, { threshold: 0 });
+    motionVisibility.observe(stage);
   }
   function shake() {
     let moved = 0;
@@ -435,17 +412,12 @@ function hero() {
       }
     }
     if (dots.length && lettersWereHit && dots.every((d) => d.state === 'home')) { lettersWereHit = false; [0, 2, 4, 7].forEach((n, i) => setTimeout(() => note(n + 7, { length: 0.14, volume: 0.035 }), i * 70)); }
-    // the shooting star and the cat come and go on their own
+    // the shooting star comes and goes on its own
     if (!shooter && now > nextShooter) {
       if (nextShooter) shooter = { x: W * (0.05 + Math.random() * 0.4), y: H * (0.04 + Math.random() * 0.12), vx: W * 0.55, vy: H * 0.2 };
       nextShooter = now + 11000 + Math.random() * 9000;
     }
     if (shooter) { shooter.x += shooter.vx * dt; shooter.y += shooter.vy * dt; if (shooter.x > W + 4 || shooter.y > F * 0.7) shooter = null; }
-    if (!cat && now > nextCat) {
-      if (nextCat) { const s = Math.max(1, Math.round(7 / cell)); const lo = wordBottom + 3; const room = Math.max(0, Math.floor(F * 0.62) - lo - 6 * s); cat = { x: 3 + Math.random() * (W - 7 * s - 6) | 0, y: lo + Math.random() * room | 0, scale: s, born: now, seen: 0 }; }
-      nextCat = now + 16000 + Math.random() * 14000;
-    }
-    if (cat && (cat.seen ? now - cat.seen > 300 : now - cat.born > 4200)) cat = null;
     const burstFriction = Math.pow(0.9, dt * 30);
     for (const b of bursts) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= burstFriction; b.vy *= burstFriction; b.life -= dt * 1.8; }
     bursts = bursts.filter((b) => b.life > 0);
@@ -484,11 +456,6 @@ function hero() {
       if (dt.state === 'intro' && dt.y < -1) continue;
       const wave = dt.state === 'home' && !reduced ? Math.round(Math.sin(time * 2.4 - dt.li * 0.7) * 0.75 * K) : 0;
       put(Math.round(dt.x), Math.round(dt.y) + wave, dt.color);
-    }
-    if (cat) {
-      const age = now - cat.born; const a = cat.seen ? 0 : Math.min(1, age / 500, (4200 - age) / 500);
-      const blink = Math.floor(age / 1400) % 3 === 2 && age % 1400 < 160;
-      if (a > 0) CAT.forEach((row, j) => row.forEach((c, i) => { if (!c) return; const col = blink && j === 3 && c[0] < 60 ? rgb(C.orange) : c; for (let sy = 0; sy < cat.scale; sy++) for (let sx = 0; sx < cat.scale; sx++) put(cat.x + i * cat.scale + sx, cat.y + j * cat.scale + sy, col, a); }));
     }
     for (const piece of pieces) for (const c of piece.cells) put(c.x, c.y, RGB[c.v - 1]);
     for (const f of flashes) for (let x = 0; x < W; x++) put(x, f.y, WHITE, f.life);
@@ -546,7 +513,7 @@ function hero() {
   function cellOf(e) { const r = canvas.getBoundingClientRect(); return { x: Math.floor(((e.clientX - r.left) / r.width) * W), y: Math.floor(((e.clientY - r.top) / r.height) * H) }; }
   function tap(x, y, quick) {
     if (quick) {
-      if (catchShooter(x, y) || catchCat(x, y)) return;
+      if (catchShooter(x, y)) return;
       const li = letterAt(x, y, reach(10));
       if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; return; }
       if (catchStar(x, y)) return;
@@ -556,7 +523,7 @@ function hero() {
   canvas.addEventListener('pointerup', (e) => {
     if (!press || e.pointerId !== press.id) return;
     if (drawing) stop(); else tap(press.x, press.y, performance.now() - press.t < TAP_MS);
-    press = null; askMotion(); redraw();
+    press = null; redraw();
   });
   canvas.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) { stop(); press = null; } });
   // letting go drops the drawing
@@ -628,7 +595,7 @@ function hero() {
 
   layout();
   redraw(); // animate() is registered before layout(), so render the initialized canvas now.
-  nextShooter = performance.now() + 6000; nextCat = performance.now() + 9000;
+  nextShooter = performance.now() + 6000;
   const resizeHero = () => { const g = gridFor(stage.getBoundingClientRect()); if (g.w !== W || g.h !== H || g.c !== cell) { layout(); redraw(); } };
   if (typeof ResizeObserver === 'function') new ResizeObserver(resizeHero).observe(stage);
   else addEventListener('resize', resizeHero, { passive: true });

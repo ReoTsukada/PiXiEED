@@ -1,7 +1,4 @@
-import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
-import { hashCanonical } from './asset-contract.mjs';
-import { importAudioImage, AUDIO_IMAGE_RULES_VERSION } from './audio-image.mjs?rev=20260930-audio-timebase-1';
+import { importAudioImage } from './audio-image.mjs?rev=20260930-audio-timebase-1';
 import { beginAudioCamera, takeAudioCameraReturn, readAudioCameraDraft } from './audio-camera-handoff.mjs?rev=20260930-audio-timebase-1';
 import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20260930-audio-timebase-1';
@@ -9,28 +6,37 @@ import { renderAudioVideo } from './audio-video.mjs?rev=20260930-audio-timebase-
 import { evaluateAudioPassPolicy } from './audio-pass-policy.mjs?rev=20260930-audio-timebase-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
-import { createAudioViewport } from './audio-viewport.mjs?rev=20260930-shared-canvas-5';
-import { CAMERA_HANDOFF_KEY, cameraHandoffImage, createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
-import { validateDrawDocument } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { createAudioViewport } from './audio-viewport.mjs?rev=20261001-connected-editor-1';
+import { pixelCellAt, pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { AUDIO_INSTRUMENT_GROUPS, AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20260930-four-voices-1';
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20260929-music-icons-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-components-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-independent-1';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-components-1';
+import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-audio-animation-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { addAnimationFrame, addAnimationLayer, composeAnimationFrame, getAnimationCelDocument, getAnimationUsedColorIndices, moveAnimationFrame, moveAnimationLayer, removeAnimationFrame, removeAnimationLayer, setAnimationFrameDuration, setAnimationPalette, setLayerProperties, writeAnimationCel } from './animation-core.mjs';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-audio-animation-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261001-audio-animation-1';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261001-audio-animation-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
-  audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, normalizeAudioPixelSong, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
+  audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
 } from './audio-core.mjs?rev=20260930-audio-timebase-1';
 
-const LAST_DRAFT_KEY = 'pixieed:creation:audio:last-draft:v1';
-const LAST_DRAW_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const PITCHES = Object.freeze(AUDIO_PIXEL_PITCHES.map((midi, index) => ({ midi, label: ['ド6', 'ラ5', 'ソ5', 'ミ5', 'レ5', 'ド5', 'ラ4', 'ソ4', 'ミ4', 'レ4', 'ド4', 'ラ3', 'ソ3', 'ミ3', 'レ3', 'ド3'][index] })));
+export async function mountAudioMode({ scope, mountWorkspace = mountPxdTools } = {}) {
+  if (!scope?.listen || !scope?.add || typeof scope.disposed !== 'boolean') throw new TypeError('Audio mode requires a lifecycle scope');
+  let modeDisposed = false;
+  const disposed = () => scope.disposed || modeDisposed;
+  const timeout = scope.timeout.bind(scope);
+  const clearTimeout = scope.clearTimeout.bind(scope);
+  const requestAnimationFrame = scope.frame.bind(scope);
+  const cancelAnimationFrame = scope.cancelFrame.bind(scope);
 const status = document.querySelector('#audio-status');
 const gridWrap = document.querySelector('#audio-grid-wrap');
 const effectHost = gridWrap;
@@ -41,6 +47,10 @@ const editorUi = mountCreationEditorUi(document.querySelector('#main'));
 const pixelSurface = createPixelCanvasSurface(pixelCanvas, { alpha: false, emptyColor: '#ffffff' });
 let audioPixels = new Int16Array(AUDIO_PIXEL_COLUMNS * PITCHES.length).fill(-1);
 let pxdImage = null; let pxdLink = null; let pxdBridge = null;
+let audioAnimation = null; let selectedAudioFrameId = null; let selectedAudioLayerId = null;
+let animationControls = null;
+const animationPanel = document.querySelector('#audio-animation-panel');
+const animationControlsHost = document.querySelector('#audio-animation-controls');
 const cursor = document.querySelector('#audio-cursor');
 const playhead = document.querySelector('#audio-playhead');
 const tracksEl = document.querySelector('#audio-tracks');
@@ -50,8 +60,6 @@ const tempoInput = document.querySelector('#audio-tempo');
 const tempoValue = document.querySelector('#audio-tempo-value');
 const playButton = document.querySelector('#audio-play-toggle');
 const saveButton = document.querySelector('#audio-save');
-const resumeButton = document.querySelector('#audio-resume');
-const cameraSourceButton = document.querySelector('#audio-from-camera');
 const penButton = document.querySelector('#audio-tool-pen');
 const eraserButton = document.querySelector('#audio-tool-eraser');
 const sizeSelect = document.querySelector('#audio-canvas-size');
@@ -65,7 +73,6 @@ const photoButton = document.querySelector('#audio-take-photo');
 const exportImageButton = document.querySelector('#audio-export-image');
 const extraInstrumentIds = new Set(AUDIO_EXTRA_INSTRUMENT_IDS);
 
-let draftStore = null; let pictureShelf = null; let loadingLegacy = false;
 let song = createAudioSong({ songId: globalThis.crypto?.randomUUID?.() || `song-${Date.now()}` });
 const initialSharedImage = { width: 16, height: 16, rgba: new Uint8Array(16 * 16 * 4) };
 const initialSharedPlan = prepareSharedAudioImageImport(song, initialSharedImage);
@@ -73,7 +80,6 @@ song = initialSharedPlan.song; pxdImage = initialSharedPlan.image; pxdLink = ini
 let activeTrackId = song.tracks[0].trackId;
 let selectedColorId = null;
 let currentDraftId = song.songId;
-let cameraHandoff = cameraHandoffImage();
 let activeTool = 'pen';
 let pointerDrawId = null;
 let pointerDrawMode = 'paint';
@@ -93,6 +99,7 @@ let effectEpoch = 0;
 let playbackColumn = -1;
 let playbackCells = [];
 const viewport = createAudioViewport(pixelCanvas, gridWrap, {
+  scope,
   onStrokeStart: () => { gestureOriginalSong = song; gestureOriginalImage = pxdImage ? structuredClone(pxdImage) : null; gestureOriginalLink = pxdLink ? structuredClone(pxdLink) : null; },
   onGestureStart: () => {
     // The first finger can begin a stroke before the second arrives. Restore
@@ -101,11 +108,9 @@ const viewport = createAudioViewport(pixelCanvas, gridWrap, {
     pxdImage = gestureOriginalImage; pxdLink = gestureOriginalLink;
     effectEpoch += 1; interactionEffects.clear(); player.stop(); pointerDrawId = null; pointerLastCell = null; renderGrid();
   },
-  onChange: () => positionCursor()
+  onChange: () => { if (!disposed()) positionCursor(); }
 });
-
-try { draftStore = createLocalDraftStore(); }
-catch { saveButton.disabled = true; status.textContent = 'このブラウザーでは端末内保存を利用できません。'; }
+scope.add(() => viewport.dispose());
 
 const AudioContextConstructor = globalThis.AudioContext || globalThis.webkitAudioContext;
 const player = createAudioPlayer({
@@ -114,6 +119,7 @@ const player = createAudioPlayer({
     return new AudioContextConstructor();
   },
   onStateChange(playing, starting) {
+    if (disposed()) return;
     playButton.textContent = playing || starting ? '停止' : '再生';
     playButton.setAttribute('aria-label', starting ? '曲の再生を中止' : playing ? '曲を停止' : '曲を再生');
     playButton.setAttribute('aria-pressed', String(playing));
@@ -124,10 +130,11 @@ const player = createAudioPlayer({
 
 let statusTimer = 0;
 function setStatus(message) {
+  if (disposed()) return;
   status.textContent = message;
   clearTimeout(statusTimer);
   status.classList.toggle('is-visible', /できません|開けません|見つか|失われ|取り込みました|追加の音色|保存しました|まだ音符|動画|中止|無音/.test(message));
-  statusTimer = setTimeout(() => status.classList.remove('is-visible'), 4000);
+  statusTimer = timeout(() => { if (!disposed()) status.classList.remove('is-visible'); }, 4000);
 }
 function hasSongNotes(candidate) {
   return candidate.tracks.some((track) => track.clips.some((clip) => clip.notes.length > 0));
@@ -136,17 +143,19 @@ function hasAudioArtwork(candidateSong, image) {
   return hasSongNotes(candidateSong) || Boolean(image?.rgba?.some((value, index) => index % 4 === 3 && value > 0));
 }
 function showAudioResult({ title, detail, preview = pixelCanvas }) {
+  if (disposed()) return false;
   if (player.isPlaying || player.isStarting) player.stop();
   document.querySelectorAll('.audio-popover[open]').forEach((panel) => { panel.open = false; });
   resultView.show({ title, detail, preview });
 }
 function audioPassState() {
-  const shared = pxdLink?.rulesVersion === 'shared-canvas-v1' ? pxdImage : null;
+  const shared = animatedAudioMode() ? { ...pxdImage, colorCount: getAnimationUsedColorIndices(audioAnimation).size } : sharedMode() ? pxdImage : null;
   const active = hasPerk('project.canvas-expanded') || hasPerk('audio.canvas-wide');
   return evaluateAudioPassPolicy(song, { passActive: active, extraInstrumentPassActive: hasPerk('audio.instruments-extra'), extraInstrumentIds, sharedImage: shared });
 }
 function refreshAudioPassUi() {
   const policy = audioPassState();
+  if (disposed()) return policy;
   const sizePerkActive = hasPerk('audio.canvas-wide') || hasPerk('project.canvas-expanded');
   for (const option of sizeSelect.options) if (Number(option.value) > AUDIO_PIXEL_COLUMNS) {
     option.textContent = `${option.value} × ${PITCHES.length} ${sizePerkActive ? '★' : '🔒'} 特典`;
@@ -165,12 +174,114 @@ function refreshAudioPassUi() {
   if (policy.locked && (player.isPlaying || player.isStarting)) player.stopAfterCurrentLoop();
   return policy;
 }
-function sharedMode() { return pxdLink?.rulesVersion === 'shared-canvas-v1' && Boolean(pxdImage); }
+function animatedAudioMode() { return Boolean(audioAnimation && pxdLink?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION); }
+function sharedMode() { return (pxdLink?.rulesVersion === 'shared-canvas-v1' || animatedAudioMode()) && Boolean(pxdImage); }
 function columns() { return sharedMode() ? pxdImage.width : audioPixelColumns(song); }
 function rows() { return sharedMode() ? pxdImage.height : PITCHES.length; }
 function pitchAtRow(y) { return sharedMode() ? pxdLink.rowPitchMap[y] : PITCHES[y]?.midi; }
 function pitchLabelAtRow(y) { return PITCHES.find((item) => item.midi === pitchAtRow(y))?.label || `音程${pitchAtRow(y)}`; }
-function tickAtColumn(x) { return x * AUDIO_PIXEL_TICKS; }
+function tickAtColumn(x) { const frameIndex = animatedAudioMode() ? audioAnimation.frames.findIndex((frame) => frame.id === selectedAudioFrameId) : 0; return (Math.max(0, frameIndex) * columns() + x) * AUDIO_PIXEL_TICKS; }
+function composedAnimationImage(frameId = selectedAudioFrameId) {
+  if (!audioAnimation || !frameId) return null;
+  const composed = composeAnimationFrame(audioAnimation, frameId);
+  return { width: composed.width, height: composed.height, rgba: documentRgba(composed) };
+}
+function audioAnimationLinkFor(animation, priorLink = null, { projectionReady = false } = {}) {
+  const slots = new Set((song.pixelPalette || AUDIO_PIXEL_PALETTE).map(({ slotId }) => slotId));
+  const colors = Object.fromEntries(Object.entries(priorLink?.colorToSlot || {}).map(([id, slotId]) => [id, slotId === null || slots.has(slotId) ? slotId : null]));
+  return createAudioAnimationLink(song, animation, {
+    rowPitchMap: priorLink?.rowPitchMap?.length === animation.height ? priorLink.rowPitchMap : null,
+    colorToSlot: colors,
+    projectionReady
+  });
+}
+function adoptAudioAnimation(animation, link = null) {
+  audioAnimation = animation;
+  selectedAudioFrameId = animation.frames[0]?.id || null;
+  selectedAudioLayerId = animation.layers.find((layer) => layer.visible)?.id || animation.layers[0]?.id || null;
+  pxdLink = audioAnimationLinkFor(animation, link, { projectionReady: Boolean(link?.projectionReady) });
+  pxdImage = composedAnimationImage();
+  selectedColorId = null;
+}
+function refreshAudioAnimationControls() {
+  if (!animationPanel) return;
+  animationPanel.hidden = !audioAnimation;
+  if (!audioAnimation) return;
+  if (!audioAnimation.frames.some((frame) => frame.id === selectedAudioFrameId)) selectedAudioFrameId = audioAnimation.frames[0].id;
+  if (!audioAnimation.layers.some((layer) => layer.id === selectedAudioLayerId)) selectedAudioLayerId = audioAnimation.layers[0].id;
+  animationControls?.refresh();
+}
+function markAudioAnimationEdited() {
+  if (!audioAnimation || !pxdLink) return;
+  pxdLink = createAudioAnimationLink(song, audioAnimation, {
+    rowPitchMap: pxdLink.rowPitchMap?.length === audioAnimation.height ? pxdLink.rowPitchMap : null,
+    colorToSlot: pxdLink.colorToSlot,
+    projectionReady: false
+  });
+  pxdBridge?.markDirty();
+}
+function ensureAudioAnimationProjection() {
+  if (disposed() || !animatedAudioMode() || pxdLink.projectionReady) return song;
+  const projected = prepareAudioAnimationImport(song, audioAnimation, {
+    rowPitchMap: pxdLink.rowPitchMap,
+    colorToSlot: pxdLink.colorToSlot
+  });
+  song = projected.song;
+  pxdLink = projected.link;
+  pxdBridge?.markDirty();
+  renderSong();
+  return song;
+}
+function refreshAudioAnimationImage({ render = true } = {}) {
+  if (!animatedAudioMode()) return;
+  pxdImage = composedAnimationImage();
+  if (render) { renderSong(); updateCanvasLabel(); }
+  refreshAudioAnimationControls();
+}
+function animationControlState() {
+  return { frames: audioAnimation?.frames || [], layers: audioAnimation?.layers || [], frameId: selectedAudioFrameId,
+    layerId: selectedAudioLayerId, playing: player?.isPlaying || player?.isStarting || false, onion: false, readOnly: audioPassState().locked, audioMode: true };
+}
+async function handleAudioAnimationAction(action) {
+  if (!audioAnimation || disposed()) return false;
+  if (!['select-frame', 'select-layer'].includes(action.type) && audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return false; }
+  const oldAnimation = audioAnimation;
+  if (action.type === 'select-frame') selectedAudioFrameId = action.frameId;
+  else if (action.type === 'select-layer') selectedAudioLayerId = action.layerId;
+  else if (action.type === 'add-frame') {
+    audioAnimation = addAnimationFrame(audioAnimation, { sourceFrameId: action.frameId || selectedAudioFrameId });
+    selectedAudioFrameId = audioAnimation.frames.at(-1).id;
+    if (action.copy === false) for (const layer of audioAnimation.layers) {
+      const cel = getAnimationCelDocument(audioAnimation, selectedAudioFrameId, layer.id); cel.pixels.fill(-1);
+      cel.pixels = Uint8Array.from(cel.pixels, (value) => value + 1);
+      audioAnimation = writeAnimationCel(audioAnimation, selectedAudioFrameId, layer.id, cel);
+    }
+  } else if (action.type === 'delete-frame') {
+    audioAnimation = removeAnimationFrame(audioAnimation, action.frameId);
+    if (selectedAudioFrameId === action.frameId) selectedAudioFrameId = audioAnimation.frames[Math.max(0, audioAnimation.frames.findIndex((frame) => frame.id === action.frameId))]?.id || audioAnimation.frames[0].id;
+  } else if (action.type === 'move-frame') audioAnimation = moveAnimationFrame(audioAnimation, action.frameId, action.index);
+  else if (action.type === 'add-layer') { audioAnimation = addAnimationLayer(audioAnimation); selectedAudioLayerId = audioAnimation.layers.at(-1).id; }
+  else if (action.type === 'delete-layer') {
+    audioAnimation = removeAnimationLayer(audioAnimation, action.layerId);
+    if (selectedAudioLayerId === action.layerId) selectedAudioLayerId = audioAnimation.layers[0].id;
+  } else if (action.type === 'move-layer') audioAnimation = moveAnimationLayer(audioAnimation, action.layerId, action.index);
+  else if (action.type === 'visibility' || action.type === 'lock' || action.type === 'rename-layer') {
+    const properties = action.type === 'visibility' ? { visible: action.visible }
+      : action.type === 'lock' ? { locked: action.locked } : { name: action.name };
+    audioAnimation = setLayerProperties(audioAnimation, action.layerId, properties);
+  } else if (action.type === 'duration') audioAnimation = setAnimationFrameDuration(audioAnimation, action.frameId, action.durationMs);
+  else if (action.type === 'play') {
+    if (player.isPlaying || player.isStarting) player.stop();
+    else await player.play(ensureAudioAnimationProjection());
+    animationControls?.refresh(); return true;
+  } else if (action.type === 'onion') return true;
+  else return false;
+
+  if (audioAnimation !== oldAnimation) markAudioAnimationEdited();
+  pxdImage = composedAnimationImage();
+  renderSong(); refreshAudioAnimationControls();
+  return true;
+}
 function selectedTrack() { return song.tracks.find((track) => track.trackId === activeTrackId) || song.tracks[0]; }
 function previewPitch(pitch, slotId = selectedTrack().instrument) {
   if (audioPassState().locked) return Promise.resolve(false);
@@ -193,15 +304,18 @@ function trackNoteAt(track, pitch, tick) { return track.clips.flatMap((clip) => 
 function pitchName(pitch) { return PITCHES.find((item) => item.midi === pitch)?.label || `音程${pitch}`; }
 
 function setTool(tool) {
+  if (disposed()) return;
   activeTool = tool; penButton.setAttribute('aria-pressed', String(tool === 'pen')); eraserButton.setAttribute('aria-pressed', String(tool === 'eraser'));
   updateCanvasLabel();
 }
 
 function scalePixelBoard() {
+  if (disposed()) return;
   viewport.resize(columns(), rows());
 }
 
 function positionCursor() {
+  if (disposed()) return;
   cursor.hidden = document.activeElement !== pixelCanvas || !keyboardCursor;
   if (cursor.hidden) return;
   const canvasRect = pixelCanvas.getBoundingClientRect();
@@ -214,68 +328,11 @@ function positionCursor() {
   cursor.style.height = `${cellHeight}px`;
 }
 
-function refreshImageSources() {
-  void pictureShelf?.refresh();
-  cameraHandoff = cameraHandoffImage(); cameraSourceButton.hidden = !cameraHandoff;
+scope.listen(window, 'resize', () => { effectEpoch += 1; interactionEffects.clear(); scalePixelBoard(); }, { passive: true });
+if (typeof globalThis.ResizeObserver === 'function') {
+  const resizeObserver = new globalThis.ResizeObserver(() => { if (!disposed()) scalePixelBoard(); });
+  scope.observe(resizeObserver, gridWrap);
 }
-
-async function beginFromImage(asset, document) {
-  if (pxdBridge?.beforeReplace && !loadingLegacy) {
-    await pxdBridge.beforeReplace(async () => { loadingLegacy = true; try { await beginFromImage(asset, document); } finally { loadingLegacy = false; } }); return;
-  }
-  if (audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return; }
-  if (!asset || !['pixel_art', 'pixel_camera'].includes(asset.kind) || asset.owner?.type !== 'local' || asset.owner?.id !== 'local-owner' || asset.visibility !== 'draft' || asset.reusePermission !== 'owner_only' || asset.hashScheme !== 'sha256-canonical-v1' || await hashCanonical(document) !== asset.contentHash) throw new Error('自分の端末の画像を確認できませんでした。');
-  if (player.isPlaying || player.isStarting) player.stop();
-  const image = { width: document.width, height: document.height, rgba: documentRgba(document) };
-  const plan = prepareSharedAudioImageImport(createAudioSong({ songId: crypto.randomUUID() }), image);
-  const targetPolicy = evaluateAudioPassPolicy(plan.song, { passActive: hasPerk('project.canvas-expanded'), extraInstrumentPassActive: hasPerk('audio.instruments-extra'), sharedImage: image });
-  if (targetPolicy.locked && !(await requestPass({ perk: 'project.canvas-expanded' }))) { setStatus('この画像を使うには共通キャンバスの時間が必要です。'); return; }
-  pxdBridge?.reset();
-  song = { ...plan.song, imageSource: { assetId: asset.assetId, revisionId: asset.revisionId, contentHash: asset.contentHash, rulesVersion: AUDIO_IMAGE_RULES_VERSION } };
-  pxdImage = plan.image; pxdLink = plan.link; pxdMainImage = image;
-  activeTrackId = song.tracks[0].trackId; selectedColorId = null;
-  renderSong();
-  setStatus('画像を音楽キャンバスに取り込みました。色や音色を自由に編集できます。');
-}
-
-// Any tool's picture can be brought in; the song keeps its own copy and the picture stays where it was.
-try {
-  pictureShelf = mountPictureShelf(document.querySelector('#audio-shelf'), {
-    tool: 'audio', adapter: createIndexedDbDraftAdapter(), heading: '絵から曲をつくる',
-    onPick: async (entry) => {
-      const revision = entry.revision;
-      if (revision.asset.hashScheme !== 'sha256-canonical-v1' || await hashCanonical(revision.document) !== revision.asset.contentHash) throw new Error('自分の保存版を確認できませんでした');
-      validateDrawDocument(revision.document);
-      await beginFromImage(revision.asset, revision.document);
-    },
-    onError: (error) => setStatus(error.message || '保存した絵から曲を作れませんでした。')
-  });
-} catch { pictureShelf = null; }
-
-cameraSourceButton.addEventListener('click', async () => {
-  cameraSourceButton.disabled = true; setStatus('端末内のカメラ画像を確認しています…');
-  try {
-    const handoff = cameraHandoffImage();
-    if (!handoff) throw new Error('カメラ画像が見つからないか、受け渡し期限が切れています');
-    const image = await decodeDrawImageFile(handoff.file, { keepScale: true });
-    const document = createImportedDrawDocument(image, 128).document;
-    const contentHash = await hashCanonical(document);
-    const asset = {
-      schemaVersion: 1, assetId: `camera-${handoff.createdAt}`, revisionId: `camera-revision-${handoff.createdAt}`,
-      contentHash, hashScheme: 'sha256-canonical-v1', kind: 'pixel_camera',
-      source: { type: 'pixel_camera', assetId: null, revisionId: null },
-      owner: { type: 'local', id: 'local-owner' }, visibility: 'draft', reusePermission: 'owner_only'
-    };
-    await beginFromImage(asset, document);
-  } catch (error) { setStatus(error.message || 'カメラ画像から曲を作れませんでした。'); }
-  finally { cameraSourceButton.disabled = false; refreshImageSources(); }
-});
-
-window.addEventListener('storage', (event) => {
-  if (event.key === CAMERA_HANDOFF_KEY || event.key === LAST_DRAW_DRAFT_KEY || String(event.key).startsWith('pixieed:picture:')) refreshImageSources();
-});
-window.addEventListener('resize', () => { effectEpoch += 1; interactionEffects.clear(); scalePixelBoard(); }, { passive: true });
-if (typeof globalThis.ResizeObserver === 'function') new globalThis.ResizeObserver(scalePixelBoard).observe(gridWrap);
 
 function representativePxdColorId(slotId) {
   if (!pxdImage || !pxdLink) return null;
@@ -324,6 +381,7 @@ function selectedPaintColor() { return selectedColorId ? `#${selectedColorId.sli
 function selectedPaintSlot() { return selectedColorId ? pxdLink?.colorToSlot[selectedColorId] ?? null : selectedTrack().instrument; }
 
 function renderPalette() {
+  if (disposed()) return;
   if (selectedColorId && (!sharedMode() || !Object.hasOwn(pxdLink.colorToSlot, selectedColorId))) selectedColorId = null;
   if (selectedColorId?.endsWith('ff')) {
     const slotId = pxdLink.colorToSlot[selectedColorId];
@@ -355,32 +413,35 @@ function renderPalette() {
     const hex = `#${colorId.slice(5, 11)}`;
     if (currentPalette().some((slot) => slot.slotId === slotId && slot.color.toLowerCase() === hex.toLowerCase())) continue;
     const slot = slotId ? paletteSlot(slotId) : null;
-    const sound = slot ? instrumentIcon(slot.instrument).name : '無音';
+    const sound = slot ? `・${instrumentIcon(slot.instrument).name}` : '';
     const button = document.createElement('button'); button.type = 'button'; button.className = 'audio-track-choice'; button.dataset.colorId = colorId;
     button.setAttribute('aria-pressed', String(colorId === selectedColorId));
     const perkLabel = slot && extraInstrumentIds.has(slot.instrument) ? hasPerk('audio.instruments-extra') ? '・★ 特典音色' : '・🔒 特典音色' : '';
-    button.setAttribute('aria-label', `${hex}、${sound}${perkLabel}。描く色を選ぶ。もう一度押すと音を設定`);
-    button.title = `${hex}・${sound}${perkLabel}`;
+    button.setAttribute('aria-label', `${hex}${sound}${perkLabel}。描く色を選ぶ。もう一度押すと音を設定`);
+    button.title = `${hex}${sound}${perkLabel}`;
     const mark = document.createElement('span'); mark.className = 'audio-track-choice__mark'; mark.style.backgroundColor = hex; mark.setAttribute('aria-hidden', 'true');
     if (slot) mark.append(createInstrumentIcon(slot.instrument, hex, 'audio-instrument-icon'));
-    else { const silent = document.createElement('span'); silent.className = 'audio-track-choice__silent'; silent.textContent = '無音'; mark.append(silent); }
     if (slot && extraInstrumentIds.has(slot.instrument)) button.dataset.perk = hasPerk('audio.instruments-extra') ? 'active' : 'locked';
     button.append(mark); tracksEl.append(button);
   }
-  if (sharedMode() && Object.keys(pxdLink.colorToSlot).length < 32) {
+  if (sharedMode() && (animatedAudioMode() ? audioAnimation.palette.length < 32 : Object.keys(pxdLink.colorToSlot).length < 32)) {
     const add = document.createElement('button'); add.type = 'button'; add.className = 'audio-track-choice audio-track-choice--add';
-    add.textContent = '+'; add.setAttribute('aria-label', '無音の色を追加'); add.title = '無音の色を追加';
+    add.textContent = '+'; add.setAttribute('aria-label', '色を追加'); add.title = '色を追加';
     const picker = document.createElement('input'); picker.type = 'color'; picker.className = 'audio-add-color-input'; picker.value = '#8ecdf0'; picker.setAttribute('aria-label', '追加する色');
-    add.addEventListener('click', () => picker.click());
-    picker.addEventListener('change', () => {
+    scope.listen(add, 'click', () => picker.click());
+    scope.listen(picker, 'change', () => {
       if (audioPassState().locked || !sharedMode()) return;
       const colorId = `rgba-${picker.value.slice(1).toLowerCase()}ff`;
       if (!Object.hasOwn(pxdLink.colorToSlot, colorId)) {
-        pxdLink = { ...pxdLink, colorToSlot: { ...pxdLink.colorToSlot, [colorId]: null } };
+        if (animatedAudioMode() && audioAnimation.palette.length < 32) {
+          audioAnimation = setAnimationPalette(audioAnimation, [...audioAnimation.palette, picker.value.toLowerCase()]);
+          pxdLink = setAudioAnimationColorMapping(song, audioAnimation, pxdLink, { colorId, slotId: null });
+        } else pxdLink = { ...pxdLink, colorToSlot: { ...pxdLink.colorToSlot, [colorId]: null } };
+        if (animatedAudioMode()) markAudioAnimationEdited();
         pxdBridge?.markDirty();
       }
       selectedColorId = colorId; setTool('pen'); renderPalette(); renderPxdColorAssignments(); updateCanvasLabel();
-      setStatus('無音の色を追加しました。絵に描いてから音色を割り当てられます。');
+      setStatus('色を追加しました。');
     });
     tracksEl.append(add, picker);
   }
@@ -388,13 +449,14 @@ function renderPalette() {
   const current = document.querySelector('#audio-current');
   if (current) {
     current.style.setProperty('--editor-color', selectedPaintColor());
-    const name = selectedColorId ? `${selectedPaintColor()}、${selectedPaintSlot() ? paletteSoundName(selectedPaintSlot()) : '無音'}` : `色${paletteNumber(selectedTrack().instrument)}、${paletteSoundName(selectedTrack().instrument)}`;
+    const name = selectedColorId ? selectedPaintColor() : `色${paletteNumber(selectedTrack().instrument)}、${paletteSoundName(selectedTrack().instrument)}`;
     current.setAttribute('aria-label', `選択中の${name}を設定`);
     current.title = name;
   }
 }
 
 function renderPaletteSettings() {
+  if (disposed()) return;
   const policy = refreshAudioPassUi();
   const premiumInstrumentsActive = hasPerk('audio.instruments-extra');
   const legend = document.querySelector('#audio-instrument-legend');
@@ -419,17 +481,17 @@ function renderPaletteSettings() {
       instrument.append(options);
     }
     instrument.value = slot.instrument;
-    color.addEventListener('change', () => {
+    scope.listen(color, 'change', () => {
       if (audioPassState().locked) { renderPaletteSettings(); return; }
       try { song = setAudioPixelPalette(song, { slotId: slot.slotId, color: color.value }); renderPalette(); renderGrid(); setStatus(`色${paletteNumber(slot.slotId)}を変更しました。`); }
       catch (error) { color.value = paletteSlot(slot.slotId).color; setStatus(error.message || '色を変更できませんでした。'); }
     });
-    instrument.addEventListener('change', async () => {
+    scope.listen(instrument, 'change', async () => {
       if (audioPassState().locked) { renderPaletteSettings(); return; }
       const chosen = instrument.value;
       if (extraInstrumentIds.has(chosen) && chosen !== paletteSlot(slot.slotId).instrument && !hasPerk('audio.instruments-extra')) {
         instrument.value = paletteSlot(slot.slotId).instrument;
-        if (!await requestPass({ perk: 'audio.instruments-extra' }) || !hasPerk('audio.instruments-extra')) return;
+        if (!await requestPass({ perk: 'audio.instruments-extra' }) || !hasPerk('audio.instruments-extra') || disposed()) return;
       }
       try { if (player.isPlaying || player.isStarting) player.stop(); song = setAudioPixelPalette(song, { slotId: slot.slotId, instrument: chosen }); pxdBridge?.markDirty(); renderPalette(); renderPaletteSettings(); updateCanvasLabel(); previewPitch(72, slot.slotId); setStatus(`色${paletteNumber(slot.slotId)}の音色を${paletteSoundName(slot.slotId)}にしました。`); }
       catch (error) { instrument.value = paletteSlot(slot.slotId).instrument; setStatus(error.message || '音色を変更できませんでした。'); }
@@ -440,6 +502,7 @@ function renderPaletteSettings() {
 }
 
 function cellOwner(x, y) {
+  if (animatedAudioMode()) return song.tracks.find((track) => track.clips.some((clip) => clip.notes.some((note) => note.sourceCell?.kind === 'audio-animation' && note.sourceCell.frameId === selectedAudioFrameId && note.sourceCell.localX === x && note.sourceCell.y === y))) || null;
   if (sharedMode()) return song.tracks.find((track) => track.clips.some((clip) => clip.notes.some((note) => note.sourceCell?.x === x && note.sourceCell?.y === y))) || null;
   return song.tracks.find((track) => trackNoteAt(track, PITCHES[y].midi, x * AUDIO_PIXEL_TICKS)) || null;
 }
@@ -452,11 +515,12 @@ function cellDescription(x, y) {
   const tick = tickAtColumn(x);
   const timeLabel = sharedMode() ? `${Math.floor(tick / AUDIO_BAR_TICKS) + 1}小節の${tick}Tick` : `${Math.floor(x / 4) + 1}拍目の${x % 4 + 1}つ目の16分音符`;
   const willErase = activeTool === 'eraser' || selectedCellMatches(x, y, owner);
-  const paintName = selectedColorId ? `${selectedPaintColor()}の${selectedPaintSlot() ? paletteSoundName(selectedPaintSlot()) : '無音の色'}` : `色${paletteNumber(selectedTrack().instrument)}`;
+  const paintName = selectedColorId ? selectedPaintColor() : `色${paletteNumber(selectedTrack().instrument)}`;
   return `${pitch.label}、${timeLabel}、${owner ? `色${paletteNumber(owner.instrument)}の${paletteSoundName(owner.instrument)}あり` : '音なし'}。${willErase ? 'EnterまたはSpaceで消去' : `選択中の${paintName}でEnterまたはSpaceを押して描画`}。矢印キーで移動します。`;
 }
-function updateCanvasLabel() { pixelCanvas.setAttribute('aria-label', `${columns()}列×${rows()}行の共有画像キャンバス。${cellDescription(cursorCell.x, cursorCell.y)}`); positionCursor(); }
+function updateCanvasLabel() { if (disposed()) return; pixelCanvas.setAttribute('aria-label', `${columns()}列×${rows()}行の共有画像キャンバス。${cellDescription(cursorCell.x, cursorCell.y)}`); positionCursor(); }
 function renderGrid() {
+  if (disposed()) return;
   pxdBridge?.markDirty();
   if (pixelCanvas.width !== columns() || pixelCanvas.height !== rows()) {
     pixelSurface.resize(columns(), rows());
@@ -468,13 +532,16 @@ function renderGrid() {
 }
 
 function paintPixelCanvas(changed = null) {
+  if (disposed()) return;
   if (sharedMode() && changed === null) {
     audioPixels.fill(-1);
     for (const track of song.tracks) {
       const slot = currentPalette().findIndex((entry) => entry.slotId === track.instrument);
       if (slot < 0) continue;
       for (const clip of track.clips) for (const note of clip.notes) {
-        const { x, y } = note.sourceCell || {};
+        const source = note.sourceCell || {};
+        if (animatedAudioMode() && (source.kind !== 'audio-animation' || source.frameId !== selectedAudioFrameId)) continue;
+        const x = animatedAudioMode() ? source.localX : source.x; const { y } = source;
         if (Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < columns() && y >= 0 && y < rows()) audioPixels[y * columns() + x] = slot;
       }
     }
@@ -500,6 +567,7 @@ function paintPixelCanvas(changed = null) {
 
 function imageColorId(rgba, offset) { return `rgba-${[0, 1, 2, 3].map((channel) => rgba[offset + channel].toString(16).padStart(2, '0')).join('')}`; }
 function renderPxdColorAssignments() {
+  if (disposed()) return;
   pxdColorsPanel.replaceChildren(); pxdColorsPanel.hidden = !pxdImage || !pxdLink;
   if (pxdColorsPanel.hidden) return;
   const passLocked = audioPassState().locked;
@@ -521,27 +589,32 @@ function renderPxdColorAssignments() {
       select.append(option);
     }
     select.value = pxdLink.colorToSlot[colorId] || '';
-    select.addEventListener('change', async () => {
+    scope.listen(select, 'change', async () => {
       if (audioPassState().locked) { renderSong(); return; }
       const chosenId = select.value;
       const chosenSlot = chosenId ? paletteSlot(chosenId) : null;
       if (chosenSlot && extraInstrumentIds.has(chosenSlot.instrument) && !hasPerk('audio.instruments-extra')) {
         select.value = pxdLink.colorToSlot[colorId] || '';
-        if (!await requestPass({ perk: 'audio.instruments-extra' }) || !hasPerk('audio.instruments-extra')) return;
+        if (!await requestPass({ perk: 'audio.instruments-extra' }) || !hasPerk('audio.instruments-extra') || disposed()) return;
         select.value = chosenId;
       }
       try {
-        const result = assignPxdAudioColor(song, pxdImage, pxdLink, colorId, select.value || null);
-        song = result.song; pxdLink = result.link; pxdBridge?.markDirty(); renderSong(); setStatus(`${hex.toUpperCase()}を${select.value ? paletteShortName(select.value) : '無音'}に設定しました。`);
+        if (animatedAudioMode()) {
+          pxdLink = setAudioAnimationColorMapping(song, audioAnimation, pxdLink, { colorId, slotId: select.value || null });
+          markAudioAnimationEdited(); renderSong(); setStatus(`${hex.toUpperCase()}を${select.value ? paletteShortName(select.value) : '無音'}に設定しました。`);
+        } else {
+          const result = assignPxdAudioColor(song, pxdImage, pxdLink, colorId, select.value || null);
+          song = result.song; pxdLink = result.link; pxdBridge?.markDirty(); renderSong(); setStatus(`${hex.toUpperCase()}を${select.value ? paletteShortName(select.value) : '無音'}に設定しました。`);
+        }
       } catch (error) { setStatus(error.message || '色の割り当てを変更できませんでした。'); renderPxdColorAssignments(); }
     });
     row.append(swatch, text, select); pxdColorsPanel.append(row);
   }
   const paging = document.createElement('div'); paging.className = 'audio-pxd-colors__paging';
   const previous = document.createElement('button'); previous.type = 'button'; previous.textContent = '前の色'; previous.disabled = pxdColorPage === 0;
-  previous.addEventListener('click', () => { pxdColorPage -= 1; renderPxdColorAssignments(); });
+  scope.listen(previous, 'click', () => { pxdColorPage -= 1; renderPxdColorAssignments(); });
   const next = document.createElement('button'); next.type = 'button'; next.textContent = '次の色'; next.disabled = pxdColorPage + 1 >= pages;
-  next.addEventListener('click', () => { pxdColorPage += 1; renderPxdColorAssignments(); });
+  scope.listen(next, 'click', () => { pxdColorPage += 1; renderPxdColorAssignments(); });
   paging.append(previous, next); pxdColorsPanel.append(paging);
 }
 
@@ -564,11 +637,7 @@ function updatePxdImageCell(cell, active, slotId) {
 }
 
 function canvasCellAt(event) {
-  const rect = pixelCanvas.getBoundingClientRect();
-  const x = Math.floor((event.clientX - rect.left) / rect.width * columns());
-  const y = Math.floor((event.clientY - rect.top) / rect.height * rows());
-  if (x < 0 || x >= columns() || y < 0 || y >= rows()) return null;
-  return { x, y };
+  return pixelCellAt(event, pixelCanvas.getBoundingClientRect(), columns(), rows());
 }
 
 function applyPixel(cell, mode, { render = true, announce = true, audition = true } = {}) {
@@ -580,8 +649,33 @@ function applyPixel(cell, mode, { render = true, announce = true, audition = tru
   const owner = cellOwner(x, y);
   if (active && selectedCellMatches(x, y, owner)) return false;
   if (!active && !owner && !pxdImage?.rgba[(y * columns() + x) * 4 + 3]) return false;
+  if (animatedAudioMode() && audioAnimation.layers.find((layer) => layer.id === selectedAudioLayerId)?.locked) {
+    if (announce) setStatus('選択中のレイヤーはロックされています。');
+    return false;
+  }
   try {
     if (player.isPlaying || player.isStarting) player.stop();
+    if (animatedAudioMode()) {
+      let candidate = audioAnimation, candidateLink = pxdLink;
+      const colorId = active ? selectedColorId || representativePxdColorId(slotId) || `rgba-${selectedPaintColor().slice(1).padEnd(8, 'f').toLowerCase()}` : null;
+      if (active && !candidate.palette.some((color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}` === colorId)) candidate = setAnimationPalette(candidate, [...candidate.palette, `#${colorId.slice(5, 11)}`]);
+      if (active && !selectedColorId) candidateLink = createAudioAnimationLink(song, candidate, { rowPitchMap: pxdLink.rowPitchMap, colorToSlot: { ...pxdLink.colorToSlot, [colorId]: slotId }, projectionReady: false });
+      const usedColors = getAnimationUsedColorIndices(candidate);
+      if (active) usedColors.add(candidate.palette.findIndex((color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}` === colorId));
+      const colorPolicy = evaluateSharedCanvasPolicy({ width: candidate.width, height: candidate.height, colorCount: usedColors.size }, { passActive: hasPerk('project.canvas-expanded') || hasPerk('audio.canvas-wide') });
+      if (colorPolicy.locked || !colorPolicy.supported) { setStatus('この色を追加するには特典時間が必要です。'); return false; }
+      const result = setAudioAnimationPixel(candidate, candidateLink, {
+        frameId: selectedAudioFrameId, layerId: selectedAudioLayerId, x, y,
+        colorId, active
+      });
+      if (!result.changed) return false;
+      audioAnimation = result.animation; pxdLink = candidateLink; markAudioAnimationEdited(); pxdImage = composedAnimationImage();
+      pxdBridge?.markDirty();
+      if (render) { paintPixelCanvas([y * columns() + x]); renderPalette(); renderPxdColorAssignments(); updateCanvasLabel(); refreshAudioAnimationControls(); }
+      if (active && audition && slotId) previewCell(pitch, slotId, cell);
+      if (announce) setStatus('コマを編集しました。');
+      return true;
+    }
     if (sharedMode()) {
       const result = setSharedAudioCell(song, pxdImage, pxdLink, { x, y, slotId, colorId: active ? selectedColorId : null, active });
       const colorPolicy = evaluateSharedCanvasPolicy({ width: result.image.width, height: result.image.height, colorCount: result.image.colorCount }, { passActive: hasPerk('project.canvas-expanded') || hasPerk('audio.canvas-wide') });
@@ -590,7 +684,7 @@ function applyPixel(cell, mode, { render = true, announce = true, audition = tru
       pxdBridge?.markDirty();
       if (render) { paintPixelCanvas([y * columns() + x]); renderPalette(); renderPxdColorAssignments(); updateCanvasLabel(); }
       if (active && audition && slotId) previewCell(pitch, slotId, cell);
-      if (announce) setStatus(active && !slotId ? '無音の色を描きました。' : `${pitchName(pitch)}の音を${active ? `色${paletteNumber(slotId)}で描きました` : '消しました'}。`);
+      if (announce) setStatus(active && !slotId ? '色を描きました。' : `${pitchName(pitch)}の音を${active ? `色${paletteNumber(slotId)}で描きました` : '消しました'}。`);
       return true;
     }
     song = setAudioPixel(song, { trackId: track.trackId, pitch, startTick: tick, noteId: `note-${globalThis.crypto?.randomUUID?.() || Date.now()}-${x}-${y}`, active });
@@ -613,11 +707,20 @@ function startPlayhead() {
     playhead.hidden = tick === null;
     if (pixelCanvas && tick !== null) {
       const boardRect = gridWrap.getBoundingClientRect(); const canvasRect = pixelCanvas.getBoundingClientRect();
-      const phase = sharedMode() ? Math.min(1, tick / (columns() * AUDIO_PIXEL_TICKS)) : tick / song.loopTicks;
+      if (animatedAudioMode()) {
+        const sequenceColumn = Math.floor(tick / AUDIO_PIXEL_TICKS);
+        const frameIndex = Math.min(audioAnimation.frames.length - 1, Math.floor(sequenceColumn / columns()));
+        const frame = audioAnimation.frames[frameIndex];
+        if (frame && frame.id !== selectedAudioFrameId) {
+          selectedAudioFrameId = frame.id; pxdImage = composedAnimationImage(frame.id);
+          renderSong();
+        }
+      }
+      const phase = animatedAudioMode() ? (tick % (columns() * AUDIO_PIXEL_TICKS)) / (columns() * AUDIO_PIXEL_TICKS) : sharedMode() ? Math.min(1, tick / (columns() * AUDIO_PIXEL_TICKS)) : tick / song.loopTicks;
       playhead.style.left = `${canvasRect.left - boardRect.left + canvasRect.width * phase}px`;
       playhead.style.top = `${canvasRect.top - boardRect.top}px`;
       playhead.style.height = `${canvasRect.height}px`;
-      const column = tick < columns() * AUDIO_PIXEL_TICKS ? Math.floor(tick / AUDIO_PIXEL_TICKS) : -1;
+      const column = animatedAudioMode() ? Math.floor((tick % (columns() * AUDIO_PIXEL_TICKS)) / AUDIO_PIXEL_TICKS) : tick < columns() * AUDIO_PIXEL_TICKS ? Math.floor(tick / AUDIO_PIXEL_TICKS) : -1;
       if (column >= 0 && column !== playbackColumn) {
         playbackColumn = column;
         for (const cell of playbackCells[column].slice(0, 4)) {
@@ -637,6 +740,7 @@ function stopPlayhead() {
 }
 
 function renderSong({ focusCell = null } = {}) {
+  if (disposed()) return;
   validateAudioSong(song);
   activeTrackId = song.tracks.some((track) => track.trackId === activeTrackId) ? activeTrackId : song.tracks[0].trackId;
   renderPalette(); renderPaletteSettings(); renderGrid(); renderPxdColorAssignments();
@@ -653,7 +757,7 @@ function renderSong({ focusCell = null } = {}) {
   tempoInput.value = String(song.tempo); tempoValue.value = String(song.tempo); tempoValue.textContent = String(song.tempo);
 }
 
-tracksEl.addEventListener('click', (event) => {
+scope.listen(tracksEl, 'click', (event) => {
   const colorButton = event.target.closest('button[data-color-id]');
   if (colorButton && sharedMode()) {
     const colorId = colorButton.dataset.colorId;
@@ -669,7 +773,7 @@ tracksEl.addEventListener('click', (event) => {
       renderPxdColorAssignments();
       document.querySelector('#audio-palette-settings').open = true;
       pxdColorsPanel.querySelector(`[data-color-id="${colorId}"]`)?.scrollIntoView({ block: 'nearest' });
-    } else setStatus(slotId ? `${colorButton.title}で描きます。もう一度押すと音色を設定できます。` : '無音の色で描きます。もう一度押すと音色を設定できます。');
+    } else setStatus(`${colorButton.title}で描きます。もう一度押すと音色を設定できます。`);
     return;
   }
   const button = event.target.closest('button[data-track-id]');
@@ -687,18 +791,18 @@ tracksEl.addEventListener('click', (event) => {
   if (editSelected) document.querySelector('#audio-palette-settings').open = true;
 });
 
-penButton.addEventListener('click', () => setTool('pen'));
-eraserButton.addEventListener('click', () => setTool('eraser'));
-document.querySelector('#audio-current')?.addEventListener('click', () => {
+scope.listen(penButton, 'click', () => setTool('pen'));
+scope.listen(eraserButton, 'click', () => setTool('eraser'));
+if (document.querySelector('#audio-current')) scope.listen(document.querySelector('#audio-current'), 'click', () => {
   const panel = document.querySelector('#audio-palette-settings');
   panel.open = !panel.open;
   document.querySelector('#audio-current').setAttribute('aria-expanded', String(panel.open));
 });
-document.querySelector('#audio-palette-settings')?.addEventListener('toggle', (event) => {
+if (document.querySelector('#audio-palette-settings')) scope.listen(document.querySelector('#audio-palette-settings'), 'toggle', (event) => {
   document.querySelector('#audio-current')?.setAttribute('aria-expanded', String(event.target.open));
 });
-document.querySelector('#audio-palette-close')?.addEventListener('click', () => { document.querySelector('#audio-palette-settings').open = false; });
-document.addEventListener('keydown', (event) => {
+if (document.querySelector('#audio-palette-close')) scope.listen(document.querySelector('#audio-palette-close'), 'click', () => { document.querySelector('#audio-palette-settings').open = false; });
+scope.listen(document, 'keydown', (event) => {
   if (event.metaKey || event.ctrlKey || event.altKey || document.body.hasAttribute('data-tool-result-open')
       || event.target.closest?.('input, select, textarea, summary, [contenteditable]')) return;
   const key = event.key.toLowerCase();
@@ -706,11 +810,11 @@ document.addEventListener('keydown', (event) => {
   else if (key === 'e') setTool('eraser');
 });
 
-sizeSelect.addEventListener('change', async () => {
+scope.listen(sizeSelect, 'change', async () => {
   const chosen = Number(sizeSelect.value); sizeSelect.value = String(columns());
   if (audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return; }
   if (chosen > columns() && chosen > AUDIO_PIXEL_COLUMNS && !hasPerk('audio.canvas-wide')) {
-    if (!await requestPass({ perk: 'audio.canvas-wide' })) return;
+    if (!await requestPass({ perk: 'audio.canvas-wide' }) || disposed()) return;
   }
   try {
     player.stop();
@@ -722,38 +826,38 @@ sizeSelect.addEventListener('change', async () => {
     setStatus(`キャンバスを${columns()} × ${PITCHES.length}に変更しました。`);
   } catch (error) { sizeSelect.value = String(columns()); setStatus(error.message || 'キャンバスを変更できませんでした。'); }
 });
-extraInstrumentsButton.addEventListener('click', async () => {
-  if (await requestPass({ perk: 'audio.instruments-extra' })) { renderPaletteSettings(); setStatus('追加の音色を「色と音」から選べます。'); }
+scope.listen(extraInstrumentsButton, 'click', async () => {
+  if (await requestPass({ perk: 'audio.instruments-extra' }) && !disposed()) { renderPaletteSettings(); setStatus('追加の音色を「色と音」から選べます。'); }
 });
-audioPassAddButton.addEventListener('click', async () => {
+scope.listen(audioPassAddButton, 'click', async () => {
   const policy = audioPassState();
   audioPassAddButton.disabled = true;
   try {
-    if (await requestPass({ perk: sharedMode() && policy.premiumContent ? 'project.canvas-expanded' : policy.wideCanvas ? 'audio.canvas-wide' : 'audio.instruments-extra', extend: true })) {
+    if (await requestPass({ perk: sharedMode() && policy.premiumContent ? 'project.canvas-expanded' : policy.wideCanvas ? 'audio.canvas-wide' : 'audio.instruments-extra', extend: true }) && !disposed()) {
       refreshAudioPassUi(); renderPaletteSettings(); setStatus('時間を追加しました。保存している曲と絵を続けて使えます。');
     }
-  } finally { audioPassAddButton.disabled = false; }
+  } finally { if (!disposed()) audioPassAddButton.disabled = false; }
 });
-onPassChange(() => { renderPalette(); renderPaletteSettings(); });
+scope.add(onPassChange(() => { if (!disposed()) { renderPalette(); renderPaletteSettings(); } }));
 
-document.querySelector('#audio-output [data-output-project]')?.addEventListener('click', () => {
+if (document.querySelector('#audio-output [data-output-project]')) scope.listen(document.querySelector('#audio-output [data-output-project]'), 'click', () => {
   editorUi.closePanels();
   void pxdBridge?.showProjects();
 });
 
-photoButton.addEventListener('click', async () => {
+scope.listen(photoButton, 'click', async () => {
   if (audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return; }
   try {
     let pxd;
-    if (pxdBridge) { const saved = await pxdBridge.save(); pxd = { projectId: saved.projectId, revisionId: saved.revisionId }; }
+    if (pxdBridge) { const saved = await pxdBridge.save(); if (disposed()) return; pxd = { projectId: saved.projectId, revisionId: saved.revisionId }; }
     const url = beginAudioCamera({ song, pxd, width: columns(), height: rows() }); player.stop(); location.assign(url);
   }
   catch (error) { setStatus(error.message || '撮影の準備を保存できませんでした。'); }
 });
-exportImageButton.addEventListener('click', async () => {
+scope.listen(exportImageButton, 'click', async () => {
   editorUi.closePanels();
   const exportEpoch = effectEpoch;
-  const sourceSnapshot = { song, image: pxdImage, link: pxdLink, bridge: pxdBridge, current: pxdBridge?.currentProject, held: pxdBridge?.heldProject };
+  const sourceSnapshot = { song, image: pxdImage, link: pxdLink, animation: audioAnimation, bridge: pxdBridge, current: pxdBridge?.currentProject, held: pxdBridge?.heldProject };
   const selectedImage = pxdImage;
   const imageSnapshot = selectedImage ? { width: selectedImage.width, height: selectedImage.height, rgba: new Uint8ClampedArray(selectedImage.rgba) } : null;
   const songSnapshot = structuredClone(song);
@@ -761,10 +865,13 @@ exportImageButton.addEventListener('click', async () => {
   exportImageButton.disabled = true;
   try {
     await pxdBridge?.assertCanSave();
+    if (disposed()) return;
     if (!unchangedSource()) throw new Error('素材が切り替わりました。絵をもう一度保存してください。');
     const { blob, width, height } = await exportAudioImage(songSnapshot, imageSnapshot ? { image: imageSnapshot } : {});
+    if (disposed()) return;
     if (!unchangedSource()) throw new Error('素材が切り替わりました。絵をもう一度保存してください。');
     const saved = await saveFile(blob, `pixieed-dot-music-${width}x${height}.png`);
+    if (disposed()) return;
     if (saved === 'cancelled') return;
     if (exportEpoch === effectEpoch && !viewport.isGesturing && document.visibilityState === 'visible') {
       try { interactionEffects.exportImage({ from: pixelCanvas, to: exportImageButton, image: pixelCanvas }); } catch {}
@@ -775,7 +882,7 @@ exportImageButton.addEventListener('click', async () => {
   finally { exportImageButton.disabled = false; }
 });
 
-gridWrap.addEventListener('pointerdown', (event) => {
+scope.listen(gridWrap, 'pointerdown', (event) => {
   if (viewport.isGesturing) return;
   if (event.target !== pixelCanvas) return;
   const cell = canvasCellAt(event); if (!cell) return;
@@ -784,39 +891,26 @@ gridWrap.addEventListener('pointerdown', (event) => {
   pointerDrawMode = activeTool === 'eraser' || selectedCellMatches(cell.x, cell.y, owner) ? 'erase' : 'paint';
   keyboardCursor = false; cursorCell = cell; updateCanvasLabel(); applyPixel(cell, pointerDrawMode);
 });
-gridWrap.addEventListener('pointermove', (event) => {
+scope.listen(gridWrap, 'pointermove', (event) => {
   if (viewport.isGesturing) return;
   if (event.pointerId !== pointerDrawId) return;
   const cell = canvasCellAt(event); if (!cell || !pointerLastCell) return;
   const changed = [];
   let lastChanged = null;
-  for (const point of lineCells(pointerLastCell, cell)) if (applyPixel(point, pointerDrawMode, { render: false, announce: false, audition: false })) { changed.push(point.y * columns() + point.x); lastChanged = point; }
+  for (const point of pixelLineCells(pointerLastCell, cell)) if (applyPixel(point, pointerDrawMode, { render: false, announce: false, audition: false })) { changed.push(point.y * columns() + point.x); lastChanged = point; }
   pointerLastCell = cell; cursorCell = cell; if (changed.length) { paintPixelCanvas(changed); if (pointerDrawMode === 'paint' && lastChanged && selectedPaintSlot()) previewCell(pitchAtRow(lastChanged.y), selectedPaintSlot(), lastChanged); } updateCanvasLabel();
 });
-function lineCells(from, to) {
-  const cells = []; let x = from.x; let y = from.y;
-  const dx = Math.abs(to.x - from.x); const sx = from.x < to.x ? 1 : -1;
-  const dy = -Math.abs(to.y - from.y); const sy = from.y < to.y ? 1 : -1;
-  let error = dx + dy;
-  while (true) {
-    cells.push({ x, y }); if (x === to.x && y === to.y) break;
-    const twice = 2 * error;
-    if (twice >= dy) { error += dy; x += sx; }
-    if (twice <= dx) { error += dx; y += sy; }
-  }
-  return cells;
-}
 function finishPointer(event) {
   if (event.pointerId !== pointerDrawId) return;
   if (event.type === 'pointercancel') { effectEpoch += 1; interactionEffects.clear(); }
   pointerDrawId = null; pointerLastCell = null;
   if (sharedMode()) { renderPalette(); renderPxdColorAssignments(); }
 }
-document.addEventListener('pointerup', finishPointer);
-document.addEventListener('pointercancel', finishPointer);
-pixelCanvas.addEventListener('focus', () => { keyboardCursor = pixelCanvas.matches(':focus-visible'); updateCanvasLabel(); });
-pixelCanvas.addEventListener('blur', () => { cursor.hidden = true; });
-pixelCanvas.addEventListener('keydown', (event) => {
+scope.listen(document, 'pointerup', finishPointer);
+scope.listen(document, 'pointercancel', finishPointer);
+scope.listen(pixelCanvas, 'focus', () => { keyboardCursor = pixelCanvas.matches(':focus-visible'); updateCanvasLabel(); });
+scope.listen(pixelCanvas, 'blur', () => { cursor.hidden = true; });
+scope.listen(pixelCanvas, 'keydown', (event) => {
   const next = { ...cursorCell };
   if (event.key === 'ArrowRight') next.x = Math.min(columns() - 1, next.x + 1);
   else if (event.key === 'ArrowLeft') next.x = Math.max(0, next.x - 1);
@@ -831,7 +925,7 @@ pixelCanvas.addEventListener('keydown', (event) => {
   setStatus(cellDescription(cursorCell.x, cursorCell.y));
 });
 
-tempoInput.addEventListener('input', () => {
+scope.listen(tempoInput, 'input', () => {
   if (audioPassState().locked) { tempoInput.value = String(song.tempo); setStatus('続けるには時間を追加してください。'); return; }
   try {
     if (player.isPlaying || player.isStarting) player.stop();
@@ -842,11 +936,12 @@ tempoInput.addEventListener('input', () => {
   } catch (error) { setStatus(error.message || 'テンポを変更できませんでした。'); }
 });
 
-playButton.addEventListener('click', async () => {
+scope.listen(playButton, 'click', async () => {
   if (player.isPlaying || player.isStarting) { player.stop(); setStatus('再生を停止しました。'); return; }
   if (audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return; }
   try {
-    const started = await player.play(song);
+    const started = await player.play(ensureAudioAnimationProjection());
+    if (disposed()) return;
     if (started) setStatus('再生中です。中央の停止ボタンで音を止められます。');
     else if (!collectAudioEvents(song).length) setStatus('まだ音符がありません。グリッドのマスを押して音を追加してください。');
   } catch {
@@ -854,37 +949,19 @@ playButton.addEventListener('click', async () => {
   }
 });
 
-saveButton.addEventListener('click', async () => {
+scope.listen(saveButton, 'click', async () => {
   editorUi.closePanels();
   saveButton.disabled = true; setStatus('端末に保存しています…');
   try {
+    ensureAudioAnimationProjection();
     validateAudioSong(song);
     await pxdBridge.save();
+    if (disposed()) return;
     setStatus('曲と絵を、このプロジェクトに保存しました。');
   } catch (error) {
     setStatus(`保存できませんでした：${error.message || '空き容量とブラウザーの保存設定を確認してください。'}`);
-  } finally { saveButton.disabled = false; }
+  } finally { if (!disposed()) saveButton.disabled = false; }
 });
-
-resumeButton.addEventListener('click', () => void pxdBridge.beforeReplace(loadLegacySong));
-async function loadLegacySong() {
-  if (!draftStore) return;
-  let draftId;
-  try { draftId = localStorage.getItem(LAST_DRAFT_KEY); }
-  catch { setStatus('前回の曲を読み出せませんでした。'); return; }
-  if (!draftId) { resumeButton.hidden = true; setStatus('前回の曲はありません。'); return; }
-  resumeButton.disabled = true; setStatus('前回の曲を開いています…'); player.stop();
-  try {
-    const revision = await draftStore.load(draftId);
-    if (!revision || revision.asset.kind !== 'song' || revision.asset.owner.type !== 'local' || revision.asset.owner.id !== 'local-owner' || revision.asset.visibility !== 'draft' || revision.document.songId !== draftId) throw new Error('保存した曲が見つかりません');
-    validateAudioSong(revision.document);
-    pxdBridge?.reset(); pxdImage = null; pxdLink = null; pxdMainImage = null;
-    song = normalizeAudioPixelSong(revision.document); currentDraftId = crypto.randomUUID(); activeTrackId = song.tracks[0].trackId;
-    renderSong(); resumeButton.disabled = false; setStatus('前回の曲を開きました。');
-  } catch {
-    resumeButton.disabled = false; setStatus('曲を開けませんでした。端末内の保存内容を確認してください。');
-  }
-}
 
 function stopOnExit() {
   effectEpoch += 1; interactionEffects.clear();
@@ -893,11 +970,11 @@ function stopOnExit() {
   void player.dispose();
 
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') stopOnExit(); });
-window.addEventListener('pagehide', stopOnExit);
-window.addEventListener('beforeunload', stopOnExit);
+scope.listen(document, 'visibilitychange', () => { if (document.visibilityState !== 'visible') stopOnExit(); });
+scope.listen(window, 'pagehide', stopOnExit);
+scope.listen(window, 'beforeunload', stopOnExit);
 
-pxdBridge = mountPxdTools({
+pxdBridge = mountWorkspace({
   tool: 'audio',
   projectWorkspace: true,
   getEditorState: () => ({ activeTrackId, selectedColorId, activeTool, viewport: viewport.getState() }),
@@ -911,12 +988,28 @@ pxdBridge = mountPxdTools({
   async openProject(project) {
     if (!project.entries.length) {
       player.stop(); song = createAudioSong({ songId: crypto.randomUUID() });
+      audioAnimation = null; selectedAudioFrameId = null; selectedAudioLayerId = null; pxdLink = null;
       const blank = { width: 16, height: 16, rgba: new Uint8Array(16 * 16 * 4) };
       const plan = prepareSharedAudioImageImport(song, blank);
       song = plan.song; pxdImage = plan.image; pxdLink = plan.link; pxdMainImage = blank;
       activeTrackId = song.tracks[0].trackId; selectedColorId = null; currentDraftId = crypto.randomUUID(); renderSong(); return;
     }
     const storedSong = readPxdAudioState(project); const sharedImage = await readPxdSharedImage(project);
+    const audioRoleAnimation = await readPxdAnimation(project, 'audio');
+    if (audioRoleAnimation) {
+      const animation = audioRoleAnimation;
+      const animationSong = storedSong || createAudioSong({ songId: crypto.randomUUID() });
+      const animationLink = audioRoleAnimation ? readPxdAudioLink(project) : null;
+      if (player.isPlaying || player.isStarting) player.stop();
+      song = animationSong;
+      adoptAudioAnimation(animation, animationLink);
+      activeTrackId = song.tracks[0].trackId; currentDraftId = crypto.randomUUID();
+      if (audioRoleAnimation && animationLink?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION) {
+        validateAudioAnimationBinding(song, animation, animationLink);
+      }
+      renderSong(); refreshAudioAnimationControls();
+      return;
+    }
     const storedLink = storedSong ? readPxdAudioLink(project) : null;
     const audioProject = storedSong && storedLink?.rulesVersion === 'shared-canvas-v1' && storedLink.imageRole === 'main'
       ? await detachPxdAudioImage(project)
@@ -966,9 +1059,19 @@ pxdBridge = mountPxdTools({
     renderSong();
   },
   async getProject(project) {
+    ensureAudioAnimationProjection();
     const snapshot = structuredClone(song); const image = pxdImage ? structuredClone(pxdImage) : audioSongImage(snapshot);
     const link = pxdLink ? structuredClone(pxdLink) : audioCellLink(snapshot); const original = pxdMainImage ? structuredClone(pxdMainImage) : null;
     let next = project || createPxdProject();
+    if (animatedAudioMode()) {
+      const animatedLink = audioAnimationLinkFor(audioAnimation, pxdLink, { projectionReady: pxdLink.projectionReady });
+      const posterFrameId = audioAnimation.frames[0]?.id;
+      const posterImage = composedAnimationImage(posterFrameId);
+      next = await writePxdAudioState(next, snapshot, { link: animatedLink, animation: audioAnimation });
+      next = await writePxdAnimation(next, audioAnimation, { role: 'audio', posterFrameId });
+      if (posterImage) next = await putPxdImage(next, posterImage, 'audio');
+      return next;
+    }
     if (link.rulesVersion === 'shared-canvas-v1') {
       if (original && !pxdImageRoles(next).includes('main')) next = await putPxdSharedImage(next, original);
       next = await writePxdAudioState(next, snapshot, { image, link });
@@ -980,8 +1083,29 @@ pxdBridge = mountPxdTools({
   }
 });
 
+if (animationControlsHost) {
+  animationControls = mountAnimationControls({ host: animationControlsHost, scope,
+    getState: animationControlState, onAction: handleAudioAnimationAction,
+    getFramePreview: (frameId) => { const image = composedAnimationImage(frameId); return image ? new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height) : null; } });
+}
+
+const disposeAudioMode = () => {
+  if (modeDisposed) return;
+  modeDisposed = true;
+  clearTimeout(statusTimer);
+  stopPlayhead();
+  effectEpoch += 1; audioVideoEpoch += 1;
+  audioVideoController?.abort(); audioVideoController = null;
+  interactionEffects.clear();
+  animationControls?.dispose(); animationControls = null;
+  editorUi.dispose(); resultView.dispose();
+  player.stop(); void player.dispose();
+};
+scope.add(disposeAudioMode);
+
 try {
   await pxdBridge.ready;
+  if (disposed()) return { workspace: pxdBridge, dispose: disposeAudioMode };
   const cancelled = new URLSearchParams(location.search).get('cancelled') === '1';
   const handoff = cancelled ? null : takeAudioCameraReturn();
   if (handoff) {
@@ -994,12 +1118,12 @@ try {
     const preserveShared = samePxd && sharedMode();
     if (preserveShared && (image.width !== pxdImage.width || image.height !== pxdImage.height)) throw new Error('撮影画像の大きさが共有キャンバスと異なります。PXDと撮影前の曲は保持しています。');
     const plan = prepareSharedAudioImageImport(baseSong, image, { rowPitchMap });
-    await pxdBridge.save(); pxdBridge.reset();
+    await pxdBridge.save(); if (disposed()) return { workspace: pxdBridge, dispose: disposeAudioMode }; pxdBridge.reset();
     song = plan.song; pxdImage = plan.image; pxdLink = plan.link;
     pxdMainImage = null;
     currentDraftId = song.songId; activeTrackId = song.tracks[0].trackId;
     pxdBridge.markDirty();
-    await pxdBridge.save();
+    await pxdBridge.save(); if (disposed()) return { workspace: pxdBridge, dispose: disposeAudioMode };
     setStatus('撮った写真の主な色を音色に割り当て、新しいプロジェクトに保存しました。');
   } else {
     const returnParams = new URLSearchParams(location.search);
@@ -1014,32 +1138,33 @@ try {
     if (draft) {
       const samePxd = draft.pxd && pxdBridge.currentProject?.projectId === draft.pxd.projectId && pxdBridge.currentProject?.revisionId === draft.pxd.revisionId;
       if (draft.pxd && !samePxd) throw new Error('撮影前のPXD revisionが現在の作品と一致しません。作品を切り替えず、保存済みの内容を維持しました。');
-      if (!samePxd) { await pxdBridge.save(); pxdBridge.reset(); pxdImage = null; pxdLink = null; pxdMainImage = null; song = draft.song; }
+      if (!samePxd) { await pxdBridge.save(); if (disposed()) return { workspace: pxdBridge, dispose: disposeAudioMode }; pxdBridge.reset(); pxdImage = null; pxdLink = null; pxdMainImage = null; song = draft.song; }
       currentDraftId = song.songId; activeTrackId = song.tracks[0].trackId;
       setStatus(cancelled ? '撮影前の曲に戻りました。' : '写真を取り込めませんでした。撮影前の曲は残しています。');
     }
   }
 } catch (error) { setStatus(error.message || '撮った写真を取り込めませんでした。'); }
 renderSong();
-try { resumeButton.hidden = !draftStore || !localStorage.getItem(LAST_DRAFT_KEY); }
-catch { resumeButton.hidden = true; }
-refreshImageSources();
 
 // ---- the song as a sound file (WAV): the loop repeated to about 8 seconds, same instruments as playback ----
-exportSoundButton?.addEventListener('click', async () => {
+if (exportSoundButton) scope.listen(exportSoundButton, 'click', async () => {
   editorUi.closePanels();
   if (audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return; }
+  try { ensureAudioAnimationProjection(); } catch (error) { setStatus(error.message || '音を準備できませんでした。'); return; }
   const sourceSong = song; const sourceImage = pxdImage; const sourceLink = pxdLink; const sourceBridge = pxdBridge;
   const sourceCurrent = pxdBridge?.currentProject; const sourceHeld = pxdBridge?.heldProject;
   const unchanged = () => sourceSong === song && sourceImage === pxdImage && sourceLink === pxdLink && sourceBridge === pxdBridge && sourceCurrent === pxdBridge?.currentProject && sourceHeld === pxdBridge?.heldProject;
   audioWavExporting = true; refreshAudioPassUi(); setStatus('音を書き出しています…');
   try {
     await sourceBridge?.assertCanSave();
+    if (disposed()) return;
     if (!unchanged()) throw new Error('素材が切り替わりました。音をもう一度保存してください。');
     const songSnapshot = structuredClone(sourceSong);
     const { blob, seconds } = await renderAudioWav(songSnapshot);
+    if (disposed()) return;
     if (!unchanged()) throw new Error('素材が切り替わりました。音をもう一度保存してください。');
     const saved = await saveFile(blob, `pixieed-dot-music-${Math.round(seconds)}s.wav`);
+    if (disposed()) return;
     if (saved !== 'cancelled' && unchanged()) {
       setStatus(`${Math.round(seconds)}秒の音を保存しました`);
       if (hasSongNotes(songSnapshot)) showAudioResult({ title: '音を保存しました', detail: `${Math.round(seconds)}秒` });
@@ -1049,16 +1174,17 @@ exportSoundButton?.addEventListener('click', async () => {
   finally { audioWavExporting = false; refreshAudioPassUi(); }
 });
 
-exportVideoButton?.addEventListener('click', async () => {
+if (exportVideoButton) scope.listen(exportVideoButton, 'click', async () => {
   editorUi.closePanels();
   if (audioVideoController) return;
   if (audioPassState().locked) { setStatus('続けるには時間を追加してください。'); return; }
+  try { ensureAudioAnimationProjection(); } catch (error) { setStatus(error.message || '動画の音を準備できませんでした。'); return; }
   const controller = new AbortController(); const epoch = ++audioVideoEpoch;
   audioVideoController = controller;
-  const sourceSnapshot = { song, image: pxdImage, link: pxdLink, bridge: pxdBridge, current: pxdBridge?.currentProject, held: pxdBridge?.heldProject };
+  const sourceSnapshot = { song, image: pxdImage, link: pxdLink, animation: audioAnimation, bridge: pxdBridge, current: pxdBridge?.currentProject, held: pxdBridge?.heldProject };
   const selectedImage = pxdImage || audioSongImage(song);
   const imageSnapshot = { width: selectedImage.width, height: selectedImage.height, rgba: new Uint8ClampedArray(selectedImage.rgba) };
-  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current === pxdBridge?.currentProject && sourceSnapshot.held === pxdBridge?.heldProject && (sourceSnapshot.image === null || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
+  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.animation === audioAnimation && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current === pxdBridge?.currentProject && sourceSnapshot.held === pxdBridge?.heldProject && (sourceSnapshot.image === null || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
   const songSnapshot = structuredClone(song);
   refreshAudioPassUi();
   cancelVideoButton.hidden = false;
@@ -1067,8 +1193,13 @@ exportVideoButton?.addEventListener('click', async () => {
     await pxdBridge?.assertCanSave();
     if (!unchangedSource() || epoch !== audioVideoEpoch) throw new Error('素材が切り替わりました。音付き動画をもう一度作成してください。');
     if (controller.signal.aborted) { const error = new Error('動画の作成を中止しました。'); error.name = 'AbortError'; throw error; }
+    const videoSeconds = songSnapshot.loopTicks * 60 / songSnapshot.tempo / AUDIO_PPQ;
+    if (videoSeconds > 120) throw new RangeError('この曲は長いため動画にできません。曲を120秒以内にしてください。プロジェクト保存と再生は続けられます。');
+    const frameImages = animatedAudioMode() ? audioAnimation.frames.map(({ id }) => composedAnimationImage(id)) : null;
     const result = await renderAudioVideo(songSnapshot, imageSnapshot, {
       signal: controller.signal,
+      frameImages,
+      frameTicks: animatedAudioMode() ? audioAnimation.width * AUDIO_PIXEL_TICKS : null,
       onProgress(progress) {
         if (epoch === audioVideoEpoch && audioVideoController === controller && unchangedSource()) status.textContent = `動画を作成しています… ${Math.min(99, Math.floor(progress * 100))}%`;
         else controller.abort();
@@ -1078,6 +1209,7 @@ exportVideoButton?.addEventListener('click', async () => {
     status.textContent = '動画を端末に保存しています…';
     if (!unchangedSource()) return;
     const saved = await saveFile(result.blob, `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`);
+    if (disposed() || epoch !== audioVideoEpoch) return;
     if (saved !== 'cancelled' && epoch === audioVideoEpoch && !controller.signal.aborted && unchangedSource()) {
       setStatus(`${Math.round(result.seconds)}秒の音付き動画を保存しました。`);
       if (hasSongNotes(songSnapshot)) showAudioResult({ title: '動画を保存しました', detail: `${Math.round(result.seconds)}秒` });
@@ -1092,4 +1224,6 @@ exportVideoButton?.addEventListener('click', async () => {
     if (epoch === audioVideoEpoch) { cancelVideoButton.hidden = true; refreshAudioPassUi(); }
   }
 });
-cancelVideoButton?.addEventListener('click', () => audioVideoController?.abort());
+if (cancelVideoButton) scope.listen(cancelVideoButton, 'click', () => audioVideoController?.abort());
+  return { workspace: pxdBridge, dispose: disposeAudioMode };
+}

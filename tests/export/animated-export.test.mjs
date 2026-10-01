@@ -30,8 +30,9 @@ test('camera capture planning bounds retained RGBA pixels and downsamples only t
 
 test('worker export borrows source frames and terminates after output', async () => {
   const source = frames(); const before = source.map((f) => [...f.data]);
+  source[0].delayMs = 40;
   let terminated = 0;
-  const worker = { terminate() { terminated++; }, postMessage(message, transfer) { assert.equal(transfer, undefined); assert.equal(message.frames, source); queueMicrotask(() => this.onmessage({ data: { bytes: new Uint8Array([71, 73, 70]) } })); } };
+  const worker = { terminate() { terminated++; }, postMessage(message, transfer) { assert.equal(transfer, undefined); assert.equal(message.frames, source); assert.equal(message.delayMs, 100); assert.equal(message.frames[0].delayMs, 40); queueMicrotask(() => this.onmessage({ data: { bytes: new Uint8Array([71, 73, 70]) } })); } };
   const result = await encodeAnimatedGif(source, { longEdge: 32, workerFactory: () => worker });
   assert.equal(result.width, 32); assert.deepEqual([...result.bytes], [71, 73, 70]);
   assert.equal(terminated, 1); assert.deepEqual(source.map((f) => [...f.data]), before);
@@ -49,6 +50,12 @@ test('abort stops a pending worker and stale output cannot complete the export',
 test('bad frames are rejected before spawning a worker', async () => {
   let spawned = false; const invalid = frames(); invalid[1].height = 3;
   await assert.rejects(encodeAnimatedGif(invalid, { workerFactory() { spawned = true; } }), RangeError);
+  assert.equal(spawned, false);
+});
+
+test('invalid per-frame delay is rejected before spawning a worker', async () => {
+  let spawned = false; const source = frames(); source[1].delayMs = 19;
+  await assert.rejects(encodeAnimatedGif(source, { workerFactory() { spawned = true; } }), RangeError);
   assert.equal(spawned, false);
 });
 

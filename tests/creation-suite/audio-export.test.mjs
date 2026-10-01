@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
 import { readPixelPngMetadata } from '../../js/pixel-png-metadata.mjs';
 import { audioImageExportSize } from '../../js/creation/audio-export.mjs';
-import { createAudioSong } from '../../js/creation/audio-core.mjs';
-import { audioExportLoops, encodeWav, exportAudioImage } from '../../js/creation/audio-export.mjs';
+import { AUDIO_MAX_LOOP_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { audioExportLoops, encodeWav, exportAudioImage, renderAudioWav } from '../../js/creation/audio-export.mjs';
 
 function pngFixture(width, height) {
   const chunk = (type, data) => {
@@ -57,4 +57,18 @@ test('sound export: the loop repeats to about 8 seconds and the WAV header match
   assert.equal(String.fromCharCode(...wav.slice(0, 4)), 'RIFF'); assert.equal(String.fromCharCode(...wav.slice(8, 12)), 'WAVE');
   assert.equal(view.getUint16(22, true), 2); assert.equal(view.getUint32(24, true), 44100); assert.equal(view.getUint32(40, true), 12);
   assert.equal(wav.length, 44 + 12); assert.equal(view.getInt16(44 + 4, true), 32767); assert.equal(view.getInt16(44 + 8, true), -32768);
+});
+
+test('long WAV requests are rejected before allocating an OfflineAudioContext', async () => {
+  const song = setAudioPixel(createAudioSong({ loopTicks: AUDIO_MAX_LOOP_TICKS }), {
+    trackId: 'track-square', pitch: 60, startTick: 0, noteId: 'long-export-note'
+  });
+  let allocations = 0;
+  class OfflineContext { constructor() { allocations += 1; throw new Error('should be admitted before allocation'); } }
+  await assert.rejects(renderAudioWav(song, { loops: 1, OfflineContext }), /120秒以内/);
+  assert.equal(allocations, 0);
+});
+
+test('WAV encoding enforces its byte cap before allocating the output buffer', () => {
+  assert.throws(() => encodeWav({ numberOfChannels: 2, sampleRate: 44100, length: 20_000_000, getChannelData() { throw new Error('must not read'); } }), /64MBまで/);
 });

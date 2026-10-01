@@ -6,6 +6,7 @@ import {
 } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
 import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20260930-audio-timebase-1';
 import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261001-audio-animation-1';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
 const AUDIO_LINK_PATH = 'audio/link.json';
@@ -246,7 +247,20 @@ export function resizePxdAudioWorkingImage(image, link, width) {
   return { image: { width, height: image.height, rgba: next }, link: { ...link, width, height: image.height, sourceMapping: { ...(link.sourceMapping || {}), canvasWidth: width, canvasHeight: image.height, resizeRule: 'left-anchor-v1' } } };
 }
 
-export async function writePxdAudioState(project, song, { image = audioSongImage(song), link = audioCellLink(song) } = {}) {
+export async function writePxdAudioState(project, song, { image = null, link = audioCellLink(song), animation = null } = {}) {
+  if (link?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION) {
+    if (!animation) throw new TypeError('音楽用アニメーションがありません。PXDは変更していません。');
+    validateAudioAnimationBinding(song, animation, link);
+    let next = project || createPxdProject();
+    next = optionalJson(next, AUDIO_STATE_PATH) === null
+      ? setPxdJson(next, AUDIO_STATE_PATH, clone(song))
+      : mergePxdJson(next, AUDIO_STATE_PATH, clone(song));
+    next = optionalJson(next, AUDIO_LINK_PATH) === null
+      ? setPxdJson(next, AUDIO_LINK_PATH, clone(link))
+      : mergePxdJson(next, AUDIO_LINK_PATH, clone(link));
+    return next;
+  }
+  image ||= audioSongImage(song);
   if (link?.rulesVersion === 'shared-canvas-v1') {
     let next = project || createPxdProject();
     if (![AUDIO_IMAGE_ROLE, SHARED_IMAGE_ROLE].includes(link.imageRole)) throw new TypeError('音楽画像の参照先が不正です');
@@ -277,6 +291,17 @@ export async function writePxdAudioState(project, song, { image = audioSongImage
     : mergePxdJson(next, AUDIO_LINK_PATH, clone(link));
   next = await putPxdImage(next, image, AUDIO_IMAGE_ROLE);
   return next;
+}
+
+/** Keep the audio-role link valid when the shared animation changes elsewhere. */
+export async function updatePxdAudioAnimationLink(project, animation) {
+  const song = readPxdAudioState(project);
+  if (!song) return project;
+  const prior = readPxdAudioLink(project);
+  const colors = prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION ? prior.colorToSlot : null;
+  const rowPitchMap = prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION && prior.rowPitchMap?.length === animation.height ? prior.rowPitchMap : null;
+  const link = createAudioAnimationLink(song, animation, { colorToSlot: colors, rowPitchMap, projectionReady: false });
+  return writePxdAudioState(project, song, { link, animation });
 }
 
 /** Build a temporary Draw-shaped input without resizing or reducing RGBA colors. */

@@ -17,6 +17,7 @@ export function collectColors(frames, limit = 256) {
   for (const f of frames) {
     const d = f.data;
     for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 128) continue;
       const k = key(d, i);
       const c = counts.get(k);
       if (c !== undefined) counts.set(k, c + 1);
@@ -57,6 +58,16 @@ export function medianCut(counts, size = 256) {
 export function buildPalette(frames) {
   const counts = collectColors(frames);
   return counts.size <= 256 ? [...counts.keys()] : medianCut(counts, 256);
+}
+
+function hasTransparentPixels(frames) {
+  for (const frame of frames) for (let index = 3; index < frame.data.length; index += 4) if (frame.data[index] < 128) return true;
+  return false;
+}
+
+function validDelay(value) {
+  if (!Number.isFinite(value) || value < 20 || value > 655350) throw new RangeError('GIFのコマ時間は20〜655350msで指定してください。');
+  return Math.max(2, Math.min(65535, Math.round(value / 10)));
 }
 
 function nearest(palette, r, g, b) {
@@ -137,26 +148,31 @@ export function encodeGif(frames, { delayMs = 1000 / GIF_FPS, scale = 1, palette
   if (!frames.length) throw new RangeError('no frames');
   const { width, height } = frames[0];
   const W = width * scale; const H = height * scale;
-  let bitsPerColor = 1; while ((1 << bitsPerColor) < Math.max(2, palette.length)) bitsPerColor++;
+  const transparent = hasTransparentPixels(frames);
+  const colors = transparent && palette.length > 255 ? medianCut(collectColors(frames), 255) : palette;
+  const tableColorCount = colors.length + (transparent ? 1 : 0);
+  let bitsPerColor = 1; while ((1 << bitsPerColor) < Math.max(2, tableColorCount)) bitsPerColor++;
   const tableSize = 1 << bitsPerColor;
   const out = new ByteWriter(W * H);
   out.str('GIF89a'); out.word(W); out.word(H);
   out.byte(0x80 | ((bitsPerColor - 1) << 4) | (bitsPerColor - 1)); out.byte(0); out.byte(0);
-  for (let i = 0; i < tableSize; i++) { const c = palette[i] ?? 0; out.byte(c >> 16); out.byte(c >> 8); out.byte(c); }
+  for (let i = 0; i < tableSize; i++) { const c = transparent ? i === 0 ? 0 : colors[i - 1] ?? 0 : colors[i] ?? 0; out.byte(c >> 16); out.byte(c >> 8); out.byte(c); }
   out.bytes([0x21, 0xff, 0x0b]); out.str('NETSCAPE2.0'); out.bytes([3, 1, 0, 0, 0]); // loop forever
-  const toIndex = indexer(palette);
-  const delay = Math.max(2, Math.round(delayMs / 10));
+  const toIndex = indexer(colors);
+  validDelay(delayMs);
   const small = new Uint8Array(width * height);
   const big = new Uint8Array(W * H);
   for (const frame of frames) {
+    const delay = validDelay(frame.delayMs === undefined ? delayMs : frame.delayMs);
     const d = frame.data;
-    for (let p = 0, i = 0; p < small.length; p++, i += 4) small[p] = toIndex(key(d, i));
+    for (let p = 0, i = 0; p < small.length; p++, i += 4) small[p] = transparent && d[i + 3] < 128 ? 0 : toIndex(key(d, i)) + (transparent ? 1 : 0);
     let indices = small;
     if (scale > 1) {
       for (let y = 0; y < H; y++) { const row = ((y / scale) | 0) * width; const o = y * W; for (let x = 0; x < W; x++) big[o + x] = small[row + ((x / scale) | 0)]; }
       indices = big;
     }
-    out.bytes([0x21, 0xf9, 4, 0x04, delay & 255, delay >> 8, 0, 0]); // graphic control: keep previous, delay
+    // Transparent full-frame animation clears to transparent between frames to avoid stale pixels.
+    out.bytes([0x21, 0xf9, 4, transparent ? 0x09 : 0x04, delay & 255, delay >> 8, 0, 0]);
     out.byte(0x2c); out.word(0); out.word(0); out.word(W); out.word(H); out.byte(0);
     lzwEncode(indices, Math.max(2, bitsPerColor), out);
   }

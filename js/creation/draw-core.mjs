@@ -1,3 +1,5 @@
+import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
+
 export const DRAW_SIZES = Object.freeze([16, 32, 64, 128, 256, 512]);
 export const DRAW_SIZE = 16;
 // かんたんドット絵 draws with 16 fixed colours + transparent. The first seven keep their old slots so earlier
@@ -50,39 +52,36 @@ function pointIndex(x, y, width, height) {
   return px < 0 || py < 0 || px >= width || py >= height ? -1 : py * width + px;
 }
 
-export function strokePixels(document, from, to, value, { trusted = false } = {}) {
+export function strokePixels(document, from, to, value, { trusted = false, tracker = null } = {}) {
   // Pointer moves operate on an already validated document; importing and committing still validate fully.
   if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
   const x0 = Math.floor(from.x); const y0 = Math.floor(from.y); const x1 = Math.floor(to.x); const y1 = Math.floor(to.y);
   if (![x0, y0, x1, y1].every(Number.isFinite)) return [];
   if ([x0, y0, x1, y1].some((coordinate) => Math.abs(coordinate) > Math.max(document.width, document.height) * 4)) return [];
-  const changed = []; let x = x0; let y = y0;
-  const dx = Math.abs(x1 - x0); const sx = x0 < x1 ? 1 : -1; const dy = -Math.abs(y1 - y0); const sy = y0 < y1 ? 1 : -1; let error = dx + dy;
-  for (;;) {
+  const changed = [];
+  for (const { x, y } of pixelLineCells({ x: x0, y: y0 }, { x: x1, y: y1 })) {
     const index = pointIndex(x, y, document.width, document.height);
-    if (index >= 0 && document.pixels[index] !== value) { document.pixels[index] = value; changed.push(index); }
-    if (x === x1 && y === y1) break;
-    const twice = 2 * error;
-    if (twice >= dy) { error += dy; x += sx; }
-    if (twice <= dx) { error += dx; y += sy; }
+    if (index >= 0 && document.pixels[index] !== value) { writeTrackedPixel(document, tracker, index, value); changed.push(index); }
   }
   return changed;
 }
 
-export function floodFill(document, x, y, value) {
-  validateDrawDocument(document);
+export function floodFill(document, x, y, value, { trusted = false, tracker = null, queue = null } = {}) {
+  if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
   const start = pointIndex(x, y, document.width, document.height);
   if (start < 0) return [];
   const target = document.pixels[start];
   if (target === value) return [];
-  const changed = new Uint32Array(document.pixels.length); let count = 0; let cursor = 0;
-  document.pixels[start] = value; changed[count++] = start;
+  const changed = queue ?? new Uint32Array(document.pixels.length);
+  if (!(changed instanceof Uint32Array) || changed.length < document.pixels.length) throw new RangeError('Flood-fill queue must hold at least one entry per canvas pixel');
+  let count = 0; let cursor = 0;
+  writeTrackedPixel(document, tracker, start, value); changed[count++] = start;
   while (cursor < count) {
     const index = changed[cursor++];
     const px = index % document.width; const py = Math.floor(index / document.width);
-    const add = (next) => { if (document.pixels[next] === target) { document.pixels[next] = value; changed[count++] = next; } };
+    const add = (next) => { if (document.pixels[next] === target) { writeTrackedPixel(document, tracker, next, value); changed[count++] = next; } };
     if (px > 0) add(index - 1); if (px + 1 < document.width) add(index + 1);
     if (py > 0) add(index - document.width); if (py + 1 < document.height) add(index + document.width);
   }
@@ -101,6 +100,15 @@ function makePatch(before, after) {
 }
 function applyPatch(pixels, patch, values) { for (let slot = 0; slot < patch.indices.length; slot += 1) pixels[patch.indices[slot]] = values[slot]; }
 
+function patchFromChanges(changes) {
+  const entries = [...changes].filter(([, change]) => change[0] !== change[1]);
+  const indices = new Uint32Array(entries.length); const oldValues = new Int16Array(entries.length); const newValues = new Int16Array(entries.length);
+  for (let slot = 0; slot < entries.length; slot += 1) {
+    indices[slot] = entries[slot][0]; oldValues[slot] = entries[slot][1][0]; newValues[slot] = entries[slot][1][1];
+  }
+  return { indices, oldValues, newValues, bytes: indices.byteLength + oldValues.byteLength + newValues.byteLength };
+}
+
 const samePalette = (a, b) => a.length === b.length && a.every((color, index) => color === b[index]);
 // One history step holds the changed pixels and, when the colours were edited, the palette before and after.
 export function createDrawHistory(document, { maxBytes = DEFAULT_HISTORY_BYTES, maxEntries = 100 } = {}) {
@@ -108,6 +116,11 @@ export function createDrawHistory(document, { maxBytes = DEFAULT_HISTORY_BYTES, 
   const past = []; const future = []; let retainedBytes = 0; let lastStep = null;
   const clearFuture = () => { for (const entry of future) retainedBytes -= entry.bytes; future.length = 0; };
   const trimPast = () => { while (past.length > maxEntries || retainedBytes > maxBytes && past.length > 1) retainedBytes -= past.shift().bytes; };
+  const recordPatch = (patch) => {
+    clearFuture();
+    if (patch.bytes > maxBytes) { past.length = 0; retainedBytes = 0; }
+    else { past.push(patch); retainedBytes += patch.bytes; trimPast(); }
+  };
   const moveEntry = (from, to, backwards) => {
     if (!from.length) return false;
     const patch = from.pop(); applyPatch(document.pixels, patch, backwards ? patch.oldValues : patch.newValues);
@@ -126,14 +139,71 @@ export function createDrawHistory(document, { maxBytes = DEFAULT_HISTORY_BYTES, 
       if (!patch && !paletteChanged) return false;
       patch ??= { indices: new Uint32Array(0), oldValues: new Int16Array(0), newValues: new Int16Array(0), bytes: 0 };
       if (paletteChanged) { patch.paletteBefore = [...document.palette]; patch.paletteAfter = [...nextDocument.palette]; patch.bytes += (patch.paletteBefore.length + patch.paletteAfter.length) * 9; }
-      clearFuture();
-      if (patch.bytes > maxBytes) { past.length = 0; retainedBytes = 0; }
-      else { past.push(patch); retainedBytes += patch.bytes; trimPast(); }
+      recordPatch(patch);
       document.pixels = nextDocument.pixels; if (paletteChanged) document.palette = [...nextDocument.palette]; return true;
+    },
+    commitPatch(changes) {
+      if (!(changes instanceof Map)) throw new TypeError('Stroke changes must be a Map');
+      const patch = patchFromChanges(changes);
+      if (!patch.indices.length) return false;
+      for (let slot = 0; slot < patch.indices.length; slot += 1) {
+        const index = patch.indices[slot]; const before = patch.oldValues[slot]; const after = patch.newValues[slot];
+        if (index >= document.pixels.length || before < -1 || before >= document.palette.length || after < -1 || after >= document.palette.length || document.pixels[index] !== after) throw new TypeError('Stroke patch does not match the active document');
+      }
+      recordPatch(patch); lastStep = { indices: patch.indices, paletteChanged: false }; return true;
     },
     undo() { return moveEntry(past, future, true); },
     redo() { return moveEntry(future, past, false); }
   };
+}
+
+/** Begin a sparse undo tracker for an in-place stroke without copying the pixel array. */
+export function beginDrawStroke(document, { trusted = false } = {}) {
+  if (!trusted) validateDrawDocument(document);
+  return { document, width: document.width, height: document.height, changes: new Map(), closed: false };
+}
+
+function assertStrokeTracker(tracker, document) {
+  if (!tracker || tracker.closed || tracker.document !== document || tracker.width !== document.width || tracker.height !== document.height) throw new TypeError('Stroke tracker does not match the active document');
+}
+
+function writeTrackedPixel(document, tracker, index, value) {
+  if (tracker) {
+    assertStrokeTracker(tracker, document);
+    let change = tracker.changes.get(index);
+    const before = change ? change[0] : document.pixels[index];
+    if (!change) change = [before, value];
+    else change[1] = value;
+    document.pixels[index] = value;
+    if (change[0] === value) tracker.changes.delete(index);
+    else tracker.changes.set(index, change);
+    return;
+  }
+  document.pixels[index] = value;
+}
+
+/** Run one pixel operation with a sparse before/after recorder and return the operation's result. */
+export function trackDrawStrokeChanges(tracker, document, operation) {
+  assertStrokeTracker(tracker, document);
+  if (typeof operation !== 'function') return Uint32Array.from(tracker.changes.keys());
+  return operation(tracker);
+}
+
+/** Commit live stroke edits to Undo history without a full-document validation or diff scan. */
+export function commitDrawStroke(document, history, tracker) {
+  assertStrokeTracker(tracker, document);
+  const committed = history.commitPatch(tracker.changes);
+  tracker.closed = true;
+  return committed;
+}
+
+/** Restore pre-stroke values after a cancelled gesture. */
+export function cancelDrawStroke(document, tracker) {
+  assertStrokeTracker(tracker, document);
+  for (const [index, change] of tracker.changes) document.pixels[index] = change[0];
+  tracker.closed = true;
+  tracker.changes.clear();
+  return true;
 }
 
 export function finishDrawStroke(document, history, originalPixels) {

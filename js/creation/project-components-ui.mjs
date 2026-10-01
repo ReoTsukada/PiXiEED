@@ -59,11 +59,11 @@ export function createProjectComponentShelf({ tool, onOpen, onReplace, onEditIma
         if (exists && part.tool !== 'draw') {
           const actions = node('div', 'project-component__actions');
           if (onEditImage && image) {
-            const edit = node('button', '', part.tool === 'spot_difference' ? '違いを描く' : '絵を編集'); edit.type = 'button'; edit.id = `project-edit-${part.tool}`;
+            const edit = node('button', '', part.tool === 'spot_difference' ? '違いを描く' : part.tool === 'audio' ? '曲の絵を編集' : '絵を編集'); edit.type = 'button'; edit.id = `project-edit-${part.tool}`;
             edit.setAttribute('aria-label', `${part.label}に使う絵を編集`); edit.addEventListener('click', () => onEditImage(part.tool)); actions.append(edit);
           }
-          const replace = node('button', '', '絵を差し替える'); replace.type = 'button'; replace.id = `project-replace-${part.tool}`;
-          replace.setAttribute('aria-label', `${part.label}の絵を差し替える`); replace.addEventListener('click', () => onReplace(part.tool)); actions.append(replace); card.append(actions);
+          const replace = node('button', '', part.tool === 'audio' ? '絵の更新を曲に反映' : '絵を差し替える'); replace.type = 'button'; replace.id = `project-replace-${part.tool}`;
+          replace.setAttribute('aria-label', part.tool === 'audio' ? 'プロジェクトの最新の絵を曲に反映' : `${part.label}の絵を差し替える`); replace.addEventListener('click', () => onReplace(part.tool)); actions.append(replace); card.append(actions);
         }
         element.append(card);
       }

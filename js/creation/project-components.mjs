@@ -1,9 +1,12 @@
 import { imageToDrawDocument, putPxdDrawDocument, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-components-1';
-import { detachPxdAudioImage, readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-components-1';
+import { detachPxdAudioImage, readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-animation-1';
 import { freezePxdPuzzleImages, createPxdPuzzleFromMain, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { resolveLocalDrawRevision } from './spot-difference-core.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
+import { cloneAnimation, composeAnimationFrame } from './animation-core.mjs';
+import { prepareAudioAnimationImport } from './audio-animation.mjs';
 
 export const COMPONENTS = Object.freeze([
   { tool: 'draw', label: '絵', role: 'main' },
@@ -46,6 +49,15 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   let next = await freezeProjectComponents(project);
   if (tool === 'audio') {
     const song = readPxdAudioState(next); const link = readPxdAudioLink(next);
+    const animation = await readPxdAnimation(next, componentImageRole(next, 'draw'));
+    if (animation) {
+      const copy = cloneAnimation(animation);
+      const plan = prepareAudioAnimationImport(song, copy, { colorToSlot: link?.colorToSlot || null,
+        rowPitchMap: link?.rowPitchMap?.length === copy.height ? link.rowPitchMap : null });
+      next = await writePxdAudioState(next, plan.song, { image, link: plan.link, animation: copy });
+      next = await writePxdAnimation(next, copy, { role: 'audio', posterFrameId: copy.frames[0].id });
+      return putPxdDrawDocument(next, composeAnimationFrame(copy, copy.frames[0].id), 'audio');
+    }
     const options = { colorToSlot: link?.colorToSlot || null };
     if (link?.rowPitchMap?.length === image.height) options.rowPitchMap = link.rowPitchMap;
     const plan = prepareSharedAudioImageImport(song, image, options);
@@ -65,5 +77,8 @@ export async function replaceProjectComponentImage(project, tool, image, { store
 
 /** Same-sized inputs remain exact. A tool edits only its own working image. */
 export async function putProjectComponentImage(project, tool, image, role = componentImageRole(project, tool)) {
+  if (project?.entries?.some((entry) => entry.path === `animations/${role}/state.json`)) {
+    throw new Error('アニメーションの大きさは描画画面のサイズボタンで変更してください。コマの絵と色を保持します。');
+  }
   return putPxdDrawDocument(project, imageToDrawDocument(image), role);
 }

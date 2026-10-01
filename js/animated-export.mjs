@@ -1,4 +1,4 @@
-import { encodeGif, GIF_LONG_EDGE } from './pixel-lens/gif.mjs?v=20260928-rewards-1';
+import { encodeGif, GIF_LONG_EDGE } from './pixel-lens/gif.mjs?v=20261001-animation-1';
 
 export const ANIMATED_MAX_INPUT_PIXELS = 8e6;
 export const ANIMATED_MAX_FALLBACK_OUTPUT_PIXELS = 8e6;
@@ -73,9 +73,13 @@ export async function encodeAnimatedGif(frames, {
     if (frame.width !== width || frame.height !== height || !ArrayBuffer.isView(frame.data) || frame.data.BYTES_PER_ELEMENT !== 1 || frame.data.length !== width * height * 4) throw new RangeError('invalid GIF frame');
   }
   if (!Number.isFinite(delayMs) || delayMs < 20 || delayMs > 655350) throw new RangeError('invalid GIF delay');
+  for (const frame of frames) {
+    const frameDelay = frame.delayMs === undefined ? delayMs : frame.delayMs;
+    if (!Number.isFinite(frameDelay) || frameDelay < 20 || frameDelay > 655350) throw new RangeError('invalid GIF frame delay');
+  }
   let worker;
   try {
-    worker = workerFactory ? workerFactory() : typeof Worker === 'function' ? new Worker(new URL('./gif-export-worker.mjs?v=20260928-rewards-1', import.meta.url), { type: 'module' }) : null;
+    worker = workerFactory ? workerFactory() : typeof Worker === 'function' ? new Worker(new URL('./gif-export-worker.mjs?v=20261001-animation-1', import.meta.url), { type: 'module' }) : null;
   } catch { /* A small bounded export is still available when workers are blocked. */ }
   if (!worker) {
     const small = animatedGeometry(width, height, frames.length, {

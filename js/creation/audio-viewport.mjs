@@ -8,8 +8,18 @@ export function audioViewportGeometry({ width, height, hostWidth, hostHeight, zo
   return { width: width * cell, height: height * cell, x: Math.max(-maxX, Math.min(maxX, x)) || 0, y: Math.max(-maxY, Math.min(maxY, y)) || 0 };
 }
 
-export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, onGestureStart = () => {}, onChange = () => {} } = {}) {
+export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, onGestureStart = () => {}, onChange = () => {}, scope = null } = {}) {
   const touches = new Map();
+  const cleanups = [];
+  const listen = (target, type, callback, options) => {
+    if (scope?.listen) {
+      const cleanup = scope.listen(target, type, callback, options);
+      if (typeof cleanup === 'function') cleanups.push(cleanup);
+      return;
+    }
+    target.addEventListener(type, callback, options);
+    cleanups.push(() => target.removeEventListener(type, callback, options));
+  };
   let width = 16, height = 16, zoom = 1, x = 0, y = 0, gesture = null, gesturing = false;
   const touchPose = () => {
     const [a, b] = [...touches.values()];
@@ -22,7 +32,7 @@ export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, on
     canvas.style.transform = `translate(${x}px, ${y}px)`;
     onChange();
   };
-  host.addEventListener('pointerdown', (event) => {
+  listen(host, 'pointerdown', (event) => {
     if (event.pointerType !== 'touch') return;
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (touches.size === 1) onStrokeStart();
@@ -32,7 +42,7 @@ export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, on
       try { host.setPointerCapture(event.pointerId); } catch {}
     }
   }, { capture: true });
-  host.addEventListener('pointermove', (event) => {
+  listen(host, 'pointermove', (event) => {
     if (!touches.has(event.pointerId)) return;
     touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (!gesture || touches.size !== 2) return;
@@ -48,8 +58,8 @@ export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, on
     if (touches.size < 2) gesture = null;
     if (touches.size === 0) gesturing = false;
   };
-  for (const type of ['pointerup', 'pointercancel']) document.addEventListener(type, end, { capture: true });
-  host.addEventListener('wheel', (event) => {
+  for (const type of ['pointerup', 'pointercancel']) listen(document, type, end, { capture: true });
+  listen(host, 'wheel', (event) => {
     event.preventDefault(); const next = Math.max(1, Math.min(16, zoom * wheelZoomFactor(event.deltaY, event.deltaMode, host.clientHeight)));
     const ratio = next / zoom, bounds = host.getBoundingClientRect();
     x = x * ratio + (1 - ratio) * (event.clientX - bounds.left - bounds.width / 2);
@@ -67,6 +77,10 @@ export function createAudioViewport(canvas, host, { onStrokeStart = () => {}, on
     resize(nextWidth, nextHeight) {
       if (nextWidth !== width || nextHeight !== height) { zoom = 1; x = 0; y = 0; }
       width = nextWidth; height = nextHeight; layout();
+    },
+    dispose() {
+      touches.clear(); gesture = null; gesturing = false;
+      for (const cleanup of cleanups.splice(0)) cleanup();
     }
   };
 }

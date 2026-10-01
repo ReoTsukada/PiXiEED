@@ -415,6 +415,22 @@ test('dense chords lower per-note peaks while isolated notes retain their level'
   assert.ok(chord.every((peak) => Math.abs(peak - solo[0] / 4) < 1e-9), 'sixteen overlapping notes receive square-root gain compensation');
 });
 
+test('player schedules distant notes through a bounded lookahead instead of allocating the whole song at once', async () => {
+  const timers = []; const starts = [];
+  class Param { setValueAtTime() {} linearRampToValueAtTime() {} }
+  class Node { constructor() { this.frequency = new Param(); this.gain = new Param(); } connect() {} disconnect() {} start(at) { starts.push(at); } stop() {} }
+  const context = { currentTime: 0, sampleRate: 8000, destination: {}, resume: async () => {}, close: async () => {}, createOscillator: () => new Node(), createGain: () => new Node() };
+  let song = setAudioPixel(createAudioSong({ loopTicks: AUDIO_BAR_TICKS * 4 }), { trackId: 'track-square', pitch: 60, startTick: 0, noteId: 'near' });
+  song = setAudioPixel(song, { trackId: 'track-square', pitch: AUDIO_PIXEL_PITCHES[1], startTick: 2400, noteId: 'far' });
+  const player = createAudioPlayer({ audioContextFactory: () => context, schedule: (callback, delay) => { const timer = { callback, delay }; timers.push(timer); return timer; }, cancel(timer) { timer.cancelled = true; } });
+  await player.play(song);
+  assert.equal(starts.length, 1, 'only the event inside the one-second lookahead is allocated');
+  context.currentTime = 2.1;
+  timers.find((timer) => timer.delay === 25).callback();
+  assert.equal(starts.length, 2, 'the later event is scheduled when it enters the lookahead');
+  player.stop(); await player.dispose();
+});
+
 test('every selectable timbre can schedule a short canvas note without invalid audio times', async () => {
   class Param {
     constructor() { this.value = 0; }
@@ -441,26 +457,28 @@ test('every selectable timbre can schedule a short canvas note without invalid a
   }
 });
 
-test('audio page exposes labeled editing, save/resume and central playback controls', async () => {
+test('audio page exposes labeled editing, project save and central playback controls without legacy entry points', async () => {
   const { readFile } = await import('node:fs/promises');
   const page = await readFile(new URL('../../audio/index.html', import.meta.url), 'utf8');
   const script = await readFile(new URL('../../js/creation/audio-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /id="audio-play-toggle"/);
   assert.match(page, /aria-label="アプリナビゲーション"/);
   assert.match(page, /id="audio-save"/);
-  assert.match(page, /id="audio-resume"/);
-  assert.match(page, /id="audio-shelf"/); assert.match(page, /id="audio-from-camera"/);
+  assert.doesNotMatch(page, /id="audio-resume"|id="audio-shelf"/);
+  assert.doesNotMatch(page, /audio-from-camera|前のカメラ画像から/);
+  assert.match(page, /id="audio-take-photo"[^>]*写真を撮って音楽にする/);
   assert.match(page, /id="audio-pixel-canvas"[^>]*tabindex="0"/);
   assert.doesNotMatch(page, /audio-pixel-board/); assert.match(page, /共有画像のセルを音に割り当てる音楽キャンバス/);
   assert.equal((page.match(/<header class="site-header"/g) || []).length, 1);
   assert.doesNotMatch(page, /class="site-footer"/);
   assert.match(page, /class="[^"]*\baudio-more\b[^"]*"/); assert.match(page, /audio-tool-body/);
   assert.match(page, /id="audio-tool-pen"/); assert.match(page, /id="audio-tool-eraser"/); assert.match(page, /id="audio-playhead"/);
-  assert.match(script, /LAST_DRAW_DRAFT_KEY/); assert.match(script, /cameraHandoffImage/);
-  assert.match(script, /setAudioPixel/); assert.match(script, /pixelSurface\.paint/); assert.match(script, /pointermove/); assert.match(script, /lineCells/); assert.match(script, /ArrowRight/); assert.match(script, /event\.key === 'Enter' \|\| event\.key === ' '/);
+  assert.doesNotMatch(script, /loadLegacySong|LAST_DRAFT_KEY|createLocalDraftStore|mountPictureShelf|audio-shelf|audio-from-camera|cameraHandoffImage|refreshImageSources/);
+  assert.match(script, /beginAudioCamera\(/); assert.match(script, /takeAudioCameraReturn\(/); assert.match(script, /readAudioCameraDraft\(/);
+  assert.match(script, /setAudioPixel/); assert.match(script, /pixelSurface\.paint/); assert.match(script, /pointermove/); assert.match(script, /pixelLineCells/); assert.match(script, /ArrowRight/); assert.match(script, /event\.key === 'Enter' \|\| event\.key === ' '/);
   assert.match(script, /prepareSharedAudioImageImport/); assert.match(script, /setSharedAudioCell/); assert.match(script, /readPxdSharedImage/);
   assert.doesNotMatch(script, /createElement\('button'\).*audio-pixel-cell/);
-  assert.match(script, /hashCanonical\(revision\.document\)/); assert.doesNotMatch(script, /fetch\(|supabase|create-post/i);
+  assert.doesNotMatch(script, /fetch\(|supabase|create-post/i);
   assert.match(script, /visibilitychange/);
   assert.match(script, /pagehide/);
   assert.match(script, /beforeunload/);
@@ -469,5 +487,5 @@ test('audio page exposes labeled editing, save/resume and central playback contr
   assert.match(script, /const initialSharedImage = \{ width: 16, height: 16/);
   assert.match(script, /readPxdSharedImage/);
   assert.match(script, /await pxdBridge\.save\(\)/);
-  assert.doesNotMatch(script, /localStorage\.setItem\(LAST_DRAFT_KEY, currentDraftId\)/);
+  assert.doesNotMatch(script, /localStorage\.getItem\(['"]pixieed:creation:audio:last-draft:v1/);
 });

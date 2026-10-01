@@ -17,9 +17,12 @@ body.app-page--tool-jigsaw #main{height:calc(100dvh - var(--px-header-height,64p
 .jigsaw-workspace-tools #jigsaw-selection{min-width:0;margin-left:auto;color:#586052;font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jigsaw-workspace{position:relative;box-sizing:border-box;min-width:0;min-height:0;overflow:hidden;touch-action:none;border:1px solid #d8ddd3;border-radius:14px;background-color:#f3f5f0;background-image:radial-gradient(#cdd3c7 1px,transparent 1px);background-size:18px 18px;outline:none}
 .jigsaw-workspace:focus-visible{outline:3px solid #335cbe;outline-offset:2px}.jigsaw-board{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;image-rendering:pixelated}
-.jigsaw-preview{position:absolute;right:8px;top:8px;z-index:4;display:flex;flex-direction:column;width:min(180px,45vw);max-height:calc(100% - 16px);padding:6px;border:1px solid rgba(67,79,61,.24);border-radius:12px;background:rgba(255,255,250,.97);box-shadow:0 5px 18px rgba(31,43,28,.2);pointer-events:auto}
-.jigsaw-preview__head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;color:#394332;font-size:.7rem;font-weight:800}
-.jigsaw-play .jigsaw-preview__head button{width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;background:transparent;font-size:1.15rem;line-height:1}
+.jigsaw-preview{position:fixed;top:calc(var(--px-header-height,64px) + max(8px,env(safe-area-inset-top)));right:max(12px,env(safe-area-inset-right));z-index:70;box-sizing:border-box;display:flex;flex-direction:column;width:min(180px,calc(100vw - 24px));max-height:calc(100dvh - var(--px-header-height,64px) - 100px);padding:6px;border:1px solid rgba(67,79,61,.24);border-radius:12px;background:rgba(255,255,250,.97);box-shadow:0 5px 18px rgba(31,43,28,.2);pointer-events:auto}
+.jigsaw-preview[hidden]{display:none!important}
+.jigsaw-preview__head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:44px;margin-bottom:4px;color:#394332;font-size:.7rem;font-weight:800;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.jigsaw-preview__head:active{cursor:grabbing}
+.jigsaw-preview__head button{flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;font-size:1.15rem;line-height:1;cursor:pointer;touch-action:manipulation}
+.jigsaw-preview__head:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
 .jigsaw-preview__head{flex:none}
 .jigsaw-preview__canvas{display:block;flex:0 1 auto;min-height:0;width:100%;max-height:min(24dvh,150px);height:auto;object-fit:contain;image-rendering:pixelated;pointer-events:none}
 .jigsaw-tray{box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;min-width:0;height:74px;overflow-x:auto;overflow-y:hidden;padding:2px 3px 5px;overscroll-behavior-x:contain;touch-action:pan-x;scrollbar-width:thin}

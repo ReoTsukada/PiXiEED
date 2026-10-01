@@ -2,25 +2,37 @@ import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, finishDrawStroke, floodFill, resizeDrawRectangle, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, resizeDrawRectangle, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261001-animation-1';
+import { createDrawAnimationSession } from './draw-animation-session.mjs';
+import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-cel-workspace-2';
+import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
 import { confirmPxdConversion } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-components-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-independent-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20260930-shared-canvas-5';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeAnimatedGif } from '../animated-export.mjs?v=20260929-gif-budget-1';
+import { encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { requestPass, hasPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
-import { readPxdAudioLink, readPxdDrawDocument, synchronizeLinkedAudioImage, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-components-1';
+import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-animation-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
+
+export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
+if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
+const setTimeout = (callback, delay) => scope.timeout(callback, delay);
+const clearTimeout = (id) => scope.clearTimeout(id);
+const requestAnimationFrame = (callback) => scope.frame(callback);
+const cancelAnimationFrame = (id) => scope.cancelFrame(id);
 
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
@@ -33,6 +45,9 @@ const globeButton = $('#draw-to-globe');
 const sizeSelect = $('#draw-size');
 const interactionEffects = createInteractionEffects();
 let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false;
+let animationSession = createDrawAnimationSession(documentData), animationControls = null, strokeTracker = null;
+let playing = false, onion = false, playbackFrame = null, playbackStarted = 0, playbackOffset = 0, playbackRequest = 0;
+const onionCanvas = document.createElement('canvas'); onionCanvas.className = 'draw-onion'; onionCanvas.setAttribute('aria-hidden', 'true'); onionCanvas.style.cssText = 'position:absolute;pointer-events:none;image-rendering:pixelated;z-index:1'; $('.draw-board').append(onionCanvas); onionCanvas.hidden = true;
 // Only the newest open/import may replace the picture; the version an edit started from guards saves.
 const loadGate = createLatestGate(); let baseRevisionId = null;
 const TIMELAPSE_FPS = 12;
@@ -63,16 +78,94 @@ function setCanvasDimensions() {
   canvas.setAttribute('aria-label', `${documentData.width}×${documentData.height}の透明なキャンバス。色を選んで描きます。`);
 }
 function updateControls() {
-  $('#draw-undo').disabled = !history.canUndo; $('#draw-redo').disabled = !history.canRedo;
-  $('#draw-undo').setAttribute('aria-disabled', String(!history.canUndo)); $('#draw-redo').setAttribute('aria-disabled', String(!history.canRedo));
+  $('#draw-undo').disabled = !animationSession.canUndo; $('#draw-redo').disabled = !animationSession.canRedo;
+  $('#draw-undo').setAttribute('aria-disabled', String(!animationSession.canUndo)); $('#draw-redo').setAttribute('aria-disabled', String(!animationSession.canRedo));
   status.textContent = saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
 }
 function paint(changed = null) {
   if (readOnlyImage) { setCanvasDimensions(); canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(readOnlyImage.rgba), readOnlyImage.width, readOnlyImage.height), 0, 0); updateControls(); return; }
   if (!canvasPrepared || canvas.width !== documentData.width || canvas.height !== documentData.height) setCanvasDimensions();
-  pixelSurface.paint(documentData.pixels, documentData.palette, changed);
+  const display = playing ? composeAnimationFrame(animationSession.animation, playbackFrame || animationSession.frameId) : animationSession.composite(documentData, changed);
+  pixelSurface.paint(display.pixels, display.palette, playing ? null : changed);
+  paintOnion(display);
   updateControls();
 }
+function installAnimationDocument(doc) {
+  documentData = doc; history = recordedHistory(createDrawHistory(documentData)); saved = false;
+  selectedColor = Math.min(selectedColor, doc.palette.length - 1); canvasPrepared = false;
+  renderPalette(); showCurrentColor(); paint(); animationControls?.refresh();
+}
+function stopAnimation() {
+  playing = false; playbackFrame = null; cancelAnimationFrame(playbackRequest); playbackRequest = 0;
+  animationControls?.refresh();
+}
+function toggleAnimation() {
+  if (playing) { stopAnimation(); paint(); return; }
+  endStroke(); closeColorEditor();
+  const frames = animationSession.animation.frames; playbackOffset = 0;
+  for (const frame of frames) { if (frame.id === animationSession.frameId) break; playbackOffset += frame.durationMs; }
+  playing = true; playbackStarted = performance.now();
+  const tick = (now) => {
+    if (!playing || scope.disposed) return;
+    const sequence = animationSession.animation.frames, total = sequence.reduce((sum, frame) => sum + frame.durationMs, 0);
+    let time = (now - playbackStarted + playbackOffset) % total, current = sequence[0].id;
+    for (const frame of sequence) { current = frame.id; if (time < frame.durationMs) break; time -= frame.durationMs; }
+    if (current !== playbackFrame) { playbackFrame = current; paint(); }
+    playbackRequest = requestAnimationFrame(tick);
+  };
+  animationControls?.refresh(); tick(playbackStarted);
+}
+let onionKey = '', onionGuide = null;
+function paintOnion(display) {
+  onionCanvas.hidden = !onion || playing || readOnlyImage;
+  if (onionCanvas.hidden) return;
+  const animation = animationSession.animation, key = `${animationSession.frameId}:${animation.frames.map((frame) => frame.id).join(',')}`;
+  if (onionKey !== key || onionGuide?.animation !== animation) {
+    const index = animation.frames.findIndex((frame) => frame.id === animationSession.frameId);
+    onionGuide = { animation, previous: index > 0 ? composeAnimationFrame(animation, animation.frames[index - 1].id) : null,
+      next: index + 1 < animation.frames.length ? composeAnimationFrame(animation, animation.frames[index + 1].id) : null }; onionKey = key;
+  }
+  onionCanvas.width = display.width; onionCanvas.height = display.height;
+  const data = new Uint8ClampedArray(display.width * display.height * 4);
+  for (let index = 0; index < display.pixels.length; index++) {
+    if (display.pixels[index] >= 0) continue;
+    const previous = onionGuide.previous?.pixels[index] >= 0, next = onionGuide.next?.pixels[index] >= 0;
+    if (!previous && !next) continue;
+    data.set(previous ? [255, 100, 110, 95] : [85, 185, 255, 95], index * 4);
+  }
+  onionCanvas.getContext('2d').putImageData(new ImageData(data, display.width, display.height), 0, 0); placeOverlays();
+}
+function handleAnimationAction(action) {
+  if (action.type === 'play') return toggleAnimation();
+  if (action.type === 'onion') { onion = !onion; paint(); animationControls?.refresh(); return; }
+  if (action.type === 'export-gif') return exportAnimation();
+  stopAnimation(); endStroke(); closeColorEditor();
+  if (action.type === 'select-frame' || action.type === 'select-layer') { installAnimationDocument(animationSession.select(action.frameId, action.layerId)); return; }
+  // Layer locking protects pixels, while its own switch must remain operable.
+  const policy = evaluateSharedCanvasPolicy({ width: documentData.width, height: documentData.height, colorCount: usedColorCount() }, { passActive: hasPass() });
+  if (readOnlyImage || !policy.supported || policy.locked) { toast('コマを編集するには特典時間を追加してください。'); return; }
+  const a = animationSession.animation; let next = a, selection;
+  switch (action.type) {
+    case 'add-frame': next = addAnimationFrame(a, { sourceFrameId: action.frameId || animationSession.frameId, copy: action.copy !== false }); selection = { frameId: next.frames.at(-1).id, layerId: animationSession.layerId }; break;
+    case 'delete-frame': next = removeAnimationFrame(a, action.frameId); break;
+    case 'move-frame': next = moveAnimationFrame(a, action.frameId, action.index); break;
+    case 'add-layer': next = addAnimationLayer(a, { name: `レイヤー ${a.layers.length + 1}` }); selection = { frameId: animationSession.frameId, layerId: next.layers.at(-1).id }; break;
+    case 'delete-layer': next = removeAnimationLayer(a, action.layerId); break;
+    case 'move-layer': next = moveAnimationLayer(a, action.layerId, action.index); break;
+    case 'visibility': next = setLayerProperties(a, action.layerId, { visible: action.visible }); break;
+    case 'lock': next = setLayerProperties(a, action.layerId, { locked: action.locked }); break;
+    case 'rename-layer': next = setLayerProperties(a, action.layerId, { name: action.name }); break;
+    case 'duration': next = setAnimationFrameDuration(a, action.frameId, action.durationMs); break;
+    default: return;
+  }
+  installAnimationDocument(animationSession.apply(next, selection)); pxdBridge?.markDirty();
+}
+animationControls = mountAnimationControls({ host: $('#draw-animation-controls'), scope,
+  getState: () => ({ ...animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId, playing, onion, readOnly: Boolean(readOnlyImage) }),
+  onAction: handleAnimationAction,
+  getCelHasContent: (frameId, layerId) => hasAnimationCelContent(animationSession.animation, frameId, layerId),
+  getFramePreview: (frameId) => { const doc = composeAnimationFrame(animationSession.animation, frameId); return new ImageData(new Uint8ClampedArray(documentRgba(doc)), doc.width, doc.height); }
+});
 function renderPalette() {
   const palette = $('#draw-palette'); palette.replaceChildren();
   const transparent = document.createElement('button'); transparent.type = 'button'; transparent.className = 'draw-color draw-color--transparent'; transparent.dataset.colorIndex = '-1'; transparent.setAttribute('aria-label', '透明色'); transparent.setAttribute('aria-pressed', String(selectedColor === -1));
@@ -144,7 +237,7 @@ function placeColorEditor() {
   const above = row.top - h - 10; const below = row.bottom + 10;
   editor.style.top = `${Math.round(above >= 8 || below + h > innerHeight - 8 ? Math.max(8, above) : below)}px`;
 }
-addEventListener('resize', placeColorEditor); addEventListener('scroll', placeColorEditor, { passive: true });
+scope.listen(window, 'resize', placeColorEditor); scope.listen(window, 'scroll', placeColorEditor, { passive: true });
 function setEditColor(hex) {
   if (!colorEdit) return;
   const candidate = [...documentData.palette]; candidate[colorEdit.index] = hex;
@@ -178,7 +271,7 @@ $('.draw-current')?.addEventListener('click', () => (colorEdit ? closeColorEdito
 const editorUi = mountCreationEditorUi($('#main'), { beforePanelOpen: closeColorEditor });
 // touching the picture closes the sheet and draws straight away with the new colour
 canvas.addEventListener('pointerdown', () => { if (colorEdit) closeColorEditor(); }, true);
-addEventListener('keydown', (event) => { if (event.key === 'Escape' && colorEdit) closeColorEditor(); });
+scope.listen(window, 'keydown', (event) => { if (event.key === 'Escape' && colorEdit) closeColorEditor(); });
 function showCurrentColor() {
   const chip = $('.draw-current'); if (!chip) return;
   chip.classList.toggle('is-clear', selectedColor < 0); chip.style.setProperty('--draw-color', selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor]);
@@ -195,6 +288,12 @@ let fitNotice = '';
 let passPrompt = false;
 function usedColorCount(value = documentData) {
   const colors = new Set();
+  if (value === documentData || value.pixels === documentData.pixels) {
+    for (const index of getAnimationUsedColorIndices(animationSession.animation, { excludeFrameId: animationSession.frameId, excludeLayerId: animationSession.layerId })) {
+      const hex = index < 0 ? '#00000000' : value.palette[index]?.toLowerCase();
+      if (hex) colors.add(hex.length === 7 ? `${hex}ff` : hex);
+    }
+  }
   for (const index of value.pixels) {
     const hex = index < 0 ? '#00000000' : value.palette[index].toLowerCase();
     colors.add(hex.length === 7 ? `${hex}ff` : hex);
@@ -203,6 +302,7 @@ function usedColorCount(value = documentData) {
   return colors.size;
 }
 function canEdit(value = documentData) {
+  if (playing) { toast('再生を止めると編集できます。'); return false; }
   if (readOnlyImage) { toast('原本を表示しています。編集するにはプロジェクトのキャンバス設定でサイズと色を合わせてください。'); return false; }
   const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: usedColorCount(value) }, { passActive: hasPass() });
   if (policy.supported && !policy.locked) return true;
@@ -213,21 +313,23 @@ function canEdit(value = documentData) {
 }
 function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
   if (colorEdit) closeColorEditor();
+  const nextAnimationSession = createDrawAnimationSession(nextDocument);
   validateDrawDocument(nextDocument); fitNotice = ''; readOnlyImage = null;
   interactionEffects.clear();
   if (!fromPxd) { pxdBridge?.reset(); pxdImageRole = 'main'; }
   documentData = nextDocument; source = nextSource; history = recordedHistory(createDrawHistory(documentData)); activeDraftId = null; baseRevisionId = null; saved = false;
+  stopAnimation(); animationSession = nextAnimationSession; animationControls?.refresh();
   selectedColor = Math.min(Math.max(selectedColor, 0), documentData.palette.length - 1); renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
 }
 function commitChange(operation) {
+  if (animationSession.locked) { toast('レイヤーの鍵を外すと描けます。'); return; }
   if (!canEdit()) return;
   const next = { ...documentData, palette: documentData.palette, pixels: [...documentData.pixels] }; const changed = operation(next);
   if (!canEdit(next)) return;
   if (history.commit(next)) { saved = false; paint(changed && typeof changed.length === 'number' ? changed : null); }
 }
 function pointFromEvent(event) {
-  const rect = canvas.getBoundingClientRect();
-  return { x: Math.floor((event.clientX - rect.left) * documentData.width / rect.width), y: Math.floor((event.clientY - rect.top) * documentData.height / rect.height) };
+  return rawPixelCellAt(event, canvas.getBoundingClientRect(), documentData.width, documentData.height);
 }
 const ZOOM_MAX = 8;
 // The canvas scales about its own centre; keep the point under the fingers / cursor still while zooming
@@ -256,6 +358,7 @@ function placeOverlays() {
   const board = $('.draw-board'); const grid = $('.draw-grid'); if (!board || !grid) return;
   const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect();
   Object.assign(grid.style, { left: `${r.left - b.left - board.clientLeft}px`, top: `${r.top - b.top - board.clientTop}px`, width: `${r.width}px`, height: `${r.height}px` });
+  Object.assign(onionCanvas.style, { left: grid.style.left, top: grid.style.top, width: grid.style.width, height: grid.style.height });
   for (const node of [grid, canvas]) { node.style.setProperty('--cols', documentData.width); node.style.setProperty('--rows', documentData.height); }
   grid.classList.toggle('is-fine', r.width / documentData.width < 6);
 }
@@ -276,10 +379,13 @@ canvas.addEventListener('pointerleave', () => { if (!drawing) { $('.draw-cursor'
 let toastTimer = 0;
 function toast(message) { status.textContent = message; }
 const QUIET = new Set(['編集中です。保存すると端末に残ります。', '新しい絵を準備しています。']);
-new MutationObserver(() => { if (QUIET.has(status.textContent.trim())) return; status.classList.add('is-show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => status.classList.remove('is-show'), 2600); }).observe(status, { childList: true, characterData: true, subtree: true });
-new ResizeObserver(() => placeOverlays()).observe($('.draw-board'));
+const statusObserver = new MutationObserver(() => { if (scope.disposed || QUIET.has(status.textContent.trim())) return; status.classList.add('is-show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => { if (!scope.disposed) status.classList.remove('is-show'); }, 2600); });
+scope.observe(statusObserver, status, { childList: true, characterData: true, subtree: true });
+const overlayObserver = new ResizeObserver(() => { if (!scope.disposed) placeOverlays(); });
+scope.observe(overlayObserver, $('.draw-board'));
 function pointerPair() { return [...activePointers.values()].slice(0, 2); }
 function startPinch() {
+  if (drawing && strokeTracker) { cancelDrawStroke(documentData, strokeTracker); strokeTracker = null; strokeStartPixels = null; drawing = false; previousPoint = null; paint(); }
   if (drawing && strokeStartPixels) {
     documentData.pixels = strokeStartPixels; strokeStartPixels = null; drawing = false; previousPoint = null; paint();
   }
@@ -291,8 +397,8 @@ function selectedPixelValue() { return tool === 'eraser' ? -1 : selectedColor; }
 let mirror = false; let lineStart = null;
 const mirrored = (point) => ({ x: documentData.width - 1 - point.x, y: point.y });
 function markSegment(from, to, value) {
-  const changed = [...strokePixels(documentData, from, to, value, { trusted: true })];
-  if (mirror) changed.push(...strokePixels(documentData, mirrored(from), mirrored(to), value, { trusted: true }));
+  const changed = [...strokePixels(documentData, from, to, value, { trusted: true, tracker: strokeTracker })];
+  if (mirror) changed.push(...strokePixels(documentData, mirrored(from), mirrored(to), value, { trusted: true, tracker: strokeTracker }));
   return changed;
 }
 function pickColorAt(point) {
@@ -314,6 +420,7 @@ canvas.addEventListener('pointerdown', (event) => {
   // desktop: middle button, or Space held, drags the view
   if (event.button === 1 || spaceHeld) { panDrag = { x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); return; }
   if (activePointers.size > 1) return;
+  if (tool !== 'picker' && animationSession.locked) { toast('レイヤーの鍵を外すと描けます。'); return; }
   if (tool !== 'picker' && !canEdit()) return;
   if (tool !== 'picker' && tool !== 'fill') {
     const value = selectedPixelValue(); const used = new Set(documentData.pixels);
@@ -325,8 +432,9 @@ canvas.addEventListener('pointerdown', (event) => {
   }
   drawing = true; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
   if (tool === 'picker' || tool === 'fill') { pendingTap = touchedPoint; drawing = false; previousPoint = null; return; }
-  if (tool === 'line') { strokeStartPixels = [...documentData.pixels]; lineStart = touchedPoint; const changed = markSegment(lineStart, touchedPoint, selectedPixelValue()); saved = false; paint(changed); }
-  else { strokeStartPixels = [...documentData.pixels]; const changed = markSegment(previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
+  strokeTracker = beginDrawStroke(documentData, { trusted: true });
+  if (tool === 'line') { lineStart = touchedPoint; const changed = markSegment(lineStart, touchedPoint, selectedPixelValue()); saved = false; paint(changed); }
+  else { const changed = markSegment(previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
 });
 canvas.addEventListener('pointermove', (event) => {
   if (activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -343,11 +451,11 @@ canvas.addEventListener('pointermove', (event) => {
   showCursor(event);
   if (!drawing || tool === 'fill' || tool === 'picker') return;
   const point = pointFromEvent(event); if (point.x === previousPoint.x && point.y === previousPoint.y) return;
-  if (tool === 'line') { documentData.pixels = [...strokeStartPixels]; markSegment(lineStart, point, selectedPixelValue()); previousPoint = point; paint(); return; }
+  if (tool === 'line') { cancelDrawStroke(documentData, strokeTracker); strokeTracker = beginDrawStroke(documentData, { trusted: true }); markSegment(lineStart, point, selectedPixelValue()); previousPoint = point; paint(); return; }
   const changed = markSegment(previousPoint, point, selectedPixelValue()); previousPoint = point; saved = false; paint(changed);
 });
 function endStroke() {
-  if (drawing && strokeStartPixels && tool !== 'fill') { finishDrawStroke(documentData, history, strokeStartPixels); strokeStartPixels = null; paint(); }
+  if (drawing && strokeTracker && tool !== 'fill') { commitDrawStroke(documentData, history, strokeTracker); strokeTracker = null; strokeStartPixels = null; paint(); }
   drawing = false; previousPoint = null; lineStart = null;
 }
 function applyTap(point) {
@@ -386,7 +494,7 @@ sizeSelect.addEventListener('change', () => {
     const factor = size / Math.max(documentData.width, documentData.height);
     const next = resizeDrawRectangle(documentData, Math.max(1, Math.round(documentData.width * factor)), Math.max(1, Math.round(documentData.height * factor)));
     if (!canEdit(next)) { sizeSelect.value = String(previousSize); return; }
-    replaceDocument(next, source, { fromPxd: true }); pxdBridge?.markDirty(); status.textContent = `${next.width}×${next.height}にしました`;
+    endStroke(); closeColorEditor(); installAnimationDocument(animationSession.apply(resizeAnimation(animationSession.animation, next.width, next.height))); pxdBridge?.markDirty(); status.textContent = `${next.width}×${next.height}にしました`;
   }
   catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; sizeSelect.value = String(previousSize); }
 });
@@ -411,8 +519,8 @@ function afterHistoryStep() {
   saved = false; const step = history.lastStep;
   if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
 }
-function undo() { if (drawing || !canEdit()) return false; if (colorEdit) closeColorEditor(); if (!history.undo()) return false; afterHistoryStep(); return true; }
-function redo() { if (drawing || !canEdit()) return false; if (colorEdit) closeColorEditor(); if (!history.redo()) return false; afterHistoryStep(); return true; }
+function undo() { if (drawing || !canEdit()) return false; closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
+function redo() { if (drawing || !canEdit()) return false; closeColorEditor(); const doc = animationSession.redo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
 // a tap steps once; holding the button keeps stepping
 for (const [id, step] of [['#draw-undo', undo], ['#draw-redo', redo]]) {
   const button = $(id); let timer = 0; let repeated = false;
@@ -421,7 +529,7 @@ for (const [id, step] of [['#draw-undo', undo], ['#draw-redo', redo]]) {
   for (const type of ['pointerup', 'pointerleave', 'pointercancel']) button.addEventListener(type, stop);
   button.addEventListener('click', () => { if (repeated) { repeated = false; return; } step(); });
 }
-addEventListener('keydown', (event) => {
+scope.listen(window, 'keydown', (event) => {
   if (document.body.hasAttribute('data-tool-result-open')) return;
   if (event.target.closest?.('input, select, textarea')) return;
   const key = event.key.toLowerCase(); const mod = event.metaKey || event.ctrlKey;
@@ -436,7 +544,7 @@ addEventListener('keydown', (event) => {
   if (key === '+' || key === '=') { const r = canvas.getBoundingClientRect(); zoomAt(zoom * 1.5, r.left + r.width / 2, r.top + r.height / 2); return; }
   if (key === '-') { const r = canvas.getBoundingClientRect(); zoomAt(zoom / 1.5, r.left + r.width / 2, r.top + r.height / 2); }
 });
-addEventListener('keyup', (event) => { if (event.key === ' ') { spaceHeld = false; canvas.classList.remove('is-grab'); } });
+scope.listen(window, 'keyup', (event) => { if (event.key === ' ') { spaceHeld = false; canvas.classList.remove('is-grab'); } });
 // wheel / trackpad pinch zooms about the cursor
 $('.draw-board').addEventListener('wheel', (event) => {
   event.preventDefault();
@@ -448,23 +556,27 @@ $('#draw-zoom-label').addEventListener('click', resetView); $('#draw-zoom-label'
 canvas.addEventListener('dblclick', (event) => { if (tool === 'picker' || tool === 'fill') return; event.preventDefault(); });
 $('#draw-clear').addEventListener('click', () => commitChange((next) => { next.pixels.fill(-1); return null; }));
 async function saveRevision() {
+  if (scope.disposed) return null;
   if (!store && !pxdBridge?.currentProject && !pxdBridge?.heldProject) return;
-  if (readOnlyImage) { await pxdBridge?.save(); status.textContent = '原本をそのままプロジェクトに保存しました。'; return null; }
+  if (readOnlyImage) { await pxdBridge?.save(); if (!scope.disposed) status.textContent = '原本をそのままプロジェクトに保存しました。'; return null; }
   closeColorEditor(); editorUi.closePanels();
-  const snapshot = structuredClone(documentData);
+  endStroke(); const snapshot = structuredClone(composeAnimationFrame(animationSession.animation, animationSession.frameId));
   const sourceDocument = documentData; const sourceProjectId = pxdBridge?.currentProject?.projectId;
   saveButton.disabled = true; globeButton.disabled = true; status.textContent = '保存しています…';
   let projectSaved = false;
   try {
     // PXD is the authoritative project. A legacy draft below is a handoff copy only.
     await pxdBridge?.save();
+    if (scope.disposed) return null;
     projectSaved = Boolean(pxdBridge?.currentProject || pxdBridge?.heldProject);
   } catch (error) {
+    if (scope.disposed) return null;
     status.textContent = `プロジェクトを保存できませんでした：${error.message || '保存先を確認してください。'}`;
     saveButton.disabled = false; globeButton.disabled = false;
     return null;
   }
   if (!store) {
+    if (scope.disposed) return null;
     saved = projectSaved;
     status.textContent = projectSaved ? 'プロジェクトを保存しました。端末の再開用コピーは利用できません。' : '端末内保存を使えません。';
     saveButton.disabled = false; globeButton.disabled = false;
@@ -474,6 +586,7 @@ async function saveRevision() {
     const draftId = activeDraftId || crypto.randomUUID();
     // Save only on top of the version this edit started from; another tab's save stops it (the edit stays on screen).
     const revision = await store.save({ draftId, kind: 'pixel_art', document: snapshot, source: structuredClone(source), expectedRevisionId: activeDraftId ? baseRevisionId : null });
+    if (scope.disposed) return revision;
     if (sourceDocument !== documentData || sourceProjectId !== pxdBridge?.currentProject?.projectId) return revision;
     activeDraftId = draftId; baseRevisionId = revision.revisionId; saved = true;
     if (!setLastDraftId(draftId)) { status.textContent = projectSaved ? 'プロジェクトを保存しました。端末の再開用コピーの目印は残せませんでした。' : '絵は端末に保存しましたが、再開用の目印を残せませんでした。'; }
@@ -481,6 +594,7 @@ async function saveRevision() {
     resumeButton.hidden = false; $('#draw-copy-last').hidden = false;
     return revision;
   } catch (error) {
+    if (scope.disposed) return null;
     if (projectSaved) {
       saved = true;
       status.textContent = `プロジェクトは保存しました。端末の再開用コピーを保存できませんでした：${error.message || '端末の空き容量を確認してください。'}`;
@@ -489,15 +603,17 @@ async function saveRevision() {
     status.textContent = `保存できませんでした：${error.message || '端末の空き容量を確認してください。'}`;
     return null;
   }
-  finally { saveButton.disabled = false; globeButton.disabled = false; }
+  finally { if (!scope.disposed) { saveButton.disabled = false; globeButton.disabled = false; } }
 }
 saveButton.addEventListener('click', () => saveRevision());
 globeButton.addEventListener('click', async () => {
   try {
     await pxdBridge?.assertCanSave();
+    if (scope.disposed) return;
     validateDrawPixels(documentData);
     globeButton.disabled = true;
     const revision = await saveRevision();
+    if (scope.disposed) return;
     if (!revision) return;
     if (!revision.revisionId) {
       status.textContent = 'プロジェクトは保存しました。地球儀へ送るコピーを作成できませんでした。';
@@ -505,13 +621,16 @@ globeButton.addEventListener('click', async () => {
     }
     globeButton.disabled = true;
     const png = await encodeDrawPng(revision.document);
+    if (scope.disposed) return;
     const serialized = await serializeDrawHandoff(png, revision.revisionId);
+    if (scope.disposed) return;
     sessionStorage.setItem(DRAW_HANDOFF_KEY, serialized);
     location.assign('/globe/?from=draw');
-  } catch (error) { status.textContent = `地球儀へ送れませんでした：${error.message}`; }
-  finally { globeButton.disabled = false; }
+  } catch (error) { if (!scope.disposed) status.textContent = `地球儀へ送れませんでした：${error.message}`; }
+  finally { if (!scope.disposed) globeButton.disabled = false; }
 });
 async function loadLastDraft({ copy = false } = {}) {
+  if (scope.disposed) return;
   if (pxdBridge?.beforeReplace && !loadingLegacy) {
     await pxdBridge.beforeReplace(async () => { loadingLegacy = true; try { await loadLastDraft({ copy: true }); } finally { loadingLegacy = false; } }); return;
   }
@@ -520,20 +639,21 @@ async function loadLastDraft({ copy = false } = {}) {
   resumeButton.disabled = true; $('#draw-copy-last').disabled = true; status.textContent = copy ? '複製しています…' : '前回の絵を開いています…';
   try {
     const revision = await store.load(draftId); if (!revision) throw new Error('保存した絵が見つかりません。');
-    if (!loadGate.isCurrent(ticket)) return;
+    if (scope.disposed || !loadGate.isCurrent(ticket)) return;
     validateDrawDocument(revision.document);
     pxdBridge?.reset(); pxdImageRole = 'main';
     const nextSource = copy ? { type: 'local_draft_copy', assetId: revision.asset.assetId, revisionId: revision.revisionId, sourceDraftId: draftId, parentSource: revision.asset.source } : revision.asset.source;
     documentData = structuredClone(revision.document); source = nextSource; activeDraftId = copy ? null : draftId; baseRevisionId = copy ? null : revision.revisionId; history = recordedHistory(createDrawHistory(documentData)); saved = !copy;
     renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
     status.textContent = `${copy ? '複製しました' : 'ひらきました'}${fitNotice ? ` ${fitNotice}` : ''}`;
-  } catch (error) { status.textContent = `${copy ? '複製できませんでした' : '開けませんでした'}：${error.message}`; }
-  finally { resumeButton.disabled = false; $('#draw-copy-last').disabled = false; }
+  } catch (error) { if (!scope.disposed) status.textContent = `${copy ? '複製できませんでした' : '開けませんでした'}：${error.message}`; }
+  finally { if (!scope.disposed) { resumeButton.disabled = false; $('#draw-copy-last').disabled = false; } }
 }
 resumeButton.addEventListener('click', () => loadLastDraft());
 $('#draw-copy-last').addEventListener('click', () => loadLastDraft({ copy: true }));
 
 async function importImage(file, importSource) {
+  if (scope.disposed) return;
   if (pxdBridge?.beforeReplace && !loadingLegacy) {
     await pxdBridge.beforeReplace(async () => { loadingLegacy = true; try { await importImage(file, importSource); } finally { loadingLegacy = false; } }); return;
   }
@@ -541,22 +661,24 @@ async function importImage(file, importSource) {
   $('#draw-import-local').disabled = true; status.textContent = '画像を読み込んでいます…';
   try {
     const image = await decodeDrawImageFile(file);
-    if (!loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
+    if (scope.disposed || !loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
     const original = { width: image.width, height: image.height, rgba: new Uint8Array(image.data) };
     const prepared = prepareSharedCanvasImage(original, { passActive: hasPass() });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed && !await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
-    if (!loadGate.isCurrent(ticket)) return;
+    if (scope.disposed || !loadGate.isCurrent(ticket)) return;
     replaceDocument(next, importSource); fitNotice = '';
     status.textContent = `${scaleNotice(image)}${next.width}×${next.height}・${prepared.colorCount}色で読み込みました`;
-  } catch (error) { status.textContent = `画像を複製できませんでした：${error.message}`; }
-  finally { $('#draw-import-local').disabled = false; $('#draw-import-file').value = ''; }
+  } catch (error) { if (!scope.disposed) status.textContent = `画像を複製できませんでした：${error.message}`; }
+  finally { if (!scope.disposed) { $('#draw-import-local').disabled = false; $('#draw-import-file').value = ''; } }
 }
 $('#draw-import-local').addEventListener('click', () => $('#draw-import-file').click());
 $('#draw-import-file').addEventListener('change', () => { const file = $('#draw-import-file').files?.[0]; if (file) importImage(file, { type: 'local_image_copy', assetId: null, revisionId: null }); });
 if (getLastDraftId()) { resumeButton.hidden = false; $('#draw-copy-last').hidden = false; }
 // Pictures from the other tools come in as a new version of this tool's own picture, then open.
-if (store) mountPictureShelf($('#draw-shelf'), { tool: 'draw', adapter: drawAdapter, onBrought: async ({ from }) => { await loadLastDraft(); status.textContent = `${from.label}の絵を持ってきました`; }, onError: (error) => { status.textContent = `持ってこられませんでした：${error.message}`; } });
+const shelfContainer = $('#draw-shelf');
+const pictureShelf = store ? mountPictureShelf(shelfContainer, { tool: 'draw', adapter: drawAdapter, onBrought: async ({ from }) => { await loadLastDraft(); if (!scope.disposed) status.textContent = `${from.label}の絵を持ってきました`; }, onError: (error) => { if (!scope.disposed) status.textContent = `持ってこられませんでした：${error.message}`; } }) : null;
+scope.add(() => { pictureShelf?.dispose?.(); shelfContainer?.replaceChildren(); });
 paint();
 
 $('#draw-output [data-output-project]')?.addEventListener('click', () => {
@@ -566,12 +688,12 @@ $('#draw-output [data-output-project]')?.addEventListener('click', () => {
 
 // ---- saving: the picture leaves PiXiEED enlarged (crisp dots, about 2048px), on phones via the share sheet ----
 $('#draw-export').addEventListener('click', async () => {
-  closeColorEditor(); editorUi.closePanels();
+  endStroke(); closeColorEditor(); stopAnimation(); paint(); editorUi.closePanels();
   const original = documentData; const originalSource = source;
   const bridge = pxdBridge; const project = bridge?.currentProject; const held = bridge?.heldProject;
-  const unchangedSource = () => documentData === original && source === originalSource && pxdBridge === bridge
+  const unchangedSource = () => !scope.disposed && documentData === original && source === originalSource && pxdBridge === bridge
     && bridge?.currentProject === project && bridge?.heldProject === held;
-  const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: original.width, height: original.height, data: documentRgba(structuredClone(original)) };
+  const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: original.width, height: original.height, data: documentRgba(composeAnimationFrame(animationSession.animation, animationSession.frameId)) };
   try {
     await bridge?.assertCanSave?.();
     if (!unchangedSource()) return;
@@ -590,14 +712,16 @@ function recordedHistory(target) {
   timelapse.reset(documentData);
   return new Proxy(target, { get(object, key) {
     const value = Reflect.get(object, key, object);
-    if (key === 'commit') return (...args) => {
+    if (key === 'commit' || key === 'commitPatch') return (...args) => {
       const beforePixels = documentData.pixels; const beforePalette = documentData.palette;
       const done = value.apply(object, args);
       if (done) {
+        animationSession.commitDocument(documentData); animationControls?.refresh();
         pxdBridge?.markDirty();
         const paletteChanged = beforePalette !== documentData.palette;
         const indices = [];
-        if (!paletteChanged) for (let index = 0; index < beforePixels.length; index += 1) if (beforePixels[index] !== documentData.pixels[index]) indices.push(index);
+        if (key === 'commitPatch') indices.push(...object.lastStep.indices);
+        else if (!paletteChanged) for (let index = 0; index < beforePixels.length; index += 1) if (beforePixels[index] !== documentData.pixels[index]) indices.push(index);
         timelapse.record(documentData, { indices, paletteChanged });
       }
       return done;
@@ -614,15 +738,16 @@ history = recordedHistory(history);
 let timelapseExporting = false;
 let activeTimelapseJob = null;
 function timelapseJobIsCurrent(job) {
-  return activeTimelapseJob === job && !job.controller.signal.aborted
+  return !scope.disposed && activeTimelapseJob === job && !job.controller.signal.aborted
     && documentData === job.document
     && source === job.source
     && pxdBridge === job.bridge
     && job.bridge?.currentProject === job.currentProject
     && job.bridge?.heldProject === job.heldProject;
 }
-addEventListener('pagehide', () => activeTimelapseJob?.controller.abort());
+scope.listen(window, 'pagehide', () => activeTimelapseJob?.controller.abort());
 async function exportTimelapse(detail) {
+  if (scope.disposed) return;
   if (timelapseExporting) return;
   closeColorEditor(); editorUi.closePanels();
   const job = {
@@ -662,25 +787,44 @@ async function exportTimelapse(detail) {
   }
 }
 $('#draw-timelapse').addEventListener('click', () => exportTimelapse(false));
+let animationExporting = false, animationExportController = null;
+async function exportAnimation() {
+  if (animationExporting || readOnlyImage || scope.disposed) return;
+  endStroke(); closeColorEditor(); stopAnimation(); editorUi.closePanels();
+  const timeline = animationSession.animation; animationExporting = true;
+  animationExportController = new AbortController(); const controller = animationExportController;
+  try {
+    await pxdBridge?.assertCanSave?.();
+    const frames = [];
+    for (const frame of timeline.frames) {
+      if (scope.disposed || controller.signal.aborted) return;
+      const doc = composeAnimationFrame(timeline, frame.id);
+      frames.push({ width: doc.width, height: doc.height, data: documentRgba(doc), delayMs: Math.max(20, frame.durationMs) });
+    }
+    const result = await encodeAnimatedGif(frames, { longEdge: 1024, maxPixels: 80e6, maxInputPixels: 128 * 256 * 256, signal: controller.signal });
+    if (scope.disposed || controller.signal.aborted) return;
+    await saveFile(new Blob([result.bytes], { type: 'image/gif' }), `pixieed-animation-${result.width}x${result.height}.gif`);
+    toast(`${frames.length}コマのアニメーションを保存しました。`);
+  } catch (error) { if (!scope.disposed && error.name !== 'AbortError') toast(`GIFを書き出せませんでした：${error.message}`); }
+  finally { if (animationExportController === controller) animationExportController = null; animationExporting = false; }
+}
 // the ⋯ sheet closes when you touch anything else (the PXD panel opened from it counts as inside)
-document.addEventListener('pointerdown', (event) => {
+scope.listen(document, 'pointerdown', (event) => {
   const sheet = $('.draw-import'); if (!sheet?.open) return;
   if (sheet.contains(event.target) || event.target.closest?.('#pxd-panel, .pxd-conversion')) return;
   sheet.removeAttribute('open');
 });
 $('#draw-timelapse-detail').addEventListener('click', () => exportTimelapse(true));
 
-pxdBridge = mountPxdTools({
+pxdBridge = mountWorkspace({
   tool: 'draw',
   projectWorkspace: true,
-  getEditorState: () => ({ selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror, showGrid, imageRole: pxdImageRole }),
+  getEditorState: () => ({ selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror, showGrid, imageRole: pxdImageRole, frameId: animationSession.frameId, layerId: animationSession.layerId, onion }),
   restoreEditorState(state) {
     if (state?.imageRole && state.imageRole !== pxdImageRole) state = {};
     if (!readOnlyImage) {
-      const originalPalette = [...documentData.palette];
-      const brushes = (state?.brushColors || []).filter((color) => typeof color === 'string' && /^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color));
-      documentData.palette = [...new Set([...originalPalette, ...brushes])].slice(0, Math.max(originalPalette.length, 32));
-      history = recordedHistory(createDrawHistory(documentData));
+      documentData = animationSession.select(state?.frameId, state?.layerId);
+      history = recordedHistory(createDrawHistory(documentData)); onion = state?.onion === true;
     }
     selectedColor = Number.isInteger(state?.selectedColor) && state.selectedColor >= -1 && state.selectedColor < documentData.palette.length ? state.selectedColor : Math.min(2, documentData.palette.length - 1);
     if (state?.selectedHex && documentData.palette.includes(state.selectedHex)) selectedColor = documentData.palette.indexOf(state.selectedHex);
@@ -688,37 +832,69 @@ pxdBridge = mountPxdTools({
     zoom = Number.isFinite(state?.zoom) ? Math.max(1, Math.min(ZOOM_MAX, state.zoom)) : 1;
     panX = Number.isFinite(state?.panX) ? state.panX : 0; panY = Number.isFinite(state?.panY) ? state.panY : 0;
     mirror = state?.mirror === true; mirrorButton?.setAttribute('aria-pressed', String(mirror)); $('.draw-board')?.classList.toggle('is-mirror', mirror);
-    showGrid = state?.showGrid !== false; syncGrid(); renderPalette(); updateCanvasView();
+    showGrid = state?.showGrid !== false; syncGrid(); renderPalette(); paint(); updateCanvasView(); animationControls?.refresh();
   },
   hasContent: () => Boolean(pxdBridge?.currentProject || pxdBridge?.heldProject || activeDraftId || documentData.pixels.some((pixel) => pixel >= 0)),
   setStatus: (message) => { status.textContent = message; },
   async openProject(project) {
+    if (scope.disposed) return;
     const params = new URLSearchParams(location.search); const requestedRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : null;
     if (!project.entries.length) { pxdImageRole = 'main'; replaceDocument(createDrawDocument(), { type: 'hand_drawn', assetId: null, revisionId: null }, { fromPxd: true }); return; }
     const roles = pxdImageRoles(project);
     const rememberedRole = project.manifest.editorState?.draw?.imageRole;
     let role = requestedRole || (roles.includes(rememberedRole) ? rememberedRole : roles.includes('main') ? 'main' : roles.includes('draw') ? 'draw' : roles[0]);
+    // Validate the timeline before replacing the working document. Unknown versions fail closed.
+    const storedAnimation = await readPxdAnimation(project, role || 'main');
+    if (scope.disposed) return;
     let nextDocument;
     {
-      try { nextDocument = await readPxdDrawDocument(project, role); }
+      try { nextDocument = await readPxdDrawDocument(project, role); if (nextDocument && !storedAnimation) createDrawAnimationSession(nextDocument); if (scope.disposed) return; }
       catch (error) {
+        if (scope.disposed) return;
         const image = await readPxdImage(project, role);
+        if (scope.disposed) return;
         if (!image || !(error instanceof RangeError)) throw error;
         readOnlyImage = image; pxdImageRole = role || 'main'; saved = true; paint();
-        status.textContent = '原本をそのまま表示しています。PNG・PXDで保存できます。編集するには共通キャンバス設定でサイズと色を合わせてください。'; return;
+        status.textContent = '原本をそのまま表示しています。画像として保存できます。サイズ・色数が対応範囲を超えるため、編集はしていません。'; return;
       }
     }
     if (!nextDocument) throw new Error('このPXDには描画できる画像部品がありません。別のPXDや保存版を選んでください。');
     validateDrawDocument(nextDocument);
     pxdImageRole = role || 'main';
     replaceDocument(structuredClone(nextDocument), { type: 'pxd_project_copy', assetId: null, revisionId: null, projectId: project.projectId, imageRole: pxdImageRole }, { fromPxd: true });
+    if (storedAnimation) installAnimationDocument(animationSession.load(storedAnimation));
     saved = true; paint();
   },
   async getProject(project) {
+    if (scope.disposed) return project;
     if (readOnlyImage) return project;
-    const snapshot = structuredClone(documentData); const role = pxdImageRole;
+    endStroke(); closeColorEditor(); const timeline = animationSession.animation;
+    const snapshot = composeAnimationFrame(timeline, timeline.frames[0].id); const role = pxdImageRole;
     let next = project || createPxdProject();
-    next = await synchronizeLinkedAudioImage(next, snapshot, role);
-    return writePxdDrawDocument(next, snapshot, role);
+    next = await writePxdDrawDocument(next, snapshot, role);
+    next = await writePxdAnimation(next, timeline, { role, posterFrameId: timeline.frames[0].id });
+    return next;
   }
 });
+let modeDisposed = false;
+function disposeDrawMode() {
+  if (modeDisposed) return;
+  modeDisposed = true;
+  loadGate.begin();
+  activeTimelapseJob?.controller.abort();
+  animationExportController?.abort();
+  clearToastTimer();
+  stopAnimation(); animationControls?.dispose(); if (drawing) endStroke();
+  activePointers.clear(); pendingTap = null; pinchStart = null; panDrag = null; fingerTap = null;
+  strokeStartPixels = null; drawing = false; previousPoint = null;
+  canvas.classList.remove('is-grab', 'is-panning');
+  closeColorEditor();
+  editorUi.dispose?.();
+  resultView.dispose?.();
+  interactionEffects.clear();
+}
+function clearToastTimer() { clearTimeout(toastTimer); }
+scope.add(disposeDrawMode);
+await pxdBridge.ready;
+return { workspace: pxdBridge, dispose: disposeDrawMode };
+}

@@ -64,7 +64,13 @@ test('the tools read their own pictures, not かんたんドット\'s', () => {
     assert.doesNotMatch(source, /simple-draw\.last-draft/, `${file} no longer reads the Draw picture directly`);
     assert.match(source, /mountPictureShelf\(/, `${file} offers the shelf`); assert.match(source, new RegExp(`tool: '${tool}'`));
   }
-  for (const page of ['draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object']) {
+  for (const page of ['draw', 'jigsaw', 'spot-difference', 'hidden-object']) {
     assert.match(readFileSync(new URL(`../../${page}/index.html`, import.meta.url), 'utf8'), /id="[a-z-]+-shelf"/, `${page} has a shelf`);
   }
+  const audioPage = readFileSync(new URL('../../audio/index.html', import.meta.url), 'utf8');
+  const audioSource = readFileSync(new URL('../../js/creation/audio-page.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(audioPage, /id="audio-shelf"/, 'Audio uses the project panel instead of the legacy picture shelf');
+  assert.doesNotMatch(audioSource, /mountPictureShelf\(/);
+  assert.match(audioSource, /mountProjectWorkspace as mountPxdTools/);
+  assert.match(audioSource, /mountWorkspace\(/);
 });
