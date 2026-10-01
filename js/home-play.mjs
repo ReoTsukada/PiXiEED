@@ -7,7 +7,8 @@
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
-import { createHomeMotion } from './home-motion.mjs?rev=20261001-gyro-1';
+import { createHomeMotion } from './home-motion.mjs?rev=20261002-gyro-360-1';
+import { stepGravitySand } from './home-sand.mjs?rev=20261002-gyro-360-1';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced';
@@ -160,7 +161,7 @@ function hero() {
   //  ・文字 — dragging through PiXiEED knocks letters loose, a tap bursts one; flying dots catch stars they hit
   //  ・星 — tap a star to catch it; a shooting star is worth five
   //  ・楽譜 — a light sweeps the pile left to right and plays it: height is pitch, colour is instrument
-  //  ・ジャイロ — turn it on to pour the sand sideways; shaking loosens the pile
+  //  ・ジャイロ — turn it on to pour the sand in any direction; shaking loosens the pile
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
   const gyroButton = document.getElementById('hpGyro'); const gyroStatus = document.getElementById('hpGyroStatus');
@@ -181,7 +182,7 @@ function hero() {
   let stars = []; let caught = 0; let bursts = []; let combo = 0; let lastCatch = 0;
   let pieces = []; let flashes = []; let lines = 0; let grains = 0; // dropped drawings, rows being cleared
   let shooter = null; let nextShooter = 0; let beats = [];
-  let tilt = 0; let burstNo = 0; const burstCatches = new Map();
+  let fall = { x: 0, y: 1 }; let burstNo = 0; const burstCatches = new Map();
   let drawing = false; let last = null; let downAt = null;
   // what this visitor seems to enjoy: after enough of one play, the matching tool is offered once
   const interest = { ink: 0, letters: 0 };
@@ -230,7 +231,7 @@ function hero() {
     });
     stars = Array.from({ length: Math.max(14, Math.min(40, Math.round(W * H / 380))) }, newStar);
   }
-  const isSolid = (x, y) => y >= F || (x >= 0 && x < W && y >= 0 && sand[y * W + x] > 0);
+  const isSolid = (x, y) => y >= F || y < 0 || x < 0 || x >= W || sand[y * W + x] > 0;
   const reach = (px) => Math.max(1, Math.ceil(px / cell)); // a finger-sized distance in cells
 
   // ---- letters: a tap or a stroke bursts a letter, dots bounce, then fly home ----
@@ -298,10 +299,11 @@ function hero() {
     beats.push({ x: tx, y: top, life: 1 });
   }
 
-  // ---- phones: tilt to pour the sand sideways, shake to knock the pile loose ----
-  const gyro = createHomeMotion({ button: gyroButton, status: gyroStatus, onTilt: (value) => { tilt = value; }, onShake: shake,
-    isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
+  // ---- phones: screen-plane gravity follows a full turn, without a scalar angle seam ----
   let stageVisible = true;
+  const gyro = createHomeMotion({ button: gyroButton, status: gyroStatus, alwaysOn: true, activationTarget: stage,
+    onGravity: (value) => { fall = value; }, onShake: shake,
+    isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
   if (typeof IntersectionObserver === 'function') {
     stageVisible = false;
     const motionVisibility = new IntersectionObserver(([entry]) => { stageVisible = Boolean(entry?.isIntersecting); gyro.setVisible(); }, { threshold: 0 });
@@ -324,20 +326,7 @@ function hero() {
   let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
   const TICK = 1 / 60; let tickNo = 0; let sandBudget = 0;
   function sandStep(now) {
-    const lean = Math.abs(tilt) > 0.2 ? Math.sign(tilt) : 0;
-    for (let y = F - 2; y >= 0; y--) {
-      const dir = (y + Math.floor(now / 33)) % 2 ? 1 : -1;
-      for (let k = 0; k < W; k++) {
-        const x = dir > 0 ? k : W - 1 - k; const i = y * W + x; const v = sand[i]; if (!v) continue;
-        const below = i + W;
-        if (!sand[below]) { sand[below] = v; sand[i] = 0; if (y === F - 2 || sand[below + W]) maybeLand(now, x, y + 1, v - 1); continue; }
-        const side = lean || (Math.random() < 0.5 ? 1 : -1);
-        let slid = false;
-        for (const sx of lean ? [side] : [side, -side]) { const nx = x + sx; if (nx >= 0 && nx < W && !sand[below + sx] && !sand[i + sx]) { sand[below + sx] = v; sand[i] = 0; slid = true; break; } }
-        // a strong tilt lets grains roll along the surface, not just down the slope
-        if (!slid && lean && Math.random() < Math.abs(tilt) * 0.5) { const nx = x + lean; if (nx >= 0 && nx < W && !sand[i + lean]) { sand[i + lean] = v; sand[i] = 0; } }
-      }
-    }
+    stepGravitySand(sand, W, F, fall, { onLand: (x, y, v) => maybeLand(now, x, y, v - 1) });
   }
   function step(now) {
     const dt = Math.max(0, Math.min(0.1, (now - lastT) / 1000)); lastT = now;
@@ -349,13 +338,26 @@ function hero() {
       // a released drawing drops as one piece, speeding up, until any of its dots touches something
       let landed = false;
       for (const piece of pieces) {
-        piece.v = Math.min(piece.v + 0.03 * K, 0.8 * K); piece.acc += piece.v;
-        while (piece.acc >= 1 && !piece.landed) {
-          piece.acc -= 1;
-          if (piece.cells.some((c) => isSolid(c.x, c.y + 1))) piece.landed = true; else for (const c of piece.cells) c.y += 1;
+        piece.vx += fall.x * 0.03 * K; piece.vy += fall.y * 0.03 * K;
+        const speed = Math.hypot(piece.vx, piece.vy); const limit = 0.8 * K;
+        if (speed > limit) { piece.vx *= limit / speed; piece.vy *= limit / speed; }
+        piece.ax += piece.vx; piece.ay += piece.vy;
+        while ((Math.abs(piece.ax) >= 1 || Math.abs(piece.ay) >= 1) && !piece.landed) {
+          const horizontal = Math.abs(piece.ax) > Math.abs(piece.ay);
+          const dx = horizontal ? Math.sign(piece.ax) : 0; const dy = horizontal ? 0 : Math.sign(piece.ay);
+          if (horizontal) piece.ax -= dx; else piece.ay -= dy;
+          if (piece.cells.some((c) => isSolid(c.x + dx, c.y + dy))) piece.landed = true;
+          else for (const c of piece.cells) { c.x += dx; c.y += dy; }
         }
         if (piece.landed) {
-          for (const c of piece.cells) { let y = c.y; while (y >= 0 && sand[y * W + c.x]) y--; if (y >= 0) { sand[y * W + c.x] = c.v; landed = true; } }
+          // Ink can be drawn over the pile. Place overlapping cells behind the current fall direction.
+          const backX = Math.abs(fall.x) > Math.abs(fall.y) ? -Math.sign(fall.x) : 0;
+          const backY = backX ? 0 : -(Math.sign(fall.y) || 1);
+          for (const c of piece.cells) {
+            let x = c.x; let y = c.y;
+            while (x >= 0 && x < W && y >= 0 && y < F && sand[y * W + x]) { x += backX; y += backY; }
+            if (x >= 0 && x < W && y >= 0 && y < F) { sand[y * W + x] = c.v; grains++; landed = true; }
+          }
           const mid = piece.cells[piece.cells.length >> 1]; play(mid.v - 1, Math.round((mid.x / W) * 8), { volume: 0.05 });
         }
       }
@@ -383,7 +385,7 @@ function hero() {
         const tall = F - Math.floor(F * 0.45); let filled = 0; grains = 0;
         for (let x = 0; x < W; x++) if (sand[tall * W + x]) filled++;
         for (let i = 0; i < F * W; i++) if (sand[i]) { grains++; }
-        if (filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
+        if (fall.y > 0.5 && Math.abs(fall.x) < 0.3 && filled > W * 0.5) for (let x = 0; x < W; x++) if (Math.random() < 0.3) sand[(F - 1) * W + x] = 0;
       }
     }
     playPile(now);
@@ -396,7 +398,7 @@ function hero() {
         const e = 1 - (1 - p) ** 3; d.y = (-2 - 8 * K) * (1 - e) + d.hy * e; d.x = d.hx;
         if (p >= 1) d.state = 'home';
       } else if (d.state === 'free') {
-        d.vy += gravity * dt; d.vx += tilt * gravity * 0.5 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+        d.vy += fall.y * gravity * dt; d.vx += fall.x * gravity * dt; d.x += d.vx * dt; d.y += d.vy * dt;
         if (d.x < 0) { d.x = 0; d.vx *= -0.6; } if (d.x > W - 1) { d.x = W - 1; d.vx *= -0.6; }
         if (isSolid(Math.round(d.x), Math.round(d.y) + 1) && d.vy > 0) { d.y = Math.round(d.y); d.vy *= -0.45; d.vx *= 0.8; if (Math.abs(d.vy) < 3 * K) d.vy = 0; }
         if (d.y < 0) { d.y = 0; d.vy = Math.abs(d.vy) * 0.5; }
@@ -530,7 +532,7 @@ function hero() {
   function release() {
     const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: d.color + 1 }));
     ink.clear();
-    if (cells.length) pieces.push({ cells, v: 0.2 * K, acc: 0, landed: false });
+    if (cells.length) pieces.push({ cells, vx: fall.x * 0.2 * K, vy: fall.y * 0.2 * K, ax: 0, ay: 0, landed: false });
   }
   const stop = () => { if (drawing) release(); drawing = false; last = null; };
   // keyboard: arrows move a dot cursor, Space lifts / lowers the pen, Enter taps (letters, stars, one dot)
