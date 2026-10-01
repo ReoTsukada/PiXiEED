@@ -30,6 +30,18 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base + '/pixel-camera.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#capture')?.dataset.action === 'capture' && !document.querySelector('#capture').disabled);
+    assert.equal(await page.locator('#cameraSettingsPanel').isVisible(), false);
+    assert.equal(await page.locator('#toolbar').isVisible(), false);
+    assert.equal(await page.locator('#zoomStops').isVisible(), false); checks++;
+    await page.locator('#cameraSettings').click();
+    assert.equal(await page.locator('#cameraSettings').getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('#pixelsPanel').isVisible(), false, 'pixel choices only appear in their own tab');
+    assert.equal(await page.locator('#gestureHint').isVisible(), false);
+    const tabs = await page.locator('#toolbar [data-tool]').evaluateAll(nodes => nodes.map(n => {
+      const r = n.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { width: r.width, height: r.height, fits: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, reachable: hit === n || n.contains(hit) };
+    }));
+    assert.ok(tabs.every(r => r.width >= 44 && r.height >= 44 && r.fits && r.reachable), JSON.stringify({ viewport, tabs })); checks++;
     assert.equal(await page.locator('[data-tool="pixels"] b').textContent(), '128 px');
     await page.locator('[data-tool="pixels"]').click();
     const choices = await page.locator('#pixelsPanel [data-value]').evaluateAll(nodes => nodes.map(n => Number(n.dataset.value)));
@@ -43,11 +55,23 @@ try {
     await page.locator('#pixelsPanel [data-value="256"]').click();
     await page.waitForFunction(() => document.querySelector('#view')?.width === 256 && document.querySelector('#view')?.height === 256);
     assert.equal(await page.locator('#pixelsPanel [data-value="256"]').getAttribute('aria-checked'), 'true'); checks++;
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#cameraSettingsPanel').isVisible(), false);
+    assert.equal(await page.locator('#cameraSettings').getAttribute('aria-expanded'), 'false'); checks++;
+    await page.locator('#cameraSettings').click();
+    await page.locator('[data-tool="tone"]').click();
+    await page.locator('#toneSlider').scrollIntoViewIfNeeded();
+    assert.equal(await page.locator('#toneSlider').evaluate(n => {
+      const r = n.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return hit === n || n.contains(hit);
+    }), true, 'short landscape panel must not cover the tone slider'); checks++;
     await page.locator('[data-tool="aspect"]').click();
+    assert.equal(await page.locator('#pixelsPanel').isVisible(), false, 'hidden grid must not override the selected panel'); checks++;
     await page.locator('#aspectPanel [data-value="9:16"]').click();
     await page.waitForFunction(() => document.querySelector('#view')?.width === 144 && document.querySelector('#view')?.height === 256);
     await page.locator('#capture').click();
     await page.waitForFunction(() => document.body.dataset.toolResultOpen === 'camera-result');
+    assert.equal(await page.locator('#cameraSettingsPanel').isVisible(), false); checks++;
     await page.waitForFunction(() => document.querySelector('#savePng')?.href.startsWith('blob:'));
     const png = await page.evaluate(async () => {
       const bytes = await (await fetch(document.querySelector('#savePng').href)).arrayBuffer();

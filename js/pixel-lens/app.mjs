@@ -179,11 +179,13 @@ function setMode(mode) {
   root.dataset.facing = state.facing;
   $('#welcome').hidden = mode !== 'idle';
   $('#resultControls').hidden = mode !== 'captured';
-  if (mode !== 'live') openTray(null);
+  if (mode !== 'live') closeCameraSettings();
   updateSizeSummary();
   updatePrimaryAction();
   updateSharedCaptureControls();
   $('#flipCamera').disabled = mode !== 'live';
+  settingsButton.disabled = mode !== 'live';
+  settingsButton.hidden = mode !== 'live';
   updateSaveLinkState();
   setInfoForMode(mode);
 }
@@ -762,11 +764,27 @@ function stepLook(delta) {
   const index = buttons.findIndex((button) => button.dataset.look === currentLook());
   selectLook(buttons[(index + delta + buttons.length) % buttons.length]);
 }
-// ---------- Toolbar: five buttons at the bottom, one tray above them ----------
+// ---------- Folded camera settings: one choice tray and six tabs ----------
 // Each button shows its current value. Tapping one opens its row of choices (a carousel) above the bar;
 // tapping it again, or the picture, folds it. Only one row is open at a time.
 const tray = $('#tray'); const toolbar = $('#toolbar');
+const settingsPanel = $('#cameraSettingsPanel'); const settingsButton = $('#cameraSettings');
 let openTool = null; let trayClosedAt = 0;
+function closeCameraSettings() {
+  if (!settingsPanel.hidden) trayClosedAt = performance.now();
+  settingsPanel.hidden = true;
+  settingsButton.setAttribute('aria-expanded', 'false');
+  openTray(null);
+}
+function toggleCameraSettings() {
+  if (state.mode !== 'live' || gif.recording) return;
+  if (!settingsPanel.hidden) { closeCameraSettings(); return; }
+  settingsPanel.hidden = false;
+  $('#gestureHint').hidden = true;
+  settingsButton.setAttribute('aria-expanded', 'true');
+  if (!openTool) openTray('look');
+}
+settingsButton.addEventListener('click', toggleCameraSettings);
 const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
 const TONES = [['brightness', '明るさ'], ['exposure', '露出'], ['contrast', 'コントラスト'], ['saturation', '彩度'], ['shadows', '影'], ['whiteBalance', '色温度']];
 let toneKey = 'contrast';
@@ -783,6 +801,7 @@ function openTray(tool) {
   for (const button of toolbar.querySelectorAll('[data-tool]')) button.setAttribute('aria-expanded', String(button.dataset.tool === tool));
   const selected = tool && tray.querySelector(`[data-panel="${tool}"] [aria-checked="true"]`);
   if (selected) requestAnimationFrame(() => selected.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  if (tool === 'zoom') requestAnimationFrame(() => syncZoomStops(true));
 }
 function chip(value, label, { swatch = '', cls = '' } = {}) {
   const button = document.createElement('button');
@@ -842,6 +861,11 @@ for (const [key, label] of TONES) toneChips.appendChild(chip(key, label));
 const toneSlider = $('#toneSlider'); const toneValue = $('#toneValue');
 
 function currentPatternId() { return state.gradientMode === 'dither' ? state.ditherPattern : 'none'; }
+function syncZoomFace() {
+  const zoomFace = toolbar.querySelector('[data-tool="zoom"]');
+  zoomFace.querySelector('b').textContent = formatZoom(state.zoom);
+  zoomFace.setAttribute('aria-label', `ズーム ${formatZoom(state.zoom)}（タップで倍率を選ぶ）`);
+}
 function syncToolbar() {
   const lookButton = document.querySelector(`#looks [data-look="${currentLook()}"]`);
   const face = (tool) => toolbar.querySelector(`[data-tool="${tool}"]`);
@@ -862,6 +886,7 @@ function syncToolbar() {
   const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
   face('tone').querySelector('b').textContent = toneChanged ? '調整中' : '調整';
   face('tone').dataset.changed = String(toneChanged);
+  syncZoomFace();
   // selected chips
   const mark = (panel, value) => { for (const b of panel.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === value)); };
   mark(ditherPanel, currentPatternId()); mark(pixelsPanel, audioCameraRequest || sharedImageTarget ? '' : String(state.size)); mark(aspectPanel, state.ratio); mark(toneChips, toneKey);
@@ -937,7 +962,7 @@ toneSlider.addEventListener('input', () => {
 });
 $('#toneReset').addEventListener('click', () => { for (const [key] of TONES) state.camera[key] = CAMERA_SETTING_DEFAULTS[key]; navigator.vibrate?.(8); applyChange(); sayToast('色調整を元に戻しました'); });
 document.addEventListener('pointerdown', (event) => {
-  if (openTool && !tray.contains(event.target) && !toolbar.contains(event.target) && stage.contains(event.target)) openTray(null);
+  if (!settingsPanel.hidden && !settingsPanel.contains(event.target) && !settingsButton.contains(event.target) && stage.contains(event.target)) closeCameraSettings();
 }, true);
 // ---------- Palette: tap a colour of the current look to change it by hand ----------
 // The 色 row shows the look's palette as dots. Tapping one swaps the looks row for a hue / saturation /
@@ -1073,7 +1098,7 @@ $('#paletteDelete').addEventListener('click', () => {
 });
 renderMyPaletteChips();
 lockAudioCameraControls();
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && openTool) { const tool = openTool; openTray(null); toolbar.querySelector(`[data-tool="${tool}"]`)?.focus(); } });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !settingsPanel.hidden) { closeCameraSettings(); settingsButton.focus(); } });
 paintSwatches();
 syncControls();
 
@@ -1104,6 +1129,7 @@ function syncZoomStops(revealSelected = false) {
     b.setAttribute('aria-pressed', String(on));
     b.textContent = on && Math.abs(state.zoom - Number(b.dataset.zoom)) > 0.05 ? formatZoom(state.zoom) : formatZoom(Number(b.dataset.zoom));
   }
+  syncZoomFace();
   if (revealSelected && nearest) {
     const box = $('#zoomStops');
     const boxRect = box.getBoundingClientRect();
@@ -1205,6 +1231,7 @@ function startGif() {
   $('#gifRecTime').textContent = `${(gif.maxMs / 1000).toFixed(1)}s`;
   recordGifFrame(state.result);
   root.dataset.recording = 'true';
+  closeCameraSettings();
   $('#gifRec').hidden = false;
   navigator.vibrate?.(15);
   gif.raf = requestAnimationFrame(gifProgress);

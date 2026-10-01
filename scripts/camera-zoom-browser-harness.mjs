@@ -67,6 +67,9 @@ try {
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(base + '/pixel-camera.html', { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.querySelector('#capture')?.dataset.action === 'capture' && !document.querySelector('#capture').disabled);
+      assert.equal(await page.locator('#zoomStops').isVisible(), false, 'zoom values are not permanent camera overlays');
+      await page.locator('#cameraSettings').click();
+      await page.locator('[data-tool="zoom"]').click();
       const forty = page.locator('#zoomStops [data-zoom="40"]'); await forty.click();
       await page.waitForFunction(({ native }) => {
         const crop = window.__cameraCrop;
@@ -79,16 +82,22 @@ try {
       assert.ok(await page.evaluate(() => window.__cameraCrops.every(crop => crop.nativeZoom * 240 / crop.sw <= 40.001)), 'camera changes before constraint completion cannot compound above 40x'); checks++;
       assert.equal(await page.locator('#view').getAttribute('width'), '128');
       const bounds = await page.locator('.lc-top').evaluate(node => {
-        const boxes = ['.lc-top .lc-back', '#zoomStops', '#flipCamera'].map(selector => document.querySelector(selector)?.getBoundingClientRect()).filter(Boolean);
+        const boxes = ['.lc-top .lc-back', '#cameraSettings', '#flipCamera'].map(selector => document.querySelector(selector)?.getBoundingClientRect()).filter(Boolean);
         const strip = document.querySelector('#zoomStops').getBoundingClientRect();
         const button = document.querySelector('#zoomStops [data-zoom="40"]').getBoundingClientRect();
         return { fits: boxes.every(r => r.left >= 0 && r.right <= innerWidth + 1), selectedVisible: button.left >= strip.left - 1 && button.right <= strip.right + 1, size: { width: button.width, height: button.height }, overlap: boxes.some((a, i) => boxes.some((b, j) => j > i && Math.min(a.right, b.right) > Math.max(a.left, b.left) + 1 && Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top) + 1)) };
       });
       assert.ok(bounds.fits && bounds.selectedVisible && !bounds.overlap, JSON.stringify({ viewport, scenario, bounds }));
       assert.ok(bounds.size.width >= 44 && bounds.size.height >= 44); checks++;
+      await page.locator('#cameraSettings').click();
+      assert.equal(await page.locator('#cameraSettingsPanel').isVisible(), false);
       // Additional wheel input remains capped; drawing and tap gestures stay in the camera stage.
       await page.locator('#stage').dispatchEvent('wheel', { deltaY: -3000, ctrlKey: true });
       assert.equal(await page.locator('#zoomHudValue').textContent(), '40×');
+      await page.waitForTimeout(1100);
+      assert.equal(await page.locator('#zoomHud').evaluate(n => n.classList.contains('is-on')), false, 'zoom feedback disappears after the gesture');
+      await page.locator('#cameraSettings').click();
+      await page.locator('[data-tool="zoom"]').click();
       await page.locator('#zoomStops [data-zoom="1"]').click();
       await page.waitForFunction(() => document.querySelector('#zoomHudValue')?.textContent === '1×' && Math.abs((window.__cameraCrop?.sw ?? 0) - 240) < 0.001); checks++;
       await page.waitForTimeout(180);
