@@ -15,11 +15,11 @@ import { mountAnimationControls } from '../../js/creation/animation-controls.mjs
 class FakeElement {
   constructor(tagName, ownerDocument) {
     this.tagName = tagName.toUpperCase(); this.ownerDocument = ownerDocument; this.children = []; this.parentElement = null;
-    this.dataset = {}; this.attributes = new Map(); this.listeners = new Map(); this.style = {}; this.className = ''; this.classNames = new Set();
+    this.dataset = {}; this.attributes = new Map(); this.listeners = new Map(); this.style = { setProperty(name, value) { this[name] = String(value); } }; this.className = ''; this.classNames = new Set();
     this.classList = {
       add: (...names) => names.forEach((name) => this.classNames.add(name)),
       toggle: (name, force) => { const next = force === undefined ? !this.classNames.has(name) : Boolean(force); if (next) this.classNames.add(name); else this.classNames.delete(name); return next; },
-      contains: (name) => this.classNames.has(name)
+      contains: (name) => this.classNames.has(name) || String(this.className).split(/\s+/).includes(name)
     };
   }
   append(...nodes) { for (const node of nodes) { if (node.parentElement) node.parentElement.children = node.parentElement.children.filter((child) => child !== node); node.parentElement = this; this.children.push(node); } }
@@ -55,9 +55,13 @@ class FakeElement {
 }
 
 class FakeDocument {
-  constructor() { this.defaultView = { innerWidth: 390 }; this.body = this.createElement('body'); }
+  constructor() { this.defaultView = { innerWidth: 390, innerHeight: 844 }; this.body = this.createElement('body'); this.listeners = new Map(); }
   createElement(tagName) { return new FakeElement(tagName, this); }
   createElementNS(_namespace, tagName) { return new FakeElement(tagName, this); }
+  querySelector() { return null; }
+  addEventListener(type, listener) { const list = this.listeners.get(type) || []; list.push(listener); this.listeners.set(type, list); }
+  removeEventListener(type, listener) { this.listeners.set(type, (this.listeners.get(type) || []).filter((item) => item !== listener)); }
+  fire(type, event = {}) { const payload = { target: this, preventDefault() {}, ...event }; for (const listener of this.listeners.get(type) || []) listener(payload); }
 }
 
 function fakeScope() {
@@ -186,5 +190,76 @@ test('a single frame begins collapsed and GIF export is hidden in audio mode', (
   assert.equal(root.querySelector('[data-action="play"]').hidden, true);
   assert.equal(root.querySelector('[data-action="onion"]').hidden, true);
   assert.equal(root.querySelector('[data-action="toggle-duration"]').hidden, true);
+  ui.dispose();
+});
+
+test('Draw cel grid exposes add cells, contextual editing, and long-press header reorder', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls'; const scope = fakeScope();
+  const state = {
+    frames: [{ id: 'f1', durationMs: 120 }, { id: 'f2', durationMs: 240 }],
+    layers: [{ id: 'l1', name: 'Lines', visible: true, locked: false }, { id: 'l2', name: 'Color', visible: false, locked: false }],
+    frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false
+  };
+  const actions = [];
+  const ui = mountAnimationControls({ host, scope, getState: () => state, getCelHasContent: (frameId, layerId) => frameId === 'f2' && layerId === 'l2', onAction(action) {
+    actions.push(action);
+    if (action.type === 'move-frame') { const frame = state.frames.splice(state.frames.findIndex((item) => item.id === action.frameId), 1)[0]; state.frames.splice(action.index, 0, frame); }
+    if (action.type === 'move-layer') { const layer = state.layers.splice(state.layers.findIndex((item) => item.id === action.layerId), 1)[0]; state.layers.splice(action.index, 0, layer); }
+    if (action.type === 'select-frame') { state.frameId = action.frameId; if (action.layerId) state.layerId = action.layerId; }
+  } });
+  const root = host.children[0]; root.querySelector('[data-action="toggle-frames"]').fire('click');
+  const panel = doc.body.children.find((child) => child.getAttribute('role') === 'dialog');
+  const grid = panel.children[2];
+  assert.equal(panel.children[1].hidden, true, 'Draw hides the row of permanent controls');
+  assert.ok(grid.querySelector('[data-action="add-frame"]'));
+  assert.ok(grid.querySelector('[data-action="add-layer"]'));
+  assert.equal(grid.querySelector('[data-action="add-layer"]').style.gridRow, '2');
+  assert.equal(grid.querySelectorAll('[data-action="select-frame"]')[0].style.gridColumn, '2');
+  assert.equal(grid.querySelectorAll('[data-action="select-layer"]')[0].style.gridColumn, '1');
+  grid.querySelector('[data-action="add-frame"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'add-frame', frameId: 'f2', copy: true }, 'frame + uses the final frame as its source');
+  grid.querySelector('[data-action="add-layer"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'add-layer' });
+  assert.equal(grid.querySelector('[data-has-content="true"]')?.dataset.layerId, 'l2');
+  grid.querySelector('[data-action="select-cel"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'select-frame', frameId: 'f1', layerId: 'l2' });
+  grid.querySelectorAll('[data-action="select-frame"]')[1].fire('contextmenu', { preventDefault() {} });
+  const menu = doc.body.children.find((child) => child.dataset.frameMenu === 'true');
+  assert.equal(menu.hidden, false);
+  assert.ok(menu.querySelector('[data-frame-menu-action="duration"]'));
+  assert.ok(menu.querySelector('[data-frame-menu-action="onion"]'));
+  menu.querySelector('[data-frame-menu-action="duplicate"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'add-frame', frameId: 'f2', copy: true });
+  let layerHeader = grid.querySelector('[data-action="select-layer"]');
+  layerHeader.fire('contextmenu', { preventDefault() {} });
+  assert.ok(menu.querySelector('[data-context-rename]'));
+  menu.querySelector('[data-context-rename]').value = 'Tone';
+  menu.querySelector('[data-frame-menu-action="rename"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'rename-layer', layerId: 'l2', name: 'Tone' });
+  layerHeader = grid.querySelector('[data-action="select-layer"]'); layerHeader.fire('contextmenu', { preventDefault() {} });
+  menu.querySelector('[data-frame-menu-action="visibility"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'visibility', layerId: 'l2', visible: true });
+
+  let from = grid.querySelectorAll('[data-action="select-frame"]')[0]; let to = grid.querySelectorAll('[data-action="select-frame"]')[1];
+  const layerFrom = grid.querySelectorAll('[data-action="select-layer"]')[1]; const layerTo = grid.querySelectorAll('[data-action="select-layer"]')[0];
+  doc.elementFromPoint = () => layerTo;
+  layerFrom.fire('pointerdown', { pointerId: 3, clientX: 20, clientY: 64 }); scope.fireTimerDelay(350);
+  doc.fire('pointermove', { pointerId: 3, clientX: 20, clientY: 20 }); doc.fire('pointerup', { pointerId: 3, clientX: 20, clientY: 20 });
+  assert.deepEqual(actions.at(-1), { type: 'move-layer', layerId: 'l1', index: 1 });
+  from = grid.querySelectorAll('[data-action="select-frame"]')[0]; to = grid.querySelectorAll('[data-action="select-frame"]')[1];
+  doc.elementFromPoint = () => to;
+  from.fire('pointerdown', { pointerId: 4, clientX: 20, clientY: 20 }); scope.fireTimerDelay(350);
+  doc.fire('pointermove', { pointerId: 4, clientX: 80, clientY: 20 });
+  doc.fire('pointerup', { pointerId: 4, clientX: 80, clientY: 20 });
+  assert.deepEqual(actions.at(-1), { type: 'move-frame', frameId: 'f1', index: 1 });
+  const actionCount = actions.length;
+  const cancelTarget = grid.querySelectorAll('[data-action="select-frame"]')[0];
+  doc.elementFromPoint = () => cancelTarget;
+  cancelTarget.fire('pointerdown', { pointerId: 8, clientX: 20, clientY: 20 }); scope.fireTimerDelay(350);
+  doc.fire('pointercancel', { pointerId: 8 }); doc.fire('pointerup', { pointerId: 8 });
+  assert.equal(actions.length, actionCount, 'pointer cancellation never commits a reorder');
+  cancelTarget.fire('pointerdown', { pointerId: 9, clientX: 20, clientY: 20 }); scope.fireTimerDelay(350);
+  doc.fire('pointerup', { pointerId: 9, clientX: 20, clientY: 20 });
+  assert.equal(menu.hidden, false, 'releasing a long-pressed header without moving opens its contextual actions');
   ui.dispose();
 });

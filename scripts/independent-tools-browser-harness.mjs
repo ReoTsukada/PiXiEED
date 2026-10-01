@@ -15,7 +15,7 @@ try {
     const tap = async (page, selector, x, y) => { const r = await page.locator(selector).boundingBox(); const size = await page.locator(selector).evaluate((canvas) => ({ width: canvas.width, height: canvas.height })); const point = { x: r.x + (x + .5) * r.width / size.width, y: r.y + (y + .5) * r.height / size.height }; const hit = await page.evaluate(({ point }) => document.elementFromPoint(point.x, point.y)?.id, { point }); assert.equal(hit, selector.slice(1), `Canvas hit was ${hit} at ${JSON.stringify(point)} (${JSON.stringify(r)})`); await page.mouse.click(point.x, point.y); };
     await tap(draw, '#draw-canvas', 4, 4);
     await draw.locator('#draw-animation-controls [data-action="toggle-frames"]').click();
-    await draw.locator('#draw-animation-controls-panel [data-action="add-frame"]').click();
+    await draw.locator('#draw-animation-controls-panel .animation-controls__frame-add').click();
     await draw.locator('#draw-animation-controls-panel [data-action="close-animation"]').click();
     await draw.locator('#draw-save').click();
     await draw.waitForFunction(() => new URLSearchParams(location.search).has('pxd'));

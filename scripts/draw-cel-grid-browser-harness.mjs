@@ -28,10 +28,9 @@ try {
     await tap(); assert.equal(await cel().first().getAttribute('data-has-content'), 'true');
     await page.locator('#draw-undo').click(); assert.equal(await cel().first().getAttribute('data-has-content'), 'false');
     await page.locator('#draw-redo').click(); assert.equal(await cel().first().getAttribute('data-has-content'), 'true');
-    await openPanel(); await page.locator('[data-action="add-frame"]').click();
+    await openPanel(); await page.locator('.animation-controls__frame-add').click();
     assert.equal(await cel().count(), 2); assert.equal(await cel().nth(1).getAttribute('data-has-content'), 'true');
-    await page.locator('[data-action="toggle-layers"]').click(); await page.locator('[data-action="add-layer"]').click();
-    await page.locator('[data-action="close-layers"]').click();
+    await page.locator('.animation-controls__layer-add').click();
     assert.equal(await cel().count(), 4);
     const topLayerId = await cel().first().getAttribute('data-layer-id');
     const firstFrameId = await cel().first().getAttribute('data-frame-id');
@@ -56,7 +55,7 @@ try {
       return { overflow: document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight + 1, canvasHeight: r.height, canvasBottom: r.bottom, navTop: nav.top };
     });
     assert.equal(layout.overflow, false, JSON.stringify(layout)); assert.ok(layout.canvasHeight > 70 && layout.canvasBottom < layout.navTop, JSON.stringify(layout));
-    const permanentControls = await page.locator('.draw-current, [data-draw-tool="pen"], [data-draw-tool="eraser"]').evaluateAll((nodes) => nodes.map((node) => {
+    const permanentControls = await page.locator('.draw-current, [data-draw-tool="pen"]').evaluateAll((nodes) => nodes.map((node) => {
       const r = node.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
       return { label: node.getAttribute('aria-label'), reachable: r.top >= 0 && r.bottom <= innerHeight && (hit === node || node.contains(hit)) };
     }));

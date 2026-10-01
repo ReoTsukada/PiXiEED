@@ -6,7 +6,7 @@ import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER
 import { createDrawAnimationSession } from './draw-animation-session.mjs';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-cel-workspace-2';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-direct-cels-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
@@ -37,8 +37,14 @@ const cancelAnimationFrame = (id) => scope.cancelFrame(id);
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(canvas);
+const penControl = $('[data-draw-tool="pen"]');
+const eraserControl = $('[data-draw-tool="eraser"]');
+const penIcon = penControl?.querySelector('svg')?.cloneNode(true);
+const eraserIcon = eraserControl?.querySelector('svg')?.cloneNode(true);
+// One visible control alternates between drawing and erasing.
+eraserControl?.remove();
 const resultView = createToolResultView({ key: 'draw-result', main: $('#main'), returnLabel: '描画に戻る',
-  beforeShow: () => { closeColorEditor(); editorUi.closePanels(); interactionEffects.clear(); },
+  beforeShow: () => { closeColorEditor(); editorUi.closePanels(); animationControls?.close?.(); interactionEffects.clear(); },
   onClose: () => requestAnimationFrame(placeOverlays) });
 const status = $('#draw-status'); const saveButton = $('#draw-save'); const resumeButton = $('#draw-resume');
 const globeButton = $('#draw-to-globe');
@@ -279,9 +285,8 @@ function showCurrentColor() {
 function chooseColor(index, sourceElement) {
   const penButton = document.querySelector('[data-draw-tool="pen"]');
   interactionEffects.color({ from: sourceElement, to: penButton, color: index < 0 ? '#fff' : documentData.palette[index] });
-  selectedColor = index; tool = 'pen'; showCurrentColor();
+  selectedColor = index; setTool('pen'); showCurrentColor();
   document.querySelectorAll('.draw-color').forEach((node) => node.setAttribute('aria-pressed', String(Number(node.dataset.colorIndex) === index)));
-  document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === 'pen')));
 }
 // A mode switch never changes the shared image's dimensions or colours.
 let fitNotice = '';
@@ -408,7 +413,16 @@ function pickColorAt(point) {
   chooseColor(value, button); setTool('pen'); toast(value < 0 ? '透明をとりました' : 'この色をとりました');
 }
 function setTool(next) {
-  tool = next; document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next)));
+  tool = next;
+  document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next || (node === penControl && next === 'eraser'))));
+  if (penControl) {
+    const erasing = next === 'eraser';
+    const glyph = erasing ? eraserIcon : penIcon;
+    if (glyph) penControl.replaceChildren(glyph.cloneNode(true));
+    const label = erasing ? '消しゴム（もう一度押すとペン）' : 'ペン（選択中に押すと消しゴム）';
+    penControl.setAttribute('aria-label', label); penControl.title = label;
+    penControl.classList.toggle('is-eraser', erasing);
+  }
   canvas.dataset.tool = next;
 }
 let pendingTap = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
@@ -499,7 +513,10 @@ sizeSelect.addEventListener('change', () => {
   catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; sizeSelect.value = String(previousSize); }
 });
 renderPalette();
-document.querySelectorAll('[data-draw-tool]').forEach((button) => button.addEventListener('click', () => setTool(button.dataset.drawTool)));
+document.querySelectorAll('[data-draw-tool]').forEach((button) => button.addEventListener('click', () => {
+  const next = button.dataset.drawTool;
+  setTool(next === 'pen' && tool === 'pen' ? 'eraser' : next);
+}));
 // ---- mirror and grid toggles ----
 const mirrorButton = $('#draw-mirror'); const gridButton = $('#draw-grid-toggle');
 mirrorButton?.addEventListener('click', () => { mirror = !mirror; mirrorButton.setAttribute('aria-pressed', String(mirror)); $('.draw-board')?.classList.toggle('is-mirror', mirror); placeOverlays(); toast(mirror ? '左右対称で描きます' : '左右対称をやめました'); });
@@ -787,6 +804,7 @@ async function exportTimelapse(detail) {
   }
 }
 $('#draw-timelapse').addEventListener('click', () => exportTimelapse(false));
+$('#draw-animation-export')?.addEventListener('click', () => exportAnimation());
 let animationExporting = false, animationExportController = null;
 async function exportAnimation() {
   if (animationExporting || readOnlyImage || scope.disposed) return;
@@ -848,7 +866,13 @@ pxdBridge = mountWorkspace({
     if (scope.disposed) return;
     let nextDocument;
     {
-      try { nextDocument = await readPxdDrawDocument(project, role); if (nextDocument && !storedAnimation) createDrawAnimationSession(nextDocument); if (scope.disposed) return; }
+      try {
+        // An empty poster can have a transparent-only palette. The validated
+        // timeline owns its palette and cels, so restore from it directly.
+        nextDocument = storedAnimation ? composeAnimationFrame(storedAnimation, storedAnimation.frames[0].id) : await readPxdDrawDocument(project, role);
+        if (nextDocument && !storedAnimation) createDrawAnimationSession(nextDocument);
+        if (scope.disposed) return;
+      }
       catch (error) {
         if (scope.disposed) return;
         const image = await readPxdImage(project, role);

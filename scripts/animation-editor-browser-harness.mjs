@@ -23,18 +23,16 @@ for (const [name, engine] of (process.env.PIXIEED_BROWSER_ENGINES === 'chromium'
       const pixels = () => page.locator('#draw-canvas').evaluate((c) => Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data));
       const tap = async (x, y) => { if (await panel().isVisible()) await page.locator('[data-action="close-animation"]').click(); const r = await page.locator('#draw-canvas').boundingBox(); await page.mouse.click(r.x + (x + .5) * r.width / 16, r.y + (y + .5) * r.height / 16); };
       await tap(4, 4); const initial = await pixels(); assert.equal(initial[(4 * 16 + 4) * 4 + 3], 255);
-      await openPanel(); await page.locator('[data-action="add-frame"]').click(); assert.equal(await frame().count(), 2);
+      await openPanel(); await page.locator('.animation-controls__frame-add').click(); assert.equal(await frame().count(), 2);
       await tap(5, 4); assert.equal((await pixels())[(4 * 16 + 5) * 4 + 3], 255);
       await openPanel(); await frame().nth(0).click(); assert.deepEqual(await pixels(), initial);
       await frame().nth(1).click(); await page.locator('#draw-undo').click(); assert.deepEqual(await pixels(), initial);
       await page.locator('#draw-redo').click(); assert.equal((await pixels())[(4 * 16 + 5) * 4 + 3], 255);
-      await openPanel(); await page.locator('[data-action="toggle-layers"]').click(); await page.locator('[data-action="add-layer"]').click();
-      await page.locator('[data-action="close-layers"]').click();
+      await openPanel(); await page.locator('.animation-controls__layer-add').click();
       await tap(6, 4); assert.equal((await pixels())[(4 * 16 + 4) * 4 + 3], 255); assert.equal((await pixels())[(4 * 16 + 6) * 4 + 3], 255);
-      await openPanel(); await page.locator('[data-action="toggle-layers"]').click();
-      const lock = page.locator('[data-action="lock"]').first(); await lock.click();
-      await page.locator('[data-action="close-layers"]').click(); const beforeLock = await pixels(); await tap(7, 4); assert.deepEqual(await pixels(), beforeLock);
-      await openPanel(); await page.locator('[data-action="toggle-layers"]').click(); await page.locator('[data-action="lock"]').first().click(); await page.locator('[data-action="close-layers"]').click();
+      const toggleLock = async () => { await openPanel(); await page.locator('.animation-controls__layer-number').first().click({ button: 'right' }); await page.locator('[data-frame-menu-action="lock"]').click(); };
+      await toggleLock(); const beforeLock = await pixels(); await tap(7, 4); assert.deepEqual(await pixels(), beforeLock);
+      await toggleLock();
       await page.locator('[data-action="play"]').click(); await page.waitForTimeout(250); await page.locator('[data-action="play"]').click();
       const layout = await page.evaluate(() => { const r = document.querySelector('#draw-canvas').getBoundingClientRect(), nav = document.querySelector('.app-tabs').getBoundingClientRect(); return { overflow: document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight + 1, canvas: { width: r.width, height: r.height, top: r.top, bottom: r.bottom }, navTop: nav.top }; });
       assert.equal(layout.overflow, false, JSON.stringify(layout)); assert.ok(layout.canvas.height > 70 && layout.canvas.bottom < layout.navTop, JSON.stringify(layout));
@@ -47,7 +45,7 @@ for (const [name, engine] of (process.env.PIXIEED_BROWSER_ENGINES === 'chromium'
       try { await page.waitForFunction(() => document.querySelectorAll('#draw-animation-controls-panel [data-action="select-frame"]').length === 2); }
       catch (error) { console.log('Reload diagnostics', await page.locator('#draw-status').textContent(), errors, await frame().count()); throw error; }
       assert.equal(await panel().isVisible(), false, 'saved projects also open with details collapsed');
-      assert.equal(await page.locator('[data-action="toggle-layers"]').count(), 1); await openPanel(); await page.locator('[data-action="toggle-layers"]').click(); assert.equal(await page.locator('.animation-controls__layer-list [data-action="select-layer"]').count(), 2); await page.locator('[data-action="close-layers"]').click();
+      await openPanel(); assert.equal(await page.locator('.animation-controls__layer-number').count(), 2);
       assert.equal(page.url(), savedUrl); assert.deepEqual(errors, []);
       console.log(`PASS ${name} ${viewport.width}x${viewport.height}: strokes, independent frames, undo/redo, layers/lock, playback, reload, viewport`); checks++; await context.close();
     }

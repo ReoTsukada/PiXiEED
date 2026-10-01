@@ -9,9 +9,14 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   let longPressTimer = 0;
   let suppressClick = false;
   let menuFrameId = null;
+  let menuLayerId = null;
   let draggedFrameId = null;
-  let root; let frames; let frameMenu; let layers; let timing; let workspacePanel = null; let workspaceSelection = null;
+  let draggedLayerId = null;
+  let pointerHold = null;
+  let liftedHeader = null;
+  let root; let frames; let frameMenu; let layers; let timing; let workspacePanel = null; let workspaceSelection = null; let celToolbar = null;
   let status; let frameToggle; let frameToggleBadge = null; let layerToggle; let timingToggle; let workspaceOpen = false;
+  let playButton = null;
   const hasCelMatrix = typeof getCelContent === 'function';
 
   const node = (tag, className, text) => {
@@ -73,15 +78,19 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     timingToggle = durationButton; toolbar.append(durationButton);
     const layerButton = button('レイヤー', '▤', 'toggle-layers');
     layerToggle = layerButton; toolbar.append(layerButton);
-    toolbar.append(button('再生', '▶', 'play', 'animation-controls__play'));
+    playButton = button('再生', '▶', 'play', 'animation-controls__play');
+    toolbar.append(playButton);
     toolbar.append(button('オニオンスキン', '◉', 'onion'));
     toolbar.append(button('GIFを書き出す', 'GIF', 'export-gif', 'animation-controls__export'));
 
     frames = node('div', 'animation-controls__frames');
     frames.dataset.frameStrip = 'true'; frames.setAttribute('role', 'listbox'); frames.setAttribute('aria-label', 'コマ');
     frameMenu = node('div', 'animation-controls__frame-menu'); frameMenu.dataset.frameMenu = 'true'; frameMenu.hidden = true; frameMenu.setAttribute('role', 'group'); frameMenu.setAttribute('aria-label', 'コマの操作');
-    for (const [label, glyph, command] of [['複製', '＋', 'duplicate'], ['空白', '□', 'blank'], ['左へ', '←', 'left'], ['右へ', '→', 'right'], ['削除', '×', 'delete']]) {
-      const actionButton = button(label, glyph, 'frame-menu'); actionButton.dataset.frameMenuAction = command; frameMenu.append(actionButton);
+    frameMenu.setAttribute('role', 'group'); frameMenu.setAttribute('aria-label', '選択セルの操作');
+    if (!hasCelMatrix) {
+      for (const [label, glyph, command] of [['複製', '＋', 'duplicate'], ['空白', '□', 'blank'], ['左へ', '←', 'left'], ['右へ', '→', 'right'], ['削除', '×', 'delete']]) {
+        const actionButton = button(label, glyph, 'frame-menu'); actionButton.dataset.frameMenuAction = command; frameMenu.append(actionButton);
+      }
     }
 
     layers = node('div', 'animation-controls__layers'); layers.hidden = true; layers.setAttribute('role', 'group'); layers.setAttribute('aria-label', 'レイヤー操作');
@@ -109,8 +118,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const heading = node('div', 'animation-controls__workspace-heading');
       heading.append(node('strong', '', 'レイヤー・フレーム'));
       workspaceSelection = node('span', 'animation-controls__workspace-selection');
+      heading.append(playButton);
       const closeWorkspace = button('レイヤー・フレームを閉じる', '×', 'close-animation');
       heading.append(workspaceSelection, closeWorkspace);
+      celToolbar = toolbar; celToolbar.hidden = true;
       root.append(frameToggle);
       workspacePanel.append(heading, toolbar, frames, status);
     } else root.append(toolbar, frames, status);
@@ -147,11 +158,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const bottom = Math.max(8, Math.min(viewportHeight - 8, viewportHeight - rect.bottom + 8));
     const topLimit = Math.max(8, headerBottom + 8);
     const available = Math.max(0, viewportHeight - bottom - topLimit);
-    const contentHeight = 120 + (stateNow().layers.length + 1) * 44;
+    const contentHeight = 64 + (stateNow().layers.length + 2) * 44;
     const panelHeight = Math.min(360, available, contentHeight);
     workspacePanel.style.left = `${left}px`; workspacePanel.style.bottom = `${bottom}px`;
     workspacePanel.style.width = `${width}px`; workspacePanel.style.maxHeight = `${panelHeight}px`;
-    workspacePanel.style.setProperty('--animation-workspace-grid-height', `${Math.max(44, panelHeight - 120)}px`);
+    workspacePanel.style.setProperty('--animation-workspace-grid-height', `${Math.max(88, panelHeight - 64)}px`);
   }
 
   function setWorkspaceOpen(open, { returnFocus = false } = {}) {
@@ -245,30 +256,43 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (frameToggleBadge) frameToggleBadge.textContent = `L${layerIndex + 1}/F${frameIndex + 1}`;
     if (workspaceSelection) workspaceSelection.textContent = selectionLabel;
     frames.classList.add('is-cel-grid');
-    frames.style.setProperty('--animation-frame-count', String(frameList.length));
+    frames.style.setProperty('--animation-frame-count', String(frameList.length + 1));
     frames.setAttribute('role', 'grid'); frames.setAttribute('aria-label', 'レイヤーとコマ');
     frames.replaceChildren(); frameMenu.hidden = true; menuFrameId = null;
 
     const orderedLayers = state.layers.map((layer, modelIndex) => ({ layer, modelIndex })).reverse();
-    const corner = node('span', 'animation-controls__grid-corner'); corner.setAttribute('aria-hidden', 'true');
+    const corner = node('span', 'animation-controls__grid-corner'); corner.setAttribute('aria-hidden', 'true'); corner.style.gridRow = '1'; corner.style.gridColumn = '1';
     frames.append(corner);
     frameList.forEach((frame, index) => {
       const item = button(`コマ ${index + 1} を選択`, '', 'select-frame', 'animation-controls__frame');
-      item.dataset.frameId = String(frame.id); item.dataset.index = String(index); item.draggable = !state.readOnly && pending === 0;
+      item.dataset.frameId = String(frame.id); item.dataset.index = String(index); item.draggable = false;
       item.setAttribute('role', 'columnheader'); item.setAttribute('aria-selected', String(frame.id === state.frameId));
       item.setAttribute('aria-rowindex', '1'); item.setAttribute('aria-colindex', String(index + 2));
+      item.style.gridRow = '1'; item.style.gridColumn = String(index + 2);
       item.classList.toggle('is-selected', frame.id === state.frameId);
       if (Number.isFinite(frame.durationMs)) item.title += ` · ${frame.durationMs}ms`;
       item.append(node('span', 'animation-controls__frame-number', String(index + 1)));
       frames.append(item);
     });
+    const addFrame = button('末尾にコマを複製して追加', '+', 'add-frame', 'animation-controls__grid-add animation-controls__frame-add');
+    addFrame.setAttribute('role', 'columnheader'); addFrame.setAttribute('aria-label', 'コマを追加');
+    addFrame.setAttribute('aria-rowindex', '1'); addFrame.setAttribute('aria-colindex', String(frameList.length + 2));
+    addFrame.style.gridRow = '1'; addFrame.style.gridColumn = String(frameList.length + 2);
+    frames.append(addFrame);
+    const addLayer = button('レイヤーを追加', '+', 'add-layer', 'animation-controls__grid-add animation-controls__layer-add');
+    addLayer.setAttribute('role', 'rowheader'); addLayer.setAttribute('aria-label', 'レイヤーを追加');
+    addLayer.setAttribute('aria-rowindex', '2'); addLayer.setAttribute('aria-colindex', '1');
+    addLayer.style.gridRow = '2'; addLayer.style.gridColumn = '1';
+    frames.append(addLayer);
     orderedLayers.forEach(({ layer, modelIndex }, rowIndex) => {
       const layerNumber = button(`レイヤー ${modelIndex + 1} を選択`, String(modelIndex + 1), 'select-layer', 'animation-controls__layer-number');
       layerNumber.dataset.layerId = String(layer.id); layerNumber.setAttribute('role', 'rowheader');
-      layerNumber.setAttribute('aria-rowindex', String(rowIndex + 2)); layerNumber.setAttribute('aria-colindex', '1');
+      layerNumber.setAttribute('aria-rowindex', String(rowIndex + 3)); layerNumber.setAttribute('aria-colindex', '1');
+      layerNumber.style.gridRow = String(rowIndex + 3); layerNumber.style.gridColumn = '1';
       layerNumber.setAttribute('aria-pressed', String(layer.id === state.layerId));
       layerNumber.classList.toggle('is-selected', layer.id === state.layerId);
       layerNumber.title = `${layer.name || `レイヤー ${modelIndex + 1}`}を選択`;
+      layerNumber.draggable = false;
       frames.append(layerNumber);
       frameList.forEach((frame, columnIndex) => {
         const hasContent = Boolean(getCelHasContent(frame.id, layer.id));
@@ -277,7 +301,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         const cell = button(label, '', 'select-cel', 'animation-controls__cel');
         cell.dataset.frameId = String(frame.id); cell.dataset.layerId = String(layer.id);
         cell.dataset.hasContent = String(hasContent); cell.setAttribute('role', 'gridcell');
-        cell.setAttribute('aria-rowindex', String(rowIndex + 2)); cell.setAttribute('aria-colindex', String(columnIndex + 2));
+        cell.setAttribute('aria-rowindex', String(rowIndex + 3)); cell.setAttribute('aria-colindex', String(columnIndex + 2));
+        cell.style.gridRow = String(rowIndex + 3); cell.style.gridColumn = String(columnIndex + 2);
         cell.setAttribute('aria-selected', String(isSelected));
         cell.classList.toggle('is-selected', isSelected);
         if (hasContent) cell.append(node('span', 'animation-controls__cel-mark', '●'));
@@ -351,14 +376,72 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   }
 
   function request(action) { void dispatch(action); }
-  function menuAction(command) {
-    const state = stateNow(); const index = state.frames.findIndex((frame) => frame.id === menuFrameId);
+  function openCellMenu(kind, id, target) {
+    if (!hasCelMatrix || !workspacePanel) return;
+    const state = stateNow();
+    menuFrameId = kind === 'frame' ? id : null; menuLayerId = kind === 'layer' ? id : null;
+    frameMenu.replaceChildren();
+    const add = (label, glyph, command, disabled = false) => {
+      const control = button(label, glyph, 'frame-menu', 'animation-controls__context-action');
+      control.dataset.frameMenuAction = command; control.disabled = disabled;
+      control.append(node('span', 'animation-controls__context-label', label)); frameMenu.append(control); return control;
+    };
+    if (kind === 'frame') {
+      const index = state.frames.findIndex((frame) => frame.id === id); if (index < 0) return;
+      frameMenu.setAttribute('aria-label', `コマ ${index + 1} の操作`);
+      add('複製して追加', '＋', 'duplicate', state.readOnly || pending > 0);
+      add('空白コマを追加', '□', 'blank', state.readOnly || pending > 0);
+      add('表示時間', '◷', 'duration', state.readOnly || pending > 0);
+      add(state.onion ? 'オニオンスキンを解除' : 'オニオンスキン', '◉', 'onion', pending > 0 || state.frames.length < 2);
+      add('削除', '×', 'delete', state.readOnly || pending > 0 || state.frames.length <= 1);
+    } else {
+      const layer = state.layers.find((item) => item.id === id); if (!layer) return;
+      frameMenu.setAttribute('aria-label', `${layer.name || 'レイヤー'}の操作`);
+      add(layer.visible === false ? '表示する' : '隠す', layer.visible === false ? '○' : '◉', 'visibility', state.readOnly || pending > 0);
+      const lock = add(layer.locked ? 'ロック解除' : 'ロック', '', 'lock', state.readOnly || pending > 0);
+      replaceButtonIcon(lock, layer.locked ? 'unlocked' : 'locked');
+      lock.append(node('span', 'animation-controls__context-label', layer.locked ? 'ロック解除' : 'ロック'));
+      const rename = node('input', 'animation-controls__context-rename'); rename.type = 'text'; rename.value = String(layer.name || ''); rename.maxLength = 80;
+      rename.dataset.contextRename = String(layer.id); rename.setAttribute('aria-label', 'レイヤー名'); rename.disabled = state.readOnly || pending > 0 || Boolean(layer.locked); rename.placeholder = 'レイヤー名'; frameMenu.append(rename);
+      add('名前を適用', '✓', 'rename', rename.disabled);
+      add('削除', '×', 'delete-layer', state.readOnly || pending > 0 || state.layers.length <= 1 || Boolean(layer.locked));
+    }
+    frameMenu.classList.toggle('is-cel-menu', true); frameMenu.classList.toggle('is-layer-menu', kind === 'layer');
+    frameMenu.hidden = false;
+    const rect = target.getBoundingClientRect(); const view = document.defaultView;
+    const viewportWidth = view?.innerWidth || 320; const viewportHeight = view?.innerHeight || 568;
+    const width = Math.min(kind === 'frame' ? 252 : 220, viewportWidth - 16);
+    frameMenu.style.left = `${Math.max(8, Math.min(viewportWidth - width - 8, rect.left))}px`;
+    frameMenu.style.width = `${width}px`;
+    const menuHeight = Math.min(frameMenu.getBoundingClientRect().height || (kind === 'frame' ? 100 : 170), viewportHeight - 16);
+    frameMenu.style.top = `${Math.max(8, Math.min(viewportHeight - menuHeight - 8, rect.bottom + 4))}px`;
+    frameMenu.querySelector('button:not(:disabled)')?.focus();
+  }
+
+  function menuAction(command, target) {
+    const state = stateNow();
+    if (menuLayerId) {
+      const layerId = menuLayerId; const layer = state.layers.find((item) => item.id === layerId);
+      if (!layer) return;
+      if (command === 'visibility') request({ type: 'visibility', layerId, visible: layer.visible === false });
+      else if (command === 'lock') request({ type: 'lock', layerId, locked: !layer.locked });
+      else if (command === 'delete-layer') request({ type: 'delete-layer', layerId });
+      else if (command === 'rename') {
+        const input = frameMenu.querySelector('[data-context-rename]'); const name = input?.value.trim();
+        if (name && name !== layer.name) request({ type: 'rename-layer', layerId, name });
+      }
+      frameMenu.hidden = true; menuLayerId = null; return;
+    }
+    const index = state.frames.findIndex((frame) => frame.id === menuFrameId);
     suppressClick = false;
     if (index < 0) return;
     const frameId = menuFrameId; frameMenu.hidden = true; menuFrameId = null;
     if (command === 'duplicate') request({ type: 'add-frame', frameId, copy: true });
     else if (command === 'blank') request({ type: 'add-frame', frameId, copy: false });
     else if (command === 'delete') request({ type: 'delete-frame', frameId });
+    else if (command === 'duration') {
+      request({ type: 'select-frame', frameId }); timing.hidden = false; timingToggle?.setAttribute('aria-expanded', 'true');
+    } else if (command === 'onion') request({ type: 'onion', enabled: !state.onion });
     else if (command === 'left' && index > 0) request({ type: 'move-frame', frameId, index: index - 1 });
     else if (command === 'right' && index < state.frames.length - 1) request({ type: 'move-frame', frameId, index: index + 1 });
   }
@@ -368,7 +451,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (!target || ![root, workspacePanel, frameMenu, layers, timing].some((container) => container?.contains(target))) return;
     if (target.matches('input')) return;
     const state = stateNow(); const action = target.dataset.action;
-    if (action === 'frame-menu') { menuAction(target.dataset.frameMenuAction); return; }
+    if (action === 'frame-menu') { menuAction(target.dataset.frameMenuAction, target); return; }
     if (action === 'toggle-frames') {
       if (workspacePanel) { setWorkspaceOpen(!workspaceOpen); return; }
       collapsed = !collapsed; frames.dataset.userCollapsed = 'true'; frames.hidden = collapsed; frameToggle.setAttribute('aria-expanded', String(!collapsed)); return;
@@ -384,8 +467,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     if (action === 'select-frame') { if (suppressClick) { suppressClick = false; return; } request({ type: 'select-frame', frameId: target.dataset.frameId }); return; }
     if (action === 'select-cel') { request({ type: 'select-frame', frameId: target.dataset.frameId, layerId: target.dataset.layerId }); return; }
-    if (action === 'add-frame') { request({ type: 'add-frame', copy: true }); return; }
-    if (action === 'select-layer') { request({ type: 'select-layer', layerId: target.dataset.layerId }); return; }
+    if (action === 'add-frame') {
+      const sourceFrameId = target.classList.contains('animation-controls__frame-add') ? state.frames.at(-1)?.id : undefined;
+      request({ type: 'add-frame', ...(sourceFrameId ? { frameId: sourceFrameId } : {}), copy: true }); return;
+    }
+    if (action === 'select-layer') { if (suppressClick) { suppressClick = false; return; } request({ type: 'select-layer', layerId: target.dataset.layerId }); return; }
     if (action === 'visibility') {
       const layer = state.layers.find((item) => item.id === target.dataset.layerId); if (layer) request({ type: 'visibility', layerId: layer.id, visible: layer.visible === false }); return;
     }
@@ -427,16 +513,42 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       if (workspacePanel && workspaceOpen) { setWorkspaceOpen(false, { returnFocus: true }); return; }
       closePanels(); frameMenu.hidden = true; menuFrameId = null; return;
     }
-    const target = event.target.closest?.('[data-action="select-frame"]');
-    if (!target || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    const target = event.target.closest?.('[data-action="select-frame"], [data-action="select-layer"]');
+    if (hasCelMatrix && target && ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu')) {
+      event.preventDefault(); openCellMenu(target.dataset.frameId ? 'frame' : 'layer', target.dataset.frameId || target.dataset.layerId, target); return;
+    }
+    const frameTarget = target?.matches?.('[data-action="select-frame"]') ? target : null;
+    if (!frameTarget || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
     event.preventDefault();
-    const state = stateNow(); const index = state.frames.findIndex((frame) => frame.id === target.dataset.frameId); const next = state.frames[index + (event.key === 'ArrowLeft' ? -1 : 1)];
+    const state = stateNow(); const index = state.frames.findIndex((frame) => frame.id === frameTarget.dataset.frameId); const next = state.frames[index + (event.key === 'ArrowLeft' ? -1 : 1)];
     if (next) { request({ type: 'select-frame', frameId: next.id }); frameElement(next.id)?.focus(); }
+  }
+  function onContextMenu(event) {
+    if (!hasCelMatrix) return;
+    const target = event.target.closest?.('[data-action="select-frame"], [data-action="select-layer"]');
+    if (!target) return;
+    event.preventDefault(); openCellMenu(target.dataset.frameId ? 'frame' : 'layer', target.dataset.frameId || target.dataset.layerId, target);
+  }
+  function onDoubleClick(event) {
+    if (!hasCelMatrix) return;
+    const target = event.target.closest?.('[data-action="select-frame"], [data-action="select-layer"]');
+    if (!target) return;
+    event.preventDefault(); openCellMenu(target.dataset.frameId ? 'frame' : 'layer', target.dataset.frameId || target.dataset.layerId, target);
   }
 
   function onPointerDown(event) {
-    const target = event.target.closest?.('[data-action="select-frame"]'); if (!target || stateNow().readOnly) return;
+    const target = event.target.closest?.(hasCelMatrix ? '[data-action="select-frame"], [data-action="select-layer"]' : '[data-action="select-frame"]'); if (!target || stateNow().readOnly || pending > 0) return;
+    if (pointerHold && pointerHold.pointerId !== event.pointerId) return;
     clearLongPress();
+    if (hasCelMatrix) {
+      pointerHold = { target, type: target.dataset.frameId ? 'frame' : 'layer', id: target.dataset.frameId || target.dataset.layerId, pointerId: event.pointerId, x: event.clientX || 0, y: event.clientY || 0, lifted: false };
+      longPressTimer = scope.timeout(() => {
+        if (disposed || scope.disposed || !pointerHold) return;
+        pointerHold.lifted = true; liftedHeader = target; target.classList.add('is-lifted');
+        target.setPointerCapture?.(event.pointerId);
+      }, 350);
+      return;
+    }
     const frameId = target.dataset.frameId;
     longPressTimer = scope.timeout(() => {
       if (disposed || scope.disposed) return;
@@ -455,8 +567,50 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }, 520);
   }
   function clearLongPress() { if (longPressTimer) scope.clearTimeout(longPressTimer); longPressTimer = 0; }
-  function onPointerEnd() { clearLongPress(); }
+  function onPointerMove(event) {
+    if (!pointerHold || (pointerHold.pointerId != null && event.pointerId != null && pointerHold.pointerId !== event.pointerId)) return;
+    if (!pointerHold.lifted) {
+      if (Math.hypot((event.clientX || 0) - pointerHold.x, (event.clientY || 0) - pointerHold.y) > 8) { clearLongPress(); pointerHold = null; }
+      return;
+    }
+    event.preventDefault?.();
+    for (const header of frames.querySelectorAll('[data-action="select-frame"], [data-action="select-layer"]')) header.classList.toggle('is-drop-target', false);
+    const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest?.('[data-action="select-frame"], [data-action="select-layer"]');
+    if ((target && target.dataset.frameId && pointerHold.type === 'frame') || (target && target.dataset.layerId && pointerHold.type === 'layer')) target.classList.add('is-drop-target');
+    pointerHold.over = target || null;
+  }
+  function onPointerEnd(event) {
+    if (!pointerHold) return;
+    if (pointerHold.pointerId != null && event?.pointerId != null && pointerHold.pointerId !== event.pointerId) return;
+    clearLongPress();
+    const hold = pointerHold; pointerHold = null;
+    if (liftedHeader) { liftedHeader.classList.toggle('is-lifted', false); liftedHeader = null; }
+    for (const header of frames.querySelectorAll('[data-action="select-frame"], [data-action="select-layer"]')) header.classList.toggle('is-drop-target', false);
+    if (!hold.lifted) return;
+    suppressClick = true;
+    const target = hold.over || document.elementFromPoint?.(event?.clientX, event?.clientY)?.closest?.('[data-action="select-frame"], [data-action="select-layer"]');
+    scope.timeout(() => { suppressClick = false; }, 400);
+    if (!target) return;
+    if (target === hold.target) { openCellMenu(hold.type, hold.id, hold.target); return; }
+    const state = stateNow();
+    if (hold.type === 'frame' && target.dataset.frameId) {
+      const index = Number(target.dataset.index);
+      if (Number.isInteger(index)) request({ type: 'move-frame', frameId: hold.id, index });
+    } else if (hold.type === 'layer' && target.dataset.layerId) {
+      const row = Number(target.getAttribute('aria-rowindex')) - 3;
+      const index = state.layers.length - 1 - row;
+      if (Number.isInteger(index) && index >= 0 && index < state.layers.length) request({ type: 'move-layer', layerId: hold.id, index });
+    }
+  }
+  function onPointerCancel(event) {
+    if (pointerHold && pointerHold.pointerId != null && event?.pointerId != null && pointerHold.pointerId !== event.pointerId) return;
+    clearLongPress();
+    pointerHold = null;
+    if (liftedHeader) { liftedHeader.classList.toggle('is-lifted', false); liftedHeader = null; }
+    for (const header of frames.querySelectorAll('[data-action="select-frame"], [data-action="select-layer"]')) header.classList.toggle('is-drop-target', false);
+  }
   function onDragStart(event) {
+    if (hasCelMatrix) { event.preventDefault(); return; }
     const target = event.target.closest?.('[data-action="select-frame"]'); if (!target) return;
     draggedFrameId = target.dataset.frameId; event.dataTransfer?.setData('text/plain', draggedFrameId);
     event.dataTransfer?.setDragImage?.(target, target.clientWidth / 2, target.clientHeight / 2);
@@ -477,16 +631,23 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     listen(workspacePanel, 'change', onChange);
     listen(workspacePanel, 'focusout', onBlur);
     listen(workspacePanel, 'keydown', onKeydown);
+    listen(workspacePanel, 'contextmenu', onContextMenu);
+    listen(workspacePanel, 'dblclick', onDoubleClick);
     listen(document, 'pointerdown', onOutsidePointerDown);
     listen(document, 'keydown', onKeydown);
+    listen(document, 'pointermove', onPointerMove);
+    listen(document, 'pointerup', onPointerEnd);
+    listen(document, 'pointercancel', onPointerCancel);
     if (document.defaultView?.addEventListener) listen(document.defaultView, 'resize', positionWorkspacePanel);
   }
   const interactionSurfaces = workspacePanel ? [workspacePanel] : [root];
   for (const surface of interactionSurfaces) {
     listen(surface, 'pointerdown', onPointerDown);
-    listen(surface, 'pointerup', onPointerEnd);
-    listen(surface, 'pointercancel', onPointerEnd);
-    listen(surface, 'pointerleave', onPointerEnd);
+    if (!workspacePanel) {
+      listen(surface, 'pointerup', onPointerEnd);
+      listen(surface, 'pointercancel', onPointerEnd);
+      listen(surface, 'pointerleave', onPointerEnd);
+    }
     listen(surface, 'dragstart', onDragStart);
     listen(surface, 'dragover', onDragOver);
     listen(surface, 'drop', onDrop);
@@ -498,9 +659,17 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   listen(timing, 'change', onChange);
   const api = {
     refresh,
+    close() {
+      clearLongPress(); pointerHold = null; suppressClick = false;
+      liftedHeader?.classList.toggle('is-lifted', false); liftedHeader = null;
+      frameMenu.hidden = true; menuFrameId = null; menuLayerId = null;
+      closePanels();
+      if (workspacePanel) setWorkspaceOpen(false);
+    },
     dispose() {
       if (disposed) return;
       disposed = true; clearLongPress();
+      pointerHold = null; liftedHeader?.classList.toggle('is-lifted', false); liftedHeader = null;
       for (const remove of removeListeners.splice(0)) remove();
       host.replaceChildren();
       for (const element of [workspacePanel, frameMenu, layers, timing]) element?.parentElement?.removeChild(element);

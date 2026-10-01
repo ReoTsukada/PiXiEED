@@ -529,6 +529,7 @@ body.is-post-drawer-open { overflow: hidden; }
 .tool-card h2 { margin: 1.4rem 0 .35rem; font-family: 'Hiragino Sans', 'Yu Gothic', 'Meiryo', system-ui, sans-serif; font-size: 1.05rem; letter-spacing: -.02em; }
 .tool-card p { margin: 0; color: var(--ink-soft); font-size: .78rem; line-height: 1.65; }
 .tool-card__status { align-self: start; margin-top: 1rem; color: var(--ink-soft); font-family: 'DM Mono', monospace; font-size: .64rem; }
+body.home-play .hp-chip.is-open { color: #b53e33; }
 .tool-card--soon { color: var(--ink-soft); background: rgba(236, 230, 216, .55); box-shadow: none; }
 .tool-card--soon .tool-card__icon { color: rgba(79, 89, 100, .7); background: rgba(255, 253, 248, .62); }
 .tool-note { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding: 1rem 1.15rem; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .8rem; }

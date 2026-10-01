@@ -70,7 +70,7 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       assert.equal(initial.contexts, 1);
       await tap(3, 3); await page.waitForFunction((before) => __audioStarts > before, initial.starts);
       assert.equal(await page.evaluate(() => __audioContexts), 1);
-      await page.locator('#audio-tool-eraser').click();
+      await page.locator('#audio-tool-pen').click();
       const beforeErase = await page.evaluate(() => __audioStarts); await tap(3, 3); await page.waitForTimeout(40);
       assert.equal(await page.evaluate(() => __audioStarts), beforeErase);
       await page.locator('#audio-tool-pen').click();

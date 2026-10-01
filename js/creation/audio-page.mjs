@@ -18,7 +18,7 @@ import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSha
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-audio-animation-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { addAnimationFrame, addAnimationLayer, composeAnimationFrame, getAnimationCelDocument, getAnimationUsedColorIndices, moveAnimationFrame, moveAnimationLayer, removeAnimationFrame, removeAnimationLayer, setAnimationFrameDuration, setAnimationPalette, setLayerProperties, writeAnimationCel } from './animation-core.mjs';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-audio-animation-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-direct-cels-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261001-audio-animation-1';
 import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261001-audio-animation-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
@@ -62,6 +62,9 @@ const playButton = document.querySelector('#audio-play-toggle');
 const saveButton = document.querySelector('#audio-save');
 const penButton = document.querySelector('#audio-tool-pen');
 const eraserButton = document.querySelector('#audio-tool-eraser');
+const penIcon = penButton.querySelector('svg')?.cloneNode(true);
+const eraserIcon = eraserButton.querySelector('svg')?.cloneNode(true);
+eraserButton.remove();
 const sizeSelect = document.querySelector('#audio-canvas-size');
 const extraInstrumentsButton = document.querySelector('#audio-extra-instruments');
 const exportSoundButton = document.querySelector('#audio-export-sound');
@@ -305,7 +308,12 @@ function pitchName(pitch) { return PITCHES.find((item) => item.midi === pitch)?.
 
 function setTool(tool) {
   if (disposed()) return;
-  activeTool = tool; penButton.setAttribute('aria-pressed', String(tool === 'pen')); eraserButton.setAttribute('aria-pressed', String(tool === 'eraser'));
+  activeTool = tool; penButton.setAttribute('aria-pressed', 'true'); eraserButton.setAttribute('aria-pressed', String(tool === 'eraser'));
+  const erasing = tool === 'eraser'; const glyph = erasing ? eraserIcon : penIcon;
+  if (glyph) penButton.replaceChildren(glyph.cloneNode(true));
+  const label = erasing ? '消しゴム（もう一度押すとペン）' : 'ペン（選択中に押すと消しゴム）';
+  penButton.setAttribute('aria-label', label); penButton.title = label;
+  penButton.classList.toggle('is-eraser', erasing);
   updateCanvasLabel();
 }
 
@@ -791,7 +799,7 @@ scope.listen(tracksEl, 'click', (event) => {
   if (editSelected) document.querySelector('#audio-palette-settings').open = true;
 });
 
-scope.listen(penButton, 'click', () => setTool('pen'));
+scope.listen(penButton, 'click', () => setTool(activeTool === 'pen' ? 'eraser' : 'pen'));
 scope.listen(eraserButton, 'click', () => setTool('eraser'));
 if (document.querySelector('#audio-current')) scope.listen(document.querySelector('#audio-current'), 'click', () => {
   const panel = document.querySelector('#audio-palette-settings');
