@@ -1,5 +1,5 @@
 import { canonicalPxdJson, createPxdProject } from './pxd-codec.mjs';
-import { sanitizeProjectTitle } from './project-catalog.mjs';
+import { sanitizeProjectTitle } from './project-catalog.mjs?rev=20261001-free-tools-1';
 
 function copyProject(project) {
   return {

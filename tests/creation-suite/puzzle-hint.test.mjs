@@ -7,14 +7,14 @@ function memoryStorage() {
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), values };
 }
 
-test('the first visible hint is free, persists for the problem, then asks the common pass', async () => {
+test('repeated hints are free, retain history, and never ask for an ad', async () => {
   const storage = memoryStorage(); let passRequests = 0; const shown = [];
   const hints = createPuzzleHintController({ perk: 'pixfind.hint', storage, requestPass: async ({ perk }) => { assert.equal(perk, 'pixfind.hint'); passRequests += 1; return true; } });
   hints.setProblem('pixfind:problem-1');
   assert.equal(await hints.request(async () => { shown.push(1); return true; }), true);
   assert.equal(hints.getState().freeUsed, true);
   assert.equal(await hints.request(async () => { shown.push(2); return true; }), true);
-  assert.equal(passRequests, 1);
+  assert.equal(passRequests, 0);
   assert.deepEqual(shown, [1, 2]);
   const afterReload = createPuzzleHintController({ perk: 'pixfind.hint', storage, requestPass: async () => false });
   afterReload.setProblem('pixfind:problem-1');
@@ -46,24 +46,24 @@ test('concurrent taps share one request and switching problems discards stale re
   assert.equal(hints.getState().freeUsed, true);
 });
 
-test('a declined pass never displays a repeated hint', async () => {
+test('repeated hints do not depend on an old pass callback', async () => {
   const storage = memoryStorage(); let displayed = 0;
   const hints = createPuzzleHintController({ storage, requestPass: async () => false });
   hints.setProblem('jigsaw:game');
   assert.equal(await hints.request(async () => true), true);
-  assert.equal(await hints.request(async () => { displayed += 1; return true; }), false);
-  assert.equal(displayed, 0);
+  assert.equal(await hints.request(async () => { displayed += 1; return true; }), true);
+  assert.equal(displayed, 1);
 });
 
-test('the in-memory allowance still blocks repeat freebies when sessionStorage is unavailable', async () => {
+test('repeated hints work even when storage is unavailable', async () => {
   let passRequests = 0; let displayed = 0;
   const storage = { getItem() { throw new Error('storage blocked'); }, setItem() { throw new Error('storage blocked'); } };
   const hints = createPuzzleHintController({ storage, requestPass: async () => { passRequests += 1; return false; } });
   hints.setProblem('pixfind:local:problem:revision');
   assert.equal(await hints.request(async () => true), true);
-  assert.equal(await hints.request(async () => { displayed += 1; return true; }), false);
-  assert.equal(passRequests, 1);
-  assert.equal(displayed, 0);
+  assert.equal(await hints.request(async () => { displayed += 1; return true; }), true);
+  assert.equal(passRequests, 0);
+  assert.equal(displayed, 1);
   assert.equal(hints.getState().freeUsed, true);
 });
 

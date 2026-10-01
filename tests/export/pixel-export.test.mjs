@@ -26,16 +26,22 @@ test('phones get the share sheet; a cancelled share saves nothing; elsewhere it 
   assert.deepEqual(clicks, ['b.png']);
 });
 
-test('every tool saves through the shared enlarged export; new pass perks are wired to their buttons', async () => {
+test('normal exports and creative tools stay available without perk gates', async () => {
   const draw = await read('js/creation/draw-page.mjs'); const audio = await read('js/creation/audio-page.mjs');
   const camera = await read('js/pixel-lens/app.mjs'); const pixfind = await read('js/creation/pixfind-play.mjs');
-  assert.match(draw, /enlargedPng\(/); assert.match(draw, /requestPass\(\{ perk: 'draw\.timelapse-detail' \}\)/);
+  assert.match(draw, /enlargedPng\(/);
+  assert.match(draw, /\$\('#draw-timelapse-detail'\)\.addEventListener\('click', \(\) => exportTimelapse\(true\)\)/);
+  assert.doesNotMatch(draw, /requestPass|px-perk/);
   assert.match(audio, /saveFile\(blob, `pixieed-dot-music-/); assert.match(audio, /renderAudioWav\(songSnapshot\)/);
   assert.match(camera, /saveFile\(blob, (?:link\.download|snapshot\.filename)/);
-  assert.match(pixfind, /createPuzzleHintController\(\{ perk: 'pixfind\.hint', requestPass/);
-  assert.match(await read('draw/index.html'), /id="draw-timelapse-detail"[^>]*class="[^"]*\bpx-perk\b[^"]*"/);
+  assert.match(pixfind, /createPuzzleHintController\(\{ onState:/);
+  assert.doesNotMatch(pixfind, /requestPass|px-perk/);
+  assert.match(await read('draw/index.html'), /id="draw-timelapse-detail"/);
+  assert.doesNotMatch(await read('draw/index.html'), /id="draw-timelapse-detail"[^>]*px-perk/);
   assert.match(await read('audio/index.html'), /id="audio-export-sound"/);
   for (const game of ['spot-difference', 'hidden-object']) {
-    assert.match(await read(`play/${game}/index.html`), /id="pixfind-hint"[^>]*px-perk/);
+    const html = await read(`play/${game}/index.html`);
+    assert.match(html, /id="pixfind-hint"/);
+    assert.doesNotMatch(html, /id="pixfind-hint"[^>]*px-perk/);
   }
 });

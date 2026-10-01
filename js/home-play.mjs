@@ -649,7 +649,7 @@ for (const el of document.querySelectorAll('[data-toy]')) {
 async function feed() {
   const slot = document.querySelector('[data-home-feed]'); if (!slot) return;
   try {
-    const { supabaseConfig: cfg } = await import('../data/site-config.js');
+    const { supabaseConfig: cfg } = await import('../data/site-config.js?rev=20261001-free-tools-1');
     const base = String(cfg.url || '').replace(/\/$/, ''); const key = String(cfg.publishableKey || '');
     if (!base || !key) return;
     const url = new URL(`${base}/rest/v1/${encodeURIComponent(cfg.publicMapTable || 'post_map_points')}`);

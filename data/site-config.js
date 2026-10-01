@@ -30,12 +30,10 @@ export const supabaseConfig = {
 };
 
 /*
- * PiXiEEDパス（広告1本で、PiXiEED全体の特典が passHours 時間使える。貯めることはできない）。
- * 広告は共有ヘッダーから同じページ上で起動する Ad Manager の報酬型広告です。
+ * 旧パス設定との互換用。現在は全機能を無料で利用でき、広告視聴や期限による制限はありません。
  */
 export const passConfig = {
-  passHours: 1,
-  rewardedAdUnitPath: '/23379831154/pixieed_rewarded'
+  passHours: 1
 };
 
 /* 通常のディスプレイ広告。AdSenseで作った広告ユニットの数字のIDだけを入れます。

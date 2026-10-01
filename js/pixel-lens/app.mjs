@@ -1,22 +1,21 @@
 import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20260928-pixel-roundtrip-1';
-import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, OUTPUT_SIZES, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20260930-shared-canvas-5';
+import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20260930-distinct-colors-1';
-import { attachZoomGestures, formatZoom, splitZoom, zoomRange, zoomStops } from './zoom.mjs?v=20260928-pass-1';
-import { GIF_FPS, GIF_MAX_MS } from './gif.mjs?v=20261001-animation-1';
+import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261001-camera-zoom-40-1';
+import { GIF_FPS } from './gif.mjs?v=20261001-animation-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
-import { hasPerk, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { cameraPostDataUrl } from './camera-post.mjs';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20260930-audio-timebase-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260930-shared-canvas-5';
 import { createPxdProject } from '../creation/pxd-codec.mjs';
-import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
-import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20260930-shared-canvas-5';
-import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261001-independent-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
+import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261001-free-tools-1';
+import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261001-free-tools-1';
+import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261001-free-tools-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261001-free-tools-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -68,13 +67,29 @@ let audioFrozenFrame = null;
 let captureInFlight = false;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
-const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: audioCameraRequest?.width ?? 128,
+const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: normalizeOutputSize(audioCameraRequest?.width ?? 128),
   colorDepth: '16', paletteMode: 'source', gradientMode: 'none', ditherPattern: 'net8', surfaceSimplify: 0, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
 let sharedImageTarget = null;
 let sharedProjectBound = false;
 let sharedImageEdited = false;
 let sharedImageColorCount = 16;
-let zoomInfo = zoomRange(null); let appliedHardwareZoom = 1; let zoomApplyPending = false;
+let zoomInfo = zoomRange(null);
+const zoomController = createCameraZoomController({ onChange: (snapshot) => {
+  zoomInfo = snapshot.range;
+  if (state.mode === 'live') {
+    state.zoom = snapshot.requested;
+    syncZoomStops();
+    syncZoomHud();
+    if (snapshot.hardwareFailed && snapshot.total > snapshot.requested + 0.02) {
+      state.error = 'zoom';
+      setInfoForMode('live');
+      updatePrimaryAction();
+      say(snapshot.overLimit
+        ? 'カメラ倍率を40倍以内に調整できません。別のカメラをお試しください。'
+        : 'カメラ倍率を設定できませんでした。カメラを切り替えるか、開き直してください。', { visible: true });
+    }
+  }
+} });
 // 面のまとまり is automatic: it only calms dither speckle with 8-16 colours (measured: no change at 2-4 colours,
 // heavy posterising at high strength), so it runs at PiXiEELENS's default 55 there and is skipped elsewhere.
 const autoSurface = (depth) => (depth === '8' || depth === '16' ? 55 : 0);
@@ -199,11 +214,6 @@ function updatePrimaryAction() {
       button.disabled = true;
       button.title = '共通キャンバスの範囲外です';
       button.setAttribute('aria-label', button.title);
-    } else if (policy.locked && primary.action === 'capture' && !primary.disabled) {
-      label = '時間を追加して撮影';
-      button.disabled = false;
-      button.title = label;
-      button.setAttribute('aria-label', label);
     }
   }
 }
@@ -214,24 +224,12 @@ function currentAspect() {
   return resolveAspect(state.ratio, Math.max(1, stage.clientWidth), Math.max(1, stage.clientHeight));
 }
 
-function sharedPassActive() { return hasPerk('project.canvas-expanded'); }
+function sharedPassActive() { return true; }
 
 function captureDimensions() {
   if (audioCameraRequest) return { width: audioCameraRequest.width, height: audioCameraRequest.height };
   if (sharedProjectBound && sharedImageTarget) return { width: sharedImageTarget.width, height: sharedImageTarget.height };
   return frameGeometry(currentAspect(), state.size);
-}
-
-async function requestCanvasExpansion() {
-  sayToast('共通キャンバスの特典を確認します');
-  try {
-    if (await requestPass({ perk: 'project.canvas-expanded' })) sayToast('特典が有効です。もう一度撮影してください');
-    else sayToast('特典を利用できませんでした');
-  } catch {
-    sayToast('特典を確認できませんでした');
-  }
-  updateSharedCaptureControls();
-  updatePrimaryAction();
 }
 
 function paletteFromRgba(rgba) {
@@ -385,7 +383,10 @@ function cameraFrame() {
   const output = captureDimensions();
   const aspect = output.width / output.height;
   const full = centerCrop(video.videoWidth, video.videoHeight, aspect);
-  const digital = Math.max(1, state.zoom / appliedHardwareZoom); // what the camera's optics could not do is cropped
+  const zoom = zoomController.snapshot();
+  // Keep the previous published preview while device zoom is still above the user's requested total.
+  if (zoom.total > zoom.requested + 0.02) return null;
+  const digital = zoom.digital;
   const crop = { sw: full.sw / digital, sh: full.sh / digital, sx: full.sx + (full.sw - full.sw / digital) / 2, sy: full.sy + (full.sh - full.sh / digital) / 2 };
   const { width, height } = output;
   if (sourceCanvas.width !== width || sourceCanvas.height !== height) { sourceCanvas.width = width; sourceCanvas.height = height; }
@@ -466,6 +467,7 @@ loop = createFrameLoop({
 });
 
 function stopTracks() {
+  zoomController.detach();
   if (activeStream) {
     for (const track of activeStream.getTracks()) track.stop();
     activeStream = null;
@@ -513,7 +515,11 @@ async function startCamera({ focus = true } = {}) {
     // A permission prompt can outlive a hidden page. Do not stack another request.
     if (pendingCameraRequest) await pendingCameraRequest;
     if (token !== cameraSequence) return;
-    const request = navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: state.facing } } });
+    let zoomSupported = false;
+    try { zoomSupported = navigator.mediaDevices.getSupportedConstraints?.().zoom === true; } catch {}
+    const request = getUserMediaWithZoomPreference(navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices), {
+      facingMode: state.facing, zoomSupported, permissions: navigator.permissions
+    });
     pendingCameraRequest = request;
     let stream;
     try {
@@ -552,8 +558,7 @@ async function capture() {
     const target = captureDimensions();
     const maxColors = passActive ? 32 : 16;
     const policy = evaluateSharedCanvasPolicy({ width: target.width, height: target.height, colorCount: maxColors }, { passActive });
-    if (policy.reason === 'premium-required') { void requestCanvasExpansion(); return; }
-    if (!policy.supported) { sayToast('共通キャンバスの範囲外です'); return; }
+    if (!policy.supported) { sayToast('共通キャンバスは最大256px・32色です。プロジェクトのキャンバス設定を確認してください'); return; }
     let prepared;
     try {
       prepared = prepareSharedCanvasImage({ width: state.result.width, height: state.result.height, rgba: new Uint8Array(state.result.data) }, {
@@ -563,9 +568,8 @@ async function capture() {
       sayToast('共通キャンバスの範囲を確認できないため、画像を戻しませんでした');
       return;
     }
-    if (!prepared.policy.supported || prepared.policy.locked || prepared.image.width !== target.width || prepared.image.height !== target.height) {
-      if (prepared.policy.reason === 'premium-required') void requestCanvasExpansion();
-      else sayToast('共通キャンバスの範囲を確認できないため、画像を戻しませんでした');
+    if (!prepared.policy.supported || prepared.image.width !== target.width || prepared.image.height !== target.height) {
+      sayToast('共通キャンバスは最大256px・32色です。撮影画像は変更せず、編集画面に戻ります');
       return;
     }
     const rgba = new Uint8ClampedArray(prepared.image.rgba);
@@ -579,9 +583,8 @@ async function capture() {
     height: target.height,
     colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16)
   }, { passActive });
-  if (!existingPolicy.supported || existingPolicy.locked) {
-    if (existingPolicy.reason === 'premium-required') void requestCanvasExpansion();
-    else sayToast('共通キャンバスの範囲外です');
+  if (!existingPolicy.supported) {
+    sayToast('共通キャンバスは最大256px・32色です。キャンバス設定を確認してください');
     return;
   }
   const maxColors = passActive ? 32 : 16;
@@ -595,8 +598,8 @@ async function capture() {
     sayToast('共通キャンバスの範囲を確認できないため、画像を保存しませんでした');
     return;
   }
-  if (!prepared.policy.supported || prepared.policy.locked || prepared.image.width !== target.width || prepared.image.height !== target.height) {
-    sayToast('共通キャンバスの範囲を確認できないため、画像を保存しませんでした');
+  if (!prepared.policy.supported || prepared.image.width !== target.width || prepared.image.height !== target.height) {
+    sayToast('共通キャンバスは最大256px・32色です。撮影画像は保存データに反映しませんでした');
     return;
   }
   captureInFlight = true;
@@ -607,7 +610,6 @@ async function capture() {
     invalidateCaptureDownload();
     const frozen = { ...sourceFrame, width: prepared.image.width, height: prepared.image.height, data: new Uint8ClampedArray(prepared.image.rgba), palette: (sourceFrame.palette || []).slice(0, maxColors) };
     gif.pending = null;
-    $('#gifUpgrade').hidden = true;
     invalidatePreview();
     cameraSequence++;
     stopTracks();
@@ -677,7 +679,6 @@ async function retake() {
     catch (error) { sayToast(error instanceof Error ? error.message : '写真を保存できませんでした'); return; }
   }
   gif.pending = null;
-  $('#gifUpgrade').hidden = true;
   invalidateCaptureDownload();
   sharedImageTarget = null;
   sharedImageColorCount = 16;
@@ -832,7 +833,7 @@ function tintSwatches(palette) {
 }
 // dot-count and framing rows
 const pixelsPanel = $('#pixelsPanel');
-for (const size of OUTPUT_SIZES) pixelsPanel.appendChild(chip(String(size), `${size}`));
+for (const size of sharedOutputSizes()) pixelsPanel.appendChild(chip(String(size), `${size}`));
 const aspectPanel = $('#aspectPanel');
 for (const ratio of sharedFrameRatios()) { const button = chip(ratio.value, ratio.label, { swatch: true, cls: 'is-frame' }); button.dataset.ratio = ratio.value; aspectPanel.appendChild(button); }
 // tone row: pick a setting, then the slider below adjusts it
@@ -854,7 +855,7 @@ function syncToolbar() {
   dither.querySelector('.lc-tool-sw').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
   dither.querySelector('b').textContent = !available ? 'ディザなし' : pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'ディザ OFF';
   dither.setAttribute('aria-label', !available ? 'この色ではディザを使いません' : pattern ? `ディザ：${pattern.label}（タップで模様を選ぶ）` : 'ディザをオンにする');
-  face('pixels').querySelector('b').textContent = sharedImageTarget ? `${sharedImageTarget.width} × ${sharedImageTarget.height}` : `${state.size} px`;
+  face('pixels').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width} × ${audioCameraRequest.height}` : sharedImageTarget ? `${sharedImageTarget.width} × ${sharedImageTarget.height}` : `${state.size} px`;
   const ratio = FRAME_RATIOS.find((r) => r.value === state.ratio);
   face('aspect').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width}:16` : sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : (ratio?.label ?? '');
   face('aspect').dataset.ratio = sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : state.ratio;
@@ -863,7 +864,7 @@ function syncToolbar() {
   face('tone').dataset.changed = String(toneChanged);
   // selected chips
   const mark = (panel, value) => { for (const b of panel.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === value)); };
-  mark(ditherPanel, currentPatternId()); mark(pixelsPanel, String(state.size)); mark(aspectPanel, state.ratio); mark(toneChips, toneKey);
+  mark(ditherPanel, currentPatternId()); mark(pixelsPanel, audioCameraRequest || sharedImageTarget ? '' : String(state.size)); mark(aspectPanel, state.ratio); mark(toneChips, toneKey);
   const [, toneLabel] = TONES.find(([key]) => key === toneKey);
   toneSlider.value = String(state.camera[toneKey] ?? 0);
   toneSlider.setAttribute('aria-label', toneLabel);
@@ -1079,12 +1080,10 @@ syncControls();
 // ---------- Pinch-first zoom ----------
 const zoomHud = $('#zoomHud'); let hudTimer = 0;
 function setupZoomForTrack(track) {
-  let caps = null;
-  try { caps = track?.getCapabilities?.() ?? null; } catch { caps = null; }
-  zoomInfo = zoomRange(caps);
-  appliedHardwareZoom = 1;
-  if (zoomInfo.hardware) { try { const current = track.getSettings?.().zoom; if (Number.isFinite(current)) appliedHardwareZoom = current; } catch { /* keep 1 */ } }
-  setZoom(Math.min(zoomInfo.max, Math.max(zoomInfo.min, state.zoom)), { silent: true });
+  zoomInfo = zoomController.attach(track);
+  const snapshot = zoomController.setZoom(Math.min(zoomInfo.max, Math.max(zoomInfo.min, state.zoom)));
+  state.zoom = snapshot.requested;
+  zoomInfo = snapshot.range;
   renderZoomStops();
 }
 function renderZoomStops() {
@@ -1097,7 +1096,7 @@ function renderZoomStops() {
   }
   syncZoomStops();
 }
-function syncZoomStops() {
+function syncZoomStops(revealSelected = false) {
   const buttons = [...document.querySelectorAll('#zoomStops button')];
   let nearest = null; for (const b of buttons) if (!nearest || Math.abs(Number(b.dataset.zoom) - state.zoom) < Math.abs(Number(nearest.dataset.zoom) - state.zoom)) nearest = b;
   for (const b of buttons) {
@@ -1105,32 +1104,38 @@ function syncZoomStops() {
     b.setAttribute('aria-pressed', String(on));
     b.textContent = on && Math.abs(state.zoom - Number(b.dataset.zoom)) > 0.05 ? formatZoom(state.zoom) : formatZoom(Number(b.dataset.zoom));
   }
+  if (revealSelected && nearest) {
+    const box = $('#zoomStops');
+    const boxRect = box.getBoundingClientRect();
+    const buttonRect = nearest.getBoundingClientRect();
+    box.scrollLeft += buttonRect.left + buttonRect.width / 2 - (boxRect.left + box.clientWidth / 2);
+  }
 }
-function applyHardwareZoom() {
-  if (zoomApplyPending || !zoomInfo.hardware || !activeStream) return;
-  zoomApplyPending = true;
-  requestAnimationFrame(async () => {
-    const track = activeStream?.getVideoTracks()[0];
-    const { hardware } = splitZoom(state.zoom, zoomInfo);
-    try { if (track && Math.abs(hardware - appliedHardwareZoom) > 0.01) { await track.applyConstraints({ advanced: [{ zoom: hardware }] }); appliedHardwareZoom = hardware; } }
-    catch { zoomInfo = { ...zoomInfo, hardware: false }; appliedHardwareZoom = 1; }
-    zoomApplyPending = false;
-    if (Math.abs(splitZoom(state.zoom, zoomInfo).hardware - appliedHardwareZoom) > 0.01) applyHardwareZoom();
-  });
+function syncZoomHud() {
+  const value = $('#zoomHudValue');
+  const fill = $('#zoomHudFill');
+  const hint = $('#zoomHudHint');
+  if (!value || !fill || !hint) return;
+  value.textContent = formatZoom(state.zoom);
+  const logRange = Math.log(zoomInfo.max / zoomInfo.min);
+  fill.style.width = `${logRange > 0 ? (100 * Math.log(state.zoom / zoomInfo.min)) / logRange : 0}%`;
+  const parts = zoomController.snapshot();
+  const cameraZoomed = Math.abs(parts.hardware - 1) > 0.01;
+  hint.textContent = cameraZoomed && parts.digital > 1.01
+    ? 'カメラ＋拡大' : cameraZoomed ? 'カメラズーム' : '拡大ズーム';
 }
 function setZoom(value, { gesture = '', silent = false } = {}) {
   if (state.mode === 'captured') return;
   const previous = state.zoom;
   state.zoom = Math.min(zoomInfo.max, Math.max(zoomInfo.min, value));
-  // gentle detents at the preset stops so a pinch lands on 1× / 2× / 3× easily
+  // Gentle detents let a pinch land on the preset magnifications.
   if (gesture === 'pinch') for (const stop of zoomStops(zoomInfo)) if (Math.abs(state.zoom - stop) < 0.04 * stop) { if (Math.abs(previous - stop) >= 0.04 * stop) navigator.vibrate?.(6); state.zoom = stop; }
-  applyHardwareZoom();
-  syncZoomStops();
+  const snapshot = zoomController.setZoom(state.zoom);
+  state.zoom = snapshot.requested;
+  zoomInfo = snapshot.range;
+  syncZoomStops(true);
   if (silent) return;
-  const { hardware } = splitZoom(state.zoom, zoomInfo);
-  $('#zoomHudValue').textContent = formatZoom(state.zoom);
-  $('#zoomHudFill').style.width = `${(100 * Math.log(state.zoom / zoomInfo.min)) / Math.log(zoomInfo.max / zoomInfo.min)}%`;
-  $('#zoomHudHint').textContent = state.zoom <= hardware + 0.01 && zoomInfo.hardware ? '光学ズーム' : 'デジタルズーム';
+  syncZoomHud();
   zoomHud.classList.add('is-on');
   window.clearTimeout(hudTimer);
   hudTimer = window.setTimeout(() => zoomHud.classList.remove('is-on'), gesture === 'pinch' ? 900 : 700);
@@ -1177,9 +1182,8 @@ function flipCamera() {
 
 // ---------- GIF: hold the shutter ----------
 const HOLD_MS = 360;
-const gif = { recording: false, frames: [], started: 0, lastAt: 0, raf: 0, playTimer: 0, pending: null, maxMs: GIF_MAX_MS, fps: GIF_FPS, maxFrames: 0, sourceWidth: 0, sourceHeight: 0, capturePlan: null };
-// PiXiEED pass perk: 10 seconds at 20 frames a second instead of 5 s at 10
-const gifLimits = () => (hasPerk('camera.gif-long') ? { maxMs: 10000, fps: 20 } : { maxMs: GIF_MAX_MS, fps: GIF_FPS });
+const gif = { recording: false, frames: [], started: 0, lastAt: 0, raf: 0, playTimer: 0, pending: null, maxMs: 10000, fps: 20, maxFrames: 0, sourceWidth: 0, sourceHeight: 0, capturePlan: null };
+const gifLimits = () => ({ maxMs: 10000, fps: 20 });
 const captureButton = $('#capture');
 let holdTimer = 0; let holdFired = false;
 function gifProgress() {
@@ -1252,17 +1256,6 @@ function playGif(frames) {
   show();
   gif.playTimer = window.setInterval(show, 1000 / (frames.fps || GIF_FPS));
 }
-// On a finished GIF (and only there) offer the pass once, quietly, under the save button.
-function syncGifUpgrade() {
-  const button = $('#gifUpgrade');
-  button.hidden = !(state.mode === 'captured' && gif.pending) || hasPerk('camera.gif-long');
-}
-$('#gifUpgrade').addEventListener('click', async () => {
-  if (await requestPass({ perk: 'camera.gif-long' })) sayToast('特典が使えます。次のGIFから10秒・なめらかに撮れます');
-  syncGifUpgrade();
-});
-// A recording started with a valid pass keeps its captured duration and frame rate.
-onPassChange(() => { syncGifUpgrade(); updateSharedCaptureControls(); syncToolbar(); });
 function stopGifPlayback() { if (gif.playTimer) { window.clearInterval(gif.playTimer); gif.playTimer = 0; } }
 async function prepareGifDownload(frames) {
   const generation = downloadGeneration;
@@ -1281,7 +1274,6 @@ async function prepareGifDownload(frames) {
     root.dataset.gifBytes = String(bytes.length);
     updateSaveLinkState();
     sayToast(`GIFを撮影しました（${(frames.length / fps).toFixed(1)}秒）`);
-    syncGifUpgrade();
     stopGifPlayback();
     if (!audioCameraRequest) resultView.show({ title: 'GIFを撮影しました', detail: `${(frames.length / fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: downloadUrl });
     focusVisible('#savePng');

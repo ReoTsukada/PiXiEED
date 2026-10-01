@@ -1,7 +1,4 @@
-import { freeWithoutAdWaitMs, hasPro, onPassChange, passRemainingMs, requestPass } from './pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
-import { derivePassGauge } from './pass-gauge.mjs?rev=20260929-tool-ui-1';
-import './site-analytics.mjs?rev=20260930-analytics-review-1';
-import { hasPassButtonMarkup, passButtonMarkup, renderPassButton } from './pass-button.mjs?rev=20260930-pass-button-1';
+import './site-analytics.mjs?rev=20261001-free-tools-1';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 
 const brandedLink = () => {
@@ -12,35 +9,11 @@ const brandedLink = () => {
   link.innerHTML = '<img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span>';
   return link;
 };
-const handledButtons = new WeakSet();
 const handledPanels = new WeakSet();
 const panelTimers = new Map();
 const panelPhases = new WeakMap();
 const prefersReducedMotion = () => document.documentElement.dataset.pixieedMotion === 'reduced'
   || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-function formatFreeWait(waitMs) {
-  const minutes = Math.ceil(Math.max(0, waitMs) / 60000);
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return hours ? `${hours}時間${remainingMinutes ? `${remainingMinutes}分` : ''}` : `${Math.max(1, remainingMinutes)}分`;
-}
-
-export function deriveHeaderPassState({ remainingMs, pro = false, freeWaitMs = 0 }) {
-  const gauge = derivePassGauge(pro ? Infinity : remainingMs);
-  const freeReady = !pro && freeWaitMs <= 0;
-  const freeDescription = pro ? '' : freeReady ? '今日の無料1時間を受け取れます' : `明日、無料1時間を受け取れます（あと${formatFreeWait(freeWaitMs)}）`;
-  const displayLabel = freeReady && !gauge.active ? '無料1時間' : gauge.label;
-  return { gauge, freeReady, freeDescription, displayLabel };
-}
-
-function clearPanelEffects() {
-  for (const [node, timer] of panelTimers) {
-    window.clearTimeout(timer);
-    delete node.dataset.pxPanelMotion;
-  }
-  panelTimers.clear();
-}
 
 function showPanelEffect(node, kind) {
   if (!node || document.visibilityState === 'hidden' || prefersReducedMotion()) return;
@@ -74,40 +47,6 @@ function bindPanelEffects() {
   }
 }
 
-function updateButton(button) {
-  const now = Date.now();
-  const left = passRemainingMs(now);
-  const pro = hasPro();
-  const freeWait = pro ? Infinity : freeWithoutAdWaitMs(now);
-  const { gauge, freeReady, freeDescription } = deriveHeaderPassState({ remainingMs: left, pro, freeWaitMs: freeWait });
-  renderPassButton(button, { remainingMs: left, pro, freeReady });
-  if (button.disabled !== gauge.pro) button.disabled = gauge.pro;
-  const description = gauge.pro ? 'Pro：すべての特典が使えます'
-    : gauge.active ? `特典はあと${gauge.clock}。終わるとまた広告1本で1時間使えます`
-      : freeReady ? freeDescription : `広告1本で1時間、すべての特典が使えます。${freeDescription}`;
-  if (button.getAttribute('aria-label') !== description) button.setAttribute('aria-label', description);
-  if (button.title !== description) button.title = description;
-}
-
-let refreshTimer = 0;
-function refresh() {
-  window.clearTimeout(refreshTimer);
-  refreshTimer = 0;
-  if (document.visibilityState === 'hidden') {
-    clearPanelEffects();
-    return;
-  }
-  const buttons = document.querySelectorAll('[data-header-pass]');
-  if (!buttons.length) return;
-  buttons.forEach(updateButton);
-  const remaining = passRemainingMs();
-  const freeWait = hasPro() ? Infinity : freeWithoutAdWaitMs();
-  const nextChange = remaining > 0 && remaining !== Infinity
-    ? Math.min(remaining <= 5 * 60 * 1000 ? 10000 : 30000, remaining, freeWait > 0 ? freeWait : Infinity)
-    : freeWait;
-  if (Number.isFinite(nextChange) && nextChange > 0) refreshTimer = window.setTimeout(refresh, nextChange);
-}
-
 /** Preserve each page's own controls and its central navigation action. */
 export function mountSiteHeader() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return null;
@@ -139,37 +78,13 @@ export function mountSiteHeader() {
     if (document.body.dataset.toolShort) label.dataset.short = document.body.dataset.toolShort; // shown instead when the header is tight
   }
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
-  let button = inner.querySelector('[data-header-pass]');
-  if (!button) {
-    button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'px-header-pass';
-    button.setAttribute('data-header-pass', '');
-    button.innerHTML = passButtonMarkup;
-    const utilities = inner.querySelector('.menu-toggle, .audio-header-actions, .lc-top-right');
-    inner.insertBefore(button, utilities);
-  }
-  if (!hasPassButtonMarkup(button)) button.innerHTML = passButtonMarkup;
-  if (!handledButtons.has(button)) {
-    handledButtons.add(button);
-    button.addEventListener('click', async () => {
-      if (button.disabled || button.dataset.pending === 'true') return;
-      button.dataset.pending = 'true';
-      try { await requestPass({ extend: true }); }
-      finally { delete button.dataset.pending; refresh(); }
-    });
-  }
+  inner.querySelectorAll('[data-header-pass]').forEach((button) => button.remove());
   document.documentElement.classList.add('px-header-ready');
   bindPanelEffects();
-  refresh();
   return header;
 }
 
 if (typeof document !== 'undefined') {
-  onPassChange(refresh);
-  window.addEventListener('storage', refresh);
-  window.addEventListener('pageshow', refresh);
-  document.addEventListener('visibilitychange', refresh);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountSiteHeader, { once: true });
   else mountSiteHeader();
 }

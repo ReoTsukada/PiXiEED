@@ -2,36 +2,167 @@
  * Pinch-first camera zoom.
  *
  * Two fingers pinch, a trackpad pinch or ctrl+wheel zoom, a double tap returns to 1x, and the zoom pill
- * steps through 1x / 2x / 3x (plus the ultra-wide lens when the camera has one). The camera's own optical
- * zoom (MediaStreamTrack `zoom`) is used as far as it goes; beyond that the frame is cropped (digital zoom),
- * so every phone gets the same gesture.
+ * steps through useful total magnifications up to 40x. Device zoom is applied first when it reports the
+ * requested setting; a centered image crop supplies the remainder at the existing output resolution.
  */
-export const DIGITAL_MAX = 8;
+export const DIGITAL_MAX = 40;
+export const TOTAL_ZOOM_MAX = 40;
 
 export function zoomRange(capabilities) {
   const hw = capabilities?.zoom;
-  const hwMin = hw && Number.isFinite(hw.min) ? hw.min : 1;
-  const hwMax = hw && Number.isFinite(hw.max) ? hw.max : 1;
-  return { min: Math.min(1, hwMin), max: Math.max(DIGITAL_MAX, hwMax), hwMin, hwMax, hardware: Boolean(hw && hwMax > hwMin) };
+  const hwMin = hw && Number.isFinite(hw.min) && hw.min > 0 ? hw.min : 1;
+  const hwMax = hw && Number.isFinite(hw.max) && hw.max > 0 ? hw.max : 1;
+  const hwStep = hw && Number.isFinite(hw.step) && hw.step > 0 ? hw.step : 0.1;
+  const hardware = Boolean(hw && hwMax > hwMin && hwMin <= TOTAL_ZOOM_MAX);
+  return { min: hardware ? Math.min(TOTAL_ZOOM_MAX, hwMin) : 1, max: TOTAL_ZOOM_MAX, hwMin, hwMax: Math.min(TOTAL_ZOOM_MAX, hwMax), hwStep, hardware };
 }
 
-/** Split a zoom value into the part the camera does optically and the part left for cropping. */
+/** Split the requested magnification into camera zoom and the remaining crop factor. */
 export function splitZoom(value, range) {
-  const hardware = range.hardware ? Math.min(range.hwMax, Math.max(range.hwMin, value)) : 1;
-  return { hardware, digital: Math.max(1, value / hardware) };
+  const numeric = Number(value);
+  const total = Math.min(range.max ?? TOTAL_ZOOM_MAX, Math.max(range.min ?? 1, Number.isFinite(numeric) && numeric > 0 ? numeric : 1));
+  if (!range.hardware) return { hardware: 1, digital: total };
+  const target = Math.min(range.hwMax, Math.max(range.hwMin, total));
+  const steps = Math.floor((target - range.hwMin) / (range.hwStep || 0.1) + 1e-8);
+  const hardware = Math.min(range.hwMax, Math.max(range.hwMin, Number((range.hwMin + steps * (range.hwStep || 0.1)).toFixed(6))));
+  return { hardware, digital: Math.max(1, total / hardware) };
 }
 
-/** Preset stops for the pill: the ultra-wide lens (if any), 1x, 2x, 3x, 5x within range. */
+/** Preset stops for the pill: optional ultra-wide, then 1x / 2x / 5x / 10x / 20x / 40x. */
 export function zoomStops(range) {
   const stops = [];
   if (range.min < 0.95) stops.push(Math.round(range.min * 10) / 10);
-  for (const v of [1, 2, 3, 5]) if (v <= range.max) stops.push(v);
+  for (const v of [1, 2, 5, 10, 20, 40]) if (v >= range.min && v <= range.max) stops.push(v);
   return stops;
 }
 
 export function formatZoom(value) {
   const r = value < 10 ? Math.round(value * 10) / 10 : Math.round(value);
   return `${Number.isInteger(r) ? r : r.toFixed(1)}×`;
+}
+
+/** Request the camera's zoom control once, falling back only when that constraint itself is unsupported. */
+export async function getUserMediaWithZoomPreference(getUserMedia, { facingMode = 'environment', zoomSupported = false, permissions = globalThis.navigator?.permissions } = {}) {
+  const video = { facingMode: { ideal: facingMode }, ...(zoomSupported ? { zoom: true } : {}) };
+  if (!zoomSupported) return getUserMedia({ audio: false, video });
+  try { return await getUserMedia({ audio: false, video }); }
+  catch (error) {
+    const constraintFailure = ['OverconstrainedError', 'NotSupportedError', 'TypeError'].includes(error?.name)
+      && (error?.name !== 'OverconstrainedError' || !error.constraint || error.constraint === 'zoom');
+    let permissionAlreadyGranted = false;
+    if (error?.name === 'NotAllowedError') {
+      try { permissionAlreadyGranted = (await permissions?.query?.({ name: 'camera' }))?.state === 'granted'; } catch {}
+    }
+    if (!constraintFailure && !permissionAlreadyGranted) throw error;
+    return getUserMedia({ audio: false, video: { facingMode: { ideal: facingMode } } });
+  }
+}
+
+/**
+ * Serial device-zoom controller. It trusts getSettings(), never promise resolution alone, and ignores
+ * results from tracks that were replaced or stopped while an applyConstraints call was in flight.
+ */
+export function createCameraZoomController({ onChange = () => {} } = {}) {
+  let track = null;
+  let generation = 0;
+  let range = zoomRange(null);
+  let requested = 1;
+  let actualHardware = 1;
+  let hardwareFailed = false;
+  let pending = null;
+
+  const effectiveRange = () => hardwareFailed ? { ...range, hardware: false } : range;
+  const snapshot = () => {
+    const availableRange = effectiveRange();
+    const currentTrack = track;
+    const currentGeneration = generation;
+    let actual = currentTrack && validHardwareZoom(actualHardware) ? actualHardware : 1;
+    try {
+      const measured = currentTrack?.getSettings?.().zoom;
+      if (validHardwareZoom(measured) && track === currentTrack && generation === currentGeneration) {
+        actualHardware = measured;
+        actual = measured;
+      }
+    } catch {}
+    const digital = Math.max(1, requested / actual);
+    const total = actual * digital;
+    return { track: currentTrack, generation: currentGeneration, zoom: total, requested, range: availableRange, hardware: actual, digital, total, overLimit: total > TOTAL_ZOOM_MAX + 0.02, hardwareFailed };
+  };
+  const emit = () => { try { onChange(snapshot()); } catch {} };
+  const validHardwareZoom = (value) => Number.isFinite(value) && value > 0;
+  const closeEnough = (a, b) => Math.abs(a - b) <= Math.max(0.02, (range.hwStep || 0.1) * 0.1);
+
+  async function applyLatest() {
+    if (!track || !range.hardware || hardwareFailed) return snapshot();
+    const target = splitZoom(requested, range).hardware;
+    if (closeEnough(target, actualHardware)) return snapshot();
+    if (pending?.track === track && pending.generation === generation) return snapshot();
+    const currentTrack = track;
+    const currentGeneration = generation;
+    const operation = { track: currentTrack, generation: currentGeneration };
+    pending = operation;
+    try {
+      await currentTrack.applyConstraints({ advanced: [{ zoom: target }] });
+      if (track !== currentTrack || generation !== currentGeneration) return snapshot();
+      const measured = currentTrack.getSettings?.().zoom;
+      if (!validHardwareZoom(measured)) hardwareFailed = true;
+      else {
+        actualHardware = measured;
+        if (!closeEnough(measured, target)) hardwareFailed = true;
+      }
+    } catch {
+      if (track === currentTrack && generation === currentGeneration) hardwareFailed = true;
+    } finally {
+      if (pending === operation) pending = null;
+    }
+    if (track !== currentTrack || generation !== currentGeneration) return snapshot();
+    emit();
+    if (!hardwareFailed) {
+      const latestTarget = splitZoom(requested, range).hardware;
+      if (!closeEnough(latestTarget, actualHardware)) return applyLatest();
+    }
+    return snapshot();
+  }
+
+  function attach(nextTrack) {
+    generation++;
+    pending = null;
+    track = nextTrack ?? null;
+    let capabilities = null;
+    try { capabilities = track?.getCapabilities?.() ?? null; } catch {}
+    range = zoomRange(capabilities);
+    hardwareFailed = false;
+    actualHardware = 1;
+    try {
+      const measured = track?.getSettings?.().zoom;
+      if (validHardwareZoom(measured)) actualHardware = measured;
+    } catch {}
+    requested = Math.min(range.max, Math.max(range.min, requested));
+    emit();
+    void applyLatest();
+    return range;
+  }
+
+  function detach() {
+    generation++;
+    pending = null;
+    track = null;
+    range = zoomRange(null);
+    actualHardware = 1;
+    hardwareFailed = false;
+    requested = Math.min(range.max, Math.max(range.min, requested));
+    emit();
+  }
+
+  function setZoom(value) {
+    const numeric = Number(value);
+    requested = Math.min(range.max, Math.max(range.min, Number.isFinite(numeric) && numeric > 0 ? numeric : 1));
+    emit();
+    void applyLatest();
+    return snapshot();
+  }
+
+  return { attach, detach, setZoom, snapshot, get range() { return effectiveRange(); } };
 }
 
 /**

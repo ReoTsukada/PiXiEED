@@ -1,4 +1,4 @@
-import { displayAdConfig } from '../data/site-config.js?rev=20260929-display-units-1';
+import { displayAdConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 
 // Explicit page ownership prevents accidental ads in editors, private pages or embedded tools.
 const placements = new Map([

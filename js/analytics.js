@@ -1,4 +1,4 @@
-import { mapConfig } from '../data/site-config.js';
+import { mapConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 
 const VISITOR_KEY = 'PiXiEED:anonymous-visitor:v1';
 const SESSION_KEY = 'PiXiEED:analytics-session:v1';

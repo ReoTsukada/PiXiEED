@@ -1,4 +1,4 @@
-import { supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
+import { supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 import { normalizePixelFile } from './pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260929-claude-integration-1';
 

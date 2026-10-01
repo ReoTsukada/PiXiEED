@@ -1,6 +1,6 @@
 import { createPxdProject, getPxdJson, setPxdJson, setPxdBytes } from './pxd-codec.mjs';
 import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
-import { countSharedImageColors } from './shared-image.mjs?rev=20260930-shared-canvas-5';
+import { countSharedImageColors } from './shared-image.mjs?rev=20261001-free-tools-1';
 
 const MAX_PIXELS = 2 * 1024 * 1024;
 const MAX_RETURNED_COLOR_IDS = 32;

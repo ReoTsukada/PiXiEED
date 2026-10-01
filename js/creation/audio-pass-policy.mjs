@@ -1,8 +1,8 @@
 import { AUDIO_PIXEL_TICKS, collectAudioEvents } from './audio-core.mjs?rev=20260930-audio-timebase-1';
 import { AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20260930-four-voices-1';
-import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
+import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 
-/** Keep imported premium work visible and intact while pausing edits and playback. */
+/** Compatibility metadata; instruments and supported canvas sizes are available without a pass. */
 export function evaluateAudioPassPolicy(song, { passActive = false, extraInstrumentPassActive = passActive, extraInstrumentIds = AUDIO_EXTRA_INSTRUMENT_IDS, sharedImage = null } = {}) {
   const wideCanvas = song.loopTicks / AUDIO_PIXEL_TICKS > 16;
   const extraInstruments = new Set(extraInstrumentIds);
@@ -19,8 +19,8 @@ export function evaluateAudioPassPolicy(song, { passActive = false, extraInstrum
     }
     shared = evaluateSharedCanvasPolicy({ width: sharedImage.width, height: sharedImage.height, colorCount }, { passActive });
   }
-  const premiumContent = shared ? shared.premiumContent || usesExtraInstrument : wideCanvas || usesExtraInstrument;
-  const locked = shared ? shared.locked || (usesExtraInstrument && !extraInstrumentPassActive) : (wideCanvas && !passActive) || (usesExtraInstrument && !extraInstrumentPassActive);
+  const premiumContent = false;
+  const locked = false;
   return Object.freeze({
     wideCanvas,
     usesExtraInstrument,

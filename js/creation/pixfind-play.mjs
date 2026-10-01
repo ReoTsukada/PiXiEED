@@ -1,10 +1,9 @@
 import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
-import { supabaseConfig } from '../../data/site-config.js';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
-import { requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
-import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
+import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261001-free-tools-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
@@ -336,17 +335,16 @@ function mount() {
       if (Number.isFinite(cursorX) && Number.isFinite(cursorY)) { const cx = xoff + cursorX * scale; const cy = yoff + cursorY * scale; context.strokeStyle = '#3159a5'; context.lineWidth = 2; context.beginPath(); context.moveTo(cx - 7, cy); context.lineTo(cx + 7, cy); context.moveTo(cx, cy - 7); context.lineTo(cx, cy + 7); context.stroke(); }
     }
   };
-  // ---- one free hint per puzzle; further hints use the shared PiXiEED pass ----
+  // ---- hints never require an ad; concurrent taps and stale puzzles are guarded ----
   const HINT_MS = 2600; let hint = null; const hintButton = document.querySelector('#pixfind-hint');
   let hintFrame = 0; let hintTimer = 0;
   const reduceHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
   const stopHintMotion = () => { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; window.clearTimeout(hintTimer); hintTimer = 0; };
-  const hintController = createPuzzleHintController({ perk: 'pixfind.hint', requestPass, onState: ({ freeUsed, pending }) => {
+  const hintController = createPuzzleHintController({ onState: ({ pending }) => {
     if (!hintButton) return;
     hintButton.disabled = pending;
-    hintButton.dataset.hintShort = freeUsed ? 'パス' : '無料';
-    hintButton.setAttribute('aria-label', freeUsed ? 'ヒント（パス）' : 'ヒント（この問題で1回無料）');
-    hintButton.title = freeUsed ? 'ヒント（パス）' : 'ヒント（この問題で1回無料）';
+    hintButton.setAttribute('aria-label', 'ヒント');
+    hintButton.title = 'ヒント';
   } });
   const syncHint = () => { if (hintButton) hintButton.hidden = readOnly || !regions.length || found.size >= regions.length; };
   const animateHint = () => {

@@ -16,6 +16,17 @@ test('camera layout: status on top, five tools at the bottom, one tray of choice
   assert.match(html, /id="paletteSave"/);
 });
 
+test('camera starts at the displayed 128px preset and only renders choices through 256px', () => {
+  const html = read('pixel-camera.html');
+  const app = read('js/pixel-lens/app.mjs');
+  assert.match(html, /data-tool="pixels"[^>]*>[\s\S]*?<b>128 px<\/b>/);
+  assert.match(app, /size: normalizeOutputSize\(audioCameraRequest\?\.width \?\? 128\)/);
+  assert.match(app, /for \(const size of sharedOutputSizes\(\)\) pixelsPanel\.appendChild/);
+  assert.doesNotMatch(app, /for \(const size of OUTPUT_SIZES\)/);
+  assert.match(app, /normalizeOutputSize\(audioCameraRequest\?\.width \?\? 128\)/);
+  assert.match(app, /mark\(pixelsPanel, audioCameraRequest \|\| sharedImageTarget \? '' : String\(state\.size\)\)/);
+});
+
 test('dither button: a plain switch while off, the pattern chooser while on', () => {
   const app = read('js/pixel-lens/app.mjs');
   assert.match(app, /if \(state\.gradientMode !== 'dither'\) \{\s*state\.gradientMode = 'dither'/);
@@ -29,4 +40,8 @@ test('the tray can never widen the bottom area (16 colours scroll inside a fixed
   assert.match(css, /\.lc-bottom \{ grid-template-columns: minmax\(0, 1fr\); \}/);
   assert.match(css, /\.lc-tray, \.lc-look, \.lc-tone, \.lc-palette-editor \{ grid-template-columns: minmax\(0, 1fr\); \}/);
   assert.match(css, /\.lc-palette-strip \{[^}]*width: min\(calc\(100% - 1\.6rem\), 23rem\)[^}]*height: 2\.75rem/);
+  assert.match(css, /#pixelsPanel \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(css, /#pixelsPanel button \{[^}]*min-height: 44px/);
+  assert.match(css, /@media \(min-width: 720px\) \{ #pixelsPanel \{ grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
+  assert.match(css, /#pixelsPanel button\[aria-checked="true"\] \{ background: #ffd35a/);
 });

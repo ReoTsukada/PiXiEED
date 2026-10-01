@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../../js/pixel-studio/framing.mjs';
+import { FRAME_RATIOS, OUTPUT_SIZES, normalizeOutputSize, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../../js/pixel-studio/framing.mjs';
 
 test('frame choices and aspect fallback use the preview viewport', () => {
   assert.deepEqual(FRAME_RATIOS.map(({ value }) => value), ['screen', '1:1', '3:4', '9:16', '4:3', '16:9']);
@@ -8,6 +8,14 @@ test('frame choices and aspect fallback use the preview viewport', () => {
   assert.equal(resolveAspect('screen', 1200, 800), 1.5);
   assert.equal(resolveAspect('unknown', 1200, 800), 1.5);
   assert.equal(resolveAspect('9:16', 1200, 800), 9 / 16);
+});
+
+test('camera size restoration maps removed presets onto the supported 256px ceiling', () => {
+  assert.equal(normalizeOutputSize(128), 128);
+  assert.equal(normalizeOutputSize(256), 256);
+  for (const oldSize of [512, 1024, 2048]) assert.equal(normalizeOutputSize(oldSize), 256);
+  assert.equal(normalizeOutputSize(undefined), 128);
+  assert.equal(normalizeOutputSize(200, 128), 160, 'unsupported in-range values choose the nearest available size');
 });
 
 test('center crop is contained, centered, and preserves the requested ratio', () => {

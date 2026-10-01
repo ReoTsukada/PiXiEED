@@ -1,8 +1,8 @@
-import { cloneAsToolProject } from './tool-project-store.mjs';
-import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261001-independent-1';
-import { putPxdSharedImage, readPxdImage } from './pxd-project.mjs';
+import { cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
+import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261001-free-tools-1';
+import { putPxdSharedImage, readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createAudioSong } from './audio-core.mjs';
-import { prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-animation-1';
+import { prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 
 /** Copy into a fresh tool-owned project; never save or mutate the source. */

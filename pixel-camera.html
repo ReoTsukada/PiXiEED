@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
   <script defer src="/js/adsense-auto.js?rev=20260929-auto-ads-1"></script>
 <title>ドット絵カメラ｜景色を撮ってPNG保存｜PiXiEED</title>
 <meta name="description" content="カメラで景色を撮影し、ドット絵にしてPNGで保存できます。画像処理は端末内で行います。">
@@ -11,12 +12,12 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-text-contrast-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?v=20260930-ux-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261001-camera-zoom-40-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20260930-claude-review-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20260930-result-back-1">
-  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261001-independent-1">
+  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261001-camera-zoom-40-1">
 </head>
 <body data-tool-name="ドット絵カメラ" data-tool-short="カメラ">
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -46,7 +47,7 @@
       <div class="lc-zoom-hud" id="zoomHud" aria-hidden="true">
         <span class="lc-zoom-hud-value" id="zoomHudValue">1×</span>
         <span class="lc-zoom-hud-track"><i id="zoomHudFill"></i></span>
-        <span class="lc-zoom-hud-hint" id="zoomHudHint">光学</span>
+        <span class="lc-zoom-hud-hint" id="zoomHudHint">拡大ズーム</span>
       </div>
     </section>
 
@@ -104,7 +105,7 @@
       <div class="lc-toolbar" id="toolbar" role="toolbar" aria-label="撮影の設定">
         <button type="button" data-tool="look" aria-expanded="false" aria-controls="tray"><i class="lc-tool-sw lc-sw" aria-hidden="true"></i><b>GB</b><small>色</small></button>
         <button type="button" data-tool="dither" aria-expanded="false" aria-controls="tray" data-state="on"><i class="lc-tool-sw lc-tool-dither" aria-hidden="true"></i><b>網目 8×8</b><small>ディザ</small></button>
-        <button type="button" data-tool="pixels" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="4" height="4"/><rect x="10" y="4" width="4" height="4" opacity=".55"/><rect x="16" y="4" width="4" height="4"/><rect x="4" y="10" width="4" height="4" opacity=".55"/><rect x="10" y="10" width="4" height="4"/><rect x="16" y="10" width="4" height="4" opacity=".55"/><rect x="4" y="16" width="4" height="4"/><rect x="10" y="16" width="4" height="4" opacity=".55"/><rect x="16" y="16" width="4" height="4"/></svg></i><b>256 px</b><small>ドット</small></button>
+        <button type="button" data-tool="pixels" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="4" height="4"/><rect x="10" y="4" width="4" height="4" opacity=".55"/><rect x="16" y="4" width="4" height="4"/><rect x="4" y="10" width="4" height="4" opacity=".55"/><rect x="10" y="10" width="4" height="4"/><rect x="16" y="10" width="4" height="4" opacity=".55"/><rect x="4" y="16" width="4" height="4"/><rect x="10" y="16" width="4" height="4" opacity=".55"/><rect x="16" y="16" width="4" height="4"/></svg></i><b>128 px</b><small>ドット</small></button>
         <button type="button" data-tool="aspect" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic lc-tool-frame" aria-hidden="true"></i><b>画面</b><small>比率</small></button>
         <button type="button" data-tool="tone" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></i><b>調整</b><small>色味</small></button>
       </div>
@@ -112,7 +113,6 @@
           <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span id="saveLabel">画像を保存（PNG）</span></a>
               <button id="postCamera" class="lc-post" type="button">地図に投稿</button>
               <button id="useCameraImage" class="lc-post" type="button" title="プロジェクトを開いて編集・作曲・パズルに使う">作品として使う</button>
-          <button id="gifUpgrade" class="lc-upgrade" type="button" hidden>🔒 1時間、GIFを10秒・なめらかに</button>
       </div>
     </div>
 
@@ -129,7 +129,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261001-independent-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261001-context-1"></script>
+  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261001-camera-zoom-40-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261001-free-tools-1"></script>
 </body>
 </html>

@@ -1,16 +1,14 @@
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
-import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-independent-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261001-independent-1';
-import { createProjectSession } from './project-session.mjs?rev=20261001-source-refresh-1';
+import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261001-free-tools-1';
+import { createProjectSession } from './project-session.mjs?rev=20261001-free-tools-1';
 import { rebaseProjectEdits } from './project-rebase.mjs?rev=20261001-source-refresh-1';
-import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20260930-shared-canvas-5';
-import { pxdToolUrl, pxdImageRoles, primaryPxdImageRole, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
-import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20260930-shared-canvas-5';
-import { hasPass, requestPass, onPassChange } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
-import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs';
-import { componentImageRole, freezeProjectComponents, replaceProjectComponentImage, putProjectComponentImage } from './project-components.mjs?rev=20261001-components-1';
-import { createProjectComponentShelf } from './project-components-ui.mjs?rev=20261001-source-refresh-1';
+import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261001-free-tools-1';
+import { pxdToolUrl, pxdImageRoles, primaryPxdImageRole, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
+import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
+import { componentImageRole, freezeProjectComponents, replaceProjectComponentImage, putProjectComponentImage } from './project-components.mjs?rev=20261001-free-tools-1';
+import { createProjectComponentShelf } from './project-components-ui.mjs?rev=20261001-free-tools-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 
 const icons = {
@@ -117,7 +115,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (!entry) throw new Error('旧PXDの原本が見つかりません。'); download(entry.bytes, 'pixieed-original.pxd');
   })); fileActions.append(original);
   const canvasSettings = node('details', 'project-files project-canvas-settings'); const canvasSummary = node('summary', '', 'キャンバス・色数');
-  const canvasDescription = node('p', 'project-sheet__note', '開いている絵だけを変更します。通常128px・16色、特典で256px・32色。');
+  const canvasDescription = node('p', 'project-sheet__note', '開いている絵だけを変更します。最大256px・32色です。');
   const canvasFields = node('div', 'project-canvas-fields');
   const widthInput = node('input'); const heightInput = node('input');
   for (const [label, field, id] of [['幅', widthInput, 'project-canvas-width'], ['高さ', heightInput, 'project-canvas-height']]) {
@@ -129,14 +127,13 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const applyCanvas = button('変更を確認', 'project-canvas-apply', () => void transact(async () => {
     const width = Number(widthInput.value); const height = Number(heightInput.value); const maxColors = Number(colorsSelect.value);
     if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= 256)) throw new Error('幅と高さは1〜256pxで指定してください。');
-    if ((Math.max(width, height) > 128 || maxColors > 16) && !await requestPass({ perk: 'project.canvas-expanded' })) return;
     const project = await freezeProjectComponents(await save());
     const role = tool === 'draw' ? getEditorState().imageRole || componentImageRole(project, tool) : componentImageRole(project, tool);
     const image = await readPxdImage(project, role);
     if (!image) throw new Error('先に絵を描くか、画像を読み込んでください。');
-    const prepared = prepareSharedCanvasImage(image, { passActive: hasPass(), width, height, maxColors, fit: 'contain' });
+    const prepared = prepareSharedCanvasImage(image, { passActive: true, width, height, maxColors, fit: 'contain' });
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20260930-ux-fix-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-free-tools-1');
       if (!await confirmPxdConversion({ image, document: prepared.image, title: 'キャンバスを確認', applyLabel: 'このサイズ・色を使う', message: `${width}×${height}px・${prepared.colorCount}色に変更します。ほかの絵・曲・パズルは変わりません。パズルの絵を変更する場合は正解を再確認してください。` })) return;
     }
     const candidate = await putProjectComponentImage(project, tool, prepared.image, role);
@@ -195,7 +192,6 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   files.append(filesSummary, filesNote, fileActions, input);
   dialog.append(header, message, currentPane, libraryPane, importSection, files, note); selectPane('library'); document.body.append(dialog);
   dialog.addEventListener('close', () => { canvasSettings.open = false; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
-  onPassChange(() => update());
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
     async capture(base) {
@@ -248,8 +244,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const shared = activeCanvas || project?.manifest.sharedCanvas;
     if (!canvasSettings.open) { widthInput.value = String(shared?.width || 16); heightInput.value = String(shared?.height || 16); colorsSelect.value = String((shared?.colorCount ?? shared?.colors?.length ?? 0) > 16 ? 32 : 16); }
     if (shared) {
-      const policy = evaluateSharedCanvasPolicy(shared, { passActive: hasPass() });
-      canvasDescription.textContent = '開いている絵だけを変更します。通常128px・16色、特典で256px・32色。';
+      canvasDescription.textContent = '開いている絵だけを変更します。最大256px・32色です。';
     }
   }
   async function save() {
@@ -455,7 +450,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       const project = await save(); const source = await readPxdImage(project, componentImageRole(project, 'draw'));
       const before = await readPxdImage(project, componentImageRole(project, target));
       if (!source || !before) throw new Error('使う絵を確認できません。');
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-source-refresh-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-free-tools-1');
       const message = target === 'audio' ? 'このプロジェクトの最新の絵で音符を作り直します。テンポ・楽器・色と音の設定は残します。編曲した音符は置き換わります。絵とパズル、公開済みの作品は変わりません。' : 'プロジェクトの最新の絵で作り直します。正解やピースの配置はリセットされます。公開済みの作品は変わりません。';
       if (!await confirmPxdConversion({ image: before, document: source, title: target === 'audio' ? '最新の絵を曲に反映しますか？' : 'この絵を使いますか？', applyLabel: target === 'audio' ? '絵を曲に反映' : '絵を差し替える', message })) return;
       const candidate = await replaceProjectComponentImage(project, target, source);

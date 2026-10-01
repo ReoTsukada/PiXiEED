@@ -1,10 +1,10 @@
 import { createPxdProject, getPxdJson, setPxdJson } from './pxd-codec.mjs';
-import { mergePxdJson, primaryPxdImageRole, putPxdDrawDocument, putPxdImage, readPxdDrawDocument, readPxdImage, readPxdSharedImage, imageToDrawDocument } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { mergePxdJson, primaryPxdImageRole, putPxdDrawDocument, putPxdImage, readPxdDrawDocument, readPxdImage, readPxdSharedImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { detectDifferenceCandidates, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { createHiddenObjectDraft, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
-import { createJigsawLayout, createJigsawWorkspace, validateJigsawWorkspace } from './jigsaw-workspace.mjs?rev=20260928-jigsaw-workspace-1';
-import { validateJigsawSource } from './jigsaw-core.mjs?rev=20260928-jigsaw-pixfind-original-2';
+import { createJigsawLayout, createJigsawWorkspace, validateJigsawWorkspace } from './jigsaw-workspace.mjs?rev=20261001-free-tools-1';
+import { validateJigsawSource } from './jigsaw-core.mjs?rev=20261001-free-tools-1';
 
 export const PXD_PUZZLE_PATHS = Object.freeze({
   jigsaw: 'puzzles/jigsaw.json',

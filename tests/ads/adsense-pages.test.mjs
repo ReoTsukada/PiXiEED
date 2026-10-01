@@ -19,7 +19,7 @@ const EXCLUDED_PAGES = [
   'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
   'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html',
-  // the Offerwall page adds the AdSense script itself, only when no pass is running
+  // The legacy bookmark entry is only a guide; its header owns pass actions.
   'pass/index.html'
 ];
 const GOOGLE_SOURCE = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
@@ -37,6 +37,7 @@ for (const path of DIRECT_PAGES) test(`${path}: one official asynchronous AdSens
   assert.match(ads[0], /\basync\b/);
   assert.match(ads[0], /crossorigin="anonymous"/);
   assert.ok(!source.includes(LOADER_SOURCE), 'no second loader');
+  assert.ok(head.indexOf('adsense-offerwall-policy.js') >= 0 && head.indexOf('adsense-offerwall-policy.js') < head.indexOf('adsbygoogle.js'), 'Offerwall-only policy precedes the provider');
 });
 
 for (const path of STANDALONE_PAGES) test(`${path}: only the embedded-safe loader is present in head`, async () => {
@@ -48,6 +49,7 @@ for (const path of STANDALONE_PAGES) test(`${path}: only the embedded-safe loade
   assert.ok(ads[0].includes(`src="${LOADER_SOURCE}"`));
   assert.match(ads[0], /\bdefer\b/);
   assert.equal(scripts(source).filter((script) => script.includes('adsbygoogle.js')).length, 0);
+  assert.ok(head.indexOf('adsense-offerwall-policy.js') >= 0 && head.indexOf('adsense-offerwall-policy.js') < head.indexOf('adsense-auto.js'), 'standalone policy precedes the loader');
 });
 
 for (const path of EXCLUDED_PAGES) test(`${path}: no Auto ads code on private, disabled, redirect or development pages`, async () => {
@@ -109,6 +111,7 @@ test('file preview never sends an ad request', () => {
 test('ads.txt seller and privacy disclosure agree with the installed publisher', async () => {
   assert.equal((await html('ads.txt')).trim(), 'google.com, pub-9801602250480253, DIRECT, f08c47fec0942fa0');
   const privacy = await html('privacy/index.html');
-  assert.match(privacy, /Google AdSense の通常広告を利用します/);
-  assert.match(privacy, /通常広告の表示やクリックでは、特典時間は付与されません/);
+  assert.match(privacy, /Google AdSense/);
+  assert.match(privacy, /無料/);
+  assert.doesNotMatch(privacy, /広告を.*1時間追加|残り時間の上限は2時間/);
 });

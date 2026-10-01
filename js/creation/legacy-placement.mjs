@@ -1,4 +1,4 @@
-import { supabaseConfig } from '../../data/site-config.js';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { lookupCell } from '../globe/geometry.mjs';
 import { parseLocationInput } from '../globe/geo-input.mjs';
 import { publicImageUrl } from '../globe/legacy-showcase.mjs';

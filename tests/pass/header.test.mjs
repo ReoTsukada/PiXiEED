@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
 
 const pages = [
   'index.html', 'globe/index.html', 'tools/index.html', 'profile/index.html', 'audio/index.html', 'pixel-camera.html',
@@ -11,7 +10,7 @@ const pages = [
   'stores/index.html', 'collection/index.html', '404.html'
 ];
 
-test('shared pass header is loaded once by every requested public page', async () => {
+test('shared navigation header is loaded once by every requested public page', async () => {
   for (const path of pages) {
     const html = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
     const loads = html.match(/<script\b[^>]*\bsrc=["'][^"']*\/js\/site-header\.mjs(?:\?[^"']*)?["'][^>]*>/gi) || [];
@@ -20,14 +19,8 @@ test('shared pass header is loaded once by every requested public page', async (
   }
 });
 
-test('header and every reward consumer resolve the same pass module instance for same-tab notifications', async () => {
-  const paths = ['js/site-header.mjs', 'js/creation/audio-page.mjs', 'js/pixel-lens/app.mjs', 'js/creation/draw-page.mjs', 'js/creation/jigsaw-page.mjs', 'js/creation/pixfind-play.mjs'];
-  const resolved = [];
-  for (const path of paths) {
-    const source = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
-    const match = source.match(/from\s+['"]([^'"]*pixieed-pass\.mjs(?:\?[^'"]*)?)['"]/);
-    assert.ok(match, `${path} must import the canonical pass module`);
-    resolved.push(new URL(match[1], pathToFileURL(new URL(`../../${path}`, import.meta.url).pathname)).href);
-  }
-  assert.deepEqual(resolved, paths.map(() => resolved[0]), 'different query versions create separate module singletons');
+test('shared header does not depend on timed pass state or render legacy reward controls', async () => {
+  const header = await readFile(new URL('../../js/site-header.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(header, /pixieed-pass|deriveHeaderPassState|passRemainingMs|data-pass-slot/);
+  assert.match(header, /querySelectorAll\('\[data-header-pass\]'\)\.forEach\(\(button\) => button\.remove\(\)\)/);
 });

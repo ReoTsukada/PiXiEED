@@ -14,12 +14,12 @@ function image(width, height, colorCount = 1) {
   return { width, height, rgba };
 }
 
-test('shared canvas policy has common free and pass boundaries and rejects legacy overage without unlock', () => {
+test('all supported canvases are free while legacy overage retains its safety limit', () => {
   assert.deepEqual(evaluateSharedCanvasPolicy({ width: 128, height: 128, colorCount: 16 }), {
-    supported: true, premiumContent: false, locked: false, reason: null, maxDimension: 128, maxColors: 16
+    supported: true, premiumContent: false, locked: false, reason: null, maxDimension: 256, maxColors: 32
   });
   const premium = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 });
-  assert.equal(premium.supported, true); assert.equal(premium.premiumContent, true); assert.equal(premium.locked, true); assert.equal(premium.reason, 'premium-required');
+  assert.equal(premium.supported, true); assert.equal(premium.premiumContent, false); assert.equal(premium.locked, false); assert.equal(premium.reason, null);
   const unlocked = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 }, { passActive: true });
   assert.equal(unlocked.supported, true); assert.equal(unlocked.locked, false); assert.equal(unlocked.maxColors, 32);
   const legacy = evaluateSharedCanvasPolicy({ width: 512, height: 512, colorCount: 128 }, { passActive: true });
@@ -36,7 +36,7 @@ test('RGBA color counting includes alpha and supports bounded threshold checks',
 test('photo preparation preserves aspect ratio, quantizes only the requested copy, and is deterministic', () => {
   const source = image(144, 256, 40); const before = new Uint8Array(source.rgba);
   const regular = prepareSharedCanvasImage(source);
-  assert.equal(regular.image.width, 72); assert.equal(regular.image.height, 128); assert.equal(regular.colorCount, 16); assert.equal(regular.changed, true);
+  assert.equal(regular.image.width, 144); assert.equal(regular.image.height, 256); assert.equal(regular.colorCount, 32); assert.equal(regular.changed, true);
   assert.equal(regular.image.width / regular.image.height, source.width / source.height);
   const extended = prepareSharedCanvasImage(source, { passActive: true });
   assert.equal(extended.image.width, 144); assert.equal(extended.image.height, 256); assert.equal(extended.colorCount, 32);
@@ -44,7 +44,7 @@ test('photo preparation preserves aspect ratio, quantizes only the requested cop
   const exactCanvas = prepareSharedCanvasImage(image(32, 20, 8), { passActive: true, width: 48, height: 40 });
   assert.equal(exactCanvas.image.width, 48); assert.equal(exactCanvas.image.height, 40);
   assert.equal(prepareSharedCanvasImage(image(32, 20, 8), { width: 48, height: 40 }).image.width, 48);
-  assert.throws(() => prepareSharedCanvasImage(source, { width: 129, height: 128 }), /各辺128pxまで/);
+  assert.throws(() => prepareSharedCanvasImage(source, { width: 257, height: 128 }), /各辺256pxまで/);
   const rectangle = { width: 2, height: 1, rgba: new Uint8Array([220, 20, 30, 255, 20, 40, 220, 255]) };
   const contained = prepareSharedCanvasImage(rectangle, { passActive: true, width: 4, height: 4, fit: 'contain' }).image;
   assert.equal(contained.width, 4); assert.equal(contained.height, 4);

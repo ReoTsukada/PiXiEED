@@ -12,8 +12,19 @@ export const DEFAULT_FRAME_RATIO = '1:1';
 
 /** New camera captures use the same long-edge allowance as the shared canvas. */
 export function sharedOutputSizes(passActive = false) {
-  const maxDimension = passActive ? 256 : 128;
+  const maxDimension = 256;
   return OUTPUT_SIZES.filter((size) => size <= maxDimension);
+}
+
+/** Normalize an old camera preset to the nearest currently supported capture size. */
+export function normalizeOutputSize(value, fallback = 128) {
+  const sizes = sharedOutputSizes();
+  const safeFallback = sizes.includes(fallback) ? fallback : sizes[0];
+  const requested = Number(value);
+  if (!Number.isFinite(requested) || requested <= 0) return safeFallback;
+  if (sizes.includes(requested)) return requested;
+  if (requested > sizes.at(-1)) return sizes.at(-1);
+  return sizes.reduce((best, size) => Math.abs(size - requested) < Math.abs(best - requested) ? size : best, safeFallback);
 }
 
 /** The shared camera keeps screen dimensions out of the saved canvas geometry. */

@@ -13,17 +13,16 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20260930-ux-fix-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-independent-1';
-import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20260930-shared-canvas-5';
-import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20260930-shared-canvas-5';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261001-free-tools-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261001-free-tools-1';
+import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
+import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
-import { requestPass, hasPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
-import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-animation-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
+import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261001-free-tools-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 
@@ -148,8 +147,8 @@ function handleAnimationAction(action) {
   stopAnimation(); endStroke(); closeColorEditor();
   if (action.type === 'select-frame' || action.type === 'select-layer') { installAnimationDocument(animationSession.select(action.frameId, action.layerId)); return; }
   // Layer locking protects pixels, while its own switch must remain operable.
-  const policy = evaluateSharedCanvasPolicy({ width: documentData.width, height: documentData.height, colorCount: usedColorCount() }, { passActive: hasPass() });
-  if (readOnlyImage || !policy.supported || policy.locked) { toast('コマを編集するには特典時間を追加してください。'); return; }
+  const policy = evaluateSharedCanvasPolicy({ width: documentData.width, height: documentData.height, colorCount: usedColorCount() }, { passActive: true });
+  if (readOnlyImage || !policy.supported) { toast('キャンバスは256px・32色まで編集できます。プロジェクトのキャンバス設定でサイズと色数を調整してください。'); return; }
   const a = animationSession.animation; let next = a, selection;
   switch (action.type) {
     case 'add-frame': next = addAnimationFrame(a, { sourceFrameId: action.frameId || animationSession.frameId, copy: action.copy !== false }); selection = { frameId: next.frames.at(-1).id, layerId: animationSession.layerId }; break;
@@ -227,7 +226,7 @@ function openColorEditor(index) {
   editorUi.closePanels();
   closeColorEditor();
   const editor = $('#draw-color-editor'); const base = [...documentData.palette];
-  colorEdit = { index, base, maxColors: hasPass() ? 32 : 16, ...hexToHsl(base[index].slice(0, 7)) };
+  colorEdit = { index, base, maxColors: 32, ...hexToHsl(base[index].slice(0, 7)) };
   editor.querySelector('.dce-before').style.background = base[index];
   const quick = editor.querySelector('.dce-quick'); quick.replaceChildren(...QUICK_COLORS.map((color) => {
     const b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', color); b.setAttribute('aria-label', color); b.addEventListener('click', () => setEditColor(color)); return b;
@@ -247,7 +246,7 @@ scope.listen(window, 'resize', placeColorEditor); scope.listen(window, 'scroll',
 function setEditColor(hex) {
   if (!colorEdit) return;
   const candidate = [...documentData.palette]; candidate[colorEdit.index] = hex;
-  if (usedColorCount({ ...documentData, palette: candidate }) > colorEdit.maxColors) { toast(`この操作は${colorEdit.maxColors}色までです。色を増やすには特典時間を追加してください。`); return; }
+  if (usedColorCount({ ...documentData, palette: candidate }) > colorEdit.maxColors) { toast(`このキャンバスは最大${colorEdit.maxColors}色です。使用中の色を置き換えてください。`); return; }
   Object.assign(colorEdit, hexToHsl(hex));
   const palette = [...documentData.palette]; palette[colorEdit.index] = hex; documentData.palette = palette;
   const tile = document.querySelector(`.draw-color[data-color-index="${colorEdit.index}"]`); tile?.style.setProperty('--draw-color', hex);
@@ -290,7 +289,6 @@ function chooseColor(index, sourceElement) {
 }
 // A mode switch never changes the shared image's dimensions or colours.
 let fitNotice = '';
-let passPrompt = false;
 function usedColorCount(value = documentData) {
   const colors = new Set();
   if (value === documentData || value.pixels === documentData.pixels) {
@@ -309,11 +307,9 @@ function usedColorCount(value = documentData) {
 function canEdit(value = documentData) {
   if (playing) { toast('再生を止めると編集できます。'); return false; }
   if (readOnlyImage) { toast('原本を表示しています。編集するにはプロジェクトのキャンバス設定でサイズと色を合わせてください。'); return false; }
-  const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: usedColorCount(value) }, { passActive: hasPass() });
-  if (policy.supported && !policy.locked) return true;
+  const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: usedColorCount(value) }, { passActive: true });
+  if (policy.supported) return true;
   if (!policy.supported) { toast('この作品は表示・保存できます。プロジェクトのキャンバス設定で256px・32色以内に合わせると編集できます。'); return false; }
-  toast('このキャンバスの編集には特典時間を追加してください。作品はそのまま保存できます。');
-  if (!passPrompt) { passPrompt = true; void requestPass({ perk: 'project.canvas-expanded' }).finally(() => { passPrompt = false; }); }
   return false;
 }
 function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
@@ -438,9 +434,8 @@ canvas.addEventListener('pointerdown', (event) => {
   if (tool !== 'picker' && !canEdit()) return;
   if (tool !== 'picker' && tool !== 'fill') {
     const value = selectedPixelValue(); const used = new Set(documentData.pixels);
-    if (!used.has(value) && usedColorCount() >= (hasPass() ? 32 : 16)) {
-      if (!hasPass()) { toast('色を増やすには特典時間を追加してください。'); if (!passPrompt) { passPrompt = true; void requestPass({ perk: 'project.canvas-expanded' }).finally(() => { passPrompt = false; }); } }
-      else toast('このキャンバスは32色まで使えます。今の色を変更して描いてください。');
+    if (!used.has(value) && usedColorCount() >= 32) {
+      toast('このキャンバスは最大32色です。色を置き換えるか、使わない色を整理してください。');
       return;
     }
   }
@@ -680,7 +675,7 @@ async function importImage(file, importSource) {
     const image = await decodeDrawImageFile(file);
     if (scope.disposed || !loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
     const original = { width: image.width, height: image.height, rgba: new Uint8Array(image.data) };
-    const prepared = prepareSharedCanvasImage(original, { passActive: hasPass() });
+    const prepared = prepareSharedCanvasImage(original, { passActive: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed && !await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     if (scope.disposed || !loadGate.isCurrent(ticket)) return;
@@ -724,7 +719,7 @@ $('#draw-export').addEventListener('click', async () => {
     }
   } catch (error) { if (unchangedSource()) status.textContent = `PNGを書き出せませんでした：${error.message}`; }
 });
-// ---- time-lapse: a short free replay, with a longer detailed replay as a pass perk ----
+// ---- time-lapse: export a bounded replay at regular or detailed quality ----
 function recordedHistory(target) {
   timelapse.reset(documentData);
   return new Proxy(target, { get(object, key) {
@@ -782,8 +777,6 @@ async function exportTimelapse(detail) {
   const basicButton = $('#draw-timelapse'); const detailButton = $('#draw-timelapse-detail');
   basicButton.disabled = true; detailButton.disabled = true;
   try {
-    // Permission is captured at the button press; expiry never cancels this export.
-    if (detail && !await requestPass({ perk: 'draw.timelapse-detail' })) return;
     if (!timelapseJobIsCurrent(job)) return;
     await job.bridge?.assertCanSave?.();
     if (!timelapseJobIsCurrent(job)) return;

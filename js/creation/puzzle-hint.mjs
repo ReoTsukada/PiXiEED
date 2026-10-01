@@ -1,4 +1,4 @@
-/** A small, per-problem hint allowance shared by puzzle players. */
+/** Hint history shared by puzzle players; repeated hints are available without ads. */
 export const PUZZLE_HINT_STORE_PREFIX = 'pixieed:puzzle-hint:v1:';
 
 function resolvedStorage(storage) {
@@ -16,9 +16,7 @@ function writeUsed(storage, problemKey) {
 }
 
 /**
- * Creates a stale-safe hint gate. The free hint is recorded only after `show`
- * succeeds; pass cancellation, failed rendering, and switching problems leave
- * the new problem's allowance untouched.
+ * Rejects concurrent and stale hints. History is recorded only after `show` succeeds.
  */
 export function createPuzzleHintController({ perk, requestPass, storage, onState = () => {} } = {}) {
   const usedKeys = new Set();
@@ -43,7 +41,6 @@ export function createPuzzleHintController({ perk, requestPass, storage, onState
       pending = true; state();
       try {
         const free = !usedKeys.has(key) && !readUsed(storage, key);
-        if (!free && !(await requestPass?.({ perk }))) return false;
         if (turn !== generation || key !== problemKey) return false;
         const shown = await show();
         if (turn !== generation || key !== problemKey || shown === false) return false;

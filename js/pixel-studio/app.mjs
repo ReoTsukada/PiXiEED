@@ -1,6 +1,6 @@
 import { createFrameLoop } from './frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
-import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?v=20260925-lens-sizes-1';
+import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
 
 const $ = (selector) => document.querySelector(selector);

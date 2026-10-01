@@ -1,7 +1,7 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261001-context-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261001-free-tools-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
-import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20260918-post-v1';
+import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 
 const FOUND_KEY = 'PiXiEED:found-works:v1';
 const LEGACY_FOUND_KEY = '絵のよりみち:found-works:v1';
@@ -139,7 +139,7 @@ function scheduleAnalytics() {
   if (!isAnalyticsAllowed()) return;
   const load = () => {
     if (analyticsPromise) return;
-    analyticsPromise = import('./analytics.js?rev=20260918-privacy-v2').then(({ bindAnalytics, trackEvent: sendAnalyticsEvent }) => {
+    analyticsPromise = import('./analytics.js?rev=20261001-free-tools-1').then(({ bindAnalytics, trackEvent: sendAnalyticsEvent }) => {
       analyticsTrackEvent = sendAnalyticsEvent;
       bindAnalytics();
       analyticsQueue.splice(0).forEach(({ eventName, properties }) => sendAnalyticsEvent(eventName, properties));
@@ -1423,7 +1423,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20260929-claude-integration-1').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20261001-free-tools-1').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;
@@ -4222,7 +4222,7 @@ function renderPublicShell() {
       analyticsQueue.splice(0);
       analyticsTrackEvent = null;
       analyticsPromise = null;
-      void import('./analytics.js?rev=20260918-privacy-v2').then(({ clearAnalyticsData }) => clearAnalyticsData()).catch(() => {});
+      void import('./analytics.js?rev=20261001-free-tools-1').then(({ clearAnalyticsData }) => clearAnalyticsData()).catch(() => {});
       if (settingsStatus) settingsStatus.textContent = 'この端末から新しい解析データを送らない設定にしました。';
     } else {
       if (settingsStatus) settingsStatus.textContent = '利用状況の集計を再び許可しました。';
@@ -4236,7 +4236,7 @@ function renderPublicShell() {
     analyticsQueue.splice(0);
     analyticsTrackEvent = null;
     analyticsPromise = null;
-    void import('./analytics.js?rev=20260918-privacy-v2').then(({ clearAnalyticsData }) => clearAnalyticsData()).catch(() => {});
+    void import('./analytics.js?rev=20261001-free-tools-1').then(({ clearAnalyticsData }) => clearAnalyticsData()).catch(() => {});
     if (settingsStatus) settingsStatus.textContent = 'この端末に保存していた解析用の識別子を削除しました。';
   });
   applyMotionPreference();

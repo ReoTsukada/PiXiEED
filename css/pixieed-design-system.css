@@ -490,18 +490,6 @@ body.arc-jigsaw .jigsaw-workspace { --pixel-frame: #245446; }
 .art-card__image, .market-card__image, .collection-item__image { margin: 6px 6px 0; }
 .arc-pick { overflow: visible !important; }
 
-/* Perk badges share one meaning across tools: lock = unavailable, star = available now.
-   Puzzle hints own their separate free-use badge and are excluded here. */
-:is(.px-perk, [data-perk], button[aria-label$="・特典"], button[aria-label*="（特典）"]):not(.px-header-pass):not([data-hint-short]) { position: relative; }
-:is(.px-perk, [data-perk], button[aria-label$="・特典"], button[aria-label*="（特典）"]):not(.px-header-pass):not([data-hint-short]):not(select):not(input)::after {
-  content: "🔒"; position: absolute; top: -6px; right: -6px; z-index: 2; display: grid; place-items: center;
-  width: 18px; height: 18px; border: 1px solid #fff; border-radius: 5px; background: #15202b; color: #fff;
-  font: 900 11px/1 system-ui,sans-serif; box-shadow: 0 2px 3px #0005; pointer-events: none;
-}
-html[data-pass=active] :is(.px-perk, [data-perk], button[aria-label$="・特典"], button[aria-label*="（特典）"]):not(.px-header-pass):not([data-hint-short]):not(select):not(input)::after {
-  content: "★"; background: #ffd35a; color: #15202b;
-}
-
 /* ==== short landscape screens (phones on their side): a slimmer bottom bar, so the work gets the height ==== */
 @media (orientation: landscape) and (max-height: 500px) {
   .app-tabs { bottom: max(.35rem, env(safe-area-inset-bottom)); width: min(25rem, calc(100% - 1.2rem)); padding: .2rem; border-radius: .95rem; }

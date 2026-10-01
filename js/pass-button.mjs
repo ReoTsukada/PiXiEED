@@ -1,14 +1,15 @@
 /**
- * The header's 特典 button: one ad = one hour, then it can be watched again.
+ * The header's 特典 button: daily free claim, perk guide and remaining time.
  *
- *  data-state="ad"     gold coin that flips, a light sweep and twinkling pixels — 「1時間 / 広告を見る」
+ *  data-state="ad"     gold coin — 「1時間 / 特典の案内」; Google owns Offerwall serving.
  *  data-state="free"   mint gift that hops — 「無料1時間 / タップで受取」
- *  data-state="active" pixel hourglass draining, 0:42, and a 12-pixel bar; red and blinking in the last 5 minutes
+ *  data-state="active" pixel hourglass draining, 0:42, and a 12-pixel bar; each pixel represents ten minutes
  *  data-state="pro"    Pro ∞
- * Transitions: into active → pop, the bar fills pixel by pixel, a pixel burst and 「+1時間」;
- * back to ad → the hourglass turns over and the button rings to say the next ad is ready.
+ * Transitions: into active → pop, the bar fills pixel by pixel, a pixel burst and 「+1時間」; an active extension gets a small pulse;
+ * back to ad → the hourglass turns over; this does not promise an ad is available.
  */
 const HOUR_MS = 60 * 60 * 1000;
+const MAX_HOURS = 2;
 const CELLS = 12;
 const LOW_MS = 5 * 60 * 1000;
 const STAR = 'M4 0h2v2h2v2h2v2H8v2H6v2H4V8H2V6H0V4h2V2h2z';
@@ -18,7 +19,7 @@ export const passButtonMarkup = `<span class="pxb-icon" aria-hidden="true">
   <svg class="pxb-gift" viewBox="0 0 12 12" width="18" height="18" shape-rendering="crispEdges"><path class="pxb-gift-box" d="M1 5h10v7H1z"/><path class="pxb-gift-lid" d="M0 3h12v3H0z"/><path class="pxb-gift-ribbon" d="M5 3h2v9H5zM3 0h2v1h1v2H4V2H3zM7 0h2v2H8v1H6V1h1z"/></svg>
   <svg class="pxb-glass" viewBox="0 0 10 14" width="14" height="18" shape-rendering="crispEdges"><path class="pxb-glass-frame" d="M0 0h10v2H0zM0 12h10v2H0zM1 2h1v3h1v1h1v2H3v1H2v3H1zM8 2h1v10H8V9H7V8H6V6h1V5h1z"/><rect class="pxb-sand-top" x="2" y="2" width="6" height="3"/><rect class="pxb-sand-bottom" x="2" y="9" width="6" height="3"/><rect class="pxb-sand-drop" x="4.5" y="6" width="1" height="1"/></svg>
 </span>
-<span class="pxb-text"><b class="pxb-main" data-header-pass-label>1時間</b><small class="pxb-sub">広告を見る</small></span>
+<span class="pxb-text"><b class="pxb-main" data-header-pass-label>1時間</b><small class="pxb-sub">特典の案内</small></span>
 <span class="pxb-bar" aria-hidden="true">${Array.from({ length: CELLS }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</span>
 <span class="pxb-shine" aria-hidden="true"></span>
 <span class="pxb-sparks" aria-hidden="true"><i></i><i></i><i></i></span>`;
@@ -37,12 +38,12 @@ export function passButtonView({ remainingMs = 0, pro = false, freeReady = false
   if (pro) return { state: 'pro', main: 'Pro', sub: '∞', lit: CELLS, low: false, fraction: 1 };
   const left = Math.max(0, Number(remainingMs) || 0);
   if (left > 0) {
-    const fraction = Math.min(1, left / HOUR_MS);
+    const fraction = Math.min(1, left / (MAX_HOURS * HOUR_MS));
     return { state: 'active', main: clock(left), sub: '残り', lit: Math.max(1, Math.ceil(fraction * CELLS)), low: left <= LOW_MS, fraction };
   }
   return freeReady
     ? { state: 'free', main: '無料1時間', sub: 'タップで受取', lit: 0, low: false, fraction: 0 }
-    : { state: 'ad', main: '1時間', sub: '広告を見る', lit: 0, low: false, fraction: 0 };
+    : { state: 'ad', main: '1時間', sub: '特典の案内', lit: 0, low: false, fraction: 0 };
 }
 
 const set = (el, key, value) => { const text = String(value); if (el.dataset[key] !== text) el.dataset[key] = text; };
@@ -69,10 +70,12 @@ export function renderPassButton(button, input) {
   if (sandBottom) { sandBottom.setAttribute('y', String(12 - bottom)); sandBottom.setAttribute('height', String(bottom)); }
 
   const before = previous.get(button);
-  previous.set(button, view.state);
-  if (!before || before === view.state || document.visibilityState === 'hidden' || reduced()) return view;
-  if (view.state === 'active' && (before === 'ad' || before === 'free')) celebrate(button);
-  else if ((view.state === 'ad' || view.state === 'free') && before === 'active') effect(button, 'ready', 1400);
+  const left = Math.max(0, Number(input.remainingMs) || 0);
+  previous.set(button, { state: view.state, remainingMs: left });
+  if (!before || document.visibilityState === 'hidden' || reduced()) return view;
+  if (view.state === 'active' && (before.state === 'ad' || before.state === 'free')) celebrate(button);
+  else if (view.state === 'active' && before.state === 'active' && left > before.remainingMs + 5000) effect(button, 'grant', 850);
+  else if ((view.state === 'ad' || view.state === 'free') && before.state === 'active') effect(button, 'ready', 1400);
   return view;
 }
 

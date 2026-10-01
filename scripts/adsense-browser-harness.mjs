@@ -86,8 +86,9 @@ try {
     const view = await layout.newPage();
     for (const path of ['/', '/tools/', '/draw/', '/audio/', '/jigsaw/']) {
       await view.goto(base + path, { waitUntil: 'domcontentloaded' });
-      await view.locator('[data-header-pass]').waitFor();
-      const bounds = await view.locator('[data-header-pass]').boundingBox();
+      await view.locator('.px-header-brand').waitFor();
+      assert.equal(await view.locator('[data-header-pass]').count(), 0, 'free tools have no time gate');
+      const bounds = await view.locator('.px-header-brand').boundingBox();
       assert.ok(bounds.width >= 44 && bounds.height >= 44 && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width + 1, path);
       assert.equal(await view.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, path);
       checks++;

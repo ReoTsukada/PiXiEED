@@ -2,16 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { zoomRange, splitZoom, zoomStops, formatZoom, swipeDirection } from '../../js/pixel-lens/zoom.mjs';
 
-test('no optical zoom: everything is digital, 1x..8x', () => {
-  const r = zoomRange(null); assert.equal(r.hardware, false); assert.equal(r.min, 1); assert.equal(r.max, 8);
+test('unsupported device zoom keeps the full 1x..40x crop range', () => {
+  const r = zoomRange(null); assert.equal(r.hardware, false); assert.equal(r.min, 1); assert.equal(r.max, 40);
   assert.deepEqual(splitZoom(3, r), { hardware: 1, digital: 3 });
-  assert.deepEqual(zoomStops(r), [1, 2, 3, 5]);
+  assert.deepEqual(splitZoom(40, r), { hardware: 1, digital: 40 });
+  assert.deepEqual(zoomStops(r), [1, 2, 5, 10, 20, 40]);
 });
-test('optical zoom first, then crop; an ultra-wide lens adds a 0.5x stop', () => {
+test('camera zoom is used first, then centered crop supplies the remaining magnification', () => {
   const r = zoomRange({ zoom: { min: 0.5, max: 5 } });
+  assert.equal(r.min, 0.5);
   assert.deepEqual(splitZoom(4, r), { hardware: 4, digital: 1 });
   assert.deepEqual(splitZoom(8, r), { hardware: 5, digital: 1.6 });
   assert.equal(zoomStops(r)[0], 0.5);
+  assert.deepEqual(splitZoom(40, r), { hardware: 5, digital: 8 });
+  assert.equal(splitZoom(12, zoomRange({ zoom: { min: 1, max: 12, step: 1 } })).digital, 1);
+});
+test('step values are rounded down so crop remains at least 1x', () => {
+  const r = zoomRange({ zoom: { min: 1, max: 5, step: 1 } });
+  assert.deepEqual(splitZoom(2.6, r), { hardware: 2, digital: 1.3 });
+  assert.deepEqual(splitZoom(40, r), { hardware: 5, digital: 8 });
+});
+test('invalid hardware capability values cannot create non-finite zoom ranges', () => {
+  const r = zoomRange({ zoom: { min: 0, max: Infinity, step: -1 } });
+  assert.equal(r.hardware, false);
+  assert.deepEqual(splitZoom(Infinity, r), { hardware: 1, digital: 1 });
 });
 test('zoom labels', () => { assert.equal(formatZoom(1), '1×'); assert.equal(formatZoom(2.35), '2.4×'); assert.equal(formatZoom(0.5), '0.5×'); });
 test('swipes: a quick, mostly straight flick picks a direction; small or diagonal moves do not', () => {

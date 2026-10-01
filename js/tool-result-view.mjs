@@ -1,4 +1,4 @@
-import { mountDisplayAds } from './display-ads.mjs?rev=20260929-ad-layout-2';
+import { mountDisplayAds } from './display-ads.mjs?rev=20261001-free-tools-1';
 
 const views = new WeakMap();
 const keys = new Set(['camera-result', 'draw-result', 'audio-result', 'jigsaw-result', 'spot-result', 'find-result']);

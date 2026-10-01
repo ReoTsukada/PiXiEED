@@ -41,10 +41,6 @@ body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-heading,body.app-
 @media(orientation:landscape) and (max-height:520px) and (max-width:539px){.app-page--tool-jigsaw.arc-jigsaw .jigsaw-play{grid-template-rows:auto 44px minmax(0,1fr) 50px}.app-page--tool-jigsaw.arc-jigsaw .arc-hud{position:static;width:auto}}
 .jigsaw-workspace-tools{overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}.jigsaw-workspace-tools::-webkit-scrollbar{display:none}
 #jigsaw-hint{position:relative;flex:none;width:44px;height:44px;padding:1px;font-size:.57rem;font-weight:800;white-space:nowrap}
-#jigsaw-hint::after{content:attr(data-hint-short);position:absolute;right:-3px;bottom:-3px;min-width:19px;height:15px;padding:0 2px;border:1px solid #fff;border-radius:8px;background:#49643c;color:#fff;font-size:.52rem;line-height:13px;text-align:center}
-#jigsaw-hint[data-hint-short="パス"]::after{content:"🔒";background:#15202b;font-size:10px}
-html[data-pass=active] #jigsaw-hint[data-hint-short="パス"]::after{content:"★";background:#ffd35a;color:#15202b;font-size:11px}
-#jigsaw-hint:disabled::after{opacity:.65}
 #jigsaw-tray .jigsaw-piece.is-hint-target{border-color:#ffd35a;box-shadow:0 0 0 3px rgba(255,211,90,.72),0 3px 0 rgba(0,0,0,.28);background:#fff9df}
 
 /* Keep the board primary: common actions stay visible, the rest open on demand. */

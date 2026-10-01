@@ -11,7 +11,7 @@
  * Off on localhost and inside frames, and when 利用状況の集計 is turned off in settings.
  * `?ga_debug=1` marks this tab's hits as debug_mode → GA4 管理 → DebugView shows them live.
  */
-import { analyticsConfig } from '../data/site-config.js?rev=20260930-ga4-1';
+import { analyticsConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 
 const CONSENT_KEY = 'PiXiEED:analytics-consent:v1';
 const DEBUG_KEY = 'pixieed:ga-debug';

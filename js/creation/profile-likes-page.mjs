@@ -51,7 +51,7 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
     if (failed) { host.textContent = 'いいねした作品を読み込めませんでした。再読み込みしてください。'; return; }
     if (loading) return;
     loading = (async () => {
-      const { listMyPublishedLikes, loadPublishedMapPostsByIds } = await import('../globe/post-supabase.mjs?v=20260928-liked-posts-1');
+      const { listMyPublishedLikes, loadPublishedMapPostsByIds } = await import('../globe/post-supabase.mjs?rev=20261001-free-tools-1');
       const ids = await listMyPublishedLikes();
       return ids.length ? loadPublishedMapPostsByIds(ids) : [];
     })();

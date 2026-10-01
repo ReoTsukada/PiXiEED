@@ -34,7 +34,7 @@ async function contextFor(viewport, configured = false) {
     // WebKit cannot supply the canvas camera used by Chromium. Its camera
     // matrix covers the shared result layout only, without permission retries.
     // Real capture, GIF and audio handoff handlers are checked in Chromium.
-    if (engine === 'webkit' && url.pathname === '/js/pixel-lens/app.mjs') return route.fulfill({ contentType:'application/javascript',body:`import {createToolResultView} from '/js/tool-result-view.mjs?rev=20260929-compact-results-2';const main=document.querySelector('#pixelStudio');main.dataset.mode='idle';createToolResultView({key:'camera-result',main,returnLabel:'撮り直す'});` });
+    if (engine === 'webkit' && url.pathname === '/js/pixel-lens/app.mjs?rev=20261001-free-tools-1') return route.fulfill({ contentType:'application/javascript',body:`import {createToolResultView} from '/js/tool-result-view.mjs?rev=20260929-compact-results-2';const main=document.querySelector('#pixelStudio');main.dataset.mode='idle';createToolResultView({key:'camera-result',main,returnLabel:'撮り直す'});` });
     if (url.pathname === '/data/site-config.js') return route.fulfill({ contentType:'application/javascript',body:config+`\nfor(const key of Object.keys(displayAdConfig.slots)) displayAdConfig.slots[key]=${configured ? '"1234567890"' : '""'};` });
     return route.continue();
   });

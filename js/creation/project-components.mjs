@@ -1,6 +1,6 @@
-import { imageToDrawDocument, putPxdDrawDocument, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-components-1';
-import { detachPxdAudioImage, readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-animation-1';
-import { freezePxdPuzzleImages, createPxdPuzzleFromMain, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
+import { imageToDrawDocument, putPxdDrawDocument, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { detachPxdAudioImage, readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
+import { freezePxdPuzzleImages, createPxdPuzzleFromMain, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { resolveLocalDrawRevision } from './spot-difference-core.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';

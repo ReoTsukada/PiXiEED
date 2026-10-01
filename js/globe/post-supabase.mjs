@@ -1,8 +1,8 @@
-import { supabaseConfig } from '../../data/site-config.js?rev=20260921-globe-post-v1';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
 import { projectLegacyShowcase } from './legacy-showcase.mjs';
-import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs';
-import { isSafeJigsawPixfindOriginalUrl } from '../creation/jigsaw-core.mjs';
+import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs?rev=20261001-free-tools-1';
+import { isSafeJigsawPixfindOriginalUrl } from '../creation/jigsaw-core.mjs?rev=20261001-free-tools-1';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
 const LEGACY_OWNER_SESSION_KEY = 'PiXiEED:legacy-owner-session:v1';

@@ -1,7 +1,7 @@
-import { supabaseConfig } from '../../data/site-config.js';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { getCellById } from '../globe/geometry.mjs';
 import { publicImageUrl } from '../globe/legacy-showcase.mjs';
-import { cellFromPlaceInput, createLegacyPlacementApi, readOwnerAuthCallback } from './legacy-placement.mjs';
+import { cellFromPlaceInput, createLegacyPlacementApi, readOwnerAuthCallback } from './legacy-placement.mjs?rev=20261001-free-tools-1';
 
 const root = document.querySelector('#legacy-placement-root');
 if (root && new URLSearchParams(location.search).get('view') === 'posts') {

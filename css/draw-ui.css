@@ -183,7 +183,7 @@ body[data-page="draw"] .draw-import__options .draw-size-seg button[aria-checked=
   body[data-page="draw"] .draw-palette { grid-template-columns: repeat(9, minmax(0, 1fr)) !important; gap: 3px !important; }
   body[data-page="draw"] .draw-tools button, body[data-page="draw"] .draw-toggles button, body[data-page="draw"] .draw-actions button, body[data-page="draw"] .draw-import > summary { border-radius: 10px !important; }
   body[data-page="draw"] .draw-toolbar svg, body[data-page="draw"] .draw-actions svg { width: 18px; height: 18px; }
-  body[data-page="draw"] .draw-import__options { top: 8px; max-height: calc(100dvh - 16px); overflow-y: auto; }
+  body[data-page="draw"] .draw-import__options { top: calc(var(--creation-editor-header, 64px) + 8px); max-height: calc(100dvh - var(--creation-editor-header, 64px) - var(--creation-editor-bottom, 88px) - 16px); overflow-y: auto; }
 }
 /* big screens: roomier column, bigger swatches and buttons */
 @media (orientation: landscape) and (min-width: 1000px) and (min-height: 640px) {

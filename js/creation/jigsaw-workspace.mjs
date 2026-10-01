@@ -1,4 +1,4 @@
-import { validateJigsawSource, validateJigsawGame, JIGSAW_MAX_SOURCE_PIXELS } from './jigsaw-core.mjs';
+import { validateJigsawSource, validateJigsawGame, JIGSAW_MAX_SOURCE_PIXELS } from './jigsaw-core.mjs?rev=20261001-free-tools-1';
 
 const MAX_PIECES = 4096;
 const MAX_POSE = 1e7;

@@ -1,5 +1,5 @@
 import { decodePxd, encodePxd } from './pxd-codec.mjs';
-import { sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20260930-shared-canvas-5';
+import { sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261001-free-tools-1';
 
 const DATABASE_NAME = 'pixieed-pxd-v1';
 const DATABASE_VERSION = 1;

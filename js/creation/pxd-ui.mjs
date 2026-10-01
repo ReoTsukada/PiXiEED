@@ -1,9 +1,9 @@
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
-import { createPxdStore } from './pxd-store.mjs';
-import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
+import { createPxdStore } from './pxd-store.mjs?rev=20261001-free-tools-1';
+import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
-import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261001-independent-1';
+import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261001-free-tools-1';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {

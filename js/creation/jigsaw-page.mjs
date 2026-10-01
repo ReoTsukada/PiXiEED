@@ -3,23 +3,22 @@ import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import {
   chunkJigsawPuzzleIds, collectPagedRows, fingerprintBytes, firstPublishedPixfindReferences, isSafeJigsawPixfindOriginalUrl, resolveLocalDrawRevision, validateJigsawSource, JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS
-} from './jigsaw-core.mjs?rev=20260928-jigsaw-pixfind-original-2';
+} from './jigsaw-core.mjs?rev=20261001-free-tools-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import {
   createJigsawLayout, createJigsawWorkspace, migrateLegacyJigsawGame,
   moveJigsawGroup, rotateJigsawGroup, snapJigsawGroup, worldGroupBounds,
   pieceAtPoint, sliceJigsawPieces, isJigsawWorkspaceComplete, validateJigsawWorkspace
-} from './jigsaw-workspace.mjs?rev=20260928-jigsaw-workspace-1';
+} from './jigsaw-workspace.mjs?rev=20261001-free-tools-1';
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
-import { supabaseConfig } from '../../data/site-config.js';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-independent-1';
-import { putPxdSharedImage } from './pxd-project.mjs?rev=20260930-shared-canvas-5';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-components-2';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-free-tools-1';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
-import { requestPass } from '../pixieed-pass.mjs?v=20260930-rewarded-gpt-1';
-import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20260928-hint-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20260930-result-back-1';
+import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261001-free-tools-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
@@ -67,12 +66,11 @@ function scheduleJigsawResult() {
 }
 const reduceJigsawHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 const jigsawHintButton = $('#jigsaw-hint');
-const jigsawHintController = createPuzzleHintController({ perk: 'jigsaw.hint', requestPass, onState: ({ freeUsed, pending }) => {
+const jigsawHintController = createPuzzleHintController({ onState: ({ pending }) => {
   if (!jigsawHintButton) return;
   jigsawHintButton.disabled = pending || !game || isJigsawWorkspaceComplete(game);
-  jigsawHintButton.dataset.hintShort = freeUsed ? 'パス' : '無料';
-  jigsawHintButton.setAttribute('aria-label', freeUsed ? 'ヒント（パス）' : 'ヒント（このパズルで1回無料）');
-  jigsawHintButton.title = freeUsed ? 'ヒント（パス）' : 'ヒント（このパズルで1回無料）';
+  jigsawHintButton.setAttribute('aria-label', 'ヒント');
+  jigsawHintButton.title = 'ヒント';
 } });
 const PUBLIC_BUCKETS = new Set(['post-public', 'social-posts']);
 const safePublicUrl = (bucket, path) => {
