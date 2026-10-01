@@ -25,7 +25,7 @@ export function createVisibleAnimationScheduler(env = globalThis) {
   }
   function hasActive() { return [...entries.values()].some(active); }
   function watchdogDelay() {
-    const fastestFrame = Math.min(...[...entries.values()].filter(active).map((entry) => Math.max(1000 / entry.fps, reducedMotion ? 1000 / 12 : 0)));
+    const fastestFrame = Math.min(...[...entries.values()].filter(active).map((entry) => Math.max(1000 / entry.fps, reducedMotion ? 1000 / 30 : 0)));
     return Math.max(18, Math.min(250, Math.ceil(fastestFrame + 1)));
   }
   function armWatchdog() {
@@ -49,7 +49,7 @@ export function createVisibleAnimationScheduler(env = globalThis) {
   function pump(time) {
     if (!hasActive()) { stopPump(); return; }
     for (const entry of [...entries.values()]) {
-      const period = Math.max(1000 / entry.fps, reducedMotion ? 1000 / 12 : 0);
+      const period = Math.max(1000 / entry.fps, reducedMotion ? 1000 / 30 : 0);
       if (!active(entry) || time - entry.lastDraw < period - 1) continue;
       try { entry.draw(time); entry.lastDraw = time; }
       catch { entries.delete(entry.element); observer?.unobserve(entry.element); }
@@ -74,11 +74,11 @@ export function createVisibleAnimationScheduler(env = globalThis) {
   env.addEventListener?.('pageshow', onPageShow);
 
   return {
-    add(element, draw, { fps = 30 } = {}) {
+    add(element, draw, { fps = 30, throttleRedraw = false } = {}) {
       if (disposed || !element || typeof draw !== 'function') return () => {};
       const requestedFps = Number(fps);
       const safeFps = Number.isFinite(requestedFps) ? Math.max(1, Math.min(60, requestedFps)) : 30;
-      const entry = { element, draw, fps: safeFps, visible: visible(element), lastDraw: -Infinity };
+      const entry = { element, draw, fps: safeFps, throttleRedraw, visible: visible(element), lastDraw: -Infinity };
       entries.set(element, entry);
       observer?.observe(element);
       if (entry.visible) arm();
@@ -89,7 +89,10 @@ export function createVisibleAnimationScheduler(env = globalThis) {
       if (!entry) return;
       entry.visible = visible(element);
       if (active(entry)) {
-        try { entry.draw(now()); entry.lastDraw = now(); }
+        const time = now();
+        const period = Math.max(1000 / entry.fps, reducedMotion ? 1000 / 30 : 0);
+        if (entry.throttleRedraw && time - entry.lastDraw < period - 1) { arm(); return; }
+        try { entry.draw(time); entry.lastDraw = time; }
         catch { entries.delete(element); observer?.unobserve(element); }
         arm();
       }

@@ -3,9 +3,9 @@
  *
  * The first screen is a pixel canvas — drag to draw, every new dot plays a note (a taste of the editor and
  * the sound tool together). Below it, each tool card runs a tiny live version of that tool. Toys animate only
- * while on screen. Reduced motion keeps a gentle update rate and suppresses the letter entrance and wave.
+ * while on screen. Reduced motion caps updates at 30 FPS and suppresses the letter entrance and wave.
  */
-import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-frames-1';
+import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
@@ -210,7 +210,7 @@ function hero() {
     canvas.width = W; canvas.height = H; ctx = canvas.getContext('2d'); img = ctx.createImageData(W, H);
     for (let i = 0; i < img.data.length; i += 4) { img.data[i] = NIGHT[0]; img.data[i + 1] = NIGHT[1]; img.data[i + 2] = NIGHT[2]; img.data[i + 3] = 255; }
     nightFrame = new Uint8ClampedArray(img.data);
-    sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; ink.clear();
+    sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; grains = 0; ink.clear();
     const bar = document.querySelector('.hp-tools').getBoundingClientRect();
     F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / cell)));
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
@@ -363,14 +363,14 @@ function hero() {
     }
   }
   function step(now) {
-    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    // falling sand and falling pieces: 60 small ticks a second (smooth on phones), same speeds as before
+    const dt = Math.max(0, Math.min(0.1, (now - lastT) / 1000)); lastT = now;
+    // Keep the simulation's speed at both the normal 60 FPS and reduced 30 FPS display rates.
     sandTick += dt;
-    if (sandTick >= TICK) {
-      // Keep fractional time while dropping any excess backlog: a delayed or reduced-motion paint
-      // must not trigger catch-up ticks later.
-      sandTick %= TICK; tickNo += 1;
+    while (sandTick >= TICK) {
+      // dt is capped at 100 ms, so a stalled tab cannot build an unlimited backlog.
+      sandTick -= TICK; tickNo += 1;
       // a released drawing drops as one piece, speeding up, until any of its dots touches something
+      let landed = false;
       for (const piece of pieces) {
         piece.v = Math.min(piece.v + 0.03 * K, 0.8 * K); piece.acc += piece.v;
         while (piece.acc >= 1 && !piece.landed) {
@@ -378,16 +378,16 @@ function hero() {
           if (piece.cells.some((c) => isSolid(c.x, c.y + 1))) piece.landed = true; else for (const c of piece.cells) c.y += 1;
         }
         if (piece.landed) {
-          for (const c of piece.cells) { let y = c.y; while (y >= 0 && sand[y * W + c.x]) y--; if (y >= 0) sand[y * W + c.x] = c.v; }
+          for (const c of piece.cells) { let y = c.y; while (y >= 0 && sand[y * W + c.x]) y--; if (y >= 0) { sand[y * W + c.x] = c.v; landed = true; } }
           const mid = piece.cells[piece.cells.length >> 1]; play(mid.v - 1, Math.round((mid.x / W) * 8), { volume: 0.05 });
         }
       }
       pieces = pieces.filter((piece) => !piece.landed);
       // the sand keeps its old pace (a few steps per 1/30 s) but spreads them evenly over the ticks
       sandBudget += Math.max(1, Math.round(K * 0.9)) / 2;
-      while (sandBudget >= 1) { sandBudget -= 1; sandStep(now); }
+      while (sandBudget >= 1) { sandBudget -= 1; if (grains || landed) sandStep(now); }
       // row clearing and the melting floor keep their old 30-a-second rhythm
-      if (tickNo % 2 === 0) {
+      if (tickNo % 2 === 0 && (grains || landed)) {
         // a full row vanishes, like Tetris: a flash, the row played as a phrase, and everything above drops
         let cleared = 0;
         for (let y = F - 1; y >= 0; y--) {
@@ -500,7 +500,7 @@ function hero() {
     }
     ctx.putImageData(img, 0, 0);
   }
-  const redraw = animate(stage, draw, { fps: 60 });
+  const redraw = animate(stage, draw, { fps: 60, throttleRedraw: true });
 
   let lastInkNote = 0;
   function inkAt(x, y) {
@@ -585,7 +585,7 @@ function hero() {
     redraw();
   });
   document.getElementById('hpClear').addEventListener('click', () => {
-    ink.clear(); sand.fill(0); caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
+    ink.clear(); sand.fill(0); grains = 0; caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
     for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12 * K; d.delay = d.li * 90 + Math.random() * 260; }
     start = performance.now(); note(0, { length: 0.25 }); note(4, { length: 0.25 }); redraw();
   });

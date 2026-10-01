@@ -51,7 +51,7 @@ test('reduced motion keeps gentle updates and only draws strictly visible entrie
   scheduler.add(browser.element(), () => visibleDraws++);
   scheduler.add(browser.element({ left: 101, top: 1, right: 120, bottom: 20, width: 19, height: 19 }), () => outsideDraws++);
   browser.tick(84); browser.tick(168); browser.tick(252);
-  assert.ok(visibleDraws >= 2, 'reduced mode continues at about 12 FPS');
+  assert.ok(visibleDraws >= 2, 'reduced mode continues at up to 30 FPS');
   assert.equal(outsideDraws, 0);
   const observer = [...browser.observed]; assert.equal(observer.length, 2);
   scheduler.dispose();
@@ -69,17 +69,17 @@ test('hidden documents stop all scheduled work and visibility restoration restar
 
 test('a single pump caps paint rates and responds to a live motion preference change', () => {
   const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env); let draws = 0;
-  scheduler.add(browser.element(), () => draws++);
+  scheduler.add(browser.element(), () => draws++, { fps: 60 });
   for (let frame = 1; frame <= 120; frame++) browser.tick(frame * 1000 / 120);
-  assert.ok(draws >= 29 && draws <= 31, `normal paint rate: ${draws}`);
+  assert.ok(draws >= 59 && draws <= 61, `normal paint rate: ${draws}`);
   const before = draws; scheduler.setReducedMotion(true);
   for (let frame = 121; frame <= 240; frame++) browser.tick(frame * 1000 / 120);
-  assert.ok(draws - before >= 11 && draws - before <= 13, `reduced paint rate: ${draws - before}`);
+  assert.ok(draws - before >= 29 && draws - before <= 31, `reduced paint rate: ${draws - before}`);
   assert.equal(browser.rafs.size, 1); assert.equal(browser.timers.size, 1);
   scheduler.dispose();
 });
 
-test('one 120 Hz pump supports a 60 FPS hero and 30 FPS cards, with a 12 FPS reduced cap', () => {
+test('one 120 Hz pump supports independent rates, with a 30 FPS reduced cap', () => {
   const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env);
   let heroDraws = 0; let cardDraws = 0;
   scheduler.add(browser.element(), () => heroDraws++, { fps: 60 });
@@ -91,8 +91,8 @@ test('one 120 Hz pump supports a 60 FPS hero and 30 FPS cards, with a 12 FPS red
   scheduler.setReducedMotion(true);
   const beforeHero = heroDraws; const beforeCard = cardDraws;
   for (let frame = 121; frame <= 240; frame++) browser.tick(frame * 1000 / 120);
-  assert.ok(heroDraws - beforeHero >= 11 && heroDraws - beforeHero <= 13, `reduced hero cap: ${heroDraws - beforeHero}`);
-  assert.ok(cardDraws - beforeCard >= 11 && cardDraws - beforeCard <= 13, `reduced card cap: ${cardDraws - beforeCard}`);
+  assert.ok(heroDraws - beforeHero >= 29 && heroDraws - beforeHero <= 31, `reduced hero cap: ${heroDraws - beforeHero}`);
+  assert.ok(cardDraws - beforeCard >= 29 && cardDraws - beforeCard <= 31, `reduced card cap: ${cardDraws - beforeCard}`);
   assert.equal(browser.rafs.size, 1); assert.equal(browser.timers.size, 1);
   scheduler.dispose();
 });
@@ -166,4 +166,21 @@ test('redraw draws once and reuses the pending shared frame; disposal disconnect
   assert.equal(draws, before + 1); assert.equal(browser.rafs.size, 1);
   scheduler.dispose();
   assert.equal(browser.rafs.size, 0); assert.equal(browser.timers.size, 0); assert.equal(browser.observed.size, 0);
+});
+
+test('throttled redraw never exceeds its rate during rapid input and paints the latest state later', () => {
+  for (const reduced of [false, true]) {
+    const browser = fakeBrowser(); const scheduler = createVisibleAnimationScheduler(browser.env);
+    scheduler.setReducedMotion(reduced);
+    let state = 0; const painted = [];
+    const el = browser.element(); scheduler.add(el, () => painted.push(state), { fps: 60, throttleRedraw: true });
+    scheduler.redraw(el); assert.deepEqual(painted, [0], 'first frame appears immediately');
+    for (let frame = 1; frame <= 120; frame++) { state = frame; browser.tick(frame * 1000 / 120); scheduler.redraw(el); }
+    const expected = reduced ? 30 : 60;
+    assert.ok(painted.length >= expected && painted.length <= expected + 1, `${expected} FPS cap during rapid input: ${painted.length}`);
+    state = 121; scheduler.redraw(el);
+    browser.tick(1040);
+    assert.equal(painted.at(-1), 121, 'next permitted frame paints the latest input');
+    scheduler.dispose();
+  }
 });

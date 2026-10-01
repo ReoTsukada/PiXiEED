@@ -64,6 +64,8 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
         assert.ok(automaticFrames >= 20 && automaticFrames <= 34, `${engine}: visible hero should paint near 60 FPS, got ${automaticFrames} frames in 500ms`);
       }
 
+      if (scenario.reduced) assert.ok(automaticFrames >= 10 && automaticFrames <= 18, `${engine}: reduced hero should paint near 30 FPS, got ${automaticFrames} frames in 500ms`);
+
       if (scenario.reduced) {
         await page.locator('#hpColors button').nth(4).click();
         const box = await page.locator('#hpCanvas').boundingBox();
