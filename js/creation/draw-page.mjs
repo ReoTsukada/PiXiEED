@@ -4,7 +4,7 @@ import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shel
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, resizeDrawRectangle, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261001-animation-1';
 import { createDrawAnimationSession } from './draw-animation-session.mjs';
-import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
+import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261002-tool-transfer-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
@@ -13,8 +13,8 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261002-tool-transfer-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-tool-transfer-1';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261002-project-cards-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-project-cards-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -238,19 +238,27 @@ function openColorEditor(index) {
 // the sheet sits just above the palette so the colours (and most of the picture) stay in view
 function placeColorEditor() {
   const editor = $('#draw-color-editor'); if (editor.hidden) return;
-  const row = $('.draw-control-row').getBoundingClientRect(); const h = editor.offsetHeight;
+  const row = $('.draw-control-row').getBoundingClientRect();
+  const header = document.querySelector('.px-site-header, .site-header, header')?.getBoundingClientRect();
+  const navigation = document.querySelector('.app-tabs')?.getBoundingClientRect();
+  const topLimit = Math.max(8, Math.ceil(header?.bottom ?? 0) + 8);
+  const bottomLimit = Math.max(topLimit, Math.min(innerHeight, navigation?.top ?? innerHeight) - 8);
+  editor.style.maxHeight = `${bottomLimit - topLimit}px`;
+  const h = Math.min(editor.offsetHeight, bottomLimit - topLimit);
   const above = row.top - h - 10; const below = row.bottom + 10;
-  editor.style.top = `${Math.round(above >= 8 || below + h > innerHeight - 8 ? Math.max(8, above) : below)}px`;
+  const top = above >= topLimit ? above : below + h <= bottomLimit ? below : topLimit;
+  editor.style.top = `${Math.round(Math.max(topLimit, Math.min(top, bottomLimit - h)))}px`;
 }
 scope.listen(window, 'resize', placeColorEditor); scope.listen(window, 'scroll', placeColorEditor, { passive: true });
 function setEditColor(hex) {
   if (!colorEdit) return;
+  if (documentData.palette[colorEdit.index] === hex) { syncColorEditor(false); return; }
   const candidate = [...documentData.palette]; candidate[colorEdit.index] = hex;
   if (usedColorCount({ ...documentData, palette: candidate }) > colorEdit.maxColors) { toast(`このキャンバスは最大${colorEdit.maxColors}色です。使用中の色を置き換えてください。`); return; }
   Object.assign(colorEdit, hexToHsl(hex));
   const palette = [...documentData.palette]; palette[colorEdit.index] = hex; documentData.palette = palette;
   const tile = document.querySelector(`.draw-color[data-color-index="${colorEdit.index}"]`); tile?.style.setProperty('--draw-color', hex);
-  showCurrentColor(); paint(); syncColorEditor(false);
+  saved = false; showCurrentColor(); paint(); syncColorEditor(false); pxdBridge?.markDirty();
 }
 function syncColorEditor(setInputs = true) {
   const e = colorEdit; if (!e) return; const hex = documentData.palette[e.index];
@@ -885,7 +893,7 @@ pxdBridge = mountWorkspace({
   async getProject(project) {
     if (scope.disposed) return project;
     if (readOnlyImage) return project;
-    endStroke(); closeColorEditor(); const timeline = animationSession.animation;
+    endStroke(); const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
     const snapshot = composeAnimationFrame(timeline, timeline.frames[0].id); const role = pxdImageRole;
     let next = project || createPxdProject();
     next = await writePxdDrawDocument(next, snapshot, role);

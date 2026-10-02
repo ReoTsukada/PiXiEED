@@ -33,7 +33,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-tool-transfer-1'; document.head.append(css);
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-project-cards-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
@@ -152,7 +152,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (!image) throw new Error('先に絵を描くか、画像を読み込んでください。');
     const prepared = prepareSharedCanvasImage(image, { passActive: true, width, height, maxColors, fit: 'contain' });
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261002-tool-transfer-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261002-project-cards-1');
       if (!await confirmPxdConversion({ image, document: prepared.image, title: 'キャンバスを確認', applyLabel: 'このサイズ・色を使う', message: `${width}×${height}px・${prepared.colorCount}色に変更します。ほかの絵・曲・パズルは変わりません。パズルの絵を変更する場合は正解を再確認してください。` })) return;
     }
     const candidate = await putProjectComponentImage(project, tool, prepared.image, role);
@@ -306,7 +306,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (closeSheet) dialog.close();
     try { await work(); operationError = ''; }
     catch (error) { if (session.dirty && session.currentProject?.entries.length) editedSinceOpen = true; operationError = error.message || '作品を開けませんでした。今の作品は保持しています。'; say(operationError); }
-    finally { locked = false; main.inert = false; main.setAttribute('aria-busy', 'false'); update(); }
+    finally { locked = false; main.inert = false; main.setAttribute('aria-busy', 'false'); update(); scheduleAutoSave(); }
   }
   async function refreshList() {
     const version = ++listEpoch;
@@ -343,11 +343,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         info.append(node('span', '', [item.summary.width && `${item.summary.width} × ${item.summary.height}`, lastMode && `前回: ${lastMode}`, item.summary.hasAudio ? '音楽あり' : 'ドット絵'].filter(Boolean).join(' · ')));
         const date = item.updatedAt ? new Date(item.updatedAt) : null; info.append(node('time', '', date && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '保存した作品'));
         const row = node('div', 'project-list__row'); row.dataset.name = (item.summary.name || '無題の作品').normalize('NFKC').toLocaleLowerCase('ja-JP');
-        const remove = button('', `project-delete-${item.projectId}`, () => void deleteProject(item));
+        const remove = button('', `project-delete-${item.projectId}`, () => void deleteProject(item, card));
         remove.className = 'project-card__delete'; remove.setAttribute('aria-label', `${item.summary.name || '無題の作品'}を削除`);
         remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';
         card.append(canvas, info); row.append(card, remove); list.append(row);
-        cardContextCleanups.push(bindContextAction(card, () => showCardActions(item, card, openCard)));
+        cardContextCleanups.push(bindContextAction(card, ({ source }) => {
+          if (source === 'hold') { void deleteProject(item, card, { fromHold: true }); return; }
+          return showCardActions(item, card, openCard);
+        }));
         card.addEventListener('keydown', (event) => {
           if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
           event.preventDefault(); showCardActions(item, card, openCard);
@@ -383,17 +386,43 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       }
     } catch (error) { importList.replaceChildren(node('p', '', '取り込み用の作品を読み出せませんでした。')); say(error.message); }
   }
-  async function confirmDelete(name) {
+  async function confirmDelete(item, card = null, { fromHold = false } = {}) {
     const confirmation = node('dialog', 'project-delete-dialog'); confirmation.setAttribute('aria-labelledby', 'project-delete-title');
     const heading = node('h2', '', '作品を削除しますか？'); heading.id = 'project-delete-title';
-    const text = node('p', '', `このツールの「${name}」を削除します。削除した作品から戻せます。他のツールの作品や公開済みの投稿は残ります。`);
+    const name = item.summary.name || '無題の作品';
+    const preview = node('div', 'project-delete-dialog__preview'); preview.setAttribute('aria-hidden', 'true');
+    const source = card?.querySelector('canvas');
+    if (source) {
+      const canvas = node('canvas'); canvas.width = source.width; canvas.height = source.height;
+      canvas.getContext('2d').drawImage(source, 0, 0); preview.append(canvas);
+    } else if (item.summary.thumbnail) {
+      const sample = item.summary.thumbnail; const canvas = node('canvas'); canvas.width = sample.width; canvas.height = sample.height;
+      const pixels = new Uint8ClampedArray(sample.width * sample.height * 4);
+      for (let i = 0; i < sample.width * sample.height; i++) { pixels.set(sample.rgb.slice(i * 3, i * 3 + 3), i * 4); pixels[i * 4 + 3] = 255; }
+      canvas.getContext('2d').putImageData(new ImageData(pixels, sample.width, sample.height), 0, 0); preview.append(canvas);
+    }
+    const projectName = node('p', 'project-delete-dialog__name', name);
+    const text = node('p', '', '削除した作品から戻せます。他の作品や公開済みの投稿は残ります。'); text.id = 'project-delete-description';
+    confirmation.setAttribute('aria-describedby', text.id);
     const controls = node('div', 'project-sheet__actions');
+    let cancel;
     return new Promise((resolve) => {
       let finished = false;
+      // The initiating finger may release over a newly displayed button. Only
+      // a fresh press (or keyboard activation) may act on the confirmation.
+      let openingTouch = fromHold;
+      confirmation.addEventListener('pointerdown', () => { openingTouch = false; }, { capture: true });
+      confirmation.addEventListener('click', (event) => {
+        if (!openingTouch || event.detail === 0) return;
+        openingTouch = false; event.preventDefault(); event.stopImmediatePropagation();
+      }, { capture: true });
       const finish = (value) => { if (finished) return; finished = true; confirmation.close(); confirmation.remove(); resolve(value); };
-      controls.append(button('やめる', 'project-delete-cancel', () => finish(false)), button('削除する', 'project-delete-confirm', () => finish(true)));
-      confirmation.append(heading, text, controls); document.body.append(confirmation);
-      confirmation.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); }); confirmation.showModal();
+      cancel = button('キャンセル', 'project-delete-cancel', () => finish(false));
+      // Releasing the held touch can focus the dialog itself; keep dismissal safe.
+      confirmation.addEventListener('focus', () => cancel.focus({ preventScroll: true }));
+      controls.append(cancel, button('削除する', 'project-delete-confirm', () => finish(true)));
+      confirmation.append(heading, preview, projectName, text, controls); document.body.append(confirmation);
+      confirmation.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); }); confirmation.showModal(); cancel.focus();
     });
   }
   function showCardActions(item, card, openCard) {
@@ -422,9 +451,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     sheet.append(preview, title, controls); document.body.append(sheet);
     sheet.addEventListener('cancel', (event) => { event.preventDefault(); close(); }); sheet.showModal();
   }
-  async function deleteProject(item) {
+  async function deleteProject(item, card = null, options = {}) {
     await transact(async () => {
-      if (!await confirmDelete(item.summary.name || '無題の作品')) return;
+      if (!await confirmDelete(item, card, options)) return;
       const current = item.projectId === session.currentProject?.projectId;
       const selected = current ? await save() : item;
       await store.deleteProject(item.projectId, { expectedRevisionId: selected.revisionId });
@@ -494,7 +523,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       const project = await save(); const source = await readPxdImage(project, componentImageRole(project, 'draw'));
       const before = await readPxdImage(project, componentImageRole(project, target));
       if (!source || !before) throw new Error('使う絵を確認できません。');
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261002-tool-transfer-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261002-project-cards-1');
       const message = target === 'audio' ? 'この作品の最新の絵で音符を作り直します。テンポ・楽器・色と音の設定は残します。編曲した音符は置き換わります。絵とパズル、公開済みの作品は変わりません。' : '作品の最新の絵で作り直します。正解やピースの配置はリセットされます。公開済みの作品は変わりません。';
       if (!await confirmPxdConversion({ image: before, document: source, title: target === 'audio' ? '最新の絵を曲に反映しますか？' : 'この絵を使いますか？', applyLabel: target === 'audio' ? '絵を曲に反映' : '絵を差し替える', message })) return;
       const candidate = await replaceProjectComponentImage(project, target, source);
@@ -533,12 +562,16 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     }
     return session.persisted;
   })();
+  function scheduleAutoSave() {
+    clearTimeout(timer); timer = 0;
+    if (!initialized || locked || initialSelectionPending || !session.dirty || !editedSinceOpen || failed || getPublicSources().length) return;
+    timer = setTimeout(() => { timer = 0; void save().catch((error) => say(`自動保存できませんでした：${error.message}。作品を切り替える前に保存してください。`)); }, 1000);
+  }
   function markDirty() {
     if (!initialized || locked || initialSelectionPending) return;
     if (getPublicSources().length) { update(); return; }
     editedSinceOpen = true;
-    session.markDirty(); failed = false; update(); clearTimeout(timer);
-    timer = setTimeout(() => { void save().catch((error) => say(`自動保存できませんでした：${error.message}。作品を切り替える前に保存してください。`)); }, 1000);
+    session.markDirty(); failed = false; update(); scheduleAutoSave();
   }
   const observer = new MutationObserver(() => { bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true'; }); observer.observe(main, { attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
   window.addEventListener('beforeunload', (event) => { if (session.dirty && editedSinceOpen || session.busy) { event.preventDefault(); event.returnValue = ''; } });

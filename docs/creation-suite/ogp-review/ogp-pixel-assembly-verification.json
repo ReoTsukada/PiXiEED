@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-10-02T10:38:12.916Z",
+  "width": 1200,
+  "height": 630,
+  "unit": 12,
+  "cellCount": 500,
+  "cellPixelChecks": 72000,
+  "colors": {
+    "ink": "#17232d",
+    "blue": "#315fd0",
+    "red": "#e75445",
+    "yellow": "#f1c84b",
+    "green": "#51a876",
+    "aqua": "#49afc1",
+    "purple": "#8d73b4",
+    "white": "#ffffff"
+  },
+  "copy": [
+    "一つのドットから、ひろがる。",
+    "ドットであそぼう"
+  ],
+  "textBounds": [
+    {
+      "text": "PiXiEED",
+      "x": 136,
+      "y": 56,
+      "right": 259.765625,
+      "bottom": 84
+    },
+    {
+      "text": "pixieed.jp",
+      "x": 1026.0625,
+      "y": 62,
+      "right": 1128,
+      "bottom": 85.64200592041016
+    },
+    {
+      "text": "一つのドットから、ひろがる。",
+      "x": 72,
+      "y": 130,
+      "right": 800,
+      "bottom": 182
+    },
+    {
+      "text": "ドットであそぼう",
+      "x": 72,
+      "y": 204.95999145507812,
+      "right": 392,
+      "bottom": 245
+    },
+    {
+      "text": "四角",
+      "x": 106,
+      "y": 502,
+      "right": 146,
+      "bottom": 522
+    },
+    {
+      "text": "組み合わせ",
+      "x": 244,
+      "y": 502,
+      "right": 344,
+      "bottom": 522
+    },
+    {
+      "text": "音楽",
+      "x": 466,
+      "y": 502,
+      "right": 506,
+      "bottom": 522
+    },
+    {
+      "text": "ゲーム",
+      "x": 672.796875,
+      "y": 502,
+      "right": 731.203125,
+      "bottom": 522
+    },
+    {
+      "text": "パズル",
+      "x": 888,
+      "y": 446,
+      "right": 948,
+      "bottom": 466
+    },
+    {
+      "text": "写真",
+      "x": 1054,
+      "y": 426,
+      "right": 1094,
+      "bottom": 446
+    },
+    {
+      "text": "絵",
+      "x": 998,
+      "y": 582,
+      "right": 1018,
+      "bottom": 602
+    }
+  ],
+  "network": "blocked",
+  "status": "review_only"
+}

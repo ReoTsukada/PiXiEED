@@ -85,6 +85,7 @@ button, a { font: inherit; }
 /* ---------- Bottom (above the shared nav) ---------- */
 .lc-bottom { position: absolute; left: 0; right: 0; bottom: calc(var(--lc-safe-b) + var(--lc-nav-h)); display: grid; gap: .6rem; justify-items: center; padding: 0 .8rem; pointer-events: none; z-index: 5; }
 .lc-bottom > * { pointer-events: auto; }
+.lc-settings-button { justify-self: end; min-width: 44px; min-height: 44px; margin: 0 env(safe-area-inset-right, 0px) .5rem 0; }
 .lc-feedback { pointer-events: none; min-height: 0; }
 .lc-toast:not(.pc-sr-only) { margin: 0; padding: .55rem 1rem; border-radius: 999px; background: var(--lc-glass-strong); font-size: .85rem; box-shadow: 0 10px 30px rgba(0,0,0,.35); animation: lc-in .25s var(--lc-ease); }
 .lc-toast.is-policy-notice:not(.pc-sr-only) { max-width: min(90vw, 32rem); white-space: normal; text-align: center; line-height: 1.45; border-radius: 1rem; }
@@ -198,6 +199,7 @@ button, a { font: inherit; }
 @keyframes lc-blink { 50% { opacity: 0; } }
 .lc[data-recording="true"] .lc-frame { box-shadow: 0 0 0 3px rgba(220, 38, 38, .9); }
 .lc[data-recording="true"] :is(.lc-tray, .lc-toolbar, .lc-top) { opacity: 0; pointer-events: none; transition: opacity .2s; }
+.lc[data-recording="true"] :is(#cameraSettingsPanel, #cameraSettings) { visibility: hidden; pointer-events: none; }
 
 #capture { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: none; position: relative; }
 #capture::after { content: ""; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; pointer-events: none; opacity: 0;
@@ -205,14 +207,14 @@ button, a { font: inherit; }
 .lc[data-recording="true"] ~ .pc-nav #capture::after { opacity: 1; }
 .lc[data-recording="true"] ~ .pc-nav .pc-nav-shutter { background: #dc2626; box-shadow: inset 0 0 0 3px #fff; transform: scale(.8); border-radius: 30%; }
 
-.lc-hint { position: absolute; inset: auto 1rem calc(var(--lc-safe-b) + var(--lc-nav-h) + 8.5rem); margin: 0 auto; max-width: 17rem; display: grid; gap: .5rem; padding: .9rem 1.1rem; border-radius: 1rem; background: var(--lc-glass-strong); color: var(--lc-text); font-size: .85rem; z-index: 6; pointer-events: none; animation: lc-in .3s var(--lc-ease); }
+.lc-hint { position: absolute; inset: auto 1rem calc(var(--lc-safe-b) + var(--lc-nav-h) + 4.5rem) auto; width: min(calc(100vw - 2rem), 17rem); margin: 0; display: grid; gap: .5rem; padding: .9rem 1.1rem; border-radius: 1rem; background: var(--lc-glass-strong); color: var(--lc-text); font-size: .85rem; z-index: 6; pointer-events: none; animation: lc-in .3s var(--lc-ease); }
 .lc-hint[hidden] { display: none; }
 .lc-hint p { display: flex; align-items: center; gap: .7rem; margin: 0; }
 .lc-hint b { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: rgba(255,255,255,.14); font-size: .9rem; }
 @media (prefers-reduced-motion: reduce) { .lc-frame.lc-flip { animation: none; } .lc-rec i { animation: none; } }
 
 /* ---- Folded settings: six tabs and their choices ---- */
-.lc-settings-wrap { display: grid; justify-items: center; gap: .45rem; width: min(100%, 27rem); max-height: min(42dvh, 17rem, calc(100dvh - var(--lc-safe-t) - var(--lc-safe-b) - var(--lc-nav-h) - 7rem)); overflow-y: auto; overscroll-behavior: contain; padding: .4rem; border: 1px solid rgba(255,255,255,.16); border-radius: 1.5rem; background: rgba(17,23,28,.72); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 14px 38px rgba(0,0,0,.3); }
+.lc-settings-wrap { display: grid; justify-items: center; gap: .45rem; width: min(100%, 27rem); max-height: min(42dvh, 17rem, calc(100dvh - var(--lc-safe-t) - var(--lc-safe-b) - var(--lc-nav-h) - 10rem)); overflow-y: auto; overscroll-behavior: contain; padding: .4rem; border: 1px solid rgba(255,255,255,.16); border-radius: 1.5rem; background: rgba(17,23,28,.72); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); box-shadow: 0 14px 38px rgba(0,0,0,.3); }
 .lc-settings-wrap[hidden] { display: none !important; }
 .lc-settings-wrap .lc-toolbar { width: 100%; }
 .lc-settings-wrap .lc-tray { order: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

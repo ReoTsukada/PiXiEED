@@ -1,0 +1,67 @@
+{
+  "width": 1200,
+  "height": 630,
+  "generatedAt": "2026-10-02T10:17:16.876Z",
+  "logoSource": "assets/brand/pixieed-logo-48.png",
+  "logoScale": 3,
+  "logoPixelChecks": 20736,
+  "bounds": [
+    {
+      "name": "logo",
+      "x": 80,
+      "y": 56,
+      "width": 144,
+      "height": 144,
+      "right": 224,
+      "bottom": 200
+    },
+    {
+      "name": "brand",
+      "x": 256,
+      "y": 96,
+      "width": 229.84375,
+      "height": 64,
+      "right": 485.84375,
+      "bottom": 160
+    },
+    {
+      "name": "H1",
+      "x": 80,
+      "y": 244,
+      "width": 636.8125,
+      "height": 208,
+      "right": 716.8125,
+      "bottom": 452
+    },
+    {
+      "name": "features",
+      "x": 84,
+      "y": 472,
+      "width": 384,
+      "height": 48,
+      "right": 468,
+      "bottom": 520
+    },
+    {
+      "name": "accent",
+      "x": 84,
+      "y": 568,
+      "width": 16,
+      "height": 16,
+      "right": 100,
+      "bottom": 584
+    },
+    {
+      "name": "domain",
+      "x": 116,
+      "y": 558,
+      "width": 118.375,
+      "height": 40,
+      "right": 234.375,
+      "bottom": 598
+    }
+  ],
+  "font": "\"Hiragino Sans\", \"Yu Gothic\", Meiryo, sans-serif",
+  "network": "blocked",
+  "preview": "ogp-brand-preview-600x315.png"
+}

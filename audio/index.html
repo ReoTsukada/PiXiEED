@@ -12,14 +12,14 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261001-text-contrast-1">
-  <link rel="stylesheet" href="/css/creation-audio.css?rev=20261002-header-layout-1">
+  <link rel="stylesheet" href="/css/creation-audio.css?rev=20261002-palette-layout-1">
   <link rel="stylesheet" href="/css/creation-animation.css?rev=20261001-direct-cels-1">
   <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/creation-editor.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/audio-instrument-icons.css?rev=20260930-audio-palette-1">
+  <link rel="stylesheet" href="/css/creation-editor.css?rev=20261002-palette-layout-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
@@ -48,7 +48,7 @@
         <div class="audio-tools creation-editor__tools-row" role="group" aria-label="音符を描く道具">
           <button id="audio-tool-pen" type="button" aria-pressed="true" aria-label="ペン"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg></button>
           <button id="audio-tool-eraser" type="button" aria-pressed="false" aria-label="消しゴム"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4 15l9-9 6 6-7 7H8z"/><path d="M9 10l6 6"/></svg></button>
-          <details id="audio-palette-settings" class="audio-popover audio-palette-settings"><summary aria-label="色と音色を設定" title="色と音色を設定"><img src="/assets/icons/instruments/music-settings.svg" alt="" aria-hidden="true"></summary><div class="audio-popover-body audio-palette-settings__body"><button id="audio-palette-close" class="audio-palette-close" type="button" aria-label="色と音色の設定を閉じる">×</button><div id="audio-palette-rows"></div></div></details>
+          <details id="audio-palette-settings" class="audio-popover audio-palette-settings"><summary aria-label="色と音色を設定" title="色と音色を設定"><img src="/assets/icons/instruments/music-settings.svg" alt="" aria-hidden="true"></summary><div class="audio-popover-body audio-palette-settings__body"><button id="audio-palette-close" class="audio-palette-close" type="button" aria-label="色と音色の設定を閉じる">×</button><div class="audio-palette-editor__current"><span id="audio-edit-color-swatch" aria-hidden="true"></span><strong id="audio-edit-color-name"></strong></div><div class="audio-palette-editor__tabs" role="group" aria-label="色と音の設定"><button type="button" data-audio-editor-view="color" aria-pressed="true">色</button><button type="button" data-audio-editor-view="sound" aria-pressed="false">音</button></div><section id="audio-color-editor-panel" class="audio-color-editor" aria-label="色を調整"><label><span>色相 <output id="audio-hue-value">0°</output></span><input id="audio-hue" type="range" min="0" max="359" step="1" value="0"></label><label><span>鮮やかさ <output id="audio-saturation-value">0%</output></span><input id="audio-saturation" type="range" min="0" max="100" step="1" value="0"></label><label><span>明るさ <output id="audio-lightness-value">0%</output></span><input id="audio-lightness" type="range" min="0" max="100" step="1" value="0"></label></section><section id="audio-sound-editor-panel" class="audio-sound-editor" aria-label="音を設定" hidden><p id="audio-slot-share-note" class="audio-instrument-legend"></p><div class="audio-sound-assign"><button id="audio-sound-unassign" class="audio-sound-unassign" type="button" aria-label="この色の音を外す" title="音を外す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6m0-6-5 6"/></svg></button><div id="audio-sound-slots" class="audio-sound-slots" role="group" aria-label="4つの音色レーン"></div></div><div id="audio-instrument-groups" class="audio-instrument-groups"></div></section></div></details>
           <details id="audio-composition-settings" class="audio-popover audio-composition-settings"><summary aria-label="テンポとキャンバスを設定"><span id="audio-size-chip" class="audio-size-chip" aria-hidden="true">16</span></summary><div class="audio-popover-body">
             <label class="audio-tempo"><span>テンポ</span><output id="audio-tempo-value" for="audio-tempo">120</output><input id="audio-tempo" type="range" min="60" max="180" step="1" value="120" aria-label="テンポ、1分あたりの拍数"></label>
             <label class="audio-size-label" for="audio-canvas-size">キャンバス</label><select id="audio-canvas-size" aria-label="キャンバスの大きさ"><option value="16">16 × 16</option><option value="32">32 × 16</option><option value="64">64 × 16</option><option value="128">128 × 16</option></select>
@@ -72,11 +72,11 @@
   </main>
   <nav class="app-tabs" aria-label="アプリナビゲーション">
     <a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
-    <button id="audio-play-toggle" type="button" aria-label="曲を再生" aria-pressed="false">再生</button>
+    <button id="audio-play-toggle" type="button" aria-label="曲を再生" aria-pressed="false" data-state="idle"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="audio-play-icon" d="M7 4.5v15l12-7.5z"/><path class="audio-stop-icon" d="M6 6h12v12H6z"/></svg></button>
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/audio-entry.mjs?rev=20261002-tool-transfer-1"></script>
+  <script type="module" src="/js/creation/audio-entry.mjs?rev=20261002-palette-layout-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
 </body>
 </html>

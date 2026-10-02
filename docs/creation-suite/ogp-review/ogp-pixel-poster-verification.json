@@ -1,0 +1,89 @@
+{
+  "unit": 10,
+  "cells": 893,
+  "groups": {
+    "origin": 1,
+    "controller": 420,
+    "music": 227,
+    "stream": 66,
+    "gathering": 18,
+    "puzzle": 47,
+    "camera": 70,
+    "picture": 44
+  },
+  "variants": {
+    "dark": {
+      "textBounds": [
+        {
+          "text": "PiXiEED",
+          "x": 126,
+          "y": 50,
+          "right": 236.25,
+          "bottom": 76
+        },
+        {
+          "text": "pixieed.jp",
+          "x": 1065.859375,
+          "y": 59,
+          "right": 1140,
+          "bottom": 76.3759994506836
+        },
+        {
+          "text": "一つのドットから、ひろがる。",
+          "x": 60,
+          "y": 128,
+          "right": 732,
+          "bottom": 176
+        },
+        {
+          "text": "ドットであそぼう",
+          "x": 64,
+          "y": 205,
+          "right": 320,
+          "bottom": 237
+        }
+      ],
+      "pixelChecks": 89300,
+      "width": 1200,
+      "height": 630
+    },
+    "light": {
+      "textBounds": [
+        {
+          "text": "PiXiEED",
+          "x": 126,
+          "y": 50,
+          "right": 236.25,
+          "bottom": 76
+        },
+        {
+          "text": "pixieed.jp",
+          "x": 1065.859375,
+          "y": 59,
+          "right": 1140,
+          "bottom": 76.3759994506836
+        },
+        {
+          "text": "一つのドットから、ひろがる。",
+          "x": 60,
+          "y": 128,
+          "right": 732,
+          "bottom": 176
+        },
+        {
+          "text": "ドットであそぼう",
+          "x": 64,
+          "y": 205,
+          "right": 320,
+          "bottom": 237
+        }
+      ],
+      "pixelChecks": 89300,
+      "width": 1200,
+      "height": 630
+    }
+  },
+  "generatedAt": "2026-10-02T10:51:33.777Z",
+  "network": "blocked",
+  "status": "review_only"
+}

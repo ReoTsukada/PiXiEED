@@ -47,6 +47,45 @@
 @media(max-width:360px){.audio-page{padding:6px 8px 6px;gap:6px}.audio-heading h1 img{display:none}.audio-heading h1{font-size:.92rem}.audio-header-actions{gap:3px}.audio-tracks{gap:6px}.audio-tools{gap:6px}}
 @media(orientation:landscape) and (max-height:500px){.audio-page{padding:4px 10px;gap:4px}.audio-heading{min-height:44px}.audio-workspace{flex-direction:row;gap:12px}.audio-controls{width:212px;align-self:center;gap:6px}.audio-tracks{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.audio-track-choice{min-height:44px!important;flex-direction:row;align-items:center;gap:6px}.audio-track-choice__mark{width:20px;height:20px;flex:none}.audio-track-choice__preset{min-width:0;font-size:.64rem}.audio-tools{gap:6px;flex-wrap:wrap}.audio-grid-wrap{height:100%;border-radius:16px}.audio-popover-body{position:fixed;right:12px;top:60px;bottom:auto;max-height:calc(100dvh - 152px)}.audio-more .audio-popover-body{top:60px}.audio-palette-settings__body{right:12px}}
 @media(prefers-reduced-motion:reduce){.audio-page button,.audio-page summary{transition:none;transform:none!important}}
+
+/* Compact source-color palette and one selected-color editor. */
+body.creation-editor[data-page="audio"] .audio-palette-editor__current{display:flex;align-items:center;gap:12px;min-height:58px;padding:2px 48px 8px 2px;clear:both}
+body.creation-editor[data-page="audio"] #audio-edit-color-swatch{display:block;flex:0 0 52px;width:52px;height:52px;border:2px solid #fff;border-radius:12px;background:var(--audio-edit-color,#fff);box-shadow:0 2px 8px #0005}
+body.creation-editor[data-page="audio"] #audio-edit-color-name{font:800 1rem/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+body.creation-editor[data-page="audio"] .audio-palette-editor__tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:0 0 10px}
+body.creation-editor[data-page="audio"] .audio-palette-editor__tabs button{min-height:40px;padding:6px 10px;border-radius:10px;background:#34434d;color:#fff}
+body.creation-editor[data-page="audio"] .audio-palette-editor__tabs button[aria-pressed="true"]{background:#ffd35a;color:#202a33;border-color:#ffd35a}
+body.creation-editor[data-page="audio"] .audio-color-editor{display:grid;gap:10px;padding:4px 2px 8px}
+body.creation-editor[data-page="audio"] .audio-color-editor label{display:grid;gap:4px;color:#f3f5f6;font-size:.76rem;font-weight:700}
+body.creation-editor[data-page="audio"] .audio-color-editor label span{display:flex;justify-content:space-between;gap:8px}
+body.creation-editor[data-page="audio"] .audio-color-editor output{font-variant-numeric:tabular-nums;color:#d3dbe0}
+body.creation-editor[data-page="audio"] .audio-color-editor input{width:100%;min-height:44px;margin:0;accent-color:#ffd35a;touch-action:pan-x}
+body.creation-editor[data-page="audio"] .audio-sound-assign{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;align-items:center}
+body.creation-editor[data-page="audio"] .audio-sound-unassign{display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:8px!important;background:#34434d;color:#fff;border-radius:10px}
+body.creation-editor[data-page="audio"] .audio-sound-slots{display:grid;grid-template-columns:repeat(4,minmax(44px,1fr));gap:6px;min-width:0}
+body.creation-editor[data-page="audio"] .audio-sound-slot{position:relative;display:grid;place-items:center;min-width:44px;min-height:48px;padding:6px!important;border:1px solid #ffffff35!important;border-radius:11px;background:#34434d!important;color:#fff}
+body.creation-editor[data-page="audio"] .audio-sound-slot[aria-pressed="true"]{border:2px solid #ffd35a!important;box-shadow:0 0 0 2px #ffd35a55!important}
+body.creation-editor[data-page="audio"] .audio-sound-slot .audio-instrument-icon{width:24px;height:24px;filter:brightness(0) invert(1)!important}
+body.creation-editor[data-page="audio"] .audio-sound-slot__dot{position:absolute;right:4px;bottom:4px;width:9px;height:9px;border:1px solid #fff;border-radius:50%}
+body.creation-editor[data-page="audio"] .audio-instrument-groups{display:grid;gap:6px;margin-top:10px}
+body.creation-editor[data-page="audio"] .audio-instrument-group{border:1px solid #ffffff24;border-radius:10px;background:#202c34}
+body.creation-editor[data-page="audio"] .audio-instrument-group>summary{min-height:40px;padding:9px 10px;color:#fff;font-weight:800;list-style:none;cursor:pointer}
+body.creation-editor[data-page="audio"] .audio-instrument-group>summary::-webkit-details-marker{display:none}
+body.creation-editor[data-page="audio"] .audio-instrument-group>summary::after{float:right;content:"＋";color:#ffd35a}
+body.creation-editor[data-page="audio"] .audio-instrument-group[open]>summary::after{content:"−"}
+body.creation-editor[data-page="audio"] .audio-instrument-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;padding:0 6px 6px}
+body.creation-editor[data-page="audio"] .audio-instrument-choices button{display:flex;align-items:center;gap:7px;min-width:0;min-height:42px;padding:5px 7px!important;text-align:left;border-radius:8px;background:#34434d;color:#fff;font-size:.74rem}
+body.creation-editor[data-page="audio"] .audio-instrument-choices button[aria-pressed="true"]{outline:2px solid #ffd35a;outline-offset:0;background:#45525a;color:#fff}
+body.creation-editor[data-page="audio"] .audio-instrument-choices .audio-instrument-icon{flex:0 0 22px;width:22px;height:22px;filter:brightness(0) invert(1)!important}
+body.creation-editor[data-page="audio"] .audio-instrument-choices button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.creation-editor[data-page="audio"] #audio-slot-share-note{margin:8px 0;color:#d5dfe4;font-size:.74rem;line-height:1.4}
+body.creation-editor[data-page="audio"] .audio-palette-settings .audio-palette-settings__body{top:auto;right:12px;bottom:calc(var(--creation-editor-bottom) + 8px);width:min(380px,calc(100vw - 24px));max-width:none;max-height:min(440px,calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 16px));overflow:auto;overscroll-behavior:contain}
+body.creation-editor[data-page="audio"] #audio-play-toggle{display:grid;place-items:center;width:54px;height:54px;min-width:54px;padding:0;border-radius:50%;font-size:0}
+body.creation-editor[data-page="audio"] #audio-play-toggle svg{width:24px;height:24px;fill:currentColor;stroke:none}
+body.creation-editor[data-page="audio"] #audio-play-toggle .audio-play-icon{display:block}
+body.creation-editor[data-page="audio"] #audio-play-toggle .audio-stop-icon{display:none}
+body.creation-editor[data-page="audio"] #audio-play-toggle[data-state="playing"] .audio-play-icon{display:none}
+body.creation-editor[data-page="audio"] #audio-play-toggle[data-state="playing"] .audio-stop-icon{display:block}
 /* Original image colours can share an instrument without recolouring the art. */
 .audio-pxd-colors{display:grid;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #26323820}
 .audio-pxd-color{display:grid;grid-template-columns:24px minmax(0,1fr) minmax(92px,1fr);align-items:center;gap:8px;font-size:11px}
