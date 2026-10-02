@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261001-free-tools-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261002-header-layout-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
 import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
@@ -4027,44 +4027,13 @@ function setupJapanMap(root, onScaleChange, onReset = () => {}, onRegionSelect =
   return { focusTo, reset, zoomTo };
 }
 
-function getPublicShellMarkup() {
-  return `
-    <div class="site-menu-backdrop" data-menu-backdrop hidden></div>
-    <aside class="site-menu" id="site-menu" data-site-menu hidden aria-labelledby="site-menu-title">
-      <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">メニュー</h2></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
-      <a class="site-menu__profile" href="/profile/" data-menu-link><span class="site-menu__avatar" aria-hidden="true">P</span><span><strong>自分のページ</strong><small>投稿・いいね・記録</small></span><span aria-hidden="true">›</span></a>
-      <nav class="site-menu__nav" aria-label="補助メニュー">
-        <div class="site-menu__group"><span class="site-menu__label">自分の記録</span><a href="/profile/?view=posts" data-menu-link>投稿した絵</a><a href="/profile/?view=likes" data-menu-link>いいねした作品</a><a href="/profile/?view=history" data-menu-link>読み取ったQR</a></div>
-        <div class="site-menu__group"><span class="site-menu__label">探す</span><a href="/globe/" data-menu-link>地図で作品を見る</a><a href="/stores/" data-menu-link>絵に会えるお店</a></div>
-        <div class="site-menu__group"><span class="site-menu__label">参加する</span><a href="/globe/?post=1" data-menu-link>ドット絵を投稿する</a></div>
-        <div class="site-menu__group"><span class="site-menu__label">案内</span><a href="/about/" data-menu-link>PiXiEEDについて</a><a href="/guide/" data-menu-link>利用ガイド</a><a href="/privacy/" data-menu-link>プライバシー</a></div>
-        <div class="site-menu__group"><span class="site-menu__label">設定</span><button type="button" data-menu-setting="display">表示設定</button><button type="button" data-menu-setting="privacy">プライバシー設定</button></div>
-      </nav>
-    </aside>
-    <dialog class="site-settings" data-site-settings aria-labelledby="site-settings-title">
-      <div class="site-settings__head"><div><span class="eyebrow">preferences</span><h2 id="site-settings-title">設定</h2></div><button class="site-settings__close" type="button" data-settings-close aria-label="設定を閉じる">×</button></div>
-      <section data-settings-panel="display">
-        <h3>表示設定</h3>
-        <label class="site-settings__switch"><input type="checkbox" data-setting-motion><span><strong>動きを控えめにする</strong><small>地図の移動や画面切り替えを短くします。</small></span></label>
-      </section>
-      <section data-settings-panel="privacy" hidden>
-        <h3>プライバシー設定</h3>
-        <p>PiXiEEDでは、個人を特定しない形で訪問・ページ閲覧・QR読み取り・いいねなどの集計を行い、作品や地図を改善します。</p>
-        <label class="site-settings__switch"><input type="checkbox" data-setting-analytics><span><strong>利用状況の集計を許可する</strong><small>オフにすると、この端末から新しい集計を送信しません。</small></span></label>
-        <button class="button button--quiet" type="button" data-settings-clear>この端末の解析記録を削除</button>
-        <p class="site-settings__status" data-settings-status role="status"></p>
-      </section>
-      <div class="site-settings__actions"><button class="button button--primary" type="button" data-settings-close>閉じる</button></div>
-    </dialog>`;
-}
-
 function renderPublicShell() {
   if (document.body.hasAttribute('data-admin-page')) return;
   const header = document.querySelector('.site-header');
   if (!header) return;
   const headerInner = header.querySelector('.header-inner') || header;
-  const brand = headerInner.querySelector('.brand')?.outerHTML || '<a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>';
-  headerInner.innerHTML = `${brand}<button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="メニューを開く"><span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i><i></i></span></button>`;
+  // The shared header module owns the brand and menu button. Keep tool-specific
+  // actions already mounted in this header intact.
   const brandLink = headerInner.querySelector('.brand'); if (brandLink) { brandLink.setAttribute('href', '/'); brandLink.setAttribute('aria-label', 'PiXiEED ホーム'); }
 
   let tabs = document.querySelector('.mobile-nav');
@@ -4123,122 +4092,16 @@ function renderPublicShell() {
 
   const footerLinks = document.querySelector('.footer-links');
   if (footerLinks) footerLinks.innerHTML = '<a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a>';
-  if (!document.querySelector('[data-site-menu]')) document.body.insertAdjacentHTML('beforeend', getPublicShellMarkup());
-
-  const menu = document.querySelector('[data-site-menu]');
-  const backdrop = document.querySelector('[data-menu-backdrop]');
-  const toggle = document.querySelector('[data-menu-toggle]');
-  const close = document.querySelector('[data-menu-close]');
-  let lastTrigger = null;
-  let menuPointerId = null;
-  let menuPointerStartX = 0;
-  let menuPointerStartY = 0;
-  let menuSwipeActive = false;
-  let suppressMenuClick = false;
-  const setMenuOpen = (open, returnFocus = false) => {
-    if (!menu || !backdrop || !toggle) return;
-    menu.hidden = !open;
-    backdrop.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
-    toggle.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く');
-    document.body.classList.toggle('is-menu-open', open);
-    if (open) {
-      lastTrigger = toggle;
-      window.requestAnimationFrame(() => close?.focus({ preventScroll: true }));
-    } else if (returnFocus) {
-      lastTrigger?.focus({ preventScroll: true });
-    }
-  };
-  toggle?.addEventListener('click', () => setMenuOpen(menu.hidden));
-  close?.addEventListener('click', () => setMenuOpen(false, true));
-  backdrop?.addEventListener('click', () => setMenuOpen(false, true));
-  menu?.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    menuPointerId = event.pointerId;
-    menuPointerStartX = event.clientX;
-    menuPointerStartY = event.clientY;
-    menuSwipeActive = false;
-  });
-  menu?.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== menuPointerId) return;
-    const deltaX = event.clientX - menuPointerStartX;
-    const deltaY = event.clientY - menuPointerStartY;
-    if (Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY)) menuSwipeActive = true;
-  });
-  const endMenuPointer = (event) => {
-    if (event.pointerId !== menuPointerId) return;
-    const deltaX = event.clientX - menuPointerStartX;
-    const deltaY = event.clientY - menuPointerStartY;
-    const shouldClose = menuSwipeActive && deltaX > 72 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2;
-    menuPointerId = null;
-    menuSwipeActive = false;
-    if (!shouldClose) return;
-    suppressMenuClick = true;
-    window.setTimeout(() => { suppressMenuClick = false; }, 350);
-    setMenuOpen(false, true);
-  };
-  menu?.addEventListener('pointerup', endMenuPointer);
-  menu?.addEventListener('pointercancel', endMenuPointer);
-  menu?.addEventListener('click', (event) => {
-    if (!suppressMenuClick) return;
-    event.preventDefault();
-    event.stopPropagation();
-    suppressMenuClick = false;
-  }, true);
-  menu?.querySelectorAll('[data-menu-link]').forEach((link) => link.addEventListener('click', () => setMenuOpen(false)));
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && menu && !menu.hidden) {
-      event.preventDefault();
-      setMenuOpen(false, true);
-    }
-  });
-  const settings = document.querySelector('[data-site-settings]');
-  const motionSetting = settings?.querySelector('[data-setting-motion]');
-  const analyticsSetting = settings?.querySelector('[data-setting-analytics]');
-  const settingsStatus = settings?.querySelector('[data-settings-status]');
-  const openSettings = (mode = 'display') => {
-    if (!settings) return;
-    setMenuOpen(false);
-    settings.querySelectorAll('[data-settings-panel]').forEach((panel) => {
-      panel.hidden = panel.dataset.settingsPanel !== mode;
+  if (!document.documentElement.dataset.appConsentHandler) {
+    document.documentElement.dataset.appConsentHandler = 'true';
+    document.addEventListener('pixieed:analytics-consent-change', () => {
+      if (!isAnalyticsAllowed()) {
+        analyticsQueue.splice(0);
+        analyticsTrackEvent = null;
+        analyticsPromise = null;
+      } else scheduleAnalytics();
     });
-    motionSetting.checked = applyMotionPreference();
-    analyticsSetting.checked = isAnalyticsAllowed();
-    if (settingsStatus) settingsStatus.textContent = '';
-    if (!settings.open) settings.showModal();
-  };
-  menu?.querySelectorAll('[data-menu-setting]').forEach((button) => button.addEventListener('click', () => openSettings(button.dataset.menuSetting || 'display')));
-  settings?.querySelectorAll('[data-settings-close]').forEach((button) => button.addEventListener('click', () => settings.close()));
-  settings?.addEventListener('click', (event) => { if (event.target === settings) settings.close(); });
-  motionSetting?.addEventListener('change', () => {
-    try { localStorage.setItem(MOTION_PREFERENCE_KEY, motionSetting.checked ? 'reduced' : 'full'); } catch { /* storage may be blocked */ }
-    applyMotionPreference();
-  });
-  analyticsSetting?.addEventListener('change', () => {
-    const allowed = analyticsSetting.checked;
-    try { localStorage.setItem(ANALYTICS_CONSENT_KEY, allowed ? 'granted' : 'denied'); } catch { /* storage may be blocked */ }
-    document.dispatchEvent(new Event('pixieed:analytics-consent-change'));
-    if (!allowed) {
-      analyticsQueue.splice(0);
-      analyticsTrackEvent = null;
-      analyticsPromise = null;
-      void import('./analytics.js?rev=20261001-free-tools-1').then(({ clearAnalyticsData }) => clearAnalyticsData()).catch(() => {});
-      if (settingsStatus) settingsStatus.textContent = 'この端末から新しい解析データを送らない設定にしました。';
-    } else {
-      if (settingsStatus) settingsStatus.textContent = '利用状況の集計を再び許可しました。';
-      scheduleAnalytics();
-    }
-  });
-  settings?.querySelector('[data-settings-clear]')?.addEventListener('click', () => {
-    analyticsSetting.checked = false;
-    try { localStorage.setItem(ANALYTICS_CONSENT_KEY, 'denied'); } catch { /* storage may be blocked */ }
-    document.dispatchEvent(new Event('pixieed:analytics-consent-change'));
-    analyticsQueue.splice(0);
-    analyticsTrackEvent = null;
-    analyticsPromise = null;
-    void import('./analytics.js?rev=20261001-free-tools-1').then(({ clearAnalyticsData }) => clearAnalyticsData()).catch(() => {});
-    if (settingsStatus) settingsStatus.textContent = 'この端末に保存していた解析用の識別子を削除しました。';
-  });
+  }
   applyMotionPreference();
 }
 

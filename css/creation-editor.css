@@ -5,7 +5,7 @@ body.creation-editor {
   --creation-panel-edge: #39454e;
   --creation-muted: #b8c0c2;
   --creation-yellow: #ffd35a;
-  --creation-editor-header: 64px;
+  --creation-editor-header: var(--px-header-height, 64px);
   --creation-editor-bottom: 84px;
   box-sizing: border-box;
   display: block;

@@ -7,9 +7,9 @@
 
 /* Editing mode follows the camera: the artwork owns the viewport and controls float at the edges. */
 body.hidden-object-editing{height:100%;min-width:320px;overflow:hidden;overscroll-behavior:none}
-body.hidden-object-editing .site-header,body.hidden-object-editing .site-footer,body.hidden-object-editing .hidden-heading{display:none}
+body.hidden-object-editing .site-footer,body.hidden-object-editing .hidden-heading{display:none}
 body.hidden-object-editing #hidden-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-body.hidden-object-editing .hidden-page{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;margin:0;padding:0;overflow:hidden}
+body.hidden-object-editing .hidden-page{position:fixed;inset:var(--px-header-height,64px) 0 0;width:100%;height:auto;min-height:0;margin:0;padding:0;overflow:hidden}
 body.hidden-object-editing .hidden-editor{position:absolute;inset:0;display:block;min-height:0}
 .hidden-preview{position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;margin:0;background:radial-gradient(ellipse at 50% 45%,#fff 0%,#f1f2ed 72%,#e7e9e3 100%)}
 .hidden-preview figcaption{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -33,7 +33,7 @@ body.hidden-object-editing .app-tabs{z-index:30}
   body.hidden-object-editing .hidden-preview canvas{width:min(calc(100vw - 12px),calc((100dvh - 7rem)*var(--hidden-aspect,1)));max-height:calc(100dvh - 7rem)}
 }
 @media(orientation:landscape) and (max-height:400px){
-  .app-page--tool-hidden-object:not(.hidden-object-editing) .site-header,.app-page--tool-hidden-object:not(.hidden-object-editing) .site-footer{display:none}
+  .app-page--tool-hidden-object:not(.hidden-object-editing) .site-footer{display:none}
   .app-page--tool-hidden-object:not(.hidden-object-editing) .hidden-page{padding-top:5px}
   .app-page--tool-hidden-object:not(.hidden-object-editing) .hidden-heading p,.app-page--tool-hidden-object:not(.hidden-object-editing) .hidden-setup p{display:none}
   .app-page--tool-hidden-object:not(.hidden-object-editing) .hidden-setup{grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:5px 8px;margin-top:3px;padding:8px}
@@ -72,6 +72,7 @@ body.hidden-object-editing .hidden-edit-hint { top: .75rem; bottom: auto !import
 /* the draft id is for the file, not for the person drawing */
 body.hidden-object-editing .hidden-source-label { position: absolute !important; width: 1px; height: 1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
 body.hidden-object-editing .hidden-settings { top: .6rem; }
+body.hidden-object-editing .site-header{display:block;position:sticky;top:0;z-index:35}
 @media (orientation: landscape) and (max-height: 500px) {
   body.hidden-object-editing .hidden-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
   body.hidden-object-editing .hidden-settings { top: .4rem; }

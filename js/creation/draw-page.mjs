@@ -6,15 +6,15 @@ import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER
 import { createDrawAnimationSession } from './draw-animation-session.mjs';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261001-direct-cels-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261002-tool-transfer-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261002-ux-polish-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-ux-polish-1';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261002-tool-transfer-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-tool-transfer-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -22,7 +22,7 @@ import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-ro
 import { encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-ux-polish-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 

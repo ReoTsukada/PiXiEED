@@ -161,6 +161,12 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
       const button = element('button', 'px-tool-result__action', String(action.label || '続ける')); button.type = 'button';
       button.addEventListener('click', action.onClick); actionsNode.append(button);
     }
+    if (doc.body.dataset.toolTransferReady === 'true' && !controls?.querySelector('#useCameraImage')) {
+      const transfer = element('button', 'px-tool-result__action', '他のツールへ');
+      transfer.type = 'button'; transfer.dataset.toolResultTransfer = '';
+      transfer.addEventListener('click', () => doc.dispatchEvent(new win.CustomEvent('pixieed:open-tool-transfer')));
+      actionsNode.append(transfer);
+    }
     if (!opened) {
       previousFocus = doc.activeElement; previousScroll = win.scrollY;
       suspended = [...main.children].filter((node) => node !== section && !node.matches('.lc-top,.audio-heading,.site-header'))
@@ -195,7 +201,8 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
     }
   }
   function onKey(event) {
-    if (opened && event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); close(); }
+    // A menu or project sheet above the result owns its own dismissal.
+    if (opened && event.key === 'Escape' && !doc.querySelector('dialog[open]') && !doc.body.classList.contains('is-menu-open')) { event.preventDefault(); event.stopImmediatePropagation(); close(); }
   }
   doc.addEventListener('keydown', onKey, true);
   win.addEventListener('resize', updateNavClearance);

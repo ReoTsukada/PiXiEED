@@ -17,16 +17,18 @@
 .project-mode-picker:not([open]) .project-modes { display: none; }
 .project-modes button { display: flex; align-items: center; gap: 5px; padding: 0 10px; font-size: 12px; }
 .project-modes button[aria-pressed=true] { opacity: 1; background: #ffd35a; border-color: #ffd35a; color: #202a33; }
-body.project-workspace-ready.creation-editor #main { padding-top: 62px !important; }
-body.project-workspace-ready.app-page--tool-jigsaw #main { padding-top: 62px; }
+body.project-workspace-ready.creation-editor #main { padding-top: calc(var(--px-header-height, 64px) - 2px) !important; }
+body.project-workspace-ready.app-page--tool-jigsaw #main { padding-top: calc(var(--px-header-height, 64px) - 2px); }
 body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) .project-bar { top: calc(var(--px-header-height, 64px) + 8px); }
-body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) :is(.hidden-preview, .spot-preview) { top: 62px; }
+body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) :is(.hidden-preview, .spot-preview) { top: 0; }
 body.project-workspace-ready :is(.hidden-settings summary, .spot-settings summary, .hidden-target-list button) { min-height: 44px; }
 body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) :is(.hidden-source-label, .spot-source-label) { display: none; }
-body.project-workspace-ready.hidden-object-editing :is(.hidden-settings, .hidden-edit-hint) { top: calc(env(safe-area-inset-top, 0px) + 62px); }
-body.project-workspace-ready.spot-editing .spot-settings { top: calc(env(safe-area-inset-top, 0px) + 62px); }
+body.project-workspace-ready.hidden-object-editing .hidden-settings { top: 8px; right: 12px; left: auto; }
+body.project-workspace-ready.hidden-object-editing .hidden-settings summary { margin-left: auto; }
+body.project-workspace-ready.hidden-object-editing .hidden-edit-hint { top: 62px; }
+body.project-workspace-ready.spot-editing .spot-settings { top: 8px; right: 12px; }
 body.project-workspace-ready:not(.hidden-object-editing).app-page--tool-hidden-object #main,
-body.project-workspace-ready:not(.spot-editing).app-page--tool-spot-difference #main { padding-top: 62px; }
+body.project-workspace-ready:not(.spot-editing).app-page--tool-spot-difference #main { padding-top: calc(var(--px-header-height, 64px) - 2px); }
 body[data-tool-result-open] .project-bar { display: none; }
 body.project-workspace-ready.creation-editor[data-tool-result-open] #main { padding-top: 8px !important; }
 body.project-workspace-ready .draw-meta { display: none; }
@@ -188,6 +190,16 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-sheet .project-card__delete { min-width: 44px; min-height: 44px; }
 .project-sheet .project-files summary { color: #dbe3e4; }
 .project-sheet .project-files { border-color: #485d69; }
+.project-transfer { margin-top: 18px; padding-top: 14px; border-top: 1px solid #485d69; }
+.project-transfer[hidden] { display: none; }
+.project-transfer h3 { margin: 0; color: #f3e6bd; font-size: 14px; }
+.project-transfer .project-sheet__note { margin: 5px 0 10px; }
+.project-transfer__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.project-sheet .project-transfer__button { display: flex; align-items: center; justify-content: flex-start; gap: 8px; min-width: 0; min-height: 44px; padding: 8px 10px; text-align: left; line-height: 1.35; overflow-wrap: anywhere; }
+.project-transfer__button svg { width: 20px; height: 20px; color: #ffe08a; }
+.project-transfer__button span { min-width: 0; }
+.project-transfer__button:hover:not(:disabled) { background: #344957; border-color: #8399a7; }
+@media (min-width: 520px) { .project-transfer__actions { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }
 @media (max-width: 420px) {
   .project-bar__open, .project-bar__open:only-child { width: 46px; min-width: 46px; max-width: 46px; padding: 0; }
   .project-sheet { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 20px); padding-inline: 12px; }

@@ -6,9 +6,9 @@
 
 /* The comparison image owns the editor viewport; its labels and actions float at the edges. */
 body.spot-editing{height:100%;min-width:320px;overflow:hidden;overscroll-behavior:none}
-body.spot-editing .site-header,body.spot-editing .site-footer,body.spot-editing .spot-heading{display:none}
+body.spot-editing .site-footer,body.spot-editing .spot-heading{display:none}
 body.spot-editing #spot-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-body.spot-editing .spot-page{position:fixed;inset:0;width:100%;height:100vh;height:100dvh;margin:0;padding:0;overflow:hidden}
+body.spot-editing .spot-page{position:fixed;inset:var(--px-header-height,64px) 0 0;width:100%;height:auto;min-height:0;margin:0;padding:0;overflow:hidden}
 body.spot-editing .spot-editor{position:absolute;inset:0;display:block;min-height:0}
 .spot-preview{position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;margin:0;background:radial-gradient(ellipse at 50% 45%,#fff 0%,#f1f2ed 72%,#e7e9e3 100%)}
 .spot-preview figcaption{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -32,7 +32,7 @@ body.spot-editing .spot-preview{bottom:calc(5rem + env(safe-area-inset-bottom))}
 body.spot-editing .spot-preview canvas{width:min(calc(100vw - 12px),calc((100dvh - 6.5rem)*var(--spot-aspect,1)));max-width:calc(100vw - 12px);max-height:calc(100dvh - 6.5rem)}
 @media(orientation:landscape) and (max-height:500px){body.spot-editing .spot-source-label{max-width:min(26vw,11rem)}body.spot-editing .spot-edit-hint{display:none}}
 @media(orientation:landscape) and (max-height:400px){
-  .app-page--tool-spot-difference:not(.spot-editing) .site-header,.app-page--tool-spot-difference:not(.spot-editing) .site-footer{display:none}
+  .app-page--tool-spot-difference:not(.spot-editing) .site-footer{display:none}
   .app-page--tool-spot-difference:not(.spot-editing) .spot-page{padding-top:5px}
   .app-page--tool-spot-difference:not(.spot-editing) .spot-heading p,.app-page--tool-spot-difference:not(.spot-editing) .spot-setup p{display:none}
   .app-page--tool-spot-difference:not(.spot-editing) .spot-setup{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 8px;margin-top:3px;padding:8px}

@@ -27,13 +27,13 @@ function button(label, id, action) { const el = node('button', '', label); el.ty
 function download(bytes, name) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); const link = node('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
-export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null }) {
+export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true }) {
   const store = createToolProjectStore(tool); let main = document.querySelector('#main') || document.querySelector('main');
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-save-language-2'; document.head.append(css);
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-tool-transfer-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
@@ -93,6 +93,25 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }));
   const saveButton = button('このブラウザーに保存', 'pxd-save', () => void transact(async () => { await save(); say('編集できる作品データをこのブラウザーに保存しました。'); await refreshList(); }, { close: false }));
   actions.append(duplicate, saveButton);
+  const transferSection = node('section', 'project-transfer');
+  transferSection.setAttribute('aria-labelledby', 'project-transfer-title');
+  const transferTitle = node('h3', '', '他のツールへ送る'); transferTitle.id = 'project-transfer-title';
+  const transferNote = node('p', 'project-sheet__note', '内容をコピーして、新しい作品として開きます。元の作品はそのまま残ります。');
+  const transferActions = node('div', 'project-transfer__actions');
+  const transferTargets = [['draw', '描く'], ['audio', '音楽'], ['jigsaw', 'ジグソー'], ['spot_difference', '間違い探し'], ['hidden_object', 'もの探し']]
+    .filter(([target]) => target !== tool)
+    .map(([target, label]) => {
+      const el = button('', `project-send-${target}`, () => void transact(async () => {
+        const project = await save();
+        await navigate(target, project, componentImageRole(project, tool));
+      }));
+      el.className = 'project-transfer__button';
+      el.dataset.projectTransfer = target;
+      el.innerHTML = `${icon(target)}<span>${label}</span>`;
+      transferActions.append(el);
+      return { target, el };
+    });
+  transferSection.append(transferTitle, transferNote, transferActions);
   const message = node('p', 'project-sheet__status'); message.id = 'pxd-file-status'; message.setAttribute('role', 'status');
   const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存した作品');
   const trash = node('details', 'project-files project-trash'); const trashSummary = node('summary', '', '削除した作品');
@@ -133,7 +152,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (!image) throw new Error('先に絵を描くか、画像を読み込んでください。');
     const prepared = prepareSharedCanvasImage(image, { passActive: true, width, height, maxColors, fit: 'contain' });
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-free-tools-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261002-tool-transfer-1');
       if (!await confirmPxdConversion({ image, document: prepared.image, title: 'キャンバスを確認', applyLabel: 'このサイズ・色を使う', message: `${width}×${height}px・${prepared.colorCount}色に変更します。ほかの絵・曲・パズルは変わりません。パズルの絵を変更する場合は正解を再確認してください。` })) return;
     }
     const candidate = await putProjectComponentImage(project, tool, prepared.image, role);
@@ -194,7 +213,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const importNote = node('p', 'project-sheet__note', 'コピーを新しい作品として取り込みます。編集しても元の作品は変わりません。');
   const importList = node('div', 'project-list'); importList.id = 'project-import-list';
   importSection.append(importNote, importList);
-  currentPane.append(currentRow, actions);
+  currentPane.append(currentRow, actions, transferSection);
   libraryPane.append(search, count, list, noMatches, trash);
   files.append(filesSummary, filesNote, fileActions, input);
   dialog.append(header, context, identity, message, currentPane, libraryPane, importSection, files); selectPane('library'); document.body.append(dialog);
@@ -241,6 +260,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const state = failed ? '保存失敗' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
     launcher.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     launcher.setAttribute('aria-label', `${name}・${state}。作品を開く`); launcher.title = `${name} · ${state}`;
+    document.body.dataset.toolTransferReady = String(getPublicSources().length === 0 && hasContent());
     const modeLabel = { draw: 'かんたんドット', audio: 'ドットで音楽', camera: 'ドット絵カメラ', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' }[tool] || '制作';
     contextTool.textContent = `${modeLabel}の作品`;
     identity.querySelector('svg').innerHTML = icons[tool] || icons.folder;
@@ -254,6 +274,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (!titleInput.matches(':focus')) titleInput.value = name;
     working.hidden = !project || Boolean(project.manifest.sharedCanvas) || !pxdImageRoles(project).includes('audio');
     for (const { role, el } of roleLinks) el.hidden = !project || Boolean(project.manifest.sharedCanvas) || !pxdImageRoles(project).includes(role);
+    const canTransfer = Boolean(!getPublicSources().length && hasContent());
+    transferSection.hidden = !canTransfer;
+    for (const { el } of transferTargets) el.disabled = locked || !canTransfer;
     original.hidden = !project?.entries.some(({ path }) => path === 'legacy/original.pxd');
     const shared = activeCanvas || project?.manifest.sharedCanvas;
     if (!canvasSettings.open) { widthInput.value = String(shared?.width || 16); heightInput.value = String(shared?.height || 16); colorsSelect.value = String((shared?.colorCount ?? shared?.colors?.length ?? 0) > 16 ? 32 : 16); }
@@ -422,15 +445,22 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       }, { close: false }))); trashList.append(row);
     }
   }
-  async function showProjects() {
+  async function showProjects({ pane, focusTransfer = false } = {}) {
     if (locked) return; modePicker.open = false; for (const el of main.querySelectorAll('details[open]')) el.open = false;
-    if (!dialog.open) { selectPane(session.persisted || editedSinceOpen ? 'current' : 'library'); dialog.showModal(); } update();
+    if (!dialog.open) { selectPane(pane || (session.persisted || editedSinceOpen ? 'current' : 'library')); dialog.showModal(); }
+    else if (pane) selectPane(pane);
+    update();
     if (!session.currentProject?.manifest.sharedCanvas) {
       const image = await readPxdSharedImage(session.currentProject);
       if (image) { widthInput.value = String(Math.min(256, image.width)); heightInput.value = String(Math.min(256, image.height)); }
     }
     message.textContent = operationError || ''; await Promise.all([refreshList(), refreshImports(), refreshTrash()]);
+    if (focusTransfer) transferTargets.find(({ el }) => !el.hidden && !el.disabled)?.el.focus();
   }
+  document.addEventListener('pixieed:open-tool-transfer', () => {
+    if (bar.hidden || locked) return;
+    void showProjects({ pane: 'current', focusTransfer: true });
+  });
   function syncShelfActiveMode() {
     for (const card of shelf.element.querySelectorAll('.project-component')) {
       const active = card.dataset.tool === tool; card.dataset.active = String(active);
@@ -464,7 +494,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       const project = await save(); const source = await readPxdImage(project, componentImageRole(project, 'draw'));
       const before = await readPxdImage(project, componentImageRole(project, target));
       if (!source || !before) throw new Error('使う絵を確認できません。');
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-free-tools-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261002-tool-transfer-1');
       const message = target === 'audio' ? 'この作品の最新の絵で音符を作り直します。テンポ・楽器・色と音の設定は残します。編曲した音符は置き換わります。絵とパズル、公開済みの作品は変わりません。' : '作品の最新の絵で作り直します。正解やピースの配置はリセットされます。公開済みの作品は変わりません。';
       if (!await confirmPxdConversion({ image: before, document: source, title: target === 'audio' ? '最新の絵を曲に反映しますか？' : 'この絵を使いますか？', applyLabel: target === 'audio' ? '絵を曲に反映' : '絵を差し替える', message })) return;
       const candidate = await replaceProjectComponentImage(project, target, source);

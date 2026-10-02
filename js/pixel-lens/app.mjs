@@ -14,8 +14,8 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261001-free-tools-1';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261002-ux-polish-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-ux-polish-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261002-tool-transfer-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -149,6 +149,7 @@ function updateSaveLinkState() {
   const enabled = state.mode === 'captured' && Boolean(state.result && downloadUrl);
   $('#resultControls').hidden = !enabled;
   $('#postCamera').hidden = Boolean(gif.pending);
+  $('#useCameraImage').hidden = Boolean(audioCameraRequest || gif.pending);
   link.setAttribute('aria-disabled', String(!enabled));
   link.setAttribute('tabindex', enabled ? '0' : '-1');
   if (!enabled) link.removeAttribute('href');
@@ -1534,7 +1535,20 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
 });
 const openedCameraPxd = await cameraPxd.ready;
 $('#useCameraImage').hidden = Boolean(audioCameraRequest);
-$('#useCameraImage').addEventListener('click', () => { void cameraPxd.showProjects?.(); });
+$('#useCameraImage').dataset.toolResultTransfer = '';
+$('#useCameraImage').textContent = '他のツールへ';
+$('#useCameraImage').addEventListener('click', async () => {
+  if (state.mode !== 'captured' || !state.result || gif.pending) return;
+  const generation = downloadGeneration;
+  const button = $('#useCameraImage'); button.disabled = true;
+  try {
+    await cameraPxd.save();
+    if (generation !== downloadGeneration || state.mode !== 'captured') return;
+    await cameraPxd.showProjects({ pane: 'current', focusTransfer: true });
+  } catch (error) {
+    say(error instanceof Error ? error.message : '撮影画像を送る準備ができませんでした。', { visible: true });
+  } finally { button.disabled = false; }
+});
 root.dataset.ready = String(openedCameraPxd);
 fitPreview();
 if (audioCameraInvalid) {

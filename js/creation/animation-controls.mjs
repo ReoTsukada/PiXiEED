@@ -507,7 +507,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   }
 
   function onKeydown(event) {
-    if (event.defaultPrevented) return;
+    // Native project/file dialogs own the keyboard while they are open.
+    if (event.defaultPrevented || document.querySelector('dialog[open]')) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       if (workspacePanel && workspaceOpen) { setWorkspaceOpen(false, { returnFocus: true }); return; }
