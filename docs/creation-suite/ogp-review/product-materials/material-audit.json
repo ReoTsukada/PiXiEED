@@ -1,0 +1,371 @@
+{
+  "source": "current local checkout",
+  "externalRequests": "blocked",
+  "userWorks": "none",
+  "camera": "synthetic stream only; no hardware permission",
+  "captures": {
+    "draw": {
+      "title": "かんたんドット｜ブラウザでドット絵を描こう｜PiXiEED",
+      "clip": {
+        "x": 10,
+        "y": 126,
+        "width": 680,
+        "height": 593
+      }
+    },
+    "audio": {
+      "title": "ドットで音楽｜絵を描いて作曲｜PiXiEED",
+      "clip": {
+        "x": 12,
+        "y": 126,
+        "width": 736,
+        "height": 473
+      }
+    },
+    "jigsaw": {
+      "title": "かんたんジグソー｜好きな絵で遊ぶ｜PiXiEED",
+      "clip": {
+        "x": 8,
+        "y": 226,
+        "width": 744,
+        "height": 454
+      }
+    },
+    "camera": {
+      "title": "ドット絵カメラ｜景色を撮ってPNG保存｜PiXiEED",
+      "clip": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 700
+      }
+    },
+    "globe": {
+      "title": "PiXiEED地球儀",
+      "clip": {
+        "x": 0,
+        "y": 0,
+        "width": 700,
+        "height": 700
+      }
+    },
+    "home": {
+      "title": "ホーム｜ドット絵であそぶ PiXiEED",
+      "clip": {
+        "x": 0,
+        "y": 64,
+        "width": 1200,
+        "height": 544
+      }
+    }
+  },
+  "audioColors": [
+    {
+      "name": "元画像の色 #49643c、矩形波。タップで選択、もう一度で編集",
+      "color": ""
+    },
+    {
+      "name": "元画像の色 #4c82c3、三角波。タップで選択、もう一度で編集",
+      "color": ""
+    },
+    {
+      "name": "元画像の色 #e7a52b、のこぎり波。タップで選択、もう一度で編集",
+      "color": ""
+    },
+    {
+      "name": "元画像の色 #9a6bb0、ノイズ。タップで選択、もう一度で編集",
+      "color": ""
+    },
+    {
+      "name": "色を追加",
+      "color": ""
+    }
+  ],
+  "jigsawCanvases": [
+    {
+      "id": "",
+      "class": "",
+      "width": 180,
+      "height": 64
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "jigsaw-board",
+      "class": "jigsaw-board",
+      "width": 744,
+      "height": 372
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "",
+      "class": "",
+      "width": 52,
+      "height": 52
+    },
+    {
+      "id": "jigsaw-preview-canvas",
+      "class": "jigsaw-preview__canvas",
+      "width": 32,
+      "height": 32
+    }
+  ],
+  "globeCanvases": [
+    {
+      "id": "skyCanvas",
+      "width": 700,
+      "height": 636
+    },
+    {
+      "id": "globeCanvas",
+      "width": 700,
+      "height": 636
+    },
+    {
+      "id": "",
+      "width": 300,
+      "height": 150
+    },
+    {
+      "id": "scopeCanvas",
+      "width": 300,
+      "height": 150
+    },
+    {
+      "id": "",
+      "width": 305,
+      "height": 47
+    }
+  ]
+}
