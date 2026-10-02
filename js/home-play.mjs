@@ -628,19 +628,26 @@ for (const canvas of document.querySelectorAll('[data-toy] canvas')) {
   fit();
   if (typeof ResizeObserver === 'function') new ResizeObserver(fit).observe(view);
 }
-// cards rise in one after another as they come into view
+// Initialize each preview shortly before its card comes into view.
+const initializedToys = new WeakSet();
+function initializeToy(el) {
+  if (initializedToys.has(el)) return;
+  initializedToys.add(el);
+  try { homeToys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
+}
+// Cards rise in one after another as they come into view.
 const reveal = typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => entries.forEach((entry) => {
   if (!entry.isIntersecting) return;
+  initializeToy(entry.target);
   const index = [...entry.target.parentElement.children].indexOf(entry.target);
   setTimeout(() => entry.target.classList.add('is-in'), reduced ? 0 : (index % 3) * 90);
   reveal.unobserve(entry.target);
-}), { threshold: 0.2 }) : null;
+}), { rootMargin: '180px 0px', threshold: 0.2 }) : null;
 document.querySelectorAll('.hp-toy').forEach((el) => {
   if (reveal) reveal.observe(el);
-  else el.classList.add('is-in');
+  else { el.classList.add('is-in'); initializeToy(el); }
 });
 for (const el of document.querySelectorAll('[data-toy]')) {
-  try { homeToys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
   // the "もうすぐ" toys are not links: touching them only plays, never navigates
   if (el.tagName !== 'A') el.addEventListener('click', (e) => e.preventDefault());
 }
@@ -678,4 +685,15 @@ async function feed() {
     slot.replaceChildren(track); slot.hidden = false;
   } catch { /* the home stays complete without the feed */ }
 }
-feed();
+function observeHomeFeed() {
+  const slot = document.querySelector('[data-home-feed]'); if (!slot) return;
+  if (typeof IntersectionObserver !== 'function') { void feed(); return; }
+  const section = slot.closest('section') || slot;
+  const observer = new IntersectionObserver(([entry]) => {
+    if (!entry?.isIntersecting) return;
+    observer.disconnect();
+    void feed();
+  }, { rootMargin: '320px 0px' });
+  observer.observe(section);
+}
+observeHomeFeed();

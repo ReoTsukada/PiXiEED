@@ -13,8 +13,8 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261001-free-tools-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-project-panel-1';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261002-ux-polish-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-ux-polish-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -22,7 +22,7 @@ import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-ro
 import { encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261001-free-tools-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-ux-polish-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 
@@ -601,15 +601,15 @@ async function saveRevision() {
     if (scope.disposed) return revision;
     if (sourceDocument !== documentData || sourceProjectId !== pxdBridge?.currentProject?.projectId) return revision;
     activeDraftId = draftId; baseRevisionId = revision.revisionId; saved = true;
-    if (!setLastDraftId(draftId)) { status.textContent = projectSaved ? 'プロジェクトを保存しました。端末の再開用コピーの目印は残せませんでした。' : '絵は端末に保存しましたが、再開用の目印を残せませんでした。'; }
-    else status.textContent = projectSaved ? 'PXDプロジェクトと端末の再開用コピーを保存しました。' : '端末に保存しました。';
+    if (!setLastDraftId(draftId)) { status.textContent = '作品をこのブラウザーに保存しました。作品一覧から開いてください。'; }
+    else status.textContent = '作品をこのブラウザーに保存しました。';
     resumeButton.hidden = false; $('#draw-copy-last').hidden = false;
     return revision;
   } catch (error) {
     if (scope.disposed) return null;
     if (projectSaved) {
       saved = true;
-      status.textContent = `プロジェクトは保存しました。端末の再開用コピーを保存できませんでした：${error.message || '端末の空き容量を確認してください。'}`;
+      status.textContent = `作品は保存しました。復元用のコピーを保存できませんでした：${error.message || '端末の空き容量を確認してください。'}`;
       return { document: snapshot, projectSaved: true };
     }
     status.textContent = `保存できませんでした：${error.message || '端末の空き容量を確認してください。'}`;

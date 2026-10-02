@@ -124,7 +124,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
       + (Number.parseFloat(innerStyle.paddingBottom) || 0);
     const contentMinHeight = landscape
       ? Math.max(64, headingNode.getBoundingClientRect().height, actionGroupNode.getBoundingClientRect().height) + verticalPadding
-      : headingNode.getBoundingClientRect().height + (previewBox.hidden ? 0 : 64)
+      : headingNode.getBoundingClientRect().height + (previewBox.hidden ? 0 : 128)
         + actionGroupNode.getBoundingClientRect().height + gap * 2 + verticalPadding;
     const reservedHeight = Number.parseFloat(win.getComputedStyle(node).getPropertyValue('--px-display-ad-reserved-height'));
     const adHeight = Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 145;

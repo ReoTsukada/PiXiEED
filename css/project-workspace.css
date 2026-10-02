@@ -173,7 +173,7 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-sheet__identity > svg { width: 20px; height: 20px; color: #9db1bd; }
 .project-sheet__identity > span { display: grid; gap: 2px; min-width: 0; }
 .project-sheet__identity strong { overflow: hidden; color: #f5f4ed; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.project-sheet__identity small { color: #aabac2; font-size: 11px; }
+.project-sheet__identity small { color: #e7cf8c; font-size: 11px; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
 .project-sheet__identity[data-state=saved] small { color: #a6d6b0; }
 .project-sheet__identity[data-state=error] small { color: #ff9d8e; }
 .project-sheet__toolbar { gap: 8px; margin-top: 0; }

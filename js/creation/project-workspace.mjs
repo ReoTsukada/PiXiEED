@@ -33,9 +33,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-project-panel-1'; document.head.append(css);
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261002-save-language-2'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
-  const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールのプロジェクト');
+  const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
   launcher.innerHTML = `${icon('folder')}<span class="project-bar__name" aria-hidden="true"></span><span class="project-bar__state" aria-hidden="true"></span>`;
   const modes = [['draw', '描く'], ['audio', '音楽'], ['camera', '撮る'], ['jigsaw', 'ジグソー'], ['spot_difference', '間違い探し'], ['hidden_object', 'もの探し']];
@@ -65,8 +65,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   document.addEventListener('pointerdown', (event) => { if (!modePicker.contains(event.target)) modePicker.open = false; });
   const dialog = node('dialog', 'project-sheet'); dialog.id = 'pxd-panel'; dialog.setAttribute('aria-labelledby', 'project-sheet-title');
   const heading = node('div', 'project-sheet__heading'); const title = node('h2', '', '作品を管理'); title.id = 'project-sheet-title';
-  const close = button('', 'project-close', () => dialog.close()); close.innerHTML = icon('close'); close.setAttribute('aria-label', 'プロジェクト一覧を閉じる'); heading.append(title, close);
-  const note = node('p', 'project-sheet__note', 'このブラウザーに保存します。続きはプロジェクト一覧から開けます。');
+  const close = button('', 'project-close', () => dialog.close()); close.innerHTML = icon('close'); close.setAttribute('aria-label', '作品一覧を閉じる'); heading.append(title, close);
+  const note = node('p', 'project-sheet__note', '編集内容はこのブラウザーに自動保存します。画像として使うときは、ツールの画像保存を選んでください。');
   const currentRow = node('div', 'project-sheet__current'); const titleLabel = node('label', '', '作品名'); titleLabel.htmlFor = 'project-title';
   const titleInput = node('input'); titleInput.id = 'project-title'; titleInput.maxLength = 60; titleInput.autocomplete = 'off';
   const rename = button('名前を保存', 'project-rename', () => { const name = titleInput.value; void transact(async () => { session.rename(name); await save(); await refreshList(); }, { close: false }); });
@@ -75,7 +75,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const newButton = button('＋ 新規', 'project-new', () => void transact(async () => {
     if (session.persisted || editedSinceOpen) await save();
     await session.adopt(blankProject(), { persisted: false, apply: true }); resetPointer(); initialSelectionPending = false;
-    dialog.close(); say('新しいプロジェクトを作りました。');
+    dialog.close(); say('新しい作品を作りました。');
   }, { close: false }));
   const duplicate = button('複製', 'project-duplicate', () => void transact(async () => {
     let source;
@@ -89,28 +89,28 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     }
     const project = forkProject(source, { title: `${session.currentProject.manifest.title || '作品'} のコピー` });
     // Apply validates the editable components before this copy becomes active.
-    await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別のプロジェクトとして複製しました。');
+    await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別の作品として複製しました。');
   }));
-  const saveButton = button('プロジェクトを保存', 'pxd-save', () => void transact(async () => { await save(); say('この端末に保存しました。'); await refreshList(); }, { close: false }));
+  const saveButton = button('このブラウザーに保存', 'pxd-save', () => void transact(async () => { await save(); say('編集できる作品データをこのブラウザーに保存しました。'); await refreshList(); }, { close: false }));
   actions.append(duplicate, saveButton);
   const message = node('p', 'project-sheet__status'); message.id = 'pxd-file-status'; message.setAttribute('role', 'status');
-  const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存したプロジェクト');
-  const trash = node('details', 'project-files project-trash'); const trashSummary = node('summary', '', '削除したプロジェクト');
+  const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存した作品');
+  const trash = node('details', 'project-files project-trash'); const trashSummary = node('summary', '', '削除した作品');
   const trashList = node('div', 'project-trash__list'); trash.append(trashSummary, trashList);
-  const files = node('details', 'project-files'); const filesSummary = node('summary', '', 'バックアップ・読み込み'); const fileActions = node('div', 'project-sheet__actions');
-  const filesNote = node('p', 'project-sheet__note project-files__note', '以前の保存データを、このツールの新しい作品として取り込みます。元の作品は変わりません。');
+  const files = node('details', 'project-files'); const filesSummary = node('summary', '', '編集用ファイル・読み込み'); const fileActions = node('div', 'project-sheet__actions');
+  const filesNote = node('p', 'project-sheet__note project-files__note', '作品の編集を続けられるPXDファイルを端末に保存します。画像ファイルの保存とは別の形式です。以前の保存データは、このツールの新しい作品として取り込みます。');
   const input = node('input'); input.type = 'file'; input.accept = '.pxd,application/octet-stream'; input.id = 'pxd-file-input'; input.hidden = true;
-  fileActions.append(button('旧保存ファイルを取り込む', 'pxd-open', () => input.click())); const legacyExport = button('バックアップを保存（PXD）', 'pxd-export', () => void transact(async () => {
-    const project = await save(); download(await encodePxd(project), `${sanitizeProjectTitle(project.manifest.title) || 'pixieed'}.pxd`); say('PXDを書き出しました。');
+  fileActions.append(button('以前の作品を取り込む', 'pxd-open', () => input.click())); const legacyExport = button('編集用ファイルを端末に保存', 'pxd-export', () => void transact(async () => {
+    const project = await save(); download(await encodePxd(project), `${sanitizeProjectTitle(project.manifest.title) || 'pixieed'}.pxd`); say('編集を続けられるPXDバックアップを端末に保存しました。');
   })); legacyExport.hidden = true;
-  const linksHeading = node('h3', 'project-sheet__links-heading', 'このプロジェクト');
+  const linksHeading = node('h3', 'project-sheet__links-heading', 'この作品');
   const links = node('div', 'project-sheet__actions project-sheet__links');
   links.hidden = true;
   const working = button('音楽の絵を描く', 'pxd-to-audio-image', () => void transact(async () => { await navigate('draw', await save(), 'audio'); })); links.append(working);
   const roleLinks = [['spot-after', 'pxd-to-spot-after', '変更後の絵を描く'], ['hidden', 'pxd-to-hidden-image', 'もの探しの絵を描く'], ['draw', 'pxd-to-draw-image', '描画用の絵を開く']].map(([role, id, label]) => {
     const el = button(label, id, () => void transact(async () => { await navigate('draw', await save(), role); })); links.append(el); return { role, el };
   });
-  const original = button('読み込んだ旧PXDを保存', 'pxd-export-original', () => void transact(async () => {
+  const original = button('読み込んだPXD原本を端末に保存', 'pxd-export-original', () => void transact(async () => {
     const project = await save(); const entry = project.entries.find(({ path }) => path === 'legacy/original.pxd');
     if (!entry) throw new Error('旧PXDの原本が見つかりません。'); download(entry.bytes, 'pixieed-original.pxd');
   })); fileActions.append(original);
@@ -146,7 +146,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     onEditImage: (target) => void transact(async () => { const project = await save(); await navigate('draw', project, componentImageRole(project, target)); }),
     onReplace: (target) => void replaceComponent(target)
   });
-  const tabs = node('div', 'project-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'プロジェクトの操作');
+  const tabs = node('div', 'project-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '作品の操作');
   const currentPane = node('section', 'project-pane'); currentPane.id = 'project-current-pane';
   const libraryPane = node('section', 'project-pane'); libraryPane.id = 'project-library-pane';
   const currentTab = button('この作品', 'project-tab-current', () => selectPane('current'));
@@ -170,7 +170,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   identity.innerHTML = `${icon(tool)}<span><strong></strong><small></small></span>`;
   const identityName = identity.querySelector('strong'); const identityMeta = identity.querySelector('small');
   const toolbar = node('div', 'project-sheet__toolbar'); toolbar.append(tabs, newButton);
-  const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存したプロジェクトを作品名で探す');
+  const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存した作品を作品名で探す');
   const count = node('p', 'project-library-count'); count.setAttribute('role', 'status');
   const noMatches = node('p', 'project-list__empty', 'この名前の作品は見つかりません。'); noMatches.hidden = true;
   function filterList() {
@@ -233,14 +233,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const project = session?.currentProject;
     dialog.dataset.startup = String(initialSelectionPending);
     title.textContent = initialSelectionPending ? '作品を選ぶ' : '作品を管理';
-    note.textContent = initialSelectionPending ? '保存した作品を開くか、新しい作品を始めてください。' : 'このブラウザーに保存します。続きはプロジェクト一覧から開けます。';
+    note.textContent = initialSelectionPending ? '保存した作品を開くか、新しい作品を始めてください。' : '編集内容はこのブラウザーに自動保存します。画像やPXDファイルは、それぞれの保存操作で端末に保存します。';
     newButton.textContent = initialSelectionPending ? '＋ 新しい作品' : '＋ 新規';
     bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true' || getPublicSources().length > 0;
     const name = initialized ? sanitizeProjectTitle(project?.manifest.title) : '開いています…';
     launcher.querySelector('.project-bar__name').textContent = name;
-    const state = failed ? '保存できませんでした' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
+    const state = failed ? '保存失敗' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
     launcher.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
-    launcher.setAttribute('aria-label', `${name}・${state}。プロジェクトを開く`); launcher.title = `${name} · ${state}`;
+    launcher.setAttribute('aria-label', `${name}・${state}。作品を開く`); launcher.title = `${name} · ${state}`;
     const modeLabel = { draw: 'かんたんドット', audio: 'ドットで音楽', camera: 'ドット絵カメラ', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' }[tool] || '制作';
     contextTool.textContent = `${modeLabel}の作品`;
     identity.querySelector('svg').innerHTML = icons[tool] || icons.folder;
@@ -282,7 +282,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     locked = true; clearTimeout(timer); main.inert = true; main.setAttribute('aria-busy', 'true'); update();
     if (closeSheet) dialog.close();
     try { await work(); operationError = ''; }
-    catch (error) { if (session.dirty && session.currentProject?.entries.length) editedSinceOpen = true; operationError = error.message || 'プロジェクトを開けませんでした。今の作品は保持しています。'; say(operationError); }
+    catch (error) { if (session.dirty && session.currentProject?.entries.length) editedSinceOpen = true; operationError = error.message || '作品を開けませんでした。今の作品は保持しています。'; say(operationError); }
     finally { locked = false; main.inert = false; main.setAttribute('aria-busy', 'false'); update(); }
   }
   async function refreshList() {
@@ -306,10 +306,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
               await store.save(copy, { expectedRevisionId: null }); keptCopy = true;
             }
           }
-          const project = await store.load(item.projectId); if (!project) throw new Error('このプロジェクトが見つかりません。');
+          const project = await store.load(item.projectId); if (!project) throw new Error('この作品が見つかりません。');
           await session.adopt(project, { persisted: true, apply: true }); resetPointer(); remember(session.currentProject);
           initialSelectionPending = false; dialog.close();
-          say(keptCopy ? 'このタブの編集は別のプロジェクトに保存し、選んだ作品を開きました。' : 'プロジェクトを開きました。');
+          say(keptCopy ? 'このタブの編集は別の作品に保存し、選んだ作品を開きました。' : '作品を開きました。');
         }, { close: false });
         const card = button('', `project-${item.projectId}`, openCard);
         card.className = 'project-card'; card.dataset.projectId = item.projectId; card.setAttribute('aria-current', String(item.projectId === session.currentProject?.projectId));
@@ -321,7 +321,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         const date = item.updatedAt ? new Date(item.updatedAt) : null; info.append(node('time', '', date && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '保存した作品'));
         const row = node('div', 'project-list__row'); row.dataset.name = (item.summary.name || '無題の作品').normalize('NFKC').toLocaleLowerCase('ja-JP');
         const remove = button('', `project-delete-${item.projectId}`, () => void deleteProject(item));
-        remove.className = 'project-card__delete'; remove.setAttribute('aria-label', `${item.summary.name || '無題の作品'}をプロジェクトごと削除`);
+        remove.className = 'project-card__delete'; remove.setAttribute('aria-label', `${item.summary.name || '無題の作品'}を削除`);
         remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';
         card.append(canvas, info); row.append(card, remove); list.append(row);
         cardContextCleanups.push(bindContextAction(card, () => showCardActions(item, card, openCard)));
@@ -362,8 +362,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   async function confirmDelete(name) {
     const confirmation = node('dialog', 'project-delete-dialog'); confirmation.setAttribute('aria-labelledby', 'project-delete-title');
-    const heading = node('h2', '', 'プロジェクトを削除しますか？'); heading.id = 'project-delete-title';
-    const text = node('p', '', `このツールの「${name}」を削除します。削除したプロジェクトから戻せます。他のツールの作品や公開済みの投稿は残ります。`);
+    const heading = node('h2', '', '作品を削除しますか？'); heading.id = 'project-delete-title';
+    const text = node('p', '', `このツールの「${name}」を削除します。削除した作品から戻せます。他のツールの作品や公開済みの投稿は残ります。`);
     const controls = node('div', 'project-sheet__actions');
     return new Promise((resolve) => {
       let finished = false;
@@ -388,13 +388,13 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const copy = button('複製', 'project-card-actions-copy', () => {
       close(); void transact(async () => {
         if (session.persisted || editedSinceOpen) await save();
-        const original = await store.load(item.projectId); if (!original) throw new Error('このプロジェクトは削除されたか、保存先に見つかりません。');
+        const original = await store.load(item.projectId); if (!original) throw new Error('この作品は削除されたか、保存先に見つかりません。');
         const project = forkProject(original, { title: `${original.manifest.title || '作品'} のコピー` });
-        await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別のプロジェクトとして複製しました。');
+        await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別の作品として複製しました。');
       });
     });
     const remove = button('削除', 'project-card-actions-delete', () => { close(); void deleteProject(item); });
-    remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>プロジェクトを削除</span>';
+    remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>作品を削除</span>';
     controls.append(open, copy, remove, button('閉じる', 'project-card-actions-close', close));
     sheet.append(preview, title, controls); document.body.append(sheet);
     sheet.addEventListener('cancel', (event) => { event.preventDefault(); close(); }); sheet.showModal();
@@ -408,7 +408,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (current) {
         await session.adopt(blankProject(), { persisted: false, apply: true }); resetPointer(); initialSelectionPending = false;
       }
-      await Promise.all([refreshList(), refreshTrash(), refreshComponents()]); say('プロジェクトを削除しました。削除したプロジェクトから戻せます。');
+      await Promise.all([refreshList(), refreshTrash(), refreshComponents()]); say('作品を削除しました。削除した作品から戻せます。');
     }, { close: false });
   }
   async function refreshTrash() {
@@ -418,7 +418,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       const row = node('div', 'project-trash__row'); const label = node('span', '', item.summary.name || '無題の作品');
       row.append(label, button('戻す', `project-restore-${item.projectId}`, () => void transact(async () => {
         await store.restoreProject(item.projectId, { expectedRevisionId: item.revisionId });
-        await Promise.all([refreshList(), refreshTrash()]); say('プロジェクトを戻しました。カードから続きを開けます。');
+        await Promise.all([refreshList(), refreshTrash()]); say('作品を戻しました。カードから続きを開けます。');
       }, { close: false }))); trashList.append(row);
     }
   }
@@ -465,7 +465,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       const before = await readPxdImage(project, componentImageRole(project, target));
       if (!source || !before) throw new Error('使う絵を確認できません。');
       const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261001-free-tools-1');
-      const message = target === 'audio' ? 'このプロジェクトの最新の絵で音符を作り直します。テンポ・楽器・色と音の設定は残します。編曲した音符は置き換わります。絵とパズル、公開済みの作品は変わりません。' : 'プロジェクトの最新の絵で作り直します。正解やピースの配置はリセットされます。公開済みの作品は変わりません。';
+      const message = target === 'audio' ? 'この作品の最新の絵で音符を作り直します。テンポ・楽器・色と音の設定は残します。編曲した音符は置き換わります。絵とパズル、公開済みの作品は変わりません。' : '作品の最新の絵で作り直します。正解やピースの配置はリセットされます。公開済みの作品は変わりません。';
       if (!await confirmPxdConversion({ image: before, document: source, title: target === 'audio' ? '最新の絵を曲に反映しますか？' : 'この絵を使いますか？', applyLabel: target === 'audio' ? '絵を曲に反映' : '絵を差し替える', message })) return;
       const candidate = await replaceProjectComponentImage(project, target, source);
       await session.replace(candidate, { apply: true }); await save(); await refreshComponents(); say(target === 'audio' ? '最新の絵を曲に反映しました。' : '選んだ作品の絵を差し替えました。');
@@ -482,17 +482,17 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       const params = new URLSearchParams(location.search); let pointer;
       if (tool !== 'camera' && history.state?.projectWorkspaceSelection && params.has('pxd')) resetPointer();
       else if (params.has('pxd')) {
-        if (params.getAll('pxd').length !== 1 || params.getAll('pxdRevision').length !== 1 || !params.get('pxdRevision')) throw new Error('作品の保存版を特定できません。プロジェクト一覧から開いてください。');
+        if (params.getAll('pxd').length !== 1 || params.getAll('pxdRevision').length !== 1 || !params.get('pxdRevision')) throw new Error('作品の保存版を特定できません。作品一覧から開いてください。');
         pointer = { projectId: params.get('pxd'), revisionId: params.get('pxdRevision') };
       }
       if (pointer) {
         let project;
         try { project = await store.load(pointer.projectId, pointer.revisionId); }
         catch (error) { if (!['PXD_TOOL_PROJECT_FOREIGN', 'PXD_TOOL_PROJECT_UNTAGGED'].includes(error?.code)) throw error; }
-        if (project) { await session.adopt(project, { persisted: true, apply: true }); remember(project); say('プロジェクトを開きました。'); }
+        if (project) { await session.adopt(project, { persisted: true, apply: true }); remember(project); say('作品を開きました。'); }
         else {
           const source = await store.loadImportSource(pointer.projectId, pointer.revisionId);
-          if (!source) throw new Error('指定した作品をこの端末で見つけられません。プロジェクト一覧から開いてください。');
+          if (!source) throw new Error('指定した作品をこの端末で見つけられません。作品一覧から開いてください。');
           await importCopy(source);
         }
       }
@@ -553,9 +553,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, setModeAdapter, async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
     async startNewCaptureProject() {
-      if (tool !== 'camera') throw new TypeError('撮影用の新規プロジェクトはカメラから作成してください。');
+      if (tool !== 'camera') throw new TypeError('撮影用の新しい作品はカメラから作成してください。');
       await ready;
-      if (locked) throw new Error('プロジェクトの処理中です。少し待ってから撮影してください。');
+      if (locked) throw new Error('作品の処理中です。少し待ってから撮影してください。');
       locked = true; main.inert = true; main.setAttribute('aria-busy', 'true'); update();
       try {
         clearTimeout(timer);

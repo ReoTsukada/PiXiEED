@@ -87,6 +87,7 @@ button, a { font: inherit; }
 .lc-bottom > * { pointer-events: auto; }
 .lc-feedback { pointer-events: none; min-height: 0; }
 .lc-toast:not(.pc-sr-only) { margin: 0; padding: .55rem 1rem; border-radius: 999px; background: var(--lc-glass-strong); font-size: .85rem; box-shadow: 0 10px 30px rgba(0,0,0,.35); animation: lc-in .25s var(--lc-ease); }
+.lc-toast.is-policy-notice:not(.pc-sr-only) { max-width: min(90vw, 32rem); white-space: normal; text-align: center; line-height: 1.45; border-radius: 1rem; }
 @keyframes lc-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .lc-sw { width: 1.5rem; height: 1.5rem; border-radius: 50%; background: conic-gradient(var(--a) 0 25%, var(--b) 0 50%, var(--c) 0 75%, var(--d) 0); box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }

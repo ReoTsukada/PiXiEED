@@ -14,8 +14,8 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261001-free-tools-1';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261001-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261001-free-tools-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261002-ux-polish-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-ux-polish-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -64,6 +64,7 @@ let previewCounter = 0;
 let startupWatchdog = null;
 let toastTimer = null;
 let displayedPaletteRevision = null;
+let capturePolicyNotice = '';
 let audioFrozenFrame = null;
 let captureInFlight = false;
 
@@ -104,9 +105,22 @@ const COLOR_LABELS = { 2: '2色', 4: '4色', 8: '8色', 16: '16色', gray: 'グ�
 
 function say(message = '', { visible = false } = {}) {
   if (toastTimer !== null) { window.clearTimeout(toastTimer); toastTimer = null; }
+  if (!message && capturePolicyNotice && state.mode === 'live') {
+    message = capturePolicyNotice;
+    visible = true;
+  }
   stageMessage.textContent = message;
   stageMessage.hidden = !message;
   stageMessage.classList.toggle('pc-sr-only', !visible);
+  stageMessage.classList.toggle('is-policy-notice', Boolean(message && message === capturePolicyNotice));
+}
+
+function setCapturePolicyNotice(message) {
+  if (message === capturePolicyNotice) return;
+  const previous = capturePolicyNotice;
+  capturePolicyNotice = message;
+  if (message) say(message, { visible: true });
+  else if (stageMessage.textContent === previous) say('');
 }
 
 function sayToast(message) {
@@ -197,15 +211,21 @@ function updatePrimaryAction() {
     button.dataset.action = 'audio-return';
     button.setAttribute('aria-label', '画像を音楽へ戻す');
     button.title = '画像を音楽へ戻す';
+    button.removeAttribute('aria-description');
     button.disabled = false;
+    setCapturePolicyNotice('');
     return;
   }
   const primary = deriveCameraPrimaryAction({ mode: state.mode, hasResult: Boolean(state.result), error: state.error, workerUnavailable: Boolean(workerUnavailable) });
   button.dataset.action = primary.action;
   let label = audioCameraRequest && primary.action === 'capture' ? '撮影して音楽へ戻る' : primary.label;
+  const gifHelp = state.mode === 'live' && !audioCameraRequest ? 'Space長押しでGIF撮影、離すと終了' : '';
   button.setAttribute('aria-label', label);
-  button.title = label;
+  if (gifHelp) button.setAttribute('aria-description', gifHelp);
+  else button.removeAttribute('aria-description');
+  button.title = gifHelp ? `${label}（${gifHelp}）` : label;
   button.disabled = primary.disabled;
+  let policyNotice = '';
   if (state.mode === 'live') {
     const dimensions = captureDimensions();
     const policy = evaluateSharedCanvasPolicy({
@@ -215,10 +235,17 @@ function updatePrimaryAction() {
     }, { passActive: sharedPassActive() });
     if (!policy.supported) {
       button.disabled = true;
-      button.title = '共通キャンバスの範囲外です';
-      button.setAttribute('aria-label', button.title);
+      policyNotice = policy.reason === 'canvas-over-256px'
+        ? 'この作品の画像サイズが上限を超えています。作品を256px以下に変更してください。'
+        : policy.reason === 'colors-over-32'
+          ? 'この作品の色数が上限を超えています。作品を32色以下に変更してください。'
+          : 'この作品は撮影できないサイズです。作品を256px以下・32色以下に変更してください。';
+      button.title = policyNotice;
+      button.setAttribute('aria-label', policyNotice);
+      button.removeAttribute('aria-description');
     }
   }
+  setCapturePolicyNotice(policyNotice);
 }
 
 function currentAspect() {
@@ -1228,6 +1255,7 @@ const gif = { recording: false, frames: [], started: 0, lastAt: 0, raf: 0, playT
 const gifLimits = () => ({ maxMs: 10000, fps: 20 });
 const captureButton = $('#capture');
 let holdTimer = 0; let holdFired = false;
+let keyboardShutterActive = false; let keyboardHoldTimer = 0; let keyboardHoldFired = false;
 function gifProgress() {
   if (!gif.recording) return;
   const elapsed = performance.now() - gif.started;
@@ -1337,6 +1365,45 @@ captureButton.addEventListener('pointerdown', (event) => {
 const releaseShutter = () => { window.clearTimeout(holdTimer); if (gif.recording) finishGif(); };
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) captureButton.addEventListener(type, releaseShutter);
 captureButton.addEventListener('contextmenu', (event) => event.preventDefault());
+
+// Space mirrors the physical hold gesture; a short press still invokes the normal button action.
+captureButton.addEventListener('keydown', (event) => {
+  if (event.key !== ' ') return;
+  event.preventDefault();
+  if (event.repeat || keyboardShutterActive) return;
+  keyboardShutterActive = true;
+  keyboardHoldFired = false;
+  if (audioCameraRequest || state.mode !== 'live' || !state.result) return;
+  window.clearTimeout(keyboardHoldTimer);
+  keyboardHoldTimer = window.setTimeout(() => {
+    keyboardHoldFired = true;
+    startGif();
+  }, HOLD_MS);
+});
+function releaseKeyboardShutter() {
+  if (!keyboardShutterActive) return;
+  keyboardShutterActive = false;
+  window.clearTimeout(keyboardHoldTimer);
+  if (keyboardHoldFired) {
+    keyboardHoldFired = false;
+    finishGif();
+    return;
+  }
+  captureButton.click();
+}
+function cancelKeyboardShutter() {
+  if (!keyboardShutterActive) return;
+  keyboardShutterActive = false;
+  window.clearTimeout(keyboardHoldTimer);
+  if (keyboardHoldFired) finishGif();
+  keyboardHoldFired = false;
+}
+captureButton.addEventListener('keyup', (event) => {
+  if (event.key !== ' ' || !keyboardShutterActive) return;
+  event.preventDefault();
+  releaseKeyboardShutter();
+});
+captureButton.addEventListener('blur', cancelKeyboardShutter);
 
 // First time only: tell people the picture itself is the controller.
 function showGestureHintOnce() {

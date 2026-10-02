@@ -1,5 +1,5 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountAudioMode } from './audio-page.mjs?rev=20261001-free-tools-1';
+import { mountAudioMode } from './audio-page.mjs?rev=20261002-ux-polish-1';
 
 const scope = createModeScope();
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });

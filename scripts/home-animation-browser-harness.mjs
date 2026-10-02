@@ -87,7 +87,24 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
       await page.waitForTimeout(350);
       const offscreenBefore = await count(); await page.waitForTimeout(500); const offscreenAfter = await count();
       assert.equal(offscreenAfter.hero, offscreenBefore.hero, `${engine}/${scenario.name}: offscreen hero must stop`);
-      assert.ok(offscreenAfter.cards > offscreenBefore.cards, `${engine}/${scenario.name}: visible cards must animate`);
+      if (scenario.reduced) {
+        assert.equal(offscreenAfter.cards, offscreenBefore.cards, `${engine}/${scenario.name}: reduced-motion cards retain their static previews`);
+        const nearbyArt = () => page.locator('[data-toy] canvas').evaluateAll((canvases) => canvases.filter((canvas) => {
+          const r=canvas.getBoundingClientRect(); return r.top<innerHeight&&r.bottom>0;
+        }).every((canvas) => {
+          const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+          const colors = new Set();
+          for (let i = 0; i < pixels.length; i += 4) colors.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`);
+          return colors.size > 1;
+        }));
+        assert.ok(await nearbyArt(), 'visible reduced-motion cards show rendered artwork');
+        for (const card of await page.locator('[data-toy]').all()) {
+          await card.scrollIntoViewIfNeeded(); await page.waitForTimeout(120);
+          assert.ok(await nearbyArt(), 'each reduced-motion preview is drawn when reached');
+        }
+      } else {
+        assert.ok(offscreenAfter.cards > offscreenBefore.cards, `${engine}/${scenario.name}: visible cards must animate`);
+      }
       assert.equal(await page.locator('.hp-toy.is-in').count() > 0, true, 'cards stay discoverable without an observer');
       await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
       await page.waitForTimeout(250); await changedWhileVisible();

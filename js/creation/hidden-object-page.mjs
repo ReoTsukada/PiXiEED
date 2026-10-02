@@ -4,7 +4,7 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261001-free-tools-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261002-ux-polish-1';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261001-free-tools-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
