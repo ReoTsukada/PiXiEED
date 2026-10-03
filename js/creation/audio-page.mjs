@@ -12,7 +12,7 @@ import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20260930-four-v
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20260929-music-icons-1';
 import { audioHexToHsl, audioHslToHex, replaceAudioSourceColor } from './audio-color-edit.mjs?rev=20261002-audio-color-editor-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261002-project-cards-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261003-project-library-1';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Exercise actual Send buttons; external services and the physical camera stay untouched. */
 import assert from 'node:assert/strict';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { pathToFileURL } from 'node:url';
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4180';
 const origin = new URL(base).origin;
@@ -83,7 +84,7 @@ try {
         const sourceUrl = base + routes[sourceTool] + '?' + new URLSearchParams({ pxd: source.id, pxdRevision: source.revision });
         if (target === 'draw') {
           await tapCell(page, '#draw-canvas', 5, 4);
-          await page.locator('#project-open').click(); await page.locator('#pxd-save').click();
+          await saveCurrentProject(page);
           assert.deepEqual(await snapshot(page, source.id), source, 'Destination edits preserve source including music settings');
         }
         const beforeCount = await page.evaluate(async target => (await (await import('/js/creation/tool-project-store.mjs')).createToolProjectStore(target).listProjects()).projects.length, target);

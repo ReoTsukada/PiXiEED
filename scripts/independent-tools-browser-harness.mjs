@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { pathToFileURL } from 'node:url';
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4176';
 if (!['localhost', '127.0.0.1'].includes(new URL(base).hostname)) throw new Error('Local test origin required');
@@ -35,7 +36,7 @@ try {
     assert.notEqual(audioId, sourceId);
     assert.equal(await audio.locator('#audio-animation-controls [data-action="select-frame"]').count(), 2);
     await tap(audio, '#audio-pixel-canvas', 5, 4);
-    await audio.locator('#project-open').click(); await audio.locator('#pxd-save').click(); await audio.locator('#project-close').click();
+    await saveCurrentProject(audio); await audio.locator('#project-close').click();
     const editedAlpha = await audio.locator('#audio-pixel-canvas').evaluate((canvas) => canvas.getContext('2d').getImageData(5, 4, 1, 1).data[3]);
     assert.equal(editedAlpha, 255, 'Imported Music image must actually accept edits');
     const sourceAfter = await audio.evaluate(async (id) => { const { createPxdStore } = await import('/js/creation/pxd-store.mjs'); const { readPxdImage } = await import('/js/creation/pxd-project.mjs'); const source = await createPxdStore().load(id); const image = await readPxdImage(source, 'main'); return { revision: source.revisionId, alpha: image.rgba[(4 * image.width + 5) * 4 + 3] }; }, sourceId);

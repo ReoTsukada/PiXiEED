@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { pathToFileURL } from 'node:url';
 
 const baseUrl = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4182';
@@ -136,7 +137,7 @@ try {
     });
     await page.locator('#project-open').click();
     await page.locator('#project-tab-current').click();
-    await page.locator('#pxd-save').click();
+    await saveCurrentProject(page);
     await page.waitForFunction(() => localStorage.getItem('pixieed:pxd:last:spot_difference'));
     const untouched = await readSavedPxd();
     assert.equal(untouched.candidates, 0, 'unfinished empty state should be stored as an empty candidate set');
@@ -149,7 +150,7 @@ try {
     await page.locator('#project-open').click();
     await page.locator('#project-tab-current').click();
     const previousPxdRevision = await page.evaluate(() => JSON.parse(localStorage.getItem('pixieed:pxd:last:spot_difference')).revisionId);
-    await page.locator('#pxd-save').click();
+    await saveCurrentProject(page);
     await page.waitForFunction((previous) => JSON.parse(localStorage.getItem('pixieed:pxd:last:spot_difference') || 'null')?.revisionId !== previous, previousPxdRevision);
     const roundTrip = await readSavedPxd();
     assert.equal(roundTrip.candidates, 1, 'drawn work should be stored as a candidate');

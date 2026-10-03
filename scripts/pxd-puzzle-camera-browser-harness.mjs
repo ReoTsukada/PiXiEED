@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Isolated localhost acceptance for PXD puzzle editing and captured camera images. */
 import assert from 'node:assert/strict';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdBytes } from '../js/creation/pxd-codec.mjs';
@@ -45,7 +46,7 @@ async function openPanel(page) {
 }
 async function saved(page, tool) {
   const before = await page.evaluate((tool) => localStorage.getItem(`pixieed:pxd:last:${tool}`), tool);
-  await openPanel(page); await page.locator('#pxd-save').click();
+  await openPanel(page); await saveCurrentProject(page);
   await page.waitForFunction(({ before, tool }) => {
     const value = localStorage.getItem(`pixieed:pxd:last:${tool}`);
     return value && value !== before && !document.querySelector('#pxd-save').disabled;

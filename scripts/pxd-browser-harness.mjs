@@ -5,6 +5,7 @@
  * fixtures. Run with PIXIEED_PLAYWRIGHT_MODULE and PIXIEED_PXD_ENGINE.
  */
 import assert from 'node:assert/strict';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdBytes, setPxdJson } from '../js/creation/pxd-codec.mjs';
@@ -122,7 +123,7 @@ async function readSavedPointer(page, tool) {
 
 async function savePxdAndWait(page, tool) {
   const before = await readSavedPointer(page, tool);
-  await page.locator('#pxd-save').click();
+  await saveCurrentProject(page);
   await page.waitForFunction(({ tool, before }) => {
     const pointer = JSON.parse(localStorage.getItem(`pixieed:pxd:last:${tool}`) || 'null');
     const button = document.querySelector('#pxd-save');

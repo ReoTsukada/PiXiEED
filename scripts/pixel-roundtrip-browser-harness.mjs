@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Browser checks for pixel PNG scale metadata and import/export round trips. */
 import assert from 'node:assert/strict';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { readPixelPngMetadata } from '../js/pixel-png-metadata.mjs';
@@ -260,7 +261,7 @@ try {
   const pxdTools = jigsawPage.locator('#pxd-tools');
   if (!(await pxdTools.evaluate((node) => node.open))) await pxdTools.locator(':scope > summary').click();
   const oldPointer = await jigsawPage.evaluate(() => localStorage.getItem('pixieed:pxd:last:jigsaw'));
-  await jigsawPage.locator('#pxd-save').click();
+  await saveCurrentProject(jigsawPage);
   await jigsawPage.waitForFunction((oldPointer) => {
     const current = localStorage.getItem('pixieed:pxd:last:jigsaw');
     return current && current !== oldPointer && !document.querySelector('#pxd-save').disabled;

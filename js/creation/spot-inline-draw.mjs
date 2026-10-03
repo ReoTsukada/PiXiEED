@@ -7,6 +7,7 @@ export function mountSpotInlineDraw(options) {
   if (options.original.width !== options.working.width || options.original.height !== options.working.height) throw new RangeError('元の絵と複製した絵の大きさが違います。');
   const original = structuredClone(options.original); const documentData = structuredClone(options.working); const history = createDrawHistory(documentData);
   const abort = new AbortController(); const signal = abort.signal;
+  canvas.style.transform = '';
   let selectedColor = Math.max(0, documentData.palette.findIndex((color) => color.slice(0, 7).toLowerCase() === '#f2a433'));
   let erasing = false; let showingOriginal = false; let pointerId = null; let tracker = null; let lastPoint = null; const pointers = new Map(); let gestureStart = null; let zoom = 1; let panX = 0; let panY = 0;
   const say = (text) => { if (status) status.textContent = text; };
@@ -32,8 +33,33 @@ export function mountSpotInlineDraw(options) {
   }
   function pointFrom(event) {
     const rect = canvas.getBoundingClientRect(); if (rect.width <= 0 || rect.height <= 0) return null;
-    const x = Math.floor((event.clientX - rect.left) * documentData.width / rect.width); const y = Math.floor((event.clientY - rect.top) * documentData.height / rect.height);
+    // Match this canvas's centered object-fit:contain bitmap, excluding its border and empty margins.
+    const style = getComputedStyle(canvas); const scale = zoom || 1;
+    const borderLeft = parseFloat(style.borderLeftWidth) || 0; const borderRight = parseFloat(style.borderRightWidth) || 0;
+    const borderTop = parseFloat(style.borderTopWidth) || 0; const borderBottom = parseFloat(style.borderBottomWidth) || 0;
+    const paddingLeft = parseFloat(style.paddingLeft) || 0; const paddingRight = parseFloat(style.paddingRight) || 0;
+    const paddingTop = parseFloat(style.paddingTop) || 0; const paddingBottom = parseFloat(style.paddingBottom) || 0;
+    const contentWidth = rect.width / scale - borderLeft - borderRight - paddingLeft - paddingRight;
+    const contentHeight = rect.height / scale - borderTop - borderBottom - paddingTop - paddingBottom;
+    if (contentWidth <= 0 || contentHeight <= 0) return null;
+    const fit = Math.min(contentWidth / documentData.width, contentHeight / documentData.height);
+    const imageWidth = documentData.width * fit; const imageHeight = documentData.height * fit;
+    const imageLeft = borderLeft + paddingLeft + (contentWidth - imageWidth) / 2;
+    const imageTop = borderTop + paddingTop + (contentHeight - imageHeight) / 2;
+    const localX = (event.clientX - rect.left) / scale - imageLeft;
+    const localY = (event.clientY - rect.top) / scale - imageTop;
+    if (localX < 0 || localY < 0 || localX >= imageWidth || localY >= imageHeight) return null;
+    const x = Math.floor(localX * documentData.width / imageWidth); const y = Math.floor(localY * documentData.height / imageHeight);
     return x < 0 || y < 0 || x >= documentData.width || y >= documentData.height ? null : { x, y };
+  }
+  function getCanvasBaseCenter(rect = canvas.getBoundingClientRect(), currentPanX = panX, currentPanY = panY) {
+    return { x: rect.left + rect.width / 2 - currentPanX, y: rect.top + rect.height / 2 - currentPanY };
+  }
+  function panForFocus(focusX, focusY, anchorX, anchorY, baseCenterX, baseCenterY, basePanX, basePanY, ratio) {
+    return {
+      x: focusX - baseCenterX - (anchorX - baseCenterX - basePanX) * ratio,
+      y: focusY - baseCenterY - (anchorY - baseCenterY - basePanY) * ratio,
+    };
   }
   function drawTo(point) {
     if (!tracker || showingOriginal || !lastPoint) return;
@@ -44,8 +70,8 @@ export function mountSpotInlineDraw(options) {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size >= 2) {
       cancelActiveStroke();
-      const values = [...pointers.values()]; const centerX = (values[0].x + values[1].x) / 2; const centerY = (values[0].y + values[1].y) / 2; const viewport = canvas.parentElement.getBoundingClientRect();
-      gestureStart = { distance: Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y) || 1, scale: zoom, centerX, centerY, centerRelX: centerX - (viewport.left + viewport.width / 2), centerRelY: centerY - (viewport.top + viewport.height / 2), viewport, panX, panY };
+      const values = [...pointers.values()]; const centerX = (values[0].x + values[1].x) / 2; const centerY = (values[0].y + values[1].y) / 2; const center = getCanvasBaseCenter();
+      gestureStart = { distance: Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y) || 1, scale: zoom, centerX, centerY, canvasCenterX: center.x, canvasCenterY: center.y, panX, panY };
       try { canvas.setPointerCapture(event.pointerId); } catch {} event.preventDefault(); return;
     }
     if (showingOriginal || event.button !== 0) return;
@@ -54,7 +80,7 @@ export function mountSpotInlineDraw(options) {
     strokePixels(documentData, point, point, erasing ? -1 : selectedColor, { trusted: true, tracker }); paint();
   }, { signal });
   canvas.addEventListener('pointermove', (event) => { if (pointers.has(event.pointerId)) pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (pointers.size >= 2 && gestureStart) { const values = [...pointers.values()]; const distance = Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y); const nextZoom = Math.max(1, Math.min(16, gestureStart.scale * distance / gestureStart.distance)); const ratio = nextZoom / gestureStart.scale; const centerX = (values[0].x + values[1].x) / 2; const centerY = (values[0].y + values[1].y) / 2; const centerRelX = centerX - (gestureStart.viewport.left + gestureStart.viewport.width / 2); const centerRelY = centerY - (gestureStart.viewport.top + gestureStart.viewport.height / 2); zoom = nextZoom; panX = centerRelX + (gestureStart.panX - gestureStart.centerRelX) * ratio; panY = centerRelY + (gestureStart.panY - gestureStart.centerRelY) * ratio; applyCanvasTransform(); event.preventDefault(); return; }
+    if (pointers.size >= 2 && gestureStart) { const values = [...pointers.values()]; const distance = Math.hypot(values[1].x - values[0].x, values[1].y - values[0].y); const nextZoom = Math.max(1, Math.min(16, gestureStart.scale * distance / gestureStart.distance)); const ratio = nextZoom / gestureStart.scale; const centerX = (values[0].x + values[1].x) / 2; const centerY = (values[0].y + values[1].y) / 2; const nextPan = panForFocus(centerX, centerY, gestureStart.centerX, gestureStart.centerY, gestureStart.canvasCenterX, gestureStart.canvasCenterY, gestureStart.panX, gestureStart.panY, ratio); zoom = nextZoom; panX = zoom === 1 ? 0 : nextPan.x; panY = zoom === 1 ? 0 : nextPan.y; applyCanvasTransform(); event.preventDefault(); return; }
     if (event.pointerId === pointerId) { const point = pointFrom(event); if (point) drawTo(point); } }, { signal });
   const finishStroke = (event, cancel = false) => { if (event.pointerId !== pointerId || !tracker) return; if (cancel) cancelDrawStroke(documentData, tracker); else { commitDrawStroke(documentData, history, tracker); onChange(); } pointerId = null; tracker = null; lastPoint = null; paint(); };
   canvas.addEventListener('pointerup', (event) => finishStroke(event), { signal });
@@ -64,8 +90,9 @@ export function mountSpotInlineDraw(options) {
   canvas.addEventListener('pointerup', finishGesture, { signal }); canvas.addEventListener('pointercancel', finishGesture, { signal }); canvas.addEventListener('lostpointercapture', finishGesture, { signal });
   canvas.addEventListener('wheel', (event) => {
     event.preventDefault(); const nextZoom = Math.max(1, Math.min(16, zoom * (event.deltaY < 0 ? 1.12 : 0.89))); const ratio = nextZoom / zoom;
-    const viewport = canvas.parentElement.getBoundingClientRect(); const relativeX = event.clientX - (viewport.left + viewport.width / 2); const relativeY = event.clientY - (viewport.top + viewport.height / 2);
-    panX = relativeX * (1 - ratio) + panX * ratio; panY = relativeY * (1 - ratio) + panY * ratio; zoom = nextZoom; applyCanvasTransform();
+    const center = getCanvasBaseCenter();
+    const nextPan = panForFocus(event.clientX, event.clientY, event.clientX, event.clientY, center.x, center.y, panX, panY, ratio);
+    zoom = nextZoom; panX = zoom === 1 ? 0 : nextPan.x; panY = zoom === 1 ? 0 : nextPan.y; applyCanvasTransform();
   }, { signal, passive: false });
   penButton.addEventListener('click', () => { erasing = false; penButton.setAttribute('aria-pressed', 'true'); eraserButton.setAttribute('aria-pressed', 'false'); }, { signal });
   eraserButton.addEventListener('click', () => { erasing = true; eraserButton.setAttribute('aria-pressed', 'true'); penButton.setAttribute('aria-pressed', 'false'); }, { signal });
@@ -80,5 +107,5 @@ export function mountSpotInlineDraw(options) {
   }, { signal });
   finishButton.addEventListener('click', async () => { if (pointerId !== null || tracker) return; finishButton.disabled = true; try { await onFinish(structuredClone(documentData)); } catch (error) { say(`候補を作れませんでした：${error.message}`); } finally { finishButton.disabled = false; } }, { signal });
   renderPalette(); paint(); updateHistoryControls();
-  return { getDocument: () => structuredClone(documentData), dispose() { abort.abort(); if (tracker) cancelDrawStroke(documentData, tracker); } };
+  return { getDocument: () => structuredClone(documentData), dispose() { abort.abort(); if (tracker) cancelDrawStroke(documentData, tracker); canvas.style.transform = ''; } };
 }
