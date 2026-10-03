@@ -3,7 +3,7 @@ import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.m
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20261002-camera-palette-startup-2';
-import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261001-camera-zoom-40-1';
+import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261003-region-merge-1';
 import { GIF_FPS } from './gif.mjs?v=20261001-animation-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
@@ -16,6 +16,8 @@ import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/sh
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261002-project-cards-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
+import { pickPaletteIndex } from './region-merge.mjs?rev=20261003-region-merge-1';
+import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261003-live-merge-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -33,6 +35,7 @@ if (returnToAudio && !audioCameraRequest) {
   } else audioCameraInvalid = true;
 } else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
+root.dataset.regionMerge = 'false';
 const resultView = createToolResultView({ key: 'camera-result', main: root, returnLabel: '撮り直す', onClose: retake });
 const video = $('#video');
 const stage = $('#stage');
@@ -67,6 +70,7 @@ let displayedPaletteRevision = null;
 let capturePolicyNotice = '';
 let audioFrozenFrame = null;
 let captureInFlight = false;
+let regionMergeSession = null;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: normalizeOutputSize(audioCameraRequest?.width ?? 128),
@@ -189,6 +193,7 @@ function setInfoForMode(mode) {
 }
 
 function setMode(mode) {
+  if (mode !== 'live' && regionMergeSession) endRegionMerge({ restore: mode !== 'captured', endedStatus: mode === 'captured' ? 'captured' : 'cancelled' });
   if (mode !== 'captured') resultView.close({ focus: false, notify: false });
   state.mode = mode;
   root.dataset.mode = mode;
@@ -196,12 +201,11 @@ function setMode(mode) {
   $('#welcome').hidden = mode !== 'idle';
   $('#resultControls').hidden = mode !== 'captured';
   if (mode !== 'live') closeCameraSettings();
+  settingsPanel.hidden = mode !== 'live' || Boolean(regionMergeSession);
   updateSizeSummary();
   updatePrimaryAction();
   updateSharedCaptureControls();
   $('#flipCamera').disabled = mode !== 'live';
-  settingsButton.disabled = mode !== 'live';
-  settingsButton.hidden = mode !== 'live';
   updateSaveLinkState();
   setInfoForMode(mode);
 }
@@ -313,7 +317,19 @@ function fitPreview(frame) {
   // The frame has already been cropped before processing. Never crop it again
   // with CSS cover: the full displayed image is exactly what gets saved.
   const dimensions = frame?.width > 0 && frame?.height > 0 ? frame : frameGeometry(currentAspect(), state.size);
-  const fit = fitFrame(dimensions.width, dimensions.height, Math.max(1, stage.clientWidth), Math.max(1, stage.clientHeight));
+  const bottomUi = $('.lc-bottom');
+  const helperSpace = root.dataset.settingsContext === 'tone'
+    || (root.dataset.settingsContext === 'look' && $('#paletteStrip').dataset.reserved === 'false') ? 56 : 0;
+  const contextSpace = `${Math.ceil(bottomUi.offsetHeight + 16 + helperSpace)}px`;
+  if (root.style.getPropertyValue('--lc-context-space') !== contextSpace) {
+    root.style.setProperty('--lc-context-space', contextSpace);
+  }
+  const stageStyle = getComputedStyle(stage);
+  const horizontalPadding = Number.parseFloat(stageStyle.paddingLeft) + Number.parseFloat(stageStyle.paddingRight);
+  const verticalPadding = Number.parseFloat(stageStyle.paddingTop) + Number.parseFloat(stageStyle.paddingBottom);
+  const availableWidth = Math.max(1, stage.clientWidth - horizontalPadding);
+  const availableHeight = Math.max(1, stage.clientHeight - verticalPadding);
+  const fit = fitFrame(dimensions.width, dimensions.height, availableWidth, availableHeight);
   captureFrame.style.width = `${fit.width}px`;
   captureFrame.style.height = `${fit.height}px`;
 }
@@ -338,6 +354,7 @@ function clearPreview() {
 }
 
 function restartPreview({ preserveCompleted = false } = {}) {
+  if (regionMergeSession) endRegionMerge({ restore: true });
   // Changing framing must not reopen the camera or invalidate its track token.
   // Separate render generations also prevent an old in-flight frame flashing in.
   if (state.mode !== 'live') return;
@@ -403,6 +420,275 @@ function drawCompleted(result) {
   return true;
 }
 
+function mergePointFromClient(clientX, clientY) {
+  const rect = view.getBoundingClientRect();
+  if (!rect.width || !rect.height || clientX < rect.left || clientY < rect.top || clientX >= rect.right || clientY >= rect.bottom) return null;
+  return { x: Math.floor((clientX - rect.left) * view.width / rect.width), y: Math.floor((clientY - rect.top) * view.height / rect.height) };
+}
+
+function beginRegionMerge(clientX, clientY) {
+  if (state.mode !== 'live' || gif.recording || captureInFlight || regionMergeSession || !state.result?.sourceData) return false;
+  const point = mergePointFromClient(clientX, clientY);
+  if (!point) return false;
+  const baseResult = state.result;
+  const sourceFrame = { width: baseResult.width, height: baseResult.height, data: baseResult.sourceData };
+  const renderedFrame = { width: baseResult.width, height: baseResult.height, data: baseResult.data };
+  const palette = baseResult.palette ?? [];
+  const sourceIndex = pickPaletteIndex(renderedFrame, palette, point.x, point.y);
+  if (sourceIndex < 0) { sayToast('この位置の色を選べませんでした'); return false; }
+  let tracker;
+  try {
+    tracker = createLiveRegionMergeTracker({
+      source: sourceFrame, rendered: renderedFrame, palette, seed: point, sourceIndex,
+      mode: $('#regionMergeMode').value, strength: Number($('#regionMergeStrength').value)
+    });
+  } catch {
+    sayToast('色の追跡を開始できませんでした。もう一度長押ししてください');
+    return false;
+  }
+  regionMergeSession = {
+    tracker, baseResult, latestRawResult: baseResult, sourceIndex, point,
+    choicePalette: palette.map((color) => [...color]), targetColor: null, choiceTargetIndex: -1,
+    mode: $('#regionMergeMode').value, strength: Number($('#regionMergeStrength').value),
+    changedPixels: 0, selectedPixels: 0, targetIndex: -1, lastUpdatedRaw: null,
+    lastUpdateSignature: ''
+  };
+  root.dataset.regionMerge = 'true';
+  root.dataset.regionMergeStatus = 'tracking';
+  root.dataset.regionMergeLastStatus = '';
+  root.dataset.regionMergeSourceIndex = String(sourceIndex);
+  root.dataset.regionMergeTargetIndex = '';
+  root.dataset.regionMergeCurrentSourceIndex = String(sourceIndex);
+  root.dataset.regionMergeCurrentTargetIndex = '';
+  root.dataset.regionMergeChangedPixels = '0';
+  root.dataset.regionMergeSelectedPixels = '0';
+  root.dataset.regionMergeProcessingMs = '0';
+  root.dataset.regionMergeTrackerProcessingMs = '0';
+  root.dataset.regionMergeSeedX = String(point.x);
+  root.dataset.regionMergeSeedY = String(point.y);
+  captureFrame.style.translate = '';
+  closeCameraSettings();
+  root.dataset.settingsContext = 'merge';
+  root.dataset.settingsExpanded = 'false';
+  toolbarContextHead.hidden = false;
+  toolbarContextLabel.textContent = '色統合';
+  $('#toolbarContextBack').textContent = '← 色統合';
+  $('#toolbarContextBack').setAttribute('aria-label', '色統合を解除してカメラへ戻る');
+  settingsPanel.hidden = false;
+  $('#gestureHint').hidden = true;
+  $('#regionMergeSource').textContent = `選んだ色 ${sourceIndex + 1} / ${palette.length}`;
+  $('#regionMergeHeading').textContent = '色統合中';
+  $('#regionMergeCancel').textContent = '解除';
+  $('#regionMergeCancel').setAttribute('aria-label', '色統合を解除してカメラ映像へ戻る');
+  $('#regionMergeStatus').textContent = 'ライブ映像を追跡中。まとめ先を選んでください。';
+  $('#regionMergeUndo').disabled = true;
+  $('#regionMergePanel').hidden = false;
+  renderRegionMergePalette(regionMergeSession.choicePalette, sourceIndex, -1);
+  syncContextOptions('merge');
+  requestAnimationFrame(() => { if (regionMergeSession) fitPreview(state.result); });
+  say('ライブ色統合中です。中央ボタンで現在の画像を撮影できます');
+  return true;
+}
+
+function renderRegionMergePalette(palette, sourceIndex, targetIndex = -1) {
+  const box = $('#regionMergePalette');
+  box.replaceChildren();
+  palette.forEach((color, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.targetIndex = String(index);
+    button.dataset.source = String(index === sourceIndex);
+    button.setAttribute('aria-label', `色 ${index + 1} をまとめ先にする`);
+    button.setAttribute('aria-pressed', String(index === targetIndex));
+    button.style.setProperty('--region-merge-swatch', `rgb(${color.join(' ')})`);
+    button.title = index === sourceIndex ? `色 ${index + 1}（選んだ色）` : `色 ${index + 1}`;
+    button.addEventListener('click', () => applyRegionMerge(index));
+    box.append(button);
+  });
+  syncContextOptions('merge');
+}
+
+function setRegionMergeBusy(busy) {
+  if (!regionMergeSession) return;
+  $('#regionMergeMode').disabled = busy;
+  $('#regionMergeStrength').disabled = busy;
+  $('#regionMergeUndo').disabled = busy || !regionMergeSession.targetColor;
+  $('#regionMergeCancel').disabled = busy;
+  $('#regionMergePalette').querySelectorAll('button').forEach((button) => { button.disabled = busy; });
+}
+
+function updateLiveRegionMerge(rawResult, { force = false } = {}) {
+  const session = regionMergeSession;
+  if (!session || !rawResult?.sourceData) return null;
+  session.latestRawResult = rawResult;
+  session.baseResult = rawResult;
+  const signature = `${session.targetColor?.join(',') ?? ''}|${session.mode}|${session.strength}`;
+  if (session.lastUpdatedRaw === rawResult && (!force || session.lastUpdateSignature === signature)) return null;
+  const started = performance.now();
+  let update;
+  try {
+    update = session.tracker.update({
+      source: { width: rawResult.width, height: rawResult.height, data: rawResult.sourceData },
+      rendered: { width: rawResult.width, height: rawResult.height, data: rawResult.data },
+      palette: rawResult.palette ?? [], targetColor: session.targetColor,
+      mode: session.mode, strength: session.strength, enabled: Boolean(session.targetColor)
+    });
+  } catch {
+    update = { status: 'lost' };
+  }
+  session.lastUpdatedRaw = rawResult;
+  session.lastUpdateSignature = signature;
+  const trackerMs = Number.isFinite(update?.processingMs) ? update.processingMs : performance.now() - started;
+  root.dataset.regionMergeTrackerProcessingMs = String(Math.round(trackerMs));
+  root.dataset.regionMergeProcessingMs = String(Math.round((Number(rawResult.processingMs) || 0) + trackerMs));
+  if (update?.status !== 'tracking') {
+    const status = update?.status === 'scene-changed' ? 'scene-changed' : 'lost';
+    root.dataset.regionMergeLastStatus = status;
+    endRegionMerge({ restore: false, endedStatus: status });
+    return { result: rawResult, stopped: status };
+  }
+  session.changedPixels = Number(update.changedPixels) || 0;
+  session.selectedPixels = Number(update.selectedPixels) || 0;
+  session.targetIndex = session.targetColor && Number.isInteger(update.targetIndex) ? update.targetIndex : -1;
+  root.dataset.regionMergeStatus = update.status;
+  root.dataset.regionMergeCurrentSourceIndex = Number.isInteger(update.sourceIndex) ? String(update.sourceIndex) : '';
+  root.dataset.regionMergeCurrentTargetIndex = session.targetIndex >= 0 ? String(session.targetIndex) : '';
+  root.dataset.regionMergeSeedX = String(update.seed?.x ?? session.point.x);
+  root.dataset.regionMergeSeedY = String(update.seed?.y ?? session.point.y);
+  root.dataset.regionMergeChangedPixels = String(session.changedPixels);
+  root.dataset.regionMergeSelectedPixels = String(session.selectedPixels);
+  if (session.targetColor) {
+    $('#regionMergeUndo').disabled = captureInFlight;
+  } else {
+    $('#regionMergeUndo').disabled = true;
+  }
+  return {
+    result: { ...rawResult, data: update.data ?? rawResult.data, sourceData: rawResult.sourceData },
+    stopped: ''
+  };
+}
+
+function displayCurrentRegionMergeResult(result) {
+  if (!result) return;
+  state.result = result;
+  if (view.width !== result.width || view.height !== result.height) {
+    view.width = result.width;
+    view.height = result.height;
+  }
+  viewContext.putImageData(new ImageData(result.data, result.width, result.height), 0, 0);
+  fitPreview(result);
+  root.dataset.ready = 'true';
+  updateSizeSummary();
+}
+
+function applyRegionMerge(targetIndex = null) {
+  const session = regionMergeSession;
+  if (!session || captureInFlight) return;
+  if (Number.isInteger(targetIndex)) {
+    const palette = session.choicePalette;
+    if (targetIndex < 0 || targetIndex >= palette.length) return;
+    session.targetColor = [...palette[targetIndex]];
+    session.choiceTargetIndex = targetIndex;
+    root.dataset.regionMergeTargetIndex = String(targetIndex);
+    $('#regionMergePalette').querySelectorAll('[data-target-index]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(Number(button.dataset.targetIndex) === targetIndex));
+    });
+    $('#regionMergeStatus').textContent = '選んだ色をライブ映像に適用中です。';
+  }
+  session.mode = $('#regionMergeMode').value;
+  session.strength = Number($('#regionMergeStrength').value);
+  $('#regionMergeUndo').disabled = !session.targetColor;
+  const update = updateLiveRegionMerge(session.latestRawResult, { force: true });
+  if (update) {
+    displayCurrentRegionMergeResult(update.result);
+    if (update.stopped) {
+      sayToast(update.stopped === 'scene-changed'
+        ? '景色が変わったため色統合を解除しました。もう一度長押ししてください'
+        : '追跡を続けられないため色統合を解除しました。もう一度長押ししてください');
+      focusVisible('#stage');
+    }
+  }
+}
+
+function undoRegionMerge() {
+  const session = regionMergeSession;
+  if (!session || captureInFlight) return;
+  session.targetColor = null;
+  session.targetIndex = -1;
+  session.choiceTargetIndex = -1;
+  session.changedPixels = 0;
+  session.selectedPixels = 0;
+  root.dataset.regionMergeTargetIndex = '';
+  root.dataset.regionMergeCurrentTargetIndex = '';
+  root.dataset.regionMergeChangedPixels = '0';
+  root.dataset.regionMergeSelectedPixels = '0';
+  session.lastUpdateSignature = '';
+  displayCurrentRegionMergeResult(session.latestRawResult);
+  $('#regionMergePalette').querySelectorAll('[data-target-index]').forEach((button) => button.setAttribute('aria-pressed', 'false'));
+  $('#regionMergeUndo').disabled = true;
+  $('#regionMergeStatus').textContent = '色統合を解除しました。ライブ追跡は続いています。';
+}
+
+function endRegionMerge({ restore = true, endedStatus = restore ? 'cancelled' : 'captured' } = {}) {
+  const session = regionMergeSession;
+  if (!session) return;
+  regionMergeSession = null;
+  root.dataset.regionMergeLastStatus = endedStatus;
+  const latestRaw = session.latestRawResult ?? session.baseResult;
+  if (restore && latestRaw && state.mode === 'live') displayCurrentRegionMergeResult(latestRaw);
+  root.dataset.regionMerge = 'false';
+  root.dataset.regionMergeStatus = '';
+  root.dataset.regionMergeSourceIndex = '';
+  root.dataset.regionMergeTargetIndex = '';
+  root.dataset.regionMergeCurrentSourceIndex = '';
+  root.dataset.regionMergeCurrentTargetIndex = '';
+  root.dataset.regionMergeChangedPixels = '0';
+  root.dataset.regionMergeSelectedPixels = '0';
+  root.dataset.regionMergeProcessingMs = '0';
+  root.dataset.regionMergeTrackerProcessingMs = '0';
+  root.dataset.regionMergeSeedX = '';
+  root.dataset.regionMergeSeedY = '';
+  root.dataset.settingsContext = '';
+  root.dataset.settingsExpanded = 'false';
+  $('#regionMergePanel').hidden = true;
+  settingsPanel.hidden = state.mode !== 'live';
+  toolbarContextHead.hidden = true;
+  toolbarMore.hidden = true;
+  root.dataset.tray = '';
+  openTool = null;
+  captureFrame.style.translate = '';
+  $('#regionMergeMode').disabled = false;
+  $('#regionMergeStrength').disabled = false;
+  $('#regionMergeCancel').disabled = false;
+  fitPreview(state.result);
+}
+
+function returnToLiveAfterRegionMerge() {
+  if (!regionMergeSession || captureInFlight) return;
+  endRegionMerge({ restore: true });
+  sayToast('色統合を解除しました。カメラ映像に戻りました');
+  focusVisible('#stage');
+}
+
+$('#regionMergeMode').addEventListener('change', () => {
+  if (regionMergeSession) $('#regionMergeStatus').textContent = 'まとめ方をライブ映像に反映しています。';
+  applyRegionMerge();
+});
+$('#regionMergeStrength').addEventListener('input', (event) => {
+  $('#regionMergeStrengthValue').value = `${event.target.value}%`;
+  if (regionMergeSession) regionMergeSession.strength = Number(event.target.value);
+});
+$('#regionMergeStrength').addEventListener('change', (event) => {
+  if (!regionMergeSession) return;
+  $('#regionMergeStatus').textContent = `強さ ${event.target.value}% をライブ映像に適用中です。`;
+  applyRegionMerge();
+});
+$('#regionMergeUndo').addEventListener('click', undoRegionMerge);
+$('#regionMergeCancel').addEventListener('click', returnToLiveAfterRegionMerge);
+$('#regionMergePanel').addEventListener('pointerdown', (event) => event.stopPropagation());
+$('#regionMergePanel').addEventListener('click', (event) => event.stopPropagation());
+$('#regionMergePanel').addEventListener('wheel', (event) => event.stopPropagation());
+
 function clearStartupWatchdog() {
   if (startupWatchdog === null) return;
   window.clearTimeout(startupWatchdog);
@@ -411,7 +697,7 @@ function clearStartupWatchdog() {
 
 const resizeObserver = new ResizeObserver(() => {
   if (root.ownerDocument.body.dataset.toolResultOpen === 'camera-result') return;
-  if (state.mode === 'live' && state.ratio === 'screen' && Math.abs(currentAspect() - previewAspect) > 0.0001) restartPreview({ preserveCompleted: true });
+  if (state.mode === 'live' && !regionMergeSession && state.ratio === 'screen' && Math.abs(currentAspect() - previewAspect) > 0.0001) restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
 });
@@ -444,9 +730,10 @@ function cameraFrame() {
 
 function renderLens(frame) {
   const started = performance.now();
+  const sourceData = new Uint8ClampedArray(frame.image.data);
   processLensFrame(frame.image);
   const { width, height, data } = frame.image;
-  return { width, height, data, aspect: frame.aspect, palette: lensPalette(), processingMs: performance.now() - started, aiStatus: 'disabled' };
+  return { width, height, data, sourceData, aspect: frame.aspect, palette: lensPalette(), processingMs: performance.now() - started, aiStatus: 'disabled' };
 }
 
 loop = createFrameLoop({
@@ -459,8 +746,21 @@ loop = createFrameLoop({
     if (state.mode === 'live') {
       try {
         const wasError = Boolean(state.error);
-        if (!drawCompleted(result)) return;
-        if (gif.recording) recordGifFrame(result);
+        let published = result;
+        let mergeStopped = '';
+        if (regionMergeSession) {
+          const merge = updateLiveRegionMerge(result);
+          if (merge) { published = merge.result; mergeStopped = merge.stopped; }
+          else if (state.result) published = state.result;
+        }
+        if (!drawCompleted(published)) return;
+        if (mergeStopped) {
+          sayToast(mergeStopped === 'scene-changed'
+            ? '景色が変わったため色統合を解除しました。もう一度長押ししてください'
+            : '追跡を続けられないため色統合を解除しました。もう一度長押ししてください');
+          focusVisible('#stage');
+        }
+        if (gif.recording) recordGifFrame(published);
         const previewMessage = result.aiStatus === 'ready' || result.aiStatus === 'processing' || result.aiStatus === 'disabled' ? ''
           : result.aiStatus === 'no-instances' ? ''
           : 'この端末に合わせた画質で表示しています。';
@@ -516,6 +816,7 @@ function stopTracks() {
 }
 
 function closeCamera({ idle = true, message = '', focus = false, visible = false } = {}) {
+  if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   clearStartupWatchdog();
   resumeOnVisible = false;
   cameraSequence++;
@@ -531,6 +832,7 @@ function closeCamera({ idle = true, message = '', focus = false, visible = false
 }
 
 async function startCamera({ focus = true } = {}) {
+  if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   clearStartupWatchdog();
   resumeOnVisible = false;
   paletteEpoch++;
@@ -598,6 +900,15 @@ async function startCamera({ focus = true } = {}) {
 
 async function capture() {
   if (captureInFlight || state.mode !== 'live' || !state.result) return;
+  if (regionMergeSession) {
+    const merge = updateLiveRegionMerge(regionMergeSession.latestRawResult, { force: true });
+    if (merge) {
+      displayCurrentRegionMergeResult(merge.result);
+      if (merge.stopped) sayToast(merge.stopped === 'scene-changed'
+        ? '景色が変わったため色統合を解除しました。撮影画像はそのまま保存します'
+        : '追跡を続けられないため色統合を解除しました。撮影画像はそのまま保存します');
+    }
+  }
   if (audioCameraRequest) {
     if (audioFrozenFrame) { finishAudioCamera(audioFrozenFrame); return; }
     const passActive = sharedPassActive();
@@ -649,12 +960,14 @@ async function capture() {
     return;
   }
   captureInFlight = true;
+  setRegionMergeBusy(true);
   const cameraToken = cameraSequence;
   try {
     await cameraPxd.startNewCaptureProject();
     if (cameraToken !== cameraSequence || state.mode !== 'live') return;
     invalidateCaptureDownload();
-    const frozen = { ...sourceFrame, width: prepared.image.width, height: prepared.image.height, data: new Uint8ClampedArray(prepared.image.rgba), palette: (sourceFrame.palette || []).slice(0, maxColors) };
+    const { sourceData: _rawSource, ...captureBase } = sourceFrame;
+    const frozen = { ...captureBase, width: prepared.image.width, height: prepared.image.height, data: new Uint8ClampedArray(prepared.image.rgba), palette: (sourceFrame.palette || []).slice(0, maxColors) };
     gif.pending = null;
     invalidatePreview();
     cameraSequence++;
@@ -675,25 +988,28 @@ async function capture() {
     sayToast(error instanceof Error ? error.message : '新しいプロジェクトに保存できませんでした');
   } finally {
     captureInFlight = false;
+    setRegionMergeBusy(false);
   }
 }
 
 function finishAudioCamera(frozen) {
+  const { sourceData: _rawSource, ...finalFrame } = frozen;
   try {
-    const returnUrl = completeAudioCamera(audioCameraRequest, frozen);
-    audioFrozenFrame = frozen;
+    if (regionMergeSession) endRegionMerge({ restore: false, resume: false });
+    const returnUrl = completeAudioCamera(audioCameraRequest, finalFrame);
+    audioFrozenFrame = finalFrame;
     invalidatePreview();
     cameraSequence++;
     stopTracks();
     location.assign(returnUrl);
   } catch (error) {
-    audioFrozenFrame = frozen;
+    audioFrozenFrame = finalFrame;
     invalidatePreview();
     cameraSequence++;
     stopTracks();
-    state.result = frozen;
+    state.result = finalFrame;
     setMode('captured');
-    fitPreview(frozen);
+    fitPreview(finalFrame);
     $('#postCamera').hidden = true;
     $('#resultControls').hidden = true;
     info.textContent = '音楽へ画像を戻せませんでした。中央のボタンで再試行できます。';
@@ -702,7 +1018,7 @@ function finishAudioCamera(frozen) {
 }
 
 function refreshObjects() {
-  if (state.mode !== 'live') return;
+  if (state.mode !== 'live' || regionMergeSession) return;
   if (performance.now() - trayClosedAt < 600) return; // that tap only folded the tray
   // feedback without covering the picture: a short ring around the frame, a tick and a toast
   const picksColours = !state.customLook && (['8', '16'].includes(state.colorDepth) || (['2', '4'].includes(state.colorDepth) && state.paletteMode === 'source'));
@@ -720,6 +1036,7 @@ function refreshObjects() {
 
 async function retake() {
   if (captureInFlight) return;
+  if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   if (state.mode === 'captured' && sharedImageEdited) {
     try { await cameraPxd.save(); }
     catch (error) { sayToast(error instanceof Error ? error.message : '写真を保存できませんでした'); return; }
@@ -777,6 +1094,7 @@ function currentLook() {
   return Object.keys(LOOKS).find((key) => LOOKS[key].colorDepth === state.colorDepth) ?? 'gb';
 }
 function applyChange({ restart = false } = {}) {
+  if (regionMergeSession) endRegionMerge({ restore: true });
   syncLens();
   syncControls();
   if (restart) restartPreview({ preserveCompleted: true });
@@ -808,45 +1126,82 @@ function stepLook(delta) {
   const index = buttons.findIndex((button) => button.dataset.look === currentLook());
   selectLook(buttons[(index + delta + buttons.length) % buttons.length]);
 }
-// ---------- Folded camera settings: one choice tray and six tabs ----------
-// Each button shows its current value. Tapping one opens its row of choices (a carousel) above the bar;
-// tapping it again, or the picture, folds it. Only one row is open at a time.
+// ---------- Always-visible camera rail with focused setting choices ----------
 const tray = $('#tray'); const toolbar = $('#toolbar');
-const settingsPanel = $('#cameraSettingsPanel'); const settingsButton = $('#cameraSettings');
+const settingsPanel = $('#cameraSettingsPanel');
 let openTool = null; let trayClosedAt = 0;
+const CONTEXT_LABELS = { look: '色', dither: 'ディザ', pixels: 'ドット', aspect: '比率', tone: '色味', zoom: 'ズーム', merge: '色統合' };
+const toolbarContextHead = $('#toolbarContextHead');
+const toolbarContextLabel = $('#toolbarContextLabel');
+const toolbarMore = $('#toolbarContextMore');
+function contextOptionButtons(tool) {
+  if (tool === 'look') return [...document.querySelectorAll('#looks [data-look]')];
+  if (tool === 'merge') return [...document.querySelectorAll('#regionMergePalette [data-target-index]')];
+  const panel = tray.querySelector(`[data-panel="${tool}"]`);
+  if (tool === 'zoom') return [...(panel?.querySelectorAll('button[data-zoom]') ?? [])];
+  if (tool === 'tone') return [...(panel?.querySelectorAll('#toneChips [data-value]') ?? [])];
+  return [...(panel?.querySelectorAll('[data-value]') ?? [])];
+}
+function syncContextOptions(tool = (regionMergeSession ? 'merge' : openTool)) {
+  const buttons = contextOptionButtons(tool);
+  const visibleCount = window.innerWidth <= 359 ? 3 : 4;
+  const expanded = root.dataset.settingsExpanded === 'true';
+  let selected = buttons.findIndex((button) => button.getAttribute('aria-checked') === 'true' || button.getAttribute('aria-pressed') === 'true');
+  if (selected < 0 && tool === 'merge' && root.dataset.regionMergeTargetIndex === '') selected = buttons.findIndex((button) => button.dataset.source === 'true');
+  buttons.forEach((button, index) => { button.hidden = !expanded && index >= visibleCount && index !== selected; });
+  toolbarMore.hidden = !tool || buttons.length <= visibleCount;
+  const editingPalette = tool === 'look' && typeof editIndex !== 'undefined' && editIndex >= 0;
+  toolbarMore.textContent = editingPalette ? '完了' : expanded ? '基本' : 'その他';
+  toolbarMore.setAttribute('aria-label', editingPalette ? '色編集を完了' : expanded ? '基本の選択肢へ戻る' : 'その他の選択肢を表示');
+  toolbarMore.setAttribute('aria-expanded', String(expanded));
+}
 function closeCameraSettings() {
-  if (!settingsPanel.hidden) trayClosedAt = performance.now();
-  settingsPanel.hidden = true;
-  settingsButton.setAttribute('aria-expanded', 'false');
+  if (openTool) trayClosedAt = performance.now();
   openTray(null);
 }
-function toggleCameraSettings() {
-  if (state.mode !== 'live' || gif.recording) return;
-  if (!settingsPanel.hidden) { closeCameraSettings(); return; }
-  settingsPanel.hidden = false;
-  $('#gestureHint').hidden = true;
-  settingsButton.setAttribute('aria-expanded', 'true');
-  if (!openTool) openTray('look');
-}
-settingsButton.addEventListener('click', toggleCameraSettings);
-const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
-const TONES = [['brightness', '明るさ'], ['exposure', '露出'], ['contrast', 'コントラスト'], ['saturation', '彩度'], ['shadows', '影'], ['whiteBalance', '色温度']];
-let toneKey = 'contrast';
-const SHORT_LABEL = { net8: '網目 8×8', net4: '網目 4×4', net2: '網目 2×2' };
-const SWATCH_TONE = { net8: 72, net4: 72, net2: 72, checker: 128, lines: 64, diagonal: 64, halftone: 70, grain: 90 };
-let swatchColors = [[32, 56, 16], [224, 248, 208]];
-
 function openTray(tool) {
   if (openTool && !tool) trayClosedAt = performance.now();
   openTool = tool;
-  if (tool !== 'look') setPaletteEditing(-1);
   root.dataset.tray = tool ?? '';
+  root.dataset.settingsContext = tool ?? '';
+  root.dataset.settingsExpanded = 'false';
+  if (tool !== 'look') setPaletteEditing(-1);
   for (const panel of tray.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== tool;
   for (const button of toolbar.querySelectorAll('[data-tool]')) button.setAttribute('aria-expanded', String(button.dataset.tool === tool));
+  toolbarContextHead.hidden = !tool;
+  toolbarContextLabel.textContent = CONTEXT_LABELS[tool] ?? '';
+  $('#toolbarContextBack').textContent = tool ? `← ${CONTEXT_LABELS[tool]}` : '←';
+  $('#toolbarContextBack').setAttribute('aria-label', tool ? `${CONTEXT_LABELS[tool]}の設定を閉じる` : '設定項目へ戻る');
+  toolbarMore.hidden = !tool;
+  syncContextOptions(tool);
   const selected = tool && tray.querySelector(`[data-panel="${tool}"] [aria-checked="true"]`);
-  if (selected) requestAnimationFrame(() => selected.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  if (selected && !selected.hidden) requestAnimationFrame(() => selected.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  requestAnimationFrame(() => { if (state.result) fitPreview(state.result); });
   if (tool === 'zoom') requestAnimationFrame(() => syncZoomStops(true));
 }
+$('#toolbarContextBack').addEventListener('click', () => {
+  if (regionMergeSession) { returnToLiveAfterRegionMerge(); return; }
+  openTray(null);
+  $('#toolbarHome [data-tool]')?.focus({ preventScroll: true });
+});
+toolbarMore.addEventListener('click', () => {
+  if (!regionMergeSession && openTool === 'look' && typeof editIndex !== 'undefined' && editIndex >= 0) { setPaletteEditing(-1); return; }
+  if (regionMergeSession) {
+    root.dataset.settingsExpanded = String(root.dataset.settingsExpanded !== 'true');
+    syncContextOptions('merge');
+    return;
+  }
+  root.dataset.settingsExpanded = String(root.dataset.settingsExpanded !== 'true');
+  syncContextOptions(openTool);
+});
+window.addEventListener('resize', () => syncContextOptions());
+const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
+const TONES = [['brightness', '明るさ'], ['exposure', '露出'], ['contrast', 'コントラスト'], ['saturation', '彩度'], ['shadows', '影'], ['whiteBalance', '色温度']];
+let toneKey = 'contrast';
+const SHORT_LABEL = { net8: '8×8', net4: '4×4', net2: '2×2', checker: '市松', lines: '横線', diagonal: '斜線', halftone: '網点', grain: '砂目', atkinson: 'ATK', fs: '拡散' };
+const SWATCH_TONE = { net8: 72, net4: 72, net2: 72, checker: 128, lines: 64, diagonal: 64, halftone: 70, grain: 90 };
+let swatchColors = [[32, 56, 16], [224, 248, 208]];
+
 function chip(value, label, { swatch = '', cls = '' } = {}) {
   const button = document.createElement('button');
   button.type = 'button'; button.setAttribute('role', 'radio'); button.dataset.value = value;
@@ -908,6 +1263,7 @@ function currentPatternId() { return state.gradientMode === 'dither' ? state.dit
 function syncZoomFace() {
   const zoomFace = toolbar.querySelector('[data-tool="zoom"]');
   zoomFace.querySelector('b').textContent = formatZoom(state.zoom);
+  zoomFace.title = `ズーム ${formatZoom(state.zoom)}`;
   zoomFace.setAttribute('aria-label', `ズーム ${formatZoom(state.zoom)}（タップで倍率を選ぶ）`);
 }
 function syncToolbar() {
@@ -915,21 +1271,39 @@ function syncToolbar() {
   const face = (tool) => toolbar.querySelector(`[data-tool="${tool}"]`);
   face('look').querySelector('.lc-tool-sw').setAttribute('style', lookButton?.querySelector('.lc-sw')?.getAttribute('style') ?? '');
   face('look').querySelector('.lc-tool-sw').className = `lc-tool-sw lc-sw ${(lookButton?.querySelector('.lc-sw')?.className ?? '').replace(/\blc-sw\b/, '').trim()}`;
-  face('look').querySelector('b').textContent = audioCameraRequest ? '写真16色' : (lookButton?.textContent.trim() ?? '');
+  const lookFace = face('look');
+  const fullLookLabel = audioCameraRequest ? '写真16色' : (lookButton?.textContent.trim() ?? '色');
+  const compactLookLabel = fullLookLabel.startsWith('写真') ? '写真' : fullLookLabel;
+  lookFace.querySelector('b').textContent = compactLookLabel;
+  lookFace.title = `色：${fullLookLabel}`;
+  lookFace.setAttribute('aria-label', `色：${fullLookLabel}（タップで色を選ぶ）`);
   const available = !NO_DITHER_DEPTHS.has(state.colorDepth);
   const pattern = available && state.gradientMode === 'dither' ? DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) : null;
   const dither = face('dither');
   dither.dataset.state = !available ? 'na' : pattern ? 'on' : 'off';
   dither.querySelector('.lc-tool-sw').style.setProperty('--swatch', pattern ? patternSwatch(pattern) : 'none');
-  dither.querySelector('b').textContent = !available ? 'ディザなし' : pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'ディザ OFF';
-  dither.setAttribute('aria-label', !available ? 'この色ではディザを使いません' : pattern ? `ディザ：${pattern.label}（タップで模様を選ぶ）` : 'ディザをオンにする');
-  face('pixels').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width} × ${audioCameraRequest.height}` : sharedImageTarget ? `${sharedImageTarget.width} × ${sharedImageTarget.height}` : `${state.size} px`;
+  const fullDitherLabel = !available ? 'ディザなし' : pattern ? pattern.label : 'ディザ OFF';
+  dither.querySelector('b').textContent = !available ? 'なし' : pattern ? (SHORT_LABEL[pattern.id] ?? pattern.label) : 'OFF';
+  dither.title = `ディザ：${fullDitherLabel}`;
+  dither.setAttribute('aria-label', !available ? 'この色ではディザを使いません' : pattern ? `ディザ：${pattern.label}（タップで模様を選ぶ）` : 'ディザ：OFF（タップでオンにする）');
+  const pixelFace = face('pixels');
+  const fullPixelLabel = audioCameraRequest ? `${audioCameraRequest.width} × ${audioCameraRequest.height} px` : sharedImageTarget ? `${sharedImageTarget.width} × ${sharedImageTarget.height} px` : `${state.size} px`;
+  pixelFace.querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width}×${audioCameraRequest.height}` : sharedImageTarget ? `${sharedImageTarget.width}×${sharedImageTarget.height}` : `${state.size}`;
+  pixelFace.title = `ドット数：${fullPixelLabel}`;
+  pixelFace.setAttribute('aria-label', `ドット数：${fullPixelLabel}（タップで選ぶ）`);
   const ratio = FRAME_RATIOS.find((r) => r.value === state.ratio);
-  face('aspect').querySelector('b').textContent = audioCameraRequest ? `${audioCameraRequest.width}:16` : sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : (ratio?.label ?? '');
+  const aspectFace = face('aspect');
+  const fullAspectLabel = audioCameraRequest ? `${audioCameraRequest.width}:16` : sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : (ratio?.label ?? '');
+  aspectFace.querySelector('b').textContent = fullAspectLabel;
+  aspectFace.title = `比率：${fullAspectLabel}`;
+  aspectFace.setAttribute('aria-label', `比率：${fullAspectLabel}（タップで選ぶ）`);
   face('aspect').dataset.ratio = sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : state.ratio;
   const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
-  face('tone').querySelector('b').textContent = toneChanged ? '調整中' : '調整';
-  face('tone').dataset.changed = String(toneChanged);
+  const toneFace = face('tone');
+  toneFace.querySelector('b').textContent = toneChanged ? '設定中' : '調整';
+  toneFace.title = toneChanged ? '色味：調整中' : '色味：調整';
+  toneFace.setAttribute('aria-label', `${toneFace.title}（タップで項目を選ぶ）`);
+  toneFace.dataset.changed = String(toneChanged);
   syncZoomFace();
   // selected chips
   const mark = (panel, value) => { for (const b of panel.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === value)); };
@@ -944,7 +1318,7 @@ function syncToolbar() {
 function syncControls() {
   const look = currentLook();
   for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
-  if (NO_DITHER_DEPTHS.has(state.colorDepth) && openTool === 'dither') openTray(null);
+  if (NO_DITHER_DEPTHS.has(state.colorDepth) && openTool === 'dither') syncContextOptions('dither');
   syncToolbar();
 }
 
@@ -959,25 +1333,24 @@ function lockAudioCameraControls() {
 }
 
 toolbar.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-tool]'); if (!button || state.mode === 'captured') return;
+  const button = event.target.closest('[data-tool]'); if (!button || state.mode === 'captured' || regionMergeSession) return;
   const tool = button.dataset.tool;
   if (audioCameraRequest && ['look', 'dither', 'pixels', 'aspect'].includes(tool)) return;
   navigator.vibrate?.(6);
   if (tool === 'dither') {
     if (NO_DITHER_DEPTHS.has(state.colorDepth)) { sayToast('この色ではディザを使いません'); return; }
-    // OFF: this button is a plain on/off switch. ON: it becomes the pattern switcher.
     if (state.gradientMode !== 'dither') {
       state.gradientMode = 'dither'; applyChange(); openTray('dither');
-      sayToast(`ディザ ON：${DITHER_PATTERNS.find((p) => p.id === state.ditherPattern).label}`);
+      sayToast(`ディザ ON：${DITHER_PATTERNS.find((pattern) => pattern.id === state.ditherPattern).label}`);
       return;
     }
   }
-  openTray(openTool === tool ? null : tool);
+  openTray(tool);
 });
 ditherPanel.addEventListener('click', (event) => {
   const button = event.target.closest('[data-value]'); if (!button || state.mode === 'captured' || audioCameraRequest) return;
   navigator.vibrate?.(6);
-  if (button.dataset.value === 'none') { state.gradientMode = 'none'; applyChange(); openTray(null); sayToast('ディザ OFF'); return; }
+  if (button.dataset.value === 'none') { state.gradientMode = 'none'; applyChange(); sayToast('ディザ OFF'); return; }
   state.gradientMode = 'dither'; state.ditherPattern = button.dataset.value; applyChange();
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 });
@@ -1006,7 +1379,7 @@ toneSlider.addEventListener('input', () => {
 });
 $('#toneReset').addEventListener('click', () => { for (const [key] of TONES) state.camera[key] = CAMERA_SETTING_DEFAULTS[key]; navigator.vibrate?.(8); applyChange(); sayToast('色調整を元に戻しました'); });
 document.addEventListener('pointerdown', (event) => {
-  if (!settingsPanel.hidden && !settingsPanel.contains(event.target) && !settingsButton.contains(event.target) && stage.contains(event.target)) closeCameraSettings();
+  if (!settingsPanel.contains(event.target) && stage.contains(event.target) && openTool) closeCameraSettings();
 }, true);
 // ---------- Palette: tap a colour of the current look to change it by hand ----------
 // The 色 row shows the look's palette as dots. Tapping one swaps the looks row for a hue / saturation /
@@ -1068,7 +1441,7 @@ function renderPaletteStrip(palette = lensPalette()) {
   requestAnimationFrame(() => { paletteDots.dataset.overflow = String(paletteDots.scrollWidth > paletteDots.clientWidth + 1); });
   shownPalette.forEach((color, index) => {
     const dot = paletteDots.children[index];
-    dot.style.background = cssColor(color);
+    dot.style.setProperty('--palette-dot-color', cssColor(color));
     dot.setAttribute('aria-pressed', String(index === editIndex));
   });
   const edited = lensPaletteEdited() && !(state.customLook && !paletteDiffersFromSaved());
@@ -1086,6 +1459,7 @@ function paletteDiffersFromSaved() {
 function setPaletteEditing(index) {
   editIndex = index;
   root.dataset.editing = String(index >= 0);
+  if (openTool === 'look') syncContextOptions('look');
   paletteEditor.hidden = index < 0;
   for (const dot of paletteDots.children) dot.setAttribute('aria-pressed', String(Number(dot.dataset.index) === index));
   $('#paletteDone').hidden = index < 0;
@@ -1142,7 +1516,11 @@ $('#paletteDelete').addEventListener('click', () => {
 });
 renderMyPaletteChips();
 lockAudioCameraControls();
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !settingsPanel.hidden) { closeCameraSettings(); settingsButton.focus(); } });
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (regionMergeSession) { event.preventDefault(); returnToLiveAfterRegionMerge(); return; }
+  if (openTool) { closeCameraSettings(); $('#toolbarHome [data-tool]')?.focus({ preventScroll: true }); }
+});
 paintSwatches();
 syncControls();
 
@@ -1196,6 +1574,7 @@ function syncZoomHud() {
 }
 function setZoom(value, { gesture = '', silent = false } = {}) {
   if (state.mode === 'captured') return;
+  if (regionMergeSession) endRegionMerge({ restore: true });
   const previous = state.zoom;
   state.zoom = Math.min(zoomInfo.max, Math.max(zoomInfo.min, value));
   // Gentle detents let a pinch land on the preset magnifications.
@@ -1215,32 +1594,41 @@ $('#zoomStops').addEventListener('click', (event) => {
   navigator.vibrate?.(6);
   setZoom(Number(button.dataset.zoom), { gesture: 'stop' });
 });
+stage.addEventListener('contextmenu', (event) => event.preventDefault());
 attachZoomGestures(stage, {
   get: () => state.zoom,
   set: (value, info) => setZoom(value, info),
   onTap: () => refreshObjects(),
+  onLongPress: (event) => beginRegionMerge(event.clientX, event.clientY),
   // the picture leans a little with the finger, so a swipe feels attached to it
   onDrag: (dx, dy) => {
-    if (state.mode !== 'live' || gif.recording) return;
+    if (state.mode !== 'live' || gif.recording || regionMergeSession) return;
     captureFrame.classList.toggle('is-dragging', Boolean(dx || dy));
     captureFrame.style.translate = dx || dy ? `${Math.max(-40, Math.min(40, dx * 0.18))}px ${Math.max(-40, Math.min(40, dy * 0.18))}px` : '';
   },
   onSwipe: (direction) => {
-    if (state.mode !== 'live' || gif.recording) return;
+    if (state.mode !== 'live' || gif.recording || regionMergeSession) return;
     if (direction === 'left') stepLook(1);
     else if (direction === 'right') stepLook(-1);
     else flipCamera();
   }
 });
 stage.addEventListener('keydown', (event) => {
+  if (event.target !== stage) return;
   if (event.key === '+' || event.key === '=') setZoom(state.zoom * 1.25, { gesture: 'key' });
   else if (event.key === '-') setZoom(state.zoom / 1.25, { gesture: 'key' });
   else if (event.key === '0') setZoom(1, { gesture: 'key' });
+  else if (event.key.toLowerCase() === 'm' && !event.repeat && !regionMergeSession) {
+    event.preventDefault();
+    const rect = view.getBoundingClientRect();
+    if (beginRegionMerge(rect.left + rect.width / 2, rect.top + rect.height / 2)) focusVisible('#regionMergePalette button');
+  }
   else if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) { event.preventDefault(); refreshObjects(); }
 });
 
 // Swipe up / down: front and back cameras.
 function flipCamera() {
+  if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   lastFacing = state.facing === 'environment' ? 'user' : 'environment';
   captureFrame.classList.remove('lc-flip');
   requestAnimationFrame(() => captureFrame.classList.add('lc-flip'));
@@ -1268,6 +1656,7 @@ function gifProgress() {
 }
 function startGif() {
   if (audioCameraRequest || state.mode !== 'live' || !state.result) return;
+  if (regionMergeSession) { sayToast('色統合中はGIFを撮影できません'); return; }
   Object.assign(gif, gifLimits());
   gif.capturePlan = animatedCapturePlan(state.result.width, state.result.height, { maxMs: gif.maxMs, fps: gif.fps });
   gif.maxFrames = gif.capturePlan.maxFrames;
@@ -1473,6 +1862,7 @@ if (audioCameraRequest) backLink.href = audioCameraCancelUrl({ search: location.
 else if (returnToAudio || audioCameraInvalid) backLink.href = audioCameraCancelUrl({ search: location.search });
 
 function suspendCamera() {
+  if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   if (gif.recording) stopGifUi();
   if (state.mode !== 'live' && state.mode !== 'loading') return;
   closeCamera({ message: 'カメラを一時停止しています。', focus: false });

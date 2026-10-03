@@ -4,15 +4,14 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('camera layout: settings stay folded until requested, with one tray of choices', () => {
+test('camera layout: six setting categories share a contextual rail without a separate settings button', () => {
   const html = read('pixel-camera.html');
   assert.match(html, /id="flipCamera"/, 'top right switches front / back camera');
   assert.doesNotMatch(html, /id="stopCamera"|id="sizePopover"|id="ditherRail"/, 'no pause button, no settings sheet, no side rail');
   const tools = [...html.matchAll(/data-tool="([a-z]+)"/g)].map((m) => m[1]);
   assert.deepEqual(new Set(tools), new Set(['look', 'dither', 'pixels', 'aspect', 'tone', 'zoom']));
-  for (const panel of ['look', 'dither', 'pixels', 'aspect', 'tone', 'zoom']) assert.match(html, new RegExp(`data-panel="${panel}"[^>]*hidden`), `${panel} row starts folded`);
-  assert.match(html, /id="cameraSettings"[^>]*aria-expanded="false"/);
-  assert.match(html, /id="cameraSettingsPanel"[^>]*hidden/);
+  assert.doesNotMatch(html, /id="cameraSettings"/, 'no separate settings launcher covers the preview');
+  assert.match(html, /id="toolbarContextBack"/, 'the context has an explicit route back to the six settings');
   assert.match(html, /id="gifRec"/);
   assert.match(html, /id="paletteStrip"/, 'the 色 row carries the editable palette');
   assert.match(html, /id="paletteSave"/);
@@ -37,13 +36,13 @@ test('dither button: a plain switch while off, the pattern chooser while on', ()
   assert.match(app, /function startGif\(/);
 });
 
-test('the tray can never widen the bottom area (16 colours scroll inside a fixed-size strip)', () => {
-  const css = read('css/pixel-lens-camera.css');
-  assert.match(css, /\.lc-bottom \{ grid-template-columns: minmax\(0, 1fr\); \}/);
-  assert.match(css, /\.lc-tray, \.lc-look, \.lc-tone, \.lc-palette-editor \{ grid-template-columns: minmax\(0, 1fr\); \}/);
-  assert.match(css, /\.lc-palette-strip \{[^}]*width: min\(calc\(100% - 1\.6rem\), 23rem\)[^}]*height: 2\.75rem/);
-  assert.match(css, /#pixelsPanel \{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
-  assert.match(css, /#pixelsPanel button \{[^}]*min-height: 44px/);
-  assert.match(css, /@media \(min-width: 720px\) \{ #pixelsPanel \{ grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
-  assert.match(css, /#pixelsPanel button\[aria-checked="true"\] \{ background: #ffd35a/);
+test('the existing five navigation destinations and central shutter are retained', () => {
+  const html = read('pixel-camera.html');
+  const nav = html.match(/<nav class="app-tabs pc-nav"[\s\S]*?<\/nav>/)?.[0];
+  assert.ok(nav, 'the camera keeps the shared bottom navigation');
+  const destinations = [...nav.matchAll(/data-nav="(map|camera|tools|profile)"/g)].map((m) => m[1]);
+  assert.deepEqual(destinations, ['map', 'camera', 'tools', 'profile']);
+  assert.match(nav, /id="capture"[^>]*data-action="capture"/);
+  assert.match(nav, /class="pc-nav-shutter"/);
+  assert.match(nav, /長押しでGIF/);
 });

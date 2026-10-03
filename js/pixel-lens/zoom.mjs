@@ -184,41 +184,65 @@ export function swipeDirection(dx, dy, ms) {
   return null;
 }
 
-export function attachZoomGestures(element, { get, set, onTap = null, onGesture = null, onSwipe = null, onDrag = null } = {}) {
+export function attachZoomGestures(element, { get, set, onTap = null, onGesture = null, onSwipe = null, onDrag = null, onLongPress = null } = {}) {
   const pointers = new Map();
   let pinch = null; let lastTap = 0; let tapTimer = 0; let moved = false; let downAt = 0; let pinched = false;
+  let holdTimer = 0; let holdFired = false; let canceled = false; let activePointer = null;
+  const clearHold = () => { if (holdTimer) window.clearTimeout(holdTimer); holdTimer = 0; };
   const distance = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
   element.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    if (tapTimer) { window.clearTimeout(tapTimer); tapTimer = 0; }
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, x0: event.clientX, y0: event.clientY });
     try { element.setPointerCapture(event.pointerId); } catch { /* not capturable */ }
-    if (pointers.size === 1) { moved = false; pinched = false; downAt = performance.now(); }
-    if (pointers.size === 2) { pinch = { start: distance(), zoom: get() }; moved = true; pinched = true; onDrag?.(0, 0); onGesture?.('start'); }
+    if (pointers.size === 1) {
+      moved = false; pinched = false; canceled = false; holdFired = false; activePointer = event.pointerId; downAt = performance.now();
+      clearHold();
+      if (onLongPress) holdTimer = window.setTimeout(() => {
+        holdTimer = 0;
+        if (pointers.size !== 1 || moved || canceled || activePointer !== event.pointerId) return;
+        holdFired = onLongPress(event) !== false;
+        if (holdFired) { if (tapTimer) window.clearTimeout(tapTimer); tapTimer = 0; lastTap = 0; }
+      }, 550);
+    }
+    if (pointers.size === 2) {
+      clearHold(); holdFired = true; activePointer = null;
+      pinch = { start: distance(), zoom: get() }; moved = true; pinched = true; onDrag?.(0, 0); onGesture?.('start');
+    } else if (pointers.size > 2) { clearHold(); canceled = true; holdFired = true; }
   });
   element.addEventListener('pointermove', (event) => {
     const p = pointers.get(event.pointerId); if (!p) return;
     p.x = event.clientX; p.y = event.clientY;
-    if (Math.hypot(p.x - p.x0, p.y - p.y0) > 10) moved = true;
+    if (Math.hypot(p.x - p.x0, p.y - p.y0) > 10) { moved = true; clearHold(); }
     if (pinch && pointers.size >= 2) { const d = distance(); if (pinch.start > 0) set(pinch.zoom * (d / pinch.start), { gesture: 'pinch' }); }
     else if (!pinched && pointers.size === 1 && moved) onDrag?.(p.x - p.x0, p.y - p.y0);
   });
   const end = (event) => {
     const p = pointers.get(event.pointerId);
     if (!p) return;
+    clearHold();
+    const canceledPointer = event.type !== 'pointerup';
+    if (canceledPointer) { canceled = true; holdFired = true; }
     pointers.delete(event.pointerId);
     if (pinch && pointers.size < 2) { pinch = null; onGesture?.('end'); }
     if (pointers.size === 0 && moved && !pinched) {
       onDrag?.(0, 0);
-      const direction = event.type === 'pointerup' ? swipeDirection(p.x - p.x0, p.y - p.y0, performance.now() - downAt) : null;
-      if (direction) onSwipe?.(direction);
+      if (!canceled) {
+        const direction = swipeDirection(p.x - p.x0, p.y - p.y0, performance.now() - downAt);
+        if (direction) onSwipe?.(direction);
+      }
     }
-    if (pointers.size === 0 && !moved && performance.now() - downAt < 350) {
+    if (pointers.size === 0 && (moved || pinched || canceled)) lastTap = 0;
+    if (pointers.size === 0 && !moved && !pinched && !canceled && !holdFired && performance.now() - downAt < 350) {
       const now = performance.now();
       if (now - lastTap < 300) { window.clearTimeout(tapTimer); lastTap = 0; set(1, { gesture: 'double-tap' }); }
       else { lastTap = now; tapTimer = window.setTimeout(() => { if (lastTap === now) onTap?.(); }, 300); }
     }
+    if (pointers.size === 0) activePointer = null;
   };
   element.addEventListener('pointerup', end);
   element.addEventListener('pointercancel', end);
+  element.addEventListener('lostpointercapture', end);
   element.addEventListener('wheel', (event) => {
     event.preventDefault();
     const k = event.ctrlKey ? 0.012 : 0.0025; // trackpad pinch arrives as ctrl+wheel with small deltas

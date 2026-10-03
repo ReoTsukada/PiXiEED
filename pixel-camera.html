@@ -13,18 +13,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261002-camera-controls-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261003-camera-polish-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
-  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261002-project-cards-1">
+  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261003-camera-polish-1">
 </head>
 <body data-tool-name="ドット絵カメラ" data-tool-short="カメラ">
   <a class="pc-skip" href="#stage">カメラへ移動</a>
   <main class="lc" id="pixelStudio" data-mode="loading">
     <!-- The picture is the controller: pinch = zoom, double tap = 1×, tap = pick colours again,
          swipe left/right = look, swipe up/down = front/back camera -->
-    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し、左右スワイプで色、上下スワイプでカメラ切り替え。設定は画面右下のボタンから開きます" tabindex="-1">
+    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し、長押しまたは M キーで色をまとめ、左右スワイプで色、上下スワイプでカメラ切り替え。設定は画面下の6項目から選べます" tabindex="-1">
       <video id="video" class="lc-video-source" playsinline muted autoplay aria-hidden="true" tabindex="-1"></video>
       <div class="lc-frame" id="captureFrame">
         <canvas id="view" width="1" height="1" aria-hidden="true"></canvas>
@@ -41,14 +41,16 @@
       <div class="lc-hint" id="gestureHint" hidden>
         <p><b>↔</b><span>左右スワイプで色</span></p>
         <p><b>↕</b><span>上下スワイプでカメラ切替</span></p>
+        <p><b>●</b><span>画面長押しまたは M キーでライブ色統合</span></p>
         <p><b>●</b><span>シャッター長押しでGIF</span></p>
-        <p><b>⚙</b><span>右下の設定から色・倍率など</span></p>
+        <p><b>◉</b><span>下の6項目から色・倍率などを選ぶ</span></p>
       </div>
       <div class="lc-zoom-hud" id="zoomHud" aria-hidden="true">
         <span class="lc-zoom-hud-value" id="zoomHudValue">1×</span>
         <span class="lc-zoom-hud-track"><i id="zoomHudFill"></i></span>
         <span class="lc-zoom-hud-hint" id="zoomHudHint">拡大ズーム</span>
       </div>
+
     </section>
 
     <header class="lc-top">
@@ -68,9 +70,21 @@
         <p id="info" class="pc-sr-only">写真はこの端末で処理します。</p>
         <span class="pc-sr-only"><span id="cameraStatus">準備中</span><span id="frameDimensions"></span></span>
       </div>
-      <div class="lc-settings-wrap" id="cameraSettingsPanel" hidden>
-      <!-- Tray: the row of choices for whichever toolbar button is open (one at a time) -->
-      <div class="lc-tray" id="tray">
+      <div class="lc-settings-wrap" id="cameraSettingsPanel">
+      <div class="lc-toolbar" id="toolbar" role="toolbar" aria-label="撮影の設定">
+        <div class="lc-toolbar-home" id="toolbarHome">
+        <button type="button" data-tool="look" aria-expanded="false" aria-controls="tray"><i class="lc-tool-sw lc-sw" aria-hidden="true"></i><b>GB</b><small>色</small></button>
+        <button type="button" data-tool="dither" aria-expanded="false" aria-controls="tray" data-state="on"><i class="lc-tool-sw lc-tool-dither" aria-hidden="true"></i><b>8×8</b><small>ディザ</small></button>
+        <button type="button" data-tool="pixels" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="4" height="4"/><rect x="10" y="4" width="4" height="4" opacity=".55"/><rect x="16" y="4" width="4" height="4"/><rect x="4" y="10" width="4" height="4" opacity=".55"/><rect x="10" y="10" width="4" height="4"/><rect x="16" y="10" width="4" height="4" opacity=".55"/><rect x="4" y="16" width="4" height="4"/><rect x="10" y="16" width="4" height="4" opacity=".55"/><rect x="16" y="16" width="4" height="4"/></svg></i><b>128 px</b><small>ドット</small></button>
+        <button type="button" data-tool="aspect" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic lc-tool-frame" aria-hidden="true"></i><b>画面</b><small>比率</small></button>
+        <button type="button" data-tool="tone" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></i><b>調整</b><small>色味</small></button>
+        <button type="button" data-tool="zoom" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic lc-tool-zoom" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4.2 4.2M10.8 7.7v6.2M7.7 10.8h6.2"/></svg></i><b>1×</b><small>ズーム</small></button>
+        </div>
+        <div id="toolbarContextHead" class="lc-toolbar-context-head" hidden>
+          <button id="toolbarContextBack" type="button" aria-label="設定項目へ戻る">←</button>
+          <span id="toolbarContextLabel"></span>
+        </div>
+        <div class="lc-tray" id="tray">
         <div class="lc-zoom-stops" id="zoomStops" data-panel="zoom" role="group" aria-label="ズーム" hidden></div>
         <div class="lc-look" data-panel="look" hidden>
           <!-- the look's palette: tap a colour to change it -->
@@ -89,9 +103,9 @@
           <button type="button" role="radio" data-look="gb" aria-checked="true"><i class="lc-sw" style="--a:#e0f8d0;--b:#a8c070;--c:#587830;--d:#203810"></i><span>GB</span></button>
           <button type="button" role="radio" data-look="mono" aria-checked="false"><i class="lc-sw" style="--a:#fff;--b:#fff;--c:#000;--d:#000"></i><span>白黒</span></button>
           <button type="button" role="radio" data-look="gray" aria-checked="false"><i class="lc-sw" style="--a:#eee;--b:#aaa;--c:#666;--d:#222"></i><span>グレー</span></button>
+          <button type="button" role="radio" data-look="photo" aria-checked="false"><i class="lc-sw lc-sw-photo"></i><span>写真の色</span></button>
           <button type="button" role="radio" data-look="c8" aria-checked="false"><i class="lc-sw" style="--a:#f4d35e;--b:#ee964b;--c:#0d3b66;--d:#2a2a2a"></i><span>8色</span></button>
           <button type="button" role="radio" data-look="c16" aria-checked="false"><i class="lc-sw" style="--a:#f7c59f;--b:#ef6f6c;--c:#2a9d8f;--d:#264653"></i><span>16色</span></button>
-          <button type="button" role="radio" data-look="photo" aria-checked="false"><i class="lc-sw lc-sw-photo"></i><span>写真の色</span></button>
         </div>
         </div>
         <div class="lc-row" id="ditherKinds" data-panel="dither" role="radiogroup" aria-label="ディザの模様" hidden></div>
@@ -102,17 +116,29 @@
           <div class="lc-slider"><input id="toneSlider" type="range" min="-100" max="100" step="1" value="0"><output id="toneValue">0</output><button id="toneReset" class="lc-reset" type="button" aria-label="色調整を元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button></div>
         </div>
       </div>
-      <!-- Toolbar: six compact settings buttons -->
-      <div class="lc-toolbar" id="toolbar" role="toolbar" aria-label="撮影の設定">
-        <button type="button" data-tool="look" aria-expanded="false" aria-controls="tray"><i class="lc-tool-sw lc-sw" aria-hidden="true"></i><b>GB</b><small>色</small></button>
-        <button type="button" data-tool="dither" aria-expanded="false" aria-controls="tray" data-state="on"><i class="lc-tool-sw lc-tool-dither" aria-hidden="true"></i><b>網目 8×8</b><small>ディザ</small></button>
-        <button type="button" data-tool="pixels" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="4" height="4"/><rect x="10" y="4" width="4" height="4" opacity=".55"/><rect x="16" y="4" width="4" height="4"/><rect x="4" y="10" width="4" height="4" opacity=".55"/><rect x="10" y="10" width="4" height="4"/><rect x="16" y="10" width="4" height="4" opacity=".55"/><rect x="4" y="16" width="4" height="4"/><rect x="10" y="16" width="4" height="4" opacity=".55"/><rect x="16" y="16" width="4" height="4"/></svg></i><b>128 px</b><small>ドット</small></button>
-        <button type="button" data-tool="aspect" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic lc-tool-frame" aria-hidden="true"></i><b>画面</b><small>比率</small></button>
-        <button type="button" data-tool="tone" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg></i><b>調整</b><small>色味</small></button>
-        <button type="button" data-tool="zoom" aria-expanded="false" aria-controls="tray"><i class="lc-tool-ic lc-tool-zoom" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4.2 4.2M10.8 7.7v6.2M7.7 10.8h6.2"/></svg></i><b>1×</b><small>ズーム</small></button>
+        <div id="regionMergePalette" class="lc-region-merge-palette" role="group" aria-label="まとめ先の色"></div>
+        <button id="toolbarContextMore" class="lc-toolbar-more" type="button" hidden>その他</button>
       </div>
       </div>
-      <button id="cameraSettings" class="lc-round lc-settings-button" type="button" aria-label="撮影の設定" aria-expanded="false" aria-controls="cameraSettingsPanel" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3v4m0 6v8M12 3v10m0 6v2M19 3v2m0 6v10"/><circle cx="5" cy="10" r="3"/><circle cx="12" cy="16" r="3"/><circle cx="19" cy="8" r="3"/></svg></button>
+
+      <section id="regionMergePanel" class="lc-region-merge" aria-labelledby="regionMergeHeading" aria-describedby="regionMergeHelp" hidden>
+        <header class="lc-region-merge-head">
+          <div><h2 id="regionMergeHeading">色統合中</h2><p id="regionMergeSource">選んだ色</p></div>
+          <button id="regionMergeCancel" type="button" class="lc-region-merge-return" aria-label="色統合を解除してカメラ映像へ戻る">解除</button>
+        </header>
+        <p id="regionMergeHelp" class="pc-sr-only lc-region-merge-help">ライブ映像を追跡中です。まとめ先を選ぶと、選んだ色に近い面を映像に反映します。中央ボタンで表示中の画像を撮影できます。「元に戻す」は統合だけを解除し、追跡を続けます。「解除」または Esc でカメラ映像へ戻ります。</p>
+        <label class="lc-region-merge-field">まとめ方
+          <select id="regionMergeMode" name="regionMergeMode">
+            <option value="surface" selected>面を単色</option>
+            <option value="color">この色だけ</option>
+          </select>
+        </label>
+        <label class="lc-region-merge-field" for="regionMergeStrength">強さ <output id="regionMergeStrengthValue" for="regionMergeStrength">55%</output>
+          <input id="regionMergeStrength" type="range" min="0" max="100" step="1" value="55">
+        </label>
+
+        <div class="lc-region-merge-foot"><p id="regionMergeStatus" role="status" aria-live="polite">ライブ映像を追跡中。まとめ先を選んでください。</p><button id="regionMergeUndo" type="button" disabled>元に戻す</button></div>
+      </section>
       <div id="resultControls" class="lc-result" hidden>
           <a id="savePng" class="lc-save" aria-disabled="true" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 19h14"/></svg><span id="saveLabel">画像を保存（PNG）</span></a>
               <button id="postCamera" class="lc-post" type="button">地図に投稿</button>
@@ -133,7 +159,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261002-project-cards-1"></script>
+  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261003-camera-polish-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
 </body>
 </html>
