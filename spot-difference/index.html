@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261001-text-contrast-1">
-  <link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20261002-header-layout-1">
+<link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20261002-inline-draw-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
@@ -24,16 +24,46 @@
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
   <main id="main" class="spot-page">
-    <header class="spot-heading"><h1>かんたん間違い探し</h1><p>保存した絵の版を比べ、正解の場所を選ぼう。</p></header>
+    <header class="spot-heading"><h1>かんたん間違い探し</h1><p>2枚を比べるか、1枚に違いを描いて候補を作ろう。</p></header>
     <a class="puzzle-list-back" href="/play/spot-difference/">‹ みんなの一覧へ</a>
-    <p id="spot-status" class="spot-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
-    <section id="spot-setup" class="spot-setup" aria-label="比べる絵を選ぶ">
+    <p id="spot-status" class="spot-status" role="status" aria-live="polite">画像2枚から候補を見つけるか、1枚から違いを描けます。</p>
+    <section id="spot-setup" class="spot-setup" aria-label="間違い探しを作る">
       <div id="spot-shelf" hidden></div>
+      <section class="spot-quick-import" aria-labelledby="spot-quick-title">
+        <h2 id="spot-quick-title">画像から作る</h2>
+        <div class="spot-file-pair">
+          <label>元の絵（PNG・WebP）<input id="spot-before-file" type="file" accept="image/png,image/webp"></label>
+          <label>変更後の絵（PNG・WebP）<input id="spot-after-file" type="file" accept="image/png,image/webp"></label>
+          <button id="spot-import-pair" type="button" disabled>2枚から候補を作る</button>
+        </div>
+        <div class="spot-file-single">
+          <label>1枚から違いを描く<input id="spot-single-file" type="file" accept="image/png,image/webp"></label>
+          <p>原画を残したまま、複製した絵に違いを描けます。</p>
+        </div>
+      </section>
+      <details class="spot-saved-versions">
+        <summary>保存版から比べる</summary>
       <label>元にする保存版<select id="spot-before" aria-label="元にする保存版"></select></label>
       <label>変更後の保存版<select id="spot-after" aria-label="変更後の保存版"></select></label>
       <button id="spot-start" type="button" disabled>差分候補を見つける</button>
+      </details>
       <button id="spot-resume" type="button" hidden>前回の作成を再開</button>
-      <p>間違い探しは自分の絵を持ちます。ほかのツールの絵を持ってくると、ここに新しい版として写されます（元の絵は変わりません）。変えた絵をもう一度持ってくれば、2つの版を比べられます。</p>
+      <p>読み込んだ画像は間違い探し用の固定版として端末に保存します。元のファイルやほかの作品は変更しません。</p>
+    </section>
+    <section id="spot-inline-draw" class="spot-inline-draw" aria-label="違いを描く" hidden>
+      <div class="spot-inline-top"><strong>複製した絵に違いを描く</strong><button id="spot-inline-cancel" type="button">戻る</button></div>
+      <p>元の絵はそのままです。色を選んで描き、いつでも戻せます。</p>
+      <canvas id="spot-inline-canvas" aria-label="複製した絵に違いを描くキャンバス" tabindex="0"></canvas>
+      <div class="spot-inline-color-row"><div id="spot-inline-palette" class="spot-inline-palette" role="group" aria-label="描く色"></div><label class="spot-inline-add-color" title="新しい色を追加"><span aria-hidden="true">＋</span><input id="spot-inline-add-color" type="color" value="#f2a433" aria-label="新しく追加する色"></label></div>
+      <div class="spot-inline-tools" role="group" aria-label="描画操作">
+        <button id="spot-inline-pen" type="button" aria-label="ペン" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg></button>
+        <button id="spot-inline-eraser" type="button" aria-label="消しゴム" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4 15l9-9 6 6-7 7H8z"/><path d="M9 10l6 6"/></svg></button>
+        <button id="spot-inline-undo" type="button" aria-label="ひとつ戻す" title="ひとつ戻す" disabled><img src="/assets/icons/pixieed/undo.svg" alt=""></button>
+        <button id="spot-inline-redo" type="button" aria-label="やり直す" title="やり直す" disabled><img src="/assets/icons/pixieed/redo.svg" alt=""></button>
+        <button id="spot-inline-original" type="button" aria-label="元の絵と比べる" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button id="spot-inline-finish" type="button">候補を確認</button>
+      </div>
+      <p id="spot-inline-status" role="status" aria-live="polite"></p>
     </section>
     <section id="spot-editor" class="spot-editor" hidden aria-label="差分候補を確認">
       <figure class="spot-preview"><figcaption>変更後の絵。色のついた場所をタップして候補を選びます。分割モードでは画素をなぞって範囲を選べます。</figcaption><canvas id="spot-canvas" aria-label="変更後の画像。色のついた候補をタップして選び、分割モードではなぞって範囲を選択できます。ピンチで拡大。矢印キーで候補を選択" tabindex="0"></canvas></figure>
@@ -47,7 +77,8 @@
             <button id="spot-merge" type="button" disabled>まとめる</button>
             <button id="spot-split" type="button" disabled>選択範囲で分割</button>
             <button id="spot-exclude" type="button" disabled>候補を除外</button>
-            <button id="spot-confirm" type="button" disabled>正解を確定</button>
+          <button id="spot-confirm" type="button" disabled>正解を確定</button>
+          <button id="spot-redraw" type="button" hidden>違いを描き直す</button>
           </div>
           <ol id="spot-candidates" class="spot-candidates" aria-label="差分候補"></ol>
           <p id="spot-confirmed" class="spot-confirmed" role="status" hidden>作者が正解を確定しました。作品は端末内の下書きです。</p>
@@ -56,7 +87,7 @@
       </details>
       <div class="spot-publish-actions" aria-label="確定した間違い探しの操作">
         <button id="spot-play-local" type="button" hidden disabled>確定した下書きを試しに遊ぶ</button>
-        <button id="spot-publish" class="spot-publish" type="button" hidden disabled>地球儀へ投稿</button>
+        <button id="spot-publish" class="spot-publish" type="button" hidden disabled title="投稿機能は準備中">投稿機能は準備中</button>
       </div>
       <output id="spot-zoom" class="spot-zoom" aria-label="画像の拡大率">100%</output>
       <p id="spot-edit-hint" class="spot-edit-hint" role="status" aria-live="polite"></p>
@@ -65,11 +96,11 @@
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション">
     <a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
-    <button id="spot-save" type="button" aria-label="間違い探しの下書きをこのブラウザーに保存" title="下書きを保存（まだ公開されません）" disabled>下書き</button>
+    <button id="spot-save" type="button" aria-label="間違い探しの下書きをこのブラウザーに保存" title="下書きを保存（まだ公開されません）" disabled>保存</button>
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261002-project-cards-1"></script>
+  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261002-inline-draw-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
 </body>

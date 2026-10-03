@@ -1,7 +1,10 @@
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
-import { listOwnVersions, mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
+import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
+import { decodeSpotImagePair, decodeSpotSingleImage } from './spot-image-import.mjs?rev=20261002-inline-draw-1';
+import { mountSpotInlineDraw } from './spot-inline-draw.mjs?rev=20261002-inline-draw-1';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20261002-project-cards-1';
@@ -22,6 +25,8 @@ const selectedIds = new Set(); const splitPixels = new Set();
 const touchPoints = new Map(); let touchEditSnapshot = null;
 let adapter; let store; let draftId = null; let draft = null; let beforeRevision = null; let afterRevision = null; let sourceDraftId = null; let afterDraftId = null; let savedConfirmedDraftId = null;
 let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
+let inlineDraw = null; let inlineBeforeRevision = null; let inlineWorkingRevision = null; let inlineBeforeSourceId = null; let inlineSourceId = null; let inlinePreservePxd = false; let inlineDraftGameId = null;
+let sessionEpoch = 0; let inlineSessionEpoch = null;
 let splitMode = false; let activePointer = null; let previousPixel = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0; let cursorPixel = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -69,15 +74,19 @@ function updateActions() {
   $('#spot-split').disabled = ids.length !== 1 || !splitPixels.size || Boolean(draft?.confirmed);
   $('#spot-exclude').disabled = ids.length !== 1 || Boolean(draft?.confirmed);
   $('#spot-confirm').disabled = !draft || !draft.candidates.length || Boolean(draft.confirmed);
-  saveButton.disabled = !draft;
+  saveButton.disabled = !draft || !draft.candidates.length;
   const canPlayLocal = Boolean(draft?.confirmed && savedConfirmedDraftId === draft.gameId);
   playLocalButton.hidden = !canPlayLocal;
   playLocalButton.disabled = !canPlayLocal;
   playLocalButton.disabled = playLocalButton.hidden || !store || !adapter;
   publishButton.hidden = !canPlayLocal;
-  publishButton.disabled = !canPlayLocal || !store || !adapter;
+  publishButton.disabled = !canPlayLocal || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
+  publishButton.textContent = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中';
+  publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
 }
 function showEditor() {
+  inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open');
+  $('#spot-redraw').hidden = !draft?.before || draft.before.draftId !== draft.after?.draftId;
   setup.hidden = true; editor.hidden = false; document.body.classList.add('spot-editing');
   $('#spot-edit-hint').textContent = '色のついた場所をタップして選択 · ピンチで拡大';
   renderCandidates(); fitCanvas(); resetCanvasView();
@@ -156,10 +165,13 @@ async function loadSourceOptions() {
 }
 
 async function start() {
+  const epoch = sessionEpoch;
   try {
     $('#spot-start').disabled = true; message('画像の固定版を確認しています…');
     beforeRevision = await resolveLocalDrawRevision(adapter, sourceDraftId, beforeSelect.value);
+    if (epoch !== sessionEpoch) return;
     afterRevision = await resolveLocalDrawRevision(adapter, sourceDraftId, afterSelect.value);
+    if (epoch !== sessionEpoch) return;
     if (beforeRevision.revisionId === afterRevision.revisionId) throw new Error('別々の保存版を選んでください');
     const result = detectDifferenceCandidates(beforeRevision.document, afterRevision.document);
     pxdBridge?.reset();
@@ -173,8 +185,118 @@ async function start() {
   finally { $('#spot-start').disabled = false; }
 }
 
+async function saveImportedPair(pair) {
+  const first = await savePicture('spot-difference', pair.before, { adapter, store, source: { type: 'local_image_copy', assetId: null, revisionId: null } });
+  const second = await store.save({ draftId: first.draftId, kind: 'pixel_art', ownerId: 'local-owner', document: pair.after, source: { type: 'local_image_copy', assetId: first.revision.asset.assetId, revisionId: first.revision.revisionId }, expectedRevisionId: first.revision.revisionId });
+  return { sourceId: first.draftId, before: first.revision, after: second };
+}
+
+async function showCandidatePair(beforeSourceId, before, afterSourceId, after, { label = '固定版', preservePxd = false, gameId = null } = {}) {
+  if (before.revisionId === after.revisionId) throw new Error('別々の画像を選んでください。');
+  const result = detectDifferenceCandidates(before.document, after.document);
+  if (!result.candidates.length) throw new Error('2枚に差がありません。画像を確認してください。');
+  if (!preservePxd) {
+    pxdBridge?.reset(); pxdOriginalRefs = null; pxdPreservedPayload = null;
+    if (!gameId) { draft = null; draftId = null; savedConfirmedDraftId = null; }
+  }
+  draftId = null; savedConfirmedDraftId = null; selectedIds.clear(); splitPixels.clear();
+  sourceDraftId = beforeSourceId; beforeRevision = before; afterRevision = after;
+  draft = { schemaVersion: 1, gameId: gameId || crypto.randomUUID(), width: result.width, height: result.height, before: reference(beforeSourceId, before), after: reference(afterSourceId, after), candidates: result.candidates, confirmed: false, publication: 'draft', published: false };
+  validateSpotDifferenceDraft(draft);
+  $('#spot-source-label').textContent = `元 ${before.revisionId.slice(0, 8)} → 変更後 ${after.revisionId.slice(0, 8)}・${label}`;
+  $('#spot-confirmed').hidden = true; $('#spot-redraw').hidden = false; showEditor();
+  message(`${result.candidates.length}個の差分候補を作りました。すべての変更画素を候補に含めています。`);
+}
+
+async function finishInlineDrawing(edited) {
+  const requestedEpoch = sessionEpoch;
+  await pxdBridge?.save();
+  if (requestedEpoch !== sessionEpoch || !inlineDraw) return;
+  const epoch = sessionEpoch; const sourceId = inlineSourceId; const before = inlineBeforeRevision; const working = inlineWorkingRevision; const beforeSourceId = inlineBeforeSourceId; const preservePxd = inlinePreservePxd; const gameId = inlineDraftGameId;
+  if (inlineSessionEpoch !== epoch) return;
+  const result = detectDifferenceCandidates(before.document, edited);
+  if (!result.candidates.length) { $('#spot-inline-status').textContent = 'まだ差分がありません。色を選んで原画と違う画素を描いてください。'; return; }
+  const next = await store.save({ draftId: sourceId, kind: 'pixel_art', ownerId: 'local-owner', document: edited, source: { type: 'local_image_copy', assetId: before.asset.assetId, revisionId: before.revisionId }, expectedRevisionId: working.revisionId });
+  if (epoch !== sessionEpoch || inlineSourceId !== sourceId || inlineWorkingRevision?.revisionId !== working.revisionId) return;
+  inlineWorkingRevision = next;
+  await showCandidatePair(beforeSourceId, before, sourceId, next, { label: '描いた複製の固定版', preservePxd, gameId });
+}
+
+function openInlineDrawing(beforeSourceId, before, sourceId, working, { preservePxd = false, gameId = null } = {}) {
+  inlineDraw?.dispose(); inlineBeforeSourceId = beforeSourceId; inlineSourceId = sourceId; inlineBeforeRevision = before; inlineWorkingRevision = working; inlinePreservePxd = preservePxd; inlineDraftGameId = gameId;
+  inlineSessionEpoch = sessionEpoch;
+  if (!preservePxd) { pxdBridge?.reset(); pxdOriginalRefs = null; pxdPreservedPayload = null; if (!gameId) { draft = null; draftId = null; savedConfirmedDraftId = null; } }
+  saveButton.disabled = true;
+  setup.hidden = true; editor.hidden = true; $('#spot-inline-draw').hidden = false; document.body.classList.remove('spot-editing'); document.body.classList.add('spot-inline-open');
+  inlineDraw = mountSpotInlineDraw({
+    canvas: $('#spot-inline-canvas'), paletteHost: $('#spot-inline-palette'), penButton: $('#spot-inline-pen'), eraserButton: $('#spot-inline-eraser'),
+    undoButton: $('#spot-inline-undo'), redoButton: $('#spot-inline-redo'), originalButton: $('#spot-inline-original'), addColorInput: $('#spot-inline-add-color'),
+    finishButton: $('#spot-inline-finish'), status: $('#spot-inline-status'), original: before.document, working: working.document,
+    onFinish: finishInlineDrawing, onChange: () => pxdBridge?.markDirty()
+  });
+  $('#spot-inline-cancel').focus();
+}
+
+async function importTwoImages() {
+  const epoch = sessionEpoch;
+  const button = $('#spot-import-pair'); const beforeFile = $('#spot-before-file').files?.[0]; const afterFile = $('#spot-after-file').files?.[0];
+  if (!beforeFile || !afterFile || !store) return;
+  button.disabled = true; message('2枚の画像を同じドット幅で準備しています…');
+  try {
+    const pair = await decodeSpotImagePair(beforeFile, afterFile);
+    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
+    const saved = await saveImportedPair(pair);
+    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
+    await showCandidatePair(saved.sourceId, saved.before, saved.sourceId, saved.after);
+    if (pair.quantized) message('色数が多いため、2枚に同じ方法で色をまとめました。候補を確認してください。');
+  } catch (error) { message(`画像を読み込めませんでした：${error.message}`); }
+  finally { button.disabled = !$('#spot-before-file').files?.[0] || !$('#spot-after-file').files?.[0]; }
+}
+
+async function importOneImage() {
+  const epoch = sessionEpoch;
+  const input = $('#spot-single-file'); const file = input.files?.[0]; if (!file || !store) return;
+  input.disabled = true; message('画像を複製しています。元の画像はそのままです…');
+  try {
+    const pair = await decodeSpotSingleImage(file);
+    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
+    const saved = await saveImportedPair(pair);
+    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
+    openInlineDrawing(saved.sourceId, saved.before, saved.sourceId, saved.after);
+  } catch (error) { message(`画像を読み込めませんでした：${error.message}`); }
+  finally { input.disabled = false; input.value = ''; }
+}
+
+async function redrawImage() {
+  if (!beforeRevision || !afterRevision || beforeRevision.document.width !== afterRevision.document.width || beforeRevision.document.height !== afterRevision.document.height) return;
+  openInlineDrawing(draft?.before.draftId || sourceDraftId, beforeRevision, draft?.after.draftId || sourceDraftId, afterRevision, { preservePxd: Boolean(pxdOriginalRefs), gameId: draft?.gameId || null });
+}
+
+/** Freeze unfinished dots before the project workspace exports or switches projects. */
+async function persistInlineDrawing() {
+  if (!inlineDraw || inlineSessionEpoch !== sessionEpoch) return null;
+  const epoch = sessionEpoch; const before = inlineBeforeRevision; const working = inlineWorkingRevision;
+  const beforeId = inlineBeforeSourceId; const workingId = inlineSourceId; const edited = inlineDraw.getDocument();
+  let saved = working;
+  if (JSON.stringify(edited) !== JSON.stringify(working.document)) {
+    saved = await store.save({ draftId: workingId, kind: 'pixel_art', ownerId: 'local-owner', document: edited, source: { type: 'local_image_copy', assetId: before.asset.assetId, revisionId: before.revisionId }, expectedRevisionId: working.revisionId });
+  }
+  if (epoch !== sessionEpoch || inlineDraw === null || inlineWorkingRevision?.revisionId !== working.revisionId) return null;
+  inlineWorkingRevision = saved; beforeRevision = before; afterRevision = saved; sourceDraftId = beforeId; afterDraftId = workingId;
+  const result = detectDifferenceCandidates(before.document, edited);
+  const nextDraft = draft ? structuredClone(draft) : { schemaVersion: 1, gameId: inlineDraftGameId || crypto.randomUUID(), publication: 'draft', published: false };
+  Object.assign(nextDraft, {
+    schemaVersion: 1, gameId: inlineDraftGameId || nextDraft.gameId || crypto.randomUUID(), width: edited.width, height: edited.height,
+    before: reference(beforeId, before), after: reference(workingId, saved), candidates: result.candidates, confirmed: false, publication: 'draft', published: false
+  });
+  draft = validateSpotDifferenceDraft(nextDraft); draftId = null; savedConfirmedDraftId = null;
+  inlineDraftGameId = draft.gameId; inlinePreservePxd = true;
+  message(result.candidates.length ? '未確定の作業版を作品へ保存しました。候補はあとで確認できます。' : '候補はまだありませんが、原画と作業用の複製を作品へ保存しました。');
+  return draft;
+}
+
 async function save() {
-  if (!store || !draft) return;
+  if (!store || !draft || !draft.candidates.length) { message('先に画像の差分候補を作ってください。'); return; }
   savedConfirmedDraftId = null; updateActions();
   saveButton.disabled = true; message('端末に保存しています…');
   try {
@@ -188,18 +310,22 @@ async function save() {
     savedConfirmedDraftId = draft.confirmed ? draft.gameId : null;
     message(draft.confirmed ? '作者が正解を確定し、端末内の下書きに保存しました。公開はまだ行われません。' : '未確定の候補を端末に保存しました。公開はされません。');
   } catch (error) { message(`保存できませんでした：${error.message}`); }
-  finally { saveButton.disabled = !draft; updateActions(); }
+  finally { saveButton.disabled = !draft || !draft.candidates.length; updateActions(); }
 }
 
 async function resume() {
+  const epoch = sessionEpoch;
   const id = readStorage(LAST_KEY); if (!id || !store || !adapter) return;
   resumeButton.disabled = true; message('前回の下書きと画像版を確認しています…');
   try {
     const revision = await store.load(id);
+    if (epoch !== sessionEpoch) return;
     if (!revision || revision.asset.kind !== 'spot_difference' || revision.asset.visibility !== 'draft' || revision.asset.owner.type !== 'local' || revision.asset.owner.id !== 'local-owner') throw new Error('間違い探しの下書きが見つかりません');
     const restored = validateSpotDifferenceDraft(revision.document);
     beforeRevision = await resolveLocalDrawRevision(adapter, restored.before.draftId, restored.before.revisionId);
+    if (epoch !== sessionEpoch) return;
     afterRevision = await resolveLocalDrawRevision(adapter, restored.after.draftId, restored.after.revisionId);
+    if (epoch !== sessionEpoch) return;
     if (JSON.stringify(reference(restored.before.draftId, beforeRevision)) !== JSON.stringify(restored.before) || JSON.stringify(reference(restored.after.draftId, afterRevision)) !== JSON.stringify(restored.after)) throw new Error('元画像の固定版が一致しません');
     if (beforeRevision.document.width !== restored.width || beforeRevision.document.height !== restored.height || afterRevision.document.width !== restored.width || afterRevision.document.height !== restored.height) throw new Error('比較画像の寸法が保存した候補と一致しません');
     pxdBridge?.reset();
@@ -211,13 +337,16 @@ async function resume() {
 }
 
 async function openPxdSpot(project) {
+  const epoch = ++sessionEpoch;
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
-  if (!project.entries.length) { draft = null; beforeRevision = afterRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; editor.hidden = true; setup.hidden = false; return; }
+  if (!project.entries.length) { inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing'); draft = null; beforeRevision = afterRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; editor.hidden = true; setup.hidden = false; saveButton.disabled = true; return; }
   const params = new URLSearchParams(location.search);
   const preferredRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : undefined;
   const imported = hasPxdPuzzle(project, 'spot_difference')
     ? await materializePxdPuzzle(await readPxdPuzzle(project, 'spot_difference'), { tool: 'spot_difference', store })
     : await createPxdPuzzleFromMain(project, { tool: 'spot_difference', store, preferredRole });
+  if (epoch !== sessionEpoch) return;
+  inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing');
   const nextBefore = imported.bindings.before.revision; const nextAfter = imported.bindings.after.revision;
   if (nextBefore.document.width !== nextAfter.document.width || nextBefore.document.height !== nextAfter.document.height) throw new Error('PXDの比較画像サイズが一致しません。');
   beforeRevision = nextBefore; afterRevision = nextAfter; sourceDraftId = imported.bindings.before.draftId; afterDraftId = imported.bindings.after.draftId;
@@ -225,6 +354,11 @@ async function openPxdSpot(project) {
   selectedIds.clear(); splitPixels.clear();
   $('#spot-source-label').textContent = `PXD固定画像 · ${draft.width}×${draft.height}px`;
   $('#spot-confirmed').hidden = !draft.confirmed;
+  if (!draft.candidates.length) {
+    openInlineDrawing(imported.bindings.before.draftId, nextBefore, imported.bindings.after.draftId, nextAfter, { preservePxd: true, gameId: draft.gameId });
+    message('PXDの原画を保ったまま、複製に違いを描けます。');
+    return;
+  }
   showEditor(); saveButton.disabled = false;
   message(imported.sourceChanged ? 'PXD内の画像が編集されていたため、差分を作り直しました。正解は未確定です。' : imported.document.candidates.length ? 'PXDの間違い探しを端末内の新しい下書きとして開きました。保存後に試遊できます。' : '元画像から空の間違い探しを作りました。PXDメニューの「変更後の絵を描く」で画像を編集してください。');
 }
@@ -232,22 +366,31 @@ async function openPxdSpot(project) {
 function mountPxdSpot() {
   if (!store) return null;
   return mountPxdTools({
-    tool: 'spot_difference', projectWorkspace: true, setStatus: message, hasContent: () => Boolean(draft), openProject: openPxdSpot,
-    getProject: async (project) => draft ? writePxdPuzzle(project.manifest.sharedCanvas ? project : await putPxdSharedImage(project, { width: afterRevision.document.width, height: afterRevision.document.height, rgba: documentRgba(afterRevision.document) }), {
-      tool: 'spot_difference', document: draft,
-      sourceDrawDocuments: { 'spot-before': beforeRevision?.document, 'spot-after': afterRevision?.document },
-      portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
-    }) : project
+    tool: 'spot_difference', projectWorkspace: true, setStatus: message, hasContent: () => Boolean(draft || inlineDraw), openProject: openPxdSpot,
+    getProject: async (project) => {
+      if (inlineDraw) await persistInlineDrawing();
+      if (!draft || !beforeRevision || !afterRevision) return project;
+      return writePxdPuzzle(project.manifest.sharedCanvas ? project : await putPxdSharedImage(project, { width: afterRevision.document.width, height: afterRevision.document.height, rgba: documentRgba(afterRevision.document) }), {
+        tool: 'spot_difference', document: draft,
+        sourceDrawDocuments: { 'spot-before': beforeRevision.document, 'spot-after': afterRevision.document },
+        portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false
+      });
+    }
   });
 }
 
 $('#spot-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
+$('#spot-before-file').addEventListener('change', () => { $('#spot-import-pair').disabled = !$('#spot-before-file').files?.[0] || !$('#spot-after-file').files?.[0]; });
+$('#spot-after-file').addEventListener('change', () => { $('#spot-import-pair').disabled = !$('#spot-before-file').files?.[0] || !$('#spot-after-file').files?.[0]; });
+$('#spot-import-pair').addEventListener('click', importTwoImages); $('#spot-single-file').addEventListener('change', importOneImage);
+$('#spot-inline-cancel').addEventListener('click', () => { inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing'); setup.hidden = false; });
+$('#spot-redraw').addEventListener('click', redrawImage);
 playLocalButton.addEventListener('click', () => {
   if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId) return;
   window.location.assign(`/play/spot-difference/?localSpot=${encodeURIComponent(draft.gameId)}`);
 });
 publishButton.addEventListener('click', async () => {
-  if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId || !store || !adapter) return;
+  if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true) return;
   publishButton.disabled = true; message('固定版と投稿用PNGを確認しています…');
   try { await openPuzzleHandoff({ mode: 'spot_difference', draftId: draft.gameId, store, adapter }); }
   catch (error) { publishButton.disabled = false; message(`投稿を準備できませんでした：${error.message}`); }
@@ -340,7 +483,15 @@ window.addEventListener('resize', () => { fitCanvas(); applyCanvasView(); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { message('このブラウザーでは端末内保存を利用できません。'); }
 resumeButton.hidden = !readStorage(LAST_KEY);
-mountPictureShelf($('#spot-shelf'), { tool: 'spot-difference', adapter, onBrought: async ({ from }) => { await loadSourceOptions(); message(`${from.label}の絵を持ってきました。${afterSelect.options.length > 1 ? '2つの版を選んで比べられます。' : '変えた絵をもう一度持ってくると比べられます。'}`); }, onError: (error) => message(`持ってこられませんでした：${error.message}`) });
+mountPictureShelf($('#spot-shelf'), { tool: 'spot-difference', adapter, onBrought: async ({ draftId: broughtDraftId, revision, from }) => {
+  const epoch = sessionEpoch;
+  try {
+    const working = await store.save({ draftId: broughtDraftId, kind: 'pixel_art', ownerId: 'local-owner', document: structuredClone(revision.document), source: { type: 'local_draft_copy', assetId: revision.asset.assetId, revisionId: revision.revisionId }, expectedRevisionId: revision.revisionId });
+    if (epoch !== sessionEpoch) return;
+    openInlineDrawing(broughtDraftId, revision, broughtDraftId, working);
+    message(`${from.label}の絵を複製しました。原画はそのままです。`);
+  } catch (error) { message(`絵を開けませんでした：${error.message}`); }
+}, onError: (error) => message(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdSpot();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSourceOptions();

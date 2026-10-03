@@ -7,6 +7,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
+import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
@@ -278,9 +279,26 @@ function mount() {
   const game = document.querySelector('#pixfind-game'); const primary = document.querySelector('#pixfind-primary');
   if (!status || !list || !game || !primary) return;
   let puzzles = []; let selected = null; let regions = []; let found = new Set(); let original = null; let changed = null; let currentMask = null; let cursorX = NaN; let cursorY = NaN; let readOnly = false; let authoritativeAnswers = false; let answerInstruction = ''; let localRoute = false; let postPuzzleRoute = false;
-  let resultRun = 0; let resultShownRun = -1; let resultTimer = 0;
+  let resultRun = 0; let resultShownRun = -1; let resultTimer = 0; let feedbackTimer = 0; let feedbackToken = 0;
   const resultView = createToolResultView({ key: document.body.dataset.puzzleMode === 'hidden-object' ? 'find-result' : 'spot-result', main: document.querySelector('#main'), returnLabel: 'ゲームに戻る' });
   const cancelResult = (newRun = false) => { window.clearTimeout(resultTimer); resultTimer = 0; if (newRun) resultRun += 1; resultView.close(); };
+  const clearTapFeedback = () => {
+    feedbackToken += 1; window.clearTimeout(feedbackTimer); feedbackTimer = 0;
+    statusGame.removeAttribute('data-visible'); statusGame.removeAttribute('data-feedback');
+    for (const area of [playArea, changedArea].filter(Boolean)) { area.removeAttribute('data-feedback'); area.style.removeProperty('--pixfind-feedback-x'); area.style.removeProperty('--pixfind-feedback-y'); }
+  };
+  const showTapFeedback = (kind, message, area, clientX, clientY, duration = 1450) => {
+    clearTapFeedback(); const token = feedbackToken;
+    statusGame.dataset.visible = 'true'; statusGame.dataset.feedback = kind; statusGame.textContent = message;
+    const rect = area.getBoundingClientRect(); area.dataset.feedback = kind;
+    area.style.setProperty('--pixfind-feedback-x', `${clientX - rect.left}px`); area.style.setProperty('--pixfind-feedback-y', `${clientY - rect.top}px`);
+    feedbackTimer = window.setTimeout(() => {
+      if (token !== feedbackToken) return;
+      statusGame.removeAttribute('data-visible'); statusGame.removeAttribute('data-feedback');
+      area.removeAttribute('data-feedback'); area.style.removeProperty('--pixfind-feedback-x'); area.style.removeProperty('--pixfind-feedback-y');
+      feedbackTimer = 0;
+    }, duration);
+  };
   const localObjectUrls = new Set();
   const pageMode = PUZZLE_PLAY_PATHS[document.body.dataset.puzzleMode] ? document.body.dataset.puzzleMode : null;
   const originalNode = document.querySelector('#pixfind-original'); const changedNode = document.querySelector('#pixfind-changed'); const compareButton = document.querySelector('#pixfind-compare');
@@ -394,6 +412,7 @@ function mount() {
   };
   const start = async (puzzle) => {
     cancelResult(true); resultShownRun = -1;
+    clearTapFeedback();
     // Each game shows only its own kind; a link to the other kind moves to that game.
     if (pageMode && puzzle.mode !== pageMode) { window.location.replace(PUZZLE_PLAY_PATHS[puzzle.mode] + window.location.search + window.location.hash); return; }
     stopHintMotion();
@@ -429,6 +448,8 @@ function mount() {
       const base = imageData(original); const layer = puzzle.localHiddenOnly || (puzzle.publicPostOnly && puzzle.mode === 'hidden-object') ? null : imageData(changed);
       // Older puzzles may be saved enlarged; count their dots, not their pixels, when sizing the view.
       cell = layer ? gcd(detectPixelScale(base), detectPixelScale(layer)) : detectPixelScale(base);
+      playArea.style.aspectRatio = `${original.naturalWidth}/${original.naturalHeight}`;
+      if (changedArea) changedArea.style.aspectRatio = playArea.style.aspectRatio;
       updateBaseScale();
       const metrics = viewportAreas();
       viewport = clampPixfindViewport(viewport, original.naturalWidth, original.naturalHeight, baseScale, metrics);
@@ -472,10 +493,9 @@ function mount() {
       }
       currentMask = result.mask;
       if (!readOnly && !regions.length) { readOnly = true; viewMessage = '正解位置を確認できないため、画像のみ表示しています。'; }
-      playArea.style.aspectRatio = `${original.naturalWidth}/${original.naturalHeight}`;
-      if (changedArea) changedArea.style.aspectRatio = playArea.style.aspectRatio;
       if (readOnly) { primary.disabled = true; primary.setAttribute('aria-label', '正解位置未確認のためプレイできません'); progress.textContent = '閲覧のみ'; foundList.replaceChildren(); statusGame.textContent = viewMessage; }
       else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; updateProgress(); }
+      updateBaseScale(); constrainViewport(); paint();
     } catch (error) {
       statusGame.textContent = error.message || '問題を読み込めませんでした。'; primary.disabled = true;
       if (puzzle.publicPostOnly) {
@@ -486,6 +506,7 @@ function mount() {
   };
   const showList = () => {
     cancelResult(true); resultShownRun = -1;
+    clearTapFeedback();
     stopHintMotion();
     hint = null; hintController.setProblem('');
     if (localRoute || postPuzzleRoute) {
@@ -513,18 +534,31 @@ function mount() {
     compareButton.textContent = showingChanged ? '元の絵を見る' : '変化後を見る';
     paint();
   });
-  const markAt = (x, y) => {
+  const markAt = (x, y, area, clientX, clientY, pointerType = 'mouse') => {
     if (!original || !regions.length || readOnly) return;
-    cursorX = x; cursorY = y;
-    const hit = regions.findIndex((region, index) => !found.has(index) && regionContainsPoint(region, x, y, region.hitTolerance ?? 2));
-    if (hit < 0) { statusGame.textContent = 'そこにはありません。もう一度探してみてください。'; paint(); return; }
-    found.add(hit); statusGame.textContent = '見つけました！'; updateProgress();
+    let selection;
+    if (selected.mode === 'spot-difference') {
+      selection = selectPixfindHit(regions, x, y, { width: original.naturalWidth, height: original.naturalHeight, scale: geometry(area).scale, pointerType, found });
+    } else {
+      if (x < 0 || y < 0 || x >= original.naturalWidth || y >= original.naturalHeight) return;
+      const hit = regions.findIndex((region) => regionContainsPoint(region, x, y, region.hitTolerance ?? 2));
+      selection = hit < 0 ? { type: 'miss', index: -1 } : found.has(hit) ? { type: 'found', index: hit } : { type: 'hit', index: hit };
+    }
+    if (selection.type === 'outside' || selection.type === 'found') return;
+    if (selection.type !== 'hit') {
+      showTapFeedback('miss', 'ここではありません。少し場所を変えてみて。', area, clientX, clientY);
+      paint(); return;
+    }
+    found.add(selection.index); updateProgress();
+    const complete = found.size === regions.length;
+    showTapFeedback('correct', complete ? statusGame.textContent : '見つけました！', area, clientX, clientY, complete ? 1900 : 1450);
   };
-  const locate = (clientX, clientY, area = playArea) => {
+  const locate = (clientX, clientY, area = playArea, pointerType = 'mouse') => {
     if (!original || !regions.length || readOnly) return;
     const rect = area.getBoundingClientRect();
     const point = mapPixfindPoint(clientX, clientY, rect, geometry(area));
-    markAt(point.x, point.y);
+    cursorX = NaN; cursorY = NaN;
+    markAt(point.x, point.y, area, clientX, clientY, pointerType);
   };
   const constrainViewport = () => { viewport = clampPixfindViewport(viewport, original.naturalWidth, original.naturalHeight, baseScale, viewportAreas()); };
   const viewportInteractionEnabled = () => Boolean(original && selected && ['spot-difference', 'hidden-object'].includes(selected.mode));
@@ -535,6 +569,17 @@ function mount() {
     const fit = wholePixelFit(original.naturalWidth / cell, original.naturalHeight / cell, fitWidth, fitHeight, { devicePixelRatio: devicePixelRatio || 1 });
     baseScale = fit.width / original.naturalWidth;
   };
+  const observedAreaSizes = new WeakMap();
+  const areaResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => {
+    let changed = false;
+    for (const entry of entries) {
+      const area = entry.target; const next = { width: area.clientWidth, height: area.clientHeight }; const previous = observedAreaSizes.get(area);
+      observedAreaSizes.set(area, next);
+      if (previous && (Math.abs(previous.width - next.width) > 0.5 || Math.abs(previous.height - next.height) > 0.5)) changed = true;
+    }
+    if (changed && original) { updateBaseScale(); constrainViewport(); paint(); }
+  }) : null;
+  if (areaResizeObserver) for (const area of [playArea, changedArea].filter(Boolean)) areaResizeObserver.observe(area);
   const pointerDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   let pinch = null;
   for (const area of [playArea, changedArea].filter(Boolean)) {
@@ -578,7 +623,7 @@ function mount() {
       const state = activePointers.get(event.pointerId); if (!state) return;
       const wasPinching = Boolean(pinch); activePointers.delete(event.pointerId);
       if (pinch && pinch.ids.includes(event.pointerId)) pinch = null;
-      if (!canceled && !state.moved && !wasPinching) locate(event.clientX, event.clientY, state.area);
+      if (!canceled && !state.moved && !wasPinching) locate(event.clientX, event.clientY, state.area, event.pointerType);
       if (wasPinching) for (const remaining of activePointers.values()) {
         remaining.moved = true; remaining.lastX = remaining.x; remaining.lastY = remaining.y;
       }
@@ -594,7 +639,10 @@ function mount() {
       if (event.key === 'ArrowLeft') cursorX = Math.max(0, cursorX - step); if (event.key === 'ArrowRight') cursorX = Math.min(original.naturalWidth - 1, cursorX + step);
       if (event.key === 'ArrowUp') cursorY = Math.max(0, cursorY - step); if (event.key === 'ArrowDown') cursorY = Math.min(original.naturalHeight - 1, cursorY + step);
       paint(); statusGame.textContent = '矢印キーで場所を選び、Enter または Space で調べます。';
-    } else if ((event.key === 'Enter' || event.key === ' ') && original && Number.isFinite(cursorX)) { event.preventDefault(); markAt(cursorX, cursorY); }
+    } else if ((event.key === 'Enter' || event.key === ' ') && original && Number.isFinite(cursorX)) {
+      event.preventDefault(); const rect = area.getBoundingClientRect(); const g = geometry(area);
+      markAt(cursorX, cursorY, area, rect.left + g.xoff + (cursorX + 0.5) * g.scale, rect.top + g.yoff + (cursorY + 0.5) * g.scale, 'keyboard');
+    }
   });
   window.addEventListener('resize', () => { if (!original) return; updateBaseScale(); constrainViewport(); paint(); });
   document.addEventListener('visibilitychange', () => {
@@ -606,7 +654,7 @@ function mount() {
     if (event.matches) { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; paint(); }
     else if (hint && !document.hidden && !hintFrame) hintFrame = requestAnimationFrame(animateHint);
   });
-  window.addEventListener('pagehide', () => { stopHintMotion(); for (const url of localObjectUrls) URL.revokeObjectURL(url); localObjectUrls.clear(); }); window.addEventListener('popstate', () => { const puzzle = resolvePuzzleFromLocation(window.location, puzzles); if (puzzle) start(puzzle); else showList(); });
+  window.addEventListener('pagehide', () => { clearTapFeedback(); areaResizeObserver?.disconnect(); stopHintMotion(); for (const url of localObjectUrls) URL.revokeObjectURL(url); localObjectUrls.clear(); }); window.addEventListener('popstate', () => { const puzzle = resolvePuzzleFromLocation(window.location, puzzles); if (puzzle) start(puzzle); else showList(); });
   (async () => {
     const query = new URLSearchParams(window.location.search || ''); const hasPostPuzzle = query.has('postPuzzle'); const publicPostId = resolvePostPuzzleId(window.location);
     if (hasPostPuzzle) {

@@ -1,5 +1,5 @@
 import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
-import { normalizePixelFile, readPixelImageDimensions } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
+import { downscalePixels, normalizePixelFile, readPixelImageDimensions, reductionScale } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_IMPORT_SOURCE_PIXELS = 2 * 1024 * 1024;
@@ -33,7 +33,7 @@ function histogramBin(red, green, blue, alpha) {
   return alphaBin * RGB_BINS + (blue >> 4) * 256 + (green >> 4) * 16 + (red >> 4);
 }
 
-function medianCutPalette(rgba) {
+function medianCutPalette(rgba, maxColors = MAX_DRAW_COLORS) {
   const counts = new Uint32Array(HISTOGRAM_BINS);
   const sumsR = new Uint32Array(HISTOGRAM_BINS); const sumsG = new Uint32Array(HISTOGRAM_BINS);
   const sumsB = new Uint32Array(HISTOGRAM_BINS); const sumsA = new Uint32Array(HISTOGRAM_BINS);
@@ -51,7 +51,7 @@ function medianCutPalette(rgba) {
     bins[index] = { id, weight, r: sumsR[id] / weight, g: sumsG[id] / weight, b: sumsB[id] / weight, a: sumsA[id] / weight, sumsR: sumsR[id], sumsG: sumsG[id], sumsB: sumsB[id], sumsA: sumsA[id] };
   }
   const boxes = [{ bins, weight: bins.reduce((sum, bin) => sum + bin.weight, 0) }];
-  while (boxes.length < MAX_DRAW_COLORS) {
+  while (boxes.length < maxColors) {
     let selected = -1; let selectedChannel = -1; let selectedScore = -1;
     for (let boxIndex = 0; boxIndex < boxes.length; boxIndex += 1) {
       const box = boxes[boxIndex]; if (box.bins.length < 2) continue;
@@ -89,6 +89,67 @@ function medianCutPalette(rgba) {
     remap[bin.id] = best;
   }
   return { palette: palette.map((color) => colorHex(((color[0] << 24) | (color[1] << 16) | (color[2] << 8) | color[3]) >>> 0)), remap };
+}
+
+const SPOT_PAIR_MAX_DIMENSION = 256;
+const SPOT_PAIR_MAX_COLORS = 32;
+function nearestSpotRaster(image, width, height) {
+  if (!image || !Number.isInteger(image.width) || !Number.isInteger(image.height)
+    || image.width < 1 || image.height < 1 || image.width * image.height > MAX_IMPORT_SOURCE_PIXELS
+    || !image.data || image.data.length !== image.width * image.height * 4) throw new TypeError('2枚の画像データを確認できません。');
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const sx = Math.min(image.width - 1, Math.floor((x + 0.5) * image.width / width));
+    const sy = Math.min(image.height - 1, Math.floor((y + 0.5) * image.height / height));
+    const from = (sy * image.width + sx) * 4; data.set(image.data.subarray(from, from + 4), (y * width + x) * 4);
+  }
+  return data;
+}
+function countPairColors(before, after) {
+  const colors = new Set();
+  for (const data of [before, after]) for (let offset = 0; offset < data.length; offset += 4) if (data[offset + 3]) colors.add(rgbaKey(data, offset));
+  return colors.size;
+}
+function documentFromSpotRgba(width, height, rgba, palette, remap = null) {
+  const pixels = Array(width * height).fill(-1);
+  if (remap) {
+    for (let index = 0; index < pixels.length; index += 1) {
+      const offset = index * 4; if (rgba[offset + 3]) pixels[index] = remap[histogramBin(rgba[offset], rgba[offset + 1], rgba[offset + 2], rgba[offset + 3])];
+    }
+  } else {
+    const exact = makeExactPalette(rgba, pixels.length);
+    if (exact) { palette = exact.palette; return validateDrawDocument({ schemaVersion: 1, width, height, palette, pixels: exact.pixels }); }
+  }
+  return validateDrawDocument({ schemaVersion: 1, width, height, palette: palette.length ? palette : ['#00000000'], pixels });
+}
+
+/** Normalize two equal-sized images with one nearest-neighbour grid and one shared quantizer. */
+export function createSpotDifferenceImagePair(beforeImage, afterImage, { maxDimension = SPOT_PAIR_MAX_DIMENSION, maxColors = SPOT_PAIR_MAX_COLORS } = {}) {
+  if (!Number.isInteger(maxDimension) || maxDimension < 1 || maxDimension > SPOT_PAIR_MAX_DIMENSION
+    || !Number.isInteger(maxColors) || maxColors < 1 || maxColors > SPOT_PAIR_MAX_COLORS) throw new RangeError('間違い探し画像の上限を確認できません。');
+  if (!beforeImage || !afterImage || beforeImage.width !== afterImage.width || beforeImage.height !== afterImage.height) throw new RangeError('2枚の画像は同じ幅・高さにしてください。画像の切り抜きや自動拡大縮小はしません。');
+  const sourceWidth = beforeImage.width; const sourceHeight = beforeImage.height;
+  if (!Number.isInteger(sourceWidth) || !Number.isInteger(sourceHeight) || sourceWidth < 1 || sourceHeight < 1
+    || sourceWidth * sourceHeight > MAX_IMPORT_SOURCE_PIXELS) throw new RangeError('画像が安全な読み込み上限を超えています。');
+  // Files are decoded with keepScale:true. Infer each enlarged dot grid, then use only the
+  // greatest shared exact block divisor so the two rasters can never be sampled differently.
+  const gcd = (left, right) => { while (right) [left, right] = [right, left % right]; return left; };
+  const commonGridScale = gcd(reductionScale(beforeImage), reductionScale(afterImage));
+  const reducedBefore = downscalePixels(beforeImage, commonGridScale); const reducedAfter = downscalePixels(afterImage, commonGridScale);
+  const dimensionScale = Math.min(1, maxDimension / Math.max(reducedBefore.width, reducedBefore.height));
+  const width = Math.max(1, Math.floor(reducedBefore.width * dimensionScale)); const height = Math.max(1, Math.floor(reducedBefore.height * dimensionScale));
+  const before = nearestSpotRaster(reducedBefore, width, height); const after = nearestSpotRaster(reducedAfter, width, height);
+  const combinedColorCount = countPairColors(before, after); let beforeDocument; let afterDocument; let quantized = false;
+  if (combinedColorCount > maxColors) {
+    const combined = new Uint8Array(before.length + after.length); combined.set(before); combined.set(after, before.length);
+    const reduced = medianCutPalette(combined, maxColors); quantized = true;
+    beforeDocument = documentFromSpotRgba(width, height, before, reduced.palette, reduced.remap);
+    afterDocument = documentFromSpotRgba(width, height, after, reduced.palette, reduced.remap);
+  } else {
+    beforeDocument = documentFromSpotRgba(width, height, before, []);
+    afterDocument = documentFromSpotRgba(width, height, after, []);
+  }
+  return { before: beforeDocument, after: afterDocument, width, height, sourceWidth, sourceHeight, commonGridScale, colorCount: quantized ? Math.max(beforeDocument.palette.length, afterDocument.palette.length) : combinedColorCount, quantized };
 }
 
 export function createImportedDrawDocument(image, size = 128) {

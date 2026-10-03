@@ -1,0 +1,49 @@
+{
+  "headline": "一つのドットから、ひろがる。",
+  "subheadline": "ドットであそぼう",
+  "textBounds": [
+    {
+      "selector": "brand",
+      "x": 60,
+      "y": 44,
+      "right": 289,
+      "bottom": 92
+    },
+    {
+      "selector": "headline",
+      "x": 58,
+      "y": 176,
+      "right": 422.65625,
+      "bottom": 333.390625
+    },
+    {
+      "selector": "sub",
+      "x": 62,
+      "y": 331,
+      "right": 314.96875,
+      "bottom": 378
+    },
+    {
+      "selector": "explain",
+      "x": 63,
+      "y": 415,
+      "right": 358,
+      "bottom": 490.59375
+    },
+    {
+      "selector": "domain",
+      "x": 63,
+      "y": 561,
+      "right": 143.4375,
+      "bottom": 582
+    }
+  ],
+  "imageCount": 7,
+  "width": 1200,
+  "height": 630,
+  "source": "current local UI, official logo, exact home wordmark, self-authored landscape and score",
+  "network": "all external requests blocked",
+  "userWorks": "none",
+  "status": "review_only",
+  "generatedAt": "2026-10-02T11:30:21.064Z"
+}

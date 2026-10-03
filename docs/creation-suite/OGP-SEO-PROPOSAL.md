@@ -4,19 +4,25 @@
 
 ## 最新の画像方針
 
-ユーザーが「ドット絵は不要」「イラストというよりも高品質なデザイン性で画期的なOGP」「Figma AIの使用も考慮」と方針を変更したため、均一セル・整数グリッド・平面ピクセル表現の制約は撤回した。音符やコントローラーのピクセル案は過去案として保持する。
+ユーザーの「全くサイトらしさがありません。もっとサイトの要素にちなんだデザインで」という評価により、赤い一点から紙・ガラス・金属状の造形が開花する抽象案は不採用。前案の微修正ではなく、現在のローカルサイトの実画面から設計し直した。「ドット絵不要」は広告全体のピクセルアート制約の撤回であり、本物のUIや作品例の小さなピクセルは使用できる。
 
-最新完成案は、赤い一点から紙・ガラス・金属のような色と形が開花するビジュアル。生成りの余白に黒い文字を置き、右側に赤・青・金色の立体的な造形を大きく配置する。コピーは「一つのドットから、ひろがる。」「ドットであそぼう」で固定。主コピーは画像上で2行に組まれている。PiXiEEDのワードマークと `pixieed.jp` も目視確認した。ワードマークを既存正式ロゴと同一の素材とは扱わない。
+描画・音楽・ジグソー・地球儀・カメラ・ホームの現行画面を専用ブラウザーで実際に確認した。すべて外部通信を遮断し、ユーザー投稿・個人画像・本番データは広告素材に使用していない。描画とジグソーには今回自作した32×32の風景を読み込んだ。音楽の譜面も実UI上で今回作成した。カメラ確認は自作風景の模擬映像のみで、実機のカメラ・マイク権限は要求していない。素材確認記録は [material-audit.json](ogp-review/product-materials/material-audit.json)。
 
-完成PNGは親スレッドで実画像を確認してユーザーへ納品済み。Library ID `libfile_1f32776943dc81919f25cdaa2dada9ce`、Library上のファイル名 `PiXiEED-OGP-1200x630.png`。MacへLibraryから取得し、別名 `ogp-design-bloom-1200x630.png` で保存した。Mac側でも目視と1200×630の寸法を確認済み。**完成画像の最新レビュー案であり、採用・本番反映は保留。** 新たな画像生成は行っていない。
+最新完成案は、濃紺と白の二つの面に、大きな文字と実際の描画ワークベンチを配置したプロダクト広告。主役は自作の風景を載せた制作キャンバス。前面に実際の色の譜面、手前に同じ絵からできた実ジグソー片、背景に実地球儀を配置し、主役・補助の大きさと重なりを付けた。カメラの画面は確認素材として保持し、完成構図へ小さく詰め込んでいない。
 
-## 制作手段とFigmaの状態
+正式48pxロゴを原寸で使用し、ホームの多色PiXiEEDワードマークの実装から文字マスクと配色を再利用した。背景の濃紺 `#0f1822`、白 `#f7f8f6`、黄色 `#ffd35a`、珊瑚色 `#e75445` は実サイト由来。キャンバス・パレット・黄色の道具選択・音楽譜面は実画面の切り取りを使い、汎用の描画アイコンで置き換えていない。
 
-親スレッドでの制作手段はOpenAI画像生成とFigmaのネイティブ文字組み。Figma AI / Weaveは有料利用の承認が必要なため未使用。Figma AIで制作した画像とは記録しない。
+コピーは「一つのドットから、ひろがる。」「ドットであそぼう」で固定。主コピーは画像上で2行に組んだ。1200×630の寸法、指定コピーと文字のキャンバス内収まりをコードで確認し、実寸と600×315の縮小表示を目視確認した。下端の切れと重なった小ラベルを調整した完成案をLibraryへ保存した。
 
-[Figma編集用リンク](https://www.figma.com/design/dS2zyoZW1BjH9xlVb4BDce?node-id=2-2) はネイティブの文字組みのみ。親スレッドの報告では公式uploadがHTTP 405となり、画像配置は未完了。したがってFigmaファイルを完成PNG全体の編集元とは扱わない。今回Mac側でFigmaへの画像配置は再試行していない。
+**画像制作は完了、採用・本番反映は保留。** Library ID `libfile_43bcd052086c81918a5e5b8820bd4e69`、ファイル名 `ogp-product-workbench-1200x630.png`、version 0。編集元HTMLは実画面素材を埋め込んだ単体ファイル。今回の完成案はコードによる構成と実画面素材で制作し、AI画像生成やFigmaは使用していない。
 
-検索・OG文言は下記の候補として保持し、画像採用時に `og:title` と `og:image:alt` の意味を揃える。新投稿・販売・制作依頼や未公開ゲームを利用可能な機能として宣伝しない。
+## 過去案の制作手段とFigmaの状態
+
+不採用の抽象開花案は親スレッドでOpenAI画像生成とFigmaのネイティブ文字組みを使用。Figma AI / Weaveは有料利用の承認が必要なため未使用。
+
+[過去案のFigma編集用リンク](https://www.figma.com/design/dS2zyoZW1BjH9xlVb4BDce?node-id=2-2) は文字組みのみ。親スレッドの報告では公式uploadがHTTP 405となり画像配置は未完了。最新の実UI広告や完成PNG全体の編集元ではない。今回はFigmaへの配置を再試行していない。
+
+検索・OG文言は下記の候補として保持し、採用時に画像と `og:title`、`og:image:alt` の意味を揃える。新投稿・販売・制作依頼や未公開ゲームを利用可能な機能として宣伝しない。
 
 ## ホームの文言候補
 
@@ -54,7 +60,13 @@ Twitterのタイトル・説明、`og:image:alt` は最終画像と各メタ文�
 
 | ファイル | 状態・由来 |
 | --- | --- |
-| [最新完成PNG](ogp-review/ogp-design-bloom-1200x630.png) | **最新案・採用待ち**。1200×630。Library ID `libfile_1f32776943dc81919f25cdaa2dada9ce`、Library名 `PiXiEED-OGP-1200x630.png`。LibraryからMacへ取得し、目視・寸法を確認。 |
+| [最新の実UI広告PNG](ogp-review/ogp-product-workbench-1200x630.png) | **最新案・採用待ち**。1200×630。Library ID `libfile_43bcd052086c81918a5e5b8820bd4e69`、Library名 `ogp-product-workbench-1200x630.png`、version 0。 |
+| [編集元HTML](ogp-review/ogp-product-workbench.html) | 実素材を埋め込んだ単体HTML/CSS。文字組み・配色・配置を編集可能。 |
+| [縮小プレビュー](ogp-review/ogp-product-workbench-preview-600x315.png) | 600×315で主コピー・描画キャンバス・譜面・パレットの可読性を目視確認。 |
+| [制作コード](ogp-review/render-product-ogp.mjs) | 確認済み素材からHTML・PNG・プレビュー・検証記録を生成する。 |
+| [検証記録](ogp-review/ogp-product-workbench-verification.json) | 寸法・指定コピー・文字の収まり・素材由来・外部通信遮断を記録。 |
+| [素材撮影コード](ogp-review/capture-product-materials.mjs) | 現行サイトをループバックで表示し、自作デモを読み込んだ実UIを保存。実機の撮影・本番書込みなし。 |
+| [抽象開花案](ogp-review/ogp-design-bloom-1200x630.png) | **不採用・サイトらしさがないとの評価**。1200×630。Library ID `libfile_1f32776943dc81919f25cdaa2dada9ce`、Library名 `PiXiEED-OGP-1200x630.png`。LibraryからMacへ取得し、目視・寸法を確認。 |
 | [ピクセルポスター案](ogp-review/ogp-pixel-poster-1200x630.png) | **過去案・方針変更により置き換え**。1200×630、濃紺背景。Library ID `libfile_d4506f6e6f3081918b3aec28a298eddf`、保存名 `ogp-pixel-poster-1200x630.png`、version 0。 |
 | [過去ピクセル案の編集元SVG](ogp-review/ogp-pixel-poster.svg) | 正式ロゴを埋め込んだ編集可能SVG。モチーフは均一10pxセル。 |
 | [過去ピクセル案の縮小プレビュー](ogp-review/ogp-pixel-poster-preview-600x315.png) | 600×315でコピーと主役の形を目視確認。 |
@@ -71,7 +83,7 @@ Twitterのタイトル・説明、`og:image:alt` は最終画像と各メタ文�
 | [書き出し用スクリプト](ogp-review/render-ogp.mjs) | 停止した文字案の再現用。既存Playwrightモジュールが必要。新方向の画像を制作するものではない。 |
 | [書き出し検証記録](ogp-review/ogp-brand-verification.json) | PNG寸法、要素の収まり、ロゴ3倍拡大の20,736ピクセル一致を確認した記録。採用・公開や新方向の検証を意味しない。 |
 
-最新完成PNGはLibraryの既存ID `libfile_1f32776943dc81919f25cdaa2dada9ce` を保持してMacへ保存した。新規Libraryファイルは作成していない。過去の画像は削除・上書きしていない。現行HTML、公開画像、canonicalは変更せず、commit・push・公開も行っていない。
+最新PNGをLibraryへ新規保存し、識別情報とversion 0をMac側にも保持した。抽象案のLibrary ID `libfile_1f32776943dc81919f25cdaa2dada9ce` と過去の画像は削除・上書きしていない。現行HTML、公開画像、canonicalは変更せず、commit・push・公開も行っていない。
 
 ## 検索表示の根拠と検証境界
 

@@ -77,3 +77,58 @@ body.hidden-object-editing .site-header{display:block;position:sticky;top:0;z-in
   body.hidden-object-editing .hidden-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
   body.hidden-object-editing .hidden-settings { top: .4rem; }
 }
+
+/* Image-first maker: keep the next authoring actions together and in view. */
+.hidden-image-import { display: grid; gap: 5px; padding: 10px; border: 1px solid #d5d9cf; border-radius: 13px; background: #f4f7f1; }
+.hidden-image-import button, .hidden-image-replace { min-height: 44px; padding: 8px 12px; border: 1px solid #49643c; border-radius: 12px; background: #49643c; color: #fff; font: inherit; font-size: .88rem; font-weight: 700; cursor: pointer; }
+.hidden-image-import p { margin: 0; color: #586052; font-size: .76rem; line-height: 1.4; }
+.hidden-workbench { display: grid; gap: 7px; min-width: 0; }
+.hidden-workbench__heading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
+.hidden-workbench .hidden-image-replace { justify-self: start; min-height: 38px; padding: 5px 10px; background: #fff; color: #31482a; font-size: .76rem; }
+.hidden-workbench__heading .puzzle-editor-play { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0 10px; border: 1px solid #c5cbbd; border-radius: 999px; color: #31482a; background: #fff; font-size: .74rem; font-weight: 700; text-decoration: none; }
+.hidden-workbench .hidden-target-list { position: static; right: auto; bottom: auto; left: auto; z-index: auto; min-height: 44px; max-height: 48px; padding: 2px; border: 0; border-radius: 0; background: transparent; backdrop-filter: none; }
+.hidden-workbench .hidden-target-list button { min-height: 44px; border-bottom: 3px solid var(--target-color, #49643c); }
+.hidden-workbench .hidden-target-list button[aria-pressed="true"] { color: #17232d; background: color-mix(in srgb, var(--target-color, #49643c) 14%, white); box-shadow: 0 0 0 2px #335cbe; }
+.hidden-workbench .hidden-target-list button[data-mask-empty="true"] { border-style: dashed; }
+.hidden-hit-preview { position: absolute; z-index: 2; overflow: visible; pointer-events: none; }
+.hidden-workbench .hidden-target-create label { font-size: .75rem; }
+.hidden-workbench .hidden-target-create button, .hidden-workbench .hidden-tools button, .hidden-workbench .hidden-confirm { min-height: 44px; }
+.hidden-workbench .hidden-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.hidden-workbench .hidden-tools button { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; padding: 6px; }
+.hidden-workbench .hidden-tools svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hidden-workbench .hidden-tools button[aria-pressed="true"] { border-color: #49643c; background: #e5eddf; color: #263b20; font-weight: 700; }
+.hidden-workbench .hidden-mask-summary { min-height: 1.2em; font-size: .72rem; }
+.hidden-workbench .hidden-confirm { width: 100%; min-height: 48px; }
+.hidden-workbench .hidden-confirm:disabled { opacity: .48; }
+.hidden-workbench .hidden-image-replace:disabled, body.hidden-object-editing[aria-busy="true"] .hidden-workbench button { opacity: .55; pointer-events: none; }
+body.hidden-object-editing .hidden-workbench { position: absolute; right: .6rem; bottom: calc(5.15rem + env(safe-area-inset-bottom)); left: .6rem; z-index: 14; width: min(calc(100% - 1.2rem), 30rem); max-height: calc(100dvh - var(--px-header-height, 64px) - 6rem); margin: 0 auto; padding: 8px 10px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(27,32,37,.12); border-radius: 16px; background: rgba(255,255,255,.94); box-shadow: 0 12px 32px rgba(20,30,24,.2); backdrop-filter: blur(18px); }
+body.hidden-object-editing .hidden-preview { bottom: calc(20rem + env(safe-area-inset-bottom)); }
+body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-workbench { display: none; }
+body.hidden-object-editing #hidden-editor[data-confirmed="false"] .hidden-publish-actions { display: none; }
+.hidden-publish-actions { flex-wrap: wrap; }
+.hidden-confirmed { box-sizing: border-box; flex: 1 0 100%; margin: 0; padding: 6px 8px; font-size: .72rem; line-height: 1.3; }
+.hidden-publish-actions #hidden-new { display: none; }
+.hidden-publish-actions #hidden-new:not([hidden]) { display: block; }
+.hidden-publish-actions #hidden-play-local { width: auto; }
+.hidden-publish-actions button { min-height: 44px; }
+body.hidden-object-editing #hidden-editor[aria-busy="true"] .hidden-preview { pointer-events: none; }
+body.hidden-object-editing #hidden-editor[aria-busy="true"] .hidden-workbench { pointer-events: none; }
+body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-preview { bottom: calc(8.6rem + env(safe-area-inset-bottom)); }
+@media (orientation: portrait) and (max-height: 650px) {
+  body.hidden-object-editing #hidden-editor[data-confirmed="false"] .hidden-preview { bottom: calc(100% - 8rem); }
+  body.hidden-object-editing #hidden-editor[data-confirmed="false"] .hidden-preview canvas { width: min(calc(100vw - 12px), calc((100cqh - 12px) * var(--hidden-aspect, 1))) !important; max-height: calc(100cqh - 12px) !important; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  body.hidden-object-editing .hidden-workbench { top: .5rem; right: .6rem; bottom: calc(4.5rem + env(safe-area-inset-bottom)); left: auto; width: min(20rem, 38vw); max-height: calc(100dvh - 5rem - env(safe-area-inset-bottom)); margin: 0; }
+  body.hidden-object-editing .hidden-preview { right: calc(min(20rem, 38vw) + 1.2rem); bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+  body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-preview { right: 0; bottom: calc(8.6rem + env(safe-area-inset-bottom)); }
+  body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-workbench { display: none; }
+}
+@media (max-width: 380px) {
+  body.hidden-object-editing .hidden-workbench { gap: 5px; padding: 6px 7px; }
+  .hidden-workbench__heading { gap: 5px; }
+  .hidden-workbench .hidden-image-replace { padding-inline: 7px; font-size: .7rem; }
+  .hidden-workbench__heading .puzzle-editor-play { padding-inline: 7px; font-size: .68rem; }
+  .hidden-workbench .hidden-target-create button, .hidden-workbench .hidden-tools button { padding-inline: 4px; font-size: .76rem; }
+  .hidden-workbench .hidden-tools svg { width: 16px; height: 16px; }
+}

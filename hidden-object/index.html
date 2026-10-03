@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261001-text-contrast-1">
-  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20261002-header-layout-1">
+  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20261002-hidden-maker-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
@@ -26,36 +26,38 @@
   <main id="main" class="hidden-page">
     <header class="hidden-heading"><h1>かんたんもの探し</h1><p>見つけてほしいものを、絵の上にぬって登録しよう。</p></header>
     <a class="puzzle-list-back" href="/play/hidden-object/">‹ みんなの一覧へ</a>
-    <p id="hidden-status" class="hidden-status" role="status" aria-live="polite">自分の端末に保存した絵を選んでください。</p>
+    <p id="hidden-status" class="hidden-status" role="status" aria-live="polite">画像ファイルか、自分の保存した絵から作れます。</p>
     <section id="hidden-setup" class="hidden-setup" aria-label="元の絵を選ぶ">
       <div id="hidden-shelf" hidden></div>
+      <div class="hidden-image-import">
+        <input id="hidden-image-file" type="file" accept="image/png,image/webp" hidden>
+        <button id="hidden-image-pick" type="button">画像ファイルから作る</button>
+        <p>PNGまたはWebPを読み込みます。最大256px・32色に調整し、もの探し専用のコピーを作ります。</p>
+      </div>
       <label>元にする保存版<select id="hidden-source" aria-label="元にする自分の保存版"></select></label>
       <button id="hidden-start" type="button" disabled>対象を描きはじめる</button>
       <button id="hidden-resume" type="button" hidden>前回の作成を再開</button>
       <p>もの探しは自分の絵を持ちます。ほかのツールの絵を持ってくると、ここに写されます（元の絵は変わりません）。</p>
     </section>
     <section id="hidden-editor" class="hidden-editor" hidden aria-label="もの探しの対象を指定">
-      <figure class="hidden-preview"><figcaption>絵の上をなぞって対象を指定。ピンチで拡大、矢印キーとSpaceでも編集できます。</figcaption><canvas id="hidden-canvas" aria-label="元画像。指でなぞって対象を指定できます。ピンチで拡大。矢印キーで画素を選び、Spaceで編集" tabindex="0"></canvas></figure>
+      <figure class="hidden-preview"><figcaption>絵の上をなぞって対象を指定。ピンチで拡大、矢印キーとSpaceでも編集できます。</figcaption><canvas id="hidden-canvas" aria-label="元画像。指でなぞって対象を指定できます。ピンチで拡大。矢印キーで画素を選び、Spaceで編集" tabindex="0"></canvas><svg id="hidden-hit-preview" class="hidden-hit-preview" aria-hidden="true" hidden></svg></figure>
       <p id="hidden-source-label" class="hidden-source-label"></p>
-      <div id="hidden-target-list" class="hidden-target-list" role="group" aria-label="対象を選ぶ"></div>
-      <details class="hidden-settings">
-        <summary aria-label="対象と編集方法の設定を開く">対象・編集</summary>
-        <div class="hidden-settings__sheet">
-          <div class="hidden-target-create"><label for="hidden-name">見つけるものの名前</label><div><input id="hidden-name" maxlength="48" autocomplete="off" placeholder="例：赤い花"><button id="hidden-add" type="button">追加</button></div></div>
-          <div class="hidden-tools" role="group" aria-label="マスクの編集">
-            <button type="button" data-hidden-mode="paint" aria-pressed="true">ぬる</button>
-            <button type="button" data-hidden-mode="erase" aria-pressed="false">消す</button>
-            <button id="hidden-remove" type="button" disabled>対象を削除</button>
-          </div>
-          <p id="hidden-mask-summary" class="hidden-mask-summary"></p>
-          <button id="hidden-confirm" class="hidden-confirm" type="button" disabled>対象と正解範囲を確定</button>
-          <p id="hidden-confirmed" class="hidden-confirmed" role="status" hidden>作者が指定した対象を確定しました。端末内の非公開下書きです。</p>
-          <button id="hidden-new" class="hidden-new" type="button" hidden>別のもの探しを作る</button>
-          <a class="puzzle-editor-play" href="/play/hidden-object/">みんなの一覧へ</a>
+      <section class="hidden-workbench" aria-label="対象を追加して正解を指定">
+        <div class="hidden-workbench__heading"><button id="hidden-image-replace" class="hidden-image-replace" type="button">別の画像から作る</button><a class="puzzle-editor-play" href="/play/hidden-object/">みんなの一覧へ</a></div>
+        <div id="hidden-target-list" class="hidden-target-list" role="group" aria-label="2. 編集する対象を選ぶ"></div>
+        <div class="hidden-target-create"><label for="hidden-name">1. 見つけるものの名前</label><div><input id="hidden-name" maxlength="48" autocomplete="off" placeholder="例：赤い花"><button id="hidden-add" type="button">対象を追加</button></div></div>
+        <div class="hidden-tools" role="group" aria-label="マスクの編集">
+          <button type="button" data-hidden-mode="paint" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 9-9 4 4-9 9H4zm11-11 2-2 4 4-2 2"/></svg><span>ぬる</span></button>
+          <button type="button" data-hidden-mode="erase" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 14 9-9 9 9-6 6H9zM8 9l7 7"/></svg><span>消す</span></button>
+          <button id="hidden-remove" type="button" disabled>対象を削除</button>
         </div>
-      </details>
+        <p id="hidden-mask-summary" class="hidden-mask-summary" aria-live="polite"></p>
+        <button id="hidden-confirm" class="hidden-confirm" type="button" disabled>3. 正解を確認</button>
+      </section>
       <div class="hidden-publish-actions" aria-label="確定したもの探しの操作">
-        <button id="hidden-play-local" type="button" hidden disabled>確定した下書きを試しに遊ぶ</button>
+        <p id="hidden-confirmed" class="hidden-confirmed" role="status" hidden>番号付きの枠が、遊ぶ人に見つけてもらう範囲です。</p>
+        <button id="hidden-new" class="hidden-new" type="button" hidden>新しく作る</button>
+        <button id="hidden-play-local" type="button" hidden disabled>試しに遊ぶ</button>
         <button id="hidden-publish" class="hidden-publish" type="button" hidden disabled>地球儀へ投稿</button>
       </div>
       <output id="hidden-zoom" class="hidden-zoom" aria-label="画像の拡大率">100%</output>
@@ -65,11 +67,11 @@
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション">
     <a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
-    <button id="hidden-save" type="button" aria-label="もの探しの下書きをこのブラウザーに保存" title="下書きを保存（まだ公開されません）" disabled>下書き</button>
+    <button id="hidden-save" type="button" aria-label="もの探しの下書きをこのブラウザーに保存" title="下書きを保存（まだ公開されません）" disabled>保存</button>
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261002-project-cards-1"></script>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261002-hidden-maker-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
 </body>

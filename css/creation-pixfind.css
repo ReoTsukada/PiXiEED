@@ -59,6 +59,25 @@ body.pixfind-is-playing>.site-footer{display:none}
 }
 .pixfind-game--comparison .pixfind-back{width:44px;height:44px;min-width:44px;min-height:44px}
 .pixfind-game .pixfind-game-status:not([data-visible="true"]){height:0;min-height:0;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pixfind-game .pixfind-game-status[data-feedback="correct"]{color:#245b31}
+.pixfind-game .pixfind-game-status[data-feedback="miss"]{color:#8a4d17}
+.pixfind-page--playing #pixfind-game:not(.arc-play)>.pixfind-game__heading{grid-row:1}
+.pixfind-page--playing #pixfind-game:not(.arc-play)>.pixfind-game-status{grid-row:2}
+.pixfind-page--playing #pixfind-game:not(.arc-play)>.pixfind-images{grid-row:3}
+.pixfind-page--playing #pixfind-game:not(.arc-play)>.pixfind-found-list{grid-row:4}
+.pixfind-page--playing #pixfind-game.arc-play>.arc-hud{grid-row:1}
+.pixfind-page--playing #pixfind-game.arc-play>.pixfind-game__heading{grid-row:2}
+.pixfind-page--playing #pixfind-game.arc-play>.pixfind-game-status{grid-row:3}
+.pixfind-page--playing #pixfind-game.arc-play>.pixfind-images{grid-row:4}
+.pixfind-page--playing #pixfind-game.arc-play>.pixfind-found-list{grid-row:5}
+.pixfind-page--playing .pixfind-game .pixfind-game-status{box-sizing:border-box;width:100%;height:1.25em;min-height:1.25em;margin:0;padding:0;overflow:hidden;clip-path:none;font-size:.75rem;text-overflow:ellipsis;white-space:nowrap;visibility:hidden}
+.pixfind-page--playing .pixfind-game .pixfind-game-status[data-visible="true"]{visibility:visible}
+.pixfind-game .pixfind-game-status[data-feedback]{padding:0 5px;border:1px solid #c8d9c9;border-radius:999px;background:rgba(255,255,255,.96);text-align:center}
+.pixfind-game .pixfind-game-status[data-feedback="miss"]{border-color:#e6c79d;background:rgba(255,248,237,.97)}
+.pixfind-play-area[data-feedback]::after{position:absolute;z-index:3;top:var(--pixfind-feedback-y);left:var(--pixfind-feedback-x);width:30px;height:30px;border:3px solid #65c77a;border-radius:50%;content:"";pointer-events:none;transform:translate(-50%,-50%);animation:pixfind-feedback-pop 900ms ease-out both}
+.pixfind-play-area[data-feedback="miss"]::after{border-color:#e5a34c}
+@keyframes pixfind-feedback-pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.45)}35%{opacity:1}100%{opacity:.75;transform:translate(-50%,-50%) scale(1.25)}}
+@media(prefers-reduced-motion:reduce){.pixfind-play-area[data-feedback]::after{animation:none;opacity:1;transform:translate(-50%,-50%)}}
 .pixfind-game .pixfind-image #pixfind-image-label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .pixfind-game--comparison .pixfind-image{position:relative;grid-template-rows:minmax(0,1fr)}
 .pixfind-game--comparison .pixfind-image figcaption{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -69,6 +88,9 @@ body.pixfind-is-playing>.site-footer{display:none}
   body[data-puzzle-mode="spot-difference"].pixfind-is-playing .pixfind-page--playing{top:var(--px-header-height,64px)!important}
   .pixfind-game--comparison>.arc-hud{display:none!important}
   .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison{grid-template-rows:auto auto minmax(0,1fr)}
+  .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.pixfind-game__heading{grid-row:1}
+  .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.pixfind-game-status{grid-row:2}
+  .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.pixfind-images{grid-row:3}
 }
 
 /* The player handles pinch zoom and image panning with pointer events. */
@@ -81,6 +103,23 @@ body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li
 body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li::before{content:'○';flex:none;margin-right:5px;color:#7a8a7d;font-size:.82rem}
 body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li.pixfind-target--found{border-color:#5f9e68;background:#e0f1df;color:#295d31}
 body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li.pixfind-target--found::before{content:'✓';color:#268042}
+
+/* Keep the object artwork usable on short landscape screens without letting the
+   status list or arcade HUD consume the play surface. */
+@media(orientation:landscape) and (max-height:500px){
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.arc-hud{display:none}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game.arc-play{grid-template-rows:auto auto minmax(70px,1fr) minmax(26px,auto);gap:1px}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game.arc-play>.pixfind-game__heading{grid-row:1}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game.arc-play>.pixfind-game-status{grid-row:2}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game.arc-play>.pixfind-images{grid-row:3}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game.arc-play>.pixfind-found-list{grid-row:4}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-game__heading{min-height:26px;grid-template-columns:25px minmax(0,1fr) auto;gap:4px}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-game__heading p{display:none}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-back{width:24px;height:24px;min-width:24px;min-height:24px}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-image figcaption{min-height:15px}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list{min-height:26px;max-height:26px;padding:1px 4px}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li{height:22px;padding:0 7px;font-size:.62rem}
+}
 
 /* Keep a puzzle's name and author legible in the first viewport beside the fixed app navigation. */
 .pixfind-page:not(.pixfind-page--playing){padding-bottom:calc(160px + env(safe-area-inset-bottom,0px))}
