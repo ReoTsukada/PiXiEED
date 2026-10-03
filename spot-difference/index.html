@@ -3,16 +3,17 @@
 <head>
   <meta charset="utf-8">
 <title>かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED</title>
-<meta name="description" content="保存した絵の版を比べ、違いの場所を選んで間違い探しを作成できます。">
+<meta name="description" content="2枚の画像から違いを見つけるか、1枚の画像に違いを描いて間違い探しを作れます。">
 <link rel="canonical" href="https://pixieed.jp/spot-difference/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED"><meta property="og:description" content="保存した絵の版を比べ、違いの場所を選んで間違い探しを作成できます。"><meta property="og:url" content="https://pixieed.jp/spot-difference/"><meta property="og:image" content="https://pixieed.jp/assets/og/spot-difference.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「まちがい探し」のアイコン">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED"><meta name="twitter:description" content="保存した絵の版を比べ、違いの場所を選んで間違い探しを作成できます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/spot-difference.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「まちがい探し」のアイコン">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED"><meta property="og:description" content="2枚の画像から違いを見つけるか、1枚の画像に違いを描いて間違い探しを作れます。"><meta property="og:url" content="https://pixieed.jp/spot-difference/"><meta property="og:image" content="https://pixieed.jp/assets/og/spot-difference.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「まちがい探し」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="かんたん間違い探し｜問題を作って遊ぶ｜PiXiEED"><meta name="twitter:description" content="2枚の画像から違いを見つけるか、1枚の画像に違いを描いて間違い探しを作れます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/spot-difference.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「まちがい探し」のアイコン">
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261001-text-contrast-1">
-<link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20261002-inline-draw-1">
+  <link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20261003-puzzle-import-1">
+  <link rel="stylesheet" href="/css/puzzle-image-import.css?rev=20261003-puzzle-import-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
@@ -31,14 +32,24 @@
       <div id="spot-shelf" hidden></div>
       <section class="spot-quick-import" aria-labelledby="spot-quick-title">
         <h2 id="spot-quick-title">画像から作る</h2>
-        <div class="spot-file-pair">
-          <label>元の絵（PNG・WebP）<input id="spot-before-file" type="file" accept="image/png,image/webp"></label>
-          <label>変更後の絵（PNG・WebP）<input id="spot-after-file" type="file" accept="image/png,image/webp"></label>
-          <button id="spot-import-pair" type="button" disabled>2枚から候補を作る</button>
+        <div class="puzzle-image-pair spot-image-pair" aria-label="比べる画像を選択">
+          <div id="spot-before-slot" class="puzzle-image-slot" role="button" tabindex="0" aria-label="元の画像を選ぶ（PNG・WebP）">
+            <img data-slot-preview alt="" hidden>
+            <span data-slot-empty><span aria-hidden="true">＋</span>元の画像<small>タップまたはドロップ</small></span>
+            <span data-slot-name></span>
+            <button type="button" data-slot-clear aria-label="元の画像を外す" title="画像を外す" hidden>×</button>
+            <input id="spot-before-file" type="file" accept="image/png,image/webp" hidden>
+          </div>
+          <div id="spot-after-slot" class="puzzle-image-slot" role="button" tabindex="0" aria-label="変更後の画像を選ぶ（PNG・WebP）">
+            <img data-slot-preview alt="" hidden>
+            <span data-slot-empty><span aria-hidden="true">＋</span>変更後の画像<small>または1枚から違いを描く</small></span>
+            <span data-slot-name></span>
+            <button type="button" data-slot-clear aria-label="変更後の画像を外す" title="画像を外す" hidden>×</button>
+            <input id="spot-after-file" type="file" accept="image/png,image/webp" hidden>
+          </div>
         </div>
-        <div class="spot-file-single">
-          <label>1枚から違いを描く<input id="spot-single-file" type="file" accept="image/png,image/webp"></label>
-          <p>原画を残したまま、複製した絵に違いを描けます。</p>
+        <div class="puzzle-import-toolbar spot-import-toolbar">
+          <button id="spot-import-pair" type="button" disabled>画像を選んでください</button>
         </div>
       </section>
       <details class="spot-saved-versions">
@@ -100,7 +111,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261002-inline-draw-1"></script>
+  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261003-puzzle-import-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
 </body>

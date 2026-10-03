@@ -84,6 +84,7 @@ function overlap(a, b) { return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <
 
 export function validateHiddenPuzzleDefinition(definition, original) {
   const { width, height, pixelCount, rows } = assertDefinition(definition, 'targets');
+  if (definition.prompt !== undefined && (typeof definition.prompt !== 'string' || definition.prompt.length > 180 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(definition.prompt))) throw new TypeError('共有画像の文言は180文字以内で入力してください');
   validateImage(original, width, height, '元画像');
   const ids = new Set(); const names = new Set(); const occupied = new Set(); let total = 0;
   const cellCss = 120 / width; const required = Math.ceil(24 / cellCss); const hitBoxes = []; const targets = [];
@@ -105,5 +106,5 @@ export function validateHiddenPuzzleDefinition(definition, original) {
     for (const previous of hitBoxes) if (overlap(previous, hitBox)) throw new Error('対象の当たり範囲が重なっています');
     hitBoxes.push(hitBox); targets.push({ id: row.id, name, pixels });
   }
-  return { schemaVersion: 1, width, height, confirmed: true, targets, hitBoxes };
+  return { schemaVersion: 1, width, height, confirmed: true, targets, hitBoxes, ...(definition.prompt?.trim() ? { prompt: definition.prompt.trim() } : {}) };
 }

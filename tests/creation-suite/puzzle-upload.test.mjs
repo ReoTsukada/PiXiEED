@@ -69,6 +69,15 @@ test('rejects unconfirmed or foreign-owner local puzzle drafts', async () => {
   await assert.rejects(prepare(await fixture('hidden_object', { ownerId: 'other-owner' }), 'hidden_object'));
 });
 
+test('Hidden custom share wording survives local save, upload preparation and server admission', async () => {
+  const f = await fixture('hidden_object'); f.document.prompt = 'りんごがあるよ、鍵が6こ';
+  await f.store.save({ draftId: f.draftId, kind: 'hidden_object', document: f.document });
+  const result = await prepare(f, 'hidden_object');
+  assert.equal(result.puzzle.definition.prompt, f.document.prompt);
+  const admitted = await admitPuzzleUpload(result.puzzle, Buffer.from(result.image.base64, 'base64'), result.image);
+  assert.equal(admitted.definition.prompt, f.document.prompt);
+});
+
 test('rejects mismatched saved Draw refs and dimension drift', async () => {
   const f = await fixture('spot_difference');
   const wrongRef = structuredClone(f.document);

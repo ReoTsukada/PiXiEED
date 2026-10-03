@@ -49,11 +49,13 @@ test('保存/再開で固定した自分の画像版を復元し、確定対象�
   const changed = structuredClone(image); changed.pixels[1] = 3;
   await store.save({ draftId: 'draw', kind: 'pixel_art', document: changed });
   const draft = confirmHiddenObjectTargets(makeDraft(sourceRef(first), [{ id: 'flower', name: '花', pixels: boxPixels(16, 5, 5) }]));
+  draft.prompt = '花を見つけよう';
   assert.equal(draft.published, false);
   assert.equal(draft.publication, 'draft');
   const saved = await store.save({ draftId: draft.gameId, kind: 'hidden_object', document: draft, source: { type: 'local_draft_copy', assetId: first.asset.assetId, revisionId: first.revisionId } });
   const restored = await store.load(saved.document.gameId);
   assert.deepEqual(restored.document.targets, draft.targets);
+  assert.equal(restored.document.prompt, draft.prompt);
   assert.equal(restored.document.confirmed, true);
   const fixed = await resolveLocalDrawRevision(adapter, restored.document.source.draftId, restored.document.source.revisionId);
   assert.equal(fixed.documentHash, first.documentHash);
@@ -64,6 +66,14 @@ test('保存/再開で固定した自分の画像版を復元し、確定対象�
   tampered.revisions[0].asset.visibility = 'draft'; tampered.revisions[0].document.pixels[2] = 4; await adapter.put(tampered);
   await assert.rejects(() => resolveLocalDrawRevision(adapter, 'draw', first.revisionId), /hashと編集データが一致しません/);
   await adapter.put(originalRecord);
+});
+
+test('共有文言の追加は正解範囲を変えず、長すぎる文言や制御文字を拒否', () => {
+  const source = { draftId: 'draw', assetId: 'asset', revisionId: 'rev', contentHash: 'a'.repeat(64), hashScheme: 'sha256-canonical-v1' };
+  const draft = makeDraft(source, [{ id: 'flower', name: '花', pixels: boxPixels(16, 5, 5) }]);
+  const plain = confirmHiddenObjectTargets(draft), captioned = confirmHiddenObjectTargets({ ...draft, prompt: 'りんごがあるよ、鍵が6こ' });
+  assert.deepEqual(captioned.hitBoxes, plain.hitBoxes);
+  for (const prompt of [null, 5, 'あ'.repeat(181), 'a\u0000b']) assert.throws(() => validateHiddenObjectDraft({ ...draft, prompt }), /180文字/);
 });
 
 test('512px下の保存量に上限を設け、tamperされたhitboxや公開状態を拒否', () => {

@@ -68,6 +68,16 @@ test('Hidden validation recalculates hitboxes and matches the client core on a s
   assert.equal(Object.hasOwn(result, 'source'), false);
 });
 
+test('Hidden public definition preserves bounded author wording but strips unrelated fields', () => {
+  const { original, definition } = hiddenFixture();
+  const plain = validateHiddenPuzzleDefinition(definition, original);
+  const result = validateHiddenPuzzleDefinition({ ...definition, prompt: ' 鍵が6こ ', extra: 'private' }, original);
+  assert.equal(result.prompt, '鍵が6こ'); assert.equal(Object.hasOwn(result, 'extra'), false);
+  assert.deepEqual(result.hitBoxes, plain.hitBoxes);
+  assert.equal(Object.hasOwn(plain, 'prompt'), false);
+  for (const prompt of [null, {}, 'あ'.repeat(181), 'a\u0000b']) assert.throws(() => validateHiddenPuzzleDefinition({ ...definition, prompt }, original), /180文字/);
+});
+
 test('Hidden rejects bad masks, duplicate IDs/names, and overlapping recomputed hitboxes', () => {
   const { original, definition } = hiddenFixture();
   assert.throws(() => validateHiddenPuzzleDefinition({ ...definition, targets: [{ ...definition.targets[0], pixels: [] }] }, original), /画素数/);

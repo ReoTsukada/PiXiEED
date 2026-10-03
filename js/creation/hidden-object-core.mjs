@@ -89,8 +89,9 @@ function validateTargetMasks(targets, width, height) {
   return true;
 }
 
-export function createHiddenObjectDraft({ gameId, source, width, height, targets = [], confirmed = false, hitBoxes = null, hitTestLayout = null }) {
+export function createHiddenObjectDraft({ gameId, source, width, height, targets = [], prompt, confirmed = false, hitBoxes = null, hitTestLayout = null }) {
   const draft = { schemaVersion: HIDDEN_OBJECT_SCHEMA_VERSION, gameId, source: structuredClone(source), width, height, targets: structuredClone(targets), confirmed, hitBoxes: hitBoxes ? structuredClone(hitBoxes) : null, hitTestLayout: hitTestLayout ? structuredClone(hitTestLayout) : null, publication: 'draft', published: false };
+  if (prompt !== undefined) draft.prompt = prompt;
   return validateHiddenObjectDraft(draft);
 }
 
@@ -103,6 +104,7 @@ export function confirmHiddenObjectTargets(draft) {
 export function validateHiddenObjectDraft(draft) {
   if (!draft || draft.schemaVersion !== HIDDEN_OBJECT_SCHEMA_VERSION || typeof draft.gameId !== 'string' || !draft.gameId) throw new TypeError('もの探しの保存データが壊れています');
   assertSource(draft.source);
+  if (draft.prompt !== undefined && (typeof draft.prompt !== 'string' || draft.prompt.length > 180 || /[\u0000-\u0008\u000b-\u001f\u007f]/.test(draft.prompt))) throw new TypeError('共有画像の文言は180文字以内で入力してください');
   if (![draft.width, draft.height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512) || draft.width * draft.height > HIDDEN_OBJECT_MAX_PIXELS) throw new RangeError('画像の寸法が安全な範囲ではありません');
   validateTargetMasks(draft.targets, draft.width, draft.height);
   if (draft.confirmed) {

@@ -64,6 +64,15 @@ test('parent publication is authoritative even when a published point remains', 
   await assert.rejects(buildPublicPuzzleResponse(input, PROJECT), { code: 'public_puzzle_parent_not_published' });
 });
 
+test('Hidden public response retains author share wording while preserving answer masks', async () => {
+  const { input } = await snapshot('hidden_object');
+  input.puzzle.definition.prompt = '花を見つけよう';
+  const response = await buildPublicPuzzleResponse(input, PROJECT);
+  assert.equal(response.puzzle.definition.prompt, input.puzzle.definition.prompt);
+  assert.deepEqual(response.puzzle.definition.targets, input.puzzle.definition.targets);
+  assert.doesNotMatch(JSON.stringify(response), /private-note|private-author|secret-cell/);
+});
+
 test('all three IDs, parent and point dates, review approval and version are mandatory', async () => {
   for (const change of [
     (input) => { input.point.postId = OTHER_ID; },

@@ -71,6 +71,7 @@ export async function preparePuzzleUpload({ mode, draftId, store, adapter, encod
     ? { schemaVersion: 1, width: draft.width, height: draft.height, confirmed: true, candidates: structuredClone(draft.candidates) }
     : { schemaVersion: 1, width: draft.width, height: draft.height, confirmed: true, targets: structuredClone(draft.targets) };
   const source = { schemaVersion: 1, original: sourceRef(mode === 'spot_difference' ? draft.before : draft.source) };
+  if (mode === 'hidden_object' && draft.prompt?.trim()) definition.prompt = draft.prompt.trim();
   if (changedRevision) source.changed = sourceRef(draft.after);
   const puzzle = { mode, definition, source };
   if (changedRevision) puzzle.changedImage = await imageClaim(changedRevision.document, encodeImage, inspectImage, draft.width, draft.height);

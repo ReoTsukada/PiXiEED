@@ -3,6 +3,7 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
 import { decodeSpotImagePair, decodeSpotSingleImage } from './spot-image-import.mjs?rev=20261002-inline-draw-1';
+import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
 import { mountSpotInlineDraw } from './spot-inline-draw.mjs?rev=20261002-inline-draw-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
@@ -32,6 +33,22 @@ let splitMode = false; let activePointer = null; let previousPixel = null; let p
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStorage(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
 function message(text) { status.textContent = text; }
+const importButton = $('#spot-import-pair');
+let beforeImageSlot; let afterImageSlot;
+function refreshImportAction() {
+  if (!beforeImageSlot || !afterImageSlot) return;
+  const count = Number(Boolean(beforeImageSlot.getFile())) + Number(Boolean(afterImageSlot.getFile()));
+  importButton.textContent = count === 1 ? '違いを描く' : count === 2 ? '候補を確認' : '画像を選んでください';
+  importButton.disabled = count === 0 || !store || Boolean(importButton.dataset.busy) || beforeImageSlot.isLoading() || afterImageSlot.isLoading();
+}
+beforeImageSlot = mountPuzzleImageSlot({
+  host: $('#spot-before-slot'), input: $('#spot-before-file'),
+  onFile: refreshImportAction, onError: (error) => message(`元の画像を選べませんでした：${error.message}`)
+});
+afterImageSlot = mountPuzzleImageSlot({
+  host: $('#spot-after-slot'), input: $('#spot-after-file'),
+  onFile: refreshImportAction, onError: (error) => message(`変更後の画像を選べませんでした：${error.message}`)
+});
 function revisionLabel(revision, index) { return `保存版 ${index + 1}・${revision.document.width}×${revision.document.height}px`; }
 function reference(draftIdValue, revision) { return { draftId: draftIdValue, assetId: revision.asset.assetId, revisionId: revision.revisionId, contentHash: revision.documentHash, hashScheme: revision.hashScheme }; }
 
@@ -237,34 +254,32 @@ function openInlineDrawing(beforeSourceId, before, sourceId, working, { preserve
   $('#spot-inline-cancel').focus();
 }
 
-async function importTwoImages() {
+async function importSelectedImages() {
   const epoch = sessionEpoch;
-  const button = $('#spot-import-pair'); const beforeFile = $('#spot-before-file').files?.[0]; const afterFile = $('#spot-after-file').files?.[0];
-  if (!beforeFile || !afterFile || !store) return;
-  button.disabled = true; message('2枚の画像を同じドット幅で準備しています…');
+  const button = importButton; const beforeFile = beforeImageSlot.getFile(); const afterFile = afterImageSlot.getFile();
+  if ((!beforeFile && !afterFile) || !store || button.dataset.busy) return;
+  button.dataset.busy = String(epoch); button.disabled = true;
+  beforeImageSlot.setBusy(true); afterImageSlot.setBusy(true);
   try {
-    const pair = await decodeSpotImagePair(beforeFile, afterFile);
-    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
+    message(beforeFile && afterFile ? '2枚の画像を同じドット幅で準備しています…' : '画像を複製しています。元の画像はそのままです…');
+    const pair = beforeFile && afterFile
+      ? await decodeSpotImagePair(beforeFile, afterFile)
+      : await decodeSpotSingleImage(beforeFile || afterFile);
+    if (epoch !== sessionEpoch) return;
     const saved = await saveImportedPair(pair);
-    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
-    await showCandidatePair(saved.sourceId, saved.before, saved.sourceId, saved.after);
-    if (pair.quantized) message('色数が多いため、2枚に同じ方法で色をまとめました。候補を確認してください。');
-  } catch (error) { message(`画像を読み込めませんでした：${error.message}`); }
-  finally { button.disabled = !$('#spot-before-file').files?.[0] || !$('#spot-after-file').files?.[0]; }
-}
-
-async function importOneImage() {
-  const epoch = sessionEpoch;
-  const input = $('#spot-single-file'); const file = input.files?.[0]; if (!file || !store) return;
-  input.disabled = true; message('画像を複製しています。元の画像はそのままです…');
-  try {
-    const pair = await decodeSpotSingleImage(file);
-    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
-    const saved = await saveImportedPair(pair);
-    if (epoch !== sessionEpoch) { message('別のプロジェクトに切り替えたため、画像を開きませんでした。'); return; }
-    openInlineDrawing(saved.sourceId, saved.before, saved.sourceId, saved.after);
-  } catch (error) { message(`画像を読み込めませんでした：${error.message}`); }
-  finally { input.disabled = false; input.value = ''; }
+    if (epoch !== sessionEpoch) return;
+    if (beforeFile && afterFile) {
+      await showCandidatePair(saved.sourceId, saved.before, saved.sourceId, saved.after);
+      if (epoch === sessionEpoch && pair.quantized) message('色数が多いため、2枚に同じ方法で色をまとめました。候補を確認してください。');
+    } else {
+      openInlineDrawing(saved.sourceId, saved.before, saved.sourceId, saved.after);
+    }
+  } catch (error) { if (epoch === sessionEpoch) message(`画像を読み込めませんでした：${error.message}`); }
+  finally {
+    if (epoch === sessionEpoch) { beforeImageSlot.setBusy(false); afterImageSlot.setBusy(false); }
+    if (button.dataset.busy === String(epoch)) delete button.dataset.busy;
+    refreshImportAction();
+  }
 }
 
 async function redrawImage() {
@@ -338,6 +353,9 @@ async function resume() {
 
 async function openPxdSpot(project) {
   const epoch = ++sessionEpoch;
+  delete importButton.dataset.busy;
+  beforeImageSlot.clear(); afterImageSlot.clear(); beforeImageSlot.setBusy(false); afterImageSlot.setBusy(false);
+  refreshImportAction();
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
   if (!project.entries.length) { inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing'); draft = null; beforeRevision = afterRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; editor.hidden = true; setup.hidden = false; saveButton.disabled = true; return; }
   const params = new URLSearchParams(location.search);
@@ -380,9 +398,7 @@ function mountPxdSpot() {
 }
 
 $('#spot-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
-$('#spot-before-file').addEventListener('change', () => { $('#spot-import-pair').disabled = !$('#spot-before-file').files?.[0] || !$('#spot-after-file').files?.[0]; });
-$('#spot-after-file').addEventListener('change', () => { $('#spot-import-pair').disabled = !$('#spot-before-file').files?.[0] || !$('#spot-after-file').files?.[0]; });
-$('#spot-import-pair').addEventListener('click', importTwoImages); $('#spot-single-file').addEventListener('change', importOneImage);
+importButton.addEventListener('click', importSelectedImages);
 $('#spot-inline-cancel').addEventListener('click', () => { inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing'); setup.hidden = false; });
 $('#spot-redraw').addEventListener('click', redrawImage);
 playLocalButton.addEventListener('click', () => {

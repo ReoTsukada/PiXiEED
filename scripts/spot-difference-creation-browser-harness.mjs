@@ -32,7 +32,13 @@ try {
     const { context, page } = await open(viewport);
     const before = await makePng(page); const after = await makePng(page, true);
     await page.locator('#spot-before-file').setInputFiles({ name: 'before.png', mimeType: 'image/png', buffer: before });
+    await page.waitForFunction(() => document.querySelector('#spot-before-slot')?.dataset.filled === 'true');
+    assert.equal(await page.locator('#spot-import-pair').textContent(), '違いを描く');
+    assert.equal(await page.locator('#spot-inline-draw').isVisible(), false, 'choosing a file only stages its preview');
+    assert.equal(await page.locator('#spot-editor').isVisible(), false, 'choosing a file must not auto-open the editor');
     await page.locator('#spot-after-file').setInputFiles({ name: 'after.png', mimeType: 'image/png', buffer: after });
+    await page.waitForFunction(() => document.querySelector('#spot-after-slot')?.dataset.filled === 'true');
+    assert.equal(await page.locator('#spot-import-pair').textContent(), '候補を確認');
     await page.locator('#spot-import-pair').click();
     await page.waitForFunction(() => !document.querySelector('#spot-editor').hidden);
     assert.match(await page.locator('#spot-status').textContent(), /差分候補/);
@@ -49,7 +55,11 @@ try {
       const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
       return canvas.toDataURL('image/png').split(',')[1];
     });
-    await page.locator('#spot-single-file').setInputFiles({ name: 'blank.png', mimeType: 'image/png', buffer: Buffer.from(transparent, 'base64') });
+    await page.locator('#spot-after-file').setInputFiles({ name: 'blank.png', mimeType: 'image/png', buffer: Buffer.from(transparent, 'base64') });
+    await page.waitForFunction(() => document.querySelector('#spot-after-slot')?.dataset.filled === 'true');
+    assert.equal(await page.locator('#spot-import-pair').textContent(), '違いを描く');
+    assert.equal(await page.locator('#spot-editor').isVisible(), false, 'one image stays as a preview until the primary action');
+    await page.locator('#spot-import-pair').click();
     await page.waitForFunction(() => !document.querySelector('#spot-inline-draw').hidden);
     const canvasBox = await page.locator('#spot-inline-canvas').boundingBox();
     assert.ok(canvasBox && canvasBox.height > 150, `inline canvas is too short at ${viewport.width}x${viewport.height}: ${JSON.stringify(canvasBox)}`);
@@ -67,6 +77,23 @@ try {
     assert.equal(await page.locator('#spot-publish').isEnabled(), false, 'publishing must stay disabled while preparing');
     await context.close();
     console.log(`PASS single-image clone/draw/candidate ${viewport.width}x${viewport.height}`);
+  }
+
+  {
+    const { context, page } = await open({ width: 320, height: 568 });
+    const image = await makePng(page, true);
+    await page.locator('#spot-after-slot').evaluate((host, bytes) => {
+      const file = new File([Uint8Array.from(atob(bytes), (char) => char.charCodeAt(0))], 'dropped.png', { type: 'image/png' });
+      const transfer = new DataTransfer(); transfer.items.add(file);
+      host.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    }, image.toString('base64'));
+    await page.waitForFunction(() => document.querySelector('#spot-after-slot')?.dataset.filled === 'true');
+    assert.equal(await page.locator('#spot-after-slot [data-slot-preview]').isVisible(), true, 'drop should populate a preview');
+    assert.equal(await page.locator('#spot-inline-draw').isVisible(), false, 'drop should not start drawing');
+    assert.equal(await page.locator('#spot-editor').isVisible(), false, 'drop should not start comparison');
+    assert.equal(await page.locator('#spot-import-pair').textContent(), '違いを描く');
+    await context.close();
+    console.log('PASS dropped image previews without auto-opening');
   }
 
   {
@@ -94,7 +121,8 @@ try {
       const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
       return canvas.toDataURL('image/png').split(',')[1];
     });
-    await page.locator('#spot-single-file').setInputFiles({ name: 'unfinished.png', mimeType: 'image/png', buffer: Buffer.from(transparent, 'base64') });
+    await page.locator('#spot-before-file').setInputFiles({ name: 'unfinished.png', mimeType: 'image/png', buffer: Buffer.from(transparent, 'base64') });
+    await page.locator('#spot-import-pair').click();
     await page.waitForFunction(() => !document.querySelector('#spot-inline-draw').hidden);
     const readSavedPxd = () => page.evaluate(async () => {
       const pointer = JSON.parse(localStorage.getItem('pixieed:pxd:last:spot_difference'));

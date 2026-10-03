@@ -14,6 +14,7 @@ import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
+import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -22,7 +23,8 @@ const canvas = $('#hidden-canvas'); const context = canvas.getContext('2d', { al
 const hitPreview = $('#hidden-hit-preview');
 const saveButton = $('#hidden-save'); const playLocalButton = $('#hidden-play-local'); const resumeButton = $('#hidden-resume'); const maskSets = new Map(); const COLORS = [[231, 84, 69], [76, 130, 195], [109, 155, 104], [154, 107, 176], [242, 184, 75], [38, 50, 56]];
 const publishButton = $('#hidden-publish');
-const imageFileInput = $('#hidden-image-file'); const imagePickButton = $('#hidden-image-pick');
+const imageFileInput = $('#hidden-image-file');
+const imageSlot = mountPuzzleImageSlot({ host: $('#hidden-image-slot'), input: imageFileInput, onFile: () => { updateStartButton(); }, onError: (error) => setStatus(`画像を選べませんでした：${error.message}`) });
 const imageReplaceButton = $('#hidden-image-replace');
 let adapter; let store; let sourceDraftId = null; let sourceRevision = null; let draft = null; let draftId = null; let savedConfirmedDraftId = null; let selectedTargetId = null; let editMode = 'paint'; let activePointer = null; let previousPoint = null; let cursorPixel = 0; let drawQueued = false; let totalMaskPixels = 0;
 let importingImage = false;
@@ -33,6 +35,14 @@ const touchPoints = new Map(); let touchStrokeSnapshot = null; let pinchStart = 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStorage(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
 function setStatus(value) { status.textContent = value; if (!editor.hidden) $('#hidden-edit-hint').textContent = value; }
+function updateStartButton() {
+  const loading = imageSlot?.isLoading() === true;
+  const hasFile = Boolean(imageSlot?.getFile());
+  const hasSource = Boolean(sourceSelect.value);
+  const button = $('#hidden-start');
+  button.disabled = importingImage || loading || (!hasFile && !hasSource);
+  button.textContent = hasFile ? 'この画像で対象を指定' : hasSource ? '保存版で対象を指定' : '対象を指定';
+}
 function sourceRef(draftIdValue, revision) { return { draftId: draftIdValue, assetId: revision.asset.assetId, revisionId: revision.revisionId, contentHash: revision.documentHash, hashScheme: revision.hashScheme }; }
 async function verifyCurrentSource() {
   const current = draft; const epoch = editorEpoch;
@@ -143,6 +153,7 @@ function fitCanvas() {
 }
 function resetCanvasView() { viewScale = 1; viewPanX = 0; viewPanY = 0; pinchStart = null; touchStrokeSnapshot = null; activePointer = null; previousPoint = null; touchPoints.clear(); applyCanvasView(); }
 function displayEditor() {
+  $('#hidden-share-prompt-text').value = typeof draft?.prompt === 'string' ? draft.prompt : '';
   setup.hidden = true; editor.hidden = false; document.body.classList.add('hidden-object-editing');
   editor.dataset.confirmed = String(Boolean(draft?.confirmed));
   $('#hidden-edit-hint').textContent = '対象を追加 → 選択 → 絵の上をなぞる';
@@ -175,16 +186,18 @@ async function loadSources() {
     // もの探し keeps its own picture; versions come from its own draft only.
     const { draftId: ownId, versions: revisions } = await listOwnVersions('hidden-object', { adapter });
     sourceDraftId = ownId;
-    if (!revisions.length) { sourceSelect.add(new Option('まだ絵がありません', '')); $('#hidden-start').disabled = true; setStatus('画像ファイルを読み込むか、ほかのツールで作った自分の絵を持ってこられます。'); return; }
+    if (!revisions.length) { sourceSelect.add(new Option('まだ絵がありません', '')); updateStartButton(); setStatus('画像を選ぶか、ほかのツールで作った自分の絵を持ってこられます。'); return; }
     revisions.forEach((revision, index) => sourceSelect.add(new Option(revisionText(revision, index), revision.revisionId)));
     sourceSelect.value = revisions.at(-1).revisionId;
-    $('#hidden-start').disabled = false;
-    setStatus('絵を選んで、見つけてほしいものを指定してください。');
-  } catch (error) { $('#hidden-start').disabled = true; setStatus(error.message); }
+    updateStartButton();
+    setStatus('画像を選んで確認するか、自分の保存版を選んでください。');
+  } catch (error) { updateStartButton(); setStatus(error.message); }
 }
 
 async function start() {
-  if (importingImage) return;
+  if (importingImage || imageSlot?.isLoading()) { updateStartButton(); return; }
+  const selectedImage = imageSlot?.getFile();
+  if (selectedImage) { await importImageFile(selectedImage); return; }
   const epoch = ++editorEpoch; const sourceId = sourceDraftId;
   try {
     $('#hidden-start').disabled = true; setStatus('元画像の固定版を確認しています…');
@@ -193,14 +206,14 @@ async function start() {
     pxdBridge?.reset();
     installRevision(revision, sourceId); setStatus('見つけてほしいものの名前を追加し、絵の上をなぞってください。');
   } catch (error) { if (epoch === editorEpoch) setStatus(`開始できませんでした：${error.message}`); }
-  finally { $('#hidden-start').disabled = false; }
+  finally { updateStartButton(); }
 }
 
 async function importImageFile(file) {
   if (!file || importingImage) return;
   if (!adapter || !store) { setStatus('このブラウザーでは端末内保存を利用できません。'); return; }
   const epoch = ++editorEpoch;
-  importingImage = true; editor.setAttribute('aria-busy', 'true'); imagePickButton.disabled = true; saveButton.disabled = true;
+  importingImage = true; editor.setAttribute('aria-busy', 'true'); imageSlot?.setBusy(true); saveButton.disabled = true;
   imageReplaceButton.disabled = true; $('#hidden-start').disabled = true; resumeButton.disabled = true;
   setStatus('画像を読み込み、もの探し専用の固定版を作っています…');
   try {
@@ -222,7 +235,9 @@ async function importImageFile(file) {
   } catch (error) {
     if (epoch === editorEpoch) setStatus(`画像を読み込めませんでした：${error.message}`);
   } finally {
-    importingImage = false; editor.removeAttribute('aria-busy'); imagePickButton.disabled = false; imageReplaceButton.disabled = Boolean(draft?.confirmed); saveButton.disabled = !draft; resumeButton.disabled = false; $('#hidden-start').disabled = !sourceSelect.value; imageFileInput.value = '';
+    if (epoch === editorEpoch) {
+      importingImage = false; editor.removeAttribute('aria-busy'); imageSlot?.setBusy(false); imageReplaceButton.disabled = Boolean(draft?.confirmed); saveButton.disabled = !draft; resumeButton.disabled = false; updateStartButton();
+    }
   }
 }
 
@@ -281,8 +296,9 @@ async function resume() {
 
 async function openPxdHidden(project) {
   const epoch = ++editorEpoch;
+  importingImage = false; imageSlot.clear(); imageSlot.setBusy(false); updateStartButton();
   if (!store || !adapter) throw new Error('端末内保存を利用できません。');
-  if (!project.entries.length) { draft = null; sourceRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; maskSets.clear(); editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); return; }
+  if (!project.entries.length) { draft = null; $('#hidden-share-prompt-text').value = ''; sourceRevision = null; draftId = null; pxdOriginalRefs = pxdPreservedPayload = null; maskSets.clear(); editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); return; }
   const params = new URLSearchParams(location.search);
   const preferredRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : undefined;
   let imported;
@@ -428,14 +444,27 @@ canvas.addEventListener('keydown', (event) => {
 canvas.addEventListener('focus', requestDraw); canvas.addEventListener('blur', requestDraw);
 
 $('#hidden-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
-imagePickButton.addEventListener('click', () => imageFileInput.click()); imageReplaceButton.addEventListener('click', () => imageFileInput.click());
-imageFileInput.addEventListener('change', () => { void importImageFile(imageFileInput.files?.[0]); });
+sourceSelect.addEventListener('change', () => { imageSlot?.clear(); updateStartButton(); });
+imageReplaceButton.addEventListener('click', () => {
+  if (importingImage) return;
+  editorEpoch += 1; imageSlot?.clear(); editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); updateStartButton(); imageFileInput.click();
+});
+imageFileInput.addEventListener('cancel', () => { if (draft && !draft.confirmed) { displayEditor(); setStatus('画像の選択を取り消しました。作成中の内容を続けられます。'); } });
 playLocalButton.addEventListener('click', () => { if (draft?.confirmed && draftId && savedConfirmedDraftId === draftId) window.location.assign(`/play/hidden-object/?localHidden=${encodeURIComponent(draftId)}`); });
 publishButton.addEventListener('click', async () => {
   if (!draft?.confirmed || !draftId || savedConfirmedDraftId !== draftId || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true) return;
   publishButton.disabled = true; setStatus('固定版と投稿用PNGを確認しています…');
   try { await openPuzzleHandoff({ mode: 'hidden_object', draftId, store, adapter }); }
   catch (error) { publishButton.disabled = false; setStatus(`投稿を準備できませんでした：${error.message}`); }
+});
+$('#hidden-share-prompt-text').addEventListener('input', (event) => {
+  if (!draft || draft.confirmed) return;
+  const value = event.currentTarget.value;
+  if (value) draft.prompt = value; else delete draft.prompt;
+  savedConfirmedDraftId = null;
+  saveButton.disabled = false;
+  pxdBridge?.markDirty();
+  updateLocalPlayButton();
 });
 $('#hidden-add').addEventListener('click', addTarget); $('#hidden-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addTarget(); } }); $('#hidden-remove').addEventListener('click', removeTarget);
 document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.addEventListener('click', () => { editMode = button.dataset.hiddenMode; document.querySelectorAll('[data-hidden-mode]').forEach((option) => option.setAttribute('aria-pressed', String(option === button))); }));
@@ -445,7 +474,7 @@ $('#hidden-confirm').addEventListener('click', async () => {
   try { await verifyCurrentSource(); if (epoch !== editorEpoch) return; draft = confirmHiddenObjectTargets(modelWithMasks()); editor.dataset.confirmed = 'true'; $('#hidden-confirmed').hidden = false; renderTargets(); requestDraw(); setStatus(`番号付きの枠が、遊ぶ人に見つけてもらう範囲です。`); await save(); }
   catch (error) { if (epoch === editorEpoch) setStatus(`確定できませんでした：${error.message}`); }
 });
-$('#hidden-new').addEventListener('click', () => { editorEpoch += 1; pxdBridge?.reset(); draft = null; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = null; pxdPreservedPayload = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); setStatus('新しいもの探しの元画像を選んでください。'); });
+$('#hidden-new').addEventListener('click', () => { editorEpoch += 1; importingImage = false; imageSlot.clear(); imageSlot.setBusy(false); updateStartButton(); pxdBridge?.reset(); $('#hidden-share-prompt-text').value = ''; draft = null; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = null; pxdPreservedPayload = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); setStatus('新しいもの探しの元画像を選んでください。'); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { setStatus('このブラウザーでは端末内保存を利用できません。'); }
 window.addEventListener('resize', fitCanvas);

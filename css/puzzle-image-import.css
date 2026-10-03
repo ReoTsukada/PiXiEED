@@ -1,0 +1,50 @@
+/* Same image-first entry across the puzzle makers. */
+.puzzle-image-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}
+.puzzle-image-slot{position:relative;display:grid;place-items:center;box-sizing:border-box;min-width:0;width:100%;aspect-ratio:1;overflow:hidden;border:2px dashed #acb9c1;border-radius:18px;background:#f1f5f5;color:#344d5d;cursor:pointer;isolation:isolate;transition:background-color .15s,border-color .15s}
+.puzzle-image-slot:hover,.puzzle-image-slot:focus-visible,.puzzle-image-slot[data-dragging=true]{border-color:#365f91;background:#e7eff7;outline:3px solid #8ecdf080;outline-offset:2px}
+.puzzle-image-slot[data-filled=true]{border-style:solid;background:repeating-conic-gradient(#eef1f0 0 25%,#fff 0 50%) 0/16px 16px}
+.puzzle-image-slot[aria-disabled=true]{cursor:wait;opacity:.65}
+.puzzle-image-slot [data-slot-preview]{position:absolute;inset:12px 12px 40px;width:calc(100% - 24px);height:calc(100% - 52px);object-fit:contain;image-rendering:pixelated;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.puzzle-image-slot [data-slot-empty]{display:flex;flex-direction:column;align-items:center;gap:9px;padding:12px;text-align:center;font-size:.85rem;font-weight:650;line-height:1.5;pointer-events:none}
+.puzzle-image-slot [data-slot-empty] svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.puzzle-image-slot [data-slot-empty] small{font-size:.7rem;font-weight:400;color:#536d7b}
+.puzzle-image-slot [data-slot-name]{position:absolute;right:8px;bottom:8px;left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:.7rem;color:#304959;pointer-events:none}
+.puzzle-image-slot [data-slot-clear]{position:absolute;z-index:2;top:4px;right:4px;display:grid;place-items:center;box-sizing:border-box;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:1px solid #d2dbdf;border-radius:50%;background:#fffffff0;color:#354751;box-shadow:0 2px 8px #122a3814;font-size:22px;cursor:pointer}
+.puzzle-image-slot [hidden]{display:none!important}
+.puzzle-image-slot[aria-busy=true]::after{position:absolute;bottom:10px;content:'画像を読み込み中…';padding:4px 10px;border-radius:20px;background:#fff;color:#304959;font-size:.75rem}
+.puzzle-import-toolbar{display:flex;justify-content:center;gap:8px;margin-top:12px}
+.puzzle-import-toolbar>button{box-sizing:border-box;min-height:48px;max-width:100%;padding:10px 24px;border:1px solid #263f50;border-radius:14px;background:#263f50;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.puzzle-import-toolbar>button:disabled{opacity:.45;cursor:default}
+@media(max-width:380px){.puzzle-image-pair{gap:8px}.puzzle-image-slot{border-radius:14px}.puzzle-image-slot [data-slot-empty]{gap:4px;padding:8px;font-size:.77rem}.puzzle-image-slot [data-slot-empty] small{font-size:.65rem}.puzzle-image-slot [data-slot-preview]{inset:8px 8px 34px;width:calc(100% - 16px);height:calc(100% - 42px)}}
+@media(prefers-reduced-motion:reduce){.puzzle-image-slot{transition:none}}
+
+/* Keep the existing arcade finish while giving the image and next action priority. */
+body.arc-tool :is(#spot-setup,#hidden-setup)>.arc-title{display:flex;align-items:center;justify-content:center;gap:8px;padding:2px 0}
+body.arc-tool :is(#spot-setup,#hidden-setup)>.arc-title canvas{width:96px;height:56px;flex:0 0 96px}
+body.arc-tool :is(#spot-setup,#hidden-setup)>.arc-title h1{font-size:1rem;text-align:left}
+body.arc-tool :is(#spot-setup,#hidden-setup)>.arc-title .arc-title-sub{display:none}
+body.arc-tool #spot-setup .spot-quick-import{color:#263f50}
+body.arc-tool #spot-setup .spot-quick-import h2{color:#263f50}
+body.arc-tool :is(#spot-setup,#hidden-setup) :is(.spot-saved-versions,.hidden-saved-source){color:#e1e8ed}
+body.arc-tool #spot-setup .spot-saved-versions{background:#1d2b38;border-color:#ffffff26}
+body.arc-tool #hidden-setup .hidden-saved-source summary{color:#e1e8ed}
+body.arc-tool #hidden-setup .hidden-image-import>p{display:none}
+body.arc-tool #hidden-setup .hidden-image-import .puzzle-image-slot{width:min(100%,280px);aspect-ratio:1.45}
+body.arc-tool #hidden-setup #hidden-start{grid-row:3;min-height:48px}
+body.arc-tool #spot-setup #spot-import-pair{min-height:48px}
+@media(max-height:650px){
+  body.arc-tool :is(#spot-setup,#hidden-setup)>.arc-title{display:none}
+  body.arc-tool #spot-setup .spot-quick-import h2{display:none}
+  body.arc-tool #hidden-setup .hidden-image-import .puzzle-image-slot{width:min(100%,220px);aspect-ratio:2}
+  body.arc-tool #hidden-setup #hidden-start{grid-row:2}
+  body.arc-tool #spot-setup .spot-quick-import{gap:4px;padding:8px}
+  body.arc-tool #spot-setup .puzzle-import-toolbar{margin-top:4px}
+}
+@media(orientation:landscape) and (max-height:500px){
+  body.arc-tool #spot-setup{grid-template-columns:1fr}
+  body.arc-tool #spot-setup .spot-quick-import{grid-template-columns:minmax(0,1fr) minmax(140px,1fr);align-items:center}
+  body.arc-tool #spot-setup .puzzle-image-pair{max-width:220px}
+  body.arc-tool #hidden-setup{grid-template-columns:minmax(0,1fr) minmax(140px,1fr);align-items:center}
+  body.arc-tool #hidden-setup #hidden-start{grid-column:2;grid-row:1}
+  body.arc-tool #hidden-setup .hidden-saved-source{grid-column:1/-1}
+}

@@ -12,7 +12,8 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261001-text-contrast-1">
-  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20261002-hidden-maker-1">
+  <link rel="stylesheet" href="/css/puzzle-image-import.css?rev=20261003-puzzle-import-1">
+  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20261003-hidden-maker-3">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
@@ -31,11 +32,16 @@
       <div id="hidden-shelf" hidden></div>
       <div class="hidden-image-import">
         <input id="hidden-image-file" type="file" accept="image/png,image/webp" hidden>
-        <button id="hidden-image-pick" type="button">画像ファイルから作る</button>
-        <p>PNGまたはWebPを読み込みます。最大256px・32色に調整し、もの探し専用のコピーを作ります。</p>
+        <div id="hidden-image-slot" class="puzzle-image-slot" role="button" tabindex="0" aria-label="もの探しに使う画像を選ぶか、ここにドロップ">
+          <img data-slot-preview alt="" hidden>
+          <span data-slot-empty><span aria-hidden="true">＋</span><span>画像を選ぶ<br>またはここにドロップ</span><small>PNG・WebP / 1枚</small></span>
+          <span data-slot-name></span>
+          <button type="button" data-slot-clear aria-label="選んだ画像を取り消す" hidden>×</button>
+        </div>
+        <p>PNGまたはWebPを選べます。選んだ画像を確認してから作成を始めます。</p>
       </div>
-      <label>元にする保存版<select id="hidden-source" aria-label="元にする自分の保存版"></select></label>
-      <button id="hidden-start" type="button" disabled>対象を描きはじめる</button>
+      <details class="hidden-saved-source"><summary>自分の保存版から作る</summary><label>元にする保存版<select id="hidden-source" aria-label="元にする自分の保存版"></select></label></details>
+      <button id="hidden-start" type="button" disabled>対象を指定</button>
       <button id="hidden-resume" type="button" hidden>前回の作成を再開</button>
       <p>もの探しは自分の絵を持ちます。ほかのツールの絵を持ってくると、ここに写されます（元の絵は変わりません）。</p>
     </section>
@@ -45,6 +51,12 @@
       <section class="hidden-workbench" aria-label="対象を追加して正解を指定">
         <div class="hidden-workbench__heading"><button id="hidden-image-replace" class="hidden-image-replace" type="button">別の画像から作る</button><a class="puzzle-editor-play" href="/play/hidden-object/">みんなの一覧へ</a></div>
         <div id="hidden-target-list" class="hidden-target-list" role="group" aria-label="2. 編集する対象を選ぶ"></div>
+        <details class="hidden-share-prompt">
+          <summary>共有画像の文言</summary>
+          <label for="hidden-share-prompt-text">任意・180文字まで</label>
+          <textarea id="hidden-share-prompt-text" maxlength="180" rows="2" aria-describedby="hidden-share-prompt-help" placeholder="例：りんごがあるよ、鍵が6こ"></textarea>
+          <small id="hidden-share-prompt-help">空欄なら登録した対象名を表示します。</small>
+        </details>
         <div class="hidden-target-create"><label for="hidden-name">1. 見つけるものの名前</label><div><input id="hidden-name" maxlength="48" autocomplete="off" placeholder="例：赤い花"><button id="hidden-add" type="button">対象を追加</button></div></div>
         <div class="hidden-tools" role="group" aria-label="マスクの編集">
           <button type="button" data-hidden-mode="paint" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 9-9 4 4-9 9H4zm11-11 2-2 4 4-2 2"/></svg><span>ぬる</span></button>
@@ -71,7 +83,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261002-hidden-maker-1"></script>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261003-hidden-maker-3"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
 </body>

@@ -132,3 +132,26 @@ body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-preview
   .hidden-workbench .hidden-target-create button, .hidden-workbench .hidden-tools button { padding-inline: 4px; font-size: .76rem; }
   .hidden-workbench .hidden-tools svg { width: 16px; height: 16px; }
 }
+
+/* One staged image is reviewed before the primary action imports it. */
+.hidden-image-import { gap: 8px; padding: 0; border: 0; background: transparent; }
+.hidden-image-import > p { text-align: center; }
+.hidden-image-slot { min-width: 0; }
+.hidden-image-import .puzzle-image-slot { width: min(100%, 280px); margin-inline: auto; aspect-ratio: 1.45; border-radius: 16px; }
+.hidden-image-import .puzzle-image-slot [data-slot-clear] { box-sizing: border-box; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid #d2dbdf; border-radius: 50%; background: #fffffff0; color: #354751; font-size: 22px; }
+.hidden-saved-source { border-top: 1px solid #e1e4dc; padding-top: 8px; }
+.hidden-saved-source summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: #485044; font-size: .82rem; font-weight: 700; }
+.hidden-saved-source[open] label { margin-top: 5px; }
+@media (max-width: 380px) { .hidden-saved-source summary { min-height: 44px; } }
+@media (max-width: 380px) {
+  .hidden-image-import .puzzle-image-slot { aspect-ratio: 1.75; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .hidden-image-import .puzzle-image-slot { width: min(100%, 320px); aspect-ratio: 2.1; }
+  .hidden-image-import > p { font-size: .7rem; }
+}
+
+.hidden-share-prompt { display: grid; gap: 4px; min-width: 0; }
+.hidden-share-prompt summary { display: flex; min-height: 44px; align-items: center; color: #485044; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.hidden-share-prompt label, .hidden-share-prompt small { color: #586052; font-size: .7rem; line-height: 1.4; }
+.hidden-share-prompt textarea { box-sizing: border-box; width: 100%; min-height: 64px; resize: vertical; padding: 8px 10px; border: 1px solid #c5cbbd; border-radius: 10px; color: inherit; background: #fff; font: inherit; font-size: .82rem; line-height: 1.4; }
