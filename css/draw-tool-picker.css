@@ -1,0 +1,250 @@
+/* Loaded after the legacy draw toolbar rules so the compact picker wins every viewport rule. */
+body[data-page="draw"] .draw-controls .draw-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  overflow: visible !important;
+}
+body[data-page="draw"] .draw-controls .draw-tools,
+body[data-page="draw"] .draw-controls .draw-toggles {
+  display: flex !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
+  gap: 8px !important;
+  overflow: visible !important;
+}
+body[data-page="draw"] .draw-controls .draw-tools > button[data-draw-tool="pen"],
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary,
+body[data-page="draw"] .draw-controls .draw-settings-picker > summary,
+body[data-page="draw"] .draw-controls .draw-toggles > button {
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
+  border: 1px solid #ffffff30 !important;
+  border-radius: 12px !important;
+  background: #28333d !important;
+  color: #f5f2e8 !important;
+  cursor: pointer;
+  list-style: none;
+}
+body[data-page="draw"] .draw-controls .draw-tools > button[data-draw-tool="pen"][aria-pressed="true"],
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary[data-active="true"],
+body[data-page="draw"] .draw-controls .draw-settings-picker[open] > summary,
+body[data-page="draw"] .draw-controls .draw-toggles > button[aria-pressed="true"] {
+  border-color: #ffd35a !important;
+  background: #ffd35a !important;
+  color: #17232d !important;
+  box-shadow: 0 3px 0 #b88f1d !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-picker { position: static !important; flex: 0 0 auto !important; }
+body[data-page="draw"] .draw-controls .draw-settings-picker { position: static !important; flex: 0 0 auto !important; }
+body[data-page="draw"] .draw-controls .draw-settings-picker > summary::-webkit-details-marker { display: none; }
+body[data-page="draw"] .draw-controls .draw-settings-picker > summary { position: relative !important; }
+body[data-page="draw"] .draw-controls .draw-settings-picker > summary > .drawing-tool-icon { width: 24px; height: 24px; flex: 0 0 24px; }
+body[data-page="draw"] .draw-controls .draw-settings-panel {
+  position: fixed !important;
+  z-index: 80 !important;
+  left: 12px;
+  right: auto;
+  bottom: var(--draw-settings-panel-bottom, calc(env(safe-area-inset-bottom, 0px) + 84px));
+  box-sizing: border-box !important;
+  width: min(260px, calc(100vw - 24px)) !important;
+  max-height: min(440px, var(--draw-settings-panel-max-height, calc(100dvh - 120px)));
+  padding: 12px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  border: 1px solid #ffffff35 !important;
+  border-radius: 16px !important;
+  background: #202a33 !important;
+  color: #f5f2e8 !important;
+  box-shadow: 0 12px 38px #0008 !important;
+}
+body[data-page="draw"] .draw-controls .draw-settings-picker:not([open]) > .draw-settings-panel { display: none !important; }
+body[data-page="draw"] .draw-controls .draw-settings-picker[open] > .draw-settings-panel {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-auto-rows: 52px !important;
+  align-content: start !important;
+  gap: 8px !important;
+}
+body[data-page="draw"] .draw-controls .draw-settings-panel > button {
+  box-sizing: border-box !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  height: 52px !important;
+  aspect-ratio: 1 / 1 !important;
+  padding: 5px !important;
+  border: 1px solid #ffffff35 !important;
+  border-radius: 12px !important;
+  background: #2b3742 !important;
+  color: #edf2f3 !important;
+  cursor: pointer !important;
+}
+body[data-page="draw"] .draw-controls .draw-settings-panel > button[aria-pressed="true"] {
+  border-color: #ffd35a !important;
+  background: #ffd35a !important;
+  color: #17232d !important;
+  box-shadow: 0 2px 0 #b88f1d, inset 0 0 0 1px #fff3bd !important;
+}
+body[data-page="draw"] .draw-controls .draw-settings-panel > button:disabled { opacity: .58 !important; cursor: not-allowed !important; }
+body[data-page="draw"] .draw-controls .draw-settings-panel > button > .drawing-tool-icon { width: 26px; height: 26px; }
+body[data-page="draw"] .draw-controls .draw-settings-panel button:focus-visible,
+body[data-page="draw"] .draw-controls .draw-settings-picker > summary:focus-visible { outline: 3px solid #8ecdf0 !important; outline-offset: 2px !important; }
+body[data-page="draw"] .draw-controls .draw-settings-panel button:active { transform: translateY(1px); }
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary::-webkit-details-marker { display: none; }
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary {
+  position: relative !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  padding: 0 !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary > .drawing-tool-icon { width: 25px; height: 25px; flex: 0 0 25px; }
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary [data-draw-tool-name] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-picker__chevron {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: .56rem;
+  line-height: 1;
+}
+body[data-page="draw"] .draw-controls .draw-toolbar .draw-tools .draw-tool-menu {
+  position: fixed !important;
+  z-index: 80 !important;
+  left: 12px;
+  right: auto;
+  bottom: var(--draw-tool-menu-bottom, calc(env(safe-area-inset-bottom, 0px) + 84px));
+  box-sizing: border-box !important;
+  width: 196px !important;
+  min-width: 196px !important;
+  max-height: min(440px, var(--draw-tool-menu-max-height, calc(100dvh - 120px)));
+  margin-left: 0 !important;
+  padding: 10px !important;
+  overflow: auto !important;
+  overscroll-behavior: contain;
+  border: 1px solid #ffffff35 !important;
+  border-radius: 16px !important;
+  background: #202a33 !important;
+  color: #f5f2e8 !important;
+  box-shadow: 0 12px 38px #0008 !important;
+  display: none !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-picker[open] > .draw-tool-menu {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group {
+  display: grid !important;
+  flex: 0 0 auto !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group__heading {
+  grid-column: 1 / -1 !important;
+  margin: 0 !important;
+  padding: 0 2px 2px !important;
+  border-bottom: 1px solid #ffffff25 !important;
+  color: #dce5e9 !important;
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  letter-spacing: .03em;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > button[data-draw-tool] {
+  box-sizing: border-box !important;
+  display: grid !important;
+  place-items: center !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  min-width: 48px !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 48px !important;
+  height: 52px !important;
+  padding: 0 !important;
+  border: 1px solid #ffffff25 !important;
+  border-radius: 12px !important;
+  background: #2b3742 !important;
+  color: #f5f2e8 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > button[data-draw-tool][aria-pressed="true"] {
+  border-color: #ffd35a !important;
+  background: #3a4140 !important;
+  box-shadow: inset 0 0 0 1px #ffd35a !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .drawing-tool-icon {
+  grid-row: auto;
+  width: 26px;
+  height: 26px;
+  color: #ffd35a;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu [data-tool-label],
+body[data-page="draw"] .draw-controls .draw-tool-menu [data-tool-description] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary:focus-visible,
+body[data-page="draw"] .draw-controls .draw-tool-menu button:focus-visible {
+  outline: 3px solid #8ecdf0 !important;
+  outline-offset: 2px !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-picker > summary:active,
+body[data-page="draw"] .draw-controls .draw-tool-menu button:active { transform: translateY(1px); }
+
+body[data-page="draw"] .draw-board > .draw-selection {
+  position: absolute;
+  z-index: 4;
+  box-sizing: border-box;
+  border: 1px dashed #fff1a8;
+  outline: 1px solid #17232d;
+  box-shadow: 0 0 0 1px #17232d, 0 0 7px #0009;
+  background: #ffd35a14;
+  pointer-events: none;
+}
+body[data-page="draw"] .draw-board > .draw-selection[hidden] { display: none !important; }
+body[data-page="draw"] .draw-tool-menu__tip {
+  grid-column: 1 / -1;
+  margin: 2px 2px 0;
+  padding-top: 8px;
+  border-top: 1px solid #ffffff25;
+  color: #d4dce0;
+  font-size: .72rem;
+  line-height: 1.4;
+}

@@ -14,6 +14,7 @@ import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
+import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
@@ -467,6 +468,7 @@ $('#hidden-share-prompt-text').addEventListener('input', (event) => {
   updateLocalPlayButton();
 });
 $('#hidden-add').addEventListener('click', addTarget); $('#hidden-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addTarget(); } }); $('#hidden-remove').addEventListener('click', removeTarget);
+applyDrawingToolIcons(document.querySelector('.hidden-tools'));
 document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.addEventListener('click', () => { editMode = button.dataset.hiddenMode; document.querySelectorAll('[data-hidden-mode]').forEach((option) => option.setAttribute('aria-pressed', String(option === button))); }));
 $('#hidden-confirm').addEventListener('click', async () => {
   if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;

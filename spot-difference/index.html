@@ -67,8 +67,8 @@
       <canvas id="spot-inline-canvas" aria-label="複製した絵に違いを描くキャンバス" tabindex="0"></canvas>
       <div class="spot-inline-color-row"><div id="spot-inline-palette" class="spot-inline-palette" role="group" aria-label="描く色"></div><label class="spot-inline-add-color" title="新しい色を追加"><span aria-hidden="true">＋</span><input id="spot-inline-add-color" type="color" value="#f2a433" aria-label="新しく追加する色"></label></div>
       <div class="spot-inline-tools" role="group" aria-label="描画操作">
-        <button id="spot-inline-pen" type="button" aria-label="ペン" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg></button>
-        <button id="spot-inline-eraser" type="button" aria-label="消しゴム" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4 15l9-9 6 6-7 7H8z"/><path d="M9 10l6 6"/></svg></button>
+        <button id="spot-inline-pen" type="button" data-drawing-icon="pen" aria-label="ペン" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg></button>
+        <button id="spot-inline-eraser" type="button" data-drawing-icon="eraser" aria-label="消しゴム" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h11"/><path d="M4 15l9-9 6 6-7 7H8z"/><path d="M9 10l6 6"/></svg></button>
         <button id="spot-inline-undo" type="button" aria-label="ひとつ戻す" title="ひとつ戻す" disabled><img src="/assets/icons/pixieed/undo.svg" alt=""></button>
         <button id="spot-inline-redo" type="button" aria-label="やり直す" title="やり直す" disabled><img src="/assets/icons/pixieed/redo.svg" alt=""></button>
         <button id="spot-inline-original" type="button" aria-label="元の絵と比べる" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -111,9 +111,9 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261003-inline-hit-1"></script>
+  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261004-drawing-tools-4"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
-  <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261003-tool-help-3"></script>
+  <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>
 </html>

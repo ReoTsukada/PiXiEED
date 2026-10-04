@@ -471,9 +471,15 @@ test('audio page exposes labeled editing, project save and central playback cont
   assert.doesNotMatch(page, /audio-pixel-board/); assert.match(page, /共有画像のセルを音に割り当てる音楽キャンバス/);
   assert.equal((page.match(/<header class="site-header"/g) || []).length, 1);
   assert.doesNotMatch(page, /class="site-footer"/);
-  assert.match(page, /class="[^"]*\baudio-more\b[^"]*"/); assert.match(page, /audio-tool-body/);
+  const audioTools = page.match(/<[^>]*class="[^"]*\baudio-tools\b[^"]*"[^>]*>/)?.[0] || '';
+  assert.match(audioTools, /role="group"/); assert.match(page, /audio-tool-body/);
+  const outputMenu = page.match(/<details(?=[^>]*\bid="audio-output")[^>]*>[\s\S]*?<\/details>/)?.[0] || '';
+  assert.match(outputMenu, /<summary[^>]*aria-label="ファイルを開く・保存"/);
+  assert.match(outputMenu, /id="audio-save"[^>]*>[\s\S]*?この作品を保存/);
+  assert.match(outputMenu, /id="audio-take-photo"[^>]*aria-label="写真を撮って音楽にする"/);
+  assert.doesNotMatch(page, /id="audio-more"|class="[^"]*\baudio-more\b/);
   assert.match(page, /id="audio-tool-pen"/); assert.match(page, /id="audio-tool-eraser"/); assert.match(page, /id="audio-playhead"/);
-  assert.doesNotMatch(script, /loadLegacySong|LAST_DRAFT_KEY|createLocalDraftStore|mountPictureShelf|audio-shelf|audio-from-camera|cameraHandoffImage|refreshImageSources/);
+  assert.doesNotMatch(script, /loadLegacySong|LAST_DRAFT_KEY|createLocalDraftStore|mountPictureShelf|audio-shelf|audio-from-camera|cameraHandoffImage|refreshImageSources|audio-more/);
   assert.match(script, /beginAudioCamera\(/); assert.match(script, /takeAudioCameraReturn\(/); assert.match(script, /readAudioCameraDraft\(/);
   assert.match(script, /setAudioPixel/); assert.match(script, /pixelSurface\.paint/); assert.match(script, /pointermove/); assert.match(script, /pixelLineCells/); assert.match(script, /ArrowRight/); assert.match(script, /event\.key === 'Enter' \|\| event\.key === ' '/);
   assert.match(script, /prepareSharedAudioImageImport/); assert.match(script, /setSharedAudioCell/); assert.match(script, /readPxdSharedImage/);

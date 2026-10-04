@@ -1,6 +1,6 @@
 import { createPxdProject, decodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261001-free-tools-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261004-audio-frames-1';
 import { createProjectSession } from './project-session.mjs?rev=20261001-free-tools-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261001-free-tools-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
@@ -418,8 +418,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     await session.initialize(blankProject(), { persisted: false, apply: tool !== 'camera' }); main.inert = true;
     try {
       const params = new URLSearchParams(location.search); let pointer;
-      if (tool !== 'camera' && history.state?.projectWorkspaceSelection && params.has('pxd')) resetPointer();
-      else if (params.has('pxd')) {
+      // An explicit revision remains authoritative when the current tab reloads.
+      if (params.has('pxd')) {
         if (params.getAll('pxd').length !== 1 || params.getAll('pxdRevision').length !== 1 || !params.get('pxdRevision')) throw new Error('作品の保存版を特定できません。作品一覧から開いてください。');
         pointer = { projectId: params.get('pxd'), revisionId: params.get('pxdRevision') };
       }

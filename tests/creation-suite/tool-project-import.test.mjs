@@ -27,3 +27,16 @@ test('puzzle import uses the chosen picture rather than an unrelated puzzle in a
   assert.equal(source.entries.some(({ path }) => path === 'puzzles/jigsaw.json'), true);
   assert.deepEqual((await readPxdImage(imported)).rgba, (await readPxdImage(source)).rgba);
 });
+
+
+test('music import starts on the frame selected in Draw without changing the source selection', async () => {
+  const source = await drawing();
+  const animation = await readPxdAnimation(source, 'main');
+  const frameId = animation.frames[1].id;
+  source.manifest.editorState = { draw: { frameId, layerId: animation.layers[0].id } };
+  const before = structuredClone(source);
+  const imported = await importToolProject(source, 'audio');
+  assert.equal(imported.manifest.editorState.audio.frameId, frameId);
+  assert.equal(imported.manifest.editorState.audio.layerId, undefined);
+  assert.deepEqual(source, before);
+});

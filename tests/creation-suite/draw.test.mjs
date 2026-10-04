@@ -248,6 +248,7 @@ test('かんたんドット: a colour change is one undo step and undo reports o
   assert.equal(history.lastStep.paletteChanged, false); assert.deepEqual([...history.lastStep.indices], [0]); assert.equal(document.pixels[0], -1);
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
-  assert.match(html, /id="draw-color-editor"/); assert.match(html, /id="dce-h"/);
+  assert.match(page, /mountColorPanel/); assert.match(html, /color-panel\.css/);
+  assert.doesNotMatch(html, /id="draw-color-editor"/);
   assert.match(page, /function zoomAt\(/); assert.match(page, /fingers >= 3\) redo\(\); else undo\(\)/);
 });

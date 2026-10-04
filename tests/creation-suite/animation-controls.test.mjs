@@ -193,6 +193,24 @@ test('a single frame begins collapsed and GIF export is hidden in audio mode', (
   ui.dispose();
 });
 
+test('external onion control removes toolbar and frame-menu actions only when opted in', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls'; const scope = fakeScope();
+  const state = {
+    frames: [{ id: 'f1', durationMs: 120 }, { id: 'f2', durationMs: 240 }],
+    layers: [{ id: 'l1', name: 'Layer', visible: true, locked: false }],
+    frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false
+  };
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onionControlExternal: true, onAction() {} });
+  const root = host.children[0];
+  assert.equal(root.querySelector('[data-action="onion"]'), null);
+  root.querySelector('[data-action="toggle-frames"]').fire('click');
+  root.querySelectorAll('[data-action="select-frame"]')[0].fire('contextmenu', { preventDefault() {} });
+  const menu = doc.body.children.find((child) => child.dataset.frameMenu === 'true');
+  assert.equal(menu.querySelector('[data-frame-menu-action="onion"]'), null);
+  assert.ok(root.querySelector('[data-action="play"]'), 'other animation actions remain available');
+  ui.dispose();
+});
+
 test('Draw cel grid exposes add cells, contextual editing, and long-press header reorder', () => {
   const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls'; const scope = fakeScope();
   const state = {
@@ -213,9 +231,15 @@ test('Draw cel grid exposes add cells, contextual editing, and long-press header
   assert.equal(panel.children[1].hidden, true, 'Draw hides the row of permanent controls');
   assert.ok(grid.querySelector('[data-action="add-frame"]'));
   assert.ok(grid.querySelector('[data-action="add-layer"]'));
-  assert.equal(grid.querySelector('[data-action="add-layer"]').style.gridRow, '2');
+  const addLayer = grid.querySelector('[data-action="add-layer"]');
+  assert.equal(addLayer.style.gridRow, '4', 'layer + occupies the row after the two existing layers');
+  assert.equal(addLayer.getAttribute('aria-rowindex'), '4');
+  assert.equal(grid.children.at(-1), addLayer, 'layer + follows the layer rows in DOM order');
   assert.equal(grid.querySelectorAll('[data-action="select-frame"]')[0].style.gridColumn, '2');
-  assert.equal(grid.querySelectorAll('[data-action="select-layer"]')[0].style.gridColumn, '1');
+  const layerHeaders = grid.querySelectorAll('[data-action="select-layer"]');
+  assert.equal(layerHeaders[0].style.gridColumn, '1');
+  assert.deepEqual(layerHeaders.map((header) => header.style.gridRow), ['2', '3']);
+  assert.deepEqual(layerHeaders.map((header) => header.getAttribute('aria-rowindex')), ['2', '3']);
   grid.querySelector('[data-action="add-frame"]').fire('click');
   assert.deepEqual(actions.at(-1), { type: 'add-frame', frameId: 'f2', copy: true }, 'frame + uses the final frame as its source');
   grid.querySelector('[data-action="add-layer"]').fire('click');
@@ -261,5 +285,75 @@ test('Draw cel grid exposes add cells, contextual editing, and long-press header
   cancelTarget.fire('pointerdown', { pointerId: 9, clientX: 20, clientY: 20 }); scope.fireTimerDelay(350);
   doc.fire('pointerup', { pointerId: 9, clientX: 20, clientY: 20 });
   assert.equal(menu.hidden, false, 'releasing a long-pressed header without moving opens its contextual actions');
+  ui.dispose();
+});
+
+
+test('Audio frame-only launcher opens a strip with frame actions and no layer or drawing timing UI', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'audio-animation-controls';
+  const scope = fakeScope(); const actions = [];
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }],
+    layers: [{ id: 'l1', name: 'Hidden', visible: false, locked: true }, { id: 'l2', name: 'Top', visible: true, locked: false }],
+    frameId: 'f1', layerId: 'l2', audioMode: true, readOnly: false, playing: false, onion: false };
+  const ui = mountAnimationControls({ host, scope, getState: () => state, frameOnly: true, onAction: action => actions.push(action) });
+  const launcher = host.querySelector('[data-action="toggle-frames"]');
+  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
+  assert.equal(panel.hidden, true);
+  assert.equal(host.querySelectorAll('button').length, 1, 'the closed editor uses one launcher');
+  assert.equal(panel.getAttribute('aria-label'), 'フレーム');
+  assert.equal(doc.body.querySelector('[data-action="add-layer"]'), null);
+  launcher.fire('click');
+  assert.equal(panel.hidden, false);
+  assert.equal(launcher.getAttribute('aria-expanded'), 'true');
+  assert.equal(panel.querySelector('[data-frame-strip]').hidden, false);
+  assert.equal(panel.querySelector('[data-action="toggle-layers"]'), null);
+  assert.equal(panel.querySelector('[data-action="toggle-duration"]').hidden, true);
+  panel.querySelector('[data-action="add-frame"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'add-frame', copy: true });
+  panel.querySelector('[data-action="select-frame"]').fire('contextmenu');
+  const menu = doc.body.querySelector('[data-frame-menu]');
+  assert.equal(menu.hidden, false);
+  assert.equal(menu.querySelector('[data-frame-menu-action="duration"]'), null);
+  assert.equal(menu.querySelector('[data-frame-menu-action="onion"]'), null);
+  menu.querySelector('[data-frame-menu-action="right"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'move-frame', frameId: 'f1', index: 1 });
+  const firstFrame = panel.querySelector('[data-action="select-frame"]');
+  firstFrame.fire('pointerdown', { pointerId: 1, clientX: 20, clientY: 100 });
+  doc.fire('pointerup', { target: firstFrame, pointerId: 1 });
+  scope.fireTimerDelay(520);
+  assert.equal(menu.hidden, true, 'a quick tap must not open a delayed context menu');
+  panel.querySelector('[data-action="close-animation"]').fire('click');
+  assert.equal(panel.hidden, true);
+  ui.dispose();
+  assert.equal(host.children.length, 0);
+  assert.equal(doc.body.children.length, 0);
+});
+
+test('Audio frame-only strip previews distant frames and preserves horizontal scroll on selection refresh', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'audio-animation-controls';
+  const scope = fakeScope(); const actions = []; const previewCalls = [];
+  const frameData = Object.freeze(Array.from({ length: 9 }, (_, index) => Object.freeze({ id: `f${index + 1}`, durationMs: 100 })));
+  const state = { frames: frameData, layers: Object.freeze([]), frameId: 'f1', layerId: null, audioMode: true, readOnly: false, playing: false, onion: false };
+  const ui = mountAnimationControls({ host, scope, frameOnly: true, getState: () => state, onAction: action => actions.push(action),
+    getFramePreview(frameId) { const preview = doc.createElement('canvas'); preview.nodeType = 1; previewCalls.push(frameId); return preview; } });
+  const strip = doc.body.querySelector('[data-frame-strip]');
+  const assertEveryFrameHasPreview = () => {
+    const items = strip.querySelectorAll('[data-action="select-frame"]');
+    assert.equal(items.length, frameData.length);
+    assert.ok(items.every((item) => item.children.some((child) => child.classList.contains('animation-controls__preview'))));
+  };
+
+  assertEveryFrameHasPreview();
+  assert.equal(previewCalls.length, frameData.length);
+  for (const selectedIndex of [4, 8, 0]) {
+    strip.scrollLeft = 72 + selectedIndex;
+    state.frameId = frameData[selectedIndex].id;
+    ui.refresh();
+    assertEveryFrameHasPreview();
+    assert.equal(strip.scrollLeft, 72 + selectedIndex);
+  }
+  assert.equal(state.frames, frameData, 'refresh preserves the frame collection');
+  assert.deepEqual(frameData.map((frame) => frame.id), ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9']);
+  assert.deepEqual(actions, [], 'preview refreshes do not change project data');
   ui.dispose();
 });

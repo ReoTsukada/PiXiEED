@@ -66,6 +66,73 @@ test('timeline and canvas operations preserve identity and reject invalid capaci
   assert.equal(animation.frames.length, 2);
 });
 
+test('nearest resize resamples every frame and layer while preserving metadata and transparency', () => {
+  const palette = ['#112233', '#aabbcc'];
+  let animation = createAnimation({ width: 2, height: 2, palette });
+  const firstFrame = animation.frames[0].id, bottom = animation.layers[0].id;
+  animation = writeAnimationCel(animation, firstFrame, bottom, { width:2, height:2, pixels:[0,1,2,0] });
+  animation = addAnimationFrame(animation, { sourceFrameId:firstFrame, durationMs:240, copy:false });
+  const secondFrame = animation.frames[1].id;
+  animation = writeAnimationCel(animation, secondFrame, bottom, { width:2, height:2, pixels:[2,2,0,1] });
+  animation = addAnimationLayer(animation, { name:'Hidden locked', visible:false, locked:true });
+  const top = animation.layers[1].id;
+  animation = writeAnimationCel(animation, firstFrame, top, { width:2, height:2, pixels:[1,0,0,2] });
+  animation = writeAnimationCel(animation, secondFrame, top, { width:2, height:2, pixels:[0,1,2,0] });
+
+  const sourceCels = new Map(animation.frames.flatMap(frame => animation.layers.map(layer => [
+    `${frame.id}/${layer.id}`, getAnimationCelDocument(animation, frame.id, layer.id).pixels,
+  ])));
+  const originalMetadata = { width:animation.width, height:animation.height, palette:[...animation.palette], frames:structuredClone(animation.frames), layers:structuredClone(animation.layers) };
+  const resized = resizeAnimation(animation, 4, 3, { resample:'nearest' });
+  assert.deepEqual([resized.width, resized.height], [4,3]);
+  assert.deepEqual(resized.palette, palette);
+  assert.deepEqual(resized.frames, animation.frames);
+  assert.deepEqual(resized.layers, animation.layers);
+  assert.equal(resized.frames[1].id, secondFrame);
+  assert.equal(resized.frames[1].durationMs, 240);
+  assert.equal(resized.layers[1].id, top);
+  assert.equal(resized.layers[1].visible, false);
+  assert.equal(resized.layers[1].locked, true);
+
+  for (const frame of animation.frames) for (const layer of animation.layers) {
+    const before = getAnimationCelDocument(animation, frame.id, layer.id);
+    const after = getAnimationCelDocument(resized, frame.id, layer.id);
+    const expected = [];
+    for (let y=0; y<3; y+=1) for (let x=0; x<4; x+=1) {
+      const sx = Math.floor((x + .5) * 2 / 4), sy = Math.floor((y + .5) * 2 / 3);
+      expected.push(before.pixels[sy * 2 + sx]);
+    }
+    assert.deepEqual(after.pixels, expected, `nearest resample ${frame.id}/${layer.id}`);
+    assert.deepEqual(getAnimationCelDocument(animation, frame.id, layer.id).pixels, sourceCels.get(`${frame.id}/${layer.id}`), 'resampling must not mutate source cels');
+  }
+  assert.deepEqual({ width:animation.width, height:animation.height, palette:[...animation.palette], frames:animation.frames, layers:animation.layers }, originalMetadata);
+
+  const history = createAnimationHistory(animation, { maxBytes:100000, maxEntries:4 });
+  history.commit(resized);
+  assert.equal(history.canUndo, true);
+  assert.equal(history.undo(), true);
+  assert.equal(history.current, animation, 'one Undo should restore the exact pre-resize snapshot');
+});
+
+test('resize without a resample option keeps legacy top-left pad and crop behavior', () => {
+  let animation = createAnimation({ width:2, height:2, palette:['#112233'] });
+  const frameId = animation.frames[0].id, layerId = animation.layers[0].id;
+  animation = writeAnimationCel(animation, frameId, layerId, { width:2, height:2, pixels:[1,0,0,1] });
+  const padded = resizeAnimation(animation, 3, 3);
+  assert.deepEqual(getAnimationCelDocument(padded, frameId, layerId).pixels, [0,-1,-1,-1,0,-1,-1,-1,-1]);
+  assert.deepEqual(getAnimationCelDocument(animation, frameId, layerId).pixels, [0,-1,-1,0]);
+  const cropped = resizeAnimation(animation, 1, 1);
+  assert.deepEqual(getAnimationCelDocument(cropped, frameId, layerId).pixels, [0]);
+});
+
+test('resize rejects unsupported resampling options', () => {
+  const animation = createAnimation({ width:2, height:2 });
+  assert.throws(() => resizeAnimation(animation, 4, 4, { resample:'bilinear' }), /nearest/);
+  assert.throws(() => resizeAnimation(animation, 4, 4, null), /オプション/);
+  assert.equal(animation.width, 2);
+  assert.equal(animation.height, 2);
+});
+
 test('blank frame insertion preserves timeline identity and frame capacity stops at 128', () => {
   let animation = createAnimation({ width: 1, height: 1, palette: ['#123456'] });
   const originalId = animation.frames[0].id; const layerId = animation.layers[0].id;

@@ -59,8 +59,8 @@
         </details>
         <div class="hidden-target-create"><label for="hidden-name">1. 見つけるものの名前</label><div><input id="hidden-name" maxlength="48" autocomplete="off" placeholder="例：赤い花"><button id="hidden-add" type="button">対象を追加</button></div></div>
         <div class="hidden-tools" role="group" aria-label="マスクの編集">
-          <button type="button" data-hidden-mode="paint" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 9-9 4 4-9 9H4zm11-11 2-2 4 4-2 2"/></svg><span>ぬる</span></button>
-          <button type="button" data-hidden-mode="erase" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 14 9-9 9 9-6 6H9zM8 9l7 7"/></svg><span>消す</span></button>
+          <button type="button" data-hidden-mode="paint" data-drawing-icon="pen" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 9-9 4 4-9 9H4zm11-11 2-2 4 4-2 2"/></svg><span>ぬる</span></button>
+          <button type="button" data-hidden-mode="erase" data-drawing-icon="eraser" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 14 9-9 9 9-6 6H9zM8 9l7 7"/></svg><span>消す</span></button>
           <button id="hidden-remove" type="button" disabled>対象を削除</button>
         </div>
         <p id="hidden-mask-summary" class="hidden-mask-summary" aria-live="polite"></p>
@@ -83,9 +83,9 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261003-project-library-1"></script>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261004-drawing-tools-4"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
-  <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261003-tool-help-3"></script>
+  <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>
 </html>

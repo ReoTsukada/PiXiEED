@@ -6,7 +6,7 @@ import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER
 import { createDrawAnimationSession } from './draw-animation-session.mjs';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261002-tool-transfer-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261004-layer-add-bottom-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
@@ -14,7 +14,7 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
 import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261003-project-library-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261003-project-library-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261004-symmetry-color-panel-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -25,6 +25,12 @@ import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './p
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
+import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261004-symmetry-color-panel-1';
+
+import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261004-symmetry-color-panel-1';
+import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261004-canvas-settings-1';
+import { mountColorPanel } from './color-panel.mjs?rev=20261004-audio-fixed-panel-3';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
@@ -36,10 +42,11 @@ const cancelAnimationFrame = (id) => scope.cancelFrame(id);
 const LAST_DRAFT_KEY = 'pixieed.simple-draw.last-draft.v1';
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(canvas);
+applyDrawingToolIcons($('#main'));
 const penControl = $('[data-draw-tool="pen"]');
 const eraserControl = $('[data-draw-tool="eraser"]');
-const penIcon = penControl?.querySelector('svg')?.cloneNode(true);
-const eraserIcon = eraserControl?.querySelector('svg')?.cloneNode(true);
+const penIcon = createDrawingToolIcon('pen');
+const eraserIcon = createDrawingToolIcon('eraser');
 // One visible control alternates between drawing and erasing.
 eraserControl?.remove();
 const resultView = createToolResultView({ key: 'draw-result', main: $('#main'), returnLabel: '描画に戻る',
@@ -51,6 +58,12 @@ const sizeSelect = $('#draw-size');
 const interactionEffects = createInteractionEffects();
 let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false;
 let animationSession = createDrawAnimationSession(documentData), animationControls = null, strokeTracker = null;
+let selection = null, selectionDrag = null, strokeWasSaved = false;
+const selectionOverlay = document.createElement('div'); selectionOverlay.className = 'draw-selection'; selectionOverlay.setAttribute('aria-hidden', 'true'); selectionOverlay.hidden = true; $('.draw-board').append(selectionOverlay);
+scope.add(() => selectionOverlay.remove());
+const TOOL_NAMES = { pen: 'ペン', eraser: '消しゴム', fill: '塗りつぶし', line: '直線', rectangle: '四角形', 'rectangle-fill': '四角塗り', ellipse: '楕円', 'ellipse-fill': '楕円塗り', spray: 'スプレー', select: '範囲移動', picker: 'スポイト' };
+const SHAPE_TOOLS = new Set(['line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill']);
+let lastOtherTool = 'fill';
 let playing = false, onion = false, playbackFrame = null, playbackStarted = 0, playbackOffset = 0, playbackRequest = 0;
 const onionCanvas = document.createElement('canvas'); onionCanvas.className = 'draw-onion'; onionCanvas.setAttribute('aria-hidden', 'true'); onionCanvas.style.cssText = 'position:absolute;pointer-events:none;image-rendering:pixelated;z-index:1'; $('.draw-board').append(onionCanvas); onionCanvas.hidden = true;
 // Only the newest open/import may replace the picture; the version an edit started from guards saves.
@@ -70,7 +83,7 @@ function setCanvasDimensions() {
     pixelSurface.resize(readOnlyImage.width, readOnlyImage.height); canvas.style.aspectRatio = `${readOnlyImage.width} / ${readOnlyImage.height}`; canvasPrepared = true;
     canvas.style.setProperty('--draw-aspect', `${readOnlyImage.width} / ${readOnlyImage.height}`);
     canvas.setAttribute('aria-label', `${readOnlyImage.width}×${readOnlyImage.height}の原本。表示と保存ができます。`);
-    $('.draw-grid').hidden = true; $('.draw-cursor').hidden = true;
+    $('.draw-grid').hidden = true; $('.draw-cursor').hidden = true; requestAnimationFrame(() => syncSizeButtons(true));
     $('#draw-size-label').textContent = `${readOnlyImage.width}×${readOnlyImage.height}px`; return;
   }
   pixelSurface.resize(documentData.width, documentData.height);
@@ -96,9 +109,10 @@ function paint(changed = null) {
   updateControls();
 }
 function installAnimationDocument(doc) {
+  clearSelection();
   documentData = doc; history = recordedHistory(createDrawHistory(documentData)); saved = false;
   selectedColor = Math.min(selectedColor, doc.palette.length - 1); canvasPrepared = false;
-  renderPalette(); showCurrentColor(); paint(); animationControls?.refresh();
+  renderPalette(); showCurrentColor(); paint(); syncDrawingSettings(); animationControls?.refresh();
 }
 function stopAnimation() {
   playing = false; playbackFrame = null; cancelAnimationFrame(playbackRequest); playbackRequest = 0;
@@ -142,7 +156,12 @@ function paintOnion(display) {
 }
 function handleAnimationAction(action) {
   if (action.type === 'play') return toggleAnimation();
-  if (action.type === 'onion') { onion = !onion; paint(); animationControls?.refresh(); return; }
+  if (action.type === 'onion') {
+    const enabled = typeof action.enabled === 'boolean' ? action.enabled : !onion;
+    const canEnable = animationSession.animation.frames.length >= 2;
+    onion = enabled ? canEnable : false;
+    paint(); syncDrawingSettings(); animationControls?.refresh(); return;
+  }
   if (action.type === 'export-gif') return exportAnimation();
   stopAnimation(); endStroke(); closeColorEditor();
   if (action.type === 'select-frame' || action.type === 'select-layer') { installAnimationDocument(animationSession.select(action.frameId, action.layerId)); return; }
@@ -167,6 +186,7 @@ function handleAnimationAction(action) {
 }
 animationControls = mountAnimationControls({ host: $('#draw-animation-controls'), scope,
   getState: () => ({ ...animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId, playing, onion, readOnly: Boolean(readOnlyImage) }),
+  onionControlExternal: true,
   onAction: handleAnimationAction,
   getCelHasContent: (frameId, layerId) => hasAnimationCelContent(animationSession.animation, frameId, layerId),
   getFramePreview: (frameId) => { const doc = composeAnimationFrame(animationSession.animation, frameId); return new ImageData(new Uint8ClampedArray(documentRgba(doc)), doc.width, doc.height); }
@@ -203,85 +223,38 @@ function renderPalette() {
   }
 }
 // ---- changing a colour: hue / vividness / lightness sliders and a few quick colours; one undo step per edit ----
-const QUICK_COLORS = ['#17232d', '#ffffff', '#ff4d4d', '#ff9f1c', '#ffe14d', '#7ed957', '#2ec4b6', '#3a86ff', '#8338ec', '#ff6fb5', '#a0522d', '#ffd8b1'];
 let colorEdit = null;
-const hexToHsl = (hex) => {
-  const r = Number.parseInt(hex.slice(1, 3), 16) / 255; const g = Number.parseInt(hex.slice(3, 5), 16) / 255; const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b); const min = Math.min(r, g, b); const l = (max + min) / 2; const d = max - min;
-  if (!d) return { h: colorEdit?.h ?? 0, s: 0, l: Math.round(l * 100) };
-  const s = d / (1 - Math.abs(2 * l - 1)); let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  h = Math.round(h * 60); if (h < 0) h += 360; return { h, s: Math.round(s * 100), l: Math.round(l * 100) };
-};
-const hslToHex = (h, s, l) => {
-  s /= 100; l /= 100; const k = (n) => (n + h / 30) % 12; const a = s * Math.min(l, 1 - l);
-  const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
-  return `#${[f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-};
+const colorPanel = mountColorPanel({ scope, getAnchor: () => $('.draw-control-row'), onChange: setEditColor, onClose: closeColorEditor });
 function linkedToSong() {
   try { const link = readPxdAudioLink(pxdBridge?.currentProject || pxdBridge?.heldProject); return Boolean(link && link.imageRole === pxdImageRole); } catch { return false; }
 }
 function openColorEditor(index) {
-  if (index < 0) return;
-  if (!canEdit()) return;
-  editorUi.closePanels();
-  closeColorEditor();
-  const editor = $('#draw-color-editor'); const base = [...documentData.palette];
-  colorEdit = { index, base, maxColors: 32, ...hexToHsl(base[index].slice(0, 7)) };
-  editor.querySelector('.dce-before').style.background = base[index];
-  const quick = editor.querySelector('.dce-quick'); quick.replaceChildren(...QUICK_COLORS.map((color) => {
-    const b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', color); b.setAttribute('aria-label', color); b.addEventListener('click', () => setEditColor(color)); return b;
-  }));
-  $('#dce-reset').hidden = index >= DRAW_PALETTE.length || base[index] === DRAW_PALETTE[index];
-  syncColorEditor(); editor.hidden = false; placeColorEditor(); requestAnimationFrame(() => editor.classList.add('is-open'));
+  if (index < 0 || index >= documentData.palette.length || !canEdit()) return;
+  editorUi.closePanels(); closeColorEditor();
+  const base = [...documentData.palette]; colorEdit = { index, base, maxColors: 32 };
+  colorPanel.open({ color: base[index].slice(0, 7), resetColor: index < DRAW_PALETTE.length ? DRAW_PALETTE[index] : null });
   $('.draw-current')?.setAttribute('aria-expanded', 'true');
 }
-// the sheet sits just above the palette so the colours (and most of the picture) stay in view
-function placeColorEditor() {
-  const editor = $('#draw-color-editor'); if (editor.hidden) return;
-  const row = $('.draw-control-row').getBoundingClientRect();
-  const header = document.querySelector('.px-site-header, .site-header, header')?.getBoundingClientRect();
-  const navigation = document.querySelector('.app-tabs')?.getBoundingClientRect();
-  const topLimit = Math.max(8, Math.ceil(header?.bottom ?? 0) + 8);
-  const bottomLimit = Math.max(topLimit, Math.min(innerHeight, navigation?.top ?? innerHeight) - 8);
-  editor.style.maxHeight = `${bottomLimit - topLimit}px`;
-  const h = Math.min(editor.offsetHeight, bottomLimit - topLimit);
-  const above = row.top - h - 10; const below = row.bottom + 10;
-  const top = above >= topLimit ? above : below + h <= bottomLimit ? below : topLimit;
-  editor.style.top = `${Math.round(Math.max(topLimit, Math.min(top, bottomLimit - h)))}px`;
-}
-scope.listen(window, 'resize', placeColorEditor); scope.listen(window, 'scroll', placeColorEditor, { passive: true });
 function setEditColor(hex) {
-  if (!colorEdit) return;
-  if (documentData.palette[colorEdit.index] === hex) { syncColorEditor(false); return; }
+  if (!colorEdit) return false;
+  const actual = documentData.palette[colorEdit.index];
+  if (actual === hex) return actual;
   const candidate = [...documentData.palette]; candidate[colorEdit.index] = hex;
-  if (usedColorCount({ ...documentData, palette: candidate }) > colorEdit.maxColors) { toast(`このキャンバスは最大${colorEdit.maxColors}色です。使用中の色を置き換えてください。`); return; }
-  Object.assign(colorEdit, hexToHsl(hex));
-  const palette = [...documentData.palette]; palette[colorEdit.index] = hex; documentData.palette = palette;
-  const tile = document.querySelector(`.draw-color[data-color-index="${colorEdit.index}"]`); tile?.style.setProperty('--draw-color', hex);
-  saved = false; showCurrentColor(); paint(); syncColorEditor(false); pxdBridge?.markDirty();
-}
-function syncColorEditor(setInputs = true) {
-  const e = colorEdit; if (!e) return; const hex = documentData.palette[e.index];
-  const editor = $('#draw-color-editor'); editor.querySelector('.dce-after').style.background = hex;
-  if (setInputs) { $('#dce-h').value = e.h; $('#dce-s').value = e.s; $('#dce-l').value = e.l; }
-  editor.style.setProperty('--h', e.h); editor.style.setProperty('--s', `${e.s}%`); editor.style.setProperty('--l', `${e.l}%`);
-  for (const b of editor.querySelectorAll('.dce-quick button')) b.setAttribute('aria-pressed', String(b.style.getPropertyValue('--c') === hex));
+  if (usedColorCount({ ...documentData, palette: candidate }) > colorEdit.maxColors) { toast(`このキャンバスは最大${colorEdit.maxColors}色です。使用中の色を置き換えてください。`); return actual; }
+  documentData.palette = candidate;
+  document.querySelector(`.draw-color[data-color-index="${colorEdit.index}"]`)?.style.setProperty('--draw-color', hex);
+  saved = false; showCurrentColor(); paint(); pxdBridge?.markDirty(); return hex;
 }
 function closeColorEditor() {
-  const editor = $('#draw-color-editor'); if (!colorEdit) { editor.hidden = true; return; }
+  colorPanel.close();
+  if (!colorEdit) return;
   const after = documentData.palette; documentData.palette = colorEdit.base; colorEdit = null;
   if (history.commit({ ...documentData, pixels: [...documentData.pixels], palette: after })) saved = false;
-  editor.classList.remove('is-open'); editor.hidden = true; $('.draw-current')?.setAttribute('aria-expanded', 'false');
+  $('.draw-current')?.setAttribute('aria-expanded', 'false');
   renderPalette(); showCurrentColor(); paint();
 }
-for (const id of ['#dce-h', '#dce-s', '#dce-l']) $(id).addEventListener('input', () => {
-  if (!colorEdit) return; colorEdit.h = Number($('#dce-h').value); colorEdit.s = Number($('#dce-s').value); colorEdit.l = Number($('#dce-l').value);
-  const hex = hslToHex(colorEdit.h, colorEdit.s, colorEdit.l); const { h, s, l } = colorEdit; setEditColor(hex); Object.assign(colorEdit, { h, s, l }); syncColorEditor(false);
-});
-$('#dce-done').addEventListener('click', closeColorEditor);
-$('#dce-reset').addEventListener('click', () => { if (colorEdit) setEditColor(DRAW_PALETTE[colorEdit.index]); syncColorEditor(); });
 $('.draw-current')?.addEventListener('click', () => (colorEdit ? closeColorEditor() : openColorEditor(selectedColor)));
-const editorUi = mountCreationEditorUi($('#main'), { beforePanelOpen: closeColorEditor });
+const editorUi = mountCreationEditorUi($('#main'), { beforePanelOpen: () => { closeColorEditor(); animationControls?.close?.(); } });
 // touching the picture closes the sheet and draws straight away with the new colour
 canvas.addEventListener('pointerdown', () => { if (colorEdit) closeColorEditor(); }, true);
 scope.listen(window, 'keydown', (event) => { if (event.key === 'Escape' && colorEdit) closeColorEditor(); });
@@ -292,7 +265,7 @@ function showCurrentColor() {
 function chooseColor(index, sourceElement) {
   const penButton = document.querySelector('[data-draw-tool="pen"]');
   interactionEffects.color({ from: sourceElement, to: penButton, color: index < 0 ? '#fff' : documentData.palette[index] });
-  selectedColor = index; setTool('pen'); showCurrentColor();
+  selectedColor = index; if (tool === 'eraser' || tool === 'picker' || tool === 'select') setTool('pen'); showCurrentColor();
   document.querySelectorAll('.draw-color').forEach((node) => node.setAttribute('aria-pressed', String(Number(node.dataset.colorIndex) === index)));
 }
 // A mode switch never changes the shared image's dimensions or colours.
@@ -321,13 +294,14 @@ function canEdit(value = documentData) {
   return false;
 }
 function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
+  endStroke(true); clearSelection();
   if (colorEdit) closeColorEditor();
   const nextAnimationSession = createDrawAnimationSession(nextDocument);
   validateDrawDocument(nextDocument); fitNotice = ''; readOnlyImage = null;
   interactionEffects.clear();
   if (!fromPxd) { pxdBridge?.reset(); pxdImageRole = 'main'; }
   documentData = nextDocument; source = nextSource; history = recordedHistory(createDrawHistory(documentData)); activeDraftId = null; baseRevisionId = null; saved = false;
-  stopAnimation(); animationSession = nextAnimationSession; animationControls?.refresh();
+  stopAnimation(); animationSession = nextAnimationSession; syncDrawingSettings(); animationControls?.refresh();
   selectedColor = Math.min(Math.max(selectedColor, 0), documentData.palette.length - 1); renderPalette(); sizeSelect.value = String(documentData.width); setCanvasDimensions(); paint();
 }
 function commitChange(operation) {
@@ -367,23 +341,53 @@ function placeOverlays() {
   const board = $('.draw-board'); const grid = $('.draw-grid'); if (!board || !grid) return;
   const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect();
   Object.assign(grid.style, { left: `${r.left - b.left - board.clientLeft}px`, top: `${r.top - b.top - board.clientTop}px`, width: `${r.width}px`, height: `${r.height}px` });
+  grid.style.setProperty('--symmetry-length', `${2 * Math.max(r.width, r.height)}px`);
   Object.assign(onionCanvas.style, { left: grid.style.left, top: grid.style.top, width: grid.style.width, height: grid.style.height });
   for (const node of [grid, canvas]) { node.style.setProperty('--cols', documentData.width); node.style.setProperty('--rows', documentData.height); }
   grid.classList.toggle('is-fine', r.width / documentData.width < 6);
+  placeSelection();
 }
+function clearSelection() { selection = null; selectionDrag = null; selectionOverlay.hidden = true; }
+function placeSelection() {
+  selectionOverlay.hidden = !selection || tool !== 'select';
+  if (selectionOverlay.hidden) return;
+  const board = $('.draw-board'), b = board.getBoundingClientRect(), r = canvas.getBoundingClientRect();
+  Object.assign(selectionOverlay.style, { left: `${r.left - b.left - board.clientLeft + selection.x * r.width / documentData.width}px`, top: `${r.top - b.top - board.clientTop + selection.y * r.height / documentData.height}px`, width: `${selection.width * r.width / documentData.width}px`, height: `${selection.height * r.height / documentData.height}px` });
+}
+function placeToolMenu() {
+  const menu = $('.draw-tool-menu'), summary = $('#draw-tool-summary'); if (!menu || !summary) return;
+  const r = summary.getBoundingClientRect(), header = document.querySelector('body > .site-header')?.getBoundingClientRect().bottom || 64;
+  const navigationTop = document.querySelector('.app-tabs')?.getBoundingClientRect().top || innerHeight;
+  const width = Math.min(196, innerWidth - 24), controls = $('.draw-controls').getBoundingClientRect();
+  const above = Math.max(44, r.top - header - 20), below = Math.max(0, navigationTop - r.bottom - 20);
+  const openBelow = below > above;
+  menu.style.left = `${Math.max(12, Math.min(innerWidth - width - 12, controls.left + (controls.width - width) / 2))}px`;
+  menu.style.bottom = openBelow ? 'auto' : `${Math.max(12, innerHeight - r.top + 8)}px`;
+  menu.style.top = openBelow ? `${r.bottom + 8}px` : 'auto';
+  menu.style.maxHeight = `${Math.min(440, openBelow ? below : above)}px`;
+
+}
+const cursorTwins = Array.from({ length: 7 }, (_, index) => {
+  const twin = index === 0 ? $('.draw-cursor-twin') : $('.draw-cursor-twin').cloneNode();
+  if (index) { $('.draw-board').append(twin); scope.add(() => twin.remove()); }
+  return twin;
+});
+function hideCursors() { $('.draw-cursor').hidden = true; cursorTwins.forEach(node => { node.hidden = true; }); }
 function showCursor(event) {
   const cursor = $('.draw-cursor'); if (!cursor) return;
-  if (event.pointerType === 'touch' && !drawing) { cursor.hidden = true; return; }
+  if (event.pointerType === 'touch' && !drawing) { hideCursors(); return; }
   const p = pointFromEvent(event);
-  if (p.x < 0 || p.y < 0 || p.x >= documentData.width || p.y >= documentData.height) { cursor.hidden = true; return; }
-  const board = $('.draw-board'); const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect(); const cw = r.width / documentData.width; const ch = r.height / documentData.height;
-  Object.assign(cursor.style, { left: `${r.left - b.left - board.clientLeft + p.x * cw}px`, top: `${r.top - b.top - board.clientTop + p.y * ch}px`, width: `${cw}px`, height: `${ch}px` });
-  cursor.style.setProperty('--draw-color', tool === 'eraser' || selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor] || 'transparent');
-  cursor.dataset.tool = tool; cursor.hidden = false;
-  const twin = $('.draw-cursor-twin');
-  if (mirror && twin) { Object.assign(twin.style, { left: `${r.left - b.left - board.clientLeft + (documentData.width - 1 - p.x) * cw}px`, top: cursor.style.top, width: cursor.style.width, height: cursor.style.height }); twin.hidden = false; } else if (twin) twin.hidden = true;
+  if (p.x < 0 || p.y < 0 || p.x >= documentData.width || p.y >= documentData.height) { hideCursors(); return; }
+  const board = $('.draw-board'), b = board.getBoundingClientRect(), r = canvas.getBoundingClientRect(), cw = r.width / documentData.width, ch = r.height / documentData.height;
+  const points = tool === 'select' || tool === 'picker' ? [p] : symmetryPoints(p, documentData.width, documentData.height, symmetry);
+  [cursor, ...cursorTwins].forEach((node, index) => {
+    const point = points[index]; node.hidden = !point;
+    if (!point) return;
+    Object.assign(node.style, { left: `${r.left - b.left - board.clientLeft + point.x * cw}px`, top: `${r.top - b.top - board.clientTop + point.y * ch}px`, width: `${cw}px`, height: `${ch}px` });
+    node.style.setProperty('--draw-color', tool === 'eraser' || selectedColor < 0 ? 'transparent' : documentData.palette[selectedColor] || 'transparent'); node.dataset.tool = tool;
+  });
 }
-canvas.addEventListener('pointerleave', () => { if (!drawing) { $('.draw-cursor').hidden = true; const twin = $('.draw-cursor-twin'); if (twin) twin.hidden = true; } });
+canvas.addEventListener('pointerleave', () => { if (!drawing) hideCursors(); });
 // ---- short messages float over the canvas and fade (the status line keeps the full text for screen readers) ----
 let toastTimer = 0;
 function toast(message) { status.textContent = message; }
@@ -394,20 +398,41 @@ const overlayObserver = new ResizeObserver(() => { if (!scope.disposed) placeOve
 scope.observe(overlayObserver, $('.draw-board'));
 function pointerPair() { return [...activePointers.values()].slice(0, 2); }
 function startPinch() {
-  if (drawing && strokeTracker) { cancelDrawStroke(documentData, strokeTracker); strokeTracker = null; strokeStartPixels = null; drawing = false; previousPoint = null; paint(); }
-  if (drawing && strokeStartPixels) {
-    documentData.pixels = strokeStartPixels; strokeStartPixels = null; drawing = false; previousPoint = null; paint();
-  }
+  if (drawing) endStroke(true);
   const [a, b] = pointerPair(); if (!a || !b) return;
   pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2, time: performance.now(), moved: 0, fingers: activePointers.size };
 }
 function selectedPixelValue() { return tool === 'eraser' ? -1 : selectedColor; }
 // ---- drawing helpers: a mirror copy of every mark, the straight line, the colour picker ----
-let mirror = false; let lineStart = null;
-const mirrored = (point) => ({ x: documentData.width - 1 - point.x, y: point.y });
+const SYMMETRY_NAMES = { horizontal: '左右対称', vertical: '上下対称', diagonalDown: '右下がりの対角線', diagonalUp: '右上がりの対角線' };
+let symmetry = Object.fromEntries(Object.keys(SYMMETRY_NAMES).map(key => [key, false])); let lineStart = null;
+let showGrid = true; try { showGrid = localStorage.getItem('pixieed:draw:grid') !== 'off'; } catch { /* private mode */ }
+const symmetryButtons = [...document.querySelectorAll('[data-symmetry]')];
+const gridButton = $('#draw-grid-toggle'), onionButton = $('#draw-onion-toggle');
+const settingsPicker = $('#draw-settings-picker'), settingsSummary = $('#draw-settings-summary');
+const symmetryAxes = symmetryButtons.map(button => {
+  const axis = document.createElement('span'); axis.className = `draw-symmetry-axis axis-${button.dataset.symmetry}`; axis.hidden = true;
+  $('.draw-grid').append(axis); scope.add(() => axis.remove()); return axis;
+});
+function setAttributeIfChanged(node, name, value) {
+  const text = String(value); if (node && node.getAttribute(name) !== text) node.setAttribute(name, text);
+}
+function syncDrawingSettings() {
+  const frames = animationSession?.animation?.frames?.length || 0, available = tool !== 'select';
+  symmetryButtons.forEach((button, index) => {
+    const key = button.dataset.symmetry; setAttributeIfChanged(button, 'aria-pressed', symmetry[key]); button.disabled = !available;
+    button.title = available ? button.getAttribute('aria-label') : '範囲移動中は対称描画を使えません';
+    if (!available) button.setAttribute('aria-description', button.title); else button.removeAttribute('aria-description');
+    symmetryAxes[index].hidden = !available || !symmetry[key];
+  });
+  setAttributeIfChanged(gridButton, 'aria-pressed', showGrid); setAttributeIfChanged(onionButton, 'aria-pressed', onion);
+  if (onionButton) { onionButton.disabled = frames < 2 && !onion; onionButton.title = onionButton.disabled ? '2コマ以上あると前後のコマを表示できます' : onionButton.getAttribute('aria-label'); }
+  $('.draw-board')?.classList.toggle('has-symmetry', available && Object.values(symmetry).some(Boolean));
+  $('.draw-board')?.classList.toggle('has-grid', showGrid);
+}
 function markSegment(from, to, value) {
-  const changed = [...strokePixels(documentData, from, to, value, { trusted: true, tracker: strokeTracker })];
-  if (mirror) changed.push(...strokePixels(documentData, mirrored(from), mirrored(to), value, { trusted: true, tracker: strokeTracker }));
+  const changed = [];
+  for (const matrix of symmetryTransforms(symmetry)) changed.push(...strokePixels(documentData, symmetryPoint(from, documentData.width, documentData.height, matrix), symmetryPoint(to, documentData.width, documentData.height, matrix), value, { trusted: true, tracker: strokeTracker }));
   return changed;
 }
 function pickColorAt(point) {
@@ -417,42 +442,103 @@ function pickColorAt(point) {
   chooseColor(value, button); setTool('pen'); toast(value < 0 ? '透明をとりました' : 'この色をとりました');
 }
 function setTool(next) {
-  tool = next;
+  if (!Object.hasOwn(TOOL_NAMES, next)) return;
+  if (drawing) endStroke();
+  if (next !== 'select') clearSelection();
+  tool = next; syncDrawingSettings();
   document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next || (node === penControl && next === 'eraser'))));
   if (penControl) {
     const erasing = next === 'eraser';
     const glyph = erasing ? eraserIcon : penIcon;
-    if (glyph) penControl.replaceChildren(glyph.cloneNode(true));
+    penControl.replaceChildren(glyph.cloneNode(true));
     const label = erasing ? '消しゴム（もう一度押すとペン）' : 'ペン（選択中に押すと消しゴム）';
     penControl.setAttribute('aria-label', label); penControl.title = label;
     penControl.classList.toggle('is-eraser', erasing);
   }
+  const other = next !== 'pen' && next !== 'eraser';
+  if (other) lastOtherTool = next;
+  const summary = $('#draw-tool-summary');
+  if (summary) {
+    summary.querySelector('svg')?.replaceWith(createDrawingToolIcon(lastOtherTool));
+    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = TOOL_NAMES[lastOtherTool];
+    summary.dataset.active = String(other);
+    summary.setAttribute('aria-label', `${TOOL_NAMES[lastOtherTool]}：道具を選ぶ`);
+    summary.title = `${TOOL_NAMES[lastOtherTool]}：道具を選ぶ`;
+  }
   canvas.dataset.tool = next;
+  placeSelection();
 }
-let pendingTap = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
+function markShape(from, to) {
+  if (tool === 'line') return markSegment(from, to, selectedPixelValue());
+  return drawShapePixels(documentData, from, to, selectedPixelValue(), { shape: tool.startsWith('rectangle') ? 'rectangle' : 'ellipse', filled: tool.endsWith('-fill'), symmetry, tracker: strokeTracker });
+}
+function markSpray(from, to) { return sprayPixels(documentData, from, to, selectedPixelValue(), { symmetry, tracker: strokeTracker }); }
+function updateSelection(point) {
+  if (selectionDrag?.mode === 'move') {
+    const { origin, bounds, pixels } = selectionDrag;
+    const dx = Math.max(-bounds.x, Math.min(documentData.width - bounds.x - bounds.width, point.x - origin.x));
+    const dy = Math.max(-bounds.y, Math.min(documentData.height - bounds.y - bounds.height, point.y - origin.y));
+    cancelDrawStroke(documentData, strokeTracker); strokeTracker = beginDrawStroke(documentData, { trusted: true });
+    moveSelectionPixels(documentData, pixels, bounds, dx, dy, { tracker: strokeTracker });
+    selection = { ...bounds, x: bounds.x + dx, y: bounds.y + dy }; paint();
+  } else selection = selectionBounds(lineStart, point, documentData.width, documentData.height);
+  placeSelection();
+}
+let pendingTap = null; let pendingTapPointerId = null; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
 canvas.addEventListener('pointerdown', (event) => {
   if (event.button !== undefined && event.button !== 0 && event.button !== 1) return;
-  event.preventDefault(); canvas.setPointerCapture(event.pointerId);
+  event.preventDefault(); canvas.focus({ preventScroll: true }); canvas.setPointerCapture(event.pointerId);
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
+  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; pendingTapPointerId = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
   // desktop: middle button, or Space held, drags the view
   if (event.button === 1 || spaceHeld) { panDrag = { x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); return; }
   if (activePointers.size > 1) return;
   if (tool !== 'picker' && animationSession.locked) { toast('レイヤーの鍵を外すと描けます。'); return; }
   if (tool !== 'picker' && !canEdit()) return;
-  if (tool !== 'picker' && tool !== 'fill') {
+  if (tool !== 'picker' && tool !== 'fill' && tool !== 'select') {
     const value = selectedPixelValue(); const used = new Set(documentData.pixels);
     if (!used.has(value) && usedColorCount() >= 32) {
       toast('このキャンバスは最大32色です。色を置き換えるか、使わない色を整理してください。');
       return;
     }
   }
-  drawing = true; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
-  if (tool === 'picker' || tool === 'fill') { pendingTap = touchedPoint; drawing = false; previousPoint = null; return; }
+  strokeWasSaved = saved;
+  drawing = true; drawingPointerId = event.pointerId; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
+  if (tool === 'picker' || tool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; drawing = false; drawingPointerId = null; previousPoint = null; return; }
+  if (tool === 'select') {
+    lineStart = touchedPoint;
+    const inside = selection && touchedPoint.x >= selection.x && touchedPoint.x < selection.x + selection.width && touchedPoint.y >= selection.y && touchedPoint.y < selection.y + selection.height;
+    selectionDrag = { mode: inside ? 'move' : 'select', origin: touchedPoint, bounds: selection && { ...selection }, pixels: inside ? [...documentData.pixels] : null };
+    if (inside) strokeTracker = beginDrawStroke(documentData, { trusted: true });
+    else { selection = selectionBounds(touchedPoint, touchedPoint, documentData.width, documentData.height); placeSelection(); }
+    return;
+  }
   strokeTracker = beginDrawStroke(documentData, { trusted: true });
-  if (tool === 'line') { lineStart = touchedPoint; const changed = markSegment(lineStart, touchedPoint, selectedPixelValue()); saved = false; paint(changed); }
-  else { const changed = markSegment(previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
+  if (SHAPE_TOOLS.has(tool)) { lineStart = touchedPoint; const changed = markShape(lineStart, touchedPoint); saved = false; paint(changed); }
+  else { const changed = tool === 'spray' ? markSpray(previousPoint, previousPoint) : markSegment(previousPoint, previousPoint, selectedPixelValue()); saved = false; paint(changed); }
 });
+function applyDrawPoint(point) {
+  if (!drawing || !previousPoint || tool === 'fill' || tool === 'picker') return;
+  if (point.x === previousPoint.x && point.y === previousPoint.y) return;
+  if (tool === 'select') { updateSelection(point); previousPoint = point; return; }
+  if (SHAPE_TOOLS.has(tool)) {
+    cancelDrawStroke(documentData, strokeTracker); strokeTracker = beginDrawStroke(documentData, { trusted: true });
+    markShape(lineStart, point); previousPoint = point; saved = false; paint(); return;
+  }
+  const changed = tool === 'spray' ? markSpray(previousPoint, point) : markSegment(previousPoint, point, selectedPixelValue());
+  previousPoint = point; saved = false; paint(changed);
+}
+function applyPointerMoveSamples(event) {
+  if (!drawing || event.pointerId !== drawingPointerId) return;
+  const coalescedTool = tool === 'pen' || tool === 'eraser' || tool === 'spray';
+  if (coalescedTool && typeof event.getCoalescedEvents === 'function') {
+    let samples = [];
+    try { samples = event.getCoalescedEvents() || []; } catch { samples = []; }
+    for (const sample of samples) applyDrawPoint(pointFromEvent(sample));
+  }
+  // The dispatched event carries the latest point even on engines whose coalesced list omits it.
+  applyDrawPoint(pointFromEvent(event));
+}
 canvas.addEventListener('pointermove', (event) => {
   if (activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (panDrag) { panX = panDrag.panX + event.clientX - panDrag.x; panY = panDrag.panY + event.clientY - panDrag.y; updateCanvasView(); return; }
@@ -465,25 +551,53 @@ canvas.addEventListener('pointermove', (event) => {
     // zoom about the first centre, then follow the fingers as they move together
     zoomAt(target, pinchStart.centerX, pinchStart.centerY, pinchStart); panX += centerX - pinchStart.centerX; panY += centerY - pinchStart.centerY; updateCanvasView(); return;
   }
+  if (drawing && event.pointerId !== drawingPointerId) return;
   showCursor(event);
-  if (!drawing || tool === 'fill' || tool === 'picker') return;
-  const point = pointFromEvent(event); if (point.x === previousPoint.x && point.y === previousPoint.y) return;
-  if (tool === 'line') { cancelDrawStroke(documentData, strokeTracker); strokeTracker = beginDrawStroke(documentData, { trusted: true }); markSegment(lineStart, point, selectedPixelValue()); previousPoint = point; paint(); return; }
-  const changed = markSegment(previousPoint, point, selectedPixelValue()); previousPoint = point; saved = false; paint(changed);
+  const mousePrimaryReleased = drawing && event.pointerId === drawingPointerId
+    && event.pointerType === 'mouse' && typeof event.buttons === 'number' && (event.buttons & 1) === 0;
+  applyPointerMoveSamples(event);
+  if (mousePrimaryReleased && drawing && event.pointerId === drawingPointerId) {
+    if (event.buttons === 0) activePointers.delete(event.pointerId);
+    endStroke(false);
+  }
 });
-function endStroke() {
-  if (drawing && strokeTracker && tool !== 'fill') { commitDrawStroke(documentData, history, strokeTracker); strokeTracker = null; strokeStartPixels = null; paint(); }
-  drawing = false; previousPoint = null; lineStart = null;
+function endStroke(cancel = false) {
+  if (drawing && strokeTracker) {
+    if (cancel) { cancelDrawStroke(documentData, strokeTracker); saved = strokeWasSaved; }
+    else if (commitDrawStroke(documentData, history, strokeTracker)) saved = false;
+    strokeTracker = null; strokeStartPixels = null; paint();
+  }
+  if (cancel && selectionDrag) selection = selectionDrag.bounds;
+  const selected = drawing && tool === 'select' && selectionDrag?.mode === 'select' && !cancel;
+  drawing = false; drawingPointerId = null; previousPoint = null; lineStart = null; selectionDrag = null; placeSelection();
+  if (selected && selection) toast('枠の内側をドラッグして移動します。外側で選び直せます。');
 }
 function applyTap(point) {
   if (tool === 'picker') { pickColorAt(point); return; }
-  commitChange((next) => { const a = [...floodFill(next, point.x, point.y, selectedPixelValue())]; if (mirror) { const m = mirrored(point); a.push(...floodFill(next, m.x, m.y, selectedPixelValue())); } return a; });
+  commitChange((next) => symmetryPoints(point, next.width, next.height, symmetry).flatMap(p => [...floodFill(next, p.x, p.y, selectedPixelValue())]));
 }
 function releasePointer(event) {
+  const ownsMouseStroke = drawing && event.pointerType === 'mouse' && event.pointerId === drawingPointerId;
+  if (event.type === 'lostpointercapture' && ownsMouseStroke && activePointers.has(event.pointerId)) {
+    // A mouse capture loss ends the gesture at its last accepted sample. Do not draw the
+    // capture-loss event's coordinates, which may be outside the canvas or stale.
+    activePointers.delete(event.pointerId);
+    endStroke(false);
+    return;
+  }
+  if (event.type === 'pointerup' && drawing && event.pointerId === drawingPointerId && activePointers.has(event.pointerId)) {
+    applyDrawPoint(pointFromEvent(event));
+  }
   const wasActive = activePointers.delete(event.pointerId);
+  // A late lostpointercapture or a non-owning pointer must not finish a newer gesture.
+  if (!wasActive) return;
   if (panDrag) { if (!activePointers.size) { panDrag = null; canvas.classList.remove('is-panning'); } return; }
-  if (pendingTap && wasActive && event.type === 'pointerup' && !pinchStart && activePointers.size === 0) { const tap = pendingTap; pendingTap = null; applyTap(tap); return; }
-  if (!activePointers.size) pendingTap = null;
+  if (pendingTap && event.pointerId === pendingTapPointerId) {
+    const tap = pendingTap; pendingTap = null; pendingTapPointerId = null;
+    if (event.type === 'pointerup' && !pinchStart && activePointers.size === 0) applyTap(tap);
+    return;
+  }
+  if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; }
   // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
   // still two-finger tap is undo and a three-finger tap is redo
   if (!pinchStart && fingerTap) {
@@ -496,45 +610,116 @@ function releasePointer(event) {
     else if (activePointers.size === 0 && performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); }
     if (activePointers.size >= 2) { startPinch(); Object.assign(pinchStart, { time: gesture.time, fingers: gesture.fingers, moved: gesture.moved }); }
     else if (activePointers.size === 0) { zoom = Math.max(1, zoom); if (zoom === 1) panX = panY = 0; updateCanvasView(); }
-    drawing = false; previousPoint = null; strokeStartPixels = null; return;
+    drawing = false; drawingPointerId = null; previousPoint = null; strokeStartPixels = null; return;
   }
-  endStroke();
+  if (drawing && event.pointerId !== drawingPointerId) return;
+  endStroke(event.type !== 'pointerup');
 }
 canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('pointercancel', releasePointer); canvas.addEventListener('lostpointercapture', releasePointer);
+scope.listen(document, 'pointerup', (event) => { if (event.pointerType === 'mouse') releasePointer(event); });
 
 [16, 32, 64, 128, 256].forEach((size) => { const option = document.createElement('option'); option.value = String(size); option.textContent = `${size}px`; sizeSelect.append(option); });
 sizeSelect.value = String(DRAW_SIZE);
-sizeSelect.addEventListener('change', () => {
-  sizeWasChosen = true;
-  const previousSize = documentData.width; const size = Number(sizeSelect.value);
-  try {
-    const factor = size / Math.max(documentData.width, documentData.height);
-    const next = resizeDrawRectangle(documentData, Math.max(1, Math.round(documentData.width * factor)), Math.max(1, Math.round(documentData.height * factor)));
-    if (!canEdit(next)) { sizeSelect.value = String(previousSize); return; }
-    endStroke(); closeColorEditor(); installAnimationDocument(animationSession.apply(resizeAnimation(animationSession.animation, next.width, next.height))); pxdBridge?.markDirty(); status.textContent = `${next.width}×${next.height}にしました`;
+function resizeCanvas(width, height) {
+  if (![width, height].every(value => Number.isInteger(value) && value >= 1 && value <= 256)) {
+    status.textContent = '幅と高さは1〜256pxの整数で指定してください。'; return false;
   }
-  catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; sizeSelect.value = String(previousSize); }
+  if (width === documentData.width && height === documentData.height) { syncSizeButtons(true); return true; }
+  try {
+    const next = resizeDrawRectangle(documentData, width, height);
+    if (!canEdit(next)) return false;
+    endStroke(); closeColorEditor(); sizeWasChosen = true;
+    installAnimationDocument(animationSession.apply(resizeAnimation(animationSession.animation, width, height, { resample: 'nearest' })));
+    syncSizeButtons(true); pxdBridge?.markDirty(); status.textContent = `${width}×${height}にしました`; return true;
+  } catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; return false; }
+}
+sizeSelect.addEventListener('change', () => {
+  const size = Number(sizeSelect.value), factor = size / Math.max(documentData.width, documentData.height);
+  if (!resizeCanvas(Math.max(1, Math.round(documentData.width * factor)), Math.max(1, Math.round(documentData.height * factor)))) sizeSelect.value = String(Math.max(documentData.width, documentData.height));
 });
 renderPalette();
 document.querySelectorAll('[data-draw-tool]').forEach((button) => button.addEventListener('click', () => {
   const next = button.dataset.drawTool;
   setTool(next === 'pen' && tool === 'pen' ? 'eraser' : next);
+  const chooser = $('#draw-tool-picker'); if (chooser?.contains(button)) { chooser.open = false; $('#draw-tool-summary')?.focus({ preventScroll: true }); toast(`${TOOL_NAMES[next]}を選びました`); }
 }));
-// ---- mirror and grid toggles ----
-const mirrorButton = $('#draw-mirror'); const gridButton = $('#draw-grid-toggle');
-mirrorButton?.addEventListener('click', () => { mirror = !mirror; mirrorButton.setAttribute('aria-pressed', String(mirror)); $('.draw-board')?.classList.toggle('is-mirror', mirror); placeOverlays(); toast(mirror ? '左右対称で描きます' : '左右対称をやめました'); });
-let showGrid = true; try { showGrid = localStorage.getItem('pixieed:draw:grid') !== 'off'; } catch { /* private mode */ }
-function syncGrid() { gridButton?.setAttribute('aria-pressed', String(showGrid)); $('.draw-board')?.classList.toggle('has-grid', showGrid); }
-gridButton?.addEventListener('click', () => { showGrid = !showGrid; try { localStorage.setItem('pixieed:draw:grid', showGrid ? 'on' : 'off'); } catch { /* private mode */ } syncGrid(); });
-syncGrid();
-// ---- size buttons drive the page's own size control ----
-const sizeButtons = [...document.querySelectorAll('[data-draw-size]')];
-function syncSizeButtons() {
-  for (const b of sizeButtons) b.setAttribute('aria-checked', String(Number(b.dataset.drawSize) === documentData.width && documentData.width === documentData.height));
-  const chip = $('#draw-size-chip'); if (chip) chip.textContent = String(documentData.width);
+$('#draw-tool-picker')?.addEventListener('toggle', placeToolMenu);
+// Native toggle is queued; prepare the fixed panel before the opening frame.
+$('#draw-tool-summary')?.addEventListener('click', placeToolMenu);
+scope.listen(window, 'resize', placeToolMenu);
+// ---- drawing settings ----
+symmetryButtons.forEach(button => button.addEventListener('click', () => {
+  if (tool === 'select') return;
+  const key = button.dataset.symmetry; symmetry[key] = !symmetry[key];
+  syncDrawingSettings(); placeOverlays(); hideCursors(); pxdBridge?.markDirty();
+  toast(`${SYMMETRY_NAMES[key]}を${symmetry[key] ? '使います' : '解除しました'}`);
+}));
+gridButton?.addEventListener('click', () => {
+  showGrid = !showGrid; try { localStorage.setItem('pixieed:draw:grid', showGrid ? 'on' : 'off'); } catch { /* private mode */ }
+  syncDrawingSettings();
+});
+onionButton?.addEventListener('click', () => handleAnimationAction({ type: 'onion', enabled: !onion }));
+function placeSettingsPanel() {
+  const panel = $('.draw-settings-panel'), summary = settingsSummary, controls = $('.draw-controls');
+  if (!panel || !summary || !controls) return;
+  const r = summary.getBoundingClientRect(), header = document.querySelector('body > .site-header')?.getBoundingClientRect().bottom || 64;
+  const navigationTop = document.querySelector('.app-tabs')?.getBoundingClientRect().top || innerHeight;
+  const width = Math.min(260, innerWidth - 24), bounds = controls.getBoundingClientRect();
+  const actionsBottom = $('.draw-actions')?.getBoundingClientRect().bottom || r.bottom;
+  const belowAnchor = Math.max(r.bottom, actionsBottom);
+  const above = Math.max(44, r.top - header - 20), below = Math.max(0, navigationTop - belowAnchor - 20);
+  const openBelow = below > above;
+  panel.style.left = `${Math.max(12, Math.min(innerWidth - width - 12, bounds.left + (bounds.width - width) / 2))}px`;
+  panel.style.bottom = openBelow ? 'auto' : `${Math.max(12, innerHeight - r.top + 8)}px`;
+  panel.style.top = openBelow ? `${belowAnchor + 8}px` : 'auto';
+  panel.style.maxHeight = `${Math.min(440, openBelow ? below : above)}px`;
 }
-for (const b of sizeButtons) b.addEventListener('click', () => {
-  $('.draw-import')?.removeAttribute('open'); if (sizeSelect.value === b.dataset.drawSize && documentData.width === Number(b.dataset.drawSize)) return; sizeSelect.value = b.dataset.drawSize; sizeSelect.dispatchEvent(new Event('change')); });
+settingsPicker?.addEventListener('toggle', placeSettingsPanel);
+settingsSummary?.addEventListener('click', placeSettingsPanel);
+scope.listen(window, 'resize', placeSettingsPanel);
+// Keyboard activation of the animation workspace does not produce the outside-pointer event.
+scope.listen($('#draw-animation-controls'), 'click', (event) => {
+  if (!event.target.closest?.('[data-action="toggle-frames"]') || !settingsPicker?.open) return;
+  settingsPicker.open = false;
+});
+syncDrawingSettings(); setTool(tool);
+// Canvas settings keep the current picture until a valid size is applied.
+const sizeButtons = [...document.querySelectorAll('[data-draw-size]')];
+const widthInput = $('#draw-canvas-width'), heightInput = $('#draw-canvas-height'), ratioInput = $('#draw-canvas-ratio');
+const sizeForm = $('#draw-canvas-form'), sizeApply = $('#draw-canvas-apply');
+const canvasPicker = $('.draw-import'); let sizeInputDimensions = '';
+const canvasSettingsPanel = mountDrawCanvasPanel({ scope, picker: canvasPicker, summary: canvasPicker.querySelector('summary'), panel: $('.draw-canvas-panel') });
+function syncSizeButtons(resetInputs = false) {
+  const width = readOnlyImage?.width ?? documentData.width, height = readOnlyImage?.height ?? documentData.height;
+  for (const button of sizeButtons) { button.setAttribute('aria-checked', String(Number(button.dataset.drawSize) === Math.max(width, height))); button.disabled = Boolean(readOnlyImage); }
+  const chip = $('#draw-size-chip'); if (chip) chip.textContent = String(Math.max(width, height));
+  const dimensions = `${width}×${height}`; $('#draw-canvas-dimensions').textContent = `${dimensions} px`;
+  if (resetInputs || sizeInputDimensions !== dimensions) {
+    widthInput.value = String(width); heightInput.value = String(height); sizeInputDimensions = dimensions;
+  }
+  widthInput.disabled = heightInput.disabled = ratioInput.disabled = Boolean(readOnlyImage);
+  sizeApply.disabled = Boolean(readOnlyImage);
+}
+function syncDimensionRatio(event) {
+  if (!ratioInput.checked) return;
+  const sourceInput = event.target, counterpart = sourceInput === widthInput ? heightInput : widthInput;
+  const value = Number(sourceInput.value); if (!sourceInput.value || !Number.isInteger(value) || value < 1 || value > 256) return;
+  const ratio = sourceInput === widthInput ? documentData.height / documentData.width : documentData.width / documentData.height;
+  let other = Math.max(1, Math.round(value * ratio));
+  if (other > 256) { other = 256; sourceInput.value = String(Math.max(1, Math.round(other / ratio))); }
+  counterpart.value = String(other);
+}
+scope.listen(widthInput, 'input', syncDimensionRatio); scope.listen(heightInput, 'input', syncDimensionRatio);
+scope.listen(ratioInput, 'change', () => { if (ratioInput.checked) syncDimensionRatio({ target: widthInput }); });
+scope.listen(sizeForm, 'submit', event => {
+  event.preventDefault(); if (!sizeForm.reportValidity()) return;
+  resizeCanvas(Number(widthInput.value), Number(heightInput.value)); canvasSettingsPanel.position();
+});
+scope.listen(canvasPicker, 'toggle', () => { if (canvasPicker.open) syncSizeButtons(true); });
+for (const button of sizeButtons) scope.listen(button, 'click', () => {
+  sizeSelect.value = button.dataset.drawSize; sizeSelect.dispatchEvent(new Event('change')); canvasSettingsPanel.position();
+});
+syncSizeButtons(true);
 function afterHistoryStep() {
   saved = false; const step = history.lastStep;
   if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
@@ -556,8 +741,10 @@ scope.listen(window, 'keydown', (event) => {
   if (mod && key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return; }
   if (mod && key === 'y') { event.preventDefault(); redo(); return; }
   if (mod) return;
+  if (key === 'escape') { if (drawing) endStroke(true); clearSelection(); return; }
+  if (key === 'enter' && tool === 'select' && event.target === canvas) { clearSelection(); return; }
   if (key === ' ') { if (!spaceHeld && document.activeElement === canvas) event.preventDefault(); spaceHeld = true; canvas.classList.add('is-grab'); return; }
-  const tools = { b: 'pen', p: 'pen', e: 'eraser', g: 'fill', l: 'line', i: 'picker' };
+  const tools = { b: 'pen', p: 'pen', e: 'eraser', g: 'fill', l: 'line', i: 'picker', r: event.shiftKey ? 'rectangle-fill' : 'rectangle', o: event.shiftKey ? 'ellipse-fill' : 'ellipse', a: 'spray', v: 'select' };
   if (tools[key]) { setTool(tools[key]); return; }
   if (key === 'm') { $('#draw-mirror')?.click(); return; }
   if (key === '0') { resetView(); return; }
@@ -827,18 +1014,12 @@ async function exportAnimation() {
   } catch (error) { if (!scope.disposed && error.name !== 'AbortError') toast(`GIFを書き出せませんでした：${error.message}`); }
   finally { if (animationExportController === controller) animationExportController = null; animationExporting = false; }
 }
-// the ⋯ sheet closes when you touch anything else (the PXD panel opened from it counts as inside)
-scope.listen(document, 'pointerdown', (event) => {
-  const sheet = $('.draw-import'); if (!sheet?.open) return;
-  if (sheet.contains(event.target) || event.target.closest?.('#pxd-panel, .pxd-conversion')) return;
-  sheet.removeAttribute('open');
-});
 $('#draw-timelapse-detail').addEventListener('click', () => exportTimelapse(true));
 
 pxdBridge = mountWorkspace({
   tool: 'draw',
   projectWorkspace: true,
-  getEditorState: () => ({ selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror, showGrid, imageRole: pxdImageRole, frameId: animationSession.frameId, layerId: animationSession.layerId, onion }),
+  getEditorState: () => ({ selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror: symmetry.horizontal, symmetry: { ...symmetry }, showGrid, imageRole: pxdImageRole, frameId: animationSession.frameId, layerId: animationSession.layerId, onion }),
   restoreEditorState(state) {
     if (state?.imageRole && state.imageRole !== pxdImageRole) state = {};
     if (!readOnlyImage) {
@@ -847,11 +1028,12 @@ pxdBridge = mountWorkspace({
     }
     selectedColor = Number.isInteger(state?.selectedColor) && state.selectedColor >= -1 && state.selectedColor < documentData.palette.length ? state.selectedColor : Math.min(2, documentData.palette.length - 1);
     if (state?.selectedHex && documentData.palette.includes(state.selectedHex)) selectedColor = documentData.palette.indexOf(state.selectedHex);
-    setTool(['pen', 'eraser', 'fill', 'picker', 'line'].includes(state?.tool) ? state.tool : 'pen');
+    setTool(Object.hasOwn(TOOL_NAMES, state?.tool) ? state.tool : 'pen');
     zoom = Number.isFinite(state?.zoom) ? Math.max(1, Math.min(ZOOM_MAX, state.zoom)) : 1;
     panX = Number.isFinite(state?.panX) ? state.panX : 0; panY = Number.isFinite(state?.panY) ? state.panY : 0;
-    mirror = state?.mirror === true; mirrorButton?.setAttribute('aria-pressed', String(mirror)); $('.draw-board')?.classList.toggle('is-mirror', mirror);
-    showGrid = state?.showGrid !== false; syncGrid(); renderPalette(); paint(); updateCanvasView(); animationControls?.refresh();
+    symmetry = Object.fromEntries(Object.keys(SYMMETRY_NAMES).map(key => [key, state?.symmetry ? state.symmetry[key] === true : key === 'horizontal' && state?.mirror === true]));
+    if (typeof state?.showGrid === 'boolean') showGrid = state.showGrid;
+    renderPalette(); paint(); updateCanvasView(); syncDrawingSettings(); animationControls?.refresh();
   },
   hasContent: () => Boolean(pxdBridge?.currentProject || pxdBridge?.heldProject || activeDraftId || documentData.pixels.some((pixel) => pixel >= 0)),
   setStatus: (message) => { status.textContent = message; },
@@ -909,8 +1091,8 @@ function disposeDrawMode() {
   activeTimelapseJob?.controller.abort();
   animationExportController?.abort();
   clearToastTimer();
-  stopAnimation(); animationControls?.dispose(); if (drawing) endStroke();
-  activePointers.clear(); pendingTap = null; pinchStart = null; panDrag = null; fingerTap = null;
+  stopAnimation(); animationControls?.dispose(); if (drawing) endStroke(); clearSelection();
+  activePointers.clear(); pendingTap = null; pendingTapPointerId = null; drawingPointerId = null; pinchStart = null; panDrag = null; fingerTap = null;
   strokeStartPixels = null; drawing = false; previousPoint = null;
   canvas.classList.remove('is-grab', 'is-panning');
   closeColorEditor();

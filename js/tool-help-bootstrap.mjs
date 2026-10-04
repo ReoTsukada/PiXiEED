@@ -1,5 +1,5 @@
-import { isToolsHubPath, mountToolHelp } from './tool-help.mjs?rev=20261003-tool-help-3';
-import { getToolGuide } from './tool-help-data.mjs?rev=20261003-tool-help-1';
+import { isToolsHubPath, mountToolHelp } from './tool-help.mjs?rev=20261004-audio-frames-1';
+import { getToolGuide } from './tool-help-data.mjs?rev=20261004-audio-frames-1';
 
 /** Attach help after the existing shared header mounts, without loading a second header. */
 export function installToolHelp({ document = globalThis.document, window = globalThis.window } = {}) {

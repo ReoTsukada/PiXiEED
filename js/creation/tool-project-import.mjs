@@ -22,6 +22,11 @@ export async function importToolProject(source, tool) {
     const plan = prepareSharedAudioImageImport(createAudioSong({ songId: crypto.randomUUID() }), image);
     project = await writePxdAudioState(project, plan.song, { image: plan.image, link: plan.link });
     project = await replaceProjectComponentImage(project, 'audio', image);
+    const sourceFrameId = source.manifest?.editorState?.draw?.frameId;
+    const audioAnimation = sourceFrameId ? await readPxdAnimation(project, 'audio') : null;
+    if (audioAnimation?.frames.some(frame => frame.id === sourceFrameId)) {
+      project.manifest.editorState = { ...project.manifest.editorState, audio: { ...project.manifest.editorState?.audio, frameId: sourceFrameId } };
+    }
   } else if (tool === 'draw') {
     const animation = await readPxdAnimation(source, role);
     if (animation) project = await writePxdAnimation(project, animation, { role: 'main', posterFrameId: animation.frames[0].id });
