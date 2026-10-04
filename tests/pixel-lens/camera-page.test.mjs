@@ -46,3 +46,14 @@ test('the existing five navigation destinations and central shutter are retained
   assert.match(nav, /class="pc-nav-shutter"/);
   assert.match(nav, /長押しでGIF/);
 });
+
+
+test('camera gestures use immediate tap palette refresh and hold-to-merge without double tap', () => {
+  const html = read('pixel-camera.html');
+  const app = read('js/pixel-lens/app.mjs');
+  assert.match(html, /タップで色を選び直してピント合わせを要求/);
+  assert.match(html, /長押しでその位置の色をライブ統合/);
+  assert.doesNotMatch(html, /ダブルタップでその位置の色をライブ統合/);
+  assert.match(app, /doubleTapEnabled: false,[\s\S]*?onTap: \(event\) => \{[\s\S]*?refreshObjects\(\);[\s\S]*?requestCameraFocusAt\(event\.clientX, event\.clientY, \{ silent: true \}\)/);
+  assert.match(app, /onLongPress: \(event\) => \{[\s\S]*?beginRegionMerge\(event\.clientX, event\.clientY\)/);
+});

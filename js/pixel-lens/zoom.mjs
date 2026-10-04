@@ -167,8 +167,8 @@ export function createCameraZoomController({ onChange = () => {} } = {}) {
 
 /**
  * Attach pinch / wheel / tap / hold / swipe handling to `element`.
- * `set(value, { gesture })` receives the new zoom; `onTap()` fires for a single tap that was not part of a
- * double tap, pinch or swipe (the caller uses it to re-pick colours). A one-finger flick calls
+ * `set(value, { gesture })` receives the new zoom; `onTap(event)` receives a single tap that was not part of a
+ * double tap, pinch or swipe. Set `doubleTapEnabled: false` for immediate taps with no double-tap zoom reset. A one-finger flick calls
  * `onSwipe('left'|'right'|'up'|'down')`; `onDrag(dx, dy)` follows the finger meanwhile (and `onDrag(0, 0)`
  * on release) so the view can lean with it.
  */
@@ -187,7 +187,7 @@ export function swipeDirection(dx, dy, ms) {
 export const DOUBLE_TAP_MAX_DISTANCE = 48;
 export const DOUBLE_TAP_DELAY_MS = 300;
 
-export function attachZoomGestures(element, { get, set, onTap = null, onDoubleTap = null, onGesture = null, onSwipe = null, onDrag = null, onLongPress = null, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id), doubleTapDistance = DOUBLE_TAP_MAX_DISTANCE } = {}) {
+export function attachZoomGestures(element, { get, set, onTap = null, onDoubleTap = null, onGesture = null, onSwipe = null, onDrag = null, onLongPress = null, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id), doubleTapDistance = DOUBLE_TAP_MAX_DISTANCE, doubleTapEnabled = true } = {}) {
   const pointers = new Map();
   let pinch = null;
   let gesture = null;
@@ -199,12 +199,12 @@ export function attachZoomGestures(element, { get, set, onTap = null, onDoubleTa
   const clearPendingTap = () => { clearTapTimer(); pendingTap = null; };
   const distance = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
   const closeTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) <= doubleTapDistance;
-  const scheduleTap = (point, time) => {
-    pendingTap = { ...point, time };
+  const scheduleTap = (point, time, event) => {
+    pendingTap = { ...point, time, event };
     clearTapTimer();
     tapTimer = setTimer(() => {
       tapTimer = 0;
-      if (pendingTap?.time === time) { pendingTap = null; onTap?.(); }
+      if (pendingTap?.time === time) { const tap = pendingTap; pendingTap = null; onTap?.(tap.event); }
     }, DOUBLE_TAP_DELAY_MS);
   };
   element.addEventListener('pointerdown', (event) => {
@@ -214,9 +214,9 @@ export function attachZoomGestures(element, { get, set, onTap = null, onDoubleTa
     pointers.set(event.pointerId, { ...point, x0: point.x, y0: point.y });
     try { element.setPointerCapture(event.pointerId); } catch { /* not capturable */ }
     if (pointers.size === 1) {
-      const isDoubleCandidate = Boolean(pendingTap && time - pendingTap.time <= DOUBLE_TAP_DELAY_MS && closeTo(point, pendingTap));
+      const isDoubleCandidate = Boolean(doubleTapEnabled && pendingTap && time - pendingTap.time <= DOUBLE_TAP_DELAY_MS && closeTo(point, pendingTap));
       if (isDoubleCandidate) clearTapTimer();
-      else if (pendingTap) { clearPendingTap(); onTap?.(); }
+      else if (pendingTap) { const priorTap = pendingTap; clearPendingTap(); onTap?.(priorTap.event); }
       gesture = { pointerId: event.pointerId, x0: point.x, y0: point.y, started: time, moved: false, pinched: false, canceled: false, holdFired: false, doubleCandidate: isDoubleCandidate };
       clearHold();
       if (onLongPress) holdTimer = setTimer(() => {
@@ -269,13 +269,16 @@ export function attachZoomGestures(element, { get, set, onTap = null, onDoubleTa
       }
       const duration = now() - endedGesture.started;
       const tapEligible = !endedGesture.moved && !endedGesture.pinched && !endedGesture.canceled && !endedGesture.holdFired && duration < 350;
-      if (tapEligible && endedGesture.doubleCandidate && pendingTap && now() - pendingTap.time <= DOUBLE_TAP_DELAY_MS && closeTo(point, pendingTap)) {
+      if (tapEligible && !doubleTapEnabled) {
+        clearPendingTap();
+        onTap?.(event);
+      } else if (tapEligible && endedGesture.doubleCandidate && pendingTap && now() - pendingTap.time <= DOUBLE_TAP_DELAY_MS && closeTo(point, pendingTap)) {
         clearPendingTap();
         if (onDoubleTap) onDoubleTap(event);
         else set(1, { gesture: 'double-tap' });
       } else if (tapEligible) {
-        if (endedGesture.doubleCandidate && pendingTap) { clearPendingTap(); onTap?.(); }
-        scheduleTap(point, now());
+        if (endedGesture.doubleCandidate && pendingTap) { const priorTap = pendingTap; clearPendingTap(); onTap?.(priorTap.event); }
+        scheduleTap(point, now(), event);
       } else {
         clearPendingTap();
       }

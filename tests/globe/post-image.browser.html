@@ -11,24 +11,46 @@ import { inspectPixelImage } from '../../js/globe/post-image.mjs';
 import { verifyPixelPngClaim } from '../../supabase/functions/_shared/pixel-png.mjs';
 const output = document.querySelector('#result');
 try {
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#234567'; ctx.fillRect(0, 0, 8, 16);
-  ctx.fillStyle = '#dc8420'; ctx.fillRect(8, 0, 8, 16);
   const results = [];
-  for (const type of ['image/png', 'image/webp']) {
+  async function makeImage(width, height, colorFn, type = 'image/png') {
+    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      ctx.fillStyle = colorFn(x, y); ctx.fillRect(x, y, 1, 1);
+    }
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, type));
+    canvas.width = canvas.height = 1;
+    return blob;
+  }
+  for (const type of ['image/png', 'image/webp']) {
+    const blob = await makeImage(16, 16, (x) => x < 8 ? '#234567' : '#dc8420', type);
     if (!blob || blob.type !== type) throw new Error(`${type} を作れません`);
-    const checked = await inspectPixelImage(new File([blob], `input.${type === 'image/png' ? 'png' : 'webp'}`, { type }));
+    const checked = await inspectPixelImage(new File([blob], `input.${type === 'image/png' ? 'png' : 'webp'}`, { type }), { keepScale: true });
     if (checked.mimeType !== 'image/png' || checked.width !== 16 || checked.height !== 16 || checked.colorCount > 128 || checked.size > 512 * 1024) throw new Error(`${type} の検証結果が違います: ${JSON.stringify({mimeType:checked.mimeType,width:checked.width,height:checked.height,colorCount:checked.colorCount,size:checked.size})}`);
     const binary = atob(checked.dataUrl.split(',')[1]);
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
     await verifyPixelPngClaim(bytes, checked);
     results.push(`${type}→PNG ${checked.colorCount}色 ${checked.width}×${checked.height}px`);
   }
-  ctx.clearRect(0, 0, 2, 2);
-  ctx.fillStyle = 'rgba(10, 230, 90, .5)'; ctx.fillRect(4, 4, 3, 3);
-  const alphaBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  for (const [width, height] of [[1,1], [256,1], [1,256], [256,64], [64,256], [255,17], [16,16]]) {
+    const blob = await makeImage(width, height, (x, y) => (x + y) % 2 ? '#dc8420' : '#234567');
+    const checked = await inspectPixelImage(new File([blob], 'dimensions.png', { type: 'image/png' }), { keepScale: true });
+    if (checked.width !== width || checked.height !== height) throw new Error(`寸法 ${width}×${height}px が保持されません: ${checked.width}×${checked.height}px`);
+    const bytes = Uint8Array.from(atob(checked.dataUrl.split(',')[1]), (character) => character.charCodeAt(0));
+    await verifyPixelPngClaim(bytes, checked);
+    results.push(`${width}×${height}px`);
+  }
+  const tooWide = await makeImage(257, 1, () => '#234567');
+  try {
+    await inspectPixelImage(new File([tooWide], 'too-wide.png', { type: 'image/png' }), { keepScale: true });
+    throw new Error('257pxの長辺が拒否されません');
+  } catch (error) { if (!/長辺/.test(error.message)) throw error; }
+  const tooManyColors = await makeImage(129, 1, (x) => `rgb(${x},${(x >> 1) & 255},${(x * 7) & 255})`);
+  try {
+    await inspectPixelImage(new File([tooManyColors], 'too-many-colors.png', { type: 'image/png' }), { keepScale: true });
+    throw new Error('129色が拒否されません');
+  } catch (error) { if (!/色数/.test(error.message)) throw error; }
+  const alphaBlob = await makeImage(16, 16, (x, y) => x >= 4 && x < 7 && y >= 4 && y < 7 ? 'rgba(10, 230, 90, .5)' : 'rgba(0,0,0,0)');
   const alphaChecked = await inspectPixelImage(new File([alphaBlob], 'alpha.png', { type: 'image/png' }));
   if (!alphaChecked.hasTransparency) throw new Error('透明色を検出できません');
   const alphaBytes = Uint8Array.from(atob(alphaChecked.dataUrl.split(',')[1]), (character) => character.charCodeAt(0));

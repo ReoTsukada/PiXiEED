@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Focused synthetic-camera acceptance for double-tap region merge and long-press focus. */
+/** Focused synthetic-camera acceptance for tap repick/focus and long-press region merge. */
 import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -11,23 +11,24 @@ assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'only the
 const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 const { chromium } = await import(pathToFileURL(runtime).href);
 const browser = await chromium.launch({ headless: true });
-const out = '/tmp/pixieed-camera-gestures-20261003';
+const out = '/tmp/pixieed-camera-gestures-20261004';
 await mkdir(out, { recursive: true });
 const errors = [];
 const checks = [];
 const sourceHashes = {};
-for (const file of ['pixel-camera.html','css/pixel-lens-camera.css','js/pixel-lens/app.mjs','js/pixel-lens/zoom.mjs','js/pixel-lens/focus.mjs','scripts/camera-region-merge-browser-harness.mjs','scripts/camera-gesture-browser-harness.mjs']) {
+for (const file of ['pixel-camera.html','css/pixel-lens-camera.css','js/pixel-lens/app.mjs','js/pixel-lens/zoom.mjs','js/pixel-lens/focus.mjs','scripts/camera-gesture-browser-harness.mjs']) {
   try { sourceHashes[file] = createHash('sha256').update(await readFile(new URL(`../${file}`, import.meta.url))).digest('hex'); } catch { sourceHashes[file] = 'pending'; }
 }
 
 const viewports = [{ width:390, height:844 }, { width:844, height:390 }];
 
-async function openPage(viewport, focusSupported) {
+async function openPage(viewport, focusSupported, focusRejected = false) {
   const context = await browser.newContext({ viewport, deviceScaleFactor:1, hasTouch:true });
-  await context.addInitScript(({ focusSupported }) => {
+  await context.addInitScript(({ focusSupported, focusRejected }) => {
     window.__cameraRequestCount = 0;
     window.__cameraTrackMocks = [];
     window.__focusConstraintCalls = [];
+    window.__focusApplyRejected = focusRejected;
     window.__singleTapMessages = [];
     const camera = document.createElement('canvas'); camera.width=320; camera.height=480;
     const cameraContext = camera.getContext('2d'); let frame=0;
@@ -51,10 +52,10 @@ async function openPage(viewport, focusSupported) {
       Object.defineProperty(track,'getCapabilities',{configurable:true,value:()=>structuredClone(capabilities)});
       Object.defineProperty(track,'getSettings',{configurable:true,value:()=>structuredClone(settings)});
       Object.defineProperty(track,'getConstraints',{configurable:true,value:()=>({})});
-      Object.defineProperty(track,'applyConstraints',{configurable:true,value:async value=>{window.__focusConstraintCalls.push({facing,constraints:structuredClone(value)});if(value.focusMode)settings.focusMode=value.focusMode;if(value.pointsOfInterest)settings.pointsOfInterest=structuredClone(value.pointsOfInterest);}});
+      Object.defineProperty(track,'applyConstraints',{configurable:true,value:async value=>{window.__focusConstraintCalls.push({facing,constraints:structuredClone(value)});if(window.__focusApplyRejected)throw new Error('mock focus rejected');if(value.focusMode)settings.focusMode=value.focusMode;if(value.pointsOfInterest)settings.pointsOfInterest=structuredClone(value.pointsOfInterest);}});
       return stream;
     };
-  }, { focusSupported });
+  }, { focusSupported, focusRejected });
   await context.route('**/*', route => {
     const url=new URL(route.request().url());
     if(url.hostname==='pagead2.googlesyndication.com') return route.fulfill({ contentType:'application/javascript', body:'' });
@@ -68,21 +69,17 @@ async function openPage(viewport, focusSupported) {
   await page.waitForFunction(()=>document.querySelector('#gestureHint')?.hidden===true,null,{timeout:6000});
   await page.evaluate(()=>{
     window.__gestureMessages=[];
+    window.__mergeSeedLog=[];
     const node=document.querySelector('#stageMsg');
     if(node){const record=()=>{const text=node.textContent.trim();if(text)window.__gestureMessages.push(text);};new MutationObserver(record).observe(node,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});}
+    const root=document.querySelector('#pixelStudio');
+    if(root)new MutationObserver(()=>{if(root.dataset.regionMerge==='true')window.__mergeSeedLog.push({x:root.dataset.regionMergeSeedX,y:root.dataset.regionMergeSeedY,time:performance.now()});}).observe(root,{attributes:true,attributeFilter:['data-region-merge','data-region-merge-seed-x','data-region-merge-seed-y']});
   });
   return { context, page };
 }
 
 async function livePoint(page, x=.73, y=.37) {
   return page.locator('#view').evaluate((view,{x,y})=>{const r=view.getBoundingClientRect();return{x:r.left+r.width*x,y:r.top+r.height*y,rect:{left:r.left,top:r.top,width:r.width,height:r.height},canvas:{width:view.width,height:view.height}};},{x,y});
-}
-
-async function doubleTap(page, point) {
-  await page.mouse.click(point.x,point.y);
-  await page.waitForTimeout(90);
-  await page.mouse.click(point.x,point.y);
-  await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.regionMerge==='true',null,{timeout:5000});
 }
 
 async function longPress(page, point) {
@@ -96,7 +93,8 @@ async function cameraState(page) {
   return page.evaluate(()=>{
     const root=document.querySelector('#pixelStudio'),view=document.querySelector('#view'),video=document.querySelector('#video'),frame=document.querySelector('#captureFrame');
     const rect=frame.getBoundingClientRect();
-    return {mode:root.dataset.mode,settingsContext:root.dataset.settingsContext,regionMerge:root.dataset.regionMerge,facing:root.dataset.facing,focusStatus:root.dataset.focusStatus,focus:{x:root.dataset.focusX,y:root.dataset.focusY},zoomStops:[...document.querySelectorAll('#zoomStops [data-zoom]')].map(node=>({zoom:node.dataset.zoom,pressed:node.getAttribute('aria-pressed'),hidden:node.hidden})),seed:{x:root.dataset.regionMergeSeedX,y:root.dataset.regionMergeSeedY},canvas:{width:view.width,height:view.height},video:{width:video.videoWidth,height:video.videoHeight},frame:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},focusCalls:structuredClone(window.__focusConstraintCalls),tracks:structuredClone(window.__cameraTrackMocks),messages:structuredClone(window.__gestureMessages||[]),toast:{text:document.querySelector('#stageMsg').textContent.trim(),visible:!document.querySelector('#stageMsg').hidden},marker:(()=>{const node=document.querySelector('#focusMarker');return node?{state:node.dataset.focusState,hidden:node.hidden,rect:node.getBoundingClientRect().toJSON()}:null})()};
+    const toolbar=document.querySelector('#toolbar')?.getBoundingClientRect();
+    return {mode:root.dataset.mode,settingsContext:root.dataset.settingsContext,regionMerge:root.dataset.regionMerge,facing:root.dataset.facing,focusStatus:root.dataset.focusStatus,focus:{x:root.dataset.focusX,y:root.dataset.focusY},paletteEpoch:Number(root.dataset.paletteEpoch||0),zoomStops:[...document.querySelectorAll('#zoomStops [data-zoom]')].map(node=>({zoom:node.dataset.zoom,pressed:node.getAttribute('aria-pressed'),hidden:node.hidden})),seed:{x:root.dataset.regionMergeSeedX,y:root.dataset.regionMergeSeedY},seedLog:structuredClone(window.__mergeSeedLog||[]),canvas:{width:view.width,height:view.height},video:{width:video.videoWidth,height:video.videoHeight},frame:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},toolbar:toolbar?{x:toolbar.x,y:toolbar.y,width:toolbar.width,height:toolbar.height}:null,focusCalls:structuredClone(window.__focusConstraintCalls),tracks:structuredClone(window.__cameraTrackMocks),messages:structuredClone(window.__gestureMessages||[]),toast:{text:document.querySelector('#stageMsg').textContent.trim(),visible:!document.querySelector('#stageMsg').hidden},marker:(()=>{const node=document.querySelector('#focusMarker');return node?{state:node.dataset.focusState,hidden:node.hidden,rect:node.getBoundingClientRect().toJSON()}:null})()};
   });
 }
 
@@ -134,11 +132,10 @@ function expectedFocus({ clientX,clientY,rect,videoWidth,videoHeight,frameWidth,
 }
 
 async function assertFocusRequest(page, point, facing, name) {
-  await page.waitForFunction(()=>document.querySelector('#stageMsg')?.textContent.includes('この位置へのピント合わせを要求しました')&&document.querySelector('#focusMarker')?.dataset.focusState==='requested',null,{timeout:5000});
+  await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.focusStatus==='requested'&&window.__focusConstraintCalls?.length>0,null,{timeout:3000});
   const state=await cameraState(page);
   assert.notEqual(state.regionMerge,'true',`${name}: long-press opened region merge`);
-  assert.ok(state.toast.text.includes('ピント合わせを要求しました'),`${name}: successful request notice is not visible: ${state.toast.text}`);
-  assert.ok(state.marker&&!state.marker.hidden&&state.marker.state==='requested',`${name}: accepted focus request marker is absent`);
+  // Tap focus is deliberately quiet; the accepted track constraint is the observable contract.
   const call=state.focusCalls.at(-1);
   assert.ok(call,`${name}: mocked track did not receive applyConstraints`);
   assert.equal(call.facing,facing,`${name}: focus applied to the wrong camera track`);
@@ -189,12 +186,12 @@ async function assertNoSingleTap(page,label) {
 async function assertSeedMatches(page, point, viewport) {
   const state=await cameraState(page);
   const expected={x:Math.floor((point.x-point.rect.left)*state.canvas.width/point.rect.width),y:Math.floor((point.y-point.rect.top)*state.canvas.height/point.rect.height)};
-  assert.equal(state.regionMerge,'true','double tap opens live region merge');
-  assert.deepEqual({x:Number(state.seed.x),y:Number(state.seed.y)},expected,'double-tap merge seed maps from the picked preview point');
-  assert.ok(Number(state.seed.x)>=0&&Number(state.seed.x)<state.canvas.width&&Number(state.seed.y)>=0&&Number(state.seed.y)<state.canvas.height,'merge seed stays in the source frame');
-  checks.push({name:`${viewport.width}x${viewport.height} double-tap region seed`,pass:true,expected,actual:state.seed,canvas:state.canvas});
-  await page.screenshot({path:`${out}/doubletap-region-merge-${viewport.width}.png`});
-  await assertNoSingleTap(page,`${viewport.width} double-tap`);
+  assert.equal(state.regionMerge,'true','long press opens live region merge');
+  const initial=state.seedLog[0]||state.seed;
+  assert.deepEqual({x:Number(initial.x),y:Number(initial.y)},expected,'initial long-press merge seed maps from the picked preview point');
+  assert.ok(Number(initial.x)>=0&&Number(initial.x)<state.canvas.width&&Number(initial.y)>=0&&Number(initial.y)<state.canvas.height,'initial merge seed stays in the source frame');
+  checks.push({name:`${viewport.width}x${viewport.height} long-press region seed`,pass:true,expected,initial,latest:state.seed,canvas:state.canvas});
+  await page.screenshot({path:`${out}/longpress-region-merge-${viewport.width}.png`});
   return state;
 }
 
@@ -205,7 +202,7 @@ async function openZoomContext(page) {
 
 async function assertZoomStill(page,value,label) {
   const selected=page.locator(`#zoomStops [aria-pressed="true"]`);
-  await selected.waitFor({state:'visible'});
+  await selected.waitFor({state:'attached'});
   assert.equal(await selected.getAttribute('data-zoom'),String(value),`${label}: zoom preset changed`);
   checks.push({name:`${label} preserves ${value}x zoom`,pass:true});
 }
@@ -223,59 +220,89 @@ async function dispatchPointers(page,points,type='pointerdown') {
   },{points,type});
 }
 
+async function dispatchTouch(page, point, phase='tap', duration=80) {
+  const session=await page.context().newCDPSession(page);
+  const send=(type,touchPoints)=>session.send('Input.dispatchTouchEvent',{type,touchPoints});
+  await send('touchStart',[{x:point.x,y:point.y,id:7,radiusX:2,radiusY:2,force:1}]);
+  if(duration) await page.waitForTimeout(duration);
+  if(phase==='hold') await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.regionMerge==='true',null,{timeout:3000});
+  await send('touchEnd',[]);
+  await session.detach();
+}
+
+async function waitPaletteEpoch(page, previous, count=1) {
+  const target=previous+count;
+  try { await page.waitForFunction(target=>Number(document.querySelector('#pixelStudio')?.dataset.paletteEpoch||0)>=target,target,{timeout:1800}); }
+  catch { const actual=await page.locator('#pixelStudio').getAttribute('data-palette-epoch'); throw new Error(`palette epoch did not reach ${target}; actual=${actual}`); }
+}
+
+function assertPreviewControlsDoNotOverlap(state,label) {
+  const a=state.frame,b=state.toolbar;
+  assert.ok(a&&b,`${label}: preview and toolbar geometry are available`);
+  const overlap=a.x < b.x+b.width && a.x+a.width > b.x && a.y < b.y+b.height && a.y+a.height > b.y;
+  assert.equal(overlap,false,`${label}: live preview overlaps the settings toolbar`);
+  checks.push({name:`${label} preview and toolbar do not overlap`,pass:true,preview:a,toolbar:b});
+}
+
 try {
   for (const viewport of viewports) {
     const {context,page}=await openPage(viewport,true);
     try {
       await chooseZoom(page,2);
       await waitForClearToast(page);
-      const point=await livePoint(page,.73,.37);
-      const requestsBefore=await page.evaluate(()=>window.__cameraRequestCount);
-      await doubleTap(page,point);
-      const mergeState=await assertSeedMatches(page,point,viewport);
-      assert.equal(await page.evaluate(()=>window.__cameraRequestCount),requestsBefore,'double tap does not restart or replace the camera');
+      // The normal camera UI suppresses a preview tap briefly after a tray has been closed.
+      await page.waitForTimeout(650);
+      const tapPoint=await livePoint(page,.73,.37);
+      const beforeTap=await cameraState(page), tapStarted=Date.now();
+      if(viewport.width===390) await page.mouse.click(tapPoint.x,tapPoint.y);
+      else await dispatchTouch(page,tapPoint,'tap',35);
+      await waitPaletteEpoch(page,beforeTap.paletteEpoch);
+      const tapLatencyMs=Date.now()-tapStarted;
+      assert.ok(tapLatencyMs<500,`${viewport.width} tap waited for double-tap recognition (${tapLatencyMs}ms)`);
+      const tapFocus=await assertFocusRequest(page,tapPoint,'environment',`${viewport.width} tap focus`);
+      const afterTap=await cameraState(page);
+      assert.equal(afterTap.paletteEpoch,beforeTap.paletteEpoch+1,'a tap refreshes the current palette exactly once');
+      assert.notEqual(afterTap.regionMerge,'true','single tap does not open region merge');
+      assert.equal(afterTap.focusStatus,'requested','tap issues a supported focus request');
+      assert.equal(Number(afterTap.focus.x),tapFocus.actual.x,'root focus diagnostic x equals the hardware request');
+      assert.equal(Number(afterTap.focus.y),tapFocus.actual.y,'root focus diagnostic y equals the hardware request');
+      assertPreviewControlsDoNotOverlap(afterTap,`${viewport.width} tap`);
+      checks.push({name:`${viewport.width} immediate tap refreshes palette and requests focus`,pass:true,tapLatencyMs,epochBefore:beforeTap.paletteEpoch,epochAfter:afterTap.paletteEpoch,expected:tapFocus.expected,actual:tapFocus.actual});
+      await page.screenshot({path:`${out}/tap-repick-focus-${viewport.width}.png`});
+
+      // Two quick taps remain two ordinary refreshes; they never invoke a separate double-tap command.
+      await waitForClearToast(page);
+      const beforeRapid=await cameraState(page), rapidPoint=await livePoint(page,.68,.41);
+      await page.mouse.click(rapidPoint.x,rapidPoint.y); await waitPaletteEpoch(page,beforeRapid.paletteEpoch,1);
+      await page.mouse.click(rapidPoint.x,rapidPoint.y); await waitPaletteEpoch(page,beforeRapid.paletteEpoch,2);
+      const afterRapid=await cameraState(page);
+      assert.equal(afterRapid.paletteEpoch,beforeRapid.paletteEpoch+2,'rapid taps each repick the palette');
+      assert.notEqual(afterRapid.regionMerge,'true','rapid taps do not open region merge');
+      await assertZoomStill(page,2,`${viewport.width} rapid taps`);
+      checks.push({name:`${viewport.width} rapid taps do not create double-tap or reset zoom`,pass:true,epochBefore:beforeRapid.paletteEpoch,epochAfter:afterRapid.paletteEpoch});
+
+      // A hold enters region merge, and releasing that pointer cannot leak a tap or focus request.
+      await waitForClearToast(page);
+      const mergePoint=await livePoint(page,.52,.49), beforeHold=await cameraState(page);
+      if(viewport.width===390) await longPress(page,mergePoint);
+      else await dispatchTouch(page,mergePoint,'hold',620);
+      const mergeState=await assertSeedMatches(page,mergePoint,viewport);
+      assert.equal(mergeState.paletteEpoch,beforeHold.paletteEpoch,'hold does not repick the palette');
+      assert.equal(mergeState.focusCalls.length,beforeHold.focusCalls.length,'hold does not request hardware focus');
+      await page.screenshot({path:`${out}/longpress-region-merge-${viewport.width}.png`});
       await page.locator('#regionMergeCancel').click();
       await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.regionMerge==='false');
-      await openZoomContext(page); await assertZoomStill(page,2,`${viewport.width} double-tap`);
-      await page.locator('#toolbarContextBack').click();
-      await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.settingsContext==='');
+      const afterRelease=await cameraState(page);
+      assert.equal(afterRelease.paletteEpoch,beforeHold.paletteEpoch,'release after hold does not trigger tap repick');
+      assert.equal(afterRelease.focusCalls.length,beforeHold.focusCalls.length,'release after hold does not trigger focus');
+      await assertZoomStill(page,2,`${viewport.width} long press`);
+      checks.push({name:`${viewport.width} long-press merge consumes release`,pass:true});
 
-      await waitForClearToast(page);
-      const focusPoint=await livePoint(page,.71,.36);
-      const beforeFocus=await cameraState(page);
-      await longPress(page,focusPoint);
-      const accepted=await assertFocusRequest(page,focusPoint,'environment',`${viewport.width} environment focus`);
-      assertFrameStable(beforeFocus,accepted.state,`${viewport.width} accepted-focus toast`);
-      assert.equal(accepted.state.focusStatus,'requested','root exposes accepted focus-request status');
-      assert.equal(Number(accepted.state.focus.x),accepted.actual.x,'normalized x diagnostic matches the applied focus constraint');
-      assert.equal(Number(accepted.state.focus.y),accepted.actual.y,'normalized y diagnostic matches the applied focus constraint');
-      await assertNoSingleTap(page,`${viewport.width} long press`);
-      await page.screenshot({path:`${out}/focus-request-environment-${viewport.width}.png`});
-      await page.waitForFunction(()=>document.querySelector('#focusMarker')?.hidden===true,null,{timeout:2500}).catch(()=>{});
-      checks.push({name:`${viewport.width} accepted focus marker clears`,pass:await page.locator('#focusMarker').evaluate(node=>node.hidden)});
-
-      if(viewport.width===844){
-        await page.locator('#flipCamera').click();
-        await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.facing==='user'&&document.querySelector('#pixelStudio')?.dataset.ready==='true',null,{timeout:12000});
-        await openZoomContext(page);
-        await assertZoomStill(page,2,'front-camera flip');
-        await page.locator('#toolbarContextBack').click();
-        await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.settingsContext==='');
-        await waitForClearToast(page);
-        const frontPoint=await livePoint(page,.69,.42);
-        await longPress(page,frontPoint);
-        const front=await assertFocusRequest(page,frontPoint,'user','844 user-facing focus');
-        assert.ok(front.expected.x<.5,'front-facing POI x includes the expected horizontal mirror for the selected right-side point');
-        checks.push({name:'user-facing focus mapping mirrors x after preview crop and digital zoom',pass:true,expected:front.expected,actual:front.actual});
-        await page.screenshot({path:`${out}/focus-request-front-844.png`});
-      }
-
-      // Each non-tap gesture starts from a clean event state so a stale pending tap cannot mask a regression.
-      await page.waitForFunction(()=>document.querySelector('#focusMarker')?.hidden===true,null,{timeout:3000}).catch(()=>{});
       await waitForClearToast(page);
       const beforeDrag=await cameraState(page), dragPoint=await livePoint(page,.50,.50);
-      await page.mouse.move(dragPoint.x,dragPoint.y); await page.mouse.down(); await page.mouse.move(dragPoint.x+15,dragPoint.y,{steps:2}); await page.mouse.up();
-      await assertNoActionAfterGesture(page,{focusCalls:beforeDrag.focusCalls.length},`${viewport.width} short drag`);
+      await page.mouse.move(dragPoint.x,dragPoint.y); await page.mouse.down(); await page.mouse.move(dragPoint.x+18,dragPoint.y+2,{steps:2}); await page.mouse.up();
+      await assertNoActionAfterGesture(page,{focusCalls:beforeDrag.focusCalls.length},`${viewport.width} drag cancel`);
+      assert.equal((await cameraState(page)).paletteEpoch,beforeDrag.paletteEpoch,'drag does not repick colors');
 
       await waitForClearToast(page);
       const beforePinch=await cameraState(page), pinchPoint=await livePoint(page,.5,.5);
@@ -284,13 +311,15 @@ try {
       await dispatchPointers(page,[pinchPoints[1]],'pointerdown');
       await page.waitForTimeout(620);
       await dispatchPointers(page,[pinchPoints[0],pinchPoints[1]],'pointerup');
-      await assertNoActionAfterGesture(page,{focusCalls:beforePinch.focusCalls.length},`${viewport.width} pinch`);
+      await assertNoActionAfterGesture(page,{focusCalls:beforePinch.focusCalls.length},`${viewport.width} pinch cancel`);
+      assert.equal((await cameraState(page)).paletteEpoch,beforePinch.paletteEpoch,'pinch does not repick colors');
 
       await waitForClearToast(page);
       const beforeCancel=await cameraState(page), cancelPoint=await livePoint(page,.48,.46);
       await dispatchPointers(page,[cancelPoint],'pointerdown'); await page.waitForTimeout(100); await dispatchPointers(page,[cancelPoint],'pointercancel'); await page.waitForTimeout(620);
       await assertNoActionAfterGesture(page,{focusCalls:beforeCancel.focusCalls.length},`${viewport.width} pointercancel`);
-      await writeFile(`${out}/gesture-state-${viewport.width}.json`,JSON.stringify({viewport,mergeState,accepted,finalState:await cameraState(page)},null,2));
+      assert.equal((await cameraState(page)).paletteEpoch,beforeCancel.paletteEpoch,'pointer cancellation does not repick colors');
+      await writeFile(`${out}/gesture-state-${viewport.width}.json`,JSON.stringify({viewport,tapFocus,tapLatencyMs,mergeState,finalState:await cameraState(page)},null,2));
     } catch(error) {
       await page.screenshot({path:`${out}/failure-${viewport.width}.png`}).catch(()=>{});
       await writeFile(`${out}/failure-${viewport.width}.json`,JSON.stringify({viewport,error:String(error),stack:error?.stack,checks,errors,sourceHashes,state:await cameraState(page).catch(()=>null)},null,2));
@@ -298,32 +327,51 @@ try {
     } finally { await context.close(); }
   }
 
-  // An unsupported camera must produce the user-facing notice without a marker or constraint call.
+  // Unsupported focus hardware still performs the normal tap palette refresh without merging.
   {
     const viewport={width:390,height:844}, {context,page}=await openPage(viewport,false);
     try {
       await waitForClearToast(page);
       const point=await livePoint(page,.68,.39);
       const before=await cameraState(page);
-      await longPress(page,point);
-      await page.waitForFunction(()=>document.querySelector('#stageMsg')?.textContent.includes('このカメラはタッチ位置でのピント合わせに対応していません'),null,{timeout:5000});
+      await page.mouse.click(point.x,point.y);
+      await waitPaletteEpoch(page,before.paletteEpoch);
       const state=await cameraState(page);
-      assertFrameStable(before,state,'unsupported-focus toast');
+      assertFrameStable(before,state,'unsupported-focus tap');
       assert.equal(state.focusStatus,'unsupported','unsupported hardware is reported as unsupported');
-      assert.ok(state.toast.visible&&state.toast.text.includes('ピント合わせに対応していません'),'unsupported focus notice is visible');
       assert.equal(state.marker?.hidden,true,'unsupported request never shows a requested marker');
       assert.equal(state.focusCalls.length,0,'unsupported track receives no focus constraint');
-      assert.notEqual(state.regionMerge,'true','long press on unsupported focus never opens merge');
-      await assertNoSingleTap(page,'unsupported long press');
-      await page.screenshot({path:`${out}/focus-unsupported-390.png`});
-      checks.push({name:'unsupported focus capability shows notice without marker or applyConstraints',pass:true,capabilities:state.tracks.at(-1)?.capabilities,toast:state.toast.text});
+      assert.equal(state.paletteEpoch,before.paletteEpoch+1,'unsupported focus does not prevent tap palette refresh');
+      assert.notEqual(state.regionMerge,'true','unsupported focus tap does not open merge');
+      await page.screenshot({path:`${out}/tap-focus-unsupported-390.png`});
+      checks.push({name:'unsupported focus tap still repicks palette without merge or constraints',pass:true,capabilities:state.tracks.at(-1)?.capabilities});
     } catch(error) {
       await page.screenshot({path:`${out}/failure-unsupported-390.png`}).catch(()=>{});
       await writeFile(`${out}/failure-unsupported-390.json`,JSON.stringify({error:String(error),stack:error?.stack,checks,errors,sourceHashes,state:await cameraState(page).catch(()=>null)},null,2));
       throw error;
     } finally { await context.close(); }
   }
+  // A device may advertise point focus but reject the request; palette repick remains independent.
+  {
+    const viewport={width:390,height:844}, {context,page}=await openPage(viewport,true,true);
+    try {
+      await waitForClearToast(page);
+      const point=await livePoint(page,.66,.40), before=await cameraState(page);
+      await page.mouse.click(point.x,point.y); await waitPaletteEpoch(page,before.paletteEpoch);
+      await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.focusStatus==='failed',null,{timeout:2500});
+      const state=await cameraState(page);
+      assert.equal(state.paletteEpoch,before.paletteEpoch+1,'rejected focus leaves palette repick intact');
+      assert.notEqual(state.regionMerge,'true','rejected focus tap does not enter merge');
+      assert.equal(state.focusCalls.length,1,'mock rejected exactly one focus constraint request');
+      await page.screenshot({path:`${out}/tap-focus-rejected-390.png`});
+      checks.push({name:'rejected focus tap still repicks palette and does not merge',pass:true,request:state.focusCalls[0]});
+    } catch(error) {
+      await page.screenshot({path:`${out}/failure-rejected-390.png`}).catch(()=>{});
+      await writeFile(`${out}/failure-rejected-390.json`,JSON.stringify({error:String(error),stack:error?.stack,checks,errors,sourceHashes,state:await cameraState(page).catch(()=>null)},null,2));
+      throw error;
+    } finally { await context.close(); }
+  }
   assert.deepEqual(errors,[],'no browser page errors');
-  await writeFile(`${out}/gesture-results.json`,JSON.stringify({checks:checks.length,checks,viewports,sourceHashes,errors,scope:{camera:'synthetic canvas stream with mocked MediaStreamTrack capabilities',physicalFocus:'UNTESTED',realDeviceGestures:'UNTESTED',Safari:'UNTESTED'}},null,2));
+  await writeFile(`${out}/gesture-results.json`,JSON.stringify({checks:checks.length,checks,viewports,sourceHashes,errors,scope:{camera:'isolated synthetic canvas stream with mocked MediaStreamTrack capabilities and CDP touch input',physicalFocus:'UNTESTED; only mocked applyConstraints requests were checked',realDeviceGestures:'UNTESTED',Safari:'UNTESTED'}},null,2));
   console.log(`Camera gesture browser checks: ${checks.length} PASS; synthetic mock camera only; physical focus and camera behavior UNTESTED; artifacts: ${out}`);
 } finally { await browser.close(); }

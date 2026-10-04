@@ -3,11 +3,11 @@ import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.m
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20261002-camera-palette-startup-2';
-import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261003-camera-focus-1';
+import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261004-camera-tap-focus-1';
 import { GIF_FPS } from './gif.mjs?v=20261001-animation-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
-import { cameraPostDataUrl } from './camera-post.mjs';
+import { cameraPostDataUrl } from './camera-post.mjs?rev=20261004-post-size-256-1';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20260930-audio-timebase-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260930-shared-canvas-5';
 import { createPxdProject } from '../creation/pxd-codec.mjs';
@@ -449,18 +449,19 @@ function showFocusRequestMarker(clientX, clientY) {
   focusMarkerTimer = window.setTimeout(hideFocusMarker, 900);
 }
 
-async function requestCameraFocusAt(clientX, clientY) {
+async function requestCameraFocusAt(clientX, clientY, { silent = false } = {}) {
+  const notify = (message) => { if (!silent) sayToast(message); };
   if (state.mode !== 'live' || gif.recording || captureInFlight) return;
   if (focusRequestInFlight) {
     root.dataset.focusStatus = 'busy';
-    sayToast('ピント要求中です。完了してからもう一度お試しください');
+    notify('ピント要求中です。完了してからもう一度お試しください');
     return;
   }
   const track = activeStream?.getVideoTracks?.()[0];
-  if (!track || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  if (!track || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) { root.dataset.focusStatus = 'unavailable'; return; }
   if (zoomController.isApplying()) {
     root.dataset.focusStatus = 'busy';
-    sayToast('ズーム調整中です。少し待ってから長押ししてください');
+    notify('ズーム調整中です。少し待ってからもう一度タップしてください');
     return;
   }
   const rect = view.getBoundingClientRect();
@@ -482,6 +483,8 @@ async function requestCameraFocusAt(clientX, clientY) {
       supportedConstraints,
       isCurrent: (currentTrack) => currentTrack === activeStream?.getVideoTracks?.()[0] && cameraSequence === cameraToken && state.mode === 'live'
     });
+  } catch {
+    result = { status: 'failed', reason: 'request-error' };
   } finally {
     if (requestToken === focusRequestToken) focusRequestInFlight = false;
   }
@@ -491,15 +494,15 @@ async function requestCameraFocusAt(clientX, clientY) {
     root.dataset.focusX = String(point.x);
     root.dataset.focusY = String(point.y);
     showFocusRequestMarker(clientX, clientY);
-    sayToast('この位置へのピント合わせを要求しました');
+    notify('この位置へのピント合わせを要求しました');
   } else if (result.status === 'unsupported') {
     root.dataset.focusX = '';
     root.dataset.focusY = '';
-    sayToast('このカメラはタッチ位置でのピント合わせに対応していません');
+    notify('このカメラはタッチ位置でのピント合わせに対応していません');
   } else {
     root.dataset.focusX = '';
     root.dataset.focusY = '';
-    sayToast('タッチ位置のピント要求に失敗しました');
+    notify('タッチ位置のピント要求に失敗しました');
   }
 }
 
@@ -1686,9 +1689,15 @@ stage.addEventListener('contextmenu', (event) => event.preventDefault());
 attachZoomGestures(stage, {
   get: () => state.zoom,
   set: (value, info) => setZoom(value, info),
-  onTap: () => refreshObjects(),
-  onDoubleTap: (event) => { if (beginRegionMerge(event.clientX, event.clientY)) focusVisible('#regionMergePalette button'); },
-  onLongPress: (event) => { void requestCameraFocusAt(event.clientX, event.clientY); return true; },
+  doubleTapEnabled: false,
+  onTap: (event) => {
+    refreshObjects();
+    if (event) void requestCameraFocusAt(event.clientX, event.clientY, { silent: true });
+  },
+  onLongPress: (event) => {
+    if (beginRegionMerge(event.clientX, event.clientY)) focusVisible('#regionMergePalette button');
+    return true;
+  },
   // the picture leans a little with the finger, so a swipe feels attached to it
   onDrag: (dx, dy) => {
     if (state.mode !== 'live' || gif.recording || regionMergeSession) return;
@@ -1949,6 +1958,10 @@ $('#postCamera').addEventListener('click', async () => {
 const backLink = $('.lc-back');
 if (audioCameraRequest) backLink.href = audioCameraCancelUrl({ search: location.search });
 else if (returnToAudio || audioCameraInvalid) backLink.href = audioCameraCancelUrl({ search: location.search });
+else if (new URLSearchParams(location.search).get('from') === 'globe') {
+  backLink.href = '/globe/';
+  backLink.setAttribute('aria-label', '地球儀へ戻る');
+}
 
 function suspendCamera() {
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });

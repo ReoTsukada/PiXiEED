@@ -1,7 +1,9 @@
 // Admission decoder for the browser-normalized PNG format. Unsupported PNG
 // variants are rejected rather than accepting an unverified colour count.
 const SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+// Existing 512px works remain decodable for review and public puzzle reads.
 const MAX_SIZE = 512;
+const MAX_POST_SIZE = 256;
 const MAX_COLORS = 128;
 const MAX_BYTES = 512 * 1024;
 
@@ -38,7 +40,7 @@ function parseChunks(bytes) {
       if (dimensions || length !== 13) invalid();
       const width = u32(bytes, dataStart); const height = u32(bytes, dataStart + 4);
       const bitDepth = bytes[dataStart + 8]; const colorType = bytes[dataStart + 9];
-      if (width < 8 || height < 8 || width > MAX_SIZE || height > MAX_SIZE) throw new PixelPngError('image_pixels_invalid');
+      if (width < 1 || height < 1 || width > MAX_SIZE || height > MAX_SIZE) throw new PixelPngError('image_pixels_invalid');
       if (bitDepth !== 8 || ![2, 6].includes(colorType) || bytes[dataStart + 10] !== 0 || bytes[dataStart + 11] !== 0 || bytes[dataStart + 12] !== 0) invalid();
       dimensions = { width, height, channels: colorType === 6 ? 4 : 3 };
     } else if (type === 'IDAT') {
@@ -135,7 +137,7 @@ export async function verifyPixelPngClaim(bytes, claim, { includeRgba = false } 
   if (!claim || claim.mimeType !== 'image/png') throw new PixelPngError('image_type_invalid');
   if (!(bytes instanceof Uint8Array) || bytes.length < 1 || bytes.length > MAX_BYTES || claim.size !== bytes.length) throw new PixelPngError('image_size_invalid');
   const actual = includeRgba ? await decodePixelPngRgba(bytes) : await inspectPixelPng(bytes);
-  if (claim.width !== actual.width || claim.height !== actual.height) throw new PixelPngError('image_pixels_invalid');
+  if (actual.width > MAX_POST_SIZE || actual.height > MAX_POST_SIZE || claim.width !== actual.width || claim.height !== actual.height) throw new PixelPngError('image_pixels_invalid');
   if (claim.colorCount !== actual.colorCount) throw new PixelPngError('image_colors_invalid');
   return actual;
 }

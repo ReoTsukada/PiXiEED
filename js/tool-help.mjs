@@ -1,4 +1,4 @@
-import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261004-audio-frames-1';
+import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261004-camera-tap-focus-1';
 
 const mountedDocuments = new WeakMap();
 const HELP_CSS_ID = 'px-tool-help-styles';

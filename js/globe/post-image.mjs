@@ -3,7 +3,7 @@
 import { normalizePixelFile } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260929-claude-integration-1';
 
-export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 8, maxSize: 512, maxColors: 128, mime: ['image/png', 'image/webp'] });
+export const PIXEL_LIMITS = Object.freeze({ maxBytes: 512 * 1024, minSize: 1, maxSize: 256, maxColors: 128, mime: ['image/png', 'image/webp'] });
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 
 async function blobBase64(blob) {
@@ -19,8 +19,8 @@ export async function inspectPixelImage(file, { keepScale = false } = {}) {
   const normalized = await normalizePixelFile(file, { keepScale });
   const { width, height, data } = normalized;
   const { minSize, maxSize, maxColors } = PIXEL_LIMITS;
-  if (width < minSize || height < minSize) throw new Error(`小さすぎます（${width}×${height}px）。${minSize}px 以上にしてください。`);
-  if (width > maxSize || height > maxSize) throw new Error(`大きすぎます（${width}×${height}px）。${maxSize}px 以内のドット絵にしてください。`);
+  if (width < minSize || height < minSize) throw new Error(`画像サイズが不正です（${width}×${height}px）。`);
+  if (Math.max(width, height) > maxSize) throw new Error(`大きすぎます（${width}×${height}px）。長辺を${maxSize}px以内にしてください。`);
   const canvas = document.createElement('canvas');
   canvas.width = width; canvas.height = height;
   try {

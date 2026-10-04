@@ -4,15 +4,16 @@ import { lookupCell } from '../../js/globe/geometry.mjs';
 import { buildGlobePostPayload } from '../../js/globe/post-supabase.mjs';
 import { fitPixelImage, PIXEL_LIMITS } from '../../js/globe/post-image.mjs';
 
-test('hand-authored posts allow up to 512px per side and 128 colours', () => {
-  assert.equal(PIXEL_LIMITS.maxSize, 512);
+test('hand-authored posts allow any rectangle up to a 256px long edge and 128 colours', () => {
+  assert.equal(PIXEL_LIMITS.minSize, 1);
+  assert.equal(PIXEL_LIMITS.maxSize, 256);
   assert.equal(PIXEL_LIMITS.maxColors, 128);
 });
 
 test('portrait and landscape posts fit the viewer without losing their aspect ratio', () => {
   assert.deepEqual(fitPixelImage(16, 32, 176, 176), { width: 80, height: 160 });
-  assert.deepEqual(fitPixelImage(512, 256, 176, 176), { width: 176, height: 88 });
-  assert.deepEqual(fitPixelImage(256, 512, 176, 176), { width: 88, height: 176 });
+  assert.deepEqual(fitPixelImage(256, 128, 176, 176), { width: 176, height: 88 });
+  assert.deepEqual(fitPixelImage(128, 256, 176, 176), { width: 88, height: 176 });
   assert.throws(() => fitPixelImage(0, 16, 176, 176), /サイズ/);
 });
 

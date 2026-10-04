@@ -9,7 +9,7 @@
  */
 import { lookupCell, projectGeoToScreen } from './geometry.mjs?v=20260921-grid11-1';
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
-import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20260929-claude-integration-1';
+import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20261004-post-size-256-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
 import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?v=20260928-puzzle-handoff-1';
 
@@ -47,7 +47,7 @@ const SOURCE_LABEL = Object.freeze({
   cell: 'セルの中心',
   'map-link': 'Googleマップのリンク',
   coordinates: '入力した座標',
-  geolocation: '現在地（約100mに丸め）',
+  geolocation: '現在地',
   globe: '地球でタップ',
   sample: 'サンプル'
 });
@@ -97,7 +97,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
           <span class="drop__pixels" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
           <strong>ドット絵をドロップ</strong>
           <span>クリックで選ぶ ・ 貼り付け（Ctrl/⌘+V）も使えます</span>
-          <small>PNG / WebP ・ ${PIXEL_LIMITS.minSize}〜${PIXEL_LIMITS.maxSize}px ・ ${PIXEL_LIMITS.maxColors}色まで ・ 拡大保存も等倍に戻します</small>
+          <small>PNG / WebP ・ 長辺${PIXEL_LIMITS.maxSize}pxまで ・ ${PIXEL_LIMITS.maxColors}色まで ・ 横長・縦長も可 ・ 拡大保存も等倍に戻します</small>
         </div>
         <a class="camera-link" data-camera-link href="/pixel-camera.html?from=globe" target="_top" rel="noopener">ドット絵カメラで撮って作る</a>
         <input type="file" accept="image/png,image/webp" data-file hidden>
@@ -240,6 +240,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   // ---- panels ---------------------------------------------------------------------------------
   const sheets = { composer, viewer, gallery };
   function showSheet(name) {
+    if (name !== 'composer') invalidateLocationRequest();
     for (const [key, node] of Object.entries(sheets)) node.hidden = key !== name;
     stage.classList.toggle('has-sheet', Boolean(name));
     stage.classList.toggle('is-composing', name === 'composer');
@@ -273,6 +274,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     place: $(composer, '[data-place]'),
     smart: $(composer, '[data-smart]'),
     smartStatus: $(composer, '[data-smart-status]'),
+    geolocate: $(composer, '[data-geolocate]'),
     missing: $(composer, '[data-missing]'),
     submit: $(composer, '[data-submit]'),
     done: $(composer, '[data-done]'),
@@ -282,6 +284,18 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   };
   const puzzlePanel = $(composer, '[data-puzzle-panel]');
   const puzzleRights = $(composer, '[data-puzzle-rights]');
+  let locationRequestSequence = 0;
+  let imageRequestSequence = 0;
+
+  function invalidateLocationRequest() {
+    locationRequestSequence += 1;
+    if (c.geolocate.disabled) {
+      c.geolocate.disabled = false;
+      if (c.smartStatus.textContent === '現在地の許可を確認しています…') {
+        c.smartStatus.textContent = ''; c.smartStatus.dataset.state = '';
+      }
+    }
+  }
 
   async function makeRequestFingerprint() {
     const content = JSON.stringify({ title: c.title.value.trim(), caption: c.caption.value.trim(), pin: state.pin && { latitude: state.pin.latitude, longitude: state.pin.longitude, cellId: state.pin.cellId }, postKind: state.postKind, image: state.image?.dataUrl || '', puzzle: state.puzzle });
@@ -332,6 +346,8 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   }
 
   async function setImage(file, { fromCamera = false, puzzlePayload = null, keepScale = false } = {}) {
+    const imageSequence = ++imageRequestSequence;
+    invalidateLocationRequest();
     c.artError.textContent = '';
     if (!file) return;
     if (!puzzlePayload) {
@@ -339,8 +355,11 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       if (state.puzzleHandoff) { const discard = state.puzzleHandoff.onDiscard; state.puzzleHandoff = null; discard?.(); }
     }
     state.postKind = fromCamera ? 'pixel_camera' : 'pixel_art';
+    state.image = null;
+    syncComposer();
     try {
       const inspected = await inspectPixelImage(file, { keepScale: keepScale || fromCamera || Boolean(puzzlePayload) });
+      if (imageSequence !== imageRequestSequence) return;
       state.image = inspected;
       c.artImage.src = inspected.dataUrl;
       const display = fitPixelImage(inspected.width, inspected.height, 232, 232);
@@ -348,12 +367,14 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       c.artImage.style.height = `${display.height}px`;
       c.artMeta.textContent = `${inspected.width}×${inspected.height}px ・ ${inspected.colorCount}色${inspected.scale > 1 ? ` ・ ${inspected.scale}倍から等倍に戻しました` : ''}`;
     } catch (error) {
+      if (imageSequence !== imageRequestSequence) return;
       state.image = null;
       c.artError.textContent = error instanceof Error ? error.message : '画像を確認できませんでした。';
     }
     if (state.image && puzzlePayload) {
       const expected = puzzlePayload.image;
       const actual = new Uint8Array(await file.arrayBuffer());
+      if (imageSequence !== imageRequestSequence) return;
       let binary = ''; for (let offset = 0; offset < actual.length; offset += 0x8000) binary += String.fromCharCode(...actual.subarray(offset, offset + 0x8000));
       if (btoa(binary) !== expected.base64 || state.image.width !== expected.width || state.image.height !== expected.height || state.image.colorCount !== expected.colorCount || actual.length !== expected.size) {
         state.image = null; c.artError.textContent = '元画像とパズルの投稿データが一致しません。作成画面からもう一度送ってください。';
@@ -368,6 +389,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   }
 
   function setPin(pin, { fly = false } = {}) {
+    invalidateLocationRequest();
     const cell = lookupCell(pin.longitude, pin.latitude);
     if (!state.pin || state.pin.latitude !== pin.latitude || state.pin.longitude !== pin.longitude || state.pin.cellId !== cell.cellId) invalidateRequestKey();
     state.pin = { ...pin, cellId: cell.cellId };
@@ -382,6 +404,8 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   }
 
   function resetComposer() {
+    invalidateLocationRequest();
+    imageRequestSequence += 1;
     state.image = null; state.postKind = 'pixel_art'; state.puzzle = null; state.pin = null; state.submitting = false; state.done = null; state.requestKey = null; state.requestFingerprint = null; puzzleRights.checked = false;
     c.form.reset();
     c.artError.textContent = ''; c.smartStatus.textContent = ''; c.smartStatus.dataset.state = '';
@@ -397,12 +421,27 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     return true;
   }
 
-  function openComposer({ selection = null, file = null, postKind = 'pixel_art', puzzlePayload = null, keepScale = false } = {}) {
-    if (needLogin(() => openComposer({ selection, file, postKind, puzzlePayload, keepScale }))) return;
+  function openComposer({ selection = null, file = null, postKind = 'pixel_art', puzzlePayload = null, keepScale = false, useCurrentLocation = false } = {}) {
+    if (needLogin(() => openComposer({ selection, file, postKind, puzzlePayload, keepScale, useCurrentLocation }))) return;
+    invalidateLocationRequest();
+    imageRequestSequence += 1;
     if (state.done) resetComposer();
     showSheet('composer');
+    if (useCurrentLocation) {
+      state.pin = null;
+      invalidateRequestKey();
+      c.smart.value = '';
+      c.smartStatus.textContent = '';
+      c.smartStatus.dataset.state = '';
+      syncComposer();
+    }
     if (selection) { const pin = pinFromSelection(selection); if (pin) setPin(pin); }
-    if (file) return setImage(file, { fromCamera: postKind === 'pixel_camera', puzzlePayload, keepScale });
+    if (file) {
+      const imagePromise = setImage(file, { fromCamera: postKind === 'pixel_camera', puzzlePayload, keepScale });
+      if (useCurrentLocation) requestCurrentLocation();
+      return imagePromise;
+    }
+    if (useCurrentLocation) requestCurrentLocation();
     else if (!state.image) requestAnimationFrame(() => c.drop.focus({ preventScroll: true }));
     return Promise.resolve();
   }
@@ -454,21 +493,44 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     }, 180);
   });
 
-  $(composer, '[data-geolocate]').addEventListener('click', () => {
-    if (!navigator.geolocation) { c.smartStatus.textContent = 'このブラウザでは現在地を使えません。'; c.smartStatus.dataset.state = 'error'; return; }
-    c.smartStatus.textContent = '現在地を確認しています…'; c.smartStatus.dataset.state = '';
+  function requestCurrentLocation() {
+    invalidateLocationRequest();
+    const sequence = locationRequestSequence;
+    if (!navigator.geolocation) {
+      c.smartStatus.textContent = 'このブラウザでは現在地を使えません。'; c.smartStatus.dataset.state = 'error';
+      return;
+    }
+    c.geolocate.disabled = true;
+    c.smartStatus.textContent = '現在地の許可を確認しています…'; c.smartStatus.dataset.state = '';
+    const isCurrent = () => sequence === locationRequestSequence && openSheet() === 'composer' && !state.done;
     navigator.geolocation.getCurrentPosition((position) => {
-      const round = (value) => Math.round(value * 1000) / 1000;
-      setPin({ latitude: round(position.coords.latitude), longitude: round(position.coords.longitude), source: 'geolocation' }, { fly: true });
-      c.smartStatus.textContent = '現在地に置きました（約100mに丸めています）'; c.smartStatus.dataset.state = 'ok';
-    }, () => { c.smartStatus.textContent = '現在地を取得できませんでした。許可設定を確認するか、地球で選んでください。'; c.smartStatus.dataset.state = 'error'; }, { timeout: 8000, maximumAge: 60000 });
-  });
+      if (!isCurrent()) return;
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        c.geolocate.disabled = false;
+        c.smartStatus.textContent = '現在地の座標を確認できませんでした。もう一度お試しください。'; c.smartStatus.dataset.state = 'error';
+        return;
+      }
+      setPin({ latitude, longitude, source: 'geolocation' }, { fly: true });
+      c.smartStatus.textContent = '現在地を選びました。内容を確認してから投稿してください。'; c.smartStatus.dataset.state = 'ok';
+    }, (error) => {
+      if (!isCurrent()) return;
+      c.geolocate.disabled = false;
+      const message = error?.code === 1 ? '現在地の利用が許可されませんでした。設定を確認するか、地球で選んでください。'
+        : error?.code === 3 ? '現在地の確認が時間切れになりました。再試行するか、地球で選んでください。'
+          : '現在地を取得できませんでした。再試行するか、地球で選んでください。';
+      c.smartStatus.textContent = message; c.smartStatus.dataset.state = 'error';
+    }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  }
+  c.geolocate.addEventListener('click', requestCurrentLocation);
 
   c.form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (c.submit.disabled || state.submitting) return;
     const user = currentUser();
     if (!user) { needLogin(() => c.form.requestSubmit()); return; }
+    invalidateLocationRequest();
     state.submitting = true; syncComposer();
     try {
       const fingerprint = await makeRequestFingerprint();

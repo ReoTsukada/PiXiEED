@@ -11,10 +11,10 @@ test('camera handoff keeps a crisp pixel grid within map image limits', () => {
     data[i + 3] = 255;
   }
   const post = cameraPostPixels({ width, height, data });
-  assert.equal(post.width, 512);
-  assert.equal(post.height, 256);
-  assert.equal(post.data[(10 * 512 + 20) * 4], 10);
-  assert.equal(post.data[(10 * 512 + 400) * 4], 240);
+  assert.equal(post.width, 256);
+  assert.equal(post.height, 128);
+  assert.equal(post.data[(10 * 256 + 20) * 4], 10);
+  assert.equal(post.data[(10 * 256 + 200) * 4], 240);
 });
 
 test('full-colour camera frames stay within the 128-colour map palette limit', () => {
@@ -42,4 +42,15 @@ test('a 256px camera image keeps its dimensions and existing small palette', () 
   assert.equal(post.height, height);
   assert.equal(post.data[0], 201);
   assert.equal(post.data[4], 23);
+});
+
+test('camera output accepts one-pixel sides and keeps odd aspect ratios within 256px', () => {
+  for (const [width, height] of [[1, 1], [256, 1], [1, 256], [257, 17], [17, 257]]) {
+    const data = new Uint8ClampedArray(width * height * 4);
+    data.fill(255);
+    const post = cameraPostPixels({ width, height, data });
+    assert.ok(post.width >= 1 && post.height >= 1);
+    assert.ok(Math.max(post.width, post.height) <= 256);
+    if (width <= 256 && height <= 256) assert.deepEqual([post.width, post.height], [width, height]);
+  }
 });

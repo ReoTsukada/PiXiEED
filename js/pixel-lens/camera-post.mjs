@@ -1,13 +1,13 @@
-// Keep the captured grid up to 512px. Quantize only when the capture exceeds
+// Keep the captured grid up to 256px. Quantize only when the capture exceeds
 // the map's 128-colour admission limit; its saved PNG is unaffected.
-export function cameraPostPixels(frame, maxSize = 512) {
+export function cameraPostPixels(frame, maxSize = 256) {
   if (!frame || !Number.isInteger(frame.width) || !Number.isInteger(frame.height) ||
-      frame.width < 8 || frame.height < 8 || frame.data?.length !== frame.width * frame.height * 4) {
+      frame.width < 1 || frame.height < 1 || frame.data?.length !== frame.width * frame.height * 4) {
     throw new Error('撮影画像を確認できませんでした。');
   }
   const scale = Math.min(1, maxSize / Math.max(frame.width, frame.height));
-  const width = Math.max(8, Math.round(frame.width * scale));
-  const height = Math.max(8, Math.round(frame.height * scale));
+  const width = Math.max(1, Math.round(frame.width * scale));
+  const height = Math.max(1, Math.round(frame.height * scale));
   const data = new Uint8ClampedArray(width * height * 4);
   const colors = new Set();
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
@@ -33,7 +33,7 @@ export function cameraPostPixels(frame, maxSize = 512) {
 
 export function cameraPostDataUrl(frame) {
   const canvas = document.createElement('canvas');
-  for (const maxSize of [512, 384, 256, 192, 128]) {
+  for (const maxSize of [256, 192, 128, 64]) {
     const pixels = cameraPostPixels(frame, maxSize);
     canvas.width = pixels.width;
     canvas.height = pixels.height;

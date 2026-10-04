@@ -474,7 +474,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .sheet { position: absolute; top: 14px; right: 14px; bottom: 14px; z-index: 6; width: min(372px, calc(100% - 28px)); display: flex; flex-direction: column; overflow: hidden auto; padding: 14px 16px 0; border: 1px solid rgba(140, 210, 226, .22); border-radius: 20px; background: rgba(6, 14, 22, .93); backdrop-filter: blur(14px); box-shadow: 0 20px 60px rgba(0, 0, 0, .5); color: #dcecef; font-size: .84rem; }
 .sheet[hidden], .post-modal[hidden] { display: none; }
 .sheet * { min-width: 0; }
-.sheet__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet__head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sheet__head h2 { margin: 0; font-size: 1.05rem; letter-spacing: 0; }
 .sheet .sheet__close { width: var(--control); height: var(--control); margin-right: -6px; border-radius: 50%; background: rgba(140, 210, 226, .08); }
 .sheet button { font-size: var(--control-font); }
@@ -486,7 +486,7 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .sheet .danger[data-armed="1"] { background: #ff5d73; color: #2b0008; }
 .sheet .link { width: auto; height: var(--control); padding: 0 12px; margin-right: -12px; color: #7ccfe0; text-decoration: underline; text-underline-offset: 3px; }
 
-.steps { display: flex; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
+.steps { flex-shrink: 0; display: flex; gap: 6px; margin: 0 0 12px; padding: 0; list-style: none; }
 .steps li { flex: 1; display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(140, 210, 226, .07); color: #8fb1b8; font-size: var(--text-small); transition: background .2s, color .2s; }
 .steps b { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(140, 210, 226, .18); font-size: .68rem; }
 .steps li.is-done { background: rgba(244, 212, 93, .14); color: #ffe89a; }
@@ -495,8 +495,9 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .steps li.is-done b { font-size: 0; }
 .steps li.is-done b::before { font-size: .7rem; }
 
-.composer__form { display: flex; flex-direction: column; flex: 1; gap: 14px; }
-.field { display: grid; gap: 8px; }
+.composer__form { display: flex; flex-direction: column; flex: 1 0 auto; gap: 14px; }
+.field { flex-shrink: 0; display: grid; gap: 8px; }
+.field[hidden] { display: none; }
 .field h3 { margin: 0; font-size: .8125rem; color: #8ad4e4; letter-spacing: .04em; }
 .field h3 em { margin-left: 6px; font-style: normal; font-size: var(--text-small); color: #f4d45d; }
 .field input[type="text"], .field textarea, .post-modal__card input {

@@ -103,3 +103,28 @@ test('CRC-valid PNG with an invalid chunk name is rejected before admission', as
   const reservedBit = Uint8Array.from(Buffer.concat([bytes.subarray(0, beforeIdat), chunk('abce', [1]), bytes.subarray(beforeIdat)]));
   await assert.rejects(inspectPixelPng(reservedBit), { code: 'image_decode_invalid' });
 });
+
+
+test('any rectangular grid from 1 through 256px preserves its actual dimensions', async () => {
+  for (const [width, height] of [[1, 1], [256, 1], [1, 256], [256, 64], [64, 256], [255, 17], [256, 256]]) {
+    const bytes = png(width, height, () => [20, 50, 80, 255]);
+    const claim = { mimeType: 'image/png', size: bytes.length, width, height, colorCount: 1 };
+    assert.deepEqual(await verifyPixelPngClaim(bytes, claim), { width, height, colorCount: 1 });
+  }
+});
+
+test('the 256px longest-side limit rejects either axis without imposing an aspect ratio', async () => {
+  for (const [width, height] of [[257, 1], [1, 257], [0, 16], [16, 0]]) {
+    const bytes = png(width, height, () => [20, 50, 80, 255]);
+    await assert.rejects(verifyPixelPngClaim(bytes, { mimeType: 'image/png', size: bytes.length, width, height, colorCount: 1 }), { code: 'image_pixels_invalid' });
+  }
+});
+
+
+test('historical 512px images can still be decoded for moderation while new uploads are limited to 256px', async () => {
+  const bytes = png(512, 8, () => [20, 50, 80, 255]);
+  const decoded = await decodePixelPngRgba(bytes);
+  assert.equal(decoded.width, 512);
+  assert.equal(decoded.height, 8);
+  await assert.rejects(verifyPixelPngClaim(bytes, { mimeType: 'image/png', size: bytes.length, width: 512, height: 8, colorCount: 1 }), { code: 'image_pixels_invalid' });
+});

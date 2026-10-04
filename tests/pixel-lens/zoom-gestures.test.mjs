@@ -26,11 +26,11 @@ function setup(options = {}) {
   const target = new EventTarget();
   target.setPointerCapture = () => {};
   const clock = new FakeClock();
-  const calls = { taps: 0, doubles: [], holds: [], zoom: [], drag: [], gestures: [] };
+  const calls = { taps: 0, tapPoints: [], doubles: [], holds: [], zoom: [], drag: [], gestures: [] };
   const gesture = attachZoomGestures(target, {
     now: clock.now, setTimer: clock.setTimer, clearTimer: clock.clearTimer,
     get: () => 1, set: (...args) => calls.zoom.push(args),
-    onTap: () => calls.taps++, onDoubleTap: (event) => calls.doubles.push([event.clientX, event.clientY]),
+    onTap: (event) => { calls.taps++; calls.tapPoints.push([event?.clientX, event?.clientY]); }, onDoubleTap: (event) => calls.doubles.push([event.clientX, event.clientY]),
     onLongPress: (event) => { calls.holds.push([event.clientX, event.clientY]); return true; },
     onDrag: (...args) => calls.drag.push(args), onGesture: (name) => calls.gestures.push(name),
     ...options
@@ -133,4 +133,28 @@ test('pointer cancellation and wheel cancel hold and pending taps', () => {
   assert.equal(wheeled.calls.holds.length, 0);
   assert.equal(wheeled.calls.taps, 0);
   assert.equal(wheeled.calls.zoom.length, 1);
+});
+
+
+test('camera mode can deliver every tap immediately without double-tap zoom reset', () => {
+  const ctx = setup({ doubleTapEnabled: false });
+  tap(ctx, 1, 20, 30);
+  assert.equal(ctx.calls.taps, 1);
+  assert.deepEqual(ctx.calls.tapPoints, [[20, 30]]);
+  tap(ctx, 2, 42, 35);
+  assert.equal(ctx.calls.taps, 2);
+  assert.deepEqual(ctx.calls.tapPoints, [[20, 30], [42, 35]]);
+  assert.deepEqual(ctx.calls.doubles, []);
+  assert.deepEqual(ctx.calls.zoom, []);
+});
+
+test('camera-mode hold starts the held-point action and never falls through to a tap', () => {
+  const ctx = setup({ doubleTapEnabled: false });
+  ctx.send('pointerdown', { x: 80, y: 90 });
+  ctx.clock.advance(550);
+  ctx.send('pointerup', { x: 80, y: 90 });
+  ctx.clock.advance(400);
+  assert.deepEqual(ctx.calls.holds, [[80, 90]]);
+  assert.equal(ctx.calls.taps, 0);
+  assert.deepEqual(ctx.calls.zoom, []);
 });
