@@ -70,3 +70,26 @@ test('clipboard failure returns a verified URL for manual selection without clai
   const { fetchImpl } = publishedFetch();
   await assert.rejects(() => copyVerifiedPuzzleShareUrl({ mode: 'spot-difference', postId: id, origin, fetchImpl, DOMParserImpl: htmlDocument(`<link rel="canonical" href="${origin}/play/spot-difference/puzzles/${id}/"><meta property="og:url" content="${origin}/play/spot-difference/puzzles/${id}/"><meta property="og:title" content="Test"><meta property="og:description" content="Test"><meta property="og:image" content="${origin}/play/spot-difference/puzzles/${id}/ogp.png">`) }, { writeText: async () => { throw new Error('denied'); } }), (error) => error.code === 'clipboard_unavailable' && error.url === `${origin}/play/spot-difference/puzzles/${id}/`);
 });
+
+
+test('legacy IDs share within their own game without entering the modern ID namespace', () => {
+  for (const [mode, legacyId] of [['spot-difference', `pixfind-${id}`], ['spot_difference', `pixfind-sd-${id}`], ['hidden-object', `pixfind-ho-${id}`]]) {
+    const game = mode === 'hidden-object' ? 'hidden-object' : 'spot-difference';
+    assert.equal(puzzleShareUrl({ mode, postId: legacyId, origin }), `${origin}/play/${game}/puzzles/${legacyId}/`);
+  }
+  for (const [mode, legacyId] of [['hidden-object', `pixfind-${id}`], ['spot-difference', `pixfind-ho-${id}`], ['hidden-object', `pixfind-ho-${id}/../other`], ['spot-difference', `pixfind-${id}%2f`]]) {
+    assert.throws(() => puzzleShareUrl({ mode, postId: legacyId, origin }), { code: 'puzzle_unavailable' });
+  }
+});
+
+test('a published legacy page and PNG are verified before copying', async () => {
+  const legacyId = `pixfind-ho-${id}`;
+  const url = `${origin}/play/hidden-object/puzzles/${legacyId}/`;
+  const image = `${url}ogp-1234567890abcdef.png`;
+  const markup = `<link rel="canonical" href="${url}"><meta property="og:url" content="${url}"><meta property="og:title" content="Test"><meta property="og:description" content="Test"><meta property="og:image" content="${image}">`;
+  const { fetchImpl, calls } = publishedFetch({ canonical: url, image });
+  const copied = [];
+  assert.equal(await copyVerifiedPuzzleShareUrl({ mode: 'hidden-object', postId: legacyId, origin, fetchImpl, DOMParserImpl: htmlDocument(markup) }, { writeText: async value => copied.push(value) }), url);
+  assert.deepEqual(copied, [url]);
+  assert.deepEqual(calls.map(call => call.method), ['HEAD', 'GET', 'HEAD']);
+});

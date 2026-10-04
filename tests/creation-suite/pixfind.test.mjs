@@ -385,3 +385,18 @@ test('間違い探し and もの探し are separate games; PiXFiND links forward
   assert.match(tools, /href="\/play\/spot-difference\/"/); assert.match(tools, /href="\/play\/hidden-object\/"/);
   assert.doesNotMatch(tools, /PiXFiND|href="\/pixfind\//);
 });
+
+
+test('sharing preserves the public boundary for legacy, modern and local puzzles', async () => {
+  const { isPublicPuzzleShareable } = await import('../../js/creation/pixfind-play.mjs');
+  const legacy = { id: 'pixfind-ho-123e4567-e89b-42d3-a456-426614174000', mode: 'hidden-object', publicLegacyOnly: true };
+  assert.equal(isPublicPuzzleShareable(legacy, 'hidden-object'), true);
+  assert.equal(isPublicPuzzleShareable(legacy, 'spot-difference'), false);
+  assert.equal(isPublicPuzzleShareable({ ...legacy, publicLegacyOnly: false }, 'hidden-object'), false);
+  assert.equal(isPublicPuzzleShareable({ ...legacy, id: 'invalid' }, 'hidden-object'), false);
+  for (const flag of ['localOnly', 'localHiddenOnly']) assert.equal(isPublicPuzzleShareable({ ...legacy, [flag]: true }, 'hidden-object'), false);
+  const modern = { id: '123e4567-e89b-42d3-a456-426614174000', mode: 'spot-difference', publicPostOnly: true };
+  assert.equal(isPublicPuzzleShareable(modern, 'spot-difference'), true);
+  assert.equal(isPublicPuzzleShareable({ ...modern, id: 'invalid' }, 'spot-difference'), false);
+  assert.equal(isPublicPuzzleShareable({ ...modern, localOnly: true }, 'spot-difference'), false);
+});

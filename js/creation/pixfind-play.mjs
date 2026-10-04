@@ -9,7 +9,8 @@ import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, vali
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
 import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
-import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261004-puzzle-share-1';
+import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261004-legacy-puzzle-share-1';
+import { isLegacyPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
@@ -236,13 +237,20 @@ async function getJson(url) {
 }
 function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text != null) node.textContent = text; return node; }
 
+/** Sharing is available only for loaded public puzzles of this page's game. */
+export function isPublicPuzzleShareable(puzzle, pageMode) {
+  return Boolean(puzzle && puzzle.mode === pageMode && !puzzle.localOnly && !puzzle.localHiddenOnly
+    && ((puzzle.publicPostOnly === true && typeof puzzle.id === 'string' && UUID.test(puzzle.id))
+      || (puzzle.publicLegacyOnly === true && isLegacyPuzzleShareId(puzzle.mode, puzzle.id))));
+}
+
 function safePuzzle(row) {
   const originalUrl = safePuzzleImageUrl(row.original_url);
   const changedUrl = safePuzzleImageUrl(row.diff_url);
   const thumbnailUrl = safePuzzleImageUrl(row.thumbnail_url) || originalUrl;
   if (!originalUrl || !changedUrl || !row.id || !row.slug) return null;
   const mode = [row.mode, row.game_mode, row.play_mode].includes('hidden-object') ? 'hidden-object' : 'spot-difference';
-  return Object.freeze({ id: row.id, slug: row.slug, label: typeof row.label === 'string' ? row.label.slice(0, 160) : MODE_NAMES[mode], author: typeof row.author_name === 'string' ? row.author_name.slice(0, 120) : '作者不明', originalUrl, changedUrl, thumbnailUrl, mode, targets: Array.isArray(row.targets) ? row.targets : [], storedRegions: Array.isArray(row.regions) ? row.regions : null });
+  return Object.freeze({ id: row.id, slug: row.slug, label: typeof row.label === 'string' ? row.label.slice(0, 160) : MODE_NAMES[mode], author: typeof row.author_name === 'string' ? row.author_name.slice(0, 120) : '作者不明', originalUrl, changedUrl, thumbnailUrl, mode, publicLegacyOnly: isLegacyPuzzleShareId(mode, row.id), targets: Array.isArray(row.targets) ? row.targets : [], storedRegions: Array.isArray(row.regions) ? row.regions : null });
 }
 
 function loadImage(url) {
@@ -508,7 +516,7 @@ function mount() {
       else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; updateProgress(); }
       updateBaseScale(); constrainViewport(); paint();
       if (sharePanel) {
-        sharePanel.hidden = puzzle.publicPostOnly !== true;
+        sharePanel.hidden = !isPublicPuzzleShareable(puzzle, pageMode);
         if (!sharePanel.hidden) { updateBaseScale(); constrainViewport(); paint(); }
       }
     } catch (error) {
@@ -545,7 +553,7 @@ function mount() {
   primary.addEventListener('click', () => { if (selected) start(selected); else if (puzzles.length) start(puzzles[0]); });
   shareButton?.addEventListener('click', async () => {
     const puzzle = selected;
-    if (!puzzle?.publicPostOnly || puzzle.mode !== pageMode || !sharePanel) return;
+    if (!isPublicPuzzleShareable(puzzle, pageMode) || !sharePanel) return;
     const request = ++shareRequest;
     shareButton.disabled = true;
     shareButton.textContent = '公開ページを確認しています…';

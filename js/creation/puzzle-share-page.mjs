@@ -1,3 +1,5 @@
+import { isLegacyPuzzleShareId, legacyPuzzleImageUrl } from './puzzle-share-identity.mjs';
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SITE_ORIGIN = 'https://pixieed.jp';
 const SPOT_OGP = Object.freeze({ width: 1200, height: 630, padding: 12, gap: 16, background: '#f7f8f6' });
@@ -158,7 +160,8 @@ export function sharePagePath(game, postId) {
  * Both games use separately generated images. Answer coordinates are never serialized.
  */
 export function createPuzzleSharePage(payload, { postId, supabaseUrl, ogpImagePath } = {}) {
-  if (typeof postId !== 'string' || !UUID.test(postId)) reject('share_post_id_invalid');
+  const legacy = payload?.puzzle?.source === 'legacy';
+  if (typeof postId !== 'string' || !(legacy ? isLegacyPuzzleShareId(payload?.puzzle?.mode, postId) : UUID.test(postId))) reject('share_post_id_invalid');
   if (typeof supabaseUrl !== 'string') reject('share_config_invalid');
   if (!isRecord(payload) || payload.ok !== true || !isRecord(payload.puzzle)) reject('share_puzzle_unavailable');
 
@@ -175,13 +178,16 @@ export function createPuzzleSharePage(payload, { postId, supabaseUrl, ogpImagePa
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 512 || height > 512) {
     reject('share_image_dimensions_invalid');
   }
-  publicImageUrl(puzzle.originalImage?.url, postId, supabaseUrl);
+  const validateImageUrl = (value) => legacy
+    ? (legacyPuzzleImageUrl(value, { puzzleId: postId, supabaseUrl }) || reject('share_image_url_invalid'))
+    : publicImageUrl(value, postId, supabaseUrl);
+  validateImageUrl(puzzle.originalImage?.url);
   const game = puzzle.mode === 'hidden_object' ? 'hidden-object' : 'spot-difference';
   if (puzzle.mode === 'spot_difference') {
     const changed = puzzle.changedImage;
     if (!Number.isInteger(changed?.width) || !Number.isInteger(changed?.height)
         || changed.width !== width || changed.height !== height) reject('share_image_dimensions_mismatch');
-    publicImageUrl(changed?.url, postId, supabaseUrl);
+    validateImageUrl(changed?.url);
   } else hiddenObjectOgpText(puzzle.definition);
   const pageFolder = sharePagePath(game, postId);
   const imagePath = ogpImagePath ?? `${pageFolder}ogp.png`;
@@ -189,7 +195,9 @@ export function createPuzzleSharePage(payload, { postId, supabaseUrl, ogpImagePa
       || !/^ogp(?:-[a-f0-9]{16})?\.png$/i.test(imagePath.slice(pageFolder.length))) reject('share_ogp_path_invalid');
   const ogImageUrl = `${SITE_ORIGIN}${imagePath}`;
   const canonicalUrl = `${SITE_ORIGIN}${sharePagePath(game, postId)}`;
-  const playUrl = `${SITE_ORIGIN}/play/${game}/?postPuzzle=${postId.toLowerCase()}`;
+  const playUrl = legacy
+    ? `${SITE_ORIGIN}/play/${game}/?puzzle=${postId}`
+    : `${SITE_ORIGIN}/play/${game}/?postPuzzle=${postId.toLowerCase()}`;
   const title = `PiXiEED | ${puzzle.title.trim()}`;
   const description = puzzle.mode === 'hidden_object'
     ? '公開されたもの探しをPiXiEEDで遊ぼう。'

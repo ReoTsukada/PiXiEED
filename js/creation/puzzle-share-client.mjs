@@ -1,4 +1,4 @@
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { isPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
 const GAMES = Object.freeze({ 'spot-difference': 'spot-difference', hidden_object: 'hidden-object', 'hidden-object': 'hidden-object', spot_difference: 'spot-difference' });
 
 export class PuzzleShareError extends Error {
@@ -14,7 +14,7 @@ function fail(code, message, options) { throw new PuzzleShareError(code, message
 
 export function puzzleShareUrl({ mode, postId, origin } = {}) {
   const game = GAMES[mode];
-  if (!game || typeof postId !== 'string' || !UUID.test(postId)) fail('puzzle_unavailable', 'この問題は共有できません。公開中の問題を開いてください。');
+  if (!game || typeof postId !== 'string' || !isPuzzleShareId(mode, postId)) fail('puzzle_unavailable', 'この問題は共有できません。公開中の問題を開いてください。');
   let base;
   try { base = new URL(origin); } catch { fail('share_origin_invalid', '共有ページを確認できません。'); }
   if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) fail('share_origin_invalid', '共有ページを確認できません。');

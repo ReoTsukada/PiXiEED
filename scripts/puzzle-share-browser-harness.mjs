@@ -78,7 +78,9 @@ async function inspectLayout(page, width, height, mode) {
   checks.push(`${mode} ${width}×${height}: share and fallback controls are clickable, artwork clears navigation`);
 }
 
-async function openPlayer(mode, viewport, apiStatus = 200) {
+async function openPlayer(mode, viewport, apiStatus = 200, legacy = false) {
+  const shareId = legacy ? `${mode === 'hidden-object' ? 'pixfind-ho' : 'pixfind-sd'}-${id}` : id;
+  let published = apiStatus === 200;
   const context = await browser.newContext({ viewport, permissions: ['clipboard-read', 'clipboard-write'] });
   const page = await context.newPage();
   page.on('pageerror', (error) => { throw error; });
@@ -91,6 +93,14 @@ async function openPlayer(mode, viewport, apiStatus = 200) {
   await context.route('**/*', async (route) => {
     const request = route.request(); const url = new URL(request.url());
     if (url.hostname === 'pagead2.googlesyndication.com') return route.fulfill({ status: 200, contentType: 'application/javascript', body: '' });
+    if (legacy && url.origin.endsWith('.supabase.co')) {
+      const cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'apikey, authorization, content-type' };
+      if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const imageBase = `${url.origin}/storage/v1/object/public/pixfind-puzzles/puzzles/${shareId}/`;
+      if (url.pathname.endsWith('/rest/v1/social_posts')) return route.fulfill({ status: 200, headers: cors, json: published ? [{ id, status: 'published', post_kind: 'pixfind', distribution_mode: 'pixfind', pixfind_puzzle_id: shareId }] : [] });
+      if (url.pathname.endsWith('/rest/v1/pixfind_puzzles')) return route.fulfill({ status: 200, headers: cors, json: [{ id: shareId, slug: 'legacy-test', label: '以前の公開問題', author_name: '以前の作者', mode, game_mode: mode, original_url: `${imageBase}original.png`, diff_url: `${imageBase}diff.png`, thumbnail_url: `${imageBase}original.png`, targets: mode === 'hidden-object' ? [{ label: '花', marker: { minX: 5, minY: 5, maxX: 9, maxY: 9, centerX: 7, centerY: 7, radius: 2 } }] : [], regions: [] }] });
+      if (url.pathname.startsWith(`/storage/v1/object/public/pixfind-puzzles/puzzles/${shareId}/`)) return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: url.pathname.endsWith('/diff.png') ? changedPng : originalPng });
+    }
     if (url.pathname.endsWith('/functions/v1/public-post-puzzle')) {
       const cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'apikey, authorization, content-type, x-client-info' };
       if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
@@ -98,19 +108,19 @@ async function openPlayer(mode, viewport, apiStatus = 200) {
       return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: JSON.stringify(publicPayload(mode, url.origin)) });
     }
     if (url.pathname.includes(`/storage/v1/object/public/post-public/${id}/`)) return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: url.pathname.endsWith('/changed.png') ? changedPng : originalPng });
-    if (url.pathname === `/play/${mode}/puzzles/${id}/`) {
+    if (url.pathname === `/play/${mode}/puzzles/${shareId}/`) {
       if (scenario === 'not-found') return route.fulfill({ status: 404, contentType: 'text/html', body: 'not found' });
       if (scenario === 'incomplete') return route.fulfill({ status: 200, contentType: 'text/html', body: '<html><head><title>Preparing</title></head></html>' });
-      const shareUrl = `${base}/play/${mode}/puzzles/${id}/`;
+      const shareUrl = `${base}/play/${mode}/puzzles/${shareId}/`;
       const pageHtml = `<html><head><link rel="canonical" href="${shareUrl}"><meta property="og:url" content="${shareUrl}"><meta property="og:image" content="${shareUrl}ogp.png"><meta property="og:title" content="Test"><meta property="og:description" content="Test"></head></html>`;
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: pageHtml });
     }
-    if (url.pathname === `/play/${mode}/puzzles/${id}/ogp.png`) return route.fulfill({ status: scenario === 'image-404' ? 404 : 200, contentType: 'image/png', body: scenario === 'image-404' ? 'missing' : originalPng });
+    if (url.pathname === `/play/${mode}/puzzles/${shareId}/ogp.png`) return route.fulfill({ status: scenario === 'image-404' ? 404 : 200, contentType: 'image/png', body: scenario === 'image-404' ? 'missing' : originalPng });
     if (url.origin === base) return route.continue();
     return route.abort();
   });
   const path = mode === 'spot-difference' ? 'spot-difference' : 'hidden-object';
-  await page.goto(`${base}/play/${path}/?postPuzzle=${id}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${base}/play/${path}/?${legacy ? 'puzzle' : 'postPuzzle'}=${shareId}`, { waitUntil: 'domcontentloaded' });
   if (apiStatus === 200) {
     await page.waitForFunction(() => document.querySelector('#puzzle-share')?.hidden === false, null, { timeout: 15000 }).catch(async (error) => {
       console.error(`${mode} did not enable sharing:`, await page.evaluate(() => ({ status: document.querySelector('#pixfind-game-status')?.textContent, progress: document.querySelector('#pixfind-progress')?.textContent, title: document.querySelector('#pixfind-title')?.textContent })));
@@ -120,7 +130,7 @@ async function openPlayer(mode, viewport, apiStatus = 200) {
     await page.waitForFunction(() => document.querySelector('#pixfind-game-status')?.textContent.includes('現在利用できません'), null, { timeout: 8000 });
     assert.equal(await page.locator('#puzzle-share').evaluate((node) => node.hidden), true);
   }
-  return { context, page, get scenario() { return scenario; }, set scenario(value) { scenario = value; } };
+  return { context, page, shareId, set published(value) { published = value; }, get scenario() { return scenario; }, set scenario(value) { scenario = value; } };
 }
 
 try {
@@ -186,6 +196,28 @@ try {
     assert.ok(!localLayout.rows.slice(2).some((height) => height >= 43 && height <= 45), `${mode}: hidden share panel creates no blank 44px grid row (layout=${JSON.stringify(localLayout)})`);
     await local.close();
     checks.push(`${mode}: unavailable local trial hides share controls without reserving a blank row`);
+  }
+  for (const mode of ['spot-difference', 'hidden-object']) {
+    const harness = await openPlayer(mode, { width: 390, height: 844 }, 200, true);
+    harness.scenario = 'published';
+    const expected = `${base}/play/${mode}/puzzles/${harness.shareId}/`;
+    await harness.page.locator('#puzzle-share-copy').click();
+    await harness.page.waitForFunction(() => document.querySelector('#puzzle-share-status').textContent.includes('コピーしました'));
+    assert.deepEqual(await harness.page.evaluate(() => window.__clipboardWrites), [expected]);
+    checks.push(`${mode}: an existing published puzzle copies its verified legacy OGP URL`);
+    await harness.page.evaluate(() => { window.__clipboardReject = true; });
+    await harness.page.locator('#puzzle-share-copy').click();
+    await harness.page.waitForFunction(() => document.querySelector('#puzzle-share-url')?.hidden === false);
+    assert.equal(await harness.page.locator('#puzzle-share-url').inputValue(), expected);
+    checks.push(`${mode}: legacy clipboard denial exposes only the verified URL`);
+    for (const viewport of [[320, 568], [390, 440], [568, 320], [768, 800], [1280, 800]]) await inspectLayout(harness.page, viewport[0], viewport[1], mode);
+    harness.published = false;
+    await harness.page.reload();
+    await harness.page.waitForFunction(() => document.querySelector('#pixfind-status').textContent.includes('指定された問題は見つかりません'));
+    assert.equal(await harness.page.locator('#puzzle-share').evaluate(node => node.hidden), true);
+    assert.equal(await harness.page.locator('.pixfind-card').count(), 0);
+    checks.push(`${mode}: a withdrawn legacy puzzle is excluded and cannot share`);
+    await harness.context.close();
   }
   console.log(`Puzzle share browser checks: ${checks.length} PASS (${checks.join('; ')})`);
 } finally {

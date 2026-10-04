@@ -6,6 +6,8 @@ const POST_ID = '123e4567-e89b-42d3-a456-426614174000';
 const PROJECT = 'https://project.supabase.co';
 const originalUrl = `${PROJECT}/storage/v1/object/public/post-public/${POST_ID}/original.png`;
 const changedUrl = `${PROJECT}/storage/v1/object/public/post-public/${POST_ID}/changed.png`;
+const LEGACY_ID = 'pixfind-45be2f57-5271-4389-8cdf-85d56714a52b';
+const LEGACY_IMAGE = `${PROJECT}/storage/v1/object/public/pixfind-puzzles/puzzles/${LEGACY_ID}/original.png`;
 const shareOptions = { postId: POST_ID, supabaseUrl: PROJECT };
 
 function response(mode = 'spot_difference', overrides = {}) {
@@ -123,6 +125,19 @@ test('rejects cross-project, non-HTTPS, non-public-bucket, query, and other-post
       originalImage: { url, width: 128, height: 128 },
     }), shareOptions), /share_image_url_invalid/);
   }
+});
+
+test('legacy share pages retain the full legacy ID in canonical URLs and the play CTA', () => {
+  const payload = { ok: true, puzzle: {
+    postId: LEGACY_ID, source: 'legacy', mode: 'spot_difference', title: '旧版の問題', author: '作者名',
+    originalImage: { url: LEGACY_IMAGE, width: 64, height: 32 },
+    changedImage: { url: LEGACY_IMAGE.replace('original.png', 'diff.png'), width: 64, height: 32 },
+  } };
+  const html = createPuzzleSharePage(payload, { postId: LEGACY_ID, supabaseUrl: PROJECT });
+  assert.match(html, new RegExp(`canonical" href="https://pixieed\\.jp/play/spot-difference/puzzles/${LEGACY_ID}/`));
+  assert.match(html, new RegExp(`href="https://pixieed\\.jp/play/spot-difference/\\?puzzle=${LEGACY_ID}"`));
+  assert.doesNotMatch(html, /postPuzzle=/);
+  assert.throws(() => createPuzzleSharePage({ ...payload, puzzle: { ...payload.puzzle, source: 'modern' } }, { postId: LEGACY_ID, supabaseUrl: PROJECT }), /share_post_id_invalid/);
 });
 
 test('rejects an invalid image size and malformed public project URL', () => {

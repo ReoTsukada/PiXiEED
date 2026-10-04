@@ -8,7 +8,16 @@ import { pathToFileURL } from 'node:url';
 export function createHiddenObjectOgpRenderer() {
   let browserPromise;
   let chromePromise;
-  const modulePromise = readFile(new URL('../../js/creation/puzzle-share-page.mjs', import.meta.url)).then(bytes => `data:text/javascript;base64,${bytes.toString('base64')}`);
+  // data: modules cannot resolve relative imports. Embed this fixed local dependency
+  // as another data: module so both browser backends remain offline.
+  const modulePromise = Promise.all([
+    readFile(new URL('../../js/creation/puzzle-share-page.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../../js/creation/puzzle-share-identity.mjs', import.meta.url)),
+  ]).then(([source, identity]) => {
+    const identityUrl = `data:text/javascript;base64,${identity.toString('base64')}`;
+    const embedded = source.replace("from './puzzle-share-identity.mjs'", `from '${identityUrl}'`);
+    return `data:text/javascript;base64,${Buffer.from(embedded).toString('base64')}`;
+  });
 
   async function playwrightBrowser() {
     if (!browserPromise) browserPromise = (async () => {
