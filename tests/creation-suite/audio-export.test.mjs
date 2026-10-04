@@ -3,8 +3,34 @@ import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
 import { readPixelPngMetadata } from '../../js/pixel-png-metadata.mjs';
 import { audioImageExportSize } from '../../js/creation/audio-export.mjs';
-import { AUDIO_MAX_LOOP_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { AUDIO_INSTRUMENTS, AUDIO_MAX_LOOP_TICKS, AUDIO_PPQ, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
 import { audioExportLoops, encodeWav, exportAudioImage, renderAudioWav } from '../../js/creation/audio-export.mjs';
+
+function fakeOfflineContextClass() {
+  const starts = []; const scheduledStops = [];
+  class Param { setValueAtTime(value) { this.value = value; } linearRampToValueAtTime() {} exponentialRampToValueAtTime() {} }
+  class Node {
+    constructor() { this.frequency = new Param(); this.detune = new Param(); this.gain = new Param(); }
+    connect() {}
+    disconnect() {}
+    setPeriodicWave() {}
+    start(when) { starts.push({ when, frequency: this.frequency.value }); }
+    stop(when) { scheduledStops.push(when); }
+  }
+  return class FakeOfflineContext {
+    static starts = starts;
+    static scheduledStops = scheduledStops;
+    constructor(numberOfChannels, length, sampleRate) {
+      this.numberOfChannels = numberOfChannels; this.length = length; this.sampleRate = sampleRate; this.destination = {};
+      this.channels = Array.from({ length: numberOfChannels }, () => new Float32Array(length));
+      this.channels[0][10] = 0.4;
+    }
+    createGain() { return new Node(); }
+    createOscillator() { return new Node(); }
+    createPeriodicWave() { return {}; }
+    async startRendering() { return { numberOfChannels: this.numberOfChannels, length: this.length, sampleRate: this.sampleRate, getChannelData: (channel) => this.channels[channel] }; }
+  };
+}
 
 function pngFixture(width, height) {
   const chunk = (type, data) => {
@@ -57,6 +83,65 @@ test('sound export: the loop repeats to about 8 seconds and the WAV header match
   assert.equal(String.fromCharCode(...wav.slice(0, 4)), 'RIFF'); assert.equal(String.fromCharCode(...wav.slice(8, 12)), 'WAVE');
   assert.equal(view.getUint16(22, true), 2); assert.equal(view.getUint32(24, true), 44100); assert.equal(view.getUint32(40, true), 12);
   assert.equal(wav.length, 44 + 12); assert.equal(view.getInt16(44 + 4, true), 32767); assert.equal(view.getInt16(44 + 8, true), -32768);
+});
+
+test('WAV scheduler runs lookahead timers so late notes sound in a single full loop and release is retained', async () => {
+  const song = setAudioPixel(createAudioSong({ songId: 'wav-late', tempo: 120 }), {
+    trackId: 'track-square', pitch: 60, startTick: 1440, noteId: 'wav-late-note'
+  });
+  const originalNotes = structuredClone(song.tracks.map((track) => track.clips.map((clip) => clip.notes)));
+  const OfflineContext = fakeOfflineContextClass();
+  const result = await renderAudioWav(song, { loops: 1, sampleRate: 8000, OfflineContext });
+  const expectedOnset = 0.035 + 1440 * 60 / song.tempo / 480;
+  assert.ok(OfflineContext.starts.some(({ when }) => Math.abs(when - expectedOnset) < 0.001), 'the note beyond the initial one-second lookahead is scheduled');
+  assert.ok(OfflineContext.scheduledStops.some((time) => time > expectedOnset + 0.25), 'the note release is scheduled after its gate');
+  assert.equal(OfflineContext.starts.some(({ when }) => when >= expectedOnset + 2), false, 'one-loop export does not begin another cycle');
+  assert.equal(result.loops, 1);
+  assert.deepEqual(song.tracks.map((track) => track.clips.map((clip) => clip.notes)), originalNotes, 'export leaves source notes untouched');
+});
+
+test('WAV scheduler renders every requested loop including late top and bottom notes, then leaves the final release tail', async () => {
+  let song = createAudioSong({ songId: 'wav-multi', tempo: 120 });
+  song = setAudioPixel(song, { trackId: 'track-square', pitch: 60, startTick: 1440, noteId: 'wav-late-note' });
+  for (const [row, pitch] of AUDIO_PIXEL_PITCHES.entries()) {
+    song = setAudioPixel(song, { trackId: 'track-square', pitch, startTick: 1800, noteId: `wav-run-${row}` });
+  }
+  song = {
+    ...song,
+    tracks: song.tracks.map((track) => track.trackId !== 'track-square' ? track : {
+      ...track,
+      clips: track.clips.map((clip) => ({
+        ...clip,
+        notes: clip.notes.map((note) => note.startTick === 1800
+          ? { ...note, sourceCell: { kind: 'audio-image', x: 15, y: AUDIO_PIXEL_PITCHES.indexOf(note.pitch) } }
+          : note)
+      }))
+    })
+  };
+  const originalNotes = structuredClone(song.tracks.map((track) => track.clips.map((clip) => clip.notes)));
+  const OfflineContext = fakeOfflineContextClass();
+  const result = await renderAudioWav(song, { loops: 2, sampleRate: 8000, OfflineContext });
+  const tickSeconds = 60 / song.tempo / AUDIO_PPQ;
+  for (const tick of [1440, 1800]) {
+    const onset = 0.035 + tick * tickSeconds;
+    assert.ok(OfflineContext.starts.some(({ when }) => Math.abs(when - onset) < 0.001), `loop one schedules tick ${tick}`);
+    assert.equal(OfflineContext.starts.filter(({ when }) => Math.abs(when - (onset + 2)) < 0.001).length, tick === 1800 ? 2 : 1, `loop two schedules the source run at tick ${tick}`);
+  }
+  const finalEndpointOnset = 0.035 + 1800 * tickSeconds + 2;
+  const endpointVoices = OfflineContext.starts.filter(({ when }) => Math.abs(when - finalEndpointOnset) < 0.001);
+  assert.equal(endpointVoices.length, 2, 'a thick shared-image run plays only its upper and lower endpoint');
+  const endpointPitches = endpointVoices.map(({ frequency }) => Math.round(69 + 12 * Math.log2(frequency / 440))).sort((a, b) => a - b);
+  assert.deepEqual(endpointPitches, [48, 84]);
+  const thirdLoopLateOnset = 0.035 + 1440 * tickSeconds + 4;
+  assert.equal(OfflineContext.starts.some(({ when }) => Math.abs(when - thirdLoopLateOnset) < 0.001), false, 'no third loop is started');
+  const finalEndpointSoundEnd = 0.035 + 1800 * tickSeconds + 2 + AUDIO_PIXEL_TICKS * tickSeconds + AUDIO_INSTRUMENTS.find(({ id }) => id === 'square').release + 0.005;
+  assert.ok(OfflineContext.scheduledStops.some((time) => Math.abs(time - finalEndpointSoundEnd) < 0.002), 'the second-loop endpoint release is scheduled through its tail');
+  assert.equal(result.loops, 2);
+  assert.ok(result.seconds > 4, 'the rendered file includes the release tail');
+  assert.deepEqual(song.tracks.map((track) => track.clips.map((clip) => clip.notes)), originalNotes, 'multi-loop export leaves source notes untouched');
+  const wav = new Uint8Array(await result.blob.arrayBuffer());
+  assert.equal(String.fromCharCode(...wav.slice(0, 4)), 'RIFF');
+  assert.ok(new DataView(wav.buffer).getInt16(84, true) > 20000, 'peak normalization is retained');
 });
 
 test('long WAV requests are rejected before allocating an OfflineAudioContext', async () => {

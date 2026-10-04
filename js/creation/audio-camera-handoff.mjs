@@ -1,4 +1,4 @@
-import { AUDIO_PIXEL_TICKS, validateAudioSong } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { AUDIO_PIXEL_TICKS, validateAudioSong } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
 
 export const AUDIO_CAMERA_REQUEST_KEY = 'pixieed:audio-camera-request:v1';
 export const AUDIO_CAMERA_RETURN_KEY = 'pixieed:audio-camera-return:v1';

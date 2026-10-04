@@ -27,6 +27,7 @@ export function validateAudioSharedImage(image, rowPitchMap) {
   return image;
 }
 import { AUDIO_INSTRUMENTS, getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1';
+import { createAudioColorMixPlan } from './audio-color-mix.mjs?rev=20261004-audio-color-mix-1';
 export { AUDIO_INSTRUMENTS };
 
 /** Four stable storage lanes. Palette slots can select any modeled instrument. */
@@ -281,7 +282,7 @@ export function normalizeAudioPixelSong(song) {
   return normalized;
 }
 
-export function collectAudioEvents(song, { joinAdjacent = false } = {}) {
+export function collectAudioEvents(song, { joinAdjacent = false, outlineRuns = false } = {}) {
   validateAudioSong(song);
   const events = [];
   const instruments = new Map((song.pixelPalette || AUDIO_PIXEL_PALETTE).map((slot) => [slot.slotId, slot.instrument]));
@@ -289,11 +290,12 @@ export function collectAudioEvents(song, { joinAdjacent = false } = {}) {
     events.push({ instrument: instruments.get(track.instrument) || track.instrument, startTick: note.startTick, durationTicks: note.durationTicks, pitch: note.pitch, velocity: note.velocity,
       trackId: track.trackId, colorId: note.colorId || `slot-${track.instrument}`, sourceCell: note.sourceCell || null });
   }
-  const audible = joinAdjacent ? [] : events;
+  const projected = outlineRuns ? projectSourceCellRuns(events) : events;
+  const audible = joinAdjacent ? [] : projected;
   if (joinAdjacent) {
     const lanes = new Map();
-    for (const event of events) {
-      const key = JSON.stringify([event.trackId, event.pitch, event.sourceCell?.y ?? null]);
+    for (const event of projected) {
+      const key = JSON.stringify([event.trackId, event.colorId, event.pitch, event.sourceCell?.y ?? null, event.groupGain ?? 1]);
       if (!lanes.has(key)) lanes.set(key, []);
       lanes.get(key).push(event);
     }
@@ -303,18 +305,62 @@ export function collectAudioEvents(song, { joinAdjacent = false } = {}) {
       for (const event of lane) {
         if (current && current.colorId === event.colorId && current.velocity === event.velocity
           && current.startTick + current.durationTicks === event.startTick
+          && (current.groupGain ?? 1) === (event.groupGain ?? 1)
           && Boolean(current.sourceCell) === Boolean(event.sourceCell)
           && (!event.sourceCell || (current.sourceCell.kind === 'audio-animation'
-            ? current.sourceCell.x + current.durationTicks / AUDIO_PIXEL_TICKS === event.sourceCell.x
-            : current.sourceCell.x + 1 === event.sourceCell.x))) {
+            ? current.sourceCell.kind === event.sourceCell.kind
+              && current.sourceCell.x + 1 === event.sourceCell.x
+              && ((current.sourceCell.frameId === event.sourceCell.frameId
+                && current.sourceCell.frameIndex === event.sourceCell.frameIndex
+                && current.sourceCell.localX + 1 === event.sourceCell.localX)
+                || (event.sourceCell.frameIndex === current.sourceCell.frameIndex + 1 && event.sourceCell.localX === 0))
+            : current.sourceCell.kind === event.sourceCell.kind
+              && current.sourceCell.x + 1 === event.sourceCell.x))) {
           current.durationTicks += event.durationTicks;
           if (event.sourceCell) current.sourceCell = event.sourceCell;
         } else { current = { ...event }; audible.push(current); }
       }
     }
   }
-  return audible.map(({ trackId, colorId, sourceCell, ...event }) => event)
+  return audible.map(({ trackId, colorId, sourceCell, groupGain, ...event }) => outlineRuns
+    ? { ...event, ...(colorId === undefined ? {} : { colorId }), ...(sourceCell ? { sourceCell } : {}), ...(groupGain === undefined ? {} : { groupGain }) }
+    : event)
     .sort((left, right) => left.startTick - right.startTick || left.pitch - right.pitch || (left.instrument < right.instrument ? -1 : left.instrument > right.instrument ? 1 : 0));
+}
+
+/** Keep only the sounding outline of each contiguous source-image color run. */
+function projectSourceCellRuns(events) {
+  const columns = new Map();
+  const manual = [];
+  for (const event of events) {
+    const cell = event.sourceCell;
+    if (!cell || !Number.isInteger(cell.x) || !Number.isInteger(cell.y)) { manual.push({ ...event }); continue; }
+    const key = JSON.stringify([event.trackId, event.colorId, event.startTick, event.durationTicks,
+      cell.kind ?? null, cell.x, cell.frameId ?? null, cell.frameIndex ?? null, cell.localX ?? null]);
+    if (!columns.has(key)) columns.set(key, []);
+    columns.get(key).push(event);
+  }
+  const projected = [...manual];
+  for (const column of columns.values()) {
+    column.sort((left, right) => left.sourceCell.y - right.sourceCell.y);
+    let run = [];
+    const flush = () => {
+      if (!run.length) return;
+      const top = run[0]; const bottom = run[run.length - 1];
+      if (top.pitch === bottom.pitch) projected.push({ ...top, groupGain: 1 });
+      else {
+        projected.push({ ...top, groupGain: 0.5 });
+        projected.push({ ...bottom, groupGain: 0.5 });
+      }
+      run = [];
+    };
+    for (const event of column) {
+      if (run.length && event.sourceCell.y !== run[run.length - 1].sourceCell.y + 1) flush();
+      run.push(event);
+    }
+    flush();
+  }
+  return projected;
 }
 
 export function midiFrequency(pitch) {
@@ -429,7 +475,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
 
   function scheduleCycle(song, cycleToken) {
     if (!playing || cycleToken !== token || !context) return;
-    const events = collectAudioEvents(song, { joinAdjacent: true });
+    const events = collectAudioEvents(song, { joinAdjacent: true, outlineRuns: true });
     if (events.length > AUDIO_MAX_PLAYBACK_EVENTS) throw new RangeError(`再生できる音符数は${AUDIO_MAX_PLAYBACK_EVENTS.toLocaleString()}個までです。絵を曲に反映し直すか、音符を減らしてください。`);
     const startAt = context.currentTime + 0.035;
     const secondsPerTick = 60 / song.tempo / AUDIO_PPQ;
@@ -438,6 +484,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       const instrument = getAudioInstrument(event.instrument);
       return { event, instrument, onsetTick: event.startTick, endTick: event.startTick + event.durationTicks + (instrument?.release || 0) / secondsPerTick };
     });
+    const colorMixPlan = createAudioColorMixPlan(scheduled);
     const playable = scheduled.map((item, index) => ({ ...item, index })).filter(({ instrument }) => instrument);
     const playableCounts = estimateOverlapCounts(playable);
     const overlapCounts = new Array(scheduled.length).fill(1);
@@ -461,7 +508,8 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       // Scale only dense passages. Count notes whose gated or release sound
       // overlaps this note's audible window, including tails from earlier cells.
       const overlaps = overlapCounts[eventIndex - 1] || 1;
-      const peak = event.velocity / 127 * 0.18 / Math.sqrt(Math.max(1, overlaps));
+      const sourceMix = colorMixPlan[eventIndex - 1];
+      const peak = event.velocity / 127 * 0.18 / (sourceMix ? 1 : Math.sqrt(Math.max(1, overlaps)));
       const sum = context.createGain();
       let output = sum;
       let filterNode = null;
@@ -471,7 +519,31 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
         sum.connect(filterNode); output = filterNode; activeNodes.add(filterNode);
       }
       const gain = context.createGain();
-      output.connect(gain); gain.connect(context.destination);
+      output.connect(gain);
+      let mixGain = null;
+      if (sourceMix) {
+        mixGain = context.createGain();
+        gain.connect(mixGain); mixGain.connect(context.destination);
+        const initialPoint = sourceMix.filter(({ tick }) => tick <= event.startTick).at(-1) || sourceMix[0];
+        const initialMixGain = initialPoint?.gain ?? 1;
+        mixGain.gain.setValueAtTime(initialMixGain, onset);
+        let lastAutomationAt = onset;
+        let lastMixGain = initialMixGain;
+        for (let pointIndex = 0; pointIndex < sourceMix.length; pointIndex += 1) {
+          const point = sourceMix[pointIndex];
+          const changeAt = startAt + point.tick * secondsPerTick;
+          if (changeAt <= onset || changeAt > soundEnd || point === initialPoint) continue;
+          const rampStart = Math.max(lastAutomationAt, changeAt);
+          const nextPoint = sourceMix[pointIndex + 1];
+          const nextChangeAt = nextPoint ? startAt + nextPoint.tick * secondsPerTick : soundEnd;
+          const rampEnd = Math.min(soundEnd, nextChangeAt, rampStart + 0.02);
+          mixGain.gain.setValueAtTime(lastMixGain, rampStart);
+          if (rampEnd > rampStart) mixGain.gain.linearRampToValueAtTime(point.gain, rampEnd);
+          else mixGain.gain.setValueAtTime(point.gain, rampStart);
+          lastAutomationAt = rampEnd;
+          lastMixGain = point.gain;
+        }
+      } else gain.connect(context.destination);
       gain.gain.setValueAtTime(0, onset);
       gain.gain.linearRampToValueAtTime(peak, onset + instrument.attack);
       gain.gain.linearRampToValueAtTime(peak * instrument.sustain, decayEnd);
@@ -488,7 +560,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       const sourceGains = [1, ...instrument.partials.map(({ gain: level }) => level), ...(sources.length > instrument.partials.length + 1 ? [instrument.transient] : [])];
       let remainingSources = sources.length;
       const cleanNote = () => {
-        disposeNode(gain); disposeNode(sum);
+        disposeNode(gain); if (mixGain) disposeNode(mixGain); disposeNode(sum);
         if (filterNode) disposeNode(filterNode);
       };
       sources.forEach((source, index) => {
@@ -499,7 +571,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
         source.onended = () => { disposeNode(source); if (route) disposeNode(route); remainingSources -= 1; if (remainingSources === 0) cleanNote(); };
         activeNodes.add(source); source.start(onset); source.stop(soundEnd);
       });
-      activeNodes.add(sum); activeNodes.add(gain);
+      activeNodes.add(sum); activeNodes.add(gain); if (mixGain) activeNodes.add(mixGain);
       }
       if (eventIndex < scheduled.length) lookaheadTimer = schedule(() => { lookaheadTimer = null; scheduleWindow(); }, 25);
     };

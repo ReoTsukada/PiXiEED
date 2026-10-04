@@ -1,4 +1,4 @@
-import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_PALETTE, audioPixelColumns, resizeAudioCanvas, validateAudioSong } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_PALETTE, audioPixelColumns, resizeAudioCanvas, validateAudioSong } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
 import { DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs';
 
 const colorDefaults = AUDIO_PIXEL_PALETTE.map(({ color }) => color);

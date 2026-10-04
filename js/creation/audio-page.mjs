@@ -1,7 +1,7 @@
 import { importAudioImage } from './audio-image.mjs?rev=20260930-audio-timebase-1';
 import { beginAudioCamera, takeAudioCameraReturn, readAudioCameraDraft } from './audio-camera-handoff.mjs?rev=20260930-audio-timebase-1';
-import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20260930-audio-timebase-1';
-import { renderAudioVideo } from './audio-video.mjs?rev=20260930-audio-timebase-1';
+import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20261004-audio-outline-color-1';
+import { renderAudioVideo } from './audio-video.mjs?rev=20261004-audio-outline-color-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
 import { createAudioViewport } from './audio-viewport.mjs?rev=20261001-connected-editor-1';
@@ -27,7 +27,7 @@ import { mountColorPanel } from './color-panel.mjs?rev=20261004-audio-fixed-pane
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
   audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
-} from './audio-core.mjs?rev=20260930-audio-timebase-1';
+} from './audio-core.mjs?rev=20261004-audio-outline-color-1';
 
 const PITCHES = Object.freeze(AUDIO_PIXEL_PITCHES.map((midi, index) => ({ midi, label: ['ド6', 'ラ5', 'ソ5', 'ミ5', 'レ5', 'ド5', 'ラ4', 'ソ4', 'ミ4', 'レ4', 'ド4', 'ラ3', 'ソ3', 'ミ3', 'レ3', 'ド3'][index] })));
 export async function mountAudioMode({ scope, mountWorkspace = mountPxdTools } = {}) {
@@ -1360,14 +1360,14 @@ if (exportVideoButton) scope.listen(exportVideoButton, 'click', async () => {
   try { ensureAudioAnimationProjection(); } catch (error) { setStatus(error.message || '動画の音を準備できませんでした。'); return; }
   const controller = new AbortController(); const epoch = ++audioVideoEpoch;
   audioVideoController = controller;
-  const sourceSnapshot = { song, image: pxdImage, link: pxdLink, animation: audioAnimation, bridge: pxdBridge, current: pxdBridge?.currentProject, held: pxdBridge?.heldProject };
+  const sourceSnapshot = { song, image: pxdImage, link: pxdLink, animation: audioAnimation, bridge: pxdBridge, currentProjectId: pxdBridge?.currentProject?.projectId, held: pxdBridge?.heldProject };
   const selectedImage = pxdImage || audioSongImage(song);
   const imageSnapshot = { width: selectedImage.width, height: selectedImage.height, rgba: new Uint8ClampedArray(selectedImage.rgba) };
-  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.animation === audioAnimation && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current === pxdBridge?.currentProject && sourceSnapshot.held === pxdBridge?.heldProject && (sourceSnapshot.image === null || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
+  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.animation === audioAnimation && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.currentProjectId === pxdBridge?.currentProject?.projectId && sourceSnapshot.held === pxdBridge?.heldProject && (sourceSnapshot.image === null || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
   const songSnapshot = structuredClone(song);
   refreshAudioUi();
   cancelVideoButton.hidden = false;
-  status.classList.add('is-visible'); status.textContent = '1ループの動画を作成しています…';
+  status.classList.add('is-visible'); status.textContent = '曲の最後まで動画を作成しています…';
   try {
     await pxdBridge?.assertCanSave();
     if (!unchangedSource() || epoch !== audioVideoEpoch) throw new Error('素材が切り替わりました。音付き動画をもう一度作成してください。');

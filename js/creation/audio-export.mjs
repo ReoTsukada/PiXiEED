@@ -1,4 +1,4 @@
-import { AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { AUDIO_INSTRUMENTS, AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
@@ -71,7 +71,7 @@ export async function renderAudioWav(song, { loops = audioExportLoops(song), sam
     throw new RangeError('この曲は長いためWAVへ書き出せません。曲を120秒以内にしてください。プロジェクト保存と再生は続けられます。');
   }
   const offline = new OfflineContext(2, frameCount, sampleRate);
-  let clock = 0; let nextCycle = null;
+  let clock = 0; let timerId = 0; const timers = [];
   const context = new Proxy(offline, { get(target, key) {
     if (key === 'currentTime') return clock;
     if (key === 'resume') return async () => {};
@@ -79,11 +79,44 @@ export async function renderAudioWav(song, { loops = audioExportLoops(song), sam
     const value = Reflect.get(target, key, target);
     return typeof value === 'function' ? value.bind(target) : value;
   } });
-  const player = createAudioPlayer({ audioContextFactory: () => context, schedule: (callback) => { nextCycle = callback; return 1; }, cancel: () => { nextCycle = null; } });
-  if (!await player.play(song)) throw new Error('まだ音がありません。');
-  for (let loop = 1; loop < loops && nextCycle; loop += 1) { const run = nextCycle; nextCycle = null; clock = loop * loopSeconds; run(); }
-  nextCycle = null;
-  const rendered = await offline.startRendering();
+  const player = createAudioPlayer({
+    audioContextFactory: () => context,
+    schedule(callback, delay = 0) {
+      const timer = { callback, due: clock * 1000 + Math.max(0, Number(delay) || 0), id: ++timerId, cancelled: false };
+      timers.push(timer);
+      return timer;
+    },
+    cancel(timer) { if (timer) timer.cancelled = true; }
+  });
+  let rendered;
+  try {
+    if (!await player.play(song)) throw new Error('まだ音がありません。');
+    if (loops === 1) player.stopAfterCurrentLoop();
+    const loopMilliseconds = loopSeconds * 1000;
+    const releaseMilliseconds = Math.max(0, ...collectAudioEvents(song).map(({ instrument }) => AUDIO_INSTRUMENTS.find((voice) => voice.id === instrument)?.release || 0)) * 1000;
+    const renderDeadline = loopMilliseconds * loops + releaseMilliseconds + 60;
+    let nextLoopBoundary = loopMilliseconds; let completedLoops = 0; let operations = 0;
+    let reachedDeadline = false;
+    while (operations++ < 250_000) {
+      timers.sort((left, right) => left.due - right.due || left.id - right.id);
+      while (timers[0]?.cancelled) timers.shift();
+      const timer = timers.shift();
+      if (!timer || timer.due >= renderDeadline - 1e-6) { reachedDeadline = Boolean(timer); break; }
+      clock = Math.max(clock, timer.due / 1000);
+      timer.callback();
+      if (Math.abs(timer.due - nextLoopBoundary) < 0.05) {
+        completedLoops += 1;
+        nextLoopBoundary += loopMilliseconds;
+        if (completedLoops === loops - 1) player.stopAfterCurrentLoop();
+      }
+    }
+    if (operations >= 250_000) throw new Error('音の書き出しスケジュールが上限を超えました。');
+    if (player.isPlaying && !reachedDeadline) throw new Error('音の書き出しを最後まで準備できませんでした。');
+    clock = Math.max(clock, renderDeadline / 1000);
+    rendered = await offline.startRendering();
+  } finally {
+    player.stop();
+  }
   // playback is quiet on purpose (it mixes with the page); a saved file is brought up to a normal level
   let peak = 0; for (let channel = 0; channel < rendered.numberOfChannels; channel += 1) for (const sample of rendered.getChannelData(channel)) peak = Math.max(peak, Math.abs(sample));
   const gain = peak > 0 ? Math.min(4, 0.89 / peak) : 1;

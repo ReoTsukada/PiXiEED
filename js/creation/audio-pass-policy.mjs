@@ -1,4 +1,4 @@
-import { AUDIO_PIXEL_TICKS, collectAudioEvents } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { AUDIO_PIXEL_TICKS, collectAudioEvents } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
 import { AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20260930-four-voices-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 

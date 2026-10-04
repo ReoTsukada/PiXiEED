@@ -1,4 +1,4 @@
-import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20260930-audio-timebase-1';
+import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
 import { getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1';
 
 const VIDEO_FRAME_LONG_EDGE = 1024;
@@ -105,7 +105,8 @@ export async function renderAudioVideo(song, image, {
   const tailMs = Math.ceil(releaseSeconds * 1000) + 80;
   const chunks = []; const allTracks = new Set();
   let canvas = null; let source = null; let draw = null; let canvasStream = null; let audioContext = null; let audioStream = null; let stream = null; let recorder = null;
-  let loopTimer = null; let tailTimer = null; let watchdogTimer = null; let progressTimer = null; let player = null; let startedAt = 0;
+  const scheduledTimers = new Set();
+  let completionTimer = null; let watchdogTimer = null; let progressTimer = null; let player = null; let startedAt = 0;
   let settled = false; let startedRecording = false; let failure = null;
   const hiddenListener = () => { if (documentRef.visibilityState === 'hidden') finishError(abortError()); };
   let resolveRecording; let rejectRecording;
@@ -157,28 +158,42 @@ export async function renderAudioVideo(song, image, {
     documentRef.addEventListener?.('visibilitychange', hiddenListener);
     recorder.start(1000);
     startedRecording = true;
-    watchdogTimer = setTimeoutImpl(() => finishError(new Error('動画の記録が時間内に完了しませんでした。もう一度お試しください。')), Math.ceil(loopSeconds * 1000 + tailMs + 5000));
+    watchdogTimer = setTimeoutImpl(() => finishError(new Error('動画の記録が時間内に完了しませんでした。もう一度お試しください。')), Math.ceil((loopSeconds + 0.035) * 1000 + tailMs + 5000));
     player = playerFactory({
       audioContextFactory: () => routedContext,
-      schedule: (_callback, delay) => {
-        loopTimer = setTimeoutImpl(() => {
-          loopTimer = null;
-          if (settled) return;
-          draw(1);
-          progressTimer !== null && clearIntervalImpl(progressTimer);
-          progressTimer = null;
-          tailTimer = setTimeoutImpl(() => { tailTimer = null; player?.stop(); if (recorder?.state === 'recording') recorder.stop(); }, tailMs);
-        }, delay + 40);
-        return loopTimer;
+      schedule: (callback, delay) => {
+        let timer = null;
+        timer = setTimeoutImpl(() => {
+          scheduledTimers.delete(timer);
+          if (!settled) callback();
+        }, delay);
+        scheduledTimers.add(timer);
+        return timer;
       },
-      cancel: (timer) => { if (timer !== null) clearTimeoutImpl(timer); if (timer === loopTimer) loopTimer = null; }
+      cancel: (timer) => {
+        if (timer === null) return;
+        clearTimeoutImpl(timer);
+        scheduledTimers.delete(timer);
+      }
     });
     const played = await Promise.race([player.play(song), recording.then((result) => ({ recordingResult: result }))]);
     if (played?.recordingResult) return played.recordingResult;
     if (!played) throw new Error('この曲を動画にできませんでした。');
     if (signal?.aborted) throw abortError();
     if (failure) throw failure;
-    startedAt = Date.now();
+    if (typeof player.stopAfterCurrentLoop !== 'function' || !player.stopAfterCurrentLoop()) {
+      throw new Error('曲の再生をループ終端で停止できませんでした。');
+    }
+    startedAt = Date.now() + 35;
+    completionTimer = setTimeoutImpl(() => {
+      completionTimer = null;
+      if (settled) return;
+      draw(1);
+      progressTimer !== null && clearIntervalImpl(progressTimer);
+      progressTimer = null;
+      player?.stop();
+      if (recorder?.state === 'recording') recorder.stop();
+    }, Math.ceil((loopSeconds + 0.035) * 1000 + tailMs));
     progressTimer = setIntervalImpl(() => {
       if (settled) return;
       const progress = Math.min(1, (Date.now() - startedAt) / (loopSeconds * 1000));
@@ -191,8 +206,9 @@ export async function renderAudioVideo(song, image, {
     finishError(reported);
     throw reported;
   } finally {
-    if (loopTimer !== null) clearTimeoutImpl(loopTimer);
-    if (tailTimer !== null) clearTimeoutImpl(tailTimer);
+    if (completionTimer !== null) clearTimeoutImpl(completionTimer);
+    for (const timer of scheduledTimers) clearTimeoutImpl(timer);
+    scheduledTimers.clear();
     if (watchdogTimer !== null) clearTimeoutImpl(watchdogTimer);
     if (progressTimer !== null) clearIntervalImpl(progressTimer);
     signal?.removeEventListener('abort', abortListener);

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { audioVideoFrameSize, chooseAudioVideoMimeType, renderAudioVideo } from '../../js/creation/audio-video.mjs';
-import { AUDIO_MAX_LOOP_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { AUDIO_MAX_LOOP_TICKS, createAudioPlayer, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { getAudioInstrument } from '../../js/creation/audio-timbres.mjs';
 
 test('video frame sizing preserves the source aspect ratio and stays bounded', () => {
   assert.deepEqual(audioVideoFrameSize(16, 16), { width: 1024, height: 1024, scale: 64 });
@@ -18,8 +19,9 @@ test('video format prefers a supported MP4 encoder and falls back to WebM', () =
   assert.equal(chooseAudioVideoMimeType(class Unsupported { static isTypeSupported() { return false; } }), null);
 });
 
-function makeHarness({ failRecorder = false } = {}) {
-  const timers = []; const intervals = []; const audioTracks = []; const videoTracks = []; const contexts = [];
+function makeHarness({ failRecorder = false, playerFactory } = {}) {
+  const timers = []; const intervals = []; const audioTracks = []; const videoTracks = []; const contexts = []; const sources = [];
+  let now = 0;
   const draws = []; const listeners = new Map(); let recorderInstance; let observedDestination; let mediaDestination;
   class Track { constructor(kind) { this.kind = kind; this.stopped = false; } stop() { this.stopped = true; } }
   class FakeCanvas {
@@ -38,9 +40,12 @@ function makeHarness({ failRecorder = false } = {}) {
     addEventListener(type, callback) { listeners.set(type, callback); }, removeEventListener(type) { listeners.delete(type); }
   };
   class FakeAudioContext {
-    constructor() { this.state = 'running'; this.destination = { original: true }; this.currentTime = 0; this.closed = false; contexts.push(this); }
+    constructor() { this.state = 'running'; this.destination = { original: true }; this.closed = false; contexts.push(this); }
+    get currentTime() { return now / 1000; }
     createMediaStreamDestination() { const track = new Track('audio'); audioTracks.push(track); mediaDestination = { stream: { getTracks: () => [track], getAudioTracks: () => [track] } }; return mediaDestination; }
-    createGain() { return { gain: { value: 1 }, connect(destination) { this.destination = destination; } }; }
+    createGain() { return { gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect(destination) { this.destination = destination; }, disconnect() {} }; }
+    createOscillator() { const source = { frequency: { setValueAtTime() {} }, detune: { setValueAtTime() {} }, connect() {}, disconnect() {}, start: (at) => { sources.push(at); }, stop() {} }; return source; }
+    createBiquadFilter() { return { frequency: { value: 0 }, Q: { value: 0 }, connect() {}, disconnect() {} }; }
     async resume() {}
     async close() { this.closed = true; this.state = 'closed'; }
   }
@@ -52,22 +57,28 @@ function makeHarness({ failRecorder = false } = {}) {
     start() { if (failRecorder) throw new Error('recorder failed'); this.state = 'recording'; }
     stop() { if (this.state !== 'recording') return; this.state = 'inactive'; this.listeners.get('dataavailable')?.({ data: new Blob(['video'], { type: this.mimeType }) }); this.listeners.get('stop')?.(); }
   }
-  const playerFactory = ({ audioContextFactory, schedule }) => {
+  const fakePlayerFactory = ({ audioContextFactory, schedule }) => {
     const routed = audioContextFactory(); observedDestination = routed.destination;
     return {
-      async play() { await routed.resume(); schedule(() => assert.fail('must not start a second loop'), 2000); return true; },
+      async play() { await routed.resume(); schedule(() => { this.schedulerCallbackRan = true; }, 25); return true; },
+      stopAfterCurrentLoop() { this.stopAfterLoopRequested = true; return true; },
       stop() {}, async dispose() { await routed.close(); }
     };
   };
   const dependencies = {
     MediaRecorderImpl: FakeRecorder, AudioContextImpl: FakeAudioContext, MediaStreamImpl: FakeMediaStream,
-    documentRef, playerFactory,
-    setTimeoutImpl(callback, delay) { const timer = { callback, delay, cleared: false }; timers.push(timer); return timer; },
+    documentRef, playerFactory: playerFactory || fakePlayerFactory,
+    setTimeoutImpl(callback, delay) { const timer = { callback, delay, due: now + delay, cleared: false }; timers.push(timer); return timer; },
     clearTimeoutImpl(timer) { if (timer) timer.cleared = true; },
     setIntervalImpl(callback, delay) { const timer = { callback, delay, cleared: false }; intervals.push(timer); return timer; },
     clearIntervalImpl(timer) { if (timer) timer.cleared = true; }
   };
-  return { dependencies, timers, intervals, audioTracks, videoTracks, contexts, draws, listeners, get recorder() { return recorderInstance; }, get observedDestination() { return observedDestination; }, get mediaDestination() { return mediaDestination; } };
+  function runNextTimer(before = Infinity) {
+    const timer = timers.filter((candidate) => !candidate.cleared && candidate.due <= before).sort((a, b) => a.due - b.due)[0];
+    if (!timer) return null;
+    timer.cleared = true; now = timer.due; timer.callback(); return timer;
+  }
+  return { dependencies, timers, intervals, audioTracks, videoTracks, contexts, draws, listeners, sources, runNextTimer, get now() { return now; }, get recorder() { return recorderInstance; }, get observedDestination() { return observedDestination; }, get mediaDestination() { return mediaDestination; } };
 }
 
 function fixture() {
@@ -84,15 +95,65 @@ test('records exactly one loop to a routed audio track and releases every record
   assert.equal(harness.recorder.stream.tracks.length, 2, 'the recording has one video and one audio track');
   assert.equal(harness.recorder.state, 'recording');
   assert.deepEqual(harness.draws.find(([kind]) => kind === 'pixels')[1].slice(0, 4), [37, 37, 37, 37], 'the source RGBA image is retained');
-  const loopDelay = song.loopTicks * 60 / song.tempo / 480 * 1000;
-  harness.timers.find(({ delay, cleared }) => !cleared && delay === loopDelay + 40).callback();
-  const tail = harness.timers.find(({ delay, cleared }) => !cleared && delay > 80 && delay < 1000);
-  tail.callback();
+  const completion = harness.timers.find(({ delay, cleared }) => !cleared && delay > 2000 && delay < 2500);
+  assert.ok(completion, 'recording completion is scheduled independently after the song and release tail');
+  harness.runNextTimer(completion.due - 1);
+  assert.equal(harness.recorder.state, 'recording', 'the player lookahead callback does not finish recording');
+  assert.ok(harness.timers.some(({ delay, cleared }) => delay === 25 && cleared), 'a scheduled audio-player callback actually ran');
+  assert.equal(harness.recorder.state, 'recording', 'the song remains recorded until its independent completion deadline');
+  while (harness.runNextTimer(completion.due - 1)) {}
+  assert.equal(harness.recorder.state, 'recording');
+  harness.runNextTimer(completion.due);
   const result = await pending;
   assert.equal(result.extension, 'webm'); assert.equal(result.seconds, 2); assert.equal(result.blob.size, 5);
   assert.ok(harness.audioTracks.every((track) => track.stopped)); assert.ok(harness.videoTracks.every((track) => track.stopped));
   assert.ok(harness.contexts.every((context) => context.closed)); assert.equal(harness.intervals.every(({ cleared }) => cleared), true);
+  assert.equal(harness.timers.every(({ cleared }) => cleared), true);
   assert.equal(harness.listeners.size, 0);
+});
+
+test('real player lookahead schedules late notes and one frame records through the full music loop and release tail', async () => {
+  const harness = makeHarness({ playerFactory: createAudioPlayer });
+  const { image } = fixture();
+  let song = setAudioPixel(createAudioSong({ tempo: 120 }), { trackId: 'track-square', pitch: 84, startTick: 0, noteId: 'early-video-note' });
+  song = setAudioPixel(song, { trackId: 'track-square', pitch: 84, startTick: 1200, noteId: 'late-video-note' });
+  let resolved = false;
+  const pending = renderAudioVideo(song, image, { ...harness.dependencies, frameImages: [image], frameTicks: 1 }).then((result) => { resolved = true; return result; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.recorder.state, 'recording');
+  const firstLookahead = harness.timers.find(({ delay, cleared }) => delay === 25 && !cleared);
+  assert.ok(firstLookahead, 'the real player schedules its 25ms lookahead callback');
+  harness.runNextTimer(firstLookahead.due);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.recorder.state, 'recording', 'lookahead callbacks cannot be mistaken for loop completion');
+  assert.equal(resolved, false);
+
+  const loopMs = song.loopTicks * 60 / song.tempo / 480 * 1000;
+  const completion = harness.timers.filter(({ cleared }) => !cleared).find(({ delay }) => delay > loopMs && delay < loopMs + 1000);
+  assert.ok(completion);
+  assert.equal(completion.delay, Math.ceil(loopMs + 35 + Math.ceil(getAudioInstrument('square').release * 1000) + 80));
+  while (harness.runNextTimer(completion.due - 1)) {}
+  assert.ok(harness.sources.length >= 2, 'the late note was scheduled by the live player lookahead');
+  assert.equal(harness.recorder.state, 'recording', 'single-frame output is held until the music loop and release tail end');
+  assert.equal(resolved, false);
+  harness.runNextTimer(completion.due);
+  const result = await pending;
+  assert.equal(result.seconds, 2, 'reported seconds remain the musical loop duration');
+  assert.equal(harness.recorder.state, 'inactive');
+  assert.ok(harness.timers.every(({ cleared }) => cleared));
+});
+
+test('multi-frame video holds its final frame through audio completion', async () => {
+  const harness = makeHarness(); const { song, image } = fixture();
+  const lastFrame = { width: image.width, height: image.height, rgba: new Uint8ClampedArray(image.rgba.length).fill(88) };
+  const pending = renderAudioVideo(song, image, { ...harness.dependencies, frameImages: [image, lastFrame], frameTicks: 1 });
+  await new Promise((resolve) => setImmediate(resolve));
+  const completion = harness.timers.find(({ delay, cleared }) => !cleared && delay > 2000 && delay < 2500);
+  while (harness.runNextTimer(completion.due - 1)) {}
+  harness.runNextTimer(completion.due);
+  await pending;
+  const finalPixels = harness.draws.filter(([kind]) => kind === 'pixels').at(-1)[1];
+  assert.deepEqual(finalPixels.slice(0, 4), [88, 88, 88, 88]);
 });
 
 test('abort rejects promptly, stops recorder, tracks, and audio context', async () => {
