@@ -109,21 +109,90 @@ test('small exposure change tracks but accumulated brightness drift eventually l
   const mild = brighten(initial, 6); const mildResult = tracker.update({ source: mild, rendered: quantized(mild), palette, targetColor: palette[3], enabled: true });
   assert.equal(mildResult.status, 'tracking');
   let terminal; let terminalRaw;
+  const intermediateStatuses = [];
   for (let step = 1; step <= 30; step += 1) {
     const frameNow = brighten(initial, step * 5);
     terminalRaw = quantized(frameNow);
     terminal = tracker.update({ source: frameNow, rendered: terminalRaw, palette, targetColor: palette[3], enabled: true });
-    if (terminal.status !== 'tracking') break;
+    if (terminal.status === 'tracking') continue;
+    intermediateStatuses.push(terminal.status);
+    assert.deepEqual(terminal.data, terminalRaw.data);
+    assert.equal(terminal.changedPixels, 0);
+    assert.equal(terminal.selectedPixels, 0);
+    if (terminal.status === 'lost' || terminal.status === 'scene-changed') break;
+    assert.equal(terminal.status, 'paused');
   }
   assert.ok(terminal.status === 'lost' || terminal.status === 'scene-changed', 'drifting references cannot walk into another scene');
+  assert.ok(intermediateStatuses.includes('paused') || terminal.status === 'scene-changed');
   assert.equal(terminal.changedPixels, 0); assert.deepEqual(terminal.data, terminalRaw.data);
 });
 
-test('occlusion loses tracking and returns the current raw frame', () => {
+test('brief occlusion pauses on raw pixels and recovers from the last good source with target preserved', () => {
+  const initial = city(); const initialRendered = quantized(initial);
+  const initialCopy = new Uint8ClampedArray(initial.data);
+  const tracker = createLiveRegionMergeTracker({ source: initial, rendered: initialRendered, palette, seed: { x: 18, y: 18 }, sourceIndex: 1 });
+  const occluded = frame(initial.width, initial.height, (x, y) => x >= 10 && x <= 26 && y >= 10 && y <= 27 ? [220, 40, 30] : rgbAt(initial, x, y));
+  const raw = quantized(occluded); const occludedCopy = new Uint8ClampedArray(occluded.data);
+  const paused = tracker.update({ source: occluded, rendered: raw, palette, targetColor: palette[3], enabled: true });
+  assert.equal(paused.status, 'paused'); assert.deepEqual(paused.data, raw.data); assert.equal(paused.changedPixels, 0);
+  assert.equal(paused.selectedPixels, 0); assert.ok(paused.mask.every((value) => value === 0));
+  const recovered = tracker.update({ source: initial, rendered: initialRendered, palette, enabled: true });
+  assert.equal(recovered.status, 'tracking'); assert.ok(Math.abs(recovered.seed.x - 18) <= 1);
+  assert.ok(recovered.changedPixels > 0); assert.equal(recovered.targetIndex, 3);
+  assert.ok(recovered.mask[recovered.seed.y * initial.width + recovered.seed.x]);
+  assert.deepEqual(initial.data, initialCopy); assert.deepEqual(occluded.data, occludedCopy);
+});
+
+test('three consecutive transient occlusions become terminal and never apply a stale merge', () => {
   const initial = city(); const tracker = createLiveRegionMergeTracker({ source: initial, rendered: quantized(initial), palette, seed: { x: 18, y: 18 }, sourceIndex: 1 });
   const occluded = frame(initial.width, initial.height, (x, y) => x >= 10 && x <= 26 && y >= 10 && y <= 27 ? [220, 40, 30] : rgbAt(initial, x, y));
-  const raw = quantized(occluded); const result = tracker.update({ source: occluded, rendered: raw, palette, targetColor: palette[3], enabled: true });
-  assert.equal(result.status, 'lost'); assert.deepEqual(result.data, raw.data); assert.equal(result.changedPixels, 0);
+  const raw = quantized(occluded);
+  const statuses = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const result = tracker.update({ source: occluded, rendered: raw, palette, targetColor: palette[3], enabled: true });
+    statuses.push(result.status);
+    assert.deepEqual(result.data, raw.data);
+    assert.equal(result.changedPixels, 0);
+    assert.equal(result.selectedPixels, 0);
+  }
+  assert.deepEqual(statuses, ['paused', 'paused', 'lost']);
+  const recoveryRaw = quantized(initial);
+  const terminal = tracker.update({ source: initial, rendered: recoveryRaw, palette, targetColor: palette[3], enabled: true });
+  assert.equal(terminal.status, 'lost'); assert.deepEqual(terminal.data, recoveryRaw.data);
+});
+
+test('a valid frame after the 500ms pause deadline is lost instead of being reapplied', () => {
+  let clockMs = 100;
+  const initial = city(); const initialRendered = quantized(initial);
+  const tracker = createLiveRegionMergeTracker({
+    source: initial, rendered: initialRendered, palette, seed: { x: 18, y: 18 }, sourceIndex: 1,
+    now: () => clockMs
+  });
+  const occluded = frame(initial.width, initial.height, (x, y) => x >= 10 && x <= 26 && y >= 10 && y <= 27 ? [220, 40, 30] : rgbAt(initial, x, y));
+  const paused = tracker.update({ source: occluded, rendered: quantized(occluded), palette, targetColor: palette[3], enabled: true });
+  assert.equal(paused.status, 'paused');
+  clockMs += 501;
+  const goodRaw = quantized(initial);
+  const expired = tracker.update({ source: initial, rendered: goodRaw, palette, enabled: true });
+  assert.equal(expired.status, 'lost'); assert.deepEqual(expired.data, goodRaw.data); assert.equal(expired.changedPixels, 0);
+});
+
+test('128px patch matching accepts a 6px translation without jumping to a distant repeated surface', () => {
+  const width = 128; const height = 128;
+  const initial = city(width, height);
+  for (let y = 10; y < 32; y += 1) for (let x = 0; x < 24; x += 1) {
+    const from = (y * width + 12 + x) * 4; const to = (y * width + 82 + x) * 4;
+    initial.data.set(initial.data.subarray(from, from + 4), to);
+  }
+  const initialRendered = quantized(initial);
+  const tracker = createLiveRegionMergeTracker({ source: initial, rendered: initialRendered, palette, seed: { x: 30, y: 20 }, sourceIndex: 1, strength: 55 });
+  const moved = shift(initial, 6, 0); const movedRendered = quantized(moved);
+  const result = tracker.update({ source: moved, rendered: movedRendered, palette, targetColor: palette[3], enabled: true });
+  assert.equal(result.status, 'tracking');
+  assert.ok(Math.abs(result.seed.x - 36) <= 1, `tracked seed x=${result.seed.x}`);
+  assert.ok(result.mask[result.seed.y * width + result.seed.x]);
+  assert.equal(result.mask[20 * width + 94], 0, 'the disconnected repeated surface is not selected');
+  assert.ok(result.changedPixels > 0);
 });
 
 test('a spatial hard cut with the same mean RGB closes as scene-changed', () => {

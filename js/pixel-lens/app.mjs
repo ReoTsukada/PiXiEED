@@ -16,8 +16,8 @@ import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/sh
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261003-project-library-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
-import { pickPaletteIndex } from './region-merge.mjs?rev=20261003-region-merge-1';
-import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261003-live-merge-1';
+import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
+import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
 
 const $ = (selector) => document.querySelector(selector);
@@ -37,12 +37,15 @@ if (returnToAudio && !audioCameraRequest) {
 } else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
 root.dataset.regionMerge = 'false';
+root.dataset.mergeMaskVisible = 'false';
 const resultView = createToolResultView({ key: 'camera-result', main: root, returnLabel: '撮り直す', onClose: retake });
 const video = $('#video');
 const stage = $('#stage');
 const view = $('#view');
 const captureFrame = $('#captureFrame');
 const viewContext = view.getContext('2d', { alpha: false });
+const mergeSelectionOverlay = $('#mergeSelectionOverlay');
+const mergeSelectionContext = mergeSelectionOverlay.getContext('2d');
 const stageMessage = $('#stageMsg');
 const info = $('#info');
 const sourceCanvas = document.createElement('canvas');
@@ -163,6 +166,11 @@ function updateSaveLinkState() {
   link.setAttribute('aria-disabled', String(!enabled));
   link.setAttribute('tabindex', enabled ? '0' : '-1');
   if (!enabled) link.removeAttribute('href');
+}
+
+function focusMergeTarget() {
+  const target = $('#regionMergePalette button[data-recommended="true"]:not([hidden])') ?? $('#regionMergePalette button:not([hidden])');
+  if (target) focusVisible(`#regionMergePalette button[data-rank="${target.dataset.rank}"]`);
 }
 
 function focusVisible(selector) {
@@ -507,45 +515,63 @@ async function requestCameraFocusAt(clientX, clientY, { silent = false } = {}) {
 }
 
 function beginRegionMerge(clientX, clientY) {
-  if (state.mode !== 'live' || gif.recording || captureInFlight || regionMergeSession || !state.result?.sourceData) return false;
+  if (state.mode !== 'live' || gif.recording || captureInFlight || !state.result?.sourceData) return false;
   const point = mergePointFromClient(clientX, clientY);
   if (!point) return false;
-  const baseResult = state.result;
+  const previousSession = regionMergeSession;
+  const baseResult = previousSession?.latestRawResult ?? state.result;
   const sourceFrame = { width: baseResult.width, height: baseResult.height, data: baseResult.sourceData };
   const renderedFrame = { width: baseResult.width, height: baseResult.height, data: baseResult.data };
   const palette = baseResult.palette ?? [];
-  const sourceIndex = pickPaletteIndex(renderedFrame, palette, point.x, point.y);
-  if (sourceIndex < 0) { sayToast('この位置の色を選べませんでした'); return false; }
+  if (!palette.length) { sayToast('色数を制限してから色統合してください'); return false; }
+
+  let picked;
+  try { picked = pickMergeSource({ source: sourceFrame, rendered: renderedFrame, palette, seed: point }); }
+  catch { picked = null; }
+  if (!picked) { sayToast('この位置の色を選べませんでした'); return false; }
+  const sourceIndex = picked.sourceIndex;
+  const seed = picked.seed;
   let tracker;
+  let initialUpdate;
+  let rankedTargets;
+  const mode = $('#regionMergeMode').value;
+  const strength = Number($('#regionMergeStrength').value);
   try {
-    tracker = createLiveRegionMergeTracker({
-      source: sourceFrame, rendered: renderedFrame, palette, seed: point, sourceIndex,
-      mode: $('#regionMergeMode').value, strength: Number($('#regionMergeStrength').value)
-    });
+    tracker = createLiveRegionMergeTracker({ source: sourceFrame, rendered: renderedFrame, palette, seed, sourceIndex, mode, strength });
+    initialUpdate = tracker.update({ source: sourceFrame, rendered: renderedFrame, palette, targetColor: null, mode, strength, enabled: false });
+    if (initialUpdate?.status !== 'tracking' || !initialUpdate.mask) throw new Error('initial mask unavailable');
+    rankedTargets = rankMergeTargets({ rendered: renderedFrame, palette, mask: initialUpdate.mask, sourceIndex });
+    if (!rankedTargets.length) throw new Error('target ranking unavailable');
   } catch {
     sayToast('色の追跡を開始できませんでした。もう一度長押ししてください');
     return false;
   }
-  regionMergeSession = {
-    tracker, baseResult, latestRawResult: baseResult, sourceIndex, point,
-    choicePalette: palette.map((color) => [...color]), targetColor: null, choiceTargetIndex: -1,
-    mode: $('#regionMergeMode').value, strength: Number($('#regionMergeStrength').value),
-    changedPixels: 0, selectedPixels: 0, targetIndex: -1, lastUpdatedRaw: null,
-    lastUpdateSignature: ''
+  const recommendedIndex = rankedTargets.find((item) => item.recommended)?.index ?? -1;
+  const signature = `|${mode}|${strength}`;
+  const nextSession = {
+    tracker, baseResult, latestRawResult: baseResult, sourceIndex, currentSourceIndex: initialUpdate.sourceIndex ?? sourceIndex, point: initialUpdate.seed ?? seed,
+    choicePalette: palette.map((color) => [...color]), rankedTargets, recommendedIndex,
+    targetColor: null, choiceTargetIndex: -1, mode, strength,
+    changedPixels: 0, selectedPixels: Number(initialUpdate.selectedPixels) || 0, targetIndex: -1, mask: initialUpdate.mask,
+    lastUpdatedRaw: baseResult, lastUpdateSignature: signature
   };
+  // Keep the old selection intact unless the new tracker and its first mask both started cleanly.
+  regionMergeSession = nextSession;
+  // Replacing a target starts from the latest unmerged live frame, never the previously edited display.
+  displayCurrentRegionMergeResult(baseResult);
   root.dataset.regionMerge = 'true';
   root.dataset.regionMergeStatus = 'tracking';
   root.dataset.regionMergeLastStatus = '';
   root.dataset.regionMergeSourceIndex = String(sourceIndex);
   root.dataset.regionMergeTargetIndex = '';
-  root.dataset.regionMergeCurrentSourceIndex = String(sourceIndex);
+  root.dataset.regionMergeCurrentSourceIndex = String(nextSession.currentSourceIndex);
   root.dataset.regionMergeCurrentTargetIndex = '';
   root.dataset.regionMergeChangedPixels = '0';
-  root.dataset.regionMergeSelectedPixels = '0';
+  root.dataset.regionMergeSelectedPixels = String(nextSession.selectedPixels);
   root.dataset.regionMergeProcessingMs = '0';
   root.dataset.regionMergeTrackerProcessingMs = '0';
-  root.dataset.regionMergeSeedX = String(point.x);
-  root.dataset.regionMergeSeedY = String(point.y);
+  root.dataset.regionMergeSeedX = String(nextSession.point.x);
+  root.dataset.regionMergeSeedY = String(nextSession.point.y);
   captureFrame.style.translate = '';
   closeCameraSettings();
   root.dataset.settingsContext = 'merge';
@@ -556,32 +582,145 @@ function beginRegionMerge(clientX, clientY) {
   $('#toolbarContextBack').setAttribute('aria-label', '色統合を解除してカメラへ戻る');
   settingsPanel.hidden = false;
   $('#gestureHint').hidden = true;
-  $('#regionMergeSource').textContent = `選んだ色 ${sourceIndex + 1} / ${palette.length}`;
+  updateRegionMergeColorSummary(nextSession, baseResult.palette ?? palette);
   $('#regionMergeHeading').textContent = '色統合中';
   $('#regionMergeCancel').textContent = '解除';
   $('#regionMergeCancel').setAttribute('aria-label', '色統合を解除してカメラ映像へ戻る');
-  $('#regionMergeStatus').textContent = 'ライブ映像を追跡中。まとめ先を選んでください。';
+  $('#regionMergeStatus').textContent = '枠線の範囲を確認し、候補色を選んでください。別の場所を長押しすると選び直せます。';
   $('#regionMergeUndo').disabled = true;
   $('#regionMergePanel').hidden = false;
-  renderRegionMergePalette(regionMergeSession.choicePalette, sourceIndex, -1);
+  renderRegionMergePalette(nextSession.choicePalette, sourceIndex, -1, rankedTargets);
+  updateMergeSelectionOverlay(nextSession.mask, baseResult.width, baseResult.height, renderedFrame, nextSession.currentSourceIndex, mode);
   syncContextOptions('merge');
-  requestAnimationFrame(() => { if (regionMergeSession) fitPreview(state.result); });
-  say('ライブ色統合中です。中央ボタンで現在の画像を撮影できます');
+  requestAnimationFrame(() => { if (regionMergeSession === nextSession) fitPreview(state.result); });
+  say('枠線の範囲を確認し、色を選んでください');
   return true;
 }
 
-function renderRegionMergePalette(palette, sourceIndex, targetIndex = -1) {
+function updateRegionMergeColorSummary(session, palette = session?.latestRawResult?.palette ?? session?.choicePalette ?? [], { preserveSource = false } = {}) {
+  if (!session) return;
+  const sourceIndex = Number.isInteger(session.currentSourceIndex) ? session.currentSourceIndex : session.sourceIndex;
+  const sourceColor = palette[sourceIndex] ?? session.choicePalette[session.sourceIndex];
+  const sourceChip = $('#regionMergeSourceChip');
+  const sourceLabel = $('#regionMergeSourceLabel');
+  if (sourceColor && !preserveSource) {
+    const rgb = sourceColor.slice(0, 3).join(',');
+    const label = '色 ' + (sourceIndex + 1) + ' / ' + palette.length;
+    if (sourceChip.dataset.index !== String(sourceIndex) || sourceChip.dataset.rgb !== rgb) {
+      sourceChip.dataset.index = String(sourceIndex);
+      sourceChip.dataset.rgb = rgb;
+      sourceChip.style.setProperty('--merge-color', 'rgb(' + sourceColor.join(' ') + ')');
+    }
+    if (sourceLabel.textContent !== label) sourceLabel.textContent = label;
+  }
+  const targetChip = $('#regionMergeTargetChip');
+  const targetLabel = $('#regionMergeTargetLabel');
+  if (session.targetColor) {
+    const targetIndex = Number.isInteger(session.targetIndex) && session.targetIndex >= 0 ? session.targetIndex : session.choiceTargetIndex;
+    const targetColor = session.targetIndex >= 0 ? (palette[session.targetIndex] ?? session.targetColor) : session.targetColor;
+    const rgb = targetColor.slice(0, 3).join(',');
+    const indexText = targetIndex >= 0 ? String(targetIndex) : 'requested';
+    if (targetChip.dataset.rgb !== rgb || targetChip.dataset.index !== indexText) {
+      targetChip.dataset.index = indexText;
+      targetChip.dataset.rgb = rgb;
+      targetChip.style.setProperty('--merge-color', 'rgb(' + targetColor.join(' ') + ')');
+    }
+    if (targetChip.hidden) targetChip.hidden = false;
+    const label = targetIndex >= 0 ? '色 ' + (targetIndex + 1) : '選択中';
+    if (targetLabel.textContent !== label) targetLabel.textContent = label;
+    if (targetLabel.dataset.recommended !== 'false') targetLabel.dataset.recommended = 'false';
+    if (targetLabel.hasAttribute('title')) targetLabel.removeAttribute('title');
+    return;
+  }
+  const recommendation = session.rankedTargets?.find((item) => item.recommended);
+  if (recommendation) {
+    const color = session.choicePalette[recommendation.index];
+    const rgb = color.slice(0, 3).join(',');
+    if (targetChip.dataset.index !== String(recommendation.index) || targetChip.dataset.rgb !== rgb) {
+      targetChip.dataset.index = String(recommendation.index);
+      targetChip.dataset.rgb = rgb;
+      targetChip.style.setProperty('--merge-color', 'rgb(' + color.join(' ') + ')');
+    }
+    if (targetChip.hidden) targetChip.hidden = false;
+    const label = '候補 色 ' + (recommendation.index + 1);
+    if (targetLabel.textContent !== label) targetLabel.textContent = label;
+    if (targetLabel.dataset.recommended !== 'true') targetLabel.dataset.recommended = 'true';
+    const title = '選択範囲で多く使われている色です。自動では適用されません。';
+    if (targetLabel.title !== title) targetLabel.title = title;
+  } else {
+    if (!targetChip.hidden) targetChip.hidden = true;
+    if (targetLabel.textContent !== '候補なし') targetLabel.textContent = '候補なし';
+    if (targetLabel.dataset.recommended !== 'false') targetLabel.dataset.recommended = 'false';
+    if (targetLabel.title !== '他の色を選んでください。') targetLabel.title = '他の色を選んでください。';
+  }
+}
+
+function updateMergeSelectionOverlay(mask, width, height, rendered = null, sourceIndex = -1, mode = 'surface') {
+  if (!mask || !width || !height || mask.length !== width * height) {
+    clearMergeSelectionOverlay();
+    return;
+  }
+  if (mergeSelectionOverlay.width !== width || mergeSelectionOverlay.height !== height) {
+    mergeSelectionOverlay.width = width;
+    mergeSelectionOverlay.height = height;
+  }
+  const palette = regionMergeSession?.latestRawResult?.palette ?? [];
+  const from = mode === 'color' && rendered?.data && Number.isInteger(sourceIndex) ? palette[sourceIndex] : null;
+  const filteredMask = from ? new Uint8Array(mask.length) : mask;
+  if (from) {
+    for (let pixel = 0; pixel < mask.length; pixel += 1) {
+      if (!mask[pixel]) continue;
+      const offset = pixel * 4;
+      if (rendered.data[offset] === from[0] && rendered.data[offset + 1] === from[1] && rendered.data[offset + 2] === from[2]) filteredMask[pixel] = 1;
+    }
+  }
+  const image = mergeSelectionContext.createImageData(width, height);
+  const pixels = image.data;
+  const selected = (x, y) => x >= 0 && y >= 0 && x < width && y < height && filteredMask[y * width + x] !== 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!selected(x, y)) continue;
+      const boundary = !selected(x - 1, y) || !selected(x + 1, y) || !selected(x, y - 1) || !selected(x, y + 1);
+      if (!boundary) continue;
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height || selected(nx, ny)) continue;
+        const outside = (ny * width + nx) * 4;
+        pixels[outside] = 8; pixels[outside + 1] = 12; pixels[outside + 2] = 16; pixels[outside + 3] = 205;
+      }
+      const edge = (y * width + x) * 4;
+      pixels[edge] = 255; pixels[edge + 1] = 220; pixels[edge + 2] = 105; pixels[edge + 3] = 235;
+    }
+  }
+  mergeSelectionContext.putImageData(image, 0, 0);
+  if (mergeSelectionOverlay.hidden) mergeSelectionOverlay.hidden = false;
+  if (root.dataset.mergeMaskVisible !== 'true') root.dataset.mergeMaskVisible = 'true';
+}
+
+function clearMergeSelectionOverlay() {
+  mergeSelectionContext.clearRect(0, 0, mergeSelectionOverlay.width, mergeSelectionOverlay.height);
+  if (!mergeSelectionOverlay.hidden) mergeSelectionOverlay.hidden = true;
+  if (root.dataset.mergeMaskVisible !== 'false') root.dataset.mergeMaskVisible = 'false';
+}
+
+function renderRegionMergePalette(palette, sourceIndex, targetIndex = -1, rankedTargets = []) {
   const box = $('#regionMergePalette');
   box.replaceChildren();
-  palette.forEach((color, index) => {
+  const order = rankedTargets.length ? rankedTargets : palette.map((_color, index) => ({ index, count: 0, recommended: false }));
+  order.forEach(({ index, count, recommended }, rank) => {
+    const color = palette[index];
+    if (!color) return;
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.targetIndex = String(index);
+    button.dataset.rank = String(rank);
     button.dataset.source = String(index === sourceIndex);
-    button.setAttribute('aria-label', `色 ${index + 1} をまとめ先にする`);
+    button.dataset.recommended = String(Boolean(recommended));
+    button.dataset.regionCount = String(count ?? 0);
+    const recommendationLabel = recommended ? '候補。' : '';
+    button.setAttribute('aria-label', `色 ${index + 1} ${recommendationLabel}をまとめ先にする`);
     button.setAttribute('aria-pressed', String(index === targetIndex));
     button.style.setProperty('--region-merge-swatch', `rgb(${color.join(' ')})`);
-    button.title = index === sourceIndex ? `色 ${index + 1}（選んだ色）` : `色 ${index + 1}`;
+    button.title = `${recommended ? '候補・' : ''}色 ${index + 1}${index === sourceIndex ? '（元の色）' : ''}`;
     button.addEventListener('click', () => applyRegionMerge(index));
     box.append(button);
   });
@@ -603,7 +742,8 @@ function updateLiveRegionMerge(rawResult, { force = false } = {}) {
   session.latestRawResult = rawResult;
   session.baseResult = rawResult;
   const signature = `${session.targetColor?.join(',') ?? ''}|${session.mode}|${session.strength}`;
-  if (session.lastUpdatedRaw === rawResult && (!force || session.lastUpdateSignature === signature)) return null;
+  // Controls can change during a pause, but only a fresh camera frame counts as a retry.
+  if (session.lastUpdatedRaw === rawResult && (root.dataset.regionMergeStatus === 'paused' || !force || session.lastUpdateSignature === signature)) return null;
   const started = performance.now();
   let update;
   try {
@@ -621,14 +761,35 @@ function updateLiveRegionMerge(rawResult, { force = false } = {}) {
   const trackerMs = Number.isFinite(update?.processingMs) ? update.processingMs : performance.now() - started;
   root.dataset.regionMergeTrackerProcessingMs = String(Math.round(trackerMs));
   root.dataset.regionMergeProcessingMs = String(Math.round((Number(rawResult.processingMs) || 0) + trackerMs));
+  if (update?.status === 'paused') {
+    root.dataset.regionMergeStatus = 'paused';
+    session.changedPixels = 0;
+    session.selectedPixels = 0;
+    session.targetIndex = -1;
+    root.dataset.regionMergeCurrentTargetIndex = '';
+    updateRegionMergeColorSummary(session, rawResult.palette ?? session.choicePalette, { preserveSource: true });
+    root.dataset.regionMergeChangedPixels = '0';
+    root.dataset.regionMergeSelectedPixels = '0';
+    clearMergeSelectionOverlay();
+    const notice = '再検知中。色の選択を保ったまま、元の映像を表示しています。';
+    if ($('#regionMergeStatus').textContent !== notice) $('#regionMergeStatus').textContent = notice;
+    return { result: rawResult, stopped: '' };
+  }
   if (update?.status !== 'tracking') {
     const status = update?.status === 'scene-changed' ? 'scene-changed' : 'lost';
     root.dataset.regionMergeLastStatus = status;
     endRegionMerge({ restore: false, endedStatus: status });
     return { result: rawResult, stopped: status };
   }
+  if (root.dataset.regionMergeStatus === 'paused') {
+    $('#regionMergeStatus').textContent = session.targetColor
+      ? '再検知できました。選んだ色をライブ映像に適用しています。'
+      : '再検知できました。枠線を確認し、まとめ先を選んでください。';
+  }
   session.changedPixels = Number(update.changedPixels) || 0;
   session.selectedPixels = Number(update.selectedPixels) || 0;
+  if (update.mask) session.mask = update.mask;
+  if (Number.isInteger(update.sourceIndex)) session.currentSourceIndex = update.sourceIndex;
   session.targetIndex = session.targetColor && Number.isInteger(update.targetIndex) ? update.targetIndex : -1;
   root.dataset.regionMergeStatus = update.status;
   root.dataset.regionMergeCurrentSourceIndex = Number.isInteger(update.sourceIndex) ? String(update.sourceIndex) : '';
@@ -637,10 +798,14 @@ function updateLiveRegionMerge(rawResult, { force = false } = {}) {
   root.dataset.regionMergeSeedY = String(update.seed?.y ?? session.point.y);
   root.dataset.regionMergeChangedPixels = String(session.changedPixels);
   root.dataset.regionMergeSelectedPixels = String(session.selectedPixels);
+  updateRegionMergeColorSummary(session, rawResult.palette ?? session.choicePalette);
   if (session.targetColor) {
+    clearMergeSelectionOverlay();
     $('#regionMergeUndo').disabled = captureInFlight;
   } else {
     $('#regionMergeUndo').disabled = true;
+    updateMergeSelectionOverlay(session.mask, rawResult.width, rawResult.height,
+      { width: rawResult.width, height: rawResult.height, data: rawResult.data }, session.currentSourceIndex, session.mode);
   }
   return {
     result: { ...rawResult, data: update.data ?? rawResult.data, sourceData: rawResult.sourceData },
@@ -668,12 +833,16 @@ function applyRegionMerge(targetIndex = null) {
     const palette = session.choicePalette;
     if (targetIndex < 0 || targetIndex >= palette.length) return;
     session.targetColor = [...palette[targetIndex]];
+    session.targetIndex = -1;
     session.choiceTargetIndex = targetIndex;
     root.dataset.regionMergeTargetIndex = String(targetIndex);
     $('#regionMergePalette').querySelectorAll('[data-target-index]').forEach((button) => {
       button.setAttribute('aria-pressed', String(Number(button.dataset.targetIndex) === targetIndex));
     });
-    $('#regionMergeStatus').textContent = '選んだ色をライブ映像に適用中です。';
+    updateRegionMergeColorSummary(session);
+    clearMergeSelectionOverlay();
+    $('#regionMergeStatus').textContent = root.dataset.regionMergeStatus === 'paused'
+      ? '再検知中。復帰したら選んだ色を適用します。' : '選んだ色をライブ映像に適用中です。';
   }
   session.mode = $('#regionMergeMode').value;
   session.strength = Number($('#regionMergeStrength').value);
@@ -706,7 +875,15 @@ function undoRegionMerge() {
   displayCurrentRegionMergeResult(session.latestRawResult);
   $('#regionMergePalette').querySelectorAll('[data-target-index]').forEach((button) => button.setAttribute('aria-pressed', 'false'));
   $('#regionMergeUndo').disabled = true;
-  $('#regionMergeStatus').textContent = '色統合を解除しました。ライブ追跡は続いています。';
+  updateRegionMergeColorSummary(session, session.latestRawResult?.palette ?? session.choicePalette);
+  if (root.dataset.regionMergeStatus === 'paused') {
+    clearMergeSelectionOverlay();
+    $('#regionMergeStatus').textContent = '統合を元に戻しました。範囲は再検知中です。';
+  } else {
+    updateMergeSelectionOverlay(session.mask, session.latestRawResult.width, session.latestRawResult.height,
+      { width: session.latestRawResult.width, height: session.latestRawResult.height, data: session.latestRawResult.data }, session.currentSourceIndex, session.mode);
+    $('#regionMergeStatus').textContent = '色統合を解除しました。ライブ追跡は続いています。';
+  }
 }
 
 function endRegionMerge({ restore = true, endedStatus = restore ? 'cancelled' : 'captured' } = {}) {
@@ -731,6 +908,7 @@ function endRegionMerge({ restore = true, endedStatus = restore ? 'cancelled' : 
   root.dataset.settingsContext = '';
   root.dataset.settingsExpanded = 'false';
   $('#regionMergePanel').hidden = true;
+  clearMergeSelectionOverlay();
   settingsPanel.hidden = state.mode !== 'live';
   toolbarContextHead.hidden = true;
   toolbarMore.hidden = true;
@@ -1234,7 +1412,7 @@ function syncContextOptions(tool = (regionMergeSession ? 'merge' : openTool)) {
   const visibleCount = window.innerWidth <= 359 ? 3 : 4;
   const expanded = root.dataset.settingsExpanded === 'true';
   let selected = buttons.findIndex((button) => button.getAttribute('aria-checked') === 'true' || button.getAttribute('aria-pressed') === 'true');
-  if (selected < 0 && tool === 'merge' && root.dataset.regionMergeTargetIndex === '') selected = buttons.findIndex((button) => button.dataset.source === 'true');
+  if (selected < 0 && tool === 'merge' && root.dataset.regionMergeTargetIndex === '') selected = buttons.findIndex((button) => button.dataset.recommended === 'true');
   buttons.forEach((button, index) => { button.hidden = !expanded && index >= visibleCount && index !== selected; });
   toolbarMore.hidden = !tool || buttons.length <= visibleCount;
   const editingPalette = tool === 'look' && typeof editIndex !== 'undefined' && editIndex >= 0;
@@ -1695,7 +1873,7 @@ attachZoomGestures(stage, {
     if (event) void requestCameraFocusAt(event.clientX, event.clientY, { silent: true });
   },
   onLongPress: (event) => {
-    if (beginRegionMerge(event.clientX, event.clientY)) focusVisible('#regionMergePalette button');
+    if (beginRegionMerge(event.clientX, event.clientY)) focusMergeTarget();
     return true;
   },
   // the picture leans a little with the finger, so a swipe feels attached to it
@@ -1719,7 +1897,7 @@ stage.addEventListener('keydown', (event) => {
   else if (event.key.toLowerCase() === 'm' && !event.repeat && !regionMergeSession) {
     event.preventDefault();
     const rect = view.getBoundingClientRect();
-    if (beginRegionMerge(rect.left + rect.width / 2, rect.top + rect.height / 2)) focusVisible('#regionMergePalette button');
+    if (beginRegionMerge(rect.left + rect.width / 2, rect.top + rect.height / 2)) focusMergeTarget();
   }
   else if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) { event.preventDefault(); refreshObjects(); }
 });

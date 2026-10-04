@@ -2,6 +2,8 @@ import { mergeRegionColors } from './region-merge.mjs';
 
 const MAX_FRAME_PIXELS = 256 * 256;
 const MAX_UPDATE_MS = 60;
+const MAX_PAUSE_MS = 500;
+const MAX_CONSECUTIVE_FAILURES = 3;
 const PATCH_SAMPLES_PER_AXIS = 9;
 const MAX_TRANSLATION = 8;
 
@@ -99,7 +101,7 @@ function patchScore(previous, current, seed, dx, dy, offsets) {
   return Math.max(0, 1 - absoluteDifference / (count * 3 * 72));
 }
 function findTranslation(previous, current, seed, offsets) {
-  const radius = Math.min(MAX_TRANSLATION, Math.max(3, Math.round(Math.min(current.width, current.height) * 0.035)));
+  const radius = Math.min(MAX_TRANSLATION, Math.max(3, Math.round(Math.min(current.width, current.height) * 0.06)));
   let best = null; let second = null; let zero = null; const candidates = [];
   for (let dy = -radius; dy <= radius; dy += 1) for (let dx = -radius; dx <= radius; dx += 1) {
     const score = patchScore(previous, current, seed, dx, dy, offsets);
@@ -155,7 +157,7 @@ function masksOverlap(previousMask, currentMask, width, height, dx, dy, oldCount
   return Math.min(oldContainment, newContainment, (overlap * stride) / Math.max(1, oldCount + newCount - overlap * stride));
 }
 /** Track a conservative connected source surface across a short live-camera sequence. */
-export function createLiveRegionMergeTracker({ source, rendered, palette, seed, sourceIndex, mode = 'surface', strength = 55 } = {}) {
+export function createLiveRegionMergeTracker({ source, rendered, palette, seed, sourceIndex, mode = 'surface', strength = 55, now = () => performance.now() } = {}) {
   const size = frameInfo(source, 'source'); const renderSize = frameInfo(rendered, 'rendered');
   if (size.width !== renderSize.width || size.height !== renderSize.height) throw new RangeError('source and rendered dimensions must match');
   if (size.pixels > MAX_FRAME_PIXELS) throw new RangeError(`live tracking is bounded to ${MAX_FRAME_PIXELS} pixels`);
@@ -164,6 +166,7 @@ export function createLiveRegionMergeTracker({ source, rendered, palette, seed, 
   if (!seed || !Number.isInteger(seed.x) || !Number.isInteger(seed.y) || seed.x < 0 || seed.y < 0 || seed.x >= size.width || seed.y >= size.height) throw new RangeError('seed must be inside the initial frame');
   if (mode !== 'surface' && mode !== 'color') throw new TypeError("mode must be 'surface' or 'color'");
   if (!Number.isFinite(strength) || strength < 0 || strength > 100) throw new RangeError('strength must be in the range 0..100');
+  if (typeof now !== 'function') throw new TypeError('now must be a function');
   const referenceColor = initialPalette[sourceIndex].slice();
   const originSeedLab = toOklab(readRgb(source.data, (seed.y * size.width + seed.x) * 4));
   let currentSeedLab = originSeedLab;
@@ -179,11 +182,27 @@ export function createLiveRegionMergeTracker({ source, rendered, palette, seed, 
   };
   let previousSignature = sceneSignature(source);
   let lastProcessingMs = 0; let terminalStatus = null;
+  let consecutiveFailures = 0; let pauseStartedAt = null;
   const patchOffsets = makePatchOffsets(size.width, size.height);
+
+  const pauseClock = () => {
+    const value = now();
+    if (!Number.isFinite(value)) throw new TypeError('now must return a finite number');
+    return value;
+  };
 
   const endedResult = (nextRendered, nextSeed, nextSourceIndex, nextTargetIndex, status, started) => {
     terminalStatus = status;
     return rawResult(nextRendered, size.width, size.height, nextSeed, nextSourceIndex, nextTargetIndex, status, performance.now() - started);
+  };
+  const pauseResult = (nextRendered, nextSourceIndex, nextTargetIndex, started) => {
+    const pauseNow = pauseClock();
+    if (pauseStartedAt === null) pauseStartedAt = pauseNow;
+    consecutiveFailures += 1;
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES || pauseNow - pauseStartedAt > MAX_PAUSE_MS) {
+      return endedResult(nextRendered, currentSeed, nextSourceIndex, nextTargetIndex, 'lost', started);
+    }
+    return rawResult(nextRendered, size.width, size.height, currentSeed, nextSourceIndex, nextTargetIndex, 'paused', performance.now() - started);
   };
 
   return {
@@ -204,36 +223,40 @@ export function createLiveRegionMergeTracker({ source, rendered, palette, seed, 
       if (!Number.isFinite(nextStrength) || nextStrength < 0 || nextStrength > 100) throw new RangeError('strength must be in the range 0..100');
       if (targetColor != null) selectedTargetColor = checkedRgb(targetColor, 'targetColor').slice();
       if (mappedSourceIndex < 0 || sourceMatch.distance > 3 * 65 * 65) return endedResult(nextRendered, currentSeed, mappedSourceIndex, mappedTarget.index, 'scene-changed', started);
-      const targetMatch = selectedTargetColor ? nearestIndex(selectedTargetColor, colors) : { index: -1, distance: Infinity };
-      const targetIndex = targetMatch.index;
-      if (enabled && selectedTargetColor && targetMatch.distance > 3 * 65 * 65) return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
-      if (selectedTargetColor && targetIndex < 0) return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
-      if (lastProcessingMs > MAX_UPDATE_MS) return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
-
-      const sameSourcePixels = samePixels(previousSource, nextSource);
       const signature = sceneSignature(nextSource); const signatureDelta = signatureDistance(previousSignature, signature);
       if ((signatureDelta.mean > 0.19 && signatureDelta.changedFraction > 0.32)
-          || signatureDelta.changedFraction > 0.78) return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'scene-changed', started);
-      const match = findTranslation(previousSource, nextSource, currentSeed, patchOffsets);
-      if (match.status !== 'tracking') {
-        return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, signatureDelta.mean > 0.12 ? 'scene-changed' : 'lost', started);
+          || signatureDelta.changedFraction > 0.78) return endedResult(nextRendered, currentSeed, mappedSourceIndex, mappedTarget.index, 'scene-changed', started);
+      if (pauseStartedAt !== null && pauseClock() - pauseStartedAt > MAX_PAUSE_MS) {
+        return endedResult(nextRendered, currentSeed, mappedSourceIndex, mappedTarget.index, 'lost', started);
       }
+      const targetMatch = selectedTargetColor ? nearestIndex(selectedTargetColor, colors) : { index: -1, distance: Infinity };
+      const targetIndex = targetMatch.index;
+      if (enabled && selectedTargetColor && targetMatch.distance > 3 * 65 * 65) return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
+      if (selectedTargetColor && targetIndex < 0) return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
+      if (lastProcessingMs > MAX_UPDATE_MS) return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
+
+      const sameSourcePixels = samePixels(previousSource, nextSource);
+      const match = findTranslation(previousSource, nextSource, currentSeed, patchOffsets);
+      if (match.status !== 'tracking') return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
       const nextSeed = { x: currentSeed.x + match.dx, y: currentSeed.y + match.dy };
       const nextSeedOffset = (nextSeed.y * size.width + nextSeed.x) * 4;
       if (nextSeed.x < 0 || nextSeed.y < 0 || nextSeed.x >= size.width || nextSeed.y >= size.height || nextSource.data[nextSeedOffset + 3] === 0) {
-        return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
+        return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
       }
       const nextSeedLab = toOklab(readRgb(nextSource.data, nextSeedOffset));
       if (labDistance(nextSeedLab, originSeedLab) > 0.13 || labDistance(nextSeedLab, currentSeedLab) > 0.085) {
+        return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
+      }
+      if (performance.now() - started > 16) return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
+      if (pauseStartedAt !== null && pauseClock() - pauseStartedAt > MAX_PAUSE_MS) {
         return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
       }
-      if (performance.now() - started > 16) return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
 
       let merged;
       try {
         merged = mergeRegionColors({ source: nextSource, rendered: nextRendered, palette: colors, seed: nextSeed, sourceIndex: mappedSourceIndex, targetIndex: targetIndex < 0 ? mappedSourceIndex : targetIndex, mode: nextMode, strength: nextStrength });
       } catch {
-        return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
+        return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
       }
       const nextStats = maskStats(merged.mask, size.width, size.height);
       const areaRatio = nextStats.count / Math.max(1, previousStats.count);
@@ -243,7 +266,7 @@ export function createLiveRegionMergeTracker({ source, rendered, palette, seed, 
       const centroidDrift = Math.hypot(centroidDeltaX, centroidDeltaY);
       const settingOnlyUpdate = sameSourcePixels && match.dx === 0 && match.dy === 0;
       if (!nextStats.count || (!settingOnlyUpdate && (areaRatio < 0.28 || areaRatio > 3.2 || overlap < 0.1 || centroidDrift > Math.max(10, Math.min(size.width, size.height) * 0.12)))) {
-        return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
+        return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
       }
       let trackedSeed = nextSeed; let trackedSeedLab = nextSeedLab;
       if (match.ambiguous && !settingOnlyUpdate) {
@@ -294,11 +317,15 @@ export function createLiveRegionMergeTracker({ source, rendered, palette, seed, 
         }
       }
       const processingMs = performance.now() - started;
-      if (processingMs > MAX_UPDATE_MS) return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
+      if (processingMs > MAX_UPDATE_MS) return pauseResult(nextRendered, mappedSourceIndex, targetIndex, started);
+      if (pauseStartedAt !== null && pauseClock() - pauseStartedAt > MAX_PAUSE_MS) {
+        return endedResult(nextRendered, currentSeed, mappedSourceIndex, targetIndex, 'lost', started);
+      }
 
       currentSeed = trackedSeed; currentSeedLab = trackedSeedLab;
       previousSource = { width: size.width, height: size.height, data: cloneFrameData(nextSource) };
       previousMask = new Uint8Array(merged.mask); previousStats = nextStats; previousSignature = signature; lastProcessingMs = processingMs;
+      consecutiveFailures = 0; pauseStartedAt = null;
       if (!enabled || targetIndex < 0) return { data: cloneFrameData(nextRendered), mask: merged.mask, changedPixels: 0, selectedPixels: merged.selectedPixels, status: 'tracking', seed: { ...currentSeed }, sourceIndex: mappedSourceIndex, targetIndex, processingMs };
       return { ...merged, status: 'tracking', seed: { ...currentSeed }, sourceIndex: mappedSourceIndex, targetIndex, processingMs };
     }
