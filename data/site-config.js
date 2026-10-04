@@ -23,7 +23,7 @@ export const supabaseConfig = {
   createPostFunction: 'create-post',
   moderationFunction: 'moderate-post',
   // Set true only after the puzzle database migration and all three production Edge Functions are confirmed live.
-  puzzlePublicationEnabled: false,
+  puzzlePublicationEnabled: true,
   publicMapTable: 'post_map_points',
   publicStorageBucket: 'post-public',
   publicMapLimit: 500

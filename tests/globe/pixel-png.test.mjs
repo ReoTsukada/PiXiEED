@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
-import { decodePixelPngRgba, inspectPixelPng, verifyPixelPngClaim } from '../../supabase/functions/_shared/pixel-png.mjs';
+import { decodePixelPngRgba, inspectPixelPng, verifyPixelPngClaim, verifyStoredPixelPngClaim } from '../../supabase/functions/_shared/pixel-png.mjs';
 
 const signature = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
 function u32(value) { return Uint8Array.from([(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]); }
@@ -127,4 +127,17 @@ test('historical 512px images can still be decoded for moderation while new uplo
   assert.equal(decoded.width, 512);
   assert.equal(decoded.height, 8);
   await assert.rejects(verifyPixelPngClaim(bytes, { mimeType: 'image/png', size: bytes.length, width: 512, height: 8, colorCount: 1 }), { code: 'image_pixels_invalid' });
+});
+
+test('stored 512px claims retain actual sample, size and color validation', async () => {
+  const bytes = png(512, 16, () => [20, 50, 80, 255]);
+  const claim = { mimeType: 'image/png', size: bytes.length, width: 512, height: 16, colorCount: 1 };
+  assert.deepEqual(await verifyStoredPixelPngClaim(bytes, claim), { width: 512, height: 16, colorCount: 1 });
+  assert.equal((await verifyStoredPixelPngClaim(bytes, claim, { includeRgba: true })).rgba.length, 512 * 16 * 4);
+  await assert.rejects(verifyPixelPngClaim(bytes, claim), { code: 'image_pixels_invalid' });
+  for (const [change, code] of [[{ width: 256 }, 'image_pixels_invalid'], [{ size: bytes.length - 1 }, 'image_size_invalid'], [{ colorCount: 2 }, 'image_colors_invalid']]) {
+    await assert.rejects(verifyStoredPixelPngClaim(bytes, { ...claim, ...change }), { code });
+  }
+  const manyColors = png(512, 16, (x) => [x % 256, 1, 2, 255]);
+  await assert.rejects(verifyStoredPixelPngClaim(manyColors, { ...claim, size: manyColors.length, colorCount: 128 }), { code: 'image_colors_invalid' });
 });

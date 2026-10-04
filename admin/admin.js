@@ -152,7 +152,7 @@ function renderDashboard() {
   root.querySelector('[data-sheet-save]').addEventListener('click', saveEditorSheet);
   root.querySelector('[data-publish]').addEventListener('click', publishSheets);
   root.insertAdjacentHTML('beforeend', '<section class="admin-card admin-card--moderation" data-admin-moderation></section>');
-  void import('./moderation.js?rev=20260928-puzzle-handoff-1').then(({ bindModerationPanel }) => {
+  void import('./moderation.js?rev=20261004-puzzle-share-1').then(({ bindModerationPanel }) => {
     bindModerationPanel(root.querySelector('[data-admin-moderation]'));
   }).catch(() => {
     const moderation = root.querySelector('[data-admin-moderation]');

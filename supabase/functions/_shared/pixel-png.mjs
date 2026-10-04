@@ -133,11 +133,21 @@ export async function decodePixelPngRgba(bytes) {
   return await decodePixelPng(bytes, { includeRgba: true });
 }
 
-export async function verifyPixelPngClaim(bytes, claim, { includeRgba = false } = {}) {
+async function verifyClaim(bytes, claim, maxDimension, { includeRgba = false } = {}) {
   if (!claim || claim.mimeType !== 'image/png') throw new PixelPngError('image_type_invalid');
   if (!(bytes instanceof Uint8Array) || bytes.length < 1 || bytes.length > MAX_BYTES || claim.size !== bytes.length) throw new PixelPngError('image_size_invalid');
   const actual = includeRgba ? await decodePixelPngRgba(bytes) : await inspectPixelPng(bytes);
-  if (actual.width > MAX_POST_SIZE || actual.height > MAX_POST_SIZE || claim.width !== actual.width || claim.height !== actual.height) throw new PixelPngError('image_pixels_invalid');
+  if (actual.width > maxDimension || actual.height > maxDimension || claim.width !== actual.width || claim.height !== actual.height) throw new PixelPngError('image_pixels_invalid');
   if (claim.colorCount !== actual.colorCount) throw new PixelPngError('image_colors_invalid');
   return actual;
+}
+
+/** New submissions must obey the current 256px limit. */
+export async function verifyPixelPngClaim(bytes, claim, options = {}) {
+  return await verifyClaim(bytes, claim, MAX_POST_SIZE, options);
+}
+
+/** Read already stored works without applying a later upload size policy. */
+export async function verifyStoredPixelPngClaim(bytes, claim, options = {}) {
+  return await verifyClaim(bytes, claim, MAX_SIZE, options);
 }

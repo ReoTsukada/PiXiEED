@@ -6,6 +6,8 @@ insert into auth.users (id) values
   ('00000000-0000-4000-8000-00000000a002');
 
 do $$
+declare
+  hidden_definition jsonb := '{"schemaVersion":1,"width":16,"height":16,"confirmed":true,"targets":[{"id":"flower","name":"花","pixels":[85]}],"hitBoxes":[{"targetId":"flower","minX":5,"minY":5,"maxX":10,"maxY":10}]}'::jsonb;
 begin
   if public.pixieed_valid_puzzle_source('hidden_object', 'null'::jsonb) is distinct from false
     or public.pixieed_valid_puzzle_source('hidden_object', '{"original":{}}'::jsonb) is distinct from false
@@ -24,6 +26,16 @@ begin
   if not has_function_privilege('service_role', 'public.pixieed_create_post(jsonb,jsonb,jsonb)', 'execute')
     or not has_function_privilege('service_role', 'public.pixieed_read_public_puzzle(uuid)', 'execute') then
     raise exception 'service role is missing puzzle RPC access';
+  end if;
+  if not public.pixieed_valid_puzzle_definition('hidden_object', hidden_definition)
+    or not public.pixieed_valid_puzzle_definition('hidden_object', hidden_definition || jsonb_build_object('prompt', E'花を探して\nね'))
+    or public.pixieed_valid_puzzle_definition('hidden_object', hidden_definition || jsonb_build_object('unexpected', 'value'))
+    or public.pixieed_valid_puzzle_definition('hidden_object', hidden_definition || jsonb_build_object('prompt', repeat('x', 181)))
+    or public.pixieed_valid_puzzle_definition('hidden_object', hidden_definition || jsonb_build_object('prompt', E'bad\rcontrol')) then
+    raise exception 'optional hidden-object prompt does not match the client validation contract';
+  end if;
+  if public.pixieed_valid_image_claim('{"mimeType":"image/png","size":120,"width":16,"height":16,"colorCount":129}'::jsonb) then
+    raise exception '129-colour image claim passed database validation';
   end if;
 end;
 $$;
@@ -53,6 +65,8 @@ declare
   v_other_post_id uuid := '00000000-0000-4000-8000-00000000b002';
   v_hidden_id uuid := '00000000-0000-4000-8000-00000000b003';
   v_rollback_id uuid := '00000000-0000-4000-8000-00000000b004';
+  v_one_pixel_id uuid := '00000000-0000-4000-8000-00000000b005';
+  v_oversize_id uuid := '00000000-0000-4000-8000-00000000b006';
   v_key uuid := '00000000-0000-4000-8000-00000000c001';
   v_digest text := repeat('a', 64);
   v_claim jsonb := '{"mimeType":"image/png","size":120,"width":16,"height":16,"colorCount":2}'::jsonb;
@@ -123,6 +137,25 @@ begin
     raise exception 'another author could not submit an identical content hash';
   end if;
 
+  -- Ordinary new posts allow the 1px minimum and reject either axis above 256px.
+  v_post := jsonb_build_object(
+    'id',v_one_pixel_id,'author_id',v_author,'title','One pixel','caption','', 'post_kind','pixel_art',
+    'image_path',v_author::text || '/' || v_one_pixel_id::text || '.png','image_mime','image/png','image_bytes',120,
+    'image_width',1,'image_height',1,'color_count',1,'content_hash',repeat('1',64),'status','pending',
+    'request_key',null,'request_digest',null
+  );
+  v_result := public.pixieed_create_post(v_post,v_location,null);
+  if v_result->>'postId' <> v_one_pixel_id::text then raise exception '1x1 ordinary post was rejected'; end if;
+  v_post := jsonb_set(v_post,'{id}',to_jsonb(v_oversize_id::text));
+  v_post := jsonb_set(v_post,'{image_path}',to_jsonb(v_author::text || '/' || v_oversize_id::text || '.png'));
+  v_post := jsonb_set(v_post,'{image_width}','257'::jsonb);
+  begin
+    perform public.pixieed_create_post(v_post,v_location,null);
+    raise exception '257px ordinary post was accepted';
+  exception when sqlstate '22023' then null;
+  end;
+  if exists(select 1 from public.user_posts where id=v_oversize_id) then raise exception 'oversized ordinary post left a parent row'; end if;
+
   -- A location constraint failure after parent insertion rolls the whole RPC back.
   v_post := jsonb_build_object(
     'id',v_rollback_id,'author_id',v_author,'title','Rollback fixture','caption','',
@@ -186,7 +219,7 @@ begin
     'request_key',null,'request_digest',null
   );
   v_puzzle := jsonb_build_object(
-    'mode','hidden_object','schema_version',1,'source_metadata',v_hidden_source,'definition',v_hidden_definition,
+    'mode','hidden_object','schema_version',1,'source_metadata',v_hidden_source,'definition',v_hidden_definition || jsonb_build_object('prompt', E'花を探して\nね'),
     'definition_hash',repeat('8',64)
   );
   v_result := public.pixieed_create_post(v_post,v_location,v_puzzle);

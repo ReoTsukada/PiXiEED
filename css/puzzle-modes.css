@@ -6,3 +6,25 @@ body.pixfind-is-playing .puzzle-create-link{display:none}
 body:is(.spot-editing,.hidden-object-editing) .puzzle-list-back{display:none}
 .puzzle-editor-play{box-sizing:border-box;display:grid;place-items:center;min-height:44px;margin-top:8px;padding:8px 12px;border:1px solid #b8c8b6;border-radius:12px;background:#fff;color:#203c2a;font-size:.82rem;font-weight:800;text-align:center;text-decoration:none}
 .puzzle-create-link:focus-visible,.puzzle-list-back:focus-visible,.puzzle-editor-play:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
+.puzzle-share{box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;padding:10px 12px;border:1px solid #ccd8ce;border-radius:14px;background:#f8faf7}
+.puzzle-share[hidden],.puzzle-share__url[hidden]{display:none}
+.puzzle-share__button{box-sizing:border-box;min-height:44px;padding:8px 14px;border:1px solid #335c43;border-radius:12px;background:#28583b;color:#fff;font:inherit;font-size:.9rem;font-weight:800;touch-action:manipulation}
+.puzzle-share__button:disabled{opacity:.66;cursor:wait}
+.puzzle-share__status{flex:1 1 100%;min-width:0;margin:0;color:#294d39;font-size:.86rem;line-height:1.5;overflow-wrap:anywhere}
+.puzzle-share__url{box-sizing:border-box;flex:1 1 240px;min-width:0;min-height:44px;padding:8px 10px;border:1px solid #879a8b;border-radius:9px;background:#fff;color:#182c20;font:inherit;font-size:.82rem}
+.puzzle-share__button:focus-visible,.puzzle-share__url:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
+/* Keep the artwork in the flexible row while the share panel stays compact and scrollable. */
+body[data-puzzle-mode="spot-difference"].pixfind-is-playing .pixfind-page--playing{bottom:calc(5.25rem + env(safe-area-inset-bottom,0px))}
+.pixfind-page--playing #pixfind-game:not(.arc-play){grid-template-rows:auto auto auto minmax(70px,1fr) auto}
+body .pixfind-page--playing #pixfind-game:not(.arc-play)>.puzzle-share{grid-row:3;min-width:0;min-height:0;max-height:clamp(58px,20dvh,160px);margin:0;padding:6px 8px;overflow:auto}
+body .pixfind-page--playing #pixfind-game:not(.arc-play)>.pixfind-images{grid-row:4}
+body .pixfind-page--playing #pixfind-game:not(.arc-play)>.pixfind-found-list{grid-row:5;min-height:0;max-height:40px;overflow:auto}
+body .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison{grid-template-rows:auto auto auto auto minmax(70px,1fr)}
+body .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.puzzle-share{grid-row:4;min-width:0;min-height:0;max-height:clamp(58px,20dvh,160px);margin:0;padding:6px 8px;overflow:auto}
+body .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.pixfind-images{grid-row:5}
+body .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison){grid-template-rows:auto auto auto auto minmax(70px,1fr) auto}
+body .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison)>.puzzle-share{grid-row:4;min-width:0;min-height:0;max-height:clamp(58px,20dvh,160px);margin:0;padding:6px 8px;overflow:auto}
+body .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison)>.pixfind-images{grid-row:5}
+body .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison)>.pixfind-found-list{grid-row:6}
+@media(orientation:landscape) and (max-height:500px){body[data-puzzle-mode="hidden-object"] .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison){grid-template-rows:auto auto auto minmax(48px,1fr) auto}body[data-puzzle-mode="hidden-object"] .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison)>.puzzle-share{grid-row:3;max-height:clamp(48px,18dvh,88px)}body[data-puzzle-mode="hidden-object"] .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison)>.pixfind-images{grid-row:4}body[data-puzzle-mode="hidden-object"] .pixfind-page--playing #pixfind-game.arc-play:not(.pixfind-game--comparison)>.pixfind-found-list{grid-row:5}}
+@media(orientation:landscape) and (max-height:360px){body .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison{grid-template-rows:auto auto auto minmax(48px,1fr)}body .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.puzzle-share{grid-row:3;max-height:clamp(48px,18dvh,88px)}body .pixfind-page--playing #pixfind-game.arc-play.pixfind-game--comparison>.pixfind-images{grid-row:4}}

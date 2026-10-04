@@ -12,7 +12,18 @@ const port = '55439'; // Unix socket lives under the unique scratch directory.
 const migrationDir = join(root, 'supabase/migrations');
 const publication = readdirSync(migrationDir).filter((name) => name.endsWith('_complete_puzzle_publication.sql'));
 if (publication.length !== 1) throw new Error('Exactly one complete_puzzle_publication migration is required');
-const migrations = [
+const rollout = readdirSync(migrationDir).filter(name => name.endsWith('_enable_puzzle_ogp_publication.sql'));
+if (rollout.length !== 1) throw new Error('Exactly one enable_puzzle_ogp_publication migration is required');
+const productionShape = process.argv.includes('--production-shape');
+const migrations = productionShape ? [
+  '20260918102416_user_posting_system.sql',
+  '20260918102444_published_map_visibility.sql',
+  '20260918102715_map_visibility_security_definer.sql',
+  '20260921011823_add_globe_post_cells.sql',
+  '20260927065511_expand_pixel_art_post_dimensions.sql',
+  '20261004113352_allow_rectangular_256_pixel_posts.sql',
+  rollout[0],
+] : [
   '20260918102416_user_posting_system.sql',
   '20260918102444_published_map_visibility.sql',
   '20260918102715_map_visibility_security_definer.sql',
@@ -22,6 +33,8 @@ const migrations = [
   '20260927120000_verify_new_pixel_post_limits.sql',
   '20260927163635_add_social_post_map_points.sql',
   publication[0],
+  '20261004113352_allow_rectangular_256_pixel_posts.sql',
+  rollout[0],
 ];
 
 function run(command, args) {
@@ -58,10 +71,11 @@ try {
     grant select on public.social_posts to anon, authenticated;
   `, 'bootstrap.sql');
   for (const name of migrations) {
-    if (name === '20260927120000_verify_new_pixel_post_limits.sql') {
+    if (name === '20260927120000_verify_new_pixel_post_limits.sql' ||
+      (productionShape && name === '20261004113352_allow_rectangular_256_pixel_posts.sql')) {
       sql(`insert into auth.users(id) values ('00000000-0000-4000-8000-000000000001');
         insert into public.user_posts(id,author_id,title,image_path,image_mime,image_bytes,image_width,image_height,color_count,content_hash)
-        values ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','Legacy preservation','legacy/source.webp','image/webp',100,128,128,512,repeat('a',64));`, 'legacy.sql');
+        values ('00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000001','Legacy preservation','legacy/source.webp','image/webp',100,512,512,512,repeat('a',64));`, 'legacy.sql');
     }
     sql(readFileSync(join(migrationDir, name), 'utf8'), name);
     console.log(`MIGRATION PASS: ${name}`);
@@ -70,11 +84,23 @@ try {
   if (!migrationOnly) {
     const result = sql(readFileSync(join(root, 'tests/creation-suite/puzzle-publication.sql'), 'utf8'), 'acceptance.sql');
     console.log(result.trim());
-    console.log(sql(readFileSync(join(root, 'tests/creation-suite/legacy-placement.sql'), 'utf8'), 'legacy-placement.sql').trim());
+    if (!productionShape) {
+      console.log(sql(readFileSync(join(root, 'tests/creation-suite/legacy-placement.sql'), 'utf8'), 'legacy-placement.sql').trim());
+    }
   }
   sql(`do $$ begin
-    if not exists(select 1 from public.user_posts where id='00000000-0000-4000-8000-000000000002' and image_mime='image/webp' and color_count=512 and title='Legacy preservation') then
+    update public.user_posts set status='rejected', moderation_note='Historical moderation remains possible'
+      where id='00000000-0000-4000-8000-000000000002';
+    if not exists(select 1 from public.user_posts where id='00000000-0000-4000-8000-000000000002' and image_mime='image/webp' and color_count=512 and image_width=512 and image_height=512 and status='rejected' and title='Legacy preservation') then
       raise exception 'legacy row changed';
+    end if;
+    begin
+      update public.user_posts set image_path='legacy/replaced.png' where id='00000000-0000-4000-8000-000000000002';
+      raise exception 'historical image replacement unexpectedly passed new image trigger';
+    exception when check_violation then null;
+    end;
+    if (select image_path from public.user_posts where id='00000000-0000-4000-8000-000000000002') <> 'legacy/source.webp' then
+      raise exception 'rejected historical image replacement changed the stored row';
     end if;
   end $$;`, 'preservation.sql');
   if (process.argv.includes('--integration')) {

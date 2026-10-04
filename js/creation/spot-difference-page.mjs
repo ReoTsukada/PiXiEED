@@ -5,7 +5,7 @@ import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf
 import { decodeSpotImagePair, decodeSpotSingleImage } from './spot-image-import.mjs?rev=20261002-inline-draw-1';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
 import { mountSpotInlineDraw } from './spot-inline-draw.mjs?rev=20261004-drawing-tools-4';
-import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20261003-project-library-1';

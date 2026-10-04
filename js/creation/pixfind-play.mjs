@@ -1,5 +1,5 @@
 import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
-import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
@@ -9,6 +9,7 @@ import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, vali
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
 import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
+import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261004-puzzle-share-1';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
@@ -278,6 +279,11 @@ function mount() {
   const status = document.querySelector('#pixfind-status'); const list = document.querySelector('#pixfind-list');
   const game = document.querySelector('#pixfind-game'); const primary = document.querySelector('#pixfind-primary');
   if (!status || !list || !game || !primary) return;
+  const sharePanel = document.querySelector('#puzzle-share');
+  const shareButton = document.querySelector('#puzzle-share-copy');
+  const shareStatus = document.querySelector('#puzzle-share-status');
+  const shareInput = document.querySelector('#puzzle-share-url');
+  let shareRequest = 0;
   let puzzles = []; let selected = null; let regions = []; let found = new Set(); let original = null; let changed = null; let currentMask = null; let cursorX = NaN; let cursorY = NaN; let readOnly = false; let authoritativeAnswers = false; let answerInstruction = ''; let localRoute = false; let postPuzzleRoute = false;
   let resultRun = 0; let resultShownRun = -1; let resultTimer = 0; let feedbackTimer = 0; let feedbackToken = 0;
   const resultView = createToolResultView({ key: document.body.dataset.puzzleMode === 'hidden-object' ? 'find-result' : 'spot-result', main: document.querySelector('#main'), returnLabel: 'ゲームに戻る' });
@@ -411,6 +417,11 @@ function mount() {
     paint();
   };
   const start = async (puzzle) => {
+    shareRequest += 1;
+    if (sharePanel) sharePanel.hidden = true;
+    if (shareButton) { shareButton.disabled = false; shareButton.textContent = '共有URLをコピー'; }
+    if (shareStatus) shareStatus.textContent = '';
+    if (shareInput) { shareInput.hidden = true; shareInput.value = ''; }
     cancelResult(true); resultShownRun = -1;
     clearTapFeedback();
     // Each game shows only its own kind; a link to the other kind moves to that game.
@@ -496,6 +507,10 @@ function mount() {
       if (readOnly) { primary.disabled = true; primary.setAttribute('aria-label', '正解位置未確認のためプレイできません'); progress.textContent = '閲覧のみ'; foundList.replaceChildren(); statusGame.textContent = viewMessage; }
       else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; updateProgress(); }
       updateBaseScale(); constrainViewport(); paint();
+      if (sharePanel) {
+        sharePanel.hidden = puzzle.publicPostOnly !== true;
+        if (!sharePanel.hidden) { updateBaseScale(); constrainViewport(); paint(); }
+      }
     } catch (error) {
       statusGame.textContent = error.message || '問題を読み込めませんでした。'; primary.disabled = true;
       if (puzzle.publicPostOnly) {
@@ -505,6 +520,8 @@ function mount() {
     }
   };
   const showList = () => {
+    shareRequest += 1;
+    if (sharePanel) sharePanel.hidden = true;
     cancelResult(true); resultShownRun = -1;
     clearTapFeedback();
     stopHintMotion();
@@ -526,6 +543,39 @@ function mount() {
   };
   primary.setAttribute('aria-label', '一覧の先頭の問題を遊ぶ');
   primary.addEventListener('click', () => { if (selected) start(selected); else if (puzzles.length) start(puzzles[0]); });
+  shareButton?.addEventListener('click', async () => {
+    const puzzle = selected;
+    if (!puzzle?.publicPostOnly || puzzle.mode !== pageMode || !sharePanel) return;
+    const request = ++shareRequest;
+    shareButton.disabled = true;
+    shareButton.textContent = '公開ページを確認しています…';
+    shareStatus.textContent = '';
+    shareInput.hidden = true;
+    try {
+      const url = await verifyPuzzleSharePage({ mode: puzzle.mode, postId: puzzle.id, origin: window.location.origin });
+      if (request !== shareRequest || selected !== puzzle) return;
+      shareInput.value = url;
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+        await navigator.clipboard.writeText(url);
+        if (request !== shareRequest || selected !== puzzle) return;
+        shareStatus.textContent = '公開ページと共有画像を確認し、URLをコピーしました。';
+        shareButton.textContent = 'もう一度コピー';
+      } catch {
+        if (request !== shareRequest || selected !== puzzle) return;
+        shareInput.hidden = false;
+        shareInput.focus(); shareInput.select();
+        shareStatus.textContent = 'コピーできませんでした。選択したURLをコピーするか、もう一度お試しください。';
+        shareButton.textContent = 'もう一度コピー';
+      }
+    } catch (error) {
+      if (request !== shareRequest || selected !== puzzle) return;
+      shareStatus.textContent = error instanceof Error ? error.message : '共有ページを確認できません。時間をおいて再試行してください。';
+      shareButton.textContent = '再試行';
+    } finally {
+      if (request === shareRequest) shareButton.disabled = false;
+    }
+  });
   document.querySelector('#pixfind-back').addEventListener('click', showList);
   compareButton?.addEventListener('click', () => {
     const showingChanged = compareButton.getAttribute('aria-pressed') !== 'true';

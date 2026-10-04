@@ -1,4 +1,4 @@
-import { supabaseConfig } from '../data/site-config.js?rev=20260918-post-v2';
+import { supabaseConfig } from '../data/site-config.js?rev=20261004-puzzle-share-1';
 
 const SESSION_KEY = 'PiXiEED:admin-supabase-session:v1';
 

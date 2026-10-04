@@ -3,3 +3,7 @@
 .DS_Store
 .vscode/
 Claude outputs/
+
+# OGP pages are generated into the Pages deployment artifact.
+/play/spot-difference/puzzles/
+/play/hidden-object/puzzles/

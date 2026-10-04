@@ -1,4 +1,4 @@
-import { verifyPixelPngClaim, PixelPngError } from './pixel-png.mjs';
+import { verifyStoredPixelPngClaim, PixelPngError } from './pixel-png.mjs';
 import { validateHiddenPuzzleDefinition, validateSpotPuzzleDefinition } from './puzzle-definition.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -48,7 +48,7 @@ function imageUrl(origin, path, postId) {
 }
 
 async function verifyImage(bytes, claim, prefix) {
-  try { return await verifyPixelPngClaim(bytes, claim, { includeRgba: true }); }
+  try { return await verifyStoredPixelPngClaim(bytes, claim, { includeRgba: true }); }
   catch (error) {
     if (error instanceof PixelPngError) reject(`${prefix}_${error.code}`);
     reject(`${prefix}_image_invalid`);

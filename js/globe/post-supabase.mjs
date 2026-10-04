@@ -1,4 +1,4 @@
-import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
 import { projectLegacyShowcase } from './legacy-showcase.mjs';
 import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs?rev=20261001-free-tools-1';

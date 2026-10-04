@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { deflateSync, inflateSync } from 'node:zlib';
 import { createDrawDocument, encodePng } from '../../js/creation/draw-core.mjs';
 import { admitPuzzleUpload } from '../../supabase/functions/_shared/puzzle-admission.mjs';
 import { inspectPixelPng } from '../../supabase/functions/_shared/pixel-png.mjs';
@@ -125,4 +126,31 @@ test('title is parent-owned and author fallback is display-only', async () => {
   assert.equal(response.puzzle.author, '作者不明');
   input.parent.title = '題'.repeat(61);
   await assert.rejects(buildPublicPuzzleResponse(input, PROJECT), { code: 'public_puzzle_title_invalid' });
+});
+
+test('an approved historical 512px puzzle remains publicly readable', async () => {
+  const { input } = await snapshot('hidden_object');
+  const encoded = Buffer.from(encodePng(createDrawDocument(512)));
+  // Draw's pure encoder is uncompressed; use a genuine compressed stored PNG.
+  const chunks = []; let offset = 8;
+  while (offset < encoded.length) {
+    const length = encoded.readUInt32BE(offset); const end = offset + 12 + length;
+    if (encoded.toString('ascii', offset + 4, offset + 8) === 'IDAT') {
+      const body = deflateSync(inflateSync(encoded.subarray(offset + 8, end - 4)));
+      const chunk = Buffer.alloc(body.length + 12); chunk.writeUInt32BE(body.length); chunk.write('IDAT', 4); body.copy(chunk, 8);
+      let crc = 0xffffffff;
+      for (const byte of chunk.subarray(4, -4)) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0); }
+      chunk.writeUInt32BE((crc ^ 0xffffffff) >>> 0, chunk.length - 4); chunks.push(chunk);
+    } else chunks.push(encoded.subarray(offset, end));
+    offset = end;
+  }
+  input.originalBytes = Uint8Array.from(Buffer.concat([encoded.subarray(0, 8), ...chunks]));
+  input.parent.imageClaim = await claim(input.originalBytes);
+  input.puzzle.definition.width = 512;
+  input.puzzle.definition.height = 512;
+  input.puzzle.definition.targets[0].pixels = [];
+  for (let y = 5; y < 10; y++) for (let x = 5; x < 10; x++) input.puzzle.definition.targets[0].pixels.push(y * 512 + x);
+  const response = await buildPublicPuzzleResponse(input, PROJECT);
+  assert.equal(response.puzzle.originalImage.width, 512);
+  assert.equal(preparePublicPostPuzzle(response, POST_ID, PROJECT).width, 512);
 });
