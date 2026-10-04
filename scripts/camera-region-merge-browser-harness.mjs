@@ -12,7 +12,7 @@ const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.c
 const { chromium } = await import(pathToFileURL(runtime).href);
 const browser = await chromium.launch({ headless: true });
 const errors = [];
-const out = '/tmp/pixieed-camera-toolbar-polish';
+const out = '/tmp/pixieed-camera-gestures-20261003/region-regression';
 await mkdir(out, { recursive: true });
 let checks = 0;
 const visualMeasurements = [];
@@ -115,12 +115,13 @@ async function waitForMerge(page) {
   await page.waitForFunction(() => document.querySelector('#pixelStudio')?.dataset.regionMerge === 'true' && document.querySelector('#regionMergePanel')?.getClientRects().length, null, { timeout: 5000 });
   await page.locator('#regionMergePanel').waitFor({ state: 'visible' });
 }
-async function beginByHold(page) {
+async function beginByDoubleTap(page) {
   const point = await page.locator('#captureFrame').evaluate(node => {
     const r = node.getBoundingClientRect(); return { x: r.x + r.width * .53, y: r.y + r.height * .2 };
   });
-  await page.mouse.move(point.x, point.y);
-  await page.mouse.down(); await page.waitForTimeout(640); await page.mouse.up();
+  await page.mouse.click(point.x, point.y);
+  await page.waitForTimeout(90);
+  await page.mouse.click(point.x, point.y);
   await waitForMerge(page);
 }
 async function pixels(page) {
@@ -334,8 +335,8 @@ try {
     await cdp.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
     await cdp.detach(); checks++;
 
-    // The primary entrance is a real long-hold. Its selected source is marked in the palette.
-    await beginByHold(page);
+    // The primary entrance is a real double-tap. Its selected source is marked in the palette.
+    await beginByDoubleTap(page);
     const sourceIndex = Number(await root.getAttribute('data-region-merge-source-index'));
     const sourceSwatch = page.locator(`#regionMergePalette [data-target-index="${sourceIndex}"]`);
     assert.equal(await sourceSwatch.getAttribute('data-source'), 'true', 'the live source color is visibly identified on open');
@@ -428,7 +429,7 @@ try {
     assert.ok(sameImage(await pixels(page), keyboardBaseline), 'Escape cancels and restores the latest raw frame for this static synthetic scene'); checks++;
     await assertToolbarHome(page, viewport, 'Escape');
     await page.waitForFunction((old) => Number(document.querySelector('#pixelStudio')?.dataset.previewFrames) > old, Number(await frameCounter()), { timeout: 5000 });
-    await beginByHold(page);
+    await beginByDoubleTap(page);
     const backBaseline = await pixels(page);
     await chooseTarget(page, 'surface');
     assert.ok(!sameImage(await pixels(page), backBaseline), 'back-route checkpoint has a real merge edit');
@@ -437,15 +438,15 @@ try {
     assert.ok(sameImage(await pixels(page), backBaseline), 'context back restores the latest raw frame for this static synthetic scene');
     await assertToolbarHome(page, viewport, 'context back');
     await page.waitForFunction((old) => Number(document.querySelector('#pixelStudio')?.dataset.previewFrames) > old, Number(await frameCounter()), { timeout: 5000 });
-    // Long-hold is the primary entrance. Keep a color edit active for capture/PXD verification.
-    await beginByHold(page);
+    // Double-tap is the primary entrance. Keep a color edit active for capture/PXD verification.
+    await beginByDoubleTap(page);
     const captureBaseline = await pixels(page);
     await chooseTarget(page, 'color');
     await page.waitForTimeout(100);
     const edited = await pixels(page);
     const editedState = await exactPixels(page);
     assert.ok(editedState, 'capture source ImageData is observed');
-    assert.ok(!sameImage(edited, captureBaseline), 'long-hold target edit changes the current still'); checks++;
+    assert.ok(!sameImage(edited, captureBaseline), 'double-tap target edit changes the current still'); checks++;
     if (viewport.width === 390) await page.screenshot({ path: `${out}/camera-region-merge-after.png` });
 
     // Capture through the existing camera button; PXD local storage must contain those edited pixels.

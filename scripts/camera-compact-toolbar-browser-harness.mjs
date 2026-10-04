@@ -11,13 +11,23 @@ assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'only loc
 const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 const { chromium } = await import(pathToFileURL(runtime).href);
 const browser = await chromium.launch({ headless: true });
-const out = '/tmp/pixieed-camera-toolbar-polish';
-await mkdir(out, { recursive: true });
+const labelPhase = process.env.PIXIEED_CAMERA_LABEL_PHASE || 'final';
+const outRoot = '/tmp/pixieed-camera-label-stability';
+const out = ['source-before','source-after'].includes(labelPhase) ? `${outRoot}/${labelPhase}` : outRoot;
+const labelOut = out;
+await mkdir(outRoot, { recursive: true });
+await mkdir(labelOut, { recursive: true });
 const errors = [];
 let checks = 0;
 const polishMeasurements = [];
+const labelStability = [];
+const loadedCssHashes = {};
 const sourceHashes = {};
 for(const file of ['pixel-camera.html','css/pixel-lens-camera.css','js/pixel-lens/app.mjs','js/pixel-lens/engine.mjs','js/pixel-lens/region-merge.mjs','js/pixel-lens/live-region-merge.mjs','scripts/camera-compact-toolbar-browser-harness.mjs'])sourceHashes[file]=createHash('sha256').update(await readFile(new URL(`../${file}`,import.meta.url))).digest('hex');
+if(labelPhase==='source-before') {
+  const baselineCSS=await readFile(`${outRoot}/pixel-lens-camera-head-18604317.css`);
+  sourceHashes['css/pixel-lens-camera.css@HEAD-18604317']=createHash('sha256').update(baselineCSS).digest('hex');
+}
 const viewports = [{width:1280,height:800},{width:390,height:844},{width:320,height:568},{width:844,height:390}]
   .filter(({width}) => !process.env.PIXIEED_CAMERA_COMPACT_VIEWPORT || width === Number(process.env.PIXIEED_CAMERA_COMPACT_VIEWPORT));
 const tools = ['look','dither','pixels','aspect','tone','zoom'];
@@ -26,6 +36,111 @@ const optionGroups = {
   aspect: '#aspectPanel [data-value]', tone: '#toneChips [data-value]', zoom: '#zoomStops [data-zoom]'
 };
 const optionRows = { look:'#looks', dither:'#ditherKinds', pixels:'#pixelsPanel', aspect:'#aspectPanel', tone:'#toneChips', zoom:'#zoomStops' };
+
+async function previewLabelGeometry(page) {
+  return page.evaluate(() => {
+    const rect=selector=>{const node=document.querySelector(selector);if(!node)return null;const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+    const visible=selector=>{const node=document.querySelector(selector);return !!node&&!node.hidden&&node.getClientRects().length>0&&getComputedStyle(node).display!=='none'&&getComputedStyle(node).visibility!=='hidden';};
+    const root=document.querySelector('#pixelStudio'),bottom=document.querySelector('.lc-bottom'),feedback=document.querySelector('.lc-feedback'),message=document.querySelector('#stageMsg'),frame=document.querySelector('#captureFrame'),canvas=document.querySelector('#view');
+    const frameRect=rect('#captureFrame');
+    const feedbackStyle=feedback?getComputedStyle(feedback):null,toastStyle=message?getComputedStyle(message):null;
+    return {context:root?.dataset.settingsContext,mode:root?.dataset.mode,rootFontSize:getComputedStyle(document.documentElement).fontSize,canvas:{width:canvas?.width,height:canvas?.height},frame:frameRect,frameCenter:frameRect?{x:frameRect.x+frameRect.width/2,y:frameRect.y+frameRect.height/2}:null,frameStyle:frame?{width:frame.style.width,height:frame.style.height}:null,contextSpace:root?.style.getPropertyValue('--lc-context-space'),bottom:{rect:rect('.lc-bottom'),offsetHeight:bottom?.offsetHeight,scrollHeight:bottom?.scrollHeight},feedback:{rect:rect('.lc-feedback'),offsetHeight:feedback?.offsetHeight,transform:feedbackStyle?.transform,width:feedbackStyle?.width,minWidth:feedbackStyle?.minWidth,maxWidth:feedbackStyle?.maxWidth,position:feedbackStyle?.position},toast:{visible:visible('#stageMsg'),text:message?.textContent.trim()||'',hidden:message?.hidden,className:message?.className,rect:visible('#stageMsg')?rect('#stageMsg'):null,width:toastStyle?.width,minWidth:toastStyle?.minWidth,maxWidth:toastStyle?.maxWidth,scrollWidth:message?.scrollWidth,clientWidth:message?.clientWidth},toolbar:rect('#toolbar'),panel:rect('#cameraSettingsPanel'),lookRow:rect('#looks'),paletteStrip:{reserved:document.querySelector('#paletteStrip')?.dataset.reserved,visible:visible('#paletteStrip'),rect:visible('#paletteStrip')?rect('#paletteStrip'):null},paletteSlider:{visible:visible('.lc-color-slider'),rect:visible('.lc-color-slider')?rect('.lc-color-slider'):null},toneSlider:{visible:visible('#toneSlider'),rect:visible('#toneSlider')?rect('#toneSlider'):null},mergePanel:{visible:visible('#regionMergePanel'),rect:visible('#regionMergePanel')?rect('#regionMergePanel'):null},nav:rect('.app-tabs[data-nav="five"]')};
+  });
+}
+
+async function measureNaturalLookToast(page, viewport) {
+  await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.settingsContext==='look'&&document.querySelector('#stageMsg')?.hidden===true);
+  await page.waitForTimeout(300);
+  const before=await previewLabelGeometry(page);
+  await writeFile(`${labelOut}/label-before-look-${viewport.width}.json`,JSON.stringify({phase:labelPhase,viewport,geometry:before},null,2));
+  await page.screenshot({path:`${labelOut}/label-before-look-${viewport.width}.png`});
+  const choice=page.locator('#looks [data-look="c16"]');
+  await choice.scrollIntoViewIfNeeded(); await choice.click();
+  await page.waitForFunction(()=>{const n=document.querySelector('#stageMsg');return n&&!n.hidden&&n.textContent.trim()==='16色';},null,{timeout:4000});
+  await page.waitForTimeout(100);
+  await page.screenshot({path:`${labelOut}/label-during-look-${viewport.width}.png`});
+  const timeline=[]; const started=Date.now();
+  while(Date.now()-started<3300){timeline.push({elapsedMs:Date.now()-started,...await previewLabelGeometry(page)});await page.waitForTimeout(100);}
+  await page.waitForFunction(()=>document.querySelector('#stageMsg')?.hidden===true,null,{timeout:1500});
+  await page.waitForTimeout(300);
+  const after=await previewLabelGeometry(page);
+  await page.screenshot({path:`${labelOut}/label-after-look-${viewport.width}.png`});
+  const visible=timeline.filter(sample=>sample.toast.visible),movement=samples=>({maxWidthDelta:Math.max(...samples.map(x=>Math.abs(x.frame.width-before.frame.width)),0),maxHeightDelta:Math.max(...samples.map(x=>Math.abs(x.frame.height-before.frame.height)),0),maxCenterXDelta:Math.max(...samples.map(x=>Math.abs(x.frameCenter.x-before.frameCenter.x)),0),maxCenterYDelta:Math.max(...samples.map(x=>Math.abs(x.frameCenter.y-before.frameCenter.y)),0)});
+  const report={viewport,sourceLook:'c16',toastText:'16色',toastDurationMs:visible.length?visible.at(-1).elapsedMs-visible[0].elapsedMs:0,sameSettingsContext:timeline.every(x=>x.context==='look')&&after.context==='look',sameCanvasDimensions:timeline.every(x=>x.canvas.width===before.canvas.width&&x.canvas.height===before.canvas.height)&&after.canvas.width===before.canvas.width&&after.canvas.height===before.canvas.height,before,visibleSamples:visible,allSamples:timeline,after,duringMovement:movement(visible),afterMovement:movement([after]),naturalToastDisappeared:!after.toast.visible};
+  await writeFile(`${labelOut}/label-toast-look-result-${viewport.width}.json`,JSON.stringify(report,null,2));
+  return report;
+}
+
+async function measureInjectedLabel(page, viewport, name, text) {
+  const before=await previewLabelGeometry(page),contextBefore=before.context,modeBefore=before.mode;
+  await page.evaluate(message=>{const node=document.querySelector('#stageMsg');node.textContent=message;node.hidden=false;node.classList.remove('pc-sr-only');node.classList.toggle('is-policy-notice',message.length>72);},text);
+  await page.waitForTimeout(300);
+  const during=await previewLabelGeometry(page);
+  await page.screenshot({path:`${labelOut}/injected-${name}-${viewport.width}.png`});
+  const overlap=await page.evaluate(()=>{
+    const node=document.querySelector('#stageMsg'),r=node.getBoundingClientRect(),frame=document.querySelector('#captureFrame').getBoundingClientRect(),nav=document.querySelector('.app-tabs[data-nav="five"]').getBoundingClientRect();
+    const overlaps=(a,b)=>a.left<b.right-.5&&a.right>b.left+.5&&a.top<b.bottom-.5&&a.bottom>b.top+.5;
+    const selectors=['#toolbar','#paletteStrip','.lc-color-slider','#toneSlider','#regionMergePanel','.app-tabs[data-nav="five"]'];
+    const interactiveOverlaps=selectors.flatMap(selector=>{const target=document.querySelector(selector);if(!target||getComputedStyle(target).display==='none'||getComputedStyle(target).visibility==='hidden'||target.hidden)return[];const q=target.getBoundingClientRect();return overlaps(r,q)?[{selector,rect:{left:q.left,right:q.right,top:q.top,bottom:q.bottom}}]:[];});
+    return {message:{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,scrollWidth:node.scrollWidth,scrollHeight:node.scrollHeight,clientWidth:node.clientWidth,clientHeight:node.clientHeight,text:node.textContent.trim(),pointerEvents:getComputedStyle(node).pointerEvents},frameOverlap:overlaps(r,frame),navOverlap:overlaps(r,nav),interactiveOverlaps,viewportOverflow:r.left<0||r.right>innerWidth+1||r.top<0||r.bottom>innerHeight+1,documentOverflow:document.documentElement.scrollWidth>innerWidth};
+  });
+  await page.evaluate(()=>{const node=document.querySelector('#stageMsg');node.textContent='';node.hidden=true;node.classList.add('pc-sr-only');node.classList.remove('is-policy-notice');});
+  await page.waitForTimeout(180);
+  const after=await previewLabelGeometry(page);
+  const movement={width:Math.abs(during.frame.width-before.frame.width),height:Math.abs(during.frame.height-before.frame.height),centerX:Math.abs(during.frameCenter.x-before.frameCenter.x),centerY:Math.abs(during.frameCenter.y-before.frameCenter.y),afterCenterX:Math.abs(after.frameCenter.x-before.frameCenter.x),afterCenterY:Math.abs(after.frameCenter.y-before.frameCenter.y)};
+  assert.equal(during.context,contextBefore,`${name} injected label leaves settings context unchanged`);
+  assert.equal(after.context,contextBefore,`${name} hidden label leaves settings context unchanged`);
+  assert.equal(during.mode,modeBefore,`${name} injected label leaves camera mode unchanged`);
+  assert.ok(Object.values(movement).every(value=>value<=.5),`${name} label moves preview: ${JSON.stringify(movement)}`);
+  assert.deepEqual(overlap.interactiveOverlaps,[],`${name} label overlaps toolbar/palette/slider/merge/navigation controls: ${JSON.stringify(overlap)}`);
+  assert.equal(overlap.viewportOverflow,false,`${name} label exceeds viewport: ${JSON.stringify(overlap)}`);
+  assert.equal(overlap.documentOverflow,false,`${name} label creates horizontal page overflow: ${JSON.stringify(overlap)}`);
+  assert.equal(overlap.message.pointerEvents,'none',`${name} label blocks pointer interactions`);
+  assert.ok(overlap.message.scrollWidth<=overlap.message.clientWidth+1,`${name} label text overflows its content box: ${JSON.stringify(overlap.message)}`);
+  const report={kind:'harness-injected-only',name,textLength:text.length,viewport,context:contextBefore,mode:modeBefore,before,during,after,movement,overlap};
+  await writeFile(`${labelOut}/injected-${name}-${viewport.width}.json`,JSON.stringify(report,null,2));
+  return report;
+}
+
+async function measureActualToast(page, viewport, name, trigger, expected) {
+  await page.waitForTimeout(240);
+  const before=await previewLabelGeometry(page);
+  await trigger();
+  await page.waitForFunction(({text})=>{const node=document.querySelector('#stageMsg');return node&&!node.hidden&&node.textContent.trim().includes(text);},{text:expected},{timeout:5000});
+  let previous=null,stable=0;const settleStart=Date.now();
+  while(Date.now()-settleStart<900&&stable<3){const current=await page.locator('#captureFrame').boundingBox();if(previous&&Math.max(Math.abs(current.x-previous.x),Math.abs(current.y-previous.y),Math.abs(current.width-previous.width),Math.abs(current.height-previous.height))<.1)stable++;else stable=0;previous=current;await page.waitForTimeout(60);}
+  assert.ok(stable>=3,`${name} preview did not settle after its triggering UI action`);
+  const during=await previewLabelGeometry(page);
+  await page.screenshot({path:`${labelOut}/actual-${name}-during-${viewport.width}.png`});
+  await page.waitForFunction(()=>document.querySelector('#stageMsg')?.hidden===true,null,{timeout:4000});
+  await page.waitForTimeout(180);
+  const after=await previewLabelGeometry(page);
+  const movement={duringCenterX:Math.abs(during.frameCenter.x-before.frameCenter.x),duringCenterY:Math.abs(during.frameCenter.y-before.frameCenter.y),duringWidth:Math.abs(during.frame.width-before.frame.width),duringHeight:Math.abs(during.frame.height-before.frame.height),afterCenterX:Math.abs(after.frameCenter.x-before.frameCenter.x),afterCenterY:Math.abs(after.frameCenter.y-before.frameCenter.y)};
+  assert.equal(during.context,before.context,`${name} actual toast changes settings context`);
+  assert.equal(after.context,before.context,`${name} after-toast settings context differs`);
+  assert.equal(during.mode,before.mode,`${name} actual toast changes camera mode`);
+  assert.ok(during.canvas.width===before.canvas.width&&during.canvas.height===before.canvas.height,`${name} actual toast changes canvas dimensions`);
+  assert.ok(Object.values(movement).every(value=>value<=.5),`${name} actual toast moves preview: ${JSON.stringify(movement)}`);
+  const report={kind:'real-ui-action-and-toast',name,expected,viewport,before,during,after,movement,naturalToastDisappeared:after.toast.visible===false};
+  await writeFile(`${labelOut}/actual-${name}-${viewport.width}.json`,JSON.stringify(report,null,2));
+  return report;
+}
+
+async function measureCurrentToastDisappearance(page, viewport, name, expected) {
+  await page.waitForFunction(({text})=>{const node=document.querySelector('#stageMsg');return node&&!node.hidden&&node.textContent.trim().includes(text);},{text:expected},{timeout:5000});
+  await page.waitForTimeout(160);
+  const during=await previewLabelGeometry(page),started=Date.now(),samples=[];
+  await page.screenshot({path:`${labelOut}/actual-${name}-during-${viewport.width}.png`});
+  while(Date.now()-started<3300){samples.push(await previewLabelGeometry(page));await page.waitForTimeout(100);}
+  await page.waitForFunction(()=>document.querySelector('#stageMsg')?.hidden===true,null,{timeout:1500});
+  await page.waitForTimeout(180);
+  const after=await previewLabelGeometry(page),movement={maxWidthDelta:Math.max(...samples.map(item=>Math.abs(item.frame.width-during.frame.width)),0),maxHeightDelta:Math.max(...samples.map(item=>Math.abs(item.frame.height-during.frame.height)),0),maxCenterXDelta:Math.max(...samples.map(item=>Math.abs(item.frameCenter.x-during.frameCenter.x)),0),maxCenterYDelta:Math.max(...samples.map(item=>Math.abs(item.frameCenter.y-during.frameCenter.y)),0),afterCenterX:Math.abs(after.frameCenter.x-during.frameCenter.x),afterCenterY:Math.abs(after.frameCenter.y-during.frameCenter.y)};
+  assert.ok(samples.every(item=>item.context===during.context&&item.mode===during.mode),`${name} status changed mode or context`);
+  assert.ok(Object.values(movement).every(value=>value<=.5),`${name} dismissal moves preview: ${JSON.stringify(movement)}`);
+  const report={kind:'real-ui-capture-toast',name,expected,viewport,during,samples,after,movement,naturalToastDisappeared:after.toast.visible===false};
+  await writeFile(`${labelOut}/actual-${name}-${viewport.width}.json`,JSON.stringify(report,null,2));
+  return report;
+}
 
 async function openPage(viewport) {
   const context = await browser.newContext({ viewport, deviceScaleFactor:1, acceptDownloads:true, hasTouch:true });
@@ -86,8 +201,9 @@ async function openPage(viewport) {
     navigator.mediaDevices.getSupportedConstraints=()=>({});
     navigator.mediaDevices.getUserMedia=async()=>stream;
   });
-  await context.route('**/*',route=>{
+  await context.route('**/*',async route=>{
     const url=new URL(route.request().url());
+    if(labelPhase==='source-before'&&url.pathname==='/css/pixel-lens-camera.css') return route.fulfill({contentType:'text/css',body:await readFile(`${outRoot}/pixel-lens-camera-head-18604317.css`)});
     if(url.hostname==='pagead2.googlesyndication.com') return route.fulfill({contentType:'application/javascript',body:''});
     return url.origin===origin?route.continue():route.abort();
   });
@@ -97,7 +213,9 @@ async function openPage(viewport) {
   await page.waitForFunction(()=>document.querySelector('#capture')?.dataset.action==='capture'&&!document.querySelector('#capture').disabled,null,{timeout:20000});
   await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.ready==='true',null,{timeout:20000});
   await page.waitForFunction(()=>document.querySelector('#gestureHint')?.hidden===true,null,{timeout:6000});
-  return {context,page};
+  const loadedCss=await page.evaluate(async()=>{const link=[...document.querySelectorAll('link[rel="stylesheet"]')].find(node=>new URL(node.href).pathname==='/css/pixel-lens-camera.css');if(!link)return null;const response=await fetch(link.href,{cache:'no-store'});return {url:response.url,status:response.status,body:await response.text()};});
+  const loadedCssHash=loadedCss&&createHash('sha256').update(loadedCss.body).digest('hex');
+  return {context,page,loadedCssHash,loadedCssUrl:loadedCss?.url,loadedCssStatus:loadedCss?.status};
 }
 async function imageState(page) {
   return page.locator('#view').evaluate(canvas=>{
@@ -277,17 +395,32 @@ async function setRange(page,selector,value) {
 
 try {
   for(const viewport of viewports) {
-    const {context,page}=await openPage(viewport),root=page.locator('#pixelStudio');
+    const {context,page,loadedCssHash,loadedCssUrl,loadedCssStatus}=await openPage(viewport),root=page.locator('#pixelStudio');
+    loadedCssHashes[`${viewport.width}x${viewport.height}`]={sha256:loadedCssHash,url:loadedCssUrl,status:loadedCssStatus};
     const navBefore=await page.locator('.app-tabs[data-nav="five"]').evaluate(node=>[...node.children].map(n=>({tag:n.tagName,id:n.id,nav:n.dataset.nav,label:n.getAttribute('aria-label')})));
     assert.equal(await page.locator('#cameraSettings').count(),0,'right-side gear is absent');
     assert.equal(await page.locator('#toolbar [data-tool]').count(),6,'six home tools are always rendered');
     let home=await assertLayout(page,viewport);
     await assertHomeFrameFits(page,viewport,'1:1 initial');
     await page.screenshot({path:`${out}/camera-compact-home-${viewport.width}.png`});
+    if(labelPhase==='source-after') {
+      await measureActualToast(page,viewport,'home-swipe',async()=>{
+        const r=await page.locator('#view').boundingBox(),y=r.y+r.height*.5;
+        await page.mouse.move(r.x+r.width*.82,y);await page.mouse.down();await page.mouse.move(r.x+r.width*.18,y,{steps:7});await page.mouse.up();
+      },'色');
+      await measureInjectedLabel(page,viewport,'home-long','共通キャンバスは最大256px・32色です。プロジェクトのキャンバス設定を確認してください。現在の画像は変更されていません。');
+    }
 
     // Look: switch 8/16-color presets, edit one swatch, and use the saved My palette.
     let state=await imageState(page); await selectContext(page,'look');
     await page.waitForTimeout(250);
+    if(['before','source-before','source-after'].includes(process.env.PIXIEED_CAMERA_LABEL_PHASE)&&viewport.width===390){
+      const report=await measureNaturalLookToast(page,viewport);labelStability.push(report);
+      if(process.env.PIXIEED_CAMERA_LABEL_ONLY==='1'){await context.close();continue;}
+    }
+    if(labelPhase==='source-after'&&viewport.width!==390){const report=await measureNaturalLookToast(page,viewport);labelStability.push(report);}
+    if(labelPhase==='source-after')state=await imageState(page);
+    if(labelPhase==='source-after')await measureInjectedLabel(page,viewport,'look-open-long','写真の保存範囲を確認できないため、保存を停止しました。撮影した画像は変更していません。設定を確認してからもう一度お試しください。');
     await page.screenshot({path:`${out}/camera-compact-look-open-${viewport.width}.png`});
     await assertLayout(page,viewport,'look'); await assertHomeFrameFits(page,viewport,'look choice rail'); const lookCount=await assertOptionReachability(page,'look');
     const lookFrame=Number(await root.getAttribute('data-preview-frames'))||0;
@@ -297,12 +430,14 @@ try {
     const editingDone=page.locator('#toolbarContextMore'); await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.editing==='true');
     await page.waitForTimeout(250);
     await assertHomeFrameFits(page,viewport,'palette color editor helper');
+    if(labelPhase==='source-after')await measureInjectedLabel(page,viewport,'look-editor-long','共通キャンバスの範囲を確認できないため、画像を戻しませんでした。撮影画像は変更せず、編集画面に戻ります。');
     if(viewport.width===320||viewport.width===1280) await page.screenshot({path:`${out}/camera-compact-edit-${viewport.width}.png`});
     assert.match(await editingDone.textContent(),/完了/,'palette edit exposes the contextual Done action');
     assert.ok(await editingDone.isVisible(),'palette edit Done action is reachable'); await editingDone.click();
     await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.editing==='false');
     const paletteSave=page.locator('#paletteSave'); await page.waitForFunction(()=>{const n=document.querySelector('#paletteSave');return n&&!n.disabled&&!n.hidden&&getComputedStyle(n).visibility!=='hidden';});
-    await paletteSave.click(); await page.waitForFunction(()=>document.querySelectorAll('#looks [data-look^="my-"]').length>0);
+    if(labelPhase==='source-after')await measureActualToast(page,viewport,'look-save',()=>paletteSave.click(),'マイ'); else await paletteSave.click();
+    await page.waitForFunction(()=>document.querySelectorAll('#looks [data-look^="my-"]').length>0);
     const my=page.locator('#looks [data-look^="my-"]').first(); await revealChoice(page,'look','#looks [data-look^="my-"]'); await my.click(); await page.waitForFunction(()=>document.querySelector('#toolbar [data-tool="look"] b')?.textContent.startsWith('マイ'));
     await page.screenshot({path:`${out}/camera-compact-look-${viewport.width}.png`}); checks++;
     await returnHome(page,'back');
@@ -331,6 +466,10 @@ try {
     // Tone and zoom controls each alter the image pixels.
     state=await imageState(page); await selectContext(page,'tone'); await assertLayout(page,viewport,'tone'); await assertHomeFrameFits(page,viewport,'tone slider helper'); await assertOptionReachability(page,'tone');
     await revealChoice(page,'tone','#toneChips [data-value="brightness"]'); await choose(page,'#toneChips [data-value="brightness"]'); await setRange(page,'#toneSlider',40); await waitForImageChange(page,state); checks++;
+    if(labelPhase==='source-after'){
+      await measureActualToast(page,viewport,'tone-reset',()=>page.locator('#toneReset').click(),'色調整を元に戻しました');
+      await measureInjectedLabel(page,viewport,'tone-long','共通キャンバスは最大256px・32色です。撮影画像は保存データに反映しませんでした。設定を確認してください。');
+    }
     await page.screenshot({path:`${out}/camera-compact-tone-${viewport.width}.png`}); await returnHome(page,'back');
     state=await imageState(page); await selectContext(page,'zoom'); await assertLayout(page,viewport,'zoom'); await assertOptionReachability(page,'zoom');
     const zoomValues=await page.locator('#zoomStops [data-zoom]').evaluateAll(nodes=>nodes.map(n=>Number(n.dataset.zoom)));
@@ -343,6 +482,10 @@ try {
     const beforeCapture=await exactState(page); assert.ok(beforeCapture,'capture source pixels observed');
     await page.locator('#capture').click();
     await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.mode==='captured',null,{timeout:15000});
+    if(labelPhase==='source-after'){
+      await measureCurrentToastDisappearance(page,viewport,'captured','撮影しました。PNGを保存できます。');
+      await measureInjectedLabel(page,viewport,'captured-long','共通キャンバスは最大256px・32色です。撮影画像は変更せず、編集画面に戻ります。保存前にサイズと色数を確認してください。');
+    }
     const stored=await page.evaluate(async frame=>{
       const store=await import('/js/creation/pxd-store.mjs'),projectApi=await import('/js/creation/pxd-project.mjs'),shared=await import('/js/creation/shared-image.mjs');
       let pointer=null;
@@ -364,7 +507,7 @@ try {
     console.log(`compact camera toolbar ${viewport.width}x${viewport.height}: PASS; home tools=6; look choices=${lookCount}; settings context paths=6`);
   }
   assert.deepEqual(errors,[],'no browser page errors');
-  await writeFile(`${out}/compact-results.json`,JSON.stringify({checks,viewports,sourceHashes,measurements:polishMeasurements,errors},null,2));
+  await writeFile(`${out}/compact-results.json`,JSON.stringify({checks,viewports,sourceHashes,measurements:polishMeasurements,labelStability,errors},null,2));
   console.log(`Camera compact toolbar: ${checks}/${checks} PASS; synthetic canvas camera only; live camera, Safari, physical devices, and production UNTESTED; screenshots: ${out}`);
 } finally { await browser.close(); }
 

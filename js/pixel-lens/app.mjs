@@ -3,7 +3,7 @@ import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.m
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20261002-camera-palette-startup-2';
-import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261003-region-merge-1';
+import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261003-camera-focus-1';
 import { GIF_FPS } from './gif.mjs?v=20261001-animation-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
@@ -18,6 +18,7 @@ import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261003-project-libra
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
 import { pickPaletteIndex } from './region-merge.mjs?rev=20261003-region-merge-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261003-live-merge-1';
+import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -71,6 +72,11 @@ let capturePolicyNotice = '';
 let audioFrozenFrame = null;
 let captureInFlight = false;
 let regionMergeSession = null;
+const focusController = createCameraFocusController();
+const focusMarker = $('#focusMarker');
+let focusMarkerTimer = 0;
+let focusRequestInFlight = false;
+let focusRequestToken = 0;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: normalizeOutputSize(audioCameraRequest?.width ?? 128),
@@ -424,6 +430,77 @@ function mergePointFromClient(clientX, clientY) {
   const rect = view.getBoundingClientRect();
   if (!rect.width || !rect.height || clientX < rect.left || clientY < rect.top || clientX >= rect.right || clientY >= rect.bottom) return null;
   return { x: Math.floor((clientX - rect.left) * view.width / rect.width), y: Math.floor((clientY - rect.top) * view.height / rect.height) };
+}
+
+function hideFocusMarker() {
+  if (focusMarkerTimer) window.clearTimeout(focusMarkerTimer);
+  focusMarkerTimer = 0;
+  focusMarker.hidden = true;
+  focusMarker.dataset.focusState = '';
+}
+
+function showFocusRequestMarker(clientX, clientY) {
+  const stageRect = stage.getBoundingClientRect();
+  focusMarker.style.left = `${clientX - stageRect.left}px`;
+  focusMarker.style.top = `${clientY - stageRect.top}px`;
+  focusMarker.dataset.focusState = 'requested';
+  focusMarker.hidden = false;
+  if (focusMarkerTimer) window.clearTimeout(focusMarkerTimer);
+  focusMarkerTimer = window.setTimeout(hideFocusMarker, 900);
+}
+
+async function requestCameraFocusAt(clientX, clientY) {
+  if (state.mode !== 'live' || gif.recording || captureInFlight) return;
+  if (focusRequestInFlight) {
+    root.dataset.focusStatus = 'busy';
+    sayToast('ピント要求中です。完了してからもう一度お試しください');
+    return;
+  }
+  const track = activeStream?.getVideoTracks?.()[0];
+  if (!track || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  if (zoomController.isApplying()) {
+    root.dataset.focusStatus = 'busy';
+    sayToast('ズーム調整中です。少し待ってから長押ししてください');
+    return;
+  }
+  const rect = view.getBoundingClientRect();
+  const point = mapPreviewPointToCameraFocus({
+    clientX, clientY, rect, videoWidth: video.videoWidth, videoHeight: video.videoHeight,
+    frameWidth: state.result?.width ?? view.width, frameHeight: state.result?.height ?? view.height,
+    digitalZoom: zoomController.snapshot().digital, facing: state.facing
+  });
+  if (!point) return;
+  hideFocusMarker();
+  const cameraToken = cameraSequence;
+  let supportedConstraints = {};
+  try { supportedConstraints = navigator.mediaDevices?.getSupportedConstraints?.() ?? {}; } catch {}
+  const requestToken = ++focusRequestToken;
+  focusRequestInFlight = true;
+  let result;
+  try {
+    result = await focusController.request(track, point, {
+      supportedConstraints,
+      isCurrent: (currentTrack) => currentTrack === activeStream?.getVideoTracks?.()[0] && cameraSequence === cameraToken && state.mode === 'live'
+    });
+  } finally {
+    if (requestToken === focusRequestToken) focusRequestInFlight = false;
+  }
+  if (result.status === 'stale') return;
+  root.dataset.focusStatus = result.status;
+  if (result.status === 'requested') {
+    root.dataset.focusX = String(point.x);
+    root.dataset.focusY = String(point.y);
+    showFocusRequestMarker(clientX, clientY);
+    sayToast('この位置へのピント合わせを要求しました');
+  } else if (result.status === 'unsupported') {
+    root.dataset.focusX = '';
+    root.dataset.focusY = '';
+    sayToast('このカメラはタッチ位置でのピント合わせに対応していません');
+  } else {
+    root.dataset.focusX = '';
+    root.dataset.focusY = '';
+    sayToast('タッチ位置のピント要求に失敗しました');
+  }
 }
 
 function beginRegionMerge(clientX, clientY) {
@@ -806,6 +883,13 @@ loop = createFrameLoop({
 });
 
 function stopTracks() {
+  focusController.cancel();
+  focusRequestToken++;
+  focusRequestInFlight = false;
+  hideFocusMarker();
+  root.dataset.focusStatus = '';
+  root.dataset.focusX = '';
+  root.dataset.focusY = '';
   zoomController.detach();
   if (activeStream) {
     for (const track of activeStream.getTracks()) track.stop();
@@ -1574,6 +1658,10 @@ function syncZoomHud() {
 }
 function setZoom(value, { gesture = '', silent = false } = {}) {
   if (state.mode === 'captured') return;
+  if (focusRequestInFlight) {
+    sayToast('ピント要求中はズームを調整できません');
+    return;
+  }
   if (regionMergeSession) endRegionMerge({ restore: true });
   const previous = state.zoom;
   state.zoom = Math.min(zoomInfo.max, Math.max(zoomInfo.min, value));
@@ -1599,7 +1687,8 @@ attachZoomGestures(stage, {
   get: () => state.zoom,
   set: (value, info) => setZoom(value, info),
   onTap: () => refreshObjects(),
-  onLongPress: (event) => beginRegionMerge(event.clientX, event.clientY),
+  onDoubleTap: (event) => { if (beginRegionMerge(event.clientX, event.clientY)) focusVisible('#regionMergePalette button'); },
+  onLongPress: (event) => { void requestCameraFocusAt(event.clientX, event.clientY); return true; },
   // the picture leans a little with the finger, so a swipe feels attached to it
   onDrag: (dx, dy) => {
     if (state.mode !== 'live' || gif.recording || regionMergeSession) return;

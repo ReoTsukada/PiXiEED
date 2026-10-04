@@ -13,18 +13,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261003-camera-polish-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261003-camera-focus-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
-  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261003-camera-polish-1">
+  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261003-camera-focus-1">
 </head>
 <body data-tool-name="ドット絵カメラ" data-tool-short="カメラ">
   <a class="pc-skip" href="#stage">カメラへ移動</a>
   <main class="lc" id="pixelStudio" data-mode="loading">
-    <!-- The picture is the controller: pinch = zoom, double tap = 1×, tap = pick colours again,
-         swipe left/right = look, swipe up/down = front/back camera -->
-    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで等倍、タップで色を選び直し、長押しまたは M キーで色をまとめ、左右スワイプで色、上下スワイプでカメラ切り替え。設定は画面下の6項目から選べます" tabindex="-1">
+    <!-- The picture is the controller: pinch = zoom, double tap = merge live colours, long press = request focus at that point, tap = pick colours again. -->
+    <section class="lc-stage" id="stage" aria-label="撮影プレビュー。ピンチでズーム、ダブルタップで押した位置の色をライブ統合、長押しでその位置へのピント合わせを要求、タップで色を選び直し、左右スワイプで色、上下スワイプでカメラ切り替え。Mキーでも中央位置から色統合できます。設定は画面下の6項目から選べます" tabindex="-1">
       <video id="video" class="lc-video-source" playsinline muted autoplay aria-hidden="true" tabindex="-1"></video>
       <div class="lc-frame" id="captureFrame">
         <canvas id="view" width="1" height="1" aria-hidden="true"></canvas>
@@ -41,10 +40,13 @@
       <div class="lc-hint" id="gestureHint" hidden>
         <p><b>↔</b><span>左右スワイプで色</span></p>
         <p><b>↕</b><span>上下スワイプでカメラ切替</span></p>
-        <p><b>●</b><span>画面長押しまたは M キーでライブ色統合</span></p>
+        <p><b>●</b><span>ダブルタップでその位置の色をライブ統合</span></p>
+        <p><b>⌖</b><span>画面長押しでその位置へのピント合わせを要求</span></p>
+        <p><b>M</b><span>M キーで中央位置から色統合</span></p>
         <p><b>●</b><span>シャッター長押しでGIF</span></p>
         <p><b>◉</b><span>下の6項目から色・倍率などを選ぶ</span></p>
       </div>
+      <div id="focusMarker" class="lc-focus-marker" aria-hidden="true" hidden></div>
       <div class="lc-zoom-hud" id="zoomHud" aria-hidden="true">
         <span class="lc-zoom-hud-value" id="zoomHudValue">1×</span>
         <span class="lc-zoom-hud-track"><i id="zoomHudFill"></i></span>
@@ -159,7 +161,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261003-camera-polish-1"></script>
+  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261003-camera-focus-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
+  <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261003-tool-help-3"></script>
 </body>
 </html>

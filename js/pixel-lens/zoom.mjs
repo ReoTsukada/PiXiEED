@@ -1,7 +1,7 @@
 /**
  * Pinch-first camera zoom.
  *
- * Two fingers pinch, a trackpad pinch or ctrl+wheel zoom, a double tap returns to 1x, and the zoom pill
+ * Two fingers pinch and a trackpad pinch or ctrl+wheel zoom. Double tap is delegated to the caller, and the zoom pill
  * steps through useful total magnifications up to 40x. Device zoom is applied first when it reports the
  * requested setting; a centered image crop supplies the remainder at the existing output resolution.
  */
@@ -162,11 +162,11 @@ export function createCameraZoomController({ onChange = () => {} } = {}) {
     return snapshot();
   }
 
-  return { attach, detach, setZoom, snapshot, get range() { return effectiveRange(); } };
+  return { attach, detach, setZoom, snapshot, isApplying: () => Boolean(pending), get range() { return effectiveRange(); } };
 }
 
 /**
- * Attach pinch / wheel / double-tap / swipe handling to `element`.
+ * Attach pinch / wheel / tap / hold / swipe handling to `element`.
  * `set(value, { gesture })` receives the new zoom; `onTap()` fires for a single tap that was not part of a
  * double tap, pinch or swipe (the caller uses it to re-pick colours). A one-finger flick calls
  * `onSwipe('left'|'right'|'up'|'down')`; `onDrag(dx, dy)` follows the finger meanwhile (and `onDrag(0, 0)`
@@ -184,70 +184,115 @@ export function swipeDirection(dx, dy, ms) {
   return null;
 }
 
-export function attachZoomGestures(element, { get, set, onTap = null, onGesture = null, onSwipe = null, onDrag = null, onLongPress = null } = {}) {
+export const DOUBLE_TAP_MAX_DISTANCE = 48;
+export const DOUBLE_TAP_DELAY_MS = 300;
+
+export function attachZoomGestures(element, { get, set, onTap = null, onDoubleTap = null, onGesture = null, onSwipe = null, onDrag = null, onLongPress = null, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = (id) => clearTimeout(id), doubleTapDistance = DOUBLE_TAP_MAX_DISTANCE } = {}) {
   const pointers = new Map();
-  let pinch = null; let lastTap = 0; let tapTimer = 0; let moved = false; let downAt = 0; let pinched = false;
-  let holdTimer = 0; let holdFired = false; let canceled = false; let activePointer = null;
-  const clearHold = () => { if (holdTimer) window.clearTimeout(holdTimer); holdTimer = 0; };
+  let pinch = null;
+  let gesture = null;
+  let pendingTap = null;
+  let tapTimer = 0;
+  let holdTimer = 0;
+  const clearHold = () => { if (holdTimer) clearTimer(holdTimer); holdTimer = 0; };
+  const clearTapTimer = () => { if (tapTimer) clearTimer(tapTimer); tapTimer = 0; };
+  const clearPendingTap = () => { clearTapTimer(); pendingTap = null; };
   const distance = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  const closeTo = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) <= doubleTapDistance;
+  const scheduleTap = (point, time) => {
+    pendingTap = { ...point, time };
+    clearTapTimer();
+    tapTimer = setTimer(() => {
+      tapTimer = 0;
+      if (pendingTap?.time === time) { pendingTap = null; onTap?.(); }
+    }, DOUBLE_TAP_DELAY_MS);
+  };
   element.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
-    if (tapTimer) { window.clearTimeout(tapTimer); tapTimer = 0; }
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, x0: event.clientX, y0: event.clientY });
+    const time = now();
+    const point = { x: event.clientX, y: event.clientY };
+    pointers.set(event.pointerId, { ...point, x0: point.x, y0: point.y });
     try { element.setPointerCapture(event.pointerId); } catch { /* not capturable */ }
     if (pointers.size === 1) {
-      moved = false; pinched = false; canceled = false; holdFired = false; activePointer = event.pointerId; downAt = performance.now();
+      const isDoubleCandidate = Boolean(pendingTap && time - pendingTap.time <= DOUBLE_TAP_DELAY_MS && closeTo(point, pendingTap));
+      if (isDoubleCandidate) clearTapTimer();
+      else if (pendingTap) { clearPendingTap(); onTap?.(); }
+      gesture = { pointerId: event.pointerId, x0: point.x, y0: point.y, started: time, moved: false, pinched: false, canceled: false, holdFired: false, doubleCandidate: isDoubleCandidate };
       clearHold();
-      if (onLongPress) holdTimer = window.setTimeout(() => {
+      if (onLongPress) holdTimer = setTimer(() => {
         holdTimer = 0;
-        if (pointers.size !== 1 || moved || canceled || activePointer !== event.pointerId) return;
-        holdFired = onLongPress(event) !== false;
-        if (holdFired) { if (tapTimer) window.clearTimeout(tapTimer); tapTimer = 0; lastTap = 0; }
+        if (pointers.size !== 1 || !gesture || gesture.pointerId !== event.pointerId || gesture.moved || gesture.canceled) return;
+        gesture.holdFired = true;
+        gesture.doubleCandidate = false;
+        clearPendingTap();
+        onLongPress(event);
       }, 550);
+    } else if (pointers.size >= 2) {
+      clearHold();
+      clearPendingTap();
+      if (gesture) { gesture.pinched = true; gesture.holdFired = true; gesture.doubleCandidate = false; }
+      if (pointers.size === 2) {
+        pinch = { start: distance(), zoom: get() };
+        onDrag?.(0, 0);
+        onGesture?.('start');
+      } else if (gesture) gesture.canceled = true;
     }
-    if (pointers.size === 2) {
-      clearHold(); holdFired = true; activePointer = null;
-      pinch = { start: distance(), zoom: get() }; moved = true; pinched = true; onDrag?.(0, 0); onGesture?.('start');
-    } else if (pointers.size > 2) { clearHold(); canceled = true; holdFired = true; }
   });
   element.addEventListener('pointermove', (event) => {
-    const p = pointers.get(event.pointerId); if (!p) return;
-    p.x = event.clientX; p.y = event.clientY;
-    if (Math.hypot(p.x - p.x0, p.y - p.y0) > 10) { moved = true; clearHold(); }
+    const point = pointers.get(event.pointerId); if (!point) return;
+    point.x = event.clientX; point.y = event.clientY;
+    if (gesture && Math.hypot(point.x - point.x0, point.y - point.y0) > 10) {
+      gesture.moved = true;
+      clearHold();
+      if (gesture.doubleCandidate) { gesture.doubleCandidate = false; clearPendingTap(); }
+    }
     if (pinch && pointers.size >= 2) { const d = distance(); if (pinch.start > 0) set(pinch.zoom * (d / pinch.start), { gesture: 'pinch' }); }
-    else if (!pinched && pointers.size === 1 && moved) onDrag?.(p.x - p.x0, p.y - p.y0);
+    else if (gesture && !gesture.pinched && pointers.size === 1 && gesture.moved) onDrag?.(point.x - point.x0, point.y - point.y0);
   });
   const end = (event) => {
-    const p = pointers.get(event.pointerId);
-    if (!p) return;
+    const point = pointers.get(event.pointerId);
+    if (!point) return;
     clearHold();
     const canceledPointer = event.type !== 'pointerup';
-    if (canceledPointer) { canceled = true; holdFired = true; }
+    if (canceledPointer) {
+      clearPendingTap();
+      if (gesture) { gesture.canceled = true; gesture.holdFired = true; gesture.doubleCandidate = false; }
+    }
     pointers.delete(event.pointerId);
     if (pinch && pointers.size < 2) { pinch = null; onGesture?.('end'); }
-    if (pointers.size === 0 && moved && !pinched) {
-      onDrag?.(0, 0);
-      if (!canceled) {
-        const direction = swipeDirection(p.x - p.x0, p.y - p.y0, performance.now() - downAt);
-        if (direction) onSwipe?.(direction);
+    if (pointers.size === 0 && gesture) {
+      const endedGesture = gesture;
+      if (endedGesture.moved) onDrag?.(0, 0);
+      if (endedGesture.moved && !endedGesture.pinched && !endedGesture.canceled) {
+        const direction = swipeDirection(point.x - point.x0, point.y - point.y0, now() - endedGesture.started);
+        if (direction) { clearPendingTap(); onSwipe?.(direction); }
       }
+      const duration = now() - endedGesture.started;
+      const tapEligible = !endedGesture.moved && !endedGesture.pinched && !endedGesture.canceled && !endedGesture.holdFired && duration < 350;
+      if (tapEligible && endedGesture.doubleCandidate && pendingTap && now() - pendingTap.time <= DOUBLE_TAP_DELAY_MS && closeTo(point, pendingTap)) {
+        clearPendingTap();
+        if (onDoubleTap) onDoubleTap(event);
+        else set(1, { gesture: 'double-tap' });
+      } else if (tapEligible) {
+        if (endedGesture.doubleCandidate && pendingTap) { clearPendingTap(); onTap?.(); }
+        scheduleTap(point, now());
+      } else {
+        clearPendingTap();
+      }
+      gesture = null;
     }
-    if (pointers.size === 0 && (moved || pinched || canceled)) lastTap = 0;
-    if (pointers.size === 0 && !moved && !pinched && !canceled && !holdFired && performance.now() - downAt < 350) {
-      const now = performance.now();
-      if (now - lastTap < 300) { window.clearTimeout(tapTimer); lastTap = 0; set(1, { gesture: 'double-tap' }); }
-      else { lastTap = now; tapTimer = window.setTimeout(() => { if (lastTap === now) onTap?.(); }, 300); }
-    }
-    if (pointers.size === 0) activePointer = null;
   };
   element.addEventListener('pointerup', end);
   element.addEventListener('pointercancel', end);
   element.addEventListener('lostpointercapture', end);
   element.addEventListener('wheel', (event) => {
+    clearHold();
+    clearPendingTap();
+    if (gesture) { gesture.canceled = true; gesture.holdFired = true; gesture.doubleCandidate = false; }
     event.preventDefault();
-    const k = event.ctrlKey ? 0.012 : 0.0025; // trackpad pinch arrives as ctrl+wheel with small deltas
+    const k = event.ctrlKey ? 0.012 : 0.0025;
     set(get() * Math.exp(-event.deltaY * k), { gesture: 'wheel' });
   }, { passive: false });
-  // iOS Safari: stop the page itself from pinch-zooming while the camera handles it
   for (const type of ['gesturestart', 'gesturechange']) element.addEventListener(type, (event) => event.preventDefault());
+  return { cancelPendingTap: clearPendingTap, cancelHold: clearHold };
 }
