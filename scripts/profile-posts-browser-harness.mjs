@@ -182,6 +182,7 @@ try {
       await page.getByText('投稿した絵はまだありません').waitFor();
       await page.getByRole('link', { name: '作品を投稿する' }).first().waitFor();
       assertNoPageErrors();
+      assert.equal(await page.locator('[data-author-profiles-root]').isVisible(), false, 'signed-out author settings stay hidden');
       check(`signed-out ${path} ${viewport.width}px`);
     } finally { await context.close(); }
   }
@@ -303,9 +304,11 @@ try {
       await page.locator('.profile-post-card').first().waitFor();
       const item = page.locator(`[data-post-id="${publishedId}"]`);
       await item.getByRole('button', { name: '詳細を見る' }).click();
+      assert.equal(await page.locator('[data-delete-confirm]').isVisible(), false, 'confirmation is initially hidden');
       await page.getByRole('button', { name: '削除する' }).click();
       await page.getByRole('button', { name: '戻る' }).click();
       assert.equal(state.deleted.size, 0, 'cancel leaves the post unchanged');
+      assert.equal(await page.locator('[data-delete-confirm]').isVisible(), false, 'cancel hides confirmation');
       await page.getByRole('button', { name: '削除する' }).click();
       await page.getByRole('button', { name: '投稿を削除' }).click();
       await page.locator(`[data-post-id="${publishedId}"]`).waitFor({ state: 'detached' });

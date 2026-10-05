@@ -79,3 +79,5 @@
 .profile-post-dialog :focus-visible,.profile-post-card :focus-visible{outline:3px solid #335cbe;outline-offset:2px}
 @media(max-width:560px){.profile-summary{gap:.4rem}.profile-summary a{padding:.7rem}.profile-summary span{font-size:.72rem}.profile-posts-intro{align-items:start;flex-direction:column}.profile-posts-intro .button{width:100%;justify-content:center}.profile-recent{padding:.75rem}.profile-my-posts{grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}.profile-post-card{padding:.45rem}.profile-post-dialog__inner{padding:.75rem}.profile-post-dialog__actions>*{flex:1 1 auto}}
 @media(max-width:340px){.profile-summary a{padding:.55rem}.profile-summary strong{font-size:1.2rem}.profile-overview__actions>*{flex:1 1 100%;justify-content:center}.profile-recent__heading{align-items:start;flex-direction:column;gap:.4rem}}
+
+.profile-author-settings[hidden],.profile-post-dialog__confirm[hidden]{display:none}
