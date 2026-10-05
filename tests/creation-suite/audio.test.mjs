@@ -192,25 +192,59 @@ test('palette-selected modeled timbres survive save and resolve to distinct synt
   assert.equal(getAudioInstrument('piano').waveform, 'sine');
   assert.equal(getAudioInstrument('electric-piano').partials[0].waveform, 'pulse');
   assert.equal(getAudioInstrument('organ').sustain > getAudioInstrument('piano').sustain, true);
-  assert.equal(getAudioInstrument('marimba').partials[0].ratio, 3.9);
+  assert.ok(getAudioInstrument('marimba').partials.some(({ ratio }) => ratio === 4));
   assert.equal(getAudioInstrument('gb-pulse-1').duty, 0.25);
   assert.equal(getAudioInstrument('nes-noise').waveform, 'noise');
 });
 
-test('silent songs do not create an audio context and stop disconnects every sounding node', async () => {
+test('all 56 stable preset slots carry bounded immutable synthesis data', () => {
+  assert.equal(AUDIO_INSTRUMENTS.length, 56);
+  assert.deepEqual(AUDIO_INSTRUMENTS.slice(0, 4).map(({ id }) => id), ['square', 'triangle', 'sawtooth', 'noise']);
+  for (const profile of AUDIO_INSTRUMENTS) {
+    assert.ok(Object.isFrozen(profile), profile.id);
+    assert.ok(profile.attack >= 0 && profile.decay >= 0 && profile.release >= 0, profile.id);
+    assert.ok(profile.sustain >= 0 && profile.sustain <= 1, profile.id);
+    assert.ok(profile.partials.length + 1 + (typeof profile.transient === 'object' ? profile.transient.bursts.length : profile.transient > 0 ? 1 : 0) <= 8, profile.id);
+    assert.ok(profile.harmonics.length <= 6, profile.id);
+    assert.ok(Object.isFrozen(profile.partials) && profile.partials.every(Object.isFrozen), profile.id);
+    assert.ok(Object.isFrozen(profile.harmonics) && profile.harmonics.every(Object.isFrozen), profile.id);
+    for (const mode of [...profile.partials, ...profile.harmonics]) {
+      assert.ok(Number.isFinite(mode.ratio) && mode.ratio > 0, profile.id);
+      assert.ok(Number.isFinite(mode.gain) && Math.abs(mode.gain) <= 1, profile.id);
+    }
+    for (const partial of profile.partials) assert.ok(Number.isFinite(partial.decay) && partial.decay > 0 && partial.decay <= 1, profile.id);
+    for (const mode of profile.harmonics) assert.equal(Object.hasOwn(mode, 'decay'), false, profile.id);
+    if (profile.drum) {
+      assert.ok(Object.isFrozen(profile.drum), profile.id);
+      assert.ok(profile.drum.frequency > 0 && profile.drum.duration > profile.release && profile.drum.duration <= 1.15, profile.id);
+    }
+    if (profile.pitchSweep) assert.ok(Object.isFrozen(profile.pitchSweep) && profile.pitchSweep.fromRatio > 0 && profile.pitchSweep.seconds > 0, profile.id);
+    if (typeof profile.transient === 'object') assert.ok(Object.isFrozen(profile.transient) && Object.isFrozen(profile.transient.bursts), profile.id);
+    if (profile.filter) assert.ok(profile.filter.frequency > 0 && profile.filter.q > 0, profile.id);
+    if (profile.vibrato) assert.ok(profile.vibrato.rate > 0 && profile.vibrato.depth >= 0, profile.id);
+    if (profile.tremolo) assert.ok(profile.tremolo.rate > 0 && profile.tremolo.depth >= 0, profile.id);
+  }
+  assert.deepEqual(AUDIO_INSTRUMENTS.find(({ id }) => id === 'clarinet').harmonics.map(({ ratio }) => ratio), [3, 5, 7, 9, 11]);
+  assert.equal(AUDIO_INSTRUMENTS.find(({ id }) => id === 'gb-wave').steps, 32);
+  assert.equal(AUDIO_INSTRUMENTS.find(({ id }) => id === 'nes-triangle').steps, 16);
+  assert.equal(AUDIO_INSTRUMENTS.find(({ id }) => id === 'gb-noise').noiseMode, 'gb');
+  assert.equal(AUDIO_INSTRUMENTS.find(({ id }) => id === 'nes-noise').noiseMode, 'nes');
+});
+
+test('silent songs avoid an audio context and stop fades before disconnecting sounding nodes', async () => {
   let contextCreations = 0;
   const silentPlayer = createAudioPlayer({ audioContextFactory: () => { contextCreations += 1; throw new Error('should not create'); } });
   assert.equal(await silentPlayer.play(createAudioSong()), false);
   assert.equal(contextCreations, 0);
 
   const nodes = []; const timers = [];
-  class FakeParam { setValueAtTime() {} linearRampToValueAtTime() {} }
+  class FakeParam { constructor() { this.events = []; this.value = 0; } setValueAtTime(value, at) { this.events.push(['set', value, at]); this.value = value; } linearRampToValueAtTime(value, at) { this.events.push(['ramp', value, at]); this.value = value; } cancelScheduledValues(at) { this.events.push(['cancel', at]); } }
   class FakeNode {
     constructor() { this.disconnected = false; this.stopped = false; this.frequency = new FakeParam(); this.gain = new FakeParam(); }
     connect() {}
     disconnect() { this.disconnected = true; }
     start() { this.started = true; }
-    stop() { this.stopped = true; }
+    stop(at = 0) { this.stopped = true; this.stopAt = at; }
   }
   let closeCount = 0;
   const context = {
@@ -230,9 +264,15 @@ test('silent songs do not create an audio context and stop disconnects every sou
   assert.equal(timers[0].delay, 2000);
   player.stop();
   assert.equal(player.isPlaying, false);
-  assert.equal(nodes.every((node) => node.disconnected), true);
+  assert.equal(nodes.every((node) => !node.disconnected), true, 'nodes stay connected during the anti-click fade');
   assert.equal(nodes.find((node) => node.started).stopped, true);
+  assert.equal(nodes.find((node) => node.started).stopAt, 0.008, 'oscillators stop after the 8ms bus fade');
+  assert.ok(nodes.some((node) => node.gain.events.some((entry) => entry[0] === 'ramp' && entry[1] === 0 && entry[2] === 0.008)), 'the isolated transport bus ramps to silence over 8ms');
   assert.equal(timers[0].cancelled, true);
+  const cleanupTimer = timers.find((timer) => timer.delay === 28);
+  assert.ok(cleanupTimer, 'node cleanup is deferred until after the short fade');
+  cleanupTimer.callback();
+  assert.equal(nodes.every((node) => node.disconnected), true);
   assert.equal(closeCount, 0, 'stop keeps the reusable AudioContext alive');
   assert.equal(await player.play(song), true);
   assert.equal(contextCreations, 1, 'a second play reuses the same AudioContext');
@@ -244,7 +284,7 @@ test('silent songs do not create an audio context and stop disconnects every sou
 
 test('pass expiry lets the started audio loop and its release tail finish, then stops before another loop', async () => {
   const timers = []; const nodes = [];
-  class Param { setValueAtTime() {} linearRampToValueAtTime() {} }
+  class Param { constructor() { this.events = []; this.value = 0; } setValueAtTime(value, at) { this.events.push(['set', value, at]); this.value = value; } linearRampToValueAtTime(value, at) { this.events.push(['ramp', value, at]); this.value = value; } cancelScheduledValues(at) { this.events.push(['cancel', at]); } }
   class Node {
     constructor() { this.frequency = new Param(); this.gain = new Param(); }
     connect() {}
@@ -267,6 +307,9 @@ test('pass expiry lets the started audio loop and its release tail finish, then 
   assert.ok(timers[1].delay > 0, 'the last note release tail is allowed to finish');
   timers[1].callback();
   assert.equal(player.isPlaying, false);
+  assert.ok(nodes.some((node) => node.gain?.events?.some((entry) => entry[0] === 'ramp' && entry[1] === 0 && entry[2] === 0.008)), 'pass expiry fades the transport bus after the natural release tail');
+  const cleanup = timers.find((timer) => timer.delay === 28 && !timer.cancelled);
+  cleanup?.callback();
   assert.ok(nodes.every((node) => node.disconnected));
   await player.dispose();
 });
@@ -328,6 +371,40 @@ test('a canceled audio start ignores a later context rejection', async () => {
   await player.dispose();
 });
 
+test('dispose detaches its old master before awaiting fade so a new context is independent', async () => {
+  const contexts = []; const timers = [];
+  class Param { constructor() { this.value = 0; } setValueAtTime(value) { this.value = value; } linearRampToValueAtTime(value) { this.value = value; } cancelScheduledValues() {} }
+  class Node {
+    constructor() { this.gain = new Param(); this.frequency = new Param(); this.detune = new Param(); this.Q = new Param(); this.threshold = new Param(); this.knee = new Param(); this.ratio = new Param(); this.attack = new Param(); this.release = new Param(); }
+    connect() {} disconnect() { this.disconnected = true; }
+    start() {} stop() {}
+  }
+  function makeContext() {
+    const ctx = { state: 'running', currentTime: 0, sampleRate: 44100, destination: {}, closeCount: 0, masterNodes: [], resume: async () => {}, close: async () => { ctx.closeCount += 1; }, createGain: () => new Node(), createOscillator: () => new Node() };
+    ctx.createDynamicsCompressor = () => { const node = new Node(); ctx.masterNodes.push(node); return node; };
+    contexts.push(ctx); return ctx;
+  }
+  const player = createAudioPlayer({ audioContextFactory: makeContext, schedule: (callback, delay) => { const timer = { callback, delay }; timers.push(timer); return timer; }, cancel(timer) { timer.cancelled = true; } });
+  const song = toggleAudioStep(createAudioSong(), { trackId: 'track-square', pitch: 60, startTick: 0, noteId: 'dispose-race-note' });
+  await player.play(song);
+  const oldContext = contexts[0]; const oldCompressor = oldContext.masterNodes[0];
+  assert.ok(oldCompressor);
+  const disposing = player.dispose();
+  assert.equal(oldContext.closeCount, 0, 'dispose waits for the live fade before closing the old context');
+  assert.equal(oldCompressor.disconnected, undefined, 'the old compressor remains connected during its fade');
+  assert.equal(await player.play(song), true, 'a new transport may start while the previous context fades');
+  const newContext = contexts[1];
+  assert.notEqual(newContext, oldContext);
+  const newCompressor = newContext.masterNodes[0]; assert.ok(newCompressor);
+  assert.notEqual(newCompressor, oldCompressor);
+  assert.equal(oldCompressor.disconnected, undefined, 'new master creation does not cut the old fade');
+  await disposing;
+  assert.equal(oldContext.closeCount, 1);
+  assert.equal(oldCompressor.disconnected, true);
+  assert.equal(newCompressor.disconnected, undefined, 'finishing old disposal leaves the new master intact');
+  player.stop(); await player.dispose();
+});
+
 test('frequency conversion is stable and bounded to MIDI pitch range', () => {
   assert.equal(midiFrequency(69), 440);
   assert.throws(() => midiFrequency(128), /0–127/);
@@ -339,7 +416,7 @@ test('Pulse 25 layer uses a periodic waveform and short chip-style envelope', as
   class Node { constructor() { this.frequency = new Param(); this.gain = new Param(); } connect() {} disconnect() {} start() {} stop() {} setPeriodicWave(wave) { this.wave = wave; } }
   const context = {
     currentTime: 0, sampleRate: 44100, destination: {}, resume: async () => {}, close: async () => {},
-    createPeriodicWave(real, imag) { assert.equal(real.length, 33); assert.equal(imag.length, 33); const wave = { real, imag }; voices.push(wave); return wave; },
+    createPeriodicWave(real, imag) { assert.ok(real.length > 33); assert.equal(real.length, imag.length); const wave = { real, imag }; voices.push(wave); return wave; },
     createOscillator() { const node = new Node(); voices.push(node); return node; }, createGain() { return new Node(); }
   };
   const song = setAudioPixel(createAudioSong(), { trackId: 'track-square', pitch: 60, startTick: 0, noteId: 'pulse-note', active: true });
@@ -369,7 +446,7 @@ test('selected piano and organ timbres schedule their own partials, filters, and
     setPeriodicWave(wave) { this.wave = wave; }
   }
   const context = {
-    currentTime: 0, sampleRate: 8000, destination: {}, resume: async () => {}, close: async () => {},
+    currentTime: 0, sampleRate: 44100, destination: {}, resume: async () => {}, close: async () => {},
     createPeriodicWave(real) { return { real }; },
     createOscillator() { const node = new Node('oscillator'); oscillatorRecords.push(node); return node; },
     createGain() { const node = new Node('gain'); gainRecords.push(node); return node; },
@@ -385,12 +462,11 @@ test('selected piano and organ timbres schedule their own partials, filters, and
   const player = createAudioPlayer({ audioContextFactory: () => context, schedule: () => 1, cancel() {} });
   await player.play(song);
   assert.ok(oscillatorRecords.some((node) => node.type === 'sine'), 'piano fundamental is synthesized as sine');
-  assert.ok(oscillatorRecords.some((node) => node.type === 'triangle'), 'piano upper partial is synthesized separately');
-  assert.ok(oscillatorRecords.some((node) => node.wave), 'organ pulse harmonics use a modeled duty-cycle waveform');
-  assert.ok(filterRecords.some((node) => node.type === 'lowpass' && node.frequency.value === 5800));
-  assert.ok(filterRecords.some((node) => node.type === 'lowpass' && node.frequency.value === 5500));
+  assert.ok(oscillatorRecords.filter((node) => node.type === 'sine').length >= 6, 'piano fundamental and decaying harmonic modes use sine partials');
+  assert.ok(oscillatorRecords.some((node) => node.wave), 'organ harmonics use a modeled periodic waveform');
+  assert.ok(filterRecords.length >= 2 && filterRecords.every((node) => node.frequency.value > 0 && node.frequency.value <= context.sampleRate * 0.45));
   assert.ok(automationRecords.some(([, at]) => Math.abs(at - 0.58) < 1e-9), 'piano release follows the 125 ms cell and its natural tail');
-  const envelopes = gainRecords.map((node) => node.gain.events).filter((events) => events.length === 5);
+  const envelopes = gainRecords.map((node) => node.gain.events).filter((events) => events.length >= 5 && events[0][0] === 0 && events.at(-1)[0] === 0);
   assert.ok(envelopes.length >= 2 && envelopes.every((events) => events.every((event, index) => index === 0 || event[1] >= events[index - 1][1])), 'each decay ends before its release is scheduled');
   await player.dispose();
 });
@@ -405,7 +481,7 @@ test('dense chords lower per-note peaks while isolated notes retain their level'
     for (let index = 0; index < count; index += 1) song = setAudioPixel(song, { trackId: 'track-square', pitch: AUDIO_PIXEL_PITCHES[index], startTick: 0, noteId: `chord-${index}` });
     const player = createAudioPlayer({ audioContextFactory: () => context, schedule: () => 1, cancel() {} });
     await player.play(song);
-    const notePeaks = gains.map(({ gain }) => gain.events).filter((events) => events.length === 5).map((events) => events[1][0]);
+    const notePeaks = gains.map(({ gain }) => gain.events).filter((events) => events.length >= 5 && events[0][0] === 0 && events[1][0] > 0 && events.at(-1)[0] === 0).map((events) => events[1][0]);
     await player.dispose();
     return notePeaks;
   }

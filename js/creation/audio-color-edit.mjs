@@ -1,6 +1,7 @@
+import { getAudioColorInstrument } from './audio-core.mjs?rev=20261005-audio-color-instruments-1';
 import { setAnimationPalette } from './animation-core.mjs';
 import { validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261001-audio-animation-1';
-import { validatePxdAudioBinding } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
+import { validatePxdAudioBinding } from './pxd-draw-audio.mjs?rev=20261005-audio-color-instruments-1';
 import { hexToHsl, hslToHex } from './color-utils.mjs?rev=20261004-symmetry-color-panel-1';
 
 const rgbaPattern = /^rgba-([\da-f]{8})$/i;
@@ -31,7 +32,8 @@ export function replaceAudioSourceColor({ image = null, animation = null, link, 
   if (oldBytes[3] === 0 || !Object.hasOwn(link.colorToSlot, oldId)) throw new TypeError('元の画像色が見つかりません。');
   const newRgb = requested[1].toLowerCase(); const nextId = `rgba-${newRgb}${match[1].slice(6, 8).toLowerCase()}`;
   if (oldId === nextId) return { image, animation, link, song, colorId: oldId, changed: false };
-  if (Object.hasOwn(link.colorToSlot, nextId) && link.colorToSlot[nextId] !== link.colorToSlot[oldId]) {
+  if (Object.hasOwn(link.colorToSlot, nextId) && (link.colorToSlot[nextId] !== link.colorToSlot[oldId]
+    || getAudioColorInstrument(song, nextId, link.colorToSlot[nextId]) !== getAudioColorInstrument(song, oldId, link.colorToSlot[oldId]))) {
     throw new TypeError('変更先の色は別の音に割り当て済みです。音が混ざらないよう、別の色を選んでください。');
   }
 
@@ -86,6 +88,11 @@ export function replaceAudioSourceColor({ image = null, animation = null, link, 
       })
     }))
   })) };
+  if (Object.hasOwn(song.colorInstruments || {}, oldId)) {
+    nextSong.colorInstruments = { ...song.colorInstruments, [nextId]: song.colorInstruments[oldId] };
+    // Unrelated manually tagged notes keep their original sound.
+    if (!nextSong.tracks.some((track) => track.clips.some((clip) => clip.notes.some((note) => note.colorId === oldId)))) delete nextSong.colorInstruments[oldId];
+  }
   if (animation) validateAudioAnimationBinding(nextSong, nextAnimation, nextLink);
   else validatePxdAudioBinding(nextSong, nextImage, nextLink);
   return { image: nextImage, animation: nextAnimation, link: nextLink, song: nextSong, colorId: nextId, changed: true };

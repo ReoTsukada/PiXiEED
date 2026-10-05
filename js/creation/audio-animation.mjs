@@ -10,11 +10,93 @@ export const AUDIO_ANIMATION_MAX_COLORS = 32;
 
 const rgbaId = (color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}`;
 
-function validateSequenceLink(song, animation, { rowPitchMap, colorToSlot }) {
-  if (!Array.isArray(rowPitchMap) || rowPitchMap.length !== animation.height
-      || rowPitchMap.some((pitch) => pitch !== null && (!Number.isInteger(pitch) || pitch < 0 || pitch > 127))) {
+function validatePitchMap(rowPitchMap, height) {
+  if (!Array.isArray(rowPitchMap) || rowPitchMap.length !== height) return false;
+  for (let index = 0; index < height; index += 1) {
+    const pitch = rowPitchMap[index];
+    if (pitch !== null && (!Number.isInteger(pitch) || pitch < 0 || pitch > 127)) return false;
+  }
+  return true;
+}
+
+function normalizeFrameRowPitchMaps(animation, frameRowPitchMaps, { pruneStale = false } = {}) {
+  if (frameRowPitchMaps === undefined || frameRowPitchMaps === null) return {};
+  if (typeof frameRowPitchMaps !== 'object' || Array.isArray(frameRowPitchMaps)
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(frameRowPitchMaps))) {
+    throw new TypeError('フレームごとの音程対応が不正です。');
+  }
+  const frameIds = new Set(animation.frames.map(({ id }) => id));
+  const maps = {};
+  for (const [frameId, pitches] of Object.entries(frameRowPitchMaps)) {
+    if (!frameIds.has(frameId)) {
+      if (pruneStale) continue;
+      throw new TypeError('フレームごとの音程対応に存在しないコマがあります。');
+    }
+    if (!validatePitchMap(pitches, animation.height)) throw new TypeError('フレームごとの音程対応が不正です。');
+    Object.defineProperty(maps, frameId, { value: [...pitches], enumerable: true, configurable: true, writable: true });
+  }
+  return maps;
+}
+
+function normalizeFrameCellPitchMaps(animation, frameCellPitchMaps, { pruneStale = false } = {}) {
+  if (frameCellPitchMaps === undefined || frameCellPitchMaps === null) return {};
+  if (typeof frameCellPitchMaps !== 'object' || Array.isArray(frameCellPitchMaps)
+      || ![Object.prototype, null].includes(Object.getPrototypeOf(frameCellPitchMaps))) {
+    throw new TypeError('セルごとの音程対応が不正です。');
+  }
+  const frameIds = new Set(animation.frames.map(({ id }) => id));
+  const maps = {};
+  for (const [frameId, cellMap] of Object.entries(frameCellPitchMaps)) {
+    if (!frameIds.has(frameId)) {
+      if (pruneStale) continue;
+      throw new TypeError('セルごとの音程対応に存在しないコマがあります。');
+    }
+    if (!cellMap || typeof cellMap !== 'object' || Array.isArray(cellMap)
+        || ![Object.prototype, null].includes(Object.getPrototypeOf(cellMap))) {
+      throw new TypeError('セルごとの音程対応が不正です。');
+    }
+    const normalizedCells = {};
+    for (const [coordinate, pitch] of Object.entries(cellMap)) {
+      const match = /^(0|[1-9]\d*):(0|[1-9]\d*)$/.exec(coordinate);
+      const x = match ? Number(match[1]) : NaN;
+      const y = match ? Number(match[2]) : NaN;
+      if (!Number.isSafeInteger(x) || x < 0 || x >= animation.width || !Number.isSafeInteger(y) || y < 0 || y >= animation.height
+          || !Number.isInteger(pitch) || pitch < 0 || pitch > 127) {
+        throw new TypeError('セルごとの音程対応が不正です。');
+      }
+      Object.defineProperty(normalizedCells, coordinate, { value: pitch, enumerable: true, configurable: true, writable: true });
+    }
+    if (Object.keys(normalizedCells).length) {
+      Object.defineProperty(maps, frameId, { value: normalizedCells, enumerable: true, configurable: true, writable: true });
+    }
+  }
+  return maps;
+}
+
+/** Resolve a frame-local axis while preserving the legacy shared-axis fallback. */
+export function getAudioAnimationRowPitchMap(link, frameId) {
+  const frameMaps = link?.frameRowPitchMaps;
+  return frameId && frameMaps && Object.hasOwn(frameMaps, frameId)
+    ? frameMaps[frameId]
+    : link?.rowPitchMap ?? null;
+}
+
+/** Resolve a cell override before the frame-local or legacy row pitch. */
+export function getAudioAnimationCellPitch(link, frameId, x, y) {
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return null;
+  const frameMaps = link?.frameCellPitchMaps;
+  const cells = frameMaps && Object.hasOwn(frameMaps, frameId) ? frameMaps[frameId] : null;
+  const key = `${x}:${y}`;
+  if (cells && Object.hasOwn(cells, key)) return cells[key];
+  return getAudioAnimationRowPitchMap(link, frameId)?.[y] ?? null;
+}
+
+function validateSequenceLink(song, animation, { rowPitchMap, frameRowPitchMaps = {}, frameCellPitchMaps = {}, colorToSlot }) {
+  if (!validatePitchMap(rowPitchMap, animation.height)) {
     throw new TypeError('アニメーションの行と音程の対応が不正です。');
   }
+  normalizeFrameRowPitchMaps(animation, frameRowPitchMaps);
+  normalizeFrameCellPitchMaps(animation, frameCellPitchMaps);
   if (!colorToSlot || typeof colorToSlot !== 'object' || Array.isArray(colorToSlot)) throw new TypeError('アニメーションの色と音色の対応が不正です。');
   const slotIds = new Set((song.pixelPalette || AUDIO_PIXEL_PALETTE).map(({ slotId }) => slotId));
   for (const [colorId, slotId] of Object.entries(colorToSlot)) {
@@ -24,14 +106,16 @@ function validateSequenceLink(song, animation, { rowPitchMap, colorToSlot }) {
   }
 }
 
-export function createAudioAnimationLink(song, animation, { rowPitchMap = null, colorToSlot = null, projectionReady = false } = {}) {
+export function createAudioAnimationLink(song, animation, { rowPitchMap = null, frameRowPitchMaps = null, frameCellPitchMaps = null, colorToSlot = null, projectionReady = false } = {}) {
   validateAudioSong(song); validateAnimation(animation);
   if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('音楽に使えるアニメーションは256pxまでです。');
   if (animation.palette.length > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える色は32色までです。');
   const pitches = rowPitchMap || createAudioRowPitchMap(animation.height);
+  const framePitches = normalizeFrameRowPitchMaps(animation, frameRowPitchMaps, { pruneStale: true });
+  const cellPitches = normalizeFrameCellPitchMaps(animation, frameCellPitchMaps, { pruneStale: true });
   const mapping = { ...(colorToSlot || {}) };
   for (const color of animation.palette) { const id = rgbaId(color); if (!Object.hasOwn(mapping, id)) mapping[id] = null; }
-  validateSequenceLink(song, animation, { rowPitchMap: pitches, colorToSlot: mapping });
+  validateSequenceLink(song, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping });
   return {
     rulesVersion: AUDIO_ANIMATION_LINK_VERSION,
     imageRole: 'audio',
@@ -39,6 +123,8 @@ export function createAudioAnimationLink(song, animation, { rowPitchMap = null, 
     height: animation.height,
     frameIds: animation.frames.map(({ id }) => id),
     rowPitchMap: [...pitches],
+    ...(Object.keys(framePitches).length ? { frameRowPitchMaps: framePitches } : {}),
+    ...(Object.keys(cellPitches).length ? { frameCellPitchMaps: cellPitches } : {}),
     ticksPerCell: AUDIO_PIXEL_TICKS,
     colorToSlot: mapping,
     sequenceTicks: animation.frames.length * animation.width * AUDIO_PIXEL_TICKS,
@@ -74,6 +160,8 @@ function fillClipGaps(song) {
 /** Explicitly project every visible animation frame into one sequential audio timeline. */
 export function prepareAudioAnimationImport(song, animation, {
   rowPitchMap = null,
+  frameRowPitchMaps = null,
+  frameCellPitchMaps = null,
   colorToSlot = null,
   composeFrame = composeAnimationFrame,
   maxNotes = AUDIO_ANIMATION_MAX_NOTES
@@ -85,12 +173,14 @@ export function prepareAudioAnimationImport(song, animation, {
   if (!Number.isSafeInteger(maxNotes) || maxNotes < 1 || maxNotes > AUDIO_ANIMATION_MAX_NOTES) throw new RangeError('音符数の上限が不正です。');
 
   const pitches = rowPitchMap || createAudioRowPitchMap(animation.height);
+  const framePitches = normalizeFrameRowPitchMaps(animation, frameRowPitchMaps, { pruneStale: true });
+  const cellPitches = normalizeFrameCellPitchMaps(animation, frameCellPitchMaps, { pruneStale: true });
   const mapping = { ...(colorToSlot || {}) };
   for (const color of animation.palette) {
     const id = rgbaId(color);
     if (!Object.hasOwn(mapping, id)) mapping[id] = null;
   }
-  validateSequenceLink(song, animation, { rowPitchMap: pitches, colorToSlot: mapping });
+  validateSequenceLink(song, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping });
 
   const nextSong = extendAudioLoopForImage(song, animation.width, { frameCount: animation.frames.length });
   const tracks = fillClipGaps(nextSong).map((track) => ({
@@ -102,24 +192,45 @@ export function prepareAudioAnimationImport(song, animation, {
   }));
   const tracksBySlot = new Map(tracks.map((track) => [track.instrument, track]));
   const usedIds = new Set(tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes.map((note) => note.noteId))));
+  const priorCells = new Map();
+  for (const track of song.tracks) for (const clip of track.clips) for (const note of clip.notes) {
+    const cell = note.sourceCell;
+    if (cell?.kind !== 'audio-animation' || typeof cell.frameId !== 'string'
+        || !Number.isInteger(cell.localX) || !Number.isInteger(cell.y)) continue;
+    const key = `animation:${cell.frameId}:${cell.localX}:${cell.y}`;
+    if (!priorCells.has(key)) priorCells.set(key, []);
+    priorCells.get(key).push(note);
+  }
   const frameIndexById = new Map(animation.frames.map((frame, index) => [frame.id, index]));
   let noteCount = 0;
   const addNote = (frame, frameIndex, x, y, colorIndex) => {
     const color = animation.palette[colorIndex];
     const colorId = rgbaId(color);
     const slotId = mapping[colorId];
-    if (!slotId || pitches[y] === null) return;
+    const pitch = Object.hasOwn(cellPitches, frame.id) && Object.hasOwn(cellPitches[frame.id], `${x}:${y}`)
+      ? cellPitches[frame.id][`${x}:${y}`]
+      : (Object.hasOwn(framePitches, frame.id) ? framePitches[frame.id] : pitches)[y];
+    if (!slotId || pitch === null) return;
     if (++noteCount > maxNotes) throw new RangeError(`音符が上限（${maxNotes.toLocaleString()}個）を超えました。フレーム数か描画量を減らしてください。`);
     const sequenceX = frameIndex * animation.width + x;
     const startTick = sequenceX * AUDIO_PIXEL_TICKS;
     const track = tracksBySlot.get(slotId);
     const clip = track?.clips.find((item) => startTick >= item.startTick && startTick + AUDIO_PIXEL_TICKS <= item.startTick + item.lengthTicks);
     if (!clip) throw new RangeError('音楽ページの時間範囲を作れませんでした。曲の内容は保持されています。');
-    let noteId = `animation-${song.songId}-${frame.id}-${x}-${y}`;
+    const prior = priorCells.get(`animation:${frame.id}:${x}:${y}`)?.find((note) => {
+      const source = note.sourceCell;
+      return Number.isInteger(source.frameIndex)
+        && source.x === source.frameIndex * animation.width + source.localX
+        && note.startTick === source.x * AUDIO_PIXEL_TICKS
+        && note.pitch === pitch && note.durationTicks === AUDIO_PIXEL_TICKS && note.colorId === colorId;
+    });
+    let noteId = prior?.noteId && !usedIds.has(prior.noteId)
+      ? prior.noteId
+      : `animation-${song.songId}-${frame.id}-${x}-${y}`;
     let suffix = 1;
     while (usedIds.has(noteId)) noteId = `animation-${song.songId}-${frame.id}-${x}-${y}-${suffix++}`;
     usedIds.add(noteId);
-    clip.notes.push({ noteId, pitch: pitches[y], startTick, durationTicks: AUDIO_PIXEL_TICKS, velocity: 96,
+    clip.notes.push({ ...(prior || {}), noteId, pitch, startTick, durationTicks: AUDIO_PIXEL_TICKS, velocity: prior?.velocity ?? 96,
       colorId, sourceCell: { kind: 'audio-animation', frameId: frame.id, frameIndex, x: sequenceX, localX: x, y } });
   };
 
@@ -143,7 +254,7 @@ export function prepareAudioAnimationImport(song, animation, {
   const resultSong = validateAudioSong({ ...nextSong, tracks });
   return {
     song: resultSong,
-    link: createAudioAnimationLink(resultSong, animation, { rowPitchMap: pitches, colorToSlot: mapping, projectionReady: true }),
+    link: createAudioAnimationLink(resultSong, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping, projectionReady: true }),
     animation,
     noteCount,
     durationSeconds: resultSong.loopTicks * 60 / resultSong.tempo / AUDIO_PPQ
@@ -169,6 +280,7 @@ export function validateAudioAnimationBinding(song, animation, link) {
     const frameIndex = frameIndexById(animation, source.frameId);
     if (frameIndex < 0 || frameIndex !== source.frameIndex || source.x !== frameIndex * animation.width + source.localX
         || source.y < 0 || source.y >= animation.height || source.localX < 0 || source.localX >= animation.width
+        || note.pitch !== getAudioAnimationCellPitch(link, source.frameId, source.localX, source.y)
         || note.startTick !== source.x * AUDIO_PIXEL_TICKS) throw new TypeError('アニメーション音符の位置が不正です。');
   }
   return song;
@@ -206,6 +318,6 @@ export function setAudioAnimationColorMapping(song, animation, link, { colorId, 
       || !Array.isArray(link.frameIds) || JSON.stringify(link.frameIds) !== JSON.stringify(animation.frames.map(({ id }) => id))) throw new TypeError('音楽用アニメーションの対応が一致しません。');
   if (!Object.hasOwn(link.colorToSlot || {}, colorId) || (slotId !== null && !(song.pixelPalette || AUDIO_PIXEL_PALETTE).some((slot) => slot.slotId === slotId))) throw new TypeError('色と音色の対応を確認してください。');
   const colorToSlot = { ...link.colorToSlot, [colorId]: slotId };
-  validateSequenceLink(song, animation, { rowPitchMap: link.rowPitchMap, colorToSlot });
+  validateSequenceLink(song, animation, { rowPitchMap: link.rowPitchMap, frameRowPitchMaps: link.frameRowPitchMaps, frameCellPitchMaps: link.frameCellPitchMaps, colorToSlot });
   return { ...link, colorToSlot };
 }

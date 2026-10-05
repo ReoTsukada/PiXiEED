@@ -56,7 +56,8 @@ try {
     await page.locator('.project-imports > summary').click();
     await page.locator('#project-import-list .project-card').first().click();
     await page.waitForFunction(() => document.querySelector('#audio-pixel-canvas')?.width === 256);
-    await page.locator('#audio-palette-settings > summary').click();
+    await page.locator('#audio-current').click();
+    await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
     const instruments = page.locator('#audio-palette-rows select');
     await instruments.first().selectOption('piano');
     assert.equal(await instruments.first().inputValue(), 'piano');

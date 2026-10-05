@@ -75,12 +75,15 @@ body.creation-editor[data-page="audio"] .audio-track-choice {
   border: 0 !important; border-radius: 10px; background: transparent; box-shadow: none;
 }
 body.creation-editor[data-page="audio"] .audio-track-choice__mark {
-  width: 40px; height: 40px; min-width: 40px; margin: 0; border-radius: 8px;
+  position: absolute; inset: 0; display: grid; place-items: center;
+  width: auto; height: auto; min-width: 0; margin: 0; border: 0;
+  border-radius: inherit; background: transparent; box-shadow: none;
 }
 body.creation-editor[data-page="audio"] .audio-track-choice[aria-pressed="true"] {
-  border: 0 !important; background: transparent !important;
+  border: 0 !important;
   box-shadow: 0 0 0 3px #ffd35a !important;
 }
+body.creation-editor[data-page="audio"] .audio-track-choice__mark .audio-instrument-icon { width: 24px; height: 24px; }
 body.creation-editor[data-page="audio"] .audio-track-choice__silent {
   padding: 2px 3px; border-radius: 4px; background: #15202bd9; color: white;
   font: 800 9px/1 system-ui,sans-serif;

@@ -1,5 +1,5 @@
-import { isToolsHubPath, mountToolHelp } from './tool-help.mjs?rev=20261004-camera-tap-focus-1';
-import { getToolGuide } from './tool-help-data.mjs?rev=20261004-merge-selection-1';
+import { isToolsHubPath, mountToolHelp } from './tool-help.mjs?rev=20261005-audio-history-1';
+import { getToolGuide } from './tool-help-data.mjs?rev=20261005-audio-history-1';
 
 /** Attach help after the existing shared header mounts, without loading a second header. */
 export function installToolHelp({ document = globalThis.document, window = globalThis.window } = {}) {

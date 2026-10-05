@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson } from '../../js/creation/pxd-codec.mjs';
 import { imageToDrawDocument, putPxdImage, putPxdSharedImage, readPxdImage, readPxdSharedImage } from '../../js/creation/pxd-project.mjs';
 import { createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
-import { addAnimationFrame, createAnimation, removeAnimationFrame } from '../../js/creation/animation-core.mjs';
+import { addAnimationFrame, createAnimation, moveAnimationFrame, removeAnimationFrame } from '../../js/creation/animation-core.mjs';
 import { createAudioAnimationLink } from '../../js/creation/audio-animation.mjs';
 import {
   assignPxdAudioColor, audioCellLink, audioSongImage, pxdImageToAudioDocument, preparePxdAudioImageImport, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState,
@@ -297,7 +297,15 @@ test('an external audio-role frame edit updates link metadata without changing m
   const removedFrameId = animation.frames[0].id;
   animation = addAnimationFrame(animation, { sourceFrameId: removedFrameId });
   const song = { ...baseSong, tracks: baseSong.tracks.map((track) => track.trackId === 'track-square' ? { ...track, clips: track.clips.map((clip) => ({ ...clip, notes: clip.notes.map((note) => ({ ...note, sourceCell: { kind: 'audio-animation', frameId: removedFrameId, frameIndex: 0, x: 0, localX: 0, y: 0 } })) })) } : track) };
-  const link = createAudioAnimationLink(song, animation, { colorToSlot: { 'rgba-ff0000ff': 'square' } });
+  const remainingFrameId = animation.frames[1].id;
+  const removedPitchMap = Array(16).fill(84);
+  const remainingPitchMap = Array.from({ length: 16 }, (_, row) => 84 - row);
+  const remainingCellMap = { '0:0': 83, '3:5': 72 };
+  const link = createAudioAnimationLink(song, animation, {
+    colorToSlot: { 'rgba-ff0000ff': 'square' },
+    frameRowPitchMaps: { [removedFrameId]: removedPitchMap, [remainingFrameId]: remainingPitchMap },
+    frameCellPitchMaps: { [removedFrameId]: { '0:0': 84 }, [remainingFrameId]: remainingCellMap }
+  });
   let project = await writePxdAudioState(createPxdProject({ projectId: 'audio-animation-link-project' }), song, { link, animation });
   animation = removeAnimationFrame(animation, removedFrameId);
   project = await updatePxdAudioAnimationLink(project, animation);
@@ -305,5 +313,37 @@ test('an external audio-role frame edit updates link metadata without changing m
   assert.equal(readPxdAudioLink(project).projectionReady, false);
   assert.deepEqual(readPxdAudioLink(project).frameIds, animation.frames.map(({ id }) => id));
   assert.equal(readPxdAudioLink(project).colorToSlot['rgba-ff0000ff'], 'square');
+  assert.deepEqual(readPxdAudioLink(project).frameRowPitchMaps, { [remainingFrameId]: remainingPitchMap });
+  assert.deepEqual(readPxdAudioLink(project).frameCellPitchMaps, { [remainingFrameId]: remainingCellMap });
   assert.equal(readPxdAudioState(project).tracks.flatMap((track) => track.clips.flatMap((clip) => clip.notes)).length, 1);
+});
+
+test('animation frame pitch maps survive PXD reorder and removed owned maps do not return on rewrite', async () => {
+  const song = createAudioSong({ songId: 'frame-row-map-roundtrip' });
+  let animation = createAnimation({ width: 16, height: 16, palette: ['#ff0000'] });
+  const firstFrameId = animation.frames[0].id;
+  animation = addAnimationFrame(animation, { sourceFrameId: firstFrameId });
+  const secondFrameId = animation.frames[1].id;
+  const firstMap = Array.from({ length: 16 }, (_, row) => 80 - row);
+  const secondMap = Array.from({ length: 16 }, (_, row) => 60 - row);
+  const firstCells = { '0:0': 79, '15:15': 64 }; const secondCells = { '2:7': 55 };
+  let link = createAudioAnimationLink(song, animation, {
+    frameRowPitchMaps: { [firstFrameId]: firstMap, [secondFrameId]: secondMap },
+    frameCellPitchMaps: { [firstFrameId]: firstCells, [secondFrameId]: secondCells }
+  });
+  let project = await writePxdAudioState(createPxdProject({ projectId: 'frame-row-map-project' }), song, { link, animation });
+  assert.deepEqual(readPxdAudioLink(project).frameRowPitchMaps, { [firstFrameId]: firstMap, [secondFrameId]: secondMap });
+  assert.deepEqual(readPxdAudioLink(project).frameCellPitchMaps, { [firstFrameId]: firstCells, [secondFrameId]: secondCells });
+
+  animation = moveAnimationFrame(animation, secondFrameId, 0);
+  link = createAudioAnimationLink(song, animation, { rowPitchMap: link.rowPitchMap, frameRowPitchMaps: link.frameRowPitchMaps, frameCellPitchMaps: link.frameCellPitchMaps });
+  project = await writePxdAudioState(project, song, { link, animation });
+  assert.deepEqual(readPxdAudioLink(project).frameIds, [secondFrameId, firstFrameId]);
+  assert.deepEqual(readPxdAudioLink(project).frameRowPitchMaps, { [firstFrameId]: firstMap, [secondFrameId]: secondMap });
+  assert.deepEqual(readPxdAudioLink(project).frameCellPitchMaps, { [firstFrameId]: firstCells, [secondFrameId]: secondCells });
+
+  link = createAudioAnimationLink(song, animation, { rowPitchMap: link.rowPitchMap, frameRowPitchMaps: { [secondFrameId]: secondMap }, frameCellPitchMaps: { [secondFrameId]: secondCells } });
+  project = await writePxdAudioState(project, song, { link, animation });
+  assert.deepEqual(readPxdAudioLink(project).frameRowPitchMaps, { [secondFrameId]: secondMap });
+  assert.deepEqual(readPxdAudioLink(project).frameCellPitchMaps, { [secondFrameId]: secondCells });
 });

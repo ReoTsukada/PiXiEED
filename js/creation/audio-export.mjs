@@ -1,4 +1,4 @@
-import { AUDIO_INSTRUMENTS, AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
+import { AUDIO_INSTRUMENTS, AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261005-audio-noise-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
@@ -93,7 +93,7 @@ export async function renderAudioWav(song, { loops = audioExportLoops(song), sam
     if (!await player.play(song)) throw new Error('まだ音がありません。');
     if (loops === 1) player.stopAfterCurrentLoop();
     const loopMilliseconds = loopSeconds * 1000;
-    const releaseMilliseconds = Math.max(0, ...collectAudioEvents(song).map(({ instrument }) => AUDIO_INSTRUMENTS.find((voice) => voice.id === instrument)?.release || 0)) * 1000;
+    const releaseMilliseconds = Math.max(0, ...collectAudioEvents(song).map(({ instrument }) => { const profile = AUDIO_INSTRUMENTS.find((voice) => voice.id === instrument); return profile?.drum?.duration || profile?.release || 0; })) * 1000;
     const renderDeadline = loopMilliseconds * loops + releaseMilliseconds + 60;
     let nextLoopBoundary = loopMilliseconds; let completedLoops = 0; let operations = 0;
     let reachedDeadline = false;

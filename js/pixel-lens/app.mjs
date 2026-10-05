@@ -19,6 +19,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
+import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?v=20261005-miniature-1';
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
@@ -50,6 +51,11 @@ const stageMessage = $('#stageMsg');
 const info = $('#info');
 const sourceCanvas = document.createElement('canvas');
 const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
+const applyMiniature = createMiniatureProcessor();
+const miniatureSource = document.createElement('canvas');
+const miniatureSourceContext = miniatureSource.getContext('2d', { willReadFrequently: true });
+const miniatureCanvas = document.createElement('canvas');
+const miniatureContext = miniatureCanvas.getContext('2d');
 let activeStream = null;
 let cameraSequence = 0;
 let renderSequence = 0;
@@ -83,7 +89,8 @@ let focusRequestToken = 0;
 
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: normalizeOutputSize(audioCameraRequest?.width ?? 128),
-  colorDepth: '16', paletteMode: 'source', gradientMode: 'none', ditherPattern: 'net8', surfaceSimplify: 0, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1 };
+  colorDepth: '16', paletteMode: 'source', gradientMode: 'none', ditherPattern: 'net8', surfaceSimplify: 0, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1, miniature: false };
+root.dataset.miniature = 'false';
 let sharedImageTarget = null;
 let sharedProjectBound = false;
 let sharedImageEdited = false;
@@ -410,6 +417,10 @@ function drawCompleted(result) {
   root.dataset.paletteSize = String(result.palette?.length ?? 0);
   if (result.stats?.globalToneLevels) root.dataset.toneLevels = String(result.stats.globalToneLevels);
   root.dataset.paletteEpoch = String(paletteEpoch);
+  root.dataset.miniatureFrame = String(Boolean(result.miniature));
+  root.dataset.miniatureMs = String(Math.round(result.miniatureMs ?? 0));
+  root.dataset.miniatureSourceWidth = String(result.miniatureSourceWidth ?? 0);
+  root.dataset.miniatureSourceHeight = String(result.miniatureSourceHeight ?? 0);
   if (result.stats && 'paletteRevision' in result.stats) root.dataset.paletteRevision = String(result.stats.paletteRevision);
   if (result.stats && 'paletteLocked' in result.stats) root.dataset.paletteLocked = String(result.stats.paletteLocked);
   if (result.stats && 'dither' in result.stats) root.dataset.dither = String(result.stats.dither);
@@ -972,6 +983,27 @@ function cameraFrame() {
   const digital = zoom.digital;
   const crop = { sw: full.sw / digital, sh: full.sh / digital, sx: full.sx + (full.sw - full.sw / digital) / 2, sy: full.sy + (full.sh - full.sh / digital) / 2 };
   const { width, height } = output;
+  let sampleSource = video, sampleCrop = crop, miniatureMs = 0, miniatureSourceWidth = 0, miniatureSourceHeight = 0;
+  if (state.miniature) {
+    const started = performance.now();
+    const work = miniatureWorkSize(crop.sw, crop.sh);
+    miniatureSourceWidth = work.width; miniatureSourceHeight = work.height;
+    if (miniatureSource.width !== work.width || miniatureSource.height !== work.height) {
+      miniatureSource.width = miniatureCanvas.width = work.width;
+      miniatureSource.height = miniatureCanvas.height = work.height;
+    }
+    miniatureSourceContext.imageSmoothingEnabled = true;
+    miniatureSourceContext.imageSmoothingQuality = 'high';
+    miniatureSourceContext.clearRect(0, 0, work.width, work.height);
+    // Start from the original crop every frame; tone and pixelisation follow later.
+    miniatureSourceContext.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, work.width, work.height);
+    const original = miniatureSourceContext.getImageData(0, 0, work.width, work.height);
+    const blurred = applyMiniature(original, true);
+    miniatureContext.putImageData(new ImageData(blurred.data, work.width, work.height), 0, 0);
+    sampleSource = miniatureCanvas;
+    sampleCrop = { sx: 0, sy: 0, sw: work.width, sh: work.height };
+    miniatureMs = performance.now() - started;
+  }
   if (sourceCanvas.width !== width || sourceCanvas.height !== height) { sourceCanvas.width = width; sourceCanvas.height = height; }
   // PiXiEELENS renderDotFrame: draw the camera straight onto the dot grid through its smoothing blur and
   // camera tone filter, then run its colour pipeline on that dot-resolution image
@@ -981,17 +1013,26 @@ function cameraFrame() {
   sourceContext.filter = lensFrameFilter();
   sourceContext.clearRect(0, 0, width, height);
   if (state.facing === 'user') { sourceContext.translate(width, 0); sourceContext.scale(-1, 1); }
-  sourceContext.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
+  sourceContext.drawImage(sampleSource, sampleCrop.sx, sampleCrop.sy, sampleCrop.sw, sampleCrop.sh, 0, 0, width, height);
   sourceContext.restore();
-  return { image: sourceContext.getImageData(0, 0, width, height), aspect };
+  return { image: sourceContext.getImageData(0, 0, width, height), aspect, miniature: state.miniature, miniatureMs, miniatureSourceWidth, miniatureSourceHeight };
 }
 
 function renderLens(frame) {
   const started = performance.now();
   const sourceData = new Uint8ClampedArray(frame.image.data);
-  processLensFrame(frame.image);
-  const { width, height, data } = frame.image;
-  return { width, height, data, sourceData, aspect: frame.aspect, palette: lensPalette(), processingMs: performance.now() - started, aiStatus: 'disabled' };
+  const image = frame.image;
+  processLensFrame(image);
+  const { width, height } = image;
+  // Gray can have more shades than the existing shared-capture colour limit.
+  // In miniature mode show that final reduction live, so capture does not change
+  // the displayed pixels. OFF retains the old live pipeline byte-for-byte.
+  const data = frame.miniature && state.colorDepth === 'gray'
+    ? new Uint8ClampedArray(prepareSharedCanvasImage({ width, height, rgba: image.data }, {
+      passActive: sharedPassActive(), width, height, maxColors: sharedPassActive() ? 32 : 16
+    }).image.rgba)
+    : image.data;
+  return { width, height, data, sourceData, aspect: frame.aspect, palette: lensPalette(), processingMs: performance.now() - started + frame.miniatureMs, miniature: frame.miniature, miniatureMs: frame.miniatureMs, miniatureSourceWidth: frame.miniatureSourceWidth, miniatureSourceHeight: frame.miniatureSourceHeight, aiStatus: 'disabled' };
 }
 
 loop = createFrameLoop({
@@ -1245,7 +1286,7 @@ async function capture() {
     setMode('captured');
     updateSharedCaptureControls();
     cameraPxd.markDirty();
-    fitPreview(frozen);
+    drawCompleted(frozen);
     say('PNGを準備しています…', { visible: true });
     void prepareCaptureDownload(frozen);
     await cameraPxd.save();
@@ -1522,6 +1563,7 @@ for (const ratio of sharedFrameRatios()) { const button = chip(ratio.value, rati
 // tone row: pick a setting, then the slider below adjusts it
 const toneChips = $('#toneChips');
 for (const [key, label] of TONES) toneChips.appendChild(chip(key, label));
+toneChips.appendChild(chip('miniature', 'ジオラマ'));
 const toneSlider = $('#toneSlider'); const toneValue = $('#toneValue');
 
 function currentPatternId() { return state.gradientMode === 'dither' ? state.ditherPattern : 'none'; }
@@ -1565,15 +1607,19 @@ function syncToolbar() {
   face('aspect').dataset.ratio = sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : state.ratio;
   const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
   const toneFace = face('tone');
-  toneFace.querySelector('b').textContent = toneChanged ? '設定中' : '調整';
-  toneFace.title = toneChanged ? '色味：調整中' : '色味：調整';
+  toneFace.querySelector('b').textContent = toneChanged || state.miniature ? '設定中' : '調整';
+  toneFace.title = state.miniature ? (toneChanged ? '色味：調整中・ジオラマ ON' : '色味：ジオラマ ON') : toneChanged ? '色味：調整中' : '色味：調整';
   toneFace.setAttribute('aria-label', `${toneFace.title}（タップで項目を選ぶ）`);
-  toneFace.dataset.changed = String(toneChanged);
+  toneFace.dataset.changed = String(toneChanged || state.miniature);
   syncZoomFace();
   // selected chips
   const mark = (panel, value) => { for (const b of panel.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === value)); };
   mark(ditherPanel, currentPatternId()); mark(pixelsPanel, audioCameraRequest || sharedImageTarget ? '' : String(state.size)); mark(aspectPanel, state.ratio); mark(toneChips, toneKey);
-  const [, toneLabel] = TONES.find(([key]) => key === toneKey);
+  const [, toneLabel] = TONES.find(([key]) => key === toneKey) ?? ['miniature', 'ジオラマ'];
+  $('#toneSliderPanel').hidden = toneKey === 'miniature';
+  $('#miniaturePanel').hidden = toneKey !== 'miniature';
+  $('#miniatureToggle').setAttribute('aria-pressed', String(state.miniature));
+  $('#miniatureToggle').querySelector('span').textContent = state.miniature ? 'ON' : 'OFF';
   toneSlider.value = String(state.camera[toneKey] ?? 0);
   toneSlider.setAttribute('aria-label', toneLabel);
   const v = Number(toneSlider.value); toneValue.textContent = v > 0 ? `+${v}` : String(v);
@@ -1635,7 +1681,7 @@ toneChips.addEventListener('click', (event) => {
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 });
 toneSlider.addEventListener('input', () => {
-  if (state.mode === 'captured') return;
+  if (state.mode === 'captured' || toneKey === 'miniature') return;
   const value = Number(toneSlider.value);
   // a light detent at 0 so the standard look is easy to find again
   const snapped = Math.abs(value) <= 3 ? 0 : value;
@@ -1643,6 +1689,13 @@ toneSlider.addEventListener('input', () => {
   state.camera[toneKey] = snapped; applyChange();
 });
 $('#toneReset').addEventListener('click', () => { for (const [key] of TONES) state.camera[key] = CAMERA_SETTING_DEFAULTS[key]; navigator.vibrate?.(8); applyChange(); sayToast('色調整を元に戻しました'); });
+$('#miniatureToggle').addEventListener('click', () => {
+  if (state.mode !== 'live' || gif.recording || captureInFlight || regionMergeSession) return;
+  state.miniature = !state.miniature;
+  root.dataset.miniature = String(state.miniature);
+  navigator.vibrate?.(6);
+  applyChange({ restart: true });
+});
 document.addEventListener('pointerdown', (event) => {
   if (!settingsPanel.contains(event.target) && stage.contains(event.target) && openTool) closeCameraSettings();
 }, true);

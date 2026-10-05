@@ -182,7 +182,8 @@ try {
     await page.locator('#dce-done').click();
     const plainColor = page.locator(`#audio-tracks [data-color-id="${editedColorId}"]`);
     assert.equal(await plainColor.locator('img').count(), 1, 'The source swatch keeps its current sound icon until unassigned');
-    await page.locator('#audio-palette-settings > summary').click();
+    await page.locator('#audio-current').click();
+    await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
     await page.waitForFunction(() => document.querySelector('#audio-palette-settings').open);
     assert.equal(await page.locator('#audio-color-editor-panel').isVisible(), false, 'Opening sound settings closes the shared color editor');
     assert.equal(await page.locator('#audio-current').getAttribute('aria-expanded'), 'false');
@@ -229,8 +230,8 @@ try {
     assert.deepEqual(await canvasPixels(page, '#audio-pixel-canvas'), latest.rgba, 'Reopened project retains edited source colors');
     assert.deepEqual(errors, []);
     if (viewport.width === 390) {
-      await page.locator('#audio-palette-settings > summary').click();
-      await page.locator('[data-audio-editor-view="sound"]').click();
+      await page.locator('#audio-current').click();
+      await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
       await page.screenshot({ path: '/tmp/pixieed-audio-color-sound.png' });
     }
     console.log(`PASS Audio ${viewport.width}x${viewport.height}: RGB/timing persistence, icon assignment, instruments, play/stop, project isolation, reopen, sheet fit`);

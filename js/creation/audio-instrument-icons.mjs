@@ -1,4 +1,4 @@
-import { AUDIO_INSTRUMENTS } from './audio-timbres.mjs?rev=20260928-dot-music-1';
+import { AUDIO_INSTRUMENTS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 
 // Existing sound IDs remain the authority. Similar presets share a recognizable silhouette.
 export const AUDIO_INSTRUMENT_ICON_FAMILIES = Object.freeze({
@@ -49,7 +49,15 @@ export const AUDIO_INSTRUMENT_ICON_FAMILIES = Object.freeze({
   "nes-triangle": "famicom",
   "nes-noise": "famicom",
   "woodblock": "woodblock",
-  "low-drum": "drum"
+  "low-drum": "drum",
+  "drum-kick": "drum",
+  "drum-snare": "drum",
+  "drum-hat-closed": "drum",
+  "drum-hat-open": "drum",
+  "drum-tom-low": "drum",
+  "drum-tom-high": "drum",
+  "drum-clap": "drum",
+  "drum-crash": "drum"
 });
 
 export function getAudioInstrumentIcon(instrumentId) {

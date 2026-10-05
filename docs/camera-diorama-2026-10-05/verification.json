@@ -1,0 +1,152 @@
+{
+  "baselineSha256": "3069c84c08d8f3a7dab4c16d18036680736cc0d0cd17693d83194c5c53c76677",
+  "camera": "synthetic canvas stream",
+  "remoteTraffic": "blocked",
+  "cases": [
+    {
+      "engine": "chromium",
+      "config": {
+        "size": 128,
+        "ratio": "1:1",
+        "look": "photo",
+        "saturation": 0
+      },
+      "legacyOff": {
+        "width": 128,
+        "height": 128,
+        "hash": 796623516
+      },
+      "saved": {
+        "width": 2048,
+        "height": 2048,
+        "scale": 16,
+        "mismatches": 0
+      }
+    },
+    {
+      "engine": "chromium",
+      "config": {
+        "size": 256,
+        "ratio": "9:16",
+        "look": "photo",
+        "saturation": 38,
+        "dither": "checker"
+      },
+      "legacyOff": {
+        "width": 144,
+        "height": 256,
+        "hash": 3053497835
+      },
+      "saved": {
+        "width": 1152,
+        "height": 2048,
+        "scale": 8,
+        "mismatches": 0
+      }
+    },
+    {
+      "engine": "chromium",
+      "config": {
+        "size": 32,
+        "ratio": "16:9",
+        "look": "gray",
+        "saturation": -40
+      },
+      "legacyOff": {
+        "width": 32,
+        "height": 18,
+        "hash": 2041685626
+      },
+      "saved": {
+        "width": 2048,
+        "height": 1152,
+        "scale": 64,
+        "mismatches": 0
+      }
+    },
+    {
+      "engine": "chromium",
+      "config": {
+        "size": 16,
+        "ratio": "1:1",
+        "look": "gb",
+        "saturation": 0
+      },
+      "legacyOff": {
+        "width": 16,
+        "height": 16,
+        "hash": 40664581
+      },
+      "saved": {
+        "width": 2048,
+        "height": 2048,
+        "scale": 128,
+        "mismatches": 0
+      }
+    }
+  ],
+  "performance": [
+    {
+      "engine": "chromium",
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "width": 270,
+      "height": 480,
+      "medianMs": 4.899999976158142,
+      "p95Ms": 5.099999904632568,
+      "measuredFrames": 3,
+      "elapsedMs": 106
+    },
+    {
+      "engine": "chromium",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "width": 270,
+      "height": 480,
+      "medianMs": 4.799999952316284,
+      "p95Ms": 5,
+      "measuredFrames": 3,
+      "elapsedMs": 108
+    },
+    {
+      "engine": "chromium",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "width": 270,
+      "height": 480,
+      "medianMs": 4.800000071525574,
+      "p95Ms": 5,
+      "measuredFrames": 3,
+      "elapsedMs": 107
+    }
+  ],
+  "skipped": [
+    {
+      "engine": "webkit",
+      "reason": "Existing WebKit binary not installed; no installation performed"
+    }
+  ],
+  "checks": 19,
+  "status": "passed-with-skips",
+  "baselineGitRef": "92fcb07dd2a56276e3c6cc41882fbd905030595d",
+  "nodeTests": {
+    "passed": 105,
+    "failed": 0,
+    "suite": "tests/pixel-lens/*.test.mjs"
+  },
+  "effect": {
+    "position": "original cropped video before tone filter and dot sampling",
+    "sharpBand": 0.2,
+    "transitionPerSide": 0.4,
+    "sigmaRatio": 0.006,
+    "workLongEdge": 512,
+    "easing": "quintic",
+    "minimumSigma": null
+  }
+}

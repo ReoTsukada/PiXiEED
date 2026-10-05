@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
+  <title id="title">窓辺の小さな読書室</title>
+  <desc id="desc">本棚、窓から差す光、机の上の本、椅子と植木を描いたオリジナルのドット絵です。</desc>
+  <rect width="640" height="480" fill="#d8d9b8"/>
+  <rect y="304" width="640" height="176" fill="#b98962"/>
+  <rect x="16" y="16" width="608" height="448" fill="#34494b"/>
+  <rect x="32" y="32" width="576" height="416" fill="#e8dec4"/>
+  <rect x="48" y="48" width="244" height="192" fill="#547977"/>
+  <rect x="64" y="64" width="212" height="160" fill="#b6d0c1"/>
+  <rect x="72" y="72" width="196" height="144" fill="#ead49b"/>
+  <rect x="80" y="80" width="180" height="128" fill="#95b9ad"/>
+  <rect x="88" y="88" width="44" height="36" fill="#faedc9"/>
+  <rect x="132" y="88" width="36" height="36" fill="#f7d786"/>
+  <rect x="168" y="88" width="48" height="36" fill="#f0c36e"/>
+  <rect x="216" y="88" width="36" height="36" fill="#f6dc9b"/>
+  <rect x="80" y="124" width="180" height="16" fill="#c7d8bc"/>
+  <rect x="80" y="140" width="48" height="68" fill="#d8c782"/>
+  <rect x="128" y="140" width="44" height="68" fill="#e7d9aa"/>
+  <rect x="172" y="140" width="44" height="68" fill="#bdd0b5"/>
+  <rect x="216" y="140" width="44" height="68" fill="#d5b678"/>
+  <rect x="156" y="48" width="12" height="192" fill="#547977"/>
+  <rect x="48" y="232" width="244" height="16" fill="#3d5d5b"/>
+  <rect x="72" y="264" width="204" height="12" fill="#5b6c56"/>
+  <rect x="80" y="276" width="16" height="36" fill="#405652"/>
+  <rect x="252" y="276" width="16" height="36" fill="#405652"/>
+  <rect x="336" y="48" width="240" height="264" fill="#785c49"/>
+  <rect x="352" y="64" width="208" height="232" fill="#ddc99f"/>
+  <rect x="352" y="144" width="208" height="12" fill="#785c49"/>
+  <rect x="352" y="224" width="208" height="12" fill="#785c49"/>
+  <rect x="368" y="80" width="28" height="64" fill="#bf654d"/>
+  <rect x="400" y="72" width="32" height="72" fill="#476d66"/>
+  <rect x="436" y="88" width="24" height="56" fill="#e3b45f"/>
+  <rect x="464" y="76" width="36" height="68" fill="#687f68"/>
+  <rect x="504" y="84" width="40" height="60" fill="#bc8059"/>
+  <rect x="368" y="164" width="40" height="60" fill="#536e7a"/>
+  <rect x="412" y="160" width="28" height="64" fill="#d27a57"/>
+  <rect x="444" y="172" width="44" height="52" fill="#e4c678"/>
+  <rect x="492" y="160" width="24" height="64" fill="#5e7b66"/>
+  <rect x="520" y="168" width="24" height="56" fill="#bd8b61"/>
+  <rect x="372" y="244" width="32" height="48" fill="#d4b15f"/>
+  <rect x="408" y="252" width="48" height="40" fill="#8a6650"/>
+  <rect x="460" y="240" width="36" height="52" fill="#bd654f"/>
+  <rect x="500" y="248" width="40" height="44" fill="#4d6d62"/>
+  <rect x="96" y="328" width="380" height="24" fill="#6d513e"/>
+  <rect x="120" y="352" width="20" height="88" fill="#6d513e"/>
+  <rect x="432" y="352" width="20" height="88" fill="#6d513e"/>
+  <rect x="208" y="300" width="152" height="28" fill="#bf654d"/>
+  <rect x="220" y="288" width="128" height="12" fill="#f2d98e"/>
+  <rect x="228" y="276" width="112" height="12" fill="#f8f0d8"/>
+  <rect x="236" y="264" width="96" height="12" fill="#55736a"/>
+  <rect x="500" y="304" width="40" height="40" fill="#d18b59"/>
+  <rect x="508" y="292" width="24" height="12" fill="#59745d"/>
+  <rect x="496" y="276" width="12" height="24" fill="#59745d"/>
+  <rect x="532" y="272" width="12" height="28" fill="#59745d"/>
+  <rect x="484" y="260" width="16" height="24" fill="#59745d"/>
+  <rect x="540" y="256" width="16" height="24" fill="#59745d"/>
+  <rect x="168" y="368" width="80" height="72" fill="#4b6462"/>
+  <rect x="152" y="388" width="16" height="44" fill="#4b6462"/>
+  <rect x="248" y="388" width="16" height="44" fill="#4b6462"/>
+  <rect x="184" y="352" width="48" height="16" fill="#4b6462"/>
+  <rect x="48" y="448" width="544" height="8" fill="#34494b"/>
+</svg>

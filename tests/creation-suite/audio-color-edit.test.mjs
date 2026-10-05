@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addAnimationFrame, composeAnimationFrame, createAnimation, getAnimationCelDocument, writeAnimationCel } from '../../js/creation/animation-core.mjs';
-import { AUDIO_PIXEL_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { AUDIO_PIXEL_TICKS, createAudioSong, setAudioColorInstrument, setAudioPixel } from '../../js/creation/audio-core.mjs';
 import { prepareAudioAnimationImport, validateAudioAnimationBinding } from '../../js/creation/audio-animation.mjs?rev=20261001-audio-animation-1';
-import { createPxdProject, decodePxd, encodePxd, getPxdJson } from '../../js/creation/pxd-codec.mjs';
+import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdJson } from '../../js/creation/pxd-codec.mjs';
 import { readPxdAnimation, writePxdAnimation } from '../../js/creation/pxd-animation.mjs';
 import { readPxdImage } from '../../js/creation/pxd-project.mjs';
 import { preparePxdAudioImageImport, prepareSharedAudioImageImport, readPxdAudioLink, readPxdAudioState, validatePxdAudioBinding, writePxdAudioState } from '../../js/creation/pxd-draw-audio.mjs?rev=20261001-free-tools-1';
@@ -166,4 +166,66 @@ test('wrong versions, mismatched image modes, and duplicate animation colors fai
   const animated = prepareAudioAnimationImport(createAudioSong(), animation, { rowPitchMap: [64], colorToSlot: { 'rgba-112233ff': 'square' } });
   assert.throws(() => replaceAudioSourceColor({ animation: animated.animation, link: { ...animated.link, colorToSlot: { ...animated.link.colorToSlot, 'rgba-abcdefff': 'square' } }, song: animated.song, colorId: 'rgba-112233ff', hex: '#abcdef' }), /すでに同じ色/);
   validateAudioAnimationBinding(animated.song, animated.animation, animated.link);
+});
+
+
+test('color sound follows recoloring and repeated PXD writes replace owned maps, preserving unknown fields', async () => {
+  const plan = prepareSharedAudioImageImport(createAudioSong({ songId: 'override-recolor' }), imageWithTwoColors(), {
+    rowPitchMap: [64], colorToSlot: { [OLD_ID]: 'square', 'rgba-44556680': 'square' }
+  });
+  const song = setAudioColorInstrument(plan.song, { colorId: OLD_ID, instrument: 'organ' });
+  let project = await writePxdAudioState(createPxdProject({ projectId: 'override-recolor-project' }), song, { image: plan.image, link: plan.link });
+  project = setPxdJson(project, 'audio/state.json', { ...getPxdJson(project, 'audio/state.json'), futureField: { retained: true } });
+  project = setPxdJson(project, 'audio/link.json', { ...getPxdJson(project, 'audio/link.json'), futureField: { retained: true } });
+  const changed = replaceAudioSourceColor({ ...plan, song, colorId: OLD_ID, hex: '#abcdef' });
+  assert.deepEqual(changed.song.colorInstruments, { [TARGET_ID]: 'organ' });
+  project = await writePxdAudioState(project, changed.song, { image: changed.image, link: changed.link });
+  project = await decodePxd(await encodePxd(project));
+  assert.deepEqual(readPxdAudioState(project).colorInstruments, { [TARGET_ID]: 'organ' });
+  assert.equal(Object.hasOwn(readPxdAudioLink(project).colorToSlot, OLD_ID), false);
+  assert.deepEqual(getPxdJson(project, 'audio/state.json').futureField, { retained: true });
+  assert.deepEqual(getPxdJson(project, 'audio/link.json').futureField, { retained: true });
+  const cleared = setAudioColorInstrument(changed.song, { colorId: TARGET_ID, instrument: null });
+  project = await writePxdAudioState(project, cleared, { image: changed.image, link: changed.link });
+  assert.deepEqual(readPxdAudioState(project).colorInstruments, {});
+  const legacy = { ...cleared }; delete legacy.colorInstruments;
+  project = await writePxdAudioState(project, legacy, { image: changed.image, link: changed.link });
+  assert.equal(Object.hasOwn(readPxdAudioState(project), 'colorInstruments'), false);
+});
+
+test('same-slot colors with different effective sounds cannot be merged by recoloring', () => {
+  const plan = prepareSharedAudioImageImport(createAudioSong({ songId: 'different-voices-collision' }), imageWithTwoColors(), {
+    rowPitchMap: [64], colorToSlot: { [OLD_ID]: 'square', 'rgba-44556680': 'square' }
+  });
+  const song = setAudioColorInstrument(plan.song, { colorId: OLD_ID, instrument: 'organ' });
+  const before = structuredClone({ song, link: plan.link, image: plan.image });
+  assert.throws(() => replaceAudioSourceColor({ ...plan, song, colorId: OLD_ID, hex: '#445566' }), /別の音に割り当て済み/);
+  assert.deepEqual({ song, link: plan.link, image: plan.image }, before);
+});
+
+test('recolor retains original color sound for unrelated manually tagged notes', () => {
+  const plan = prepareSharedAudioImageImport(addManualNote(createAudioSong({ songId: 'manual-override' })), imageWithTwoColors(), {
+    rowPitchMap: [64], colorToSlot: { [OLD_ID]: 'square', 'rgba-44556680': 'triangle' }
+  });
+  const song = setAudioColorInstrument(plan.song, { colorId: OLD_ID, instrument: 'organ' });
+  const result = replaceAudioSourceColor({ ...plan, song, colorId: OLD_ID, hex: '#abcdef' });
+  assert.deepEqual(result.song.colorInstruments, { [OLD_ID]: 'organ', [TARGET_ID]: 'organ' });
+  assert.equal(noteList(result.song).find(({ note }) => note.noteId === 'manual-manual-override').note.colorId, OLD_ID);
+});
+
+test('animation recolor moves the independent color sound through repeated saves', async () => {
+  const oldId = 'rgba-112233ff'; const nextId = 'rgba-abcdefff';
+  let animation = createAnimation({ width: 2, height: 1, palette: ['#112233', '#445566'] });
+  animation = writeAnimationCel(animation, animation.frames[0].id, animation.layers[0].id, { width: 2, height: 1, pixels: [1, 2] });
+  const plan = prepareAudioAnimationImport(createAudioSong({ songId: 'animation-override-recolor' }), animation, {
+    rowPitchMap: [64], colorToSlot: { [oldId]: 'square', 'rgba-445566ff': 'square' }
+  });
+  const song = setAudioColorInstrument(plan.song, { colorId: oldId, instrument: 'organ' });
+  let project = await writePxdAudioState(createPxdProject({ projectId: 'animation-override-recolor-project' }), song, { animation: plan.animation, link: plan.link });
+  const result = replaceAudioSourceColor({ ...plan, song, colorId: oldId, hex: '#abcdef' });
+  project = await writePxdAudioState(project, result.song, { animation: result.animation, link: result.link });
+  project = await decodePxd(await encodePxd(project));
+  assert.deepEqual(readPxdAudioState(project).colorInstruments, { [nextId]: 'organ' });
+  assert.equal(Object.hasOwn(readPxdAudioLink(project).colorToSlot, oldId), false);
+  validateAudioAnimationBinding(readPxdAudioState(project), result.animation, readPxdAudioLink(project));
 });

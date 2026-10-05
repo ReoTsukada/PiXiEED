@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4182';
+const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4176';
 const origin = new URL(base).origin;
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Only a local test server is allowed');
-const playwrightPath = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
-const { chromium } = await import(pathToFileURL(playwrightPath).href);
+const { chromium } = await import(process.env.PIXIEED_PLAYWRIGHT_MODULE
+  ? pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE).href : 'playwright');
 const browser = await chromium.launch({ headless:true });
 const viewports = [{name:'320x568',width:320,height:568},{name:'390x844',width:390,height:844},{name:'844x390',width:844,height:390},{name:'1280x800',width:1280,height:800}];
-const outDir = '/tmp/pixieed-audio-sound-switch-20261004';
+const outDir = process.env.PIXIEEED_AUDIO_SWITCH_ARTIFACTS || '/tmp/pixieed-audio-icons-20261005';
 const result = { base, viewports:[], audioCases:{}, drawCase:null, pageErrors:[], checks:0 };
 let checks = 0;
 function check(value, message) { checks += 1; assert.ok(value, message); }
@@ -44,6 +44,17 @@ async function seed(page, tool) {
     return {id:project.projectId,revision:project.revisionId};
   }, tool);
 }
+async function seedManualAudio(page) {
+  return page.evaluate(async () => {
+    const { createPxdProject } = await import('/js/creation/pxd-codec.mjs');
+    const { createAudioSong } = await import('/js/creation/audio-core.mjs?manual-palette-fixture=1');
+    const { writePxdAudioState } = await import('/js/creation/pxd-draw-audio.mjs?manual-palette-fixture=1');
+    const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs');
+    const base=createPxdProject({manifest:{title:'Standalone palette icon check',lastMode:'audio',toolProject:{schemaVersion:1,tool:'audio'}}});
+    const project=await createToolProjectStore('audio').save(await writePxdAudioState(base,createAudioSong({songId:'manual-palette-icons'})),{expectedRevisionId:null});
+    return {id:project.projectId,revision:project.revisionId};
+  });
+}
 async function snapshot(page, id) {
   return page.evaluate(async projectId => {
     const project = await (await import('/js/creation/pxd-store.mjs')).createPxdStore().load(projectId);
@@ -64,7 +75,7 @@ function noteTiming(song) {
   return song.tracks.map(track => ({trackId:track.trackId,slot:track.instrument,clips:track.clips.map(clip => ({clipId:clip.clipId,startTick:clip.startTick,lengthTicks:clip.lengthTicks,
     notes:clip.notes.map(note => ({noteId:note.noteId,pitch:note.pitch,startTick:note.startTick,durationTicks:note.durationTicks,velocity:note.velocity}))}))}));
 }
-function selectedInstrumentForSlot(song,slotId) { return song.pixelPalette.find(slot => slot.slotId === slotId)?.instrument ?? null; }
+function selectedInstrumentForColor(song,slotId,colorId) { return song.colorInstruments?.[colorId] ?? song.pixelPalette.find(slot => slot.slotId === slotId)?.instrument ?? null; }
 async function canvasPixels(page, selector) {
   return page.locator(selector).evaluate(canvas => Array.from(canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data));
 }
@@ -138,8 +149,10 @@ async function assertOnlyView(page, expected, label) {
 }
 async function openSoundPanel(page, {probe=false}={}) {
   if (probe) await armFirstVisibleProbe(page,'.audio-palette-settings__body');
-  const details=page.locator('#audio-palette-settings');
-  if (!(await details.evaluate(node=>node.open))) await page.locator('#audio-palette-settings > summary').click();
+  if (!(await page.locator('#audio-palette-settings').evaluate(node=>node.open))) {
+    if (!(await page.locator('#audio-color-editor-panel').isVisible().catch(()=>false))) await page.locator('#audio-current').click();
+    await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
+  }
   await page.waitForFunction(() => document.querySelector('#audio-palette-settings')?.open && !document.querySelector('#audio-sound-editor-panel')?.hidden,null,{timeout:5000});
   if (probe) return firstVisibleProbe(page);
   return null;
@@ -180,7 +193,7 @@ async function categoryMetrics(page,label) {
     return {categories:categories.map(describe),gridCount:grids.length,instruments:instruments.map(describe),accordionCount:document.querySelectorAll('#audio-instrument-groups details.audio-instrument-group').length,
       panel:{scrollWidth:document.querySelector('.audio-palette-settings__body')?.scrollWidth,clientWidth:document.querySelector('.audio-palette-settings__body')?.clientWidth}};
   });
-  check(metrics.categories.length===9,`${label}: all instrument categories should be represented by category buttons: ${metrics.categories.length}`);
+  check(metrics.categories.length===10,`${label}: all instrument categories should be represented by category buttons: ${metrics.categories.length}`);
   check(metrics.gridCount===1,`${label}: there should be one instrument grid, got ${metrics.gridCount}`);
   check(metrics.accordionCount===0,`${label}: instrument categories should not be accordions, got ${metrics.accordionCount}`);
   check(metrics.instruments.length>0,`${label}: selected category should show instruments`);
@@ -206,18 +219,85 @@ async function assertNoViews(page,label) {
   const views=await visiblePanels(page);
   check(!views.color&&!views.sound,`${label}: no color/sound editor should remain visible: ${JSON.stringify(views)}`);
 }
+async function paletteIconMetrics(page,selector) {
+  await page.waitForFunction(query=>[...document.querySelectorAll(`${query} img.audio-instrument-icon`)].every(image=>image.complete&&image.naturalWidth>0),selector,{timeout:10000});
+  return page.locator(selector).evaluateAll(buttons=>{
+    const rgb=value=>{const m=value.match(/[\d.]+/g)||[];return m.length>=3?m.slice(0,3).map(Number):null;};
+    const luminance=color=>color?.map((value,index)=>{const c=value/255;return (c<=.04045?c/12.92:((c+.055)/1.055)**2.4)*[.2126,.7152,.0722][index];}).reduce((sum,value)=>sum+value,0)??null;
+    return buttons.map(button=>{
+      const mark=button.querySelector('.audio-track-choice__mark'),icon=mark?.querySelector('.audio-instrument-icon');
+      const b=button.getBoundingClientRect(),m=mark?.getBoundingClientRect(),i=icon?.getBoundingClientRect();
+      const bs=getComputedStyle(button),ms=mark?getComputedStyle(mark):null,is=icon?getComputedStyle(icon):null;
+      const bg=rgb(bs.backgroundColor),filter=is?.filter||'';
+      const iconColor=/invert\(1\)/.test(filter)?[255,255,255]:/brightness\(0\)/.test(filter)?[0,0,0]:null;
+      const l1=luminance(bg),l2=luminance(iconColor);
+      return {instrument:button.dataset.trackId||null,colorId:button.dataset.colorId||null,pressed:button.getAttribute('aria-pressed'),button:{width:button.offsetWidth,height:button.offsetHeight,background:bs.backgroundColor,border:bs.border,boxShadow:bs.boxShadow},
+        mark:mark?{tag:mark.tagName,children:mark.children.length,background:ms.backgroundColor,sourceBackground:mark.style.backgroundColor,border:ms.border,borderWidth:ms.borderWidth,boxShadow:ms.boxShadow,width:m.width,height:m.height}:null,
+        icon:icon?{tag:icon.tagName,children:mark.children.length,width:i.width,height:i.height,cssWidth:is.width,cssHeight:is.height,offsetWidth:icon.offsetWidth,offsetHeight:icon.offsetHeight,filter,source:icon.getAttribute('src'),complete:icon.complete&&icon.naturalWidth>0,
+          centerDeltaX:Math.abs((i.left+i.right-b.left-b.right)/2),centerDeltaY:Math.abs((i.top+i.bottom-b.top-b.bottom)/2),contrast:l1===null||l2===null?null:(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05)}:null,
+        badge:Boolean(button.querySelector('.audio-track-choice__sound-badge')),visibleText:[...button.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE&&node.textContent.trim()).map(node=>node.textContent.trim()),
+        label:(()=>{const node=button.querySelector('.audio-track-choice__label');if(!node)return null;const s=getComputedStyle(node);return {position:s.position,width:s.width,height:s.height,clipPath:s.clipPath,overflow:s.overflow};})()};
+    });
+  });
+}
+function assertIconOnly(metrics,label,{contrast=false}={}) {
+  check(metrics.length===4,`${label}: expected four palette icons, got ${metrics.length}`);
+  check(metrics.filter(item=>item.pressed==='true').length===1,`${label}: exactly one palette choice stays selected`);
+  for(const item of metrics) {
+    check(item.button.width===44&&item.button.height===44,`${label}: ${item.colorId||item.instrument} button stays 44x44: ${JSON.stringify(item)}`);
+    check(item.mark?.children===1&&item.icon?.tag==='IMG'&&!item.badge&&item.visibleText.length===0&&(!item.label||(item.label.position==='absolute'&&item.label.clipPath==='inset(50%)'&&item.label.width==='1px'&&item.label.height==='1px')),`${label}: ${item.colorId||item.instrument} shows one icon without a badge or visible label: ${JSON.stringify(item)}`);
+    check(item.icon?.cssWidth==='24px'&&item.icon?.cssHeight==='24px'&&item.icon.offsetWidth===24&&item.icon.offsetHeight===24,`${label}: icon CSS box is 24x24: ${JSON.stringify(item.icon)}`);
+    check(item.icon?.complete&&item.icon.centerDeltaX<=1&&item.icon.centerDeltaY<=1,`${label}: icon is loaded and centered: ${JSON.stringify(item.icon)}`);
+    check(item.mark.background==='rgba(0, 0, 0, 0)'&&item.mark.borderWidth==='0px'&&item.mark.boxShadow==='none',`${label}: icon area has no fill frame or shadow: ${JSON.stringify(item.mark)}`);
+    if(contrast) check(item.icon.contrast>=4.5,`${label}: ${item.colorId} icon contrast is below 4.5: ${JSON.stringify(item.icon)}`);
+  }
+}
+async function manualPaletteMetrics(page,label) {
+  const metrics=await paletteIconMetrics(page,'#audio-tracks button[data-track-id]');
+  assertIconOnly(metrics,label,{contrast:true});
+  const expected=await page.locator('#audio-tracks button[data-track-id]').evaluateAll(buttons=>buttons.map(button=>{
+    const hex=button.getAttribute('aria-label')?.match(/#[\da-f]{6}/i)?.[0];
+    return {instrument:button.dataset.trackId,background:button.querySelector('.audio-track-choice__mark')?.style.backgroundColor||button.style.getPropertyValue('--audio-source-color')||'',expected:hex?`rgb(${parseInt(hex.slice(1,3),16)}, ${parseInt(hex.slice(3,5),16)}, ${parseInt(hex.slice(5,7),16)})`:null,buttonBackground:getComputedStyle(button).backgroundColor};
+  }));
+  for(const item of expected) check(item.buttonBackground===item.expected,`${label}: ${item.instrument} keeps its slot color whether selected or not: ${JSON.stringify(item)}`);
+  return metrics;
+}
+async function sharedPaletteMetrics(page,label) {
+  const metrics=await paletteIconMetrics(page,'#audio-tracks button.audio-track-choice--source[data-color-id]');
+  assertIconOnly(metrics,label,{contrast:true});
+  const originalColors=await page.evaluate(()=>[...document.querySelectorAll('#audio-tracks button.audio-track-choice--source[data-color-id]')].map(button=>{
+    const match=button.dataset.colorId.match(/^rgba-([\da-f]{6})[\da-f]{2}$/i),hex=match?`#${match[1]}`:null;
+    const expected=hex?`rgb(${parseInt(hex.slice(1,3),16)}, ${parseInt(hex.slice(3,5),16)}, ${parseInt(hex.slice(5,7),16)})`:null;
+    return {colorId:button.dataset.colorId,background:getComputedStyle(button).backgroundColor,expected,pressed:button.getAttribute('aria-pressed')};
+  }));
+  for(const color of originalColors) check(color.expected===color.background,`${label}: ${color.colorId} keeps its original color fill and aria selection: ${JSON.stringify(color)}`);
+  return {icons:metrics,originalColors};
+}
 
 try {
   for (const viewport of viewports) {
     const {context,page}=await openPage(viewport);
     try {
       await page.goto(`${base}/audio/`,{waitUntil:'domcontentloaded'}); await ready(page);
+      const manualFixture=await seedManualAudio(page);
+      await page.goto(`${base}/audio/?${new URLSearchParams({pxd:manualFixture.id,pxdRevision:manualFixture.revision})}`,{waitUntil:'domcontentloaded'}); await ready(page);
+      await page.waitForSelector('#audio-tracks button[data-track-id]');
+      const manualPalette=await manualPaletteMetrics(page,`${viewport.name} manual palette`);
       const fixture=await seed(page,'audio');
       await page.goto(`${base}/audio/?${new URLSearchParams({pxd:fixture.id,pxdRevision:fixture.revision})}`,{waitUntil:'domcontentloaded'}); await ready(page);
       await page.waitForSelector('#audio-tracks [data-color-id]');
       const baseline=await snapshot(page,fixture.id);
       check(baseline.song.tracks.length===4,`${viewport.name}: fixture has four lanes`);
       check(baseline.song.tracks.reduce((sum,track)=>sum+track.clips.reduce((n,clip)=>n+clip.notes.length,0),0)>0,`${viewport.name}: fixture includes notes`);
+      const sharedPalette=await sharedPaletteMetrics(page,`${viewport.name} shared palette`);
+      if(viewport.width===1280) {
+        await mkdir(outDir,{recursive:true});
+        await page.screenshot({path:`${outDir}/audio-palette-icons-1280x800-settings-closed.png`});
+      }
+      if(viewport.width===390) {
+        await mkdir(outDir,{recursive:true});
+        await page.locator('#audio-tracks').screenshot({path:`${outDir}/audio-palette-icons-390x844.png`});
+      }
       const soundFirst=await openSoundPanel(page,{probe:true});
       await assertOnlyView(page,'sound',`${viewport.name} initial sound view`);
       const initialFit=await panelFit(page,'#audio-palette-settings .audio-palette-settings__body',`${viewport.name} initial sound view`);
@@ -260,7 +340,7 @@ try {
         assert.notEqual(afterBottom.revision,beforeBottom.revision,'844x390: selecting the bottom instrument persists the lane change');
         equal(afterBottom.rgba,beforeBottom.rgba,'844x390: bottom instrument selection preserves RGBA');
         equal(noteTiming(afterBottom.song),noteTiming(beforeBottom.song),'844x390: bottom instrument selection preserves note timing');
-        assert.equal(selectedInstrumentForSlot(afterBottom.song,slotId),instrumentId,'844x390: bottom instrument updates the selected lane');
+        assert.equal(selectedInstrumentForColor(afterBottom.song,slotId,await page.locator('#audio-tracks button[data-color-id][aria-pressed="true"]').getAttribute('data-color-id')),instrumentId,'844x390: bottom instrument updates the selected color');
         await selectCategory(page,'鍵盤');
         frameBaseline=await snapshot(page,fixture.id);
       }
@@ -303,7 +383,7 @@ try {
         await mkdir(outDir,{recursive:true});
         await page.screenshot({path:`${outDir}/audio-sound-switch-${viewport.name}.png`});
       }
-      result.viewports.push({name:viewport.name,firstVisible:soundFirst,fit:initialFit,category:keyboardMetrics,deepScroll,colorDeepScroll,panelFrames:{sound:soundFrame,color:colorFrame,returnedSound:returnedSoundFrame,colorTab:legacyColorTab,sharedColorTab,soundTab:sharedSoundTab,audioSoundTab}});
+      result.viewports.push({name:viewport.name,manualPalette,sharedPalette,firstVisible:soundFirst,fit:initialFit,category:keyboardMetrics,deepScroll,colorDeepScroll,panelFrames:{sound:soundFrame,color:colorFrame,returnedSound:returnedSoundFrame,colorTab:legacyColorTab,sharedColorTab,soundTab:sharedSoundTab,audioSoundTab}});
 
       if(viewport.width===390) {
         // A real source-color change in the shared editor remains undoable in Draw, with no Audio tabs added there.
@@ -350,6 +430,7 @@ try {
         await selectedSlotButton.waitFor({state:'visible'});
         const slotId=await selectedSlotButton.getAttribute('data-sound-slot');
         assert.ok(slotId,'Sound panel should have a selected lane');
+        const chosenColorId=await page.locator('#audio-tracks button[data-color-id][aria-pressed="true"]').getAttribute('data-color-id');
         const chosenGroup=await page.locator('.audio-instrument-group-tabs button[aria-pressed="true"]').getAttribute('data-instrument-group');
         assert.equal(chosenGroup,'鍵盤','Selected category should persist through the switch');
         const instrument=page.locator('.audio-instrument-choices button[data-instrument]').first();
@@ -366,7 +447,7 @@ try {
         assert.notEqual(afterInstrument.revision,afterHslRevision,'Choosing an instrument should persist a new PXD revision');
         equal(afterInstrument.rgba,afterHsl.rgba,'Instrument selection must not recolor source image');
         equal(noteTiming(afterInstrument.song),noteTiming(afterHsl.song),'Instrument selection must preserve note timing');
-        assert.equal(selectedInstrumentForSlot(afterInstrument.song,slotId),instrumentId,'Chosen instrument should update the selected 4-lane slot');
+        assert.equal(selectedInstrumentForColor(afterInstrument.song,slotId,chosenColorId),instrumentId,'Chosen instrument should update only the selected color');
         assert.equal(await page.locator('.audio-instrument-group-tabs button[aria-pressed="true"]').getAttribute('data-instrument-group'),chosenGroup,'Category remains selected after instrument selection');
         result.audioCases.instrument={slotId,instrumentId,revisionChanged:true,rgbaStable:true,noteTimingStable:true,categoryRetained:true};
 
@@ -394,8 +475,8 @@ try {
         equal(restored.rgba,latest.rgba,'Reload restores source RGBA');
         equal(await canvasPixels(page,'#audio-pixel-canvas'),latest.rgba,'Reloaded Audio canvas displays the saved source RGBA');
         equal(noteTiming(restored.song),noteTiming(latest.song),'Reload restores note timing');
-        assert.equal(selectedInstrumentForSlot(restored.song,slotId),instrumentId,'Reload restores the instrument assignment');
-        const mappedColorId=Object.entries(restored.link?.colorToSlot||{}).find(([,mappedSlot])=>mappedSlot===slotId)?.[0];
+        assert.equal(selectedInstrumentForColor(restored.song,slotId,chosenColorId),instrumentId,'Reload restores the instrument assignment');
+        const mappedColorId=chosenColorId;
         assert.ok(mappedColorId,`Reloaded PXD should retain a color mapped to ${slotId}`);
         const currentlySelectedColor=await page.locator('#audio-tracks button[data-color-id][aria-pressed="true"]').getAttribute('data-color-id').catch(()=>null);
         if(currentlySelectedColor===mappedColorId) {

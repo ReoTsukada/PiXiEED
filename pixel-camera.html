@@ -13,11 +13,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261004-merge-selection-1">
+  <link rel="stylesheet" href="css/pixel-lens-camera.css?rev=20261005-diorama-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261002-header-layout-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
-  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261004-merge-selection-1">
+  <link rel="modulepreload" href="/js/pixel-lens/app.mjs?rev=20261005-diorama-1">
 </head>
 <body data-tool-name="ドット絵カメラ" data-tool-short="カメラ">
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -116,7 +116,8 @@
         <div class="lc-row" id="aspectPanel" data-panel="aspect" role="radiogroup" aria-label="縦横比" hidden></div>
         <div class="lc-tone" data-panel="tone" hidden>
           <div class="lc-row" id="toneChips" role="radiogroup" aria-label="調整する項目"></div>
-          <div class="lc-slider"><input id="toneSlider" type="range" min="-100" max="100" step="1" value="0"><output id="toneValue">0</output><button id="toneReset" class="lc-reset" type="button" aria-label="色調整を元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button></div>
+          <div id="toneSliderPanel" class="lc-slider"><input id="toneSlider" type="range" min="-100" max="100" step="1" value="0"><output id="toneValue">0</output><button id="toneReset" class="lc-reset" type="button" aria-label="色調整を元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button></div>
+          <div id="miniaturePanel" class="lc-miniature" hidden><span>上下をぼかして、模型のような風景に</span><button id="miniatureToggle" type="button" aria-label="ジオラマ効果" aria-pressed="false">ジオラマ <span>OFF</span></button></div>
         </div>
       </div>
         <div id="regionMergePalette" class="lc-region-merge-palette" role="group" aria-label="まとめ先の色"></div>
@@ -165,7 +166,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261004-merge-selection-1"></script>
+  <script type="module" src="/js/pixel-lens/app.mjs?rev=20261005-diorama-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-merge-selection-1"></script>
 </body>

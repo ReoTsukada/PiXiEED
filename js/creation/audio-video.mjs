@@ -1,5 +1,5 @@
-import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
-import { getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1';
+import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261005-audio-noise-1';
+import { getAudioInstrument } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 
 const VIDEO_FRAME_LONG_EDGE = 1024;
 const VIDEO_FRAME_MAX_EDGE = 1024;
@@ -101,7 +101,7 @@ export async function renderAudioVideo(song, image, {
   const frameSize = audioVideoFrameSize(image.width, image.height);
   const loopSeconds = song.loopTicks * 60 / song.tempo / AUDIO_PPQ;
   if (!Number.isFinite(loopSeconds) || loopSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('この曲は長いため動画にできません。曲を120秒以内にしてください。プロジェクト保存と再生は続けられます。');
-  const releaseSeconds = Math.max(0, ...events.map(({ instrument }) => getAudioInstrument(instrument)?.release || 0));
+  const releaseSeconds = Math.max(0, ...events.map(({ instrument }) => { const profile = getAudioInstrument(instrument); return profile?.drum?.duration || profile?.release || 0; }));
   const tailMs = Math.ceil(releaseSeconds * 1000) + 80;
   const chunks = []; const allTracks = new Set();
   let canvas = null; let source = null; let draw = null; let canvasStream = null; let audioContext = null; let audioStream = null; let stream = null; let recorder = null;
@@ -132,7 +132,7 @@ export async function renderAudioVideo(song, image, {
     ({ canvas, source, draw } = makeVideoCanvas(documentRef, image, frameSize, frameImages || [image], frameTicks, song.loopTicks));
     if (typeof canvas.captureStream !== 'function') throw new Error('このブラウザーでは映像を記録できません。PNGとWAVは引き続き保存できます。');
     canvasStream = canvas.captureStream(24);
-    audioContext = new AudioContextImpl();
+    audioContext = new AudioContextImpl({ latencyHint: 'playback' });
     const audioDestination = audioContext.createMediaStreamDestination();
     let playerDestination = audioDestination;
     if (audioContext.createGain) {
@@ -196,7 +196,13 @@ export async function renderAudioVideo(song, image, {
     }, Math.ceil((loopSeconds + 0.035) * 1000 + tailMs));
     progressTimer = setIntervalImpl(() => {
       if (settled) return;
-      const progress = Math.min(1, (Date.now() - startedAt) / (loopSeconds * 1000));
+      // Keep the picture on the same clock as the scheduled notes. A wall
+      // clock can drift from AudioContext.currentTime while a long recording
+      // is under load, which makes the animation lead or lag the music.
+      const tick = player?.currentTick;
+      const progress = Number.isFinite(tick)
+        ? Math.min(1, tick / song.loopTicks)
+        : Math.min(1, (Date.now() - startedAt) / (loopSeconds * 1000));
       draw(progress);
       try { onProgress(progress); } catch {}
     }, 1000 / 24);

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,follow">
+  <meta name="description" content="歩いて、見つけて、選ぶ。ドットのお店の試作です。">
+  <title>ドットのお店（試作）｜PiXiEED</title>
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="stylesheet" href="/css/site.css?rev=20261001-text-contrast-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
+  <link rel="stylesheet" href="/css/books-room.css?rev=20261005-room-2">
+</head>
+<body class="room-page">
+  <header class="room-header">
+    <a class="room-back" href="/books/" aria-label="ドットのあそび棚へ戻る"><span aria-hidden="true">←</span> 棚へ</a>
+    <h1>ドットのお店 <span>試作</span></h1>
+    <button class="room-help-button" id="room-help" type="button" aria-haspopup="dialog" aria-controls="room-help-dialog">遊び方</button>
+  </header>
+
+  <main class="room-main">
+    <section class="room-stage" id="room-stage" aria-label="ドットのお店の店内">
+      <canvas id="room-canvas" width="960" height="640" aria-label="店内を歩いて商品を選ぶドット絵の試作">
+        この画面にはCanvasを表示できません。下の一覧から商品を選べます。
+      </canvas>
+      <p class="room-status" id="room-status" role="status" aria-live="polite" aria-atomic="true"></p>
+    </section>
+  </main>
+
+  <footer class="room-footer">
+    <p class="room-hint">スワイプで歩く <span aria-hidden="true">·</span> 商品・記事をタップして見る <span class="room-hint__keyboard">· 矢印キーでも移動</span></p>
+    <div class="room-footer__controls">
+      <label class="room-sr-only" for="room-product-select">商品・記事を選ぶ</label>
+      <select class="room-product-select" id="room-product-select" aria-label="商品・記事を選ぶ">
+        <option value="" selected>商品・記事を選ぶ</option>
+      </select>
+      <button class="room-product-open" id="room-product-open" type="button" aria-label="選んだ商品や記事を見る">見る</button>
+      <button class="room-motion-toggle" id="room-motion-toggle" type="button" aria-pressed="true">動き ON</button>
+    </div>
+  </footer>
+
+  <dialog class="room-dialog room-product-dialog" id="room-product-dialog" aria-labelledby="room-product-title" aria-describedby="room-product-description">
+    <div class="room-dialog__layout">
+      <div class="room-dialog__main">
+        <p class="room-dialog__eyebrow">この棚の商品</p>
+        <h2 id="room-product-title">商品を選んでください</h2>
+        <p class="room-dialog__description" id="room-product-description">店内の商品をタップするか、下の一覧から選べます。</p>
+        <p class="room-dialog__format" id="room-product-format">形式：商品ページでご確認ください</p>
+      </div>
+      <div class="room-dialog__actions">
+        <div id="room-product-commerce">
+          <p class="room-dialog__ad">広告／Amazonアソシエイトリンク</p>
+          <p class="room-dialog__disclosure">Amazonのアソシエイトとして、PiXiEEDは適格販売により収入を得ています。</p>
+          <a class="room-amazon-link" id="room-product-amazon" href="https://www.amazon.co.jp/" target="_blank" rel="sponsored noopener noreferrer">Amazonで見る <span aria-hidden="true">↗</span></a>
+          <p class="room-dialog__amazon-note">価格や商品詳細はAmazonでご確認ください。</p>
+        </div>
+        <div class="room-article-actions" id="room-article-actions" hidden>
+          <p class="room-dialog__ad">記事を読む</p>
+          <button class="room-amazon-link room-article-open" id="room-article-open" type="button">ここで読む</button>
+          <a class="room-article-external" id="room-article-external" href="#" target="_blank" rel="noopener noreferrer">元の記事を開く <span aria-hidden="true">↗</span></a>
+          <p class="room-dialog__amazon-note">紹介元のページを表示します。</p>
+        </div>
+        <button class="room-dialog__close" id="room-product-close" type="button">閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
+
+  <dialog class="room-reader-dialog" id="room-reader-dialog" aria-labelledby="room-reader-title" aria-describedby="room-reader-note">
+    <div class="room-reader__layout">
+      <header class="room-reader__header">
+        <div class="room-reader__heading">
+          <p class="room-dialog__eyebrow">ARTICLE READER</p>
+          <h2 id="room-reader-title">選んだ記事</h2>
+          <p id="room-reader-source" class="room-reader__source"></p>
+        </div>
+        <button class="room-reader__close" id="room-reader-close" type="button" aria-label="記事を閉じる">閉じる</button>
+      </header>
+      <div class="room-reader__body">
+        <p class="room-reader__note" id="room-reader-note">表示できないサイトは、元の記事を開いてください。</p>
+        <iframe id="room-reader-frame" title="選んだ記事" sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy"></iframe>
+      </div>
+      <footer class="room-reader__footer">
+        <a class="room-reader__external" id="room-reader-external" href="#" target="_blank" rel="noopener noreferrer">元の記事を開く <span aria-hidden="true">↗</span></a>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog class="room-dialog room-help-dialog" id="room-help-dialog" aria-labelledby="room-help-title">
+    <div class="room-dialog__layout">
+      <div class="room-dialog__main">
+        <p class="room-dialog__eyebrow">HOW TO PLAY</p>
+        <h2 id="room-help-title">お店を歩いてみよう</h2>
+        <ol class="room-help-steps">
+          <li>画面を上下左右にスワイプすると、その方向へ歩きます。</li>
+          <li>気になる商品・記事をタップすると、説明を見られます。</li>
+          <li>下の一覧から商品・記事を選ぶこともできます。</li>
+          <li>店内と商品は仮のドット絵です。描いた画像に差し替えられます。</li>
+        </ol>
+      </div>
+      <div class="room-dialog__actions">
+        <p class="room-dialog__ad">広告について</p>
+        <p class="room-dialog__disclosure">Amazonのアソシエイトとして、PiXiEEDは適格販売により収入を得ています。</p>
+        <p class="room-dialog__amazon-note">商品詳細と現在の取扱状況はAmazonでご確認ください。</p>
+        <button class="room-dialog__close" id="room-help-close" type="button">閉じる</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="/js/books-room.mjs?rev=20261005-room-4"></script>
+</body>
+</html>

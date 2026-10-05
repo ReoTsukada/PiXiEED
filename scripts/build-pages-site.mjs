@@ -21,6 +21,9 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
   const files = names.filter(name => {
     const parts = name.split('/');
     if (parts.some(part => part === '..' || part.startsWith('.')) || excluded.has(parts[0])) return false;
+    // Keep the books prototype and its dedicated assets local until publication is requested.
+    if (parts[0] === 'books' || name.startsWith('assets/books/')
+        || /^css\/books(?:-[a-z-]+)?\.css$/.test(name) || /^js\/books(?:-[a-z-]+)?\.mjs$/.test(name)) return false;
     if (/^(?:package(?:-lock)?|deno(?:\.lock)?)\.(?:json|jsonc)$/.test(parts.at(-1))) return false;
     return parts[0] === 'assets' || publicExtension.test(name) || name === 'CNAME';
   });

@@ -146,7 +146,7 @@ test('player schedules endpoint pitches and applies each endpoint group gain', a
   const player = createAudioPlayer({ audioContextFactory: () => context, schedule: () => 1, cancel() {} });
   await player.play(song);
   assert.deepEqual(oscillators.map(({ frequency }) => frequency.events[0][1]).sort((a, b) => a - b), [midiFrequency(60), midiFrequency(84)]);
-  const envelopes = gains.map(({ gain }) => gain.events).filter((events) => events.length === 5);
+  const envelopes = gains.map(({ gain }) => gain.events).filter((events) => events.length >= 5 && events[0]?.[1] === 0 && events.at(-1)?.[1] === 0);
   assert.equal(envelopes.length, 2, 'the middle source row does not create a third sound');
   assert.ok(envelopes.every((events) => Math.abs(events[1][1] - 0.18 * 96 / 127) < 1e-9), 'the color mix node, not global overlap scaling, distributes source-backed amplitude');
   const mixLevels = gains.map(({ gain }) => gain.events).filter((events) => events[0]?.[1] === 0.5 && events.at(-1)?.[1] === 0);

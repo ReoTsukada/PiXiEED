@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { audioVideoFrameSize, chooseAudioVideoMimeType, renderAudioVideo } from '../../js/creation/audio-video.mjs';
-import { AUDIO_MAX_LOOP_TICKS, createAudioPlayer, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { AUDIO_MAX_LOOP_TICKS, createAudioPlayer, createAudioSong, setAudioPixel, setAudioPixelPalette } from '../../js/creation/audio-core.mjs';
 import { getAudioInstrument } from '../../js/creation/audio-timbres.mjs';
 
 test('video frame sizing preserves the source aspect ratio and stays bounded', () => {
@@ -187,4 +187,22 @@ test('invalid animation video frames are rejected before recording resources are
   const harness = makeHarness(); const { song, image } = fixture();
   await assert.rejects(renderAudioVideo(song, image, { ...harness.dependencies, frameImages: [{ ...image, width: 1 }] }), /動画のコマ/);
   assert.equal(harness.contexts.length, 0); assert.equal(harness.draws.length, 0);
+});
+
+
+test('drum video retains the full crash one-shot after the loop boundary', async () => {
+  const harness = makeHarness(); const { image } = fixture();
+  let song = setAudioPixel(createAudioSong({ tempo: 120 }), { trackId: 'track-square', pitch: 84, startTick: 1800, noteId: 'final-crash' });
+  song = setAudioPixelPalette(song, { slotId: 'square', instrument: 'drum-crash' });
+  const original = structuredClone(song);
+  const pending = renderAudioVideo(song, image, harness.dependencies);
+  await new Promise((resolve) => setImmediate(resolve));
+  const deadline = 35 + 2000 + Math.ceil(getAudioInstrument('drum-crash').drum.duration * 1000) + 80;
+  const completion = harness.timers.find(({ delay, cleared }) => !cleared && delay === deadline);
+  assert.ok(completion, 'recorder deadline includes the entire fixed drum duration');
+  while (harness.runNextTimer(completion.due - 1)) {}
+  assert.equal(harness.recorder.state, 'recording');
+  harness.runNextTimer(completion.due);
+  await pending;
+  assert.deepEqual(song, original);
 });

@@ -218,9 +218,10 @@ body.creation-editor[data-page="audio"] .audio-current__swatch { inset: 7px !imp
 body.creation-editor[data-page="audio"] #audio-current[aria-expanded="true"] .audio-current__swatch { box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 0 0 3px #8ecdf0 !important; }
 body.creation-editor[data-page="audio"] .audio-tracks { display: grid !important; flex-wrap: nowrap !important; grid-auto-flow: column !important; grid-auto-columns: 44px !important; grid-template-columns: none !important; justify-content: start !important; gap: 6px !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; max-height: 58px !important; padding: 3px !important; overflow-x: auto !important; overflow-y: hidden !important; overscroll-behavior-x: contain; scrollbar-width: thin; }
 body.creation-editor[data-page="audio"] .audio-track-choice--source[data-color-id] { position: relative !important; box-sizing: border-box !important; display: block !important; flex: 0 0 44px !important; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; padding: 0 !important; border: 2px solid rgba(255,255,255,.22) !important; border-radius: 9px !important; background: var(--audio-source-color, #fff) !important; box-shadow: 0 3px 0 rgba(0,0,0,.45) !important; transition: transform .12s cubic-bezier(.2,1.3,.4,1), box-shadow .12s !important; }
-body.creation-editor[data-page="audio"] .audio-track-choice--source .audio-track-choice__mark { position: absolute !important; inset: 0 !important; display: block !important; width: auto !important; height: auto !important; margin: 0 !important; border: 0 !important; border-radius: inherit !important; background: transparent !important; box-shadow: none !important; }
-body.creation-editor[data-page="audio"] .audio-track-choice__sound-badge { position: absolute; right: 2px; bottom: 2px; display: grid; width: 15px; height: 15px; place-items: center; border: 1px solid #fff; border-radius: 50%; background: #202a33c9; box-shadow: 0 1px 3px #0008; }
-body.creation-editor[data-page="audio"] .audio-track-choice__sound-badge .audio-instrument-icon { display: block; width: 10px; height: 10px; filter: brightness(0) invert(1) !important; }
+body.creation-editor[data-page="audio"] .audio-track-choice--source .audio-track-choice__mark { position: absolute !important; inset: 0 !important; display: grid !important; place-items: center !important; width: auto !important; height: auto !important; margin: 0 !important; border: 0 !important; border-radius: inherit !important; background: transparent !important; box-shadow: none !important; }
+body.creation-editor[data-page="audio"] .audio-track-choice:not(.audio-track-choice--source)[data-track-id] { background: var(--audio-source-color, #26323b) !important; }
+body.creation-editor[data-page="audio"] .audio-track-choice__mark { position: absolute !important; inset: 0 !important; display: grid !important; place-items: center !important; width: auto !important; height: auto !important; min-width: 0 !important; margin: 0 !important; border: 0 !important; border-radius: inherit !important; background: transparent !important; box-shadow: none !important; }
+body.creation-editor[data-page="audio"] .audio-track-choice__mark .audio-instrument-icon { display: block !important; width: 24px !important; height: 24px !important; filter: none; }
 body.creation-editor[data-page="audio"] .audio-track-choice--source[data-color-id][aria-pressed="true"] { border-color: #fff !important; transform: translateY(-3px) scale(1.08) !important; box-shadow: 0 0 0 3px #ffd35a, 0 5px 0 rgba(0,0,0,.45) !important; }
 body.creation-editor[data-page="audio"] .audio-track-choice--source[data-color-id]:active { transform: translateY(2px) !important; }
 body.creation-editor[data-page="draw"] .draw-tools button,
@@ -238,7 +239,7 @@ body.creation-editor[data-page="draw"] .draw-toggles,
 body.creation-editor[data-page="draw"] .draw-actions { display: flex !important; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
 body.creation-editor[data-page="draw"] .draw-toolbar { margin: 0; }
 body.creation-editor[data-page="draw"] #draw-canvas { width: min(calc(100cqw - 16px), calc((100cqh - 16px) * var(--draw-aspect, 1))); height: auto; max-height: none; }
-body.creation-editor[data-page="audio"] .audio-track-choice:not(.audio-track-choice--source)[aria-pressed="true"] { background: #26323b !important; color: #fff !important; transform: none; box-shadow: 0 0 0 2px #ffd35a !important; }
+body.creation-editor[data-page="audio"] .audio-track-choice:not(.audio-track-choice--source)[aria-pressed="true"] { background: var(--audio-source-color, #26323b) !important; color: #fff !important; transform: none; box-shadow: 0 0 0 2px #ffd35a !important; }
 body.creation-editor .audio-icon-button img { filter: brightness(0) invert(1); }
 body.creation-editor .audio-tools > details > summary { font-weight: 750; font-size: .8rem; }
 body.creation-editor .audio-current__swatch { background: var(--editor-color, #fff); }
@@ -320,3 +321,9 @@ body.creation-editor .creation-output__panel .creation-output__card:hover { bord
 body.creation-editor .creation-output__divider { height: 1px; margin: 8px 0 10px; background: #ffffff2b; }
 body.creation-editor .creation-output__panel .creation-output__cancel { width: 100%; margin: 0 0 6px; padding: 8px 11px; }
 body.creation-editor .creation-output__project-help { margin: -2px 0 2px; color: #c2cbd0; font-size: .76rem; line-height: 1.4; }
+
+/* Audio history uses the existing drawing actions; the color swatch opens sound settings. */
+body.creation-editor[data-page="audio"] .audio-toolbar { flex-wrap: wrap; }
+body.creation-editor[data-page="audio"] #audio-palette-settings { position: absolute; width: 0; height: 0; }
+body.creation-editor[data-page="audio"] #audio-palette-settings > summary[hidden] { display: none !important; }
+body.creation-editor[data-page="audio"] .audio-tools > :is(#audio-undo, #audio-redo):disabled { opacity: .4; }

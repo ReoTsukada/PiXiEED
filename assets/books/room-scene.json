@@ -1,0 +1,36 @@
+{
+  "worldSize": { "width": 896, "height": 640 },
+  "spawn": { "x": 130, "y": 300, "facing": "up" },
+  "movementBounds": { "left": 32, "top": 132, "right": 864, "bottom": 608 },
+  "shelves": [
+    { "id": "shelf-books", "label": "ドット絵の本", "x": 72, "y": 148, "width": 238, "height": 108 },
+    { "id": "shelf-art", "label": "描き方と作品", "x": 329, "y": 148, "width": 238, "height": 108 },
+    { "id": "shelf-play", "label": "つくって遊ぶ", "x": 586, "y": 148, "width": 238, "height": 108 },
+    { "id": "shelf-reading", "label": "読んで楽しむ", "x": 329, "y": 390, "width": 238, "height": 108 }
+  ],
+  "productSpots": [
+    { "id": "product-dot-classroom", "x": 138, "y": 216, "shelf": "shelf-books" },
+    { "id": "product-pochipochi", "x": 250, "y": 216, "shelf": "shelf-books" },
+    { "id": "product-background", "x": 386, "y": 216, "shelf": "shelf-art" },
+    { "id": "product-new-pixel-art", "x": 448, "y": 216, "shelf": "shelf-art" },
+    { "id": "product-famicom", "x": 510, "y": 216, "shelf": "shelf-art" },
+    { "id": "product-3d-dot", "x": 664, "y": 216, "shelf": "shelf-play" },
+    { "id": "product-dot-notebook", "x": 776, "y": 216, "shelf": "shelf-play" }
+  ],
+  "articleSpots": [
+    { "id": "article-pixel-start", "x": 448, "y": 458, "shelf": "shelf-reading" }
+  ],
+  "tilemap": { "src": "/assets/books/room-tilemap.json" },
+  "assets": {
+    "background": null,
+    "character": {
+      "src": null,
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 1,
+      "fps": 6,
+      "directionRows": ["down"]
+    },
+    "products": {}
+  }
+}

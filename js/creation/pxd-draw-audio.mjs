@@ -4,9 +4,9 @@ import {
   readPxdDrawDocument as readProjectDrawDocument, readPxdImage,
   readPxdSharedImage, putPxdSharedImage
 } from './pxd-project.mjs?rev=20261001-free-tools-1';
-import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
+import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20261005-audio-color-instruments-1';
 import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20260930-shared-canvas-5';
-import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261001-audio-animation-1';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261005-frame-cell-pitch-1';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
 const AUDIO_LINK_PATH = 'audio/link.json';
@@ -33,6 +33,18 @@ function imageColorCounts(image) {
 function optionalJson(project, path) {
   if (!project?.entries?.some((entry) => entry.path === path)) return null;
   return getPxdJson(project, path);
+}
+/** Snapshot owned color maps while retaining unrelated future JSON fields. */
+function writeAudioJson(project, path, value, ownedMaps) {
+  const next = optionalJson(project, path) === null
+    ? setPxdJson(project, path, clone(value))
+    : mergePxdJson(project, path, clone(value));
+  const merged = getPxdJson(next, path);
+  for (const key of ownedMaps) {
+    if (Object.hasOwn(value, key)) merged[key] = clone(value[key]);
+    else delete merged[key];
+  }
+  return setPxdJson(next, path, merged);
 }
 function sameImage(left, right) {
   return Boolean(left && right && left.width === right.width && left.height === right.height
@@ -252,12 +264,8 @@ export async function writePxdAudioState(project, song, { image = null, link = a
     if (!animation) throw new TypeError('音楽用アニメーションがありません。PXDは変更していません。');
     validateAudioAnimationBinding(song, animation, link);
     let next = project || createPxdProject();
-    next = optionalJson(next, AUDIO_STATE_PATH) === null
-      ? setPxdJson(next, AUDIO_STATE_PATH, clone(song))
-      : mergePxdJson(next, AUDIO_STATE_PATH, clone(song));
-    next = optionalJson(next, AUDIO_LINK_PATH) === null
-      ? setPxdJson(next, AUDIO_LINK_PATH, clone(link))
-      : mergePxdJson(next, AUDIO_LINK_PATH, clone(link));
+    next = writeAudioJson(next, AUDIO_STATE_PATH, song, ['colorInstruments']);
+    next = writeAudioJson(next, AUDIO_LINK_PATH, link, ['colorToSlot', 'frameRowPitchMaps', 'frameCellPitchMaps']);
     return next;
   }
   image ||= audioSongImage(song);
@@ -271,24 +279,16 @@ export async function writePxdAudioState(project, song, { image = null, link = a
     } else {
       next = await putPxdImage(next, image, AUDIO_IMAGE_ROLE);
     }
-    next = optionalJson(next, AUDIO_STATE_PATH) === null
-      ? setPxdJson(next, AUDIO_STATE_PATH, clone(song))
-      : mergePxdJson(next, AUDIO_STATE_PATH, clone(song));
-    next = optionalJson(next, AUDIO_LINK_PATH) === null
-      ? setPxdJson(next, AUDIO_LINK_PATH, clone(link))
-      : mergePxdJson(next, AUDIO_LINK_PATH, clone(link));
+    next = writeAudioJson(next, AUDIO_STATE_PATH, song, ['colorInstruments']);
+    next = writeAudioJson(next, AUDIO_LINK_PATH, link, ['colorToSlot']);
     return next;
   }
   assertPxdAudioPixelCompatibility(song);
   assertLinkedCellSong(song, link, image);
   assertImageNotesMatch(song, link, image);
   let next = project || createPxdProject();
-  next = optionalJson(next, AUDIO_STATE_PATH) === null
-    ? setPxdJson(next, AUDIO_STATE_PATH, clone(song))
-    : mergePxdJson(next, AUDIO_STATE_PATH, clone(song));
-  next = optionalJson(next, AUDIO_LINK_PATH) === null
-    ? setPxdJson(next, AUDIO_LINK_PATH, clone(link))
-    : mergePxdJson(next, AUDIO_LINK_PATH, clone(link));
+  next = writeAudioJson(next, AUDIO_STATE_PATH, song, ['colorInstruments']);
+  next = writeAudioJson(next, AUDIO_LINK_PATH, link, ['colorToSlot']);
   next = await putPxdImage(next, image, AUDIO_IMAGE_ROLE);
   return next;
 }
@@ -300,7 +300,14 @@ export async function updatePxdAudioAnimationLink(project, animation) {
   const prior = readPxdAudioLink(project);
   const colors = prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION ? prior.colorToSlot : null;
   const rowPitchMap = prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION && prior.rowPitchMap?.length === animation.height ? prior.rowPitchMap : null;
-  const link = createAudioAnimationLink(song, animation, { colorToSlot: colors, rowPitchMap, projectionReady: false });
+  const frameRowPitchMaps = prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION
+    ? Object.fromEntries(Object.entries(prior.frameRowPitchMaps || {}).filter(([frameId, map]) => animation.frames.some((frame) => frame.id === frameId) && map?.length === animation.height))
+    : null;
+  const dimensionsUnchanged = prior?.width === animation.width && prior?.height === animation.height;
+  const frameCellPitchMaps = dimensionsUnchanged && prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION
+    ? Object.fromEntries(Object.entries(prior.frameCellPitchMaps || {}).filter(([frameId]) => animation.frames.some((frame) => frame.id === frameId)))
+    : null;
+  const link = createAudioAnimationLink(song, animation, { colorToSlot: colors, rowPitchMap, frameRowPitchMaps, frameCellPitchMaps, projectionReady: false });
   return writePxdAudioState(project, song, { link, animation });
 }
 
@@ -504,6 +511,8 @@ export async function synchronizeLinkedAudioImage(project, document, role = 'mai
       for (let channel = 0; channel < 4; channel += 1) if (before.rgba[offset + channel] !== after.rgba[offset + channel]) { changed = true; break; }
     }
     nextLink.width = after.width; nextLink.height = after.height;
+    if (link.height !== after.height || link.width !== after.width) delete nextLink.frameCellPitchMaps;
+    if (link.height !== after.height || (nextLink.frameRowPitchMaps && Object.values(nextLink.frameRowPitchMaps).some((map) => map?.length !== after.height))) delete nextLink.frameRowPitchMaps;
     nextLink.ticksPerCell = AUDIO_PIXEL_TICKS;
     if (nextLink.rowPitchMap.length !== after.height) nextLink.rowPitchMap = createAudioRowPitchMap(after.height);
     const afterColors = new Set();

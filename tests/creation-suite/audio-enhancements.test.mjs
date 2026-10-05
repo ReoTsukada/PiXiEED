@@ -70,11 +70,11 @@ test('transparent image pixels remain empty and import preserves tempo, loop siz
 
 function fakeAudioContext({ resume = async () => {} } = {}) {
   const nodes = [];
-  class Param { setValueAtTime() {} linearRampToValueAtTime() {} exponentialRampToValueAtTime() {} }
+  class Param { constructor() { this.events = []; this.value = 0; } setValueAtTime(value, at) { this.events.push(['set', value, at]); this.value = value; } linearRampToValueAtTime(value, at) { this.events.push(['ramp', value, at]); this.value = value; } exponentialRampToValueAtTime(value, at) { this.events.push(['exp', value, at]); this.value = value; } cancelScheduledValues(at) { this.events.push(['cancel', at]); } }
   class Node {
     constructor() { this.frequency = new Param(); this.detune = new Param(); this.gain = new Param(); this.Q = new Param(); nodes.push(this); }
-    connect() {} disconnect() { this.disconnected = true; }
-    start() { this.started = true; } stop() { this.stopped = true; } setPeriodicWave() {}
+    connect(destination) { (this.destinations ||= []).push(destination); } disconnect() { this.disconnected = true; }
+    start() { this.started = true; } stop(at = 0) { this.stopped = true; this.stopAt = at; } setPeriodicWave() {}
   }
   return {
     nodes,
@@ -86,14 +86,16 @@ function fakeAudioContext({ resume = async () => {} } = {}) {
   };
 }
 
-test('preview reuses one context, does not start transport, and stop disconnects bounded preview nodes', async () => {
+test('rapid preview fades the prior isolated voice, reuses one context, and dispose disconnects bounded nodes', async () => {
   const fake = fakeAudioContext(); let contexts = 0; let timers = 0;
   const player = createAudioPlayer({ audioContextFactory: () => { contexts += 1; return fake.context; }, schedule: () => { timers += 1; return 1; }, cancel() {} });
   assert.equal(await player.preview({ instrument: 'synth-bell', pitch: 72 }), true);
   const firstNodes = [...fake.nodes];
   assert.equal(player.isPlaying, false); assert.equal(player.isStarting, false); assert.equal(timers, 0);
   assert.equal(await player.preview({ instrument: 'synth-bell', pitch: 72 }), true);
-  assert.ok(firstNodes.every((node) => node.stopped && node.disconnected), 'a drag preview stops and detaches the previous voice');
+  assert.ok(firstNodes.filter((node) => node.started).every((node) => node.stopped && node.stopAt === 0.008), 'previous preview sources stop after the short fade');
+  assert.ok(firstNodes.every((node) => !node.disconnected), 'prior nodes remain connected through the fade');
+  assert.ok(firstNodes.some((node) => node.gain.events.some((entry) => entry[0] === 'ramp' && entry[1] === 0 && entry[2] === 0.008)), 'the preview bus ramps to zero');
   assert.equal(contexts, 1);
   await player.dispose();
   assert.ok(fake.nodes.every((node) => node.disconnected));
@@ -105,8 +107,12 @@ test('preview leaves an already-running transport state and loop timer untouched
   const song = setAudioPixel(createAudioSong(), { trackId: 'track-square', pitch: 60, startTick: 0, noteId: 'transport-note' });
   assert.equal(await player.play(song), true);
   assert.equal(player.isPlaying, true); assert.equal(timers.length, 1);
+  const transportBus = fake.nodes.find((node) => node.destinations?.includes(fake.context.destination));
   assert.equal(await player.preview({ instrument: 'woodblock', pitch: 60 }), true);
   assert.equal(player.isPlaying, true); assert.equal(timers.length, 1);
+  const buses = fake.nodes.filter((node) => node.destinations?.includes(fake.context.destination));
+  assert.equal(buses.length, 2, 'transport and preview route through distinct gain buses');
+  assert.ok(!transportBus.gain.events.some((entry) => entry[0] === 'ramp' && entry[1] === 0), 'preview does not fade the active transport bus');
   player.stop(); await player.dispose();
 });
 

@@ -10,7 +10,7 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
   const scratch = await mkdtemp(join(tmpdir(), 'pixieed-pages-test-')); t.after(() => rm(scratch, { recursive: true, force: true }));
   const root = join(scratch, 'source'); await mkdir(root);
   execFileSync('git', ['init', '-q', root]);
-  const entries = { 'index.html': '<h1>site</h1>', 'assets/test.bin': 'asset', 'js/site.mjs': 'export const ready = true;', 'data/site-config.js': 'export const publicConfig = true;', 'supabase/private.sql': 'private', 'tests/fixture.html': 'fixture', 'docs/notes.html': 'notes' };
+  const entries = { 'index.html': '<h1>site</h1>', 'assets/test.bin': 'asset', 'js/site.mjs': 'export const ready = true;', 'data/site-config.js': 'export const publicConfig = true;', 'supabase/private.sql': 'private', 'tests/fixture.html': 'fixture', 'docs/notes.html': 'notes', 'books/index.html': 'prototype', 'books/room-preview.html': 'prototype room', 'assets/books/room-scene.json': '{}', 'css/books-room.css': 'canvas{}', 'js/books-room.mjs': 'export {};' };
   for (const [name, value] of Object.entries(entries)) { await mkdir(join(root, name, '..'), { recursive: true }); await writeFile(join(root, name), value); }
   execFileSync('git', ['add', '.'], { cwd: root });
   await writeFile(join(root, 'experiment.html'), 'untracked');
@@ -29,7 +29,7 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
   assert.equal(await readFile(join(result.output, 'index.html'), 'utf8'), '<h1>site</h1>');
   assert.equal(await readFile(join(result.output, page, 'index.html'), 'utf8'), '<meta property="og:image">');
   assert.equal(await readFile(join(result.output, legacyPage, 'index.html'), 'utf8'), '<meta property="og:image">');
-  for (const path of ['supabase/private.sql', 'tests/fixture.html', 'docs/notes.html', 'experiment.html']) await assert.rejects(readFile(join(result.output, path)), { code: 'ENOENT' });
+  for (const path of ['supabase/private.sql', 'tests/fixture.html', 'docs/notes.html', 'experiment.html', 'books/index.html', 'books/room-preview.html', 'assets/books/room-scene.json', 'css/books-room.css', 'js/books-room.mjs']) await assert.rejects(readFile(join(result.output, path)), { code: 'ENOENT' });
   await writeFile(join(root, page, 'answers.json'), 'must not leak');
   await assert.rejects(buildPagesSite({ root, output: join(scratch, 'bad-site') }), /Unexpected generated puzzle file/);
   await rm(join(root, page, 'answers.json'));

@@ -192,6 +192,14 @@
     "nes-triangle": "famicom",
     "nes-noise": "famicom",
     "woodblock": "woodblock",
-    "low-drum": "drum"
+    "low-drum": "drum",
+    "drum-kick": "drum",
+    "drum-snare": "drum",
+    "drum-hat-closed": "drum",
+    "drum-hat-open": "drum",
+    "drum-tom-low": "drum",
+    "drum-tom-high": "drum",
+    "drum-clap": "drum",
+    "drum-crash": "drum"
   }
 }

@@ -97,7 +97,7 @@ test('the real player keeps both blue edges audible and rebalances them around a
       near(enterRamp.at, .035 + .25 + .02);
       assert.ok(node.gain.events.some(e => e.kind === 'ramp' && e.value === .5 && e.at > enterRamp.at), 'the held blue endpoints recover after red release');
     }
-    const envelopes = gains.filter(node => node.gain.events[0]?.value === 0 && node.gain.events.length === 5);
+    const envelopes = gains.filter(node => node.gain.events[0]?.value === 0 && node.gain.events.length >= 5 && node.gain.events.at(-1)?.value === 0);
     assert.equal(envelopes.length, 3);
     envelopes.forEach(node => near(node.gain.events[1].value, .18 * 96 / 127));
     assert.deepEqual(song, before);

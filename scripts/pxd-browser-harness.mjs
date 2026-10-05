@@ -358,7 +358,8 @@ async function checkAudioImageCase(context, fixture) {
   assert.deepEqual(firstPngCell.rgba, [...unmappedBytes], 'Audio PNG must retain the visible original pixel, including alpha');
   check('Audio PNG export contains the original unmapped pixel instead of dropping it');
 
-  await page.locator('#audio-palette-settings > summary').click();
+  await page.locator('#audio-current').click();
+  await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
   const targetSelect = page.locator(`.audio-pxd-color select[aria-label="${unmappedHex.toLowerCase()}の音色割り当て"]`);
   if (!(await targetSelect.count())) {
     const state = await page.locator('.audio-pxd-colors').evaluate((node) => ({ hidden: node.hidden, text: node.textContent, html: node.innerHTML.slice(0, 600) }));

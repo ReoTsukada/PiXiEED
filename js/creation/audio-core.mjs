@@ -26,8 +26,9 @@ export function validateAudioSharedImage(image, rowPitchMap) {
   if (!Array.isArray(rowPitchMap) || rowPitchMap.length !== image.height || rowPitchMap.some((pitch) => pitch !== null && (!Number.isInteger(pitch) || pitch < 0 || pitch > 127))) throw new TypeError('画像の行と音程の対応が不正です');
   return image;
 }
-import { AUDIO_INSTRUMENTS, getAudioInstrument } from './audio-timbres.mjs?rev=20260928-dot-music-1';
+import { AUDIO_INSTRUMENTS, getAudioInstrument } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { createAudioColorMixPlan } from './audio-color-mix.mjs?rev=20261004-audio-color-mix-1';
+import { scheduleAudioVoice } from './audio-voice.mjs?rev=20261005-audio-drums-1';
 export { AUDIO_INSTRUMENTS };
 
 /** Four stable storage lanes. Palette slots can select any modeled instrument. */
@@ -159,6 +160,15 @@ export function validateAudioSong(song) {
       slots.add(entry.slotId); colors.add(entry.color.toLowerCase());
     }
   }
+  if (song.colorInstruments !== undefined) {
+    const overrides = song.colorInstruments;
+    if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)
+        || ![Object.prototype, null].includes(Object.getPrototypeOf(overrides))
+        || Object.keys(overrides).length > 32
+        || Object.entries(overrides).some(([colorId, instrument]) => !/^rgba-[\da-f]{8}$/.test(colorId) || colorId.endsWith('00') || !INSTRUMENT_IDS.has(instrument))) {
+      throw new TypeError('色ごとの音色設定が不正です');
+    }
+  }
 
   const trackIds = new Set(); const instrumentIds = new Set(); const clipIds = new Set(); const noteIds = new Set();
   for (const track of song.tracks) {
@@ -189,6 +199,26 @@ export function setAudioTempo(song, tempo) {
 export function audioPixelPalette(song) {
   validateAudioSong(song);
   return song.pixelPalette || AUDIO_PIXEL_PALETTE;
+}
+
+/** Resolve an optional color-specific sound before the palette slot's default. */
+export function getAudioColorInstrument(song, colorId, slotId) {
+  if (colorId && song?.colorInstruments && Object.hasOwn(song.colorInstruments, colorId)) return song.colorInstruments[colorId];
+  const slot = (song?.pixelPalette || AUDIO_PIXEL_PALETTE).find((entry) => entry.slotId === slotId);
+  if (slot && INSTRUMENT_IDS.has(slot.instrument)) return slot.instrument;
+  return TRACK_INSTRUMENT_IDS.has(slotId) ? slotId : null;
+}
+
+/** Set or clear one immutable RGBA color sound override. */
+export function setAudioColorInstrument(song, { colorId, instrument } = {}) {
+  validateAudioSong(song);
+  if (!/^rgba-[\da-f]{8}$/.test(colorId || '') || colorId.endsWith('00') || (instrument !== null && !INSTRUMENT_IDS.has(instrument))) {
+    throw new TypeError('色ごとの音色設定が不正です');
+  }
+  const colorInstruments = { ...(song.colorInstruments || {}) };
+  if (instrument === null) delete colorInstruments[colorId];
+  else colorInstruments[colorId] = instrument;
+  return validateAudioSong({ ...song, colorInstruments });
 }
 
 export function setAudioPixelPalette(song, { slotId, color, instrument }) {
@@ -282,44 +312,87 @@ export function normalizeAudioPixelSong(song) {
   return normalized;
 }
 
+function isDrumEvent(event) { return Boolean(getAudioInstrument(event.instrument)?.drum); }
+
+function drumHitIdentity(event) {
+  const cell = event.sourceCell;
+  const animation = cell?.kind === 'audio-animation'
+    ? [cell.frameId ?? null, cell.frameIndex ?? null, cell.x ?? null, cell.localX ?? null]
+    : null;
+  return JSON.stringify([event.colorId, event.instrument, event.startTick, animation]);
+}
+
+function expandDrumCellRun(event) {
+  if (!['audio-image', 'audio-animation'].includes(event.sourceCell?.kind) || event.durationTicks <= AUDIO_PIXEL_TICKS) return [event];
+  const hits = [];
+  for (let offset = 0; offset < event.durationTicks; offset += AUDIO_PIXEL_TICKS) {
+    const cellOffset = Math.floor(offset / AUDIO_PIXEL_TICKS);
+    const sourceCell = { ...event.sourceCell, x: event.sourceCell.x + cellOffset };
+    if (Number.isInteger(event.sourceCell.localX)) sourceCell.localX += cellOffset;
+    hits.push({ ...event, startTick: event.startTick + offset, durationTicks: Math.min(AUDIO_PIXEL_TICKS, event.durationTicks - offset), sourceCell });
+  }
+  return hits;
+}
+
+/** Collapse only the playback projection: vertical pixels paint one fixed-pitch drum hit. */
+function projectDrumHits(events) {
+  const byHit = new Map();
+  for (const event of events.flatMap(expandDrumCellRun)) {
+    const key = drumHitIdentity(event);
+    const prior = byHit.get(key);
+    if (!prior) {
+      byHit.set(key, { ...event, pitch: 60, sourceCell: event.sourceCell ? { ...event.sourceCell, y: 0 } : null });
+    } else prior.velocity = Math.max(prior.velocity, event.velocity);
+  }
+  return [...byHit.values()];
+}
+
 export function collectAudioEvents(song, { joinAdjacent = false, outlineRuns = false } = {}) {
   validateAudioSong(song);
   const events = [];
-  const instruments = new Map((song.pixelPalette || AUDIO_PIXEL_PALETTE).map((slot) => [slot.slotId, slot.instrument]));
   for (const track of song.tracks) for (const clip of track.clips) for (const note of clip.notes) {
-    events.push({ instrument: instruments.get(track.instrument) || track.instrument, startTick: note.startTick, durationTicks: note.durationTicks, pitch: note.pitch, velocity: note.velocity,
+    events.push({ instrument: getAudioColorInstrument(song, note.colorId, track.instrument) || track.instrument, startTick: note.startTick, durationTicks: note.durationTicks, pitch: note.pitch, velocity: note.velocity,
       trackId: track.trackId, colorId: note.colorId || `slot-${track.instrument}`, sourceCell: note.sourceCell || null });
   }
-  const projected = outlineRuns ? projectSourceCellRuns(events) : events;
-  const audible = joinAdjacent ? [] : projected;
-  if (joinAdjacent) {
-    const lanes = new Map();
-    for (const event of projected) {
-      const key = JSON.stringify([event.trackId, event.colorId, event.pitch, event.sourceCell?.y ?? null, event.groupGain ?? 1]);
-      if (!lanes.has(key)) lanes.set(key, []);
-      lanes.get(key).push(event);
-    }
-    for (const lane of lanes.values()) {
-      lane.sort((left, right) => left.startTick - right.startTick);
-      let current = null;
-      for (const event of lane) {
-        if (current && current.colorId === event.colorId && current.velocity === event.velocity
-          && current.startTick + current.durationTicks === event.startTick
-          && (current.groupGain ?? 1) === (event.groupGain ?? 1)
-          && Boolean(current.sourceCell) === Boolean(event.sourceCell)
-          && (!event.sourceCell || (current.sourceCell.kind === 'audio-animation'
-            ? current.sourceCell.kind === event.sourceCell.kind
-              && current.sourceCell.x + 1 === event.sourceCell.x
-              && ((current.sourceCell.frameId === event.sourceCell.frameId
-                && current.sourceCell.frameIndex === event.sourceCell.frameIndex
-                && current.sourceCell.localX + 1 === event.sourceCell.localX)
-                || (event.sourceCell.frameIndex === current.sourceCell.frameIndex + 1 && event.sourceCell.localX === 0))
-            : current.sourceCell.kind === event.sourceCell.kind
-              && current.sourceCell.x + 1 === event.sourceCell.x))) {
-          current.durationTicks += event.durationTicks;
-          if (event.sourceCell) current.sourceCell = event.sourceCell;
-        } else { current = { ...event }; audible.push(current); }
-      }
+  if (!joinAdjacent) {
+    const projected = outlineRuns ? projectSourceCellRuns(events) : events;
+    return projected.map(({ trackId, colorId, sourceCell, groupGain, ...event }) => outlineRuns
+      ? { ...event, ...(colorId === undefined ? {} : { colorId }), ...(sourceCell ? { sourceCell } : {}), ...(groupGain === undefined ? {} : { groupGain }) }
+      : event)
+      .sort((left, right) => left.startTick - right.startTick || left.pitch - right.pitch || (left.instrument < right.instrument ? -1 : left.instrument > right.instrument ? 1 : 0));
+  }
+
+  const drumEvents = projectDrumHits(events.filter(isDrumEvent));
+  const melodicEvents = events.filter((event) => !isDrumEvent(event));
+  const projected = (outlineRuns ? projectSourceCellRuns(melodicEvents) : melodicEvents).concat(drumEvents);
+  const audible = [];
+  const lanes = new Map();
+  for (const event of projected) {
+    if (isDrumEvent(event)) { audible.push(event); continue; }
+    const key = JSON.stringify([event.trackId, event.colorId, event.instrument, event.pitch, event.sourceCell?.y ?? null, event.groupGain ?? 1]);
+    if (!lanes.has(key)) lanes.set(key, []);
+    lanes.get(key).push(event);
+  }
+  for (const lane of lanes.values()) {
+    lane.sort((left, right) => left.startTick - right.startTick);
+    let current = null;
+    for (const event of lane) {
+      if (current && current.colorId === event.colorId && current.instrument === event.instrument && current.velocity === event.velocity
+        && current.startTick + current.durationTicks === event.startTick
+        && (current.groupGain ?? 1) === (event.groupGain ?? 1)
+        && Boolean(current.sourceCell) === Boolean(event.sourceCell)
+        && (!event.sourceCell || (current.sourceCell.kind === 'audio-animation'
+          ? current.sourceCell.kind === event.sourceCell.kind
+            && current.sourceCell.x + 1 === event.sourceCell.x
+            && ((current.sourceCell.frameId === event.sourceCell.frameId
+              && current.sourceCell.frameIndex === event.sourceCell.frameIndex
+              && current.sourceCell.localX + 1 === event.sourceCell.localX)
+              || (event.sourceCell.frameIndex === current.sourceCell.frameIndex + 1 && event.sourceCell.localX === 0))
+          : current.sourceCell.kind === event.sourceCell.kind
+            && current.sourceCell.x + 1 === event.sourceCell.x))) {
+        current.durationTicks += event.durationTicks;
+        if (event.sourceCell) current.sourceCell = event.sourceCell;
+      } else { current = { ...event }; audible.push(current); }
     }
   }
   return audible.map(({ trackId, colorId, sourceCell, groupGain, ...event }) => outlineRuns
@@ -368,51 +441,6 @@ export function midiFrequency(pitch) {
   return 440 * (2 ** ((pitch - 69) / 12));
 }
 
-const pulseWaveCache = new WeakMap();
-function getPulseWave(context, duty = 0.25) {
-  let waves = pulseWaveCache.get(context);
-  if (!waves) { waves = new Map(); pulseWaveCache.set(context, waves); }
-  if (waves.has(duty)) return waves.get(duty);
-  if (typeof context.createPeriodicWave !== 'function') return null;
-  const harmonics = 32; const real = new Float32Array(harmonics + 1); const imag = new Float32Array(harmonics + 1);
-  for (let harmonic = 1; harmonic <= harmonics; harmonic += 1) {
-    const angle = 2 * Math.PI * harmonic * duty;
-    real[harmonic] = Math.sin(angle) / (Math.PI * harmonic);
-    imag[harmonic] = (1 - Math.cos(angle)) / (Math.PI * harmonic);
-  }
-  const wave = context.createPeriodicWave(real, imag);
-  waves.set(duty, wave);
-  return wave;
-}
-
-function makeInstrumentSource(context, profile, waveform, duty, frequency, onset, partial = null) {
-  if (waveform === 'noise') {
-    const length = Math.max(1, Math.ceil(context.sampleRate * 0.3));
-    const buffer = context.createBuffer(1, length, context.sampleRate);
-    const data = buffer.getChannelData(0); let b0 = 0; let b1 = 0; let b2 = 0;
-    for (let index = 0; index < data.length; index += 1) {
-      const white = Math.random() * 2 - 1;
-      if (profile.noiseColor === 'pink') { b0 = 0.99765 * b0 + white * 0.099046; b1 = 0.963 * b1 + white * 0.2965164; b2 = 0.57 * b2 + white * 1.0526913; data[index] = (b0 + b1 + b2 + white * 0.1848) * 0.12; }
-      else data[index] = white;
-    }
-    const source = context.createBufferSource(); source.buffer = buffer; return source;
-  }
-  const source = context.createOscillator();
-  if (waveform === 'pulse') {
-    const wave = getPulseWave(context, duty);
-    if (wave) source.setPeriodicWave(wave); else source.type = 'square';
-  } else source.type = waveform;
-  const ratio = partial?.ratio ?? 1;
-  const frequencyValue = Math.max(20, Math.min(20000, frequency * ratio));
-  source.frequency.setValueAtTime(frequencyValue, onset);
-  if (partial?.detune && source.detune?.setValueAtTime) source.detune.setValueAtTime(partial.detune, onset);
-  if (partial === null && ['marimba', 'xylophone'].includes(profile.id)) {
-    source.frequency.setValueAtTime(frequencyValue * 1.018, onset);
-    if (source.frequency.exponentialRampToValueAtTime) source.frequency.exponentialRampToValueAtTime(frequencyValue, onset + 0.025);
-  }
-  return source;
-}
-
 function estimateOverlapCounts(events) {
   const heap = [];
   const push = (value) => { let index = heap.length; heap.push(value); while (index > 0) { const parent = (index - 1) >> 1; if (heap[parent] <= value) break; heap[index] = heap[parent]; index = parent; } heap[index] = value; };
@@ -429,22 +457,70 @@ function estimateOverlapCounts(events) {
   return counts;
 }
 
-export function createAudioPlayer({ audioContextFactory = () => new globalThis.AudioContext(), schedule = globalThis.setTimeout, cancel = globalThis.clearTimeout, onStateChange = () => {} } = {}) {
-  let context = null; let loopTimer = null; let lookaheadTimer = null; let playing = false; let starting = false; let stopAtLoopEnd = false; let token = 0; let previewToken = 0; let cycleStartAt = null; let cycleLoopTicks = null; let cycleSecondsPerTick = null; const activeNodes = new Set(); const previewNodes = new Set();
+export function createAudioPlayer({ audioContextFactory = () => new globalThis.AudioContext({ latencyHint: 'playback' }), schedule = globalThis.setTimeout, cancel = globalThis.clearTimeout, onStateChange = () => {} } = {}) {
+  let context = null; let masterContext = null; let masterNode = null; let loopTimer = null; let lookaheadTimer = null; let playing = false; let starting = false; let stopAtLoopEnd = false; let token = 0; let previewToken = 0; let cycleStartAt = null; let cycleLoopTicks = null; let cycleSecondsPerTick = null; const activeNodes = new Set(); const previewNodes = new Set(); const sessions = new Set(); const nodeSessions = new WeakMap(); let transportSession = null; let previewSession = null; const chokeVoices = new Map();
+  const STOP_FADE_SECONDS = 0.008;
+  const STOP_CLEANUP_DELAY_MS = 28;
+
+  function masterOutput() {
+    if (!context) return null;
+    if (masterContext === context) return masterNode || context.destination;
+    try { masterNode?.disconnect(); } catch {}
+    masterContext = context; masterNode = null;
+    if (context.createDynamicsCompressor) {
+      try {
+        masterNode = context.createDynamicsCompressor();
+        for (const [key, value] of [['threshold', -9], ['knee', 3], ['ratio', 20], ['attack', 0.001], ['release', 0.08]]) if (masterNode[key]) masterNode[key].value = value;
+        masterNode.connect(context.destination);
+      } catch { masterNode = null; }
+    }
+    return masterNode || context.destination;
+  }
 
   function notify() { onStateChange(playing, starting); }
+  function createSession(kind) {
+    const bus = context.createGain(); bus.gain.value = 1; bus.connect(masterOutput());
+    const session = { kind, context, bus, nodes: new Set(), sources: new Set(), cleanupTimer: null, closing: false };
+    sessions.add(session);
+    return session;
+  }
+  function registerSessionNode(session, node) {
+    activeNodes.add(node); session.nodes.add(node); nodeSessions.set(node, session);
+    if (session.kind === 'preview') previewNodes.add(node);
+    if (typeof node.stop === 'function') session.sources.add(node);
+  }
   function disposeNode(node) {
     activeNodes.delete(node);
     previewNodes.delete(node);
+    const session = nodeSessions.get(node);
+    if (session) { session.nodes.delete(node); session.sources.delete(node); nodeSessions.delete(node); }
     try { node.disconnect(); } catch {}
+  }
+  function forceCleanupSession(session) {
+    if (!sessions.has(session)) return;
+    if (session.cleanupTimer !== null) { cancel(session.cleanupTimer); session.cleanupTimer = null; }
+    for (const node of [...session.nodes]) disposeNode(node);
+    try { session.bus.disconnect(); } catch {}
+    sessions.delete(session);
+  }
+  function fadeSession(session) {
+    if (!session || session.closing) return;
+    session.closing = true;
+    const now = context?.currentTime ?? 0; const stopAt = now + STOP_FADE_SECONDS;
+    const gain = session.bus.gain;
+    try { gain.cancelScheduledValues?.(now); } catch {}
+    if (gain?.setValueAtTime) gain.setValueAtTime(Number.isFinite(gain.value) ? gain.value : 1, now);
+    if (gain?.linearRampToValueAtTime) gain.linearRampToValueAtTime(0, stopAt);
+    else if (gain) gain.value = 0;
+    for (const node of [...session.nodes]) {
+      activeNodes.delete(node); previewNodes.delete(node);
+    }
+    for (const source of [...session.sources]) { try { source.stop(stopAt); } catch {} }
+    session.cleanupTimer = schedule(() => { session.cleanupTimer = null; forceCleanupSession(session); }, STOP_CLEANUP_DELAY_MS);
   }
   function cancelPreviews() {
     previewToken += 1;
-    const now = context?.currentTime ?? 0;
-    for (const node of [...previewNodes]) {
-      try { node.stop(now); } catch {}
-      disposeNode(node);
-    }
+    fadeSession(previewSession); previewSession = null;
     previewNodes.clear();
   }
   function stop() {
@@ -453,21 +529,25 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
     cancelPreviews();
     playing = false;
     starting = false;
-    cycleStartAt = null; cycleLoopTicks = null; cycleSecondsPerTick = null;
+    cycleStartAt = null; cycleLoopTicks = null; cycleSecondsPerTick = null; chokeVoices.clear();
     if (loopTimer !== null) { cancel(loopTimer); loopTimer = null; }
     if (lookaheadTimer !== null) { cancel(lookaheadTimer); lookaheadTimer = null; }
-    const now = context?.currentTime ?? 0;
-    for (const node of [...activeNodes]) {
-      try { node.stop(now); } catch {}
-      disposeNode(node);
-    }
+    fadeSession(transportSession); transportSession = null;
     notify();
   }
 
   async function dispose() {
     stop();
     const closing = context;
+    const closingMaster = masterContext === closing ? masterNode : null;
+    const closingSessions = [...sessions].filter((session) => session.context === closing);
     context = null;
+    if (masterContext === closing) { masterNode = null; masterContext = null; }
+    if (closing?.state === 'running' && closingSessions.some((session) => session.closing)) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, STOP_CLEANUP_DELAY_MS));
+    }
+    for (const session of closingSessions) forceCleanupSession(session);
+    try { closingMaster?.disconnect(); } catch {}
     if (closing && typeof closing.close === 'function') {
       try { await closing.close(); } catch {}
     }
@@ -475,6 +555,7 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
 
   function scheduleCycle(song, cycleToken) {
     if (!playing || cycleToken !== token || !context) return;
+    transportSession ||= createSession('transport');
     const events = collectAudioEvents(song, { joinAdjacent: true, outlineRuns: true });
     if (events.length > AUDIO_MAX_PLAYBACK_EVENTS) throw new RangeError(`再生できる音符数は${AUDIO_MAX_PLAYBACK_EVENTS.toLocaleString()}個までです。絵を曲に反映し直すか、音符を減らしてください。`);
     const startAt = context.currentTime + 0.035;
@@ -482,7 +563,8 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
     cycleStartAt = startAt; cycleLoopTicks = song.loopTicks; cycleSecondsPerTick = secondsPerTick;
     const scheduled = events.map((event) => {
       const instrument = getAudioInstrument(event.instrument);
-      return { event, instrument, onsetTick: event.startTick, endTick: event.startTick + event.durationTicks + (instrument?.release || 0) / secondsPerTick };
+      const drumSeconds = instrument?.drum?.duration;
+      return { event, instrument, onsetTick: event.startTick, endTick: event.startTick + (drumSeconds ?? (event.durationTicks * secondsPerTick + (instrument?.release || 0))) / secondsPerTick };
     });
     const colorMixPlan = createAudioColorMixPlan(scheduled);
     const playable = scheduled.map((item, index) => ({ ...item, index })).filter(({ instrument }) => instrument);
@@ -500,30 +582,20 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       const { event, instrument } = item;
       if (!instrument) continue;
       const onset = startAt + event.startTick * secondsPerTick;
-      const frequency = midiFrequency(event.pitch);
-      const gateEnd = onset + event.durationTicks * secondsPerTick;
-      const releaseEnd = gateEnd + instrument.release;
+      const frequency = instrument.drum?.frequency ?? midiFrequency(event.pitch);
+      const gateEnd = onset + (instrument.drum ? Math.max(0, instrument.drum.duration - instrument.release) : event.durationTicks * secondsPerTick);
+      const releaseEnd = instrument.drum ? onset + instrument.drum.duration : gateEnd + instrument.release;
       const soundEnd = releaseEnd + 0.005;
-      const decayEnd = Math.min(gateEnd, onset + instrument.attack + instrument.decay);
       // Scale only dense passages. Count notes whose gated or release sound
       // overlaps this note's audible window, including tails from earlier cells.
       const overlaps = overlapCounts[eventIndex - 1] || 1;
       const sourceMix = colorMixPlan[eventIndex - 1];
       const peak = event.velocity / 127 * 0.18 / (sourceMix ? 1 : Math.sqrt(Math.max(1, overlaps)));
-      const sum = context.createGain();
-      let output = sum;
-      let filterNode = null;
-      if (instrument.filter && context.createBiquadFilter) {
-        filterNode = context.createBiquadFilter();
-        filterNode.type = instrument.filter.type; filterNode.frequency.value = instrument.filter.frequency; filterNode.Q.value = instrument.filter.q;
-        sum.connect(filterNode); output = filterNode; activeNodes.add(filterNode);
-      }
-      const gain = context.createGain();
-      output.connect(gain);
       let mixGain = null;
       if (sourceMix) {
         mixGain = context.createGain();
-        gain.connect(mixGain); mixGain.connect(context.destination);
+        registerSessionNode(transportSession, mixGain);
+        mixGain.connect(transportSession.bus);
         const initialPoint = sourceMix.filter(({ tick }) => tick <= event.startTick).at(-1) || sourceMix[0];
         const initialMixGain = initialPoint?.gain ?? 1;
         mixGain.gain.setValueAtTime(initialMixGain, onset);
@@ -543,35 +615,25 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
           lastAutomationAt = rampEnd;
           lastMixGain = point.gain;
         }
-      } else gain.connect(context.destination);
-      gain.gain.setValueAtTime(0, onset);
-      gain.gain.linearRampToValueAtTime(peak, onset + instrument.attack);
-      gain.gain.linearRampToValueAtTime(peak * instrument.sustain, decayEnd);
-      gain.gain.setValueAtTime(peak * instrument.sustain, gateEnd);
-      gain.gain.linearRampToValueAtTime(0, releaseEnd);
-      const sources = [makeInstrumentSource(context, instrument, instrument.waveform, instrument.duty, frequency, onset)];
-      for (const partial of instrument.partials) sources.push(makeInstrumentSource(context, instrument, partial.waveform, instrument.duty, frequency, onset, partial));
-      if (instrument.transient > 0 && context.createBuffer && context.createBufferSource) {
-        const transientLength = Math.max(1, Math.ceil(context.sampleRate * 0.025));
-        const buffer = context.createBuffer(1, transientLength, context.sampleRate); const data = buffer.getChannelData(0);
-        for (let index = 0; index < data.length; index += 1) data[index] = Math.random() * 2 - 1;
-        const transient = context.createBufferSource(); transient.buffer = buffer; sources.push(transient);
       }
-      const sourceGains = [1, ...instrument.partials.map(({ gain: level }) => level), ...(sources.length > instrument.partials.length + 1 ? [instrument.transient] : [])];
-      let remainingSources = sources.length;
-      const cleanNote = () => {
-        disposeNode(gain); if (mixGain) disposeNode(mixGain); disposeNode(sum);
-        if (filterNode) disposeNode(filterNode);
-      };
-      sources.forEach((source, index) => {
-        const sourceGain = sourceGains[index] ?? 1;
-        let route = null;
-        if (sourceGain === 1) source.connect(sum);
-        else { route = context.createGain(); route.gain.value = sourceGain; source.connect(route); route.connect(sum); activeNodes.add(route); }
-        source.onended = () => { disposeNode(source); if (route) disposeNode(route); remainingSources -= 1; if (remainingSources === 0) cleanNote(); };
-        activeNodes.add(source); source.start(onset); source.stop(soundEnd);
+      const voice = scheduleAudioVoice(context, instrument, { frequency, velocity: event.velocity, onset, gateEnd, releaseEnd, peak, destination: mixGain || transportSession.bus, registerNode: (node) => registerSessionNode(transportSession, node), onSourceEnded: disposeNode });
+      const chokeGroup = instrument.drum?.chokeGroup;
+      if (chokeGroup && voice.choke) {
+        let group = chokeVoices.get(chokeGroup);
+        if (group && onset > group.onset + 1e-9) {
+          for (const previous of group.voices) previous.choke(onset);
+          group = null;
+        }
+        if (!group) { group = { onset, voices: [] }; chokeVoices.set(chokeGroup, group); }
+        group.voices.push(voice);
+      }
+      let remaining = voice.sources.length;
+      const cleanNote = () => { for (const node of [voice.gain, mixGain, voice.sum, voice.filter, ...voice.nodes]) if (node) disposeNode(node); };
+      voice.sources.forEach((source) => {
+        const previous = source.onended;
+        source.onended = () => { previous?.(); remaining -= 1; if (!remaining) cleanNote(); };
       });
-      activeNodes.add(sum); activeNodes.add(gain); if (mixGain) activeNodes.add(mixGain);
+      if (!remaining) cleanNote();
       }
       if (eventIndex < scheduled.length) lookaheadTimer = schedule(() => { lookaheadTimer = null; scheduleWindow(); }, 25);
     };
@@ -579,7 +641,10 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
       loopTimer = null;
       if (lookaheadTimer !== null) { cancel(lookaheadTimer); lookaheadTimer = null; }
       if (!stopAtLoopEnd) { scheduleCycle(song, cycleToken); return; }
-      const releaseMs = Math.max(0, ...events.map(({ instrument: id }) => getAudioInstrument(id)?.release || 0)) * 1000;
+      const releaseMs = Math.max(0, ...events.map(({ instrument: id }) => {
+        const profile = getAudioInstrument(id);
+        return profile?.drum?.duration || profile?.release || 0;
+      })) * 1000;
       loopTimer = schedule(stop, releaseMs + 60);
     }, song.loopTicks * secondsPerTick * 1000);
     scheduleWindow();
@@ -596,42 +661,18 @@ export function createAudioPlayer({ audioContextFactory = () => new globalThis.A
     catch (error) { if (previewId !== previewToken || !context) return false; throw error; }
     if (previewId !== previewToken || !context) return false;
 
-    const onset = context.currentTime + 0.008;
+    const onset = context.currentTime + 0.035;
+    previewSession ||= createSession('preview');
     const gateEnd = onset + Math.max(0.035, duration);
-    const releaseEnd = gateEnd + Math.min(instrument.release, 0.16);
-    const sum = context.createGain(); let output = sum; let filterNode = null;
-    if (instrument.filter && context.createBiquadFilter) {
-      filterNode = context.createBiquadFilter();
-      filterNode.type = instrument.filter.type; filterNode.frequency.value = instrument.filter.frequency; filterNode.Q.value = instrument.filter.q;
-      sum.connect(filterNode); output = filterNode;
-    }
-    const gain = context.createGain(); output.connect(gain); gain.connect(context.destination);
+    const releaseEnd = gateEnd + instrument.release;
     const peak = velocity / 127 * 0.18;
-    gain.gain.setValueAtTime(0, onset);
-    gain.gain.linearRampToValueAtTime(peak, onset + Math.min(instrument.attack, duration * 0.45));
-    gain.gain.linearRampToValueAtTime(peak * instrument.sustain, Math.min(gateEnd, onset + instrument.attack + instrument.decay));
-    gain.gain.setValueAtTime(peak * instrument.sustain, gateEnd);
-    gain.gain.linearRampToValueAtTime(0, releaseEnd);
-    const sources = [makeInstrumentSource(context, instrument, instrument.waveform, instrument.duty, midiFrequency(pitch), onset)];
-    for (const part of instrument.partials) sources.push(makeInstrumentSource(context, instrument, part.waveform, instrument.duty, midiFrequency(pitch), onset, part));
-    if (instrument.transient > 0 && context.createBuffer && context.createBufferSource) {
-      const length = Math.max(1, Math.ceil(context.sampleRate * Math.min(0.025, duration)));
-      const buffer = context.createBuffer(1, length, context.sampleRate); const data = buffer.getChannelData(0);
-      for (let index = 0; index < data.length; index += 1) data[index] = Math.random() * 2 - 1;
-      const transient = context.createBufferSource(); transient.buffer = buffer; sources.push(transient);
+    const voice = scheduleAudioVoice(context, instrument, { frequency: midiFrequency(pitch), velocity, onset, gateEnd, releaseEnd, peak, destination: previewSession.bus, registerNode: (node) => registerSessionNode(previewSession, node), onSourceEnded: disposeNode });
+    let remaining = voice.sources.length;
+    for (const source of voice.sources) {
+      const previous = source.onended;
+      source.onended = () => { previous?.(); remaining -= 1; if (!remaining) for (const node of voice.nodes) { disposeNode(node); previewNodes.delete(node); } };
     }
-    let remaining = sources.length;
-    const cleanup = () => { disposeNode(gain); disposeNode(sum); if (filterNode) disposeNode(filterNode); };
-    sources.forEach((source, index) => {
-      const level = index === 0 ? 1 : index <= instrument.partials.length ? instrument.partials[index - 1].gain : instrument.transient;
-      let route = null;
-      if (level === 1) source.connect(sum);
-      else { route = context.createGain(); route.gain.value = level; source.connect(route); route.connect(sum); activeNodes.add(route); previewNodes.add(route); }
-      source.onended = () => { disposeNode(source); if (route) disposeNode(route); remaining -= 1; if (remaining === 0) cleanup(); };
-      activeNodes.add(source); previewNodes.add(source); source.start(onset); source.stop(releaseEnd + 0.005);
-    });
-    activeNodes.add(sum); activeNodes.add(gain); previewNodes.add(sum); previewNodes.add(gain);
-    if (filterNode) { activeNodes.add(filterNode); previewNodes.add(filterNode); }
+    if (!remaining) for (const node of voice.nodes) { disposeNode(node); previewNodes.delete(node); }
     return true;
   }
 

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { AUDIO_PIXEL_TICKS, createAudioPlayer, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs?rev=20260928-audio-transport-position-1';
 
 test('currentTick follows the scheduled AudioContext cycle, waits for onset, wraps, and stops cleanly', async () => {
@@ -41,4 +42,27 @@ test('currentTick follows the scheduled AudioContext cycle, waits for onset, wra
   assert.equal(player.currentTick, null);
   await player.dispose();
   assert.equal(AUDIO_PIXEL_TICKS, 120);
+});
+
+test('animation playback frame changes repaint only the view and use playback latency', () => {
+  const page = readFileSync(new URL('../../js/creation/audio-page.mjs', import.meta.url), 'utf8');
+  const functionBody = (name, nextName) => {
+    const start = page.indexOf(`function ${name}(`);
+    const end = page.indexOf(`function ${nextName}(`, start + 1);
+    assert.ok(start >= 0 && end > start, `${name} source is present`);
+    return page.slice(start, end);
+  };
+  const startPlayhead = functionBody('startPlayhead', 'stopPlayhead');
+  const stopPlayhead = functionBody('stopPlayhead', 'showPlaybackFrame');
+  const viewUpdate = functionBody('showPlaybackFrame', 'renderSong');
+  for (const body of [startPlayhead, stopPlayhead]) {
+    assert.match(body, /showPlaybackFrame\(/);
+    assert.doesNotMatch(body, /renderSong\(|renderGrid\(|markDirty\(/);
+  }
+  assert.match(viewUpdate, /composedAnimationImage\(frameId\)/);
+  assert.match(viewUpdate, /paintPixelCanvas\(\)/);
+  assert.match(viewUpdate, /updateCanvasLabel\(\)/);
+  assert.match(viewUpdate, /animationControls\?\.refresh\(\)/);
+  assert.doesNotMatch(viewUpdate, /renderSong\(|renderGrid\(|markDirty\(/);
+  assert.match(page, /new AudioContextConstructor\(\{\s*latencyHint:\s*'playback'\s*\}\)/);
 });

@@ -55,12 +55,17 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
       assert.equal(layout.canvas.width, layout.canvas.height); assert.ok(layout.canvas.width > 80);
       assert.ok(layout.canvas.bottom < layout.navTop);
       for (const id of ['audio-palette-settings', 'audio-composition-settings', 'audio-more']) {
-        await page.locator('#' + id + '>summary').click();
+        if (id === 'audio-palette-settings') {
+          await page.locator('#audio-current').click();
+          await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
+          await page.waitForFunction(() => document.querySelector('#audio-palette-settings')?.open && !document.querySelector('#audio-sound-editor-panel')?.hidden);
+        } else await page.locator('#' + id + '>summary').click();
         await page.waitForTimeout(40);
         const bounds = await page.locator('#' + id + ' .audio-popover-body').boundingBox();
         assert.ok(bounds.x >= -1 && bounds.x + bounds.width <= viewport.width + 1 && bounds.y >= 0 && bounds.y + bounds.height <= viewport.height, JSON.stringify(bounds));
         assert.equal(await page.locator('.audio-popover[open]').count(), 1);
-        await page.keyboard.press('Escape');
+        if (id === 'audio-palette-settings') await page.locator('#audio-palette-close').click();
+        else await page.keyboard.press('Escape');
       }
       pass(`${name} ${viewport.width}×${viewport.height}: 44px controls, contained panels, square gapless canvas`);
       const canvas = page.locator('#audio-pixel-canvas'); const rect = await canvas.boundingBox();
@@ -125,7 +130,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
     await page.locator('#audio-composition-settings>summary').click();
     await page.locator('#audio-canvas-size').selectOption('32'); await page.locator('.px-pass-go').click();
     await page.waitForFunction(() => document.querySelector('#audio-pixel-canvas').width === 32);
-    await page.locator('#audio-palette-settings>summary').click();
+    await page.locator('#audio-current').click();
+    await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
+    await page.waitForFunction(() => document.querySelector('#audio-palette-settings')?.open && !document.querySelector('#audio-sound-editor-panel')?.hidden);
     const options = page.locator('#audio-palette-rows select').first();
     const extra = await options.locator('optgroup').last().locator('option').first().getAttribute('value');
     await options.selectOption(extra);
@@ -145,7 +152,9 @@ for (const [name, engine] of [['chromium', chromium], ['webkit', webkit]]) {
     await page.waitForFunction(() => document.querySelector('#audio-status').textContent.includes('保存しました'));
     await page.reload(); await page.locator('#audio-more>summary').click(); await page.locator('#audio-resume').click();
     await page.waitForFunction(() => document.querySelector('#audio-pixel-canvas').width === 32);
-    await page.locator('#audio-palette-settings>summary').click();
+    await page.locator('#audio-current').click();
+    await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();
+    await page.waitForFunction(() => document.querySelector('#audio-palette-settings')?.open && !document.querySelector('#audio-sound-editor-panel')?.hidden);
     assert.equal(await page.locator('#audio-palette-rows select').first().inputValue(), extra);
     assert.deepEqual(errors, []);
     pass(`${name}: ad opt-in/cancel/grant, both perks, expiry keeps authored content, non-destructive shrink, save/resume`);
