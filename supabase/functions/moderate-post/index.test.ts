@@ -7,10 +7,12 @@ function makeAdmin({
   initialStatus = "pending",
   publish = "success",
   puzzleMode = null,
+  pointReadError = false,
 }: {
   initialStatus?: string;
-  publish?: "success" | "error_pending" | "error_published" | "throw_pending";
+  publish?: "success" | "error_pending" | "error_published" | "throw_pending" | "error_rejected" | "error_hidden" | "error_hidden_committed" | "point_read_error";
   puzzleMode?: "spot_difference" | "hidden_object" | null;
+  pointReadError?: boolean;
 } = {}) {
   let status = initialStatus;
   let uploadedPath = "";
@@ -60,6 +62,13 @@ function makeAdmin({
         status = "published";
         committedPointPath = String((args.p_point as Record<string, unknown>).public_image_path);
       }
+      if (publish === "error_rejected") status = "rejected";
+      if (publish === "error_hidden") status = "hidden";
+      if (publish === "error_hidden_committed") {
+        status = "hidden";
+        committedPointPath = String((args.p_point as Record<string, unknown>).public_image_path);
+      }
+      if (publish === "point_read_error") status = "hidden";
       return { data: null, error: new Error("simulated write failure") };
     },
     from(table: string) {
@@ -86,7 +95,9 @@ function makeAdmin({
         }) }) }),
       };
       if (table === "post_map_points") return {
-        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { post_id: POST_ID, public_image_path: committedPointPath }, error: null }) }) }),
+        select: () => ({ eq: () => ({ maybeSingle: async () => pointReadError
+          ? ({ data: null, error: new Error("point read failed") })
+          : ({ data: committedPointPath ? { post_id: POST_ID, public_image_path: committedPointPath } : null, error: null }) }) }),
       };
       throw new Error(`Unexpected table ${table}`);
     },
@@ -146,6 +157,35 @@ Deno.test("an ambiguous response is confirmed from the final point without delet
   const result = await moderatePost(fixture.admin, { postId: POST_ID, action: "approve" });
   assert.equal(result.status, "published");
   assert.ok(!fixture.calls.some((call) => call.startsWith("remove-")));
+});
+
+Deno.test("a reject or hide race removes an unreferenced trial image", async () => {
+  for (const publish of ["error_rejected", "error_hidden"] as const) {
+    const fixture = makeAdmin({ publish });
+    await assert.rejects(
+      () => moderatePost(fixture.admin, { postId: POST_ID, action: "approve" }),
+      /post_publish_failed/,
+    );
+    assert.equal(fixture.calls.at(-1), `remove-image:${fixture.uploadedPath}`);
+  }
+});
+
+Deno.test("a hidden post keeps the trial image when its map point already references it", async () => {
+  const fixture = makeAdmin({ publish: "error_hidden_committed" });
+  await assert.rejects(
+    () => moderatePost(fixture.admin, { postId: POST_ID, action: "approve" }),
+    /post_publish_failed/,
+  );
+  assert.equal(fixture.calls.some((call) => call.startsWith("remove-image:")), false);
+});
+
+Deno.test("an unreadable map point never triggers deletion of a possibly committed image", async () => {
+  const fixture = makeAdmin({ publish: "point_read_error", pointReadError: true });
+  await assert.rejects(
+    () => moderatePost(fixture.admin, { postId: POST_ID, action: "approve" }),
+    /post_publish_outcome_unknown/,
+  );
+  assert.equal(fixture.calls.some((call) => call.startsWith("remove-image:")), false);
 });
 
 Deno.test("a stale approval does not upload or overwrite another publication", async () => {

@@ -1,3 +1,4 @@
+import { publishOrdinaryPost } from "../_shared/auto-publish-post.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.106.2";
 import { normalizeGlobeCell } from "../_shared/globe-cell.ts";
 import { verifyPixelPngClaim, PixelPngError } from "../_shared/pixel-png.mjs";
@@ -274,6 +275,21 @@ export async function createPostHandler(request: Request, deps: {
   const digest = requestKey ? await requestDigest({
     title, caption, postKind, location, imageHash: contentHash, puzzleHash,
   }) : null;
+  const finishCreate = async (record: Record<string, unknown>, statusCode: number) => {
+    let completed = record;
+    if (!admittedPuzzle) {
+      try {
+        completed = { ...record, ...await publishOrdinaryPost(admin, String(record.postId || ""), userData.user.id) };
+      } catch {
+        // Keep the saved post and request key available for a retry; never claim pending as published.
+        return fail(request, "post_publication_failed", 503);
+      }
+    }
+    if (!["pending", "published"].includes(String(completed.status))) return fail(request, "post_not_public", 409);
+    return json(request, { ...completed, ok: true,
+      message: completed.status === "published" ? "投稿を地図に公開しました。" : "投稿を受け付けました。確認後に地図へ表示します。",
+    }, statusCode);
+  };
   if (requestKey && digest) {
     const lookup = await admin.rpc("pixieed_lookup_post_request", {
       p_author_id: userData.user.id, p_request_key: requestKey, p_request_digest: digest,
@@ -285,7 +301,7 @@ export async function createPostHandler(request: Request, deps: {
       return fail(request, "request_lookup_failed", 500);
     }
     const prior = rpcRecord(lookup.data);
-    if (prior) return json(request, { ok: true, postId: prior.postId, status: prior.status, replayed: true }, 200);
+    if (prior) return await finishCreate({ postId: prior.postId, status: prior.status, replayed: true }, 200);
   }
   const postId = crypto.randomUUID();
   const imagePath = `${userData.user.id}/${postId}.png`;
@@ -366,14 +382,14 @@ export async function createPostHandler(request: Request, deps: {
       const replayPostId = String(confirmed.postId || "");
       if (replayPostId.toLowerCase() !== postId.toLowerCase()) {
         const cleaned = await removeAttemptAssets();
-        return json(request, { ok: true, postId: replayPostId, status: confirmed.status, replayed: true,
+        return await finishCreate({ postId: replayPostId, status: confirmed.status, replayed: true,
           ...(cleaned ? {} : { cleanup: "pending" }) }, 200);
       }
-      return json(request, { ok: true, postId: replayPostId, status: confirmed.status, replayed: true }, 200);
+      return await finishCreate({ postId: replayPostId, status: confirmed.status, replayed: true }, 200);
     }
     const check = await admin.from("user_posts").select("id,status").eq("id", postId).maybeSingle();
     if (check.error) return fail(request, "post_save_outcome_unknown", 503);
-    if (check.data) return json(request, { ok: true, postId, status: check.data.status, replayed: false }, 201);
+    if (check.data) return await finishCreate({ postId, status: check.data.status, replayed: false }, 201);
     await removeAttemptAssets();
     return fail(request, "post_save_failed", 500);
   }
@@ -388,13 +404,11 @@ export async function createPostHandler(request: Request, deps: {
   let cleanupPending = false;
   if (responsePostId.toLowerCase() !== postId.toLowerCase()) cleanupPending = !(await removeAttemptAssets());
 
-  return json(request, {
-    ok: true,
+  return await finishCreate({
     postId: responsePostId,
     status: createdRecord.status || "pending",
     replayed: Boolean(createdRecord.replayed) || responsePostId.toLowerCase() !== postId.toLowerCase(),
     ...(cleanupPending ? { cleanup: "pending" } : {}),
-    message: "投稿を受け付けました。確認後に地図へ表示します。",
   }, createdRecord.replayed || responsePostId.toLowerCase() !== postId.toLowerCase() ? 200 : 201);
 }
 

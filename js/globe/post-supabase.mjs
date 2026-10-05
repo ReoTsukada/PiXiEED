@@ -350,13 +350,24 @@ export function createSupabaseGlobeStore() {
   let published = [];
   const listeners = new Set();
   const notify = () => listeners.forEach((listener) => listener());
+  const upsertPublished = (post) => {
+    const next = published.filter((item) => item.id !== post.id);
+    next.push(post);
+    published = next.sort((left, right) => right.createdAt - left.createdAt);
+    notify();
+  };
   const ready = (async () => {
     if (!configured()) return;
     const [current, legacy] = await Promise.allSettled([loadCurrentMapPosts(), loadPlacedShowcases()]);
-    published = [
+    const initial = [
       ...(current.status === 'fulfilled' ? current.value : []),
       ...(legacy.status === 'fulfilled' ? legacy.value : [])
-    ].sort((left, right) => right.createdAt - left.createdAt);
+    ];
+    // A post may be added while the initial requests are in flight. Keep the
+    // newer in-memory version for duplicate IDs instead of losing that update.
+    const merged = new Map(initial.map((post) => [post.id, post]));
+    for (const post of published) merged.set(post.id, post);
+    published = [...merged.values()].sort((left, right) => right.createdAt - left.createdAt);
     notify();
   })();
   return {
@@ -369,8 +380,7 @@ export function createSupabaseGlobeStore() {
       if (published.some((post) => post.id === id)) return true;
       const [post] = await loadPublishedMapPostsByIds([id]);
       if (!post) return false;
-      published = [...published, post].sort((left, right) => right.createdAt - left.createdAt);
-      notify();
+      upsertPublished(post);
       return true;
     },
     async add(post) {
@@ -390,7 +400,16 @@ export function createSupabaseGlobeStore() {
       const submittedBy = session.owner
         ? { id: session.owner.id, name: post.author?.id === session.owner.id ? String(post.author.name || '') : '' }
         : post.author;
-      return { ...post, author: submittedBy, id: result.postId, status: result.status || 'pending', puzzleMode: result.puzzleMode || null, createdAt: Date.now() };
+      const created = { ...post, author: submittedBy, id: result.postId, status: result.status || 'pending', puzzleMode: result.puzzleMode || null, createdAt: Date.now() };
+      if (created.status === 'published' && UUID.test(String(created.id || ''))) {
+        // Make the submitted image visible immediately; replace it with the canonical public projection when available.
+        upsertPublished(created);
+        try {
+          const [canonical] = await loadPublishedMapPostsByIds([created.id]);
+          if (canonical) upsertPublished(canonical);
+        } catch { /* temporary public-read failures must not hide a successful submission */ }
+      }
+      return created;
     },
     listMyLikes: loadMyLikes,
     hasLiked,

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
+import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createSupabaseGlobeStore } from '../../js/globe/post-supabase.mjs';
 import { lookupCell } from '../../js/globe/geometry.mjs';
 

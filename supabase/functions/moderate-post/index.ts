@@ -388,7 +388,14 @@ export async function moderatePost(admin: any, body: Record<string, unknown>) {
       await removeUploadedImage();
       throw new Error("post_already_published");
     }
-    if (current.data?.status === "pending") await removeUploadedImage();
+    if (["pending", "rejected", "hidden"].includes(String(current.data?.status))) {
+      const pointCheck = await admin.from("post_map_points").select("post_id,public_image_path")
+        .eq("post_id", postId).maybeSingle();
+      if (pointCheck.error) throw new Error("post_publish_outcome_unknown");
+      // Preserve a committed image even if another action hid it after publication.
+      // Otherwise remove this request's unreferenced trial image, including reject races.
+      if (pointCheck.data?.public_image_path !== publicPath) await removeUploadedImage();
+    }
     throw new Error("post_publish_failed");
   }
   return { postId, status: "published", mapCell: cell, globeCell };
