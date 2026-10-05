@@ -23,6 +23,11 @@ try {
     submissions.push({payload,actual});
     return route.fulfill({status:201,contentType:'application/json',headers:{'access-control-allow-origin':origin},body:JSON.stringify({ok:true,postId:'11111111-1111-4111-8111-111111111111',status})});
    }
+   if(url.pathname.endsWith('/post_map_points') && url.searchParams.has('post_id') && submissions.length && status==='published') {
+    const payload=submissions[0].payload;
+    return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':origin},body:JSON.stringify([{post_id:'11111111-1111-4111-8111-111111111111',title:payload.title,caption:payload.caption,post_kind:payload.postKind,public_image_path:'fixture/canonical.png',published_at:new Date().toISOString(),globe_cell_id:payload.location.globeCell.id}])});
+   }
+   if(url.pathname.endsWith('/post-public/fixture/canonical.png') && submissions.length)return route.fulfill({status:200,contentType:'image/png',headers:{'access-control-allow-origin':origin},body:Buffer.from(submissions[0].payload.image.base64,'base64')});
    if(url.pathname.startsWith('/rest/v1/'))return route.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':origin},body:'[]'});
    return route.abort();
   });

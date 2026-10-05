@@ -712,23 +712,33 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     author: $(viewer, '[data-v-author]'), date: $(viewer, '[data-v-date]'), coords: $(viewer, '[data-v-coords]'), puzzle: $(viewer, '[data-v-puzzle]'),
     map: $(viewer, '[data-v-map]'), del: $(viewer, '[data-v-delete]'), like: $(viewer, '[data-v-like]'), kicker: $(viewer, '[data-v-kicker]')
   };
+  const viewerArt = v.image.parentElement;
+  const fitViewerImage = (width, height) => {
+    if (!(width > 0 && height > 0)) return;
+    const style = getComputedStyle(viewerArt);
+    const boxWidth = viewerArt.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const boxHeight = viewerArt.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    if (!(boxWidth > 0 && boxHeight > 0)) return;
+    const scale = Math.min(boxWidth / width, boxHeight / height);
+    v.image.style.width = `${width * scale}px`;
+    v.image.style.height = `${height * scale}px`;
+  };
+  const viewerArtObserver = new ResizeObserver(() => {
+    if (state.viewerId && v.image.naturalWidth > 0) fitViewerImage(v.image.naturalWidth, v.image.naturalHeight);
+  });
+  viewerArtObserver.observe(viewerArt);
 
   function openViewer(id, { fly = true } = {}) {
     const post = posts().find((item) => item.id === id);
     if (!post) return false;
     state.viewerId = id;
-    const artBox = window.innerWidth < 680 ? 176 : 288;
     showSheet('viewer');
-    const displayImage = (width, height) => {
-      const display = fitPixelImage(width, height, artBox, artBox);
-      v.image.style.width = `${display.width}px`; v.image.style.height = `${display.height}px`;
-    };
     v.image.onload = () => {
-      if (state.viewerId === id && v.image.naturalWidth > 0) displayImage(v.image.naturalWidth, v.image.naturalHeight);
+      if (state.viewerId === id && v.image.naturalWidth > 0) fitViewerImage(v.image.naturalWidth, v.image.naturalHeight);
     };
-    displayImage(post.image.width, post.image.height);
+    fitViewerImage(post.image.width, post.image.height);
     v.image.src = post.image.dataUrl;
-    if (v.image.complete && v.image.naturalWidth > 0) displayImage(v.image.naturalWidth, v.image.naturalHeight);
+    if (v.image.complete && v.image.naturalWidth > 0) fitViewerImage(v.image.naturalWidth, v.image.naturalHeight);
     v.image.alt = post.title;
     v.title.textContent = post.title;
     v.caption.textContent = post.caption || '';

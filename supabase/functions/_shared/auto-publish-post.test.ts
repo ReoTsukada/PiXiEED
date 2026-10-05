@@ -71,6 +71,7 @@ Deno.test("pending ordinary post uses atomic moderation publication", async () =
   const result = await publishOrdinaryPost(fixture.admin, POST_ID, USER_ID);
   assert.equal(result.postId, POST_ID);
   assert.equal(result.status, "published");
+  assert.ok("mapCell" in result);
   assert.deepEqual(result.mapCell, { grid: 64, x: 3, y: 4, prefectureCode: "13" });
   assert.ok(fixture.calls.includes("rpc:approve"));
   assert.ok(fixture.uploadedPath.endsWith(".png"));

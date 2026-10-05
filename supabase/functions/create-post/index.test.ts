@@ -75,7 +75,9 @@ function mockCreateClient(options: FixtureOptions) {
           assert.equal(record.author_id, USER_ID);
           postId = String(record.id);
           ownerId = options.initialPostId ? (options.ownerId || String(record.author_id)) : String(record.author_id);
-          postKind = String(record.post_kind);
+          const createdKind = String(record.post_kind);
+          assert.ok(createdKind === "pixel_art" || createdKind === "pixel_camera");
+          postKind = createdKind;
           status = "pending";
           if (options.puzzleMode) {
             const puzzle = args.p_puzzle as Record<string, unknown>;

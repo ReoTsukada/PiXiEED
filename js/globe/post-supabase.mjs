@@ -5,6 +5,8 @@ import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs?rev=2
 import { isSafeJigsawPixfindOriginalUrl } from '../creation/jigsaw-core.mjs?rev=20261001-free-tools-1';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
+const DELETION_KEY = 'PiXiEED:post-deletions:v1';
+const AUTHOR_CHANGE_KEY = 'PiXiEED:post-author-change:v1';
 const LEGACY_OWNER_SESSION_KEY = 'PiXiEED:legacy-owner-session:v1';
 const baseUrl = () => String(supabaseConfig.url || '').trim().replace(/\/$/, '');
 const publicKey = () => String(supabaseConfig.publishableKey || '').trim();
@@ -68,32 +70,55 @@ function socialImageUrl(path) {
   const safePath = String(path || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
   return safePath ? `${baseUrl()}/storage/v1/object/public/${bucket}/${safePath}` : '';
 }
+function publicAuthorName(value) {
+  if (typeof value !== 'string') return '';
+  return Array.from(value.normalize('NFC').trim()).slice(0, 40).join('');
+}
 function fromPublicRow(row) {
   try {
     const cell = getCellById(String(row.globe_cell_id || ''));
     const url = imageUrl(row.public_image_path); if (!url) return null;
-    return { id: String(row.post_id), title: String(row.title || '地図の投稿'), caption: String(row.caption || ''), postKind: row.post_kind === 'pixel_camera' ? 'pixel_camera' : 'pixel_art', puzzleMode: ['spot_difference', 'hidden_object'].includes(row.puzzle_mode) ? row.puzzle_mode : null, image: { dataUrl: url, width: 32, height: 32, colorCount: 0 }, pin: { latitude: cell.center.latitude, longitude: cell.center.longitude, cellId: cell.id, source: 'cell' }, author: { id: '', name: '' }, status: 'published', createdAt: Date.parse(row.published_at) || 0, likeable: true };
+    return { id: String(row.post_id), title: String(row.title || '地図の投稿'), caption: String(row.caption || ''), postKind: row.post_kind === 'pixel_camera' ? 'pixel_camera' : 'pixel_art', puzzleMode: ['spot_difference', 'hidden_object'].includes(row.puzzle_mode) ? row.puzzle_mode : null, image: { dataUrl: url, width: 32, height: 32, colorCount: 0 }, pin: { latitude: cell.center.latitude, longitude: cell.center.longitude, cellId: cell.id, source: 'cell' }, author: { id: '', name: publicAuthorName(row.author_name) }, status: 'published', createdAt: Date.parse(row.published_at) || 0, likeable: true };
   } catch { return null; }
 }
 const dataUrlBase64 = (dataUrl) => String(dataUrl || '').split(',', 2)[1] || '';
 const publicLimit = () => Math.min(1000, Math.max(1, Number(supabaseConfig.publicMapLimit) || 500));
 
+async function fetchPublicMapRows(url, columns) {
+  let optional = ['post_kind', 'puzzle_mode', 'author_name'];
+  for (let attempt = 0; attempt < 7; attempt += 1) {
+    url.searchParams.set('select', optional.length ? `${columns},${optional.join(',')}` : columns);
+    const response = await fetch(url, { headers: headers(), cache: 'no-store' });
+    if (response.status !== 400) return response;
+
+    let message = '';
+    try {
+      const error = await response.json();
+      message = String(error?.message || error?.details || error?.hint || '');
+    } catch { /* keep compatibility with minimal fetch responses */ }
+    const missing = ['author_name', 'puzzle_mode', 'post_kind'].find((column) => message.includes(column) && optional.includes(column));
+    if (missing) {
+      if (missing === 'post_kind' && optional.length > 1) optional = ['post_kind'];
+      else optional = optional.filter((column) => column !== missing);
+      continue;
+    }
+    if (optional.includes('author_name')) optional = optional.filter((column) => column !== 'author_name');
+    else if (optional.includes('puzzle_mode')) optional = optional.filter((column) => column !== 'puzzle_mode');
+    else if (optional.includes('post_kind')) optional = optional.filter((column) => column !== 'post_kind');
+    else return response;
+  }
+  return { ok: false, status: 400, async json() { return {}; } };
+}
+
 async function loadCurrentMapPosts() {
   const table = encodeURIComponent(String(supabaseConfig.publicMapTable || 'post_map_points'));
   const url = new URL(`${baseUrl()}/rest/v1/${table}`);
   const columns = 'post_id,title,caption,public_image_path,published_at,globe_cell_id';
-  url.searchParams.set('select', `${columns},post_kind,puzzle_mode`);
   url.searchParams.set('map_space', 'eq.globe');
   url.searchParams.set('published_at', 'not.is.null');
   url.searchParams.set('order', 'published_at.desc');
   url.searchParams.set('limit', String(publicLimit()));
-  let response = await fetch(url, { headers: headers(), cache: 'no-store' });
-  // Older published rows can still be read before the new column is deployed.
-  if (response.status === 400) {
-    url.searchParams.set('select', `${columns},post_kind`);
-    response = await fetch(url, { headers: headers(), cache: 'no-store' });
-    if (response.status === 400) { url.searchParams.set('select', columns); response = await fetch(url, { headers: headers(), cache: 'no-store' }); }
-  }
+  const response = await fetchPublicMapRows(url, columns);
   if (!response.ok) return [];
   const rows = await response.json();
   return Array.isArray(rows) ? rows.map(fromPublicRow).filter(Boolean) : [];
@@ -107,17 +132,12 @@ export async function loadPublishedMapPostsByIds(inputIds) {
   for (let offset = 0; offset < ids.length; offset += 50) {
     const url = new URL(`${baseUrl()}/rest/v1/${table}`);
     const chunkIds = ids.slice(offset, offset + 50);
-    url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id,post_kind,puzzle_mode');
+    const columns = 'post_id,title,caption,public_image_path,published_at,globe_cell_id';
     url.searchParams.set('post_id', `in.(${chunkIds.join(',')})`);
     url.searchParams.set('map_space', 'eq.globe');
     url.searchParams.set('published_at', 'not.is.null');
     url.searchParams.set('limit', '50');
-    let response = await fetch(url, { headers: headers(), cache: 'no-store' });
-    if (response.status === 400) {
-      url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id,post_kind');
-      response = await fetch(url, { headers: headers(), cache: 'no-store' });
-      if (response.status === 400) { url.searchParams.set('select', 'post_id,title,caption,public_image_path,published_at,globe_cell_id'); response = await fetch(url, { headers: headers(), cache: 'no-store' }); }
-    }
+    const response = await fetchPublicMapRows(url, columns);
     if (!response.ok) throw new Error('公開投稿を読み込めませんでした。時間をおいて再試行してください。');
     const rows = await response.json();
     if (Array.isArray(rows)) output.push(...rows.filter((row) => chunkIds.includes(String(row?.post_id || ''))).map(fromPublicRow).filter(Boolean));
@@ -348,9 +368,57 @@ export function createSupabaseGlobeAuth() {
 
 export function createSupabaseGlobeStore() {
   let published = [];
+  const withdrawn = new Set();
   const listeners = new Set();
   const notify = () => listeners.forEach((listener) => listener());
+  const retireDeletedPosts = () => {
+    try {
+      const ids = JSON.parse(globalThis.localStorage?.getItem(DELETION_KEY) || '[]');
+      if (!Array.isArray(ids)) return;
+      for (const id of ids) if (UUID.test(String(id))) withdrawn.add(id);
+      const next = published.filter((post) => !withdrawn.has(post.id));
+      if (next.length !== published.length) { published = next; notify(); }
+    } catch { /* private mode or an invalid local notice */ }
+  };
+  let initialLoaded = false;
+  let authorRefresh = null;
+  const authorNotice = () => { try { return globalThis.localStorage?.getItem(AUTHOR_CHANGE_KEY) || ''; } catch { return ''; } };
+  let seenAuthorNotice = authorNotice();
+  const refreshAuthorNames = () => {
+    if (!initialLoaded || authorRefresh || authorNotice() === seenAuthorNotice) return authorRefresh;
+    const notice = authorNotice();
+    const ids = published.filter((post) => UUID.test(post.id) && !withdrawn.has(post.id)).map((post) => post.id);
+    if (!ids.length) { seenAuthorNotice = notice; return null; }
+    authorRefresh = (async () => {
+      try {
+        // Only refresh after an explicit name save, never on map zoom or pan.
+        const names = new Map();
+        for (let i = 0; i < ids.length; i += 50) {
+          for (const post of await loadPublishedMapPostsByIds(ids.slice(i, i + 50))) names.set(post.id, post.author.name);
+        }
+        let changed = false;
+        published = published.map((post) => {
+          if (!names.has(post.id) || post.author?.name === names.get(post.id)) return post;
+          changed = true;
+          return { ...post, author: { ...post.author, name: names.get(post.id) } };
+        });
+        seenAuthorNotice = notice;
+        if (changed) notify();
+      } catch { /* A failed refresh keeps the displayed post and retries on the next page visit. */ }
+    })().finally(() => {
+      authorRefresh = null;
+      if (seenAuthorNotice === notice && authorNotice() !== notice) void refreshAuthorNames();
+    });
+    return authorRefresh;
+  };
+  retireDeletedPosts();
+  globalThis.addEventListener?.('storage', (event) => {
+    if (event.key === DELETION_KEY) retireDeletedPosts();
+    if (event.key === AUTHOR_CHANGE_KEY) void refreshAuthorNames();
+  });
+  globalThis.addEventListener?.('pageshow', () => { retireDeletedPosts(); return refreshAuthorNames(); });
   const upsertPublished = (post) => {
+    if (withdrawn.has(post.id)) return;
     const next = published.filter((item) => item.id !== post.id);
     next.push(post);
     published = next.sort((left, right) => right.createdAt - left.createdAt);
@@ -365,10 +433,12 @@ export function createSupabaseGlobeStore() {
     ];
     // A post may be added while the initial requests are in flight. Keep the
     // newer in-memory version for duplicate IDs instead of losing that update.
-    const merged = new Map(initial.map((post) => [post.id, post]));
+    const merged = new Map(initial.filter((post) => !withdrawn.has(post.id)).map((post) => [post.id, post]));
     for (const post of published) merged.set(post.id, post);
     published = [...merged.values()].sort((left, right) => right.createdAt - left.createdAt);
+    initialLoaded = true;
     notify();
+    void refreshAuthorNames();
   })();
   return {
     ready,
@@ -407,6 +477,12 @@ export function createSupabaseGlobeStore() {
         try {
           const [canonical] = await loadPublishedMapPostsByIds([created.id]);
           if (canonical) upsertPublished(canonical);
+          else {
+            // A successful empty read is authoritative: a concurrent deletion may have won.
+            withdrawn.add(created.id);
+            published = published.filter((item) => item.id !== created.id);
+            notify();
+          }
         } catch { /* temporary public-read failures must not hide a successful submission */ }
       }
       return created;

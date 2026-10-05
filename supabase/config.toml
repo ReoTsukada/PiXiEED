@@ -420,3 +420,13 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/public-post-puzzle/deno.json"
 entrypoint = "./functions/public-post-puzzle/index.ts"
+
+[functions.delete-post]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/delete-post/index.ts"
+
+[functions.set-author-name]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/set-author-name/index.ts"

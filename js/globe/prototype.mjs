@@ -1,6 +1,6 @@
-import { initPostUi } from './post-ui.mjs?v=20261005-admin-boundary-1';
+import { initPostUi } from './post-ui.mjs?v=20261006-profile-artwork-1';
 import { initMapEvents } from './map-events.mjs?v=20261005-admin-boundary-1';
-import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-immediate-posts-1';
+import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261005-admin-boundary-1';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
 

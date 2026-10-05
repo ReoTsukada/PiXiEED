@@ -136,3 +136,108 @@ test('pending, hidden, and rejected responses never enter the public map cache',
     assert.equal(calls.some(({ url }) => url.searchParams.has('post_id') && url.pathname.endsWith('/post_map_points')), false);
   }
 });
+
+
+test('successful empty public read retracts a post removed during publication', async (t) => {
+  installBrowserStubs(t);
+  const previous = globalThis.fetch;
+  globalThis.fetch = (input, init) => {
+    const url = new URL(String(input));
+    return url.pathname.endsWith('/post_map_points') && url.searchParams.has('post_id')
+      ? Promise.resolve(response([])) : previous(input, init);
+  };
+  const store = createSupabaseGlobeStore();
+  await store.ready;
+  await store.add(fixture());
+  assert.equal(store.list().length, 0);
+});
+
+
+test('late initial loading cannot resurrect a withdrawn publication', async (t) => {
+  installBrowserStubs(t);
+  const previous = globalThis.fetch;
+  let release;
+  const initial = new Promise((resolve) => { release = resolve; });
+  globalThis.fetch = (input, init) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/post_map_points')) return url.searchParams.has('post_id')
+      ? Promise.resolve(response([])) : initial;
+    return previous(input, init);
+  };
+  const store = createSupabaseGlobeStore();
+  await store.add(fixture());
+  release(response([canonicalRow]));
+  await store.ready;
+  assert.equal(store.list().length, 0);
+});
+
+test('history-restored map retires a deletion completed in My Page', async (t) => {
+  installBrowserStubs(t);
+  const previousListener = globalThis.addEventListener;
+  const handlers = new Map();
+  globalThis.addEventListener = (name, handler) => handlers.set(name, handler);
+  t.after(() => {
+    if (previousListener === undefined) delete globalThis.addEventListener;
+    else globalThis.addEventListener = previousListener;
+  });
+  const store = createSupabaseGlobeStore();
+  await store.ready;
+  await store.add(fixture());
+  assert.equal(store.list().length, 1);
+  globalThis.localStorage.setItem('PiXiEED:post-deletions:v1', JSON.stringify([postId]));
+  handlers.get('pageshow')();
+  assert.equal(store.list().length, 0);
+});
+
+
+test('returning from My Page refreshes configured names without zoom requests', async (t) => {
+  installBrowserStubs(t);
+  const previousListener = globalThis.addEventListener;
+  const handlers = new Map();
+  globalThis.addEventListener = (name, handler) => handlers.set(name, handler);
+  t.after(() => {
+    if (previousListener === undefined) delete globalThis.addEventListener;
+    else globalThis.addEventListener = previousListener;
+  });
+  const store = createSupabaseGlobeStore();
+  await store.ready;
+  await store.add(fixture());
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = (input, init) => new URL(String(input)).searchParams.has('post_id')
+    ? Promise.resolve(response([{ ...canonicalRow, author_name: '新しい作者名' }])) : previousFetch(input, init);
+  let updates = 0;
+  store.subscribe(() => { updates++; });
+  globalThis.localStorage.setItem('PiXiEED:post-author-change:v1', '{"at":1}');
+  await handlers.get('pageshow')();
+  assert.equal(store.list()[0].author.name, '新しい作者名');
+  assert.equal(updates, 1);
+  await handlers.get('pageshow')();
+  assert.equal(updates, 1);
+});
+
+
+test('failed author refresh preserves the image and retries on the next page visit', async (t) => {
+  installBrowserStubs(t);
+  const previousListener = globalThis.addEventListener;
+  const handlers = new Map();
+  globalThis.addEventListener = (name, handler) => handlers.set(name, handler);
+  t.after(() => {
+    if (previousListener === undefined) delete globalThis.addEventListener;
+    else globalThis.addEventListener = previousListener;
+  });
+  const store = createSupabaseGlobeStore();
+  await store.ready;
+  await store.add(fixture());
+  const before = store.list()[0];
+  const previousFetch = globalThis.fetch;
+  let fail = true;
+  globalThis.fetch = (input, init) => new URL(String(input)).searchParams.has('post_id')
+    ? Promise.resolve(fail ? response({}, 503) : response([{ ...canonicalRow, author_name: '再取得した作者名' }])) : previousFetch(input, init);
+  globalThis.localStorage.setItem('PiXiEED:post-author-change:v1', '{"at":2}');
+  await handlers.get('pageshow')();
+  assert.equal(store.list()[0], before);
+  fail = false;
+  await handlers.get('pageshow')();
+  assert.equal(store.list()[0].author.name, '再取得した作者名');
+  assert.equal(store.list()[0].image.dataUrl, before.image.dataUrl);
+});
