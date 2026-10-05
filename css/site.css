@@ -741,3 +741,14 @@ body[data-page="draw"] .draw-import__options .picture-shelf__item { display: inl
 body[data-page="draw"] .draw-import__options .picture-shelf__title { color: rgba(255, 255, 255, .72); }
 /* The PXD button inside かんたんドット's dark menu (was white on white). */
 body[data-page="draw"] .draw-import__options .pxd-tools > summary { border-color: rgba(255, 255, 255, .14); background: #1d2b38; color: #fff; }
+
+/* Panel headers stay reachable while only their contents move. */
+.map-post-drawer__panel{padding:0;overflow:hidden}
+.map-post-drawer__head{flex:none;padding:max(1.1rem,env(safe-area-inset-top)) 1.1rem .8rem}
+.map-post-drawer__body{flex:1 1 auto;min-height:0;padding:0 1.1rem max(1.2rem,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
+.map-post-drawer__close{flex:none;min-width:44px;min-height:44px}
+.map-popover{max-height:min(28rem,calc(100% - 2rem));overflow-y:auto;overscroll-behavior:contain}
+.map-popover__top{position:sticky;top:-1rem;z-index:2;margin:-1rem -1rem 0;padding:.6rem 1rem;background:#fffdf8}
+.map-popover__close{flex:none;width:44px;height:44px}
+.dialog{max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
+.dialog__close{position:sticky;top:0;z-index:2;min-width:44px;min-height:44px;background:#fffdf8}

@@ -60,12 +60,12 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
       viewTabsHost.append(button);
     }
     element.querySelector('.dce-header')?.after(viewTabsHost);
-    const contentHost = document.createElement('div'); contentHost.className = 'dce-content';
-    for (const selector of ['.dce-preview', '.dce-quick', '.dce-sliders', '.dce-actions']) {
-      const content = element.querySelector(selector); if (content) contentHost.append(content);
-    }
-    viewTabsHost.after(contentHost);
   }
+  const contentHost = document.createElement('div'); contentHost.className = 'dce-content';
+  for (const selector of ['.dce-preview', '.dce-quick', '.dce-sliders']) {
+    const content = element.querySelector(selector); if (content) contentHost.append(content);
+  }
+  (viewTabsHost || element.querySelector('.dce-header'))?.after(contentHost);
   const before = element.querySelector('.dce-before'); const after = element.querySelector('.dce-after');
   const resetButton = element.querySelector('#dce-reset'); const doneButton = element.querySelector('#dce-done');
   const input = (axis) => element.querySelector(`[data-dce-axis="${axis}"]`);
@@ -98,6 +98,8 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     const topLimit = Math.max(8, Math.ceil(header?.bottom ?? 0) + 8);
     const bottomLimit = Math.max(topLimit + 44, Math.min(innerHeight, nav?.top ?? innerHeight) - 8);
     const available = Math.max(44, bottomLimit - topLimit);
+    // Re-measure natural height after resizing or changing the selected color.
+    element.style.height = '';
     element.style.maxHeight = `${available}px`;
     element.style.width = `min(380px, calc(100vw - 16px))`;
     const width = Math.min(380, innerWidth - 16);
@@ -105,6 +107,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     left = Math.max(8, Math.min(left, innerWidth - width - 8));
     element.style.left = `${Math.round(left)}px`;
     const height = Math.min(element.scrollHeight, available);
+    element.style.height = `${height}px`;
     const above = (rect?.top ?? bottomLimit) - height - 8;
     const below = (rect?.bottom ?? topLimit) + 8;
     let top;

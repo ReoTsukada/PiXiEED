@@ -99,6 +99,9 @@ body.creation-editor[data-page="audio"] :is(#audio-color-editor-panel, #audio-pa
   transform:none!important;align-content:start;overflow:hidden!important;
   grid-template-rows:62px 44px minmax(0,1fr)!important
 }
+body.creation-editor[data-page="audio"] #audio-color-editor-panel{
+  grid-template-rows:62px 44px minmax(0,1fr) auto!important
+}
 body.creation-editor[data-page="audio"] #audio-color-editor-panel .dce-content,
 body.creation-editor[data-page="audio"] #audio-sound-editor-panel{
   min-height:0;overflow:auto;overscroll-behavior:contain

@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261002-header-layout-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261006-panel-close-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
 import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
@@ -1423,7 +1423,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20261001-free-tools-1').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20261006-panel-close-1').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;

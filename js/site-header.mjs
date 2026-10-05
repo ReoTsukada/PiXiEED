@@ -51,6 +51,7 @@ const MENU_MARKUP = `
   <div class="site-menu-backdrop" data-menu-backdrop hidden></div>
   <aside class="site-menu" id="site-menu" data-site-menu hidden aria-labelledby="site-menu-title">
     <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">メニュー</h2></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
+    <div class="site-menu__body">
     <a class="site-menu__profile" href="/profile/" data-menu-link><span class="site-menu__avatar" aria-hidden="true">P</span><span><strong>自分のページ</strong><small>投稿・いいね・記録</small></span><span aria-hidden="true">›</span></a>
     <nav class="site-menu__nav" aria-label="補助メニュー">
       <div class="site-menu__group"><span class="site-menu__label">自分の記録</span><a href="/profile/?view=posts" data-menu-link>投稿した絵</a><a href="/profile/?view=likes" data-menu-link>いいねした作品</a><a href="/profile/?view=history" data-menu-link>読み取ったQR</a></div>
@@ -59,12 +60,15 @@ const MENU_MARKUP = `
       <div class="site-menu__group"><span class="site-menu__label">案内</span><a href="/about/" data-menu-link>PiXiEEDについて</a><a href="/guide/" data-menu-link>利用ガイド</a><a href="/privacy/" data-menu-link>プライバシー</a></div>
       <div class="site-menu__group"><span class="site-menu__label">設定</span><button type="button" data-menu-setting="display">表示設定</button><button type="button" data-menu-setting="privacy">プライバシー設定</button></div>
     </nav>
+    </div>
   </aside>
   <dialog class="site-settings" data-site-settings aria-labelledby="site-settings-title">
     <div class="site-settings__head"><div><span class="eyebrow">preferences</span><h2 id="site-settings-title">設定</h2></div><button class="site-settings__close" type="button" data-settings-close aria-label="設定を閉じる">×</button></div>
+    <div class="site-settings__body">
     <section data-settings-panel="display"><h3>表示設定</h3><label class="site-settings__switch"><input type="checkbox" data-setting-motion><span><strong>動きを控えめにする</strong><small>地図の移動や画面切り替えを短くします。</small></span></label></section>
     <section data-settings-panel="privacy" hidden><h3>プライバシー設定</h3><p>PiXiEEDでは、個人を特定しない形で訪問・ページ閲覧・QR読み取り・いいねなどの集計を行い、作品や地図を改善します。</p><label class="site-settings__switch"><input type="checkbox" data-setting-analytics><span><strong>利用状況の集計を許可する</strong><small>オフにすると、この端末から新しい集計を送信しません。</small></span></label><button class="button button--quiet" type="button" data-settings-clear>この端末の解析記録を削除</button><p class="site-settings__status" data-settings-status role="status"></p></section>
     <div class="site-settings__actions"><button class="button button--primary" type="button" data-settings-close>閉じる</button></div>
+    </div>
   </dialog>`;
 
 const mountedMenus = new WeakSet();

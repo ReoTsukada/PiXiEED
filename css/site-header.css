@@ -184,3 +184,12 @@ html[data-pixieed-motion=reduced] .px-pass button:active{transform:none}
 /* tight headers use the short name (ドットで音楽 → 音楽) */
 @media(max-width:360px){.px-site-header .px-header-brand--tool>span[data-short]{font-size:0!important}.px-site-header .px-header-brand--tool>span[data-short]::after{content:attr(data-short);font-size:.95rem}}
 @media(max-width:440px){.audio-heading.px-site-header .px-header-brand--tool>span[data-short],.lc-top.px-site-header .px-header-brand--tool>span[data-short]{font-size:0!important}.audio-heading.px-site-header .px-header-brand--tool>span[data-short]::after,.lc-top.px-site-header .px-header-brand--tool>span[data-short]::after{content:attr(data-short);font-size:.95rem}}
+
+/* Keep dismissal outside the content scroller on every shared header surface. */
+body .site-menu:not([hidden]),body.px-standalone-globe .site-menu:not([hidden]){display:flex;flex-direction:column;padding:0;overflow:hidden}
+body .site-menu__head{flex:none;margin:0;padding:max(1rem,env(safe-area-inset-top)) 1.25rem .8rem}
+body .site-menu__body{flex:1 1 auto;min-height:0;padding:0 1.25rem max(6rem,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
+body .site-settings,body.px-standalone-globe .site-settings{box-sizing:border-box;max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);padding:0;overflow:hidden}
+body .site-settings[open],body.px-standalone-globe .site-settings[open]{display:flex;flex-direction:column}
+body .site-settings__head{flex:none;margin:0;padding:1.2rem 1.2rem .8rem}
+body .site-settings__body{min-height:0;padding:0 1.2rem 1.2rem;overflow-y:auto;overscroll-behavior:contain}

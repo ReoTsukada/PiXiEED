@@ -3,7 +3,7 @@ import { createPxdStore } from './pxd-store.mjs?rev=20261001-free-tools-1';
 import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261003-project-library-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261006-panel-close-1';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {
@@ -16,7 +16,7 @@ function errorMessage(error) {
 }
 function style() {
   if (document.querySelector('[data-pxd-css]')) return;
-  const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/css/pxd-tools.css?rev=20261001-output-copy-1'; link.dataset.pxdCss = ''; document.head.append(link);
+  const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/css/pxd-tools.css?rev=20261006-panel-close-1'; link.dataset.pxdCss = ''; document.head.append(link);
 }
 function button(text, id, run) { const node = document.createElement('button'); node.type = 'button'; node.textContent = text; node.id = id; node.addEventListener('click', run); return node; }
 function download(bytes, name) {

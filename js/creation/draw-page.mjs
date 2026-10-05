@@ -13,8 +13,8 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261003-project-library-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261004-symmetry-color-panel-1';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261006-panel-close-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-panel-close-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -30,7 +30,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261004-symmetry-color-panel-1';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261004-canvas-settings-1';
-import { mountColorPanel } from './color-panel.mjs?rev=20261004-audio-fixed-panel-3';
+import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');

@@ -30,7 +30,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261003-project-library-1'; document.head.append(css);
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261006-panel-close-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
@@ -340,11 +340,15 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         openingTouch = false; event.preventDefault(); event.stopImmediatePropagation();
       }, { capture: true });
       const finish = (value) => { if (finished) return; finished = true; confirmation.close(); confirmation.remove(); resolve(value); };
+      const header = node('div', 'project-delete-dialog__header');
+      const dismiss = button('×', 'project-delete-dismiss', () => finish(false));
+      dismiss.setAttribute('aria-label', '削除をキャンセルして閉じる');
+      header.append(heading, dismiss);
       cancel = button('キャンセル', 'project-delete-cancel', () => finish(false));
       // Releasing the held touch can focus the dialog itself; keep dismissal safe.
       confirmation.addEventListener('focus', () => cancel.focus({ preventScroll: true }));
       controls.append(cancel, button('削除する', 'project-delete-confirm', () => finish(true)));
-      confirmation.append(heading, preview, projectName, text, controls); document.body.append(confirmation);
+      confirmation.append(header, preview, projectName, text, controls); document.body.append(confirmation);
       confirmation.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); }); confirmation.showModal(); cancel.focus();
     });
   }
@@ -371,7 +375,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const remove = button('削除', 'project-card-actions-delete', () => { close(); void deleteProject(item); });
     remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>作品を削除</span>';
     controls.append(open, copy, remove, button('閉じる', 'project-card-actions-close', close));
-    sheet.append(preview, title, controls); document.body.append(sheet);
+    const header = node('div', 'project-delete-dialog__header');
+    const dismiss = button('×', 'project-card-actions-dismiss', close);
+    dismiss.setAttribute('aria-label', '作品の操作を閉じる');
+    header.append(title, dismiss);
+    sheet.append(header, preview, controls); document.body.append(sheet);
     sheet.addEventListener('cancel', (event) => { event.preventDefault(); close(); }); sheet.showModal();
   }
   async function deleteProject(item, card = null, options = {}) {

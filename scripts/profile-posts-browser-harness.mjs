@@ -248,6 +248,174 @@ try {
     } finally { await context.close(); }
   }
 
+  // A long synthetic caption keeps the profile dialog scrolling while its close control stays clickable.
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 1280, height: 800 },
+  ]) {
+    const { context, page, state } = await setupPage(viewport, { account: true });
+    try {
+      state.rows[0].caption = '長い合成キャプションです。'.repeat(2400);
+      await page.goto(`${base}/profile/?view=posts`, { waitUntil: 'domcontentloaded' });
+      const card = page.locator(`[data-post-id="${publishedId}"]`);
+      await card.waitFor();
+      await card.getByRole('button', { name: '詳細を見る' }).click();
+      const dialog = page.locator('[data-profile-post-dialog]');
+      await dialog.waitFor({ state: 'visible' });
+      const maxScroll = await dialog.evaluate((node) => node.scrollHeight - node.clientHeight);
+      assert.ok(maxScroll > 300, `long caption creates dialog scroll range at ${viewport.width}x${viewport.height}: ${maxScroll}`);
+      const positions = [];
+      for (const point of ['top', 'middle', 'bottom']) {
+        const stateAtPoint = await dialog.evaluate((node, point) => {
+          const max = node.scrollHeight - node.clientHeight;
+          node.scrollTop = point === 'top' ? 0 : point === 'middle' ? max / 2 : max;
+          const close = node.querySelector('.profile-post-dialog__close');
+          const rect = close.getBoundingClientRect();
+          const dialogRect = node.getBoundingClientRect();
+          const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+          const hit = document.elementFromPoint(center.x, center.y);
+          return {
+            scrollTop: node.scrollTop,
+            width: rect.width,
+            height: rect.height,
+            rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+            dialog: { left: dialogRect.left, right: dialogRect.right, top: dialogRect.top, bottom: dialogRect.bottom },
+            viewport: { width: innerWidth, height: innerHeight },
+            hit: hit === close || close.contains(hit),
+          };
+        }, point);
+        assert.ok(stateAtPoint.width >= 44 && stateAtPoint.height >= 44, `profile close touch size ${point}: ${JSON.stringify(stateAtPoint)}`);
+        assert.ok(stateAtPoint.rect.left >= 0 && stateAtPoint.rect.right <= viewport.width && stateAtPoint.rect.top >= 0 && stateAtPoint.rect.bottom <= viewport.height, `profile close is in viewport ${point}: ${JSON.stringify(stateAtPoint)}`);
+        assert.ok(stateAtPoint.rect.left >= stateAtPoint.dialog.left && stateAtPoint.rect.right <= stateAtPoint.dialog.right && stateAtPoint.rect.top >= stateAtPoint.dialog.top && stateAtPoint.rect.bottom <= stateAtPoint.dialog.bottom, `profile close is in dialog ${point}: ${JSON.stringify(stateAtPoint)}`);
+        assert.ok(stateAtPoint.hit, `profile close receives elementFromPoint ${point}: ${JSON.stringify(stateAtPoint)}`);
+        positions.push(`${point}@${Math.round(stateAtPoint.scrollTop)}`);
+      }
+      const closeRect = await dialog.locator('.profile-post-dialog__close').boundingBox();
+      await page.mouse.click(closeRect.x + closeRect.width / 2, closeRect.y + closeRect.height / 2);
+      await dialog.waitFor({ state: 'hidden' });
+      assertNoPageErrors();
+      check(`profile detail close top/middle/bottom ${viewport.width}x${viewport.height} (${positions.join(', ')})`);
+    } finally { await context.close(); }
+  }
+
+  // The actual globe prototype stylesheet keeps both scroll-panel headers and their close buttons exposed.
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 1280, height: 800 },
+  ]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      for (const fixture of [
+        {
+          panel: '.sheet', close: '.sheet__close',
+          content: '<aside class="sheet viewer" data-panel="sheet"><header class="sheet__head"><h2>作品シート</h2><button class="sheet__close" type="button" aria-label="閉じる" data-probe-close>×</button></header><div style="height:1800px;flex:none">合成スクロール本文</div></aside>',
+        },
+        {
+          panel: '.map-events-panel', close: '.map-events-panel__close',
+          content: '<aside class="map-events-panel" data-panel="events"><header class="map-events-panel__head"><h2>イベント一覧</h2><button class="map-events-panel__close" type="button" data-probe-close>×</button></header><div class="map-events-panel__list">' + '<article class="map-event-card">合成イベント</article>'.repeat(40) + '</div></aside>',
+        },
+      ]) {
+        await page.setContent(`<!doctype html><html lang="ja"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${base}/css/globe-prototype.css"></head><body><main class="globe-stage" style="height:100dvh;min-height:0;border:0;border-radius:0">${fixture.content}</main></body></html>`);
+        await page.waitForFunction(() => [...document.styleSheets].some((sheet) => sheet.href?.includes('/css/globe-prototype.css')));
+        const panel = page.locator(fixture.panel);
+        const maxScroll = await panel.evaluate((node) => node.scrollHeight - node.clientHeight);
+        assert.ok(maxScroll > 200, `${fixture.panel} has real scroll range at ${viewport.width}x${viewport.height}: ${maxScroll}`);
+        for (const point of ['top', 'middle', 'bottom']) {
+          const stateAtPoint = await panel.evaluate((node, point) => {
+            const max = node.scrollHeight - node.clientHeight;
+            node.scrollTop = point === 'top' ? 0 : point === 'middle' ? max / 2 : max;
+            const close = node.querySelector('[data-probe-close]');
+            const rect = close.getBoundingClientRect();
+            const panelRect = node.getBoundingClientRect();
+            const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            const hit = document.elementFromPoint(center.x, center.y);
+            return { scrollTop: node.scrollTop, width: rect.width, height: rect.height, rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, panel: { left: panelRect.left, right: panelRect.right, top: panelRect.top, bottom: panelRect.bottom }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === close || close.contains(hit) };
+          }, point);
+          assert.ok(stateAtPoint.width >= 44 && stateAtPoint.height >= 44, `${fixture.panel} close touch size ${point}: ${JSON.stringify(stateAtPoint)}`);
+          assert.ok(stateAtPoint.rect.left >= 0 && stateAtPoint.rect.right <= viewport.width && stateAtPoint.rect.top >= 0 && stateAtPoint.rect.bottom <= viewport.height, `${fixture.panel} close is in viewport ${point}: ${JSON.stringify(stateAtPoint)}`);
+          assert.ok(stateAtPoint.rect.left >= stateAtPoint.panel.left && stateAtPoint.rect.right <= stateAtPoint.panel.right && stateAtPoint.rect.top >= stateAtPoint.panel.top && stateAtPoint.rect.bottom <= stateAtPoint.panel.bottom, `${fixture.panel} close is in panel ${point}: ${JSON.stringify(stateAtPoint)}`);
+          assert.ok(stateAtPoint.hit, `${fixture.panel} close receives elementFromPoint ${point}: ${JSON.stringify(stateAtPoint)}`);
+          if (point === 'bottom') {
+            const closeRect = await panel.locator(fixture.close).boundingBox();
+            await page.mouse.click(closeRect.x + closeRect.width / 2, closeRect.y + closeRect.height / 2);
+          }
+        }
+        check(`${fixture.panel} close top/middle/bottom ${viewport.width}x${viewport.height}`);
+      }
+      assertNoPageErrors();
+    } finally { await context.close(); }
+  }
+
+  // The unpublished room preview keeps product/help close buttons exposed over long synthetic dialog content.
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 844, height: 390 },
+    { width: 1280, height: 800 },
+  ]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.route('**/*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.origin === origin) return route.continue();
+      return route.abort();
+    });
+    try {
+      await page.goto(`${base}/books/room-preview.html`, { waitUntil: 'domcontentloaded' });
+      await page.locator('#room-help').waitFor();
+      await page.waitForFunction(() => {
+        const select = document.querySelector('#room-product-select');
+        return select && [...select.options].some((option) => option.value === 'product-dot-classroom');
+      });
+      for (const kind of ['help', 'product']) {
+        if (kind === 'help') {
+          await page.locator('#room-help').click();
+          await page.locator('#room-help-dialog').evaluate((dialog) => {
+            const step = dialog.querySelector('.room-help-steps li');
+            step.textContent = '長い合成ヘルプ本文です。'.repeat(1200);
+          });
+        } else {
+          await page.locator('#room-product-select').selectOption('product-dot-classroom');
+          await page.locator('#room-product-open').click();
+          await page.locator('#room-product-dialog').waitFor({ state: 'visible' });
+          await page.locator('#room-product-description').evaluate((node) => { node.textContent = '長い合成商品説明です。'.repeat(1200); });
+        }
+        const dialog = page.locator(kind === 'help' ? '#room-help-dialog' : '#room-product-dialog');
+        const scrollArea = dialog.locator('.room-dialog__layout');
+        const maxScroll = await scrollArea.evaluate((node) => node.scrollHeight - node.clientHeight);
+        assert.ok(maxScroll > 200, `room ${kind} has scroll range at ${viewport.width}x${viewport.height}: ${maxScroll}`);
+        for (const point of ['top', 'middle', 'bottom']) {
+          const stateAtPoint = await scrollArea.evaluate((node, point) => {
+            const max = node.scrollHeight - node.clientHeight;
+            node.scrollTop = point === 'top' ? 0 : point === 'middle' ? max / 2 : max;
+            const close = node.parentElement.querySelector('.room-dialog__close');
+            const rect = close.getBoundingClientRect();
+            const dialogRect = node.parentElement.getBoundingClientRect();
+            const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            const hit = document.elementFromPoint(center.x, center.y);
+            return { scrollTop: node.scrollTop, width: rect.width, height: rect.height, rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, dialog: { left: dialogRect.left, right: dialogRect.right, top: dialogRect.top, bottom: dialogRect.bottom }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === close || close.contains(hit) };
+          }, point);
+          assert.ok(stateAtPoint.width >= 44 && stateAtPoint.height >= 44, `room ${kind} close touch size ${point}: ${JSON.stringify(stateAtPoint)}`);
+          assert.ok(stateAtPoint.rect.left >= 0 && stateAtPoint.rect.right <= viewport.width && stateAtPoint.rect.top >= 0 && stateAtPoint.rect.bottom <= viewport.height, `room ${kind} close is in viewport ${point}: ${JSON.stringify(stateAtPoint)}`);
+          assert.ok(stateAtPoint.rect.left >= stateAtPoint.dialog.left && stateAtPoint.rect.right <= stateAtPoint.dialog.right && stateAtPoint.rect.top >= stateAtPoint.dialog.top && stateAtPoint.rect.bottom <= stateAtPoint.dialog.bottom, `room ${kind} close is in dialog ${point}: ${JSON.stringify(stateAtPoint)}`);
+          assert.ok(stateAtPoint.hit, `room ${kind} close receives elementFromPoint ${point}: ${JSON.stringify(stateAtPoint)}`);
+        }
+        const closeRect = await dialog.locator('.room-dialog__close').boundingBox();
+        await page.mouse.click(closeRect.x + closeRect.width / 2, closeRect.y + closeRect.height / 2);
+        await dialog.waitFor({ state: 'hidden' });
+      }
+      assertNoPageErrors();
+      check(`books preview help/product close top/middle/bottom ${viewport.width}x${viewport.height}`);
+    } finally { await context.close(); }
+  }
+
   // Author names are stored by verified session scope and projected back onto existing artwork.
   {
     const { context, page } = await setupPage({ width: 390, height: 844 }, { account: true, device: true });

@@ -1,18 +1,18 @@
 .creation-color-panel.draw-color-editor {
   position: fixed; left: 8px; right: auto; top: 8px; bottom: auto; z-index: 1100;
   box-sizing: border-box; display: grid; gap: 12px; width: min(380px, calc(100vw - 16px));
-  max-height: calc(100dvh - 16px); overflow: auto; overscroll-behavior: contain;
+  max-height: calc(100dvh - 16px); overflow: hidden; overscroll-behavior: contain; grid-template-rows: auto auto minmax(0, 1fr) auto;
   margin: 0; padding: 16px; border: 1px solid #ffffff30; border-radius: 20px;
   color: #f5f8fa; background: #15202b; box-shadow: 0 14px 34px #0006, 0 0 0 2px #ffffff0f;
   transform: none; opacity: 1; transition: opacity .14s ease;
 }
 .creation-color-panel.draw-color-editor[hidden] { display: none !important; }
-.creation-color-panel .dce-header { display: flex; align-items: center; min-height: 36px; }
+.creation-color-panel .dce-header { grid-row: 1; display: flex; align-items: center; min-height: 36px; }
 .creation-color-panel .dce-header h2 { margin: 0; color: inherit; font: 800 1rem/1.3 system-ui, -apple-system, sans-serif; }
-.creation-color-panel .dce-view-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.creation-color-panel .dce-view-tabs { grid-row: 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .creation-color-panel .dce-view-tabs button { min-width: 44px; min-height: 44px; padding: 8px 12px; border: 1px solid #ffffff35; border-radius: 11px; background: #263642; color: #f5f8fa; font: 800 .9rem/1.2 system-ui, -apple-system, sans-serif; cursor: pointer; }
 .creation-color-panel .dce-view-tabs button[aria-pressed="true"] { border-color: #ffd35a; background: #ffd35a; color: #17232d; }
-.creation-color-panel .dce-content { display: grid; gap: 12px; min-height: 0; overflow: auto; overscroll-behavior: contain; align-content: start; }
+.creation-color-panel .dce-content { grid-row: 3; display: grid; gap: 12px; min-height: 0; overflow: auto; overscroll-behavior: contain; align-content: start; }
 .creation-color-panel .dce-preview { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .creation-color-panel .dce-preview-swatch { display: flex; flex: none; overflow: hidden; width: 88px; height: 48px; border: 2px solid #ffffffa8; border-radius: 12px; box-shadow: 0 2px 8px #0005; }
 .creation-color-panel .dce-preview-swatch > span { flex: 1; min-width: 0; }
@@ -32,7 +32,7 @@
 .creation-color-panel .dce-hue input { --track: linear-gradient(90deg, hsl(0 var(--s) var(--l)), hsl(60 var(--s) var(--l)), hsl(120 var(--s) var(--l)), hsl(180 var(--s) var(--l)), hsl(240 var(--s) var(--l)), hsl(300 var(--s) var(--l)), hsl(359 var(--s) var(--l))); }
 .creation-color-panel .dce-sat input { --track: linear-gradient(90deg, hsl(var(--h) 0% var(--l)), hsl(var(--h) 100% var(--l))); }
 .creation-color-panel .dce-light input { --track: linear-gradient(90deg, #000, hsl(var(--h) var(--s) 50%), #fff); }
-.creation-color-panel .dce-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.creation-color-panel .dce-actions { grid-row: 4; align-self: end; display: flex; justify-content: flex-end; gap: 8px; padding: 0; background: #15202b; }
 .creation-color-panel .dce-actions button { box-sizing: border-box; min-width: 88px; min-height: 44px; padding: 8px 14px; border: 1px solid #ffffff35; border-radius: 12px; background: #263642; color: #fff; font: 800 .9rem/1.2 system-ui, -apple-system, sans-serif; cursor: pointer; }
 .creation-color-panel .dce-actions .dce-done { background: #ffd35a; border-color: #ffd35a; color: #17232d; }
 .creation-color-panel .dce-actions #dce-reset[hidden] { display: none !important; }

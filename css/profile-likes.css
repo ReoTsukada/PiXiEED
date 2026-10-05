@@ -60,7 +60,7 @@
 .profile-post-dialog{width:min(680px,calc(100vw - 24px));max-width:none;max-height:min(90svh,900px);padding:0;border:1px solid #d4dad3;border-radius:1.1rem;background:#fff;color:#202720;box-shadow:0 24px 80px #10181055;overflow:auto}
 .profile-post-dialog::backdrop{background:#10181099;backdrop-filter:blur(3px)}
 .profile-post-dialog__inner{display:grid;gap:1rem;padding:1rem}
-.profile-post-dialog__header{display:flex;align-items:start;justify-content:space-between;gap:1rem}
+.profile-post-dialog__header{position:sticky;top:0;z-index:2;display:flex;align-items:start;justify-content:space-between;gap:1rem;background:#fff}
 .profile-post-dialog__header h3{margin:.2rem 0;font-size:1.2rem;overflow-wrap:anywhere}
 .profile-post-dialog__close{flex:none;min-width:44px;min-height:44px;border:1px solid #d4dad3;border-radius:.7rem;background:#fff;color:inherit;font:inherit;cursor:pointer}
 .profile-post-dialog__image-wrap{display:grid;place-items:center;width:100%;height:min(60svh,520px);min-height:120px;border-radius:.8rem;background:#f1f2ed;overflow:hidden}

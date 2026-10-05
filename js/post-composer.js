@@ -153,6 +153,7 @@ export function bindUserPostComposer(root, options = {}) {
     <button class="map-post-drawer__backdrop" type="button" data-post-backdrop aria-label="投稿パネルを閉じる"></button>
     <section class="map-post-drawer__panel" role="dialog" aria-modal="true" aria-labelledby="map-post-title">
       <div class="map-post-drawer__head"><div><span class="eyebrow">user post</span><h2 id="map-post-title">地図に絵を置く</h2></div><button class="map-post-drawer__close" type="button" data-post-close aria-label="投稿パネルを閉じる">×</button></div>
+      <div class="map-post-drawer__body">
       <p class="map-post-drawer__lead">小さなドット絵とセルを選ぶだけ。確認後に、選んだセル自体が掲載場所になります。</p>
       <div class="map-post-drawer__steps" aria-label="投稿の流れ"><span class="is-current">01 絵</span><span>02 セル</span><span>03 確認</span></div>
       <form class="map-post-form" data-post-form novalidate>
@@ -164,6 +165,7 @@ export function bindUserPostComposer(root, options = {}) {
         <p class="map-post-form__status" data-post-status role="status" aria-live="polite"></p>
         <button class="button button--primary map-post-form__submit" type="submit" data-post-submit disabled>投稿を送る</button>
       </form>
+      </div>
     </section>`;
   root.append(panel);
 

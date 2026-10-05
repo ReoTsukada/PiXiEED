@@ -200,6 +200,7 @@ body.room-page {
   max-width: 560px;
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.5rem);
   margin: auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   padding: 1rem;
   overflow: hidden;
   border: 1px solid rgba(38, 54, 50, .24);
@@ -208,10 +209,14 @@ body.room-page {
   background: #fffdf8;
   box-shadow: 0 22px 70px rgba(24, 41, 34, .25);
 }
+.room-dialog[open] { display: grid; }
 .room-dialog::backdrop { background: rgba(20, 33, 30, .48); }
 .room-dialog__layout {
   display: grid;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   gap: .8rem;
 }
 .room-dialog__main,
@@ -279,6 +284,8 @@ body.room-page {
   background: var(--room-red);
 }
 .room-dialog__close {
+  position: relative;
+  z-index: 2;
   width: 100%;
   margin-top: .45rem;
   color: var(--room-ink);

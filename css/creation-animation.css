@@ -164,6 +164,7 @@
   position: fixed;
   z-index: 60;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 44px minmax(88px, 1fr);
   gap: 4px;
   overflow: hidden;
@@ -183,7 +184,7 @@
 .animation-controls__workspace-panel [hidden] { display: none !important; }
 .animation-controls__workspace-panel.is-open { opacity: 1; transform: translateY(0); pointer-events: auto; }
 .animation-controls__workspace-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.animation-controls__workspace-heading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.animation-controls__workspace-heading strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .animation-controls__workspace-selection { overflow: hidden; min-width: 0; margin-left: auto; color: var(--creation-muted, #b8c0c2); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .animation-controls__workspace-heading .animation-controls__button { margin-left: 0; }
 .animation-controls__workspace-panel .animation-controls__toolbar { display: none; }
@@ -256,7 +257,7 @@
   box-shadow: 0 12px 34px #0009;
 }
 .animation-controls__timing { top: auto; bottom: calc(var(--creation-editor-bottom, 84px) + 9px + env(safe-area-inset-bottom, 0px)); width: min(250px, calc(100vw - 20px)); overflow: visible; }
-.animation-controls__panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; margin: 0 0 5px; font-size: 13px; font-weight: 800; }
+.animation-controls__panel-heading { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; margin: 0 0 5px; background: var(--creation-panel, #202a33); font-size: 13px; font-weight: 800; }
 .animation-controls__panel-heading .animation-controls__button { flex-basis: 44px; }
 .animation-controls__layer-list { display: grid; gap: 5px; max-height: min(55dvh, 430px); overflow: auto; overscroll-behavior: contain; }
 .animation-controls__layer { display: grid; grid-template-columns: minmax(0, 1fr) repeat(5, 44px); align-items: center; gap: 3px; min-width: 0; padding: 2px; border: 1px solid transparent; border-radius: 10px; }
