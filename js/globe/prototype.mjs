@@ -1,10 +1,12 @@
-import { initAstroUi } from './astro-ui.mjs?v=20260929-gallery-observe-1';
-import { initPostUi } from './post-ui.mjs?v=20261004-post-size-256-1';
-import { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } from './real-sky.mjs?v=20260927-sky-events-v1';
+import { initPostUi } from './post-ui.mjs?v=20261005-admin-boundary-1';
+import { initMapEvents } from './map-events.mjs?v=20261005-admin-boundary-1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261004-puzzle-share-1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20260927-solar-tool-2';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261005-admin-boundary-1';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
 
+const telescopeTool = new URLSearchParams(location.search).get('tool') === 'telescope';
+// Astronomy belongs to the stand-alone telescope; a map never starts its timers or catalogue.
+const astronomy = telescopeTool ? await Promise.all([import('./astro-ui.mjs?v=20261005-admin-boundary-1'), import('./real-sky.mjs?v=20260927-sky-events-v1')]) : null;
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 
 const canvas = document.querySelector('#globeCanvas');
@@ -14,12 +16,23 @@ const selectionPanel = document.querySelector('#selectionPanel');
 const selectedOwner = document.querySelector('#selectedOwner');
 const selectedStage = document.querySelector('#selectedStage');
 const placeHere = document.querySelector('#placeHere');
+const viewCellPosts = document.querySelector('#viewCellPosts');
+const zoomToCell = document.querySelector('#zoomToCell');
+const clearCellSelection = document.querySelector('#clearCellSelection');
+const selectedPostCount = document.querySelector('#selectedPostCount');
+const cellTooltip = document.querySelector('#cellTooltip');
+let currentHover = null;
 const accountSlot = document.querySelector('#accountSlot');
 const primaryAction = document.querySelector('#globePrimaryAction');
-const viewSwitch = document.querySelector('#astroViewSwitch');
+const viewSwitch = document.querySelector('#mapLayerSwitch');
+let eventUi = null;
+let mapContentLayer = 'posts';
 let postUi = null;
 let currentSelection = null;
 
+const MAP_CELLS_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
+const MAP_ADMIN1_URL = 'assets/maps/map-admin1-v1.json?v=20261005-admin-boundary-1';
+const MAP_PREFECTURES_URL = 'assets/maps/map-prefectures-v1.json?v=20261005-admin-boundary-1';
 const RASTER_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
 
 function readJson(path) {
@@ -37,14 +50,55 @@ function showSelection(selection) {
   // Keyboard selection can happen while the time drawer is open. Keep its
   // overlay from hiding the newly available placement action.
   globalThis.__PIXIEED_ASTRO__?.setOpen(false);
-  selectedStage.textContent = getSelectionStageLabel(selection.lodLevel);
-  selectedOwner.textContent = selection.ownerLabel || selection.countryId || '土地セル';
-  placeHere.setAttribute('aria-label', `${selectedOwner.textContent}のセルに作品を置く`);
+  const isMap = renderer?.getSnapshot()?.camera?.projection === 'mercator';
+  selectedStage.textContent = isMap ? (selection.mapRegionKind === 'admin1' ? '選択中の州・地域' : selection.prefectureId ? '選択中の都道府県' : selection.mapRegionId ? '選択中の国' : '選択中のセル') : getSelectionStageLabel(selection.lodLevel);
+  selectedOwner.textContent = cellLocationLabel(selection);
+  const events = mapContentLayer === 'events';
+  const summary = contentSummary(selection);
+  selectedPostCount.textContent = String(events ? summary.count : summary);
+  document.querySelector('#selectedContentKind').textContent = events ? 'イベント ' : '投稿 ';
+  viewCellPosts.setAttribute('aria-label', `${selectedOwner.textContent}${events ? 'のイベント' : selection.mapRegionId || selection.prefectureId ? 'の投稿' : '付近の投稿'}を見る`);
+  placeHere.setAttribute('aria-label', `${selectedOwner.textContent}に作品を置く`);
+}
+
+function cellLocationLabel(selection) {
+  const record = selection?.displayCell || selection;
+  const country = record?.countryLabel || selection?.countryLabel || selection?.countryId;
+  const prefecture = record?.prefectureLabel || selection?.prefectureLabel;
+  if (prefecture) return prefecture;
+  const region = record?.mapRegionLabel || selection?.mapRegionLabel;
+  const kind = record?.mapRegionKind || selection?.mapRegionKind;
+  return [country === 'Japan' || country === 'JPN' ? '日本' : country, kind === 'country' ? null : region].filter(Boolean).join(' · ') || selection?.ownerLabel || '土地セル';
+}
+function showCellHover(selection) {
+  currentHover = selection;
+  cellTooltip.hidden = !selection;
+  if (!selection) { canvas.removeAttribute('aria-describedby'); return; }
+  canvas.setAttribute('aria-describedby', 'cellTooltip');
+  cellTooltip.querySelector('[data-cell-name]').textContent = cellLocationLabel(selection);
+  const summary = contentSummary(selection);
+  const record = selection.displayCell || selection;
+  const scopeLabel = record.prefectureId || selection.prefectureId ? '県内' : record.mapRegionId || selection.mapRegionId ? '地域内' : '付近';
+  const eventLabel = `${scopeLabel}のイベント`;
+  const countText = mapContentLayer === 'events'
+    ? `${eventLabel} ${summary.count}件（今後・開催中 ${summary.future}／過去 ${summary.past}）`
+    : `${scopeLabel}の投稿 ${summary}件`;
+  cellTooltip.querySelector('[data-cell-posts]').textContent = `${countText} · クリックで選択`;
+  const viewport = renderer.getSnapshot().camera.viewport;
+  const tooltipWidth = cellTooltip.offsetWidth || 220;
+  const tooltipHeight = cellTooltip.offsetHeight || 64;
+  const x = Math.max(8, Math.min(viewport.width - tooltipWidth - 8, selection.x + 18));
+  const y = Math.max(8, Math.min(viewport.height - tooltipHeight - 8, selection.y + 18));
+  cellTooltip.style.transform = `translate(${x}px, ${y}px)`;
 }
 
 let renderer;
+let previousViewKey = '';
+let skyStarted = false;
+let paintRealSky = () => {};
 function createPrototypeRenderer(options = {}) {
   renderer = createGlobeRenderer(canvas, {
+    projection: new URLSearchParams(location.search).get('tool') === 'telescope' ? 'orthographic' : 'mercator',
     backgroundElement: globeStage,
     skyCanvas: document.querySelector('#skyCanvas'),
     spaceTexture: globeStage?.dataset.spaceTexture || '',
@@ -52,39 +106,56 @@ function createPrototypeRenderer(options = {}) {
     onPick(selection) {
       // While the composer is open a tap moves the draft pin instead of drilling down.
       if (postUi?.handlePick(selection)) { showSelection(null); return; }
+      showCellHover(null);
       showSelection(selection);
-      if (selection) renderer.focusSelection(selection);
+      if (selection && renderer.getSnapshot().camera.projection !== 'mercator') renderer.focusSelection(selection);
     },
-    onLongPress(spot) {
+    onHover: showCellHover,
+    onLongPress: telescopeTool ? function (spot) {
       // Holding a spot on the globe looks at the sky from there.
       if (postUi?.getState?.().sheet === 'composer') return;
       navigator.vibrate?.(8);
       globalThis.__PIXIEED_ASTRO__?.openScope({ latitude: spot.latitude, longitude: spot.longitude });
-    },
-    onZoomLimit(info) { globalThis.__PIXIEED_ASTRO__?.zoomLimit?.(info); },
-    onStateChange({ view }) {
+    } : undefined,
+    onZoomLimit: telescopeTool ? info => globalThis.__PIXIEED_ASTRO__?.zoomLimit?.(info) : undefined,
+    onStateChange({ view, camera }) {
+      const key = [camera.projection, camera.viewport.width, camera.viewport.height, view.centerLongitude, view.centerLatitude, view.zoom].join(':');
+      if (key === previousViewKey) return;
+      previousViewKey = key;
       globalThis.__PIXIEED_ASTRO__?.rememberGlobeView?.(view);
-      globalThis.__PIXIEED_ASTRO__?.refreshView?.();
+      if (camera.projection !== 'mercator') globalThis.__PIXIEED_ASTRO__?.refreshView?.();
       postUi?.refresh();
-      if (globeStage) globeStage.style.setProperty('--space-offset', `${50 + (view.centerLongitude / 360) * 8}% 50%`);
+      eventUi?.refresh();
+      if (camera.projection !== 'mercator' && globeStage) globeStage.style.setProperty('--space-offset', `${50 + (view.centerLongitude / 360) * 8}% 50%`);
     }
   });
   globalThis.__PIXIEED_GLOBE__ = renderer;
-  // The real night sky replaces the procedural stars once it is painted (after the first frame).
-  // Bright stars become sharp sprites on the sky layer; the painted sky then only carries the faint ones.
-  const paintRealSky = () => sharedSky().then(async ({ sky, canvas }) => {
-    const sprites = renderer.setStars?.(sky, { maxMagnitude: SPRITE_MAGNITUDE }) || 0;
-    renderer.setSkyImage?.(sprites ? (await sharedFaintSky()).canvas : canvas);
-  }).catch((error) => console.warn('Real sky unavailable', error));
-  (typeof requestIdleCallback === 'function' ? requestIdleCallback : (fn) => setTimeout(fn, 60))(paintRealSky);
-  if (!globalThis.__PIXIEED_ASTRO__) {
-    try { initAstroUi({ renderer, stage: globeStage, initiallyCollapsed: true }); } catch (error) { console.warn('Astronomy panel unavailable', error); }
+  // Load the catalogue only when an observation view first opens.
+  paintRealSky = () => {
+    if (skyStarted) return;
+    skyStarted = true;
+    if (!astronomy) return;
+    const { sharedSky, sharedFaintSky, SPRITE_MAGNITUDE } = astronomy[1];
+    sharedSky().then(async ({ sky, canvas }) => {
+      const sprites = renderer.setStars?.(sky, { maxMagnitude: SPRITE_MAGNITUDE }) || 0;
+      renderer.setSkyImage?.(sprites ? (await sharedFaintSky()).canvas : canvas);
+    }).catch((error) => { skyStarted = false; console.warn('Real sky unavailable', error); });
+  };
+  if (new URLSearchParams(location.search).get('tool') === 'telescope') paintRealSky();
+  if (astronomy && !globalThis.__PIXIEED_ASTRO__) {
+    try { astronomy[0].initAstroUi({ renderer, stage: globeStage, initiallyCollapsed: true }); } catch (error) { console.warn('Astronomy panel unavailable', error); }
   }
   try {
-    postUi = initPostUi({ renderer, stage: globeStage, accountSlot: embedMode ? null : accountSlot, store: createSupabaseGlobeStore(), auth: createSupabaseGlobeAuth() });
+    postUi = initPostUi({ renderer, stage: globeStage, accountSlot: embedMode ? null : accountSlot, store: createSupabaseGlobeStore(), auth: createSupabaseGlobeAuth(), showMapPins: telescopeTool });
     globalThis.__PIXIEED_POSTS__ = postUi;
     adoptPostHandoff();
   } catch (error) { console.warn('Posting UI unavailable', error); }
+  if (!telescopeTool) {
+    eventUi = initMapEvents({ renderer, stage: globeStage, onChange: updateMapContent, onOpen: () => { postUi?.close(); showCellHover(null); } });
+    globalThis.__PIXIEED_MAP_EVENTS__ = eventUi;
+    updateMapContent();
+    setMapContentLayer('posts');
+  }
   syncObservationViews();
   return renderer;
 }
@@ -97,8 +168,22 @@ function adoptPostHandoff() {
   } catch (error) { console.warn('Image handoff failed', error); }
 }
 
+clearCellSelection?.addEventListener('click', () => { renderer?.clearSelection?.(); canvas.focus({ preventScroll: true }); });
+viewCellPosts?.addEventListener('click', () => { if (currentSelection) { if (mapContentLayer === 'events') eventUi?.openCellEvents(currentSelection); else postUi?.openCellGallery?.(currentSelection); } });
+zoomToCell?.addEventListener('click', () => {
+  if (!currentSelection) return;
+  const view = renderer.getSnapshot().view;
+  renderer.flyTo({ centerLongitude: currentSelection.center.longitude, centerLatitude: currentSelection.center.latitude, zoom: Math.min(view.zoomRange.max, Math.max(6, view.zoom * 2)) }, { duration: 240 });
+});
+globeStage?.addEventListener('pixieed:map-postsopen', () => {
+  if (!telescopeTool && mapContentLayer !== 'posts') { eventUi?.close(); setMapContentLayer('posts'); }
+});
+globeStage?.addEventListener('pixieed:map-postschange', () => {
+  updateMapContent();
+});
+
 placeHere.addEventListener('click', () => {
-  if (currentSelection && postUi) postUi.openComposer({ selection: currentSelection });
+  if (currentSelection && postUi) { setMapContentLayer('posts'); postUi.openComposer({ selection: currentSelection }); }
 });
 
 function syncPrimaryAction() {
@@ -114,28 +199,42 @@ function syncPrimaryAction() {
   if (!telescopeTool) document.querySelector('[data-globe-nav-map]')?.setAttribute('aria-current', 'page');
   else document.querySelector('[data-globe-nav-tools]')?.setAttribute('aria-current', 'page');
 }
-function syncObservationViews() {
-  if (!viewSwitch) return;
-  const standalone = document.documentElement.classList.contains('is-tool-telescope');
-  viewSwitch.hidden = standalone;
-  globeStage.classList.toggle('has-astro-views', !standalone);
-  const mode = globeStage.classList.contains('is-orrery') ? 'solar' : globeStage.classList.contains('is-scope') ? 'sky' : 'globe';
-  for (const button of viewSwitch.querySelectorAll('[data-astro-view]')) button.setAttribute('aria-pressed', String(button.dataset.astroView === mode));
+function contentSummary(selection) {
+  if (mapContentLayer === 'events') return eventUi?.getCellSummary?.(selection) || { count: 0, future: 0, past: 0 };
+  return postUi?.getCellSummary?.(selection)?.count || 0;
 }
-viewSwitch?.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-astro-view]');
-  const api = globalThis.__PIXIEED_ASTRO__;
-  if (!button || !api || api.orrery.getSnapshot().closing || button.getAttribute('aria-pressed') === 'true') return;
-  if (button.dataset.astroView === 'globe') api.returnToGallery();
-  else if (button.dataset.astroView === 'sky') api.showSky();
-  else api.openOrrery();
+function updateMapContent() {
+  if (!renderer || telescopeTool) return;
+  renderer.setMapContent?.({ posts: (postUi?.getPosts?.() || []).map(post => post.pin), events: eventUi?.getDensityEvents?.() || [] });
+  renderer.setMapEventPeriod?.(eventUi?.getPeriodFilter?.() || 'future');
+  if (currentSelection) showSelection(currentSelection);
+  if (currentHover) showCellHover(currentHover);
+}
+function setMapContentLayer(layer) {
+  mapContentLayer = layer === 'events' ? 'events' : 'posts';
+  renderer?.setMapContentLayer?.(mapContentLayer);
+  globeStage.classList.toggle('is-events-layer', mapContentLayer === 'events');
+  postUi?.setMapVisible?.(mapContentLayer === 'posts');
+  eventUi?.setActive(mapContentLayer === 'events');
+  for (const button of viewSwitch?.querySelectorAll('[data-map-content]') || []) button.setAttribute('aria-pressed', String(button.dataset.mapContent === mapContentLayer));
+  if (currentSelection) showSelection(currentSelection);
+  if (currentHover) showCellHover(currentHover);
+}
+function syncObservationViews() {
+  if (viewSwitch) viewSwitch.hidden = telescopeTool;
+  if (telescopeTool && (globeStage.classList.contains('is-orrery') || globeStage.classList.contains('is-scope'))) paintRealSky();
+}
+viewSwitch?.addEventListener('click', event => {
+  const button = event.target.closest('[data-map-content]');
+  if (!button || button.getAttribute('aria-pressed') === 'true') return;
+  postUi?.close(); eventUi?.close();
+  setMapContentLayer(button.dataset.mapContent);
 });
 primaryAction?.addEventListener('click', () => {
   if (document.documentElement.classList.contains('is-tool-telescope')) globalThis.__PIXIEED_ASTRO__?.toggleTelescopeSolarSystem();
   else {
-    const open = () => postUi?.openComposer();
-    if (globalThis.__PIXIEED_ASTRO__?.returnToGallery) globalThis.__PIXIEED_ASTRO__.returnToGallery(open);
-    else open();
+    setMapContentLayer('posts');
+    postUi?.openComposer({ selection: currentSelection });
   }
 });
 globeStage?.addEventListener('pixieed:astro-viewchange', syncPrimaryAction);
@@ -155,7 +254,7 @@ function openToolFromUrl() {
 
 // The globe has no zoom/rotate buttons. A one-time hint names the gestures and
 // leaves as soon as the globe is touched.
-const GESTURE_HINT_KEY = 'PiXiEED:globe-gesture-hint:v1';
+const GESTURE_HINT_KEY = 'PiXiEED:map-gesture-hint:v2';
 const gestureHint = document.querySelector('#gestureHint');
 function dismissGestureHint() {
   if (!gestureHint || gestureHint.hidden) return;
@@ -170,20 +269,24 @@ canvas.addEventListener('pointerdown', dismissGestureHint, { once: true });
 canvas.addEventListener('wheel', dismissGestureHint, { once: true, passive: true });
 
 try {
-  // The HTML head starts this request in parallel with the module graph, so the
-  // 660KB raster no longer waits behind four levels of module fetches.
-  const preloaded = globalThis.__PIXIEED_GLOBE_RASTER__;
-  const source = preloaded ? await preloaded.catch(() => readJson(RASTER_URL)) : await readJson(RASTER_URL);
-  const raster = decodeRasterData(source);
-  createPrototypeRenderer({ rasterData: raster });
+  // Fine map pixels stay in typed arrays; picking preserves canonical posting IDs.
+  const telescope = new URLSearchParams(location.search).get('tool') === 'telescope';
+  const preloaded = telescope ? globalThis.__PIXIEED_GLOBE_RASTER__ : globalThis.__PIXIEED_MAP_CELLS__;
+  const url = telescope ? RASTER_URL : MAP_CELLS_URL;
+  const [source, mapPrefectureData, mapAdmin1Data] = await Promise.all([
+    preloaded ? preloaded.catch(() => readJson(url)) : readJson(url),
+    telescope ? null : (globalThis.__PIXIEED_MAP_PREFECTURES__ || readJson(MAP_PREFECTURES_URL)),
+    telescope ? null : (globalThis.__PIXIEED_MAP_ADMIN1__ || readJson(MAP_ADMIN1_URL)).catch(error => { console.warn('Administrative regions unavailable; using countries.', error); return null; })
+  ]);
+  createPrototypeRenderer(telescope ? { rasterData: decodeRasterData(source) } : { mapCellData: source, mapPrefectureData, mapAdmin1Data });
   loadStatus.textContent = '';
   openToolFromUrl();
   performance.mark?.('globe-ready');
-  console.info(`[globe] ready in ${Math.round(performance.now())}ms (${preloaded ? 'preloaded' : 'late'} raster)`);
+  console.info(`[globe] ready in ${Math.round(performance.now())}ms (${preloaded ? 'preloaded' : 'late'} map)`);
 } catch (rasterError) {
   // A missing/invalid generated asset is an explicit Canvas fallback. The
   // GeoJSON path remains available for recovery and never affects WebGL startup.
-  console.warn('Generated globe raster unavailable; using Canvas fallback.', rasterError);
+  console.warn('Generated map cells unavailable; using Canvas fallback.', rasterError);
   createPrototypeRenderer({ forceCanvas: true });
   openToolFromUrl();
   try {

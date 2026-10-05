@@ -28,6 +28,9 @@ uniform sampler2D uLandMask;
 uniform vec2 uViewport;
 uniform vec2 uCenter;
 uniform float uScale;
+uniform int uMercator;
+uniform vec2 uMapCenter;
+uniform float uWorldSize;
 uniform vec4 uOrientation;
 uniform sampler2D uBandTex;
 uniform float uLatStep;
@@ -160,16 +163,32 @@ vec3 skyColor() {
 vec4 globe() {
   vec2 cameraPoint = (gl_FragCoord.xy - vec2(uCenter.x, uViewport.y - uCenter.y)) / uScale;
   float radialSquared = dot(cameraPoint, cameraPoint);
-  if (radialSquared > 1.0) return vec4(0.0);
-
-  float edgeAlpha = clamp((1.0 - sqrt(radialSquared)) * uScale, 0.0, 1.0);
-  float depth = sqrt(max(0.0, 1.0 - radialSquared));
-  // getViewQuaternion maps the camera's forward vector to the geographic
-  // centre. This is the inverse of the projection's world-to-camera step.
-  vec3 world = rotateByQuaternion(vec3(cameraPoint, depth), uOrientation);
-  float sunlight = surfaceLight(world);
-  float longitude = degrees(atan(world.x, world.z));
-  float latitude = degrees(asin(clamp(world.y, -1.0, 1.0)));
+  float edgeAlpha = 1.0;
+  float sunlight = 1.0;
+  vec3 world;
+  float longitude;
+  float latitude;
+  if (uMercator == 1) {
+    float mapY = uMapCenter.y + cameraPoint.y;
+    if (abs(mapY) > 3.141592654) return vec4(0.025, 0.065, 0.095, 1.0);
+    // Reduce in pixel space before converting to radians: repeated copies
+    // then use identical arithmetic, including near cell/coast boundaries.
+    float worldX = mod(gl_FragCoord.x - uCenter.x + uWorldSize * 0.5, uWorldSize);
+    float lambda = uMapCenter.x + (worldX / uWorldSize - 0.5) * 6.283185307;
+    lambda -= 6.283185307 * floor((lambda + 3.141592654) / 6.283185307);
+    longitude = degrees(lambda);
+    latitude = degrees(atan(sinh(mapY)));
+    world = vec3(cos(radians(latitude)) * sin(lambda), sin(radians(latitude)), cos(radians(latitude)) * cos(lambda));
+    radialSquared = 0.0;
+  } else {
+    if (radialSquared > 1.0) return vec4(0.0);
+    edgeAlpha = clamp((1.0 - sqrt(radialSquared)) * uScale, 0.0, 1.0);
+    float depth = sqrt(max(0.0, 1.0 - radialSquared));
+    world = rotateByQuaternion(vec3(cameraPoint, depth), uOrientation);
+    sunlight = surfaceLight(world);
+    longitude = degrees(atan(world.x, world.z));
+    latitude = degrees(asin(clamp(world.y, -1.0, 1.0)));
+  }
   float bandFloat = clamp(floor((90.0 - latitude) / uLatStep), 0.0, float(uBandTotal - 1));
   int band = int(bandFloat);
   float longitudeCount = bandCountAt(band);
@@ -186,7 +205,7 @@ vec4 globe() {
   // Differentiating the per-band column coordinate spiked at every band edge and
   // drew stray streaks in the sea.
   vec2 heading = normalize(world.xz + vec2(1e-6));
-  float lonDegPerPixel = degrees(length(fwidth(heading)));
+  float lonDegPerPixel = uMercator == 1 ? degrees(1.0 / uScale) : degrees(length(fwidth(heading)));
   float latDegPerPixel = fwidth(latitude);
   float cellWidthEarly = 360.0 / longitudeCount;
   float baseFootprint = max(lonDegPerPixel / cellWidthEarly, latDegPerPixel / uLatStep);
@@ -254,6 +273,7 @@ vec4 globe() {
 void main() {
   if (uLayer == 2) { outColor = vec4(skyColor(), 1.0); return; }
   vec4 planet = globe();
+  if (uMercator == 1) { outColor = vec4(planet.rgb, 1.0); return; }
   if (uLayer == 1) { outColor = vec4(planet.rgb, planet.a); return; } // blending premultiplies it
   outColor = vec4(mix(skyColor(), planet.rgb, planet.a), 1.0);
 }
@@ -405,18 +425,19 @@ function createMaskTexture(gl, rasterData, grid) {
     // No generated raster: derive one value per cell from the static 0.5 degree
     // mask, sampled at each cell's centre.
     const staticMask = unpackStaticMask(WORLD_LAND_MASK);
-    const perCell = new Uint8Array(staticMask.width * grid.bandCount);
+    const width = Math.max(...grid.bands.map((band) => band.longitudeCount));
+    const perCell = new Uint8Array(width * grid.bandCount);
     for (let band = 0; band < grid.bandCount; band += 1) {
       const count = grid.bands[band].longitudeCount;
       const staticBand = Math.min(staticMask.height - 1, Math.floor(((band + 0.5) / grid.bandCount) * staticMask.height));
       const sourceRow = (staticMask.height - 1 - staticBand) * staticMask.width;
-      const targetRow = (grid.bandCount - 1 - band) * staticMask.width;
+      const targetRow = (grid.bandCount - 1 - band) * width;
       for (let column = 0; column < count; column += 1) {
         const texel = Math.min(staticMask.width - 1, Math.floor(((column + 0.5) / count) * staticMask.width));
         perCell[targetRow + column] = staticMask.values[sourceRow + texel];
       }
     }
-    return uploadMaskTexture(gl, perCell, staticMask.width, grid.bandCount);
+    return uploadMaskTexture(gl, perCell, width, grid.bandCount);
   }
   const width = rasterData.textureWidth;
   const height = rasterData.textureHeight;
@@ -505,6 +526,9 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       viewport: gl.getUniformLocation(program, 'uViewport'),
       center: gl.getUniformLocation(program, 'uCenter'),
       scale: gl.getUniformLocation(program, 'uScale'),
+      mercator: gl.getUniformLocation(program, 'uMercator'),
+      mapCenter: gl.getUniformLocation(program, 'uMapCenter'),
+      worldSize: gl.getUniformLocation(program, 'uWorldSize'),
       orientation: gl.getUniformLocation(program, 'uOrientation'),
       bandTex: gl.getUniformLocation(program, 'uBandTex'),
       latStep: gl.getUniformLocation(program, 'uLatStep'),
@@ -562,6 +586,9 @@ export function createWebGLRenderer(canvas, { grid, rasterData = null, skyUrl = 
       gl.uniform2f(locations.viewport, viewportWidth, viewportHeight);
       gl.uniform2f(locations.center, camera.viewport.physicalCenterX, camera.viewport.physicalCenterY);
       gl.uniform1f(locations.scale, camera.scale * camera.viewport.dpr);
+      gl.uniform1i(locations.mercator, camera.projection === 'mercator' ? 1 : 0);
+      gl.uniform2f(locations.mapCenter, camera.centerLongitude * Math.PI / 180, camera.centerMercatorY || 0);
+      gl.uniform1f(locations.worldSize, (camera.worldSize || 1) * camera.viewport.dpr);
       gl.uniform4fv(locations.orientation, quaternionToFloat32(camera.orientation));
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, bandTexture);

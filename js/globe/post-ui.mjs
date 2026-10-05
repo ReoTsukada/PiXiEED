@@ -7,7 +7,7 @@
  * is required; a pin can also come from a Google Maps link / pasted coordinates
  * (parsed offline, so it costs nothing).
  */
-import { lookupCell, projectGeoToScreen } from './geometry.mjs?v=20260921-grid11-1';
+import { lookupCell, projectGeoCopiesToScreen, mercatorY, inverseMercatorY } from './geometry.mjs?v=20261005-map-layers-1';
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
 import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20261004-post-size-256-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
@@ -48,11 +48,11 @@ const SOURCE_LABEL = Object.freeze({
   'map-link': 'Googleマップのリンク',
   coordinates: '入力した座標',
   geolocation: '現在地',
-  globe: '地球でタップ',
+  globe: '地図でタップ',
   sample: 'サンプル'
 });
 
-export function initPostUi({ renderer, stage, store = createPostStore(), auth = createDemoAuth(), accountSlot = null } = {}) {
+export function initPostUi({ renderer, stage, store = createPostStore(), auth = createDemoAuth(), accountSlot = null, showMapPins = true } = {}) {
   if (!renderer || !stage) throw new Error('initPostUi requires a renderer and a stage');
 
   // ---- DOM ----------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   dock.append(composeButton, galleryButton);
 
   const hint = el('div', 'place-hint', { hidden: true, role: 'status' });
-  hint.textContent = '地球のセルをタップすると、ピンがそこに移ります';
+  hint.textContent = '地図のセルをタップすると、ピンがそこに移ります';
 
   const toast = el('div', 'post-toast', { role: 'status', 'aria-live': 'polite' });
 
@@ -81,7 +81,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       <h2 data-compose-title>ドット絵を置く</h2>
       <button type="button" class="sheet__close" data-close aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
     </header>
-    <div class="peek-bar" data-peek-bar hidden><span>地球のセルをタップしてピンを置く</span><button type="button" class="primary" data-peek-done>決定</button></div>
+    <div class="peek-bar" data-peek-bar hidden><span>地図のセルをタップしてピンを置く</span><button type="button" class="primary" data-peek-done>決定</button></div>
     <ol class="steps" aria-label="投稿の進み具合">
       <li data-step="art"><b>1</b>絵</li><li data-step="title"><b>2</b>題名</li><li data-step="place"><b>3</b>場所</li>
     </ol>
@@ -121,7 +121,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
           <div class="place__icon" aria-hidden="true"></div>
           <div class="place__text">
             <strong data-place-main>まだ置いていません</strong>
-            <span data-place-sub>地球のセルをタップするか、下の方法で決めます</span>
+            <span data-place-sub>地図のセルをタップするか、下の方法で決めます</span>
           </div>
         </div>
         <label class="smart">
@@ -130,7 +130,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
         </label>
         <p class="smart__status" data-smart-status role="status"></p>
         <div class="place__actions">
-          <button type="button" class="chip chip--globe" data-pick-globe>地球で選ぶ</button>
+          <button type="button" class="chip chip--globe" data-pick-globe>地図で選ぶ</button>
           <button type="button" class="chip" data-geolocate>現在地を使う</button>
         </div>
         <details class="howto">
@@ -153,7 +153,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       <h3>置きました</h3>
       <p data-done-text></p>
       <div class="done__actions">
-        <button type="button" class="primary" data-done-view>地球で見る</button>
+        <button type="button" class="primary" data-done-view>地図で見る</button>
         <button type="button" class="ghost" data-done-again>もう1枚置く</button>
       </div>
     </div>`;
@@ -174,7 +174,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     </dl>
     <div class="viewer__actions">
       <button type="button" class="ghost" data-v-prev aria-label="前の作品">←</button>
-      <button type="button" class="ghost" data-v-focus>地球で見る</button>
+      <button type="button" class="ghost" data-v-focus>地図で見る</button>
       <button type="button" class="ghost" data-v-next aria-label="次の作品">→</button>
       <a class="viewer__puzzle" data-v-puzzle target="_top" hidden>遊ぶ</a>
       <button type="button" class="viewer__like" data-v-like aria-pressed="false" hidden>♡ いいね</button>
@@ -217,7 +217,77 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     toastTimer = setTimeout(() => toast.classList.remove('is-on'), 3200);
   };
   const currentUser = () => auth.getUser();
-  const posts = () => store.list();
+  let postList = [], postById = new Map(), postsByCell = new Map(), postsByRegion = new Map(), galleryCellId = null, galleryRegionId = null, galleryRegionLabel = null;
+  let orderedPosts = [], orderedViewerId = null, postsRevision = 0, lastRefreshKey = '', mapVisible = true;
+  const mapPinsEnabled = showMapPins !== false;
+  const markerDetails = new WeakMap();
+  const pinMetrics = { refreshes: 0, skipped: 0, created: 0, clusterChecks: 0 };
+  const posts = () => postList;
+  const currentProjection = () => renderer.getSnapshot().camera?.projection || renderer.getSnapshot().view?.projection || null;
+  const regionGroupingEnabled = () => currentProjection() === 'mercator';
+  function mapRegionForLocation(longitude, latitude) {
+    if (typeof renderer.getMapLocation !== 'function') return null;
+    const location = renderer.getMapLocation(longitude, latitude);
+    if (!location) return null;
+    const prefectureId = location.prefectureId;
+    const id = location.mapRegionId || (location.countryId === 'JPN' && prefectureId ? `prefecture:${prefectureId}` : null);
+    if (!id) return null;
+    const kind = location.mapRegionKind || (location.countryId === 'JPN' && prefectureId ? 'prefecture' : 'admin1');
+    const label = String(location.mapRegionLabel || location.prefectureLabel || location.countryLabel || id);
+    const countryLabel = String(location.countryLabel || location.countryId || '');
+    const displayLabel = kind === 'country' ? (countryLabel || label)
+      : kind === 'prefecture' ? label
+        : [countryLabel, label].filter(Boolean).join(' · ');
+    return { id: String(id), index: Number(location.mapRegionIndex || location.prefectureIndex || 0), label, countryId: location.countryId || null, countryLabel, kind, displayLabel };
+  }
+  const regionForLocation = (longitude, latitude) => regionGroupingEnabled() ? mapRegionForLocation(longitude, latitude) : null;
+  function regionForSelection(selection) {
+    if (!regionGroupingEnabled()) return null;
+    const displayCell = selection?.displayCell;
+    const prefectureId = displayCell?.prefectureId ?? selection?.prefectureId;
+    const countryId = displayCell?.countryId ?? selection?.countryId;
+    const id = displayCell?.mapRegionId ?? selection?.mapRegionId ?? ((!countryId || countryId === 'JPN') && prefectureId ? `prefecture:${prefectureId}` : null);
+    if (!id) return null;
+    const kind = displayCell?.mapRegionKind ?? selection?.mapRegionKind ?? ((!countryId || countryId === 'JPN') && prefectureId ? 'prefecture' : 'admin1');
+    const label = String(displayCell?.mapRegionLabel ?? selection?.mapRegionLabel ?? displayCell?.prefectureLabel ?? selection?.prefectureLabel ?? selection?.ownerLabel ?? id);
+    const countryLabel = String(displayCell?.countryLabel ?? selection?.countryLabel ?? countryId ?? '');
+    const displayLabel = kind === 'country' ? (countryLabel || label)
+      : kind === 'prefecture' ? label
+        : [countryLabel, label].filter(Boolean).join(' · ');
+    return { id: String(id), index: Number(displayCell?.mapRegionIndex ?? selection?.mapRegionIndex ?? displayCell?.prefectureIndex ?? selection?.prefectureIndex ?? 0), label, countryId: countryId || null, countryLabel, kind, displayLabel };
+  }
+  const scopedPosts = () => galleryRegionId && regionGroupingEnabled()
+    ? postsByRegion.get(galleryRegionId) || []
+    : galleryCellId ? postsByCell.get(galleryCellId) || [] : postList;
+  function rebuildPosts() {
+    postList = Array.from(store.list()).filter(post => post?.pin && Number.isFinite(post.pin.latitude) && Number.isFinite(post.pin.longitude));
+    postById = new Map(postList.map(post => [post.id, post]));
+    postsByCell = new Map();
+    postsByRegion = new Map();
+    for (const post of postList) {
+      const id = post.pin.cellId || lookupCell(post.pin.longitude, post.pin.latitude).id;
+      let group = postsByCell.get(id);
+      if (!group) { group = []; postsByCell.set(id, group); }
+      group.push(post);
+      const region = mapRegionForLocation(post.pin.longitude, post.pin.latitude);
+      if (region) {
+        let regionGroup = postsByRegion.get(region.id);
+        if (!regionGroup) { regionGroup = []; postsByRegion.set(region.id, regionGroup); }
+        regionGroup.push(post);
+      }
+    }
+    orderedPosts = postList; orderedViewerId = null; postsRevision++; lastRefreshKey = '';
+    for (const [key, marker] of markers) {
+      const post = postById.get(marker.dataset.id);
+      if (!post) { marker.remove(); markers.delete(key); } else updateMarker(marker, post);
+    }
+    galleryButton.querySelector('.post-dock__count').textContent = String(postList.length);
+  }
+  function getCellSummary(selection) {
+    const region = regionForSelection(selection);
+    if (region) return { count: postsByRegion.get(region.id)?.length || 0 };
+    return { count: postsByCell.get(selection?.cellId || selection?.cell?.id || selection?.id)?.length || 0 };
+  }
   const isMine = (post) => Boolean(currentUser()) && post.author?.id === currentUser().id && !post.sample;
   const view = () => renderer.getSnapshot().view;
 
@@ -230,6 +300,11 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     let centerLongitude = longitude;
     if (camera && openSheet()) {
       const scale = camera.radius * zoom;
+      if (camera.projection === 'mercator') {
+        if (stage.clientWidth < 680) centerLatitude = inverseMercatorY(mercatorY(latitude) - stage.clientHeight * .2 / scale);
+        else centerLongitude = longitude + 190 / scale * 180 / Math.PI;
+        renderer.setView({ centerLongitude, centerLatitude, zoom }); return;
+      }
       const narrow = stage.clientWidth < 680;
       if (narrow) centerLatitude = clamp(latitude - (stage.clientHeight * 0.2 / scale) * 57.2958, -85, 85);
       else centerLongitude = longitude + (190 / scale) * 57.2958 / Math.max(0.2, Math.cos(latitude * Math.PI / 180));
@@ -240,6 +315,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   // ---- panels ---------------------------------------------------------------------------------
   const sheets = { composer, viewer, gallery };
   function showSheet(name) {
+    if (name) stage.dispatchEvent(new CustomEvent('pixieed:map-postsopen'));
     if (name !== 'composer') invalidateLocationRequest();
     for (const [key, node] of Object.entries(sheets)) node.hidden = key !== name;
     stage.classList.toggle('has-sheet', Boolean(name));
@@ -334,13 +410,14 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     composeButton.querySelector('.post-fab__draft').hidden = !(okArt || okTitle || okPlace) || Boolean(state.done);
     if (state.pin) {
       c.place.classList.add('is-set');
-      c.placeMain.textContent = formatCoordinates(state.pin.latitude, state.pin.longitude);
-      const where = state.pin.label ? `${state.pin.label} ・ ` : '';
+      const region = regionForLocation(state.pin.longitude, state.pin.latitude);
+      c.placeMain.textContent = region?.displayLabel || formatCoordinates(state.pin.latitude, state.pin.longitude);
+      const where = state.pin.label && !region ? `${state.pin.label} ・ ` : '';
       c.placeSub.textContent = `${where}${SOURCE_LABEL[state.pin.source] || 'ピン'}`;
     } else {
       c.place.classList.remove('is-set');
       c.placeMain.textContent = 'まだ置いていません';
-      c.placeSub.textContent = '地球のセルをタップするか、下の方法で決めます';
+      c.placeSub.textContent = '地図のセルをタップするか、下の方法で決めます';
     }
     positionDraftPin();
   }
@@ -391,8 +468,9 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   function setPin(pin, { fly = false } = {}) {
     invalidateLocationRequest();
     const cell = lookupCell(pin.longitude, pin.latitude);
+    const region = regionForLocation(pin.longitude, pin.latitude);
     if (!state.pin || state.pin.latitude !== pin.latitude || state.pin.longitude !== pin.longitude || state.pin.cellId !== cell.cellId) invalidateRequestKey();
-    state.pin = { ...pin, cellId: cell.cellId };
+    state.pin = { ...pin, ...(region ? { label: region.displayLabel } : {}), cellId: cell.cellId };
     if (fly) flyTo(pin.latitude, pin.longitude, 6);
     syncComposer();
   }
@@ -517,9 +595,9 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     }, (error) => {
       if (!isCurrent()) return;
       c.geolocate.disabled = false;
-      const message = error?.code === 1 ? '現在地の利用が許可されませんでした。設定を確認するか、地球で選んでください。'
-        : error?.code === 3 ? '現在地の確認が時間切れになりました。再試行するか、地球で選んでください。'
-          : '現在地を取得できませんでした。再試行するか、地球で選んでください。';
+      const message = error?.code === 1 ? '現在地の利用が許可されませんでした。設定を確認するか、地図で選んでください。'
+        : error?.code === 3 ? '現在地の確認が時間切れになりました。再試行するか、地図で選んでください。'
+          : '現在地を取得できませんでした。再試行するか、地図で選んでください。';
       c.smartStatus.textContent = message; c.smartStatus.dataset.state = 'error';
     }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
   }
@@ -552,7 +630,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       c.doneText.textContent = record.status === 'pending'
         ? `「${record.title}」を受け付けました。確認後、このセルに表示されます。`
         : `「${record.title}」を ${formatCoordinates(record.pin.latitude, record.pin.longitude)} に置きました。`;
-      $(composer, '[data-done-view]').textContent = record.status === 'pending' ? '地球儀へ戻る' : '地球で見る';
+      $(composer, '[data-done-view]').textContent = record.status === 'pending' ? '地図へ戻る' : '地図で見る';
       c.form.hidden = true; c.done.hidden = false; hint.hidden = true;
       state.submitting = false; syncComposer();
       if (record.status !== 'pending') {
@@ -657,8 +735,11 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     v.caption.hidden = !post.caption;
     v.author.textContent = post.author?.name || '—';
     v.date.textContent = formatDate(post.createdAt);
-    v.coords.textContent = formatCoordinates(post.pin.latitude, post.pin.longitude);
-    v.map.href = googleMapsUrl(post.pin.latitude, post.pin.longitude);
+    const region = regionForLocation(post.pin.longitude, post.pin.latitude);
+    v.coords.textContent = region?.displayLabel || formatCoordinates(post.pin.latitude, post.pin.longitude);
+    v.map.href = region
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(region.displayLabel)}`
+      : googleMapsUrl(post.pin.latitude, post.pin.longitude);
     v.kicker.textContent = post.postKind === 'pixel_camera' ? 'ドット絵カメラ投稿' : (post.sample ? 'サンプル作品' : 'ドット絵作品');
     v.puzzle.hidden = !['spot_difference', 'hidden_object'].includes(post.puzzleMode) || !/^[0-9a-f-]{36}$/i.test(String(post.id));
     v.puzzle.href = v.puzzle.hidden ? '#' : `/play/${post.puzzleMode === 'hidden_object' ? 'hidden-object' : 'spot-difference'}/?postPuzzle=${encodeURIComponent(post.id)}`;
@@ -697,7 +778,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   }
 
   function stepViewer(direction) {
-    const list = posts();
+    const list = scopedPosts();
     const index = list.findIndex((item) => item.id === state.viewerId);
     if (index < 0 || list.length < 2) return;
     openViewer(list[(index + direction + list.length) % list.length].id);
@@ -787,8 +868,24 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
 
   // ---- gallery ------------------------------------------------------------------------------
   const g = { grid: $(gallery, '[data-grid]'), empty: $(gallery, '[data-empty]'), tabs: gallery.querySelectorAll('[data-tab]') };
+  const allPlaces = el('button', 'gallery__all-places', { type: 'button', hidden: true, 'data-all-places': '' });
+  allPlaces.textContent = '地図全体の投稿を見る';
+  gallery.querySelector('.sheet__head').after(allPlaces);
+  allPlaces.addEventListener('click', () => { galleryCellId = null; galleryRegionId = null; galleryRegionLabel = null; renderGallery(); });
+  function openCellGallery(selection) {
+    const region = regionForSelection(selection);
+    galleryRegionId = region?.id || null;
+    galleryRegionLabel = region?.displayLabel || null;
+    galleryCellId = selection?.cellId || selection?.cell?.id || selection?.id || null;
+    const list = scopedPosts();
+    state.tab = list.some(post => post.postKind !== 'pixel_camera') ? 'art' : list.some(post => post.postKind === 'pixel_camera') ? 'camera' : 'art';
+    renderGallery(); showSheet('gallery');
+  }
   function renderGallery() {
-    const list = posts().filter((post) => state.tab === 'camera' ? post.postKind === 'pixel_camera' : post.postKind !== 'pixel_camera');
+    const regionScope = galleryRegionId && regionGroupingEnabled();
+    gallery.querySelector('h2').textContent = regionScope ? `${galleryRegionLabel || galleryRegionId}の投稿` : galleryCellId ? 'この付近の投稿' : '地図の投稿';
+    allPlaces.hidden = !galleryCellId && !galleryRegionId;
+    const list = scopedPosts().filter((post) => state.tab === 'camera' ? post.postKind === 'pixel_camera' : post.postKind !== 'pixel_camera');
     g.grid.replaceChildren(...list.map((post) => {
       const cell = el('button', 'tile', { type: 'button', 'aria-label': post.title });
       const art = el('span', 'tile__art'); art.append(pixelImage(post));
@@ -799,80 +896,124 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       return cell;
     }));
     g.empty.hidden = list.length > 0;
-    g.empty.textContent = state.tab === 'camera' ? 'カメラ投稿はまだありません。' : 'ドット絵作品はまだありません。';
+    g.empty.textContent = regionScope ? (state.tab === 'camera' ? 'この地域のカメラ投稿はまだありません。' : 'この地域のドット絵作品はまだありません。') : galleryCellId ? (state.tab === 'camera' ? 'この付近のカメラ投稿はまだありません。' : 'この付近のドット絵作品はまだありません。') : (state.tab === 'camera' ? 'カメラ投稿はまだありません。' : 'ドット絵作品はまだありません。');
     g.tabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.dataset.tab === state.tab)));
     galleryButton.querySelector('.post-dock__count').textContent = String(posts().length);
   }
   g.tabs.forEach((tab) => tab.addEventListener('click', () => { state.tab = tab.dataset.tab; renderGallery(); }));
   $(gallery, '[data-close]').addEventListener('click', closeSheets);
-  galleryButton.addEventListener('click', () => { if (openSheet() === 'gallery') closeSheets(); else { renderGallery(); showSheet('gallery'); } });
+  galleryButton.addEventListener('click', () => { if (openSheet() === 'gallery') closeSheets(); else { galleryCellId = null; galleryRegionId = null; galleryRegionLabel = null; renderGallery(); showSheet('gallery'); } });
   composeButton.addEventListener('click', () => { if (openSheet() === 'composer') closeSheets(); else openComposer(); });
 
   // ---- pins on the globe ------------------------------------------------------------------
-  function ensureMarker(post) {
-    let marker = markers.get(post.id);
-    if (marker) return marker;
-    marker = el('button', 'pin', { type: 'button', 'data-id': post.id });
+  function updateMarker(marker, post) {
+    const details = markerDetails.get(marker);
+    if (details.imageUrl !== post.image.dataUrl) { details.art.src = post.image.dataUrl; details.imageUrl = post.image.dataUrl; }
+    details.art.width = post.image.width; details.art.height = post.image.height;
+    details.label.textContent = post.postKind === 'pixel_camera' ? `カメラ · ${post.title}` : post.title;
     marker.classList.toggle('pin--camera', post.postKind === 'pixel_camera');
-    marker.append(pixelImage(post, 'pin__art'));
-    const badge = el('span', 'pin__count', { hidden: true }); marker.append(badge);
-    const label = el('span', 'pin__label'); label.textContent = post.postKind === 'pixel_camera' ? `カメラ · ${post.title}` : post.title; marker.append(label);
+    marker.classList.toggle('is-mine', isMine(post));
     marker.setAttribute('aria-label', post.postKind === 'pixel_camera' ? `ドット絵カメラ投稿：${post.title}` : `ドット絵作品：${post.title}`);
-    marker.addEventListener('pointerdown', (event) => event.stopPropagation());
-    marker.addEventListener('click', (event) => { event.stopPropagation(); openViewer(post.id, { fly: false }); });
-    pinLayer.append(marker);
-    markers.set(post.id, marker);
+  }
+  function ensureMarker(post, slot) {
+    if (!mapPinsEnabled) return null;
+    // A slot follows a post's visible copy, rather than an absolute world index.
+    // Offscreen copies keep their image node for the next pan or zoom.
+    const key = `${post.id}:slot:${slot}`;
+    let marker = markers.get(key);
+    if (marker) return marker;
+    marker = el('button', 'pin', { type: 'button', 'data-id': post.id, hidden: true });
+    const art = pixelImage(post, 'pin__art');
+    const badge = el('span', 'pin__count', { hidden: true });
+    const label = el('span', 'pin__label');
+    marker.append(art, badge, label);
+    markerDetails.set(marker, { art, badge, label, imageUrl: post.image.dataUrl });
+    updateMarker(marker, post);
+    marker.addEventListener('pointerdown', event => event.stopPropagation());
+    marker.addEventListener('click', event => { event.stopPropagation(); galleryCellId = null; openViewer(marker.dataset.id, { fly: false }); });
+    pinLayer.append(marker); markers.set(key, marker); pinMetrics.created++;
     return marker;
   }
+  function styleValue(node, key, value) { if (node.style.getPropertyValue(key) !== value) node.style.setProperty(key, value); }
 
+  const draftCopies = [];
   function positionDraftPin() {
     const snapshot = renderer.getSnapshot();
-    if (!state.pin || composer.hidden || state.done || !snapshot.camera) { draftPin.hidden = true; return; }
-    const point = projectGeoToScreen(state.pin.longitude, state.pin.latitude, snapshot.camera);
-    draftPin.hidden = point.depth < PIN_VISIBLE_DEPTH;
-    draftPin.style.transform = `translate(${point.x}px, ${point.y}px)`;
+    const points = state.pin && !composer.hidden && !state.done && snapshot.camera
+      ? projectGeoCopiesToScreen(state.pin.longitude, state.pin.latitude, snapshot.camera, 20).filter((point) => point.depth >= PIN_VISIBLE_DEPTH) : [];
+    const pins = [draftPin, ...draftCopies];
+    while (pins.length < points.length) { const copy = draftPin.cloneNode(true); pinLayer.append(copy); draftCopies.push(copy); pins.push(copy); }
+    pins.forEach((pin, index) => { pin.hidden = !points[index]; if (points[index]) pin.style.transform = `translate(${points[index].x}px, ${points[index].y}px)`; });
   }
 
   function syncMarkerSelection() {
-    for (const [id, marker] of markers) marker.classList.toggle('is-selected', id === state.viewerId);
+    for (const marker of markers.values()) marker.classList.toggle('is-selected', marker.dataset.id === state.viewerId);
   }
 
   function refresh({ pop = '' } = {}) {
-    const snapshot = renderer.getSnapshot();
-    const camera = snapshot.camera;
-    if (!camera) return;
-    const list = posts();
-    const live = new Set(list.map((post) => post.id));
-    for (const [id, marker] of markers) if (!live.has(id)) { marker.remove(); markers.delete(id); }
+    const snapshot = renderer.getSnapshot(), camera = snapshot.camera;
+    if (!camera || !mapVisible) return;
+    if (!mapPinsEnabled) {
+      if (composer.hidden && draftPin.hidden && draftCopies.every((pin) => pin.hidden)) return;
+      positionDraftPin();
+      return;
+    }
+    const key = [camera.projection, camera.viewport.width, camera.viewport.height, camera.centerLongitude, camera.centerLatitude, camera.zoom, postsRevision, currentUser()?.id || '', state.viewerId, state.pin?.latitude, state.pin?.longitude, composer.hidden, Boolean(state.done)].join(':');
+    if (!pop && key === lastRefreshKey) { pinMetrics.skipped++; return; }
+    lastRefreshKey = key; pinMetrics.refreshes++;
     const zoom = snapshot.view.zoom;
     const size = zoom < 1.6 ? 22 : zoom < 4 ? 30 : zoom < 9 ? 42 : 56;
-    const kept = [];
-    const ordered = [...list].sort((a, b) => (a.id === state.viewerId ? -1 : b.id === state.viewerId ? 1 : 0));
-    for (const post of ordered) {
-      const marker = ensureMarker(post);
-      const point = projectGeoToScreen(post.pin.longitude, post.pin.latitude, camera);
-      if (point.depth < PIN_VISIBLE_DEPTH) { marker.hidden = true; continue; }
-      const host = kept.find((item) => Math.hypot(item.x - point.x, item.y - point.y) < size * 0.86);
-      if (host) { host.count += 1; marker.hidden = true; continue; }
-      marker.hidden = false;
-      marker.style.setProperty('--size', `${size}px`);
-      marker.style.setProperty('--fade', String(clamp((point.depth - PIN_VISIBLE_DEPTH) / 0.22, 0, 1)));
-      marker.style.transform = `translate(${point.x}px, ${point.y}px)`;
-      marker.classList.toggle('is-mine', isMine(post));
-      if (pop && post.id === pop) { marker.classList.remove('is-pop'); void marker.offsetWidth; marker.classList.add('is-pop'); }
-      kept.push({ x: point.x, y: point.y, count: 1, marker });
+    if (orderedViewerId !== state.viewerId) {
+      const chosen = postById.get(state.viewerId);
+      orderedPosts = chosen ? [chosen, ...postList.filter(post => post.id !== chosen.id)] : postList;
+      orderedViewerId = state.viewerId;
     }
+    const kept = [], buckets = new Map(), visibleMarkers = new Set(), reach = size * .86;
+    for (const post of orderedPosts) {
+      const points = projectGeoCopiesToScreen(post.pin.longitude, post.pin.latitude, camera, size);
+      let slot = 0;
+      for (const point of points) {
+        if (point.depth < PIN_VISIBLE_DEPTH) continue;
+        const marker = ensureMarker(post, slot++), bx = Math.floor(point.x / reach), by = Math.floor(point.y / reach);
+        let host = null;
+        for (let x = bx - 1; x <= bx + 1; x++) for (let y = by - 1; y <= by + 1; y++) {
+          for (const candidate of buckets.get(`${x}:${y}`) || []) {
+            pinMetrics.clusterChecks++;
+            if (Math.hypot(candidate.x - point.x, candidate.y - point.y) < reach && (!host || candidate.order < host.order)) host = candidate;
+          }
+        }
+        if (host) { host.count++; continue; }
+        visibleMarkers.add(marker);
+        if (marker.hidden) marker.hidden = false;
+        styleValue(marker, '--size', `${size}px`);
+        styleValue(marker, '--fade', String(clamp((point.depth - PIN_VISIBLE_DEPTH) / .22, 0, 1)));
+        styleValue(marker, 'transform', `translate(${point.x}px, ${point.y}px)`);
+        marker.classList.toggle('is-selected', post.id === state.viewerId);
+        if (pop && post.id === pop) { marker.classList.remove('is-pop'); void marker.offsetWidth; marker.classList.add('is-pop'); }
+        const item = { x: point.x, y: point.y, count: 1, marker, order: kept.length };
+        kept.push(item);
+        const bucketKey = `${bx}:${by}`;
+        if (!buckets.has(bucketKey)) buckets.set(bucketKey, []);
+        buckets.get(bucketKey).push(item);
+      }
+    }
+    for (const marker of markers.values()) if (!visibleMarkers.has(marker) && !marker.hidden) marker.hidden = true;
     for (const item of kept) {
-      const badge = item.marker.querySelector('.pin__count');
-      badge.hidden = item.count < 2;
-      badge.textContent = item.count > 99 ? '99+' : String(item.count);
+      const badge = markerDetails.get(item.marker).badge, text = item.count > 99 ? '99+' : String(item.count);
+      if (badge.hidden !== (item.count < 2)) badge.hidden = item.count < 2;
+      if (badge.textContent !== text) badge.textContent = text;
     }
     positionDraftPin();
   }
 
   // ---- wiring -------------------------------------------------------------------------------
-  store.subscribe(() => { refresh(); if (!gallery.hidden) renderGallery(); else galleryButton.querySelector('.post-dock__count').textContent = String(posts().length); });
-  auth.subscribe(() => { renderAccount(); refresh(); if (!gallery.hidden) renderGallery(); if (!viewer.hidden) openViewer(state.viewerId, { fly: false }); });
+  store.subscribe(() => {
+    rebuildPosts(); refresh();
+    if (!gallery.hidden) renderGallery();
+    if (!viewer.hidden) { if (postById.has(state.viewerId)) openViewer(state.viewerId, { fly: false }); else closeSheets(); }
+    stage.dispatchEvent(new CustomEvent('pixieed:map-postschange'));
+  });
+  auth.subscribe(() => { renderAccount(); lastRefreshKey = ''; for (const marker of markers.values()) marker.classList.toggle('is-mine', isMine(postById.get(marker.dataset.id))); refresh(); if (!gallery.hidden) renderGallery(); if (!viewer.hidden) openViewer(state.viewerId, { fly: false }); });
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { if (!modal.hidden) { modal.hidden = true; state.pendingAfterLogin = null; } else closeSheets(); return; }
     if (openSheet() === 'viewer' && !/INPUT|TEXTAREA|SELECT/.test(event.target?.tagName || '')) {
@@ -883,11 +1024,15 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   new ResizeObserver(() => refresh()).observe(stage);
   renderAccount();
   syncComposer();
-  store.ready.then(() => { refresh(); renderGallery(); });
-  refresh();
+  store.ready.then(() => { rebuildPosts(); refresh(); if (!gallery.hidden) renderGallery(); stage.dispatchEvent(new CustomEvent('pixieed:map-postschange')); });
+  rebuildPosts(); refresh();
 
   return {
     refresh,
+    getCellSummary,
+    getPosts: () => postList,
+    setMapVisible(visible) { mapVisible = Boolean(visible); pinLayer.hidden = !mapVisible; lastRefreshKey = ''; if (mapVisible) refresh(); },
+    openCellGallery,
     /** Called with every globe pick. Returns true when the pick was used to move the draft pin. */
     handlePick(selection) {
       if (openSheet() !== 'composer' || state.done) return false;
@@ -903,7 +1048,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     close: closeSheets,
     store,
     auth,
-    getState: () => ({ sheet: openSheet(), pin: state.pin, image: Boolean(state.image), posts: posts().length, user: currentUser() }),
+    getState: () => ({ sheet: openSheet(), pin: state.pin, image: Boolean(state.image), posts: posts().length, user: currentUser(), pinMetrics: { ...pinMetrics }, cellScope: galleryCellId }),
     setImageFile: setImage,
     setPin,
     setTitle(text) { c.title.value = text; syncComposer(); }

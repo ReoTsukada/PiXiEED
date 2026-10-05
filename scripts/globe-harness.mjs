@@ -6,6 +6,8 @@ import { resolve } from 'node:path';
 
 const DEFAULT_TESTS = [
   'tests/globe/geometry.test.mjs',
+  'tests/globe/mercator.test.mjs',
+  'tests/globe/map-cells.test.mjs',
   'tests/globe/topology.test.mjs',
   'tests/globe/hierarchy.test.mjs',
   'tests/globe/renderer.test.mjs'
@@ -14,6 +16,8 @@ const DEFAULT_TESTS = [
   , 'tests/globe/post-contract.test.mjs'
   , 'tests/globe/planets.test.mjs'
   , 'tests/globe/tool-shell.test.mjs'
+  , 'tests/globe/map-events.test.mjs'
+  , 'tests/globe/event-catalog.test.mjs'
   , 'tests/globe/real-sky.test.mjs'
   , 'tests/globe/sky-events.test.mjs'
 ];

@@ -1,0 +1,2369 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-05T07:18:39+00:00",
+  "events": [
+    {
+      "id": "pixel-art-park-9",
+      "name": "Pixel Art Park 9",
+      "prefecture": "神奈川県",
+      "area": "横浜・みなとみらい",
+      "venue": "パシフィコ横浜 展示ホールA",
+      "startDate": "2026-10-11",
+      "endDate": "2026-10-11",
+      "dateLabel": "2026年10月11日（日）11:00–18:00",
+      "status": "upcoming",
+      "sourceUrl": "https://pixelartpark.com/en/events/pap9/",
+      "socialUrls": [
+        "https://x.com/pixelartpark"
+      ],
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "shibuya-pixel-art-watch",
+      "name": "SHIBUYA PIXEL ART",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "次回会場未発表",
+      "startDate": "",
+      "endDate": "",
+      "lastHeldDate": "2025-09-21",
+      "dateLabel": "次回開催情報待ち（前回は2025年9月21日）",
+      "status": "watch",
+      "sourceUrl": "https://pixel-art.jp/spa2025",
+      "socialUrls": [
+        "https://x.com/ShibuyaPixelArt"
+      ],
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "winter-dot-daisakusen-watch",
+      "name": "冬休みドット大作戦",
+      "prefecture": "東京都",
+      "area": "北千住",
+      "venue": "次回会場未発表",
+      "startDate": "",
+      "endDate": "",
+      "lastHeldDate": "2026-01-10",
+      "dateLabel": "次回開催情報待ち（前回は2026年1月10日〜11日）",
+      "status": "watch",
+      "sourceUrl": "https://dot-daisakusen.com/",
+      "socialUrls": [
+        "https://x.com/dot_daisakusen"
+      ],
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "kyushu-pixel-marche-watch",
+      "name": "九州ピクセルマルシェ",
+      "prefecture": "福岡県",
+      "area": "福岡・天神",
+      "venue": "次回会場未発表",
+      "startDate": "",
+      "endDate": "",
+      "lastHeldDate": "2026-05-04",
+      "dateLabel": "次回開催情報待ち（前回は2026年5月4日）",
+      "status": "watch",
+      "sourceUrl": "https://pixel-marche.com/",
+      "socialUrls": [
+        "https://x.com/PixelMarche"
+      ],
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "gb-pixel-art-jam-2026",
+      "name": "GB Pixel Art Jam 2026",
+      "online": true,
+      "venue": "オンライン",
+      "startDate": "2026-10-09",
+      "endDate": "2026-10-11",
+      "dateLabel": "2026年10月9日〜11日（提出期間表示）。規約は10日00:00 GMT開始。開始時刻に1時間の差があるため公式情報を要確認。",
+      "status": "upcoming",
+      "sourceUrl": "https://itch.io/jam/gb-pixel-art-jam-2026",
+      "description": "Game Boy用160×144・4色のドット絵を制作するアートジャム。",
+      "socialTags": [
+        "#gbpixelartjam"
+      ],
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "segment-pixel-jam-2026",
+      "name": "Segment Pixel Jam 2026",
+      "online": true,
+      "venue": "オンライン",
+      "startDate": "2026-10-11",
+      "endDate": "2026-10-24",
+      "dateLabel": "2026年10月11日11:30〜24日17:00（公式表示。タイムゾーン未記載）",
+      "status": "upcoming",
+      "sourceUrl": "https://itch.io/jam/segment-pixel-jam-2026",
+      "description": "ドット絵を使用するゲームが参加条件のゲームジャム。",
+      "socialTags": [
+        "#segmentpixeljam2026"
+      ],
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "newgrounds-pixel-day-watch",
+      "name": "Newgrounds Pixel Day",
+      "online": true,
+      "venue": "オンライン",
+      "startDate": "",
+      "endDate": "",
+      "lastHeldDate": "2026-01-23",
+      "dateLabel": "次回開催情報待ち（前回は2026年1月23日）",
+      "status": "watch",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1553457/1",
+      "description": "ドット絵・ピクセルアニメーションなどのオンライン作品投稿イベント。",
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "pixelween-2026",
+      "name": "Pixelween 2026",
+      "online": true,
+      "venue": "オンライン（PixelJoint）",
+      "startDate": "2026-09-14",
+      "endDate": "2026-10-18",
+      "dateLabel": "2026年9月14日〜10月18日。本戦最終締切10月18日、審査対象外のボーナス企画は10月19日〜25日。",
+      "status": "active",
+      "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
+      "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "moertel-polaris-2026",
+      "name": "Moertel ドット絵作品出展（Polaris 2026）",
+      "country": "ドイツ",
+      "area": "ハンブルク",
+      "venue": "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
+      "startDate": "2026-10-09",
+      "endDate": "2026-10-11",
+      "dateLabel": "2026年10月9日〜11日",
+      "status": "upcoming",
+      "sourceUrl": "https://moer.tel/",
+      "sourceLabel": "出展者公式サイト",
+      "description": "ピクセルアーティストStefanie Fehling本人による、新しいドット絵作品・プリント等の出展告知。Polaris全体ではなく、この作家の出展情報。",
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art"
+    },
+    {
+      "id": "nrg-pixel-art-awards-2026",
+      "name": "NRG Awards 2026 — Pixel Art部門",
+      "country": "ポーランド",
+      "area": "ポズナン",
+      "venue": "MTP Poznań（ポーランド・ポズナン／遠隔応募可）",
+      "startDate": "2026-10-23",
+      "endDate": "2026-10-25",
+      "dateLabel": "2026年10月23日〜25日。作品提出締切は10月21日23:59（ポーランド時間 UTC+2）。遠隔応募可。",
+      "status": "upcoming",
+      "sourceUrl": "https://nrgevent.eu/compo/",
+      "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
+      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "digital-jove-pixel-art-workshop-2026",
+      "name": "Digital Jove 2026 — ピクセルアート入門ワークショップ",
+      "country": "スペイン",
+      "area": "バレンシア",
+      "venue": "Sala B-0-2, Facultad de Bellas Artes, Edificio 3N, UPV（スペイン・バレンシア）",
+      "startDate": "2026-11-05",
+      "endDate": "2026-11-05",
+      "dateLabel": "2026年11月5日 09:30–10:30（公式表示。タイムゾーン未記載）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.digitaljove.com/talleres",
+      "description": "Denis Bernalteによる、ゲーム用のキャラクターやスプライトを描くピクセルアート入門。基礎説明と制作演習。イベント全体の日程ではなく、この講座の開催日を掲載。",
+      "checkedAt": "2026-10-05T14:42:10+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "retrocon-saar-17-pixel-art-2026",
+      "name": "17. RetroCon Saar — Creative Zone（Pixel Art）",
+      "country": "ドイツ",
+      "area": "フェルクリンゲン",
+      "venue": "Hermann Neuberger Halle, Stadionstraße, 66333 Völklingen（ドイツ）",
+      "startDate": "2026-11-07",
+      "endDate": "2026-11-08",
+      "dateLabel": "2026年11月7日〜8日",
+      "status": "upcoming",
+      "sourceUrl": "https://www.retrosaar.de/",
+      "description": "レトロゲーム催事のCreative ZoneでPixel Artを扱う企画。ドット絵だけのイベントではなく、アートやインディーゲームを含むコーナー。出展者の詳細は確認時点で未発表。",
+      "checkedAt": "2026-10-05T14:42:10+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "festival-fps-pixel-art-workshop-2026",
+      "name": "Festival FPS 2026 — Pixel Artワークショップ",
+      "country": "スペイン",
+      "area": "アルメンドラレホ（バダホス）",
+      "venue": "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）",
+      "startDate": "2026-11-21",
+      "endDate": "2026-11-21",
+      "dateLabel": "2026年11月21日 17:00–19:00（公式表示。タイムゾーン未記載）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.festivalfps.com/",
+      "description": "FRAME, PLAY & SCREENの公式プログラムに掲載された、Professional Workshop 2「PIXEL ART」。講師と内容の詳細は確認時点で未発表。催事全体は11月20日〜22日。",
+      "checkedAt": "2026-10-05T14:42:10+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "hokkaido-comitia-24-juni-pixel-art-2026",
+      "name": "北海道COMITIA24 — ジュウニ（ドット絵本・委託参加予定）",
+      "prefecture": "北海道",
+      "area": "札幌市",
+      "venue": "札幌コンベンションセンター 大ホール",
+      "startDate": "2026-11-01",
+      "endDate": "2026-11-01",
+      "dateLabel": "2026年11月1日（日）11:00–15:00。ジュウニは委託参加予定。",
+      "status": "upcoming",
+      "sourceUrl": "https://tryme12.2-d.jp/12/",
+      "description": "ドット絵の本やグッズを制作するサークル「ジュウニ」が委託参加を告知。主催者の申込受付一覧にも掲載。催事全体は創作同人誌の即売会で、ドット絵作家の出展予定として掲載。作品の委託頒布であり、作家本人の来場予定ではない。",
+      "checkedAt": "2026-10-05T15:00:59+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "作家サークルと主催者の公式情報"
+    },
+    {
+      "id": "noboribetsu-barrier-free-toy-expo-dot-art-2026",
+      "name": "バリアフリーおもちゃ博 in のぼりべつ — 立体ドット絵の共同制作",
+      "prefecture": "北海道",
+      "area": "登別市",
+      "venue": "登別市観光交流センターヌプㇽ",
+      "startDate": "2026-11-01",
+      "endDate": "2026-11-01",
+      "dateLabel": "2026年11月1日（日）10:00–17:00。入場無料・事前申込制。",
+      "status": "upcoming",
+      "sourceUrl": "https://minapuru.jp/?p=889",
+      "description": "主催はヌプㇽ友の会「ミナプル」。おもちゃ博の特別企画として、登別市公式PRキャラクター「登夢くん」の立体ドット絵を来場者で共同制作する。デジタル作品の展示ではなく、立体ドット絵の制作体験。",
+      "checkedAt": "2026-10-05T15:00:59+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式情報"
+    },
+    {
+      "id": "pixel-art-park-1",
+      "name": "Pixel Art Park 1",
+      "prefecture": "東京都",
+      "area": "東京",
+      "venue": "DESIGN FESTA GALLERY EAST-101a",
+      "startDate": "2015-03-01",
+      "endDate": "2015-03-01",
+      "dateLabel": "2015年3月1日（日）11:00–19:00",
+      "status": "ended",
+      "sourceUrl": "https://pixelartpark.com/events/pap1/",
+      "kind": "pixel-art",
+      "description": "公式記録で日程・会場、ドット絵イベントを確認。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixel-art-park-2",
+      "name": "Pixel Art Park 2",
+      "prefecture": "東京都",
+      "area": "千代田区",
+      "venue": "3331 Arts Chiyoda",
+      "startDate": "2015-10-18",
+      "endDate": "2015-10-18",
+      "dateLabel": "2015年10月18日（日）11:00–19:00",
+      "status": "ended",
+      "sourceUrl": "https://pixelartpark.com/events/pap2/",
+      "kind": "pixel-art",
+      "description": "ドット絵作品展示・販売・ワークショップ。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixel-art-park-3",
+      "name": "Pixel Art Park 3",
+      "prefecture": "東京都",
+      "area": "千代田区",
+      "venue": "3331 Arts Chiyoda",
+      "startDate": "2016-09-25",
+      "endDate": "2016-09-25",
+      "dateLabel": "2016年9月25日（日）11:00–19:00",
+      "status": "ended",
+      "sourceUrl": "https://pixelartpark.com/events/pap3/",
+      "kind": "pixel-art",
+      "description": "48組のドット絵作品展示等。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixel-art-park-4",
+      "name": "Pixel Art Park 4",
+      "prefecture": "東京都",
+      "area": "千代田区",
+      "venue": "3331 Arts Chiyoda",
+      "startDate": "2017-10-08",
+      "endDate": "2017-10-08",
+      "dateLabel": "2017年10月8日（日）11:00–18:00",
+      "status": "ended",
+      "sourceUrl": "https://pixelartpark.com/events/pap4/",
+      "kind": "pixel-art",
+      "description": "ドット絵作品を扱う年次イベント。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixel-art-park-5",
+      "name": "Pixel Art Park 5",
+      "prefecture": "東京都",
+      "area": "千代田区",
+      "venue": "3331 Arts Chiyoda",
+      "startDate": "2018-12-09",
+      "endDate": "2018-12-09",
+      "dateLabel": "2018年12月9日（日）11:00–18:00",
+      "status": "ended",
+      "sourceUrl": "https://pixelartpark.com/events/pap5/",
+      "kind": "pixel-art",
+      "description": "77組のドット絵creator/企業による展示即売。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixel-art-park-6",
+      "name": "Pixel Art Park 6",
+      "prefecture": "東京都",
+      "area": "千代田区",
+      "venue": "3331 Arts Chiyoda",
+      "startDate": "2019-11-24",
+      "endDate": "2019-11-24",
+      "dateLabel": "2019年11月24日（日）11:00–18:00",
+      "status": "ended",
+      "sourceUrl": "https://pixelartpark.com/events/pap6/",
+      "kind": "pixel-art",
+      "description": "77組のドット絵creator/企業による展示即売。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2018",
+      "name": "SHIBUYA PIXEL ART 2018",
+      "prefecture": "東京都",
+      "area": "渋谷・表参道",
+      "venue": "表参道・キャットストリート周辺",
+      "startDate": "2018-07-21",
+      "endDate": "2018-07-22",
+      "dateLabel": "2018年7月21日（土）〜22日（日）",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/spa2018",
+      "kind": "pixel-art",
+      "description": "ピクセルアートを街中で展示するイベント。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2020",
+      "name": "SHIBUYA PIXEL ART 2020",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "渋谷ヒカリエ 8/COURT、Library、バーチャル渋谷、YouTube",
+      "startDate": "2020-09-25",
+      "endDate": "2020-09-27",
+      "dateLabel": "2020年9月25日（金）〜27日（日）",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/spa2020",
+      "kind": "pixel-art",
+      "description": "ドット絵受賞作品・特別企画展。オンラインと現地開催。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2021",
+      "name": "SHIBUYA PIXEL ART 2021 Reboot",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "渋谷各会場（elephant STUDIO、渋谷キャスト等）",
+      "startDate": "2021-09-02",
+      "endDate": "2021-09-30",
+      "dateLabel": "2021年9月2日〜30日。初回企画はadidasコラボ、メイン展示YUZUTOWNは9月15〜30日。複数会場。",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/reboot/",
+      "kind": "pixel-art",
+      "description": "主催者の複数のピクセルアート展示・受賞展示。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2022",
+      "name": "SHIBUYA PIXEL ART 2022",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "渋谷ヒカリエ 8/ CUBE ほか",
+      "startDate": "2022-09-21",
+      "endDate": "2022-09-28",
+      "dateLabel": "2022年9月21日〜28日",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/spa2022",
+      "kind": "pixel-art",
+      "description": "入選作品・審査員・招致アーティストの展示。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2023",
+      "name": "SHIBUYA PIXEL ART 2023 HAKKO",
+      "prefecture": "東京都",
+      "area": "渋谷・原宿",
+      "venue": "渋谷・原宿周辺の複数会場",
+      "startDate": "2023-09-15",
+      "endDate": "2023-09-24",
+      "dateLabel": "2023年9月15日〜24日",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/spa2023/",
+      "kind": "pixel-art",
+      "description": "公式がピクセルアート祭典と説明。9会場で展示等。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2024",
+      "name": "SHIBUYA PIXEL ART 2024 BIT VALLEY, BIT FLOWERS",
+      "prefecture": "東京都",
+      "area": "渋谷・原宿",
+      "venue": "渋谷・原宿周辺の7会場",
+      "startDate": "2024-09-21",
+      "endDate": "2024-09-29",
+      "dateLabel": "2024年9月21日〜29日",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/spa2024/",
+      "kind": "pixel-art",
+      "description": "100名以上のピクセルアーティスト参加。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "shibuya-pixel-art-2025",
+      "name": "SHIBUYA PIXEL ART 2025",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "渋谷ストリームホール、CIRCUS TOKYO",
+      "startDate": "2025-09-20",
+      "endDate": "2025-09-21",
+      "dateLabel": "2025年9月20日（土）前日祭、21日（日）メイン",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/spa2025",
+      "kind": "pixel-art",
+      "description": "コンテスト受賞展示、講義、出展・ライブ。既存watchの前回edition。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "the-pixel-street-2023",
+      "name": "THE PIXEL STREET",
+      "prefecture": "東京都",
+      "area": "浅草橋",
+      "venue": "浅草橋ヒューリックホール",
+      "startDate": "2023-10-21",
+      "endDate": "2023-10-21",
+      "dateLabel": "2023年10月21日（土）10:00–18:00",
+      "status": "ended",
+      "sourceUrl": "https://tpxst.com/",
+      "kind": "pixel-art",
+      "description": "約80組のドット絵creatorが出展するマーケット。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "winter-dot-daisakusen-2026",
+      "name": "冬休みドット大作戦 2026",
+      "prefecture": "東京都",
+      "area": "足立区・北千住",
+      "venue": "シアター1010 11階ギャラリー",
+      "startDate": "2026-01-10",
+      "endDate": "2026-01-11",
+      "dateLabel": "2026年1月10・11日 11:00–17:00",
+      "status": "ended",
+      "sourceUrl": "https://dot-daisakusen.com/",
+      "kind": "pixel-art",
+      "description": "ドット絵の体験・即売会。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "kyushu-pixel-marche-2024-05",
+      "name": "九州ピクセルマルシェ 2024年5月",
+      "prefecture": "福岡県",
+      "area": "福岡市",
+      "venue": "Artist Cafe Fukuoka ギャラリースペース",
+      "startDate": "2024-05-04",
+      "endDate": "2024-05-04",
+      "dateLabel": "2024年5月4日（土）11:00–16:00",
+      "status": "ended",
+      "sourceUrl": "https://pixel-marche.com/サークル配置図・出展サークル一覧/",
+      "kind": "pixel-art",
+      "description": "主催公式過去回にpixel作品出展とworkshopを記載。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "kyushu-pixel-marche-2026",
+      "name": "九州ピクセルマルシェ2",
+      "prefecture": "福岡県",
+      "area": "福岡市・天神",
+      "venue": "天神チクモクビル 大ホール",
+      "startDate": "2026-05-04",
+      "endDate": "2026-05-04",
+      "dateLabel": "2026年5月4日（月祝）13:00–17:00",
+      "status": "ended",
+      "sourceUrl": "https://pixel-marche.com/",
+      "kind": "pixel-art",
+      "description": "主催公式にpixel art展示即売会と日程・会場。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "summer-dot-daisakusen-2024",
+      "name": "夏休みドット大作戦 2024",
+      "prefecture": "東京都",
+      "area": "足立区・北千住",
+      "venue": "シアター1010 11階ギャラリー",
+      "startDate": "2024-08-03",
+      "endDate": "2024-08-03",
+      "dateLabel": "2024年8月3日（土）11:00–18:00",
+      "status": "ended",
+      "sourceUrl": "https://dot-daisakusen.com/2024_summer/",
+      "kind": "pixel-art",
+      "description": "ドット絵体験・即売会。46名出展。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixelgirls-side-b-2025",
+      "name": "PIXELGIRLS: SIDE B",
+      "prefecture": "東京都",
+      "area": "港区・赤坂",
+      "venue": "EPSON CREATIVE SQUARE AKASAKA",
+      "startDate": "2025-08-25",
+      "endDate": "2025-08-29",
+      "dateLabel": "2025年8月25日〜29日 18:00–20:00",
+      "status": "ended",
+      "sourceUrl": "https://www.xart.jp/pixelgirls",
+      "kind": "pixel-art",
+      "description": "PIXELGIRLS作品を含むピクセル表現の夜間展示・制作体験。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "ntv-imaginarium-2023",
+      "name": "日テレイマジナリウム ドット絵展示",
+      "prefecture": "東京都",
+      "area": "江東区・清澄白河／オンライン",
+      "venue": "東京都現代美術館・clusterメタバース",
+      "startDate": "2024-01-10",
+      "endDate": "2024-03-03",
+      "dateLabel": "東京都現代美術館の追加VTuberドット絵展示は2024年1月10日〜3月3日。cluster会場は1月13日〜3月3日。",
+      "status": "ended",
+      "sourceUrl": "https://www.ntv.co.jp/imaginarium/topics/a83o45il5hyfxvyg.html",
+      "kind": "pixel-art",
+      "description": "日テレ主催ページで実展示開始日を確認。フェス全体の会期2023-12-09〜2024-03-03とは区別。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "主催者公式情報"
+    },
+    {
+      "id": "pixel-school-stage-2-2024",
+      "name": "ピクセルアートの学校 第2ステージ",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "Shibuya Sakura Stage 4階 404 Not Found",
+      "startDate": "2024-08-24",
+      "endDate": "2024-08-24",
+      "dateLabel": "2024年8月24日",
+      "status": "ended",
+      "sourceUrl": "https://thepixel-mag.jp/archive/school-stage-2-movie/",
+      "kind": "pixel-art",
+      "description": "風景ピクセルアート作家APO+による講義。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "pixel-dot-party-2024",
+      "name": "Pixel Dot Party 2024",
+      "online": true,
+      "venue": "pictSQUARE",
+      "startDate": "2024-11-23",
+      "endDate": "2024-11-23",
+      "dateLabel": "2024年11月23日 10:00–23:00（公式カレンダー表示）",
+      "status": "ended",
+      "sourceUrl": "https://pictsquare.net/events/calendar/2024-11",
+      "kind": "pixel-art",
+      "description": "pictSQUARE公式カレンダーにドット絵オンリーオンラインイベントと掲載。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "公式主催・会場・開催プラットフォーム情報"
+    },
+    {
+      "id": "beyond-pixel-art-award-exhibition-2021",
+      "name": "Beyond Pixel Art賞 2020・2021 受賞展示",
+      "prefecture": "東京都",
+      "area": "渋谷",
+      "venue": "渋谷キャスト Åre",
+      "startDate": "2021-11-01",
+      "endDate": "2021-11-15",
+      "dateLabel": "2021年11月1日（月）〜15日（月）",
+      "status": "ended",
+      "sourceUrl": "https://pixel-art.jp/reboot/",
+      "kind": "pixel-art",
+      "description": "2020年受賞者・山﨑結子と2021年受賞者・TOYOYAのピクセルアート展示。2020年分は当初9月予定から延期されたと主催が記載。",
+      "checkedAt": "2026-10-05T15:14:12+09:00",
+      "sourceLabel": "主催者公式情報"
+    },
+    {
+      "id": "newgrounds-pixel-day-2017",
+      "name": "Newgrounds Pixel Day 2017",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2017-01-21",
+      "endDate": "2017-01-21",
+      "dateLabel": "2017年1月21日（第2回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1419547/1",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次pixel artイベント。オリジナルのピクセルアート、アニメーション、ゲーム、チップチューンを募集。",
+      "sourceLabel": "Newgrounds公式フォーラム"
+    },
+    {
+      "id": "newgrounds-pixel-day-2018",
+      "name": "Newgrounds Pixel Day 2018",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2018-01-23",
+      "endDate": "2018-01-23",
+      "dateLabel": "2018年1月23日（第3回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/collection/pixel-day-2018",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次pixel art祝祭。オリジナルのピクセルアート、アニメーション、ゲーム、チップチューンを募集。",
+      "sourceLabel": "Newgrounds公式コレクション"
+    },
+    {
+      "id": "newgrounds-pixel-day-2019",
+      "name": "Newgrounds Pixel Day 2019",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2019-01-23",
+      "endDate": "2019-01-23",
+      "dateLabel": "2019年1月23日（第4回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1437848/1",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次イベント。pixel art、アニメーション、ゲーム、チップチューン作品の投稿と部門別賞を実施。",
+      "sourceLabel": "Newgrounds公式フォーラム"
+    },
+    {
+      "id": "newgrounds-pixel-day-2020",
+      "name": "Newgrounds Pixel Day 2020",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2020-01-23",
+      "endDate": "2020-01-23",
+      "dateLabel": "2020年1月23日（第5回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1448508/",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次pixel artイベント。ピクセルアート、アニメーション、ゲーム、チップチューンを対象とし、作品賞を実施。",
+      "sourceLabel": "Newgrounds公式フォーラム"
+    },
+    {
+      "id": "newgrounds-pixel-day-2021",
+      "name": "Newgrounds Pixel Day 2021",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2021-01-23",
+      "endDate": "2021-01-23",
+      "dateLabel": "2021年1月23日（第6回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/collection/pixelday2021",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次pixel artとチップチューンの祝祭。作品投稿とコンテストを実施。",
+      "sourceLabel": "Newgrounds公式コレクション"
+    },
+    {
+      "id": "newgrounds-pixel-day-2022",
+      "name": "Newgrounds Pixel Day 2022",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2022-01-23",
+      "endDate": "2022-01-23",
+      "dateLabel": "2022年1月23日（第7回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/collection/pixelday2022",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次イベント。pixel-themed art、ゲーム、アニメーション、音楽を募集。",
+      "sourceLabel": "Newgrounds公式コレクション"
+    },
+    {
+      "id": "newgrounds-pixel-day-2023",
+      "name": "Newgrounds Pixel Day 2023",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2023-01-23",
+      "endDate": "2023-01-23",
+      "dateLabel": "2023年1月23日（第8回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1517210/4",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次pixel art、アニメーション、ゲーム、チップチューンイベント。",
+      "sourceLabel": "Newgrounds公式フォーラム"
+    },
+    {
+      "id": "newgrounds-pixel-day-2024",
+      "name": "Newgrounds Pixel Day 2024",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2024-01-23",
+      "endDate": "2024-01-23",
+      "dateLabel": "2024年1月23日（第9回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1531148/1",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の年次pixel art、アニメーション、ゲーム、チップチューンイベント。投稿タグと賞の案内あり。",
+      "sourceLabel": "Newgrounds公式フォーラム"
+    },
+    {
+      "id": "newgrounds-pixel-day-2025",
+      "name": "Newgrounds Pixel Day 2025",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2025-01-23",
+      "endDate": "2025-01-23",
+      "dateLabel": "2025年1月23日（第10回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/bbs/topic/1541117/1",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の第10回pixel artイベント。オリジナルpixel art、アニメーション、ゲーム、チップチューン作品の投稿と賞を実施。",
+      "sourceLabel": "Newgrounds公式フォーラム"
+    },
+    {
+      "id": "pixelween-2020",
+      "name": "Pixelween 2020",
+      "online": true,
+      "venue": "Online — Pixel Joint",
+      "startDate": "2020-09-28",
+      "endDate": "2020-10-25",
+      "dateLabel": "2020年9月28日〜10月25日（4週のpixel art challenge。結果発表は10月31日予定）",
+      "status": "ended",
+      "sourceUrl": "https://pixeljoint.com/pixels/news.asp?date=9%2F1%2F2020",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Pixel Joint主催のドット絵コンテスト。4週にわたりホラー映画の場面を指定パレット・サイズで制作。",
+      "sourceLabel": "Pixel Joint公式ニュース"
+    },
+    {
+      "id": "pixelween-2021",
+      "name": "Pixelween 2021",
+      "online": true,
+      "venue": "Online — Pixel Joint",
+      "startDate": "2021-09-27",
+      "endDate": "2021-10-24",
+      "dateLabel": "2021年9月27日〜10月24日。ホラー映画シリーズのポスターを4週連作で制作。",
+      "status": "ended",
+      "sourceUrl": "https://pixeljoint.com/2021/09/26/6474/Pixelween_2021_announcement.htm",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Pixel Joint主催のpixel artコンテスト。各週の課題でホラー映画ポスターを制作し、シリーズとして応募。",
+      "sourceLabel": "Pixel Joint公式告知"
+    },
+    {
+      "id": "pixelween-2022",
+      "name": "Pixelween 2022",
+      "online": true,
+      "venue": "Online — Pixel Joint",
+      "startDate": "2022-09-26",
+      "endDate": "2022-10-24",
+      "dateLabel": "2022年9月26日〜10月24日（4週のpixel art challenge。最終応募締切10月24日）",
+      "status": "ended",
+      "sourceUrl": "https://pixeljoint.com/pixels/news.asp?date=9%2F1%2F2022",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Pixel Joint主催のpixel artコンテスト。ホラーゲームの画面を4週連作で制作。",
+      "sourceLabel": "Pixel Joint公式ニュース"
+    },
+    {
+      "id": "pixelween-2023",
+      "name": "Pixelween 2023",
+      "online": true,
+      "venue": "Online — Pixel Joint",
+      "startDate": "2023-09-25",
+      "endDate": "2023-10-25",
+      "dateLabel": "2023年9月25日〜10月25日（4週の連作。統合作品の最終提出締切10月25日）",
+      "status": "ended",
+      "sourceUrl": "https://pixeljoint.com/2023/09/25/6860/Pixelween_2023_announcement.htm",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Pixel Joint主催のpixel artコンテスト。4つの縦長シーンを連結し、ホラー物語のパノラマ作品を制作。",
+      "sourceLabel": "Pixel Joint公式告知"
+    },
+    {
+      "id": "pixelween-2024",
+      "name": "Pixelween 2024",
+      "online": true,
+      "venue": "Online — Pixel Joint",
+      "startDate": "2024-09-30",
+      "endDate": "2024-10-27",
+      "dateLabel": "2024年9月30日〜10月27日（4週のpixel art challenge。最終締切10月27日）",
+      "status": "ended",
+      "sourceUrl": "https://pixeljoint.com/2024/09/26/7038/Pixelween_2024_announcement.htm",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Pixel Joint主催のpixel artコンテスト。週替わりのホラー小説の表紙を制作。",
+      "sourceLabel": "Pixel Joint公式告知"
+    },
+    {
+      "id": "pixelween-2025",
+      "name": "Pixelween 2025",
+      "online": true,
+      "venue": "Online — Pixel Joint",
+      "startDate": "2025-09-29",
+      "endDate": "2025-10-26",
+      "dateLabel": "2025年9月29日〜10月26日（4週のpixel art challenge。最終締切10月26日）",
+      "status": "ended",
+      "sourceUrl": "https://pixeljoint.com/2025/09/28/7236/submit_news.asp",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Pixel Joint主催のpixel artコンテスト。4枚の横長風景をつなげてパノラマ作品にする。",
+      "sourceLabel": "Pixel Joint公式告知"
+    },
+    {
+      "id": "gb-pixel-art-jam-2023",
+      "name": "GB Pixel Art Jam 2023",
+      "online": true,
+      "venue": "Online — itch.io / GB Studio Central",
+      "startDate": "2023-09-29",
+      "endDate": "2023-10-01",
+      "dateLabel": "2023年9月29日〜10月1日。Game Boy仕様の画像作品を集めてROM化するpixel art jam。",
+      "status": "ended",
+      "sourceUrl": "https://itch.io/jam/gbpixelartjam23",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "GB Studio Central主催。160×144画面などGame Boy制約に沿って制作したpixel artを集め、参加作品入りROMを制作。",
+      "sourceLabel": "主催者公式itch.io jam page"
+    },
+    {
+      "id": "gb-pixel-art-jam-2024",
+      "name": "GB Pixel Art Jam 2024",
+      "online": true,
+      "venue": "Online — itch.io / GB Studio Central",
+      "startDate": "2024-10-04",
+      "endDate": "2024-10-06",
+      "dateLabel": "2024年10月4日〜6日。色数制限を含むGame Boy pixel art制作jam。",
+      "status": "ended",
+      "sourceUrl": "https://itch.io/jam/gbpixelartjam24",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "GB Studio Central主催の画像ベースpixel art jam。Game Boy画面サイズ・タイル制約と複数の色パレットから制作。",
+      "sourceLabel": "主催者公式itch.io jam page"
+    },
+    {
+      "id": "gb-pixel-art-jam-2025",
+      "name": "GB Pixel Art Jam 2025",
+      "online": true,
+      "venue": "Online — itch.io / GB Studio Central",
+      "startDate": "2025-10-03",
+      "endDate": "2025-10-05",
+      "dateLabel": "2025年10月3日〜5日（公式表示では19:00–19:00 EDT）。1-bit白黒・160×144のpixel art jam。",
+      "status": "ended",
+      "sourceUrl": "https://itch.io/jam/gbpixelartjam25",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "GB Studio Central主催。Game Boy向けの白黒1-bit作品を制作し、参加作をまとめたROMを制作。",
+      "sourceLabel": "主催者公式itch.io jam page"
+    },
+    {
+      "id": "newgrounds-pixel-day-2026",
+      "name": "Newgrounds Pixel Day 2026",
+      "online": true,
+      "venue": "Online — Newgrounds",
+      "startDate": "2026-01-23",
+      "endDate": "2026-01-23",
+      "dateLabel": "2026年1月23日（第11回）",
+      "status": "ended",
+      "sourceUrl": "https://www.newgrounds.com/collection/pixel-day-2026",
+      "checkedAt": "2026-10-05T06:14:44Z",
+      "kind": "pixel-art",
+      "description": "Newgrounds公式の第11回年次イベント。オリジナルpixel art、アニメーション、ゲーム、チップチューン作品を募集し、各部門の賞を実施。",
+      "sourceLabel": "Newgrounds公式コレクション"
+    },
+    {
+      "id": "iwamisawa-ibox-tahara-2025",
+      "name": "田原実織展「暗渠を往く末に酸欠」",
+      "prefecture": "北海道",
+      "area": "岩見沢市",
+      "venue": "北海道教育大学岩見沢校i-BOX（JR岩見沢駅2階 有明交流プラザ）",
+      "startDate": "2025-09-03",
+      "endDate": "2025-09-15",
+      "dateLabel": "2025年9月3日〜15日。10:30–12:00／13:00–17:00",
+      "sourceUrl": "https://i-campus.hokkyodai.ac.jp/i-box/2025/07/93.html",
+      "description": "ピクセルアートによる日常風景を展示した学生個展。",
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "frosted-vibes-sapporo-2025",
+      "name": "Frosted Vibes 2025 — 北海道銘菓のドット絵展示",
+      "prefecture": "北海道",
+      "area": "札幌市",
+      "venue": "bokashi Base（札幌市中央区南2西1）",
+      "startDate": "2025-02-08",
+      "endDate": "2025-02-15",
+      "dateLabel": "2025年2月8日〜15日",
+      "sourceUrl": "https://www.do-johodai.ac.jp/topics/9694350/",
+      "description": "北海道情報大学の合同アート展に、北海道の銘菓30点を描いたドット絵作品が出展。催事全体は複数の表現を扱う。",
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "sapporo-game-odyssey-commentator-2026",
+      "name": "SAPPORO GAME ODYSSEY 2026 — コメンテーター（ピクセルアートゲーム）出展",
+      "prefecture": "北海道",
+      "area": "札幌市",
+      "venue": "チ・カ・ホ 北3条交差点広場（西）",
+      "startDate": "2026-06-07",
+      "endDate": "2026-06-07",
+      "dateLabel": "2026年6月7日（日）12:00–17:00",
+      "sourceUrl": "https://www.sapporo-game-odyssey.jp/",
+      "description": "インディーゲーム展示・試遊会で、テバサキゲームズのピクセルアート作品「コメンテーター」を出展。催事全体はドット絵専用ではない。",
+      "additionalUrls": [
+        "https://www.sapporo-game-odyssey.jp/出展作品/b7_コメンテーター"
+      ],
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "asaha-tokyo-pixel-exhibition-2023",
+      "name": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
+      "prefecture": "東京都",
+      "area": "台東区",
+      "venue": "TOKYO PiXEL. shop & gallery",
+      "startDate": "2023-11-29",
+      "endDate": "2023-12-10",
+      "dateLabel": "2023年11月29日〜12月10日。12:00–19:00、12月4・5日休廊、最終日17:00終了",
+      "sourceUrl": "https://tokyopixel.shopinfo.jp/posts/48649694/",
+      "socialUrls": [
+        "https://x.com/vpandav",
+        "https://www.youtube.com/@asaha"
+      ],
+      "description": "ピクセルアートのアニメーションと、キャラクターの原画を展示。",
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "asaha-mendako-tokyo-pixel-2026",
+      "name": "asaha個展2026夏「メンダコ天国 -Dokkoi Show-」",
+      "prefecture": "東京都",
+      "area": "台東区",
+      "venue": "TOKYO PiXEL. shop & gallery",
+      "startDate": "2026-08-01",
+      "endDate": "2026-08-11",
+      "dateLabel": "2026年8月1日〜11日。12:00–19:00、8月5〜7日休廊、最終日17:00終了",
+      "sourceUrl": "https://tokyopixel.shopinfo.jp/posts/58870023/",
+      "socialUrls": [
+        "https://x.com/vpandav",
+        "https://www.youtube.com/@asaha"
+      ],
+      "description": "メンダコを題材にしたピクセルアートのアニメーション、原画、グッズを展示。8月8日に関連ワークショップ。",
+      "additionalUrls": [
+        "https://www.asaha.world/",
+        "https://tokyopixel.shopinfo.jp/pages/2495762/blog"
+      ],
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "kac-ultra-dope-motocross-2026",
+      "name": "モトクロス斉藤 個展「ウルトラドープ」",
+      "prefecture": "東京都",
+      "area": "江東区・亀戸",
+      "venue": "亀戸アートセンター（KAC）",
+      "startDate": "2026-04-23",
+      "endDate": "2026-05-05",
+      "dateLabel": "2026年4月23日〜5月5日。平日16:00–22:00、土日祝13:00–19:00",
+      "sourceUrl": "https://kac.amebaownd.com/posts/58724347",
+      "socialUrls": [
+        "https://x.com/moot_sai/",
+        "https://www.instagram.com/moot_sai/"
+      ],
+      "description": "ピクセルアート制作10年の節目の個展。デジタル作品、アクリル、スケートボードなど多様な媒体を展示。",
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "kac-super-nice-thankass-2025",
+      "name": "SUPER NICE THANKASS — モトクロス斉藤 × ヘルミッペ",
+      "prefecture": "東京都",
+      "area": "江東区・亀戸",
+      "venue": "亀戸アートセンター（KAC）",
+      "startDate": "2025-06-27",
+      "endDate": "2025-07-09",
+      "dateLabel": "2025年6月27日〜7月9日。会期中無休、平日16:00–22:00／土日13:00–19:00",
+      "sourceUrl": "https://kac.amebaownd.com/posts/56975241/",
+      "socialUrls": [
+        "https://x.com/moot_sai/",
+        "https://www.instagram.com/hermippe_pixelart/"
+      ],
+      "description": "2人のピクセルアーティストによるピクセルアートを中心に、版画や絵画などを展示。",
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "kac-hermippe-pointless-2025",
+      "name": "ヘルミッペ 個展「ポイントレス」",
+      "prefecture": "東京都",
+      "area": "江東区・亀戸",
+      "venue": "亀戸アートセンター（KAC）",
+      "startDate": "2025-11-28",
+      "endDate": "2025-12-10",
+      "dateLabel": "2025年11月28日〜12月10日。会期中無休、平日16:00–22:00／土日13:00–19:00",
+      "sourceUrl": "https://kac.amebaownd.com/posts/58087057",
+      "description": "ピクセルアートを主軸とする作家による風景の連作とカード作品を展示。",
+      "status": "ended",
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場・大学の公式情報"
+    },
+    {
+      "id": "valedkids-meieki-pixel-workshop-autumn-2026",
+      "name": "名駅教室 — Excel関数でドット絵を作ろう！",
+      "prefecture": "愛知県",
+      "area": "名古屋市中村区",
+      "venue": "バレッドキッズ名駅教室（権現通4-1 サンモールII 1F西）",
+      "startDate": "2026-10-01",
+      "endDate": "2026-11-29",
+      "dateLabel": "2026年10月1日〜11月29日の体験実施期間。小学3年生〜中学生目安・無料。具体的な日時・定員は教室の予約カレンダーで要確認。",
+      "status": "active",
+      "sourceUrl": "https://kids.valed.jp/campaign_autumn2026/",
+      "sourceLabel": "主催者の参加教室一覧と公式リリース",
+      "description": "Excelのセルと関数でドット絵を制作する全国秋体験のうち、公式参加教室一覧に掲載された名古屋の名駅教室を登録。期間中毎日開催するという意味ではなく、教室ごとに体験日時が異なる。全国キャンペーン自体は別イベントとして重複計上しない。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "doom-loophole-center-sanuki-2026",
+      "name": "ヘルミッペ × m7kenji 二人展「Doom Loophole」",
+      "prefecture": "香川県",
+      "area": "高松市",
+      "venue": "CENTER/SANUKI（高松市常磐町1-6-13）",
+      "startDate": "2026-09-12",
+      "endDate": "2026-10-11",
+      "dateLabel": "2026年9月12日〜10月11日 10:00–21:00。入場無料。9月12日のライブドローイングは終了済み。",
+      "status": "active",
+      "sourceUrl": "https://center.degico.jp/hermippe_m7kenji_2026-html.html",
+      "sourceLabel": "会場の公式展示案内",
+      "description": "ピクセルアーティストのヘルミッペとm7kenjiによる二人展。作家別に展示を分けて件数を増やさず、ひとつの会期として登録。",
+      "socialUrls": [
+        "https://www.instagram.com/center_of_sanuki/"
+      ],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "juuni-niigata-comitia-63-2026",
+      "name": "新潟コミティア63 — ジュウニ（ドット絵本・出展予定）",
+      "prefecture": "新潟県",
+      "area": "新潟市",
+      "venue": "新潟市産業振興センター",
+      "startDate": "2026-12-06",
+      "endDate": "2026-12-06",
+      "dateLabel": "2026年12月6日（日）10:30–15:30。ジュウニは直接参加予定。主催者サークル一覧との照合は未確認。",
+      "status": "upcoming",
+      "sourceUrl": "https://tryme12.2-d.jp/12/",
+      "sourceLabel": "作家サークルと主催者の公式情報",
+      "description": "ドット絵の本やグッズを制作するサークル「ジュウニ」の直接参加予定。創作同人誌即売会全体をドット絵専用イベントとして扱わず、作家が告知する出展の範囲で掲載。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "juuni-comitia-158-pixel-art-2026",
+      "name": "COMITIA158 — ジュウニ（ドット絵本・出展予定）",
+      "prefecture": "東京都",
+      "area": "江東区",
+      "venue": "東京ビッグサイト 東1・2・3・7・8ホール",
+      "startDate": "2026-12-13",
+      "endDate": "2026-12-13",
+      "dateLabel": "2026年12月13日（日）11:00–16:00。ジュウニは直接参加予定。参加サークル一覧は10月23日公開予定のため未照合。",
+      "status": "upcoming",
+      "sourceUrl": "https://tryme12.2-d.jp/12/",
+      "sourceLabel": "作家サークルと主催者の公式情報",
+      "description": "ドット絵の本やグッズを制作するサークル「ジュウニ」が直接参加予定と告知。COMITIA全体をドット絵専用イベントとして扱わず、同サークルの出展予定として掲載。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "honkbooks-asobanight-special-weekend-pixel-art-2026",
+      "name": "小光とあそばnight! SPECIAL WEEKEND（ドット絵作家参加展示）",
+      "prefecture": "東京都",
+      "area": "新宿区",
+      "venue": "theca／コ本や honkbooks（山吹町294 小久保ビル2F）",
+      "startDate": "2026-10-30",
+      "endDate": "2026-11-03",
+      "dateLabel": "2026年10月30日〜11月3日。10月31日16:00–18:00はイベント予約者のみ。会場閲覧自由、展示作品の試遊は2,000円（ZINE付き）。",
+      "status": "upcoming",
+      "sourceUrl": "https://honkbooks.com/asobanight-20/",
+      "sourceLabel": "主催・会場の公式展示案内",
+      "description": "ゲームとアートの複合展示に、ドット絵イラストを制作するsanaenvyやピクセルアーティストを含むMidnight Peppermintが参加。10月31日のトークは別料金2,500円・要予約。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "crosspico-nagoya-vol-3-2026",
+      "name": "CROSSPICO名古屋 vol.3（インディーゲーム×ピクセルアート）",
+      "prefecture": "愛知県",
+      "area": "名古屋市中区",
+      "venue": "スペース七番（錦2-7-7 オリマチ錦2-A）",
+      "startDate": "2026-06-13",
+      "endDate": "2026-06-13",
+      "dateLabel": "2026年6月13日（土）開催済み。",
+      "status": "ended",
+      "sourceUrl": "https://sites.google.com/view/crosspico/",
+      "sourceLabel": "主催者の公式イベント案内",
+      "description": "インディーゲーム・ピクセルアート展示、RPGのドット絵をテーマにした講演、ビーズワークショップなど。今回確認できたのは終了済みのvol.3。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "crosspico-nagoya-watch",
+      "name": "CROSSPICO名古屋（次回日程未確認）",
+      "prefecture": "愛知県",
+      "area": "名古屋市",
+      "venue": "次回会場未発表",
+      "startDate": "",
+      "endDate": "",
+      "lastHeldDate": "2026-06-13",
+      "dateLabel": "次回開催情報待ち（前回は2026年6月13日）。次回の確定日程は今回確認できず。",
+      "status": "watch",
+      "sourceUrl": "https://sites.google.com/view/crosspico/",
+      "sourceLabel": "主催者の公式サイト",
+      "description": "名古屋のインディーゲーム×ピクセルアートイベント。公式サイトと次回告知を継続確認する。前年・前回の日付から次回日程を推測しない。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "beppu-minecraft-pixel-art-2026-10-18",
+      "name": "マイクラでドット絵を自動でつくろう！（10月18日回）",
+      "prefecture": "大分県",
+      "area": "別府市",
+      "venue": "SeedingNeoパソコン・プログラミング教室（亀川東町27-23 堀文2階）",
+      "startDate": "2026-10-18",
+      "endDate": "2026-10-18",
+      "dateLabel": "2026-10-18 10:00–15:00。無料・予約不要・定員10名／回。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
+      "sourceLabel": "ベップ・アート・マンス2026公式プログラム",
+      "description": "ブロックを組み合わせたプログラムでMinecraft内にドット絵を自動生成し、オリジナル作品を制作する体験。生徒作品の展示あり。10月と11月は別の実施日として登録し、その間を連続開催期間にしない。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "beppu-minecraft-pixel-art-2026-11-15",
+      "name": "マイクラでドット絵を自動でつくろう！（11月15日回）",
+      "prefecture": "大分県",
+      "area": "別府市",
+      "venue": "SeedingNeoパソコン・プログラミング教室（亀川東町27-23 堀文2階）",
+      "startDate": "2026-11-15",
+      "endDate": "2026-11-15",
+      "dateLabel": "2026-11-15 10:00–15:00。無料・予約不要・定員10名／回。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
+      "sourceLabel": "ベップ・アート・マンス2026公式プログラム",
+      "description": "ブロックを組み合わせたプログラムでMinecraft内にドット絵を自動生成し、オリジナル作品を制作する体験。生徒作品の展示あり。10月と11月は別の実施日として登録し、その間を連続開催期間にしない。",
+      "socialUrls": [],
+      "kind": "pixel-art",
+      "checkedAt": "2026-10-05T07:18:39+00:00"
+    }
+  ],
+  "sources": [
+    {
+      "id": "pixel-art-park-9",
+      "url": "https://pixelartpark.com/en/events/pap9/",
+      "socialUrls": [
+        "https://x.com/pixelartpark"
+      ],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "official-confirmed",
+      "notes": "公式ページで日程・内容を再確認。",
+      "socialChecks": [
+        {
+          "url": "https://x.com/pixelartpark",
+          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "result": "unavailable",
+          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        }
+      ]
+    },
+    {
+      "id": "shibuya-pixel-art-watch",
+      "url": "https://pixel-art.jp/spa2025",
+      "socialUrls": [
+        "https://x.com/ShibuyaPixelArt"
+      ],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "next-date-unannounced",
+      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。",
+      "socialChecks": [
+        {
+          "url": "https://x.com/ShibuyaPixelArt",
+          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "result": "unavailable",
+          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        }
+      ]
+    },
+    {
+      "id": "winter-dot-daisakusen-watch",
+      "url": "https://dot-daisakusen.com/",
+      "socialUrls": [
+        "https://x.com/dot_daisakusen"
+      ],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "next-date-unannounced",
+      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。",
+      "socialChecks": [
+        {
+          "url": "https://x.com/dot_daisakusen",
+          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "result": "unavailable",
+          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        }
+      ]
+    },
+    {
+      "id": "kyushu-pixel-marche-watch",
+      "url": "https://pixel-marche.com/",
+      "socialUrls": [
+        "https://x.com/PixelMarche"
+      ],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "next-date-unannounced",
+      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。",
+      "socialChecks": [
+        {
+          "url": "https://x.com/PixelMarche",
+          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "result": "unavailable",
+          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        }
+      ]
+    },
+    {
+      "id": "gb-pixel-art-jam-2026",
+      "url": "https://itch.io/jam/gb-pixel-art-jam-2026",
+      "socialUrls": [],
+      "socialTags": [
+        "#gbpixelartjam"
+      ],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "official-confirmed",
+      "notes": "公式ページで日程・内容を再確認。",
+      "socialChecks": [
+        {
+          "tag": "#gbpixelartjam",
+          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "result": "unavailable",
+          "notes": "公式からリンクされたBlueskyハッシュタグページを取得できず。"
+        }
+      ]
+    },
+    {
+      "id": "segment-pixel-jam-2026",
+      "url": "https://itch.io/jam/segment-pixel-jam-2026",
+      "socialUrls": [],
+      "socialTags": [
+        "#segmentpixeljam2026"
+      ],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "official-confirmed",
+      "notes": "公式ページで日程・内容を再確認。",
+      "socialChecks": [
+        {
+          "tag": "#segmentpixeljam2026",
+          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "result": "unavailable",
+          "notes": "公式からリンクされたBlueskyハッシュタグページを取得できず。"
+        }
+      ]
+    },
+    {
+      "id": "newgrounds-pixel-day-watch",
+      "url": "https://www.newgrounds.com/bbs/topic/1553457/1",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "next-date-unannounced",
+      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。"
+    },
+    {
+      "id": "pixelween-2026",
+      "url": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "official-confirmed",
+      "notes": "公式告知で課題期間・本戦締切を確認。案内先のDiscordは本文を取得できず。オンラインのため座標なし。"
+    },
+    {
+      "id": "moertel-polaris-2026",
+      "url": "https://moer.tel/",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "official-confirmed",
+      "notes": "公式サイトで日程とドット絵企画を確認。公式の緯度経度が未確認のため座標なし。"
+    },
+    {
+      "id": "nrg-pixel-art-awards-2026",
+      "url": "https://nrgevent.eu/compo/",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "result": "official-confirmed",
+      "notes": "公式サイトで日程とドット絵企画を確認。公式の緯度経度が未確認のため座標なし。",
+      "additionalUrls": [
+        "https://nrgevent.eu/"
+      ]
+    },
+    {
+      "id": "digital-jove-pixel-art-workshop-2026",
+      "url": "https://www.digitaljove.com/talleres",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。"
+    },
+    {
+      "id": "retrocon-saar-17-pixel-art-2026",
+      "url": "https://www.retrosaar.de/",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。"
+    },
+    {
+      "id": "festival-fps-pixel-art-workshop-2026",
+      "url": "https://www.festivalfps.com/",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。"
+    },
+    {
+      "id": "hokkaido-comitia-24-juni-pixel-art-2026",
+      "url": "https://tryme12.2-d.jp/12/",
+      "additionalUrls": [
+        "https://elysian.dojin.com/h-comitia/",
+        "https://elysian.dojin.com/h-comitia/uketsuke.html"
+      ],
+      "lastCheckedAt": "2026-10-05T15:00:59+09:00",
+      "result": "official-confirmed",
+      "notes": "作家公式サイトの委託参加予定とドット絵作品、主催者公式サイトの開催日時・会場、申込受付一覧のジュウニを本文で確認。配置・頒布物の最終案内は未確認。公式数値座標は未確認のため北海道の代表セルで表示。"
+    },
+    {
+      "id": "noboribetsu-barrier-free-toy-expo-dot-art-2026",
+      "url": "https://minapuru.jp/?p=889",
+      "additionalUrls": [
+        "https://nupur.jp/"
+      ],
+      "lastCheckedAt": "2026-10-05T15:00:59+09:00",
+      "result": "official-confirmed",
+      "notes": "検索ツールでは主催本文を取得できなかったが、主催公開ページを直接HTTP取得して本文の日時・会場・事前申込制・立体ドット絵共同制作を確認。公式数値座標は未確認のため北海道の代表セルで表示。"
+    },
+    {
+      "id": "pixel-art-park-1",
+      "url": "https://pixelartpark.com/events/pap1/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-art-park-2",
+      "url": "https://pixelartpark.com/events/pap2/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-art-park-3",
+      "url": "https://pixelartpark.com/events/pap3/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-art-park-4",
+      "url": "https://pixelartpark.com/events/pap4/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-art-park-5",
+      "url": "https://pixelartpark.com/events/pap5/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-art-park-6",
+      "url": "https://pixelartpark.com/events/pap6/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2018",
+      "url": "https://pixel-art.jp/spa2018",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2020",
+      "url": "https://pixel-art.jp/spa2020",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2021",
+      "url": "https://pixel-art.jp/reboot/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2022",
+      "url": "https://pixel-art.jp/spa2022",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2023",
+      "url": "https://pixel-art.jp/spa2023/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2024",
+      "url": "https://pixel-art.jp/spa2024/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "shibuya-pixel-art-2025",
+      "url": "https://pixel-art.jp/spa2025",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "the-pixel-street-2023",
+      "url": "https://tpxst.com/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "winter-dot-daisakusen-2026",
+      "url": "https://dot-daisakusen.com/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "kyushu-pixel-marche-2024-05",
+      "url": "https://pixel-marche.com/サークル配置図・出展サークル一覧/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "kyushu-pixel-marche-2026",
+      "url": "https://pixel-marche.com/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "summer-dot-daisakusen-2024",
+      "url": "https://dot-daisakusen.com/2024_summer/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelgirls-side-b-2025",
+      "url": "https://www.xart.jp/pixelgirls",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "ntv-imaginarium-2023",
+      "url": "https://www.ntv.co.jp/imaginarium/topics/a83o45il5hyfxvyg.html",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-school-stage-2-2024",
+      "url": "https://thepixel-mag.jp/archive/school-stage-2-movie/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixel-dot-party-2024",
+      "url": "https://pictsquare.net/events/calendar/2024-11",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "beyond-pixel-art-award-exhibition-2021",
+      "url": "https://pixel-art.jp/reboot/",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2017",
+      "url": "https://www.newgrounds.com/bbs/topic/1419547/1",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2018",
+      "url": "https://www.newgrounds.com/collection/pixel-day-2018",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2019",
+      "url": "https://www.newgrounds.com/bbs/topic/1437848/1",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2020",
+      "url": "https://www.newgrounds.com/bbs/topic/1448508/",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2021",
+      "url": "https://www.newgrounds.com/collection/pixelday2021",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2022",
+      "url": "https://www.newgrounds.com/collection/pixelday2022",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2023",
+      "url": "https://www.newgrounds.com/bbs/topic/1517210/4",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2024",
+      "url": "https://www.newgrounds.com/bbs/topic/1531148/1",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2025",
+      "url": "https://www.newgrounds.com/bbs/topic/1541117/1",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelween-2020",
+      "url": "https://pixeljoint.com/pixels/news.asp?date=9%2F1%2F2020",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelween-2021",
+      "url": "https://pixeljoint.com/2021/09/26/6474/Pixelween_2021_announcement.htm",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelween-2022",
+      "url": "https://pixeljoint.com/pixels/news.asp?date=9%2F1%2F2022",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelween-2023",
+      "url": "https://pixeljoint.com/2023/09/25/6860/Pixelween_2023_announcement.htm",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelween-2024",
+      "url": "https://pixeljoint.com/2024/09/26/7038/Pixelween_2024_announcement.htm",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "pixelween-2025",
+      "url": "https://pixeljoint.com/2025/09/28/7236/submit_news.asp",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "gb-pixel-art-jam-2023",
+      "url": "https://itch.io/jam/gbpixelartjam23",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "gb-pixel-art-jam-2024",
+      "url": "https://itch.io/jam/gbpixelartjam24",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "gb-pixel-art-jam-2025",
+      "url": "https://itch.io/jam/gbpixelartjam25",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2026",
+      "url": "https://www.newgrounds.com/collection/pixel-day-2026",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "iwamisawa-ibox-tahara-2025",
+      "url": "https://i-campus.hokkyodai.ac.jp/i-box/2025/07/93.html",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "frosted-vibes-sapporo-2025",
+      "url": "https://www.do-johodai.ac.jp/topics/9694350/",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "sapporo-game-odyssey-commentator-2026",
+      "url": "https://www.sapporo-game-odyssey.jp/",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。",
+      "additionalUrls": [
+        "https://www.sapporo-game-odyssey.jp/出展作品/b7_コメンテーター"
+      ]
+    },
+    {
+      "id": "asaha-tokyo-pixel-exhibition-2023",
+      "url": "https://tokyopixel.shopinfo.jp/posts/48649694/",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。",
+      "socialUrls": [
+        "https://x.com/vpandav",
+        "https://www.youtube.com/@asaha"
+      ]
+    },
+    {
+      "id": "asaha-mendako-tokyo-pixel-2026",
+      "url": "https://tokyopixel.shopinfo.jp/posts/58870023/",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。",
+      "socialUrls": [
+        "https://x.com/vpandav",
+        "https://www.youtube.com/@asaha"
+      ],
+      "additionalUrls": [
+        "https://www.asaha.world/",
+        "https://tokyopixel.shopinfo.jp/pages/2495762/blog"
+      ]
+    },
+    {
+      "id": "kac-ultra-dope-motocross-2026",
+      "url": "https://kac.amebaownd.com/posts/58724347",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。",
+      "socialUrls": [
+        "https://x.com/moot_sai/",
+        "https://www.instagram.com/moot_sai/"
+      ]
+    },
+    {
+      "id": "kac-super-nice-thankass-2025",
+      "url": "https://kac.amebaownd.com/posts/56975241/",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。",
+      "socialUrls": [
+        "https://x.com/moot_sai/",
+        "https://www.instagram.com/hermippe_pixelart/"
+      ]
+    },
+    {
+      "id": "kac-hermippe-pointless-2025",
+      "url": "https://kac.amebaownd.com/posts/58087057",
+      "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で実開催の日付・内容を確認。終了履歴として登録。"
+    },
+    {
+      "id": "series-65",
+      "url": "https://pixelartpark.com/",
+      "eventIds": [
+        "pixel-art-park-1",
+        "pixel-art-park-2",
+        "pixel-art-park-3",
+        "pixel-art-park-4",
+        "pixel-art-park-5",
+        "pixel-art-park-6"
+      ],
+      "seriesName": "Pixel Art Park",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "各edition archiveの本文で日時・会場確認"
+    },
+    {
+      "id": "series-66",
+      "url": "https://pixel-art.jp/about",
+      "eventIds": [
+        "shibuya-pixel-art-2018",
+        "shibuya-pixel-art-2020",
+        "shibuya-pixel-art-2021",
+        "shibuya-pixel-art-2022",
+        "shibuya-pixel-art-2023",
+        "shibuya-pixel-art-2024",
+        "shibuya-pixel-art-2025"
+      ],
+      "seriesName": "SHIBUYA PIXEL ART",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "年別公式ページで実施概要・日付・pixel art内容確認"
+    },
+    {
+      "id": "series-67",
+      "url": "https://dot-daisakusen.com/",
+      "eventIds": [
+        "winter-dot-daisakusen-2026",
+        "summer-dot-daisakusen-2024"
+      ],
+      "seriesName": "ドット大作戦",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "公式イベントページで日付・会場・内容確認"
+    },
+    {
+      "id": "series-68",
+      "url": "https://pixel-marche.com/",
+      "eventIds": [
+        "kyushu-pixel-marche-2024-05",
+        "kyushu-pixel-marche-2026"
+      ],
+      "seriesName": "九州ピクセルマルシェ",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "公式現行・過去ページで日付・会場・pixel art内容確認"
+    },
+    {
+      "id": "series-69",
+      "url": "https://tpxst.com/",
+      "eventIds": [
+        "the-pixel-street-2023"
+      ],
+      "seriesName": "THE PIXEL STREET",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "公式ページで日付・場所・ドット絵creator出展確認"
+    },
+    {
+      "id": "series-70",
+      "url": "https://www.xart.jp/pixelgirls",
+      "eventIds": [
+        "pixelgirls-side-b-2025"
+      ],
+      "seriesName": "PIXELGIRLS",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "主催ページで日付・会場・展示確認"
+    },
+    {
+      "id": "series-71",
+      "url": "https://www.ntv.co.jp/imaginarium/",
+      "eventIds": [
+        "ntv-imaginarium-2023"
+      ],
+      "seriesName": "日テレイマジナリウム",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "主催ページで会期とドット絵展示確認"
+    },
+    {
+      "id": "series-72",
+      "url": "https://biz.shibuyabunka.com/event/210/",
+      "eventIds": [
+        "pixel-school-stage-2-2024"
+      ],
+      "seriesName": "ピクセルアートの学校",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "開催情報に日時・会場・講義内容"
+    },
+    {
+      "id": "series-73",
+      "url": "https://pictsquare.net/events/calendar/2024-11",
+      "eventIds": [
+        "pixel-dot-party-2024"
+      ],
+      "seriesName": "Pixel Dot Party",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+      "notes": "開催プラットフォームの公式calendar listingで日時・pixel art only scope確認"
+    },
+    {
+      "id": "series-74",
+      "url": "https://www.newgrounds.com/collection/pixel-day",
+      "eventIds": [
+        "newgrounds-pixel-day-2017",
+        "newgrounds-pixel-day-2018",
+        "newgrounds-pixel-day-2019",
+        "newgrounds-pixel-day-2020",
+        "newgrounds-pixel-day-2021",
+        "newgrounds-pixel-day-2022",
+        "newgrounds-pixel-day-2023",
+        "newgrounds-pixel-day-2024",
+        "newgrounds-pixel-day-2025",
+        "newgrounds-pixel-day-2026"
+      ],
+      "seriesName": "Newgrounds Pixel Day",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "notes": "2017–2026各回の開催とpixel art企画を公式告知・コレクションで確認。2026実開催を確認してwatch枠と併存する開催実績として記録。"
+    },
+    {
+      "id": "series-75",
+      "url": "https://pixeljoint.com/",
+      "eventIds": [
+        "pixelween-2020",
+        "pixelween-2021",
+        "pixelween-2022",
+        "pixelween-2023",
+        "pixelween-2024",
+        "pixelween-2025"
+      ],
+      "seriesName": "Pixelween",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "notes": "各年のPixel Joint公式告知・challenge archiveでpixel art contest本文と締切を確認。"
+    },
+    {
+      "id": "series-76",
+      "url": "https://itch.io/jam/gbpixelartjam25",
+      "eventIds": [
+        "gb-pixel-art-jam-2023",
+        "gb-pixel-art-jam-2024",
+        "gb-pixel-art-jam-2025"
+      ],
+      "seriesName": "GB Pixel Art Jam",
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-05T06:14:44Z",
+      "notes": "GB Studio Central主催の各年itch.io jam page。開催時間・Game Boy寸法・pixel art仕様と主催名を確認。2026回は既存カタログ登録済み。"
+    },
+    {
+      "id": "valedkids-meieki-pixel-workshop-autumn-2026",
+      "url": "https://kids.valed.jp/campaign_autumn2026/",
+      "eventIds": [
+        "valedkids-meieki-pixel-workshop-autumn-2026"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": [],
+      "additionalUrls": [
+        "https://www.aplix.co.jp/?p=12421"
+      ]
+    },
+    {
+      "id": "valedkids-meieki-pixel-workshop-autumn-2026-official-1",
+      "url": "https://www.aplix.co.jp/?p=12421",
+      "eventIds": [
+        "valedkids-meieki-pixel-workshop-autumn-2026"
+      ],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+    },
+    {
+      "id": "doom-loophole-center-sanuki-2026",
+      "url": "https://center.degico.jp/hermippe_m7kenji_2026-html.html",
+      "eventIds": [
+        "doom-loophole-center-sanuki-2026"
+      ],
+      "socialUrls": [
+        "https://www.instagram.com/center_of_sanuki/"
+      ],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": [
+        {
+          "url": "https://www.instagram.com/center_of_sanuki/",
+          "result": "pending",
+          "notes": "会場公式ページに掲載された入口。SNS本文は今回未読。"
+        }
+      ]
+    },
+    {
+      "id": "juuni-niigata-comitia-63-2026",
+      "url": "https://tryme12.2-d.jp/12/",
+      "eventIds": [
+        "juuni-niigata-comitia-63-2026"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": [],
+      "additionalUrls": [
+        "https://gataket.com/comitia/e/t63/"
+      ]
+    },
+    {
+      "id": "juuni-niigata-comitia-63-2026-official-1",
+      "url": "https://gataket.com/comitia/e/t63/",
+      "eventIds": [
+        "juuni-niigata-comitia-63-2026"
+      ],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+    },
+    {
+      "id": "juuni-comitia-158-pixel-art-2026",
+      "url": "https://tryme12.2-d.jp/12/",
+      "eventIds": [
+        "juuni-comitia-158-pixel-art-2026"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": [],
+      "additionalUrls": [
+        "https://www.comitia.co.jp/html/158.html"
+      ]
+    },
+    {
+      "id": "juuni-comitia-158-pixel-art-2026-official-1",
+      "url": "https://www.comitia.co.jp/html/158.html",
+      "eventIds": [
+        "juuni-comitia-158-pixel-art-2026"
+      ],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+    },
+    {
+      "id": "honkbooks-asobanight-special-weekend-pixel-art-2026",
+      "url": "https://honkbooks.com/asobanight-20/",
+      "eventIds": [
+        "honkbooks-asobanight-special-weekend-pixel-art-2026"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "crosspico-nagoya-vol-3-2026",
+      "url": "https://sites.google.com/view/crosspico/",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "crosspico-nagoya-watch",
+      "url": "https://sites.google.com/view/crosspico/",
+      "eventIds": [
+        "crosspico-nagoya-watch"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "next-date-not-confirmed",
+      "notes": "公式サイトは前回vol.3の情報。次回日程は今回未確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "beppu-minecraft-pixel-art-2026-10-18",
+      "url": "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
+      "eventIds": [
+        "beppu-minecraft-pixel-art-2026-10-18"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "beppu-minecraft-pixel-art-2026-11-15",
+      "url": "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
+      "eventIds": [
+        "beppu-minecraft-pixel-art-2026-11-15"
+      ],
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で内容・開催日・場所を確認。",
+      "socialChecks": []
+    }
+  ],
+  "research": {
+    "checkedAt": "2026-10-05T07:18:39+00:00",
+    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。",
+    "searchExamples": [
+      "ドット絵 イベント 2026",
+      "ピクセルアート 展示 ワークショップ 2026",
+      "pixel art pixelart exhibition workshop contest 2026",
+      "arte pixel pixel art taller evento 2026",
+      "pixel art atelier festival 2026",
+      "Pixel Art Pixelkunst Veranstaltung 2026",
+      "픽셀 아트 행사 2026"
+    ],
+    "scopeLanguages": [
+      "ja",
+      "en",
+      "es",
+      "fr",
+      "de",
+      "ko"
+    ],
+    "scopeRegions": [
+      "日本",
+      "オンライン",
+      "欧州",
+      "韓国"
+    ],
+    "verifiedSourceLanguages": [
+      "es",
+      "de",
+      "ja"
+    ],
+    "verifiedSourceUrls": [
+      "https://www.digitaljove.com/talleres",
+      "https://www.retrosaar.de/",
+      "https://www.festivalfps.com/",
+      "https://tryme12.2-d.jp/12/",
+      "https://minapuru.jp/?p=889",
+      "https://kids.valed.jp/campaign_autumn2026/",
+      "https://center.degico.jp/hermippe_m7kenji_2026-html.html",
+      "https://honkbooks.com/asobanight-20/",
+      "https://sites.google.com/view/crosspico/",
+      "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2"
+    ],
+    "regionalChecks": [
+      {
+        "checkedAt": "2026-10-05T15:00:59+09:00",
+        "region": "北海道",
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "queries": [
+          "北海道 ドット絵 イベント 展示 2026",
+          "札幌 ピクセルアート 展 2026",
+          "札幌 ドット絵 展示 イベント",
+          "北海道 pixel art exhibition 2026",
+          "\"札幌\" \"ドット絵\"",
+          "\"北海道\" \"ピクセルアート\" イベント",
+          "\"札幌\" \"pixel art\"",
+          "\"札幌\" \"ピクセルアート\" 展示",
+          "\"SAPPORO GAME ODYSSEY\" \"ピクセルアート\"",
+          "\"北海道\" \"ドット絵\" \"展\"",
+          "\"札幌\" \"ピクセルアート\" \"2026年\""
+        ],
+        "addedIds": [
+          "hokkaido-comitia-24-juni-pixel-art-2026",
+          "noboribetsu-barrier-free-toy-expo-dot-art-2026"
+        ],
+        "pastExamples": [
+          {
+            "name": "田原実織「暗渠を往く末に酸欠」",
+            "startDate": "2025-09-03",
+            "endDate": "2025-09-15",
+            "area": "岩見沢市",
+            "sourceUrl": "https://i-campus.hokkyodai.ac.jp/i-box/2025/07/93.html"
+          },
+          {
+            "name": "Frosted Vibes 2025（ドット絵作品展示あり）",
+            "startDate": "2025-02-08",
+            "endDate": "2025-02-15",
+            "area": "札幌市",
+            "sourceUrl": "https://www.do-johodai.ac.jp/topics/9694350/"
+          },
+          {
+            "name": "SAPPORO GAME ODYSSEY（ピクセルアート作品の出展あり）",
+            "startDate": "2026-06-07",
+            "endDate": "2026-06-07",
+            "area": "札幌市",
+            "sourceUrl": "https://www.sapporo-game-odyssey.jp/",
+            "additionalUrl": "https://www.sapporo-game-odyssey.jp/出展作品/b7_コメンテーター"
+          }
+        ],
+        "notes": "2名のエージェントが札幌の展示・出展と道内他地域を並行調査。今後の日程とドット絵企画を公式本文で確認した2件を追加。終了済みの展示は開催実績として記録し、今後の開催枠に混ぜない。小樽の2027年始動企画は公開イベント日程・会場未発表のためイベント未登録。SAPPORO GAME ODYSSEYの公式Xは本文取得不能、次回開催は未確認。札幌以外では旭川・函館・小樽なども調査したが全件網羅は保証しない。"
+      },
+      {
+        "checkedAt": "2026-10-05T07:18:39+00:00",
+        "regions": [
+          "愛知県",
+          "名古屋市",
+          "岐阜県",
+          "静岡県",
+          "三重県",
+          "新潟県",
+          "神奈川県",
+          "千葉県",
+          "埼玉県",
+          "茨城県",
+          "長野県",
+          "石川県",
+          "宮城県",
+          "東京都",
+          "香川県",
+          "京都府",
+          "大阪府",
+          "兵庫県",
+          "福岡県",
+          "大分県",
+          "沖縄県"
+        ],
+        "languages": [
+          "ja",
+          "en"
+        ],
+        "queries": [
+          "ドット絵 展示 2026 10月 11月 12月 イベント",
+          "ピクセルアート 個展 2026 10月 11月 日本",
+          "ドット絵 ポップアップ 2026 10月 asaha",
+          "地域名 + ドット絵/ピクセルアート/pixel art + 2026/2027/展示/個展/講座/イベント",
+          "バレッドキッズ Excel関数 ドット絵 2026",
+          "Game Night Series 2026 ドット絵"
+        ],
+        "addedIds": [
+          "valedkids-meieki-pixel-workshop-autumn-2026",
+          "doom-loophole-center-sanuki-2026",
+          "juuni-niigata-comitia-63-2026",
+          "juuni-comitia-158-pixel-art-2026",
+          "honkbooks-asobanight-special-weekend-pixel-art-2026",
+          "crosspico-nagoya-vol-3-2026",
+          "crosspico-nagoya-watch",
+          "beppu-minecraft-pixel-art-2026-10-18",
+          "beppu-minecraft-pixel-art-2026-11-15"
+        ],
+        "notes": "3エージェントが東海、関東東北北陸、関西四国九州を並行調査しrootが一次本文を確認して統合。今後・開催中7件、名古屋開催済み1件、次回待ち1件を追加。名駅教室は全国キャンペーンのうち公式参加一覧にある特定会場として掲載し、全国キャンペーン自体を別件で重複計上しない。教室の予約日時は未確認。別府の個別公式ページとコ本やはWebツール取得失敗後、HTTP取得で公式本文を読めた。ジュウニは作家が直接参加予定と告知しており、主催サークル一覧は未照合。一般ゲーム催事や「Pixel」という名称だけでは登録しない。",
+        "unconfirmed": [
+          {
+            "name": "asaha 京都個展（10月17〜25日の告知候補）",
+            "sourceUrl": "https://www.asaha.world/",
+            "reason": "作家のピクセルアート活動は確認。日程はSNS検索情報・二次情報のみで公式SNS告知本文を取得できず未登録。"
+          },
+          {
+            "name": "京都駅ビル芸術祭 PIXEL DOT FIELD",
+            "sourceUrl": "https://kyotostation-gne.jp/art.html",
+            "reason": "日程と会場は公式確認済み。PAC-MANが食べるドットを題材にした立体展示で、ドット絵・ピクセルアート制作や作品展示との関連が明確ではないためイベント採用を保留。"
+          },
+          {
+            "name": "名古屋ぴくせるあーと すぽっと 2024",
+            "reason": "参加作家のnote検索結果は見つかったが直接本文を取得できず今回未登録。"
+          }
+        ]
+      }
+    ],
+    "historyCollection": {
+      "checkedAt": "2026-10-05T06:24:03+00:00",
+      "addedIds": [
+        "pixel-art-park-1",
+        "pixel-art-park-2",
+        "pixel-art-park-3",
+        "pixel-art-park-4",
+        "pixel-art-park-5",
+        "pixel-art-park-6",
+        "shibuya-pixel-art-2018",
+        "shibuya-pixel-art-2020",
+        "shibuya-pixel-art-2021",
+        "shibuya-pixel-art-2022",
+        "shibuya-pixel-art-2023",
+        "shibuya-pixel-art-2024",
+        "shibuya-pixel-art-2025",
+        "the-pixel-street-2023",
+        "winter-dot-daisakusen-2026",
+        "kyushu-pixel-marche-2024-05",
+        "kyushu-pixel-marche-2026",
+        "summer-dot-daisakusen-2024",
+        "pixelgirls-side-b-2025",
+        "ntv-imaginarium-2023",
+        "pixel-school-stage-2-2024",
+        "pixel-dot-party-2024",
+        "beyond-pixel-art-award-exhibition-2021",
+        "newgrounds-pixel-day-2017",
+        "newgrounds-pixel-day-2018",
+        "newgrounds-pixel-day-2019",
+        "newgrounds-pixel-day-2020",
+        "newgrounds-pixel-day-2021",
+        "newgrounds-pixel-day-2022",
+        "newgrounds-pixel-day-2023",
+        "newgrounds-pixel-day-2024",
+        "newgrounds-pixel-day-2025",
+        "pixelween-2020",
+        "pixelween-2021",
+        "pixelween-2022",
+        "pixelween-2023",
+        "pixelween-2024",
+        "pixelween-2025",
+        "gb-pixel-art-jam-2023",
+        "gb-pixel-art-jam-2024",
+        "gb-pixel-art-jam-2025",
+        "newgrounds-pixel-day-2026",
+        "iwamisawa-ibox-tahara-2025",
+        "frosted-vibes-sapporo-2025",
+        "sapporo-game-odyssey-commentator-2026",
+        "asaha-tokyo-pixel-exhibition-2023",
+        "asaha-mendako-tokyo-pixel-2026",
+        "kac-ultra-dope-motocross-2026",
+        "kac-super-nice-thankass-2025",
+        "kac-hermippe-pointless-2025"
+      ],
+      "queries": [
+        "Pixel Art Park past editions",
+        "SHIBUYA PIXEL ART annual archive",
+        "ドット絵 即売会 展示 過去開催",
+        "九州ピクセルマルシェ 過去イベント",
+        "Pixelween annual challenge archive",
+        "Newgrounds Pixel Day annual collection",
+        "GB Pixel Art Jam past itch.io jam pages",
+        "site:tokyopixel.shopinfo.jp ドット絵 個展",
+        "site:kac.amebaownd.com ヘルミッペ モトクロス斉藤"
+      ],
+      "languages": [
+        "ja",
+        "en"
+      ],
+      "unconfirmed": [
+        {
+          "name": "Pixel Dot Party 2023",
+          "startDate": "2023-11-26",
+          "sourceUrl": "https://note.com/kokoro7171/n/n5f5a6ca78ea1",
+          "reason": "参加者reportで催事名・日付は確認したが主催者/プラットフォームの公式告知本文を未確認。eventsには追加しない。"
+        },
+        {
+          "name": "SHIBUYA PIXEL ART 2019",
+          "sourceUrl": "https://pixel-art.jp/about",
+          "reason": "公式履歴で開催年は分かるが、今回開いた本文では日付が月より細かく確認できないため除外。"
+        }
+      ],
+      "notes": "3エージェントとrootが公式本文で開催回を確認。2015年まで遡り、出展作家別の水増しはしない。過去の開催と次回情報待ちを別レコードとして保持。北海道の過去3件はresearch例から実績イベントへ追加。全件網羅を保証しない。"
+    }
+  }
+}

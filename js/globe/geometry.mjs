@@ -1,5 +1,5 @@
 /**
- * Dependency-free geographic cells and orthographic globe geometry.
+ * Dependency-free geographic cells, orthographic globe and Web Mercator views.
  *
  * Cells are bounded by meridians and parallels on the sphere. They are never
  * stretched into screen-space squares: the renderer projects the same four
@@ -167,11 +167,18 @@ export function createGlobeCamera({ viewport, width, height, dpr, centerX, cente
   return Object.freeze({ viewport: safeViewport, centerLongitude: longitude, centerLatitude: latitude, zoom: safeZoom, radius: safeRadius, scale: safeRadius * safeZoom, orientation: quaternionNormalize(orientation || rotation || getViewQuaternion(longitude, latitude)) });
 }
 export function projectGeoToScreen(longitude, latitude, camera) {
+  if (camera?.projection === 'mercator') return projectMercator(longitude, latitude, camera);
   if (!camera?.viewport || !camera.orientation || !Number.isFinite(camera.scale)) throw new TypeError('A camera created by createGlobeCamera is required.');
   const world = geoToUnitVector(longitude, latitude); const cameraVector = rotateVectorByQuaternion(world, quaternionConjugate(camera.orientation)); const { centerX, centerY, dpr } = camera.viewport; const x = centerX + cameraVector.x * camera.scale; const y = centerY - cameraVector.y * camera.scale;
   return Object.freeze({ x, y, physicalX: x * dpr, physicalY: y * dpr, depth: cameraVector.z, visible: cameraVector.z >= -VISIBILITY_EPSILON, cameraCoordinates: Object.freeze(cameraVector) });
 }
 export function inverseScreenToGeo(x, y, camera) {
+  if (camera?.projection === 'mercator') {
+    const screenX = finite(x, 'screen x'); const screenY = finite(y, 'screen y');
+    const mapY = camera.centerMercatorY + (camera.viewport.centerY - screenY) / camera.scale;
+    if (Math.abs(mapY) > Math.PI + VISIBILITY_EPSILON) return null;
+    return Object.freeze({ longitude: normalizeLongitude(camera.centerLongitude + (screenX - camera.viewport.centerX) / camera.scale * RAD_TO_DEG), latitude: inverseMercatorY(mapY), depth: 1, visible: true, screen: Object.freeze({ x: screenX, y: screenY }) });
+  }
   if (!camera?.viewport || !camera.orientation || !Number.isFinite(camera.scale)) throw new TypeError('A camera created by createGlobeCamera is required.'); const screenX = finite(x, 'screen x'); const screenY = finite(y, 'screen y'); const { centerX, centerY } = camera.viewport; const normalizedX = (screenX - centerX) / camera.scale; const normalizedY = (centerY - screenY) / camera.scale; const radialSquared = normalizedX * normalizedX + normalizedY * normalizedY;
   if (radialSquared > 1 + VISIBILITY_EPSILON) return null; const depth = Math.sqrt(Math.max(0, 1 - Math.min(1, radialSquared))); const world = rotateVectorByQuaternion({ x: normalizedX, y: normalizedY, z: depth }, camera.orientation);
   return Object.freeze({ ...unitVectorToGeo(world), depth, visible: true, screen: Object.freeze({ x: screenX, y: screenY }) });
@@ -181,4 +188,52 @@ export function getCellCorners(cell) {
   if (!cell?.bounds) throw new TypeError('A cell returned by getCell is required.'); const { west, east, north, south } = cell.bounds;
   return Object.freeze([{ longitude: west, latitude: north }, { longitude: east, latitude: north }, { longitude: east, latitude: south }, { longitude: west, latitude: south }].map(Object.freeze));
 }
-export function projectCellCorners(cell, camera) { return Object.freeze(getCellCorners(cell).map(({ longitude, latitude }) => projectGeoToScreen(longitude, latitude, camera))); }
+export function projectCellCorners(cell, camera) {
+  if (camera?.projection !== 'mercator') return Object.freeze(getCellCorners(cell).map(({ longitude, latitude }) => projectGeoToScreen(longitude, latitude, camera)));
+  const center = projectGeoToScreen(cell.center.longitude, cell.center.latitude, camera);
+  return Object.freeze(getCellCorners(cell).map(({ longitude, latitude }) => {
+    const point = projectGeoToScreen(longitude, latitude, camera);
+    const x = center.x + (longitude - cell.center.longitude) * DEG_TO_RAD * camera.scale;
+    return Object.freeze({ ...point, x, physicalX: x * camera.viewport.dpr });
+  }));
+}
+
+/** Web Mercator presentation; geographic cells and their IDs remain unchanged. */
+export const MERCATOR_MAX_LATITUDE = Math.atan(Math.sinh(Math.PI)) * RAD_TO_DEG;
+export function mercatorY(latitude) {
+  const lat = Math.max(-MERCATOR_MAX_LATITUDE, Math.min(MERCATOR_MAX_LATITUDE, finite(latitude, 'latitude')));
+  return Math.log(Math.tan(Math.PI / 4 + lat * DEG_TO_RAD / 2));
+}
+export function inverseMercatorY(y) { return Math.atan(Math.sinh(finite(y, 'Mercator y'))) * RAD_TO_DEG; }
+export function createMercatorCamera(options = {}) {
+  const viewport = readViewport(options);
+  const requestedZoom = finite(options.zoom ?? 1, 'zoom');
+  if (requestedZoom <= 0) throw new RangeError('Camera zoom must be positive.');
+  const baseSize = Math.max(viewport.width, viewport.height);
+  const zoom = Math.max(requestedZoom, viewport.height / baseSize);
+  const worldSize = baseSize * zoom;
+  const scale = worldSize / (2 * Math.PI);
+  const limit = Math.max(0, Math.PI - Math.max(viewport.centerY, viewport.height - viewport.centerY) / scale);
+  const centerMercatorY = Math.max(-limit, Math.min(limit, mercatorY(options.centerLatitude ?? 0)));
+  const centerLatitude = inverseMercatorY(centerMercatorY);
+  const centerLongitude = normalizeLongitude(options.centerLongitude ?? 0);
+  return Object.freeze({ projection: 'mercator', viewport, centerLongitude, centerLatitude, centerMercatorY, worldSize, zoom, scale, radius: baseSize / (2 * Math.PI), orientation: getViewQuaternion(centerLongitude, centerLatitude) });
+}
+function projectMercator(longitude, latitude, camera) {
+  const lat = finite(latitude, 'latitude');
+  const x = camera.viewport.centerX + normalizeLongitude(longitude - camera.centerLongitude) * DEG_TO_RAD * camera.scale;
+  const y = camera.viewport.centerY - (mercatorY(lat) - camera.centerMercatorY) * camera.scale;
+  return Object.freeze({ x, y, physicalX: x * camera.viewport.dpr, physicalY: y * camera.viewport.dpr, depth: Math.abs(lat) <= MERCATOR_MAX_LATITUDE ? 1 : -1, visible: Math.abs(lat) <= MERCATOR_MAX_LATITUDE });
+}
+export function projectGeoCopiesToScreen(longitude, latitude, camera, padding = 0) {
+  const point = projectGeoToScreen(longitude, latitude, camera);
+  if (camera.projection !== 'mercator') return Object.freeze([point]);
+  const pad = Math.max(0, finite(padding, 'padding'));
+  if (!point.visible || point.y < -pad || point.y > camera.viewport.height + pad) return Object.freeze([]);
+  const first = Math.ceil((-pad - point.x) / camera.worldSize);
+  const last = Math.floor((camera.viewport.width + pad - point.x) / camera.worldSize);
+  return Object.freeze(Array.from({ length: Math.max(0, last - first + 1) }, (_, index) => {
+    const copy = first + index; const x = point.x + copy * camera.worldSize;
+    return Object.freeze({ ...point, x, physicalX: x * camera.viewport.dpr, copy });
+  }));
+}

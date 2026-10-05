@@ -5,7 +5,7 @@
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
   <script defer src="/js/adsense-auto.js?rev=20260929-auto-ads-1"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PiXiEED地球儀</title>
+  <title>PiXiEED地図</title>
 
 
   <script>
@@ -20,25 +20,34 @@
       }
     }());
   </script>
-  <link rel="stylesheet" href="css/globe-prototype.css?v=20261004-camera-location-1">
-  <!-- Flatten the module waterfall and fetch the land-mask raster in parallel. -->
-  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20260927-solar-tool-2">
-  <link rel="modulepreload" href="js/globe/astro-ui.mjs?v=20260929-claude-integration-1">
-  <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20261004-puzzle-share-1">
-  <link rel="modulepreload" href="js/globe/geometry.mjs?v=20260921-grid11-1">
+  <link rel="stylesheet" href="css/globe-prototype.css?v=20261005-admin-boundary-1">
+  <!-- Flatten the module waterfall and fetch the compact geographic raster in parallel. -->
+  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20261005-admin-boundary-1">
+  <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20261005-admin-boundary-1">
+  <link rel="modulepreload" href="js/globe/geometry.mjs?v=20261005-admin-boundary-1">
   <link rel="modulepreload" href="js/globe/topology.mjs?v=20260920-g4-precision-1">
   <link rel="modulepreload" href="js/globe/hierarchy.mjs?v=20260920-g4-precision-1">
-  <link rel="modulepreload" href="js/globe/webgl-renderer.mjs?v=20260927-sky-events-v1">
+  <link rel="modulepreload" href="js/globe/webgl-renderer.mjs?v=20261005-admin-boundary-1">
   <link rel="modulepreload" href="assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1">
   <script>
-    globalThis.__PIXIEED_GLOBE_RASTER__ = location.protocol === 'file:' ? null : fetch('assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1', { cache: 'force-cache' })
-      .then(function (response) { if (!response.ok) throw new Error('raster ' + response.status); return response.json(); });
-    globalThis.__PIXIEED_GLOBE_RASTER__.catch(function () {});
+    var telescope = new URLSearchParams(location.search).get('tool') === 'telescope';
+    var request = location.protocol === 'file:' ? null : fetch(telescope ? 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1' : 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1', { cache: 'force-cache' })
+      .then(function (response) { if (!response.ok) throw new Error('map ' + response.status); return response.json(); });
+    globalThis[telescope ? '__PIXIEED_GLOBE_RASTER__' : '__PIXIEED_MAP_CELLS__'] = request;
+    request?.catch(function () {});
+    if (!telescope && location.protocol !== 'file:') {
+      globalThis.__PIXIEED_MAP_PREFECTURES__ = fetch('assets/maps/map-prefectures-v1.json?v=20261005-admin-boundary-1', { cache: 'force-cache' })
+        .then(function (response) { if (!response.ok) throw new Error('map areas ' + response.status); return response.json(); });
+      globalThis.__PIXIEED_MAP_PREFECTURES__.catch(function () {});
+      globalThis.__PIXIEED_MAP_ADMIN1__ = fetch('assets/maps/map-admin1-v1.json?v=20261005-admin-boundary-1', { cache: 'force-cache' })
+        .then(function (response) { if (!response.ok) throw new Error('Administrative regions unavailable'); return response.json(); });
+      globalThis.__PIXIEED_MAP_ADMIN1__.catch(function () {});
+    }
     // If loading stalls, show a short recovery message instead of implementation details.
     setTimeout(function () {
       var status = document.getElementById('loadStatus');
       if (!globalThis.__PIXIEED_GLOBE__ && status && status.textContent.indexOf('読み込み中') >= 0) {
-        status.textContent = '地球儀を読み込めませんでした。ページを再読み込みしてください。';
+        status.textContent = '地図を読み込めませんでした。ページを再読み込みしてください。';
       }
     }, 8000);
   </script>
@@ -54,39 +63,45 @@
     <header class="prototype-header">
       <div>
         <p class="eyebrow">PiXiEED</p>
-        <h1 id="prototypeTitle" class="sr-only">PiXiEED地球儀</h1>
+        <h1 id="prototypeTitle" class="sr-only">PiXiEED地図</h1>
       </div>
       <p id="loadStatus" class="load-status" role="status">地図データを読み込み中…</p>
       <div id="accountSlot" class="account" aria-label="アカウント"></div>
     </header>
 
-    <section id="globeStage" class="globe-stage" aria-label="インタラクティブな地球儀">
+    <section id="globeStage" class="globe-stage" aria-label="インタラクティブな地図">
       <canvas id="skyCanvas" aria-hidden="true"></canvas>
-      <canvas id="globeCanvas" tabindex="0" aria-label="地球儀。ドラッグで回転、ピンチまたはホイールでズーム、2本指タップで縮小、タップでセルを選択、長押しでその場所から空を見る、いちばん小さくしてからさらに縮小すると太陽系。キーボードでは矢印で回転、プラスとマイナスでズーム、0で初期表示"></canvas>
-      <p id="gestureHint" class="gesture-hint" hidden><span>ドラッグで回す</span><span>ピンチで拡大・縮小</span><span>長押しで空を見る</span><span>さらに縮小で太陽系へ</span></p>
-      <nav id="astroViewSwitch" class="astro-views" aria-label="表示を切り替える">
-        <button type="button" data-astro-view="globe" aria-label="作品の地球儀へ戻る" aria-pressed="true"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>作品</span></button>
-        <button type="button" data-astro-view="sky" aria-label="この場所の星空を見る" aria-pressed="false"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>星空</span></button>
-        <button type="button" data-astro-view="solar" aria-label="太陽系を見る" aria-pressed="false"><img src="/assets/icons/pixieed/solar-system.svg" alt=""><span>太陽系</span></button>
+      <canvas id="globeCanvas" tabindex="0" aria-label="地図。ドラッグで移動、横方向は繰り返し表示、ピンチまたはホイールでズーム、2本指タップで縮小、タップで地域を選択、ダブルクリックで拡大、Escapeで選択解除。キーボードでは矢印で移動、プラスとマイナスでズーム、0で初期表示"></canvas>
+      <p id="gestureHint" class="gesture-hint" hidden><span>ドラッグで移動</span><span>ピンチで拡大・縮小</span><span>タップで地域を選択</span></p>
+      <nav id="mapLayerSwitch" class="map-layers" aria-label="地図に表示する内容">
+        <button type="button" data-map-content="posts" aria-pressed="true"><i aria-hidden="true"></i><span>みんなの投稿</span></button>
+        <button type="button" data-map-content="events" aria-pressed="false"><i aria-hidden="true"></i><span>イベント</span></button>
       </nav>
-      <aside id="selectionPanel" class="selection-panel" aria-live="polite" hidden>
-        <span id="selectedStage"></span>
-        <strong id="selectedOwner"></strong>
-        <button id="placeHere" class="place-here" type="button" aria-label="選択したセルに作品を置く">
-          <img src="/assets/icons/pixieed/add.svg" alt="">
-        </button>
+      <div id="cellTooltip" class="map-cell-tooltip" role="tooltip" hidden>
+        <strong data-cell-name></strong><span data-cell-posts></span>
+      </div>
+      <aside id="selectionPanel" class="selection-panel" aria-label="選択した場所" aria-live="polite" hidden>
+        <div class="selection-panel__head">
+          <div class="selection-panel__info"><span id="selectedStage">選択中のセル</span><strong id="selectedOwner"></strong></div>
+          <button id="clearCellSelection" class="selection-panel__close" type="button" aria-label="地域の選択を解除"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
+        </div>
+        <div class="selection-panel__actions">
+          <button id="viewCellPosts" type="button"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span><span id="selectedContentKind">投稿 </span><span id="selectedPostCount">0</span>件</span></button>
+          <button id="zoomToCell" type="button" aria-label="選択した場所を拡大"><img src="/assets/icons/pixieed/zoom-in.svg" alt=""><span>拡大</span></button>
+          <button id="placeHere" class="place-here" type="button" aria-label="選択した地域に作品を置く"><img src="/assets/icons/pixieed/add.svg" alt=""><span>投稿する</span></button>
+        </div>
       </aside>
     </section>
 
   </main>
   <nav class="globe-app-tabs" aria-label="アプリナビゲーション">
-    <a href="/globe/" aria-label="地球儀" data-globe-nav-map><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
+    <a href="/globe/" aria-label="地図" data-globe-nav-map><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
     <a href="/pixel-camera.html?from=globe" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
     <button id="globePrimaryAction" type="button" aria-label="作品を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>
     <a href="/tools/" aria-label="ツール" data-globe-nav-tools><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/globe/prototype.mjs?rev=20261004-puzzle-share-1"></script>
+  <script type="module" src="js/globe/prototype.mjs?rev=20261005-admin-boundary-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261002-header-layout-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>

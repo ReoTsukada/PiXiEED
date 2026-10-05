@@ -1,0 +1,3010 @@
+{
+  "version": 1,
+  "regions": [
+    {
+      "id": "region-233c311e7a92f7a4",
+      "label": "愛知県",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch",
+        "valedkids-meieki-pixel-workshop-autumn-2026"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区",
+        "名古屋市中村区"
+      ]
+    },
+    {
+      "id": "region-332d5e21f830bc60",
+      "label": "スペイン",
+      "eventIds": [
+        "digital-jove-pixel-art-workshop-2026",
+        "festival-fps-pixel-art-workshop-2026"
+      ],
+      "areas": [
+        "アルメンドラレホ（バダホス）",
+        "バレンシア"
+      ]
+    },
+    {
+      "id": "region-4bc3d1523aa54898",
+      "label": "神奈川県",
+      "eventIds": [
+        "pixel-art-park-9"
+      ],
+      "areas": [
+        "横浜・みなとみらい"
+      ]
+    },
+    {
+      "id": "region-679359c6b9f4c14c",
+      "label": "大分県",
+      "eventIds": [
+        "beppu-minecraft-pixel-art-2026-10-18",
+        "beppu-minecraft-pixel-art-2026-11-15"
+      ],
+      "areas": [
+        "別府市"
+      ]
+    },
+    {
+      "id": "region-7ab4225df7fc4c9d",
+      "label": "新潟県",
+      "eventIds": [
+        "juuni-niigata-comitia-63-2026"
+      ],
+      "areas": [
+        "新潟市"
+      ]
+    },
+    {
+      "id": "region-800953e13eb760b1",
+      "label": "北海道",
+      "eventIds": [
+        "frosted-vibes-sapporo-2025",
+        "hokkaido-comitia-24-juni-pixel-art-2026",
+        "iwamisawa-ibox-tahara-2025",
+        "noboribetsu-barrier-free-toy-expo-dot-art-2026",
+        "sapporo-game-odyssey-commentator-2026"
+      ],
+      "areas": [
+        "岩見沢市",
+        "札幌市",
+        "登別市"
+      ]
+    },
+    {
+      "id": "region-9c73dc3c0b8b156b",
+      "label": "ポーランド",
+      "eventIds": [
+        "nrg-pixel-art-awards-2026"
+      ],
+      "areas": [
+        "ポズナン"
+      ]
+    },
+    {
+      "id": "region-ce76fe655d41af06",
+      "label": "東京都",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026",
+        "asaha-tokyo-pixel-exhibition-2023",
+        "beyond-pixel-art-award-exhibition-2021",
+        "honkbooks-asobanight-special-weekend-pixel-art-2026",
+        "juuni-comitia-158-pixel-art-2026",
+        "kac-hermippe-pointless-2025",
+        "kac-super-nice-thankass-2025",
+        "kac-ultra-dope-motocross-2026",
+        "ntv-imaginarium-2023",
+        "pixel-art-park-1",
+        "pixel-art-park-2",
+        "pixel-art-park-3",
+        "pixel-art-park-4",
+        "pixel-art-park-5",
+        "pixel-art-park-6",
+        "pixel-school-stage-2-2024",
+        "pixelgirls-side-b-2025",
+        "shibuya-pixel-art-2018",
+        "shibuya-pixel-art-2020",
+        "shibuya-pixel-art-2021",
+        "shibuya-pixel-art-2022",
+        "shibuya-pixel-art-2023",
+        "shibuya-pixel-art-2024",
+        "shibuya-pixel-art-2025",
+        "shibuya-pixel-art-watch",
+        "summer-dot-daisakusen-2024",
+        "the-pixel-street-2023",
+        "winter-dot-daisakusen-2026",
+        "winter-dot-daisakusen-watch"
+      ],
+      "areas": [
+        "北千住",
+        "千代田区",
+        "台東区",
+        "新宿区",
+        "東京",
+        "江東区",
+        "江東区・亀戸",
+        "江東区・清澄白河／オンライン",
+        "浅草橋",
+        "渋谷",
+        "渋谷・原宿",
+        "渋谷・表参道",
+        "港区・赤坂",
+        "足立区・北千住"
+      ]
+    },
+    {
+      "id": "region-db3bff9f3e294214",
+      "label": "香川県",
+      "eventIds": [
+        "doom-loophole-center-sanuki-2026"
+      ],
+      "areas": [
+        "高松市"
+      ]
+    },
+    {
+      "id": "region-e8900cb0689eae74",
+      "label": "ドイツ",
+      "eventIds": [
+        "moertel-polaris-2026",
+        "retrocon-saar-17-pixel-art-2026"
+      ],
+      "areas": [
+        "ハンブルク",
+        "フェルクリンゲン"
+      ]
+    },
+    {
+      "id": "region-f94ad49248167a81",
+      "label": "福岡県",
+      "eventIds": [
+        "kyushu-pixel-marche-2024-05",
+        "kyushu-pixel-marche-2026",
+        "kyushu-pixel-marche-watch"
+      ],
+      "areas": [
+        "福岡・天神",
+        "福岡市",
+        "福岡市・天神"
+      ]
+    }
+  ],
+  "venues": [
+    {
+      "id": "venue-01d0c814e7b82a94",
+      "label": "Sala B-0-2, Facultad de Bellas Artes, Edificio 3N, UPV（スペイン・バレンシア）",
+      "eventIds": [
+        "digital-jove-pixel-art-workshop-2026"
+      ],
+      "region": "スペイン",
+      "area": "バレンシア",
+      "sourceUrls": [
+        "https://www.digitaljove.com/talleres"
+      ]
+    },
+    {
+      "id": "venue-0c3e12f0d091960a",
+      "label": "CENTER/SANUKI（高松市常磐町1-6-13）",
+      "eventIds": [
+        "doom-loophole-center-sanuki-2026"
+      ],
+      "region": "香川県",
+      "area": "高松市",
+      "sourceUrls": [
+        "https://center.degico.jp/hermippe_m7kenji_2026-html.html"
+      ]
+    },
+    {
+      "id": "venue-1757c2ccb94b8a7f",
+      "label": "MTP Poznań（ポーランド・ポズナン／遠隔応募可）",
+      "eventIds": [
+        "nrg-pixel-art-awards-2026"
+      ],
+      "region": "ポーランド",
+      "area": "ポズナン",
+      "sourceUrls": [
+        "https://nrgevent.eu/compo/"
+      ]
+    },
+    {
+      "id": "venue-17d35732a05e4430",
+      "label": "渋谷・原宿周辺の複数会場",
+      "eventIds": [
+        "shibuya-pixel-art-2023"
+      ],
+      "region": "東京都",
+      "area": "渋谷・原宿",
+      "sourceUrls": [
+        "https://pixel-art.jp/spa2023/"
+      ]
+    },
+    {
+      "id": "venue-19e24c810c8b3a7b",
+      "label": "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）",
+      "eventIds": [
+        "festival-fps-pixel-art-workshop-2026"
+      ],
+      "region": "スペイン",
+      "area": "アルメンドラレホ（バダホス）",
+      "sourceUrls": [
+        "https://www.festivalfps.com/"
+      ]
+    },
+    {
+      "id": "venue-1a6f91a9111fbd59",
+      "label": "3331 Arts Chiyoda",
+      "eventIds": [
+        "pixel-art-park-2",
+        "pixel-art-park-3",
+        "pixel-art-park-4",
+        "pixel-art-park-5",
+        "pixel-art-park-6"
+      ],
+      "region": "東京都",
+      "area": "千代田区",
+      "sourceUrls": [
+        "https://pixelartpark.com/events/pap2/",
+        "https://pixelartpark.com/events/pap3/",
+        "https://pixelartpark.com/events/pap4/",
+        "https://pixelartpark.com/events/pap5/",
+        "https://pixelartpark.com/events/pap6/"
+      ]
+    },
+    {
+      "id": "venue-1f568b8baa98b2a0",
+      "label": "Hermann Neuberger Halle, Stadionstraße, 66333 Völklingen（ドイツ）",
+      "eventIds": [
+        "retrocon-saar-17-pixel-art-2026"
+      ],
+      "region": "ドイツ",
+      "area": "フェルクリンゲン",
+      "sourceUrls": [
+        "https://www.retrosaar.de/"
+      ]
+    },
+    {
+      "id": "venue-214a176d78463b43",
+      "label": "スペース七番（錦2-7-7 オリマチ錦2-A）",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026"
+      ],
+      "region": "愛知県",
+      "area": "名古屋市中区",
+      "sourceUrls": [
+        "https://sites.google.com/view/crosspico/"
+      ]
+    },
+    {
+      "id": "venue-2f1fe62dcae2e503",
+      "label": "表参道・キャットストリート周辺",
+      "eventIds": [
+        "shibuya-pixel-art-2018"
+      ],
+      "region": "東京都",
+      "area": "渋谷・表参道",
+      "sourceUrls": [
+        "https://pixel-art.jp/spa2018"
+      ]
+    },
+    {
+      "id": "venue-2f7ba733eac871b9",
+      "label": "天神チクモクビル 大ホール",
+      "eventIds": [
+        "kyushu-pixel-marche-2026"
+      ],
+      "region": "福岡県",
+      "area": "福岡市・天神",
+      "sourceUrls": [
+        "https://pixel-marche.com/"
+      ]
+    },
+    {
+      "id": "venue-339e8fe6f47c6b37",
+      "label": "EPSON CREATIVE SQUARE AKASAKA",
+      "eventIds": [
+        "pixelgirls-side-b-2025"
+      ],
+      "region": "東京都",
+      "area": "港区・赤坂",
+      "sourceUrls": [
+        "https://www.xart.jp/pixelgirls"
+      ]
+    },
+    {
+      "id": "venue-361d285c14e30c4b",
+      "label": "Shibuya Sakura Stage 4階 404 Not Found",
+      "eventIds": [
+        "pixel-school-stage-2-2024"
+      ],
+      "region": "東京都",
+      "area": "渋谷",
+      "sourceUrls": [
+        "https://thepixel-mag.jp/archive/school-stage-2-movie/"
+      ]
+    },
+    {
+      "id": "venue-51aaaf888031b96d",
+      "label": "札幌コンベンションセンター 大ホール",
+      "eventIds": [
+        "hokkaido-comitia-24-juni-pixel-art-2026"
+      ],
+      "region": "北海道",
+      "area": "札幌市",
+      "sourceUrls": [
+        "https://tryme12.2-d.jp/12/"
+      ]
+    },
+    {
+      "id": "venue-5c6a072599949a0d",
+      "label": "bokashi Base（札幌市中央区南2西1）",
+      "eventIds": [
+        "frosted-vibes-sapporo-2025"
+      ],
+      "region": "北海道",
+      "area": "札幌市",
+      "sourceUrls": [
+        "https://www.do-johodai.ac.jp/topics/9694350/"
+      ]
+    },
+    {
+      "id": "venue-67d0fa2b8f9d6818",
+      "label": "SeedingNeoパソコン・プログラミング教室（亀川東町27-23 堀文2階）",
+      "eventIds": [
+        "beppu-minecraft-pixel-art-2026-10-18",
+        "beppu-minecraft-pixel-art-2026-11-15"
+      ],
+      "region": "大分県",
+      "area": "別府市",
+      "sourceUrls": [
+        "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2"
+      ]
+    },
+    {
+      "id": "venue-6860c2ccaa311837",
+      "label": "渋谷・原宿周辺の7会場",
+      "eventIds": [
+        "shibuya-pixel-art-2024"
+      ],
+      "region": "東京都",
+      "area": "渋谷・原宿",
+      "sourceUrls": [
+        "https://pixel-art.jp/spa2024/"
+      ]
+    },
+    {
+      "id": "venue-6fbe05cd02f283f4",
+      "label": "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
+      "eventIds": [
+        "moertel-polaris-2026"
+      ],
+      "region": "ドイツ",
+      "area": "ハンブルク",
+      "sourceUrls": [
+        "https://moer.tel/"
+      ]
+    },
+    {
+      "id": "venue-711f9e893bad6636",
+      "label": "シアター1010 11階ギャラリー",
+      "eventIds": [
+        "summer-dot-daisakusen-2024",
+        "winter-dot-daisakusen-2026"
+      ],
+      "region": "東京都",
+      "area": "足立区・北千住",
+      "sourceUrls": [
+        "https://dot-daisakusen.com/",
+        "https://dot-daisakusen.com/2024_summer/"
+      ]
+    },
+    {
+      "id": "venue-74ae11426ad7e1ad",
+      "label": "渋谷ヒカリエ 8/COURT、Library、バーチャル渋谷、YouTube",
+      "eventIds": [
+        "shibuya-pixel-art-2020"
+      ],
+      "region": "東京都",
+      "area": "渋谷",
+      "sourceUrls": [
+        "https://pixel-art.jp/spa2020"
+      ]
+    },
+    {
+      "id": "venue-74e9e4e6b3824acb",
+      "label": "北海道教育大学岩見沢校i-BOX（JR岩見沢駅2階 有明交流プラザ）",
+      "eventIds": [
+        "iwamisawa-ibox-tahara-2025"
+      ],
+      "region": "北海道",
+      "area": "岩見沢市",
+      "sourceUrls": [
+        "https://i-campus.hokkyodai.ac.jp/i-box/2025/07/93.html"
+      ]
+    },
+    {
+      "id": "venue-77a6177263192a53",
+      "label": "東京ビッグサイト 東1・2・3・7・8ホール",
+      "eventIds": [
+        "juuni-comitia-158-pixel-art-2026"
+      ],
+      "region": "東京都",
+      "area": "江東区",
+      "sourceUrls": [
+        "https://tryme12.2-d.jp/12/"
+      ]
+    },
+    {
+      "id": "venue-7ab43aa29a2327c9",
+      "label": "渋谷ヒカリエ 8/ CUBE ほか",
+      "eventIds": [
+        "shibuya-pixel-art-2022"
+      ],
+      "region": "東京都",
+      "area": "渋谷",
+      "sourceUrls": [
+        "https://pixel-art.jp/spa2022"
+      ]
+    },
+    {
+      "id": "venue-85964b328e78f62c",
+      "label": "Artist Cafe Fukuoka ギャラリースペース",
+      "eventIds": [
+        "kyushu-pixel-marche-2024-05"
+      ],
+      "region": "福岡県",
+      "area": "福岡市",
+      "sourceUrls": [
+        "https://pixel-marche.com/サークル配置図・出展サークル一覧/"
+      ]
+    },
+    {
+      "id": "venue-8872d6a89768613c",
+      "label": "渋谷キャスト Åre",
+      "eventIds": [
+        "beyond-pixel-art-award-exhibition-2021"
+      ],
+      "region": "東京都",
+      "area": "渋谷",
+      "sourceUrls": [
+        "https://pixel-art.jp/reboot/"
+      ]
+    },
+    {
+      "id": "venue-8c3a160383224b40",
+      "label": "新潟市産業振興センター",
+      "eventIds": [
+        "juuni-niigata-comitia-63-2026"
+      ],
+      "region": "新潟県",
+      "area": "新潟市",
+      "sourceUrls": [
+        "https://tryme12.2-d.jp/12/"
+      ]
+    },
+    {
+      "id": "venue-92826c47f229249a",
+      "label": "登別市観光交流センターヌプㇽ",
+      "eventIds": [
+        "noboribetsu-barrier-free-toy-expo-dot-art-2026"
+      ],
+      "region": "北海道",
+      "area": "登別市",
+      "sourceUrls": [
+        "https://minapuru.jp/?p=889"
+      ]
+    },
+    {
+      "id": "venue-970363a5d8e4f68f",
+      "label": "TOKYO PiXEL. shop & gallery",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026",
+        "asaha-tokyo-pixel-exhibition-2023"
+      ],
+      "region": "東京都",
+      "area": "台東区",
+      "sourceUrls": [
+        "https://tokyopixel.shopinfo.jp/posts/48649694/",
+        "https://tokyopixel.shopinfo.jp/posts/58870023/"
+      ]
+    },
+    {
+      "id": "venue-998dfcc8b8a982cd",
+      "label": "theca／コ本や honkbooks（山吹町294 小久保ビル2F）",
+      "eventIds": [
+        "honkbooks-asobanight-special-weekend-pixel-art-2026"
+      ],
+      "region": "東京都",
+      "area": "新宿区",
+      "sourceUrls": [
+        "https://honkbooks.com/asobanight-20/"
+      ]
+    },
+    {
+      "id": "venue-b67034b28c42a930",
+      "label": "東京都現代美術館・clusterメタバース",
+      "eventIds": [
+        "ntv-imaginarium-2023"
+      ],
+      "region": "東京都",
+      "area": "江東区・清澄白河／オンライン",
+      "sourceUrls": [
+        "https://www.ntv.co.jp/imaginarium/topics/a83o45il5hyfxvyg.html"
+      ]
+    },
+    {
+      "id": "venue-c173973265fc4b5a",
+      "label": "チ・カ・ホ 北3条交差点広場（西）",
+      "eventIds": [
+        "sapporo-game-odyssey-commentator-2026"
+      ],
+      "region": "北海道",
+      "area": "札幌市",
+      "sourceUrls": [
+        "https://www.sapporo-game-odyssey.jp/"
+      ]
+    },
+    {
+      "id": "venue-cf5a83da7c7f8d91",
+      "label": "浅草橋ヒューリックホール",
+      "eventIds": [
+        "the-pixel-street-2023"
+      ],
+      "region": "東京都",
+      "area": "浅草橋",
+      "sourceUrls": [
+        "https://tpxst.com/"
+      ]
+    },
+    {
+      "id": "venue-dcfc89af41c19327",
+      "label": "渋谷各会場（elephant STUDIO、渋谷キャスト等）",
+      "eventIds": [
+        "shibuya-pixel-art-2021"
+      ],
+      "region": "東京都",
+      "area": "渋谷",
+      "sourceUrls": [
+        "https://pixel-art.jp/reboot/"
+      ]
+    },
+    {
+      "id": "venue-e510f13f3bca829b",
+      "label": "パシフィコ横浜 展示ホールA",
+      "eventIds": [
+        "pixel-art-park-9"
+      ],
+      "region": "神奈川県",
+      "area": "横浜・みなとみらい",
+      "sourceUrls": [
+        "https://pixelartpark.com/en/events/pap9/"
+      ]
+    },
+    {
+      "id": "venue-e659b4e451ecf892",
+      "label": "渋谷ストリームホール、CIRCUS TOKYO",
+      "eventIds": [
+        "shibuya-pixel-art-2025"
+      ],
+      "region": "東京都",
+      "area": "渋谷",
+      "sourceUrls": [
+        "https://pixel-art.jp/spa2025"
+      ]
+    },
+    {
+      "id": "venue-e82d2da4cd115ed3",
+      "label": "亀戸アートセンター（KAC）",
+      "eventIds": [
+        "kac-hermippe-pointless-2025",
+        "kac-super-nice-thankass-2025",
+        "kac-ultra-dope-motocross-2026"
+      ],
+      "region": "東京都",
+      "area": "江東区・亀戸",
+      "sourceUrls": [
+        "https://kac.amebaownd.com/posts/56975241/",
+        "https://kac.amebaownd.com/posts/58087057",
+        "https://kac.amebaownd.com/posts/58724347"
+      ]
+    },
+    {
+      "id": "venue-efb5ff4cd161e26b",
+      "label": "DESIGN FESTA GALLERY EAST-101a",
+      "eventIds": [
+        "pixel-art-park-1"
+      ],
+      "region": "東京都",
+      "area": "東京",
+      "sourceUrls": [
+        "https://pixelartpark.com/events/pap1/"
+      ]
+    },
+    {
+      "id": "venue-f31da4762b9f950d",
+      "label": "バレッドキッズ名駅教室（権現通4-1 サンモールII 1F西）",
+      "eventIds": [
+        "valedkids-meieki-pixel-workshop-autumn-2026"
+      ],
+      "region": "愛知県",
+      "area": "名古屋市中村区",
+      "sourceUrls": [
+        "https://kids.valed.jp/campaign_autumn2026/"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "id": "source-0143d167663dfaf9",
+      "label": "COMITIA158 — ジュウニ（ドット絵本・出展予定）",
+      "eventIds": [
+        "juuni-comitia-158-pixel-art-2026"
+      ],
+      "url": "https://www.comitia.co.jp/html/158.html",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区"
+      ],
+      "venues": [
+        "東京ビッグサイト 東1・2・3・7・8ホール"
+      ],
+      "lastKnownEventDate": "2026-12-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+      }
+    },
+    {
+      "id": "source-05d1f67f45bb82b7",
+      "label": "北海道COMITIA24 — ジュウニ（ドット絵本・委託参加予定）",
+      "eventIds": [
+        "hokkaido-comitia-24-juni-pixel-art-2026",
+        "juuni-comitia-158-pixel-art-2026",
+        "juuni-niigata-comitia-63-2026"
+      ],
+      "url": "https://tryme12.2-d.jp/12/",
+      "kind": "website",
+      "prefectures": [
+        "北海道",
+        "新潟県",
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "新潟市",
+        "札幌市",
+        "江東区"
+      ],
+      "venues": [
+        "新潟市産業振興センター",
+        "札幌コンベンションセンター 大ホール",
+        "東京ビッグサイト 東1・2・3・7・8ホール"
+      ],
+      "lastKnownEventDate": "2026-12-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-08283e650e8b0566",
+      "label": "Newgrounds Pixel Day 2017",
+      "eventIds": [
+        "newgrounds-pixel-day-2017"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1419547/1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2017-01-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-0cc387cc06fe7104",
+      "label": "ヘルミッペ 個展「ポイントレス」",
+      "eventIds": [
+        "kac-hermippe-pointless-2025"
+      ],
+      "url": "https://kac.amebaownd.com/posts/58087057",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（KAC）"
+      ],
+      "lastKnownEventDate": "2025-12-10",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-11d36f6715dae6e3",
+      "label": "冬休みドット大作戦",
+      "eventIds": [
+        "winter-dot-daisakusen-watch"
+      ],
+      "url": "https://x.com/dot_daisakusen",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "北千住"
+      ],
+      "venues": [
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-01-10",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+      }
+    },
+    {
+      "id": "source-16782781bc80fed2",
+      "label": "モトクロス斉藤 個展「ウルトラドープ」",
+      "eventIds": [
+        "kac-super-nice-thankass-2025",
+        "kac-ultra-dope-motocross-2026"
+      ],
+      "url": "https://x.com/moot_sai/",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（KAC）"
+      ],
+      "lastKnownEventDate": "2026-05-05",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-1a614b8ad666eb26",
+      "label": "北海道COMITIA24 — ジュウニ（ドット絵本・委託参加予定）",
+      "eventIds": [
+        "hokkaido-comitia-24-juni-pixel-art-2026"
+      ],
+      "url": "https://elysian.dojin.com/h-comitia/uketsuke.html",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "札幌市"
+      ],
+      "venues": [
+        "札幌コンベンションセンター 大ホール"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-1ce6c3db1d5d32e1",
+      "label": "SAPPORO GAME ODYSSEY 2026 — コメンテーター（ピクセルアートゲーム）出展",
+      "eventIds": [
+        "sapporo-game-odyssey-commentator-2026"
+      ],
+      "url": "https://www.sapporo-game-odyssey.jp/出展作品/b7_コメンテーター",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "札幌市"
+      ],
+      "venues": [
+        "チ・カ・ホ 北3条交差点広場（西）"
+      ],
+      "lastKnownEventDate": "2026-06-07",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-207a6bf49f58b26c",
+      "label": "Pixelween 2025",
+      "eventIds": [
+        "pixelween-2025"
+      ],
+      "url": "https://pixeljoint.com/2025/09/28/7236/submit_news.asp",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2025-10-26",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-22569f06701002c0",
+      "label": "Pixel Art Park",
+      "eventIds": [
+        "pixel-art-park-1",
+        "pixel-art-park-2",
+        "pixel-art-park-3",
+        "pixel-art-park-4",
+        "pixel-art-park-5",
+        "pixel-art-park-6"
+      ],
+      "url": "https://pixelartpark.com/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区",
+        "東京"
+      ],
+      "venues": [
+        "3331 Arts Chiyoda",
+        "DESIGN FESTA GALLERY EAST-101a"
+      ],
+      "lastKnownEventDate": "2019-11-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "各edition archiveの本文で日時・会場確認"
+      }
+    },
+    {
+      "id": "source-242724d6da743f33",
+      "label": "バリアフリーおもちゃ博 in のぼりべつ — 立体ドット絵の共同制作",
+      "eventIds": [
+        "noboribetsu-barrier-free-toy-expo-dot-art-2026"
+      ],
+      "url": "https://nupur.jp/",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "登別市"
+      ],
+      "venues": [
+        "登別市観光交流センターヌプㇽ"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-282e62b3c5fcefef",
+      "label": "Pixel Art Park 1",
+      "eventIds": [
+        "pixel-art-park-1"
+      ],
+      "url": "https://pixelartpark.com/events/pap1/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "東京"
+      ],
+      "venues": [
+        "DESIGN FESTA GALLERY EAST-101a"
+      ],
+      "lastKnownEventDate": "2015-03-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-2a8324dde06622f2",
+      "label": "SHIBUYA PIXEL ART 2018",
+      "eventIds": [
+        "shibuya-pixel-art-2018"
+      ],
+      "url": "https://pixel-art.jp/spa2018",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷・表参道"
+      ],
+      "venues": [
+        "表参道・キャットストリート周辺"
+      ],
+      "lastKnownEventDate": "2018-07-22",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-34e7fa0571b6bea4",
+      "label": "ピクセルアートの学校",
+      "eventIds": [
+        "pixel-school-stage-2-2024"
+      ],
+      "url": "https://biz.shibuyabunka.com/event/210/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "Shibuya Sakura Stage 4階 404 Not Found"
+      ],
+      "lastKnownEventDate": "2024-08-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "開催情報に日時・会場・講義内容"
+      }
+    },
+    {
+      "id": "source-3c0b622a87fbdacb",
+      "label": "SHIBUYA PIXEL ART 2024 BIT VALLEY, BIT FLOWERS",
+      "eventIds": [
+        "shibuya-pixel-art-2024"
+      ],
+      "url": "https://pixel-art.jp/spa2024/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷・原宿"
+      ],
+      "venues": [
+        "渋谷・原宿周辺の7会場"
+      ],
+      "lastKnownEventDate": "2024-09-29",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-4252934a8c27eb2d",
+      "label": "Newgrounds Pixel Day 2020",
+      "eventIds": [
+        "newgrounds-pixel-day-2020"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1448508/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2020-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-42c328de9c30894e",
+      "label": "ヘルミッペ × m7kenji 二人展「Doom Loophole」",
+      "eventIds": [
+        "doom-loophole-center-sanuki-2026"
+      ],
+      "url": "https://center.degico.jp/hermippe_m7kenji_2026-html.html",
+      "kind": "website",
+      "prefectures": [
+        "香川県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "高松市"
+      ],
+      "venues": [
+        "CENTER/SANUKI（高松市常磐町1-6-13）"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-46021dc9cc2a513d",
+      "label": "小光とあそばnight! SPECIAL WEEKEND（ドット絵作家参加展示）",
+      "eventIds": [
+        "honkbooks-asobanight-special-weekend-pixel-art-2026"
+      ],
+      "url": "https://honkbooks.com/asobanight-20/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "新宿区"
+      ],
+      "venues": [
+        "theca／コ本や honkbooks（山吹町294 小久保ビル2F）"
+      ],
+      "lastKnownEventDate": "2026-11-03",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-460445fb5676be17",
+      "label": "NRG Awards 2026 — Pixel Art部門",
+      "eventIds": [
+        "nrg-pixel-art-awards-2026"
+      ],
+      "url": "https://nrgevent.eu/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ポーランド"
+      ],
+      "areas": [
+        "ポズナン"
+      ],
+      "venues": [
+        "MTP Poznań（ポーランド・ポズナン／遠隔応募可）"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-4608b22f69d47ed0",
+      "label": "Pixel Art Park 5",
+      "eventIds": [
+        "pixel-art-park-5"
+      ],
+      "url": "https://pixelartpark.com/events/pap5/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区"
+      ],
+      "venues": [
+        "3331 Arts Chiyoda"
+      ],
+      "lastKnownEventDate": "2018-12-09",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-47d7ab8424d4a0fe",
+      "label": "Newgrounds Pixel Day",
+      "eventIds": [
+        "newgrounds-pixel-day-2017",
+        "newgrounds-pixel-day-2018",
+        "newgrounds-pixel-day-2019",
+        "newgrounds-pixel-day-2020",
+        "newgrounds-pixel-day-2021",
+        "newgrounds-pixel-day-2022",
+        "newgrounds-pixel-day-2023",
+        "newgrounds-pixel-day-2024",
+        "newgrounds-pixel-day-2025",
+        "newgrounds-pixel-day-2026"
+      ],
+      "url": "https://www.newgrounds.com/collection/pixel-day",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2026-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "2017–2026各回の開催とpixel art企画を公式告知・コレクションで確認。2026実開催を確認してwatch枠と併存する開催実績として記録。"
+      }
+    },
+    {
+      "id": "source-4838470bc599f7ef",
+      "label": "Pixelween 2024",
+      "eventIds": [
+        "pixelween-2024"
+      ],
+      "url": "https://pixeljoint.com/2024/09/26/7038/Pixelween_2024_announcement.htm",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2024-10-27",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-49c6f8cdbac0ab5c",
+      "label": "SAPPORO GAME ODYSSEY 2026 — コメンテーター（ピクセルアートゲーム）出展",
+      "eventIds": [
+        "sapporo-game-odyssey-commentator-2026"
+      ],
+      "url": "https://www.sapporo-game-odyssey.jp/",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "札幌市"
+      ],
+      "venues": [
+        "チ・カ・ホ 北3条交差点広場（西）"
+      ],
+      "lastKnownEventDate": "2026-06-07",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-544e47ab47e548b9",
+      "label": "日テレイマジナリウム",
+      "eventIds": [
+        "ntv-imaginarium-2023"
+      ],
+      "url": "https://www.ntv.co.jp/imaginarium/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・清澄白河／オンライン"
+      ],
+      "venues": [
+        "東京都現代美術館・clusterメタバース"
+      ],
+      "lastKnownEventDate": "2024-03-03",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "主催ページで会期とドット絵展示確認"
+      }
+    },
+    {
+      "id": "source-56034c9dac8f3676",
+      "label": "九州ピクセルマルシェ",
+      "eventIds": [
+        "kyushu-pixel-marche-watch"
+      ],
+      "url": "https://x.com/PixelMarche",
+      "kind": "social",
+      "prefectures": [
+        "福岡県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "福岡・天神"
+      ],
+      "venues": [
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-05-04",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+      }
+    },
+    {
+      "id": "source-597672d9670da400",
+      "label": "GB Pixel Art Jam 2026",
+      "eventIds": [
+        "gb-pixel-art-jam-2026"
+      ],
+      "url": "https://itch.io/jam/gb-pixel-art-jam-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5a919355b943f700",
+      "label": "asaha個展2026夏「メンダコ天国 -Dokkoi Show-」",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026"
+      ],
+      "url": "https://tokyopixel.shopinfo.jp/pages/2495762/blog",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区"
+      ],
+      "venues": [
+        "TOKYO PiXEL. shop & gallery"
+      ],
+      "lastKnownEventDate": "2026-08-11",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-5b8d181f68f8d7c7",
+      "label": "Pixel Art Park 9",
+      "eventIds": [
+        "pixel-art-park-9"
+      ],
+      "url": "https://pixelartpark.com/en/events/pap9/",
+      "kind": "website",
+      "prefectures": [
+        "神奈川県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "横浜・みなとみらい"
+      ],
+      "venues": [
+        "パシフィコ横浜 展示ホールA"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5c56545417a46eea",
+      "label": "SHIBUYA PIXEL ART",
+      "eventIds": [
+        "shibuya-pixel-art-2025",
+        "shibuya-pixel-art-watch"
+      ],
+      "url": "https://pixel-art.jp/spa2025",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "次回会場未発表",
+        "渋谷ストリームホール、CIRCUS TOKYO"
+      ],
+      "lastKnownEventDate": "2025-09-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5cb0cb3354aedb39",
+      "label": "GB Pixel Art Jam 2024",
+      "eventIds": [
+        "gb-pixel-art-jam-2024"
+      ],
+      "url": "https://itch.io/jam/gbpixelartjam24",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — itch.io / GB Studio Central"
+      ],
+      "lastKnownEventDate": "2024-10-06",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5d12a35754b214bb",
+      "label": "名駅教室 — Excel関数でドット絵を作ろう！",
+      "eventIds": [
+        "valedkids-meieki-pixel-workshop-autumn-2026"
+      ],
+      "url": "https://kids.valed.jp/campaign_autumn2026/",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市中村区"
+      ],
+      "venues": [
+        "バレッドキッズ名駅教室（権現通4-1 サンモールII 1F西）"
+      ],
+      "lastKnownEventDate": "2026-11-29",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5d992df119d86ca8",
+      "label": "THE PIXEL STREET",
+      "eventIds": [
+        "the-pixel-street-2023"
+      ],
+      "url": "https://tpxst.com/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "浅草橋"
+      ],
+      "venues": [
+        "浅草橋ヒューリックホール"
+      ],
+      "lastKnownEventDate": "2023-10-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5e6d0159f8e8b63b",
+      "label": "GB Pixel Art Jam 2023",
+      "eventIds": [
+        "gb-pixel-art-jam-2023"
+      ],
+      "url": "https://itch.io/jam/gbpixelartjam23",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — itch.io / GB Studio Central"
+      ],
+      "lastKnownEventDate": "2023-10-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5fc72d81c9a87b5a",
+      "label": "Pixelween",
+      "eventIds": [
+        "pixelween-2020",
+        "pixelween-2021",
+        "pixelween-2022",
+        "pixelween-2023",
+        "pixelween-2024",
+        "pixelween-2025"
+      ],
+      "url": "https://pixeljoint.com/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2025-10-26",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "各年のPixel Joint公式告知・challenge archiveでpixel art contest本文と締切を確認。"
+      }
+    },
+    {
+      "id": "source-630e40ce20ad0476",
+      "label": "17. RetroCon Saar — Creative Zone（Pixel Art）",
+      "eventIds": [
+        "retrocon-saar-17-pixel-art-2026"
+      ],
+      "url": "https://www.retrosaar.de/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ドイツ"
+      ],
+      "areas": [
+        "フェルクリンゲン"
+      ],
+      "venues": [
+        "Hermann Neuberger Halle, Stadionstraße, 66333 Völklingen（ドイツ）"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-64f5f0b5728626cc",
+      "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
+      "eventIds": [
+        "asaha-tokyo-pixel-exhibition-2023"
+      ],
+      "url": "https://tokyopixel.shopinfo.jp/posts/48649694/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区"
+      ],
+      "venues": [
+        "TOKYO PiXEL. shop & gallery"
+      ],
+      "lastKnownEventDate": "2023-12-10",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-64ffb293a5a91e4f",
+      "label": "Pixel Art Park 2",
+      "eventIds": [
+        "pixel-art-park-2"
+      ],
+      "url": "https://pixelartpark.com/events/pap2/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区"
+      ],
+      "venues": [
+        "3331 Arts Chiyoda"
+      ],
+      "lastKnownEventDate": "2015-10-18",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-65eedbdd3fb548c5",
+      "label": "田原実織展「暗渠を往く末に酸欠」",
+      "eventIds": [
+        "iwamisawa-ibox-tahara-2025"
+      ],
+      "url": "https://i-campus.hokkyodai.ac.jp/i-box/2025/07/93.html",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "岩見沢市"
+      ],
+      "venues": [
+        "北海道教育大学岩見沢校i-BOX（JR岩見沢駅2階 有明交流プラザ）"
+      ],
+      "lastKnownEventDate": "2025-09-15",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-66184c8f4f8773ad",
+      "label": "Newgrounds Pixel Day 2021",
+      "eventIds": [
+        "newgrounds-pixel-day-2021"
+      ],
+      "url": "https://www.newgrounds.com/collection/pixelday2021",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2021-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-6ee99d280a9d2c6f",
+      "label": "Newgrounds Pixel Day 2018",
+      "eventIds": [
+        "newgrounds-pixel-day-2018"
+      ],
+      "url": "https://www.newgrounds.com/collection/pixel-day-2018",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2018-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-7345cf07c6a2e4a7",
+      "label": "Pixelween 2026",
+      "eventIds": [
+        "pixelween-2026"
+      ],
+      "url": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（PixelJoint）"
+      ],
+      "lastKnownEventDate": "2026-10-18",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-77bca84113ac1ffb",
+      "label": "北海道COMITIA24 — ジュウニ（ドット絵本・委託参加予定）",
+      "eventIds": [
+        "hokkaido-comitia-24-juni-pixel-art-2026"
+      ],
+      "url": "https://elysian.dojin.com/h-comitia/",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "札幌市"
+      ],
+      "venues": [
+        "札幌コンベンションセンター 大ホール"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-78790c49bf214f0b",
+      "label": "夏休みドット大作戦 2024",
+      "eventIds": [
+        "summer-dot-daisakusen-2024"
+      ],
+      "url": "https://dot-daisakusen.com/2024_summer/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "足立区・北千住"
+      ],
+      "venues": [
+        "シアター1010 11階ギャラリー"
+      ],
+      "lastKnownEventDate": "2024-08-03",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-7e7646a600b53afe",
+      "label": "バリアフリーおもちゃ博 in のぼりべつ — 立体ドット絵の共同制作",
+      "eventIds": [
+        "noboribetsu-barrier-free-toy-expo-dot-art-2026"
+      ],
+      "url": "https://minapuru.jp/?p=889",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "登別市"
+      ],
+      "venues": [
+        "登別市観光交流センターヌプㇽ"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:00:59+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-7f6c8115428ae4d3",
+      "label": "Newgrounds Pixel Day 2022",
+      "eventIds": [
+        "newgrounds-pixel-day-2022"
+      ],
+      "url": "https://www.newgrounds.com/collection/pixelday2022",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2022-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-8215268656b436d8",
+      "label": "Newgrounds Pixel Day 2025",
+      "eventIds": [
+        "newgrounds-pixel-day-2025"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1541117/1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2025-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-852460679c99dc62",
+      "label": "Pixelween 2023",
+      "eventIds": [
+        "pixelween-2023"
+      ],
+      "url": "https://pixeljoint.com/2023/09/25/6860/Pixelween_2023_announcement.htm",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2023-10-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-8daa093c024d4996",
+      "label": "モトクロス斉藤 個展「ウルトラドープ」",
+      "eventIds": [
+        "kac-ultra-dope-motocross-2026"
+      ],
+      "url": "https://www.instagram.com/moot_sai/",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（KAC）"
+      ],
+      "lastKnownEventDate": "2026-05-05",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-924c729e9b14c02f",
+      "label": "Newgrounds Pixel Day 2026",
+      "eventIds": [
+        "newgrounds-pixel-day-2026"
+      ],
+      "url": "https://www.newgrounds.com/collection/pixel-day-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2026-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-928109d96ac4c65a",
+      "label": "Newgrounds Pixel Day 2019",
+      "eventIds": [
+        "newgrounds-pixel-day-2019"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1437848/1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2019-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-93e7647de93633a6",
+      "label": "九州ピクセルマルシェ",
+      "eventIds": [
+        "kyushu-pixel-marche-2024-05",
+        "kyushu-pixel-marche-2026",
+        "kyushu-pixel-marche-watch"
+      ],
+      "url": "https://pixel-marche.com/",
+      "kind": "website",
+      "prefectures": [
+        "福岡県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "福岡・天神",
+        "福岡市",
+        "福岡市・天神"
+      ],
+      "venues": [
+        "Artist Cafe Fukuoka ギャラリースペース",
+        "天神チクモクビル 大ホール",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-05-04",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-9426aeb7d3203003",
+      "label": "SHIBUYA PIXEL ART",
+      "eventIds": [
+        "shibuya-pixel-art-2018",
+        "shibuya-pixel-art-2020",
+        "shibuya-pixel-art-2021",
+        "shibuya-pixel-art-2022",
+        "shibuya-pixel-art-2023",
+        "shibuya-pixel-art-2024",
+        "shibuya-pixel-art-2025"
+      ],
+      "url": "https://pixel-art.jp/about",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷",
+        "渋谷・原宿",
+        "渋谷・表参道"
+      ],
+      "venues": [
+        "渋谷ストリームホール、CIRCUS TOKYO",
+        "渋谷ヒカリエ 8/ CUBE ほか",
+        "渋谷ヒカリエ 8/COURT、Library、バーチャル渋谷、YouTube",
+        "渋谷・原宿周辺の7会場",
+        "渋谷・原宿周辺の複数会場",
+        "渋谷各会場（elephant STUDIO、渋谷キャスト等）",
+        "表参道・キャットストリート周辺"
+      ],
+      "lastKnownEventDate": "2025-09-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "年別公式ページで実施概要・日付・pixel art内容確認"
+      }
+    },
+    {
+      "id": "source-9b56821e89381cca",
+      "label": "PIXELGIRLS: SIDE B",
+      "eventIds": [
+        "pixelgirls-side-b-2025"
+      ],
+      "url": "https://www.xart.jp/pixelgirls",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "港区・赤坂"
+      ],
+      "venues": [
+        "EPSON CREATIVE SQUARE AKASAKA"
+      ],
+      "lastKnownEventDate": "2025-08-29",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-9e5a329f69719a21",
+      "label": "新潟コミティア63 — ジュウニ（ドット絵本・出展予定）",
+      "eventIds": [
+        "juuni-niigata-comitia-63-2026"
+      ],
+      "url": "https://gataket.com/comitia/e/t63/",
+      "kind": "website",
+      "prefectures": [
+        "新潟県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "新潟市"
+      ],
+      "venues": [
+        "新潟市産業振興センター"
+      ],
+      "lastKnownEventDate": "2026-12-06",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+      }
+    },
+    {
+      "id": "source-9eaa5990535aa7ae",
+      "label": "SUPER NICE THANKASS — モトクロス斉藤 × ヘルミッペ",
+      "eventIds": [
+        "kac-super-nice-thankass-2025"
+      ],
+      "url": "https://www.instagram.com/hermippe_pixelart/",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（KAC）"
+      ],
+      "lastKnownEventDate": "2025-07-09",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-9fe34c91dba3ff7b",
+      "label": "asaha個展2026夏「メンダコ天国 -Dokkoi Show-」",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026"
+      ],
+      "url": "https://tokyopixel.shopinfo.jp/posts/58870023/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区"
+      ],
+      "venues": [
+        "TOKYO PiXEL. shop & gallery"
+      ],
+      "lastKnownEventDate": "2026-08-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-a16186da9f207629",
+      "label": "Moertel ドット絵作品出展（Polaris 2026）",
+      "eventIds": [
+        "moertel-polaris-2026"
+      ],
+      "url": "https://moer.tel/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ドイツ"
+      ],
+      "areas": [
+        "ハンブルク"
+      ],
+      "venues": [
+        "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-a63f8c4e755a3ea1",
+      "label": "SHIBUYA PIXEL ART 2023 HAKKO",
+      "eventIds": [
+        "shibuya-pixel-art-2023"
+      ],
+      "url": "https://pixel-art.jp/spa2023/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷・原宿"
+      ],
+      "venues": [
+        "渋谷・原宿周辺の複数会場"
+      ],
+      "lastKnownEventDate": "2023-09-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-ab61234502a96fbb",
+      "label": "Newgrounds Pixel Day 2023",
+      "eventIds": [
+        "newgrounds-pixel-day-2023"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1517210/4",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2023-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-ab9bcaabc5992f1d",
+      "label": "マイクラでドット絵を自動でつくろう！（10月18日回）",
+      "eventIds": [
+        "beppu-minecraft-pixel-art-2026-10-18",
+        "beppu-minecraft-pixel-art-2026-11-15"
+      ],
+      "url": "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
+      "kind": "website",
+      "prefectures": [
+        "大分県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "別府市"
+      ],
+      "venues": [
+        "SeedingNeoパソコン・プログラミング教室（亀川東町27-23 堀文2階）"
+      ],
+      "lastKnownEventDate": "2026-11-15",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-aca4022cf326d6f8",
+      "label": "日テレイマジナリウム ドット絵展示",
+      "eventIds": [
+        "ntv-imaginarium-2023"
+      ],
+      "url": "https://www.ntv.co.jp/imaginarium/topics/a83o45il5hyfxvyg.html",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・清澄白河／オンライン"
+      ],
+      "venues": [
+        "東京都現代美術館・clusterメタバース"
+      ],
+      "lastKnownEventDate": "2024-03-03",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-ada83a5f21777b66",
+      "label": "SHIBUYA PIXEL ART 2022",
+      "eventIds": [
+        "shibuya-pixel-art-2022"
+      ],
+      "url": "https://pixel-art.jp/spa2022",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "渋谷ヒカリエ 8/ CUBE ほか"
+      ],
+      "lastKnownEventDate": "2022-09-28",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-b021bad77e561c60",
+      "label": "冬休みドット大作戦",
+      "eventIds": [
+        "summer-dot-daisakusen-2024",
+        "winter-dot-daisakusen-2026",
+        "winter-dot-daisakusen-watch"
+      ],
+      "url": "https://dot-daisakusen.com/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "北千住",
+        "足立区・北千住"
+      ],
+      "venues": [
+        "シアター1010 11階ギャラリー",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-01-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-b3956625e6273be5",
+      "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026",
+        "asaha-tokyo-pixel-exhibition-2023"
+      ],
+      "url": "https://x.com/vpandav",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区"
+      ],
+      "venues": [
+        "TOKYO PiXEL. shop & gallery"
+      ],
+      "lastKnownEventDate": "2026-08-11",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-b49f873b065a8dcf",
+      "label": "Pixel Dot Party 2024",
+      "eventIds": [
+        "pixel-dot-party-2024"
+      ],
+      "url": "https://pictsquare.net/events/calendar/2024-11",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "pictSQUARE"
+      ],
+      "lastKnownEventDate": "2024-11-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-b8bf8be845e1063d",
+      "label": "SUPER NICE THANKASS — モトクロス斉藤 × ヘルミッペ",
+      "eventIds": [
+        "kac-super-nice-thankass-2025"
+      ],
+      "url": "https://kac.amebaownd.com/posts/56975241/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（KAC）"
+      ],
+      "lastKnownEventDate": "2025-07-09",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-bffafa0fac34df36",
+      "label": "Digital Jove 2026 — ピクセルアート入門ワークショップ",
+      "eventIds": [
+        "digital-jove-pixel-art-workshop-2026"
+      ],
+      "url": "https://www.digitaljove.com/talleres",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "バレンシア"
+      ],
+      "venues": [
+        "Sala B-0-2, Facultad de Bellas Artes, Edificio 3N, UPV（スペイン・バレンシア）"
+      ],
+      "lastKnownEventDate": "2026-11-05",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c045c2097f1b7388",
+      "label": "GB Pixel Art Jam 2025",
+      "eventIds": [
+        "gb-pixel-art-jam-2023",
+        "gb-pixel-art-jam-2024",
+        "gb-pixel-art-jam-2025"
+      ],
+      "url": "https://itch.io/jam/gbpixelartjam25",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — itch.io / GB Studio Central"
+      ],
+      "lastKnownEventDate": "2025-10-05",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c809dd8b3986e1fd",
+      "label": "Pixelween 2021",
+      "eventIds": [
+        "pixelween-2021"
+      ],
+      "url": "https://pixeljoint.com/2021/09/26/6474/Pixelween_2021_announcement.htm",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2021-10-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c8205a080856e1a8",
+      "label": "Pixelween 2020",
+      "eventIds": [
+        "pixelween-2020"
+      ],
+      "url": "https://pixeljoint.com/pixels/news.asp?date=9%2F1%2F2020",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2020-10-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c9b81cc18151cd85",
+      "label": "ヘルミッペ × m7kenji 二人展「Doom Loophole」",
+      "eventIds": [
+        "doom-loophole-center-sanuki-2026"
+      ],
+      "url": "https://www.instagram.com/center_of_sanuki/",
+      "kind": "social",
+      "prefectures": [
+        "香川県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "高松市"
+      ],
+      "venues": [
+        "CENTER/SANUKI（高松市常磐町1-6-13）"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-cbc50ead4d3357f8",
+      "label": "Newgrounds Pixel Day 2024",
+      "eventIds": [
+        "newgrounds-pixel-day-2024"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1531148/1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Newgrounds"
+      ],
+      "lastKnownEventDate": "2024-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-ccac9f0afe6e959c",
+      "label": "Pixelween 2022",
+      "eventIds": [
+        "pixelween-2022"
+      ],
+      "url": "https://pixeljoint.com/pixels/news.asp?date=9%2F1%2F2022",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "Online — Pixel Joint"
+      ],
+      "lastKnownEventDate": "2022-10-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-cf5285d1a3c899b5",
+      "label": "モトクロス斉藤 個展「ウルトラドープ」",
+      "eventIds": [
+        "kac-ultra-dope-motocross-2026"
+      ],
+      "url": "https://kac.amebaownd.com/posts/58724347",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（KAC）"
+      ],
+      "lastKnownEventDate": "2026-05-05",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d1fb0b4df7a784f6",
+      "label": "Pixel Art Park 9",
+      "eventIds": [
+        "pixel-art-park-9"
+      ],
+      "url": "https://x.com/pixelartpark",
+      "kind": "social",
+      "prefectures": [
+        "神奈川県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "横浜・みなとみらい"
+      ],
+      "venues": [
+        "パシフィコ横浜 展示ホールA"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+      }
+    },
+    {
+      "id": "source-d20f36185eb67b6f",
+      "label": "CROSSPICO名古屋 vol.3（インディーゲーム×ピクセルアート）",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://sites.google.com/view/crosspico/",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d4a17eb54e781372",
+      "label": "Segment Pixel Jam 2026",
+      "eventIds": [
+        "segment-pixel-jam-2026"
+      ],
+      "url": "https://itch.io/jam/segment-pixel-jam-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン"
+      ],
+      "lastKnownEventDate": "2026-10-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d641bae0d15efdc6",
+      "label": "Pixel Art Park 6",
+      "eventIds": [
+        "pixel-art-park-6"
+      ],
+      "url": "https://pixelartpark.com/events/pap6/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区"
+      ],
+      "venues": [
+        "3331 Arts Chiyoda"
+      ],
+      "lastKnownEventDate": "2019-11-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d70b56e01800b87a",
+      "label": "SHIBUYA PIXEL ART 2020",
+      "eventIds": [
+        "shibuya-pixel-art-2020"
+      ],
+      "url": "https://pixel-art.jp/spa2020",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "渋谷ヒカリエ 8/COURT、Library、バーチャル渋谷、YouTube"
+      ],
+      "lastKnownEventDate": "2020-09-27",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d79f8c0dd8ee9d48",
+      "label": "Newgrounds Pixel Day",
+      "eventIds": [
+        "newgrounds-pixel-day-watch"
+      ],
+      "url": "https://www.newgrounds.com/bbs/topic/1553457/1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン"
+      ],
+      "lastKnownEventDate": "2026-01-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d9d3dfed8b932440",
+      "label": "Festival FPS 2026 — Pixel Artワークショップ",
+      "eventIds": [
+        "festival-fps-pixel-art-workshop-2026"
+      ],
+      "url": "https://www.festivalfps.com/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "アルメンドラレホ（バダホス）"
+      ],
+      "venues": [
+        "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）"
+      ],
+      "lastKnownEventDate": "2026-11-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-dd2b5bb40b76ae00",
+      "label": "名駅教室 — Excel関数でドット絵を作ろう！",
+      "eventIds": [
+        "valedkids-meieki-pixel-workshop-autumn-2026"
+      ],
+      "url": "https://www.aplix.co.jp/?p=12421",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市中村区"
+      ],
+      "venues": [
+        "バレッドキッズ名駅教室（権現通4-1 サンモールII 1F西）"
+      ],
+      "lastKnownEventDate": "2026-11-29",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+      }
+    },
+    {
+      "id": "source-de391fb51be41b0c",
+      "label": "Frosted Vibes 2025 — 北海道銘菓のドット絵展示",
+      "eventIds": [
+        "frosted-vibes-sapporo-2025"
+      ],
+      "url": "https://www.do-johodai.ac.jp/topics/9694350/",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "札幌市"
+      ],
+      "venues": [
+        "bokashi Base（札幌市中央区南2西1）"
+      ],
+      "lastKnownEventDate": "2025-02-15",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-e242e06d1750e9ed",
+      "label": "Pixel Art Park 3",
+      "eventIds": [
+        "pixel-art-park-3"
+      ],
+      "url": "https://pixelartpark.com/events/pap3/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区"
+      ],
+      "venues": [
+        "3331 Arts Chiyoda"
+      ],
+      "lastKnownEventDate": "2016-09-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-e458a53334a53d33",
+      "label": "SHIBUYA PIXEL ART 2021 Reboot",
+      "eventIds": [
+        "beyond-pixel-art-award-exhibition-2021",
+        "shibuya-pixel-art-2021"
+      ],
+      "url": "https://pixel-art.jp/reboot/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "渋谷キャスト Åre",
+        "渋谷各会場（elephant STUDIO、渋谷キャスト等）"
+      ],
+      "lastKnownEventDate": "2021-11-15",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-e56ea4666cebf9f0",
+      "label": "九州ピクセルマルシェ 2024年5月",
+      "eventIds": [
+        "kyushu-pixel-marche-2024-05"
+      ],
+      "url": "https://pixel-marche.com/サークル配置図・出展サークル一覧/",
+      "kind": "website",
+      "prefectures": [
+        "福岡県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "福岡市"
+      ],
+      "venues": [
+        "Artist Cafe Fukuoka ギャラリースペース"
+      ],
+      "lastKnownEventDate": "2024-05-04",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-eafca86599a780c9",
+      "label": "SHIBUYA PIXEL ART",
+      "eventIds": [
+        "shibuya-pixel-art-watch"
+      ],
+      "url": "https://x.com/ShibuyaPixelArt",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2025-09-21",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+      }
+    },
+    {
+      "id": "source-edb5d4e35005c636",
+      "label": "asaha個展2026夏「メンダコ天国 -Dokkoi Show-」",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026"
+      ],
+      "url": "https://www.asaha.world/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区"
+      ],
+      "venues": [
+        "TOKYO PiXEL. shop & gallery"
+      ],
+      "lastKnownEventDate": "2026-08-11",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-ee2b8ce6112b4917",
+      "label": "ピクセルアートの学校 第2ステージ",
+      "eventIds": [
+        "pixel-school-stage-2-2024"
+      ],
+      "url": "https://thepixel-mag.jp/archive/school-stage-2-movie/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷"
+      ],
+      "venues": [
+        "Shibuya Sakura Stage 4階 404 Not Found"
+      ],
+      "lastKnownEventDate": "2024-08-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-fa6b90dd16d33463",
+      "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
+      "eventIds": [
+        "asaha-mendako-tokyo-pixel-2026",
+        "asaha-tokyo-pixel-exhibition-2023"
+      ],
+      "url": "https://www.youtube.com/@asaha",
+      "kind": "social",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区"
+      ],
+      "venues": [
+        "TOKYO PiXEL. shop & gallery"
+      ],
+      "lastKnownEventDate": "2026-08-11",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-fda20b8e84534f3c",
+      "label": "NRG Awards 2026 — Pixel Art部門",
+      "eventIds": [
+        "nrg-pixel-art-awards-2026"
+      ],
+      "url": "https://nrgevent.eu/compo/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ポーランド"
+      ],
+      "areas": [
+        "ポズナン"
+      ],
+      "venues": [
+        "MTP Poznań（ポーランド・ポズナン／遠隔応募可）"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-ff2cb3a1c057146a",
+      "label": "Pixel Art Park 4",
+      "eventIds": [
+        "pixel-art-park-4"
+      ],
+      "url": "https://pixelartpark.com/events/pap4/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区"
+      ],
+      "venues": [
+        "3331 Arts Chiyoda"
+      ],
+      "lastKnownEventDate": "2017-10-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    }
+  ],
+  "updatedAt": "2026-10-05T07:19:30+00:00"
+}

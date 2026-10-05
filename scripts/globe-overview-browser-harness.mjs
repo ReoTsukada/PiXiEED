@@ -129,10 +129,10 @@ async function integratedModes(page, expectedView) {
 }
 try {
   for (const [viewport, reducedMotion, tool] of [
-    [{ width: 320, height: 568 }, 'no-preference', ''],
-    [{ width: 390, height: 844 }, 'no-preference', ''],
-    [{ width: 568, height: 320 }, 'no-preference', ''],
-    [{ width: 1024, height: 768 }, 'reduce', ''],
+    [{ width: 320, height: 568 }, 'no-preference', 'telescope'],
+    [{ width: 390, height: 844 }, 'no-preference', 'telescope'],
+    [{ width: 568, height: 320 }, 'no-preference', 'telescope'],
+    [{ width: 1024, height: 768 }, 'reduce', 'telescope'],
     [{ width: 390, height: 844 }, 'no-preference', 'telescope']
   ].filter(() => !process.argv.includes('--public-only'))) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 2, reducedMotion });
@@ -246,7 +246,7 @@ try {
     });
     await closed(page); assert.deepEqual(await snapshot(page), before, 'interrupted and backgrounded return completes');
     if (!tool) { await integratedModes(page, before); await page.screenshot({ path: `/tmp/pixieed-gallery-observe-${engine}-${viewport.width}.png` }); }
-    else assert.equal(await page.locator('#astroViewSwitch').isVisible(), false, 'standalone telescope keeps its own navigation');
+    else assert.equal(await page.locator('#mapLayerSwitch').isVisible(), false, 'standalone telescope keeps its own navigation');
     assert.deepEqual(errors, []); checks += 1; console.log(`PASS ${engine} ${viewport.width}x${viewport.height} ${tool || reducedMotion}`); await context.close();
   }
   {
@@ -255,8 +255,8 @@ try {
     const page = await context.newPage(); const errors = []; page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${base}/globe/`, { waitUntil: 'domcontentloaded' });
     const globe = await (await page.locator('.map-hero__globe-frame').elementHandle()).contentFrame();
-    await globe.waitForFunction(() => globalThis.__PIXIEED_ASTRO__?.orrery && globalThis.__PIXIEED_POSTS__);
-    await page.waitForSelector('[data-header-pass]');
+    await globe.waitForFunction(() => globalThis.__PIXIEED_GLOBE__ && globalThis.__PIXIEED_POSTS__);
+    await page.waitForSelector('[data-page-action="post"]');
     const headerPaint = await page.locator('.px-site-header').evaluate((node) => ({
       y: Math.floor(node.getBoundingClientRect().y + node.getBoundingClientRect().height / 2),
       color: getComputedStyle(node).backgroundColor.match(/[\d.]+/g).slice(0, 3).map(Number)
@@ -273,46 +273,17 @@ try {
     }, { png: screenshot.toString('base64'), y: headerPaint.y });
     assert.ok(headerPaint.color.every((channel, index) => Math.abs(paintedPixel[index] - channel) <= 10),
       `Globe canvas paints over the shared header: ${JSON.stringify({ headerPaint, paintedPixel })}`);
-    await observeReturns(globe);
-    await globe.evaluate(() => { __PIXIEED_ASTRO__.setPlaying(false); __PIXIEED_GLOBE__.setView({ centerLongitude: 135, centerLatitude: 32, zoom: 1.2 }); }); await frame(globe);
-    await globe.evaluate(() => __PIXIEED_GLOBE__.setView({ zoom: __PIXIEED_GLOBE__.getSnapshot().view.zoomRange.min })); await frame(globe);
-    await globe.evaluate(() => {
-      const orrery = __PIXIEED_ASTRO__.orrery; const original = orrery.open;
-      orrery.open = function (...args) {
-        const radius = __PIXIEED_GLOBE__.getSnapshot().camera.scale;
-        const result = original.apply(this, args);
-        globalThis.solarEntry = { radius, scene: orrery.getSnapshot() };
-        return result;
-      };
-    });
-    const box = await globe.locator('#globeCanvas').boundingBox(); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    for (let i = 0; i < 24 && !await globe.evaluate(() => __PIXIEED_ASTRO__.orrery.isOpen()); i += 1) { await page.mouse.wheel(0, 80); await frame(globe); }
-    assert.equal(await globe.evaluate(() => __PIXIEED_ASTRO__.orrery.isOpen()), true, 'actual wheel opens overview');
-    assertEarthEntry(await globe.evaluate(() => solarEntry));
-    await opened(globe); await layout(globe);
-    const overviewScale = (await scene(globe)).scale;
-    await page.mouse.wheel(0, -80); await frame(globe);
-    assert.ok((await scene(globe)).open && (await scene(globe)).scale > overviewScale, 'public gallery allows Solar System zoom');
-    // Enlarge the inner system, then aim at Earth and zoom continuously: no tap
-    // or return button is required for the wheel-only path back to the gallery.
-    for (let i = 0; i < 4; i += 1) { await page.mouse.wheel(0, -100); await frame(globe); }
-    for (let i = 0; i < 32 && (await scene(globe)).open && !(await scene(globe)).closing; i += 1) {
-      const earth = await bodyPoint(globe, 'earth'); await page.mouse.move(earth.x, earth.y); await page.mouse.wheel(0, -80); await frame(globe);
-    }
-    await closed(globe); await matchedReturn(globe);
-    assert.ok((await snapshot(globe)).view.zoom >= 1, 'returns at a usable globe size');
-    const galleryBeforePost = await snapshot(globe);
-    await globe.evaluate(() => { globalThis.testCompositions = []; globalThis.__PIXIEED_POSTS__ = { openComposer() { testCompositions.push({ solarOpen: __PIXIEED_ASTRO__.orrery.isOpen(), scopeOpen: __PIXIEED_ASTRO__.scope.isOpen(), leaving: document.querySelector('#globeStage').classList.contains('is-orrery-leaving'), eventsOpen: document.querySelector('.scope-hud').classList.contains('has-events') }); document.querySelector('#globeStage').classList.add('has-sheet', 'is-composing'); } }; });
-    await open(globe); await page.locator('[data-page-action="post"]').click(); await closed(globe);
-    assert.deepEqual(await globe.evaluate(() => testCompositions), [{ solarOpen: false, scopeOpen: false, leaving: false, eventsOpen: false }], 'parent posting action first returns to gallery');
-    assert.equal(await globe.locator('#astroViewSwitch').isVisible(), false, 'view switch does not cover a composition sheet');
-    await globe.evaluate(() => document.querySelector('#globeStage').classList.remove('has-sheet', 'is-composing'));
-    await globe.locator('[data-astro-view="sky"]').click(); await globe.waitForFunction(() => __PIXIEED_ASTRO__.scope.isOpen());
-    await globe.evaluate(() => __PIXIEED_ASTRO__.setEventsOpen(true));
-    await page.locator('[data-page-action="post"]').click(); await frame(globe);
-    assert.deepEqual(await globe.evaluate(() => testCompositions), [{ solarOpen: false, scopeOpen: false, leaving: false, eventsOpen: false }, { solarOpen: false, scopeOpen: false, leaving: false, eventsOpen: false }], 'sky and its event sheet also close before posting');
-    assert.deepEqual(await snapshot(globe), galleryBeforePost, 'posting from the sky preserves the gallery view');
+    assert.equal(await globe.evaluate(() => Boolean(globalThis.__PIXIEED_ASTRO__)), false, 'public map has no astronomy controller');
+    assert.equal(await globe.locator('[data-astro-view],.time-capsule,.scope-hud,.orrery-canvas').count(),0);
+    await globe.evaluate(() => __PIXIEED_GLOBE__.setView({zoom:.01})); await frame(globe);
+    await page.mouse.move(170,280);await page.mouse.wheel(0,1000);await frame(globe);
+    assert.equal(await globe.evaluate(() => __PIXIEED_GLOBE__.getSnapshot().camera.projection),'mercator','zoom limit stays on the map');
+    await globe.locator('[data-map-content="events"]').click();await frame(globe);
+    assert.equal(await globe.locator('[data-map-content="events"]').getAttribute('aria-pressed'),'true');
+    await globe.evaluate(() => {globalThis.testCompositions=[];globalThis.__PIXIEED_POSTS__={openComposer(){testCompositions.push(true);}};});
+    await page.locator('[data-page-action="post"]').click();await frame(globe);
+    assert.deepEqual(await globe.evaluate(() => testCompositions),[true],'parent posting action works without astronomy');
     assert.deepEqual(errors, []); checks += 1; console.log(`PASS ${engine} public gallery integration`); await context.close();
   }
-  console.log(`BROWSER: PASS (${engine}, ${checks} cases; cursor/pinch/keyboard zoom, planet close-ups, Earth handoff at matching size, interrupted entry/exit, globe/scope restore, responsive controls, idle drawing)`);
+  console.log(`BROWSER: PASS (${engine}, ${checks} cases; ${process.argv.includes('--public-only') ? 'public map layers, no astronomy, parent posting' : 'stand-alone telescope zoom/return and public map integration'})`);
 } finally { await browser.close(); }

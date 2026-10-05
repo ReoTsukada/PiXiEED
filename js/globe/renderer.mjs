@@ -11,6 +11,9 @@ import {
   DEFAULT_GRID,
   clampLatitude,
   createGlobeCamera,
+  createMercatorCamera,
+  mercatorY,
+  inverseMercatorY,
   createGlobeGrid,
   getCell,
   inverseScreenToGeo,
@@ -18,17 +21,23 @@ import {
   normalizeLongitude,
   projectCellCorners,
   projectGeoToScreen
-} from './geometry.mjs?v=20260921-grid11-1';
+} from './geometry.mjs?v=20261005-admin-boundary-1';
 import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20260920-g4-precision-1';
 import { JAPAN_COUNTRY_ID, JAPAN_REGION_GROUPS, getRegionForPrefecture } from './hierarchy.mjs?v=20260920-g4-precision-1';
-import { createWebGLRenderer } from './webgl-renderer.mjs?v=20260927-sky-events-v1';
+import { createWebGLRenderer } from './webgl-renderer.mjs?v=20261005-admin-boundary-1';
+import { createMapCellIndex, lookupMapCell, resolveMapLocation } from './map-cells.mjs?v=20261005-admin-boundary-1';
+import { createMapCellRenderer } from './map-cell-renderer.mjs?v=20261005-admin-boundary-1';
+import { buildMapRegionContent } from './map-region-content.mjs?v=20261005-admin-boundary-1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 export const GLOBE_RENDERER_VERSION = 'g6-webgl2-analytic-half-degree-v1';
 /** Full-resolution globe, capped to keep the map responsive on high-density screens. */
 export const GLOBE_BACKING_DPR = 1;
 export const DEFAULT_VIEW = Object.freeze({ centerLongitude: 139.6917, centerLatitude: 35.6895, zoom: 1.15 });
+export const DEFAULT_MAP_VIEW = Object.freeze({ centerLongitude: 139.6917, centerLatitude: 35.6895, zoom: 8 });
 export const DEFAULT_ZOOM_RANGE = Object.freeze({ min: 0.68, max: 24 });
+/** Flat Mercator maps can keep zooming into individual map cells beyond the telescope range. */
+export const MERCATOR_ZOOM_RANGE = Object.freeze({ min: 0.68, max: 128 });
 export const DEFAULT_PREFETCH_DEGREES = 4;
 export const DEFAULT_MAX_RENDER_CELLS = 72000;
 export const DEFAULT_CELL_CACHE_LIMIT = 65536;
@@ -56,6 +65,21 @@ export function createViewState({ centerLongitude = DEFAULT_VIEW.centerLongitude
 }
 export function withZoom(view, zoom) { const current = createViewState(view); return createViewState({ ...current, zoom: clampZoom(zoom, current.zoomRange) }); }
 export function withCenter(view, centerLongitude, centerLatitude) { const current = createViewState(view); return createViewState({ ...current, centerLongitude, centerLatitude }); }
+
+/** Return the Mercator center that keeps a geographic point under a screen point. */
+export function mercatorViewForAnchor(anchor, screenPoint, targetCamera) {
+  if (!anchor || !screenPoint || targetCamera?.projection !== 'mercator') throw new TypeError('A geographic anchor, screen point, and Mercator camera are required.');
+  const scale = finite(targetCamera.scale, 'camera scale');
+  if (scale <= 0) throw new RangeError('Camera scale must be positive.');
+  const centerX = finite(targetCamera.viewport?.centerX ?? targetCamera.viewport?.width / 2, 'viewport centerX');
+  const centerY = finite(targetCamera.viewport?.centerY ?? targetCamera.viewport?.height / 2, 'viewport centerY');
+  const x = finite(screenPoint.x, 'screen x'); const y = finite(screenPoint.y, 'screen y');
+  const longitude = finite(anchor.longitude, 'anchor longitude'); const latitude = finite(anchor.latitude, 'anchor latitude');
+  return Object.freeze({
+    centerLongitude: normalizeLongitude(longitude - (x - centerX) / scale * RAD_TO_DEG),
+    centerLatitude: inverseMercatorY(mercatorY(latitude) - (centerY - y) / scale)
+  });
+}
 
 export function resolveLodLevel(zoom, previousLevel = 'country', thresholds = LOD_THRESHOLDS) {
   const value = finite(zoom, 'zoom'); let level = assertLevel(previousLevel);
@@ -379,8 +403,9 @@ function drawCellBatches(context, cells, selectedId, hoveredId) {
 function now() { return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now(); }
 function reducedMotion() { return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
-export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick = () => {}, onLongPress = null, onZoomLimit = null, skyCanvas = null, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
+export function createGlobeRenderer(canvas, { projection = 'orthographic', initialView = null, onPick = () => {}, onLongPress = null, onZoomLimit = null, skyCanvas = null, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, mapCellData = null, mapPrefectureData = null, mapAdmin1Data = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
   if (!canvas || typeof canvas.getContext !== 'function') throw new TypeError('A Canvas element is required.');
+  const mapIndex = mapCellData ? createMapCellIndex(mapCellData, { prefectureData: mapPrefectureData, admin1Data: mapAdmin1Data }) : null;
   let initialRaster = null;
   if (rasterData) {
     try { initialRaster = decodeRasterData(rasterData, grid); } catch (error) { console.warn('Globe raster asset is invalid; using Canvas 2D fallback.', error); }
@@ -399,55 +424,204 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   canvas.height = initialBacking.physicalHeight;
   let webgl = null;
   // The sky stays on its own canvas behind the geographic globe.
-  let skyWebgl = null; let skyOrientation = null;
-  if (skyCanvas && !forceCanvas && (!rasterData || initialRaster)) {
+  let skyWebgl = null; let skyOrientation = null; let astronomy = null;
+  if (projection !== 'mercator' && skyCanvas && !forceCanvas && (!rasterData || initialRaster)) {
     try { skyWebgl = createWebGLRenderer(skyCanvas, { grid, rasterData: initialRaster, skyUrl: spaceTexture || '', onSkyReady: () => repaint(), layer: 2 }); } catch (error) { console.warn('Sky layer unavailable; the globe canvas draws the sky.', error); skyWebgl = null; }
   }
-  try { webgl = !forceCanvas && (!rasterData || initialRaster) ? createWebGLRenderer(canvas, { grid, rasterData: initialRaster, skyUrl: skyWebgl ? '' : spaceTexture || '', onSkyReady: () => repaint(), layer: skyWebgl ? 1 : 0 }) : null; } catch (error) { console.warn('WebGL2 globe renderer unavailable; using Canvas 2D fallback.', error); }
+  try { webgl = !forceCanvas && (!rasterData || initialRaster) ? createWebGLRenderer(canvas, { grid, rasterData: initialRaster, skyUrl: skyCanvas ? '' : spaceTexture || '', onSkyReady: () => repaint(), layer: skyCanvas ? 1 : 0 }) : null; } catch (error) { console.warn('WebGL2 globe renderer unavailable; using Canvas 2D fallback.', error); }
   if (!webgl && skyWebgl) { skyWebgl.destroy(); skyWebgl = null; }
   function skySize() { const requestedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1; return getCanvasBackingSize({ width: skyCanvas.clientWidth || canvas.clientWidth || 640, height: skyCanvas.clientHeight || canvas.clientHeight || 480, dpr: requestedDpr, maxDpr: 1.5 }); }
+  function ensureSky() {
+    if (!skyWebgl && skyCanvas && webgl && !forceCanvas) {
+      skyWebgl = createWebGLRenderer(skyCanvas, { grid, rasterData: initialRaster, skyUrl: spaceTexture || '', onSkyReady: () => requestDraw({ rebuildPlan: false }), layer: 2 });
+      if (astronomy) skyWebgl?.setAstronomy(astronomy);
+    }
+    return skyWebgl;
+  }
   function paintSky() {
-    if (!skyWebgl) return;
+    if (projectionMode === 'mercator' && !skyOrientation) return;
+    if (!ensureSky()) return;
     const size = skySize();
     if (skyCanvas.width !== size.physicalWidth) skyCanvas.width = size.physicalWidth;
     if (skyCanvas.height !== size.physicalHeight) skyCanvas.height = size.physicalHeight;
     skyWebgl.draw({ camera: createGlobeCamera({ viewport: size, ...view, ...(skyOrientation ? { orientation: skyOrientation } : {}) }) });
   }
+  const mapRenderer = mapIndex ? createMapCellRenderer(canvas, { index: mapIndex, forceCanvas: !webgl }) : null;
   const context = webgl ? null : canvas.getContext('2d');
   if (!context && !webgl) throw new Error('Canvas 2D/WebGL2 context is unavailable.');
   if (backgroundElement && spaceTexture) backgroundElement.style.setProperty('--space-texture', `url(${JSON.stringify(spaceTexture)})`);
-  let view = createViewState(initialView); let lodState = createLodState(); let selected = null; let hovered = null; let frame = null; let focusFrame = null; let drag = null; let backing = initialBacking; let camera; let plan; let observer = null; let layer = activeLayer; let counts = contentCounts; let lastBatchMetrics = Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', drawCalls: 0, frameMs: 0, batchCount: 0, emphasizedCount: 0 });
+  const startingView = initialView || (projection === 'mercator' ? DEFAULT_MAP_VIEW : DEFAULT_VIEW);
+  let zoomRangeOverride = startingView.zoomRange || null;
+  let view = createViewState({ ...startingView, zoomRange: zoomRangeOverride || (projection === 'mercator' ? MERCATOR_ZOOM_RANGE : DEFAULT_ZOOM_RANGE) }); let lodState = createLodState(); let selected = null; let hovered = null; let frame = null; let focusFrame = null; let drag = null; let backing = initialBacking; let camera; let plan; let observer = null; let layer = activeLayer; let counts = contentCounts; let lastBatchMetrics = Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', drawCalls: 0, frameMs: 0, batchCount: 0, emphasizedCount: 0 });
+  let mapContentLayer = null;
+  let mapContentMetrics = Object.freeze({ postPoints: 0, eventPoints: 0, droppedPostPoints: 0, droppedEventPoints: 0, occupiedCells: 0 });
+  function contentLocation(longitude, latitude) {
+    const direct = resolveMapLocation(longitude, latitude, mapIndex);
+    // The geometry-derived map must never recover sea from the old coarse land mask.
+    if (direct || mapIndex.admin1Data?.landAuthority === 'admin1-geometries' || !mapIndex.countryIndices || !mapIndex.bandOffsets) return direct;
+    // Keep legacy foreign coastal posts on a land pixel inside their stored
+    // canonical cell. Japanese ownership always comes from the prefecture geometry.
+    const canonical = lookupCell(longitude, latitude, grid);
+    const sourceOffset = mapIndex.bandOffsets[canonical.band] + canonical.column;
+    const countryId = mapIndex.countryIds[mapIndex.countryIndices[sourceOffset]];
+    if (!countryId || countryId === '__water__' || countryId === JAPAN_COUNTRY_ID) return null;
+    const bounds = canonical.bounds, n = mapIndex.resolution;
+    const left = Math.max(0, Math.floor((bounds.west + 180) / 360 * n));
+    const right = Math.min(n - 1, Math.floor((bounds.east + 180) / 360 * n));
+    const top = Math.max(0, Math.floor((Math.PI - mercatorY(bounds.north)) / (2 * Math.PI) * n));
+    const bottom = Math.min(n - 1, Math.floor((Math.PI - mercatorY(bounds.south)) / (2 * Math.PI) * n));
+    let best = null, distance = Infinity;
+    for (let row = top; row <= bottom; row++) for (let column = left; column <= right; column++) {
+      const lon = -180 + (column + .5) / n * 360;
+      const lat = inverseMercatorY(Math.PI - (row + .5) / n * 2 * Math.PI);
+      const record = lookupMapCell(lon, lat, mapIndex);
+      if (record?.cell.id !== canonical.id || record.countryId !== countryId) continue;
+      const nextDistance = Math.abs(normalizeLongitude(lon - longitude)) + Math.abs(mercatorY(lat) - mercatorY(latitude));
+      if (nextDistance < distance) { best = record; distance = nextDistance; }
+    }
+    return best;
+  }
+  function setMapContent(content = {}) {
+    if (!mapIndex || !mapRenderer) return false;
+    const { mask, stats } = buildMapRegionContent(mapIndex, content, contentLocation);
+    mapContentMetrics = stats;
+    const changed = mapRenderer.setContentMask(mask);
+    if (changed) requestDraw({ rebuildPlan: false });
+    return changed;
+  }
+  function setMapContentLayer(next) {
+    if (next !== 'posts' && next !== 'events' && next !== null) throw new RangeError('Unknown map content layer.');
+    mapContentLayer = next;
+    const changed = mapRenderer?.setContentLayer(next) || false;
+    if (changed) requestDraw({ rebuildPlan: false });
+    return changed;
+  }
+  function setMapEventPeriod(next) {
+    const changed = mapRenderer?.setEventPeriod(next) || false;
+    if (changed) requestDraw({ rebuildPlan: false });
+    return changed;
+  }
+  let projectionMode = projection;
+  function makeCamera(state = view) { return (projectionMode === 'mercator' ? createMercatorCamera : createGlobeCamera)({ viewport: backing, ...state }); }
+  function normalizeView(state) {
+    const next = createViewState({ ...state, zoomRange: zoomRangeOverride || (projectionMode === 'mercator' ? MERCATOR_ZOOM_RANGE : DEFAULT_ZOOM_RANGE) });
+    if (projectionMode !== 'mercator') return next;
+    const camera = makeCamera(next);
+    return createViewState({ ...next, zoom: camera.zoom, centerLatitude: camera.centerLatitude });
+  }
   const invalidation = createRenderInvalidationState();
   const initialPrefectures = prefectureFeatures.length ? prefectureFeatures : regionFeatures; let rasterIndex = createRasterIndex({ worldFeatures: emptyFeatures(worldFeatures), prefectureFeatures: emptyFeatures(initialPrefectures), rasterData: initialRaster, grid });
   const cellCache = createBoundedCellCache();
   // Layout size, not getBoundingClientRect(): the canvas is scaled by a CSS transform while the Solar System view is open.
   function canvasSize() { const rect = canvas.getBoundingClientRect(); const requestedDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1; return getCanvasBackingSize({ width: canvas.clientWidth || rect.width || 640, height: canvas.clientHeight || rect.height || 480, dpr: requestedDpr, maxDpr: webgl ? GLOBE_BACKING_DPR : MAX_BACKING_DPR }); }
-  function createWebGLPlan() { return Object.freeze({ version: GLOBE_RENDERER_VERSION, backend: 'webgl2', drawCalls: 1, featureMode: 'analytic-sphere-0.25-degree-mask', lodLevel: lodState.level, camera, cameraCenter: Object.freeze({ longitude: camera.centerLongitude, latitude: camera.centerLatitude }), zoom: camera.zoom, cells: Object.freeze([]), pickIndex: new Map(), grid, settings: LOD_SETTINGS[lodState.level], activeLayer: layer, candidateCount: 0, inspectedCells: 0, projectedCandidates: 0, ownershipChecks: 0, truncated: false, mask: Object.freeze({ version: initialRaster?.version || WORLD_LAND_MASK.version, width: initialRaster?.textureWidth || WORLD_LAND_MASK.width, height: initialRaster?.textureHeight || WORLD_LAND_MASK.height }) }); }
-  function rebuild() { backing = canvasSize(); if (canvas.width !== backing.physicalWidth) canvas.width = backing.physicalWidth; if (canvas.height !== backing.physicalHeight) canvas.height = backing.physicalHeight; camera = createGlobeCamera({ viewport: backing, ...view }); lodState = updateLodState(lodState, view.zoom); plan = webgl ? createWebGLPlan() : createRenderPlan({ camera, lodState, rasterIndex, grid, activeLayer: layer, contentCounts: counts, cellCache }); invalidation.markPlanBuilt(); }
-  function repaint() { if (webgl) { paintSky(); if (!skyOrientation) lastBatchMetrics = webgl.draw({ camera, selected, hovered }); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); return; } context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0); context.clearRect(0, 0, backing.width, backing.height); const { centerX, centerY } = camera.viewport; const radius = camera.scale; context.save(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.clip(); lastBatchMetrics = { backend: 'canvas2d', drawCalls: 0, frameMs: 0, ...drawCellBatches(context, plan.cells, selected?.cellId, hovered?.cellId) }; context.restore(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.strokeStyle = 'rgba(190, 232, 238, .78)'; context.lineWidth = 1.1; context.stroke(); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); }
-  function draw() { if (invalidation.needsPlan()) rebuild(); else if (webgl && backing) { camera = createGlobeCamera({ viewport: backing, ...view }); lodState = updateLodState(lodState, view.zoom); plan = Object.freeze({ ...plan, camera, lodLevel: lodState.level, cameraCenter: Object.freeze({ longitude: camera.centerLongitude, latitude: camera.centerLatitude }), zoom: camera.zoom, settings: LOD_SETTINGS[lodState.level] }); } if (invalidation.needsRepaint()) repaint(); }
+  function createWebGLPlan() { return Object.freeze({ version: GLOBE_RENDERER_VERSION, backend: webgl ? 'webgl2' : 'canvas2d', drawCalls: 1, featureMode: projectionMode === 'mercator' ? (mapIndex ? 'mercator-uniform-cells' : 'mercator-periodic-cell-mask') : 'analytic-sphere-0.25-degree-mask', lodLevel: lodState.level, camera, cameraCenter: Object.freeze({ longitude: camera.centerLongitude, latitude: camera.centerLatitude }), zoom: camera.zoom, cells: Object.freeze([]), pickIndex: new Map(), grid, settings: LOD_SETTINGS[lodState.level], activeLayer: layer, candidateCount: 0, inspectedCells: 0, projectedCandidates: 0, ownershipChecks: 0, truncated: false, mask: Object.freeze(mapIndex && projectionMode === 'mercator' ? { version: mapIndex.version, width: mapIndex.resolution, height: mapIndex.resolution, cellCount: mapIndex.cellCount, sourceCellCount: mapIndex.sourceCellCount, sourceLandCellCount: mapIndex.sourceLandCellCount, prefectureCount: 47, regionCount: mapIndex.mapRegions ? mapIndex.mapRegions.length - 1 : 47 } : { version: initialRaster?.version || WORLD_LAND_MASK.version, width: initialRaster?.textureWidth || WORLD_LAND_MASK.width, height: initialRaster?.textureHeight || WORLD_LAND_MASK.height }) }); }
+  function rebuild() { backing = canvasSize(); if (canvas.width !== backing.physicalWidth) canvas.width = backing.physicalWidth; if (canvas.height !== backing.physicalHeight) canvas.height = backing.physicalHeight; view = normalizeView(view); camera = makeCamera(); lodState = updateLodState(lodState, view.zoom); plan = webgl || projectionMode === 'mercator' ? createWebGLPlan() : createRenderPlan({ camera, lodState, rasterIndex, grid, activeLayer: layer, contentCounts: counts, cellCache }); invalidation.markPlanBuilt(); }
+
+  // Rasterize one periodic Mercator world for the Canvas fallback. Membership
+  // is sampled from the same authoritative cell as GPU rendering and picking.
+  let flatTexture = null; let flatTextureIndex = null;
+  function mapTexture() {
+    if (flatTexture && flatTextureIndex === rasterIndex) return flatTexture;
+    const texture = canvas.ownerDocument.createElement('canvas');
+    texture.width = texture.height = 1440;
+    const ctx = texture.getContext('2d'); const image = ctx.createImageData(1440, 1440);
+    for (let y = 0; y < 1440; y += 1) {
+      const latitude = inverseMercatorY(Math.PI - (y + .5) / 1440 * 2 * Math.PI);
+      const bandIndex = Math.min(grid.bandCount - 1, Math.floor((90 - latitude) / grid.latitudeStepDegrees));
+      const band = grid.bands[bandIndex];
+      for (let x = 0; x < 1440; x += 1) {
+        const column = Math.min(band.longitudeCount - 1, Math.floor((x + .5) / 1440 * band.longitudeCount));
+        const land = rasterIndex.raster ? rasterIndex.raster.countryIndices[rasterIndex.bandOffsets[bandIndex] + column] : ownerForCell(rasterIndex, getCell(bandIndex, column, grid));
+        const offset = (y * 1440 + x) * 4;
+        image.data.set(land ? [89, 173, 184, 255] : [10, 27, 38, 255], offset);
+      }
+    }
+    ctx.putImageData(image, 0, 0); flatTexture = texture; flatTextureIndex = rasterIndex;
+    return texture;
+  }
+  function paintMap() {
+    const texture = mapTexture(); context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0);
+    context.fillStyle = '#0a1b26'; context.fillRect(0, 0, backing.width, backing.height);
+    const size = camera.worldSize;
+    const left = camera.viewport.centerX - (camera.centerLongitude + 180) / 360 * size;
+    const top = camera.viewport.centerY - (Math.PI - camera.centerMercatorY) * camera.scale;
+    for (let copy = Math.floor(-left / size); left + copy * size < backing.width; copy += 1) context.drawImage(texture, left + copy * size, top, size, size);
+    for (const picked of [hovered, selected]) {
+      if (!picked?.cell) continue;
+      const corners = projectCellCorners(picked.cell, camera); const box = polygonBounds(corners);
+      context.strokeStyle = picked === selected ? '#ffda57' : '#7cebe6'; context.lineWidth = 2;
+      for (let copy = Math.floor((-box.x - box.width) / size); box.x + copy * size <= backing.width; copy += 1) context.strokeRect(box.x + copy * size, box.y, box.width, box.height);
+    }
+    lastBatchMetrics = { backend: 'canvas2d', drawCalls: 1, frameMs: 0 };
+    invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics });
+  }
+
+  function repaint() { if (mapRenderer && projectionMode === 'mercator' && !skyOrientation) { lastBatchMetrics = mapRenderer.draw({ camera, selected, hovered }); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); return; } if (!webgl && projectionMode === 'mercator') { paintMap(); return; } if (webgl) { paintSky(); if (!skyOrientation) lastBatchMetrics = webgl.draw({ camera, selected, hovered }); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); return; } context.setTransform(backing.dpr, 0, 0, backing.dpr, 0, 0); context.clearRect(0, 0, backing.width, backing.height); const { centerX, centerY } = camera.viewport; const radius = camera.scale; context.save(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.clip(); lastBatchMetrics = { backend: 'canvas2d', drawCalls: 0, frameMs: 0, ...drawCellBatches(context, plan.cells, selected?.cellId, hovered?.cellId) }; context.restore(); context.beginPath(); context.arc(centerX, centerY, radius, 0, Math.PI * 2); context.strokeStyle = 'rgba(190, 232, 238, .78)'; context.lineWidth = 1.1; context.stroke(); invalidation.markRepainted(); onStateChange({ view, plan, camera, selected, hovered, metrics: lastBatchMetrics }); }
+  let pendingHoverPoint = null;
+  function setHover(next) {
+    const oldId = hovered?.mapRegionId || hovered?.displayCellId || hovered?.cellId || null;
+    const nextId = next?.mapRegionId || next?.displayCellId || next?.cellId || null;
+    if (oldId === nextId) {
+      if (next && (hovered.x !== next.x || hovered.y !== next.y)) { hovered = next; onHover(hovered); }
+      return false;
+    }
+    hovered = next;
+    if (hovered) canvas.dataset.cellHovered = 'true'; else delete canvas.dataset.cellHovered;
+    onHover(hovered);
+    invalidation.invalidateRepaint();
+    return true;
+  }
+  function draw() {
+    if (invalidation.needsPlan()) rebuild();
+    else if ((webgl || projectionMode === 'mercator') && backing) {
+      view = normalizeView(view); camera = makeCamera(); lodState = updateLodState(lodState, view.zoom);
+      if (plan) plan = Object.freeze({ ...plan, camera, lodLevel: lodState.level, cameraCenter: Object.freeze({ longitude: camera.centerLongitude, latitude: camera.centerLatitude }), zoom: camera.zoom, settings: LOD_SETTINGS[lodState.level] });
+    }
+    if (pendingHoverPoint) {
+      const point = pendingHoverPoint; pendingHoverPoint = null;
+      setHover((webgl || projectionMode === 'mercator') ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan));
+    }
+    if (invalidation.needsRepaint()) repaint();
+  }
   function requestDraw({ rebuildPlan = true } = {}) { if (rebuildPlan) invalidation.invalidatePlan(); else invalidation.invalidateRepaint(); if (frame !== null) return; if (typeof requestAnimationFrame !== 'function') { draw(); return; } frame = requestAnimationFrame(() => { frame = null; draw(); }); }
   function cancelFocusAnimation() { if (focusFrame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(focusFrame); focusFrame = null; }
-  function updateView(next) { cancelFocusAnimation(); view = createViewState({ ...view, ...next }); requestDraw({ rebuildPlan: !webgl }); }
-  function animateFocus(next, duration = 260) { cancelFocusAnimation(); if (reducedMotion() || typeof requestAnimationFrame !== 'function') { view = createViewState({ ...view, ...next }); requestDraw({ rebuildPlan: !webgl }); return; } const start = view; const started = now(); const longitudeDelta = normalizeLongitude(next.centerLongitude - start.centerLongitude); const tick = (time) => { if (focusFrame === null) return; const progress = Math.min(1, Math.max(0, (time - started) / duration)); const eased = duration > 400 ? (progress < .5 ? 4 * progress ** 3 : 1 - ((-2 * progress + 2) ** 3) / 2) : 1 - ((1 - progress) ** 3); view = createViewState({ ...view, centerLongitude: normalizeLongitude(start.centerLongitude + longitudeDelta * eased), centerLatitude: start.centerLatitude + (next.centerLatitude - start.centerLatitude) * eased, zoom: start.zoom + (next.zoom - start.zoom) * eased }); requestDraw({ rebuildPlan: !webgl }); if (progress >= 1) { focusFrame = null; return; } focusFrame = requestAnimationFrame(tick); }; focusFrame = requestAnimationFrame(tick); }
-  function pickWebGLCell(x, y) { if (!webgl || !camera) return null; const geo = inverseScreenToGeo(x, y, camera); if (!geo) return null; const cell = lookupCell(geo.longitude, geo.latitude, grid); const owner = ownerForCell(rasterIndex, cell); if (rasterIndex.raster && !owner) return null; return Object.freeze({ ...cell, cell, id: cell.id, cellId: cell.id, lodLevel: lodState.level, ownerLevel: lodState.level, ownerId: ownerId(owner, lodState.level), ownerLabel: ownerLabel(owner, lodState.level) || '土地セル', countryId: owner?.countryId || null, regionId: owner?.regionId || null, prefectureId: owner?.prefectureId || null, x, y, screenX: x, screenY: y, depth: geo.depth, opacity: 1, pickedGeo: geo }); }
+  function updateView(next) { cancelFocusAnimation(); view = normalizeView({ ...view, ...next }); requestDraw({ rebuildPlan: projectionMode !== 'mercator' && !webgl }); }
+  function animateFocus(next, duration = 260) { cancelFocusAnimation(); if (reducedMotion() || typeof requestAnimationFrame !== 'function') { view = normalizeView({ ...view, ...next }); requestDraw({ rebuildPlan: projectionMode !== 'mercator' && !webgl }); return; } const start = view; const started = now(); const longitudeDelta = normalizeLongitude(next.centerLongitude - start.centerLongitude); const tick = (time) => { if (focusFrame === null) return; const progress = Math.min(1, Math.max(0, (time - started) / duration)); const eased = duration > 400 ? (progress < .5 ? 4 * progress ** 3 : 1 - ((-2 * progress + 2) ** 3) / 2) : 1 - ((1 - progress) ** 3); view = normalizeView({ ...view, centerLongitude: normalizeLongitude(start.centerLongitude + longitudeDelta * eased), centerLatitude: start.centerLatitude + (next.centerLatitude - start.centerLatitude) * eased, zoom: start.zoom + (next.zoom - start.zoom) * eased }); requestDraw({ rebuildPlan: projectionMode !== 'mercator' && !webgl }); if (progress >= 1) { focusFrame = null; return; } focusFrame = requestAnimationFrame(tick); }; focusFrame = requestAnimationFrame(tick); }
+  function pickWebGLCell(x, y) { if ((!webgl && projectionMode !== 'mercator') || !backing) return null; camera = makeCamera(view); lodState = updateLodState(lodState, view.zoom); const geo = inverseScreenToGeo(x, y, camera); if (!geo) return null; const displayCell = mapIndex && projectionMode === 'mercator' ? lookupMapCell(geo.longitude, geo.latitude, mapIndex) : null;
+    if (mapIndex && projectionMode === 'mercator' && !displayCell) return null;
+    const cell = displayCell?.cell || lookupCell(geo.longitude, geo.latitude, grid);
+    const owner = displayCell ? { ...displayCell, country: { properties: { NAME: displayCell.countryLabel } }, prefecture: displayCell.prefectureId ? { properties: { 'name:ja': displayCell.prefectureLabel } } : null } : ownerForCell(rasterIndex, cell);
+    if (rasterIndex.raster && !owner) return null; return Object.freeze({ ...cell, cell, ...(displayCell ? { displayCell, displayIndex: displayCell.index, displayCellId: displayCell.displayCellId, bounds: displayCell.bounds, center: displayCell.center } : {}), id: cell.id, cellId: cell.id, lodLevel: lodState.level, ownerLevel: lodState.level, ownerId: ownerId(owner, lodState.level), mapRegionId: displayCell?.mapRegionId || (displayCell?.prefectureId ? `prefecture:${displayCell.prefectureId}` : null), mapRegionIndex: displayCell?.mapRegionIndex || displayCell?.prefectureIndex || 0, mapRegionLabel: displayCell?.mapRegionLabel || displayCell?.prefectureLabel || null, mapRegionKind: displayCell?.mapRegionKind || (displayCell?.prefectureId ? 'prefecture' : null), prefectureIndex: displayCell?.prefectureIndex || 0, ownerLabel: displayCell?.mapRegionLabel || displayCell?.prefectureLabel || ownerLabel(owner, lodState.level) || '土地セル', countryId: owner?.countryId || null, countryLabel: displayCell?.countryLabel || owner?.country?.properties?.NAME || owner?.countryId || null, regionId: owner?.regionId || null, prefectureId: owner?.prefectureId || null, prefectureLabel: displayCell?.prefectureLabel || owner?.prefecture?.properties?.['name:ja'] || owner?.prefectureId || null, x, y, screenX: x, screenY: y, depth: geo.depth, opacity: 1, pickedGeo: geo }); }
   // Direct manipulation only: one finger rotates and keeps a short fling, two
   // fingers pinch-zoom and pan around their midpoint, a quick two-finger tap zooms
   // out, and a clean single tap picks. There are no on-screen zoom/rotate buttons.
   const TAP_SLOP = 6; const TAP_MS = 450; const LONG_PRESS_MS = 520; const TWO_TAP_MS = 320; const FLING_MIN_SPEED = .25; const FLING_DECAY_MS = 320;
+  let wheelInteractionTimer = null;
+  function setMapInteracting(active) { if (active) canvas.dataset.mapInteracting = 'true'; else delete canvas.dataset.mapInteracting; }
+  function clearHover() { pendingHoverPoint = null; if (setHover(null)) requestDraw({ rebuildPlan: false }); }
+  function queueHover(point) { pendingHoverPoint = point; if (frame === null) { if (typeof requestAnimationFrame !== 'function') draw(); else frame = requestAnimationFrame(() => { frame = null; draw(); }); } }
+  function pointerPosition(event) { const rect = canvas.getBoundingClientRect(); const width = canvas.clientWidth || camera?.viewport?.width || rect.width; const height = canvas.clientHeight || camera?.viewport?.height || rect.height; return { x: rect.width ? (event.clientX - rect.left) * width / rect.width : event.clientX - rect.left, y: rect.height ? (event.clientY - rect.top) * height / rect.height : event.clientY - rect.top }; }
   const pointers = new Map(); let pinch = null; let twoTap = null; let gesture = null; let fling = null;
-  function pointerPosition(event) { const rect = canvas.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; }
-  function geoUnder(point, state = view) { if (!backing || !point) return null; return inverseScreenToGeo(point.x, point.y, createGlobeCamera({ viewport: backing, ...state })); }
+  function geoUnder(point, state = view) { if (!backing || !point) return null; return inverseScreenToGeo(point.x, point.y, makeCamera(state)); }
   // Zoom to `zoom` while keeping the ground that was under `from` under `to`.
   // Report attempts to zoom past the range (the caller turns a pinch-out beyond the globe into the Solar System view).
-  function reportLimit(requested) { if (typeof onZoomLimit !== 'function') return; const { min, max } = view.zoomRange; if (requested < min && view.zoom <= min * 1.001) onZoomLimit({ direction: 'out', amount: Math.log(min / requested) }); else if (requested > max && view.zoom >= max * 0.999) onZoomLimit({ direction: 'in', amount: Math.log(requested / max) }); }
+  function reportLimit(requested) { if (typeof onZoomLimit !== 'function') return; const { max } = view.zoomRange; const min = projectionMode === 'mercator' ? makeCamera({ ...view, zoom: view.zoomRange.min }).zoom : view.zoomRange.min; if (requested < min && view.zoom <= min * 1.001) onZoomLimit({ direction: 'out', amount: Math.log(min / requested) }); else if (requested > max && view.zoom >= max * 0.999) onZoomLimit({ direction: 'in', amount: Math.log(requested / max) }); }
   function anchorView(from, to, zoom) {
     reportLimit(zoom);
-    let next = createViewState({ ...view, zoom: clampZoom(zoom, view.zoomRange) }); const anchor = geoUnder(from);
+    let next = normalizeView({ ...view, zoom: clampZoom(zoom, view.zoomRange) }); const anchor = geoUnder(from);
+    if (projectionMode === 'mercator' && anchor) {
+      const nextCamera = makeCamera(next);
+      updateView({ ...next, ...mercatorViewForAnchor(anchor, to, nextCamera) });
+      return;
+    }
     for (let pass = 0; anchor && pass < 2; pass += 1) { const after = geoUnder(to, next); if (!after) break; next = createViewState({ ...next, centerLongitude: next.centerLongitude + normalizeLongitude(anchor.longitude - after.longitude), centerLatitude: next.centerLatitude + (anchor.latitude - after.latitude) }); }
     updateView(next);
   }
-  function rotateBy(dx, dy) { const scale = Math.max(1, (camera?.radius || 1) * view.zoom); updateView({ centerLongitude: view.centerLongitude - dx / scale * RAD_TO_DEG, centerLatitude: clampLatitude(view.centerLatitude + dy / scale * RAD_TO_DEG) }); }
+  function rotateBy(dx, dy) {
+    if (projectionMode === 'mercator') {
+      updateView({ centerLongitude: view.centerLongitude - dx / camera.scale * RAD_TO_DEG, centerLatitude: inverseMercatorY(mercatorY(view.centerLatitude) + dy / makeCamera().scale) }); return;
+    }
+    const scale = Math.max(1, (camera?.radius || 1) * view.zoom); updateView({ centerLongitude: view.centerLongitude - dx / scale * RAD_TO_DEG, centerLatitude: clampLatitude(view.centerLatitude + dy / scale * RAD_TO_DEG) }); }
   function cancelFling() { if (fling?.frame != null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(fling.frame); fling = null; }
   function startFling(vx, vy) {
     if (reducedMotion() || typeof requestAnimationFrame !== 'function' || Math.hypot(vx, vy) < FLING_MIN_SPEED) return;
@@ -459,7 +633,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   function pinchState() { const [first, second] = [...pointers.values()]; return { mid: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }, distance: Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)) }; }
   function onPointerDown(event) {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    cancelFocusAnimation(); cancelFling(); const point = pointerPosition(event); canvas.setPointerCapture?.(event.pointerId);
+    cancelFocusAnimation(); cancelFling(); clearHover(); setMapInteracting(true); const point = pointerPosition(event); canvas.setPointerCapture?.(event.pointerId);
     pointers.set(event.pointerId, { x: point.x, y: point.y });
     if (pointers.size === 1) {
       gesture = { start: point, started: now(), moved: false, multi: false, consumed: false, timer: null };
@@ -470,7 +644,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
   }
   function onPointerMove(event) {
     const point = pointerPosition(event); const tracked = pointers.get(event.pointerId);
-    if (!tracked) { if (event.pointerType !== 'mouse') return; const nextHover = webgl ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); if (nextHover?.cellId !== hovered?.cellId) { hovered = nextHover; onHover(hovered); requestDraw({ rebuildPlan: false }); } return; }
+    if (!tracked) { if (!['mouse', 'pen'].includes(event.pointerType) || canvas.hasAttribute('data-map-interacting')) return; queueHover(point); return; }
     tracked.x = point.x; tracked.y = point.y;
     if (pinch && pointers.size >= 2) {
       const next = pinchState();
@@ -489,6 +663,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
     if (pinch) {
       if (pointers.size >= 2) { pinch = pinchState(); return; }
       pinch = null;
+      if (!pointers.size) setMapInteracting(false);
       if (!cancelled && twoTap && !twoTap.moved && now() - twoTap.started < TWO_TAP_MS) animateFocus({ centerLongitude: view.centerLongitude, centerLatitude: view.centerLatitude, zoom: clampZoom(view.zoom / 2, view.zoomRange) });
       twoTap = null;
       // Hand the remaining finger back to rotation from where it is now, without a jump.
@@ -497,6 +672,7 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
     }
     const released = drag?.pointerId === event.pointerId ? drag : null; drag = null;
     const current = gesture; clearLongPress(); if (pointers.size === 0) gesture = null;
+    if (!pointers.size) setMapInteracting(false);
     if (cancelled || !current || current.consumed) return;
     if (!current.moved && !current.multi && now() - current.started < TAP_MS) { pick(point); return; }
     if (released && current.moved && released.samples.length > 1) {
@@ -516,7 +692,11 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
     if (Math.abs(wheelPending) > 1e-4) wheelTimer = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(flushWheel) : setTimeout(flushWheel, 16); else wheelPending = 0;
   }
   function onWheel(event) {
-    event.preventDefault(); cancelFling(); wheelPoint = pointerPosition(event);
+    event.preventDefault(); cancelFling(); clearHover(); setMapInteracting(true); clearTimeout(wheelInteractionTimer); wheelInteractionTimer = setTimeout(() => { wheelInteractionTimer = null; if (!pointers.size) setMapInteracting(false); }, 180); wheelPoint = pointerPosition(event);
+    if (projectionMode === 'mercator' && !event.ctrlKey && Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
+      rotateBy(-finite(event.deltaX, 'horizontal wheel delta') * unit, 0); return;
+    }
     const at = now(); if (at - wheelLast > WHEEL_GESTURE_GAP_MS) wheelGesture = 0; wheelLast = at;
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
     const delta = clamp(finite(event.deltaY, 'wheel delta') * unit, -WHEEL_MAX_EVENT, WHEEL_MAX_EVENT);
@@ -524,25 +704,40 @@ export function createGlobeRenderer(canvas, { initialView = DEFAULT_VIEW, onPick
     wheelPending += nextGesture - wheelGesture; wheelGesture = nextGesture;
     if (wheelTimer === null) wheelTimer = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(flushWheel) : setTimeout(flushWheel, 16);
   }
-  function pick(point) { selected = webgl ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); onPick(selected); requestDraw({ rebuildPlan: false }); }
+  function pick(point) { selected = (webgl || projectionMode === 'mercator') ? pickWebGLCell(point.x, point.y) : pickRenderedCellAt(point.x, point.y, plan); onPick(selected); requestDraw({ rebuildPlan: false }); }
+  function onDoubleClick(event) { event.preventDefault(); cancelFling(); clearHover(); setMapInteracting(true); const point = pointerPosition(event); const anchor = geoUnder(point); const nextZoom = clampZoom(view.zoom * 2, view.zoomRange); if (anchor) anchorView(point, point, nextZoom); else updateView({ zoom: nextZoom }); clearTimeout(wheelInteractionTimer); wheelInteractionTimer = setTimeout(() => { wheelInteractionTimer = null; setMapInteracting(false); }, 180); }
   function onKeyDown(event) {
     const key = event.key; let handled = true;
     if (key === '+' || key === '=') updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) });
     else if (key === '-' || key === '_') updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) });
     else if (key === 'ArrowLeft' || key === 'ArrowRight') updateView({ centerLongitude: view.centerLongitude + (key === 'ArrowLeft' ? -8 : 8) });
     else if (key === 'ArrowUp' || key === 'ArrowDown') updateView({ centerLatitude: clampLatitude(view.centerLatitude + (key === 'ArrowUp' ? 6 : -6)) });
-    else if (key === '0') { selected = clearSelection(); onPick(null); animateFocus(DEFAULT_VIEW); }
-    else if (key === 'Enter' || key === ' ') { if (!backing) return; pick({ x: backing.width / 2, y: backing.height / 2 }); }
+    else if (key === '0') { clearCurrentSelection(); animateFocus(projectionMode === 'mercator' ? DEFAULT_MAP_VIEW : DEFAULT_VIEW); }
+    else if (key === 'Escape') { clearCurrentSelection(); }
+    else if (key === 'Enter' || key === ' ') { if (!camera) return; pick({ x: camera.viewport.centerX, y: camera.viewport.centerY }); }
     else handled = false;
     if (handled) event.preventDefault();
   }
   const onPointerCancel = (event) => endPointer(event, true);
   const onLostPointerCapture = (event) => endPointer(event, true);
-  canvas.addEventListener('pointerdown', onPointerDown); canvas.addEventListener('pointermove', onPointerMove); canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', onPointerCancel); canvas.addEventListener('lostpointercapture', onLostPointerCapture); canvas.addEventListener('wheel', onWheel, { passive: false }); canvas.addEventListener('keydown', onKeyDown);
+  const onPointerLeave = () => { if (!pointers.size) { clearHover(); setMapInteracting(false); } };
+  function clearCurrentSelection() { selected = clearSelection(); clearHover(); onPick(null); requestDraw({ rebuildPlan: false }); }
+  function setView(nextView) {
+    if (nextView && Object.prototype.hasOwnProperty.call(nextView, 'zoomRange')) {
+      // Validate before changing the override or view so an invalid range is atomic.
+      const next = createViewState({ ...view, ...nextView, zoomRange: nextView.zoomRange });
+      zoomRangeOverride = next.zoomRange;
+      updateView(next);
+      return;
+    }
+    updateView(nextView);
+  }
+  canvas.addEventListener('pointerdown', onPointerDown); canvas.addEventListener('pointermove', onPointerMove); canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', onPointerCancel); canvas.addEventListener('lostpointercapture', onLostPointerCapture); canvas.addEventListener('pointerleave', onPointerLeave); canvas.addEventListener('wheel', onWheel, { passive: false }); canvas.addEventListener('dblclick', onDoubleClick); canvas.addEventListener('keydown', onKeyDown);
   if (typeof ResizeObserver !== 'undefined') { observer = new ResizeObserver(() => requestDraw()); observer.observe(canvas); } draw();
-  return Object.freeze({ draw, resize: () => requestDraw(), setData({ worldFeatures: nextWorld = worldFeatures, regionFeatures: nextRegions = regionFeatures, prefectureFeatures: nextPrefectures = prefectureFeatures } = {}) { if (!webgl) { const nextPrefectureSource = nextPrefectures?.length ? nextPrefectures : nextRegions; rasterIndex = createRasterIndex({ worldFeatures: Array.isArray(nextWorld) ? nextWorld : prepareGeoJsonFeatures(nextWorld), prefectureFeatures: Array.isArray(nextPrefectureSource) ? nextPrefectureSource : prepareGeoJsonFeatures(nextPrefectureSource, { idProperty: 'code' }) }); } requestDraw(); }, setAstronomy(next) { webgl?.setAstronomy(next); skyWebgl?.setAstronomy(next); requestDraw(); }, setSkyImage(image) { (skyWebgl || webgl)?.setSkyImage(image); requestDraw({ rebuildPlan: false }); },
+  return Object.freeze({ draw, clearSelection: clearCurrentSelection, setProjection(next) { if (!['mercator', 'orthographic'].includes(next)) throw new RangeError('Unknown projection'); if (projectionMode === next) return; cancelFling(); cancelFocusAnimation(); clearHover(); setMapInteracting(false); projectionMode = next; view = normalizeView(view); requestDraw(); }, resize: () => requestDraw(), setData({ worldFeatures: nextWorld = worldFeatures, regionFeatures: nextRegions = regionFeatures, prefectureFeatures: nextPrefectures = prefectureFeatures } = {}) { if (!webgl) { const nextPrefectureSource = nextPrefectures?.length ? nextPrefectures : nextRegions; rasterIndex = createRasterIndex({ worldFeatures: Array.isArray(nextWorld) ? nextWorld : prepareGeoJsonFeatures(nextWorld), prefectureFeatures: Array.isArray(nextPrefectureSource) ? nextPrefectureSource : prepareGeoJsonFeatures(nextPrefectureSource, { idProperty: 'code' }) }); } requestDraw(); }, setAstronomy(next) { astronomy = { ...astronomy, ...next }; webgl?.setAstronomy(next); skyWebgl?.setAstronomy(next); if (projectionMode !== 'mercator' || skyOrientation) requestDraw({ rebuildPlan: false }); }, setSkyImage(image) { (ensureSky() || webgl)?.setSkyImage(image); requestDraw({ rebuildPlan: false }); },
   /** Bright stars as sharp sprites on the sky layer; returns how many (0 when there is no separate sky layer). */
-  setStars(sky, options) { const count = skyWebgl?.setStars(sky, options) || 0; requestDraw({ rebuildPlan: false }); return count; },
+  setStars(sky, options) { const count = ensureSky()?.setStars(sky, options) || 0; requestDraw({ rebuildPlan: false }); return count; },
   /** Point the sky layer with a camera orientation of its own (the Solar System view), or give it back to the globe with null. */
-  setSkyOrientation(orientation) { skyOrientation = orientation || null; skyWebgl?.setAstronomy(skyOrientation ? { bodies: false, gmstRadians: 0 } : { bodies: true }); requestDraw({ rebuildPlan: false }); }, setLayer(nextLayer, nextCounts = counts) { layer = nextLayer || null; counts = nextCounts; requestDraw(); }, setView(nextView) { updateView(nextView); }, flyTo(nextView, { duration = 720 } = {}) { cancelFling(); animateFocus({ centerLongitude: view.centerLongitude, centerLatitude: view.centerLatitude, zoom: view.zoom, ...nextView }, duration); }, focusSelection(selection) { const transition = getFocusTransition(selection); if (transition) animateFocus(transition); return transition; }, zoomIn() { updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) }); }, zoomOut() { updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) }); }, resetView() { cancelFling(); selected = clearSelection(); onPick(null); updateView(DEFAULT_VIEW); }, pickAt(x, y) { return webgl ? pickWebGLCell(x, y) : pickRenderedCellAt(x, y, plan); }, getSnapshot() { return Object.freeze({ view, camera, plan, selected, hovered, metrics: Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', ...invalidation.snapshot(), ...lastBatchMetrics, cellCache: cellCache.snapshot() }) }); }, destroy() { if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame); cancelFocusAnimation(); cancelFling(); clearLongPress(); observer?.disconnect(); webgl?.destroy(); skyWebgl?.destroy(); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerup', endPointer); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('lostpointercapture', onLostPointerCapture); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('keydown', onKeyDown); } });
+  setMapContent, setMapContentLayer, setMapEventPeriod, getMapLocation(longitude, latitude) { return mapIndex ? resolveMapLocation(longitude, latitude, mapIndex) : null; }, getMapCellRepresentatives() { return mapIndex?.cells || Object.freeze([]); },
+  setSkyOrientation(orientation) { skyOrientation = orientation || null; if (skyOrientation) ensureSky(); skyWebgl?.setAstronomy(skyOrientation ? { bodies: false, gmstRadians: 0 } : { bodies: true }); requestDraw({ rebuildPlan: false }); }, setLayer(nextLayer, nextCounts = counts) { layer = nextLayer || null; counts = nextCounts; requestDraw(); }, setView(nextView) { setView(nextView); }, flyTo(nextView, { duration = 720 } = {}) { cancelFling(); animateFocus({ centerLongitude: view.centerLongitude, centerLatitude: view.centerLatitude, zoom: view.zoom, ...nextView }, duration); }, focusSelection(selection) { const transition = getFocusTransition(selection); if (transition) animateFocus(transition); return transition; }, zoomIn() { updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) }); }, zoomOut() { updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) }); }, resetView() { cancelFling(); clearCurrentSelection(); updateView(projectionMode === 'mercator' ? DEFAULT_MAP_VIEW : DEFAULT_VIEW); }, pickAt(x, y) { return (webgl || projectionMode === 'mercator') ? pickWebGLCell(x, y) : pickRenderedCellAt(x, y, plan); }, getSnapshot() { return Object.freeze({ view, camera, plan, selected, hovered, metrics: Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', ...invalidation.snapshot(), ...lastBatchMetrics, mapContentLayer, mapContent: mapContentMetrics, cellCache: cellCache.snapshot() }) }); }, destroy() { if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame); if (wheelTimer !== null) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(wheelTimer); clearTimeout(wheelTimer); } clearTimeout(wheelInteractionTimer); cancelFocusAnimation(); cancelFling(); clearLongPress(); observer?.disconnect(); mapRenderer?.destroy(); webgl?.destroy(); skyWebgl?.destroy(); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerup', endPointer); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('lostpointercapture', onLostPointerCapture); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('dblclick', onDoubleClick); canvas.removeEventListener('keydown', onKeyDown); } });
 }

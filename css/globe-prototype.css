@@ -135,41 +135,45 @@ button:focus-visible { outline: 2px solid #f4d45d; outline-offset: 2px; }
 button > img { display: block; flex: none; width: var(--control-icon); height: var(--control-icon); filter: brightness(0) invert(1); pointer-events: none; }
 
 .selection-panel {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 4;
-  max-width: min(340px, calc(100% - 24px));
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 6px 6px 16px;
-  border: 1px solid rgba(140, 210, 226, .18);
-  border-radius: 999px;
-  background: rgba(9, 22, 32, .78);
-  backdrop-filter: blur(10px);
+  position: absolute; right: 16px; bottom: calc(5.3rem + env(safe-area-inset-bottom)); top: auto;
+  z-index: 4; width: min(350px, calc(100% - 24px)); max-width: none;
+  display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(140, 210, 226, .28);
+  border-radius: 18px; background: #0c1c28; box-shadow: 0 8px 24px rgba(0, 0, 0, .24);
 }
-
 .selection-panel[hidden] { display: none; }
-/* Cell placement takes priority while selected; celestial shortcuts return on deselection. */
+.selection-panel__head { display: flex; align-items: center; gap: 10px; }
+.selection-panel__info { display: grid; gap: 3px; flex: 1; min-width: 0; padding-left: 4px; }
+.selection-panel__close { width: 44px; height: 44px; padding: 12px; border-radius: 12px; }
+.selection-panel__actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.selection-panel__actions button { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 44px; min-height: 44px; padding: 6px; border-radius: 12px; font-size: .8125rem; }
+#selectionPanel .place-here { width: auto; height: auto; border-radius: 12px; color: #152027; background: #f4d45d; }
+#selectionPanel .place-here img { filter: none; }
+#selectionPanel .selection-panel__actions span { color: inherit; font-size: inherit; white-space: nowrap; }
 .globe-stage:has(.time-capsule.is-open) .selection-panel { display: none; }
 .globe-stage.has-selection .sky-hud { display: none; }
-
-@media (max-width: 760px) {
-  /* Keep the selected cell beside the compact time control and above the view switch. */
-  .selection-panel { top: 14px; right: 10px; max-width: min(340px, calc(100% - 170px)); gap: 8px; padding-left: 12px; }
-}
-
-/* On short landscape screens the parent app navigation rises over the map.
-   Keep the 44px placement target in the free top-right corner. */
+.globe-stage.has-selection .gesture-hint { display: none; }
+@media (max-width: 680px) { .selection-panel { left: 12px; right: 12px; width: auto; } }
+@media (max-height: 500px) and (min-width: 681px) { .selection-panel { left: 16px; right: auto; } }
+@media (max-height: 500px) and (max-width: 680px) { .globe-stage.has-selection .astro-views { display: none; } }
 @media (max-height: 300px) {
-  .selection-panel { top: 10px; right: 10px; gap: 0; max-width: none; padding: 6px; }
-  .selection-panel > :not(.place-here) { display: none; }
+  .selection-panel { left: auto; top: 12px; bottom: auto; right: 12px; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; padding: 6px; gap: 6px; }
+  .selection-panel__head { display: contents; }
+  .selection-panel__info { display: none; }
+  .selection-panel__close { grid-column: 2; grid-row: 1; }
+  .selection-panel__actions { grid-column: 1; grid-row: 1; }
 }
+#globeCanvas[data-cell-hovered="true"] { cursor: pointer; }
+#globeCanvas[data-map-interacting="true"] { cursor: grabbing; }
+.map-cell-tooltip { position: absolute; top: 0; left: 0; z-index: 4; display: grid; gap: 3px; width: max-content; max-width: 220px; padding: 9px 12px; border: 1px solid rgba(124, 235, 230, .32); border-radius: 12px; background: #0c1c28; color: #e9f6f7; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); pointer-events: none; animation: map-tooltip-in .12s ease-out; }
+.map-cell-tooltip strong { overflow: hidden; overflow-wrap: anywhere; white-space: normal; font-size: .875rem; }
+.map-cell-tooltip span { font-size: .75rem; color: #adc5ce; }
+.map-cell-tooltip[hidden], .globe-stage.has-sheet .map-cell-tooltip, .globe-stage.is-scope .map-cell-tooltip, .globe-stage.is-orrery .map-cell-tooltip { display: none; }
+@keyframes map-tooltip-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .map-cell-tooltip { animation: none; } }
 
 .selection-label { color: #7ccfe0; font-size: .75rem; letter-spacing: .08em; }
 .selection-panel code { color: #f4d45d; font-size: .8rem; }
-.selection-panel strong { min-width: 0; overflow: hidden; color: #f4d45d; font-size: .9375rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.selection-panel strong { min-width: 0; overflow: hidden; overflow-wrap: anywhere; color: #f4d45d; font-size: .9375rem; font-weight: 650; white-space: normal; }
 .selection-panel span:not(.selection-label):not(.lod-status) { color: #b9d1d5; font-size: .8125rem; }
 .lod-status { margin-left: auto; }
 
@@ -571,6 +575,9 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .viewer__actions { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 14px; margin-top: auto; }
 .viewer__actions [data-v-focus] { flex: 1; }
 
+.gallery__all-places { flex-shrink: 0; min-height: 44px; padding: 0 12px; margin-bottom: 12px; border: 1px solid rgba(140, 210, 226, .26); border-radius: 12px; color: #b9e7e4; }
+.gallery__all-places[hidden] { display: none; }
+
 .tabs { display: flex; gap: 4px; height: var(--control); padding: 3px; margin-bottom: 12px; border-radius: 999px; background: rgba(140, 210, 226, .08); }
 .tabs button { flex: 1; width: auto; height: 100%; border-radius: 999px; color: #9ab8bf; }
 .tabs button[aria-pressed="true"] { background: rgba(244, 212, 93, .18); color: #ffe89a; }
@@ -768,11 +775,77 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .globe-app-tabs [aria-current="page"] { background: rgba(231, 84, 69, .1); }
 .scope-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
 .sky-events { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
-.gesture-hint, .orrery-pull { bottom: calc(6.6rem + env(safe-area-inset-bottom)); }
+.gesture-hint { bottom: calc(9rem + env(safe-area-inset-bottom)); }
+.orrery-pull { bottom: calc(6.6rem + env(safe-area-inset-bottom)); }
 .globe-stage.has-selection .post-dock { display: none; }
 .post-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
 /* Sheets stay above the shared navigation, including the submit control. */
 .sheet { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
 @media (max-width: 680px) {
   .sheet { max-height: min(72%, calc(100% - 6.1rem - env(safe-area-inset-bottom))); }
+}
+
+/* Keep the first-use hint clear of the observing controls in short landscapes. */
+@media (max-height: 500px) and (min-width: 481px) {
+  .gesture-hint span:nth-child(n + 3) { display: none; }
+}
+
+/* Content layers share the map; changing a layer keeps its camera and cell grid. */
+.map-layers { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; gap: 4px; padding: 4px; border: 1px solid #365362; border-radius: 16px; background: #071520; }
+.map-layers button { min-height: var(--control); padding: 0 12px; gap: 7px; border: 1px solid transparent; border-radius: 11px; color: #b9cdd5; font-size: .8rem; white-space: nowrap; }
+.map-layers button i { width: 10px; height: 10px; flex: 0 0 10px; background: #77aaff; border-radius: 2px; }
+.map-layers [data-map-content="events"] i { background: #f2ad55; }
+.map-layers button[aria-pressed="true"] { border-color: #638da4; background: #193648; color: #fff; }
+.map-layers button:hover { background: #203c4b; }
+.map-layers button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.map-layers[hidden], .is-tool-telescope .map-layers, .has-sheet .map-layers, .is-composing .map-layers, .has-map-events .map-layers { display: none; }
+.is-events-layer .pin-layer, .is-events-layer .post-dock { display: none; }
+.pin-layer[hidden], .map-events-dock[hidden], .map-events-panel[hidden] { display: none; }
+.map-events-dock { position: absolute; bottom: calc(5.3rem + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 3; display: grid; justify-items: center; gap: 5px; width: max-content; max-width: calc(100% - 16px); padding: 6px 8px; border: 1px solid rgba(152, 111, 69, .58); border-radius: 14px; background: rgba(7, 21, 32, .94); color: #dcecef; }
+.map-events-dock__top { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
+.map-events-dock button { min-height: var(--control); padding: 0 10px; border: 1px solid #b68145; border-radius: 999px; background: #241e18; color: #ffe0b3; white-space: nowrap; font-size: .72rem; }
+.map-events-dock__filters, .map-events-panel__filters { display: flex; flex-wrap: wrap; gap: 4px; }
+.map-events-dock__filters button, .map-events-panel__filters button { min-height: var(--control); border: 1px solid #405663; border-radius: 10px; background: #122532; color: #c4d6dd; }
+.map-events-dock__filters button[aria-pressed="true"], .map-events-panel__filters button[aria-pressed="true"] { border-color: #e9b46f; background: #392c20; color: #ffe0b3; }
+.map-events-dock__all { border-color: #b68145 !important; background: #241e18 !important; color: #ffe0b3 !important; }
+.map-events-legend__meaning { display: block; color: #bdcdd2; font-size: .64rem; text-align: center; }
+.map-events-legend__bins { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; }
+.map-events-legend__bin { display: inline-flex; align-items: center; gap: 3px; color: #bdcdd2; font-size: .62rem; white-space: nowrap; }
+.map-events-legend__swatch { display: block; width: 9px; height: 9px; border-radius: 2px; }
+.map-events-legend__swatch.is-future.is-bin-1 { background: #f2ad55; }
+.map-events-legend__swatch.is-future.is-bin-2 { background: #ea7a42; }
+.map-events-legend__swatch.is-future.is-bin-3 { background: #c7463d; }
+.map-events-legend__swatch.is-past.is-bin-1 { background: #a1adb5; }
+.map-events-legend__swatch.is-past.is-bin-2 { background: #74828c; }
+.map-events-legend__swatch.is-past.is-bin-3 { background: #485661; }
+.has-selection .map-events-dock, .has-map-events .map-events-dock, .has-map-events .selection-panel, .has-map-events .map-cell-tooltip { display: none; }
+.is-events-layer .gesture-hint, .has-map-events .gesture-hint { display: none; }
+.map-events-panel { position: absolute; top: 14px; right: 14px; bottom: calc(5.3rem + env(safe-area-inset-bottom)); z-index: 6; width: min(372px, calc(100% - 28px)); display: flex; flex-direction: column; gap: 12px; overflow: auto; overscroll-behavior: contain; padding: 14px; border: 1px solid #986f45; border-radius: 20px; background: #0a1722; color: #dcecef; }
+.map-events-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; }
+.map-events-panel__head h2 { margin: 0; font-size: 1rem; }
+.map-events-panel__close { min-width: var(--control); min-height: var(--control); border-radius: 50%; background: #273642; }
+.map-events-panel p { margin: 0; font-size: .8rem; line-height: 1.6; }
+.map-events-panel__summary { color: #c2d0d5; }
+.map-events-panel__legend { display: grid; justify-items: start; gap: 5px; }
+.map-events-panel__list { display: grid; gap: 12px; }
+.map-event-card { display: grid; gap: 7px; padding: 14px; border: 1px solid #425460; border-radius: 12px; background: #15232e; overflow-wrap: anywhere; }
+.map-event-card h3 { margin: 0; color: #ffe0b3; font-size: .95rem; }
+.map-event-card[data-event-period="past"] h3 { color: #b3bec4; }
+.map-event-card a { display: inline-flex; align-items: center; min-height: var(--control); color: #bcd9ff; text-underline-offset: 3px; }
+.map-event-card small { color: #b0c4cf; line-height: 1.5; }
+@media (max-width: 680px) {
+  .map-layers { top: 12px; right: 12px; }
+  .map-events-dock { bottom: calc(5.3rem + env(safe-area-inset-bottom)); }
+  .map-events-panel { top: auto; left: 12px; right: 12px; width: auto; max-height: 55%; }
+}
+@media (max-height: 500px) and (max-width: 680px) {
+  .has-selection .map-layers { display: none; }
+}
+
+.map-events-panel__all { flex-shrink: 0; min-height: var(--control); padding: 0 12px; border: 1px solid #986f45; border-radius: 12px; color: #ffe0b3; }
+.map-events-panel__all[hidden] { display: none; }
+
+/* Short landscapes keep event controls above the central map gesture area. */
+@media (max-height: 500px) and (min-width: 481px) {
+  .map-events-dock { top: 14px; bottom: auto; left: 14px; transform: none; max-width: calc(100% - 240px); }
 }

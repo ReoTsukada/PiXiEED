@@ -56,7 +56,7 @@ test('globe is operated by gestures, not zoom/rotate buttons', () => {
   assert.doesNotMatch(read('js/globe/prototype.mjs'), /#zoomIn|#rotateLeft|#resetView/);
 });
 
-test('time capsule keeps play as its only plain button and the sky lives on the view', () => {
+test('stand-alone telescope keeps its time capsule and sky controls', () => {
   const source = read('js/globe/astro-ui.mjs');
   assert.match(source, /class: 'tc-play'/);
   assert.match(source, /function createTimeTape\(/);
@@ -78,7 +78,7 @@ test('every control shares one size: 44px buttons, 48px single-line fields', () 
   assert.deepEqual(smallHeights, []);
 });
 
-test('pinching out past the globe opens the Solar System, and pinching into the Earth returns', () => {
+test('stand-alone telescope retains the Solar System while map callbacks are disabled', () => {
   const renderer = read('js/globe/renderer.mjs');
   assert.match(renderer, /onZoomLimit/);
   const ui = read('js/globe/astro-ui.mjs');
@@ -88,4 +88,17 @@ test('pinching out past the globe opens the Solar System, and pinching into the 
   const orrery = read('js/globe/orrery.mjs');
   assert.match(orrery, /onExit\(\)/, 'zooming into the Earth hands back to the globe');
   assert.match(read('js/globe/prototype.mjs'), /onZoomLimit/);
+});
+
+
+test('flat map exposes only posts/events and loads astronomy only for the telescope', () => {
+  const html=read('globe-prototype.html'),source=read('js/globe/prototype.mjs');
+  assert.match(html,/id="mapLayerSwitch"/);
+  assert.match(html,/data-map-content="posts"/);
+  assert.match(html,/data-map-content="events"/);
+  assert.doesNotMatch(html,/data-astro-view|astroViewSwitch|長押しで空を見る|さらに縮小で太陽系/);
+  assert.match(source,/const astronomy = telescopeTool \? await Promise\.all/);
+  assert.match(source,/onLongPress: telescopeTool \?/);
+  assert.match(source,/onZoomLimit: telescopeTool \?/);
+  assert.doesNotMatch(source,/^import .*astro-ui\.mjs|^import .*real-sky\.mjs/m);
 });

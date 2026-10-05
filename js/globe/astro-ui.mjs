@@ -399,9 +399,9 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   // ---- Solar System view -----------------------------------------------------
   const orreryCanvas = element('canvas', { class: 'orrery-canvas', hidden: '', tabindex: '0', 'aria-label': '太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大すると地球儀に戻る' });
   const orreryCloseIcon = icon('globe');
-  const orreryCloseLabel = element('span', { text: '地球儀へ' });
+  const orreryCloseLabel = element('span', { text: '地図へ' });
   const orreryHud = element('section', { class: 'orrery-hud', hidden: '', 'aria-label': '太陽系' }, [
-    element('button', { type: 'button', class: 'orrery-close', 'aria-label': '地球儀へ', onClick: () => closeOrrery() }, [orreryCloseIcon, orreryCloseLabel]),
+    element('button', { type: 'button', class: 'orrery-close', 'aria-label': '地図へ', onClick: () => closeOrrery() }, [orreryCloseIcon, orreryCloseLabel]),
     element('p', { class: 'orrery-title' }, [element('strong', { text: '太陽系' })])
   ]);
   const pull = element('div', { class: 'orrery-pull', hidden: '', 'aria-hidden': 'true' }, [element('span', { text: 'さらに縮小で太陽系へ' }), element('i')]);
@@ -425,7 +425,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     const width = canvas?.clientWidth || canvas?.getBoundingClientRect?.().width || camera?.viewport?.width || 0;
     const height = canvas?.clientHeight || canvas?.getBoundingClientRect?.().height || camera?.viewport?.height || 0;
     const cameraMatches = camera?.viewport && Math.abs(camera.viewport.width - width) < 1 && Math.abs(camera.viewport.height - height) < 1;
-    const radius = cameraMatches && Number.isFinite(camera.radius) && camera.radius > 0
+    const radius = cameraMatches && camera.projection !== 'mercator' && Number.isFinite(camera.radius) && camera.radius > 0
       ? camera.radius
       : width > 0 && height > 0 ? Math.min(width, height) / 2 : camera?.radius;
     const target = Number.isFinite(radius) && radius > 0 && Number.isFinite(view?.zoom) && view.zoom > 0 ? radius * view.zoom : camera?.scale;
@@ -436,7 +436,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     if (orrery.isOpen() || orreryClosing) return;
     const globeSnapshot = renderer.getSnapshot();
     const globeView = globeSnapshot?.view;
-    const earthRadiusPx = globeSnapshot?.camera?.scale;
+    const earthRadiusPx = globeSnapshot?.camera?.projection === 'mercator' ? Math.min(globeSnapshot.camera.viewport.width, globeSnapshot.camera.viewport.height) / 2 * globeView.zoom : globeSnapshot?.camera?.scale;
     const remembered = rememberedGlobeView || globeView;
     // Zoom-out enters at the renderer's minimum size. Restore the last usable
     // size while retaining the center reached by the current gesture.
@@ -461,9 +461,9 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     orrery.setTime(time, { moon: moonEcliptic(state) });
     orrery.open({ earthRadiusPx: returnToScope ? undefined : earthRadiusPx, returnEarthRadiusPx: globeRadiusForView(returnView) });
     orreryCloseIcon.src = `/assets/icons/pixieed/${returnToScope ? 'telescope' : 'globe'}.svg`;
-    orreryCloseLabel.textContent = returnToScope ? '望遠鏡へ' : '地球儀へ';
+    orreryCloseLabel.textContent = returnToScope ? '望遠鏡へ' : '地図へ';
     orreryHud.querySelector('.orrery-close').setAttribute('aria-label', orreryCloseLabel.textContent);
-    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大・縮小。天体をタップして近づき、地球を戻りサイズまで拡大すると${returnToScope ? '望遠鏡' : '地球儀'}に戻る`);
+    orreryCanvas.setAttribute('aria-label', `太陽系。ドラッグで視点を回転。ピンチまたはホイールで拡大・縮小。天体をタップして近づき、地球を戻りサイズまで拡大すると${returnToScope ? '望遠鏡' : '地図'}に戻る`);
     stage.dispatchEvent(new Event('pixieed:astro-viewchange'));
     orreryCanvas.focus({ preventScroll: true });
   }
@@ -520,7 +520,12 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   let fovTimer = null;
   let lastFov = null;
   const scope = createScope({ canvas: scopeCanvas, onChange: onScopeChange });
-  sharedSky().then(({ canvas: sky, sky: catalogue }) => scope.setSkyImage(sky, catalogue)).catch(() => {});
+  let scopeSkyStarted = false;
+  function loadScopeSky() {
+    if (scopeSkyStarted) return;
+    scopeSkyStarted = true;
+    sharedSky().then(({ canvas: sky, sky: catalogue }) => scope.setSkyImage(sky, catalogue)).catch(() => { scopeSkyStarted = false; });
+  }
 
   // ---- behaviour -----------------------------------------------------------
   function setOpen(open) {
@@ -594,7 +599,13 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
   function orbitMarks() {
     if (!state) return;
     let snapshot; try { snapshot = renderer.getSnapshot(); } catch { return; }
-    const camera = snapshot.camera; if (!camera?.orientation) return;
+    const camera = snapshot.camera;
+    if (camera?.projection === 'mercator') {
+      for (const mark of Object.values(marks)) mark.button.hidden = true;
+      for (const mark of Object.values(planetMarks)) mark.button.hidden = true;
+      return;
+    }
+    if (!camera?.orientation) return;
     const { width, height, centerX, centerY } = camera.viewport;
     const focal = (height / 2) / Math.tan(SKY_FOCAL_HALF_ANGLE * DEG);
     const inverse = conjugate(camera.orientation);
@@ -928,6 +939,7 @@ export function initAstroUi({ renderer, stage, initiallyCollapsed = true }) {
     stage.classList.add('is-scope');
     scopeCanvas.hidden = false;
     scopeHud.hidden = false;
+    loadScopeSky();
     scope.open(location, state);
     const tracking = track || resume?.tracking || null;
     if (resume) {

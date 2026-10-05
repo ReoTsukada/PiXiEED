@@ -4,6 +4,8 @@ import {
   DEFAULT_VIEW,
   DEFAULT_MAX_RENDER_CELLS,
   LOD_SETTINGS,
+  DEFAULT_ZOOM_RANGE,
+  MERCATOR_ZOOM_RANGE,
   MAX_BACKING_DPR,
   clearSelection,
   createLodState,
@@ -15,12 +17,13 @@ import {
   getCanvasBackingSize,
   getFocusTransition,
   getSelectionStageLabel,
+  mercatorViewForAnchor,
   pickRenderedCellAt,
   prepareGeoJsonFeatures,
   resolveLodLevel,
   updateLodState
 } from '../../js/globe/renderer.mjs';
-import { createGlobeCamera, lookupCell, projectCellCorners } from '../../js/globe/geometry.mjs';
+import { createGlobeCamera, createMercatorCamera, inverseScreenToGeo, projectGeoToScreen, lookupCell, projectCellCorners } from '../../js/globe/geometry.mjs';
 
 function camera(overrides = {}) { return createGlobeCamera({ viewport: { width: 1000, height: 700, dpr: 2 }, ...overrides }); }
 function fixtureIndex() {
@@ -124,3 +127,27 @@ test('view remains centre-fixed when zoom changes', () => {
 });
 
 test('selection reset is null and no cell listener surface is required', () => { assert.equal(clearSelection({ cellId: 'any' }), null); });
+
+test('Mercator zoom range reaches individual map cells while telescope range stays unchanged', () => {
+  assert.deepEqual(DEFAULT_ZOOM_RANGE, { min: .68, max: 24 });
+  assert.deepEqual(MERCATOR_ZOOM_RANGE, { min: .68, max: 128 });
+  assert.equal(createViewState({ zoom: 200, zoomRange: MERCATOR_ZOOM_RANGE }).zoom, 128);
+  assert.equal(createViewState({ zoom: 200, zoomRange: { min: .68, max: 96 } }).zoom, 96);
+  assert.throws(() => createViewState({ zoomRange: { min: 96, max: .68 } }), /Invalid zoom range/);
+  assert.equal(createViewState({ zoom: 200 }).zoom, 24);
+});
+
+test('Mercator zoom anchoring works for a geographic point over the sea without a selected cell', () => {
+  const viewport = { width: 1200, height: 700 };
+  const before = createMercatorCamera({ ...viewport, centerLongitude: -150, centerLatitude: 0, zoom: 4 });
+  const screenPoint = { x: 600, y: 350 }; // central Pacific, where the map intentionally has no land cell
+  const seaAnchor = inverseScreenToGeo(screenPoint.x, screenPoint.y, before);
+  assert.ok(seaAnchor);
+  const zoom = 64;
+  const targetCamera = createMercatorCamera({ ...viewport, centerLongitude: 0, centerLatitude: 0, zoom });
+  const center = mercatorViewForAnchor(seaAnchor, screenPoint, targetCamera);
+  const anchoredCamera = createMercatorCamera({ ...viewport, ...center, zoom });
+  const after = projectGeoToScreen(seaAnchor.longitude, seaAnchor.latitude, anchoredCamera);
+  assert.ok(Math.abs(after.x - screenPoint.x) < 1e-7);
+  assert.ok(Math.abs(after.y - screenPoint.y) < 1e-7);
+});
