@@ -1,34 +1,31 @@
+import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261001-animation-1';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
 import { createDrawAnimationSession } from './draw-animation-session.mjs';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, canvasResizeOffset, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261006-draw-panel-dismiss-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
-import { createImportedDrawDocument, decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261006-panel-close-1';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-panel-close-1';
-import { pxdImageRoles, readPxdImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-draw-startup-1';
+import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
-import { readPxdAudioLink, readPxdDrawDocument, writePxdDrawDocument } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261004-symmetry-color-panel-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
 
-import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261006-viewport-1';
+import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-draw-panel-dismiss-1';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261006-draw-panel-dismiss-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
@@ -36,12 +33,12 @@ import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs';
-import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs';
-import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard } from './draw-selection-operations.mjs';
-import { createDrawSelectionTransform } from './draw-selection-session.mjs';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs';
-import { selectionDefaultPivot, selectionContains, snapSelectionAngle, resizeRotatedDrawSelection } from './draw-selection-geometry.mjs';
-import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs';
+import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
+import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
+import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-draw-startup-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261006-draw-startup-1';
+import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing } from './draw-selection-geometry.mjs?rev=20261006-draw-startup-1';
+import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261006-draw-startup-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
@@ -80,6 +77,7 @@ let animationSession = createDrawAnimationSession(documentData), animationContro
 let selection = null, selectionDrag = null, strokeWasSaved = false;
 let selectionTransform = null, selectionPreview = null, selectionPanel = null, selectionError = '';
 let selectionRenderRequest = 0;
+let selectionMaskCache = null, selectionMaskOwner = null;
 let preparedSelectionCommit = null;
 const selectionClipboard = createDrawSelectionClipboard(), selectionViewStates = new WeakMap();
 const resizeViewStates = new WeakMap();
@@ -171,7 +169,7 @@ function installAnimationDocument(doc) {
   if (selectionState) selection = { ...selectionState };
   if (view) { mirrorOrigin = { ...view.mirrorOrigin }; selection = view.selection && { ...view.selection }; zoom = view.zoom; panX = view.panX; panY = view.panY; }
   selectedColor = Math.min(selectedColor, doc.palette.length - 1); canvasPrepared = false;
-  renderPalette(); showCurrentColor(); paint(); syncDrawingSettings(); animationControls?.refresh();
+  renderPalette(); showCurrentColor(); paint(); syncDrawingSettings(); placeSelection(); animationControls?.refresh();
   if (view) { updateCanvasView(); placeSelection(); requestAnimationFrame(() => { if (!scope.disposed) virtualCursor?.setCanvasPosition(view.cursor); }); }
 }
 function stopAnimation() {
@@ -181,6 +179,7 @@ function stopAnimation() {
   syncMirrorRail();
 }
 function toggleAnimation() {
+  if (selectionTransform) { toast('✓で確定、×で取消してから再生できます。'); return; }
   cancelSelectionTransform(); selectionPanel?.hide();
   if (playing) { stopAnimation(); paint(); return; }
   if (readOnlyImage || animationSession.animation.frames.length < 2) { toast('2コマ以上あるとアニメーションを再生できます。'); return; }
@@ -229,7 +228,8 @@ function handleAnimationAction(action) {
     paint(); syncDrawingSettings(); animationControls?.refresh(); return;
   }
   if (action.type === 'export-gif') return exportAnimation();
-  cancelSelectionTransform(); selectionPanel?.hide(); stopAnimation(); endStroke(); closeColorEditor();
+  if (selectionTransform) { toast('✓で確定、×で取消してからコマ・レイヤーを変更できます。'); return false; }
+  selectionPanel?.hide(); stopAnimation(); endStroke(); closeColorEditor();
   if (action.type === 'select-frame' || action.type === 'select-layer') { installAnimationDocument(animationSession.select(action.frameId, action.layerId)); return; }
   // Layer locking protects pixels, while its own switch must remain operable.
   const policy = evaluateSharedCanvasPolicy({ width: documentData.width, height: documentData.height, colorCount: usedColorCount() }, { passActive: true });
@@ -271,6 +271,7 @@ function renderPalette() {
     const add = document.createElement('button'); add.type = 'button'; add.className = 'draw-color'; add.textContent = '+'; add.setAttribute('aria-label', '色を追加する');
     add.addEventListener('click', () => {
       if (!canEdit()) return;
+      if (selectionTransform) { toast('✓で確定、×で取消してから色を追加できます。'); return; }
       closeColorEditor(); const palette = [...documentData.palette, '#8ecdf0'];
       history.commit({ ...documentData, pixels: [...documentData.pixels], palette });
       selectedColor = palette.length - 1; renderPalette(); showCurrentColor(); openColorEditor(selectedColor);
@@ -285,6 +286,7 @@ function linkedToSong() {
 }
 let colorEditorReturnFocus = null;
 function openColorEditor(index) {
+  if (selectionTransform) { toast('✓で確定、×で取消してから色を編集できます。'); return; }
   if (index < 0 || index >= documentData.palette.length || !canEdit()) return;
   cancelSelectionTransform(); selectionPanel?.hide(); editorUi.closePanels(); closeColorEditor(); colorEditorReturnFocus = document.activeElement;
   const base = [...documentData.palette]; colorEdit = { index, base, maxColors: 32 };
@@ -309,7 +311,7 @@ function closeColorEditor() {
   renderPalette(); showCurrentColor(); paint();
   if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
 }
-const editorUi = mountCreationEditorUi($('#main'), { beforePanelOpen: () => { cancelSelectionTransform(); selectionPanel?.hide(); cancelDrawingInput(); closeColorEditor(); animationControls?.close?.(); } });
+const editorUi = mountCreationEditorUi($('#main'), { beforePanelOpen: () => { cancelDrawingInput(); closeColorEditor(); animationControls?.close?.(); } });
 // touching the picture closes the sheet and draws straight away with the new colour
 canvas.addEventListener('pointerdown', () => { if (colorEdit) closeColorEditor(); }, true);
 scope.listen(window, 'keydown', (event) => { if (event.key === 'Escape' && colorEdit) closeColorEditor(); });
@@ -319,7 +321,7 @@ function showCurrentColor() {
 function chooseColor(index, sourceElement, side = 'left') {
   inputSettings.bindings[side].color = index;
   if (side === 'right') {
-    if (['eraser', 'picker', 'select'].includes(inputSettings.bindings.right.tool)) inputSettings.bindings.right.tool = 'pen';
+    if (!selectionTransform && ['eraser', 'picker', 'select'].includes(inputSettings.bindings.right.tool)) inputSettings.bindings.right.tool = 'pen';
     syncInputControls(); return;
   }
   const penButton = document.querySelector('[data-draw-tool="pen"]');
@@ -379,7 +381,7 @@ function exactSelectionPoint(event) {
 }
 function selectionHandleAtEvent(event) {
   const handle = selectionControls.hit(exactSelectionPoint(event), event.pointerType);
-  if (handle !== 'rotate' && event.altKey && selectionFrame() && selectionContains(selectionFrame(), exactSelectionPoint(event))) return null;
+  if (handle === 'pivot' && event.altKey && selectionFrame() && selectionContains(selectionFrame(), exactSelectionPoint(event))) return null;
   return handle;
 }
 const ZOOM_MAX = 8;
@@ -422,8 +424,21 @@ function selectionFrame() { return selectionTransform?.state || (selection && { 
 function clearSelection() { cancelSelectionTransform(); selection = null; selectionDrag = null; selectionControls.render(null, false); selectionPanel?.sync(); }
 function placeSelection() {
   selectionPanel?.sync();
-  const visible = selection && (effectiveTool() === 'select' || inputSettings.bindings[lastInputSide]?.tool === 'select');
-  selectionControls.render(visible ? selectionFrame() : null, !animationSession.locked && !readOnlyImage && !playing, selectionDrag?.handle);
+  const selectionTool = (strokeBinding?.tool || inputSettings.bindings[lastInputSide]?.tool || tool) === 'select';
+  selectionControls.render(selection ? selectionFrame() : null, selectionTool && Boolean(selectionTransform || selectionHasPixels()) && !animationSession.locked && !readOnlyImage && !playing, selectionDrag?.handle);
+}
+function selectionMask() {
+  if (!selection) return null;
+  if (selectionMaskOwner !== selection) { selectionMaskOwner = selection; selectionMaskCache = drawSelectionMask(selection, documentData.width, documentData.height); }
+  return selectionMaskCache;
+}
+function selectionHasPixels() {
+  const mask = selectionMask();
+  return Boolean(mask && documentData.pixels.some((value, index) => mask[index] && value >= 0 && !documentData.palette[value]?.endsWith('00')));
+}
+function selectionMember(point) {
+  const x = Math.floor(point.x), y = Math.floor(point.y);
+  return x >= 0 && y >= 0 && x < documentData.width && y < documentData.height && Boolean(selectionMask()?.[y * documentData.width + x]);
 }
 function selectionOwner() { return { animation: animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId }; }
 function selectionOwnerMatches() {
@@ -433,7 +448,7 @@ function selectionOwnerMatches() {
 function startSelectionTransform() {
   if (selectionTransform) return selectionOwnerMatches();
   if (!selection || animationSession.locked || !canEdit()) return false;
-  selectionTransform = createDrawSelectionTransform(documentData, selection, { owner: selectionOwner() });
+  selectionTransform = createDrawSelectionTransform(documentData, selection, { owner: selectionOwner(), mask: selectionMask() });
   if (!selectionTransform) { toast('透明だけの範囲です。'); return false; }
   selectionError = ''; return true;
 }
@@ -464,11 +479,12 @@ function confirmSelectionTransform() {
     const prepared = animationSession.prepareDocument(next);
     const bounds = selectionTransform.rect;
     const pivot = selectionTransform.state.pivot;
+    const mask = selectionTransform.mask(documentData.width, documentData.height);
     const previousBounds = selectionTransform.originalBounds;
     cancelAnimationFrame(selectionRenderRequest); selectionRenderRequest = 0;
     selectionTransform = null; selectionPreview = null; selectionError = '';
     const x = Math.max(0, bounds.x), y = Math.max(0, bounds.y);
-    selection = { x, y, width: Math.min(documentData.width, bounds.x + bounds.width) - x, height: Math.min(documentData.height, bounds.y + bounds.height) - y, pivot };
+    selection = { x, y, width: Math.min(documentData.width, bounds.x + bounds.width) - x, height: Math.min(documentData.height, bounds.y + bounds.height) - y, pivot, mask };
     commitSelectionDocument(next, previousBounds, selection, prepared);
     renderPalette(); showCurrentColor(); paint(); placeSelection(); canvas.focus({ preventScroll: true });
     if (bounds.x < 0 || bounds.y < 0 || bounds.x + bounds.width > documentData.width || bounds.y + bounds.height > documentData.height) toast('キャンバス外の部分は切り取りました。「戻す」で復元できます。');
@@ -476,10 +492,10 @@ function confirmSelectionTransform() {
   } catch (error) { selectionError = error.message; selectionPanel?.sync(); toast(error.message); return false; }
 }
 function selectionPanelState() {
-  const editable = !playing && !readOnlyImage && !animationSession.locked;
-  return { bounds: selectionFrame(), pending: Boolean(selectionTransform), error: selectionError,
-    canCopy: Boolean(selection && !selectionTransform && !playing && !readOnlyImage),
-    canCut: Boolean(selection && !selectionTransform && editable), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform), canTransform: Boolean(selection && editable) };
+  const editable = !playing && !readOnlyImage && !animationSession.locked, busy = Boolean(drawing || pendingTap || activePointers.size);
+  return { bounds: selectionFrame(), pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
+    canCopy: Boolean(selectionHasPixels() && !selectionTransform && !playing && !readOnlyImage && !busy),
+    canCut: Boolean(selectionHasPixels() && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(selection && editable) };
 }
 function commitSelectionDocument(next, beforeBounds, afterBounds, prepared = animationSession.prepareDocument(next)) {
   const before = animationSession.animation;
@@ -498,15 +514,15 @@ function runSelectionAction(action, fields = {}) {
   if (action === 'copy' || action === 'cut') {
     if (!selection || selectionTransform || playing || readOnlyImage || action === 'cut' && animationSession.locked) return false;
     cancelDrawingInput();
-    const clip = captureDrawSelection(documentData, selection);
-    if (!clip) { toast('透明だけの範囲です。コピーは変更していません。'); return true; }
+    const clip = captureDrawSelection(documentData, selection, { mask: selectionMask() });
+    if (!clip) { toast('透明だけの範囲です。コピーは変更していません。'); return false; }
     if (action === 'cut') {
       if (!canEdit()) return false;
       selectionClipboard.set(clip);
       commitSelectionDocument(clearDrawSelection(documentData, clip, selection), selection, selection); paint();
       toast('カットしました。貼付の取消では戻りません。「戻す」で復元できます。');
     } else { selectionClipboard.set(clip); toast('選択した絵をコピーしました。このタブ内で貼り付けできます。'); }
-    selectionPanel.sync(); return true;
+    selectionPanel.setMode('paste'); return true;
   }
   if (action === 'paste') {
     if (!selectionClipboard.hasValue || selectionTransform || animationSession.locked || !canEdit()) return false;
@@ -536,13 +552,8 @@ function runSelectionAction(action, fields = {}) {
   else selectionTransform.flip(action === 'flip-x' ? 'x' : 'y');
   previewSelectionTransform(); return true;
 }
-selectionPanel = mountDrawSelectionPanel({ scope, host: $('.draw-tools'), getState: selectionPanelState, onAction: runSelectionAction,
-  beforeOpen: () => { cancelDrawingInput(); closeColorEditor(); animationControls?.close?.(); editorUi.closePanels(); } });
-scope.listen(document, 'pointerdown', event => {
-  if (selectionPanel.contains(event.target) || event.target.closest?.('[data-virtual-left], [data-virtual-right], #draw-undo, #draw-redo, #draw-virtual-toggle')) return;
-  selectionPanel.hide();
-  if (!event.target.closest?.('.draw-board')) cancelSelectionTransform();
-}, { capture: true });
+selectionPanel = mountDrawSelectionPanel({ scope, host: $('.draw-control-dock'), auxiliaryHost: $('.draw-input-settings'), getState: selectionPanelState, onAction: runSelectionAction,
+  beforeOpen: () => { cancelDrawingInput(); $('#draw-settings-picker').open = true; placeSettingsPanel(); } });
 function placeToolMenu() {
   const menu = $('.draw-tool-menu'), summary = $('#draw-tool-summary'); if (!menu || !summary) return;
   const r = summary.getBoundingClientRect(), header = Math.max(document.querySelector('body > .site-header')?.getBoundingClientRect().bottom || 64, document.querySelector('.project-bar')?.getBoundingClientRect().bottom || 0);
@@ -589,9 +600,10 @@ const overlayObserver = new ResizeObserver(() => { if (!scope.disposed) placeOve
 scope.observe(overlayObserver, $('.draw-board'));
 function pointerPair() { return [...activePointers.values()].slice(0, 2); }
 function startPinch() {
+  const selectionOnly = Boolean(selection || selectionTransform || strokeBinding?.tool === 'select');
   if (drawing) endStroke(true);
   const [a, b] = pointerPair(); if (!a || !b) return;
-  pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2, time: performance.now(), moved: 0, fingers: activePointers.size };
+  pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2, time: performance.now(), moved: 0, fingers: activePointers.size, selectionOnly };
 }
 function selectedPixelValue() { return effectiveTool() === 'eraser' ? -1 : effectiveColor(); }
 // ---- drawing helpers: a mirror copy of every mark, the straight line, the colour picker ----
@@ -641,7 +653,7 @@ function syncDrawingSettings() {
 function markSegment(from, to, value) {
   const changed = [];
   const flags = drawingSymmetry();
-  for (const matrix of symmetryTransforms(flags)) changed.push(...strokePixels(documentData, symmetryPoint(from, documentData.width, documentData.height, matrix, flags.origin), symmetryPoint(to, documentData.width, documentData.height, matrix, flags.origin), value, { trusted: true, tracker: strokeTracker }));
+  for (const matrix of symmetryTransforms(flags)) changed.push(...strokePixels(documentData, symmetryPoint(from, documentData.width, documentData.height, matrix, flags.origin), symmetryPoint(to, documentData.width, documentData.height, matrix, flags.origin), value, { trusted: true, tracker: strokeTracker, mask: selectionMask() }));
   return changed;
 }
 function pickColorAt(point) {
@@ -653,10 +665,10 @@ function pickColorAt(point) {
 }
 function setTool(next, side = 'left') {
   if (!Object.hasOwn(TOOL_NAMES, next)) return;
-  if (selectionTransform && next !== 'select') cancelSelectionTransform();
+  if (selectionTransform && next !== 'select') { toast('変形・貼付を配置中です。✓で確定、×で取消してから描画へ切り替えてください。'); return false; }
   inputSettings.bindings[side].tool = next;
-  if (side === 'right') { syncInputControls(); return; }
-  if (!strokeBinding && next !== 'select' && lastInputSide === 'left') clearSelection();
+  if (side === 'right') { lastInputSide = side; syncInputControls(); placeSelection(); return true; }
+  if (!strokeBinding) lastInputSide = side;
   tool = next; syncDrawingSettings(); syncInputControls();
   document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next || (node === penControl && next === 'eraser'))));
   if (penControl) {
@@ -681,7 +693,6 @@ function setTool(next, side = 'left') {
   placeSelection();
 }
 function assignDrawInput({ side, kind, value }) {
-  cancelSelectionTransform(); selectionPanel?.hide();
   if (colorEdit) closeColorEditor();
   if (kind === 'color') {
     if (!Number.isInteger(value) || value < -1 || value >= documentData.palette.length) return;
@@ -701,33 +712,37 @@ function assignDrawInput({ side, kind, value }) {
   const assignedTool = value === 'pen'
     ? side === 'left' ? (tool === 'pen' ? 'eraser' : 'pen') : (tool === 'eraser' ? 'eraser' : 'pen')
     : value;
-  if (side === 'left') { setTool(assignedTool); toast(`${TOOL_NAMES[assignedTool]}を選びました`); }
-  else { inputSettings.bindings.right.tool = assignedTool; syncInputControls(); toast(`右ボタンに${TOOL_NAMES[assignedTool]}を割り当てました`); }
+  if (setTool(assignedTool, side) !== false) toast(side === 'left' ? `${TOOL_NAMES[assignedTool]}を選びました` : `右ボタンに${TOOL_NAMES[assignedTool]}を割り当てました`);
 }
 const drawAssignmentInput = mountDrawAssignmentInput({ root: $('#main'), onAssign: assignDrawInput });
 scope.add(() => drawAssignmentInput.dispose());
 function markShape(from, to) {
   if (effectiveTool() === 'line') return markSegment(from, to, selectedPixelValue());
-  return drawShapePixels(documentData, from, to, selectedPixelValue(), { shape: effectiveTool().startsWith('rectangle') ? 'rectangle' : 'ellipse', filled: effectiveTool().endsWith('-fill'), symmetry: drawingSymmetry(), tracker: strokeTracker });
+  return drawShapePixels(documentData, from, to, selectedPixelValue(), { shape: effectiveTool().startsWith('rectangle') ? 'rectangle' : 'ellipse', filled: effectiveTool().endsWith('-fill'), symmetry: drawingSymmetry(), tracker: strokeTracker, mask: selectionMask() });
 }
-function markSpray(from, to) { return sprayPixels(documentData, from, to, selectedPixelValue(), { symmetry: drawingSymmetry(), tracker: strokeTracker }); }
+function markSpray(from, to) { return sprayPixels(documentData, from, to, selectedPixelValue(), { symmetry: drawingSymmetry(), tracker: strokeTracker, mask: selectionMask() }); }
 function updateSelection(point, event = {}) {
-  if (selectionDrag?.mode !== 'select' && selectionTransform && selectionDrag) {
+  if (selectionDrag?.screenOrigin && Number.isFinite(event.clientX)) selectionDrag.maxDistance = Math.max(selectionDrag.maxDistance || 0,
+    Math.hypot(event.clientX - selectionDrag.screenOrigin.x, event.clientY - selectionDrag.screenOrigin.y));
+  if (selectionTransform && ['corner', 'pivot', 'move'].includes(selectionDrag?.mode)) {
     const { origin, state, handle, mode } = selectionDrag;
     const dx = point.x - origin.x, dy = point.y - origin.y;
-    if (mode === 'resize') selectionTransform.update(resizeRotatedDrawSelection(state, handle, dx, dy, selectionPanel.fixedRatio, selectionTransform.aspectRatio));
-    else if (mode === 'rotate') {
-      const start = Math.atan2(origin.y - state.pivot.y, origin.x - state.pivot.x), end = Math.atan2(point.y - state.pivot.y, point.x - state.pivot.x);
-      if (Math.hypot(point.x - state.pivot.x, point.y - state.pivot.y) < .01) return;
-      selectionTransform.update(state);
-      selectionTransform.setAngle(snapSelectionAngle(state.angle + (end - start) * 180 / Math.PI, event));
-    } else if (mode === 'pivot') selectionTransform.setPivot({ x: Math.max(-1024, Math.min(1024, state.pivot.x + dx)), y: Math.max(-1024, Math.min(1024, state.pivot.y + dy)) });
+    if (mode === 'corner') {
+      if (selectionDrag.suspended) return;
+      const pivot = state.pivot, bearing = Math.atan2(point.y - pivot.y, point.x - pivot.x);
+      if (Math.hypot(point.x - pivot.x, point.y - pivot.y) <= selectionDrag.minRadius) { selectionDrag.suspended = true; toast('中心付近では操作を止めます。指を離し、別の角または数値で調整してください。'); return; }
+      selectionDrag.angleDelta += unwrapSelectionBearing(selectionDrag.lastBearing, bearing) * 180 / Math.PI;
+      selectionDrag.lastBearing = bearing;
+      const next = transformSelectionFromCorner(state, origin, point, { shiftKey: event.shiftKey, altKey: event.altKey, angleDelta: selectionDrag.angleDelta, minRadius: selectionDrag.minRadius });
+      if (next) selectionTransform.update(next);
+    }
+    else if (mode === 'pivot') selectionTransform.setPivot({ x: Math.max(-1024, Math.min(1024, state.pivot.x + dx)), y: Math.max(-1024, Math.min(1024, state.pivot.y + dy)) });
     else {
       const x = Math.max(-1024, Math.min(1024, state.x + dx)), y = Math.max(-1024, Math.min(1024, state.y + dy));
       selectionTransform.update({ ...state, x, y, pivot: { x: state.pivot.x + x - state.x, y: state.pivot.y + y - state.y } });
     }
     previewSelectionTransform();
-  } else selection = selectionBounds(lineStart, point, documentData.width, documentData.height);
+  } else if (!['outside', 'flip', 'empty'].includes(selectionDrag?.mode)) selection = selectionBounds(lineStart, point, documentData.width, documentData.height);
   placeSelection();
 }
 let pendingTap = null; let pendingTapPointerId = null; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
@@ -743,6 +758,8 @@ function handleCanvasPointerDown(event) {
   const side = event.pointerType === 'touch' ? 'left' : event.button === 2 ? 'right' : 'left';
   const binding = { ...inputSettings.bindings[side], side, mask: side === 'right' ? 2 : 1 };
   const inputTool = binding.tool;
+  if (inputTool !== 'select' && selectionTransform) { activePointers.delete(event.pointerId); toast('✓で確定、×で取消してから描画できます。'); return; }
+  if (inputTool === 'picker' && selection && !selectionMember(pointFromEvent(event))) { activePointers.delete(event.pointerId); return; }
   if (inputTool !== 'picker' && inputTool !== 'select' && animationSession.locked) { toast('レイヤーの鍵を外すと描けます。'); return; }
   if (inputTool !== 'picker' && !canEdit()) return;
   if (inputTool !== 'picker' && inputTool !== 'fill' && inputTool !== 'select') {
@@ -752,20 +769,35 @@ function handleCanvasPointerDown(event) {
       return;
     }
   }
-  if (inputTool !== 'select') clearSelection();
   lastInputSide = side; strokeBinding = binding; syncDrawingSettings();
   strokeWasSaved = saved;
   drawing = true; drawingPointerId = event.pointerId; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
-  if (inputTool === 'picker' || inputTool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; drawing = false; drawingPointerId = null; previousPoint = null; return; }
+  if (inputTool === 'picker' || inputTool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; drawing = false; drawingPointerId = null; previousPoint = null; selectionPanel.sync(); return; }
   if (inputTool === 'select') {
     lineStart = touchedPoint;
     const handle = selectionHandleAtEvent(event);
-    const inside = selectionFrame() && selectionContains(selectionFrame(), exactSelectionPoint(event));
-    if ((handle || inside) && !animationSession.locked && startSelectionTransform()) {
-      selectionDrag = { mode: handle === 'pivot' || handle === 'rotate' ? handle : handle ? 'resize' : 'move', handle, origin: exactSelectionPoint(event), bounds: { ...selection }, state: selectionTransform.state };
-    } else if (selectionTransform) { drawing = false; drawingPointerId = null; strokeBinding = null; toast('先に変形を確定するか、Escで取り消してください。'); }
-    else { selectionDrag = { mode: 'select', bounds: selection && { ...selection } }; selection = selectionBounds(touchedPoint, touchedPoint, documentData.width, documentData.height); placeSelection(); }
-    return;
+    const inside = selectionTransform ? selectionContains(selectionFrame(), exactSelectionPoint(event)) : selectionMember(touchedPoint);
+    const hadTransform = Boolean(selectionTransform);
+    const origin = exactSelectionPoint(event), screenOrigin = { x: event.clientX, y: event.clientY };
+    if (handle?.startsWith('flip')) {
+      selectionDrag = { mode: 'flip', handle, origin, screenOrigin, pointerType: event.pointerType };
+    } else if ((handle || inside) && !animationSession.locked && startSelectionTransform()) {
+      const state = selectionTransform.state, r = canvas.getBoundingClientRect(), minRadius = 6 / Math.min(r.width / canvas.width, r.height / canvas.height);
+      const corner = handle && handle !== 'pivot';
+      if (corner && Math.hypot(origin.x - state.pivot.x, origin.y - state.pivot.y) <= minRadius) {
+        drawing = false; drawingPointerId = null; strokeBinding = null; if (!hadTransform) cancelSelectionTransform(); placeSelection(); toast('中心に近い角です。別の角、中心の移動、または数値補助で調整してください。'); return;
+      }
+      selectionDrag = { mode: handle === 'pivot' ? 'pivot' : corner ? 'corner' : 'move', handle, origin, screenOrigin, bounds: { ...selection }, state,
+        createdTransaction: !hadTransform, minRadius, lastBearing: Math.atan2(origin.y - state.pivot.y, origin.x - state.pivot.x), angleDelta: 0 };
+    } else if (inside) {
+      selectionDrag = { mode: 'empty' };
+    } else if (selection) {
+      selectionDrag = { mode: 'outside', origin, screenOrigin, pointerType: event.pointerType, bounds: selection, transaction: selectionTransform };
+    } else {
+      selectionDrag = { mode: 'select', bounds: null };
+      selection = selectionBounds(touchedPoint, touchedPoint, documentData.width, documentData.height); placeSelection();
+    }
+    placeSelection(); return;
   }
   strokeTracker = beginDrawStroke(documentData, { trusted: true });
   if (SHAPE_TOOLS.has(inputTool)) { lineStart = touchedPoint; const changed = markShape(lineStart, touchedPoint); saved = false; paint(changed); }
@@ -777,7 +809,7 @@ canvas.addEventListener('pointerdown', handleCanvasPointerDown);
 scope.listen($('.draw-board'), 'pointerdown', event => {
   if (event.target === canvas || event.virtual || !selection) return;
   const side = event.button === 2 ? 'right' : 'left';
-  if (inputSettings.bindings[side].tool === 'select' && selectionHandleAtEvent(event)) handleCanvasPointerDown(event);
+  if (inputSettings.bindings[side].tool === 'select') handleCanvasPointerDown(event);
 });
 scope.listen($('.draw-board'), 'pointermove', event => {
   if (event.target !== canvas && !drawing && !virtualCursor?.enabled) selectionControls.hover(selectionHandleAtEvent(event) || '');
@@ -829,7 +861,8 @@ function handleCanvasPointerMove(event) {
   }
 }
 canvas.addEventListener('pointermove', handleCanvasPointerMove);
-function endStroke(cancel = false) {
+function endStroke(cancel = false, releaseEvent = null) {
+  const endedSelectionDrag = selectionDrag;
   const hadBinding = Boolean(strokeBinding);
   if (drawingPointerId === -7106) { activePointers.delete(drawingPointerId); virtualCursor?.resetPress(); }
   if (drawing && strokeTracker) {
@@ -839,19 +872,42 @@ function endStroke(cancel = false) {
   }
   if (cancel && selectionDrag) {
     if (selectionDrag.state && selectionTransform) { selectionTransform.update(selectionDrag.state); previewSelectionTransform(); }
-    else selection = selectionDrag.bounds;
+    else if (Object.hasOwn(selectionDrag, 'bounds')) selection = selectionDrag.bounds;
   }
   const selected = drawing && effectiveTool() === 'select' && selectionDrag?.mode === 'select' && !cancel;
   drawing = false; drawingPointerId = null; previousPoint = null; lineStart = null; selectionDrag = null; strokeBinding = null; placeSelection(); if (hadBinding) syncDrawingSettings();
-  if (selected && selection) toast('四隅で拡縮・↻で回転・二重リングで回転中心。内側で移動、「選択の操作」で数値・コピーを調整できます。');
+  if (selected && selection) { selectionPanel.setMode('select'); toast('四隅で拡縮＋回転、二重リングで中心、↔ / ↕で反転。内側で移動、外タップで確定・解除。'); }
+  if (endedSelectionDrag?.createdTransaction && selectionTransform && (cancel || sameSelectionFrame(endedSelectionDrag.state, selectionTransform.state))) cancelSelectionTransform();
+  if (!cancel && releaseEvent?.type === 'pointerup' && endedSelectionDrag) finishSelectionRelease(endedSelectionDrag, releaseEvent);
+}
+function sameSelectionFrame(a, b) {
+  return ['x', 'y', 'width', 'height', 'angle'].every(k => Math.abs(a[k] - b[k]) < 1e-7) && Boolean(a.flipX) === Boolean(b.flipX) && Boolean(a.flipY) === Boolean(b.flipY)
+    && Math.hypot(a.pivot.x - b.pivot.x, a.pivot.y - b.pivot.y) < 1e-7;
+}
+function finishSelectionRelease(drag, event) {
+  const distance = Math.max(drag.maxDistance || 0, Math.hypot(event.clientX - drag.screenOrigin?.x, event.clientY - drag.screenOrigin?.y)), threshold = drag.pointerType === 'touch' ? 10 : 6;
+  if (drag.mode === 'flip') {
+    if (distance <= threshold && selectionHandleAtEvent(event) === drag.handle) runSelectionAction(drag.handle);
+    return;
+  }
+  if (drag.mode !== 'outside' || selectionTransform !== drag.transaction) return;
+  if (distance <= threshold) {
+    if (selectionTransform) confirmSelectionTransform();
+    else { clearSelection(); toast('選択を解除しました。画素は変更していません。'); }
+    return;
+  }
+  if (selectionTransform && !confirmSelectionTransform()) return;
+  const next = selectionBounds(drag.origin, exactSelectionPoint(event), documentData.width, documentData.height);
+  if (next) { selection = next; selectionPanel.setMode('select'); placeSelection(); }
 }
 function applyTap(point) {
   if (effectiveTool() === 'picker') { pickColorAt(point); return; }
-  commitChange((next) => symmetryPoints(point, next.width, next.height, drawingSymmetry()).flatMap(p => [...floodFill(next, p.x, p.y, selectedPixelValue())]));
+  commitChange((next) => symmetryPoints(point, next.width, next.height, drawingSymmetry()).flatMap(p => [...floodFill(next, p.x, p.y, selectedPixelValue(), { mask: selectionMask() })]));
 }
 function releasePointer(event) {
   if (virtualCursor?.realRelease(event)) return;
   const ownsMouseStroke = drawing && event.pointerType === 'mouse' && event.pointerId === drawingPointerId;
+  if (event.type === 'pointerup' && event.pointerType === 'mouse' && strokeBinding && typeof event.buttons === 'number' && (event.buttons & strokeBinding.mask)) return;
   if (event.type === 'lostpointercapture' && ownsMouseStroke && activePointers.has(event.pointerId)) {
     // A mouse capture loss ends the gesture at its last accepted sample. Do not draw the
     // capture-loss event's coordinates, which may be outside the canvas or stale.
@@ -875,19 +931,21 @@ function releasePointer(event) {
   // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
   // still two-finger tap is undo and a three-finger tap is redo
   if (!pinchStart && fingerTap) {
-    if (activePointers.size === 0) { const gesture = fingerTap; fingerTap = null; if (performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); } }
+    if (activePointers.size === 0) { const gesture = fingerTap; fingerTap = null; if (!gesture.selectionOnly && performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); } }
     return;
   }
   if (pinchStart) {
     const gesture = pinchStart; pinchStart = null;
     if (activePointers.size >= 1 && activePointers.size < 2) fingerTap = gesture;
-    else if (activePointers.size === 0 && performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); }
+    else if (activePointers.size === 0 && !gesture.selectionOnly && performance.now() - gesture.time < 360 && gesture.moved < 12) { if (gesture.fingers >= 3) redo(); else undo(); }
     if (activePointers.size >= 2) { startPinch(); Object.assign(pinchStart, { time: gesture.time, fingers: gesture.fingers, moved: gesture.moved }); }
     else if (activePointers.size === 0) { zoom = Math.max(1, zoom); if (zoom === 1) panX = panY = 0; updateCanvasView(); }
     drawing = false; drawingPointerId = null; previousPoint = null; strokeStartPixels = null; return;
   }
   if (drawing && event.pointerId !== drawingPointerId) return;
-  endStroke(event.type !== 'pointerup');
+  const viewport = $('.draw-board').getBoundingClientRect();
+  const outsideViewport = selectionDrag && (event.clientX < viewport.left || event.clientX >= viewport.right || event.clientY < viewport.top || event.clientY >= viewport.bottom);
+  endStroke(event.type !== 'pointerup' || Boolean(outsideViewport), event);
 }
 canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('pointercancel', releasePointer); canvas.addEventListener('lostpointercapture', releasePointer);
 scope.listen(document, 'pointerup', (event) => { if (event.pointerType === 'mouse') releasePointer(event); });
@@ -922,6 +980,7 @@ virtualCursor = mountDrawVirtualCursor({ scope, board: $('.draw-board'), canvas,
 [16, 32, 64, 128, 256].forEach((size) => { const option = document.createElement('option'); option.value = String(size); option.textContent = `${size}px`; sizeSelect.append(option); });
 sizeSelect.value = String(DRAW_SIZE);
 function resizeCanvas(width, height) {
+  if (selectionTransform) { toast('✓で確定、×で取消してからキャンバスを変更できます。'); return false; }
   if (![width, height].every(value => Number.isInteger(value) && value >= 1 && value <= 256)) {
     status.textContent = '幅と高さは1〜256pxの整数で指定してください。'; return false;
   }
@@ -992,7 +1051,7 @@ function syncInputControls() {
     const name = `${side === 'left' ? '左' : '右'}：${TOOL_NAMES[binding.tool]}`;
     const icon = $(`[data-button-tool-icon="${side}"]`); if (icon && icon.dataset.tool !== binding.tool) { icon.replaceChildren(createDrawingToolIcon(binding.tool)); icon.dataset.tool = binding.tool; }
     const swatch = $(`[data-button-swatch="${side}"]`); if (swatch) { swatch.style.setProperty('--draw-button-swatch-color', binding.color < 0 ? 'transparent' : documentData.palette[binding.color]); swatch.classList.toggle('is-clear', binding.color < 0 || binding.tool === 'eraser'); }
-    const label = $(`[data-button-label="${side}"]`); if (label) label.textContent = name;
+    const label = $(`[data-button-label="${side}"]`); if (label) label.textContent = side === 'left' ? '左' : '右';
     const button = $(`[data-virtual-${side}]`); if (button) { button.setAttribute('aria-label', `${name}。${binding.tool === 'eraser' || binding.color < 0 ? '透明色' : documentData.palette[binding.color]}。押しながら描画面で動かすと描画します。`); button.title = name; button.dataset.tool = binding.tool; button.dataset.colorIndex = String(binding.color); }
   }
   const placement = $('#draw-controls-side-toggle'), onLeft = inputSettings.controlsSide === 'left';
@@ -1204,12 +1263,18 @@ async function importImage(file, importSource) {
   const ticket = loadGate.begin();
   $('#draw-import-local').disabled = true; status.textContent = '画像を読み込んでいます…';
   try {
+    const { decodeDrawImageFile } = await import('./draw-import.mjs?rev=20260928-pixel-roundtrip-1');
+    if (scope.disposed || !loadGate.isCurrent(ticket)) return;
     const image = await decodeDrawImageFile(file);
     if (scope.disposed || !loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
     const original = { width: image.width, height: image.height, rgba: new Uint8Array(image.data) };
     const prepared = prepareSharedCanvasImage(original, { passActive: true });
     const next = imageToDrawDocument(prepared.image);
-    if (prepared.changed && !await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
+    if (prepared.changed) {
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261006-draw-startup-1');
+      if (scope.disposed || !loadGate.isCurrent(ticket)) return;
+      if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
+    }
     if (scope.disposed || !loadGate.isCurrent(ticket)) return;
     replaceDocument(next, importSource); fitNotice = '';
     status.textContent = `${scaleNotice(image)}${next.width}×${next.height}・${prepared.colorCount}色で読み込みました`;
@@ -1257,10 +1322,12 @@ function recordedHistory(target) {
   return new Proxy(target, { get(object, key) {
     const value = Reflect.get(object, key, object);
     if (key === 'commit' || key === 'commitPatch') return (...args) => {
+      const beforeAnimation = animationSession.animation, beforeSelection = selection;
       const beforePixels = documentData.pixels; const beforePalette = documentData.palette;
       const done = value.apply(object, args);
       if (done) {
         if (preparedSelectionCommit) preparedSelectionCommit(); else animationSession.commitDocument(documentData);
+        if (beforeSelection) { selectionViewStates.set(beforeAnimation, { ...beforeSelection }); selectionViewStates.set(animationSession.animation, { ...beforeSelection }); }
         animationControls?.refresh();
         pxdBridge?.markDirty();
         const paletteChanged = beforePalette !== documentData.palette;
@@ -1314,6 +1381,8 @@ async function exportTimelapse(detail) {
     await job.bridge?.assertCanSave?.();
     if (!timelapseJobIsCurrent(job)) return;
     const frames = selectDrawTimelapseFrames(timeline, { detail, fps: TIMELAPSE_FPS });
+    const { encodeAnimatedGif } = await import('../animated-export.mjs?v=20261001-animation-1');
+    if (!timelapseJobIsCurrent(job)) return;
     const { bytes, width, height } = await encodeAnimatedGif(frames, { delayMs: 1000 / TIMELAPSE_FPS, signal: job.controller.signal, longEdge: 1024, maxPixels: 80e6 });
     if (!timelapseJobIsCurrent(job)) return;
     const result = await saveFile(new Blob([bytes], { type: 'image/gif' }), `pixieed-drawing-timelapse-${width}x${height}.gif`);
@@ -1345,6 +1414,8 @@ async function exportAnimation() {
       const doc = composeAnimationFrame(timeline, frame.id);
       frames.push({ width: doc.width, height: doc.height, data: documentRgba(doc), delayMs: Math.max(20, frame.durationMs) });
     }
+    const { encodeAnimatedGif } = await import('../animated-export.mjs?v=20261001-animation-1');
+    if (scope.disposed || controller.signal.aborted) return;
     const result = await encodeAnimatedGif(frames, { longEdge: 1024, maxPixels: 80e6, maxInputPixels: 128 * 256 * 256, signal: controller.signal });
     if (scope.disposed || controller.signal.aborted) return;
     await saveFile(new Blob([result.bytes], { type: 'image/gif' }), `pixieed-animation-${result.width}x${result.height}.gif`);
@@ -1425,7 +1496,7 @@ pxdBridge = mountWorkspace({
     endStroke(); const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
     const snapshot = composeAnimationFrame(timeline, timeline.frames[0].id); const role = pxdImageRole;
     let next = project || createPxdProject();
-    next = await writePxdDrawDocument(next, snapshot, role);
+    next = await putPxdDrawDocument(next, snapshot, role);
     next = await writePxdAnimation(next, timeline, { role, posterFrameId: timeline.frames[0].id });
     return next;
   }
@@ -1442,7 +1513,7 @@ const commandFocus = selector => {
   node.focus({ preventScroll: true }); node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true;
 };
 function commandOpen(detailsSelector, focusSelector) {
-  cancelSelectionTransform(); selectionPanel?.hide();
+  selectionPanel?.hide();
   cancelDrawingInput(); closeColorEditor(); animationControls?.close?.(); editorUi.closePanels();
   const details = $(detailsSelector); if (!details) return false;
   details.open = true;
@@ -1456,16 +1527,17 @@ function keyboardMove(dx, dy, event) {
   const scale = event?.shiftKey ? 5 : 1;
   if (spaceHeld) { panX += dx * 12 * scale; panY += dy * 12 * scale; updateCanvasView(); return true; }
   if (virtualCursor?.enabled) return virtualCursor.nudge(dx, dy, scale);
-  if (selection && !drawing && !animationSession.locked && !readOnlyImage) {
+  if (selection && (inputSettings.bindings[lastInputSide]?.tool || tool) === 'select' && !drawing && !animationSession.locked && !readOnlyImage) {
     if (!startSelectionTransform()) return true;
-    selectionTransform.update({ x: Math.max(-256, Math.min(512, selection.x + dx * scale)), y: Math.max(-256, Math.min(512, selection.y + dy * scale)) });
+    const frame = selectionTransform.state;
+    selectionTransform.update({ x: Math.max(-256, Math.min(512, frame.x + dx * scale)), y: Math.max(-256, Math.min(512, frame.y + dy * scale)) });
     previewSelectionTransform(); return true;
   }
   if (zoom > 1) { panX += dx * 12 * scale; panY += dy * 12 * scale; updateCanvasView(); return true; }
   return false;
 }
 function focusAnimationControl(action, selector) {
-  cancelSelectionTransform(); selectionPanel?.hide();
+  selectionPanel?.hide();
   cancelDrawingInput(); closeColorEditor(); editorUi.closePanels();
   const launcher = $('#draw-animation-controls [data-action="toggle-frames"]');
   if (launcher?.getAttribute('aria-expanded') !== 'true') launcher?.click();
@@ -1478,7 +1550,7 @@ function animateCommand(type, fields = {}) {
 }
 const commandHandlers = {
   'selection.copy': () => runSelectionAction('copy'), 'selection.cut': () => runSelectionAction('cut'), 'selection.paste': () => runSelectionAction('paste'),
-  'selection.confirm': confirmSelectionTransform, 'selection.operations': () => commandClick('#draw-selection-open'),
+  'selection.confirm': confirmSelectionTransform, 'selection.operations': () => { selectionPanel.focus(); return true; },
   'selection.rotateLeft': () => runSelectionAction('rotate-left'), 'selection.rotateRight': () => runSelectionAction('rotate-right'),
   'selection.flipX': () => runSelectionAction('flip-x'), 'selection.flipY': () => runSelectionAction('flip-y'),
   'selection.cancel': () => { cancelDrawingInput(); if (!cancelSelectionTransform()) clearSelection(); selectionPanel?.hide(); return true; },

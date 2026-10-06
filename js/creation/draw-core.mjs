@@ -52,7 +52,7 @@ function pointIndex(x, y, width, height) {
   return px < 0 || py < 0 || px >= width || py >= height ? -1 : py * width + px;
 }
 
-export function strokePixels(document, from, to, value, { trusted = false, tracker = null } = {}) {
+export function strokePixels(document, from, to, value, { trusted = false, tracker = null, mask = null } = {}) {
   // Pointer moves operate on an already validated document; importing and committing still validate fully.
   if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
@@ -62,16 +62,16 @@ export function strokePixels(document, from, to, value, { trusted = false, track
   const changed = [];
   for (const { x, y } of pixelLineCells({ x: x0, y: y0 }, { x: x1, y: y1 })) {
     const index = pointIndex(x, y, document.width, document.height);
-    if (index >= 0 && document.pixels[index] !== value) { writeTrackedPixel(document, tracker, index, value); changed.push(index); }
+    if (index >= 0 && (!mask || mask[index]) && document.pixels[index] !== value) { writeTrackedPixel(document, tracker, index, value); changed.push(index); }
   }
   return changed;
 }
 
-export function floodFill(document, x, y, value, { trusted = false, tracker = null, queue = null } = {}) {
+export function floodFill(document, x, y, value, { trusted = false, tracker = null, queue = null, mask = null } = {}) {
   if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
   const start = pointIndex(x, y, document.width, document.height);
-  if (start < 0) return [];
+  if (start < 0 || mask && !mask[start]) return [];
   const target = document.pixels[start];
   if (target === value) return [];
   const changed = queue ?? new Uint32Array(document.pixels.length);
@@ -81,7 +81,7 @@ export function floodFill(document, x, y, value, { trusted = false, tracker = nu
   while (cursor < count) {
     const index = changed[cursor++];
     const px = index % document.width; const py = Math.floor(index / document.width);
-    const add = (next) => { if (document.pixels[next] === target) { writeTrackedPixel(document, tracker, next, value); changed[count++] = next; } };
+    const add = (next) => { if ((!mask || mask[next]) && document.pixels[next] === target) { writeTrackedPixel(document, tracker, next, value); changed[count++] = next; } };
     if (px > 0) add(index - 1); if (px + 1 < document.width) add(index + 1);
     if (py > 0) add(index - document.width); if (py + 1 < document.height) add(index + document.width);
   }

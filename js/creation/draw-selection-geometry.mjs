@@ -67,3 +67,21 @@ export function hitSelectionControls(point, controls, radiusX, radiusY) {
   }
   return closest;
 }
+
+/** Similarity transform from one gesture checkpoint, around its independent pivot.
+ * Pointer bearing is unwrapped by the caller; raster samples always come from the source. */
+export function transformSelectionFromCorner(frame, start, point, { angleDelta = null, minRadius = 0, ...modifiers } = {}) {
+  const pivot = frame.pivot || selectionDefaultPivot(frame);
+  const a = { x: start.x - pivot.x, y: start.y - pivot.y }, b = { x: point.x - pivot.x, y: point.y - pivot.y };
+  const radius = Math.hypot(a.x, a.y), distance = Math.hypot(b.x, b.y);
+  if (![radius, distance].every(Number.isFinite) || radius <= Math.max(minRadius, 1e-8) || distance <= minRadius) return null;
+  const delta = angleDelta ?? Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y) * 180 / Math.PI;
+  const scale = Math.max(1 / Math.min(frame.width, frame.height), Math.min(256 / Math.max(frame.width, frame.height), distance / radius));
+  const width = Math.max(1, Math.min(256, Math.round(frame.width * scale))), height = Math.max(1, Math.min(256, Math.round(frame.height * scale)));
+  const angle = snapSelectionAngle(frame.angle + delta, modifiers), localPivot = selectionLocalPoint(frame, pivot), { c, s } = selectionAxes(angle);
+  const u = localPivot.x * width / frame.width, v = localPivot.y * height / frame.height;
+  return { ...frame, x: tidy(pivot.x - c * u + s * v), y: tidy(pivot.y - s * u - c * v), width, height, angle, pivot: { ...pivot }, rotationOffset: undefined };
+}
+export function unwrapSelectionBearing(previous, next) {
+  return ((next - previous + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+}

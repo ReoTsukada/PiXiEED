@@ -335,3 +335,70 @@ Node creation-suite 670件PASS。追加10件はpivot不変、自由角往復、�
 既存回帰の記録は `/tmp/pixieed-draw-handles-regressions-20261006/`。既存選択68群、角印／PNG14群、layout70項目、パネル96群、キー35群、仮想gesture48群、割当14群、左右24群、cancel24群、canvas変更24群をPASS確認。celグリッドと速いstrokeのharnessは既定ポート4176への接続失敗があったため、実サーバー4188を明示して再確認し、両方とも4画面PASS（速いstrokeはbaseline 5項目、症状未再現）。これは試験起動設定で、Draw画面でのJS例外ではない。
 
 実機Safari／iPhone／Android／Windows、物理タッチの使い心地、本番は未検証。元の再生不能症状は未再現であり、今回の修正済みとは扱わない。ユーザーの既存Chromeタブは再読込していない。commit／push／deploy／公開なし。
+
+## 2026-10-06：同じ角で拡縮＋回転、選択マスクと範囲外操作
+
+前節の対角固定の角拡縮と独立した回転つまみを、可動する回転中心を基準にした同時拡縮＋回転へ変更した。角で操作開始した時のpointerベクトル・frame・原本を保持し、中心からの距離比で寸法、unwrapした角度差で回転を計算する。どちらも開始時のstateから計算し、中間プレビューを原本にしない。pivotは動かず、flip状態も維持する。寸法は1〜256pxの整数なので比率は丸めの範囲で近似する。初動方向によるモード分類はしない。
+
+中心の6画面px近傍ではゼロ除算・急拡大を避ける。開始時から近すぎる角は拒否して新規transactionを残さず、操作中に近づいた場合はその指を離すまで最後の正常なstateで止める。別の角・pivot移動・数値補助で続けられる。Shiftは90度刻み、通常は±3度の吸着、Altで吸着なし。角度吸着中も距離による拡縮は続く。実DOMイベントの修飾キーを明示的にコピーする。
+
+上辺中央に↔（枠の左右）、右辺中央に↕（枠の上下）の反転タップを置いた。回転した枠の局所軸が基準で、pivot・枠位置を動かさない。小選択・画面端でcorner/pivotと44px判定が重なる場合はviewport端へ2つを離して配置する。目印はCSS/DOMだけで、実PNG/PXD/GIFには描かない。透明だけの選択とロック時は変形目印を表示せず、選択枠は残す。
+
+### 操作欄と状態
+
+「選択の操作」開閉ボタン・旧浮動パネルを削除した。左右マウス入力を保持し、それとは別の2枠を同じ52pxの固定行へ収めた。320pxでは別の行を足すと道具欄がほぼ隠れるため、この配置を採用した。左右は短いラベル、道具アイコン・色・完全なaccessible name/titleを持つ。OFFでも領域を保つ。
+
+| 状態 | 2枠 |
+| --- | --- |
+| 範囲を選択 | コピー／カット |
+| コピー・カット後、または操作種類を「貼付」へ | 貼り付け／範囲へ |
+| 未確定の変形・貼付 | ✓確定／×取消 |
+
+常設の小さい「範囲／貼付」selectで、過去のclipboardへコピーし直さず到達できる。「範囲へ」は表示を戻すだけで、選択・clipboard・画素を変更しない。3つのclipboard操作は同時表示しない。押下中は操作を無効化し、contextボタンの押下時actionとphaseを記録して途中の意味変更による誤実行を避ける。コピー後は元の選択を保ち、貼付を押して初めてfloatingになる。Cutはその時点で1履歴、Pasteは別履歴であり、Paste取消ではCutは戻らない。
+
+幅・高さの自由比率変更、角度、pivot、位置は既存設定欄の小さい「選択の数値補助」にまとめた。巨大な操作パネルや旧変形ボタン列は復活させない。数値拡縮もpivotを固定する。選択の数値補助ショートカットはここへ導く。
+
+### 選択内への描画
+
+selection membershipを画素の不透明度と分離した。透明部分も選択内なら描ける。選択を保持して道具を変更し、押した側のtool/colorをgesture開始時に固定する。選択ツールは範囲作成・変形、pen/eraser/line/shape/spray/fillはmask内にだけ書く。mirrorの各コピーも最終の画素書込みでmaskを判定し、fillはmaskを越えて探索しない。選択外から始めた線でも中へ入った部分は描ける。完全に外だけのstroke/tapは画素・履歴を増やさない。pickerは選択外を無視する。
+
+floating中の描画開始・描画道具への切替は拒否し、✓/×で先に決める案内を出す。色数検査・原snapshot・exact RGB remap・transparent skip・pixels＋paletteのatomic Undoを維持する。確定後は整数のclip済みAABBと独立したmembership mask/pivotを保持し、Undoにも保持する。非矩形の選択作成UIは追加していない。全透明の選択は描画maskとして保持しCopy/Cutを無効化、以前のclipboardは変更しない。ロック中はCopyのみ可能。
+
+### 範囲外の単タップとドラッグ
+
+選択ツールを割り当てた側だけに適用する。pointerdownでは確定も解除もしない。離した時にgesture全体の最大移動量で単タップかドラッグかを決める（6px、実touchは10px）。途中で遠くへ移動して戻った場合も単タップにしない。
+
+- 未確定の変更がない枠：外タップで選択解除。画素は変更しない。
+- 未確定の移動／拡縮／回転／反転／Paste：外タップで正常に確定し、枠を残す。次の外タップで解除。
+- 外からの新範囲ドラッグ：元の未確定を正常に確定できた場合だけ新範囲を適用。確定失敗ならpreview・選択・画素・palette・履歴を保持し理由を表示。
+- 取消はEsc/×。確定後の画素復元はUndo。動かなかった内部クリックや新規gesture取消は空のtransactionを残さない。
+
+反対側の描画tool・contextmenuイベント・panel操作・2指pan/pinch・pointercancel・非ownerのreleaseでは外タップ処理を行わない。viewport外やパネル上へ離したselection gestureは取消す。既存floatingならgesture開始checkpoint、新規gestureなら元枠へ戻す。選択中の2指はview専用で、既存の2指Undoを誤発火させない。同じphysical pointerIdの反対ボタンを離してもownerボタンが押下中なら終了しない。仮想buttonとpadのpointerId分離、quarantine、viewport内作用を維持した。
+
+旧 `draw-selection-handles-browser-harness.mjs` は新同時操作の `draw-selection-context-browser-harness.mjs` へ転送する。旧対角固定の期待値は現仕様の回帰とは扱わず、既存clipboard・保存・Undoのharnessは現UIへ移行して保持した。
+
+この機能段階の検証：Node creation-suite 685件PASS（ログ `/tmp/pixieed-selection-context-node-final.log`）。新操作4画面×17群=68 PASS、既存選択4画面×17群=68 PASS、他11harness PASS。新操作の全走行と限定再試験の違い、ソースSHA256、全4画面PNGは `/tmp/pixieed-draw-selection-context-20261006/results.json`。既存選択は `/tmp/pixieed-selection-transform-context-regression/results.json`、他の回帰とJS/ネットワーク監査は `/tmp/pixieed-selection-context-regressions/`。全11監査でアプリ例外・未処理Promise・local request失敗・HTTP失敗0。RGBAはRAFプレビュー完了後に検査し、実capturelossはcapture成立後にネイティブAPIで発生させた。横向きの数値補助はパネル固定header×で閉じる正規導線を検証した。実機Safari/iOS/Android/Windowsは未検証。元の再生不能症状は未再現のままであり、今回直したとは扱わない。
+
+## 2026-10-06 初期読込の改善
+
+CPU profileでは約3.4秒の待機に対し描画用JSの実行は短く、保存一覧の全件走査を待っているわけではなかった。初期に不要な音楽・パズルのstatic依存とES moduleの段階的な取得が主因だった。project-componentsの既存async処理は必要なcomponentがある時だけ音楽・パズル・旧原画resolverを読み込む。音楽リンクmetadataの軽量readerを分離し、Draw画像の読書きは同等のpxd-project関数を使用。画像読込・変換確認・GIFは利用時に取得し、async境界後のowner/job/loadGate/disposed確認を維持した。不正なorphan音楽linkの拒否、未知JSON、旧パズル/音楽のmain alias固定も追加6件のunitで検証した。
+
+開始時に必ず使う6moduleへmodulepreloadを追加し、旧/new workspaceのquery重複を解消した。変更したmodule間のstatic/dynamic importも更新番号を揃え、古いchild module cacheと新しいentryが混在しないようにした。更新対象moduleのURLは `20261006-draw-startup-1`。保存作品の復元待ちとmain.inertの解除条件は維持し、entry完了時のdata-draw-readyを追加。広告・auth・保存ポリシーは維持した。844px横向きでもcontextの各操作buttonが44×44px以上になるよう最小幅140pxを確保した。
+
+測定は同じisolated Chromium、844×390 DPR2、各条件3回。cold/warm/明示PXD URL復元/reloadと、通常/CPU4倍＋100ms遅延＋500KiB/sの8条件を比較した。保存fixtureは128×128・2framesを専用IDBへ保存し、直接URL復元時に画素とframe数を検査。blank起動は既存仕様通り新規作品であり、last pointerを自動復元した結果ではない。
+
+| 条件 | 変更前中央値 | 変更後中央値 | 変更後範囲 |
+| --- | --- | --- | --- |
+| 制約付きcold | 3809.8ms | 2729.5ms | 2702.8–2743.2ms |
+| 制約付き保存作品URL復元 | 3889.2ms | 2825.6ms | 2816.2–2840.7ms |
+| 制約付きwarm | 91.6ms | 87.0ms | 83.2–88.1ms |
+| 制約付きreload | 206.3ms | 194.3ms | 192.6–194.5ms |
+| 通常cold | 101.4ms | 91.4ms | 84.9–119.6ms |
+
+制約付きcoldは28.4%、URL復元は27.3%短縮。通常coldは変更前範囲99.9–124.5msと重なり、通常環境の改善は断言しない。初期local resourceは108→89、decoded body合計1,418,910→1,048,953bytes（26.1%減、HTTP圧縮後の通信量ではない）。preload追加前と比較してさらに約10%短縮した。比較途中のrevision更新に影響されたreload値は除外し、固定版の24回を採用。外部リクエストを有効にした追加3coldも成功し広告scriptの応答を確認した（広告の実配信は未検証）。例外・未処理Promise・local通信/HTTPerrorは0。性能比較とsource SHA256は `/tmp/pixieed-draw-load-cache-comparison-final.json`。詳細は `/tmp/pixieed-draw-load-cache-final/`、外部有効は `/tmp/pixieed-draw-load-cache-external/`。
+
+単体691件PASS（未依頼portable-release5件を含む作業コピー全体）。無関係な未追跡3ファイルを除いたstaged snapshotでは単体686件PASS（`/tmp/pixieed-draw-cache-staged-node.log`）。最終query版の既存選択68群と他11harnessもPASS、後者の例外・未処理拒否・local request/HTTP/console errorは0（`/tmp/pixieed-draw-cache-final-regressions/audit-summary.json`）。公開サーバーでの圧縮・HTTP/2、実機Safari/iOS/Android/Windowsは未検証。元の再生不能症状は未再現のまま。
+
+実HTTP cache upgradeは旧commit `297e94b2` のmoduleをmax-age600でブラウザーに保持してから、同じoriginでPXD参照を維持した新HTMLへ切替。HTTP cacheをclearせず、Playwright routeも使わず、未変更mode-scopeはserver requestなし・ResourceTiming transferSize=0を確認。新entry/page/変更child13本の更新URL取得と新context/mask/corner操作、PNGimport、実GIF、保存/同URLreloadの8群PASS。証跡は `/tmp/pixieed-draw-cache-upgrade-cache-final-20261006/results.json` と同folderのserver request log。
+
+公開対象最終query版の新context68群、実cache upgrade8群、PNG/GIF/PXDのlazy機能10群、計86群が全PASS。source SHAの一致と各結果への参照は `/tmp/pixieed-draw-selection-context-cache-final-20261006/suite-results.json`。全4画面のPNGは同folder。既存選択68群は `/tmp/pixieed-draw-selection-transform-cache-final/results.json`。Pagesビルドは489 public files、必須の新light moduleを含めて取得でき、static/dynamic依存の欠落なし。測定・ブラウザ対象ソースとステージしたソースのSHA256一致を確認。今回変更だけをcommit/pushし、無関係なportable-releaseの未追跡3ファイルは残す。

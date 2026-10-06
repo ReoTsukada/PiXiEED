@@ -1,10 +1,11 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261006-draw-selection-handles-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261006-draw-startup-1';
 
 const scope = createModeScope();
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });
 try {
   await mountDrawMode({ scope });
+  if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
 } catch (error) {
   scope.dispose();
   const status = document.querySelector('#draw-status');

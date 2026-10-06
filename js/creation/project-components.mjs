@@ -1,12 +1,8 @@
+import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
 import { imageToDrawDocument, putPxdDrawDocument, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
-import { detachPxdAudioImage, readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261001-free-tools-1';
-import { freezePxdPuzzleImages, createPxdPuzzleFromMain, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { resolveLocalDrawRevision } from './spot-difference-core.mjs';
-import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 import { cloneAnimation, composeAnimationFrame } from './animation-core.mjs';
-import { prepareAudioAnimationImport } from './audio-animation.mjs';
 
 export const COMPONENTS = Object.freeze([
   { tool: 'draw', label: '絵', role: 'main' },
@@ -35,11 +31,18 @@ export async function freezeProjectComponents(project, { resolveSourceImage } = 
   let adapter;
   const resolve = resolveSourceImage || (async (ref) => {
     adapter ||= createIndexedDbDraftAdapter();
+    const [{ resolveLocalDrawRevision }, { documentRgba }] = await Promise.all([import('./spot-difference-core.mjs'), import('./draw-core.mjs?rev=20261006-draw-startup-1')]);
     const fixed = await resolveLocalDrawRevision(adapter, ref.draftId, ref.revisionId);
     if (fixed.documentHash !== ref.contentHash || fixed.asset.assetId !== ref.assetId) throw new Error('パズルに使った絵の保存版を確認できません。');
     return { width: fixed.document.width, height: fixed.document.height, rgba: documentRgba(fixed.document) };
   });
-  const next = await freezePxdPuzzleImages(project, { resolveSourceImage: resolve });
+  let next = project;
+  if (COMPONENTS.some(part => part.tool !== 'audio' && part.path && has(next, part.path))) {
+    const { freezePxdPuzzleImages } = await import('./pxd-puzzles.mjs?rev=20261001-free-tools-1');
+    next = await freezePxdPuzzleImages(next, { resolveSourceImage: resolve });
+  }
+  if (!has(next, 'audio/state.json')) { readPxdAudioLink(next); return next; }
+  const { detachPxdAudioImage } = await import('./pxd-draw-audio.mjs?rev=20261006-draw-startup-1');
   return detachPxdAudioImage(next);
 }
 
@@ -48,6 +51,7 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   if (!hasProjectComponent(project, tool) || tool === 'draw') throw new Error('先に曲やパズルを作ってください。');
   let next = await freezeProjectComponents(project);
   if (tool === 'audio') {
+    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261006-draw-startup-1'), import('./audio-animation.mjs')]);
     const song = readPxdAudioState(next); const link = readPxdAudioLink(next);
     const animation = await readPxdAnimation(next, componentImageRole(next, 'draw'));
     if (animation) {
@@ -66,6 +70,7 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   // Build against a temporary source; the drawing itself is never replaced here.
   const temporary = await putPxdSharedImage(next, image);
   const draftStore = store || createLocalDraftStore(createIndexedDbDraftAdapter());
+  const { createPxdPuzzleFromMain, writePxdPuzzle } = await import('./pxd-puzzles.mjs?rev=20261001-free-tools-1');
   const imported = await createPxdPuzzleFromMain(temporary, { tool, store: draftStore, preferredRole: 'main' });
   const sources = tool === 'spot_difference'
     ? { 'spot-before': imported.bindings.before.drawDocument, 'spot-after': imported.bindings.after.drawDocument }

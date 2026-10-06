@@ -25,7 +25,14 @@
   <link rel="stylesheet" href="/css/color-panel.css?rev=20261006-panel-close-1">
   <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261004-symmetry-color-panel-1">
   <link rel="stylesheet" href="/css/draw-canvas-panel.css?rev=20261004-canvas-settings-1">
-  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261006-draw-selection-handles-1">
+  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261006-draw-startup-1">
+  <!-- Start the editor dependency graph together with its styles. -->
+  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261006-draw-startup-1">
+  <link rel="modulepreload" href="/js/creation/project-workspace.mjs?rev=20261006-draw-startup-1">
+  <link rel="modulepreload" href="/js/creation/draw-core.mjs?rev=20261006-draw-startup-1">
+  <link rel="modulepreload" href="/js/creation/animation-core.mjs">
+  <link rel="modulepreload" href="/js/creation/pxd-project.mjs?rev=20261001-free-tools-1">
+  <link rel="modulepreload" href="/js/creation/pxd-codec.mjs">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
 </head>
@@ -112,7 +119,7 @@
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-save" type="button" aria-label="プロジェクトをこのブラウザーに保存" title="プロジェクトを保存">保存</button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-draw-selection-handles-1"></script>
+  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-draw-startup-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-panel-close-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>

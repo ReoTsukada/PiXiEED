@@ -1,7 +1,7 @@
-import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261001-animation-1';
+import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { symmetryPoints } from './drawing-symmetry.mjs';
-import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs';
+import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
 
 const MAX_SIDE = 512;
 const MAX_COORDINATE_FACTOR = 4;
@@ -28,17 +28,17 @@ function combineSymmetry(symmetry, mirror) {
   return { ...symmetry, horizontal: mirror || symmetry.horizontal === true };
 }
 
-function paintCells(document, cells, value, tracker) {
+function paintCells(document, cells, value, tracker, mask) {
   const changed = [];
   for (const index of cells) {
     const x = index % document.width; const y = Math.floor(index / document.width);
-    changed.push(...strokePixels(document, { x, y }, { x, y }, value, { trusted: true, tracker }));
+    changed.push(...strokePixels(document, { x, y }, { x, y }, value, { trusted: true, tracker, mask }));
   }
   return Uint32Array.from(changed);
 }
 
 /** Draw a normalized, inclusive rectangle or ellipse and return the changed pixel indices. */
-export function drawShapePixels(document, from, to, value, { shape = 'rectangle', filled = false, mirror = false, symmetry = {}, tracker = null } = {}) {
+export function drawShapePixels(document, from, to, value, { shape = 'rectangle', filled = false, mirror = false, symmetry = {}, tracker = null, mask = null } = {}) {
   validateDrawDocument(document);
   validateValue(document, value);
   if (shape !== 'rectangle' && shape !== 'ellipse') throw new RangeError('Shape must be rectangle or ellipse');
@@ -87,11 +87,11 @@ export function drawShapePixels(document, from, to, value, { shape = 'rectangle'
       } else cells.add(y * document.width + x);
     }
   }
-  return paintCells(document, cells, value, tracker);
+  return paintCells(document, cells, value, tracker, mask);
 }
 
 /** Spray deterministic-injectable dots along a line, with a bounded circular brush radius. */
-export function sprayPixels(document, from, to, value, { radius = 2, random = Math.random, mirror = false, symmetry = {}, tracker = null } = {}) {
+export function sprayPixels(document, from, to, value, { radius = 2, random = Math.random, mirror = false, symmetry = {}, tracker = null, mask = null } = {}) {
   validateDrawDocument(document);
   validateValue(document, value);
   if (!Number.isFinite(radius) || !Number.isInteger(radius) || radius < 0 || radius > 16) throw new RangeError('Spray radius must be an integer from 0 to 16');
@@ -123,7 +123,7 @@ export function sprayPixels(document, from, to, value, { radius = 2, random = Ma
       } else cells.add(py * document.width + px);
     }
   }
-  return paintCells(document, cells, value, tracker);
+  return paintCells(document, cells, value, tracker, mask);
 }
 
 /** Return an inclusive drag rectangle clipped to the canvas, or null when it misses. */

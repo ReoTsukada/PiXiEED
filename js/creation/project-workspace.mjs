@@ -1,11 +1,11 @@
 import { createPxdProject, decodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261004-audio-frames-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261006-draw-startup-1';
 import { createProjectSession } from './project-session.mjs?rev=20261001-free-tools-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261001-free-tools-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
-import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261001-free-tools-1';
+import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261006-draw-startup-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 
 const icons = {

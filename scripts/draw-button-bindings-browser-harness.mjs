@@ -52,7 +52,7 @@ try {
       await page.evaluate(()=>document.addEventListener('pointerdown',e=>{if(e.target.closest('.draw-board'))window.__testPointer=e.pointerId;},{capture:true}));
       await assign('right','pen',4);await assign('left','line',2);
       assert.equal((await bindings()).bindings.left.tool,'line');assert.equal((await bindings()).bindings.right.tool,'pen');
-      const l=await page.locator('[data-virtual-left]').boundingBox(),r=await page.locator('[data-virtual-right]').boundingBox();assert.equal(l.width,r.width);
+      const l=await page.locator('[data-virtual-left]').boundingBox(),r=await page.locator('[data-virtual-right]').boundingBox();assert.ok(Math.abs(l.width-r.width)<=1/32,'equal grid tracks allow browser subpixel rounding');
       assert.equal(await page.locator('[data-button-tool-icon="left"] svg').count(),1);
       assert.equal(await page.locator('[data-button-swatch="right"]').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(76, 130, 195)');
       const path=[[2,3],[2,8],[10,8]];

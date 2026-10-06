@@ -1,5 +1,5 @@
-import { validateDrawDocument } from './draw-core.mjs';
-import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
+import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261006-draw-startup-1';
 
 export const selectionColor = color => {
   if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) throw new TypeError('選択の色が不正です。');
@@ -10,13 +10,17 @@ const fail = message => { throw new RangeError(message); };
 const dimension = n => Number.isInteger(n) && n >= 1 && n <= 256;
 
 /** Tab-local clipboard: zero is a hole; positive bytes address its own palette. */
-export function captureDrawSelection(doc, bounds) {
+export function captureDrawSelection(doc, bounds, { mask = null } = {}) {
   validateDrawDocument(doc);
   if (!bounds || !dimension(bounds.width) || !dimension(bounds.height) || !Number.isInteger(bounds.x) || !Number.isInteger(bounds.y)
     || bounds.x < 0 || bounds.y < 0 || bounds.x + bounds.width > doc.width || bounds.y + bounds.height > doc.height) fail('選択範囲がキャンバス外です。');
-  const palette = [], colors = new Map(), indices = new Uint8Array(bounds.width * bounds.height);
+  if (mask && (!(mask instanceof Uint8Array) || mask.length !== doc.pixels.length)) fail('選択マスクの寸法が不正です。');
+  const palette = [], colors = new Map(), indices = new Uint8Array(bounds.width * bounds.height), localMask = mask && new Uint8Array(indices.length);
   for (let y = 0; y < bounds.height; y++) for (let x = 0; x < bounds.width; x++) {
-    const value = doc.pixels[(bounds.y + y) * doc.width + bounds.x + x];
+    const offset = (bounds.y + y) * doc.width + bounds.x + x;
+    if (mask && !mask[offset]) continue;
+    if (localMask) localMask[y * bounds.width + x] = 1;
+    const value = doc.pixels[offset];
     if (value < 0) continue;
     const color = selectionColor(doc.palette[value]);
     if (color.endsWith('00')) continue;
@@ -27,7 +31,7 @@ export function captureDrawSelection(doc, bounds) {
     }
     indices[y * bounds.width + x] = colors.get(color);
   }
-  return palette.length ? { format: DRAW_SELECTION_FORMAT, version: 1, width: bounds.width, height: bounds.height, origin: { x: bounds.x, y: bounds.y }, indices, palette } : null;
+  return palette.length ? { format: DRAW_SELECTION_FORMAT, version: 1, width: bounds.width, height: bounds.height, origin: { x: bounds.x, y: bounds.y }, indices, palette, ...(localMask ? { mask: localMask } : {}) } : null;
 }
 
 function validateClipboard(clip) {
@@ -133,7 +137,7 @@ export function rasterDrawSelection(clip, frame) {
   validateClipboard(clip);
   if (!dimension(frame.width) || !dimension(frame.height) || ![frame.x, frame.y, frame.angle].every(Number.isFinite)
     || Math.abs(frame.x) > 4096 || Math.abs(frame.y) > 4096) fail('選択の位置・角度・寸法が不正です。');
-  const bounds = selectionFrameBounds(frame), indices = new Uint8Array(bounds.width * bounds.height), { c, s } = selectionAxes(frame.angle);
+  const bounds = selectionFrameBounds(frame), indices = new Uint8Array(bounds.width * bounds.height), mask = new Uint8Array(indices.length), { c, s } = selectionAxes(frame.angle);
   for (let y = 0; y < bounds.height; y++) for (let x = 0; x < bounds.width; x++) {
     const wx = bounds.x + x + .5 - frame.x, wy = bounds.y + y + .5 - frame.y;
     // Remove only floating-point noise at quarter-turn boundaries; keep genuine subpixels.
@@ -143,9 +147,9 @@ export function rasterDrawSelection(clip, frame) {
     if (frame.flipX) sx = clip.width - 1 - sx;
     if (frame.flipY) sy = clip.height - 1 - sy;
     const source = sy * clip.width + sx;
-    if (!clip.mask || clip.mask[source]) indices[y * bounds.width + x] = clip.indices[source];
+    if (!clip.mask || clip.mask[source]) { indices[y * bounds.width + x] = clip.indices[source]; mask[y * bounds.width + x] = 1; }
   }
-  return { ...bounds, indices };
+  return { ...bounds, indices, mask };
 }
 
 /** Logical hit testing shared by real pointers and the virtual cursor. */
@@ -174,4 +178,21 @@ export function resizeDrawSelectionFromHandle(bounds, handle, dx, dy, fixedRatio
     width = Math.max(1, Math.round(width * factor)); height = Math.max(1, Math.round(height * factor));
   }
   return { ...bounds, x: west ? bounds.x + bounds.width - width : bounds.x, y: north ? bounds.y + bounds.height - height : bounds.y, width, height };
+}
+
+/** Full-canvas membership is independent of opaque pixels, including transparent holes. */
+export function drawSelectionMask(bounds, width, height) {
+  if (!bounds) return null;
+  if (bounds.mask instanceof Uint8Array && bounds.mask.length === width * height) return bounds.mask;
+  const mask = new Uint8Array(width * height);
+  for (let y = Math.max(0, bounds.y); y < Math.min(height, bounds.y + bounds.height); y++)
+    for (let x = Math.max(0, bounds.x); x < Math.min(width, bounds.x + bounds.width); x++) mask[y * width + x] = 1;
+  return mask;
+}
+export function rasterSelectionMask(raster, width, height) {
+  const mask = new Uint8Array(width * height);
+  for (let y = Math.max(0, -raster.y); y < Math.min(raster.height, height - raster.y); y++)
+    for (let x = Math.max(0, -raster.x); x < Math.min(raster.width, width - raster.x); x++)
+      mask[(y + raster.y) * width + x + raster.x] = raster.mask[y * raster.width + x];
+  return mask;
 }

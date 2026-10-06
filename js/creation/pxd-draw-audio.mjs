@@ -1,3 +1,5 @@
+import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
+export { readPxdAudioLink };
 import { createPxdProject, getPxdJson, setPxdJson } from './pxd-codec.mjs';
 import {
   imageToDrawDocument, mergePxdJson, putPxdDrawDocument, putPxdImage,
@@ -5,7 +7,7 @@ import {
   readPxdSharedImage, putPxdSharedImage
 } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20261005-audio-color-instruments-1';
-import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
 import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261005-frame-cell-pitch-1';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
@@ -67,7 +69,6 @@ export function readPxdAudioState(project) {
   validateAudioSong(song);
   return clone(song);
 }
-export function readPxdAudioLink(project) { const link = optionalJson(project, AUDIO_LINK_PATH); return link === null ? null : clone(link); }
 
 /** Freeze a legacy main-linked music image into its own PXD role without changing its pixels. */
 export async function detachPxdAudioImage(project) {

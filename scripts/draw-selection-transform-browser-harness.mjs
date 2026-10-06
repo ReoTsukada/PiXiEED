@@ -39,9 +39,30 @@ try {
   const pixel = (data, x, y) => data.slice((y * 16 + x) * 4, (y * 16 + x) * 4 + 4);
   const point = async (x, y) => { const r = await p.locator('#draw-canvas').boundingBox(); return { x: r.x + x * r.width / 16, y: r.y + y * r.height / 16 }; };
   const drag = async (from, to) => { const a = await point(...from), b = await point(...to); await p.mouse.move(a.x, a.y); await p.mouse.down(); await p.mouse.move(b.x, b.y, { steps: 4 }); await p.mouse.up(); await p.waitForTimeout(50); };
-  const select = async () => { await p.locator('#draw-canvas').focus(); await p.keyboard.press('Escape'); await p.keyboard.press('v'); await drag([3.5, 4.5], [6.5, 6.5]); };
-  const openPanel = async () => { if (!await p.locator('#draw-selection-panel').isVisible()) await p.locator('#draw-selection-open').click(); };
-  const action = async name => { await openPanel(); await p.locator(`[data-selection-action="${name}"]`).click(); await p.waitForTimeout(50); };
+  const closeNumbers = async () => {
+    await p.locator('#draw-settings-picker').evaluate(n => { n.open = false; });
+    await p.locator('#draw-selection-numbers').evaluate(n => { n.open = false; });
+  };
+  const select = async () => { await closeNumbers(); await p.locator('#draw-canvas').focus(); await p.keyboard.press('Escape'); await p.keyboard.press('Escape'); await p.keyboard.press('v'); await drag([3.5, 4.5], [6.5, 6.5]); };
+  const openPanel = async () => {
+    if (!await p.locator('#draw-settings-picker').evaluate(n => n.open)) await p.locator('#draw-settings-summary').click();
+    await p.locator('#draw-selection-numbers').evaluate(n => { n.open = true; });
+  };
+  const action = async name => {
+    if (name === 'close') await closeNumbers();
+    else if (name.startsWith('rotate-')) {
+      await openPanel(); const input = p.locator('#draw-selection-angle');
+      await input.fill(String(Number(await input.inputValue()) + (name === 'rotate-right' ? 90 : -90))); await input.press('Tab'); await closeNumbers();
+    } else if (name.startsWith('flip-')) {
+      await closeNumbers(); const r = await p.locator(`[data-selection-control="${name}"]`).boundingBox(); await p.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+    } else {
+      await closeNumbers();
+      if (name === 'copy' || name === 'cut') await p.locator('#draw-selection-mode').selectOption('select');
+      if (name === 'paste') await p.locator('#draw-selection-mode').selectOption('paste');
+      await p.locator(`#draw-selection-controls [data-selection-action="${name}"]`).click();
+    }
+    await p.waitForTimeout(50);
+  };
   const stored = async () => p.evaluate(async () => {
     const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs?rev=20261001-free-tools-1');
     const { readPxdAnimation } = await import('/js/creation/pxd-animation.mjs'); const { getAnimationCelDocument } = await import('/js/creation/animation-core.mjs');
@@ -51,7 +72,7 @@ try {
   const saveWithoutPointer = async () => { await p.locator('#pxd-save').evaluate(n => n.click()); await p.waitForFunction(() => !document.querySelector('#main').inert && !document.querySelector('#pxd-save').disabled); return stored(); };
   const undo = async () => { await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+z`); await p.waitForTimeout(40); };
   const command = async id => {
-    if (await p.locator('#draw-selection-panel').isVisible()) { const r = await p.locator('.draw-board').boundingBox(); await p.mouse.click(r.x + 2, r.y + 5); }
+    await closeNumbers();
     await p.locator('#draw-settings-summary').click(); await p.locator('#draw-shortcuts-open').click(); await p.locator(`[data-command-run="${id}"]`).click(); await p.waitForTimeout(40);
   };
   const load = async (name, count) => {
@@ -66,39 +87,49 @@ try {
    if (await p.locator('#pxd-panel').evaluate(n => n.open)) await p.locator('#project-close').click();
    const initial = await rgba(), rects = await p.locator('.draw-board, #draw-canvas, .draw-controls, #draw-virtual-controls').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
    await select(); assert.deepEqual(await rgba(), initial);
-   await openPanel(); const panel = await p.locator('#draw-selection-panel').boundingBox(); assert.ok(panel.x >= 0 && panel.x + panel.width <= variant.width + 1); assert.ok(panel.y >= 0 && panel.y + panel.height <= variant.height + 1);
-   if (variant.width < variant.height) { const boardBox = await p.locator('.draw-board').boundingBox(); assert.ok(panel.y >= boardBox.y + boardBox.height / 2, 'portrait sheet leaves the upper half of the drawing viewport visible'); }
+   await openPanel(); const panel = await p.locator('#draw-selection-controls').boundingBox(); assert.ok(panel.x >= 0 && panel.x + panel.width <= variant.width + 1); assert.ok(panel.y >= 0 && panel.y + panel.height <= variant.height + 1);
+   const boardBox = await p.locator('.draw-board').boundingBox(); assert.ok(panel.y >= boardBox.y + boardBox.height - 1 || panel.x >= boardBox.x + boardBox.width - 1 || panel.x + panel.width <= boardBox.x + 1, 'fixed action strip stays outside the drawing viewport'); assert.equal(await p.locator('#draw-selection-controls button').count(), 2);
    assert.deepEqual(await p.locator('.draw-board, #draw-canvas, .draw-controls, #draw-virtual-controls').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; })), rects);
-   await p.screenshot({ path: `${output}/${variant.width}x${variant.height}-selection-panel.png` }); await action('close'); checks.push('selection sheet fits screen and leaves viewport/control rectangles unchanged');
+   await p.screenshot({ path: `${output}/${variant.width}x${variant.height}-selection-panel.png` }); await action('close'); checks.push('fixed two-slot selection strip fits screen and leaves viewport/control rectangles unchanged');
    await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+c`);
    await p.keyboard.down('Alt'); await drag([4.5, 6.3], [10.5, 6.3]); await p.keyboard.up('Alt'); const moved = await rgba();
    await p.screenshot({ path: `${output}/${variant.width}x${variant.height}-move-preview.png` });
    assert.equal(pixel(moved, 3, 4)[3], 0); assert.deepEqual(pixel(moved, 11, 4), pixel(initial, 11, 4)); assert.deepEqual(pixel(moved, 9, 4), pixel(initial, 3, 4));
    assert.deepEqual((await saveWithoutPointer()).pixels, indices, 'saving while floating persists only the committed document');
-   assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'true');
+   assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'true');
    await p.locator('#draw-canvas').focus(); await p.keyboard.press('Enter'); assert.deepEqual(await rgba(), moved); await undo(); assert.deepEqual(await rgba(), initial);
    checks.push('real mouse move protects holes; preview excluded from PXD save; confirm is one Undo');
-   await select(); await drag([7.02, 7.02], [9.12, 8.07]); await openPanel();
-   assert.equal(await p.locator('#draw-selection-width').inputValue(), '6'); assert.equal(await p.locator('#draw-selection-height').inputValue(), '5');
+   await select(); await drag([7.02, 7.02], [6.964, 10.098]); await openPanel();
+   assert.equal(await p.locator('#draw-selection-width').inputValue(), '8'); assert.equal(await p.locator('#draw-selection-height').inputValue(), '6');
+   assert.ok(Math.abs(Number(await p.locator('#draw-selection-angle').inputValue()) - 30) < 2, 'one corner simultaneously doubles the dimensions and rotates around the pivot');
+   assert.equal(await p.locator('#draw-selection-pivot-x').inputValue(), '5'); assert.equal(await p.locator('#draw-selection-pivot-y').inputValue(), '5.5');
    await p.locator('#draw-selection-width').fill('2'); await p.locator('#draw-selection-width').press('Tab');
-   await p.locator('#draw-selection-width').fill('4'); await p.locator('#draw-selection-width').press('Tab'); await p.waitForTimeout(50); assert.deepEqual(await rgba(), initial);
-   await action('cancel'); checks.push('corner resize preserves source ratio and nearest down/up previews recover original pixels');
+   await p.locator('#draw-selection-width').fill('4'); await p.locator('#draw-selection-width').press('Tab');
+   await p.locator('#draw-selection-angle').fill('0'); await p.locator('#draw-selection-angle').press('Tab'); await p.waitForTimeout(50); assert.deepEqual(await rgba(), initial);
+   await action('cancel'); checks.push('one corner scales and rotates about fixed pivot; numeric down/up and angle reset recover immutable original pixels');
    for (let turn = 0; turn < 4; turn++) await action('rotate-right'); assert.deepEqual(await rgba(), initial);
    for (const flip of ['flip-x', 'flip-y']) { await action(flip); await action(flip); assert.deepEqual(await rgba(), initial); }
    await action('rotate-left'); await action('confirm'); assert.notDeepEqual(await rgba(), initial); await undo(); assert.deepEqual(await rgba(), initial);
    checks.push('four 90-degree turns and double flips are exact; rotation confirm/Undo is atomic');
    await select(); await action('cut'); const cut = await rgba(); assert.equal(pixel(cut, 3, 4)[3], 0);
-   await action('paste'); await action('close'); assert.deepEqual(await rgba(), cut); await undo(); assert.deepEqual(await rgba(), initial);
+   await action('paste'); await action('cancel'); assert.deepEqual(await rgba(), cut); await undo(); assert.deepEqual(await rgba(), initial);
    checks.push('Cut immediately deletes opaque source; Paste cancel leaves Cut; Undo restores Cut');
-   await select(); await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+v`); await p.keyboard.press('Shift+ArrowRight'); await undo(); assert.deepEqual(await rgba(), initial); assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'false');
+   await select(); await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+v`); await p.keyboard.press('Shift+ArrowRight'); await undo(); assert.deepEqual(await rgba(), initial); assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'false');
    checks.push('platform clipboard shortcuts and pending Undo cancel without changing document');
    await select(); for (let i = 0; i < 4; i++) { await p.locator('#draw-canvas').focus(); await p.keyboard.press('Shift+ArrowRight'); }
-   await p.keyboard.press('Enter'); assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'true'); await action('cancel'); assert.deepEqual(await rgba(), initial);
+   await p.keyboard.press('Enter'); assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'true'); await action('cancel'); assert.deepEqual(await rgba(), initial);
    checks.push('wholly outside confirm refused; cancel keeps original artwork');
-   await select(); await action('rotate-right'); await p.evaluate(() => dispatchEvent(new Event('blur'))); assert.deepEqual(await rgba(), initial); assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'false');
-   await select(); await action('rotate-right'); await command('animation.addBlankFrame'); assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'false'); await undo(); assert.deepEqual(await rgba(), initial);
-   checks.push('blur and frame change discard floating transforms rather than applying to another cel');
-   await command('animation.toggleLayerLock'); await select(); await openPanel(); assert.equal(await p.locator('[data-selection-action="copy"]').isEnabled(), true); for (const a of ['cut', 'paste', 'rotate-right', 'flip-x']) assert.equal(await p.locator(`[data-selection-action="${a}"]`).isEnabled(), false); await action('copy'); await action('close'); await command('animation.toggleLayerLock');
+   await select(); await action('rotate-right'); await p.evaluate(() => dispatchEvent(new Event('blur'))); assert.deepEqual(await rgba(), initial); assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'false');
+   await select(); await action('rotate-right');
+   const pendingRotation = await rgba(); await command('animation.addBlankFrame'); await closeNumbers();
+   assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'true'); assert.deepEqual(await rgba(), pendingRotation);
+   await action('cancel'); await command('animation.addBlankFrame'); await undo(); assert.deepEqual(await rgba(), initial);
+   checks.push('blur cancels preview; pending frame command refuses to execute and retains preview until explicit cancellation');
+   await command('animation.toggleLayerLock'); await select(); await p.locator('#draw-selection-mode').selectOption('select');
+   assert.equal(await p.locator('[data-selection-action="copy"]').isEnabled(), true); assert.equal(await p.locator('[data-selection-action="cut"]').isEnabled(), false);
+   await p.locator('#draw-selection-mode').selectOption('paste'); assert.equal(await p.locator('[data-selection-action="paste"]').isEnabled(), false);
+   await openPanel(); for (const id of ['width', 'height', 'angle']) assert.equal(await p.locator(`#draw-selection-${id}`).isEnabled(), false);
+   assert.equal(await p.locator('[data-selection-control="flip-x"]').isVisible(), false); await action('copy'); await action('close'); await command('animation.toggleLayerLock');
    checks.push('locked layer can be selected/copied; all modifying selection actions disabled');
    await select(); await openPanel(); const keyGuard = await p.locator('#draw-selection-width').evaluate((n, os) => { const e = new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', ctrlKey: os === 'windows', metaKey: os === 'mac', bubbles: true, cancelable: true }); n.dispatchEvent(e); return e.defaultPrevented; }, variant.os); assert.equal(keyGuard, false); await action('close');
    checks.push('selection number fields retain native clipboard key behavior');
@@ -119,13 +150,15 @@ try {
    await load('source', 3); await p.locator('#draw-canvas').focus(); await p.keyboard.press('v'); await drag([3.5, 4.5], [3.5, 4.5]); await p.keyboard.press(`${mod}+c`);
    for (const count of [31, 32]) {
     await load(`limit-${count}`, count); const limitBefore = await rgba(); await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+v`); await p.waitForTimeout(50); await p.keyboard.press('Enter');
-    assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'true'); await openPanel(); assert.match(await p.locator('[data-selection-status]').textContent(), count === 31 ? /使用色/ : /パレット/);
-    const unchanged = await saveWithoutPointer(); assert.equal(unchanged.palette.length, count); assert.ok(unchanged.pixels.every(v => v === -1)); await action('close'); assert.deepEqual(await rgba(), limitBefore);
+    assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'true'); await openPanel(); assert.match(await p.locator('[data-selection-status]').textContent(), count === 31 ? /使用色/ : /パレット/);
+    const unchanged = await saveWithoutPointer(); assert.equal(unchanged.palette.length, count); assert.ok(unchanged.pixels.every(v => v === -1)); await action('cancel'); assert.deepEqual(await rgba(), limitBefore);
    }
    checks.push('both global usage cap including transparency/other frame and palette capacity reject before any saved mutation');
    await load('source', 3); await select(); await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+c`);
    // All-transparent Copy must retain the previous nonempty clipboard.
-   await p.keyboard.press('Escape'); await drag([0.5, .5], [1.5, 1.5]); await p.keyboard.press(`${mod}+c`); await p.keyboard.press('Escape'); await p.keyboard.press(`${mod}+v`); await p.waitForTimeout(50); assert.deepEqual(pixel(await rgba(), 6, 6), pixel(initial, 3, 4)); await p.keyboard.press('Escape');
+   await p.keyboard.press('Escape'); await drag([0.5, .5], [1.5, 1.5]);
+   await p.locator('#draw-selection-mode').selectOption('select'); for (const name of ['copy', 'cut']) assert.equal(await p.locator(`[data-selection-action="${name}"]`).isEnabled(), false);
+   await p.locator('#draw-canvas').focus(); await p.keyboard.press(`${mod}+c`); await p.keyboard.press('Escape'); await p.keyboard.press(`${mod}+v`); await p.waitForTimeout(50); assert.deepEqual(pixel(await rgba(), 6, 6), pixel(initial, 3, 4)); await p.keyboard.press('Escape');
    checks.push('all-transparent Copy is a no-op and preserves the prior clipboard');
    await saveWithoutPointer(); const savedOriginal = await stored(); await p.reload(); await p.waitForFunction(() => !document.querySelector('#main').inert); assert.deepEqual(await rgba(), initial); assert.deepEqual((await stored()).pixels, savedOriginal.pixels);
    checks.push('PXD-backed save/reload preserves committed artwork; clipboard intentionally clears on reload');
@@ -140,7 +173,7 @@ try {
    for (const side of ['left', 'right']) {
      const r = await p.locator(`[data-virtual-${side}]`).boundingBox(), pad = await point(8.5, 8.5), press = { id: 11, x: r.x + r.width / 2, y: r.y + r.height / 2 }, second = { id: 22, ...pad };
      await p.keyboard.down('Alt'); await touch('touchStart', [press]); await touch('touchStart', [press, second]); await touch('touchMove', [press, { ...second, x: second.x + 20 }]); await touch('touchEnd', [press]); await touch('touchEnd', []); await p.keyboard.up('Alt'); await p.waitForTimeout(50);
-     assert.equal(await p.locator('#draw-selection-open').getAttribute('data-pending'), 'true'); assert.equal(await p.locator(`[data-virtual-${side}]`).getAttribute('aria-pressed'), 'false');
+     assert.equal(await p.locator('#draw-selection-controls').getAttribute('data-pending'), 'true'); assert.equal(await p.locator(`[data-virtual-${side}]`).getAttribute('aria-pressed'), 'false');
      await p.locator('#draw-canvas').focus(); await p.keyboard.press('Escape'); assert.deepEqual(await rgba(), virtualInitial); await nudgeTo(4, 6);
    }
    checks.push('native two-pointer pad movement with independent virtual left/right selection bindings; release and Escape restore pixels');

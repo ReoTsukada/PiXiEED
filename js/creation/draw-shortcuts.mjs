@@ -10,7 +10,7 @@ export const DRAW_SHORTCUT_COMMANDS = Object.freeze([
   command('selection.cut', '選択をカット', '切り取り clipboard', 'primary+KeyX', { canvasOnly: true }),
   command('selection.paste', 'このタブ内の絵を貼り付け', '貼付 clipboard', 'primary+KeyV', { canvasOnly: true }),
   command('selection.confirm', '選択の変形を確定', '選択 変形 commit', null),
-  command('selection.operations', '選択の操作を開く', '選択 コピー 貼付 拡縮 回転 反転', null),
+  command('selection.operations', '選択の数値補助を開く', '選択 数値 幅 高さ 角度 中心', null),
   command('selection.rotateLeft', '選択を左に90度回転', '選択 回転', null),
   command('selection.rotateRight', '選択を右に90度回転', '選択 回転', null),
   command('selection.flipX', '選択を左右反転', '選択 反転', null),

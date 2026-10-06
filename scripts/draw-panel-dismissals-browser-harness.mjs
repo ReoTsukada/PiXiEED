@@ -26,7 +26,7 @@ try {
     };
     const reachable = async selector => {
       const r = await page.locator(selector).boundingBox(); assert.ok(r, `${selector} exists`);
-      assert.ok(r.width >= 44 && r.height >= 44, `${selector} has a 44px target`);
+      assert.ok(r.width >= 44 && r.height >= 44, `${selector} has a 44px target: ${JSON.stringify(r)}`);
       assert.ok(r.x >= 0 && r.y >= 0 && r.x+r.width <= width+.5 && r.y+r.height <= height+.5, `${selector} in viewport: ${JSON.stringify(r)}`);
       const hit = await page.locator(selector).evaluate(n => { const r=n.getBoundingClientRect(); const target=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2); return {ok:n===target || n.contains(target), target:target?.outerHTML.slice(0,300), rect:{x:r.x,y:r.y}}; });
       if(!hit.ok)await page.screenshot({path:`${output}/${width}x${height}-blocked.png`});

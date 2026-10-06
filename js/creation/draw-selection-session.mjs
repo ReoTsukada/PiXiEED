@@ -1,9 +1,9 @@
-import { captureDrawSelection, cloneDrawSelection, projectDrawSelection } from './draw-selection-operations.mjs';
-import { selectionFrameBounds, selectionDefaultPivot, selectionLocalPoint, selectionWorldPoint, rotateSelectionFrame } from './draw-selection-geometry.mjs';
+import { captureDrawSelection, cloneDrawSelection, projectDrawSelection, rasterDrawSelection, rasterSelectionMask } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
+import { selectionFrameBounds, selectionDefaultPivot, selectionLocalPoint, selectionWorldPoint, rotateSelectionFrame, selectionAxes } from './draw-selection-geometry.mjs?rev=20261006-draw-startup-1';
 
 /** One floating transaction belongs to one immutable cel/animation revision. */
-export function createDrawSelectionTransform(document, bounds, { clipboard = null, owner = null } = {}) {
-  const captured = clipboard || captureDrawSelection(document, bounds);
+export function createDrawSelectionTransform(document, bounds, { clipboard = null, owner = null, mask = null } = {}) {
+  const captured = clipboard || captureDrawSelection(document, bounds, { mask });
   if (!captured) return null;
   const clip = cloneDrawSelection(captured);
   const base = { ...document, pixels: [...document.pixels], palette: [...document.palette] };
@@ -26,12 +26,15 @@ export function createDrawSelectionTransform(document, bounds, { clipboard = nul
     setPivot(pivot) { transform = { ...transform, pivot: { ...pivot }, rotationOffset: undefined }; },
     resize(size) {
       const local = selectionLocalPoint(transform, transform.pivot), next = { ...transform, ...size, rotationOffset: undefined };
-      next.pivot = selectionWorldPoint(next, local.x * next.width / transform.width, local.y * next.height / transform.height);
+      const u = local.x * next.width / transform.width, v = local.y * next.height / transform.height, { c, s } = selectionAxes(next.angle);
+      next.x = transform.pivot.x - c * u + s * v; next.y = transform.pivot.y - s * u - c * v;
+      next.pivot = { ...transform.pivot };
       transform = next;
     },
     setAngle(angle) { transform = rotateSelectionFrame(transform, angle); },
     rotate(delta) { transform = rotateSelectionFrame(transform, transform.angle + delta * 90); },
     flip(axis) { const key = axis === 'x' ? 'flipX' : 'flipY'; transform = { ...transform, [key]: !transform[key] }; },
+    mask(width, height) { return rasterSelectionMask(rasterDrawSelection(clip, transform), width, height); },
     project(options) { return projectDrawSelection(base, clip, transform, { ...options, sourceBounds }); }
   };
 }

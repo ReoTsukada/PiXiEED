@@ -80,7 +80,7 @@ try {
         await page.keyboard.press('Escape'); await page.locator('#draw-undo').click();
         checks.push(`${name} artwork: 12px corners remain anchored at 225% zoom and pan; ordinary selection move and Undo`);
       }
-      await page.locator('#draw-canvas').focus(); await page.keyboard.press('v'); await stroke([7, 7], [7, 7]);
+      await page.locator('#draw-canvas').focus(); await page.keyboard.press('b'); await stroke([7, 7], [7, 7]); await page.keyboard.press('v'); await stroke([7, 7], [7, 7]);
       await assertMarks(); await page.screenshot({ path: `${output}/${prefix}-single-pixel.png` });
       checks.push('one-pixel selection retains four corner handles');
       assert.deepEqual(errors, []); results.push({ variant, checks, errors }); console.log(`PASS ${prefix}: ${checks.length} selection cases`);
