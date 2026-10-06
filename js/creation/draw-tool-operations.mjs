@@ -1,6 +1,7 @@
 import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261001-animation-1';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { symmetryPoints } from './drawing-symmetry.mjs';
+import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs';
 
 const MAX_SIDE = 512;
 const MAX_COORDINATE_FACTOR = 4;
@@ -143,7 +144,7 @@ function validatedBounds(bounds, width, height) {
   return bounds;
 }
 
-/** Move a rectangular active-cel selection from its original snapshot; transparent cells replace destination pixels. */
+/** Move only opaque cells from the original snapshot; holes preserve destination artwork. */
 export function moveSelectionPixels(document, originalPixels, bounds, dx, dy, { tracker = null } = {}) {
   validateDrawDocument(document);
   validatedBounds(bounds, document.width, document.height);
@@ -152,13 +153,9 @@ export function moveSelectionPixels(document, originalPixels, bounds, dx, dy, { 
   for (const value of originalPixels) if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Selection snapshot contains an invalid pixel');
 
   const destination = new Map();
-  for (let y = bounds.y; y < bounds.y + bounds.height; y += 1) for (let x = bounds.x; x < bounds.x + bounds.width; x += 1) destination.set(y * document.width + x, -1);
-  for (let y = 0; y < bounds.height; y += 1) for (let x = 0; x < bounds.width; x += 1) {
-    const targetX = bounds.x + x + dx; const targetY = bounds.y + y + dy;
-    if (targetX < 0 || targetY < 0 || targetX >= document.width || targetY >= document.height) continue;
-    const sourceIndex = (bounds.y + y) * document.width + bounds.x + x;
-    destination.set(targetY * document.width + targetX, originalPixels[sourceIndex]);
-  }
+  const source = (x, y) => originalPixels[(bounds.y + y) * document.width + bounds.x + x];
+  visitOpaqueDrawSelection(source, bounds.width, bounds.height, bounds, document.width, document.height, index => destination.set(index, -1), { transparent: -1 });
+  visitOpaqueDrawSelection(source, bounds.width, bounds.height, { x: bounds.x + dx, y: bounds.y + dy }, document.width, document.height, (index, value) => destination.set(index, value), { transparent: -1 });
   return applyDestination(document, destination, tracker);
 }
 

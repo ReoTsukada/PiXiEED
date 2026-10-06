@@ -207,10 +207,16 @@ export function setAnimationFrameDuration(animation, frameId, durationMs) {
   if (!Number.isFinite(durationMs) || durationMs < 1 || durationMs > 60000) throw new RangeError('コマの時間は1〜60000msで指定してください。');
   return makeAnimation({ ...animation, frames: animation.frames.map((frame) => frame.id === frameId ? { ...frame, durationMs } : frame) }, internal(animation).cels, internal(animation).pool, { share: true });
 }
+/** Integer center anchors telescope across odd/even sizes, so padding round trips do not drift. */
+export function canvasResizeOffset(oldWidth, oldHeight, width, height, anchor = 'top-left') {
+  if (!['top-left', 'center'].includes(anchor)) throw new TypeError('キャンバスの基準位置が不正です。');
+  return anchor === 'center' ? { x: Math.floor(width / 2) - Math.floor(oldWidth / 2), y: Math.floor(height / 2) - Math.floor(oldHeight / 2) } : { x: 0, y: 0 };
+}
 export function resizeAnimation(animation, width, height, options = {}) {
   validateAnimation(animation); dimensions(width, height);
   if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('サイズ変更オプションが不正です。');
-  const { resample } = options;
+  const { resample, anchor = 'top-left' } = options;
+  const offset = canvasResizeOffset(animation.width, animation.height, width, height, anchor);
   if (resample !== undefined && resample !== 'nearest') throw new TypeError('再標本化方式は nearest から選んでください。');
   const resized = { ...animation, width, height }; const cels = new Map(); const pool = new Map(); const hashIndex = new Map();
   for (const frame of animation.frames) for (const layer of animation.layers) {
@@ -224,9 +230,9 @@ export function resizeAnimation(animation, width, height, options = {}) {
         }
       }
     } else {
-      for (let y = 0; y < Math.min(height, animation.height); y += 1) {
-        const row = y * width, sourceRow = y * animation.width;
-        for (let x = 0; x < Math.min(width, animation.width); x += 1) pixels[row + x] = doc.pixels[sourceRow + x] + 1;
+      for (let y = Math.max(0, -offset.y); y < Math.min(animation.height, height - offset.y); y += 1) {
+        const row = (y + offset.y) * width, sourceRow = y * animation.width;
+        for (let x = Math.max(0, -offset.x); x < Math.min(animation.width, width - offset.x); x += 1) pixels[row + x + offset.x] = doc.pixels[sourceRow + x] + 1;
       }
     }
     writeCelMaps(resized, cels, pool, hashIndex, frame.id, layer.id, pixels);

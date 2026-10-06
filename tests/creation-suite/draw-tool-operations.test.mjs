@@ -5,6 +5,16 @@ import { drawShapePixels, moveSelectionPixels, selectionBounds, sprayPixels } fr
 
 const coords = (indices, width) => [...indices].map((index) => [index % width, Math.floor(index / width)]).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
 
+test('shapes and spray use the moved shared mirror origin', () => {
+  const symmetry = { horizontal: true, origin: { x: 4.5, y: 5.5 } };
+  for (const shape of ['rectangle', 'ellipse']) {
+    const document = createDrawDocument(16);
+    assert.deepEqual(coords(drawShapePixels(document, { x: 2, y: 4 }, { x: 3, y: 4 }, 2, { shape, symmetry }), 16), [[2,4],[3,4],[6,4],[7,4]]);
+  }
+  const document = createDrawDocument(16);
+  assert.deepEqual(coords(sprayPixels(document, { x: 2, y: 4 }, { x: 2, y: 4 }, 2, { radius: 0, symmetry }), 16), [[2,4],[7,4]]);
+});
+
 test('rectangle geometry normalizes reversed corners, fills and clips to the canvas', () => {
   const document = createDrawDocument(16);
   const outline = drawShapePixels(document, { x: 3, y: 4 }, { x: 1, y: 2 }, 2);
@@ -85,13 +95,13 @@ test('selectionBounds clips inclusive drags and rejects a selection outside the 
   assert.equal(selectionBounds({ x: Infinity, y: 0 }, { x: 1, y: 1 }, 8, 8), null);
 });
 
-test('selection move snapshots overlapping content and transparent cells erase destination pixels', () => {
+test('selection move snapshots overlapping content and transparent holes preserve destination pixels', () => {
   const document = createDrawDocument(16);
   document.pixels.splice(0, 4, 0, -1, 1, 2);
   const original = [...document.pixels];
   const changed = moveSelectionPixels(document, original, { x: 0, y: 0, width: 2, height: 1 }, 1, 0);
-  assert.deepEqual(document.pixels.slice(0, 4), [-1, 0, -1, 2]);
-  assert.deepEqual([...changed].sort((a, b) => a - b), [0, 1, 2]);
+  assert.deepEqual(document.pixels.slice(0, 4), [-1, 0, 1, 2]);
+  assert.deepEqual([...changed].sort((a, b) => a - b), [0, 1]);
 });
 
 test('selection move clips the destination at canvas edges', () => {

@@ -1,5 +1,5 @@
 /** Compact, host-agnostic frame and layer controls shared by Draw and Audio modes. */
-export function mountAnimationControls({ host, scope, getState, onAction, getFramePreview, getCelHasContent: getCelContent, onionControlExternal = false, frameOnly = false } = {}) {
+export function mountAnimationControls({ host, scope, getState, onAction, getFramePreview, getCelHasContent: getCelContent, onionControlExternal = false, frameOnly = false, dismissibleMenus = false } = {}) {
   if (!host?.ownerDocument || !scope || typeof getState !== 'function' || typeof onAction !== 'function') throw new TypeError('Animation controls require a host, lifecycle scope, state reader, and action handler');
   const document = host.ownerDocument;
   let disposed = false;
@@ -10,6 +10,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   let suppressClick = false;
   let menuFrameId = null;
   let menuLayerId = null;
+  let menuReturnFocus = null;
   let draggedFrameId = null;
   let draggedLayerId = null;
   let pointerHold = null;
@@ -357,6 +358,14 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const add = layers.querySelector('[data-action="add-layer"]'); add.disabled = Boolean(state.readOnly) || pending > 0;
   }
 
+  function showPlaybackFrame(frameId) {
+    if (disposed) return;
+    for (const item of frames.querySelectorAll('[data-frame-id]')) item.classList.toggle('is-playing', frameId !== null && item.dataset.frameId === String(frameId));
+    if (frameId !== null && workspaceSelection) {
+      const state = stateNow(), index = state.frames.findIndex(frame => frame.id === frameId);
+      workspaceSelection.textContent = `再生 ${index + 1} / ${state.frames.length}`;
+    }
+  }
   function refresh() {
     if (disposed || scope.disposed) return;
     const state = stateNow();
@@ -378,7 +387,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     playButton.setAttribute('aria-label', state.playing ? '再生を止める' : '再生');
     const controls = [...root.querySelectorAll('button'), ...(workspacePanel ? [...workspacePanel.querySelectorAll('button')] : [])];
     for (const control of controls) {
-      if (control.dataset.action === 'play' || control.dataset.action === 'onion' || control.dataset.action === 'export-gif' || control.dataset.action === 'toggle-frames' || control.dataset.action === 'toggle-layers' || control.dataset.action === 'toggle-duration' || control.dataset.action === 'close-animation' || control.dataset.action === 'close-layers' || control.dataset.action === 'close-duration') continue;
+      if (control.dataset.action === 'play' || control.dataset.action === 'onion' || control.dataset.action === 'export-gif' || control.dataset.action === 'toggle-frames' || control.dataset.action === 'toggle-layers' || control.dataset.action === 'toggle-duration' || control.dataset.action === 'close-frame-menu' || control.dataset.action === 'close-animation' || control.dataset.action === 'close-layers' || control.dataset.action === 'close-duration') continue;
       if (control.dataset.action === 'select-frame' || control.dataset.action === 'select-layer' || control.dataset.action === 'select-cel' || control.dataset.action === 'previous-frame' || control.dataset.action === 'next-frame') control.disabled = pending > 0;
       else control.disabled = Boolean(state.readOnly) || pending > 0;
     }
@@ -386,17 +395,28 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const next = actionElement('next-frame'); if (next) next.disabled ||= pending > 0 || state.frames.findIndex((frame) => frame.id === state.frameId) >= state.frames.length - 1;
     const addFrame = actionElement('add-frame'); if (addFrame) addFrame.disabled = Boolean(state.readOnly) || pending > 0;
     const exportGif = actionElement('export-gif'); if (exportGif) exportGif.hidden = Boolean(state.audioMode);
-    const play = actionElement('play'); if (play) play.disabled = pending > 0;
+    const play = actionElement('play'); if (play) play.disabled = pending > 0 || (!state.playing && (state.readOnly || (!state.audioMode && state.frames.length < 2)));
+    showPlaybackFrame(state.playing ? state.playbackFrameId ?? null : null);
     const onionButton = actionElement('onion'); if (onionButton) onionButton.disabled = pending > 0 || state.frames.length < 2;
     if (workspaceOpen) positionWorkspacePanel();
   }
 
   function request(action) { void dispatch(action); }
+  function closeCellMenu({ returnFocus = false } = {}) {
+    clearLongPress(); pointerHold = null; suppressClick = false;
+    frameMenu.hidden = true; menuFrameId = null; menuLayerId = null;
+    if (returnFocus && menuReturnFocus?.isConnected) menuReturnFocus.focus({ preventScroll: true });
+    menuReturnFocus = null;
+  }
   function openCellMenu(kind, id, target) {
     if (!hasWorkspace || !workspacePanel) return;
     const state = stateNow();
     menuFrameId = kind === 'frame' ? id : null; menuLayerId = kind === 'layer' ? id : null;
-    frameMenu.replaceChildren();
+    frameMenu.replaceChildren(); menuReturnFocus = target;
+    if (dismissibleMenus) {
+      const heading = node('div', 'draw-panel-header'); heading.append(node('strong', '', kind === 'frame' ? 'コマの操作' : 'レイヤーの操作'));
+      const close = button('操作メニューを閉じる', '×', 'close-frame-menu', 'draw-panel-close'); heading.append(close); frameMenu.append(heading);
+    }
     const add = (label, glyph, command, disabled = false) => {
       const control = button(label, glyph, 'frame-menu', 'animation-controls__context-action');
       control.dataset.frameMenuAction = command; control.disabled = disabled;
@@ -471,6 +491,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (!target || ![root, workspacePanel, frameMenu, layers, timing].some((container) => container?.contains(target))) return;
     if (target.matches('input')) return;
     const state = stateNow(); const action = target.dataset.action;
+    if (action === 'close-frame-menu') { closeCellMenu({ returnFocus: true }); return; }
     if (action === 'frame-menu') { menuAction(target.dataset.frameMenuAction, target); return; }
     if (action === 'toggle-frames') {
       if (workspacePanel) { setWorkspaceOpen(!workspaceOpen); return; }
@@ -478,9 +499,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     if (action === 'close-animation') { setWorkspaceOpen(false, { returnFocus: true }); return; }
     if (action === 'toggle-layers') { timing.hidden = true; layers.hidden = !layers.hidden; layerToggle.setAttribute('aria-expanded', String(!layers.hidden)); timingToggle.setAttribute('aria-expanded', 'false'); return; }
-    if (action === 'close-layers') { layers.hidden = true; layerToggle.setAttribute('aria-expanded', 'false'); return; }
+    if (action === 'close-layers') { layers.hidden = true; layerToggle.setAttribute('aria-expanded', 'false'); if (dismissibleMenus) layerToggle.focus({ preventScroll: true }); return; }
     if (action === 'toggle-duration') { layers.hidden = true; timing.hidden = !timing.hidden; timingToggle.setAttribute('aria-expanded', String(!timing.hidden)); layerToggle.setAttribute('aria-expanded', 'false'); return; }
-    if (action === 'close-duration') { timing.hidden = true; timingToggle.setAttribute('aria-expanded', 'false'); return; }
+    if (action === 'close-duration') { timing.hidden = true; timingToggle.setAttribute('aria-expanded', 'false'); if (dismissibleMenus) (menuReturnFocus?.isConnected ? menuReturnFocus : timingToggle).focus({ preventScroll: true }); return; }
     if (action === 'previous-frame' || action === 'next-frame') {
       const current = state.frames.findIndex((frame) => frame.id === state.frameId); const next = current + (action === 'previous-frame' ? -1 : 1);
       if (state.frames[next]) request({ type: 'select-frame', frameId: state.frames[next].id }); return;
@@ -531,6 +552,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (event.defaultPrevented || document.querySelector('dialog[open]')) return;
     if (event.key === 'Escape') {
       event.preventDefault();
+      if (dismissibleMenus && !frameMenu.hidden) { closeCellMenu({ returnFocus: true }); return; }
+      if (dismissibleMenus && !timing.hidden) { timing.hidden = true; (menuReturnFocus?.isConnected ? menuReturnFocus : timingToggle).focus({ preventScroll: true }); return; }
       if (workspacePanel && workspaceOpen) { setWorkspaceOpen(false, { returnFocus: true }); return; }
       closePanels(); frameMenu.hidden = true; menuFrameId = null; return;
     }
@@ -682,6 +705,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   listen(timing, 'change', onChange);
   const api = {
     refresh,
+    showPlaybackFrame,
+    get hasOpenPanels() { return workspaceOpen || !frameMenu.hidden || !timing.hidden || !layers.hidden; },
     close() {
       clearLongPress(); pointerHold = null; suppressClick = false;
       liftedHeader?.classList.toggle('is-lifted', false); liftedHeader = null;

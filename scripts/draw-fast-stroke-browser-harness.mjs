@@ -81,6 +81,8 @@ function changedPixelIndices(before, after) {
 }
 
 async function reloadBlank(page) {
+  // Each fixture begins with the default pen; tool choices now persist across reloads.
+  await page.evaluate(() => localStorage.removeItem('pixieed:draw:input-settings:v1'));
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelector('#draw-canvas')?.dataset.tool === 'pen');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));

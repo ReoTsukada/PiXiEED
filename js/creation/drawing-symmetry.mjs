@@ -67,11 +67,12 @@ function validateMatrix(matrix) {
 }
 
 /** Apply a centered matrix once, rounding the final pixel coordinate without clipping. */
-export function symmetryPoint(point, width, height, matrix) {
+export function symmetryPoint(point, width, height, matrix, origin = null) {
   if (!dimensionsAreValid(width, height)) throw new RangeError('Canvas dimensions must be integers from 1 to 512');
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError('Symmetry point must have finite coordinates');
   validateMatrix(matrix);
-  const centerX = (width - 1) / 2; const centerY = (height - 1) / 2;
+  if (origin !== null && (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y))) throw new TypeError('Symmetry origin must have finite coordinates');
+  const centerX = origin?.x ?? (width - 1) / 2; const centerY = origin?.y ?? (height - 1) / 2;
   const x = point.x - centerX; const y = point.y - centerY;
   return {
     x: Math.round(centerX + matrix[0][0] * x + matrix[0][1] * y),
@@ -84,7 +85,7 @@ export function symmetryPoints(point, width, height, flags = {}, { clip = true }
   if (typeof clip !== 'boolean') throw new TypeError('clip must be boolean');
   const mapped = new Map();
   for (const matrix of transformsFor(flags)) {
-    const next = symmetryPoint(point, width, height, matrix);
+    const next = symmetryPoint(point, width, height, matrix, flags.origin ?? null);
     if (clip && (next.x < 0 || next.y < 0 || next.x >= width || next.y >= height)) continue;
     mapped.set(`${next.x},${next.y}`, next);
   }

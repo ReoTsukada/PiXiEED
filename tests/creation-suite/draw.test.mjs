@@ -194,7 +194,7 @@ test('draw page exposes local copies (no camera copy: camera shots are not edite
   assert.match(html, /id="draw-size"/); assert.match(html, /id="draw-import-local"/); assert.doesNotMatch(html, /id="draw-import-camera"/); assert.match(html, /id="draw-copy-last"/);
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /drawAdapter = createIndexedDbDraftAdapter\(\); store = createLocalDraftStore\(drawAdapter\)/); assert.match(page, /store\.save\(/); assert.match(page, /store\.load\(/);
-  assert.match(page, /resizeDrawRectangle/); assert.doesNotMatch(page, /cameraHandoffImage/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
+  assert.match(page, /resizeAnimation/); assert.doesNotMatch(page, /cameraHandoffImage/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
   assert.throws(() => validateDrawDocument({ schemaVersion: 2 }), /1〜512/);
 });
 

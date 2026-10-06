@@ -22,6 +22,8 @@ export function installSiteInteractions({ document: doc = globalThis.document, w
   if (existing) return existing;
   const link = addStylesheet(doc);
   const onContextMenu = (event) => {
+    // Draw owns its two-button gestures locally; keep ordinary browser menus outside it.
+    if (doc.body?.dataset?.page === 'draw' && !event.target?.closest?.('.draw-board, [data-virtual-left], [data-virtual-right]')) return;
     if (!isEditable(event.target)) event.preventDefault();
   };
   const onDragStart = (event) => {

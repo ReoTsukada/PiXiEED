@@ -55,16 +55,21 @@ try {
       return { overflow: document.documentElement.scrollWidth > innerWidth || document.documentElement.scrollHeight > innerHeight + 1, canvasHeight: r.height, canvasBottom: r.bottom, navTop: nav.top };
     });
     assert.equal(layout.overflow, false, JSON.stringify(layout)); assert.ok(layout.canvasHeight > 70 && layout.canvasBottom < layout.navTop, JSON.stringify(layout));
-    const permanentControls = await page.locator('.draw-current, [data-draw-tool="pen"]').evaluateAll((nodes) => nodes.map((node) => {
-      const r = node.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-      return { label: node.getAttribute('aria-label'), reachable: r.top >= 0 && r.bottom <= innerHeight && (hit === node || node.contains(hit)) };
-    }));
-    assert.ok(permanentControls.every(({ reachable }) => reachable), JSON.stringify(permanentControls));
     const selectedReachable = await target().evaluate((node) => {
       const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
       return hit === node || node.contains(hit);
     });
     assert.equal(selectedReachable, true, 'selected cel remains reachable below the sticky frame header');
+    // The compact control area scrolls independently. The permanent current-color
+    // button was removed; test the actual palette and tool after closing the sheet.
+    await page.locator('[data-action="close-animation"]').click();
+    const fixedBoard = await page.locator('.draw-board').boundingBox();
+    for (const selector of ['.draw-color[data-color-index="2"]', '[data-draw-tool="pen"]']) {
+      await page.locator(selector).scrollIntoViewIfNeeded();
+      assert.equal(await page.locator(selector).evaluate(node => { const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return hit === node || node.contains(hit); }), true, `${selector} remains reachable by control scrolling`);
+      assert.deepEqual(await page.locator('.draw-board').boundingBox(), fixedBoard, 'control scrolling leaves the drawing viewport fixed');
+    }
+    await openPanel();
     await page.screenshot({ path: `/tmp/pixieed-draw-cel-grid-${viewport.width}.png` });
     await page.locator('[data-action="close-animation"]').click(); assert.equal(await panel().isVisible(), false);
     await openPanel(); await page.keyboard.press('Escape'); assert.equal(await panel().isVisible(), false);

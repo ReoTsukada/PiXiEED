@@ -193,6 +193,17 @@ test('a single frame begins collapsed and GIF export is hidden in audio mode', (
   ui.dispose();
 });
 
+test('playback frame highlight survives refresh without changing the editing selection', () => {
+  const doc = new FakeDocument(), host = doc.createElement('div'), scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }], layers: [{ id: 'l1', name: 'Layer', visible: true }], frameId: 'f1', layerId: 'l1', playing: true, playbackFrameId: 'f2' };
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction() {} });
+  const active = () => host.querySelectorAll('[data-frame-id]').filter(n => n.classList.contains('is-playing')).map(n => n.dataset.frameId);
+  assert.deepEqual(active(), ['f2']); ui.refresh(); assert.deepEqual(active(), ['f2']);
+  assert.equal(host.querySelector('[data-frame-id="f1"]').getAttribute('aria-selected'), 'true');
+  state.playing = false; state.playbackFrameId = null; ui.refresh(); assert.deepEqual(active(), []);
+  ui.dispose();
+});
+
 test('external onion control removes toolbar and frame-menu actions only when opted in', () => {
   const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls'; const scope = fakeScope();
   const state = {

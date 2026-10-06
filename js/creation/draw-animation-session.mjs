@@ -1,4 +1,5 @@
 import { createAnimationFromDraw, createAnimationHistory, getAnimationCelDocument, composeAnimationFrame, writeAnimationCel, setAnimationPalette } from './animation-core.mjs';
+import { validateDrawDocument } from './draw-core.mjs';
 
 /** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */
 export function createDrawAnimationSession(document) {
@@ -13,6 +14,19 @@ export function createDrawAnimationSession(document) {
     composed = new Int16Array(animation.width * animation.height);
   }
   function remember() { selections.set(animation, { frameId, layerId }); }
+  function prepareDocument(doc) {
+    // Validate signed values before the Uint8 adapter, so invalid values cannot wrap.
+    validateDrawDocument(doc);
+    const original = animation, originalFrame = frameId, originalLayer = layerId;
+    let next = animation;
+    if (doc.palette.some((color, index) => color !== next.palette[index]) || doc.palette.length !== next.palette.length) next = setAnimationPalette(next, doc.palette);
+    next = writeAnimationCel(next, frameId, layerId, { width: doc.width, height: doc.height, pixels: Uint8Array.from(doc.pixels, value => value + 1) });
+    // Palette, indices and tile budgets have passed without changing either history.
+    return () => {
+      if (animation !== original || frameId !== originalFrame || layerId !== originalLayer) throw new TypeError('選択の対象が変わりました。');
+      history.commit(next); animation = next; remember();
+    };
+  }
   function restore(next, selection = selections.get(next)) {
     animation = next;
     frameId = animation.frames.some((frame) => frame.id === selection?.frameId) ? selection.frameId : animation.frames[0].id;
@@ -27,12 +41,8 @@ export function createDrawAnimationSession(document) {
     document() { return getAnimationCelDocument(animation, frameId, layerId); },
     select(frame, layer) { return restore(animation, { frameId: frame ?? frameId, layerId: layer ?? layerId }); },
     load(next, selection) { history = createAnimationHistory(next); return restore(next, selection); },
-    commitDocument(doc) {
-      let next = animation;
-      if (doc.palette.some((color, index) => color !== next.palette[index]) || doc.palette.length !== next.palette.length) next = setAnimationPalette(next, doc.palette);
-      next = writeAnimationCel(next, frameId, layerId, { width: doc.width, height: doc.height, pixels: Uint8Array.from(doc.pixels, (value) => value + 1) });
-      history.commit(next); animation = next; remember();
-    },
+    prepareDocument,
+    commitDocument(doc) { prepareDocument(doc)(); },
     apply(next, selection) { history.commit(next); return restore(next, selection ?? { frameId, layerId }); },
     undo() { return history.undo() ? restore(history.current) : null; },
     redo() { return history.redo() ? restore(history.current) : null; },

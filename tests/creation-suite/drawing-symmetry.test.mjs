@@ -48,3 +48,15 @@ test('symmetry maps each matrix from the original coordinate instead of rounding
     return inBounds && direct.findIndex((candidate) => key(candidate) === key(mapped)) === index;
   }));
 });
+
+test('moved axes share one origin, including combined diagonals and clipping', () => {
+  const origin = { x: 4.5, y: 5.5 }, source = { x: 2, y: 4 };
+  assert.deepEqual(symmetryPoints(source, 16, 16, { horizontal: true, origin }), [source, { x: 7, y: 4 }]);
+  assert.deepEqual(symmetryPoints(source, 16, 16, { vertical: true, origin }), [source, { x: 2, y: 7 }]);
+  assert.deepEqual(symmetryPoints(source, 16, 16, { diagonalDown: true, origin }), [source, { x: 3, y: 3 }]);
+  assert.deepEqual(symmetryPoints(source, 16, 16, { diagonalUp: true, origin }), [source, { x: 6, y: 8 }]);
+  const orbit = symmetryPoints(source, 16, 16, { horizontal: true, vertical: true, diagonalDown: true, diagonalUp: true, origin });
+  assert.deepEqual(new Set(orbit.map(key)), new Set(['2,4', '7,4', '2,7', '7,7', '3,3', '6,3', '3,8', '6,8']));
+  assert.deepEqual(symmetryPoints({ x: 15, y: 4 }, 16, 16, { horizontal: true, origin }), [{ x: 15, y: 4 }]);
+  assert.throws(() => symmetryPoints(source, 16, 16, { horizontal: true, origin: { x: NaN, y: 0 } }), TypeError);
+});

@@ -89,3 +89,12 @@ test('desktop and keyboard context actions provide stable menu coordinates', () 
   assert.equal(keyboard.defaultPrevented, true); assert.deepEqual([calls[1].source, calls[1].x, calls[1].y], ['keyboard', 60, 40]);
   off();
 });
+
+test('Draw browser context menus stay available outside owned drawing controls', () => {
+  const doc = new Target(), win = new FakeWindow(); doc.getElementById = () => ({}); doc.body = { dataset: { page: 'draw' } };
+  const off = installSiteInteractions({ document: doc, window: win });
+  assert.equal(doc.dispatch('contextmenu', { target: { closest: () => null } }).defaultPrevented, false);
+  assert.equal(doc.dispatch('contextmenu', { target: { closest: selector => selector.includes('.draw-board') ? {} : null } }).defaultPrevented, true);
+  assert.equal(doc.dispatch('contextmenu', { target: { closest: selector => selector.includes('.draw-color') ? {} : null } }).defaultPrevented, false, 'color and tool assignment gestures own their context menus locally');
+  off();
+});

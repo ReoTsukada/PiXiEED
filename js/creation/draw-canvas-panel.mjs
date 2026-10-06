@@ -22,7 +22,7 @@ export function mountDrawCanvasPanel({ scope, picker, summary, panel } = {}) {
     const header = boundsOf('.px-site-header, .site-header, header');
     const nav = boundsOf('.app-tabs, .site-bottom-nav, nav[aria-label="アプリナビゲーション"]');
     const safeLeft = 8; const safeRight = Math.max(safeLeft, innerWidth - 8);
-    const safeTop = Math.max(8, Math.ceil(header?.bottom ?? 0) + 8);
+    const safeTop = Math.max(8, Math.ceil(Math.max(header?.bottom ?? 0, boundsOf('.project-bar')?.bottom ?? 0)) + 8);
     const safeBottom = Math.max(safeTop + 80, Math.min(innerHeight - 8, Math.floor(nav?.top ?? innerHeight) - 8));
     const safeHeight = Math.max(80, safeBottom - safeTop);
     const anchor = summary.getBoundingClientRect();
