@@ -42,6 +42,16 @@
       ]
     },
     {
+      "id": "region-23d678706afded83",
+      "label": "オーストラリア",
+      "eventIds": [
+        "syntax-demoparty-pixel-art-2026"
+      ],
+      "areas": [
+        "Melbourne"
+      ]
+    },
+    {
       "id": "region-332d5e21f830bc60",
       "label": "スペイン",
       "eventIds": [
@@ -68,6 +78,16 @@
         "嘉義市",
         "桃園市",
         "高雄市"
+      ]
+    },
+    {
+      "id": "region-40ed2c2eb2a924c0",
+      "label": "コロンビア",
+      "eventIds": [
+        "sofa-nigromante-pixel-art-talk-2026"
+      ],
+      "areas": [
+        "Bogotá"
       ]
     },
     {
@@ -125,6 +145,29 @@
       ],
       "areas": [
         "ポズナン"
+      ]
+    },
+    {
+      "id": "region-b289b2720987c665",
+      "label": "シンガポール",
+      "eventIds": [
+        "lccl-game-design-pixel-art-camp-2026-11-30",
+        "lccl-game-design-pixel-art-camp-2026-12-08"
+      ],
+      "areas": [
+        "Orchard Road, Singapore"
+      ]
+    },
+    {
+      "id": "region-c8af5159309d6a67",
+      "label": "フランス",
+      "eventIds": [
+        "chateaubourg-pixel-art-workshop-2026-10-07",
+        "riedisheim-en-pixel-closing-2026"
+      ],
+      "areas": [
+        "Châteaubourg",
+        "Riedisheim"
       ]
     },
     {
@@ -218,6 +261,18 @@
     }
   ],
   "venues": [
+    {
+      "id": "venue-005c52bea2bf3009",
+      "label": "Médiathèque Les Curiosités（2 Place de Verdun, 35220 Châteaubourg）",
+      "eventIds": [
+        "chateaubourg-pixel-art-workshop-2026-10-07"
+      ],
+      "region": "フランス",
+      "area": "Châteaubourg",
+      "sourceUrls": [
+        "https://www.chateaubourg.fr/agenda/atelier-pixel-art/"
+      ]
+    },
     {
       "id": "venue-01d0c814e7b82a94",
       "label": "Sala B-0-2, Facultad de Bellas Artes, Edificio 3N, UPV（スペイン・バレンシア）",
@@ -676,6 +731,55 @@
       ]
     },
     {
+      "id": "venue-b8023be552d18277",
+      "label": "Corferias, Geek Academy（Reflejo Verde）, Salón Conector 4",
+      "eventIds": [
+        "sofa-nigromante-pixel-art-talk-2026"
+      ],
+      "region": "コロンビア",
+      "area": "Bogotá",
+      "sourceUrls": [
+        "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item"
+      ]
+    },
+    {
+      "id": "venue-b91517ff13842a4a",
+      "label": "La Maison Jaune（Cité Hof、6 bis rue du Maréchal Foch, 68400 Riedisheim）",
+      "eventIds": [
+        "riedisheim-en-pixel-closing-2026"
+      ],
+      "region": "フランス",
+      "area": "Riedisheim",
+      "sourceUrls": [
+        "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/"
+      ]
+    },
+    {
+      "id": "venue-be324f237b95902d",
+      "label": "非公開。事前登録後に開催地を案内（主催者はprivate house partyと説明）",
+      "eventIds": [
+        "syntax-demoparty-pixel-art-2026"
+      ],
+      "region": "オーストラリア",
+      "area": "Melbourne",
+      "sourceUrls": [
+        "https://www.syntaxparty.org/"
+      ]
+    },
+    {
+      "id": "venue-bf93c190df0acf36",
+      "label": "Forum Office Tower 13階（583 Orchard Road, Singapore 238884）",
+      "eventIds": [
+        "lccl-game-design-pixel-art-camp-2026-11-30",
+        "lccl-game-design-pixel-art-camp-2026-12-08"
+      ],
+      "region": "シンガポール",
+      "area": "Orchard Road, Singapore",
+      "sourceUrls": [
+        "https://www.lcclcoding.com/holidays/game-design/"
+      ]
+    },
+    {
       "id": "venue-c173973265fc4b5a",
       "label": "チ・カ・ホ 北3条交差点広場（西）",
       "eventIds": [
@@ -814,6 +918,31 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T07:18:39+00:00",
         "notes": "主催者・公式発表の本文で対象開催回の日付と会場または全国実施期間を確認。"
+      }
+    },
+    {
+      "id": "source-0574a6523eae8e9b",
+      "label": "SOFA 2026 — El Nigromante y el arte del pixel art",
+      "eventIds": [
+        "sofa-nigromante-pixel-art-talk-2026"
+      ],
+      "url": "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "コロンビア"
+      ],
+      "areas": [
+        "Bogotá"
+      ],
+      "venues": [
+        "Corferias, Geek Academy（Reflejo Verde）, Salón Conector 4"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -1434,6 +1563,31 @@
       }
     },
     {
+      "id": "source-4b53f7c05e777905",
+      "label": "Riedisheim en Pixel — Conseil des Jeunes展示・締めくくり企画",
+      "eventIds": [
+        "riedisheim-en-pixel-closing-2026"
+      ],
+      "url": "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Riedisheim"
+      ],
+      "venues": [
+        "La Maison Jaune（Cité Hof、6 bis rue du Maréchal Foch, 68400 Riedisheim）"
+      ],
+      "lastKnownEventDate": "2026-10-10",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-4c891ccad1295e97",
       "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
       "eventIds": [
@@ -1749,6 +1903,31 @@
       }
     },
     {
+      "id": "source-5ff081b3b571c4f0",
+      "label": "Syntax DemoParty 2026 — pixel graphics / pixel art competitions",
+      "eventIds": [
+        "syntax-demoparty-pixel-art-2026"
+      ],
+      "url": "https://www.syntaxparty.org/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "オーストラリア"
+      ],
+      "areas": [
+        "Melbourne"
+      ],
+      "venues": [
+        "非公開。事前登録後に開催地を案内（主催者はprivate house partyと説明）"
+      ],
+      "lastKnownEventDate": "2026-11-15",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-61a1c0059537f94e",
       "label": "Pixel Art & Alternative Interfaces — NOVA FCT",
       "eventIds": [
@@ -2017,6 +2196,30 @@
       }
     },
     {
+      "id": "source-7b811728ee26f0b5",
+      "label": "SOFA 2026 — El Nigromante y el arte del pixel art",
+      "eventIds": [
+        "sofa-nigromante-pixel-art-talk-2026"
+      ],
+      "url": "https://www.enelsofa.com/sofa2026/index.php?page=info",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "コロンビア"
+      ],
+      "areas": [
+        "Bogotá"
+      ],
+      "venues": [
+        "Corferias, Geek Academy（Reflejo Verde）, Salón Conector 4"
+      ],
+      "lastKnownEventDate": "2026-10-11",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-7e7646a600b53afe",
       "label": "バリアフリーおもちゃ博 in のぼりべつ — 立体ドット絵の共同制作",
       "eventIds": [
@@ -2040,6 +2243,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:00:59+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-7f008ba44f7511a3",
+      "label": "Atelier Pixel Art — Médiathèque Les Curiosités",
+      "eventIds": [
+        "chateaubourg-pixel-art-workshop-2026-10-07"
+      ],
+      "url": "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Châteaubourg"
+      ],
+      "venues": [
+        "Médiathèque Les Curiosités（2 Place de Verdun, 35220 Châteaubourg）"
+      ],
+      "lastKnownEventDate": "2026-10-07",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2597,6 +2825,30 @@
       }
     },
     {
+      "id": "source-b79d7ed68978b992",
+      "label": "Atelier Pixel Art — Médiathèque Les Curiosités",
+      "eventIds": [
+        "chateaubourg-pixel-art-workshop-2026-10-07"
+      ],
+      "url": "https://www.chateaubourg.fr/contacts/bibliotheque/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Châteaubourg"
+      ],
+      "venues": [
+        "Médiathèque Les Curiosités（2 Place de Verdun, 35220 Châteaubourg）"
+      ],
+      "lastKnownEventDate": "2026-10-07",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-b7c17e03fc62efa6",
       "label": "Coloring Pixels 8周年 — ピクセルアート作品募集",
       "eventIds": [
@@ -2863,6 +3115,30 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:24:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d0a3f6c1459bb6da",
+      "label": "Riedisheim en Pixel — Conseil des Jeunes展示・締めくくり企画",
+      "eventIds": [
+        "riedisheim-en-pixel-closing-2026"
+      ],
+      "url": "https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Riedisheim"
+      ],
+      "venues": [
+        "La Maison Jaune（Cité Hof、6 bis rue du Maréchal Foch, 68400 Riedisheim）"
+      ],
+      "lastKnownEventDate": "2026-10-10",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -3297,6 +3573,32 @@
       }
     },
     {
+      "id": "source-f4bdf3dd12f7065e",
+      "label": "Game Design Camp: From Pencil to Pixel — 11月30日開始回",
+      "eventIds": [
+        "lccl-game-design-pixel-art-camp-2026-11-30",
+        "lccl-game-design-pixel-art-camp-2026-12-08"
+      ],
+      "url": "https://www.lcclcoding.com/holidays/game-design/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "シンガポール"
+      ],
+      "areas": [
+        "Orchard Road, Singapore"
+      ],
+      "venues": [
+        "Forum Office Tower 13階（583 Orchard Road, Singapore 238884）"
+      ],
+      "lastKnownEventDate": "2026-12-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-fa6b90dd16d33463",
       "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
       "eventIds": [
@@ -3376,5 +3678,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-06T00:09:40+00:00"
+  "updatedAt": "2026-10-06T04:43:01+00:00"
 }

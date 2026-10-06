@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-06T00:08:38+00:00",
+  "updatedAt": "2026-10-06T04:33:14+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -1431,6 +1431,111 @@
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "socialUrls": []
+    },
+    {
+      "id": "chateaubourg-pixel-art-workshop-2026-10-07",
+      "name": "Atelier Pixel Art — Médiathèque Les Curiosités",
+      "country": "フランス",
+      "area": "Châteaubourg",
+      "venue": "Médiathèque Les Curiosités（2 Place de Verdun, 35220 Châteaubourg）",
+      "startDate": "2026-10-07",
+      "endDate": "2026-10-07",
+      "dateLabel": "2026年10月7日 15:00–17:00（会場現地表示）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
+      "additionalUrls": ["https://www.chateaubourg.fr/contacts/bibliotheque/"],
+      "description": "市立メディアテークのPixel Art制作体験。アイロンビーズで作品を作る手作業の企画で、デジタル制作ではないことを明記。",
+      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "市公式イベント情報"
+    },
+    {
+      "id": "riedisheim-en-pixel-closing-2026",
+      "name": "Riedisheim en Pixel — Conseil des Jeunes展示・締めくくり企画",
+      "country": "フランス",
+      "area": "Riedisheim",
+      "venue": "La Maison Jaune（Cité Hof、6 bis rue du Maréchal Foch, 68400 Riedisheim）",
+      "startDate": "2026-10-10",
+      "endDate": "2026-10-10",
+      "dateLabel": "2026年10月10日 14:00–17:30（会場現地表示）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/",
+      "additionalUrls": ["https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"],
+      "description": "市の若者評議会によるPixel Artコンテスト作品と若者のモザイク作品の展示・年度企画の締めくくり。",
+      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "市公式イベント情報"
+    },
+    {
+      "id": "sofa-nigromante-pixel-art-talk-2026",
+      "name": "SOFA 2026 — El Nigromante y el arte del pixel art",
+      "country": "コロンビア",
+      "area": "Bogotá",
+      "venue": "Corferias, Geek Academy（Reflejo Verde）, Salón Conector 4",
+      "locationPrecision": "area",
+      "mapAreaLocation": {
+        "latitude": 4.6294899,
+        "longitude": -74.0900271,
+        "precision": "area",
+        "sourceUrl": "https://www.enelsofa.com/sofa2026/index.php?page=info"
+      },
+      "startDate": "2026-10-11",
+      "endDate": "2026-10-11",
+      "dateLabel": "2026年10月11日 18:00（プログラム表示。ボゴタ現地時刻）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
+      "description": "SOFA全体ではなく、Jimmy Guazhamboによるピクセルアート制作経験・キャラクターデザイン講演。地図位置は会場Corferiasの敷地代表点で、ステージの正確な位置ではない。",
+      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者の公式プログラム"
+    },
+    {
+      "id": "syntax-demoparty-pixel-art-2026",
+      "name": "Syntax DemoParty 2026 — pixel graphics / pixel art competitions",
+      "country": "オーストラリア",
+      "area": "Melbourne",
+      "venue": "非公開。事前登録後に開催地を案内（主催者はprivate house partyと説明）",
+      "startDate": "2026-11-14",
+      "endDate": "2026-11-15",
+      "dateLabel": "2026年11月14日〜15日（主催者公式表示。13日はchipmusic preshow）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.syntaxparty.org/",
+      "description": "デモシーンの催事。ピクセルグラフィック、アニメーション、チップチューンのコンペとpixel art交流を含む。開催場所は登録者向け案内のため地図位置は付けない。",
+      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式ページ"
+    },
+    {
+      "id": "lccl-game-design-pixel-art-camp-2026-11-30",
+      "name": "Game Design Camp: From Pencil to Pixel — 11月30日開始回",
+      "country": "シンガポール",
+      "area": "Orchard Road, Singapore",
+      "venue": "Forum Office Tower 13階（583 Orchard Road, Singapore 238884）",
+      "startDate": "2026-11-30",
+      "endDate": "2026-12-04",
+      "dateLabel": "2026年11月30日〜12月4日、月〜金 9:30–12:30（主催者表示時刻）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.lcclcoding.com/holidays/game-design/",
+      "description": "子ども向けゲームデザインキャンプ全体の開催回。2日目にpixel artのスプライトを制作する。Pixel Art単独講座ではないため、含まれる企画の範囲を明記。",
+      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式プログラム"
+    },
+    {
+      "id": "lccl-game-design-pixel-art-camp-2026-12-08",
+      "name": "Game Design Camp: From Pencil to Pixel — 12月8日開始回",
+      "country": "シンガポール",
+      "area": "Orchard Road, Singapore",
+      "venue": "Forum Office Tower 13階（583 Orchard Road, Singapore 238884）",
+      "startDate": "2026-12-08",
+      "endDate": "2026-12-11",
+      "dateLabel": "2026年12月8日〜11日、火〜金 9:15–13:00（主催者表示時刻）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.lcclcoding.com/holidays/game-design/",
+      "description": "子ども向けゲームデザインキャンプ全体の開催回。2日目にpixel artのスプライトを制作する。Pixel Art単独講座ではないため、含まれる企画の範囲を明記。",
+      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式プログラム"
     }
   ],
   "sources": [
@@ -2409,6 +2514,57 @@
       ]
     },
     {
+      "id": "chateaubourg-pixel-art-workshop-2026-10-07",
+      "url": "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
+      "socialUrls": [],
+      "additionalUrls": ["https://www.chateaubourg.fr/contacts/bibliotheque/"],
+      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "result": "official-confirmed",
+      "notes": "市公式イベント本文で開催日・時刻・会場とアイロンビーズのPixel Art制作内容を確認。会場住所は市役所住所と区別。",
+      "eventIds": ["chateaubourg-pixel-art-workshop-2026-10-07"]
+    },
+    {
+      "id": "riedisheim-en-pixel-closing-2026",
+      "url": "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/",
+      "socialUrls": [],
+      "additionalUrls": ["https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"],
+      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "result": "official-confirmed",
+      "notes": "市公式本文でPixel Artコンテスト作品展示、開催日・時間・Maison Jaune会場を確認。市役所住所は会場として扱わない。",
+      "eventIds": ["riedisheim-en-pixel-closing-2026"]
+    },
+    {
+      "id": "sofa-nigromante-pixel-art-talk-2026",
+      "url": "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
+      "socialUrls": [],
+      "additionalUrls": ["https://www.enelsofa.com/sofa2026/index.php?page=info"],
+      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式プログラムで講演内容・10月11日18時・Salón Conector 4を確認。開催地はCorferiasで、主催者の会場案内ページにある地図リンクを使用。",
+      "eventIds": ["sofa-nigromante-pixel-art-talk-2026"]
+    },
+    {
+      "id": "syntax-demoparty-pixel-art-2026",
+      "url": "https://www.syntaxparty.org/",
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式本文で日程・ピクセルグラフィック等の競技・Melbourne開催を確認。会場は事前登録後に案内のため所在地を設定しない。",
+      "eventIds": ["syntax-demoparty-pixel-art-2026"]
+    },
+    {
+      "id": "lccl-game-design-pixel-art-camp-2026",
+      "url": "https://www.lcclcoding.com/holidays/game-design/",
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式本文で2開催回の日程、開催場所、2日目のpixel art sprite制作を確認。連絡先住所ではなくLOCATION欄の開催会場を登録。",
+      "eventIds": [
+        "lccl-game-design-pixel-art-camp-2026-11-30",
+        "lccl-game-design-pixel-art-camp-2026-12-08"
+      ]
+    },
+    {
       "id": "kai-whos-game-room-kaohsiung-signups-2026",
       "eventIds": [
         "kai-whos-game-room-kaohsiung-2026"
@@ -2429,7 +2585,15 @@
       "arte pixel pixel art taller evento 2026",
       "pixel art atelier festival 2026",
       "Pixel Art Pixelkunst Veranstaltung 2026",
-      "픽셀 아트 행사 2026"
+      "픽셀 아트 행사 2026",
+      "도트 아트 전시 행사 공모전 2026",
+      "像素藝術 / 像素艺术 展覽 活動 2026",
+      "seni piksel acara pixel art Indonesia Oktober 2026",
+      "فن البكسل فعالية 2026 ورشة",
+      "arte del pixel art evento taller 2026 Colombia",
+      "pixel art workshop game design camp Singapore 2026",
+      "pixel graphics pixel art demoparty Melbourne November 2026",
+      "Atelier Pixel Art exposition concours octobre 2026 France"
     ],
     "scopeLanguages": [
       "ja",
@@ -2439,7 +2603,9 @@
       "de",
       "ko",
       "zh",
-      "pt"
+      "pt",
+      "id",
+      "ar"
     ],
     "scopeRegions": [
       "日本",
@@ -2447,7 +2613,12 @@
       "欧州",
       "韓国",
       "中国語圏",
-      "ポルトガル語圏"
+      "ポルトガル語圏",
+      "フランス語圏",
+      "スペイン語圏",
+      "東南アジア",
+      "中東",
+      "豪州"
     ],
     "verifiedSourceLanguages": [
       "es",
@@ -2455,7 +2626,8 @@
       "ja",
       "en",
       "zh",
-      "pt"
+      "pt",
+      "fr"
     ],
     "verifiedSourceUrls": [
       "https://www.digitaljove.com/talleres",
@@ -2472,7 +2644,13 @@
       "https://moer.tel/",
       "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
       "https://sites.google.com/pioneiro.g12.br/scratchday2026/p%C3%A1gina-inicial",
-      "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces"
+      "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces",
+      "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
+      "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/",
+      "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
+      "https://www.enelsofa.com/sofa2026/index.php?page=info",
+      "https://www.syntaxparty.org/",
+      "https://www.lcclcoding.com/holidays/game-design/"
     ],
     "regionalChecks": [
       {
@@ -2700,6 +2878,57 @@
           "https://bsky.app/hashtag/gbpixelartjam",
           "https://www.instagram.com/kai_pixelart/"
         ]
+      },
+      {
+        "checkedAt": "2026-10-06T04:33:14+00:00",
+        "regions": ["フランス", "コロンビア", "豪州", "シンガポール", "韓国", "中国", "香港", "インドネシア", "中東", "スイス", "ベルギー"],
+        "languages": ["fr", "es", "en", "ko", "zh", "id", "ar", "de"],
+        "queries": [
+          "Atelier Pixel Art atelier exposition concours octobre 2026 France",
+          "pixel art événement exposition atelier France octobre novembre 2026",
+          "arte del pixel art evento taller 2026 Colombia SOFA",
+          "pixel art workshop game design camp Singapore October 2026",
+          "pixel graphics pixel art demoparty Melbourne November 2026",
+          "픽셀 아트 전시 행사 공모전 2026",
+          "도트 아트 행사 2026 전시",
+          "像素藝術 2026 展覽 台灣 活動 10月",
+          "像素艺术 2026 展览 活动 10月 中国",
+          "seni piksel acara pixel art Indonesia Oktober 2026",
+          "فن البكسل فعالية 2026 ورشة",
+          "pixel art exposition Lausanne 2026 2027",
+          "pixel art Bruxelles événement octobre novembre 2026"
+        ],
+        "addedIds": [
+          "chateaubourg-pixel-art-workshop-2026-10-07",
+          "riedisheim-en-pixel-closing-2026",
+          "sofa-nigromante-pixel-art-talk-2026",
+          "syntax-demoparty-pixel-art-2026",
+          "lccl-game-design-pixel-art-camp-2026-11-30",
+          "lccl-game-design-pixel-art-camp-2026-12-08"
+        ],
+        "unconfirmed": [
+          {
+            "name": "Moulins Atelier Pixel Art（複数回）",
+            "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+            "reason": "観光協会検索結果に10月以降の日付とアイロンビーズ企画が出たが、詳細本文を開けず公式本文の確認が完了しなかった。"
+          },
+          {
+            "name": "India BookMyShow Pixel Art workshop（複数会場）",
+            "sourceUrl": "https://in.bookmyshow.com/events/pixel-art/ET00451895",
+            "reason": "一覧には10月6〜11日と表示されたが、個別本文と各会場の開催詳細を取得できず未登録。"
+          },
+          {
+            "name": "Lausanne Musées — L'art du calcul のpixel art章",
+            "sourceUrl": "https://lausannemusees.ch/fr_CH/programme/l-art-du-calcul",
+            "reason": "展示全体は開催中だが、公式本文でpixel artの章は今後追加とされ、独立した公開開始日も確認できないため未登録。"
+          },
+          {
+            "name": "台湾 KAI 高雄左營の追加会期候補",
+            "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+            "reason": "既存10月会期と重複し、主催者公式本文内に後続会期の日付矛盾があるため新規回として追加しない。"
+          }
+        ],
+        "notes": "日本語/韓国語/中国語/仏語/西語/英語で名称と語形を検索。未来の日付・Pixel Artとの明確な関係を一次ページで確認した6開催回を追加。会場位置が書面で確認できないSyntaxと数値座標を未確認のFrance/Singapore会場は、住所を主催者住所と誤認せず座標なしで記録。SOFAは企画単位を登録し、Google Mapsリンクで確認したCorferias敷地代表点を使用。韓国/中国語圏/インドネシア/中東は今回、未来の確定新規を確認できず。"
       }
     ],
     "historyCollection": {
