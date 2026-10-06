@@ -18,6 +18,15 @@ test('explicit numeric coordinates keep canonical identity; null and strings nev
     assert.equal(invalid.position,null);
   }
 });
+test('area-level map anchors are used for placement and preserve their approximate precision',()=>{
+  const anchor={latitude:39.4767,longitude:-0.3744,precision:'area',sourceUrl:'https://www.valencia.es/estadistica/Recull/Recull2021_Castellano.pdf'};
+  const resolver=()=>({id:'valencia-cell',mapRegionId:'admin1:ESP:ES-VC',mapRegionIndex:3,mapRegionLabel:'Valencian Community',mapRegionKind:'admin1',countryId:'ESP',countryLabel:'Spain'});
+  const [event]=normalizeMapEvents([{name:'Area-level event',locationPrecision:'area',mapAreaLocation:anchor}],[],resolver);
+  assert.equal(event.placement,'region');
+  assert.equal(event.locationPrecision,'area');
+  assert.deepEqual(event.position,{latitude:anchor.latitude,longitude:anchor.longitude});
+  assert.equal(event.mapRegionId,'admin1:ESP:ES-VC');
+});
 test('missing records remain empty; county aliases and zero coordinates are valid',()=>{
   assert.deepEqual(normalizeMapEvents(null,representatives),[]);
   assert.deepEqual(normalizeMapEvents([null,{},false],representatives),[]);

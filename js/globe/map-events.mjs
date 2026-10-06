@@ -24,7 +24,11 @@ function numericCoordinate(value, limit) {
 }
 
 function coordinatesOf(record) {
-  const source = record?.location && typeof record.location === 'object' ? record.location : record;
+  const source = record?.location && typeof record.location === 'object'
+    ? record.location
+    : record?.mapAreaLocation && typeof record.mapAreaLocation === 'object'
+      ? record.mapAreaLocation
+      : record;
   const latitude = numericCoordinate(source?.latitude ?? source?.lat, 90);
   const longitude = numericCoordinate(source?.longitude ?? source?.lng ?? source?.lon, 180);
   return latitude === null || longitude === null ? null : { latitude, longitude };
@@ -51,7 +55,7 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
     if (!source || typeof source !== 'object') return [];
     const record = source;
     if (!String(record.name || record.title || '').trim()) return [];
-    const precise = coordinatesOf(record.location) || coordinatesOf({ latitude: record.latitude, longitude: record.longitude, lat: record.lat, lng: record.lng, lon: record.lon });
+    const precise = coordinatesOf(record.location) || coordinatesOf(record.mapAreaLocation) || coordinatesOf({ latitude: record.latitude, longitude: record.longitude, lat: record.lat, lng: record.lng, lon: record.lon });
     let resolved = null;
     if (precise && typeof resolveLocation === 'function') {
       try { resolved = resolveLocation(precise.longitude, precise.latitude) || null; } catch { resolved = null; }
@@ -251,7 +255,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
       const details = [event.dateLabel || event.dates || event.date || [event.startDate, event.endDate].filter(Boolean).join('–'), event.venue, eventLocation].filter(value => typeof value === 'string' && value.trim());
       if (details.length) { const meta = doc.createElement('p'); meta.className = 'map-event-card__meta'; meta.textContent = details.join(' · '); card.append(meta); }
       const regionName = eventRegionName(event);
-      const placement = doc.createElement('p'); placement.className = 'map-event-card__placement'; placement.textContent = event.online ? 'オンライン開催' : event.placement === 'coordinate' ? '公開された位置情報' : event.placement === 'prefecture' ? (event.representativeCell ? `${regionName || '都道府県'}単位でまとめて表示（会場位置ではありません）` : `${regionName || '都道府県'}内のイベント`) : event.placement === 'region' ? `${regionName || '地域'}単位でまとめて表示（位置情報あり）` : '地図上の位置情報なし'; card.append(placement);
+      const placement = doc.createElement('p'); placement.className = 'map-event-card__placement'; placement.textContent = event.online ? 'オンライン開催' : event.placement === 'coordinate' ? (event.locationPrecision === 'area' ? `${regionName || '地域'}周辺に表示（会場の正確な位置ではありません）` : '公開された位置情報') : event.placement === 'prefecture' ? (event.representativeCell ? `${regionName || '都道府県'}単位でまとめて表示（会場位置ではありません）` : `${regionName || '都道府県'}内のイベント`) : event.placement === 'region' ? `${regionName || '地域'}単位でまとめて表示（会場位置ではありません）` : '地図上の位置情報なし'; card.append(placement);
       const statusText = eventStatus(event, today);
       if (statusText) { const status = doc.createElement('p'); status.className = 'map-event-card__status'; status.textContent = statusText; card.append(status); }
       const href = safeUrl(event.url || event.sourceUrl || event.website);

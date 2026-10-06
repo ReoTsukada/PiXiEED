@@ -2,6 +2,32 @@
   "version": 1,
   "regions": [
     {
+      "id": "region-170f8cfbca8977ea",
+      "label": "ブラジル",
+      "eventIds": [
+        "scratch-day-pioneiro-pixel-art-2026"
+      ],
+      "areas": []
+    },
+    {
+      "id": "region-187d4b5e8c981da2",
+      "label": "オーストリア",
+      "eventIds": [
+        "moertel-viecc-2026"
+      ],
+      "areas": [
+        "ウィーン"
+      ]
+    },
+    {
+      "id": "region-2033b6ff83df2abf",
+      "label": "ポルトガル",
+      "eventIds": [
+        "nova-fct-pixel-art-alternative-interfaces-2026"
+      ],
+      "areas": []
+    },
+    {
       "id": "region-233c311e7a92f7a4",
       "label": "愛知県",
       "eventIds": [
@@ -25,6 +51,23 @@
       "areas": [
         "アルメンドラレホ（バダホス）",
         "バレンシア"
+      ]
+    },
+    {
+      "id": "region-33db161daa042c42",
+      "label": "台湾",
+      "eventIds": [
+        "kai-whos-game-room-chiayi-2026",
+        "kai-whos-game-room-kaohsiung-2026",
+        "kai-whos-game-room-kaohsiung-sanduo-2026",
+        "kai-whos-game-room-taipei-2026",
+        "kai-whos-game-room-taoyuan-2026"
+      ],
+      "areas": [
+        "台北市",
+        "嘉義市",
+        "桃園市",
+        "高雄市"
       ]
     },
     {
@@ -150,9 +193,11 @@
       "label": "ドイツ",
       "eventIds": [
         "moertel-polaris-2026",
+        "moertel-spiel-2026",
         "retrocon-saar-17-pixel-art-2026"
       ],
       "areas": [
+        "エッセン",
         "ハンブルク",
         "フェルクリンゲン"
       ]
@@ -186,6 +231,18 @@
       ]
     },
     {
+      "id": "venue-08f6c2e16c89e41b",
+      "label": "新光三越高雄三多店12F",
+      "eventIds": [
+        "kai-whos-game-room-kaohsiung-sanduo-2026"
+      ],
+      "region": "台湾",
+      "area": "高雄市",
+      "sourceUrls": [
+        "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
+      ]
+    },
+    {
       "id": "venue-0c3e12f0d091960a",
       "label": "CENTER/SANUKI（高松市常磐町1-6-13）",
       "eventIds": [
@@ -195,6 +252,18 @@
       "area": "高松市",
       "sourceUrls": [
         "https://center.degico.jp/hermippe_m7kenji_2026-html.html"
+      ]
+    },
+    {
+      "id": "venue-126377f1b75608ce",
+      "label": "NOVA FCT図書館 Auditório（Piso -1）／Sala Estúdio（Piso 0）",
+      "eventIds": [
+        "nova-fct-pixel-art-alternative-interfaces-2026"
+      ],
+      "region": "ポルトガル",
+      "area": "",
+      "sourceUrls": [
+        "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces"
       ]
     },
     {
@@ -251,6 +320,18 @@
         "https://pixelartpark.com/events/pap4/",
         "https://pixelartpark.com/events/pap5/",
         "https://pixelartpark.com/events/pap6/"
+      ]
+    },
+    {
+      "id": "venue-1cc6401f3eca1d32",
+      "label": "新光三越嘉義垂楊店11F",
+      "eventIds": [
+        "kai-whos-game-room-chiayi-2026"
+      ],
+      "region": "台湾",
+      "area": "嘉義市",
+      "sourceUrls": [
+        "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
       ]
     },
     {
@@ -338,6 +419,30 @@
       ]
     },
     {
+      "id": "venue-55249ad6c6cc10ef",
+      "label": "Messe Wien",
+      "eventIds": [
+        "moertel-viecc-2026"
+      ],
+      "region": "オーストリア",
+      "area": "ウィーン",
+      "sourceUrls": [
+        "https://moer.tel/"
+      ]
+    },
+    {
+      "id": "venue-5948ba90467d5b90",
+      "label": "Messe Essen",
+      "eventIds": [
+        "moertel-spiel-2026"
+      ],
+      "region": "ドイツ",
+      "area": "エッセン",
+      "sourceUrls": [
+        "https://moer.tel/"
+      ]
+    },
+    {
       "id": "venue-5c6a072599949a0d",
       "label": "bokashi Base（札幌市中央区南2西1）",
       "eventIds": [
@@ -347,6 +452,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://www.do-johodai.ac.jp/topics/9694350/"
+      ]
+    },
+    {
+      "id": "venue-66b69ce5ff30fcd8",
+      "label": "新光三越台北站前店12F",
+      "eventIds": [
+        "kai-whos-game-room-taipei-2026"
+      ],
+      "region": "台湾",
+      "area": "台北市",
+      "sourceUrls": [
+        "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
       ]
     },
     {
@@ -372,6 +489,30 @@
       "area": "渋谷・原宿",
       "sourceUrls": [
         "https://pixel-art.jp/spa2024/"
+      ]
+    },
+    {
+      "id": "venue-6b74af714ff12892",
+      "label": "Centro Educacional Pioneiro（Quadra Coberta）",
+      "eventIds": [
+        "scratch-day-pioneiro-pixel-art-2026"
+      ],
+      "region": "ブラジル",
+      "area": "",
+      "sourceUrls": [
+        "https://sites.google.com/pioneiro.g12.br/scratchday2026/p%C3%A1gina-inicial"
+      ]
+    },
+    {
+      "id": "venue-6c0bb43701b22248",
+      "label": "新光三越高雄左營店11F",
+      "eventIds": [
+        "kai-whos-game-room-kaohsiung-2026"
+      ],
+      "region": "台湾",
+      "area": "高雄市",
+      "sourceUrls": [
+        "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
       ]
     },
     {
@@ -556,6 +697,18 @@
       "area": "浅草橋",
       "sourceUrls": [
         "https://tpxst.com/"
+      ]
+    },
+    {
+      "id": "venue-dcdc623f624a043a",
+      "label": "新光三越桃園站前店10F",
+      "eventIds": [
+        "kai-whos-game-room-taoyuan-2026"
+      ],
+      "region": "台湾",
+      "area": "桃園市",
+      "sourceUrls": [
+        "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
       ]
     },
     {
@@ -769,8 +922,8 @@
       "lastKnownEventDate": "2026-01-10",
       "check": {
         "result": "unavailable",
-        "attemptedAt": "2026-10-05T13:31:42+09:00",
-        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        "attemptedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
       }
     },
     {
@@ -1042,6 +1195,41 @@
       }
     },
     {
+      "id": "source-3f87b2e45c8c540a",
+      "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
+      "eventIds": [
+        "kai-whos-game-room-chiayi-2026",
+        "kai-whos-game-room-kaohsiung-2026",
+        "kai-whos-game-room-kaohsiung-sanduo-2026",
+        "kai-whos-game-room-taipei-2026",
+        "kai-whos-game-room-taoyuan-2026"
+      ],
+      "url": "https://www.instagram.com/skm_whoartyou/",
+      "kind": "social",
+      "prefectures": [],
+      "countries": [
+        "台湾"
+      ],
+      "areas": [
+        "台北市",
+        "嘉義市",
+        "桃園市",
+        "高雄市"
+      ],
+      "venues": [
+        "新光三越台北站前店12F",
+        "新光三越嘉義垂楊店11F",
+        "新光三越桃園站前店10F",
+        "新光三越高雄三多店12F",
+        "新光三越高雄左營店11F"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-4252934a8c27eb2d",
       "label": "Newgrounds Pixel Day 2020",
       "eventIds": [
@@ -1246,6 +1434,42 @@
       }
     },
     {
+      "id": "source-4c891ccad1295e97",
+      "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
+      "eventIds": [
+        "kai-whos-game-room-chiayi-2026",
+        "kai-whos-game-room-kaohsiung-2026",
+        "kai-whos-game-room-kaohsiung-sanduo-2026",
+        "kai-whos-game-room-taipei-2026",
+        "kai-whos-game-room-taoyuan-2026"
+      ],
+      "url": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "台湾"
+      ],
+      "areas": [
+        "台北市",
+        "嘉義市",
+        "桃園市",
+        "高雄市"
+      ],
+      "venues": [
+        "新光三越台北站前店12F",
+        "新光三越嘉義垂楊店11F",
+        "新光三越桃園站前店10F",
+        "新光三越高雄三多店12F",
+        "新光三越高雄左營店11F"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-544e47ab47e548b9",
       "label": "日テレイマジナリウム",
       "eventIds": [
@@ -1295,8 +1519,8 @@
       "lastKnownEventDate": "2026-05-04",
       "check": {
         "result": "unavailable",
-        "attemptedAt": "2026-10-05T13:31:42+09:00",
-        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        "attemptedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
       }
     },
     {
@@ -1316,7 +1540,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1369,7 +1593,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1398,7 +1622,7 @@
       "lastKnownEventDate": "2025-09-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1522,6 +1746,29 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
         "notes": "各年のPixel Joint公式告知・challenge archiveでpixel art contest本文と締切を確認。"
+      }
+    },
+    {
+      "id": "source-61a1c0059537f94e",
+      "label": "Pixel Art & Alternative Interfaces — NOVA FCT",
+      "eventIds": [
+        "nova-fct-pixel-art-alternative-interfaces-2026"
+      ],
+      "url": "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ポルトガル"
+      ],
+      "areas": [],
+      "venues": [
+        "NOVA FCT図書館 Auditório（Piso -1）／Sala Estúdio（Piso 0）"
+      ],
+      "lastKnownEventDate": "2026-03-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -1652,6 +1899,29 @@
       }
     },
     {
+      "id": "source-67c1c8e0364d58c7",
+      "label": "Scratch Day 2026 — Pixel Artコンテストと学生作品展示",
+      "eventIds": [
+        "scratch-day-pioneiro-pixel-art-2026"
+      ],
+      "url": "https://sites.google.com/pioneiro.g12.br/scratchday2026/p%C3%A1gina-inicial",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ブラジル"
+      ],
+      "areas": [],
+      "venues": [
+        "Centro Educacional Pioneiro（Quadra Coberta）"
+      ],
+      "lastKnownEventDate": "2026-05-23",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-6ee99d280a9d2c6f",
       "label": "Newgrounds Pixel Day 2018",
       "eventIds": [
@@ -1689,7 +1959,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1933,7 +2203,7 @@
       "lastKnownEventDate": "2026-05-04",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2089,24 +2359,31 @@
       "id": "source-a16186da9f207629",
       "label": "Moertel ドット絵作品出展（Polaris 2026）",
       "eventIds": [
-        "moertel-polaris-2026"
+        "moertel-polaris-2026",
+        "moertel-spiel-2026",
+        "moertel-viecc-2026"
       ],
       "url": "https://moer.tel/",
       "kind": "website",
       "prefectures": [],
       "countries": [
+        "オーストリア",
         "ドイツ"
       ],
       "areas": [
+        "ウィーン",
+        "エッセン",
         "ハンブルク"
       ],
       "venues": [
-        "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2"
+        "Messe Essen",
+        "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
+        "Messe Wien"
       ],
-      "lastKnownEventDate": "2026-10-11",
+      "lastKnownEventDate": "2026-11-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2267,7 +2544,7 @@
       "lastKnownEventDate": "2026-01-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2316,6 +2593,27 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-b7c17e03fc62efa6",
+      "label": "Coloring Pixels 8周年 — ピクセルアート作品募集",
+      "eventIds": [
+        "coloring-pixels-8th-anniversary-art-competition-2026"
+      ],
+      "url": "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（ToastieLabs）"
+      ],
+      "lastKnownEventDate": "2026-10-09",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2392,6 +2690,42 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c1cf1361c47c3b35",
+      "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
+      "eventIds": [
+        "kai-whos-game-room-chiayi-2026",
+        "kai-whos-game-room-kaohsiung-2026",
+        "kai-whos-game-room-kaohsiung-sanduo-2026",
+        "kai-whos-game-room-taipei-2026",
+        "kai-whos-game-room-taoyuan-2026"
+      ],
+      "url": "https://event.skm.com.tw/course_list.php?MM_SEARCH=search&activityStatus=&area=3&attr=&edate=2026-10-25&group=21&keyword=&sdate=2026-10-02",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "台湾"
+      ],
+      "areas": [
+        "台北市",
+        "嘉義市",
+        "桃園市",
+        "高雄市"
+      ],
+      "venues": [
+        "新光三越台北站前店12F",
+        "新光三越嘉義垂楊店11F",
+        "新光三越桃園站前店10F",
+        "新光三越高雄三多店12F",
+        "新光三越高雄左營店11F"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "公式親ページから個別申込ページへ進んだがCache miss。展示会期は親ページで確認済み。個別活動日時は未確認。"
       }
     },
     {
@@ -2554,8 +2888,8 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "unavailable",
-        "attemptedAt": "2026-10-05T13:31:42+09:00",
-        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        "attemptedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
       }
     },
     {
@@ -2605,7 +2939,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2682,6 +3016,42 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T13:31:42+09:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d7d242194c91323e",
+      "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
+      "eventIds": [
+        "kai-whos-game-room-chiayi-2026",
+        "kai-whos-game-room-kaohsiung-2026",
+        "kai-whos-game-room-kaohsiung-sanduo-2026",
+        "kai-whos-game-room-taipei-2026",
+        "kai-whos-game-room-taoyuan-2026"
+      ],
+      "url": "https://www.instagram.com/kai_pixelart/",
+      "kind": "social",
+      "prefectures": [],
+      "countries": [
+        "台湾"
+      ],
+      "areas": [
+        "台北市",
+        "嘉義市",
+        "桃園市",
+        "高雄市"
+      ],
+      "venues": [
+        "新光三越台北站前店12F",
+        "新光三越嘉義垂楊店11F",
+        "新光三越桃園站前店10F",
+        "新光三越高雄三多店12F",
+        "新光三越高雄左營店11F"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "公式リンクのInstagramを開いたが本文を取得できず。"
       }
     },
     {
@@ -2869,8 +3239,8 @@
       "lastKnownEventDate": "2025-09-21",
       "check": {
         "result": "unavailable",
-        "attemptedAt": "2026-10-05T13:31:42+09:00",
-        "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+        "attemptedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
       }
     },
     {
@@ -2974,7 +3344,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3006,5 +3376,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-05T07:19:30+00:00"
+  "updatedAt": "2026-10-06T00:09:40+00:00"
 }

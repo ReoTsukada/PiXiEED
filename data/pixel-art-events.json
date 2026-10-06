@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-05T07:18:39+00:00",
+  "updatedAt": "2026-10-06T00:08:38+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -16,7 +16,7 @@
       "socialUrls": [
         "https://x.com/pixelartpark"
       ],
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -35,7 +35,7 @@
       "socialUrls": [
         "https://x.com/ShibuyaPixelArt"
       ],
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -54,7 +54,7 @@
       "socialUrls": [
         "https://x.com/dot_daisakusen"
       ],
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -73,7 +73,7 @@
       "socialUrls": [
         "https://x.com/PixelMarche"
       ],
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -91,7 +91,7 @@
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -109,7 +109,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -140,7 +140,7 @@
       "status": "active",
       "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -150,6 +150,13 @@
       "country": "ドイツ",
       "area": "ハンブルク",
       "venue": "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
+      "locationPrecision": "area",
+      "mapAreaLocation": {
+        "latitude": 53.55,
+        "longitude": 10,
+        "precision": "area",
+        "sourceUrl": "https://marketing.hamburg.de/de/hamburg-medien-service/ueber-hamburg"
+      },
       "startDate": "2026-10-09",
       "endDate": "2026-10-11",
       "dateLabel": "2026年10月9日〜11日",
@@ -157,7 +164,7 @@
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展者公式サイト",
       "description": "ピクセルアーティストStefanie Fehling本人による、新しいドット絵作品・プリント等の出展告知。Polaris全体ではなく、この作家の出展情報。",
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art"
     },
     {
@@ -166,13 +173,20 @@
       "country": "ポーランド",
       "area": "ポズナン",
       "venue": "MTP Poznań（ポーランド・ポズナン／遠隔応募可）",
+      "locationPrecision": "area",
+      "mapAreaLocation": {
+        "latitude": 52.40014,
+        "longitude": 16.90498,
+        "precision": "area",
+        "sourceUrl": "https://badam.poznan.pl/nasza-przestrzen/01_powierzchnia/polozenie-i-powierzchnia-miasta/"
+      },
       "startDate": "2026-10-23",
       "endDate": "2026-10-25",
       "dateLabel": "2026年10月23日〜25日。作品提出締切は10月21日23:59（ポーランド時間 UTC+2）。遠隔応募可。",
       "status": "upcoming",
       "sourceUrl": "https://nrgevent.eu/compo/",
       "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
-      "checkedAt": "2026-10-05T13:31:42+09:00",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -182,6 +196,13 @@
       "country": "スペイン",
       "area": "バレンシア",
       "venue": "Sala B-0-2, Facultad de Bellas Artes, Edificio 3N, UPV（スペイン・バレンシア）",
+      "locationPrecision": "area",
+      "mapAreaLocation": {
+        "latitude": 39.47667,
+        "longitude": -0.37444,
+        "precision": "area",
+        "sourceUrl": "https://www.valencia.es/estadistica/Recull/Recull2021_Castellano.pdf"
+      },
       "startDate": "2026-11-05",
       "endDate": "2026-11-05",
       "dateLabel": "2026年11月5日 09:30–10:30（公式表示。タイムゾーン未記載）",
@@ -198,6 +219,13 @@
       "country": "ドイツ",
       "area": "フェルクリンゲン",
       "venue": "Hermann Neuberger Halle, Stadionstraße, 66333 Völklingen（ドイツ）",
+      "locationPrecision": "area",
+      "mapAreaLocation": {
+        "latitude": 49.25,
+        "longitude": 6.85,
+        "precision": "area",
+        "sourceUrl": "https://www.voelklingen.de/voelklingen/stadtportrait-statistik-geschichte/"
+      },
       "startDate": "2026-11-07",
       "endDate": "2026-11-08",
       "dateLabel": "2026年11月7日〜8日",
@@ -214,6 +242,13 @@
       "country": "スペイン",
       "area": "アルメンドラレホ（バダホス）",
       "venue": "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）",
+      "locationPrecision": "area",
+      "mapAreaLocation": {
+        "latitude": 38.68889,
+        "longitude": -6.36111,
+        "precision": "area",
+        "sourceUrl": "https://www.aemet.es/es/eltiempo/observacion/ultimosdatos?datos=det&f=humedad&k=ext&l=4436Y&w=0&x="
+      },
       "startDate": "2026-11-21",
       "endDate": "2026-11-21",
       "dateLabel": "2026年11月21日 17:00–19:00（公式表示。タイムゾーン未記載）",
@@ -1214,6 +1249,188 @@
       "socialUrls": [],
       "kind": "pixel-art",
       "checkedAt": "2026-10-05T07:18:39+00:00"
+    },
+    {
+      "id": "coloring-pixels-8th-anniversary-art-competition-2026",
+      "name": "Coloring Pixels 8周年 — ピクセルアート作品募集",
+      "online": true,
+      "venue": "オンライン（ToastieLabs）",
+      "startDate": "2026-08-16",
+      "endDate": "2026-10-09",
+      "status": "active",
+      "dateLabel": "2026年8月16日募集告知公開（公式記事のdatePublished）。締切10月9日17:00 UTC、結果発表10月16日。受付開始時刻は未記載。",
+      "sourceUrl": "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
+      "description": "ゲームに収録するドット絵の募集。PNG、最大300×300、100色未満が条件。告知公開日から応募締切日までを掲載。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報",
+      "socialUrls": []
+    },
+    {
+      "id": "moertel-spiel-2026",
+      "name": "Moertel ドット絵作品出展（SPIEL 2026）",
+      "country": "ドイツ",
+      "area": "エッセン",
+      "venue": "Messe Essen",
+      "startDate": "2026-10-22",
+      "endDate": "2026-10-25",
+      "dateLabel": "2026-10-22〜2026-10-25（作家本人の公式出展カレンダー）",
+      "status": "upcoming",
+      "sourceUrl": "https://moer.tel/",
+      "sourceLabel": "出展作家の公式カレンダー",
+      "description": "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "socialUrls": []
+    },
+    {
+      "id": "moertel-viecc-2026",
+      "name": "Moertel ドット絵作品出展（VIECC 2026）",
+      "country": "オーストリア",
+      "area": "ウィーン",
+      "venue": "Messe Wien",
+      "startDate": "2026-11-21",
+      "endDate": "2026-11-22",
+      "dateLabel": "2026-11-21〜2026-11-22（作家本人の公式出展カレンダー）",
+      "status": "upcoming",
+      "sourceUrl": "https://moer.tel/",
+      "sourceLabel": "出展作家の公式カレンダー",
+      "description": "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "socialUrls": []
+    },
+    {
+      "id": "kai-whos-game-room-kaohsiung-2026",
+      "name": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
+      "country": "台湾",
+      "area": "高雄市",
+      "venue": "新光三越高雄左營店11F",
+      "startDate": "2026-10-02",
+      "endDate": "2026-10-25",
+      "dateLabel": "2026-10-02〜2026-10-25。各店の展示内容は店別告知を要確認。",
+      "status": "active",
+      "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "socialUrls": [
+        "https://www.instagram.com/kai_pixelart/",
+        "https://www.instagram.com/skm_whoartyou/"
+      ],
+      "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報"
+    },
+    {
+      "id": "kai-whos-game-room-taoyuan-2026",
+      "name": "是誰的遊戲間 — KAI PIXEL ART（新光三越桃園站前店10F）",
+      "country": "台湾",
+      "area": "桃園市",
+      "venue": "新光三越桃園站前店10F",
+      "startDate": "2026-06-12",
+      "endDate": "2026-06-28",
+      "dateLabel": "2026-06-12〜2026-06-28。各店の展示内容は店別告知を要確認。",
+      "status": "ended",
+      "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "socialUrls": [
+        "https://www.instagram.com/kai_pixelart/",
+        "https://www.instagram.com/skm_whoartyou/"
+      ],
+      "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報"
+    },
+    {
+      "id": "kai-whos-game-room-kaohsiung-sanduo-2026",
+      "name": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄三多店12F）",
+      "country": "台湾",
+      "area": "高雄市",
+      "venue": "新光三越高雄三多店12F",
+      "startDate": "2026-07-04",
+      "endDate": "2026-07-20",
+      "dateLabel": "2026-07-04〜2026-07-20。各店の展示内容は店別告知を要確認。",
+      "status": "ended",
+      "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "socialUrls": [
+        "https://www.instagram.com/kai_pixelart/",
+        "https://www.instagram.com/skm_whoartyou/"
+      ],
+      "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報"
+    },
+    {
+      "id": "kai-whos-game-room-taipei-2026",
+      "name": "是誰的遊戲間 — KAI PIXEL ART（新光三越台北站前店12F）",
+      "country": "台湾",
+      "area": "台北市",
+      "venue": "新光三越台北站前店12F",
+      "startDate": "2026-07-29",
+      "endDate": "2026-08-23",
+      "dateLabel": "2026-07-29〜2026-08-23。各店の展示内容は店別告知を要確認。",
+      "status": "ended",
+      "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "socialUrls": [
+        "https://www.instagram.com/kai_pixelart/",
+        "https://www.instagram.com/skm_whoartyou/"
+      ],
+      "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報"
+    },
+    {
+      "id": "kai-whos-game-room-chiayi-2026",
+      "name": "是誰的遊戲間 — KAI PIXEL ART（新光三越嘉義垂楊店11F）",
+      "country": "台湾",
+      "area": "嘉義市",
+      "venue": "新光三越嘉義垂楊店11F",
+      "startDate": "2026-08-29",
+      "endDate": "2026-09-21",
+      "dateLabel": "2026-08-29〜2026-09-21。各店の展示内容は店別告知を要確認。",
+      "status": "ended",
+      "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "socialUrls": [
+        "https://www.instagram.com/kai_pixelart/",
+        "https://www.instagram.com/skm_whoartyou/"
+      ],
+      "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報"
+    },
+    {
+      "id": "scratch-day-pioneiro-pixel-art-2026",
+      "name": "Scratch Day 2026 — Pixel Artコンテストと学生作品展示",
+      "country": "ブラジル",
+      "venue": "Centro Educacional Pioneiro（Quadra Coberta）",
+      "startDate": "2026-05-23",
+      "endDate": "2026-05-23",
+      "dateLabel": "2026年5月23日09:00–12:00（公式本文にタイムゾーン記載なし）。",
+      "status": "ended",
+      "sourceUrl": "https://sites.google.com/pioneiro.g12.br/scratchday2026/p%C3%A1gina-inicial",
+      "description": "学校のScratch Day内で行われた第2回Pixel Artコンテスト投票、学生作品展示、自由制作。ドット絵企画の範囲だけを掲載。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報",
+      "socialUrls": []
+    },
+    {
+      "id": "nova-fct-pixel-art-alternative-interfaces-2026",
+      "name": "Pixel Art & Alternative Interfaces — NOVA FCT",
+      "country": "ポルトガル",
+      "venue": "NOVA FCT図書館 Auditório（Piso -1）／Sala Estúdio（Piso 0）",
+      "startDate": "2026-03-06",
+      "endDate": "2026-03-13",
+      "dateLabel": "2026年3月6日講演・ワークショップ、3月6〜13日作品展示。講演と展示を同じ日程の連続講座として扱わない。",
+      "status": "ended",
+      "sourceUrl": "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces",
+      "description": "NOVA FCTのピクセルアート講演と制作ワークショップ、Pixel Art Jam 2025作品の展示。英語開催。作品展示会期を期間として掲載し、講演実施日は別記。",
+      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式情報",
+      "socialUrls": []
     }
   ],
   "sources": [
@@ -1224,15 +1441,15 @@
         "https://x.com/pixelartpark"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページで日程・内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。",
       "socialChecks": [
         {
           "url": "https://x.com/pixelartpark",
-          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "attemptedAt": "2026-10-06T00:08:38+00:00",
           "result": "unavailable",
-          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+          "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
         }
       ]
     },
@@ -1243,15 +1460,15 @@
         "https://x.com/ShibuyaPixelArt"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "next-date-unannounced",
-      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。",
+      "notes": "公式本文を再確認。次回確定日なしのwatchは維持。日程変更・中止は確認されず。",
       "socialChecks": [
         {
           "url": "https://x.com/ShibuyaPixelArt",
-          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "attemptedAt": "2026-10-06T00:08:38+00:00",
           "result": "unavailable",
-          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+          "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
         }
       ]
     },
@@ -1262,15 +1479,15 @@
         "https://x.com/dot_daisakusen"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "next-date-unannounced",
-      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。",
+      "notes": "公式本文を再確認。次回確定日なしのwatchは維持。日程変更・中止は確認されず。",
       "socialChecks": [
         {
           "url": "https://x.com/dot_daisakusen",
-          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "attemptedAt": "2026-10-06T00:08:38+00:00",
           "result": "unavailable",
-          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+          "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
         }
       ]
     },
@@ -1281,15 +1498,15 @@
         "https://x.com/PixelMarche"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "next-date-unannounced",
-      "notes": "公式ページを再確認。次回の開催日を確認できず、watchを維持。",
+      "notes": "公式本文を再確認。次回確定日なしのwatchは維持。日程変更・中止は確認されず。",
       "socialChecks": [
         {
           "url": "https://x.com/PixelMarche",
-          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "attemptedAt": "2026-10-06T00:08:38+00:00",
           "result": "unavailable",
-          "notes": "公開SNSの取得を試みたが本文を取得できず。公式サイトで確認。"
+          "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
         }
       ]
     },
@@ -1300,15 +1517,15 @@
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページで日程・内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。",
       "socialChecks": [
         {
           "tag": "#gbpixelartjam",
-          "attemptedAt": "2026-10-05T13:31:42+09:00",
+          "attemptedAt": "2026-10-06T00:08:38+00:00",
           "result": "unavailable",
-          "notes": "公式からリンクされたBlueskyハッシュタグページを取得できず。"
+          "notes": "Blueskyハッシュタグ本文の取得を再試行したが取得不能。"
         }
       ]
     },
@@ -1319,9 +1536,9 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページで日程・内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。",
       "socialChecks": [
         {
           "tag": "#segmentpixeljam2026",
@@ -1345,27 +1562,32 @@
       "url": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "official-confirmed",
-      "notes": "公式告知で課題期間・本戦締切を確認。案内先のDiscordは本文を取得できず。オンラインのため座標なし。"
+      "notes": "公式本文で開催期間・企画内容を再確認。"
     },
     {
       "id": "moertel-polaris-2026",
       "url": "https://moer.tel/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "official-confirmed",
-      "notes": "公式サイトで日程とドット絵企画を確認。公式の緯度経度が未確認のため座標なし。"
+      "notes": "公式本文で開催期間・企画内容を再確認。",
+      "eventIds": [
+        "moertel-polaris-2026",
+        "moertel-spiel-2026",
+        "moertel-viecc-2026"
+      ]
     },
     {
       "id": "nrg-pixel-art-awards-2026",
       "url": "https://nrgevent.eu/compo/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T13:31:42+09:00",
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
       "result": "official-confirmed",
-      "notes": "公式サイトで日程とドット絵企画を確認。公式の緯度経度が未確認のため座標なし。",
+      "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。",
       "additionalUrls": [
         "https://nrgevent.eu/"
       ]
@@ -2118,11 +2340,88 @@
       "result": "official-confirmed",
       "notes": "公式本文で内容・開催日・場所を確認。",
       "socialChecks": []
+    },
+    {
+      "id": "coloring-pixels-8th-anniversary-art-competition-2026",
+      "url": "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で日程と明確なドット絵関連内容を確認。",
+      "eventIds": [
+        "coloring-pixels-8th-anniversary-art-competition-2026"
+      ]
+    },
+    {
+      "id": "kai-whos-game-room-kaohsiung-2026",
+      "url": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "socialUrls": [
+        "https://www.instagram.com/kai_pixelart/",
+        "https://www.instagram.com/skm_whoartyou/"
+      ],
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "result": "official-confirmed",
+      "notes": "2026年巡回展の高雄左營会期と、終了済み4会期を公式本文で確認。各店の個別体験は別イベントとして水増ししない。",
+      "eventIds": [
+        "kai-whos-game-room-kaohsiung-2026",
+        "kai-whos-game-room-taoyuan-2026",
+        "kai-whos-game-room-kaohsiung-sanduo-2026",
+        "kai-whos-game-room-taipei-2026",
+        "kai-whos-game-room-chiayi-2026"
+      ],
+      "socialChecks": [
+        {
+          "url": "https://www.instagram.com/kai_pixelart/",
+          "attemptedAt": "2026-10-06T00:08:38+00:00",
+          "result": "unavailable",
+          "notes": "公式リンクのInstagramを開いたが本文を取得できず。"
+        },
+        {
+          "url": "https://www.instagram.com/skm_whoartyou/",
+          "result": "pending",
+          "notes": "公式本文のアカウント表記から巡回先へ追加。SNS投稿本文は未読。"
+        }
+      ],
+      "additionalUrls": [
+        "https://event.skm.com.tw/course_list.php?MM_SEARCH=search&activityStatus=&area=3&attr=&edate=2026-10-25&group=21&keyword=&sdate=2026-10-02"
+      ]
+    },
+    {
+      "id": "scratch-day-pioneiro-pixel-art-2026",
+      "url": "https://sites.google.com/pioneiro.g12.br/scratchday2026/p%C3%A1gina-inicial",
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で日程と明確なドット絵関連内容を確認。",
+      "eventIds": [
+        "scratch-day-pioneiro-pixel-art-2026"
+      ]
+    },
+    {
+      "id": "nova-fct-pixel-art-alternative-interfaces-2026",
+      "url": "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces",
+      "socialUrls": [],
+      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で日程と明確なドット絵関連内容を確認。",
+      "eventIds": [
+        "nova-fct-pixel-art-alternative-interfaces-2026"
+      ]
+    },
+    {
+      "id": "kai-whos-game-room-kaohsiung-signups-2026",
+      "eventIds": [
+        "kai-whos-game-room-kaohsiung-2026"
+      ],
+      "url": "https://event.skm.com.tw/course_list.php?MM_SEARCH=search&activityStatus=&area=3&attr=&edate=2026-10-25&group=21&keyword=&sdate=2026-10-02",
+      "result": "unavailable",
+      "attemptedAt": "2026-10-06T00:08:38+00:00",
+      "notes": "公式親ページから個別申込ページへ進んだがCache miss。展示会期は親ページで確認済み。個別活動日時は未確認。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-05T07:18:39+00:00",
-    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。",
+    "checkedAt": "2026-10-06T00:08:38+00:00",
+    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。",
     "searchExamples": [
       "ドット絵 イベント 2026",
       "ピクセルアート 展示 ワークショップ 2026",
@@ -2138,18 +2437,25 @@
       "es",
       "fr",
       "de",
-      "ko"
+      "ko",
+      "zh",
+      "pt"
     ],
     "scopeRegions": [
       "日本",
       "オンライン",
       "欧州",
-      "韓国"
+      "韓国",
+      "中国語圏",
+      "ポルトガル語圏"
     ],
     "verifiedSourceLanguages": [
       "es",
       "de",
-      "ja"
+      "ja",
+      "en",
+      "zh",
+      "pt"
     ],
     "verifiedSourceUrls": [
       "https://www.digitaljove.com/talleres",
@@ -2161,7 +2467,12 @@
       "https://center.degico.jp/hermippe_m7kenji_2026-html.html",
       "https://honkbooks.com/asobanight-20/",
       "https://sites.google.com/view/crosspico/",
-      "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2"
+      "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
+      "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
+      "https://moer.tel/",
+      "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
+      "https://sites.google.com/pioneiro.g12.br/scratchday2026/p%C3%A1gina-inicial",
+      "https://www.fct.unl.pt/noticias/agenda/2026/02/pixel-art-alternative-interfaces"
     ],
     "regionalChecks": [
       {
@@ -2278,6 +2589,116 @@
             "name": "名古屋ぴくせるあーと すぽっと 2024",
             "reason": "参加作家のnote検索結果は見つかったが直接本文を取得できず今回未登録。"
           }
+        ]
+      },
+      {
+        "checkedAt": "2026-10-06T00:08:38+00:00",
+        "regions": [
+          "青森県",
+          "岩手県",
+          "秋田県",
+          "山形県",
+          "福島県",
+          "岡山県",
+          "広島県",
+          "台湾",
+          "中国",
+          "香港",
+          "マカオ",
+          "ブラジル",
+          "ポルトガル",
+          "ドイツ",
+          "オーストリア",
+          "オンライン"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "zh",
+          "pt"
+        ],
+        "queries": [
+          "青森 ドット絵 ピクセルアート 展示 2026 2027",
+          "岩手 ドット絵 ピクセルアート 展示 ワークショップ 2026 2027",
+          "秋田 ドット絵 ピクセルアート 展示 イベント 2026 2027",
+          "山形 ドット絵 ピクセルアート 展示 イベント 2026 2027",
+          "福島 ドット絵 ピクセルアート 展示 講座 2026 2027",
+          "岡山 ドット絵 ピクセルアート 展示 ワークショップ 2026 2027",
+          "広島 ドット絵 ピクセルアート 展示 イベント 2026 2027",
+          "2026 像素藝術 展覽 台灣 10月",
+          "2026 像素艺术 展览 中国 10月",
+          "2026 像素畫 工作坊 香港 10月",
+          "2026 澳门 像素艺术 活动 展览",
+          "site:skm.com.tw \"是誰的遊戲間\" 像素 2026",
+          "\"是誰的遊戲間\" \"10/2\" KAI 高雄 左營 新光三越",
+          "\"像素艺术\" \"2026年10月\" 展览 中国 官方",
+          "\"像素畫\" \"2026\" 香港 工作坊 十月 官方",
+          "site:*.br \"pixel art\" exposição oficina 2026",
+          "\"arte pixel\" exposição 2026 Brasil",
+          "\"pixel art\" oficina 2026 Brasil concurso",
+          "\"arte em pixel\" exposição 2026 Portugal",
+          "\"pixel art\" exposição 2026 Portugal oficina",
+          "\"pixel art\" concurso 2027 Brasil Portugal",
+          "site:instagram.com \"pixel art\" exposição Brasil 2026",
+          "\"pixel art\" festival Portugal 2026",
+          "\"SHIBUYA PIXEL ART\" \"2026\" 開催",
+          "\"冬休みドット大作戦\" \"2027\"",
+          "\"Pixelween\" \"2026\" October weekly challenge",
+          "\"pixel art\" jam October November 2026 art contest"
+        ],
+        "addedIds": [
+          "coloring-pixels-8th-anniversary-art-competition-2026",
+          "moertel-spiel-2026",
+          "moertel-viecc-2026",
+          "kai-whos-game-room-kaohsiung-2026",
+          "kai-whos-game-room-taoyuan-2026",
+          "kai-whos-game-room-kaohsiung-sanduo-2026",
+          "kai-whos-game-room-taipei-2026",
+          "kai-whos-game-room-chiayi-2026",
+          "scratch-day-pioneiro-pixel-art-2026",
+          "nova-fct-pixel-art-alternative-interfaces-2026"
+        ],
+        "recheckedIds": [
+          "pixel-art-park-9",
+          "shibuya-pixel-art-watch",
+          "winter-dot-daisakusen-watch",
+          "kyushu-pixel-marche-watch",
+          "gb-pixel-art-jam-2026",
+          "segment-pixel-jam-2026",
+          "pixelween-2026",
+          "moertel-polaris-2026",
+          "nrg-pixel-art-awards-2026"
+        ],
+        "notes": "3エージェントが前回未調査の国内7県・中国語圏・ポルトガル語圏を調査しrootが公式本文で統合。中断前の未読検索結果は確認済みにせず、国内6県を再検索して補完。日本7県・中国/香港/マカオ・pt圏では今回は未来の確定新規なし。今後/開催中4件を優先し、同一公式ページの台湾終了済み4会期とpt圏の開催実績2件を補足。日付/座標推測なし。網羅したとの主張なし。",
+        "unconfirmed": [
+          {
+            "name": "Farm Keeper Pixel Art Jam 2026（終了済み）",
+            "sourceUrl": "https://itch.io/jam/farm-keeper-pixel-art-jam-2026",
+            "reason": "公式プラットフォームの9月3〜13日表示とGMT+7の9月4〜14日表記、日英の開始時刻に差。今回の登録は保留。"
+          },
+          {
+            "name": "香港NFT像素馬賽克磚杯墊工作坊",
+            "sourceUrl": "https://www.klook.com/zh-HK/activity/79981-lcmleather-nftmosaiccoasterworkshop-causewaybay/",
+            "reason": "具体的な実開催日と主催公式本文未確認。"
+          },
+          {
+            "name": "asaha 京都個展",
+            "sourceUrl": "https://www.asaha.world/",
+            "reason": "公式Webを再読したが京都会期の確定日程は確認できず。SNS本文未確認。"
+          },
+          {
+            "name": "KAI展個別活動申込ページ",
+            "sourceUrl": "https://event.skm.com.tw/course_list.php?MM_SEARCH=search&activityStatus=&area=3&attr=&edate=2026-10-25&group=21&keyword=&sdate=2026-10-02",
+            "reason": "Cache missで個別活動本文取得不能。親公式ページの会期と区別。"
+          }
+        ],
+        "unavailableUrls": [
+          "https://x.com/pixelartpark",
+          "https://x.com/ShibuyaPixelArt",
+          "https://x.com/dot_daisakusen",
+          "https://x.com/PixelMarche",
+          "https://bsky.app/hashtag/gbpixelartjam",
+          "https://www.instagram.com/kai_pixelart/"
         ]
       }
     ],
