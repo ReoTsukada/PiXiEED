@@ -36,7 +36,15 @@ try {
         const brand = document.querySelector('.px-header-brand').getBoundingClientRect();
         const header = toggle.closest('.px-site-header');
         const controls = [...header.querySelectorAll('button,a')].filter(node => node !== toggle).map(node => node.getBoundingClientRect()).filter(r => r.width && r.height);
-        const overlaps = controls.some(r => r.left < rect.right - 1 && r.right > rect.left + 1 && r.top < rect.bottom - 1 && r.bottom > rect.top + 1);
+      // Horizontal tool actions can extend beyond their clipping scroller.
+      // Count overlap only where the browser actually paints a control.
+      const overlaps = controls.some(r => {
+        const left = Math.max(r.left, rect.left), right = Math.min(r.right, rect.right);
+        const top = Math.max(r.top, rect.top), bottom = Math.min(r.bottom, rect.bottom);
+        if (right - left <= 1 || bottom - top <= 1) return false;
+        const painted = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+        return painted && painted !== toggle && !toggle.contains(painted);
+      });
         const centre = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
         return { width: rect.width, height: rect.height, top: rect.top, right: rect.right, overlaps, brandRight: brand.right,
           reachable: centre === toggle || toggle.contains(centre), overflow: document.documentElement.scrollWidth > innerWidth + 1 };

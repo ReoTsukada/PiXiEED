@@ -7,6 +7,7 @@ import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261001-free-to
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261006-draw-startup-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',
@@ -30,7 +31,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261006-panel-close-1'; document.head.append(css);
+  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261006-header-controls-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
@@ -42,6 +43,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     else location.assign(url);
   }
   bar.append(launcher); document.body.append(bar);
+  mountToolHeaderControls(document, { projectBar: bar });
   const dialog = node('dialog', 'project-sheet'); dialog.id = 'pxd-panel'; dialog.setAttribute('aria-labelledby', 'project-sheet-title');
   const heading = node('div', 'project-sheet__heading'); const title = node('h2', '', '作品を管理'); title.id = 'project-sheet-title';
   const close = button('', 'project-close', () => dialog.close()); close.innerHTML = icon('close'); close.setAttribute('aria-label', '作品一覧を閉じる'); heading.append(title, close);

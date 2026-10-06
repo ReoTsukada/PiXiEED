@@ -29,6 +29,9 @@
 [data-state=saving] .project-bar__state { animation: project-save 1s steps(2) infinite; }
 @keyframes project-save { 50% { opacity: .4; } }
 .project-bar__name { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+/* Moving the existing launcher into the header removes its reserved editor row. */
+body.px-tool-header.project-workspace-ready .project-bar.px-tool-header-files { position: relative; top: auto; left: auto; flex: 0 0 44px; width: 44px; height: 44px; }
+body.px-tool-header .project-bar.px-tool-header-files button { width: 44px; height: 44px; border-radius: 10px; box-shadow: inset 0 1px #ffffff12; }
 body.project-workspace-ready.creation-editor #main { padding-top: calc(var(--px-header-height, 64px) - 2px) !important; }
 body.project-workspace-ready.app-page--tool-jigsaw #main { padding-top: calc(var(--px-header-height, 64px) - 2px); }
 body.project-workspace-ready:is(.hidden-object-editing, .spot-editing) .project-bar { top: calc(var(--px-header-height, 64px) + 8px); }
@@ -46,6 +49,16 @@ body.project-workspace-ready.creation-editor[data-tool-result-open] #main { padd
 body.project-workspace-ready .draw-meta { display: none; }
 body.project-workspace-ready .audio-status.is-visible { top: calc(var(--creation-editor-header, 64px) + 60px); }
 body.project-workspace-ready[data-tool-name="ドット絵カメラ"] .lc-top.px-site-header .lc-zoom-stops { top: calc(100% + 60px); }
+body.px-tool-header.project-workspace-ready.creation-editor #main { padding-top: 8px !important; }
+body.px-tool-header.project-workspace-ready.app-page--tool-jigsaw #main,
+body.px-tool-header.project-workspace-ready:not(.hidden-object-editing).app-page--tool-hidden-object #main,
+body.px-tool-header.project-workspace-ready:not(.spot-editing).app-page--tool-spot-difference #main { padding-top: 8px; }
+body.px-tool-header.project-workspace-ready .audio-status.is-visible { top: calc(var(--creation-editor-header,56px) + 8px); }
+body.px-tool-header.project-workspace-ready[data-tool-name="ドット絵カメラ"] .lc-top.px-site-header .lc-zoom-stops { top: calc(100% + 4px); }
+body.px-tool-header.project-workspace-ready.creation-editor .px-site-header .creation-output__panel { top: calc(var(--creation-editor-header) + 8px); max-height: calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 20px); }
+body.px-tool-header.project-workspace-ready.creation-editor .px-site-header .creation-output[open] > summary { position: relative; top: auto; right: auto; z-index: auto; }
+body.px-tool-header.project-workspace-ready.creation-editor .px-site-header .creation-output[open] > summary svg { display: block; }
+body.px-tool-header.project-workspace-ready.creation-editor .px-site-header .creation-output[open] > summary::after { content: none; }
 body.project-workspace-ready #draw-palette { display: flex !important; justify-content: flex-start !important; flex-wrap: nowrap !important; gap: 6px !important; }
 body.project-workspace-ready #draw-palette .draw-color { flex: none !important; }
 @media (min-width: 900px), (orientation: landscape) and (min-width: 560px) {

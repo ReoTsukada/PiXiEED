@@ -1,6 +1,9 @@
 /** Small, shared editor chrome. Artwork and song state stay in their own tools. */
+function editorDetails(root) {
+  return [...root.ownerDocument.querySelectorAll('details')].filter(panel => root.contains(panel) || panel.closest('[data-editor-header-control]'));
+}
 export function closeEditorPanels(root) {
-  for (const panel of root?.querySelectorAll('details[open]') || []) {
+  for (const panel of root ? editorDetails(root).filter(panel => panel.open) : []) {
     panel.open = false;
     panel.querySelector('summary')?.setAttribute('aria-expanded', 'false');
     // PXD's sheet lives outside the workspace to avoid Safari containing blocks.
@@ -36,17 +39,17 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
   }
   function onToggle(event) {
     const panel = event.target;
-    if (!panel.matches?.('details')) return;
+    if (!panel.matches?.('details') || (!root.contains(panel) && !panel.closest('[data-editor-header-control]'))) return;
     panel.querySelector('summary')?.setAttribute('aria-expanded', String(panel.open));
     if (!panel.open) return;
     beforePanelOpen();
-    for (const other of root.querySelectorAll('details[open]')) {
+    for (const other of editorDetails(root).filter(panel => panel.open)) {
       // A nested PXD menu retains the parent that contains its launcher.
       if (other !== panel && !other.contains(panel) && !panel.contains(other)) other.open = false;
     }
   }
   function onPointerDown(event) {
-    const panels = [...root.querySelectorAll('details[open]')];
+    const panels = editorDetails(root).filter(panel => panel.open);
     // Interacting with a body-mounted sheet also keeps its ancestor menus open.
     if (panels.some((panel) => {
       const id = panel.querySelector('summary')?.getAttribute('aria-controls');
@@ -63,11 +66,11 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
   }
   function onKey(event) {
     if (event.key !== 'Escape') return;
-    const panel = [...root.querySelectorAll('details[open]')].at(-1);
+    const panel = editorDetails(root).filter(panel => panel.open).at(-1);
     if (!panel) return;
     closeEditorPanels(root); panel.querySelector('summary')?.focus({ preventScroll: true });
   }
-  root.addEventListener('toggle', onToggle, true);
+  doc.addEventListener('toggle', onToggle, true);
   doc.addEventListener('pointerdown', onPointerDown);
   doc.addEventListener('keydown', onKey);
   win.addEventListener('resize', updateInsets, { passive: true });
@@ -76,7 +79,7 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
   updateInsets();
   return { closePanels: () => closeEditorPanels(root), dispose() {
     disposed = true; observer?.disconnect();
-    root.removeEventListener('toggle', onToggle, true);
+    doc.removeEventListener('toggle', onToggle, true);
     doc.removeEventListener('pointerdown', onPointerDown); doc.removeEventListener('keydown', onKey);
     win.removeEventListener('resize', updateInsets);
   } };

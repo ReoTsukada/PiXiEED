@@ -12,12 +12,18 @@ test('export closes nested menus and body-mounted PXD sheets without changing ar
       setAttribute: (key, value) => attrs.set(key, value)
     }) };
   }
-  const panels = [panel(null), panel('pxd-panel')];
-  const root = { querySelectorAll: () => panels, ownerDocument: { getElementById: () => sheet } };
+  const workspacePanel = panel(null), headerPanel = panel('pxd-panel'), unrelatedPanel = panel(null);
+  workspacePanel.closest = unrelatedPanel.closest = () => null;
+  headerPanel.closest = () => ({});
+  const panels = [workspacePanel, headerPanel];
+  const root = { contains: entry => entry === workspacePanel, ownerDocument: {
+    querySelectorAll: () => [...panels, unrelatedPanel], getElementById: () => sheet
+  } };
   closeEditorPanels(root);
   assert.ok(panels.every((entry) => !entry.open));
   assert.ok(panels.every((entry) => entry.attrs.get('aria-expanded') === 'false'));
   assert.equal(sheet.hidden, true);
+  assert.equal(unrelatedPanel.open, true, 'unrelated site panels stay open');
   assert.deepEqual([...image], [255, 0, 0, 255]);
   closeEditorPanels(root); // Repeated save/preview transitions do not reopen anything.
   assert.equal(sheet.hidden, true);

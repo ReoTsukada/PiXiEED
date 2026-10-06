@@ -12,7 +12,7 @@ import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { audioHslToHex, replaceAudioSourceColor } from './audio-color-edit.mjs?rev=20261005-audio-color-instruments-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-panel-close-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-header-controls-1';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, pxdImageToAudioDocument, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261005-frame-cell-pitch-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
@@ -21,7 +21,7 @@ import { mountAnimationControls } from './animation-controls.mjs?rev=20261004-au
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261001-audio-animation-1';
 import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261005-frame-cell-pitch-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
-import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
+import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261005-audio-history-1';

@@ -1,5 +1,7 @@
 import './site-analytics.mjs?rev=20261001-free-tools-1';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
+import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261006-header-controls-1';
+export { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261006-header-controls-1';
 
 const brandedLink = () => {
   const link = document.createElement('a');
@@ -214,13 +216,20 @@ export function mountSiteHeader() {
   brand.classList.add('px-header-brand');
   brand.href = '/';
   brand.setAttribute('aria-label', 'PiXiEED ホーム');
-  // tool pages name themselves beside the logo (<body data-tool-name="かんたんドット">); home says PiXiEED
+  // Tool names remain in document titles and headings; editing chrome uses the space for controls.
   const toolName = document.body.dataset.toolName;
   if (toolName) {
     let label = brand.querySelector('span:not(.brand-mark)');
     if (!label) { label = document.createElement('span'); brand.append(label); }
-    label.textContent = toolName; brand.classList.add('px-header-brand--tool');
-    if (document.body.dataset.toolShort) label.dataset.short = document.body.dataset.toolShort; // shown instead when the header is tight
+    label.textContent = toolName; label.hidden = true;
+    brand.classList.add('px-header-brand--tool');
+    mountToolHeaderControls(document, { selectors: document.body.dataset.page === 'audio'
+      ? ['#audio-output', '#audio-undo', '#audio-redo', '#audio-composition-settings', '#audio-animation-panel']
+      : document.body.dataset.page === 'spot-difference' ? ['.spot-settings']
+        : document.body.dataset.page === 'jigsaw' ? ['#jigsaw-preview-toggle', '#jigsaw-hint', '#jigsaw-rotate', '#jigsaw-return', '.jigsaw-more']
+          : document.body.dataset.page === 'hidden-object' ? ['[data-hidden-mode="paint"]', '[data-hidden-mode="erase"]']
+        : document.body.dataset.page === 'creation-game' ? ['#game-new']
+          : document.body.dataset.toolName === 'ドット絵カメラ' ? ['#cameraChooseImage'] : [] });
   }
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   inner.querySelectorAll('[data-header-pass]').forEach((button) => button.remove());
