@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
-  <link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20261003-puzzle-import-1">
+  <link rel="stylesheet" href="/css/creation-spot-difference.css?rev=20261006-maker-icons-1">
   <link rel="stylesheet" href="/css/puzzle-image-import.css?rev=20261003-puzzle-import-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261006-header-controls-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
@@ -62,7 +62,7 @@
       <p>読み込んだ画像は間違い探し用の固定版として端末に保存します。元のファイルやほかの作品は変更しません。</p>
     </section>
     <section id="spot-inline-draw" class="spot-inline-draw" aria-label="違いを描く" hidden>
-      <div class="spot-inline-top"><strong>複製した絵に違いを描く</strong><button id="spot-inline-cancel" type="button">戻る</button></div>
+      <div class="spot-inline-top"><strong>複製した絵に違いを描く</strong><button id="spot-inline-cancel" type="button" aria-label="画像選択に戻る" title="画像選択に戻る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m6-6-6 6 6 6"/></svg></button></div>
       <p>元の絵はそのままです。色を選んで描き、いつでも戻せます。</p>
       <canvas id="spot-inline-canvas" aria-label="複製した絵に違いを描くキャンバス" tabindex="0"></canvas>
       <div class="spot-inline-color-row"><div id="spot-inline-palette" class="spot-inline-palette" role="group" aria-label="描く色"></div><label class="spot-inline-add-color" title="新しい色を追加"><span aria-hidden="true">＋</span><input id="spot-inline-add-color" type="color" value="#f2a433" aria-label="新しく追加する色"></label></div>
@@ -72,7 +72,7 @@
         <button id="spot-inline-undo" type="button" aria-label="ひとつ戻す" title="ひとつ戻す" disabled><img src="/assets/icons/pixieed/undo.svg" alt=""></button>
         <button id="spot-inline-redo" type="button" aria-label="やり直す" title="やり直す" disabled><img src="/assets/icons/pixieed/redo.svg" alt=""></button>
         <button id="spot-inline-original" type="button" aria-label="元の絵と比べる" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-        <button id="spot-inline-finish" type="button">候補を確認</button>
+        <button id="spot-inline-finish" type="button" aria-label="描いた違いの候補を確認" title="描いた違いの候補を確認"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>
       </div>
       <p id="spot-inline-status" role="status" aria-live="polite"></p>
     </section>
@@ -80,16 +80,16 @@
       <figure class="spot-preview"><figcaption>変更後の絵。色のついた場所をタップして候補を選びます。分割モードでは画素をなぞって範囲を選べます。</figcaption><canvas id="spot-canvas" aria-label="変更後の画像。色のついた候補をタップして選び、分割モードではなぞって範囲を選択できます。ピンチで拡大。矢印キーで候補を選択" tabindex="0"></canvas></figure>
       <p id="spot-source-label" class="spot-source-label"></p>
       <details class="spot-settings">
-        <summary aria-label="候補と編集操作を開く">候補・編集</summary>
+        <summary aria-label="差分候補を開く" title="差分候補"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h11M9 12h11M9 19h11"/><circle cx="4" cy="5" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="19" r="1"/></svg></summary>
         <div class="spot-settings__sheet">
           <p id="spot-edit-help" class="spot-edit-help">絵をタップすると候補を選択。分割は「分割する」をオンにして画素をなぞります。</p>
-          <button id="spot-split-mode" class="spot-split-mode" type="button" aria-pressed="false">分割する</button>
+          <button id="spot-split-mode" class="spot-split-mode" type="button" aria-pressed="false" aria-label="分割モード" title="分割モード"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v16H4zM14 4h6v16h-6zM12 2v20"/></svg></button>
           <div class="spot-actions" aria-label="候補の編集">
-            <button id="spot-merge" type="button" disabled>まとめる</button>
-            <button id="spot-split" type="button" disabled>選択範囲で分割</button>
-            <button id="spot-exclude" type="button" disabled>候補を除外</button>
-          <button id="spot-confirm" type="button" disabled>正解を確定</button>
-          <button id="spot-redraw" type="button" hidden>違いを描き直す</button>
+            <button id="spot-merge" type="button" disabled aria-label="選んだ候補をまとめる" title="選んだ候補をまとめる"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h16v6H4zM7 11v2M17 11v2"/></svg></button>
+            <button id="spot-split" type="button" disabled aria-label="選択範囲で分割" title="選択範囲で分割"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v16H4zM14 4h6v16h-6zM12 2v20"/></svg></button>
+            <button id="spot-exclude" type="button" disabled aria-label="選んだ候補を除外" title="選んだ候補を除外"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM8 8l8 8M16 8l-8 8"/></svg></button>
+          <button id="spot-confirm" type="button" disabled aria-label="正解を確定" title="正解を確定"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>
+          <button id="spot-redraw" type="button" hidden aria-label="違いを描き直す" title="違いを描き直す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16 12-12 4 4L8 20H4zM13 7l4 4"/></svg></button>
           </div>
           <ol id="spot-candidates" class="spot-candidates" aria-label="差分候補"></ol>
           <p id="spot-confirmed" class="spot-confirmed" role="status" hidden>作者が正解を確定しました。作品は端末内の下書きです。</p>
@@ -97,8 +97,8 @@
         </div>
       </details>
       <div class="spot-publish-actions" aria-label="確定した間違い探しの操作">
-        <button id="spot-play-local" type="button" hidden disabled>確定した下書きを試しに遊ぶ</button>
-        <button id="spot-publish" class="spot-publish" type="button" hidden disabled title="投稿機能は準備中">投稿機能は準備中</button>
+        <button id="spot-play-local" type="button" hidden disabled aria-label="確定した下書きを試しに遊ぶ" title="確定した下書きを試しに遊ぶ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 12 8-12 8z"/></svg></button>
+        <button id="spot-publish" class="spot-publish" type="button" hidden disabled aria-label="地球儀へ投稿" title="地球儀へ投稿"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M5 13v8h14v-8"/></svg></button>
       </div>
       <output id="spot-zoom" class="spot-zoom" aria-label="画像の拡大率">100%</output>
       <p id="spot-edit-hint" class="spot-edit-hint" role="status" aria-live="polite"></p>
@@ -111,7 +111,7 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261006-header-controls-1"></script>
+  <script type="module" src="/js/creation/spot-difference-page.mjs?rev=20261006-maker-icons-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>

@@ -47,6 +47,11 @@ try {
         if (await page.locator('#draw-controls-side-toggle').getAttribute('data-side') !== side) await page.locator('#draw-controls-side-toggle').click();
         const placement = page.locator('#draw-controls-side-toggle');
         assert.equal(await placement.textContent(), ''); assert.equal(await page.locator('button[data-draw-controls-side]').count(), 0);
+        assert.equal(await placement.evaluate(n => n.parentElement.classList.contains('draw-settings-panel')), true, 'placement is an ordinary ON/OFF grid button');
+        assert.equal(await page.locator('.draw-input-settings__choices').count(), 0, 'no separate placement row');
+        const gridBox = await placement.boundingBox(), virtualBox = await page.locator('#draw-virtual-toggle').boundingBox();
+        assert.equal(gridBox.width, virtualBox.width); assert.equal(gridBox.height, virtualBox.height);
+        assert.equal(gridBox.y, virtualBox.y, 'placement aligns with virtual cursor in the grid');
         assert.equal(await placement.getAttribute('aria-pressed'), String(side === 'left'));
         assert.match(await placement.getAttribute('aria-label'), new RegExp(`操作欄は${side==='left'?'左':'右'}。${side==='left'?'右':'左'}に移動`));
         await page.locator('.draw-settings-panel .draw-panel-close').click();

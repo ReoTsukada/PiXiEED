@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
-import { supabaseConfig } from '../data/site-config.js';
 const { chromium } = await import(pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE).href);
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4182';
 if (!['localhost', '127.0.0.1'].includes(new URL(base).hostname)) throw new Error('Local server required.');
+await (await import('node:fs/promises')).mkdir('/tmp/pixieed-game-maker-layout', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 try {
   for (const [width, height] of [[320, 568], [390, 844], [844, 390], [1280, 800]]) {
@@ -29,6 +29,10 @@ try {
     await page.waitForFunction(() => !document.querySelector('#hidden-editor').hidden);
     await page.locator('#hidden-target-settings > summary').click();
     await page.locator('#hidden-name').fill('赤い花'); await page.locator('#hidden-add').click();
+    const workspace = await page.locator('.hidden-preview').boundingBox();
+    assert.ok(workspace.height >= (height < 500 ? 180 : 290), `workspace too small: ${JSON.stringify(workspace)}`);
+    assert.equal(await page.locator('#hidden-target-settings').getAttribute('open'), null, 'adding a target returns to the picture');
+    await page.screenshot({ path: `/tmp/pixieed-game-maker-layout/hidden-edit-${width}.png` });
     await page.locator('#hidden-canvas').click({ position: { x: 5 / 16 * (await page.locator('#hidden-canvas').boundingBox()).width, y: 5 / 16 * (await page.locator('#hidden-canvas').boundingBox()).height } });
     const sharedPrompt = 'りんごがあるよ、鍵が6こ';
     await page.locator('#hidden-target-settings > summary').click();
@@ -40,15 +44,14 @@ try {
       const canvas = document.querySelector('#hidden-canvas').getBoundingClientRect(), svg = document.querySelector('#hidden-hit-preview'), rect = svg.getBoundingClientRect();
       return { overflowX: document.documentElement.scrollWidth > innerWidth + 1, overflowY: document.documentElement.scrollHeight > innerHeight + 1, overlay: !svg.hasAttribute('hidden') && getComputedStyle(svg).display !== 'none', labels: [...svg.querySelectorAll('text')].map(n => n.textContent), aligned: Math.abs(canvas.x - rect.x) < 1 && Math.abs(canvas.y - rect.y) < 1 && Math.abs(canvas.width - rect.width) < 1 && Math.abs(canvas.height - rect.height) < 1 };
     });
-    assert.equal(measured.overflowX, false); assert.equal(measured.overflowY, false); assert.equal(measured.overlay, true); assert.equal(measured.aligned, true); assert.deepEqual(measured.labels, ['1']); assert.equal(await page.locator('#hidden-publish').isEnabled(), supabaseConfig.puzzlePublicationEnabled === true); assert.deepEqual(errors, []);
-    const controls = [];
-    for (const id of ['hidden-new', 'hidden-play-local', 'hidden-publish']) {
-      const button = page.locator('#' + id); await button.scrollIntoViewIfNeeded();
-      controls.push(await button.evaluate(n => { const r = n.getBoundingClientRect(), s = n.closest('.px-tool-header-controls').getBoundingClientRect(); return { id: n.id, width: r.width, height: r.height, visible: r.x >= s.left - .1 && r.right <= s.right + .1 && r.y >= 0 && r.bottom <= 64, hit: n.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)) }; }));
-    }
-    assert.ok(controls.length === 3 && controls.every(c => c.width >= 44 && c.height <= 80 && c.visible && c.hit), `confirmation controls clipped: ${JSON.stringify(controls)}`);
+    assert.equal(measured.overflowX, false); assert.equal(measured.overflowY, false); assert.equal(measured.overlay, true); assert.equal(measured.aligned, true); assert.deepEqual(measured.labels, ['1']); assert.equal(await page.locator('#hidden-publish').getAttribute('aria-label'), '地球儀へ投稿'); assert.deepEqual(errors, []);
+    const controls = await page.evaluate(() => {
+      const nav = document.querySelector('.app-tabs').getBoundingClientRect();
+      return [...document.querySelectorAll('#hidden-new, #hidden-play-local')].map(button => { const r = button.getBoundingClientRect(); return { id: button.id, width: r.width, height: r.height, visible: r.x >= 0 && r.right <= innerWidth + 1 && r.y >= 0 && r.bottom <= nav.top + 1 }; });
+    });
+    assert.ok(controls.every(c => c.width >= 44 && c.height <= 80 && c.visible), `confirmation controls clipped: ${JSON.stringify(controls)}`);
     await page.waitForTimeout(1100); // Let the one-shot confirmation burst settle for visual review.
-    await page.screenshot({ path: `/tmp/pixieed-hidden-maker-review-${width}.png` });
+    await page.screenshot({ path: `/tmp/pixieed-game-maker-layout/hidden-confirmed-${width}.png` });
     await page.locator('#hidden-new').click();
     assert.equal(await page.locator('#hidden-image-slot').getAttribute('data-filled'), null, 'new maker must clear the staged image');
     assert.equal(await page.locator('#hidden-share-prompt-text').inputValue(), '', 'new maker must clear the previous prompt');
@@ -59,6 +62,17 @@ try {
     assert.equal(await page.locator('#hidden-share-prompt-text').inputValue(), sharedPrompt, 'saved prompt must be restored with the draft');
     await page.locator('#hidden-play-local').click(); await page.waitForURL(/\/play\/hidden-object\/\?localHidden=/);
     await page.waitForFunction(() => document.querySelector('#pixfind-progress')?.textContent.includes('0 / 1'));
+    assert.equal(await page.locator('#puzzle-share-copy').isVisible(), false, 'local drafts have no public URL in the header');
+    const image = await page.locator('#pixfind-original').boundingBox();
+    await page.mouse.click(image.x + image.width * 5.5 / 16, image.y + image.height * 5.5 / 16);
+    const result = page.locator('[data-tool-result-view="find-result"]');
+    await result.waitFor({ state: 'visible' });
+    assert.equal(await result.getByRole('button', { name: '共有する', exact: true }).count(), 0, 'local results cannot share a private draft');
+    assert.equal(await page.locator('.px-tool-header-slot:has(#puzzle-share-copy)').isVisible(), false, 'local result also keeps the header share slot hidden');
+    const listLink = result.getByRole('link', { name: '問題一覧に戻る', exact: true });
+    assert.equal(await listLink.getAttribute('href'), '/play/hidden-object/');
+    await listLink.click(); await page.waitForURL(`${base}/play/hidden-object/`);
+    await page.waitForFunction(() => document.querySelector('#pixfind-game')?.hidden);
     let importRace = 'SKIP';
     if (width === 320) {
       const racePage = await context.newPage();
@@ -117,6 +131,6 @@ try {
       importRace = 'PASS'; await racePage.close();
     }
     assert.deepEqual(errors, []);
-    console.log(JSON.stringify({ width, height, ...measured, localPlay: 'PASS', importRace, errors })); await context.close();
+    console.log(JSON.stringify({ width, height, ...measured, localPlay: 'PASS', localResultShareHidden: 'PASS', importRace, errors })); await context.close();
   }
 } finally { await browser.close(); }

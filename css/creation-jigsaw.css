@@ -54,3 +54,38 @@ body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-heading,body.app-
 .jigsaw-more[open]>summary{background:#ffd35a;border-color:#b88f1d}
 .jigsaw-more__menu{position:absolute;top:calc(100% + 8px);right:0;z-index:10;display:grid;grid-template-columns:repeat(3,44px);gap:6px;padding:8px;border:1px solid #374858;border-radius:16px;background:#15202b;box-shadow:0 10px 28px #0005}
 .jigsaw-workspace-tools .jigsaw-more__menu #jigsaw-new{grid-column:1/-1;width:100%;min-height:44px}
+
+/* Tools live in the shared icon header. The board keeps the space they freed. */
+body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play{grid-template-rows:minmax(0,1fr) 74px!important}
+body.app-page--tool-jigsaw .jigsaw-play>.arc-hud,body.app-page--tool-jigsaw .jigsaw-play>.arc-win{display:none!important}
+body.app-page--tool-jigsaw .jigsaw-workspace-tools{position:absolute;width:1px;height:1px;min-height:0;padding:0;overflow:hidden;clip-path:inset(50%)}
+body.app-page--tool-jigsaw .jigsaw-workspace{grid-row:1}
+body.app-page--tool-jigsaw .jigsaw-tray{grid-row:2}
+body.app-page--tool-jigsaw[data-tool-result-open] .px-tool-header-slot{visibility:hidden}
+@media(max-height:420px){body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play{grid-template-rows:minmax(0,1fr) 48px!important}}
+@media(orientation:landscape) and (max-height:520px) and (min-width:540px){
+  body.app-page--tool-jigsaw[data-jigsaw-playing="true"] .jigsaw-play{grid-template-rows:minmax(0,1fr)!important;grid-template-areas:"work tray"!important}
+}
+
+/* Reference window: image aspect is computed independently of its 44px controls. */
+body.app-page--tool-jigsaw .px-site-header #jigsaw-preview-toggle{position:relative;background:#fff;color:#17232d;border:2px solid #657383;min-width:44px;min-height:44px}
+body.app-page--tool-jigsaw .px-site-header #jigsaw-preview-toggle svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+body.app-page--tool-jigsaw .px-site-header #jigsaw-preview-toggle[aria-pressed="true"]{background:#ffd35a;color:#17232d;border-color:#6e5510}
+.jigsaw-preview-indicator{display:none;position:absolute;right:1px;bottom:0;font-size:11px;font-weight:900;line-height:14px}
+#jigsaw-preview-toggle[aria-pressed="true"] .jigsaw-preview-indicator{display:block}
+.jigsaw-preview{max-height:none;gap:4px;touch-action:none;overflow:visible}
+.jigsaw-preview__head{height:44px;min-height:44px;margin:0;font-size:12px}
+.jigsaw-preview__head button{background:#edf0e7;border:1px solid #8a9681;color:#253221}
+.jigsaw-preview__canvas{flex:none;align-self:center;max-height:none;object-fit:fill}
+.jigsaw-preview__foot{display:flex;align-items:center;justify-content:space-between;gap:4px;flex:none;height:44px;color:#394332;font-size:11px;font-variant-numeric:tabular-nums}
+#jigsaw-preview-resize{box-sizing:border-box;flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:9px;border:1px solid #718265;border-radius:8px;background:#edf0e7;color:#253221;cursor:nwse-resize;touch-action:none}
+#jigsaw-preview-resize svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#jigsaw-preview-resize:focus-visible,#jigsaw-preview-close:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
+.jigsaw-preview[data-preview-gesture]{border-color:#335cbe;box-shadow:0 0 0 2px #335cbe55,0 5px 18px #1f2b1c33}
+body.app-page--tool-jigsaw .jigsaw-more__menu{grid-template-columns:minmax(0,1fr);width:212px;max-width:calc(100vw - 32px);gap:8px}
+body.app-page--tool-jigsaw .jigsaw-more__menu button{box-sizing:border-box;min-height:44px;border:1px solid #657383;border-radius:10px;background:#fff;color:#17232d;font-size:13px;padding:8px}
+body.app-page--tool-jigsaw .jigsaw-more__menu button:disabled{background:#263442;color:#adbac5;border-color:#41515f;cursor:default}
+body.app-page--tool-jigsaw .jigsaw-more__menu #jigsaw-fit{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%}
+#jigsaw-view-scale{font-variant-numeric:tabular-nums;font-size:11px}
+.jigsaw-more__pages{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:6px;align-items:center;text-align:center;color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
+body.app-page--tool-jigsaw .jigsaw-more__menu #jigsaw-new{width:100%}

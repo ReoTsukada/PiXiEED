@@ -28,7 +28,7 @@
   <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261006-header-controls-1">
   <link rel="stylesheet" href="/css/draw-compact-controls.css?rev=20261006-floating-mouse-2">
   <!-- Start the editor dependency graph together with its styles. -->
-  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261006-floating-mouse-2">
+  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261006-selection-fix-1">
   <link rel="modulepreload" href="/js/creation/project-workspace.mjs?rev=20261006-header-controls-1">
   <link rel="modulepreload" href="/js/creation/draw-core.mjs?rev=20261006-draw-startup-1">
   <link rel="modulepreload" href="/js/creation/animation-core.mjs">
@@ -101,12 +101,8 @@
             <button id="draw-grid-toggle" type="button" data-drawing-icon="grid" aria-pressed="true" aria-label="マス目を表示" title="マス目を表示"></button>
             <button id="draw-onion-toggle" type="button" data-drawing-icon="onion" aria-pressed="false" aria-label="前後のコマを重ねて表示" title="前後のコマを重ねて表示"></button>
             <button id="draw-virtual-toggle" type="button" aria-pressed="false" aria-label="仮想カーソル。描画面をなぞってカーソルを動かす" title="仮想カーソル"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v16l5-5 4 7 3-2-4-6h8Z"/></svg></button>
-            <section class="draw-input-settings" aria-labelledby="draw-input-settings-title">
-              <h2 id="draw-input-settings-title">操作欄</h2>
-              <div class="draw-input-settings__choices" role="group" aria-label="操作欄の位置">
-                <button id="draw-controls-side-toggle" type="button" aria-pressed="false" aria-label="操作欄は右。左に移動" title="操作欄は右。左に移動"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><rect data-controls-side-highlight x="16" y="6" width="3" height="12" rx="1"/></svg></button>
-              </div>
-              <p>横画面で左右を入れ替え</p>
+            <button id="draw-controls-side-toggle" type="button" aria-pressed="false" aria-label="操作欄は右。左に移動" title="操作欄は右。左に移動"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><rect data-controls-side-highlight x="16" y="6" width="3" height="12" rx="1"/></svg></button>
+            <section class="draw-input-settings" aria-label="操作設定">
               <p class="draw-input-help">色・道具はタップ／左クリックで左に設定。長押し／右クリックで右に設定。キーボードは対象を選んで Shift＋Enter。選択中の色をもう一度押すと編集。透明は編集しません。</p>
               <button id="draw-shortcuts-open" type="button" aria-label="ショートカット一覧と設定を開く">ショートカット</button>
               <button id="draw-mouse-position-reset" type="button">仮想マウスの位置を戻す</button>
@@ -123,7 +119,7 @@
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-animation-play" type="button" aria-pressed="false" aria-label="アニメーションを再生" title="再生"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="draw-play-icon" d="m8 5 11 7-11 7Z"/><path class="draw-stop-icon" d="M8 5v14M16 5v14"/></svg></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-floating-mouse-2"></script>
+  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-selection-fix-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>

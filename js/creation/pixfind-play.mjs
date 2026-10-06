@@ -3,7 +3,7 @@ import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-sh
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261006-result-list-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
@@ -11,6 +11,7 @@ import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
 import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261004-legacy-puzzle-share-1';
 import { isLegacyPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
@@ -20,6 +21,8 @@ const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
 /** 間違い探し and もの探し are separate games, each on its own page. */
 export const PUZZLE_PLAY_PATHS = Object.freeze({ 'spot-difference': '/play/spot-difference/', 'hidden-object': '/play/hidden-object/' });
 export const MODE_NAMES = Object.freeze({ 'spot-difference': '間違い探し', 'hidden-object': 'もの探し' });
+/** Results leave a preview/direct link for its game's list, independent of browser history. */
+export const puzzleResultListHref = (mode) => PUZZLE_PLAY_PATHS[mode] || '/tools/';
 
 /** The game page an older /pixfind/ link belongs to; a local もの探し draft is known from its address, anything else starts at 間違い探し and moves on once the puzzle's mode is known. */
 export function playPathForLegacyLink(location) {
@@ -291,10 +294,18 @@ function mount() {
   const shareButton = document.querySelector('#puzzle-share-copy');
   const shareStatus = document.querySelector('#puzzle-share-status');
   const shareInput = document.querySelector('#puzzle-share-url');
+  if (shareButton) {
+    shareButton.setAttribute('aria-label', '共有URLをコピー'); shareButton.title = '共有URLをコピー';
+    shareButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>';
+  }
+  mountToolHeaderControls(document, { selectors: ['#pixfind-back', '#puzzle-share-copy', '#pixfind-hint'] });
+  document.querySelector('.px-tool-header-controls')?.setAttribute('aria-label', 'ゲームの操作');
   let shareRequest = 0;
   let puzzles = []; let selected = null; let regions = []; let found = new Set(); let original = null; let changed = null; let currentMask = null; let cursorX = NaN; let cursorY = NaN; let readOnly = false; let authoritativeAnswers = false; let answerInstruction = ''; let localRoute = false; let postPuzzleRoute = false;
   let resultRun = 0; let resultShownRun = -1; let resultTimer = 0; let feedbackTimer = 0; let feedbackToken = 0;
-  const resultView = createToolResultView({ key: document.body.dataset.puzzleMode === 'hidden-object' ? 'find-result' : 'spot-result', main: document.querySelector('#main'), returnLabel: 'ゲームに戻る' });
+  const resultListHref = puzzleResultListHref(document.body.dataset.puzzleMode);
+  const resultView = createToolResultView({ key: document.body.dataset.puzzleMode === 'hidden-object' ? 'find-result' : 'spot-result', main: document.querySelector('#main'),
+    returnLabel: '問題一覧に戻る', returnHref: resultListHref, onReturn: () => window.location.assign(resultListHref) });
   const cancelResult = (newRun = false) => { window.clearTimeout(resultTimer); resultTimer = 0; if (newRun) resultRun += 1; resultView.close(); };
   const clearTapFeedback = () => {
     feedbackToken += 1; window.clearTimeout(feedbackTimer); feedbackTimer = 0;
@@ -372,11 +383,13 @@ function mount() {
   let hintFrame = 0; let hintTimer = 0;
   const reduceHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
   const stopHintMotion = () => { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; window.clearTimeout(hintTimer); hintTimer = 0; };
-  const hintController = createPuzzleHintController({ onState: ({ pending }) => {
+  const hintController = createPuzzleHintController({ storage: null, onState: ({ pending, freeUsed }) => {
     if (!hintButton) return;
     hintButton.disabled = pending;
-    hintButton.setAttribute('aria-label', 'ヒント');
-    hintButton.title = 'ヒント';
+    hintButton.setAttribute('aria-label', 'ヒント：未発見の場所を一時表示');
+    hintButton.setAttribute('aria-busy', String(pending));
+    hintButton.dataset.used = String(freeUsed);
+    hintButton.title = '未発見の場所を一時表示（正解には数えません）';
   } });
   const syncHint = () => { if (hintButton) hintButton.hidden = readOnly || !regions.length || found.size >= regions.length; };
   const animateHint = () => {
@@ -418,7 +431,9 @@ function mount() {
           if (scheduledRun !== resultRun || selected !== scheduledPuzzle || game.hidden || !original || readOnly || !regions.length || found.size !== regions.length || resultShownRun === scheduledRun) return;
           resultShownRun = scheduledRun;
           const title = authoritativeAnswers ? 'すべて見つけました' : '候補をすべて確認しました';
-          resultView.show({ title, detail: `${selected.label} · ${found.size} / ${regions.length}件`, preview: originalNode });
+          resultView.show({ title, detail: `${selected.label} · ${found.size} / ${regions.length}件`, preview: originalNode,
+            controls: isPublicPuzzleShareable(selected, pageMode) ? sharePanel : undefined,
+            actions: isPublicPuzzleShareable(selected, pageMode) ? [{ label: '共有する', onClick: () => sharePuzzle(true) }] : [] });
         }, 350);
       }
     }
@@ -427,10 +442,12 @@ function mount() {
   const start = async (puzzle) => {
     shareRequest += 1;
     if (sharePanel) sharePanel.hidden = true;
-    if (shareButton) { shareButton.disabled = false; shareButton.textContent = '共有URLをコピー'; }
+    if (shareButton) { shareButton.disabled = false; shareButton.title = '共有URLをコピー'; }
     if (shareStatus) shareStatus.textContent = '';
     if (shareInput) { shareInput.hidden = true; shareInput.value = ''; }
     cancelResult(true); resultShownRun = -1;
+    const loadRun = resultRun;
+    game.dataset.puzzleRun = crypto.randomUUID();
     clearTapFeedback();
     // Each game shows only its own kind; a link to the other kind moves to that game.
     if (pageMode && puzzle.mode !== pageMode) { window.location.replace(PUZZLE_PLAY_PATHS[puzzle.mode] + window.location.search + window.location.hash); return; }
@@ -439,7 +456,7 @@ function mount() {
     const hintIdentity = puzzle.localOnly || puzzle.localHiddenOnly
       ? `local:${puzzle.mode || 'puzzle'}:${String(puzzle.id || 'draft')}:${String(puzzle.hintRevision || 'revision-unknown')}`
       : `public:${puzzle.mode || 'puzzle'}:${String(puzzle.id || puzzle.slug || 'puzzle')}`;
-    hintController.setProblem(`pixfind:${hintIdentity}`);
+    hintController.setProblem(`pixfind:${hintIdentity}:run:${loadRun}`);
     selected = puzzle; found = new Set(); regions = []; cursorX = NaN; cursorY = NaN; viewport = { zoom: 1, x: 0, y: 0 }; activePointers.clear(); readOnly = false; authoritativeAnswers = false; answerInstruction = ''; primary.disabled = false; statusGame.dataset.visible = 'true'; statusGame.textContent = '絵を準備しています。';
     originalNode.hidden = false; changedNode.hidden = puzzle.mode === 'hidden-object';
     if (changedFigure) changedFigure.hidden = puzzle.mode !== 'spot-difference';
@@ -450,6 +467,7 @@ function mount() {
     else if (puzzle.publicPostOnly) postPuzzleRoute = true;
     else { const nextUrl = new URL(window.location.href); nextUrl.searchParams.delete('localSpot'); nextUrl.searchParams.set('puzzle', puzzle.id); nextUrl.hash = ''; history.replaceState(null, '', nextUrl); }
     game.hidden = false; list.hidden = true; document.querySelector('#pixfind-title').textContent = puzzle.label;
+    progress.textContent = '準備中';
     document.querySelector('#pixfind-author').textContent = `作者：${puzzle.author}`;
     if (localNotice) localNotice.hidden = !(puzzle.localOnly || puzzle.localHiddenOnly);
     document.querySelector('#pixfind-image-label').textContent = puzzle.mode === 'hidden-object' ? '絵をタップして探す' : '元の絵';
@@ -457,10 +475,14 @@ function mount() {
     primary.className = 'pixfind-primary-ready';
     try {
       if (puzzle.localHiddenOnly || (puzzle.publicPostOnly && puzzle.mode === 'hidden-object')) {
-        original = await loadImage(puzzle.originalUrl); changed = null; originalNode.src = puzzle.originalUrl; changedNode.removeAttribute('src'); changedNode.hidden = true; if (compareButton) compareButton.hidden = true;
+        const nextOriginal = await loadImage(puzzle.originalUrl);
+        if (selected !== puzzle || resultRun !== loadRun) return;
+        original = nextOriginal; changed = null; originalNode.src = puzzle.originalUrl; changedNode.removeAttribute('src'); changedNode.hidden = true; if (compareButton) compareButton.hidden = true;
         if (original.naturalWidth !== puzzle.width || original.naturalHeight !== puzzle.height) throw new Error('元画像の保存版サイズが一致しません。');
       } else {
-        [original, changed] = await Promise.all([loadImage(puzzle.originalUrl), loadImage(puzzle.changedUrl)]);
+        const nextImages = await Promise.all([loadImage(puzzle.originalUrl), loadImage(puzzle.changedUrl)]);
+        if (selected !== puzzle || resultRun !== loadRun) return;
+        [original, changed] = nextImages;
         originalNode.src = puzzle.originalUrl; changedNode.src = puzzle.changedUrl;
         if (original.naturalWidth !== changed.naturalWidth || original.naturalHeight !== changed.naturalHeight) throw new Error('2枚の画像サイズが一致しないため、この問題は遊べません。');
       }
@@ -514,12 +536,14 @@ function mount() {
       if (!readOnly && !regions.length) { readOnly = true; viewMessage = '正解位置を確認できないため、画像のみ表示しています。'; }
       if (readOnly) { primary.disabled = true; primary.setAttribute('aria-label', '正解位置未確認のためプレイできません'); progress.textContent = '閲覧のみ'; foundList.replaceChildren(); statusGame.textContent = viewMessage; }
       else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; updateProgress(); }
+      document.dispatchEvent(new CustomEvent('pixfind:run-start'));
       updateBaseScale(); constrainViewport(); paint();
       if (sharePanel) {
         sharePanel.hidden = !isPublicPuzzleShareable(puzzle, pageMode);
         if (!sharePanel.hidden) { updateBaseScale(); constrainViewport(); paint(); }
       }
     } catch (error) {
+      if (selected !== puzzle || resultRun !== loadRun) return;
       statusGame.textContent = error.message || '問題を読み込めませんでした。'; primary.disabled = true;
       if (puzzle.publicPostOnly) {
         readOnly = true; regions = []; found.clear(); currentMask = null;
@@ -551,39 +575,48 @@ function mount() {
   };
   primary.setAttribute('aria-label', '一覧の先頭の問題を遊ぶ');
   primary.addEventListener('click', () => { if (selected) start(selected); else if (puzzles.length) start(puzzles[0]); });
-  shareButton?.addEventListener('click', async () => {
+  const sharePuzzle = async (nativeShare = false) => {
     const puzzle = selected;
-    if (!isPublicPuzzleShareable(puzzle, pageMode) || !sharePanel) return;
+    if (!isPublicPuzzleShareable(puzzle, pageMode) || !sharePanel || shareButton.disabled) return;
     const request = ++shareRequest;
     shareButton.disabled = true;
-    shareButton.textContent = '公開ページを確認しています…';
+    shareButton.title = '公開ページを確認しています…';
     shareStatus.textContent = '';
     shareInput.hidden = true;
     try {
       const url = await verifyPuzzleSharePage({ mode: puzzle.mode, postId: puzzle.id, origin: window.location.origin });
       if (request !== shareRequest || selected !== puzzle) return;
       shareInput.value = url;
+      if (nativeShare && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: puzzle.label, url });
+          if (request === shareRequest && selected === puzzle) shareStatus.textContent = '共有しました。';
+          return;
+        } catch { /* Cancellation and unsupported share targets fall back to URL copying. */ }
+        if (request !== shareRequest || selected !== puzzle) return;
+      }
       try {
         if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
         await navigator.clipboard.writeText(url);
         if (request !== shareRequest || selected !== puzzle) return;
         shareStatus.textContent = '公開ページと共有画像を確認し、URLをコピーしました。';
-        shareButton.textContent = 'もう一度コピー';
+        shareButton.title = 'もう一度コピー';
       } catch {
         if (request !== shareRequest || selected !== puzzle) return;
         shareInput.hidden = false;
         shareInput.focus(); shareInput.select();
         shareStatus.textContent = 'コピーできませんでした。選択したURLをコピーするか、もう一度お試しください。';
-        shareButton.textContent = 'もう一度コピー';
+        shareButton.title = 'もう一度コピー';
       }
     } catch (error) {
       if (request !== shareRequest || selected !== puzzle) return;
       shareStatus.textContent = error instanceof Error ? error.message : '共有ページを確認できません。時間をおいて再試行してください。';
-      shareButton.textContent = '再試行';
+      shareButton.title = '再試行';
     } finally {
       if (request === shareRequest) shareButton.disabled = false;
     }
-  });
+  };
+  shareButton?.addEventListener('click', () => sharePuzzle());
   document.querySelector('#pixfind-back').addEventListener('click', showList);
   compareButton?.addEventListener('click', () => {
     const showingChanged = compareButton.getAttribute('aria-pressed') !== 'true';
@@ -628,16 +661,22 @@ function mount() {
     baseScale = fit.width / original.naturalWidth;
   };
   const observedAreaSizes = new WeakMap();
+  const imageLayout = game.querySelector('.pixfind-images');
+  let areaResizeFrame = 0;
   const areaResizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => {
     let changed = false;
     for (const entry of entries) {
-      const area = entry.target; const next = { width: area.clientWidth, height: area.clientHeight }; const previous = observedAreaSizes.get(area);
+      const area = entry.target; const next = { width: entry.contentRect.width, height: entry.contentRect.height }; const previous = observedAreaSizes.get(area);
       observedAreaSizes.set(area, next);
       if (previous && (Math.abs(previous.width - next.width) > 0.5 || Math.abs(previous.height - next.height) > 0.5)) changed = true;
     }
-    if (changed && original) { updateBaseScale(); constrainViewport(); paint(); }
+    if (changed && original && !areaResizeFrame) areaResizeFrame = requestAnimationFrame(() => {
+      areaResizeFrame = 0;
+      if (!original || game.hidden || document.body.dataset.toolResultOpen) return;
+      updateBaseScale(); constrainViewport(); paint();
+    });
   }) : null;
-  if (areaResizeObserver) for (const area of [playArea, changedArea].filter(Boolean)) areaResizeObserver.observe(area);
+  if (imageLayout) areaResizeObserver?.observe(imageLayout);
   const pointerDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   let pinch = null;
   for (const area of [playArea, changedArea].filter(Boolean)) {
@@ -712,7 +751,22 @@ function mount() {
     if (event.matches) { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; paint(); }
     else if (hint && !document.hidden && !hintFrame) hintFrame = requestAnimationFrame(animateHint);
   });
-  window.addEventListener('pagehide', () => { clearTapFeedback(); areaResizeObserver?.disconnect(); stopHintMotion(); for (const url of localObjectUrls) URL.revokeObjectURL(url); localObjectUrls.clear(); }); window.addEventListener('popstate', () => { const puzzle = resolvePuzzleFromLocation(window.location, puzzles); if (puzzle) start(puzzle); else showList(); });
+  window.addEventListener('pagehide', (event) => {
+    shareRequest += 1; cancelResult(true); clearTapFeedback(); areaResizeObserver?.disconnect(); stopHintMotion();
+    if (areaResizeFrame) cancelAnimationFrame(areaResizeFrame); areaResizeFrame = 0;
+    if (!event.persisted) { for (const url of localObjectUrls) URL.revokeObjectURL(url); localObjectUrls.clear(); }
+  });
+  window.addEventListener('pageshow', (event) => {
+    if (!event.persisted) return;
+    if (imageLayout) areaResizeObserver?.observe(imageLayout);
+    if (selected && !game.hidden) void start(selected);
+  });
+  window.addEventListener('popstate', () => {
+    const puzzle = resolvePuzzleFromLocation(window.location, puzzles);
+    if (puzzle) void start(puzzle);
+    else if (selected && (localRoute || postPuzzleRoute)) void start(selected);
+    else showList();
+  });
   (async () => {
     const query = new URLSearchParams(window.location.search || ''); const hasPostPuzzle = query.has('postPuzzle'); const publicPostId = resolvePostPuzzleId(window.location);
     if (hasPostPuzzle) {

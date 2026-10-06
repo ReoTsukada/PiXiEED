@@ -18,8 +18,9 @@ import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261006-result-list-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
+import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -30,9 +31,7 @@ const resumeButton = $('#jigsaw-resume'); const saveButton = $('#jigsaw-save');
 const setupSection = $('#jigsaw-setup'); const playSection = $('#jigsaw-play');
 const boardElement = $('#jigsaw-board'); const workspaceElement = $('#jigsaw-workspace'); const trayElement = $('#jigsaw-tray');
 const previewPanel = $('#jigsaw-preview'); const previewCanvas = $('#jigsaw-preview-canvas'); const previewToggle = $('#jigsaw-preview-toggle');
-const previewDragHandle = previewPanel?.querySelector('.jigsaw-preview__head');
-const JIGSAW_PREVIEW_POSITION_KEY = 'pixieed:jigsaw:preview-position:v1';
-let previewDrag = null;
+const previewWindow = createJigsawPreviewWindow({ panel: previewPanel, canvas: previewCanvas, toggle: previewToggle });
 const completionMessage = $('#jigsaw-complete'); const sourceLabel = $('#jigsaw-source-label');
 const trayPrev = $('#jigsaw-tray-prev'); const trayNext = $('#jigsaw-tray-next'); const trayPageLabel = $('#jigsaw-tray-page');
 const interactionEffects = createInteractionEffects();
@@ -48,7 +47,8 @@ let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 let resultRun = 0; let resultShownRun = -1; let resultTimer = 0;
 const MAX_TRAY_DOM = 80;
-const jigsawResult = createToolResultView({ key: 'jigsaw-result', main: $('#main'), returnLabel: 'パズルに戻る', onClose: () => { if (game) queuePaint(); } });
+const jigsawResult = createToolResultView({ key: 'jigsaw-result', main: $('#main'), returnLabel: '問題一覧に戻る', returnHref: '/jigsaw/',
+  beforeShow: closeSourcePreview, onReturn: showJigsawList, onClose: () => { if (game && !playSection.hidden) queuePaint(); } });
 function cancelJigsawResult(openingNewRun = false) {
   window.clearTimeout(resultTimer); resultTimer = 0;
   if (openingNewRun) resultRun += 1;
@@ -69,8 +69,8 @@ const jigsawHintButton = $('#jigsaw-hint');
 const jigsawHintController = createPuzzleHintController({ onState: ({ pending }) => {
   if (!jigsawHintButton) return;
   jigsawHintButton.disabled = pending || !game || isJigsawWorkspaceComplete(game);
-  jigsawHintButton.setAttribute('aria-label', 'ヒント');
-  jigsawHintButton.title = 'ヒント';
+  jigsawHintButton.setAttribute('aria-label', 'ヒント：未配置ピースの合う場所を一時表示');
+  jigsawHintButton.title = '未配置ピースの合う場所を一時表示';
 } });
 const PUBLIC_BUCKETS = new Set(['post-public', 'social-posts']);
 const safePublicUrl = (bucket, path) => {
@@ -339,6 +339,8 @@ function animateLift(groupId, to, duration) {
 }
 function clearDragState() { delete workspaceElement.dataset.jigsawDragging; liftEffect = null; liftValue = 0; }
 function paintWorkspace() {
+  const scaleLabel = $('#jigsaw-view-scale');
+  if (scaleLabel) scaleLabel.textContent = `${Math.round(view.scale * 100)}%`;
   if (!game || !pieces.length) return;
   const metrics = canvasMetrics(); const context = boardElement.getContext('2d'); if (!context) return;
   context.setTransform(1, 0, 0, 1, 0, 0); context.clearRect(0, 0, metrics.width, metrics.height); context.imageSmoothingEnabled = false;
@@ -409,45 +411,10 @@ function renderSourcePreview(image) {
   context.imageSmoothingEnabled = false;
   context.putImageData(new ImageData(new Uint8ClampedArray(sourcePixels.rgba), sourcePixels.width, sourcePixels.height), 0, 0);
 }
-function closeSourcePreview() {
-  if (previewPanel) previewPanel.hidden = true;
-  previewToggle?.setAttribute('aria-pressed', 'false');
-  previewToggle?.setAttribute('aria-label', '完成図を表示');
-}
-function clampPreviewPosition(left, top) {
-  if (!previewPanel) return null;
-  const margin = 8;
-  const rect = previewPanel.getBoundingClientRect();
-  return {
-    left: Math.max(margin, Math.min(window.innerWidth - rect.width - margin, left)),
-    top: Math.max(margin, Math.min(window.innerHeight - rect.height - margin, top))
-  };
-}
-function placePreview(left, top, remember = true) {
-  if (!previewPanel) return;
-  const position = clampPreviewPosition(left, top);
-  if (!position) return;
-  previewPanel.style.left = `${position.left}px`;
-  previewPanel.style.top = `${position.top}px`;
-  previewPanel.style.right = 'auto';
-  if (remember) {
-    try { localStorage.setItem(JIGSAW_PREVIEW_POSITION_KEY, JSON.stringify(position)); } catch {}
-  }
-}
-function persistPreviewPosition() {
-  if (!previewPanel) return;
-  const rect = previewPanel.getBoundingClientRect();
-  try { localStorage.setItem(JIGSAW_PREVIEW_POSITION_KEY, JSON.stringify({ left: rect.left, top: rect.top })); } catch {}
-}
-function restorePreviewPosition() {
-  if (!previewPanel) return;
-  try {
-    const saved = JSON.parse(localStorage.getItem(JIGSAW_PREVIEW_POSITION_KEY) || 'null');
-    if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) placePreview(saved.left, saved.top, false);
-  } catch {}
-}
+function closeSourcePreview() { previewWindow.close(); }
 function setSourcePreview(image) {
   renderSourcePreview(image);
+  previewWindow.refresh();
   if (!image) closeSourcePreview();
 }
 function updateSelectionControls() {
@@ -599,10 +566,22 @@ function updateViewport() {
 }
 
 function showGame() {
+  $('#jigsaw-current').hidden = true;
   setupSection.hidden = true; playSection.hidden = false; document.body.dataset.jigsawPlaying = 'true';
   const problemKey = game?.gameId ? `jigsaw:${game.gameId}` : '';
   if (jigsawHintController.getState().problemKey !== problemKey) { window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0; jigsawHint = null; }
   jigsawHintController.setProblem(problemKey); renderGame();
+}
+
+function showJigsawList() {
+  cancelJigsawResult(); closeSourcePreview(); cancelPendingPaint();
+  window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0; jigsawHint = null;
+  document.querySelector('.jigsaw-more')?.removeAttribute('open');
+  delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false;
+  // Keep the same in-memory game and PXD dirty state; selecting the list never discards unsaved placement.
+  $('#jigsaw-current').hidden = !game;
+  updateStatus('問題にする絵を選べます。直前のパズルの配置は保持しています。');
+  $('#jigsaw-current').focus({ preventScroll: true });
 }
 
 function requestJigsawHint() {
@@ -844,7 +823,7 @@ function mountPxdJigsaw() {
       if (!project.manifest.sharedCanvas && game.source.type !== 'public') {
         const doc = sourceDrawDocuments['jigsaw-main'];
         const image = sourceImages['jigsaw-main'] || (doc && { width: doc.width, height: doc.height, rgba: documentRgba(doc) });
-        if (image) sharedProject = putPxdSharedImage(project, image);
+        if (image) sharedProject = await putPxdSharedImage(project, image);
       }
       return writePxdPuzzle(sharedProject, { tool: 'jigsaw', document: game, sourceDrawDocuments, sourceImages, portableOriginalRefs: pxdOriginalRefs, preservedPayload: pxdPreservedPayload, sourceChanged: false });
     },
@@ -853,59 +832,6 @@ function mountPxdJigsaw() {
 }
 
 startButton.addEventListener('click', startGame);
-// The reference window is independent of the table's drag/pinch capture.
-previewPanel?.addEventListener('pointerdown', (event) => event.stopPropagation());
-previewPanel?.addEventListener('wheel', (event) => event.stopPropagation(), { passive: true });
-previewDragHandle?.addEventListener('pointerdown', (event) => {
-  if (event.target.closest('button') || event.button !== 0) return;
-  event.preventDefault();
-  event.stopPropagation();
-  const rect = previewPanel.getBoundingClientRect();
-  previewDrag = { pointerId: event.pointerId, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top };
-  try { previewDragHandle.setPointerCapture(event.pointerId); } catch {}
-  placePreview(rect.left, rect.top, false);
-});
-previewDragHandle?.addEventListener('pointermove', (event) => {
-  if (!previewDrag || event.pointerId !== previewDrag.pointerId) return;
-  event.preventDefault();
-  placePreview(event.clientX - previewDrag.offsetX, event.clientY - previewDrag.offsetY, false);
-});
-const finishPreviewDrag = (event) => {
-  if (previewDrag && event.pointerId === previewDrag.pointerId) {
-    previewDrag = null;
-    persistPreviewPosition();
-  }
-};
-previewDragHandle?.addEventListener('pointerup', finishPreviewDrag);
-previewDragHandle?.addEventListener('pointercancel', finishPreviewDrag);
-previewDragHandle?.addEventListener('lostpointercapture', finishPreviewDrag);
-previewDragHandle?.addEventListener('keydown', (event) => {
-  if (event.target.closest('button')) return;
-  const step = event.shiftKey ? 32 : 16;
-  const directions = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
-  const direction = directions[event.key];
-  if (!direction) return;
-  event.preventDefault();
-  const rect = previewPanel.getBoundingClientRect();
-  placePreview(rect.left + direction[0], rect.top + direction[1]);
-});
-window.addEventListener('resize', () => {
-  if (!previewPanel || previewPanel.hidden || !previewPanel.style.left) return;
-  const rect = previewPanel.getBoundingClientRect();
-  placePreview(rect.left, rect.top);
-});
-previewToggle?.addEventListener('click', () => {
-  if (!sourcePixels) return;
-  const opening = previewPanel.hidden;
-  previewPanel.hidden = !opening;
-  if (opening) restorePreviewPosition();
-  previewToggle.setAttribute('aria-pressed', String(opening));
-  previewToggle.setAttribute('aria-label', opening ? '完成図を閉じる' : '完成図を表示');
-});
-$('#jigsaw-preview-close')?.addEventListener('click', closeSourcePreview);
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && previewPanel && !previewPanel.hidden) { closeSourcePreview(); event.stopPropagation(); }
-});
 const sourceChoiceStatus = () => {
   displaySourceFields();
   const ready = !startButton.disabled;
@@ -981,8 +907,10 @@ $('#jigsaw-new').addEventListener('click', () => {
   pieceLookupSource = pieces; pieceLookup.clear(); pieceOrderSource = null; pieceOrderIndex.clear();
   pxdOriginalRefs = null; pxdPreservedPayload = null;
   delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; saveButton.disabled = true;
-  updateStatus('絵とピースの大きさを選んでください。');
+  $('#jigsaw-current').hidden = true;
+  updateStatus('絵とむずかしさを選んでください。');
 });
+$('#jigsaw-current').addEventListener('click', () => { if (game) { showGame(); workspaceElement.focus({ preventScroll: true }); } });
 
 jigsawHintButton?.addEventListener('click', () => { void requestJigsawHint(); });
 

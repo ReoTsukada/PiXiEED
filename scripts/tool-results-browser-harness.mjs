@@ -72,7 +72,7 @@ async function verifyResult(page, configured) {
     if(mounted) await page.waitForFunction(()=>document.querySelector('[data-display-ad]')?.dataset.adState==='filled');
     const layout=await ad.evaluate((el)=>{
       const a=el.getBoundingClientRect(),u=el.querySelector('ins')?.getBoundingClientRect()||{width:0},p=el.parentElement.getBoundingClientRect();
-      const overlaps=[...document.querySelectorAll('a,button,input,summary')].filter((n)=>!el.contains(n)).filter((n)=>{const r=n.getBoundingClientRect();return r.width&&r.height&&r.left<a.right&&r.right>a.left&&r.top<a.bottom&&r.bottom>a.top;}).map((n)=>({id:n.id,text:n.textContent,class:n.className,rect:n.getBoundingClientRect().toJSON()}));
+      const overlaps=[...document.querySelectorAll('a,button,input,summary')].filter((n)=>!el.contains(n)&&n.checkVisibility({visibilityProperty:true})).filter((n)=>{const r=n.getBoundingClientRect();return r.width&&r.height&&r.left<a.right&&r.right>a.left&&r.top<a.bottom&&r.bottom>a.top;}).map((n)=>({id:n.id,text:n.textContent,class:n.className,rect:n.getBoundingClientRect().toJSON()}));
       const lastControl=[...document.querySelectorAll('.px-tool-result__content button,.px-tool-result__content a')].at(-1)?.getBoundingClientRect();
       return {mounted:Boolean(u.width),visible:!el.hidden,overlaps,overflow:document.documentElement.scrollWidth>innerWidth+1,center:Math.abs((p.left+p.right)/2-document.documentElement.clientWidth/2),fits:u.width===0||u.left>=a.left-1&&u.right<=a.right+1,gap:lastControl? a.top-lastControl.bottom:Infinity,withinViewport:a.bottom<=innerHeight+1};
     });
@@ -125,11 +125,11 @@ try {
     }
     console.log(`${engine}: result layouts ${viewport.width}px PASS`);
   }
-  const context=await contextFor({width:390,height:844},true);const page=await context.newPage();const errors=[];page.on('pageerror',(e)=>errors.push(e.message));
+  const context=await contextFor({width:390,height:844},true);const page=await context.newPage();const errors=[];page.on('pageerror',(e)=>{errors.push(e.message);console.error('pageerror',page.url(),e.message);});
   // Real export handlers, not controller injection.
   await page.goto(base+'/draw/');await page.locator('#draw-canvas').click({position:{x:8,y:8}});await page.waitForFunction(()=>!document.querySelector('#draw-undo').disabled);
   const drawing=await page.locator('#draw-canvas').evaluate((c)=>c.toDataURL());
-  await page.locator('.app-tabs button').click();await frames(page);assert.equal(await page.locator('[data-display-ad]').count(),0,'draft saving is not an ad trigger');checks++;
+  await exposeOutput(page,'#draw-save');await page.locator('#draw-save').click();await frames(page);assert.equal(await page.locator('[data-display-ad]').count(),0,'draft saving is not an ad trigger');checks++;
   await exposeOutput(page,'#draw-export');let download=page.waitForEvent('download');await page.locator('#draw-export').click();await download;await page.waitForFunction(()=>Boolean(document.body.dataset.toolResultOpen));await verifyResult(page,true);
   await page.locator('.px-tool-result__return').click();assert.equal(await page.locator('#draw-canvas').evaluate((c)=>c.toDataURL()),drawing);checks++;
   // A cancelled phone share is not a successful export or a results trigger.
@@ -153,14 +153,21 @@ try {
     assert.ok(box.width>=16&&box.height>=16,`visible artwork: ${mode} ${viewport.width}`);
     await page.mouse.click(box.x+x*box.width/16,box.y+y*box.height/16);
     await page.waitForFunction(()=>Boolean(document.body.dataset.toolResultOpen));await verifyResult(page,true);console.log(`${engine}: ${mode} completion PASS`);
-    assert.equal(await page.locator('.px-tool-result [download],.px-tool-result a').count(),0,'public/play results provide no exports');await page.keyboard.press('Escape');await frames(page);assert.equal(await page.locator('.px-tool-result').isVisible(),false,'one completion view per run');checks++;
+    assert.equal(await page.locator('.px-tool-result [download]').count(),0,'public/play results provide no exports');
+    assert.equal(await page.locator('.px-tool-result a').count(),1,'only the problem-list link is present');
+    assert.equal(await page.locator('.px-tool-result__return').getAttribute('href'),`/play/${path}/`);
+    await page.keyboard.press('Escape');await page.waitForURL(`${base}/play/${path}/`);await frames(page);
+    assert.equal(await page.locator('.px-tool-result:visible').count(),0,'completion exits to the actual problem list');checks++;
     }
   }
   await page.setViewportSize({width:390,height:844});
   // A real one-piece puzzle completes when the piece leaves the tray, not on start.
   await page.goto(base+'/jigsaw/');
   const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=c.height=24;const x=c.getContext('2d');x.fillStyle='#79aec4';x.fillRect(0,0,24,24);x.fillStyle='#ed7356';x.fillRect(5,8,12,12);return c.toDataURL().split(',')[1];});
-  await page.locator('#jigsaw-source-kind').selectOption('file');await page.locator('#jigsaw-file').setInputFiles({name:'local-fixture.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});await page.locator('#jigsaw-grid-size').selectOption('24');
+  await page.locator('#jigsaw-source-kind').selectOption('file');await page.locator('#jigsaw-file').setInputFiles({name:'local-fixture.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+  // The piece-size select is engine state, hidden from the difficulty-only UI.
+  // This completion fixture needs one piece; difficulty interaction has its own browser coverage.
+  await page.locator('#jigsaw-grid-size').evaluate(node=>{node.value='24';node.dispatchEvent(new Event('change',{bubbles:true}));});
   // Hold the fixture at one piece after the arcade's automatic difficulty selection.
   await page.evaluate(()=>document.addEventListener('jigsaw:source-ready',()=>{document.querySelector('#jigsaw-grid-size').value='24';},{once:true}));
   await page.waitForFunction(()=>!document.querySelector('#jigsaw-start').disabled);await page.locator('#jigsaw-start').click();await page.locator('#jigsaw-play').waitFor({state:'visible'});

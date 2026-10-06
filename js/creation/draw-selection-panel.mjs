@@ -18,7 +18,13 @@ export function mountDrawSelectionPanel({ scope, host, getState, onAction, befor
     const actions = s.pending ? [['confirm', '✓ 確定', !s.busy], ['cancel', '× 取消', !s.busy]]
       : mode === 'paste' ? [['paste', '貼り付け', s.canPaste], ['back', '範囲へ', !s.busy]]
         : [['copy', 'コピー', s.canCopy], ['cut', 'カット', s.canCut]];
-    buttons.forEach((button, i) => { const [action, label, enabled] = actions[i]; button.dataset.selectionAction = action; button.textContent = label; button.disabled = !enabled; });
+    buttons.forEach((button, i) => {
+      const [action, label, enabled] = actions[i]; button.dataset.selectionAction = action;
+      // Preserve the pressed text node: WebKit can drop a native mouse click
+      // when pointerdown synchronization replaces that node with the same label.
+      if (button.textContent !== label) button.textContent = label;
+      button.disabled = !enabled;
+    });
     root.querySelector('p').textContent = s.error || (s.pending ? '外をタップで確定 → 次の外タップで解除。取消は× / Esc。' : s.bounds ? '選択内に描画できます。選択ツールで外をタップすると解除。' : s.hasClipboard ? '貼付で前のコピーを使えます。範囲へで新しい範囲を選べます。' : '選択ツールで範囲を囲んでください。');
     const bounds = s.bounds;
     for (const input of fields.querySelectorAll('input[type="number"]')) {

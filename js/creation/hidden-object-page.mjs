@@ -1,3 +1,4 @@
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
@@ -58,7 +59,8 @@ function updateLocalPlayButton() {
   const ready = Boolean(draft?.confirmed && draftId && savedConfirmedDraftId === draftId);
   playLocalButton.hidden = !ready; playLocalButton.disabled = !ready;
   publishButton.hidden = !ready; publishButton.disabled = !ready || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
-  publishButton.textContent = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿は準備中';
+  const publishLabel = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿は準備中';
+  publishButton.setAttribute('aria-label', publishLabel); publishButton.title = publishLabel;
 }
 
 function requestDraw() {
@@ -122,6 +124,9 @@ function renderTargets() {
   $('#hidden-confirm').disabled = draft.confirmed || !draft.targets.length || draft.targets.some((target) => !(maskSets.get(target.id)?.size));
   $('#hidden-add').disabled = draft.confirmed; $('#hidden-name').disabled = draft.confirmed;
   $('#hidden-new').hidden = !draft.confirmed;
+  $('#hidden-target-settings').hidden = draft.confirmed;
+  for (const id of ['hidden-remove', 'hidden-confirm', 'hidden-image-replace']) document.getElementById(id).hidden = draft.confirmed;
+  document.querySelectorAll('[data-hidden-mode]').forEach(button => { button.disabled = draft.confirmed || !currentTarget(); });
   saveButton.disabled = !draft;
   updateLocalPlayButton();
   updateSummary();
@@ -336,7 +341,7 @@ function addTarget() {
   if (draft.targets.some((target) => target.name.trim().toLocaleLowerCase('ja') === name.toLocaleLowerCase('ja'))) { setStatus('対象の名前は重複できません。'); return; }
   if (draft.targets.length >= 128) { setStatus('対象は128個までです。'); return; }
   let suffix = draft.targets.length + 1; let id = `target-${String(suffix).padStart(3, '0')}`; const ids = new Set(draft.targets.map((target) => target.id)); while (ids.has(id)) id = `target-${String(++suffix).padStart(3, '0')}`;
-  draft.targets.push({ id, name, pixels: [] }); maskSets.set(id, new Set()); selectedTargetId = id; editMode = 'paint'; document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.hiddenMode === 'paint'))); $('#hidden-name').value = ''; renderTargets(); requestDraw(); pxdBridge?.markDirty(); setStatus(`${name}を追加しました。絵の上をなぞってマスクを作ってください。`);
+  draft.targets.push({ id, name, pixels: [] }); maskSets.set(id, new Set()); selectedTargetId = id; editMode = 'paint'; document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.hiddenMode === 'paint'))); $('#hidden-name').value = ''; renderTargets(); requestDraw(); $('#hidden-target-settings').open = false; canvas.focus({ preventScroll: true }); pxdBridge?.markDirty(); setStatus(`${name}を追加しました。絵の上をなぞってマスクを作ってください。`);
 }
 
 function removeTarget() {
@@ -485,3 +490,7 @@ mountPictureShelf($('#hidden-shelf'), { tool: 'hidden-object', adapter, onBrough
 pxdBridge = mountPxdHidden();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSources();
+
+// Capture the editor's visibility before moving the target settings panel.
+for (const id of ['hidden-remove', 'hidden-confirm', 'hidden-image-replace']) editor.append(document.getElementById(id));
+mountToolHeaderControls(document, { selectors: ['#hidden-target-settings', '[data-hidden-mode="paint"]', '[data-hidden-mode="erase"]', '#hidden-remove', '#hidden-confirm', '#hidden-image-replace', '#hidden-new', '#hidden-play-local', '#hidden-publish'] });

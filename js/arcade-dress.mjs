@@ -4,7 +4,7 @@
  * into a dark game panel with a big start button, and — where the page reports progress in text — a HUD with
  * a timer and a celebration when you finish. Chosen by <body data-page>.
  */
-import { demoTitle, sfx, createTimer, formatTime, winOverlay, floatText, burst } from './arcade.mjs?rev=20260928-arcade-2';
+import { demoTitle, sfx, createTimer, formatTime, winOverlay, floatText, burst } from './arcade.mjs?rev=20261006-play-reset-1';
 
 const $ = (s) => document.querySelector(s);
 const TOOLS = {
@@ -52,9 +52,10 @@ function hud(t) {
   bar.innerHTML = '<span class="arc-badge"><b>★</b><span></span></span><span class="arc-timer" role="timer" aria-label="プレイ時間">00:00</span><span class="arc-progress"><span class="arc-progress-label"></span><span class="arc-bar"><span></span></span></span>';
   play.prepend(bar);
   const label = bar.querySelector('.arc-progress-label'); const fill = bar.querySelector('.arc-bar span'); const badge = bar.querySelector('.arc-badge span'); const timerEl = bar.querySelector('.arc-timer');
-  const timer = createTimer((ms) => { timerEl.textContent = formatTime(ms); }, `pixieed:${document.body.dataset.page}:time:`);
+  const freshPuzzlePlay = ['spot-game', 'find-game'].includes(document.body.dataset.page);
+  const timer = createTimer((ms) => { timerEl.textContent = formatTime(ms); }, `pixieed:${document.body.dataset.page}:time:`, { persist: !freshPuzzlePlay });
   let last = -1; let total = 0; let round = ''; let won = null; let moves = '';
-  const roundKey = () => (t.round ? $(t.round)?.textContent || '' : 'game');
+  const roundKey = () => freshPuzzlePlay ? play.dataset.puzzleRun || '' : (t.round ? $(t.round)?.textContent || '' : 'game');
   function read() {
     const text = progress.textContent || '';
     const m = text.match(/(\d+)\s*\/\s*(\d+)/); moves = (text.match(/移動\s*(\d+)/) || [])[1] || '';
@@ -84,6 +85,9 @@ function hud(t) {
     last = got;
   }
   new MutationObserver(read).observe(progress, { childList: true, characterData: true, subtree: true });
+  if (freshPuzzlePlay) document.addEventListener('pixfind:run-start', () => {
+    timer.stop(); won?.close(); won = null; last = -1; round = ''; read();
+  });
   if (t.win) { const w = $(t.win); if (w) new MutationObserver(read).observe(w, { attributes: true, attributeFilter: ['hidden'] }); }
   const lobby = document.querySelector('.arc-lobby');
   const syncShown = () => { if (lobby) lobby.hidden = !play.hidden; };

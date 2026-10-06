@@ -1,5 +1,5 @@
 import { validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
-import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261006-draw-startup-1';
+import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 
 export const selectionColor = color => {
   if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) throw new TypeError('選択の色が不正です。');
@@ -195,4 +195,16 @@ export function rasterSelectionMask(raster, width, height) {
     for (let x = Math.max(0, -raster.x); x < Math.min(raster.width, width - raster.x); x++)
       mask[(y + raster.y) * width + x + raster.x] = raster.mask[y * raster.width + x];
   return mask;
+}
+
+/** Bounds of selected pixel cells, including transparent cells within the mask.
+ * Geometric floor/ceil bounds can add an empty border after a fractional move. */
+export function drawSelectionMaskBounds(mask, width, height) {
+  let left = width, top = height, right = -1, bottom = -1;
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (!mask[y * width + x]) continue;
+    left = Math.min(left, x); top = Math.min(top, y);
+    right = Math.max(right, x); bottom = Math.max(bottom, y);
+  }
+  return right < left ? null : { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
 }

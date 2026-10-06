@@ -49,7 +49,8 @@ async function fixture(viewport, dpr, size = 64) {
   await page.locator('#jigsaw-source-kind').evaluate((select) => { select.value = 'file'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   await page.locator('#jigsaw-file').setInputFiles({ name: 'zoom-fixture.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
   await page.waitForFunction(() => /\d.*ピース/.test(document.querySelector('.arc-card-count')?.textContent || ''));
-  await page.locator('#jigsaw-grid-size').selectOption('3');
+  // This bounded-rendering fixture needs a dense partition; the player chooses difficulty.
+  await page.locator('#jigsaw-grid-size').evaluate(select=>{select.value='3';select.dispatchEvent(new Event('change',{bubbles:true}));});
   await page.locator('#jigsaw-start').click();
   await page.locator('#jigsaw-play').waitFor({ state: 'visible' });
   await frame(page);
@@ -87,10 +88,13 @@ async function compareUnculledPixels(page) {
     const { createJigsawLayout, sliceJigsawPieces } = await import('/js/creation/jigsaw-workspace.mjs');
     const id = localStorage.getItem('pixieed:creation:jigsaw:last-draft:v1');
     const game = (await createLocalDraftStore(createIndexedDbDraftAdapter()).load(id)).document;
-    const layout = createJigsawLayout(game.layout); const rgba = new Uint8ClampedArray(layout.width * layout.height * 4);
-    for (let y = 0; y < layout.height; y += 1) for (let x = 0; x < layout.width; x += 1) {
-      rgba.set(x < layout.width / 2 && y < layout.height / 2 ? [64, 106, 173, 255] : [210, 100, 72, 255], (y * layout.width + x) * 4);
-    }
+    const layout = createJigsawLayout(game.layout);
+    // Decode the fixture's immutable source instead of reconstructing a subtly
+    // different half-width block (the source intentionally includes one extra column).
+    const sourceImage=new Image();sourceImage.src=game.source.dataUrl;await sourceImage.decode();
+    const sourceCanvas=document.createElement('canvas');sourceCanvas.width=layout.width;sourceCanvas.height=layout.height;
+    const sourceContext=sourceCanvas.getContext('2d');sourceContext.drawImage(sourceImage,0,0,layout.width,layout.height);
+    const rgba=sourceContext.getImageData(0,0,layout.width,layout.height).data;
     const pieces = new Map(sliceJigsawPieces({ width: layout.width, height: layout.height, rgba }, layout).map((piece) => [piece.pieceId, piece]));
     const board = document.querySelector('#jigsaw-board'); const actual = board.getContext('2d');
     const reference = document.createElement('canvas'); reference.width = board.width; reference.height = board.height;
@@ -158,7 +162,14 @@ try {
     const groups = game.groups.map((group, index) => ({ ...group, x: index < 128 ? 0 : 10000, y: index < 128 ? 0 : 10000, rotation: index % 4, inTray: false }));
     await store.save({ draftId: id, kind: 'jigsaw', ownerId: 'local-owner', document: { ...game, groups }, source: { type: 'jigsaw_game', assetId: game.source.assetId ?? null, revisionId: game.source.revisionId ?? null } });
   });
-  await page.reload({ waitUntil: 'domcontentloaded' }); await page.locator('#jigsaw-resume').click(); await frame(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(()=>document.querySelector('#main').getAttribute('aria-busy')==='false');
+  // PXD may reopen its saved workspace automatically. Reach the source selector
+  // before invoking the legacy draft fixture's explicit resume operation.
+  if(await page.locator('#jigsaw-setup').evaluate(node=>node.hidden)) {
+    await page.locator('.jigsaw-more > summary').click();await page.locator('#jigsaw-new').click();
+  }
+  await page.locator('#jigsaw-resume').click(); await frame(page);
   const placed = await saveAndRead(page);
   assert.equal(await compareUnculledPixels(page), 0, 'culling retains exact pixels for all four rotations and partly visible pieces');
   assert.ok(await page.locator('#jigsaw-board').evaluate((canvas) => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data.some((value, i) => i % 4 === 3 && value)), 'visible rotated pieces render');

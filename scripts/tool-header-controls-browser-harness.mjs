@@ -68,6 +68,7 @@ async function prepareWorkspace(page, tool, checks) {
   if (tool.name === 'hidden-object') {
     await page.locator('#hidden-image-file').setInputFiles(await image(false)); await page.waitForFunction(() => !document.querySelector('#hidden-start').disabled);
     await page.locator('#hidden-start').click(); await page.locator('#hidden-editor').waitFor({ state: 'visible' });
+    await page.locator('#hidden-target-settings > summary').click();
     await page.locator('#hidden-name').fill('ロボット'); await page.locator('#hidden-add').click(); await pixelTap('#hidden-canvas', 6, 6);
     await page.waitForFunction(() => !document.querySelector('#hidden-confirm').disabled);
     checks.push('local PNG opens maker; named target and mask become confirmable');

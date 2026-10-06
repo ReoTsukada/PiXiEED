@@ -22,6 +22,13 @@ export function selectionFrameBounds(frame) {
   return { x, y, width: Math.ceil(Math.max(...points.map(p => p.x))) - x, height: Math.ceil(Math.max(...points.map(p => p.y))) - y };
 }
 export const selectionDefaultPivot = frame => ({ x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 });
+/** Snap total translation from one gesture checkpoint, retaining its grab offset. */
+export function translateSelectionFrame(frame, dx, dy) {
+  const x = Math.max(-1024, Math.min(1024, frame.x + Math.round(tidy(dx))));
+  const y = Math.max(-1024, Math.min(1024, frame.y + Math.round(tidy(dy))));
+  const pivot = frame.pivot || selectionDefaultPivot(frame);
+  return { ...frame, x, y, pivot: { x: pivot.x + x - frame.x, y: pivot.y + y - frame.y }, rotationOffset: undefined };
+}
 export function selectionContains(frame, point) {
   const p = selectionLocalPoint(frame, point);
   return p.x >= 0 && p.y >= 0 && p.x < frame.width && p.y < frame.height;

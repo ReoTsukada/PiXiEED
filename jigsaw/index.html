@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
-  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20261002-header-layout-1">
+  <link rel="stylesheet" href="/css/creation-jigsaw.css?rev=20261006-jigsaw-preview-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/jigsaw-arcade.css?rev=20260930-ux-fix-4">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261006-header-controls-1">
@@ -34,24 +34,26 @@
       <label id="jigsaw-draw-source" class="jigsaw-field">元の絵の保存版<select id="jigsaw-source-version" aria-label="元にする自分の保存版"></select></label>
       <label id="jigsaw-public-source" class="jigsaw-field" hidden>公開作品<select id="jigsaw-public-version" aria-label="パズルにする公開作品"></select></label>
       <label id="jigsaw-file-source" class="jigsaw-field" hidden>画像ファイル（PNG、WebP、JPEG）<input id="jigsaw-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg"></label>
-      <label class="jigsaw-field">ピースの大きさ<select id="jigsaw-grid-size" aria-label="ピースの大きさ"><option value="auto" selected>おまかせ</option><option value="3">約3px・細かい</option><option value="6">約6px</option><option value="12">約12px</option><option value="24">約24px</option><option value="48">約48px</option><option value="96">約96px・大きめ</option></select></label>
+      <label class="jigsaw-field" hidden aria-hidden="true">ピースの大きさ<select id="jigsaw-grid-size" aria-label="ピースの大きさ"><option value="auto" selected>おまかせ</option><option value="3">約3px・細かい</option><option value="6">約6px</option><option value="12">約12px</option><option value="24">約24px</option><option value="48">約48px</option><option value="96">約96px・大きめ</option></select></label>
       <p id="jigsaw-piece-count" class="jigsaw-piece-count" aria-live="polite">画像を選ぶとピース数の目安が表示されます。</p>
-      <div class="jigsaw-setup__actions"><button id="jigsaw-start" type="button" disabled>パズルをはじめる</button><button id="jigsaw-resume" type="button" hidden>前回のパズルを再開</button></div>
+      <div class="jigsaw-setup__actions"><button id="jigsaw-start" type="button" disabled>パズルをはじめる</button><button id="jigsaw-resume" type="button" hidden>前回のパズルを再開</button><button id="jigsaw-current" type="button" hidden>直前のパズルを開く</button></div>
       <p class="jigsaw-help">公開作品はこの端末で遊ぶためだけに読み込みます。選んだ画像の投稿やアップロードは行いません。3px未満のピースは作成できません。</p>
     </section>
     <section id="jigsaw-play" class="jigsaw-play" aria-label="ジグソーパズル" hidden>
       <p id="jigsaw-source-label" class="jigsaw-source-label"></p>
       <div class="jigsaw-workspace-tools" role="toolbar" aria-label="選択中のピースグループ">
-        <button id="jigsaw-preview-toggle" type="button" aria-label="完成図を表示" aria-pressed="false" aria-controls="jigsaw-preview" title="完成図"><img src="/assets/icons/pixieed/artwork.svg" alt=""></button>
-        <button id="jigsaw-hint" type="button" data-hint-short="無料" aria-label="ヒント（このパズルで1回無料）" title="ヒント（このパズルで1回無料）">ヒント</button>
-        <button id="jigsaw-rotate" type="button" aria-label="選択中を90度回転" title="90度回転">↻</button>
-        <button id="jigsaw-return" type="button" aria-label="選択中をトレーへ戻す" title="トレーへ戻す">戻す</button>
+        <button id="jigsaw-preview-toggle" type="button" aria-label="完成図を表示" aria-pressed="false" aria-expanded="false" aria-controls="jigsaw-preview" title="完成図を表示"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m5 17 5-6 4 4 2-2 3 4"/><circle cx="16" cy="8" r="1.5"/></svg><span class="jigsaw-preview-indicator" aria-hidden="true">✓</span></button>
+        <button id="jigsaw-hint" type="button" aria-label="ヒント" title="ヒント"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></button>
+        <button id="jigsaw-rotate" type="button" aria-label="選択中を90度回転" title="90度回転"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/></svg></button>
+        <button id="jigsaw-return" type="button" aria-label="選択中をトレーへ戻す" title="トレーへ戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13v7h18v-7M7 12l5 5 5-5M12 3v14"/></svg></button>
         <details class="jigsaw-more"><summary aria-label="その他の操作" title="その他の操作"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></summary><div class="jigsaw-more__menu" role="group" aria-label="作業スペースとピースの操作">
-          <button id="jigsaw-fit" type="button" aria-label="作業スペース全体を表示" title="全体を見る">全体</button>
-          <button id="jigsaw-tray-prev" type="button" aria-label="前のピース">‹</button>
-          <span id="jigsaw-tray-page" class="jigsaw-sr-only" aria-live="polite">1 / 1</span>
-          <button id="jigsaw-tray-next" type="button" aria-label="次のピース">›</button>
-          <button id="jigsaw-new" type="button" aria-label="別の絵でパズルを作る" title="別の絵">別の絵</button>
+          <button id="jigsaw-fit" type="button" aria-label="作業スペース全体を表示" title="拡大と移動を初期位置に戻す">全体を見る <output id="jigsaw-view-scale" aria-label="拡大率">100%</output></button>
+          <div class="jigsaw-more__pages" role="group" aria-label="トレーのページ">
+            <button id="jigsaw-tray-prev" type="button" aria-label="前のページ" title="前のページ">‹</button>
+            <span id="jigsaw-tray-page" aria-live="polite" aria-label="現在のページ">1 / 1</span>
+            <button id="jigsaw-tray-next" type="button" aria-label="次のページ" title="次のページ">›</button>
+          </div>
+          <button id="jigsaw-new" type="button" aria-label="別の絵でパズルを作る" title="現在のプレイを閉じて絵を選ぶ">別の絵を選ぶ</button>
         </div></details>
         <span id="jigsaw-selection" role="status" aria-live="polite">ピースを選択してください</span>
       </div>
@@ -67,6 +69,7 @@
       <span>完成図</span><button id="jigsaw-preview-close" type="button" aria-label="完成図を閉じる" title="閉じる">×</button>
     </div>
     <canvas id="jigsaw-preview-canvas" class="jigsaw-preview__canvas" aria-label="パズルの完成図"></canvas>
+    <div class="jigsaw-preview__foot"><span id="jigsaw-preview-size" aria-live="polite"></span><button id="jigsaw-preview-resize" type="button" aria-label="完成図のサイズ変更。ドラッグ、矢印キー、HomeとEndで調整" title="サイズ変更（矢印キーでも操作できます）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 14 10-10M9 4h5v5M10 20l10-10M15 20h5v-5"/></svg></button></div>
   </aside>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション">
@@ -76,8 +79,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20261006-header-controls-1"></script>
-  <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20260929-claude-integration-1"></script>
+  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20261006-jigsaw-preview-1"></script>
+  <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20261006-jigsaw-preview-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>

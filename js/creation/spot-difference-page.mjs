@@ -1,3 +1,4 @@
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
@@ -98,7 +99,7 @@ function updateActions() {
   playLocalButton.disabled = playLocalButton.hidden || !store || !adapter;
   publishButton.hidden = !canPlayLocal;
   publishButton.disabled = !canPlayLocal || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
-  publishButton.textContent = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中';
+  publishButton.setAttribute('aria-label', supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中');
   publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
 }
 function showEditor() {
@@ -511,3 +512,7 @@ mountPictureShelf($('#spot-shelf'), { tool: 'spot-difference', adapter, onBrough
 pxdBridge = mountPxdSpot();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSourceOptions();
+
+// Keep the editor as the visibility owner even when its candidate panel moved first.
+for (const id of ['spot-split-mode', 'spot-merge', 'spot-split', 'spot-exclude', 'spot-confirm', 'spot-redraw', 'spot-play-local', 'spot-publish']) editor.append(document.getElementById(id));
+mountToolHeaderControls(document, { selectors: ['.spot-settings', '#spot-split-mode', '#spot-merge', '#spot-split', '#spot-exclude', '#spot-confirm', '#spot-redraw', '#spot-play-local', '#spot-publish', '#spot-inline-pen', '#spot-inline-eraser', '#spot-inline-undo', '#spot-inline-redo', '#spot-inline-original', '#spot-inline-finish', '#spot-inline-cancel'] });

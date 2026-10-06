@@ -44,16 +44,18 @@ export const sfx = {
   fanfare: () => { [0, 2, 4, 7, 9, 12].forEach((n, i) => tone(NOTE(n + 5), { length: 0.18, volume: 0.05, type: 'square', at: i * 0.09 })); tone(NOTE(17), { length: 0.7, volume: 0.05, at: 0.6 }); tone(NOTE(14), { length: 0.7, volume: 0.03, at: 0.6 }); }
 };
 
-// ---------- a play timer that survives reloads per game ----------
+// ---------- a play timer; callers can opt out of saved elapsed time ----------
 export function formatTime(ms) { const s = Math.max(0, Math.floor(ms / 1000)); const m = Math.floor(s / 60); return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; }
-export function createTimer(onTick, storagePrefix = 'pixieed:arcade:time:') {
+export function createTimer(onTick, storagePrefix = 'pixieed:arcade:time:', { persist = true } = {}) {
   let id = null; let base = 0; let since = 0; let running = false; let raf = 0;
-  const read = (k) => { try { return Number(localStorage.getItem(storagePrefix + k)) || 0; } catch { return 0; } };
-  const write = () => { if (!id) return; try { localStorage.setItem(storagePrefix + id, String(Math.round(elapsed()))); } catch { /* private mode */ } };
+  const read = (k) => { if (!persist) return 0; try { return Number(localStorage.getItem(storagePrefix + k)) || 0; } catch { return 0; } };
+  const write = () => { if (!persist || !id) return; try { localStorage.setItem(storagePrefix + id, String(Math.round(elapsed()))); } catch { /* private mode */ } };
   const elapsed = () => base + (running ? performance.now() - since : 0);
   const loop = () => { onTick(elapsed()); if (running) raf = setTimeout(loop, 250); };
-  addEventListener('pagehide', write); document.addEventListener('visibilitychange', () => { if (document.hidden) write(); });
-  setInterval(write, 5000);
+  if (persist) {
+    addEventListener('pagehide', write); document.addEventListener('visibilitychange', () => { if (document.hidden) write(); });
+    setInterval(write, 5000);
+  }
   return {
     use(gameId) { if (gameId === id) return; write(); id = gameId; base = read(gameId); since = performance.now(); onTick(elapsed()); },
     start() { if (running) return; running = true; since = performance.now(); clearTimeout(raf); loop(); },

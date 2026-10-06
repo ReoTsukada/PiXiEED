@@ -92,3 +92,19 @@ body.spot-editing .spot-settings { top: .6rem; }
 body.spot-inline-open{height:100%;overflow:hidden;overscroll-behavior:none}
 @media(max-width:360px){.spot-quick-import{padding:9px}.spot-image-pair{gap:6px}.spot-inline-draw:not([hidden]){gap:4px;padding:6px}.spot-inline-tools{gap:4px}.spot-inline-tools #spot-inline-finish{margin-left:0}}
 @media(orientation:landscape) and (max-height:500px){.spot-inline-draw:not([hidden]){grid-template-columns:minmax(0,1fr) minmax(190px,34vw);grid-template-rows:auto minmax(0,1fr) auto;gap:5px 10px}.spot-inline-top{grid-column:1/-1}.spot-inline-draw>p{display:none}.spot-inline-color-row{grid-column:2;grid-row:2}.spot-inline-tools{grid-column:2;grid-row:3;align-content:start}.spot-inline-tools #spot-inline-finish{margin-left:0}#spot-inline-canvas{grid-column:1;grid-row:2/4;align-self:center;width:min(100%,100cqh,calc((100cqh - 72px)*var(--spot-inline-aspect,1)));height:auto;max-height:100%}#spot-inline-status{display:none}}
+
+/* Candidate actions and inline drawing tools occupy the shared header. */
+body.px-tool-header .px-site-header .spot-settings.px-tool-header-control { top: auto; right: auto; bottom: auto; left: auto; width: 44px; pointer-events: auto; }
+body.px-tool-header .px-site-header .spot-settings > summary { width: 44px; padding: 8px; }
+body.px-tool-header .px-site-header .spot-settings > summary::before { content: none; }
+body.spot-editing:has(.spot-publish-actions > button:not([hidden])) .spot-preview { bottom: calc(5.2rem + env(safe-area-inset-bottom)); }
+body.spot-editing .spot-actions:empty, body.spot-editing .spot-publish-actions:empty { display: none; }
+body.spot-inline-open .spot-inline-draw:not([hidden]) { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; padding: 6px; }
+body.spot-inline-open .spot-inline-top, body.spot-inline-open .spot-inline-tools, body.spot-inline-open .spot-inline-draw > p { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+body.spot-inline-open #spot-inline-canvas { grid-column: 1; grid-row: 1; align-self: center; width: min(100%,calc((100cqh - 54px)*var(--spot-inline-aspect,1))); max-height: calc(100cqh - 54px); }
+body.spot-inline-open .spot-inline-color-row { grid-column: 1; grid-row: 2; }
+body.px-tool-header .px-site-header #spot-play-local { position: relative; left: auto; bottom: auto; transform: none; width: 44px; max-width: none; padding: 8px; }
+body.px-tool-header .px-site-header [data-editor-header-control]:focus-visible { outline: 3px solid #ffd35a; outline-offset: -3px; }
+@media (orientation:landscape) and (max-height:500px) {
+  body.spot-editing:has(.spot-publish-actions > button:not([hidden])) .spot-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
+}

@@ -35,11 +35,11 @@ import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261006-f
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
-import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
-import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-draw-startup-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261006-floating-mouse-2';
-import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing } from './draw-selection-geometry.mjs?rev=20261006-draw-startup-1';
-import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261006-draw-startup-1';
+import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261006-selection-fix-1';
+import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261006-selection-fix-1';
+import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
+import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261006-selection-fix-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
@@ -494,11 +494,11 @@ function confirmSelectionTransform() {
     const bounds = selectionTransform.rect;
     const pivot = selectionTransform.state.pivot;
     const mask = selectionTransform.mask(documentData.width, documentData.height);
+    const selectedBounds = drawSelectionMaskBounds(mask, documentData.width, documentData.height);
     const previousBounds = selectionTransform.originalBounds;
     cancelAnimationFrame(selectionRenderRequest); selectionRenderRequest = 0;
     selectionTransform = null; selectionPreview = null; selectionError = '';
-    const x = Math.max(0, bounds.x), y = Math.max(0, bounds.y);
-    selection = { x, y, width: Math.min(documentData.width, bounds.x + bounds.width) - x, height: Math.min(documentData.height, bounds.y + bounds.height) - y, pivot, mask };
+    selection = { ...selectedBounds, pivot, mask };
     commitSelectionDocument(next, previousBounds, selection, prepared);
     renderPalette(); showCurrentColor(); paint(); placeSelection(); canvas.focus({ preventScroll: true });
     if (bounds.x < 0 || bounds.y < 0 || bounds.x + bounds.width > documentData.width || bounds.y + bounds.height > documentData.height) toast('キャンバス外の部分は切り取りました。「戻す」で復元できます。');
@@ -745,8 +745,7 @@ function updateSelection(point, event = {}) {
     }
     else if (mode === 'pivot') selectionTransform.setPivot({ x: Math.max(-1024, Math.min(1024, state.pivot.x + dx)), y: Math.max(-1024, Math.min(1024, state.pivot.y + dy)) });
     else {
-      const x = Math.max(-1024, Math.min(1024, state.x + dx)), y = Math.max(-1024, Math.min(1024, state.y + dy));
-      selectionTransform.update({ ...state, x, y, pivot: { x: state.pivot.x + x - state.x, y: state.pivot.y + y - state.y } });
+      selectionTransform.update(translateSelectionFrame(state, dx, dy));
     }
     previewSelectionTransform();
   } else if (!['outside', 'flip', 'empty'].includes(selectionDrag?.mode)) selection = selectionBounds(lineStart, point, documentData.width, documentData.height);

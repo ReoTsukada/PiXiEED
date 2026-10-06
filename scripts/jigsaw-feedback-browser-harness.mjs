@@ -72,7 +72,9 @@ try {
     await page.locator('#jigsaw-source-kind').evaluate((select) => { select.value = 'file'; select.dispatchEvent(new Event('change', { bubbles: true })); });
     await page.locator('#jigsaw-file').setInputFiles({ name: 'local-feedback-fixture.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
     await page.waitForFunction(() => /\d.*ピース/.test(document.querySelector('.arc-card-count')?.textContent || ''));
-    await page.locator('#jigsaw-grid-size').selectOption('6'); await page.locator('#jigsaw-start').click(); await page.locator('#jigsaw-play').waitFor({ state: 'visible' }); await frame(page);
+    // Keep the feedback fixture's exact partition through hidden engine state.
+    await page.locator('#jigsaw-grid-size').evaluate(select=>{select.value='6';select.dispatchEvent(new Event('change',{bubbles:true}));});
+    await page.locator('#jigsaw-start').click(); await page.locator('#jigsaw-play').waitFor({ state: 'visible' }); await frame(page);
     const source = (await save(page)).source;
     const tray = page.locator('#jigsaw-tray [data-group-id]').first(); const id = await tray.getAttribute('data-group-id');
     const t = await tray.boundingBox(); const board = await page.locator('#jigsaw-board').boundingBox(); const point = { x: Math.round(board.x + board.width * 0.6), y: Math.round(board.y + board.height * 0.5) };

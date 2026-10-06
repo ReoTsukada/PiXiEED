@@ -539,3 +539,32 @@ Safari・iOS・Android・Windows実機、今回版の公開サーバーは未検
 | 横向き 844×390 | `libfile_234c350adc8c819181ab7147cbceb84e` |
 
 画像の保存結果は `/tmp/pixieed-floating-mouse-undo-redo-20261006/library-images.json`、今回の対象ソースと検証の参照は同ディレクトリの `final-source-and-status.json`。今回の操作検証を `scripts/draw-undo-redo-browser-harness.mjs` に追加した。
+
+## 2026-10-06 追補：選択確定・グリッド移動・設定グリッド
+
+ユーザーのMacでの「コピー／貼付／確定が反応しない」という申告は、トラックパッドの押す位置によるものとの訂正があった。この訂正と、隔離したWebKitで独立に再現したクリック欠落を区別する。WebKitではpointerdown時の同期が同じ文字列でもボタンのテキストノードを置き換え、実マウスのclickが生成されなかった。ラベルが変わる場合だけtextContentを更新し、押下中のノードを保つようにした。
+
+範囲拡大は公開版とローカル版の実入力で再現した。4×4を0.25画素移動して確定すると5×5、続けて6×6、7×7になる。幾何学的な外接矩形のfloor/ceilで空の縁を取り込むため、確定後の枠を実際の選択マスクの画素範囲から取得するように変更した。透明な選択画素も含め、絵の不透明部分だけへ縮めない。回転に必要なラスタ外接範囲の変化は維持し、その後の変形なしの確定で拡大しない。
+
+範囲移動・貼付の配置移動は、ドラッグ開始時のフレームからの総移動量を原画素の整数に丸める。掴んだ位置のオフセットを保持し、サンプルごとの丸めを累積しない。0.25画素の移動は位置を変えず、1.25画素は1画素の移動となる。自由回転・同時拡縮は維持し、回転後の端数のあるフレーム原点も移動のたびに整数へ跳ねない。
+
+操作欄の左右切替は、既存設定グリッドの8個目のアイコンボタンへ移動した。独立した見出し／行／左右切替の説明文を除去し、仮想カーソルと同じ行・同じ寸法で並べる。アクセシブル名称・ツールチップ・黄色の選択状態を維持した。色・道具の操作案内とショートカット／リセットは既存操作設定に残している。
+
+入口、page、selection panel/session/operations/geometry/overlayのキャッシュ更新URLを `20261006-selection-fix-1` へそろえ、旧モジュールが混在しないようにした。旧テストが見落としたのは、WebKitの実マウスclick生成と、確定→再取得を繰り返す端数移動だった。今回の追加検証は実入力と確定前後の画素一致を確認する。
+
+自動保存のタイミング・保存先と各ツールの出力方法の棚卸しは [save-download-audit.md](save-download-audit.md)。自動保存機構と全ツールの名称は今回変更していない。
+
+### 検証記録
+
+| 検証 | 結果・記録 |
+| --- | --- |
+| マスク確定範囲・グリッド移動の単体テスト | 9件追加、creation-suite 703件成功。`/tmp/pixieed-selection-unit-final.log` |
+| 実マウス／タッチのCopy/Cut/Paste/確定/取消、繰り返し確定、自由回転・拡縮・反転、ズーム／パン後のグリッド移動 | Chromium/WebKit × 4サイズ × 仮想OFF/ONの16条件、144項目。DPR 1/2/3、実hit targetとtrusted click、プレビュー／確定画素一致を確認。`/tmp/pixieed-selection-actions-fix-20261006/results.json` |
+| 既存の選択・変形・描画マスク・Copy/Cut/Paste・複数指・保存 | 4サイズ68項目、失敗0。`/tmp/pixieed-selection-context-fix/results.json` |
+| 仮想マウス配置・ドラッグ・キャンセル・再ON・固定レイアウト | 4サイズ40項目。各サイズ32通りのON/OFF寸法不変。`/tmp/pixieed-floating-selection-fix/report.json` |
+| 左右切替の設定グリッド・名称・状態・パネル開閉と復帰 | 4サイズ96項目。`/tmp/pixieed-draw-grid-placement/results.json` |
+| 実HTTPキャッシュ更新・遅延画像取込・GIF・PXD再読込 | Chromium/WebKit各8項目。`/tmp/pixieed-cache-selection-final/results.json`、`/tmp/pixieed-cache-selection-webkit/results.json` |
+
+旧キャッシュ検証は `fc64ff38` のソースを実HTTPキャッシュへ読み込み、同じoriginでHTMLだけを更新して実施。変更モジュールの再取得と未変更モジュールのキャッシュ再利用をサーバーログで検証する。Chromiumでは転送サイズ0も確認する。WebKitはResource Timingのサイズ情報が不足するため、サーバー取得記録を根拠にする。Playwrightのrouteを使わずHTTPキャッシュを維持し、CSPで外部接続を遮断する。
+
+確認画像は `/tmp/pixieed-draw-grid-placement/*-settings.png` と `/tmp/pixieed-selection-actions-fix-20261006/*.png`。試用先は `http://127.0.0.1:4188/draw/`。既存のユーザータブ・未保存作品を操作せず、検証には新規の隔離コンテキストと合成画像だけを使用した。Macの物理トラックパッド操作、製品Safari、iOS/Android実機は未検証。元の再生不能症状は未再現のままで、今回の選択修正と混同しない。最新追加依頼の範囲はローカル実装・検証までで、コミット・push・公開は行っていない。

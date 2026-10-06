@@ -9,7 +9,7 @@ export function canMountToolResultAd({ availableHeight, contentMinHeight, adHeig
 }
 
 /** A normal results page inside the tool, never an advertising overlay or a save gate. */
-export function createToolResultView({ key, main, returnLabel = '戻る', beforeShow, onClose } = {}) {
+export function createToolResultView({ key, main, returnLabel = '戻る', returnHref, beforeShow, onClose, onReturn } = {}) {
   if (!keys.has(key) || !main?.ownerDocument) return { show: () => false, close() {}, dispose() {} };
   if (views.has(main)) return views.get(main);
   const doc = main.ownerDocument; const win = doc.defaultView;
@@ -40,8 +40,12 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
     media = element('img', 'px-tool-result__preview'); media.hidden = true;
     media.alt = '撮影したGIFの確認画像'; previewBox.append(media);
     actionsNode = element('div', 'px-tool-result__actions');
-    returnButton = element('button', 'px-tool-result__return', returnLabel); returnButton.type = 'button';
-    returnButton.addEventListener('click', () => close());
+    returnButton = element(returnHref ? 'a' : 'button', 'px-tool-result__return', returnLabel);
+    if (returnHref) returnButton.href = returnHref; else returnButton.type = 'button';
+    returnButton.addEventListener('click', event => {
+      if (returnHref && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || typeof onReturn !== 'function')) return;
+      event.preventDefault(); returnFromResult();
+    });
     headingNode.append(titleNode, detailNode);
     actionGroupNode.append(actionsNode, returnButton);
     adRow = element('div', 'px-tool-result__ad-row');
@@ -64,7 +68,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
   function interceptNav(event) {
     if (!opened) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (event.type === 'click') close();
+    if (event.type === 'click') returnFromResult();
   }
   function prepareNav() {
     navButton = doc.querySelector('.app-tabs button');
@@ -200,9 +204,16 @@ export function createToolResultView({ key, main, returnLabel = '戻る', before
       target?.focus({ preventScroll: true });
     }
   }
+  // Explicit user navigation is separate from internal close/reset/dispose.
+  function returnFromResult() {
+    if (!opened) return;
+    close({ focus: typeof onReturn !== 'function' });
+    if (typeof onReturn === 'function') onReturn();
+    else if (returnHref) win.location.assign(returnHref);
+  }
   function onKey(event) {
     // A menu or project sheet above the result owns its own dismissal.
-    if (opened && event.key === 'Escape' && !doc.querySelector('dialog[open]') && !doc.body.classList.contains('is-menu-open')) { event.preventDefault(); event.stopImmediatePropagation(); close(); }
+    if (opened && event.key === 'Escape' && !doc.querySelector('dialog[open]') && !doc.body.classList.contains('is-menu-open')) { event.preventDefault(); event.stopImmediatePropagation(); returnFromResult(); }
   }
   doc.addEventListener('keydown', onKey, true);
   win.addEventListener('resize', updateNavClearance);

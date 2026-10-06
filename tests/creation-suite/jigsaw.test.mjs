@@ -228,7 +228,9 @@ test('free workspace preserves source choices and avoids answer markers and fixe
   assert.match(script, /imageSmoothingEnabled = false/);
   assert.match(script, /setSourcePreview\(rgba\)/);
   assert.match(script, /setSourcePreview\(null\)/);
-  assert.match(script, /jigsaw-preview-close/);
+  assert.match(script, /createJigsawPreviewWindow/);
+  const preview = await readFile(new URL('../../js/creation/jigsaw-preview.mjs', import.meta.url), 'utf8');
+  assert.match(preview, /jigsaw-preview-close/);
   assert.doesNotMatch(page, /jigsaw-preview[^>]*download|id="jigsaw-preview-canvas"[^>]*download/i);
   assert.match(css, /image-rendering:pixelated/);
   assert.match(css, /orientation:landscape/);

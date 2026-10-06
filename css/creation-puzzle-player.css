@@ -1,0 +1,38 @@
+/* Player chrome uses the existing tool header; the flexible row belongs to the art. */
+body.pixfind-tool-body.pixfind-is-playing .pixfind-game>.arc-hud{display:none!important}
+/* These players already own the accessible tool result view. A second arcade
+   celebration must not cover the next attempt after that view is dismissed. */
+body.pixfind-tool-body .pixfind-game>.arc-win{display:none!important}
+body.pixfind-tool-body.pixfind-is-playing #pixfind-game{grid-template-rows:auto auto minmax(70px,1fr) auto!important;gap:4px}
+body.pixfind-tool-body.pixfind-is-playing #pixfind-game>.pixfind-game__heading{grid-row:1!important;grid-template-columns:minmax(0,1fr) auto;min-height:26px;gap:8px}
+body.pixfind-tool-body.pixfind-is-playing #pixfind-game>.pixfind-game-status{grid-row:2!important}
+body.pixfind-tool-body.pixfind-is-playing #pixfind-game>.pixfind-images{grid-row:3!important}
+body.pixfind-tool-body.pixfind-is-playing #pixfind-game>.pixfind-found-list{grid-row:4!important}
+body.pixfind-tool-body.pixfind-is-playing .pixfind-game__heading h2{font-size:.9rem}
+body.pixfind-tool-body.pixfind-is-playing .pixfind-game__heading p{font-size:.68rem}
+body.pixfind-tool-body.pixfind-is-playing .pixfind-progress{position:static;width:auto;height:auto;overflow:visible;clip-path:none;font-size:.75rem;white-space:nowrap}
+body.pixfind-tool-body .px-site-header :is(#pixfind-back,#pixfind-hint,#puzzle-share-copy){width:44px;height:44px;min-width:44px;min-height:44px;margin:0;padding:8px;border-radius:10px;background:#26323b;color:#f4f0e4;box-shadow:none}
+body.pixfind-tool-body .px-site-header #pixfind-back{font-size:2rem}
+body.pixfind-tool-body .px-site-header #pixfind-hint{color:#ffd35a}
+body.pixfind-tool-body .px-tool-header-control:focus-visible{outline:3px solid #335cbe;outline-offset:-3px}
+body.pixfind-tool-body[data-tool-result-open] .px-tool-header-slot{visibility:hidden}
+body.pixfind-tool-body .pixfind-game>.puzzle-share{position:fixed;z-index:40;top:calc(var(--px-header-height,56px) + 36px);right:12px;left:12px;display:block;max-height:140px;margin:0;padding:8px 12px;overflow:auto;box-shadow:0 5px 20px #0002}
+body.pixfind-tool-body .pixfind-game>.puzzle-share:has(.puzzle-share__status:empty):has(.puzzle-share__url[hidden]){display:none}
+body.pixfind-tool-body .puzzle-share__status:empty{display:none}
+body.pixfind-tool-body .px-tool-result .puzzle-share{margin:0;padding:0;border:0;background:transparent}
+body.pixfind-tool-body .px-tool-result .puzzle-share__url{width:100%}
+body.pixfind-tool-body .px-tool-result .puzzle-share__status{font-size:.8rem}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game{grid-template-rows:auto auto auto minmax(70px,1fr)!important}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list{grid-row:3!important;display:flex;min-height:44px;max-height:74px;align-items:center;flex-wrap:wrap;gap:6px;margin:0;padding:5px 8px;overflow:auto;border:1px solid #c7d3bc;border-radius:10px;background:#eef3ea}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list::before{content:'探すもの';flex:none;color:#294d39;font-size:.8rem;font-weight:800}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list li{max-width:100%;height:32px;font-size:.85rem}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-images{grid-row:4!important}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-image{grid-template-rows:minmax(0,1fr)}
+body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-image>figcaption{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+@media(orientation:landscape) and (max-height:500px){
+  body.pixfind-tool-body.pixfind-is-playing>.site-header{display:block!important}
+  body.pixfind-tool-body.pixfind-is-playing .pixfind-page--playing{top:var(--px-header-height,56px)!important}
+  body.pixfind-tool-body.pixfind-is-playing .pixfind-game__heading p{display:none}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list{min-height:36px;max-height:36px;flex-wrap:nowrap;padding:2px 6px}
+  body[data-puzzle-mode="hidden-object"].pixfind-is-playing #pixfind-game>.pixfind-found-list li{height:30px;font-size:.8rem}
+}

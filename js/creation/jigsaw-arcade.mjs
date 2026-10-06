@@ -73,11 +73,10 @@ function build() {
     cards.appendChild(b); return { button: b, canvas: c, count: text.querySelector('.arc-card-count') };
   });
 
-  // ---------- the page's controls: kept, but tucked away (the piece-size select stays as a fine control) ----------
+  // ---------- engine controls remain internal; players choose difficulty cards ----------
   for (const id of ['#jigsaw-source-kind', '#jigsaw-source-version', '#jigsaw-public-version', '#jigsaw-file']) $(id)?.closest('label')?.classList.add('arc-tucked');
   $('#jigsaw-piece-count')?.classList.add('arc-tucked');
-  const gridField = grid.closest('label'); gridField?.classList.add('arc-fine');
-  if (gridField?.firstChild?.nodeType === Node.TEXT_NODE) gridField.firstChild.textContent = 'ピースの大きさ';
+  const gridField = grid.closest('label'); if (gridField) gridField.hidden = true;
   start.classList.add('arc-start'); start.textContent = 'スタート';
   resume?.classList.add('arc-press', 'arc-sub-button'); if (resume) resume.textContent = 'つづきから';
   setup.classList.add('arc-panel');
@@ -97,14 +96,14 @@ function build() {
   const countFor = (w, h, px) => Math.max(1, Math.floor(w / px)) * Math.max(1, Math.floor(h / px));
   function planLevels(w, h) {
     let prev = null;
-    return LEVELS.map((level) => {
+    return LEVELS.map((level, index) => {
       let best = null;
-      for (let px = 3; px <= Math.max(w, h); px++) {
+      for (let px = 3; px <= Math.max(3, w, h); px++) {
         const n = countFor(w, h, px); if (n > MAX_PIECES) continue;
         const score = Math.abs(Math.log(n / level.target));
         if (!best || score < best.score - 1e-9) best = { px, n, score };
       }
-      const usable = best && (!prev || best.px !== prev.px) && best.n > 1;
+      const usable = best && (!prev || best.px !== prev.px) && (best.n > 1 || index === 0);
       const out = usable ? { ...best, cols: Math.max(1, Math.floor(w / best.px)), rows: Math.max(1, Math.floor(h / best.px)) } : null;
       if (out) prev = out; return out;
     });

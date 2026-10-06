@@ -155,3 +155,37 @@ body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-preview
 .hidden-share-prompt summary { display: flex; min-height: 44px; align-items: center; color: #485044; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .hidden-share-prompt label, .hidden-share-prompt small { color: #586052; font-size: .7rem; line-height: 1.4; }
 .hidden-share-prompt textarea { box-sizing: border-box; width: 100%; min-height: 64px; resize: vertical; padding: 8px 10px; border: 1px solid #c5cbbd; border-radius: 10px; color: inherit; background: #fff; font: inherit; font-size: .82rem; line-height: 1.4; }
+
+/* Maker actions share the compact tool header; only target names occupy the workspace. */
+body.hidden-object-editing #hidden-editor .hidden-preview,
+body.hidden-object-editing:has(.hidden-target-list:not(:empty)) #hidden-editor .hidden-preview,
+body.hidden-object-editing #hidden-editor[data-confirmed="true"] .hidden-preview {
+  top: 0; right: 0; bottom: calc(5.2rem + env(safe-area-inset-bottom));
+}
+body.hidden-object-editing:has(.hidden-target-list:not(:empty)) #hidden-editor .hidden-preview {
+  bottom: calc(8.3rem + env(safe-area-inset-bottom));
+}
+body.hidden-object-editing #hidden-editor .hidden-target-list {
+  right: .6rem; bottom: calc(5.2rem + env(safe-area-inset-bottom)); left: .6rem;
+  min-height: 44px; max-height: none; border-radius: 12px; padding: 4px;
+  background: #fffffff2;
+}
+body.hidden-object-editing .hidden-target-list button { min-height: 44px; font-size: .86rem; font-weight: 700; }
+body.px-tool-header .px-site-header #hidden-target-settings .hidden-workbench {
+  position: fixed; z-index: 51; top: calc(var(--px-header-height) + 8px); right: 12px; bottom: auto; left: auto;
+  box-sizing: border-box; width: min(360px,calc(100vw - 24px)); margin: 0; padding: 12px;
+  max-height: calc(100dvh - var(--px-header-height) - 100px); overflow: auto;
+}
+body.px-tool-header .px-site-header .hidden-workbench__heading,
+body.hidden-object-editing .hidden-tools:empty,
+body.hidden-object-editing .hidden-publish-actions:not(:has(button)) { display: none; }
+body.hidden-object-editing .hidden-edit-hint { max-width: min(80%,30rem); top: .5rem; right: .6rem; }
+body.hidden-object-editing .hidden-edit-hint:empty { display: none; }
+body.hidden-object-editing .hidden-confirmed { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+body.px-tool-header .px-site-header [data-editor-header-control]:focus-visible { outline: 3px solid #ffd35a; outline-offset: -3px; }
+@media (orientation:landscape) and (max-height:500px) {
+  body.hidden-object-editing #hidden-editor .hidden-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
+  body.hidden-object-editing:has(.hidden-target-list:not(:empty)) #hidden-editor .hidden-preview { bottom: calc(7rem + env(safe-area-inset-bottom)); }
+  body.hidden-object-editing #hidden-editor .hidden-target-list { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
+  body.hidden-object-editing .hidden-edit-hint { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+}
