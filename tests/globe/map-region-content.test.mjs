@@ -34,3 +34,20 @@ test('a known administrative region without display pixels never paints its neig
   const {mask,stats}=buildMapRegionContent(regions,{posts:[{longitude:2.35,latitude:48.85}],events:[{mapRegionId:'admin1:FRA:FR-75',mapPeriod:'upcoming',position:{longitude:2.35,latitude:48.85}}]},resolve);
   assert.equal(mask[5],0);assert.equal(stats.occupiedCells,0);assert.equal(stats.droppedPostPoints,1);assert.equal(stats.droppedEventPoints,1);
 });
+
+
+test('empty startup data does not resolve locations or mark occupied pixels', () => {
+  const { mask, stats } = buildMapRegionContent(index, {}, () => { throw new Error('Unexpected location lookup'); });
+  assert.equal(stats.occupiedCells, 0);
+  assert.equal(mask.some(Boolean), false);
+});
+test('a point overlapped by a region is counted once and retains region precedence', () => {
+  const regions = { resolution: 4, mapRegionTiles: new Map([['country:ISL', Uint32Array.from([1, 2])]]) };
+  const { mask, stats } = buildMapRegionContent(regions, {
+    posts: [{ longitude: 0, latitude: 0 }],
+    events: [{ mapRegionId: 'country:ISL', mapPeriod: 'past' }]
+  }, () => ({ row: 0, column: 1 }));
+  assert.equal(stats.occupiedCells, 2);
+  assert.equal(mask[1], (1 << 4) | (1 << 6));
+  assert.equal(mask[2], mask[1]);
+});

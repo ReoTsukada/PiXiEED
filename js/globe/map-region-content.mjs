@@ -44,11 +44,15 @@ export function buildMapRegionContent(index, { posts = [], events = [] } = {}, r
   }
   const bin = count => !count ? 0 : count === 1 ? 1 : count <= 4 ? 2 : 3;
   const encode = value => Number(value.posts) | (bin(value.future) << 1) | (bin(value.past) << 4) | (bin(value.future + value.past) << 6);
-  for (const [key, value] of points) mask[key] = encode(value);
+  // Count touched pixels while painting; empty startup data never scans the world.
+  function paint(key, bits) {
+    if (mask[key] === 0) stats.occupiedCells++;
+    mask[key] = bits;
+  }
+  for (const [key, value] of points) paint(key, encode(value));
   for (const [code, value] of regions) {
     const bits = encode(value);
-    for (const key of regionTiles.get(code)) mask[key] = bits;
+    for (const key of regionTiles.get(code)) paint(key, bits);
   }
-  for (const bits of mask) if (bits) stats.occupiedCells++;
   return { mask, stats: Object.freeze(stats) };
 }

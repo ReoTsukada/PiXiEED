@@ -1,7 +1,7 @@
 /** Uniform Web Mercator display tiles; posting IDs remain on the canonical v11 grid. */
 import { DEFAULT_GRID, getCell, lookupCell, normalizeLongitude, mercatorY, inverseMercatorY, MERCATOR_MAX_LATITUDE } from './geometry.mjs';
 import { JAPAN_COUNTRY_ID, getRegionForPrefecture } from './hierarchy.mjs';
-import { createMembershipIndex, findExplicitMembership } from './topology.mjs';
+import { createMembershipIndex, findExplicitMembership } from './topology.mjs?v=20261006-map-startup-1';
 
 export const MAP_CELL_VERSION = 'map-cells-v1';
 export const FINE_MAP_RESOLUTION = 2048;
@@ -297,7 +297,7 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   assert(countryBytes.length === total * 2 && prefectureIndices.length === total, 'Invalid fine map raster length.');
   const countryIndices = new Uint16Array(total);
   for (let i = 0; i < total; i++) countryIndices[i] = countryBytes[i * 2] | countryBytes[i * 2 + 1] << 8;
-  const bandOffsets = [], owners = new Map(); let offset = 0;
+  const bandOffsets = []; let offset = 0;
   const japanIndex = source.countryIds.indexOf(JAPAN_COUNTRY_ID);
   const patch = prefectureData ? decodePrefectureData(prefectureData, source, resolution) : null;
   const admin1Patch = admin1Data ? decodeAdmin1Data(admin1Data, source, resolution) : null;
@@ -306,7 +306,8 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   const prefectureMask = new Uint8Array(resolution * resolution);
   const mapRegionMask = new Uint16Array(resolution * resolution);
   const unselectableMask = new Uint8Array(resolution * resolution);
-  const prefectureTileLists = new Map(source.prefectureIds.slice(1).map((id) => [id, []]));
+  const prefectureTileLists = Array.from({ length: source.prefectureIds.length }, () => null);
+  for (let prefecture = 1; prefecture < source.prefectureIds.length; prefecture++) prefectureTileLists[prefecture] = [];
   const mapRegions = admin1Patch ? [...admin1Patch.mapRegions] : [null, ...source.prefectureIds.slice(1).map((id, i) => ({ id: `prefecture:${id}`, label: source.prefectureLabels[i + 1], countryId: JAPAN_COUNTRY_ID, countryLabel: source.countryLabels[japanIndex], kind: 'prefecture' }))];
   const regionIndices = new Map(mapRegions.slice(1).map((region, i) => [region.id, i + 1]));
   const countryFallbackIndices = new Uint16Array(source.countryIds.length);
@@ -325,9 +326,13 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   const geometryAuthority = admin1Patch?.landAuthority === 'admin1-geometries';
   const countryIndexById = new Map(source.countryIds.map((id, i) => [id, i]));
   const regionCountries = Uint16Array.from(mapRegions, region => region ? countryIndexById.get(region.countryId) : 0);
-  const regionTileLists = new Map(mapRegions.slice(1).map((region) => [region.id, []]));
+  const regionTileLists = Array.from({ length: mapRegions.length }, () => null);
+  for (let region = 1; region < mapRegions.length; region++) regionTileLists[region] = [];
   const unselectableBounds = patch?.unselectableBounds;
-  const seenCountries = new Set(), seenPrefectures = new Set(); let cellCount = 0;
+  const seenCountries = new Uint8Array(source.countryIds.length), seenPrefectures = new Uint8Array(source.prefectureIds.length);
+  const representativeSlots = new Uint32Array(source.countryIds.length * source.prefectureIds.length).fill(0xffffffff);
+  const representativeKeys = [];
+  let cellCount = 0;
   for (let row = 0; row < resolution; row++) {
     const latitude = inverseMercatorY(Math.PI - (row + .5) / resolution * TAU);
     const possibleUnselectableRow = Boolean(unselectableBounds && latitude >= unselectableBounds[1] && latitude <= unselectableBounds[3]);
@@ -373,17 +378,24 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
       landMask[key] = 1; cellCount++;
       prefectureMask[key] = prefecture;
       mapRegionMask[key] = mapRegionIndex;
-      seenCountries.add(country); if (prefecture) { seenPrefectures.add(prefecture); prefectureTileLists.get(source.prefectureIds[prefecture])?.push(key); }
-      if (mapRegionIndex) regionTileLists.get(mapRegions[mapRegionIndex]?.id)?.push(key);
-      const owner = ownerKey(country, prefecture); if (!owners.has(owner)) owners.set(owner, key);
+      seenCountries[country] = 1;
+      if (prefecture) { seenPrefectures[prefecture] = 1; prefectureTileLists[prefecture]?.push(key); }
+      if (mapRegionIndex) regionTileLists[mapRegionIndex]?.push(key);
+      const owner = country * source.prefectureIds.length + prefecture;
+      if (representativeSlots[owner] === 0xffffffff) { representativeSlots[owner] = key; representativeKeys.push(owner); }
     }
   }
-  assert(source.countryIds.slice(1).every((id, i) => seenCountries.has(i + 1)) && seenPrefectures.size === 47, 'Fine map must preserve every country and all 47 prefectures.');
-  const prefectureTiles = new Map([...prefectureTileLists].map(([id, keys]) => [id, Uint32Array.from(keys)]));
-  const mapRegionTiles = new Map([...regionTileLists].map(([id, keys]) => [id, Uint32Array.from(keys)]));
+  for (let country = 1; country < source.countryIds.length; country++) assert(seenCountries[country], 'Fine map must preserve every country and all 47 prefectures.');
+  let seenPrefectureCount = 0;
+  for (let prefecture = 1; prefecture < source.prefectureIds.length; prefecture++) seenPrefectureCount += seenPrefectures[prefecture];
+  assert(seenPrefectureCount === 47, 'Fine map must preserve every country and all 47 prefectures.');
+  const prefectureTiles = new Map();
+  for (let prefecture = 1; prefecture < source.prefectureIds.length; prefecture++) prefectureTiles.set(source.prefectureIds[prefecture], Uint32Array.from(prefectureTileLists[prefecture]));
+  const mapRegionTiles = new Map();
+  for (let region = 1; region < mapRegions.length; region++) mapRegionTiles.set(mapRegions[region].id, Uint32Array.from(regionTileLists[region]));
   const index = { version: 'map-grid-fine-v1', geometryVersion: DEFAULT_GRID.version, projection: 'mercator', resolution, worldCellCount: resolution ** 2, cellCount, sourceCellCount: total, sourceLandCellCount: countryIndices.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0), countryIds: source.countryIds, countryLabels: source.countryLabels, prefectureIds: source.prefectureIds, prefectureLabels: source.prefectureLabels, landMask, countryIndices, prefectureIndices, prefectureMask, prefectureTiles, mapRegionMask, unselectableMask, mapRegions, mapRegionTiles, bandOffsets, prefectureData: patch, admin1Data: admin1Patch, recordCache: new Map() };
   // Diagnostic representatives only: the complete map remains a compact bitmap.
-  index.cells = Object.freeze([...owners.values()].map(key => fineTileRecord(key, index)));
+  index.cells = Object.freeze(representativeKeys.map(owner => fineTileRecord(representativeSlots[owner], index)));
   return Object.freeze(index);
 }
 function fineTileRecord(key, index) {

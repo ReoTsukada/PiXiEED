@@ -12,6 +12,7 @@ export const GLOBE_TOPOLOGY_VERSION = 'v1';
 const LONGITUDE_EPSILON = 1e-10;
 const SEGMENT_EPSILON = 1e-10;
 const LATITUDE_EPSILON = 1e-12;
+const PREPARED_RINGS = new WeakMap();
 
 function assertFiniteNumber(value, name) {
   const number = Number(value);
@@ -57,7 +58,9 @@ function readRing(ring, name) {
   if (Math.abs(first[0] - last[0]) > LONGITUDE_EPSILON || Math.abs(first[1] - last[1]) > LATITUDE_EPSILON) {
     coordinates.push(first);
   }
-  return freezeArray(coordinates);
+  const normalized = freezeArray(coordinates);
+  PREPARED_RINGS.set(normalized, prepareRing(normalized));
+  return normalized;
 }
 
 function readPolygonCoordinates(coordinates, name) {
@@ -161,6 +164,16 @@ function unwrapRing(ring) {
   return unwrapped;
 }
 
+function prepareRing(ring) {
+  const coordinates = unwrapRing(ring);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of coordinates) {
+    minX = Math.min(minX, x); minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+  }
+  return { coordinates, minX, minY, maxX, maxY };
+}
+
 function alignLongitude(longitude, reference) {
   let aligned = normalizeLongitude(longitude);
   while (aligned - reference > 180) aligned -= 360;
@@ -179,9 +192,12 @@ function pointOnSegment(px, py, ax, ay, bx, by) {
 }
 
 function classifyRing(longitude, latitude, ring) {
-  const coordinates = unwrapRing(ring);
+  const prepared = PREPARED_RINGS.get(ring) || prepareRing(ring);
+  const { coordinates, minX, minY, maxX, maxY } = prepared;
   const pointX = alignLongitude(longitude, coordinates[0][0]);
   const pointY = latitude;
+  if (pointX < minX - SEGMENT_EPSILON || pointX > maxX + SEGMENT_EPSILON
+    || pointY < minY - SEGMENT_EPSILON || pointY > maxY + SEGMENT_EPSILON) return 'outside';
   let inside = false;
   for (let index = 0, previousIndex = coordinates.length - 1; index < coordinates.length; previousIndex = index, index += 1) {
     const [currentX, currentY] = coordinates[index];

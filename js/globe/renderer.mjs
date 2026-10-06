@@ -22,12 +22,12 @@ import {
   projectCellCorners,
   projectGeoToScreen
 } from './geometry.mjs?v=20261005-admin-boundary-1';
-import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20260920-g4-precision-1';
+import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20261006-map-startup-1';
 import { JAPAN_COUNTRY_ID, JAPAN_REGION_GROUPS, getRegionForPrefecture } from './hierarchy.mjs?v=20260920-g4-precision-1';
 import { createWebGLRenderer } from './webgl-renderer.mjs?v=20261005-admin-boundary-1';
-import { createMapCellIndex, lookupMapCell, resolveMapLocation } from './map-cells.mjs?v=20261006-unassigned-northern-islands-1';
+import { createMapCellIndex, lookupMapCell, resolveMapLocation } from './map-cells.mjs?v=20261006-map-startup-1';
 import { createMapCellRenderer } from './map-cell-renderer.mjs?v=20261005-admin-boundary-1';
-import { buildMapRegionContent } from './map-region-content.mjs?v=20261005-admin-boundary-1';
+import { buildMapRegionContent } from './map-region-content.mjs?v=20261006-map-startup-1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
 
 export const GLOBE_RENDERER_VERSION = 'g6-webgl2-analytic-half-degree-v1';

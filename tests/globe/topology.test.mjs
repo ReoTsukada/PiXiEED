@@ -131,3 +131,12 @@ test('shared topology remains finite and symmetric for polar one-column bands', 
   assert.equal(topology.south.columns[0].breakpoints[1], topology.breakpoints[1]);
   assert.ok(topology.breakpoints.every((point) => Number.isFinite(point.longitude) && Number.isFinite(point.latitude)));
 });
+
+
+test('mutable external geometry is re-read after repeated membership queries', () => {
+  const geometry = { type: 'Polygon', coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] };
+  for (let i = 0; i < 3; i++) assert.equal(pointInGeometry(geometry, 5, 5), true);
+  for (const coordinate of geometry.coordinates[0]) coordinate[0] += 20;
+  assert.equal(pointInGeometry(geometry, 5, 5), false);
+  assert.equal(pointInGeometry(geometry, 25, 5), true);
+});
