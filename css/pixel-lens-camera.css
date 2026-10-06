@@ -435,3 +435,48 @@ button, a { font: inherit; }
 @media (max-width: 359px) { .lc-toolbar-context-head { min-width: 72px; } .lc-region-merge { padding: .55rem; gap: .4rem .5rem; } }
 
 @media (max-height: 480px) { .lc-region-merge { max-height: min(42dvh, max(4rem, calc(100dvh - 20.5rem))); } }
+
+/* Native save choices stay outside the suspended camera result content. */
+.lc-file-save { width: min(28rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 1.25rem; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--lc-line); border-radius: 20px; background: #141a1f; color: var(--lc-text); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.lc-file-save::backdrop { background: rgba(0,0,0,.65); }
+.lc-file-save h2 { margin: 0 0 .75rem; font-size: 1.2rem; }
+.lc-file-save p { margin: .75rem 0; font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; }
+.lc-file-save-actions { display: grid; gap: .6rem; }
+.lc-file-save :is(button, a) { display: flex; justify-content: center; align-items: center; min-height: 48px; padding: .65rem .9rem; border: 1px solid var(--lc-line); border-radius: 12px; background: rgba(255,255,255,.08); color: var(--lc-text); font: inherit; text-align: center; text-decoration: none; cursor: pointer; overflow-wrap: anywhere; }
+.lc-file-save #cameraShareFile { background: var(--lc-accent); border-color: transparent; color: #fff; }
+.lc-file-save [hidden] { display: none; }
+.lc-file-save button:disabled { opacity: .5; cursor: wait; }
+.lc-file-save :is(button, a):focus-visible { outline: 3px solid var(--lc-accent); outline-offset: 3px; }
+.lc-file-save form { margin-top: 1rem; }
+.lc-file-save form button { width: 100%; }
+
+/* The file picker remains available during a camera permission prompt or error. */
+.lc-image-picker { display: inline-flex; align-items: center; justify-content: center; flex: none; min-height: 44px; padding: .6rem .85rem; border: 1px solid var(--lc-line); border-radius: 12px; background: var(--lc-glass-strong); color: var(--lc-text); font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.lc-image-picker:focus-visible { outline: 3px solid var(--lc-accent); outline-offset: 3px; }
+.lc-image-picker:disabled { opacity: .5; cursor: wait; }
+.lc-top.px-site-header .px-header-brand--tool > span:not(.brand-mark) { display: none; }
+.lc-top.px-site-header .px-header-brand--tool { flex: 0 0 40px; min-width: 40px; width: 40px; justify-content: center; }
+.lc-welcome { inset: calc(var(--lc-safe-t) + 4.5rem) .75rem calc(var(--lc-safe-b) + var(--lc-nav-h) + .5rem); min-height: 0; }
+.lc-welcome-card { width: min(100%, 30rem); max-height: 100%; min-height: 0; align-items: flex-start; overflow-y: auto; background: #141a1f; }
+.lc-welcome-card > img { flex: none; }
+.lc-fallback-copy { min-width: 0; }
+.lc-fallback-copy h2 { margin: 0 0 .55rem; font-size: 1.05rem; line-height: 1.4; }
+.lc-fallback-copy p { display: block; margin: .6rem 0; font-size: .85rem; line-height: 1.55; overflow-wrap: anywhere; }
+.lc-fallback-copy .lc-image-note { color: var(--lc-muted); font-size: .75rem; }
+.lc-fallback-copy .lc-image-picker { width: 100%; background: var(--lc-accent); min-height: 48px; }
+.lc[data-source="image"] .lc-zoom-stops { visibility: hidden; }
+.lc[data-mode="idle"] .lc-feedback { display: none; }
+
+#flipCamera .lc-source-camera { display: none; width: 1.3rem; height: 1.3rem; filter: invert(1); }
+.lc[data-source="image"] #flipCamera svg { display: none; }
+.lc[data-source="image"] #flipCamera .lc-source-camera { display: block; }
+
+.lc-upload-status { position: fixed; top: calc(var(--lc-safe-t) + 4.2rem); left: .75rem; right: .75rem; width: max-content; max-width: min(calc(100% - 1.5rem), 32rem); margin: 0 auto; padding: .6rem .9rem; border: 1px solid var(--lc-line); border-radius: 12px; background: #141a1f; color: var(--lc-text); font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; z-index: 7; }
+.lc-upload-status[hidden] { display: none; }
+
+.lc[data-mode="idle"] .lc-stage, .lc-welcome-card { touch-action: pan-y; }
+.lc-welcome-card { overscroll-behavior: contain; }
+
+/* Leave room for the existing project button above the fallback explanation. */
+body.project-workspace-ready .lc[data-mode="idle"] .lc-welcome { top: calc(var(--lc-safe-t) + 7.75rem); }
+.lc[data-source="image"] #gestureHint { display: none; }

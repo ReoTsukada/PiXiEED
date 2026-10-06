@@ -33,7 +33,8 @@ test('normal exports and creative tools stay available without perk gates', asyn
   assert.match(draw, /\$\('#draw-timelapse-detail'\)\.addEventListener\('click', \(\) => exportTimelapse\(true\)\)/);
   assert.doesNotMatch(draw, /requestPass|px-perk/);
   assert.match(audio, /saveFile\(blob, `pixieed-dot-music-/); assert.match(audio, /renderAudioWav\(songSnapshot\)/);
-  assert.match(camera, /saveFile\(blob, (?:link\.download|snapshot\.filename)/);
+  assert.match(camera, /fileSave\.show\(\{ blob: snapshot\.blob/);
+  assert.doesNotMatch(camera, /fetch\(snapshot\.url\)/, 'the camera shares its prepared file without an asynchronous refetch');
   assert.match(pixfind, /createPuzzleHintController\(\{ onState:/);
   assert.doesNotMatch(pixfind, /requestPass|px-perk/);
   assert.match(await read('draw/index.html'), /id="draw-timelapse-detail"/);

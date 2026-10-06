@@ -6,7 +6,8 @@ import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette,
 import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261004-camera-tap-focus-1';
 import { GIF_FPS } from './gif.mjs?v=20261001-animation-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?v=20261001-animation-1';
-import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
+import { createCameraFileSave } from './file-save.mjs?rev=20261006-camera-save-1';
+import { decodeCameraImageFile } from './image-source.mjs?rev=20261006-camera-upload-1';
 import { cameraPostDataUrl } from './camera-post.mjs?rev=20261004-post-size-256-1';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20260930-audio-timebase-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20260930-shared-canvas-5';
@@ -39,7 +40,9 @@ if (returnToAudio && !audioCameraRequest) {
 const root = $('#pixelStudio');
 root.dataset.regionMerge = 'false';
 root.dataset.mergeMaskVisible = 'false';
+root.dataset.source = 'camera';
 const resultView = createToolResultView({ key: 'camera-result', main: root, returnLabel: '撮り直す', onClose: retake });
+const fileSave = createCameraFileSave({ dialog: $('#cameraSaveDialog') });
 const video = $('#video');
 const stage = $('#stage');
 const view = $('#view');
@@ -51,6 +54,10 @@ const stageMessage = $('#stageMsg');
 const info = $('#info');
 const sourceCanvas = document.createElement('canvas');
 const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
+let importedSource = null;
+let imageSelectionSequence = 0;
+let lastImportedFrameAt = 0;
+const IMPORTED_FRAME_INTERVAL_MS = 220;
 const applyMiniature = createMiniatureProcessor();
 const miniatureSource = document.createElement('canvas');
 const miniatureSourceContext = miniatureSource.getContext('2d', { willReadFrequently: true });
@@ -68,6 +75,7 @@ let previousAiStatus = null;
 let loop = null;
 let lastFacing = 'environment';
 let downloadUrl = null;
+let downloadBlob = null;
 let downloadGeneration = 0;
 let gifExportJob = null;
 let resumeOnVisible = true;
@@ -133,6 +141,8 @@ function say(message = '', { visible = false } = {}) {
   stageMessage.hidden = !message;
   stageMessage.classList.toggle('pc-sr-only', !visible);
   stageMessage.classList.toggle('is-policy-notice', Boolean(message && message === capturePolicyNotice));
+  const unavailableReason = $('#cameraUnavailableReason');
+  if (unavailableReason && state.mode === 'idle' && message) unavailableReason.textContent = message;
 }
 
 function setCapturePolicyNotice(message) {
@@ -153,6 +163,8 @@ function sayToast(message) {
 
 function invalidateCaptureDownload() {
   downloadGeneration++;
+  fileSave.reset();
+  downloadBlob = null;
   gifExportJob?.abort(); gifExportJob = null;
   stopGifPlayback();
   if (downloadUrl) URL.revokeObjectURL(downloadUrl);
@@ -166,7 +178,7 @@ function invalidateCaptureDownload() {
 
 function updateSaveLinkState() {
   const link = $('#savePng');
-  const enabled = state.mode === 'captured' && Boolean(state.result && downloadUrl);
+  const enabled = state.mode === 'captured' && Boolean(state.result && downloadUrl && downloadBlob);
   $('#resultControls').hidden = !enabled;
   $('#postCamera').hidden = Boolean(gif.pending);
   $('#useCameraImage').hidden = Boolean(audioCameraRequest || gif.pending);
@@ -203,7 +215,8 @@ function setInfoForMode(mode) {
   if (mode === 'idle') info.textContent = '中央のカメラボタンで再開できます。';
   else if (mode === 'loading') info.textContent = '写真はこの端末で処理します。';
   else if (mode === 'live') {
-    info.textContent = state.error === 'worker'
+    info.textContent = importedSource ? '画像を調整し、中央のボタンで確定できます。'
+      : state.error === 'worker'
       ? 'ページを再読み込みしてください。'
       : state.error
         ? '前の完成画像を表示しています。'
@@ -226,7 +239,11 @@ function setMode(mode) {
   updateSizeSummary();
   updatePrimaryAction();
   updateSharedCaptureControls();
-  $('#flipCamera').disabled = mode !== 'live';
+  const flipButton = $('#flipCamera');
+  flipButton.disabled = mode !== 'live';
+  const opensCamera = mode === 'live' && Boolean(importedSource);
+  flipButton.setAttribute('aria-label', opensCamera ? 'カメラを開く' : 'インカメラと外カメラを切り替え');
+  flipButton.title = opensCamera ? 'カメラを開く' : 'カメラ切り替え';
   updateSaveLinkState();
   setInfoForMode(mode);
 }
@@ -245,7 +262,8 @@ function updatePrimaryAction() {
   const primary = deriveCameraPrimaryAction({ mode: state.mode, hasResult: Boolean(state.result), error: state.error, workerUnavailable: Boolean(workerUnavailable) });
   button.dataset.action = primary.action;
   let label = audioCameraRequest && primary.action === 'capture' ? '撮影して音楽へ戻る' : primary.label;
-  const gifHelp = state.mode === 'live' && !audioCameraRequest ? 'Space長押しでGIF撮影、離すと終了' : '';
+  if (importedSource && state.mode === 'live') label = 'この画像を確定';
+  const gifHelp = state.mode === 'live' && !audioCameraRequest && !importedSource ? 'Space長押しでGIF撮影、離すと終了' : '';
   button.setAttribute('aria-label', label);
   if (gifHelp) button.setAttribute('aria-description', gifHelp);
   else button.removeAttribute('aria-description');
@@ -471,6 +489,7 @@ function showFocusRequestMarker(clientX, clientY) {
 async function requestCameraFocusAt(clientX, clientY, { silent = false } = {}) {
   const notify = (message) => { if (!silent) sayToast(message); };
   if (state.mode !== 'live' || gif.recording || captureInFlight) return;
+  if (importedSource) { root.dataset.focusStatus = 'unavailable'; return; }
   if (focusRequestInFlight) {
     root.dataset.focusStatus = 'busy';
     notify('ピント要求中です。完了してからもう一度お試しください');
@@ -973,17 +992,26 @@ const resizeObserver = new ResizeObserver(() => {
 resizeObserver.observe(stage);
 
 function cameraFrame() {
-  if (!activeStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) return null;
+  const isImage = Boolean(importedSource);
+  const input = isImage ? importedSource.source : video;
+  const inputWidth = isImage ? importedSource.width : video.videoWidth;
+  const inputHeight = isImage ? importedSource.height : video.videoHeight;
+  if (isImage) {
+    const now = performance.now();
+    if (now - lastImportedFrameAt < IMPORTED_FRAME_INTERVAL_MS) return null;
+    lastImportedFrameAt = now;
+  } else if (!activeStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !inputWidth || !inputHeight) return null;
+  if (!input || !inputWidth || !inputHeight) return null;
   const output = captureDimensions();
   const aspect = output.width / output.height;
-  const full = centerCrop(video.videoWidth, video.videoHeight, aspect);
+  const full = centerCrop(inputWidth, inputHeight, aspect);
   const zoom = zoomController.snapshot();
   // Keep the previous published preview while device zoom is still above the user's requested total.
-  if (zoom.total > zoom.requested + 0.02) return null;
-  const digital = zoom.digital;
+  if (!isImage && zoom.total > zoom.requested + 0.02) return null;
+  const digital = isImage ? state.zoom : zoom.digital;
   const crop = { sw: full.sw / digital, sh: full.sh / digital, sx: full.sx + (full.sw - full.sw / digital) / 2, sy: full.sy + (full.sh - full.sh / digital) / 2 };
   const { width, height } = output;
-  let sampleSource = video, sampleCrop = crop, miniatureMs = 0, miniatureSourceWidth = 0, miniatureSourceHeight = 0;
+  let sampleSource = input, sampleCrop = crop, miniatureMs = 0, miniatureSourceWidth = 0, miniatureSourceHeight = 0;
   if (state.miniature) {
     const started = performance.now();
     const work = miniatureWorkSize(crop.sw, crop.sh);
@@ -996,7 +1024,7 @@ function cameraFrame() {
     miniatureSourceContext.imageSmoothingQuality = 'high';
     miniatureSourceContext.clearRect(0, 0, work.width, work.height);
     // Start from the original crop every frame; tone and pixelisation follow later.
-    miniatureSourceContext.drawImage(video, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, work.width, work.height);
+    miniatureSourceContext.drawImage(input, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, work.width, work.height);
     const original = miniatureSourceContext.getImageData(0, 0, work.width, work.height);
     const blurred = applyMiniature(original, true);
     miniatureContext.putImageData(new ImageData(blurred.data, work.width, work.height), 0, 0);
@@ -1012,7 +1040,7 @@ function cameraFrame() {
   sourceContext.imageSmoothingQuality = 'high';
   sourceContext.filter = lensFrameFilter();
   sourceContext.clearRect(0, 0, width, height);
-  if (state.facing === 'user') { sourceContext.translate(width, 0); sourceContext.scale(-1, 1); }
+  if (!isImage && state.facing === 'user') { sourceContext.translate(width, 0); sourceContext.scale(-1, 1); }
   sourceContext.drawImage(sampleSource, sampleCrop.sx, sampleCrop.sy, sampleCrop.sw, sampleCrop.sh, 0, 0, width, height);
   sourceContext.restore();
   return { image: sourceContext.getImageData(0, 0, width, height), aspect, miniature: state.miniature, miniatureMs, miniatureSourceWidth, miniatureSourceHeight };
@@ -1138,6 +1166,9 @@ function closeCamera({ idle = true, message = '', focus = false, visible = false
 }
 
 async function startCamera({ focus = true } = {}) {
+  if (audioCameraInvalid) return;
+  imageSelectionSequence++;
+  clearImportedSource();
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   clearStartupWatchdog();
   resumeOnVisible = false;
@@ -1204,8 +1235,119 @@ async function startCamera({ focus = true } = {}) {
   }
 }
 
+function clearImportedSource() {
+  if (!importedSource) {
+    root.dataset.source = 'camera';
+    return;
+  }
+  const previous = importedSource;
+  importedSource = null;
+  lastImportedFrameAt = 0;
+  root.dataset.source = 'camera';
+  previous.dispose?.();
+}
+
+async function loadCameraImage(file) {
+  const selection = ++imageSelectionSequence;
+  resumeOnVisible = false;
+  const imageStatus = $('#cameraImageStatus');
+  if (imageStatus) { imageStatus.hidden = true; imageStatus.textContent = ''; }
+  if (audioCameraInvalid || captureInFlight) {
+    const message = audioCameraInvalid
+      ? '音楽への受け渡しを確認できません。曲へ戻ってカメラを開き直してください。'
+      : '撮影の保存が終わってから画像を選んでください。';
+    if (imageStatus) { imageStatus.textContent = message; imageStatus.hidden = false; }
+    say(message, { visible: true });
+    return;
+  }
+  let decoded;
+  try {
+    decoded = await decodeCameraImageFile(file);
+  } catch (error) {
+    if (selection === imageSelectionSequence) {
+      const message = error instanceof Error ? error.message : 'この画像を開けませんでした。別の画像をお試しください。';
+      if (imageStatus) { imageStatus.textContent = message; imageStatus.hidden = false; }
+      say(message, { visible: true });
+    }
+    return;
+  }
+  if (selection !== imageSelectionSequence) { decoded.dispose?.(); return; }
+  if (state.mode === 'captured' && sharedImageEdited) {
+    try {
+      await cameraPxd.save();
+    } catch (error) {
+      decoded.dispose?.();
+      if (selection === imageSelectionSequence) {
+        const message = error instanceof Error ? error.message : '撮影画像を保存できませんでした。';
+        if (imageStatus) { imageStatus.textContent = message; imageStatus.hidden = false; }
+        say(message, { visible: true });
+      }
+      return;
+    }
+    if (selection !== imageSelectionSequence) { decoded.dispose?.(); return; }
+  }
+
+  if (regionMergeSession) endRegionMerge({ restore: false, resume: false });
+  clearStartupWatchdog();
+  resumeOnVisible = false;
+  cameraSequence++;
+  invalidatePreview();
+  if (gif.recording) stopGifUi();
+  gif.pending = null;
+  stopTracks();
+  invalidateCaptureDownload();
+  const previous = importedSource;
+  importedSource = decoded;
+  previous?.dispose?.();
+  root.dataset.source = 'image';
+  lastImportedFrameAt = 0;
+
+  sharedImageTarget = null;
+  sharedImageColorCount = 16;
+  sharedImageEdited = false;
+  sharedProjectBound = false;
+  state.zoom = 1;
+  zoomInfo = zoomRange(null);
+  zoomController.setZoom(1);
+  if (!state.customLook) {
+    resetLensPalette();
+    resetLensPaletteEdits();
+  }
+  setPaletteEditing(-1);
+  paletteEpoch++;
+  displayedPaletteRevision = null;
+  root.dataset.paletteEpoch = String(paletteEpoch);
+  syncLens();
+  syncControls();
+
+  clearPreview();
+  previewSessionStarted = performance.now();
+  previewCounter = 0;
+  root.dataset.previewFrames = '0';
+  setMode('live');
+  updateSharedCaptureControls();
+  syncZoomStops();
+  syncZoomHud();
+  say('画像を読み込みました。色やドットを調整して確定できます。', { visible: true });
+  if (!workerUnavailable) loop.start();
+}
+
+// Keep fallback buttons and scrolling outside the stage's camera gestures.
+$('#welcome').addEventListener('pointerdown', (event) => event.stopPropagation());
+$('#welcome').addEventListener('wheel', (event) => event.stopPropagation());
+const cameraImageInput = $('#cameraImageInput');
+const chooseCameraImage = () => cameraImageInput.click();
+$('#cameraChooseImage').addEventListener('click', chooseCameraImage);
+$('#cameraFallbackChoose').addEventListener('click', chooseCameraImage);
+cameraImageInput.addEventListener('change', () => {
+  const file = cameraImageInput.files?.[0];
+  cameraImageInput.value = '';
+  if (file) void loadCameraImage(file);
+});
+
 async function capture() {
   if (captureInFlight || state.mode !== 'live' || !state.result) return;
+  imageSelectionSequence++;
   if (regionMergeSession) {
     const merge = updateLiveRegionMerge(regionMergeSession.latestRawResult, { force: true });
     if (merge) {
@@ -1341,6 +1483,7 @@ function refreshObjects() {
 }
 
 async function retake() {
+  imageSelectionSequence++;
   if (captureInFlight) return;
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   if (state.mode === 'captured' && sharedImageEdited) {
@@ -1356,8 +1499,19 @@ async function retake() {
   state.result = null;
   view.width = 1;
   view.height = 1;
-  say('カメラを開き直しています…');
-  void startCamera();
+  if (importedSource) {
+    lastImportedFrameAt = 0;
+    previewSessionStarted = performance.now();
+    previewCounter = 0;
+    clearPreview();
+    setMode('live');
+    updateSharedCaptureControls();
+    say('画像をプレビューしています…');
+    if (!workerUnavailable) loop.start();
+  } else {
+    say('カメラを開き直しています…');
+    void startCamera();
+  }
 }
 
 async function prepareCaptureDownload(frozen) {
@@ -1367,6 +1521,7 @@ async function prepareCaptureDownload(frozen) {
     // original dot resolution, and capture never requests a different frame.
     const { blob, width, height } = await encodeCameraPng(frozen);
     if (generation !== downloadGeneration || state.mode !== 'captured' || state.result !== frozen) return;
+    downloadBlob = blob;
     downloadUrl = URL.createObjectURL(blob);
     const link = $('#savePng');
     link.href = downloadUrl;
@@ -1958,6 +2113,11 @@ stage.addEventListener('keydown', (event) => {
 // Swipe up / down: front and back cameras.
 function flipCamera() {
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
+  if (importedSource) {
+    sayToast('カメラを開きます');
+    void startCamera({ focus: false });
+    return;
+  }
   lastFacing = state.facing === 'environment' ? 'user' : 'environment';
   captureFrame.classList.remove('lc-flip');
   requestAnimationFrame(() => captureFrame.classList.add('lc-flip'));
@@ -1984,7 +2144,7 @@ function gifProgress() {
   gif.raf = requestAnimationFrame(gifProgress);
 }
 function startGif() {
-  if (audioCameraRequest || state.mode !== 'live' || !state.result) return;
+  if (audioCameraRequest || importedSource || state.mode !== 'live' || !state.result) return;
   if (regionMergeSession) { sayToast('色統合中はGIFを撮影できません'); return; }
   Object.assign(gif, gifLimits());
   gif.capturePlan = animatedCapturePlan(state.result.width, state.result.height, { maxMs: gif.maxMs, fps: gif.fps });
@@ -2055,7 +2215,8 @@ async function prepareGifDownload(frames) {
     const fps = frames.fps || GIF_FPS;
     const { bytes, width, height } = await encodeAnimatedGif(frames, { delayMs: 1000 / fps, signal: job.signal });
     if (generation !== downloadGeneration || state.mode !== 'captured' || job !== gifExportJob) return;
-    downloadUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/gif' }));
+    downloadBlob = new Blob([bytes], { type: 'image/gif' });
+    downloadUrl = URL.createObjectURL(downloadBlob);
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.gif`;
@@ -2075,7 +2236,7 @@ async function prepareGifDownload(frames) {
 }
 captureButton.addEventListener('pointerdown', (event) => {
   holdFired = false;
-  if (audioCameraRequest) return;
+  if (audioCameraRequest || importedSource) return;
   if (state.mode !== 'live' || !state.result || event.button > 0) return;
   try { captureButton.setPointerCapture(event.pointerId); } catch { /* ignore */ }
   window.clearTimeout(holdTimer);
@@ -2092,7 +2253,7 @@ captureButton.addEventListener('keydown', (event) => {
   if (event.repeat || keyboardShutterActive) return;
   keyboardShutterActive = true;
   keyboardHoldFired = false;
-  if (audioCameraRequest || state.mode !== 'live' || !state.result) return;
+  if (audioCameraRequest || importedSource || state.mode !== 'live' || !state.result) return;
   window.clearTimeout(keyboardHoldTimer);
   keyboardHoldTimer = window.setTimeout(() => {
     keyboardHoldFired = true;
@@ -2148,23 +2309,19 @@ $('#flipCamera').addEventListener('click', () => { if (state.mode === 'live') fl
 $('#savePng').addEventListener('click', async (event) => {
   event.preventDefault();
   const link = $('#savePng');
-  if (link.getAttribute('aria-disabled') === 'true' || !downloadUrl || state.mode !== 'captured' || !state.result) return;
-  const snapshot = { generation: downloadGeneration, frame: state.result, url: downloadUrl, filename: link.download };
-  // phones: the share sheet can put the picture straight into Photos; elsewhere a download
-  const download = async () => {
-    if (snapshot.generation !== downloadGeneration || state.mode !== 'captured' || state.result !== snapshot.frame || downloadUrl !== snapshot.url) return false;
-    const blob = await (await fetch(snapshot.url)).blob();
-    return (await saveFile(blob, snapshot.filename)) !== 'cancelled';
-  };
-  // GIFs come only from live camera captures. PXD restores are still frames and
-  // require a fresh owner check before their PNG can leave the browser.
-  if (gif.pending) { if (await download()) sayToast('GIFを保存しました。'); return; }
+  if (link.getAttribute('aria-disabled') === 'true' || !downloadUrl || !downloadBlob || state.mode !== 'captured' || !state.result) return;
+  const snapshot = { generation: downloadGeneration, frame: state.result, url: downloadUrl, blob: downloadBlob, filename: link.download };
+  const isCurrent = () => snapshot.generation === downloadGeneration && state.mode === 'captured' && state.result === snapshot.frame && downloadUrl === snapshot.url && downloadBlob === snapshot.blob;
   try {
-    await cameraPxd.assertCanSave();
-    if (!await download()) { say('画像が切り替わったため、PNGを保存できません。もう一度お試しください。', { visible: true }); return; }
-    sayToast('PNGを保存しました。');
+    // Keep the fresh ownership check for restored PXD images. The dialog's own
+    // share button supplies a new user gesture after this asynchronous check.
+    if (!gif.pending) await cameraPxd.assertCanSave();
+    if (!isCurrent()) return;
+    if (!fileSave.show({ blob: snapshot.blob, url: snapshot.url, filename: snapshot.filename, isCurrent })) {
+      say('保存画面を開けませんでした。ブラウザを更新して、もう一度お試しください。', { visible: true });
+    }
   } catch (error) {
-    say(error instanceof Error ? error.message : 'この画像を保存できません。', { visible: true });
+    if (isCurrent()) say(error instanceof Error ? error.message : 'この画像を保存できません。', { visible: true });
   }
 });
 if (returnToAudio) $('#postCamera').textContent = '曲を作る';
@@ -2198,17 +2355,35 @@ function suspendCamera() {
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   if (gif.recording) stopGifUi();
   if (state.mode !== 'live' && state.mode !== 'loading') return;
+  if (importedSource) {
+    clearStartupWatchdog();
+    invalidatePreview();
+    setMode('idle');
+    say('画像プレビューを一時停止しています。', { visible: true });
+    resumeOnVisible = true;
+    return;
+  }
   closeCamera({ message: 'カメラを一時停止しています。', focus: false });
   resumeOnVisible = true;
 }
 
 function resumeCameraIfVisible() {
-  if (document.hidden || !resumeOnVisible || state.mode === 'captured') return;
+  if (audioCameraInvalid || document.hidden || !resumeOnVisible || state.mode === 'captured') return;
   resumeOnVisible = false;
+  if (importedSource) {
+    lastImportedFrameAt = 0;
+    previewSessionStarted = performance.now();
+    previewCounter = 0;
+    clearPreview();
+    setMode('live');
+    if (!workerUnavailable) loop.start();
+    return;
+  }
   void startCamera({ focus: false });
 }
 
 window.addEventListener('pagehide', () => {
+  imageSelectionSequence++;
   if (gif.recording) stopGifUi();
   suspendCamera();
   invalidateCaptureDownload();
@@ -2237,7 +2412,10 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
     return putPxdSharedImage(base, { width: frame.width, height: frame.height, rgba: new Uint8Array(frame.data) });
   },
   async openProject(project) {
+    const openSequence = ++imageSelectionSequence;
     const image = await readPxdSharedImage(project);
+    if (openSequence !== imageSelectionSequence) return;
+    clearImportedSource();
     sharedProjectBound = true;
     sharedImageEdited = false;
     sharedImageTarget = image ? { width: image.width, height: image.height } : null;
@@ -2275,8 +2453,10 @@ $('#useCameraImage').addEventListener('click', async () => {
 root.dataset.ready = String(openedCameraPxd);
 fitPreview();
 if (audioCameraInvalid) {
+  resumeOnVisible = false;
   setMode('idle');
   $('#capture').disabled = true;
+  for (const selector of ['#cameraChooseImage', '#cameraFallbackChoose', '#cameraImageInput']) $(selector).disabled = true;
   say('音楽への受け渡しを確認できません。曲へ戻ってカメラを開き直してください。', { visible: true });
 } else if (!openedCameraPxd) {
   setMode('loading');
