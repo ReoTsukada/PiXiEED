@@ -151,10 +151,17 @@ function checksumAdmin1For(patch) {
   return `fnv1a32-${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 const worldwide = createFineMapCellIndex(source, { prefectureData, admin1Data });
-test('GeoJSON fine mask restores exact Tokyo-Kanagawa-Tokyo locations and Hokkaido/islands', () => {
+test('GeoJSON fine mask preserves prefecture shapes and leaves disputed northern islands unassigned', () => {
   for (const [longitude, latitude, id] of [[139.6917,35.6895,'13'],[139.702,35.5308,'14'],[139.438,35.546,'13'],[141.3545,43.0618,'01'],[140.7288,41.7687,'01'],[139.4,34.75,'13'],[139.53,34.08,'13']]) {
     assert.equal(resolveMapLocation(longitude,latitude,corrected)?.prefectureId,id);
     assert.equal(resolveMapLocation(longitude+360,latitude,corrected)?.prefectureId,id);
+  }
+  for (const [longitude, latitude] of [[147.8775,44.9919],[146.753,43.796]]) {
+    assert.equal(resolveMapLocation(longitude,latitude,corrected), null, 'disputed northern islands are not selected as Hokkaido');
+    assert.equal(resolveMapLocation(longitude,latitude,worldwide), null, 'disputed northern islands are not assigned to either country');
+    const display = lookupMapCell(longitude,latitude,worldwide);
+    assert.ok(!display || display.unselectable, 'any displayed island pixels remain unassigned and cannot be selected');
+    if (display) assert.equal(display.countryId, null, 'unassigned island pixels have no country label');
   }
   assert.equal(resolveMapLocation(139.8,35.4,corrected), null);
   assert.equal(resolveMapLocation(-74.006,40.7128,corrected)?.countryId,'USA');
@@ -167,7 +174,7 @@ test('corrected fine grid carries a prefecture mask and per-prefecture tile inde
 });
 test('prefecture patch decoder rejects unsupported metadata, corrupt checksums, and invalid runs', () => {
   const checksumFor = (patch) => {
-    const rows = [patch.prefectureIds, patch.prefectureLabels, patch.rowRuns, patch.features, patch.bounds];
+    const rows = [patch.prefectureIds, patch.prefectureLabels, patch.rowRuns, patch.features, patch.bounds, patch.unselectableFeatures];
     const text = JSON.stringify([patch.resolution, rows]);
     let hash = 2166136261;
     for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
@@ -256,8 +263,8 @@ test('geometry-derived world mask preserves Japan and canonical IDs while correc
   assert.equal(worldwide.resolution,2048);
   assert.deepEqual(worldwide.countryIndices,corrected.countryIndices,'stored canonical country raster is unchanged');
   assert.deepEqual(worldwide.prefectureMask,corrected.prefectureMask,'every Japanese prefecture pixel is unchanged');
-  assert.equal(new Set(worldwide.cells.map(cell => cell.countryId)).size,177);
-  assert.equal([...worldwide.prefectureTiles.values()].reduce((sum,tiles)=>sum+tiles.length,0),1575);
+  assert.equal(new Set(worldwide.cells.map(cell => cell.countryId).filter(Boolean)).size,177);
+  assert.equal([...worldwide.prefectureTiles.values()].reduce((sum,tiles)=>sum+tiles.length,0),1549, 'disputed northern islands are excluded from selectable prefecture tiles');
   for (const [longitude,latitude,id,country] of [
     [151.2093,-33.8688,'admin1:AUS:NE-AUS-2654','AUS'],
     [-122.3321,47.6062,'admin1:USA:US-WA','USA'],

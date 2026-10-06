@@ -1,7 +1,7 @@
 import { initPostUi } from './post-ui.mjs?v=20261006-profile-artwork-1';
 import { initMapEvents } from './map-events.mjs?v=20261005-admin-boundary-1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261005-admin-boundary-1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261006-unassigned-northern-islands-1';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
 
 const telescopeTool = new URLSearchParams(location.search).get('tool') === 'telescope';
@@ -32,7 +32,7 @@ let currentSelection = null;
 
 const MAP_CELLS_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
 const MAP_ADMIN1_URL = 'assets/maps/map-admin1-v1.json?v=20261005-admin-boundary-1';
-const MAP_PREFECTURES_URL = 'assets/maps/map-prefectures-v1.json?v=20261005-admin-boundary-1';
+const MAP_PREFECTURES_URL = 'assets/maps/map-prefectures-v1.json?v=20261006-unassigned-northern-islands-1';
 const RASTER_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
 
 function readJson(path) {

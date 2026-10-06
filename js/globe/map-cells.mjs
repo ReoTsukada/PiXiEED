@@ -148,8 +148,8 @@ export function lookupMapCell(longitude, latitude, index) {
 function decodePrefectureData(data, source, resolution) {
   assert(data?.version === 'map-prefectures-v1' && data.projection === 'mercator' && data.geometryVersion === DEFAULT_GRID.version, 'Unsupported prefecture mask.');
   assert(data.resolution === resolution && Array.isArray(data.prefectureIds) && data.prefectureIds.length === source.prefectureIds.length && data.prefectureIds.every((id, i) => id === source.prefectureIds[i]), 'Prefecture mask resolution or IDs do not match.');
-  assert(Array.isArray(data.prefectureLabels) && data.prefectureLabels.length === data.prefectureIds.length && Array.isArray(data.rowRuns) && Array.isArray(data.features) && data.bounds?.length === 4 && data.bounds.every(Number.isFinite) && data.bounds[0] < data.bounds[2] && data.bounds[1] < data.bounds[3], 'Invalid prefecture mask payload.')
-  assert(checksum(resolution, [data.prefectureIds, data.prefectureLabels, data.rowRuns, data.features, data.bounds]) === data.checksum, 'Prefecture mask checksum does not match.');
+  assert(Array.isArray(data.prefectureLabels) && data.prefectureLabels.length === data.prefectureIds.length && Array.isArray(data.rowRuns) && Array.isArray(data.features) && Array.isArray(data.unselectableFeatures) && data.bounds?.length === 4 && data.bounds.every(Number.isFinite) && data.bounds[0] < data.bounds[2] && data.bounds[1] < data.bounds[3], 'Invalid prefecture mask payload.')
+  assert(checksum(resolution, [data.prefectureIds, data.prefectureLabels, data.rowRuns, data.features, data.bounds, data.unselectableFeatures]) === data.checksum, 'Prefecture mask checksum does not match.');
   const mask = new Uint8Array(resolution * resolution); let previous = -1, previousRow = -1, previousOwner = -1;
   for (const run of data.rowRuns) {
     assert(Array.isArray(run) && run.length === 4 && run.every(Number.isInteger), 'Invalid prefecture mask run.');
@@ -168,7 +168,22 @@ function decodePrefectureData(data, source, resolution) {
   });
   const featureBins = new Map();
   for (const entry of featureBounds) { const [west, south, east, north] = entry.bounds; for (let x = Math.floor(west / 5); x <= Math.floor(east / 5); x++) for (let y = Math.floor(south / 5); y <= Math.floor(north / 5); y++) { const key = `${x}:${y}`; if (!featureBins.has(key)) featureBins.set(key, []); featureBins.get(key).push(entry.feature); } }
-  return Object.freeze({ mask, membershipIndex, featureBins, bounds: Object.freeze([...data.bounds]) });
+  const unselectableMembershipIndex = data.unselectableFeatures.length
+    ? createMembershipIndex({ type: 'FeatureCollection', features: data.unselectableFeatures }, { idProperty: 'code' })
+    : null;
+  let unselectableBounds = null;
+  if (unselectableMembershipIndex) {
+    let west = 180, south = 90, east = -180, north = -90;
+    for (const feature of unselectableMembershipIndex.features) {
+      const visit = (value) => {
+        if (Array.isArray(value) && typeof value[0] === 'number') { west = Math.min(west, value[0]); east = Math.max(east, value[0]); south = Math.min(south, value[1]); north = Math.max(north, value[1]); }
+        else if (Array.isArray(value)) for (const child of value) visit(child);
+      };
+      visit(feature.geometry.coordinates);
+    }
+    unselectableBounds = Object.freeze([west, south, east, north]);
+  }
+  return Object.freeze({ mask, membershipIndex, featureBins, bounds: Object.freeze([...data.bounds]), unselectableMembershipIndex, unselectableBounds });
 }
 
 function decodeAdmin1Data(data, source, resolution) {
@@ -240,6 +255,8 @@ function decodeAdmin1Data(data, source, resolution) {
 export function resolveMapLocation(longitude, latitude, index) {
   if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || Math.abs(latitude) > MERCATOR_MAX_LATITUDE) return null;
   longitude = normalizeLongitude(longitude);
+  const excluded = index?.prefectureData?.unselectableMembershipIndex;
+  if (excluded && findExplicitMembership(excluded, longitude, latitude)) return null;
   const displayCell = lookupMapCell(longitude, latitude, index);
   const patch = index?.prefectureData;
   if (patch) {
@@ -288,6 +305,7 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   const landMask = new Uint8Array(resolution * resolution);
   const prefectureMask = new Uint8Array(resolution * resolution);
   const mapRegionMask = new Uint16Array(resolution * resolution);
+  const unselectableMask = new Uint8Array(resolution * resolution);
   const prefectureTileLists = new Map(source.prefectureIds.slice(1).map((id) => [id, []]));
   const mapRegions = admin1Patch ? [...admin1Patch.mapRegions] : [null, ...source.prefectureIds.slice(1).map((id, i) => ({ id: `prefecture:${id}`, label: source.prefectureLabels[i + 1], countryId: JAPAN_COUNTRY_ID, countryLabel: source.countryLabels[japanIndex], kind: 'prefecture' }))];
   const regionIndices = new Map(mapRegions.slice(1).map((region, i) => [region.id, i + 1]));
@@ -308,9 +326,11 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   const countryIndexById = new Map(source.countryIds.map((id, i) => [id, i]));
   const regionCountries = Uint16Array.from(mapRegions, region => region ? countryIndexById.get(region.countryId) : 0);
   const regionTileLists = new Map(mapRegions.slice(1).map((region) => [region.id, []]));
+  const unselectableBounds = patch?.unselectableBounds;
   const seenCountries = new Set(), seenPrefectures = new Set(); let cellCount = 0;
   for (let row = 0; row < resolution; row++) {
     const latitude = inverseMercatorY(Math.PI - (row + .5) / resolution * TAU);
+    const possibleUnselectableRow = Boolean(unselectableBounds && latitude >= unselectableBounds[1] && latitude <= unselectableBounds[3]);
     const band = Math.min(DEFAULT_GRID.bandCount - 1, Math.floor((90 - latitude) / DEFAULT_GRID.latitudeStepDegrees));
     const columns = DEFAULT_GRID.bands[band].longitudeCount;
     for (let column = 0; column < resolution; column++) {
@@ -318,19 +338,29 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
       let country = countryIndices[sourceOffset], prefecture = prefectureIndices[sourceOffset];
       assert(country < source.countryIds.length && prefecture < source.prefectureIds.length, 'Invalid fine map ownership index.');
       const key = row * resolution + column;
+      let unselectableIsland = false;
+      if (possibleUnselectableRow) {
+        const longitude = -180 + (column + .5) / resolution * 360;
+        unselectableIsland = longitude >= unselectableBounds[0] && longitude <= unselectableBounds[2]
+          && findExplicitMembership(patch.unselectableMembershipIndex, longitude, latitude) !== null;
+      }
       if (patch) {
         prefecture = patch.mask[key];
         if (prefecture) country = japanIndex;
         else if (country === japanIndex) country = 0;
       }
+      if (unselectableIsland) { country = countryIndices[sourceOffset]; prefecture = 0; unselectableMask[key] = 1; }
       let mapRegionIndex = 0;
       if (geometryAuthority) {
         // The same geometry controls land, country and administrative ownership.
         // The independent Japanese prefecture patch takes precedence where present.
-        mapRegionIndex = patch && prefecture ? prefecture : admin1Patch.mask[key];
-        country = regionCountries[mapRegionIndex];
-        prefecture = country === japanIndex && mapRegionIndex <= 47 ? mapRegionIndex : 0;
-        if (patch && country === japanIndex && !patch.mask[key]) { country = 0; prefecture = 0; mapRegionIndex = 0; }
+        if (unselectableIsland) mapRegionIndex = 0;
+        else {
+          mapRegionIndex = patch && prefecture ? prefecture : admin1Patch.mask[key];
+          country = regionCountries[mapRegionIndex];
+          prefecture = country === japanIndex && mapRegionIndex <= 47 ? mapRegionIndex : 0;
+          if (patch && country === japanIndex && !patch.mask[key]) { country = 0; prefecture = 0; mapRegionIndex = 0; }
+        }
       } else {
         if (admin1Patch?.mask[key]) assert(country > 0, 'Admin1 ownership cannot expand land into water.');
         if (admin1Patch) {
@@ -351,7 +381,7 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   assert(source.countryIds.slice(1).every((id, i) => seenCountries.has(i + 1)) && seenPrefectures.size === 47, 'Fine map must preserve every country and all 47 prefectures.');
   const prefectureTiles = new Map([...prefectureTileLists].map(([id, keys]) => [id, Uint32Array.from(keys)]));
   const mapRegionTiles = new Map([...regionTileLists].map(([id, keys]) => [id, Uint32Array.from(keys)]));
-  const index = { version: 'map-grid-fine-v1', geometryVersion: DEFAULT_GRID.version, projection: 'mercator', resolution, worldCellCount: resolution ** 2, cellCount, sourceCellCount: total, sourceLandCellCount: countryIndices.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0), countryIds: source.countryIds, countryLabels: source.countryLabels, prefectureIds: source.prefectureIds, prefectureLabels: source.prefectureLabels, landMask, countryIndices, prefectureIndices, prefectureMask, prefectureTiles, mapRegionMask, mapRegions, mapRegionTiles, bandOffsets, prefectureData: patch, admin1Data: admin1Patch, recordCache: new Map() };
+  const index = { version: 'map-grid-fine-v1', geometryVersion: DEFAULT_GRID.version, projection: 'mercator', resolution, worldCellCount: resolution ** 2, cellCount, sourceCellCount: total, sourceLandCellCount: countryIndices.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0), countryIds: source.countryIds, countryLabels: source.countryLabels, prefectureIds: source.prefectureIds, prefectureLabels: source.prefectureLabels, landMask, countryIndices, prefectureIndices, prefectureMask, prefectureTiles, mapRegionMask, unselectableMask, mapRegions, mapRegionTiles, bandOffsets, prefectureData: patch, admin1Data: admin1Patch, recordCache: new Map() };
   // Diagnostic representatives only: the complete map remains a compact bitmap.
   index.cells = Object.freeze([...owners.values()].map(key => fineTileRecord(key, index)));
   return Object.freeze(index);
@@ -365,11 +395,12 @@ function fineTileRecord(key, index) {
   const cell = lookupCell(center.longitude, center.latitude), offset = index.bandOffsets[cell.band] + cell.column;
   const mapRegionIndex = index.mapRegionMask?.[key] || 0;
   const mapRegion = index.mapRegions?.[mapRegionIndex] || null;
+  const unselectable = Boolean(index.unselectableMask?.[key]);
   const geometryAuthority = index.admin1Data?.landAuthority === 'admin1-geometries';
-  const countryIndex = geometryAuthority ? index.countryIds.indexOf(mapRegion.countryId) : index.prefectureData && index.prefectureMask[key] ? index.countryIds.indexOf(JAPAN_COUNTRY_ID) : index.countryIndices[offset];
+  const countryIndex = unselectable ? 0 : geometryAuthority && mapRegion ? index.countryIds.indexOf(mapRegion.countryId) : index.prefectureData && index.prefectureMask[key] ? index.countryIds.indexOf(JAPAN_COUNTRY_ID) : index.countryIndices[offset];
   const prefectureIndex = index.prefectureData || geometryAuthority ? index.prefectureMask[key] : index.prefectureIndices[offset];
   const countryId = index.countryIds[countryIndex], prefectureId = prefectureIndex ? index.prefectureIds[prefectureIndex] : null;
-  const record = Object.freeze({ index: key + 1, displayCellId: `map:${index.version}:${index.resolution}:${row}:${column}`, row, column, bounds, center, cell, countryIndex, prefectureIndex, countryId, prefectureId, countryLabel: index.countryLabels?.[countryIndex] || countryId, prefectureLabel: prefectureId ? index.prefectureLabels?.[prefectureIndex] || prefectureId : null, regionId: prefectureId ? getRegionForPrefecture(prefectureId)?.id || null : null, mapRegionId: mapRegion?.id || null, mapRegionIndex, mapRegionLabel: mapRegion?.label || null, mapRegionKind: mapRegion?.kind || null, northMercator, southMercator });
+  const record = Object.freeze({ index: key + 1, displayCellId: `map:${index.version}:${index.resolution}:${row}:${column}`, row, column, bounds, center, cell, countryIndex, prefectureIndex, countryId: unselectable ? null : countryId, prefectureId, countryLabel: unselectable ? null : index.countryLabels?.[countryIndex] || countryId, prefectureLabel: prefectureId ? index.prefectureLabels?.[prefectureIndex] || prefectureId : null, regionId: prefectureId ? getRegionForPrefecture(prefectureId)?.id || null : null, mapRegionId: mapRegion?.id || null, mapRegionIndex, mapRegionLabel: mapRegion?.label || null, mapRegionKind: mapRegion?.kind || null, unselectable, northMercator, southMercator });
   index.recordCache.set(key, record);
   if (index.recordCache.size > 1024) index.recordCache.delete(index.recordCache.keys().next().value);
   return record;

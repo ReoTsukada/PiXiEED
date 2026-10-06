@@ -11,6 +11,29 @@ const SIMPLIFY_TOLERANCE_DEGREES = 0.002;
 const TAU = Math.PI * 2;
 const polygonsOf = (geometry) => geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
 
+// Keep the Northern Territories visible in the source dataset, but outside the
+// selectable Hokkaido region. The attribution is unresolved; leaving these
+// detached island polygons unassigned avoids presenting either claim as settled.
+const UNASSIGNED_HOKKAIDO_ISLAND_BOUNDS = Object.freeze([145.2, 43.15, 150, 46]);
+function selectableGeometry(feature) {
+  if (feature.properties.code !== '01' || feature.geometry.type !== 'MultiPolygon') return { geometry: feature.geometry, unselectable: null };
+  const [westLimit, southLimit, eastLimit, northLimit] = UNASSIGNED_HOKKAIDO_ISLAND_BOUNDS;
+  const selected = [], unselectable = [];
+  for (const polygon of feature.geometry.coordinates) {
+    let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+    for (const ring of polygon) for (const [longitude, latitude] of ring) {
+      west = Math.min(west, longitude); south = Math.min(south, latitude);
+      east = Math.max(east, longitude); north = Math.max(north, latitude);
+    }
+    if (west >= westLimit && south >= southLimit && east <= eastLimit && north <= northLimit) unselectable.push(polygon);
+    else selected.push(polygon);
+  }
+  return {
+    geometry: { type: 'MultiPolygon', coordinates: selected },
+    unselectable: unselectable.length ? { type: 'Feature', properties: { code: '01' }, geometry: { type: 'MultiPolygon', coordinates: unselectable } } : null
+  };
+}
+
 function distanceToSegment(point, start, end) {
   const dx = end[0] - start[0];
   const dy = end[1] - start[1];
@@ -88,12 +111,16 @@ function insideFeature(longitude, latitude, feature) {
   return false;
 }
 
+const unselectableFeatures = [];
 const features = geo.features.map((feature) => {
-  const coordinates = visitCoordinates(feature.geometry.coordinates);
+  const selected = selectableGeometry(feature);
+  if (selected.unselectable) unselectableFeatures.push(selected.unselectable);
+  const geometry = selected.geometry;
+  const coordinates = visitCoordinates(geometry.coordinates);
   return {
     id: String(feature.properties.code),
     label: feature.properties['name:ja'] || feature.properties.name,
-    geometry: feature.geometry,
+    geometry,
     bounds: [
       Math.min(...coordinates.map(([x]) => x)), Math.min(...coordinates.map(([, y]) => y)),
       Math.max(...coordinates.map(([x]) => x)), Math.max(...coordinates.map(([, y]) => y))
@@ -209,11 +236,11 @@ const simplifiedFeatures = features.map(({ id, label, geometry }) => ({
   type: 'Feature', properties: { code: id, 'name:ja': label }, geometry: simplifyGeometry(geometry)
 }));
 let hash = 2166136261;
-const checksumInput = JSON.stringify([RESOLUTION, [prefectureIds, prefectureLabels, rowRuns, simplifiedFeatures, bounds]]);
+const checksumInput = JSON.stringify([RESOLUTION, [prefectureIds, prefectureLabels, rowRuns, simplifiedFeatures, bounds, unselectableFeatures]]);
 for (let i = 0; i < checksumInput.length; i++) hash = Math.imul(hash ^ checksumInput.charCodeAt(i), 16777619);
 const data = {
   version: 'map-prefectures-v1', projection: 'mercator', geometryVersion: DEFAULT_GRID.version,
-  resolution: RESOLUTION, prefectureIds, prefectureLabels, bounds, rowRuns,
+  resolution: RESOLUTION, prefectureIds, prefectureLabels, bounds, rowRuns, unselectableFeatures,
   features: simplifiedFeatures, checksum: `fnv1a32-${(hash >>> 0).toString(16).padStart(8, '0')}`
 };
 writeFileSync(new URL('assets/maps/map-prefectures-v1.json', root), `${JSON.stringify(data)}\n`);

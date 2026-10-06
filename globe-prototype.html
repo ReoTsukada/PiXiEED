@@ -22,7 +22,7 @@
   </script>
   <link rel="stylesheet" href="css/globe-prototype.css?rev=20261006-panel-close-1">
   <!-- Flatten the module waterfall and fetch the compact geographic raster in parallel. -->
-  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20261005-admin-boundary-1">
+  <link rel="modulepreload" href="js/globe/renderer.mjs?v=20261006-unassigned-northern-islands-1">
   <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20261006-profile-artwork-1">
   <link rel="modulepreload" href="js/globe/geometry.mjs?v=20261005-admin-boundary-1">
   <link rel="modulepreload" href="js/globe/topology.mjs?v=20260920-g4-precision-1">
@@ -36,7 +36,7 @@
     globalThis[telescope ? '__PIXIEED_GLOBE_RASTER__' : '__PIXIEED_MAP_CELLS__'] = request;
     request?.catch(function () {});
     if (!telescope && location.protocol !== 'file:') {
-      globalThis.__PIXIEED_MAP_PREFECTURES__ = fetch('assets/maps/map-prefectures-v1.json?v=20261005-admin-boundary-1', { cache: 'force-cache' })
+      globalThis.__PIXIEED_MAP_PREFECTURES__ = fetch('assets/maps/map-prefectures-v1.json?v=20261006-unassigned-northern-islands-1', { cache: 'force-cache' })
         .then(function (response) { if (!response.ok) throw new Error('map areas ' + response.status); return response.json(); });
       globalThis.__PIXIEED_MAP_PREFECTURES__.catch(function () {});
       globalThis.__PIXIEED_MAP_ADMIN1__ = fetch('assets/maps/map-admin1-v1.json?v=20261005-admin-boundary-1', { cache: 'force-cache' })
@@ -101,7 +101,7 @@
     <a href="/tools/" aria-label="ツール" data-globe-nav-tools><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/globe/prototype.mjs?rev=20261006-profile-artwork-1"></script>
+  <script type="module" src="js/globe/prototype.mjs?rev=20261006-unassigned-northern-islands-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-panel-close-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>
