@@ -11,13 +11,17 @@ const SIMPLIFY_TOLERANCE_DEGREES = 0.002;
 const TAU = Math.PI * 2;
 const polygonsOf = (geometry) => geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
 
-// Keep the Northern Territories visible in the source dataset, but outside the
-// selectable Hokkaido region. The attribution is unresolved; leaving these
-// detached island polygons unassigned avoids presenting either claim as settled.
-const UNASSIGNED_HOKKAIDO_ISLAND_BOUNDS = Object.freeze([145.2, 43.15, 150, 46]);
+// Keep disputed islands visible while removing them from selectable regions.
+// Bounds are deliberately tight around the island groups, not nearby inhabited
+// islands or the sponsoring prefecture's mainland.
+const UNASSIGNED_DISPUTED_ISLAND_BOUNDS = Object.freeze([
+  Object.freeze({ code: '01', bounds: [145.2, 43.15, 150, 46], label: 'northern islands' }),
+  Object.freeze({ code: '47', bounds: [123.45, 25.72, 124.0, 25.95], label: 'Senkaku Islands' }),
+  Object.freeze({ code: '32', bounds: [131.85, 37.22, 131.95, 37.28], label: 'Takeshima' })
+]);
 function selectableGeometry(feature) {
-  if (feature.properties.code !== '01' || feature.geometry.type !== 'MultiPolygon') return { geometry: feature.geometry, unselectable: null };
-  const [westLimit, southLimit, eastLimit, northLimit] = UNASSIGNED_HOKKAIDO_ISLAND_BOUNDS;
+  const exclusions = UNASSIGNED_DISPUTED_ISLAND_BOUNDS.filter(({ code }) => code === feature.properties.code);
+  if (!exclusions.length || feature.geometry.type !== 'MultiPolygon') return { geometry: feature.geometry, unselectable: null };
   const selected = [], unselectable = [];
   for (const polygon of feature.geometry.coordinates) {
     let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
@@ -25,12 +29,13 @@ function selectableGeometry(feature) {
       west = Math.min(west, longitude); south = Math.min(south, latitude);
       east = Math.max(east, longitude); north = Math.max(north, latitude);
     }
-    if (west >= westLimit && south >= southLimit && east <= eastLimit && north <= northLimit) unselectable.push(polygon);
+    if (exclusions.some(({ bounds: [westLimit, southLimit, eastLimit, northLimit] }) =>
+      west >= westLimit && south >= southLimit && east <= eastLimit && north <= northLimit)) unselectable.push(polygon);
     else selected.push(polygon);
   }
   return {
     geometry: { type: 'MultiPolygon', coordinates: selected },
-    unselectable: unselectable.length ? { type: 'Feature', properties: { code: '01' }, geometry: { type: 'MultiPolygon', coordinates: unselectable } } : null
+    unselectable: unselectable.length ? { type: 'Feature', properties: { code: feature.properties.code }, geometry: { type: 'MultiPolygon', coordinates: unselectable } } : null
   };
 }
 

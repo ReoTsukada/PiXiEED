@@ -163,6 +163,20 @@ test('GeoJSON fine mask preserves prefecture shapes and leaves disputed northern
     assert.ok(!display || display.unselectable, 'any displayed island pixels remain unassigned and cannot be selected');
     if (display) assert.equal(display.countryId, null, 'unassigned island pixels have no country label');
   }
+  for (const [longitude, latitude, prefecture, label] of [
+    [123.47,25.744,'47','Senkaku Islands'],
+    [131.87,37.24,'32','Takeshima']
+  ]) {
+    assert.equal(resolveMapLocation(longitude, latitude, corrected), null, `${label} is outside selectable Japanese prefectures`);
+    assert.equal(resolveMapLocation(longitude, latitude, worldwide), null, `${label} is not assigned to either country`);
+    const display = lookupMapCell(longitude, latitude, worldwide);
+    assert.ok(!display || display.unselectable, `${label} is removed or unselectable`);
+    if (display) {
+      assert.equal(display.countryId, null, `${label} has no country label`);
+      assert.equal(display.prefectureId, null, `${label} has no prefecture label`);
+      assert.ok(!worldwide.prefectureTiles.get(prefecture)?.includes(display.index - 1), `${label} is absent from its prefecture selection index`);
+    }
+  }
   assert.equal(resolveMapLocation(139.8,35.4,corrected), null);
   assert.equal(resolveMapLocation(-74.006,40.7128,corrected)?.countryId,'USA');
 });
