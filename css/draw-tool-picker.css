@@ -15,9 +15,9 @@ body[data-page="draw"] .draw-controls .draw-toggles {
   gap: 8px !important;
   overflow: visible !important;
 }
-body[data-page="draw"] .draw-controls .draw-tools > button[data-draw-tool="pen"],
+body[data-page="draw"] .draw-controls .draw-tools > button:is([data-draw-tool="pen"], [data-draw-tool="eraser"]),
 body[data-page="draw"] .draw-controls .draw-tool-picker > summary,
-body[data-page="draw"] .draw-controls .draw-settings-picker > summary,
+body[data-page="draw"] .draw-settings-picker > summary,
 body[data-page="draw"] .draw-controls .draw-toggles > button {
   box-sizing: border-box !important;
   display: flex !important;
@@ -36,9 +36,9 @@ body[data-page="draw"] .draw-controls .draw-toggles > button {
   cursor: pointer;
   list-style: none;
 }
-body[data-page="draw"] .draw-controls .draw-tools > button[data-draw-tool="pen"][aria-pressed="true"],
+body[data-page="draw"] .draw-controls .draw-tools > button:is([data-draw-tool="pen"], [data-draw-tool="eraser"])[aria-pressed="true"],
 body[data-page="draw"] .draw-controls .draw-tool-picker > summary[data-active="true"],
-body[data-page="draw"] .draw-controls .draw-settings-picker[open] > summary,
+body[data-page="draw"] .draw-settings-picker[open] > summary,
 body[data-page="draw"] .draw-controls .draw-toggles > button[aria-pressed="true"] {
   border-color: #ffd35a !important;
   background: #ffd35a !important;
@@ -46,11 +46,11 @@ body[data-page="draw"] .draw-controls .draw-toggles > button[aria-pressed="true"
   box-shadow: 0 3px 0 #b88f1d !important;
 }
 body[data-page="draw"] .draw-controls .draw-tool-picker { position: static !important; flex: 0 0 auto !important; }
-body[data-page="draw"] .draw-controls .draw-settings-picker { position: static !important; flex: 0 0 auto !important; }
-body[data-page="draw"] .draw-controls .draw-settings-picker > summary::-webkit-details-marker { display: none; }
-body[data-page="draw"] .draw-controls .draw-settings-picker > summary { position: relative !important; }
-body[data-page="draw"] .draw-controls .draw-settings-picker > summary > .drawing-tool-icon { width: 24px; height: 24px; flex: 0 0 24px; }
-body[data-page="draw"] .draw-controls .draw-settings-panel {
+body[data-page="draw"] .draw-settings-picker { position: static !important; flex: 0 0 auto !important; }
+body[data-page="draw"] .draw-settings-picker > summary::-webkit-details-marker { display: none; }
+body[data-page="draw"] .draw-settings-picker > summary { position: relative !important; }
+body[data-page="draw"] .draw-settings-picker > summary > .drawing-tool-icon { width: 24px; height: 24px; flex: 0 0 24px; }
+body[data-page="draw"] .draw-settings-panel {
   position: fixed !important;
   z-index: 80 !important;
   left: 12px;
@@ -68,15 +68,15 @@ body[data-page="draw"] .draw-controls .draw-settings-panel {
   color: #f5f2e8 !important;
   box-shadow: 0 12px 38px #0008 !important;
 }
-body[data-page="draw"] .draw-controls .draw-settings-picker:not([open]) > .draw-settings-panel { display: none !important; }
-body[data-page="draw"] .draw-controls .draw-settings-picker[open] > .draw-settings-panel {
+body[data-page="draw"] .draw-settings-picker:not([open]) > .draw-settings-panel { display: none !important; }
+body[data-page="draw"] .draw-settings-picker[open] > .draw-settings-panel {
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   grid-auto-rows: 52px !important;
   align-content: start !important;
   gap: 8px !important;
 }
-body[data-page="draw"] .draw-controls .draw-settings-panel > button {
+body[data-page="draw"] .draw-settings-panel > button {
   box-sizing: border-box !important;
   display: grid !important;
   place-items: center !important;
@@ -92,17 +92,17 @@ body[data-page="draw"] .draw-controls .draw-settings-panel > button {
   color: #edf2f3 !important;
   cursor: pointer !important;
 }
-body[data-page="draw"] .draw-controls .draw-settings-panel > button[aria-pressed="true"] {
+body[data-page="draw"] .draw-settings-panel > button[aria-pressed="true"] {
   border-color: #ffd35a !important;
   background: #ffd35a !important;
   color: #17232d !important;
   box-shadow: 0 2px 0 #b88f1d, inset 0 0 0 1px #fff3bd !important;
 }
-body[data-page="draw"] .draw-controls .draw-settings-panel > button:disabled { opacity: .58 !important; cursor: not-allowed !important; }
-body[data-page="draw"] .draw-controls .draw-settings-panel > button > .drawing-tool-icon { width: 26px; height: 26px; }
-body[data-page="draw"] .draw-controls .draw-settings-panel button:focus-visible,
-body[data-page="draw"] .draw-controls .draw-settings-picker > summary:focus-visible { outline: 3px solid #8ecdf0 !important; outline-offset: 2px !important; }
-body[data-page="draw"] .draw-controls .draw-settings-panel button:active { transform: translateY(1px); }
+body[data-page="draw"] .draw-settings-panel > button:disabled { opacity: .58 !important; cursor: not-allowed !important; }
+body[data-page="draw"] .draw-settings-panel > button > .drawing-tool-icon { width: 26px; height: 26px; }
+body[data-page="draw"] .draw-settings-panel button:focus-visible,
+body[data-page="draw"] .draw-settings-picker > summary:focus-visible { outline: 3px solid #8ecdf0 !important; outline-offset: 2px !important; }
+body[data-page="draw"] .draw-settings-panel button:active { transform: translateY(1px); }
 body[data-page="draw"] .draw-controls .draw-tool-picker > summary::-webkit-details-marker { display: none; }
 body[data-page="draw"] .draw-controls .draw-tool-picker > summary {
   position: relative !important;
@@ -130,7 +130,7 @@ body[data-page="draw"] .draw-controls .draw-tool-picker__chevron {
   font-size: .56rem;
   line-height: 1;
 }
-body[data-page="draw"] .draw-controls .draw-toolbar .draw-tools .draw-tool-menu {
+body[data-page="draw"] .draw-controls .draw-tool-menu {
   position: fixed !important;
   z-index: 80 !important;
   left: 12px;

@@ -1,4 +1,5 @@
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
@@ -13,30 +14,30 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-draw-startup-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-header-controls-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
-import { mountCreationEditorUi } from './editor-ui.mjs?rev=20260929-shared-editor-1';
+import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
-import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-draw-panel-dismiss-1';
+import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-floating-mouse-2';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261006-draw-panel-dismiss-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
-import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs';
+import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261006-floating-mouse-2';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs';
-import { mountDrawAssignmentInput } from './draw-assignment-input.mjs';
+import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-draw-startup-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261006-draw-startup-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261006-floating-mouse-2';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing } from './draw-selection-geometry.mjs?rev=20261006-draw-startup-1';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261006-draw-startup-1';
 
@@ -53,12 +54,14 @@ const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(
 const viewportOverlays = mountDrawViewportOverlays({ board: $('.draw-board'), canvas, scope });
 let virtualCursor = null;
 applyDrawingToolIcons($('#main'));
-const penControl = $('[data-draw-tool="pen"]');
-const eraserControl = $('[data-draw-tool="eraser"]');
-const penIcon = createDrawingToolIcon('pen');
-const eraserIcon = createDrawingToolIcon('eraser');
-// One visible control alternates between drawing and erasing.
-eraserControl?.remove();
+mountToolHeaderControls(document, { selectors: ['.draw-import', '#draw-settings-picker', '#draw-output', '#draw-clear', '#draw-to-globe'] });
+const fixedLeft = document.createElement('div'); fixedLeft.className = 'draw-fixed-left';
+fixedLeft.append($('#draw-tool-picker'), $('#draw-animation-controls'), $('#draw-undo'));
+$('.draw-controls').prepend(fixedLeft);
+const fixedRight = document.createElement('div'); fixedRight.className = 'draw-fixed-right';
+fixedRight.append($('#draw-redo')); $('.draw-controls').append(fixedRight);
+$('.draw-toolbar')?.remove();
+$('.draw-toggles')?.remove(); $('.draw-actions')?.remove();
 const resultView = createToolResultView({ key: 'draw-result', main: $('#main'), returnLabel: '描画に戻る',
   beforeShow: () => { closeColorEditor(); editorUi.closePanels(); animationControls?.close?.(); interactionEffects.clear(); },
   onClose: () => requestAnimationFrame(placeOverlays) });
@@ -79,6 +82,14 @@ let selectionTransform = null, selectionPreview = null, selectionPanel = null, s
 let selectionRenderRequest = 0;
 let selectionMaskCache = null, selectionMaskOwner = null;
 let preparedSelectionCommit = null;
+const colorActivationBusy = new WeakSet();
+// Capture held input before the panel dismissal handler releases it.
+scope.listen(document, 'pointerdown', event => {
+  const swatch = event.target.closest?.('.draw-color[data-color-index]');
+  if (!swatch) return;
+  colorActivationBusy.delete(swatch);
+  if (strokeBinding || document.querySelector('#draw-virtual-controls button[aria-pressed="true"]')) colorActivationBusy.add(swatch);
+}, { capture: true });
 const selectionClipboard = createDrawSelectionClipboard(), selectionViewStates = new WeakMap();
 const resizeViewStates = new WeakMap();
 function resizeViewState() { return { mirrorOrigin: { ...mirrorOrigin }, selection: selection && { ...selection }, zoom, panX, panY, cursor: virtualCursor?.canvasPosition() }; }
@@ -133,9 +144,11 @@ function setCanvasDimensions() {
   $('#draw-size-label').textContent = `${documentData.width}×${documentData.height}px`;
   canvas.setAttribute('aria-label', `${documentData.width}×${documentData.height}の透明なキャンバス。色を選んで描きます。`);
 }
+function drawingInputBusy() { return Boolean(drawing || pendingTap || activePointers.size || virtualCursor?.pressed || virtualCursor?.moving); }
 function updateControls() {
-  $('#draw-undo').disabled = !selectionTransform && !animationSession.canUndo; $('#draw-redo').disabled = Boolean(selectionTransform) || !animationSession.canRedo;
-  $('#draw-undo').setAttribute('aria-disabled', String(!selectionTransform && !animationSession.canUndo)); $('#draw-redo').setAttribute('aria-disabled', String(Boolean(selectionTransform) || !animationSession.canRedo));
+  const busy = drawingInputBusy();
+  $('#draw-undo').disabled = busy || !selectionTransform && !animationSession.canUndo; $('#draw-redo').disabled = busy || Boolean(selectionTransform) || !animationSession.canRedo;
+  $('#draw-undo').setAttribute('aria-disabled', String($('#draw-undo').disabled)); $('#draw-redo').setAttribute('aria-disabled', String($('#draw-redo').disabled));
   status.textContent = saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
   syncPlaybackControl();
   selectionPanel?.sync();
@@ -285,10 +298,11 @@ function linkedToSong() {
   try { const link = readPxdAudioLink(pxdBridge?.currentProject || pxdBridge?.heldProject); return Boolean(link && link.imageRole === pxdImageRole); } catch { return false; }
 }
 let colorEditorReturnFocus = null;
-function openColorEditor(index) {
+function openColorEditor(index, sourceElement = null) {
   if (selectionTransform) { toast('✓で確定、×で取消してから色を編集できます。'); return; }
   if (index < 0 || index >= documentData.palette.length || !canEdit()) return;
-  cancelSelectionTransform(); selectionPanel?.hide(); editorUi.closePanels(); closeColorEditor(); colorEditorReturnFocus = document.activeElement;
+  cancelSelectionTransform(); selectionPanel?.hide(); editorUi.closePanels(); closeColorEditor();
+  colorEditorReturnFocus = sourceElement ? document.querySelector(`.draw-color[data-color-index="${index}"]`) : document.activeElement;
   const base = [...documentData.palette]; colorEdit = { index, base, maxColors: 32 };
   colorPanel.open({ color: base[index].slice(0, 7), resetColor: index < DRAW_PALETTE.length ? DRAW_PALETTE[index] : null });
 }
@@ -492,7 +506,7 @@ function confirmSelectionTransform() {
   } catch (error) { selectionError = error.message; selectionPanel?.sync(); toast(error.message); return false; }
 }
 function selectionPanelState() {
-  const editable = !playing && !readOnlyImage && !animationSession.locked, busy = Boolean(drawing || pendingTap || activePointers.size);
+  const editable = !playing && !readOnlyImage && !animationSession.locked, busy = drawingInputBusy();
   return { bounds: selectionFrame(), pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
     canCopy: Boolean(selectionHasPixels() && !selectionTransform && !playing && !readOnlyImage && !busy),
     canCut: Boolean(selectionHasPixels() && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(selection && editable) };
@@ -509,6 +523,7 @@ function commitSelectionDocument(next, beforeBounds, afterBounds, prepared = ani
   } finally { preparedSelectionCommit = null; }
 }
 function runSelectionAction(action, fields = {}) {
+  if (action === 'back') { setTool('select'); canvas.focus({ preventScroll: true }); return true; }
   if (action === 'cancel') { cancelDrawingInput(); return cancelSelectionTransform(); }
   if (action === 'confirm') { endStroke(); return confirmSelectionTransform(); }
   if (action === 'copy' || action === 'cut') {
@@ -670,33 +685,29 @@ function setTool(next, side = 'left') {
   if (side === 'right') { lastInputSide = side; syncInputControls(); placeSelection(); return true; }
   if (!strokeBinding) lastInputSide = side;
   tool = next; syncDrawingSettings(); syncInputControls();
-  document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next || (node === penControl && next === 'eraser'))));
-  if (penControl) {
-    const erasing = next === 'eraser';
-    const glyph = erasing ? eraserIcon : penIcon;
-    penControl.replaceChildren(glyph.cloneNode(true));
-    const label = erasing ? '消しゴム（もう一度押すとペン）' : 'ペン（選択中に押すと消しゴム）';
-    penControl.setAttribute('aria-label', label); penControl.title = label;
-    penControl.classList.toggle('is-eraser', erasing);
-  }
+  document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next)));
   const other = next !== 'pen' && next !== 'eraser';
   if (other) lastOtherTool = next;
   const summary = $('#draw-tool-summary');
   if (summary) {
-    summary.querySelector('svg')?.replaceWith(createDrawingToolIcon(lastOtherTool));
-    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = TOOL_NAMES[lastOtherTool];
-    summary.dataset.active = String(other);
-    summary.setAttribute('aria-label', `${TOOL_NAMES[lastOtherTool]}：道具を選ぶ`);
-    summary.title = `${TOOL_NAMES[lastOtherTool]}：道具を選ぶ`;
+    summary.querySelector('svg')?.replaceWith(createDrawingToolIcon(next));
+    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = TOOL_NAMES[next];
+    summary.dataset.active = 'true';
+    summary.setAttribute('aria-label', `${TOOL_NAMES[next]}：道具を選ぶ`);
+    summary.title = `${TOOL_NAMES[next]}：道具を選ぶ`;
   }
   canvas.dataset.tool = next;
   placeSelection();
 }
-function assignDrawInput({ side, kind, value }) {
+function assignDrawInput({ side, kind, value, target }) {
+  const busyActivation = colorActivationBusy.delete(target) || Boolean(strokeBinding)
+    || Boolean(document.querySelector('#draw-virtual-controls button[aria-pressed="true"]'));
+  const repeatColor = side === 'left' && kind === 'color' && value >= 0 && inputSettings.bindings.left.color === value;
   if (colorEdit) closeColorEditor();
   if (kind === 'color') {
     if (!Number.isInteger(value) || value < -1 || value >= documentData.palette.length) return;
     if (side === 'left') {
+      if (repeatColor && !busyActivation) { openColorEditor(value, target); return; }
       const sourceElement = document.querySelector(`.draw-color[data-color-index="${value}"]`);
       chooseColor(value, sourceElement);
     } else {
@@ -707,11 +718,7 @@ function assignDrawInput({ side, kind, value }) {
     return;
   }
   if (!Object.hasOwn(TOOL_NAMES, value)) return;
-  // The visible pen control shows either the pen or eraser glyph. A right assignment
-  // records that displayed choice; it never toggles based on the previous right binding.
-  const assignedTool = value === 'pen'
-    ? side === 'left' ? (tool === 'pen' ? 'eraser' : 'pen') : (tool === 'eraser' ? 'eraser' : 'pen')
-    : value;
+  const assignedTool = value;
   if (setTool(assignedTool, side) !== false) toast(side === 'left' ? `${TOOL_NAMES[assignedTool]}を選びました` : `右ボタンに${TOOL_NAMES[assignedTool]}を割り当てました`);
 }
 const drawAssignmentInput = mountDrawAssignmentInput({ root: $('#main'), onAssign: assignDrawInput });
@@ -772,6 +779,7 @@ function handleCanvasPointerDown(event) {
   lastInputSide = side; strokeBinding = binding; syncDrawingSettings();
   strokeWasSaved = saved;
   drawing = true; drawingPointerId = event.pointerId; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
+  updateControls();
   if (inputTool === 'picker' || inputTool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; drawing = false; drawingPointerId = null; previousPoint = null; selectionPanel.sync(); return; }
   if (inputTool === 'select') {
     lineStart = touchedPoint;
@@ -879,6 +887,7 @@ function endStroke(cancel = false, releaseEvent = null) {
   if (selected && selection) { selectionPanel.setMode('select'); toast('四隅で拡縮＋回転、二重リングで中心、↔ / ↕で反転。内側で移動、外タップで確定・解除。'); }
   if (endedSelectionDrag?.createdTransaction && selectionTransform && (cancel || sameSelectionFrame(endedSelectionDrag.state, selectionTransform.state))) cancelSelectionTransform();
   if (!cancel && releaseEvent?.type === 'pointerup' && endedSelectionDrag) finishSelectionRelease(endedSelectionDrag, releaseEvent);
+  updateControls();
 }
 function sameSelectionFrame(a, b) {
   return ['x', 'y', 'width', 'height', 'angle'].every(k => Math.abs(a[k] - b[k]) < 1e-7) && Boolean(a.flipX) === Boolean(b.flipX) && Boolean(a.flipY) === Boolean(b.flipY)
@@ -925,7 +934,7 @@ function releasePointer(event) {
   if (pendingTap && event.pointerId === pendingTapPointerId) {
     const tap = pendingTap; pendingTap = null; pendingTapPointerId = null;
     if (event.type === 'pointerup' && !pinchStart && activePointers.size === 0) applyTap(tap);
-    strokeBinding = null; syncDrawingSettings(); return;
+    strokeBinding = null; syncDrawingSettings(); updateControls(); return;
   }
   if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; }
   // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
@@ -963,7 +972,9 @@ scope.listen($('#draw-mirror-center'), 'click', () => {
 });
 let virtualGestureBase = null;
 virtualCursor = mountDrawVirtualCursor({ scope, board: $('.draw-board'), canvas, toggle: $('#draw-virtual-toggle'), controls: $('#draw-virtual-controls'),
-  onDown: handleCanvasPointerDown, onMove: handleCanvasPointerMove, onRelease: releasePointer,
+  isBlocked: () => $('#main').inert || $('#main').hidden || document.body.hasAttribute('data-tool-result-open')
+    || Boolean(document.querySelector('dialog[open], #draw-tool-picker[open], #draw-settings-picker[open], #draw-output[open], .draw-import[open], .animation-controls__workspace-panel:not([hidden]), #draw-color-editor:not([hidden])')),
+  onDown: handleCanvasPointerDown, onMove: handleCanvasPointerMove, onRelease: releasePointer, onStateChange: updateControls,
   allowViewportCursor: () => Boolean(selection && (inputSettings.bindings.left.tool === 'select' || inputSettings.bindings.right.tool === 'select')),
   onHover: showCursor,
   onViewportGestureStart: gesture => { virtualGestureBase = { ...gesture, zoom, panX, panY }; hideCursors(); },
@@ -1024,9 +1035,8 @@ function placeSettingsPanel() {
   if (!panel || !summary || !controls) return;
   const r = summary.getBoundingClientRect(), header = Math.max(document.querySelector('body > .site-header')?.getBoundingClientRect().bottom || 64, document.querySelector('.project-bar')?.getBoundingClientRect().bottom || 0);
   const navigationTop = document.querySelector('.app-tabs')?.getBoundingClientRect().top || innerHeight;
-  const width = Math.min(260, innerWidth - 24), bounds = controls.getBoundingClientRect();
-  const actionsBottom = $('.draw-actions')?.getBoundingClientRect().bottom || r.bottom;
-  const belowAnchor = Math.max(r.bottom, actionsBottom);
+  const width = Math.min(260, innerWidth - 24), bounds = settingsPicker.closest('[data-editor-header-control]') ? r : controls.getBoundingClientRect();
+  const belowAnchor = r.bottom;
   const above = Math.max(44, r.top - header - 20), below = Math.max(0, navigationTop - belowAnchor - 20);
   const openBelow = below > above;
   const available = Math.max(80, navigationTop - header - 16), fallback = Math.max(above, below) < Math.min(180, available);
@@ -1127,13 +1137,14 @@ function afterHistoryStep() {
   saved = false; const step = history.lastStep;
   if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
 }
-function undo() { if (selectionTransform) { cancelDrawingInput(); return cancelSelectionTransform(); } if (drawing || !canEdit()) return false; closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
-function redo() { if (selectionTransform || drawing || !canEdit()) return false; closeColorEditor(); const doc = animationSession.redo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
+function undo() { if (drawingInputBusy()) return false; if (selectionTransform) { cancelDrawingInput(); return cancelSelectionTransform(); } if (!canEdit()) return false; closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
+function redo() { if (selectionTransform || drawingInputBusy() || !canEdit()) return false; closeColorEditor(); const doc = animationSession.redo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
 function resetDrawingInput(cancel = true) {
   virtualCursor?.cancelInputs(cancel); if (!cancel && pendingTap) applyTap(pendingTap);
   pendingTap = null; pendingTapPointerId = null; endStroke(cancel);
   activePointers.clear(); pinchStart = null; fingerTap = null; panDrag = null; spaceHeld = false;
   canvas.classList.remove('is-panning', 'is-grab'); hideCursors();
+  updateControls();
 }
 function cancelDrawingInput() { resetDrawingInput(true); }
 scope.listen($('#draw-virtual-toggle'), 'click', () => resetDrawingInput(false));
@@ -1144,7 +1155,7 @@ scope.listen(document, 'visibilitychange', () => { if (document.hidden) { cancel
 for (const [id, step] of [['#draw-undo', undo], ['#draw-redo', redo]]) {
   const button = $(id); let timer = 0; let repeated = false;
   const stop = () => { clearTimeout(timer); timer = 0; };
-  button.addEventListener('pointerdown', () => { repeated = false; stop(); timer = setTimeout(function again() { repeated = true; if (step()) timer = setTimeout(again, 90); }, 420); });
+  button.addEventListener('pointerdown', () => { repeated = false; stop(); if (button.disabled) return; timer = setTimeout(function again() { if (button.disabled) { stop(); return; } repeated = true; if (step()) timer = setTimeout(again, 90); }, 420); });
   for (const type of ['pointerup', 'pointerleave', 'pointercancel']) button.addEventListener(type, stop);
   button.addEventListener('click', () => { if (repeated) { repeated = false; return; } step(); });
 }
@@ -1271,7 +1282,7 @@ async function importImage(file, importSource) {
     const prepared = prepareSharedCanvasImage(original, { passActive: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261006-draw-startup-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261006-header-controls-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -1493,7 +1504,9 @@ pxdBridge = mountWorkspace({
   async getProject(project) {
     if (scope.disposed) return project;
     if (readOnlyImage) return project;
-    endStroke(); const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
+    // Autosave can capture while another pointer is still drawing. Capture the
+    // committed timeline; releasing the stroke commits it and schedules its save.
+    const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
     const snapshot = composeAnimationFrame(timeline, timeline.frames[0].id); const role = pxdImageRole;
     let next = project || createPxdProject();
     next = await putPxdDrawDocument(next, snapshot, role);
@@ -1630,8 +1643,8 @@ function keyboardCommandEnabled(id) {
   if (id === 'selection.paste') return selectionPanelState().canPaste;
   if (id === 'selection.confirm') return Boolean(selectionTransform);
   if (['selection.rotateLeft', 'selection.rotateRight', 'selection.flipX', 'selection.flipY'].includes(id)) return selectionPanelState().canTransform;
-  if (id === 'edit.undo') return Boolean(selectionTransform) || !drawing && animationSession.canUndo;
-  if (id === 'edit.redo' || id === 'edit.redoAlt') return !selectionTransform && !drawing && animationSession.canRedo;
+  if (id === 'edit.undo') return !drawingInputBusy() && (Boolean(selectionTransform) || animationSession.canUndo);
+  if (id === 'edit.redo' || id === 'edit.redoAlt') return !selectionTransform && !drawingInputBusy() && animationSession.canRedo;
   if (id === 'cursor.right') return Boolean(virtualCursor?.enabled && !spaceHeld);
   if (id === 'cursor.left') return Boolean(!spaceHeld && (virtualCursor?.enabled || selection));
   if (id.startsWith('cursor.move')) return Boolean(spaceHeld || virtualCursor?.enabled || selection || zoom > 1);

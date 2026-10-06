@@ -1,5 +1,6 @@
 /* Draw canvas dimensions and import actions share the site color editor's solid panel language. */
-body[data-page="draw"] .draw-actions > .draw-import > .draw-import__options.draw-canvas-panel {
+body[data-page="draw"] .px-site-header .draw-import > summary { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
+body[data-page="draw"] .draw-import > .draw-import__options.draw-canvas-panel {
   position: fixed !important; z-index: 1100; inset: auto; left: 8px !important; top: 8px !important; right: auto !important; bottom: auto !important;
   transform: none !important; box-sizing: border-box !important; display: grid !important; align-content: start; gap: 12px;
   width: min(380px, calc(100vw - 16px)) !important; max-height: calc(100dvh - 16px) !important; overflow: auto !important;
@@ -10,8 +11,8 @@ body[data-page="draw"] .draw-actions > .draw-import > .draw-import__options.draw
 body[data-page="draw"] .draw-canvas-panel:not([data-positioned]) { visibility: hidden !important; }
 body[data-page="draw"] .draw-canvas-panel[data-positioned] { visibility: visible !important; }
 /* Shared site panel motion fades all details content; keep this dense editor panel opaque on its first frame. */
-body[data-page="draw"] .draw-actions > .draw-import > .draw-canvas-panel[data-px-panel-motion] { animation: none !important; opacity: 1 !important; }
-body[data-page="draw"] .draw-actions > .draw-import:not([open]) > .draw-import__options.draw-canvas-panel { display: none !important; }
+body[data-page="draw"] .draw-import > .draw-canvas-panel[data-px-panel-motion] { animation: none !important; opacity: 1 !important; }
+body[data-page="draw"] .draw-import:not([open]) > .draw-import__options.draw-canvas-panel { display: none !important; }
 body[data-page="draw"] #draw-output .creation-output__card[hidden] { display: none !important; }
 body[data-page="draw"] .draw-canvas-panel > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
 body[data-page="draw"] .draw-canvas-panel h2 { margin: 0; color: inherit; font-size: 1rem; line-height: 1.35; }

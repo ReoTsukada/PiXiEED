@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
   <link rel="stylesheet" href="/css/creation-draw.css?rev=20260929-tool-ui-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20261006-panel-close-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261006-header-controls-1">
   <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
   <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
@@ -23,12 +23,13 @@
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
   <link rel="stylesheet" href="/css/color-panel.css?rev=20261006-panel-close-1">
-  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261004-symmetry-color-panel-1">
-  <link rel="stylesheet" href="/css/draw-canvas-panel.css?rev=20261004-canvas-settings-1">
-  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261006-draw-startup-1">
+  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261006-floating-mouse-2">
+  <link rel="stylesheet" href="/css/draw-canvas-panel.css?rev=20261006-header-controls-1">
+  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261006-header-controls-1">
+  <link rel="stylesheet" href="/css/draw-compact-controls.css?rev=20261006-floating-mouse-2">
   <!-- Start the editor dependency graph together with its styles. -->
-  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261006-draw-startup-1">
-  <link rel="modulepreload" href="/js/creation/project-workspace.mjs?rev=20261006-draw-startup-1">
+  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261006-floating-mouse-2">
+  <link rel="modulepreload" href="/js/creation/project-workspace.mjs?rev=20261006-header-controls-1">
   <link rel="modulepreload" href="/js/creation/draw-core.mjs?rev=20261006-draw-startup-1">
   <link rel="modulepreload" href="/js/creation/animation-core.mjs">
   <link rel="modulepreload" href="/js/creation/pxd-project.mjs?rev=20261001-free-tools-1">
@@ -52,7 +53,8 @@
       <div class="draw-board creation-editor__stage" aria-label="描画エリア。2本指で拡大・移動できます。"><canvas id="draw-canvas" width="16" height="16" role="img" aria-label="16×16の透明なキャンバス。色を選んで描きます。ドラッグで描画、2本指で拡大・移動できます。" tabindex="0"></canvas><div class="draw-grid" aria-hidden="true"></div><div class="draw-cursor" aria-hidden="true" hidden></div><div class="draw-cursor draw-cursor-twin" aria-hidden="true" hidden></div><span id="draw-playback-position" class="draw-playback-position" hidden aria-hidden="true"></span></div>
     </div>
     <div class="draw-control-dock">
-      <div id="draw-virtual-controls" class="draw-virtual-controls is-disabled" role="group" aria-label="仮想マウスの左右ボタン" aria-disabled="true">
+      <div id="draw-virtual-controls" class="draw-virtual-controls draw-floating-mouse is-disabled" hidden role="group" aria-label="仮想マウスの左右ボタン" aria-disabled="true">
+        <span class="draw-floating-mouse__hint" aria-live="polite">ボタンをドラッグで配置</span>
         <button type="button" data-virtual-left aria-pressed="false" disabled aria-label="仮想カーソルの左ボタン。押しながら描画面で動かすと描けます。" title="左ボタン"><span class="draw-button-tool-icon" data-button-tool-icon="left" aria-hidden="true"></span><span data-button-label="left">左</span><span class="draw-button-swatch" data-button-swatch="left" aria-hidden="true"></span></button>
         <button type="button" data-virtual-right aria-pressed="false" disabled aria-label="仮想カーソルの右ボタン" title="右ボタン"><span class="draw-button-tool-icon" data-button-tool-icon="right" aria-hidden="true"></span><span data-button-label="right">右</span><span class="draw-button-swatch" data-button-swatch="right" aria-hidden="true"></span></button>
       </div>
@@ -61,12 +63,13 @@
       <div class="draw-control-row creation-editor__palette"><div id="draw-palette" class="draw-palette" role="group" aria-label="色を選ぶ"></div></div>
       <div class="draw-toolbar creation-editor__tools-row">
         <div class="draw-tools" role="group" aria-label="描画の道具">
-          <button type="button" data-draw-tool="pen" data-drawing-icon="pen" aria-pressed="true" aria-label="ペン" title="ペン"></button>
           <details id="draw-tool-picker" class="draw-tool-picker">
             <summary id="draw-tool-summary" data-drawing-icon="fill" data-active="false" aria-label="道具を選ぶ" title="道具を選ぶ"><span data-draw-tool-name>道具</span><span class="draw-tool-picker__chevron" aria-hidden="true">⌄</span></summary>
             <div class="draw-tool-menu" aria-label="道具を選ぶ">
               <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-paint">
                 <h2 id="draw-tool-group-paint" class="draw-tool-group__heading">塗る</h2>
+                <button type="button" data-draw-tool="pen" data-drawing-icon="pen" aria-pressed="true" aria-label="ペン" title="ペン"><span data-tool-label>ペン</span><small data-tool-description>点や線を描く</small></button>
+                <button type="button" data-draw-tool="eraser" data-drawing-icon="eraser" aria-pressed="false" aria-label="消しゴム" title="消しゴム"><span data-tool-label>消しゴム</span><small data-tool-description>透明に戻す</small></button>
                 <button type="button" data-draw-tool="fill" data-drawing-icon="fill" aria-pressed="false" aria-label="塗りつぶし" title="塗りつぶし：囲まれた場所を塗る"><span data-tool-label>塗りつぶし</span><small data-tool-description>囲まれた場所を塗る</small></button>
                 <button type="button" data-draw-tool="spray" data-drawing-icon="spray" aria-pressed="false" aria-label="スプレー" title="スプレー：点を散らして描く"><span data-tool-label>スプレー</span><small data-tool-description>点を散らして描く</small></button>
               </section>
@@ -87,7 +90,7 @@
           </details>
         </div>
         <div class="draw-toggles">
-        <button id="draw-animation-play" type="button" aria-pressed="false" aria-label="アニメーションを再生" title="再生"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="draw-play-icon" d="m8 5 11 7-11 7Z"/><path class="draw-stop-icon" d="M8 5v14M16 5v14"/></svg></button>
+
         <details id="draw-settings-picker" class="draw-settings-picker">
           <summary id="draw-settings-summary" data-drawing-icon="settings" aria-label="描き方・表示の設定" title="描き方・表示の設定"></summary>
           <div class="draw-settings-panel" role="group" aria-label="描き方・表示の設定">
@@ -104,23 +107,24 @@
                 <button id="draw-controls-side-toggle" type="button" aria-pressed="false" aria-label="操作欄は右。左に移動" title="操作欄は右。左に移動"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><rect data-controls-side-highlight x="16" y="6" width="3" height="12" rx="1"/></svg></button>
               </div>
               <p>横画面で左右を入れ替え</p>
-              <p class="draw-input-help">色・道具はタップ／左クリックで左に設定。長押し／右クリックで右に設定。キーボードは対象を選んで Shift＋Enter。色の編集はショートカット一覧から開けます。</p>
+              <p class="draw-input-help">色・道具はタップ／左クリックで左に設定。長押し／右クリックで右に設定。キーボードは対象を選んで Shift＋Enter。選択中の色をもう一度押すと編集。透明は編集しません。</p>
               <button id="draw-shortcuts-open" type="button" aria-label="ショートカット一覧と設定を開く">ショートカット</button>
+              <button id="draw-mouse-position-reset" type="button">仮想マウスの位置を戻す</button>
               <button id="draw-input-reset" type="button">操作設定を初期値に戻す</button>
             </section>
           </div>
         </details>
         </div>
       </div>
-      <div class="draw-actions creation-editor__actions" role="group" aria-label="編集と保存"><div id="draw-animation-controls"></div><button id="draw-undo" type="button" disabled aria-label="ひとつ戻す" title="戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 4 9l5 5M4 9h9a6 6 0 0 1 0 12h-2"/></svg></button><button id="draw-redo" type="button" disabled aria-label="やり直す" title="やり直す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5-5 5M20 9h-9a6 6 0 0 0 0 12h2"/></svg></button><button id="draw-clear" type="button" aria-label="ぜんぶ消す" title="ぜんぶ消す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/></svg></button><details id="draw-output" class="creation-output"><summary aria-label="ファイルを開く・保存" title="ファイル"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg></summary><div class="creation-output__panel"><h2>ファイル</h2><p>作品を開く・画像や動画を書き出す。</p><button id="draw-export" type="button" class="creation-output__card"><strong>画像を保存</strong><small>PNG · ドットをくっきり拡大</small></button><button id="draw-animation-export" type="button" class="creation-output__card"><strong>アニメーションを保存</strong><small>GIF · コマごとの表示時間を保持</small></button><button id="draw-timelapse" type="button" class="creation-output__card"><strong>描いた過程を保存</strong><small>GIF · 短いアニメーション</small></button><button id="draw-timelapse-detail" type="button" class="creation-output__card"><strong>描いた過程を詳しく保存</strong><small>GIF · 8秒</small></button><div class="creation-output__divider"></div><button id="draw-import-local" type="button" class="creation-output__card"><strong>画像ファイル</strong><small>PNG・WebPを複製して開く</small></button><button id="draw-copy-last" type="button" class="creation-output__card" hidden><strong>前回の絵を複製</strong><small>元の絵を残して続ける</small></button><button id="draw-resume" type="button" class="creation-output__card" hidden><strong>前回の絵をひらく</strong><small>前回の続きから編集</small></button><div id="draw-shelf" hidden></div><div class="creation-output__divider"></div><button type="button" class="creation-output__card" data-output-project><strong>作品を管理</strong><small>名前・保存・読み込み</small></button></div></details><button id="draw-to-globe" type="button" aria-label="地球儀へ投稿" title="地球儀へ"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.4 2.2 3.6 4.9 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-4.9-3.6-8S9.6 6.2 12 4z"/></svg></button><details class="draw-import"><summary id="draw-import-summary" aria-label="キャンバス設定" title="キャンバス設定" aria-controls="draw-canvas-options"><span id="draw-size-chip" class="draw-size-chip">16</span></summary><div id="draw-canvas-options" class="draw-import__options draw-canvas-panel"><header><h2>キャンバス設定</h2><p id="draw-canvas-dimensions" aria-live="polite">16 × 16 px</p></header><p id="draw-canvas-resize-help" class="draw-canvas-resize-help">絵の1pxを保ち、中央を基準に余白を変更します。小さくすると外側が切れます。「戻す」で復元できます。</p><div class="draw-size-seg" role="radiogroup" aria-label="長辺のサイズ"><button type="button" role="radio" data-draw-size="16" aria-label="長辺16px">16</button><button type="button" role="radio" data-draw-size="32" aria-label="長辺32px">32</button><button type="button" role="radio" data-draw-size="64" aria-label="長辺64px">64</button><button type="button" role="radio" data-draw-size="128" aria-label="長辺128px">128</button><button type="button" role="radio" data-draw-size="256" aria-label="長辺256px">256</button></div><form id="draw-canvas-form" aria-describedby="draw-canvas-resize-help"><div class="draw-canvas-panel__dimensions"><label for="draw-canvas-width">幅<input id="draw-canvas-width" type="number" min="1" max="256" step="1" value="16" inputmode="numeric"></label><label for="draw-canvas-height">高さ<input id="draw-canvas-height" type="number" min="1" max="256" step="1" value="16" inputmode="numeric"></label></div><label class="draw-canvas-panel__ratio"><input id="draw-canvas-ratio" type="checkbox" checked>縦横比を固定</label><button id="draw-canvas-apply" type="submit">サイズを適用</button></form></div></details></div>
+      <div class="draw-actions creation-editor__actions" role="group" aria-label="編集と保存"><div id="draw-animation-controls"></div><button id="draw-undo" type="button" disabled aria-label="ひとつ戻す" title="戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 4 9l5 5M4 9h9a6 6 0 0 1 0 12h-2"/></svg></button><button id="draw-redo" type="button" disabled aria-label="やり直す" title="やり直す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5-5 5M20 9h-9a6 6 0 0 0 0 12h2"/></svg></button><button id="draw-clear" type="button" aria-label="ぜんぶ消す" title="ぜんぶ消す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/></svg></button><details id="draw-output" class="creation-output"><summary aria-label="画像・動画と保存" title="画像・動画と保存"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg></summary><div class="creation-output__panel"><h2>ファイル</h2><p>作品を保存・画像や動画を書き出す。</p><button id="draw-save" type="button" class="creation-output__card" aria-label="プロジェクトをこのブラウザーに保存"><strong>作品を保存</strong><small>このブラウザーに保存して続ける</small></button><button id="draw-export" type="button" class="creation-output__card"><strong>画像を保存</strong><small>PNG · ドットをくっきり拡大</small></button><button id="draw-animation-export" type="button" class="creation-output__card"><strong>アニメーションを保存</strong><small>GIF · コマごとの表示時間を保持</small></button><button id="draw-timelapse" type="button" class="creation-output__card"><strong>描いた過程を保存</strong><small>GIF · 短いアニメーション</small></button><button id="draw-timelapse-detail" type="button" class="creation-output__card"><strong>描いた過程を詳しく保存</strong><small>GIF · 8秒</small></button><div class="creation-output__divider"></div><button id="draw-import-local" type="button" class="creation-output__card"><strong>画像ファイル</strong><small>PNG・WebPを複製して開く</small></button><button id="draw-copy-last" type="button" class="creation-output__card" hidden><strong>前回の絵を複製</strong><small>元の絵を残して続ける</small></button><button id="draw-resume" type="button" class="creation-output__card" hidden><strong>前回の絵をひらく</strong><small>前回の続きから編集</small></button><div id="draw-shelf" hidden></div><div class="creation-output__divider"></div><button type="button" class="creation-output__card" data-output-project><strong>作品を管理</strong><small>名前・保存・読み込み</small></button></div></details><button id="draw-to-globe" type="button" aria-label="地球儀へ投稿" title="地球儀へ"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.4 2.2 3.6 4.9 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-4.9-3.6-8S9.6 6.2 12 4z"/></svg></button><details class="draw-import"><summary id="draw-import-summary" aria-label="キャンバス設定" title="キャンバス設定" aria-controls="draw-canvas-options"><span id="draw-size-chip" class="draw-size-chip">16</span></summary><div id="draw-canvas-options" class="draw-import__options draw-canvas-panel"><header><h2>キャンバス設定</h2><p id="draw-canvas-dimensions" aria-live="polite">16 × 16 px</p></header><p id="draw-canvas-resize-help" class="draw-canvas-resize-help">絵の1pxを保ち、中央を基準に余白を変更します。小さくすると外側が切れます。「戻す」で復元できます。</p><div class="draw-size-seg" role="radiogroup" aria-label="長辺のサイズ"><button type="button" role="radio" data-draw-size="16" aria-label="長辺16px">16</button><button type="button" role="radio" data-draw-size="32" aria-label="長辺32px">32</button><button type="button" role="radio" data-draw-size="64" aria-label="長辺64px">64</button><button type="button" role="radio" data-draw-size="128" aria-label="長辺128px">128</button><button type="button" role="radio" data-draw-size="256" aria-label="長辺256px">256</button></div><form id="draw-canvas-form" aria-describedby="draw-canvas-resize-help"><div class="draw-canvas-panel__dimensions"><label for="draw-canvas-width">幅<input id="draw-canvas-width" type="number" min="1" max="256" step="1" value="16" inputmode="numeric"></label><label for="draw-canvas-height">高さ<input id="draw-canvas-height" type="number" min="1" max="256" step="1" value="16" inputmode="numeric"></label></div><label class="draw-canvas-panel__ratio"><input id="draw-canvas-ratio" type="checkbox" checked>縦横比を固定</label><button id="draw-canvas-apply" type="submit">サイズを適用</button></form></div></details></div>
       
     </section>
     </div>
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
-  <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-save" type="button" aria-label="プロジェクトをこのブラウザーに保存" title="プロジェクトを保存">保存</button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-draw-startup-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261006-panel-close-1"></script>
+  <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-animation-play" type="button" aria-pressed="false" aria-label="アニメーションを再生" title="再生"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="draw-play-icon" d="m8 5 11 7-11 7Z"/><path class="draw-stop-icon" d="M8 5v14M16 5v14"/></svg></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
+  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-floating-mouse-2"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>
 </html>

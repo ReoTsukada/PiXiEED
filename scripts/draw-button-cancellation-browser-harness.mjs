@@ -42,10 +42,11 @@ try {
         await page.locator('#draw-canvas').focus(); await page.keyboard.press(tool === 'pen' ? 'b' : 'e');
       }
       if (side === 'right' && ['pen', 'eraser'].includes(tool)) {
-        const target = page.locator('[data-draw-tool="pen"]'); await target.focus(); await target.press('Shift+Enter');
+        if (!(await page.locator('#draw-tool-picker').evaluate(node => node.open))) await page.locator('#draw-tool-summary').click();
+        const target = page.locator(`[data-draw-tool="${tool}"]`); await target.focus(); await target.press('Shift+Enter');
       } else if (side === 'right' || !['pen', 'eraser'].includes(tool)) {
         if (!(await page.locator('#draw-tool-picker').evaluate(node => node.open)) && !['pen', 'eraser'].includes(tool)) await page.locator('#draw-tool-summary').click();
-        await clickForSide(page.locator(`[data-draw-tool="${tool === 'eraser' ? 'pen' : tool}"]`));
+        await clickForSide(page.locator(`[data-draw-tool="${tool}"]`));
       }
       await clickForSide(page.locator(`.draw-color[data-color-index="${color}"]`));
       await page.keyboard.press('Escape');

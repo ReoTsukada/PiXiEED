@@ -1,6 +1,16 @@
 /** Relative viewport input and independent mouse-button fingers; never moves the OS cursor. */
+export const DRAW_MOUSE_POSITION_KEY = 'pixieed.draw.floating-mouse.position.v1';
+export function clampDrawMousePosition(point, area, size) {
+  const maxX = Math.max(area.left, area.right - size.width), maxY = Math.max(area.top, area.bottom - size.height);
+  return { x: Math.max(area.left, Math.min(maxX, point.x)), y: Math.max(area.top, Math.min(maxY, point.y)) };
+}
+export function normalizeDrawMousePosition(point, area, size) {
+  const clamped = clampDrawMousePosition(point, area, size);
+  return { x: (clamped.x - area.left) / Math.max(1, area.right - size.width - area.left),
+    y: (clamped.y - area.top) / Math.max(1, area.bottom - size.height - area.top) };
+}
 export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls, onDown, onMove, onRelease, onHover, getStep,
-  onViewportGestureStart, onViewportGestureMove, onViewportGestureEnd, allowViewportCursor }) {
+  onViewportGestureStart, onViewportGestureMove, onViewportGestureEnd, allowViewportCursor, isBlocked = () => false, onStateChange }) {
   const marker = document.createElement('div'); marker.className = 'draw-virtual-marker'; marker.hidden = true;
   marker.setAttribute('aria-hidden', 'true');
   board.append(marker); scope.add(() => marker.remove());
@@ -12,6 +22,61 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   let enabled = false, activeSide = '', position = null, padOwner = null, hover = null, gestureOwner = null;
   let viewportGestureActive = false, gestureSuspended = false;
   let cancelling = false, deferGestureUpdate = false;
+  let floatingDrag = null, placement = null;
+  const home = document.createComment('floating mouse home'); controls.before(home); document.body.append(controls);
+  const hint = controls.querySelector('.draw-floating-mouse__hint');
+  try {
+    const stored = JSON.parse(localStorage.getItem(DRAW_MOUSE_POSITION_KEY));
+    if (stored && ['x', 'y'].every(k => Number.isFinite(stored[k]) && stored[k] >= 0 && stored[k] <= 1)) placement = stored;
+  } catch { /* Optional placement storage can be unavailable. */ }
+  function panelArea() {
+    const header = document.querySelector('.site-header')?.getBoundingClientRect();
+    const nav = document.querySelector('.app-tabs')?.getBoundingClientRect();
+    const main = document.querySelector('#main'), styles = main && getComputedStyle(main);
+    return { left: Math.max(8, parseFloat(styles?.paddingLeft) || 0), right: innerWidth - Math.max(8, parseFloat(styles?.paddingRight) || 0),
+      top: (header?.bottom || 56) + 8, bottom: (nav?.top || innerHeight) - 8 };
+  }
+  function panelSize() { return { width: controls.offsetWidth || 184, height: controls.offsetHeight || 70 }; }
+  function putPanel(point) {
+    const next = clampDrawMousePosition(point, panelArea(), panelSize());
+    for (const [key, value] of [['left', `${next.x}px`], ['top', `${next.y}px`]]) if (controls.style[key] !== value) controls.style[key] = value;
+    return next;
+  }
+  function placePanel() {
+    if (floatingDrag) return;
+    const a = panelArea(), size = panelSize(), b = board.getBoundingClientRect();
+    putPanel(placement ? { x: a.left + placement.x * Math.max(0, a.right - size.width - a.left), y: a.top + placement.y * Math.max(0, a.bottom - size.height - a.top) }
+      : { x: b.right - size.width - 10, y: b.bottom - size.height - 10 });
+  }
+  function savePanel() {
+    const r = controls.getBoundingClientRect(); placement = normalizeDrawMousePosition({ x: r.left, y: r.top }, panelArea(), panelSize());
+    try { localStorage.setItem(DRAW_MOUSE_POSITION_KEY, JSON.stringify(placement)); } catch { /* Placement still works without storage. */ }
+  }
+  function finishPanelMove(cancel = false) {
+    if (!floatingDrag) return;
+    const previous = floatingDrag; floatingDrag = null;
+    if (cancel) putPanel(previous.start);
+    savePanel(); sync();
+    try { if (previous.target.hasPointerCapture(previous.pointerId)) previous.target.releasePointerCapture(previous.pointerId); } catch {}
+  }
+  scope.listen(window, 'resize', () => { cancelInputs(true); placePanel(); });
+  scope.listen(document.querySelector('#draw-mouse-position-reset'), 'click', () => {
+    cancelInputs(true); placement = null;
+    try { localStorage.removeItem(DRAW_MOUSE_POSITION_KEY); } catch {}
+    placePanel();
+  });
+  const layoutObserver = new ResizeObserver(placePanel);
+  for (const node of [board, document.querySelector('.site-header'), document.querySelector('.app-tabs')]) if (node) layoutObserver.observe(node);
+  scope.add(() => { layoutObserver.disconnect(); home.replaceWith(controls); });
+  const blockedObserver = new MutationObserver(records => {
+    if (!records.some(record => record.attributeName !== 'hidden' || record.target.matches('#main, #draw-color-editor, .animation-controls__workspace-panel'))) return;
+    if (isBlocked()) cancelInputs(true); sync();
+  });
+  for (const [node, attributes] of [[document.querySelector('#main'), ['inert', 'hidden']], [document.body, ['data-tool-result-open']]]) {
+    if (node) blockedObserver.observe(node, { attributes: true, attributeFilter: attributes });
+  }
+  blockedObserver.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['open', 'hidden'] });
+  scope.add(() => blockedObserver.disconnect());
   const pointerId = -7106;
   let modifiers = { shiftKey: false, altKey: false };
   const rememberModifiers = e => { modifiers = { shiftKey: e.shiftKey, altKey: e.altKey }; };
@@ -26,6 +91,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
       clientX: position?.x ?? 0, clientY: position?.y ?? 0, preventDefault() {} };
   }
   function sync() {
+    const hidden = !enabled || isBlocked(); if (controls.hidden !== hidden) controls.hidden = hidden;
     left.disabled = right.disabled = !enabled;
     left.setAttribute('aria-pressed', String(activeSide === 'left'));
     right.setAttribute('aria-pressed', String(activeSide === 'right'));
@@ -33,6 +99,9 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     canvas.dataset.virtualPressed = String(Boolean(activeSide));
     canvas.dataset.virtualButton = activeSide;
     marker.classList.toggle('is-pressed', Boolean(activeSide));
+    controls.dataset.floatingState = floatingDrag ? 'moving' : activeSide && gestureOwner?.role === 'draw' ? 'fixed' : activeSide ? 'pressing' : 'free';
+    if (hint) hint.textContent = floatingDrag ? '配置を移動中' : controls.dataset.floatingState === 'fixed' ? '描画中・位置は固定' : 'ボタンをドラッグで配置';
+    onStateChange?.();
   }
   function bounds() {
     const b = board.getBoundingClientRect(), c = canvas.getBoundingClientRect();
@@ -54,6 +123,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   }
   function move(dx, dy) {
     if (!enabled) return;
+    if (activeSide && gestureOwner?.kind === 'button') { gestureOwner.role = 'draw'; sync(); }
     place(); if (marker.hidden) return;
     const b = bounds();
     position.x = Math.max(b.minX + .01, Math.min(b.maxX - .01, position.x + dx));
@@ -134,6 +204,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   }
   function cancelInputs(cancel = true, endedPointerId = null) {
     if (cancelling) return;
+    finishPanelMove(cancel);
     for (const id of new Set([...pads.keys(), ...buttons.keys()])) quarantinedPointers.add(id);
     cancelling = true;
     try {
@@ -148,9 +219,10 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     if (endedPointerId !== null) quarantinedPointers.delete(endedPointerId);
   }
   function press(side, owner) {
-    if (!enabled || activeSide) return false;
+    if (!enabled || activeSide || floatingDrag || isBlocked()) return false;
     endViewportGesture(true); gestureSuspended = false;
     place(); if (marker.hidden) return false;
+    for (const record of pads.values()) { record.pendingDx = 0; record.pendingDy = 0; }
     activeSide = side; gestureOwner = owner; sync(); updateViewportGesture(); onDown(event('pointerdown', side)); return true;
   }
   function setEnabled(value) {
@@ -158,18 +230,35 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     board.classList.toggle('has-virtual-cursor', enabled);
     board.setAttribute('aria-label', enabled ? '仮想カーソルの移動パッド。なぞって相対移動。左右クリックを別の指で押しながら動かすと描画します。' : '描画エリア。2本指で拡大・移動できます。');
     toggle.setAttribute('aria-pressed', String(enabled)); toggle.title = enabled ? '仮想カーソルを解除' : '仮想カーソル';
-    marker.hidden = !enabled; sync(); if (enabled) place();
+    marker.hidden = !enabled; sync(); placePanel(); if (enabled) place();
   }
   function stop(e) { e.preventDefault(); e.stopImmediatePropagation(); }
   function beginButton(e, node, side) {
-    if (!enabled || buttons.has(e.pointerId) || (e.button !== undefined && e.button !== 0)) return;
+    if (!enabled || floatingDrag || isBlocked() || buttons.has(e.pointerId) || (e.button !== undefined && e.button !== 0)) return;
     quarantinedPointers.delete(e.pointerId);
     // A second side cannot take over an in-flight gesture.
     stop(e); node.focus({ preventScroll: true });
-    const record = { target: node, side, kind: 'button' };
+    const r = controls.getBoundingClientRect();
+    const record = { target: node, side, kind: 'button', role: 'pending', x: e.clientX, y: e.clientY, start: { x: r.left, y: r.top } };
     buttons.set(e.pointerId, record);
     press(side, record); capture(node, e.pointerId); sync();
   }
+  // Button-finger movement relocates the panel only before a pad has established drawing.
+  // Cancelling the synthetic pointer rolls back the current stroke, never invokes Undo.
+  scope.listen(document, 'pointermove', e => {
+    if (floatingDrag) {
+      if (e.pointerId !== floatingDrag.pointerId) return;
+      stop(e); putPanel({ x: floatingDrag.start.x + e.clientX - floatingDrag.x, y: floatingDrag.start.y + e.clientY - floatingDrag.y }); return;
+    }
+    const record = buttons.get(e.pointerId);
+    if (!record || record.kind !== 'button' || gestureOwner !== record || record.role === 'draw') return;
+    if (Math.hypot(e.clientX - record.x, e.clientY - record.y) <= 12) return;
+    stop(e); cancelInputs(true);
+    quarantinedPointers.delete(e.pointerId);
+    floatingDrag = { ...record, pointerId: e.pointerId };
+    capture(record.target, e.pointerId); sync();
+    putPanel({ x: record.start.x + e.clientX - record.x, y: record.start.y + e.clientY - record.y });
+  }, { capture: true });
   scope.listen(toggle, 'click', () => setEnabled(!enabled));
   for (const [node, side] of [[left, 'left'], [right, 'right']]) {
     scope.listen(node, 'pointerdown', e => beginButton(e, node, side));
@@ -181,6 +270,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   }
   scope.listen(board, 'pointerdown', e => {
     if (!enabled || e.virtual) return;
+    if (floatingDrag || isBlocked()) { stop(e); return; }
     quarantinedPointers.delete(e.pointerId);
     const b = bounds();
     if (e.pointerType === 'mouse') {
@@ -202,6 +292,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   scope.listen(board, 'pointermove', e => {
     if (!enabled || e.virtual) return;
     stop(e);
+    if (floatingDrag || isBlocked()) return;
     if (quarantinedPointers.has(e.pointerId)) return;
     const record = pads.get(e.pointerId), b = bounds();
     if (record) {
@@ -217,7 +308,13 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
         const padCount = [...pads.values()].filter(item => item.kind === 'pad').length;
         if (activeSide) {
           updateViewportGesture();
-          if (inViewport && wasInside && padOwner === e.pointerId) move(dx, dy);
+          if (inViewport && wasInside && padOwner === e.pointerId) {
+            if (gestureOwner?.kind !== 'button' || gestureOwner.role === 'draw') move(dx, dy);
+            else {
+              record.pendingDx = (record.pendingDx || 0) + dx; record.pendingDy = (record.pendingDy || 0) + dy;
+              if (Math.hypot(record.pendingDx, record.pendingDy) >= 3) { move(record.pendingDx, record.pendingDy); record.pendingDx = record.pendingDy = 0; }
+            }
+          }
         } else if (padCount >= 2 || viewportGestureActive || gestureSuspended) updateViewportGesture();
         else if (inViewport && wasInside && padOwner === e.pointerId) move(dx, dy);
       }
@@ -229,6 +326,11 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   }, { capture: true });
   function finishPointer(e) {
     if (cancelling) return;
+    if (floatingDrag?.pointerId === e.pointerId) {
+      stop(e);
+      if (e.type === 'lostpointercapture' && floatingDrag.target.hasPointerCapture(e.pointerId)) return;
+      finishPanelMove(e.type !== 'pointerup'); return;
+    }
     if (quarantinedPointers.has(e.pointerId)) {
       if (e.type !== 'lostpointercapture') quarantinedPointers.delete(e.pointerId);
       stop(e);
@@ -265,7 +367,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   scope.listen(window, 'blur', () => cancelInputs(true)); scope.listen(window, 'pagehide', () => cancelInputs(true));
   scope.listen(document, 'visibilitychange', () => { if (document.hidden) cancelInputs(true); });
   scope.add(() => { cancelInputs(true); enabled = false; sync(); board.classList.remove('has-virtual-cursor'); });
-  board.tabIndex = 0; sync();
+  board.tabIndex = 0; sync(); placePanel();
   const intercepted = e => enabled && !e.virtual;
   return { realDown: intercepted, realMove: intercepted, realRelease: intercepted, release, resetPress, place,
     cancelInputs,
@@ -274,5 +376,5 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     pressKeyboard: side => press(side, { kind: 'keyboard', side }),
     releaseKeyboard: (side, cancel = false) => { if (gestureOwner?.kind === 'keyboard' && gestureOwner.side === side) finishGesture(cancel); },
     nudge: (dx, dy, scale = 1) => { if (!enabled) return false; const step = getStep(); move(dx * step.x * scale, dy * step.y * scale); return true; },
-    get enabled() { return enabled; } };
+    get enabled() { return enabled; }, get pressed() { return Boolean(activeSide); }, get moving() { return Boolean(floatingDrag); } };
 }

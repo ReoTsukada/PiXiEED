@@ -16,9 +16,9 @@ const viewports = [
   { width: 1280, height: 900, name: '1280x900' },
   { width: 844, height: 390, name: '844x390' },
 ];
-const menuTools = ['fill', 'spray', 'line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill', 'select', 'picker'];
+const menuTools = ['pen', 'eraser', 'fill', 'spray', 'line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill', 'select', 'picker'];
 const toolGroups = [
-  { title: '塗る', tools: ['fill', 'spray'] },
+  { title: '塗る', tools: ['pen', 'eraser', 'fill', 'spray'] },
   { title: '図形', tools: ['line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill'] },
   { title: '選ぶ', tools: ['select', 'picker'] },
 ];
@@ -108,19 +108,6 @@ async function dragPixels(page, from, to) {
 }
 
 async function selectTool(page, name) {
-  if (name === 'pen' || name === 'eraser') {
-    const current = await page.locator('#draw-canvas').getAttribute('data-tool');
-    if (current !== name) {
-      const penButton = page.locator('.draw-tools > button[data-draw-tool="pen"]');
-      if (name === 'pen') await penButton.click();
-      else {
-        if (current !== 'pen') { await penButton.click(); await page.waitForFunction(() => document.querySelector('#draw-canvas')?.dataset.tool === 'pen'); }
-        await penButton.click();
-      }
-      await page.waitForFunction((tool) => document.querySelector('#draw-canvas')?.dataset.tool === tool, name);
-    }
-    return;
-  }
   await page.locator('#draw-tool-summary').click();
   await page.waitForFunction(() => document.querySelector('#draw-tool-picker')?.open === true);
   await page.waitForFunction(() => {
@@ -180,12 +167,9 @@ async function geometry(page, selector) {
 async function layoutChecks(page, viewport) {
   const canvasBefore = await page.locator('#draw-canvas').boundingBox();
   const toolCount = await page.locator('.draw-tool-menu button[data-draw-tool]').count();
-  equal(toolCount, menuTools.length, `${viewport.name}: menu should contain the nine secondary tools, not a second eraser control`);
+  equal(toolCount, menuTools.length, `${viewport.name}: menu should contain each of the eleven tools once`);
   const actualTools = await page.locator('.draw-tool-menu button[data-draw-tool]').evaluateAll((nodes) => nodes.map((node) => node.dataset.drawTool));
   equal(actualTools, menuTools, `${viewport.name}: tool order and available tools`);
-  const pen = await page.locator('.draw-tools > button[data-draw-tool="pen"]').boundingBox();
-  const summary = await page.locator('#draw-tool-summary').boundingBox();
-  check(pen && pen.width >= 44 && pen.height >= 44, `${viewport.name}: pen permanent target is under 44px: ${JSON.stringify(pen)}`);
   const summaryInfo = await geometry(page, '#draw-tool-summary');
   check(summaryInfo.width === 44 && summaryInfo.height === 44, `${viewport.name}: summary should be exactly a 44px icon-only square: ${JSON.stringify(summaryInfo)}`);
   check(Boolean(summaryInfo.ariaLabel?.trim()) && Boolean(summaryInfo.title?.trim()), `${viewport.name}: icon-only summary needs an accessible name and title: ${JSON.stringify(summaryInfo)}`);
@@ -288,14 +272,17 @@ async function functionalChecks(page, viewport) {
   const index = 1 * pen.before.width + 1;
   equal(changedIndices(baseline, pen.after), [index], `${viewport.name}: pen should change precisely the selected pixel`);
   equal(pen.after.data.slice(index * 4, index * 4 + 4), [38, 50, 56, 255], `${viewport.name}: chosen palette color should reach canvas RGBA`);
-  const penControl = page.locator('.draw-tools > button[data-draw-tool="pen"]');
-  await penControl.click();
+  const penControl = page.locator('[data-draw-tool="pen"]');
+  await selectTool(page, 'pen');
+  await page.waitForFunction(() => document.querySelector('#draw-canvas')?.dataset.tool === 'pen');
+  const eraserControl = page.locator('[data-draw-tool="eraser"]');
+  await selectTool(page, 'eraser'); await selectTool(page, 'eraser');
   await page.waitForFunction(() => document.querySelector('#draw-canvas')?.dataset.tool === 'eraser');
-  check((await penControl.getAttribute('aria-label')).includes('消しゴム'), `${viewport.name}: pen button should show eraser state label`);
+  check((await eraserControl.getAttribute('aria-label')).includes('消しゴム'), `${viewport.name}: eraser has its own accessible name`);
   const erased = await drawOnePixel(page, 1, 1);
   equal(changedIndices(pen.after, erased.after), [index], `${viewport.name}: eraser should clear the target pixel`);
   equal(erased.after.data.slice(index * 4 + 3, index * 4 + 4), [0], `${viewport.name}: eraser should clear alpha`);
-  await penControl.click();
+  await selectTool(page, 'pen');
   await page.waitForFunction(() => document.querySelector('#draw-canvas')?.dataset.tool === 'pen');
   await selectColor(page, 0);
   const zoomStart = await canvasState(page);
@@ -324,6 +311,7 @@ async function functionalChecks(page, viewport) {
 async function richDrawingChecks(page, viewport) {
   const blank = async (label) => assertCanvasBlank(page, label);
   const restoreBlank = async () => {
+    await page.locator('#draw-canvas').focus(); await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
     const state = await canvasState(page);
     if (state.data.some((_, i) => i % 4 === 3 && state.data[i] !== 0)) await page.locator('#draw-clear').click();
     await page.waitForFunction(() => [...document.querySelector('#draw-canvas').getContext('2d').getImageData(0, 0, 16, 16).data].every((value, i) => i % 4 !== 3 || value === 0));
@@ -354,8 +342,8 @@ async function richDrawingChecks(page, viewport) {
       '390x844: real CDP touch pointer should draw a filled rectangle on the canvas');
     await restoreBlank(page);
     await selectTool(page, 'pen'); await selectColor(page, 0); await dragPixels(page, { x: 2, y: 2 }, { x: 4, y: 2 });
-    await selectTool(page, 'select'); await dragPixels(page, { x: 2, y: 2 }, { x: 4, y: 2 });
-    const touchMove = await touchDragPixels(page, { x: 3, y: 2 }, { x: 6, y: 5 });
+    await selectTool(page, 'select'); await dragPixels(page, { x: 1, y: 1 }, { x: 5, y: 5 });
+    const touchMove = await touchDragPixels(page, { x: 2, y: 2 }, { x: 5, y: 5 });
     check([5, 6, 7].every((x) => touchMove.after.data[(5 * 16 + x) * 4 + 3] === 255), '390x844: CDP touch should move the selected active-cel pixels');
     check([2, 3, 4].every((x) => touchMove.after.data[(2 * 16 + x) * 4 + 3] === 0), '390x844: CDP touch selection move should clear its source pixels');
     await page.keyboard.press('Escape'); await page.mouse.up(); await restoreBlank(page);
@@ -412,28 +400,34 @@ async function richDrawingChecks(page, viewport) {
   check(await page.locator('#draw-palette .draw-color[data-color-index="0"]').getAttribute('aria-pressed') === 'true', `${viewport.name}: picker should select the sampled palette color`);
   await restoreBlank(page);
 
-  // Selection movement should clear source, move the pixels, clamp at the canvas edge, and be a single history entry.
+  // Selection movement clears source, moves pixels and commits one explicit history entry.
   await selectTool(page, 'pen'); await selectColor(page, 0);
   await dragPixels(page, { x: 2, y: 2 }, { x: 4, y: 2 });
   const beforeSelectMove = await canvasState(page);
-  await selectTool(page, 'select'); await dragPixels(page, { x: 2, y: 2 }, { x: 4, y: 2 });
+  await selectTool(page, 'select'); await dragPixels(page, { x: 1, y: 1 }, { x: 5, y: 5 });
   check(!(await page.locator('.draw-selection').isHidden()), `${viewport.name}: selection rectangle should be visible`);
-  const sourcePoint = pixelPoint(await canvasState(page), 3, 2), destPoint = pixelPoint(await canvasState(page), 5, 4);
+  const sourcePoint = pixelPoint(await canvasState(page), 2, 2), destPoint = pixelPoint(await canvasState(page), 4, 4);
   await page.mouse.move(sourcePoint.x, sourcePoint.y); await page.mouse.down(); await page.mouse.move(destPoint.x, destPoint.y, { steps: 5 }); await page.mouse.up();
   const moved = await canvasState(page);
   for (const x of [2, 3, 4]) check(moved.data[(2 * 16 + x) * 4 + 3] === 0, `${viewport.name}: selection move should clear source pixel ${x},2`);
   for (const x of [4, 5, 6]) check(moved.data[(4 * 16 + x) * 4 + 3] === 255, `${viewport.name}: selection move should preserve pixels at destination ${x},4`);
+  await page.locator('#draw-canvas').focus(); await page.keyboard.press('Enter');
   await page.locator('#draw-undo').click();
   bytesEqual((await canvasState(page)).data, beforeSelectMove.data, `${viewport.name}: selection move should be one exact history step`);
   await page.locator('#draw-redo').click();
   bytesEqual((await canvasState(page)).data, moved.data, `${viewport.name}: selection move redo should restore exact RGBA`);
-  await selectTool(page, 'select'); await dragPixels(page, { x: 4, y: 4 }, { x: 6, y: 4 });
-  const current = await canvasState(page); const leftPoint = pixelPoint(current, 5, 4), outsidePoint = pixelPoint(current, -8, 4);
-  await page.mouse.move(leftPoint.x, leftPoint.y); await page.mouse.down(); await page.mouse.move(outsidePoint.x, outsidePoint.y, { steps: 8 }); await page.mouse.up();
-  const clamped = await canvasState(page);
-  check([0, 1, 2].every((x) => clamped.data[(4 * 16 + x) * 4 + 3] === 255), `${viewport.name}: selection movement past the left edge should clamp to x=0`);
-  check(clamped.data[(4 * 16 + 3) * 4 + 3] === 0, `${viewport.name}: clamped move should clear previous destination edge`);
-  await page.keyboard.press('Escape'); await page.mouse.up(); check(await page.locator('.draw-selection').isHidden(), `${viewport.name}: Escape should clear selection overlay`);
+  await page.locator('#draw-canvas').focus();
+  for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const clipped = await canvasState(page);
+  equal(clipped.data.flatMap((value, i) => i % 4 === 3 && value ? [(i - 3) / 4] : []), [4 * 16, 4 * 16 + 1], `${viewport.name}: partially outside preview clips pixels to the image edge`);
+  await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowLeft');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  bytesEqual((await canvasState(page)).data, moved.data, `${viewport.name}: fully outside invalid preview preserves its source pixels`);
+  await page.keyboard.press('Enter');
+  bytesEqual((await canvasState(page)).data, moved.data, `${viewport.name}: fully outside confirmation fails atomically without losing source pixels`);
+  await page.keyboard.press('Escape'); bytesEqual((await canvasState(page)).data, moved.data, `${viewport.name}: cancel clipped preview restores exact source pixels`);
+  await page.keyboard.press('Escape'); check(await page.locator('.draw-selection').isHidden(), `${viewport.name}: second Escape clears the preserved selection overlay`);
 
   // A selection moves only the active cel; lower-layer pixels remain intact. A locked cel rejects drawing and selection edits.
   await restoreBlank(page);
@@ -445,9 +439,10 @@ async function richDrawingChecks(page, viewport) {
   await selectColor(page, 1); await drawOnePixel(page, 2, 2); await drawOnePixel(page, 3, 2); await drawOnePixel(page, 4, 2);
   const lowerLayerPixel = (await canvasState(page)).data.slice((8 * 16 + 8) * 4, (8 * 16 + 8) * 4 + 4);
   const baseColor = lowerLayerPixel;
-  await selectTool(page, 'select'); await dragPixels(page, { x: 2, y: 2 }, { x: 4, y: 2 }); await dragPixels(page, { x: 2, y: 2 }, { x: 5, y: 5 });
+  await selectTool(page, 'select'); await dragPixels(page, { x: 1, y: 1 }, { x: 5, y: 5 }); await dragPixels(page, { x: 2, y: 2 }, { x: 5, y: 5 });
   const afterTopMove = await canvasState(page);
   bytesEqual(afterTopMove.data.slice((8 * 16 + 8) * 4, (8 * 16 + 8) * 4 + 4), baseColor, `${viewport.name}: moving an upper cel must preserve the lower cel pixel`);
+  await page.locator('#draw-canvas').focus(); await page.keyboard.press('Enter');
   // Drawing outside the workspace closes its floating panel by design, so reopen it before opening the layer context menu.
   await page.locator('#draw-animation-controls [data-action="toggle-frames"]').click();
   await page.waitForFunction(() => document.querySelector('#draw-animation-controls-panel')?.hidden === false);
@@ -460,13 +455,15 @@ async function richDrawingChecks(page, viewport) {
   await activeLayer.click({ button: 'right' });
   await page.waitForFunction(() => document.querySelector('.animation-controls__frame-menu [data-frame-menu-action="lock"]')?.textContent.includes('ロック解除'));
   await page.keyboard.press('Escape');
+  await page.locator('#draw-canvas').focus(); await page.keyboard.press('Escape');
   const lockedBaseline = await canvasState(page);
   await selectTool(page, 'pen'); await dragPixels(page, { x: 12, y: 12 }, { x: 13, y: 12 });
   bytesEqual((await canvasState(page)).data, lockedBaseline.data, `${viewport.name}: pen drawing must not edit a locked layer`);
   await selectTool(page, 'select'); await dragPixels(page, { x: 2, y: 2 }, { x: 5, y: 5 });
-  check(await page.locator('.draw-selection').isHidden(), `${viewport.name}: a locked layer should reject selection edits`);
+  check(await page.locator('[data-selection-corner="nw"]').isHidden(), `${viewport.name}: a locked layer hides transformation handles`);
+  await page.locator('#draw-canvas').focus(); await page.keyboard.press('ArrowRight'); await page.keyboard.press('Enter');
   bytesEqual((await canvasState(page)).data, lockedBaseline.data, `${viewport.name}: selection must not edit a locked layer`);
-  results.scenarios.push({ viewport: viewport.name, case: 'drawing-tools-shapes-selection-undo-cancel', lineChangedPixels: pixels.length, selectionClamp: true, upperCelMovePreservedLower: true, lockedCelProtected: true });
+  results.scenarios.push({ viewport: viewport.name, case: 'drawing-tools-shapes-selection-undo-cancel', lineChangedPixels: pixels.length, selectionClippingAndCancel: true, upperCelMovePreservedLower: true, lockedCelProtected: true });
 }
 
 async function crossSurfaceIcons() {
@@ -504,7 +501,7 @@ async function crossSurfaceIcons() {
       await page.waitForFunction(() => document.querySelector('#hidden-editor')?.hidden === false);
       await page.locator('#hidden-name').fill('確認用の丸');
       await page.locator('#hidden-add').click();
-      await page.waitForFunction(() => [...document.querySelectorAll('.hidden-tools svg.drawing-tool-icon')].length === 2);
+      await page.waitForFunction(() => document.querySelectorAll('[data-hidden-mode] svg.drawing-tool-icon').length === 2);
     }
     await page.locator('[data-drawing-icon]').first().waitFor({ state: 'attached' });
     await page.waitForFunction(() => [...document.querySelectorAll('[data-drawing-icon]')].every((button) => button.querySelector('svg.drawing-tool-icon')),

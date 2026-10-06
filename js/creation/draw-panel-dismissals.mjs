@@ -9,7 +9,7 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
   ];
   const detailsList = () => {
     const topDialog = [...doc.querySelectorAll('dialog[open]')].at(-1);
-    return [...root.querySelectorAll('details[open]'), ...doc.querySelectorAll('#pxd-panel[open] details[open]')]
+    return [...new Set([...root.querySelectorAll('details[open]'), ...doc.querySelectorAll('[data-editor-header-control] details[open], details[data-editor-header-control][open], #pxd-panel[open] details[open]')])]
       .filter(panel => panel.getClientRects().length && !panel.closest('[hidden]') && (!topDialog || topDialog.contains(panel)));
   };
   function dismiss(details) {
@@ -33,7 +33,7 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
   }
   function decorate() {
     for (const [selector, content, title] of panels) {
-      const details = root.querySelector(selector); addHeader(details, details?.querySelector(content), title);
+      const details = doc.querySelector(selector); addHeader(details, details?.querySelector(content), title);
     }
     const project = doc.querySelector('#pxd-panel');
     if (project && !project.hasAttribute('data-draw-panel-dismissal')) {
@@ -67,6 +67,8 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
   // This must run before the viewport's capture handler, which consumes native
   // pointers in virtual mode. A dismissal contact never becomes a drawing contact.
   scope.listen(doc, 'pointerdown', event => {
+    const historyButton = event.target.closest?.('#draw-undo, #draw-redo');
+    if (historyButton?.disabled) { event.preventDefault(); event.stopImmediatePropagation(); return; }
     const onBoard = event.target.closest?.('.draw-board');
     if (onBoard && (detailsList().length || hasFloating())) {
       cancelInput(); closeFloating(); event.preventDefault(); event.stopImmediatePropagation(); return;

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4188';
 assert.ok(['127.0.0.1', 'localhost'].includes(new URL(base).hostname));
 const output = process.env.PIXIEED_DRAW_VIEWPORT_OUTPUT || '/tmp/pixieed-draw-viewport-dual-20261006';
@@ -39,7 +40,7 @@ try {
       if ((await page.locator('#draw-virtual-toggle').getAttribute('aria-pressed') === 'true') !== enabled) await page.locator('#draw-virtual-toggle').click();
       await page.keyboard.press('Escape');
     };
-    const rects = () => page.evaluate(() => Object.fromEntries(['.draw-viewport', '.draw-board', '#draw-canvas', '#draw-mirror-rail', '.draw-control-dock', '.draw-controls', '#draw-virtual-controls', '.draw-toolbar', '.draw-actions'].map(selector => [selector, document.querySelector(selector).getBoundingClientRect().toJSON()])));
+    const rects = () => page.evaluate(() => Object.fromEntries(['.draw-viewport', '.draw-board', '#draw-canvas', '#draw-mirror-rail', '.draw-control-dock', '.draw-controls', '.draw-fixed-left', '#draw-selection-controls', '.px-tool-header-controls'].map(selector => [selector, document.querySelector(selector).getBoundingClientRect().toJSON()])));
     const hotspot = () => page.locator('.draw-virtual-marker').evaluate(n => { const r = n.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
     const resize = async size => { await page.locator('#draw-import-summary').click(); await page.locator(`[data-draw-size="${size}"]`).click(); await page.keyboard.press('Escape'); };
     try {
@@ -272,6 +273,8 @@ try {
       const reachableBoard = await page.locator('.draw-board').boundingBox();
       const oldScroll = await page.locator('.draw-controls').evaluate(n => n.scrollTop);
       for (const selector of ['#draw-palette .draw-color[data-color-index="2"]', '[data-draw-tool="pen"]', '#draw-settings-summary', '#draw-undo']) {
+        if (selector === '[data-draw-tool="pen"]') await page.locator('#draw-tool-summary').click();
+        else if (await page.locator('#draw-tool-picker').evaluate(n => n.open)) await page.keyboard.press('Escape');
         await page.locator(selector).scrollIntoViewIfNeeded();
         assert.equal(await page.locator(selector).evaluate(n => { const r = n.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return hit === n || n.contains(hit); }), true, `${selector} remains reachable`);
         assert.deepEqual(await page.locator('.draw-board').boundingBox(), reachableBoard);
@@ -282,7 +285,7 @@ try {
       // Save a held cursor. The saved project must restore axes/cels without a held mouse.
       await touch('touchStart', [leftTouch]);
       await page.screenshot({ path: `${output}/${label}-left-held.png` });
-      await page.locator('#draw-save').click(); await touch('touchEnd', []);
+      await saveCurrentProject(page); await touch('touchEnd', []); await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.querySelector('#project-open').dataset.state === 'saved');
       const savedUrl = page.url(); await page.goto(savedUrl, { waitUntil: 'domcontentloaded' }); await ready();
       await page.waitForFunction(() => document.querySelector('[data-symmetry="horizontal"]')?.getAttribute('aria-pressed') === 'true');

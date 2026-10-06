@@ -402,3 +402,140 @@ CPU profileでは約3.4秒の待機に対し描画用JSの実行は短く、保�
 実HTTP cache upgradeは旧commit `297e94b2` のmoduleをmax-age600でブラウザーに保持してから、同じoriginでPXD参照を維持した新HTMLへ切替。HTTP cacheをclearせず、Playwright routeも使わず、未変更mode-scopeはserver requestなし・ResourceTiming transferSize=0を確認。新entry/page/変更child13本の更新URL取得と新context/mask/corner操作、PNGimport、実GIF、保存/同URLreloadの8群PASS。証跡は `/tmp/pixieed-draw-cache-upgrade-cache-final-20261006/results.json` と同folderのserver request log。
 
 公開対象最終query版の新context68群、実cache upgrade8群、PNG/GIF/PXDのlazy機能10群、計86群が全PASS。source SHAの一致と各結果への参照は `/tmp/pixieed-draw-selection-context-cache-final-20261006/suite-results.json`。全4画面のPNGは同folder。既存選択68群は `/tmp/pixieed-draw-selection-transform-cache-final/results.json`。Pagesビルドは489 public files、必須の新light moduleを含めて取得でき、static/dynamic依存の欠落なし。測定・ブラウザ対象ソースとステージしたソースのSHA256一致を確認。今回変更だけをcommit/pushし、無関係なportable-releaseの未追跡3ファイルは残す。
+
+## 2026-10-06 共通ヘッダーと直接入力の更新（ローカル検証完了）
+
+対象はドット、音楽、ジグソー、間違い探し、もの探し、ゲーム、カメラの7制作ページ。既存の操作ボタンを56pxの共通ヘッダーへ移し、作品のファイルボタンとサイトメニューを両端に固定した。編集操作は44pxの操作領域を保ち、狭い画面では中央だけ横スクロールする。ツール名はタイトル・アクセシブルな見出しに残し、表示用の名前と装飾見出しを外した。非制作ページは読み込みURLの更新のみ。
+
+作品ボタンのために予約していたヘッダー下の余白も解消。移設した元要素のlistener、hidden、inertと保存・復元待ちを維持した。音楽・パズルのパネルは×／Escape／外タップで閉じ、×とEscapeでは起動ボタンへフォーカスを戻す。ジグソーは削除した操作行に合わせてgrid行を更新し、盤面が44pxへ縮む回帰を防いだ。
+
+ドットはペンと消しゴムを独立した常設ボタンにした。同じ道具の反復選択は切替を起こさない。選択中の左側の不透明な色をもう一度クリック／タップ／Enterで押すと色を編集する。初回の別色選択、右クリック、長押しによる右割当、透明、キャンセルされた接触、押下中の描画には編集を混ぜない。右割当直後の合成clickを抑制し、次の実際の左押下で通常操作へ戻る。既存のstroke開始時の左右tool/color固定、pointerId分離、仮想ボタン＋別指pad操作を維持した。
+
+下部ナビゲーション中央に再生／停止を置き、旧ツール行の再生ボタンを削除。1コマでは無効、複数コマで再生できる。旧保存ボタンは画像・動画のファイルパネル内へ移し、PXDと再開用コピーを保存する処理を維持した。作品管理の保存も残している。ON/OFFの固定欄、左右同幅、操作欄の左右反転、選択変形とclipboardは保持した。
+
+同じHEAD `fc64ff38` の変更前を独立した一時ディレクトリで配信し、編集状態も実際に作って比較した。ドットのviewport寸法は次の通り。全7ページで編集面積が変更前以上であることを確認した。
+
+| 画面 | 幅 | 変更前高さ | 変更後高さ | 増分 |
+| --- | ---: | ---: | ---: | ---: |
+| 320×568 | 308px | 194px | 233px | +39px |
+| 390×844 | 370px | 389px | 497px | +108px |
+| 844×390 | 561.81px | 189px | 251px | +62px |
+| 1280×800 | 876px | 573px | 635px | +62px |
+
+最終検証は以下。外部広告・アカウントに接続せず、専用Chromium contextとfixtureの画像・仮想カメラのみを使用した。実際のユーザータブ・保存領域は操作していない。
+
+- 共通制作ヘッダー7ページ×4画面：28/28成功。操作到達、パネル閉鎖、保存、開閉時のworkspace rect不変、PNG・音楽・パズル・ゲーム・仮想カメラを確認。
+- 新入力44群、既存選択68群、左右割当24群、キャンセル24群、viewport70群、道具・共通アイコン346アサーション：成功。32通りのミラー／仮想カーソルON/OFFでbounding rect不変も確認。
+- PNG/GIF/PXDの遅延機能10群、旧版を残した実HTTP cache upgrade8群、移設した旧保存ボタンの再開用コピー＋PXD復元2画面：成功。
+- 通常ページも含む共通メニュー19経路×4画面：76/76成功。旧 `app.js` に残っていたheader importの更新番号も統一し、二重mountによるメニュー即閉鎖を防止。
+- creation-suite686件成功。関連Node検証を加えた766件中765成功、広告ページ台帳1件は既存の未列挙HTMLで失敗。変更前HEADでも同じ失敗を再現したため、今回の修正に含めていない。最終のeditor/header/camera関連16件も成功。
+- 構文・diffチェック成功。ローカルPagesビルド489 public files成功。最終QAの21ファイルと入力QAの7ファイルのSHA256が現在のソースと一致。アプリ例外・未処理Promise・local request/HTTP失敗は0。
+
+性能は他の検証ブラウザー終了後、同じChromium・844×390 DPR2・CPU4倍＋100ms遅延＋500KiB/sでcold／128px2コマ作品の直接URL復元を各3回測定。cold中央値2707.4→2757.6ms（+50.2ms）、復元2802.7→2840.4ms（+37.7ms）。初期resource中央値89→90、decoded body 1,048,953→1,061,394bytes。新しい共通操作の小さな負荷増加を含み、今回の高速化は主張しない。前回の音楽・パズル・画像・GIFの遅延取得と、復元完了までinertを保持する構成を維持した。
+
+証跡は `/tmp/pixieed-tool-header-20261006/{before.json,after.json,area-comparison.csv,source-sha256.json}`、`/tmp/pixieed-draw-header-input-20261006/results.json`、`/tmp/pixieed-draw-header-selection-context/results.json`、`/tmp/pixieed-header-lazy-final/results.json`、`/tmp/pixieed-header-cache-final/results.json`、`/tmp/pixieed-header-save-check.json`、`/tmp/pixieed-header-node-final.log`、`/tmp/pixieed-header-site-regression.log`、`/tmp/pixieed-header-load-{before,after}/`。確認用URLは `http://127.0.0.1:4188/draw/`。
+
+視認済みの4枚をLibraryへ保存した。通常のhelperは `Library prepare_uploads is not available` で準備前に停止。現在のLibrary skillが認める、準備ツール利用不可時のローカルファイルcreate batch経路で全4件の成功とlocal identity保存を確認した。詳細は `/tmp/pixieed-tool-header-20261006/library-images.json`。
+
+| 画面 | Library file ID |
+| --- | --- |
+| PC | `libfile_8f48432f8ee48191b40451b64995692b` |
+| 390px | `libfile_ece0bbf438a48191a0e09bb608f2b195` |
+| 320px | `libfile_657db89f112c8191ad9a719a280df6f1` |
+| 横向き | `libfile_cb9a9659f3548191b0007e3df4819df6` |
+
+Safari・iOS・Android・Windows実機、今回版の公開サーバーは未検証。元の再生不能症状は前回も今回も未再現であり、再生ボタンの配置確認をその症状の修正と混同しない。今回のcommit/push承認について委任元から時系列の確認指示があり、提示された「ではコミットプッシュお願いします」がヘッダー依頼開始後の発言か判別できないため、ステージ・commit・push・公開は行っていない。過去のfc64ff38への承認は今回には使っていない。無関係なportable-releaseの未追跡3ファイルも保持した。
+
+## 2026-10-06：3段パレットと移動可能な仮想マウス（ローカル実装）
+
+最新の「仮想マウスを押しながらカーソルを動かした時だけ位置を固定」「固定の仮想カーソル欄をなくして3段へ」という依頼を実装した。前節の共通ヘッダー、色編集、左右の道具・色割当、選択マスク、初期読込の改善は保持している。この作業によるstage / commit / push / deploy / 公開は行っていない。同時進行の地図・カメラ作業のファイルやコミットには触れていない。
+
+### 配置と操作
+
+- パレットを44pxの3段に固定。左右44px、間隔6px、中央は横スクロール。左は道具、フレーム／レイヤー、その下に既存の範囲／貼付モード切替を44pxのボタンとして配置した。ペンと消しゴムは道具パネル内に各1個。
+- 右は常に2枠。コピー／カット → 貼り付け／範囲へ → 確定／取消の状態切替を保持。Undoはヘッダーに残す。カットと貼付確定は別の履歴で、貼付取消はカットを復元しない。
+- ミラー4軸・仮想カーソルON/OFFの32組合せで、キャンバス、ビューポート、パレット、左右欄、ヘッダー、ナビのbounding rectが不変。
+- 仮想カーソルは既存のON/OFFパネルで切替。専用の移動／ドラッグボタンや固定行は設けず、左右同幅の仮想マウスを浮かせた。OFFでは隠れるが、周囲の配置は変わらない。
+- 左右ボタンの押下で現在位置の仮ストロークを開始。ボタン側の移動が12 CSS pxを超え、まだパッド描画を始めていなければ、現在の未確定ストロークだけをpointercancel経由で取り消し、ボタンパネルを移動する。Undoを呼ばず、確定済みの絵とRedo分岐を保持。
+- 別の指でビューポートを相対移動し、3 CSS px以上の意図した移動が入ったら描画の役割へ固定。それ以降のボタン側のずれでは配置移動に切り替わらない。キャンバス端でカーソル座標が動けなくても固定する。時間による固定はしない。
+- 配置移動を先に始めた場合は、後から触れたパッドに描画を引き継がない。ボタンとパッドはpointerIdで分離。指離れ、キャンセル、blur、モードOFF、画面回転で押下を解放し、古い指の動きで描画が再開しない。
+- 位置は表示領域内へ制限し、ヘッダーと下ナビを避ける。画面に対する割合を端末内へ保存し、再読込・回転後に収め直す。設定内の「仮想マウスの位置を戻す」で初期位置へ戻せる。
+- 道具、設定、色編集、フレーム／レイヤー、保存などのパネルを開いている間は仮想マウスを一時的に隠し、パネルの操作を遮らない。閉じると同じ配置へ戻る。
+
+3段にすることで固定の仮想マウス行を不要にし、左の起動操作と右の2枠を常時見える状態に保った。左右クリックは同じ大きさで、ラベル、道具アイコン、割当色を表示。押下側と描画中の固定状態を強調する。320pxや横向きでも全操作欄が画面内に収まり、浮いたボタンは使いやすい位置へ移せる。
+
+### 検証結果
+
+隔離したChromiumコンテキストを使用し、外部通信を遮断。ユーザーの実ブラウザーや保存領域は使っていない。以下はいずれも成功。
+
+| 検証 | 結果 |
+| --- | --- |
+| creation-suite（位置制限・回転時の割合復元の3テスト追加） | 694件成功 |
+| 新しい仮想マウス検証：320×568 / 390×844 / 844×390 / 1280×800 | 40項目、各サイズで32通りの寸法不変も確認 |
+| ヘッダー・色編集・左右割当・再生・保存 | 4サイズ、44項目 |
+| 選択・変形・マスク・Copy/Cut/Paste・上限エラー・PXD/PNG | 4サイズ、68項目 |
+| 左右道具・色割当と保存復元 | 4サイズ、24項目 |
+| 左右のキャンセル・指離れ順序・復帰 | 2サイズ、24項目 |
+| ミラー・グリッド・再生・大きなキャンバス・保存 | 5条件、70項目 |
+| 道具パネル・描画・共通アイコン | 4サイズ、378アサーション |
+| 旧HTTPキャッシュからの更新 | 8項目、追加CSSと入力モジュールの再取得も確認 |
+| 遅延読込・画像取込・GIF出力 | 2サイズ、10項目 |
+| 既存の保存ボタン：PXDダウンロード＋下書き復元 | 2件 |
+
+新しい40項目では、静止／素早いタップ、左右クリック、ボタン側とパッド側の微小な揺れ、配置移動開始後の追加指、描画中のボタン指のずれ、どちらを先に離すか、端での固定、キャンセル・blur・OFFからの再開、塗りつぶしと消しゴムの取り消し、位置保存・再読込・回転・リセット、パネル表示時の退避を確認した。仮想マウスボタンの実マウスcapture解除ではブラウザー生成のlostpointercaptureを左右で確認。新しい検証のpageerror、未処理Promise rejection、ローカルHTTPエラーはいずれも0。
+
+実機のiOS Safari / Android / Windows、OSのセーフエリアや拡大表示、極端に低いウィンドウでは未検証。CDPのtouch capture解除でブラウザー生成イベントが出ない条件は、従来検証の合成イベント経路と実マウス生成イベントの結果を区別する。元の「再生不能」症状は未再現のままであり、この配置修正で修正済みと扱わない。
+
+### 試用と確認画像
+
+試用先：`http://127.0.0.1:4188/draw/`。設定の仮想カーソルをONにして、ボタンを動かして配置変更、ボタンを押したまま別の指で描画面を動かして描画する。
+
+最終の確認画像と40項目のレポート：`/tmp/pixieed-floating-mouse-20261006/`。`compact-mouse-*`はON、`compact-off-*`はOFF。確認画像4枚を視認し、Libraryへの保存成功を確認した。
+
+| 画面 | Library画像 |
+| --- | --- |
+| PC 1280×800 | `libfile_f3b0c5ea95388191bb685608afe771df` / `compact-mouse-1280x800-dpr1.png` |
+| スマホ 390×844 | `libfile_0d3b0d21c9c88191844acb049c0f57bf` / `compact-mouse-390x844-dpr3.png` |
+| 小さいスマホ 320×568 | `libfile_1f3b7a45d4fc8191915a64ce64f6fb93` / `compact-mouse-320x568-dpr2.png` |
+| 横向き 844×390 | `libfile_234c350adc8c819181ab7147cbceb84e` / `compact-mouse-844x390-dpr2.png` |
+
+`library-images.json`に画像の保存結果、`final-source-and-status.json`に対象ソースのSHA-256と検証レポートの参照を残した。主な実装は `draw/index.html`、`css/draw-compact-controls.css`、`css/draw-tool-picker.css`、`js/creation/draw-{entry,page,selection-panel,virtual-cursor}.mjs`。追加のブラウザー検証は `scripts/draw-floating-mouse-browser-harness.mjs`、追加の位置テストは `tests/creation-suite/draw-floating-mouse.test.mjs`。
+
+## 2026-10-06 追補：左下Undo・右下Redoと既存の貼付切替
+
+この追補が上の「左下の範囲ボタン」「ヘッダーのUndo/Redo」の記録を更新する。左固定欄の3段目はUndo、右固定欄の3段目はRedoへ置き換え、元のボタンを移動してヘッダーとの重複をなくした。範囲選択の道具は既存の道具パネルに残る。左右44pxの固定欄、3段の色欄、描画領域の寸法は維持している。
+
+貼付専用ボタンは追加していない。右上の既存2枠でコピー／カット→貼付／範囲へ→確定／取消を切り替える。選択を解除した後もタブ内のコピー内容が残っていれば同じ枠に貼付を表示する。「範囲へ」は範囲選択の道具を選び、新しく囲むとコピー／カットへ戻る。貼付のための別枠を設けず、左右下端の履歴操作を対にして探しやすくした。
+
+未確定の範囲変形中はUndoがその変形だけを取り消し、Redoは無効。通常の描画履歴やMacのCmd+Z / Cmd+Shift+Z、WindowsのCtrl+Z / Ctrl+Y / Ctrl+Shift+Zは維持した。カット後の貼付取消はカットを戻さず、Undoでカットを戻せる。
+
+描画や仮想マウスの配置移動中はUndo/Redoを無効にし、無効な履歴ボタンへの別指の接触は描画を終了させず、長押しの繰り返しも予約しない。検証で、先行する編集の自動保存が押下中の描画を終了させる経路も確認した。プロジェクトの取得時は確定済みのアニメーションを保存し、指離れで描画を確定した後にその描画を保存するように変更した。
+
+### 今回の最終検証
+
+隔離Chromiumのローカル画面を使用し、外部通信を遮断した。320×568 / 390×844 / 844×390 / 1280×800で確認。
+
+| 検証 | 結果・記録 |
+| --- | --- |
+| Undo/Redo、未確定の変形、コピー／カット／貼付、複数指の誤接触、自動保存 | Mac/Windowsショートカットの8条件、48項目。`/tmp/pixieed-draw-undo-redo-20261006/results.json` |
+| 仮想マウスの配置・描画・左右操作・キャンセル・再ON | 4サイズ、40項目。各サイズ32通りのミラー／仮想カーソルON/OFFでbounding rect不変。`/tmp/pixieed-floating-mouse-undo-redo-20261006/report.json` |
+| ヘッダー、左右割当、色編集、再生、保存後の再読込 | 4サイズ、44項目。`/tmp/pixieed-draw-header-input-20261006/results.json` |
+| 左右のキャンセルと復帰 | 2サイズ、24項目。`/tmp/pixieed-draw-button-cancel-undo-redo-20261006/results.json` |
+| 選択・変形・マスク・コピー／カット／貼付・容量上限 | 4サイズ、68項目。`/tmp/pixieed-draw-selection-undo-redo-20261006/results.json` |
+| 実HTTPキャッシュ更新 | 8項目。`/tmp/pixieed-draw-cache-undo-redo-20261006/results.json` |
+| creation-suite | 694件成功。`/tmp/pixieed-undo-redo-unit-final.log` |
+
+自動保存の検証では、押下を1秒以上保持しても解除されないこと、押下中の保存内容に未確定画素が入らないこと、指離れ後の保存内容が確定画素と一致することまで確認した。WindowsのショートカットはChromium内のプラットフォーム設定で検証したもので、Windows実機ではない。iOS Safari / Android実機も未検証。元の再生不能症状は未再現のままで、修正済みとは扱わない。コミット・push・deploy・公開は行っていない。
+
+### 最新の確認画像
+
+試用先：`http://127.0.0.1:4188/draw/`。画像は `/tmp/pixieed-floating-mouse-undo-redo-20261006/compact-mouse-*.png`（ON）と `compact-off-*.png`（OFF）。ONの4枚を視認し、既存Library画像を同じIDのバージョン1へ更新した。
+
+| 画面 | 最新Library ID（全てversion 1） |
+| --- | --- |
+| PC 1280×800 | `libfile_f3b0c5ea95388191bb685608afe771df` |
+| スマホ 390×844 | `libfile_0d3b0d21c9c88191844acb049c0f57bf` |
+| 小さいスマホ 320×568 | `libfile_1f3b7a45d4fc8191915a64ce64f6fb93` |
+| 横向き 844×390 | `libfile_234c350adc8c819181ab7147cbceb84e` |
+
+画像の保存結果は `/tmp/pixieed-floating-mouse-undo-redo-20261006/library-images.json`、今回の対象ソースと検証の参照は同ディレクトリの `final-source-and-status.json`。今回の操作検証を `scripts/draw-undo-redo-browser-harness.mjs` に追加した。

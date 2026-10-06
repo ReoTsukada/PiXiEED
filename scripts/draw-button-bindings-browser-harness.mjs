@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { saveCurrentProject } from './lib/project-panel-browser.mjs';
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4188';
 assert.ok(['127.0.0.1','localhost'].includes(new URL(base).hostname));
 const output = '/tmp/pixieed-draw-buttons-20261006';
@@ -23,7 +24,6 @@ try {
     const assign=async(side,tool,color)=>{
       const priorLeftTool=side==='right'?(await bindings()).bindings.left.tool:null;
       const toolTarget=async name=>{
-        if(name==='pen'||name==='eraser') return page.locator('[data-draw-tool="pen"]');
         if(!(await page.locator('#draw-tool-picker').evaluate(n=>n.open))) await page.locator('#draw-tool-summary').click();
         return page.locator(`[data-draw-tool="${name}"]`);
       };
@@ -52,7 +52,8 @@ try {
       await page.evaluate(()=>document.addEventListener('pointerdown',e=>{if(e.target.closest('.draw-board'))window.__testPointer=e.pointerId;},{capture:true}));
       await assign('right','pen',4);await assign('left','line',2);
       assert.equal((await bindings()).bindings.left.tool,'line');assert.equal((await bindings()).bindings.right.tool,'pen');
-      const l=await page.locator('[data-virtual-left]').boundingBox(),r=await page.locator('[data-virtual-right]').boundingBox();assert.ok(Math.abs(l.width-r.width)<=1/32,'equal grid tracks allow browser subpixel rounding');
+      await virtual(true);
+      const l=await page.locator('[data-virtual-left]').boundingBox(),r=await page.locator('[data-virtual-right]').boundingBox();assert.ok(Math.abs(l.width-r.width)<=1/32,'equal grid tracks allow browser subpixel rounding'); await virtual(false);
       assert.equal(await page.locator('[data-button-tool-icon="left"] svg').count(),1);
       assert.equal(await page.locator('[data-button-swatch="right"]').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(76, 130, 195)');
       const path=[[2,3],[2,8],[10,8]];
@@ -142,7 +143,7 @@ try {
       }
       await placement('left');await page.reload({waitUntil:'domcontentloaded'});await ready();
       const restored=await bindings();assert.equal(restored.controlsSide,'left');assert.equal(restored.bindings.left.tool,'line');assert.equal(restored.bindings.right.tool,'pen');assert.equal(restored.bindings.left.color,2);assert.equal(restored.bindings.right.color,4);
-      await page.locator('#draw-save').click();await page.waitForFunction(()=>document.querySelector('#project-open').dataset.state==='saved');const savedUrl=page.url();
+      await saveCurrentProject(page);await page.keyboard.press('Escape');await page.waitForFunction(()=>document.querySelector('#project-open').dataset.state==='saved');const savedUrl=page.url();
       // Make device preferences disagree with the saved project, proving PXD restores its own assignments.
       await page.evaluate(()=>{const key='pixieed:draw:input-settings:v1',state=JSON.parse(localStorage.getItem(key));state.bindings.left={tool:'eraser',color:0,colorHex:'#263238'};state.bindings.right={tool:'line',color:2,colorHex:'#e75445'};state.editedSide='right';state.controlsSide='right';localStorage.setItem(key,JSON.stringify(state));});
       await page.goto(savedUrl,{waitUntil:'domcontentloaded'});await ready();assert.equal((await bindings()).bindings.left.tool,'line');assert.equal((await bindings()).bindings.right.tool,'pen');assert.equal((await bindings()).bindings.right.color,4);assert.equal((await bindings()).controlsSide,'left');assert.equal((await bindings()).editedSide,'left');

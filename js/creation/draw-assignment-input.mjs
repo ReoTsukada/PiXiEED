@@ -13,7 +13,8 @@ export function mountDrawAssignmentInput({ root, onAssign }) {
     return node && root.contains(node) ? node : null;
   }
   function describe(node) {
-    node.setAttribute('aria-description', '左クリックで左ボタンに割り当てます。Shift+Enter、Shift+Space、長押し、右クリックで右ボタンに割り当てます。');
+    const repeat = node.matches('.draw-color[data-color-index]') && Number(node.dataset.colorIndex) >= 0 ? '選択中の色をもう一度押すと編集できます。' : '';
+    node.setAttribute('aria-description', `左クリックで左ボタンに割り当てます。${repeat}Shift+Enter、Shift+Space、長押し、右クリックで右ボタンに割り当てます。`);
     node.setAttribute('aria-keyshortcuts', 'Shift+Enter Shift+Space');
   }
   function clearTimer(record) {
@@ -130,6 +131,7 @@ export function mountDrawAssignmentInput({ root, onAssign }) {
     if (consumeWeak(contextSuppressions, target)) return;
     const record = active.get(event.pointerId) || [...active.values()].find(item => item.target === target);
     if (record?.target === target) { clearTimer(record); record.held = true; }
+    suppressClick(event.pointerId, target);
     assign('right', target, event);
   }
   function onKeyDown(event) {

@@ -25,6 +25,8 @@ body[data-page="draw"] .draw-grid.is-fine { background: none; }
 body[data-page="draw"] .animation-controls__workspace-panel .is-playing { box-shadow: inset 0 0 0 2px #8ecdf0; background-color: #8ecdf025; }
 #draw-animation-play .draw-stop-icon, #draw-animation-play[aria-pressed="true"] .draw-play-icon { display: none; }
 #draw-animation-play[aria-pressed="true"] .draw-stop-icon { display: block; }
+body[data-page="draw"] .app-tabs #draw-animation-play svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+body[data-page="draw"] .app-tabs #draw-animation-play[aria-pressed="true"] { background: #26333d; }
 body[data-page="draw"] .draw-toggles button:disabled { opacity: .35; cursor: default; }
 .draw-virtual-controls { flex: 0 0 48px; box-sizing: border-box; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; min-width: 0; padding: 3px; border: 1px solid #8ecdf035; border-radius: 15px; background: #15202b; }
 body.creation-editor[data-page="draw"] .draw-controls > :is(.draw-control-row, .draw-virtual-controls, .draw-toolbar, .draw-actions) { flex-shrink: 0; }

@@ -36,7 +36,7 @@ try {
   const pivot = () => p.locator('[data-selection-control="pivot"]').evaluate(n => ({ x: Number(n.dataset.canvasX), y: Number(n.dataset.canvasY) }));
   const pending = () => p.locator('#draw-selection-controls').getAttribute('data-pending');
   const slots = () => p.locator('#draw-selection-controls [data-selection-action]').evaluateAll(ns => ns.map(n => n.dataset.selectionAction));
-  const rects = () => p.locator('.draw-board,#draw-canvas,.draw-controls,#draw-virtual-controls,#draw-selection-controls').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
+  const rects = () => p.locator('.draw-board,#draw-canvas,.draw-controls,.draw-fixed-left,#draw-selection-controls').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));
   const drag = async (a, b, button = 'left', modifier = null) => { if (modifier) await p.keyboard.down(modifier); await p.mouse.move(a.x, a.y); await p.mouse.down({ button }); await p.mouse.move(b.x, b.y, { steps: 5 }); await p.mouse.up({ button }); if (modifier) await p.keyboard.up(modifier); await p.waitForTimeout(40); };
   const key = async value => { await p.locator('#draw-canvas').focus(); await p.keyboard.press(value); await p.waitForTimeout(40); };
   const action = async name => { await p.locator(`#draw-selection-controls [data-selection-action="${name}"]`).click(); await p.waitForTimeout(40); };
@@ -59,9 +59,11 @@ try {
    await group('fixed two-slot context phases and independent mouse inputs fit each viewport', async () => {
     await load(); const before = await rects(); assert.equal(await p.locator('#draw-selection-open,#draw-selection-panel').count(), 0); assert.deepEqual(await slots(), ['copy', 'cut']);
     await select(); await action('copy'); assert.deepEqual(await slots(), ['paste', 'back']); await action('paste'); assert.deepEqual(await slots(), ['confirm', 'cancel']); await action('cancel'); await action('back'); assert.deepEqual(await slots(), ['copy', 'cut']);
-    await p.locator('#draw-selection-mode').selectOption('paste'); assert.deepEqual(await slots(), ['paste', 'back']); await p.locator('#draw-selection-mode').selectOption('select');
+    await key('Escape'); assert.deepEqual(await slots(), ['paste', 'back']); await action('back'); await select(); assert.deepEqual(await slots(), ['copy', 'cut']);
     for (const id of ['mirror.horizontal', 'mirror.vertical', 'toggle.grid', 'toggle.virtualCursor']) { await command(id); assert.deepEqual(await rects(), before); await command(id); }
+    await command('toggle.virtualCursor');
     for (const selector of ['#draw-virtual-controls', '#draw-selection-controls', '.draw-board']) { const b = await p.locator(selector).boundingBox(); assert.ok(b.x >= -1 && b.x + b.width <= variant.width + 1, selector + ' horizontal fit'); assert.ok(b.y >= 0 && b.y + b.height <= variant.height + 1, selector + ' vertical fit'); }
+    await command('toggle.virtualCursor');
     for (const slot of await p.locator('#draw-selection-controls [data-selection-action]').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return { width: r.width, height: r.height }; }))) assert.ok(slot.width >= 44 && slot.height >= 44, 'context action target at least 44x44 CSS pixels');
     assert.deepEqual(await rects(), before); await p.screenshot({ path: `${output}/${label}-context-actions.png` });
    });
@@ -142,7 +144,7 @@ try {
     const a = await control('se'); await virtualDrag('left', a, { x: a.x + 15, y: a.y + 12 }, true); assert.deepEqual(await rgba(), initial); near((await frame()).angle, 0, .01); assert.equal(await pending(), 'false'); await command('toggle.virtualCursor');
    });
    await group('failed outside commit preserves preview and blocks replacement range at palette capacity', async () => {
-    await load(); await select([3.5, 4.5], [3.5, 4.5]); await action('copy'); await load('limit', 32); const before = await rgba(); await p.locator('#draw-selection-mode').selectOption('paste'); await action('paste'); const preview = await rgba(), beforeFrame = await frame(); assert.notDeepEqual(preview, before); const out = await at(14, 13); await p.mouse.click(out.x, out.y); assert.equal(await pending(), 'true'); assert.deepEqual(await rgba(), preview); assert.match(await p.locator('[data-selection-status]').textContent(), /パレット|使用色|32/);
+    await load(); await select([3.5, 4.5], [3.5, 4.5]); await action('copy'); await load('limit', 32); const before = await rgba(); await action('paste'); const preview = await rgba(), beforeFrame = await frame(); assert.notDeepEqual(preview, before); const out = await at(14, 13); await p.mouse.click(out.x, out.y); assert.equal(await pending(), 'true'); assert.deepEqual(await rgba(), preview); assert.match(await p.locator('[data-selection-status]').textContent(), /パレット|使用色|32/);
     await drag(await at(11, 10), await at(14, 13)); assert.equal(await pending(), 'true'); assert.deepEqual(await frame(), beforeFrame); assert.deepEqual(await rgba(), preview); const saved = await save(); assert.equal(saved.palette.length, 32); assert.ok(saved.pixels.every(v => v === -1)); await action('cancel'); assert.deepEqual(await rgba(), before);
    });
    assert.deepEqual(errors, []); results.push({ variant, checks, errors });
