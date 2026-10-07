@@ -390,9 +390,10 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     const okOrigin = state.postKind === 'pixel_camera' || c.artMade.checked;
     const okPuzzleRights = !state.puzzle || puzzleRights.checked;
     const okTitle = title.length > 0;
-    const okPlace = Boolean(state.pin);
+    const locationReady = renderer.isMapLocationReady?.() !== false;
+    const okPlace = Boolean(state.pin) && locationReady;
     c.steps.forEach((step) => step.classList.toggle('is-done', { art: okArt, title: okTitle, place: okPlace }[step.dataset.step]));
-    const missing = [!okArt && '絵', !okOrigin && '制作確認', !okPuzzleRights && '権利確認', !okTitle && '題名', !okPlace && '場所'].filter(Boolean);
+    const missing = [!okArt && '絵', !okOrigin && '制作確認', !okPuzzleRights && '権利確認', !okTitle && '題名', !okPlace && (state.pin && !locationReady ? '場所を確認中' : '場所')].filter(Boolean);
     c.submit.disabled = missing.length > 0 || state.submitting;
     c.missing.textContent = state.submitting ? '置いています…' : (missing.length ? `あと：${missing.join(' ・ ')}` : '準備できました');
     c.titleCount.textContent = `${c.title.value.length}/${TITLE_MAX}`;
@@ -605,7 +606,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
 
   c.form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    if (c.submit.disabled || state.submitting) return;
+    if (c.submit.disabled || state.submitting || renderer.isMapLocationReady?.() === false) return;
     const user = currentUser();
     if (!user) { needLogin(() => c.form.requestSubmit()); return; }
     invalidateLocationRequest();
@@ -1039,6 +1040,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
 
   return {
     refresh,
+    refreshLocations() { rebuildPosts(); lastRefreshKey = ''; refresh(); syncComposer(); if (!gallery.hidden) renderGallery(); },
     getCellSummary,
     getPosts: () => postList,
     setMapVisible(visible) { mapVisible = Boolean(visible); pinLayer.hidden = !mapVisible; lastRefreshKey = ''; if (mapVisible) refresh(); },

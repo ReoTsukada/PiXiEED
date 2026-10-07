@@ -2,6 +2,7 @@
 import { DEFAULT_GRID, getCell, lookupCell, normalizeLongitude, mercatorY, inverseMercatorY, MERCATOR_MAX_LATITUDE } from './geometry.mjs';
 import { JAPAN_COUNTRY_ID, getRegionForPrefecture } from './hierarchy.mjs';
 import { createMembershipIndex, findExplicitMembership } from './topology.mjs?v=20261006-map-startup-1';
+import { validateMapMaskAsset, hydrateMapMaskAsset, hydrateMapMaskAssetAsync, yieldMapGeometry } from './map-asset-format.mjs?v=20261007-map-lazy-1';
 
 export const MAP_CELL_VERSION = 'map-cells-v1';
 export const FINE_MAP_RESOLUTION = 2048;
@@ -13,7 +14,12 @@ function bytes(value) {
   if (value instanceof Uint8Array) return value;
   if (value instanceof Uint16Array) return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   assert(typeof value === 'string', 'Encoded source bytes are required.');
-  if (typeof atob === 'function') return Uint8Array.from(atob(value), char => char.charCodeAt(0));
+  if (typeof atob === 'function') {
+    const decoded = atob(value);
+    const output = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) output[i] = decoded.charCodeAt(i);
+    return output;
+  }
   return new Uint8Array(Buffer.from(value, 'base64'));
 }
 function checksum(resolution, rows) {
@@ -145,21 +151,24 @@ export function lookupMapCell(longitude, latitude, index) {
 
 
 
-function decodePrefectureData(data, source, resolution) {
-  assert(data?.version === 'map-prefectures-v1' && data.projection === 'mercator' && data.geometryVersion === DEFAULT_GRID.version, 'Unsupported prefecture mask.');
+function decodePrefectureData(data, source, resolution, { existingMask = null, validated = false } = {}) {
+  const pending = data?.version === 'map-prefectures-mask-v2';
+  if (pending) validateMapMaskAsset(data, 'prefectures');
+  const features = pending ? [] : data?.features;
+  assert((pending || data?.version === 'map-prefectures-v1') && data.projection === 'mercator' && data.geometryVersion === DEFAULT_GRID.version, 'Unsupported prefecture mask.');
   assert(data.resolution === resolution && Array.isArray(data.prefectureIds) && data.prefectureIds.length === source.prefectureIds.length && data.prefectureIds.every((id, i) => id === source.prefectureIds[i]), 'Prefecture mask resolution or IDs do not match.');
-  assert(Array.isArray(data.prefectureLabels) && data.prefectureLabels.length === data.prefectureIds.length && Array.isArray(data.rowRuns) && Array.isArray(data.features) && Array.isArray(data.unselectableFeatures) && data.bounds?.length === 4 && data.bounds.every(Number.isFinite) && data.bounds[0] < data.bounds[2] && data.bounds[1] < data.bounds[3], 'Invalid prefecture mask payload.')
-  assert(checksum(resolution, [data.prefectureIds, data.prefectureLabels, data.rowRuns, data.features, data.bounds, data.unselectableFeatures]) === data.checksum, 'Prefecture mask checksum does not match.');
-  const mask = new Uint8Array(resolution * resolution); let previous = -1, previousRow = -1, previousOwner = -1;
-  for (const run of data.rowRuns) {
+  assert(Array.isArray(data.prefectureLabels) && data.prefectureLabels.length === data.prefectureIds.length && Array.isArray(data.rowRuns) && Array.isArray(features) && Array.isArray(data.unselectableFeatures) && data.bounds?.length === 4 && data.bounds.every(Number.isFinite) && data.bounds[0] < data.bounds[2] && data.bounds[1] < data.bounds[3], 'Invalid prefecture mask payload.')
+  if (!pending && !validated) assert(checksum(resolution, [data.prefectureIds, data.prefectureLabels, data.rowRuns, features, data.bounds, data.unselectableFeatures]) === data.checksum, 'Prefecture mask checksum does not match.');
+  const mask = existingMask || new Uint8Array(resolution * resolution); let previous = -1, previousRow = -1, previousOwner = -1;
+  for (const run of existingMask ? [] : data.rowRuns) {
     assert(Array.isArray(run) && run.length === 4 && run.every(Number.isInteger), 'Invalid prefecture mask run.');
     const [row, start, length, owner] = run, key = row * resolution + start;
     assert(row >= 0 && row < resolution && start >= 0 && length > 0 && start + length <= resolution && owner > 0 && owner < data.prefectureIds.length && key > previous && !(row === previousRow && key === previous + 1 && owner === previousOwner), 'Invalid or overlapping prefecture mask run.');
     mask.fill(owner, key, key + length); previous = key + length - 1; previousRow = row; previousOwner = owner;
   }
-  const membershipIndex = createMembershipIndex({ type: 'FeatureCollection', features: data.features }, { idProperty: 'code' });
+  const membershipIndex = pending ? { features: [] } : createMembershipIndex({ type: 'FeatureCollection', features }, { idProperty: 'code' });
   const ids = new Set(membershipIndex.features.map((feature) => feature.id));
-  assert(membershipIndex.features.length === 47 && ids.size === 47 && data.prefectureIds.slice(1).every((id) => ids.has(id)), 'Prefecture membership geometry must cover all 47 prefectures exactly once.');
+  if (!pending) assert(membershipIndex.features.length === 47 && ids.size === 47 && data.prefectureIds.slice(1).every((id) => ids.has(id)), 'Prefecture membership geometry must cover all 47 prefectures exactly once.');
   const featureBounds = membershipIndex.features.map((feature) => {
     const coordinates = [];
     const visit = (value) => { if (Array.isArray(value) && typeof value[0] === 'number') coordinates.push(value); else if (Array.isArray(value)) for (const child of value) visit(child); };
@@ -183,23 +192,26 @@ function decodePrefectureData(data, source, resolution) {
     }
     unselectableBounds = Object.freeze([west, south, east, north]);
   }
-  return Object.freeze({ mask, membershipIndex, featureBins, bounds: Object.freeze([...data.bounds]), unselectableMembershipIndex, unselectableBounds });
+  return Object.freeze({ mask, membershipIndex, featureBins, bounds: Object.freeze([...data.bounds]), unselectableMembershipIndex, unselectableBounds, sourceAsset: pending ? data : null, precisionReady: !pending });
 }
 
-function decodeAdmin1Data(data, source, resolution) {
-  assert(data?.version === 'map-admin1-v1' && data.projection === 'mercator' && data.geometryVersion === DEFAULT_GRID.version, 'Unsupported admin1 mask.');
+function decodeAdmin1Data(data, source, resolution, { existingMask = null, validated = false } = {}) {
+  const pending = data?.version === 'map-admin1-mask-v2';
+  if (pending) validateMapMaskAsset(data, 'admin1');
+  const sourceFeatures = pending ? [] : data?.features;
+  assert((pending || data?.version === 'map-admin1-v1') && data.projection === 'mercator' && data.geometryVersion === DEFAULT_GRID.version, 'Unsupported admin1 mask.');
   assert(data.resolution === resolution && Array.isArray(data.countryIds)
     && data.countryIds.length === source.countryIds.length
     && data.countryIds.every((id, i) => id === source.countryIds[i]), 'Admin1 mask resolution or country IDs do not match.');
   assert(Array.isArray(data.mapRegions) && data.mapRegions[0] === null
     && data.regionCount === data.mapRegions.length - 1
     && data.mapRegions.length <= 65536
-    && Array.isArray(data.rowRuns) && Array.isArray(data.features)
+    && Array.isArray(data.rowRuns) && Array.isArray(sourceFeatures)
     && Array.isArray(data.countryCounts), 'Invalid admin1 mask payload.');
   assert(data.landAuthority === undefined || data.landAuthority === 'admin1-geometries', 'Unsupported admin1 land authority.');
   const checksumRows = [data.mapRegions, data.rowRuns, data.features, data.countryCounts];
   if (data.landAuthority !== undefined) checksumRows.push(data.landAuthority);
-  assert(checksum(resolution, checksumRows) === data.checksum, 'Admin1 mask checksum does not match.');
+  if (!pending && !validated) assert(checksum(resolution, checksumRows) === data.checksum, 'Admin1 mask checksum does not match.');
   assert(data.mapRegions.slice(1, 48).every((region, i) => region?.id === `prefecture:${source.prefectureIds[i + 1]}`
     && region.countryId === JAPAN_COUNTRY_ID && region.kind === 'prefecture'), 'Admin1 region table must retain all Japanese prefectures at indices 1-47.');
   const regionIds = new Set();
@@ -210,9 +222,9 @@ function decodeAdmin1Data(data, source, resolution) {
     assert(!regionIds.has(region.id), 'Duplicate admin1 region ID.');
     regionIds.add(region.id);
   }
-  const mask = new Uint16Array(resolution * resolution);
+  const mask = existingMask || new Uint16Array(resolution * resolution);
   let previous = -1, previousRow = -1, previousOwner = -1;
-  for (const run of data.rowRuns) {
+  for (const run of existingMask ? [] : data.rowRuns) {
     assert(Array.isArray(run) && run.length === 4 && run.every(Number.isInteger), 'Invalid admin1 mask run.');
     const [row, start, length, owner] = run;
     const key = row * resolution + start;
@@ -225,7 +237,7 @@ function decodeAdmin1Data(data, source, resolution) {
     previousOwner = owner;
   }
   const featureIds = new Set();
-  const features = data.features.map((feature) => {
+  const features = sourceFeatures.map((feature) => {
     const regionIndex = feature?.properties?.regionIndex;
     const region = data.mapRegions[regionIndex];
     assert(feature?.type === 'Feature' && region && feature.properties.id === region.id
@@ -248,11 +260,33 @@ function decodeAdmin1Data(data, source, resolution) {
       }
     }
   }
-  return Object.freeze({ mask, mapRegions: data.mapRegions, features, featureById, featureBins, countryCounts: data.countryCounts, landAuthority: data.landAuthority });
+  return Object.freeze({ mask, mapRegions: data.mapRegions, features, featureById, featureBins, countryCounts: data.countryCounts, landAuthority: data.landAuthority, sourceAsset: pending ? data : null, precisionReady: !pending });
+}
+
+/** Atomically attach checked geometry without rebuilding any display pixels. */
+export function attachMapGeometry(index, { prefectures, admin1 } = {}) {
+  const oldPrefectures = index.prefectureData, oldAdmin1 = index.admin1Data;
+  const prefectureData = oldPrefectures?.sourceAsset
+    ? decodePrefectureData(hydrateMapMaskAsset(oldPrefectures.sourceAsset, prefectures), index, index.resolution, { existingMask: oldPrefectures.mask, validated: true }) : oldPrefectures;
+  const admin1Data = oldAdmin1?.sourceAsset
+    ? decodeAdmin1Data(hydrateMapMaskAsset(oldAdmin1.sourceAsset, admin1), index, index.resolution, { existingMask: oldAdmin1.mask, validated: true }) : oldAdmin1;
+  return Object.freeze({ ...index, prefectureData, admin1Data, precisionReady: true });
+}
+
+export async function attachMapGeometryAsync(index, { prefectures, admin1 } = {}, { signal } = {}) {
+  const yieldControl = async () => { if (signal?.aborted) throw new Error('Map geometry load cancelled.'); await yieldMapGeometry(); if (signal?.aborted) throw new Error('Map geometry load cancelled.'); };
+  const oldPrefectures = index.prefectureData, oldAdmin1 = index.admin1Data;
+  const prefectureData = oldPrefectures?.sourceAsset
+    ? decodePrefectureData(await hydrateMapMaskAssetAsync(oldPrefectures.sourceAsset, prefectures, { yieldControl }), index, index.resolution, { existingMask: oldPrefectures.mask, validated: true }) : oldPrefectures;
+  await yieldControl();
+  const admin1Data = oldAdmin1?.sourceAsset
+    ? decodeAdmin1Data(await hydrateMapMaskAssetAsync(oldAdmin1.sourceAsset, admin1, { yieldControl }), index, index.resolution, { existingMask: oldAdmin1.mask, validated: true }) : oldAdmin1;
+  return Object.freeze({ ...index, prefectureData, admin1Data, precisionReady: true });
 }
 
 /** Exact-to-simplified-GeoJSON location ownership; sea remains null and foreign land uses the normal map lookup. */
 export function resolveMapLocation(longitude, latitude, index) {
+  if (index?.precisionReady === false) return null;
   if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || Math.abs(latitude) > MERCATOR_MAX_LATITUDE) return null;
   longitude = normalizeLongitude(longitude);
   const excluded = index?.prefectureData?.unselectableMembershipIndex;
@@ -397,7 +431,7 @@ export function createFineMapCellIndex(source, { resolution = FINE_MAP_RESOLUTIO
   for (let country = 1; country < source.countryIds.length; country++) countryTiles.set(source.countryIds[country], Uint32Array.from(countryTileLists[country]));
   const mapRegionTiles = new Map();
   for (let region = 1; region < mapRegions.length; region++) mapRegionTiles.set(mapRegions[region].id, Uint32Array.from(regionTileLists[region]));
-  const index = { version: 'map-grid-fine-v1', geometryVersion: DEFAULT_GRID.version, projection: 'mercator', resolution, worldCellCount: resolution ** 2, cellCount, sourceCellCount: total, sourceLandCellCount: countryIndices.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0), countryIds: source.countryIds, countryLabels: source.countryLabels, prefectureIds: source.prefectureIds, prefectureLabels: source.prefectureLabels, landMask, countryIndices, prefectureIndices, prefectureMask, prefectureTiles, countryTiles, mapRegionMask, unselectableMask, mapRegions, mapRegionTiles, bandOffsets, prefectureData: patch, admin1Data: admin1Patch, recordCache: new Map() };
+  const index = { version: 'map-grid-fine-v1', geometryVersion: DEFAULT_GRID.version, projection: 'mercator', resolution, worldCellCount: resolution ** 2, cellCount, sourceCellCount: total, sourceLandCellCount: countryIndices.reduce((sum, value) => sum + (value > 0 ? 1 : 0), 0), countryIds: source.countryIds, countryLabels: source.countryLabels, prefectureIds: source.prefectureIds, prefectureLabels: source.prefectureLabels, landMask, countryIndices, prefectureIndices, prefectureMask, prefectureTiles, countryTiles, mapRegionMask, unselectableMask, mapRegions, mapRegionTiles, bandOffsets, prefectureData: patch, admin1Data: admin1Patch, precisionReady: patch?.precisionReady !== false && admin1Patch?.precisionReady !== false, recordCache: new Map() };
   // Diagnostic representatives only: the complete map remains a compact bitmap.
   index.cells = Object.freeze(representativeKeys.map(owner => fineTileRecord(representativeSlots[owner], index)));
   return Object.freeze(index);

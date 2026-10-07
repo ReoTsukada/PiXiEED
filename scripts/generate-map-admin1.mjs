@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DEFAULT_GRID, inverseMercatorY, mercatorY } from '../js/globe/geometry.mjs';
 import { createFineMapCellIndex } from '../js/globe/map-cells.mjs';
+import { splitMapAdmin1Asset } from '../js/globe/map-asset-format.mjs';
 
 const root = new URL('../', import.meta.url);
 const source = JSON.parse(readFileSync(new URL('assets/maps/globe-land-mask-v1.json', root), 'utf8'));
@@ -399,4 +400,8 @@ const serialized = `${JSON.stringify(data)}\n`;
 const bytes = Buffer.byteLength(serialized);
 if (bytes > 8 * 1024 * 1024) throw new Error(`Generated asset exceeds 8 MiB (${bytes} bytes); increase simplification before writing.`);
 writeFileSync(new URL('assets/maps/map-admin1-v1.json', root), serialized);
-console.log(JSON.stringify({ resolution, sourceFeatureCount: geo.features.length, featureCount: features.length, regionCount: data.regionCount, rowRuns: rowRuns.length, landTiles, addedLandTiles, removedLandTiles, changedCountryTiles, countryCount: countriesSeen.size, coveredLandTiles: data.landTiles - data.diagnostics.uncoveredLandTileCount, reservedSmallRegions, remainingZeroTileAdmin1Count, countriesWithoutAdmin1: fallbackRegions.length, duplicateIsoFallbackCount, uncoveredLandTileCount: data.diagnostics.uncoveredLandTileCount, bytes, checksum: data.checksum, sourceSha256 }, null, 2));
+const split = splitMapAdmin1Asset(data);
+const maskSerialized = `${JSON.stringify(split.mask)}\n`, geometrySerialized = `${JSON.stringify(split.geometry)}\n`;
+writeFileSync(new URL('assets/maps/map-admin1-mask-v2.json', root), maskSerialized);
+writeFileSync(new URL('assets/maps/map-admin1-geometry-v2.json', root), geometrySerialized);
+console.log(JSON.stringify({ resolution, sourceFeatureCount: geo.features.length, featureCount: features.length, regionCount: data.regionCount, rowRuns: rowRuns.length, landTiles, addedLandTiles, removedLandTiles, changedCountryTiles, countryCount: countriesSeen.size, coveredLandTiles: data.landTiles - data.diagnostics.uncoveredLandTileCount, reservedSmallRegions, remainingZeroTileAdmin1Count, countriesWithoutAdmin1: fallbackRegions.length, duplicateIsoFallbackCount, uncoveredLandTileCount: data.diagnostics.uncoveredLandTileCount, bytes, checksum: data.checksum, maskBytes: Buffer.byteLength(maskSerialized), geometryBytes: Buffer.byteLength(geometrySerialized), sourceSha256 }, null, 2));

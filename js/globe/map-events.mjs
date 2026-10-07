@@ -3,8 +3,9 @@ import { events as fallbackEvents } from '../../data/site-data.js?rev=20260924-n
 import { JAPAN_PREFECTURES } from './hierarchy.mjs?v=20260920-g4-precision-1';
 import { lookupCell } from './geometry.mjs?v=20261005-map-layers-1';
 
-import { readEventCatalog, mergeEventCatalog, safeEventSource } from './event-catalog.mjs?v=20261005-event-research-1';
-import { classifyEvent, DEFAULT_EVENT_PERIOD_FILTER, EVENT_PERIOD_OPTIONS, eventPeriodCounts, matchesEventPeriod, nextTokyoMidnightDelay, sortEventsByDisplayPriority, tokyoDate, uniqueEventEditions } from './event-density.mjs';
+import { readEventCatalog, mergeEventCatalog } from './event-catalog.mjs?v=20261005-event-research-1';
+import { classifyEvent, DEFAULT_EVENT_PERIOD_FILTER, eventPeriodCounts, matchesEventPeriod, nextTokyoMidnightDelay, sortEventsByDisplayPriority, tokyoDate, uniqueEventEditions } from './event-density.mjs';
+import { presentMapEvent } from './map-event-presentation.mjs?v=20261007-event-discovery-1';
 
 const CATALOG_URL = new URL('../../data/pixel-art-events.json', import.meta.url);
 const CATALOG_REFRESH_MS = 15 * 60 * 1000;
@@ -51,7 +52,7 @@ function eventRegionName(event) {
 }
 
 /** Normalize public event records without interpreting legacy SVG percentages as coordinates. */
-export function normalizeMapEvents(records, representatives = [], resolveLocation = null, resolveCountry = null) {
+export function normalizeMapEvents(records, representatives = [], resolveLocation = null, resolveCountry = null, { locationReady = true } = {}) {
   const representativeByPrefecture = new Map();
   for (const representative of representatives || []) {
     const code = String(representative?.prefectureId || '').padStart(2, '0');
@@ -106,6 +107,7 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
       ...record,
       id: String(record.id || record.eventId || record.name),
       name: String(record.name || record.title).trim(),
+      locationPending: Boolean(precise && !locationReady),
       prefectureId,
       prefectureLabel,
       mapRegionId,
@@ -121,18 +123,6 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
       representativeCell: placement === 'prefecture' && !precise ? representative : null
     })];
   });
-}
-
-function eventStatus(event, today = tokyoDate()) {
-  if (event.status === 'cancelled') return '中止';
-  if (event.status === 'postponed') return '延期・日程調整中';
-  if (event.watch || event.status === 'watch') return '次回開催情報待ち';
-  const period = classifyEvent(event, today);
-  return period === 'upcoming' ? '開催予定' : period === 'active' ? '開催中' : period === 'past' ? '終了' : '';
-}
-
-function safeUrl(value) {
-  try { const url = new URL(String(value || '').trim()); return ['http:', 'https:'].includes(url.protocol) ? url.href : ''; } catch { return ''; }
 }
 
 function readCache(storage, key) {
@@ -164,36 +154,87 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   let active = false;
   let scope = null;
   let returnFocus = null;
+  let view = 'overview', detailEventId = null, detailReturnView = 'overview', detailReturnScroll = 0;
+  let catalogStatus = 'loading', listLimit = 20;
 
   const dock = doc.createElement('div');
   dock.className = 'map-events-dock'; dock.hidden = true;
   const allButton = doc.createElement('button'); allButton.type = 'button'; allButton.className = 'map-events-dock__all'; allButton.textContent = 'イベント一覧';
-  const dockFilters = createPeriodControls('map-events-dock__filters');
+  const dockPeriodToggle = createPeriodToggle('map-events-dock__period-toggle');
   const dockLegend = createLegend('map-events-dock__legend');
-  const dockTop = doc.createElement('div'); dockTop.className = 'map-events-dock__top'; dockTop.append(dockFilters, allButton);
+  const dockTop = doc.createElement('div'); dockTop.className = 'map-events-dock__top'; dockTop.append(dockPeriodToggle, allButton);
   dock.append(dockTop, dockLegend);
   const panel = doc.createElement('section');
   panel.className = 'map-events-panel'; panel.hidden = true; panel.setAttribute('aria-label', 'イベント一覧');
   const head = doc.createElement('header'); head.className = 'map-events-panel__head';
-  const heading = doc.createElement('h2'); heading.textContent = 'イベント一覧';
+  const heading = doc.createElement('h2'); heading.className = 'map-events-panel__heading'; heading.textContent = 'イベント一覧';
+  const headControls = doc.createElement('div'); headControls.className = 'map-events-panel__head-controls';
+  const expandButton = doc.createElement('button'); expandButton.type = 'button'; expandButton.className = 'map-events-panel__expand'; expandButton.textContent = '一覧を広げる';
+  const backButton = doc.createElement('button'); backButton.type = 'button'; backButton.className = 'map-events-panel__back'; backButton.textContent = '戻る'; backButton.hidden = true;
   const closeButton = doc.createElement('button'); closeButton.type = 'button'; closeButton.className = 'map-events-panel__close'; closeButton.textContent = '閉じる'; closeButton.setAttribute('aria-label', 'イベント一覧を閉じる');
-  head.append(heading, closeButton);
+  headControls.append(expandButton, backButton, closeButton);
+  head.append(heading, headControls);
+  const compactControls = doc.createElement('div'); compactControls.className = 'map-events-panel__controls';
+  const about = doc.createElement('details'); about.className = 'map-events-panel__about';
+  const aboutSummary = doc.createElement('summary'); aboutSummary.textContent = '地図とイベント件数について';
   const explanation = doc.createElement('p'); explanation.className = 'map-events-panel__note'; explanation.textContent = '地図の色は都道府県・州など地域内のイベント件数を示します。会場の位置ではありません。';
-  const panelFilters = createPeriodControls('map-events-panel__filters');
+  const panelPeriodToggle = createPeriodToggle('map-events-panel__period-toggle');
   const panelLegend = createLegend('map-events-panel__legend');
   const periodSummary = doc.createElement('p'); periodSummary.className = 'map-events-panel__summary'; periodSummary.setAttribute('aria-live', 'polite');
+  const aboutContent = doc.createElement('div'); aboutContent.className = 'map-events-panel__about-content'; aboutContent.append(explanation, panelLegend, periodSummary);
+  about.append(aboutSummary, aboutContent);
+  compactControls.append(panelPeriodToggle, about);
+  const body = doc.createElement('div'); body.className = 'map-events-panel__body';
   const list = doc.createElement('div'); list.className = 'map-events-panel__list'; list.setAttribute('role', 'list');
-  const panelAllButton = doc.createElement('button'); panelAllButton.type = 'button'; panelAllButton.className = 'map-events-panel__all'; panelAllButton.textContent = '全イベントを表示'; panelAllButton.hidden = true;
-  panel.append(head, explanation, panelFilters, panelLegend, periodSummary, panelAllButton, list);
+  const detail = doc.createElement('article'); detail.className = 'map-events-panel__detail'; detail.hidden = true;
+  body.append(list, detail);
+  panel.append(head, compactControls, body);
+  panel.dataset.view = view;
   stage.append(dock, panel);
 
-  function createPeriodControls(className) {
-    const group = doc.createElement('div'); group.className = className; group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'イベント期間');
-    for (const [value, label] of EVENT_PERIOD_OPTIONS) {
-      const button = doc.createElement('button'); button.type = 'button'; button.dataset.eventPeriod = value; button.textContent = label;
-      button.setAttribute('aria-pressed', String(periodFilter === value)); button.addEventListener('click', () => setPeriodFilter(value)); group.append(button);
-    }
-    return group;
+  let pendingCanvasTouch = null, pendingCanvasTouchTimer = null;
+  function clearPendingCanvasTouch() {
+    pendingCanvasTouch = null;
+    clearTimeout(pendingCanvasTouchTimer);
+    pendingCanvasTouchTimer = null;
+  }
+  function rememberCanvasTouch(event) {
+    if (!event.isTrusted) return;
+    if (event.pointerType === 'touch' && event.target === stage.querySelector('#globeCanvas')) {
+      clearPendingCanvasTouch();
+      pendingCanvasTouch = { x: event.clientX, y: event.clientY, at: Date.now() };
+      pendingCanvasTouchTimer = setTimeout(clearPendingCanvasTouch, 800);
+    } else clearPendingCanvasTouch();
+  }
+  function preventCanvasTouchRetarget(event) {
+    const origin = pendingCanvasTouch;
+    if (!event.isTrusted || !origin || event.detail === 0 || Date.now() - origin.at > 800) return;
+    if (!event.target?.closest?.('.map-events-panel, .map-events-dock')) return;
+    if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 32) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    clearPendingCanvasTouch();
+  }
+  stage.addEventListener('pointerdown', rememberCanvasTouch, true);
+  stage.addEventListener('click', preventCanvasTouchRetarget, true);
+
+  function periodLabel(value) { return value === 'future' ? '今後・開催中' : value === 'past' ? '過去' : 'すべて'; }
+
+  function syncPeriodToggle(button) {
+    const label = periodLabel(periodFilter);
+    const next = periodLabel(periodFilter === 'future' ? 'past' : periodFilter === 'past' ? 'all' : 'future');
+    button.dataset.eventPeriod = periodFilter;
+    button.textContent = `${label}　›`;
+    button.setAttribute('aria-label', `期間は「${label}」。クリックで「${next}」に切り替え`);
+    button.title = `現在：${label}／次：${next}`;
+  }
+
+  function createPeriodToggle(className) {
+    const button = doc.createElement('button'); button.type = 'button'; button.className = className;
+    button.addEventListener('click', () => setPeriodFilter(periodFilter === 'future' ? 'past' : periodFilter === 'past' ? 'all' : 'future'));
+    syncPeriodToggle(button);
+    return button;
   }
 
   function createLegend(className) {
@@ -209,11 +250,13 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   }
 
   function setPeriodFilter(value) {
-    if (!['all', 'future', 'past'].includes(value) || periodFilter === value) return;
+    if (!['all', 'future', 'past'].includes(value)) return;
+    const changed = periodFilter !== value;
     periodFilter = value;
-    for (const group of [dockFilters, panelFilters]) for (const button of group.querySelectorAll('[data-event-period]')) button.setAttribute('aria-pressed', String(button.dataset.eventPeriod === value));
+    syncPeriodToggle(dockPeriodToggle); syncPeriodToggle(panelPeriodToggle);
+    if (!changed) return;
     refreshPeriodSummary();
-    if (!panel.hidden) renderList();
+    if (!panel.hidden && view !== 'detail') { const scroll = view === 'overview' ? 0 : body.scrollTop; renderList(); body.scrollTop = scroll; }
     onChange(events);
   }
 
@@ -281,39 +324,139 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const regionHeading = mapRegionKind === 'country' ? (countryLabel || mapRegionLabel) : mapRegionKind === 'admin1' && countryLabel ? [countryLabel, mapRegionLabel].filter(Boolean).join(' · ') : mapRegionLabel;
     const items = scopedEvents();
     const visibleItems = sortEventsByDisplayPriority(uniqueEventEditions(items), today).filter(event => matchesEventPeriod(event, periodFilter, today));
-    heading.textContent = `${scope ? (isRegionScope ? `${regionHeading || 'この地域'}のイベント` : isPrefectureScope ? `${mapRegionLabel || 'この県'}のイベント` : 'この付近のイベント') : 'イベント一覧'} · ${visibleItems.length}件`;
+    heading.textContent = `${scope ? (isRegionScope ? (regionHeading || 'この地域') : isPrefectureScope ? (mapRegionLabel || 'この県') : 'この付近') : 'イベント一覧'} · ${visibleItems.length}件`;
     refreshPeriodSummary();
-    panelAllButton.hidden = !scope;
-    list.replaceChildren();
-    if (!visibleItems.length) {
-      const empty = doc.createElement('p'); empty.className = 'map-events-panel__empty'; empty.textContent = periodFilter === 'future' ? '今後・開催中のイベントはありません。' : periodFilter === 'past' ? '過去の開催実績はありません。' : scope ? 'この地域の公開イベントはありません。' : '公開イベントはありません。'; list.append(empty); return;
+    list.replaceChildren(); detail.hidden = true;
+    if (!visibleItems.length) { renderEmpty(list, items); return; }
+    const count = view === 'overview' ? 1 : Math.min(listLimit, visibleItems.length);
+    for (const event of visibleItems.slice(0, count)) list.append(createEventCard(event));
+    if (view === 'list' && visibleItems.length > count) {
+      const more = doc.createElement('button'); more.type = 'button'; more.className = 'map-events-panel__more'; more.textContent = `さらに${Math.min(20, visibleItems.length - count)}件を表示`;
+      more.addEventListener('click', () => { const next = Math.min(visibleItems.length, listLimit + 20); for (const event of visibleItems.slice(listLimit, next)) list.insertBefore(createEventCard(event), more); listLimit = next; more.textContent = listLimit < visibleItems.length ? `さらに${Math.min(20, visibleItems.length - listLimit)}件を表示` : ''; more.hidden = listLimit >= visibleItems.length; });
+      list.append(more);
     }
-    for (const event of visibleItems) {
-      const card = doc.createElement('article'); card.className = 'map-event-card'; card.setAttribute('role', 'listitem');
-      card.dataset.eventPeriod = classifyEvent(event, today);
-      const title = doc.createElement('h3'); title.textContent = event.name; card.append(title);
-      const eventLocation = eventRegionName(event);
-      const details = [event.dateLabel || event.dates || event.date || [event.startDate, event.endDate].filter(Boolean).join('–'), event.venue, eventLocation].filter(value => typeof value === 'string' && value.trim());
-      if (details.length) { const meta = doc.createElement('p'); meta.className = 'map-event-card__meta'; meta.textContent = details.join(' · '); card.append(meta); }
-      const regionName = eventRegionName(event);
-      const placement = doc.createElement('p'); placement.className = 'map-event-card__placement'; placement.textContent = event.online ? 'オンライン開催' : event.placement === 'country' ? `${regionName || '国'}単位で表示（開催地の詳細位置は未確認）` : event.placement === 'country-unmapped' ? `${regionName || '国'}は確認済み（地図上に表示可能な範囲がありません）` : event.placement === 'coordinate' ? (event.locationPrecision === 'venue' ? '確認済み会場の位置（建物内の開催場所は未確認）' : event.locationPrecision === 'area' ? `${regionName || '地域'}周辺に表示（開催地の詳細位置は未確認）` : '公開された位置情報') : event.placement === 'prefecture' ? (event.representativeCell ? `${regionName || '都道府県'}単位でまとめて表示（会場位置ではありません）` : event.locationPrecision === 'venue' ? `${regionName || '都道府県'}内の確認済み会場` : event.locationPrecision === 'area' ? `${regionName || '都道府県'}内の地域代表位置（会場位置は未確認）` : `${regionName || '都道府県'}内のイベント`) : event.placement === 'region' ? `${regionName || '地域'}単位でまとめて表示（会場位置ではありません）` : '地図上の位置情報なし'; card.append(placement);
-      const statusText = eventStatus(event, today);
-      if (statusText) { const status = doc.createElement('p'); status.className = 'map-event-card__status'; status.textContent = statusText; card.append(status); }
-      const href = safeUrl(event.url || event.sourceUrl || event.website);
-      if (href) { const link = doc.createElement('a'); link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '公式情報'; card.append(link); }
-      if (event.checkedAt && Number.isFinite(Date.parse(event.checkedAt))) { const checked = doc.createElement('p'); checked.className = 'map-event-card__placement'; checked.textContent = `情報確認日：${new Date(event.checkedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}`; card.append(checked); }
-      for (const source of Array.isArray(event.socialUrls) ? event.socialUrls : []) { const url = safeEventSource(source); if (!url) continue; const link = doc.createElement('a'); link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '主催者SNS'; card.append(link); }
-      list.append(card);
-    }
+    if (view === 'detail') renderDetail();
   }
 
-  function openCellEvents(selection) { if (panel.hidden) returnFocus = doc.activeElement; scope = selection || null; onOpen(scope); renderList(); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); closeButton.focus({ preventScroll: true }); }
-  function openAll() { if (panel.hidden) returnFocus = doc.activeElement; scope = null; onOpen(null); renderList(); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); closeButton.focus({ preventScroll: true }); }
+  function placementText(event) {
+    const regionName = eventRegionName(event);
+    return event.locationPending ? '地図上の場所を確認中…' : event.online ? 'オンライン開催' : event.placement === 'country' ? `${regionName || '国'}単位で表示（開催地の詳細位置は未確認）` : event.placement === 'country-unmapped' ? `${regionName || '国'}は確認済み（地図上に表示可能な範囲がありません）` : event.placement === 'coordinate' ? (event.locationPrecision === 'venue' ? '確認済み会場の位置（建物内の開催場所は未確認）' : event.locationPrecision === 'area' ? `${regionName || '地域'}周辺に表示（開催地の詳細位置は未確認）` : '公開された位置情報') : event.placement === 'prefecture' ? (event.representativeCell ? `${regionName || '都道府県'}単位でまとめて表示（会場位置ではありません）` : event.locationPrecision === 'venue' ? `${regionName || '都道府県'}内の確認済み会場` : event.locationPrecision === 'area' ? `${regionName || '都道府県'}内の地域代表位置（会場位置は未確認）` : `${regionName || '都道府県'}内のイベント`) : event.placement === 'region' ? `${regionName || '地域'}単位でまとめて表示（会場位置ではありません）` : '地図上の位置情報なし';
+  }
+
+  function createEventCard(event) {
+    const presentation = presentMapEvent(event, today);
+    const card = doc.createElement('article'); card.className = 'map-event-card'; card.setAttribute('role', 'listitem'); card.dataset.eventPeriod = presentation.period; card.dataset.eventId = event.id;
+    const date = doc.createElement('time'); date.className = 'map-event-card__date';
+    if (event.startDate && /^\d{4}-\d\d-\d\d$/.test(event.startDate)) {
+      const [year, month, day] = event.startDate.split('-').map(Number);
+      const end = /^\d{4}-\d\d-\d\d$/.test(event.endDate || '') ? event.endDate.split('-').map(Number) : null;
+      const primary = doc.createElement('strong'); primary.textContent = `${month}/${day}`;
+      if (end && event.endDate !== event.startDate) { date.classList.add('is-range'); primary.textContent += `\n–${end[1]}/${end[2]}`; }
+      const yearText = doc.createElement('small'); yearText.textContent = end && end[0] !== year ? `${year}–${end[0]}年` : `${year}年`;
+      date.append(primary, yearText); date.dateTime = event.startDate;
+      if (presentation.time) { const timeNode = doc.createElement('small'); timeNode.textContent = presentation.time; date.append(timeNode); }
+    } else date.textContent = presentation.date || '日程未確認';
+    const content = doc.createElement('div'); content.className = 'map-event-card__content';
+    const status = doc.createElement('p'); status.className = 'map-event-card__status'; status.textContent = presentation.status; content.append(status);
+    const title = doc.createElement('h3'); title.className = 'map-event-card__title'; title.textContent = presentation.title; content.append(title);
+    const placement = placementText(event);
+    const metaText = [presentation.area, presentation.venue].filter(Boolean).join(' · ');
+    if (metaText) { const meta = doc.createElement('p'); meta.className = 'map-event-card__meta'; meta.textContent = metaText; content.append(meta); }
+    if (presentation.fee) { const fee = doc.createElement('p'); fee.className = 'map-event-card__fee'; fee.textContent = presentation.fee; content.append(fee); }
+    if (presentation.tags.length) { const tags = doc.createElement('p'); tags.className = 'map-event-card__tags'; for (const value of presentation.tags) { const tag = doc.createElement('span'); tag.textContent = value; tags.append(tag); } content.append(tags); }
+    const button = doc.createElement('button'); button.type = 'button'; button.className = 'map-event-card__detail'; button.textContent = '詳細を見る'; button.addEventListener('click', () => openDetail(event)); content.append(button);
+    if (event.locationPending) { const pending = doc.createElement('p'); pending.className = 'map-event-card__meta'; pending.textContent = placement; content.insertBefore(pending, button); }
+    card.append(date, content); return card;
+  }
+
+  function appendFact(listNode, label, value) {
+    if (!value) return;
+    const term = doc.createElement('dt'); term.textContent = label;
+    const definition = doc.createElement('dd'); definition.textContent = value;
+    listNode.append(term, definition);
+  }
+
+  function renderDetail() {
+    const event = events.find(item => item.id === detailEventId);
+    detail.replaceChildren();
+    if (!event) { detail.hidden = true; return; }
+    const presentation = presentMapEvent(event, today);
+    const title = doc.createElement('h3'); title.className = 'map-events-panel__detail-title'; title.textContent = presentation.title;
+    const summary = doc.createElement('p'); summary.className = 'map-events-panel__detail-summary'; summary.textContent = `${presentation.status}${presentation.dateLabel ? ` · ${presentation.dateLabel}` : presentation.date ? ` · ${presentation.date}` : ''}`;
+    const facts = doc.createElement('dl'); facts.className = 'map-events-panel__facts';
+    appendFact(facts, '会場', presentation.venue);
+    appendFact(facts, '地域', presentation.area);
+    appendFact(facts, '地図表示', placementText(event));
+    appendFact(facts, '料金', presentation.fee);
+    appendFact(facts, '参加条件', presentation.conditions);
+    appendFact(facts, '主催', presentation.organizer.join('・'));
+    appendFact(facts, 'タグ', presentation.tags.join('・'));
+    const links = doc.createElement('div'); links.className = 'map-events-panel__links'; links.setAttribute('aria-label', 'イベント情報のリンク');
+    for (const item of presentation.links) { const anchor = doc.createElement('a'); anchor.href = item.href; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.textContent = item.label; links.append(anchor); }
+    const source = doc.createElement('p'); source.className = 'map-events-panel__source'; source.textContent = [presentation.sourceLabel, presentation.checkedAt ? `確認日：${presentation.checkedAt}` : ''].filter(Boolean).join(' · ');
+    detail.append(title, summary, facts);
+    if (presentation.description) { const description = doc.createElement('p'); description.className = 'map-events-panel__description'; description.textContent = presentation.description; detail.append(description); }
+    detail.append(links); if (source.textContent) detail.append(source); detail.hidden = false;
+  }
+
+  function renderEmpty(listNode, allItems) {
+    const statuses = uniqueEventEditions(allItems).map(event => classifyEvent(event, today));
+    const pastCount = statuses.filter(status => status === 'past').length;
+    const undatedCount = statuses.filter(status => ['watch', 'unknown', 'postponed', 'cancelled'].includes(status)).length;
+    let message;
+    if (catalogStatus === 'loading' && (scope ? allItems.length === 0 : !events.length)) message = 'イベント情報を確認中…';
+    else if (catalogStatus === 'error' && (scope ? allItems.length === 0 : !events.length)) message = scope ? 'この地域のイベント情報を確認できませんでした。通信を確認して再試行してください。' : 'イベント情報を読み込めませんでした。通信を確認して再試行してください。';
+    else if (scope && allItems.length === 0) message = 'この地域の公開イベントはまだ掲載されていません。';
+    else if (periodFilter === 'future' && pastCount) message = `今後・開催中のイベントはありません。過去の開催実績が${pastCount}件あります。`;
+    else if (periodFilter === 'future' && undatedCount) message = `今後・開催中の日程はありません。日程未確認・次回待ちが${undatedCount}件あります。`;
+    else if (periodFilter === 'past') message = '過去の開催実績はありません。';
+    else message = '該当する公開イベントはありません。';
+    const empty = doc.createElement('p'); empty.className = `map-events-panel__empty is-${catalogStatus}`; empty.textContent = message; listNode.append(empty);
+    if (catalogStatus === 'error' && (scope ? allItems.length === 0 : !events.length)) { const retry = doc.createElement('button'); retry.type = 'button'; retry.className = 'map-events-panel__retry'; retry.textContent = '再試行'; retry.addEventListener('click', () => { void refreshCatalog(true); }); listNode.append(retry); }
+    if (periodFilter === 'future' && pastCount) { const past = doc.createElement('button'); past.type = 'button'; past.className = 'map-events-panel__past'; past.textContent = `過去の開催実績を見る（${pastCount}件）`; past.addEventListener('click', () => setPeriodFilter('past')); listNode.append(past); }
+  }
+
+  function setView(next, { restoreScroll = null } = {}) {
+    view = next; panel.dataset.view = view;
+    list.hidden = view === 'detail'; detail.hidden = view !== 'detail';
+    expandButton.hidden = view !== 'overview';
+    backButton.hidden = view !== 'detail';
+    if (view === 'detail') renderDetail(); else renderList();
+    if (restoreScroll !== null) body.scrollTop = restoreScroll;
+  }
+
+  function openDetail(event) {
+    detailEventId = event.id; detailReturnView = view; detailReturnScroll = body.scrollTop;
+    setView('detail', { restoreScroll: 0 });
+    backButton.focus({ preventScroll: true });
+  }
+
+  function backFromDetail() {
+    if (view !== 'detail') return;
+    const id = detailEventId, returnView = detailReturnView;
+    setView(returnView, { restoreScroll: detailReturnScroll });
+    const target = [...list.querySelectorAll('[data-event-id]')].find(card => card.dataset.eventId === id)?.querySelector('.map-event-card__detail');
+    target?.focus({ preventScroll: true });
+  }
+
+  function selectRegion(selection) {
+    if (destroyed) return false;
+    if (!selection) { if (!panel.hidden) close({ restoreFocus: false }); return true; }
+    const changed = scopeIdentity(scope) !== scopeIdentity(selection);
+    if (panel.hidden) { returnFocus = doc.activeElement; scope = selection; onOpen(scope); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); setView('overview'); return true; }
+    if (!changed) return true;
+    scope = selection; detailEventId = null; listLimit = 20; body.scrollTop = 0; onOpen(scope); setView('overview');
+    return true;
+  }
+
+  function openCellEvents(selection) { if (panel.hidden) returnFocus = doc.activeElement; scope = selection || null; onOpen(scope); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); detailEventId = null; listLimit = 20; body.scrollTop = 0; setView('list'); closeButton.focus({ preventScroll: true }); }
+  function openAll() { if (panel.hidden) returnFocus = doc.activeElement; scope = null; onOpen(null); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); detailEventId = null; listLimit = 20; body.scrollTop = 0; setView('list'); closeButton.focus({ preventScroll: true }); }
   function canReceiveFocus(element) {
     return Boolean(element?.isConnected && !element.hidden && element.getClientRects().length && doc.defaultView?.getComputedStyle(element).visibility !== 'hidden');
   }
   function close({ restoreFocus = true } = {}) {
     panel.hidden = true; panel.classList.remove('is-open'); stage.classList.remove('has-map-events'); scope = null;
+    body.scrollTop = 0; detailEventId = null; view = 'overview'; panel.dataset.view = view;
     if (restoreFocus) {
       const currentSelectionAction = doc.querySelector('#viewCellPosts');
       const canvas = stage.querySelector('#globeCanvas');
@@ -326,13 +469,13 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (panel.hidden) return false;
     if (!selection) { close({ restoreFocus: false }); return true; }
     const changed = scopeIdentity(scope) !== scopeIdentity(selection);
-    scope = selection;
-    if (changed) panel.scrollTop = 0;
-    renderList();
+    if (!changed) return true;
+    scope = selection; detailEventId = null; listLimit = 20; body.scrollTop = 0; setView('overview');
     return true;
   }
   allButton.addEventListener('click', openAll);
-  panelAllButton.addEventListener('click', openAll);
+  expandButton.addEventListener('click', () => { setView('list'); list.querySelector('.map-event-card__detail')?.focus({ preventScroll: true }); });
+  backButton.addEventListener('click', backFromDetail);
   closeButton.addEventListener('click', close);
   function onKeydown(event) { if (event.key === 'Escape' && !panel.hidden) { close(); event.stopPropagation(); } }
   doc.addEventListener('keydown', onKeydown);
@@ -345,16 +488,21 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (destroyed) return;
     publicRecords = nextRecords;
     today = tokyoDate();
-    const next = uniqueEventEditions(normalizeMapEvents(mergeEventCatalog(publicRecords, researchRecords), representatives, renderer.getMapLocation?.bind(renderer), renderer.getMapCountry?.bind(renderer))).map(event => Object.freeze({ ...event, mapPeriod: classifyEvent(event, today) }));
+    const next = uniqueEventEditions(normalizeMapEvents(mergeEventCatalog(publicRecords, researchRecords), representatives, renderer.getMapLocation?.bind(renderer), renderer.getMapCountry?.bind(renderer), { locationReady: renderer.isMapLocationReady?.() !== false })).map(event => Object.freeze({ ...event, mapPeriod: classifyEvent(event, today) }));
     const signature = JSON.stringify(next);
     if (signature === eventSignature) return;
     eventSignature = signature; events = next;
-    refresh(); refreshPeriodSummary(); if (!panel.hidden) renderList(); onChange(events);
+    refresh(); refreshPeriodSummary(); if (!panel.hidden) { if (view === 'detail') renderDetail(); else { const scroll = body.scrollTop; renderList(); body.scrollTop = scroll; } } onChange(events);
   }
   function loadCached() {
     let cached = null;
     try { cached = readCache(globalThis.sessionStorage, SESSION_KEY) || readCache(globalThis.localStorage, CACHE_KEY); } catch { /* storage access itself can throw */ }
     if (cached) update(cached);
+  }
+  function refreshLocations() {
+    if (destroyed) return;
+    try { representatives = renderer.getMapCellRepresentatives?.() || representatives; } catch { /* keep the last available regional metadata */ }
+    update();
   }
   loadCached();
   const endpoint = String(mapConfig.publicDataEndpoint || '').trim();
@@ -376,16 +524,18 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (destroyed || doc.visibilityState === 'hidden' || (!force && Date.now() - lastCatalogAttempt < CATALOG_REFRESH_MS)) return Promise.resolve(events);
     if (catalogPending) return catalogPending;
     lastCatalogAttempt = Date.now();
+    catalogStatus = 'loading';
+    if (!panel.hidden) { if (view === 'detail') renderDetail(); else renderList(); }
     catalogPending = (async () => {
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const timeout = setTimeout(() => controller?.abort(), 3500);
       try {
         const response = await fetch(CATALOG_URL.href, { cache: 'no-cache', signal: controller?.signal });
-        if (!response.ok || destroyed) return events;
-        const next = readEventCatalog(await response.json());
-        if (!destroyed) { researchRecords = next; update(); }
-      } catch { /* Keep the last verified catalog when a source is offline or invalid. */ }
+        if (!response.ok) catalogStatus = 'error';
+        else if (!destroyed) { const next = readEventCatalog(await response.json()); catalogStatus = 'ready'; researchRecords = next; update(); }
+      } catch { if (!destroyed) catalogStatus = researchRecords.length ? 'ready' : 'error'; }
       finally { clearTimeout(timeout); catalogPending = null; }
+      if (!destroyed && !panel.hidden) { refreshPeriodSummary(); if (view === 'detail') renderDetail(); else { const scroll = body.scrollTop; renderList(); body.scrollTop = scroll; } }
       return events;
     })();
     return catalogPending;
@@ -404,10 +554,10 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   return {
     getEvents: () => events,
     getCellSummary: selection => summarize(selection),
-    getDensityEvents: () => events.filter(event => event.mapPeriod === 'upcoming' || event.mapPeriod === 'active' || event.mapPeriod === 'past'),
+    getDensityEvents: () => events.filter(event => !event.locationPending && (event.mapPeriod === 'upcoming' || event.mapPeriod === 'active' || event.mapPeriod === 'past')),
     getPeriodFilter: () => periodFilter,
-    openCellEvents, openAll, updateSelection, refresh, setActive(value) { active = Boolean(value); if (!active) close(); refresh(); }, close,
-    ready, refreshData: () => refreshCatalog(true),
-    destroy() { destroyed = true; clearInterval(catalogTimer); clearTimeout(midnightTimer); doc.removeEventListener('visibilitychange', onVisibilityChange); close(); doc.removeEventListener('keydown', onKeydown); dock.remove(); panel.remove(); }
+    openCellEvents, openAll, selectRegion, updateSelection, refresh, setActive(value) { active = Boolean(value); if (!active) close(); refresh(); }, close,
+    ready, refreshLocations, refreshData: () => refreshCatalog(true),
+    destroy() { destroyed = true; clearInterval(catalogTimer); clearTimeout(midnightTimer); clearPendingCanvasTouch(); stage.removeEventListener('pointerdown', rememberCanvasTouch, true); stage.removeEventListener('click', preventCanvasTouchRetarget, true); doc.removeEventListener('visibilitychange', onVisibilityChange); close(); doc.removeEventListener('keydown', onKeydown); dock.remove(); panel.remove(); }
   };
 }

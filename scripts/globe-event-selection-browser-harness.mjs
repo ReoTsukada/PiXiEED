@@ -7,7 +7,7 @@ const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4189';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'browser harness must target a local server');
 const { chromium } = await import(process.env.PIXIEED_PLAYWRIGHT_MODULE
   ? pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE).href : 'playwright');
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: process.platform === 'darwin' ? ['--use-angle=metal', '--enable-gpu'] : [] });
 const errors = [];
 const checks = [];
 const storeModule = `let posts=[];const listeners=new Set();globalThis.__replacePosts=list=>{posts=list;for(const fn of listeners)fn();};export function createSupabaseGlobeStore(){return {ready:Promise.resolve(),list:()=>posts,subscribe:fn=>{listeners.add(fn);return ()=>listeners.delete(fn);}};}export function createSupabaseGlobeAuth(){return {getUser:()=>null,subscribe:()=>()=>{}};}`;
@@ -25,6 +25,14 @@ let catalogRequestArrived;
 let releaseCatalog;
 
 async function frames(page) { await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))); }
+async function setPeriod(page, period) {
+  const toggle = page.locator('.map-events-panel__period-toggle');
+  for (let step = 0; step < 3; step += 1) {
+    if (await toggle.getAttribute('data-event-period') === period) return;
+    await toggle.click();
+  }
+  assert.equal(await toggle.getAttribute('data-event-period'), period, 'single period button reaches the requested mode');
+}
 async function pickPrefecture(page, code, input, { settle = true } = {}) {
   const target = await page.evaluate(async codeValue => {
     const renderer = __PIXIEED_GLOBE__;
@@ -150,6 +158,7 @@ try {
       await page.goto(`${base}/globe-prototype.html?embed=1`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => globalThis.__PIXIEED_MAP_EVENTS__ && globalThis.__PIXIEED_POSTS__);
       await page.evaluate(() => __PIXIEED_MAP_EVENTS__.ready);
+      await page.waitForFunction(() => __PIXIEED_GLOBE__.isMapLocationReady());
       await frames(page);
       assert.equal(await page.evaluate(() => __PIXIEED_MAP_EVENTS__.getEvents().length), publicEvents.length);
       const baselineRequests = requests.length;
@@ -164,6 +173,9 @@ try {
       // Rapid actual taps on three distinct prefectures in one camera view.
       const triplet = await page.evaluate(async () => {
         const renderer = __PIXIEED_GLOBE__, canvas = document.querySelector('#globeCanvas'), panel = document.querySelector('.map-events-panel');
+        // Near-neighbor touch taps can also emit Chromium's normal double-click zoom.
+        // Bound this fixture's zoom so its precomputed points stay in one camera view.
+        renderer.setView({ zoomRange: { min: .68, max: 24 } });
         const codes = ['13', '14', '11'];
         const reps = codes.map(code => renderer.getMapCellRepresentatives().find(item => String(item.prefectureId).padStart(2, '0') === code && item.center));
         if (reps.some(item => !item)) throw new Error('Missing Tokyo/Kanagawa/Saitama representative');
@@ -203,44 +215,45 @@ try {
       assert.ok(triplet.every(point => point.hit === 'globeCanvas'), `${backend}/${input}: triplet taps hit the exposed canvas: ${JSON.stringify(triplet)}`);
       for (const point of triplet) {
         if (input === 'touch') {
-          const session = await context.newCDPSession(page);
-          await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x: point.x, y: point.y, radiusX: 1, radiusY: 1, force: 1 }] });
-          await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-          await session.detach();
+          await page.touchscreen.tap(point.x, point.y);
         } else await page.mouse.click(point.x, point.y);
+        // Let Chromium deliver the physical pointer sequence before the next one.
+        await frames(page);
       }
       await frames(page);
       const rapidSelection = await page.evaluate(() => __PIXIEED_GLOBE__.getSnapshot().selected?.prefectureId || null);
       assert.equal(rapidSelection, '11', `${backend}/${input}: rapid A→B→C picks leave the renderer on C; targets=${JSON.stringify(triplet)}, selected=${rapidSelection}`);
-      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県のイベント/);
-      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['C event 1', 'C event 2'], 'rapid picks leave cards scoped to C');
+      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県/);
+      assert.equal(await page.locator('.map-events-panel').getAttribute('data-view'), 'overview');
+      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['C event 1'], 'rapid picks leave the overview scoped to C');
       const focusAfterRapidPicks = await page.evaluate(() => document.activeElement.id === 'globeCanvas' ? 'canvas' : document.activeElement.classList.contains('map-events-panel__close') ? 'close' : 'other');
       if (input === 'mouse') assert.equal(focusAfterRapidPicks, 'canvas', 'mouse map picks naturally focus the canvas without stealing focus to a panel control');
       else assert.ok(['canvas', 'close'].includes(focusAfterRapidPicks), 'touch map picks do not focus an unexpected control');
       assert.equal(requests.length, baselineRequests, 'map picks do not trigger new network requests');
 
       // A → B → C was deliberately completed without camera movement or per-pick assertions.
-      await page.locator('.map-events-panel__filters [data-event-period="all"]').click();
+      await setPeriod(page, 'all');
       await pickPrefecture(page, '01', input);
-      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /北海道のイベント/);
+      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /北海道/);
+      await page.locator('.map-events-panel__expand').click();
       assert.equal(await page.locator('.map-event-card').count(), 9, 'all filter includes A future and past events');
-      await page.locator('.map-events-panel__filters [data-event-period="future"]').click();
-      assert.equal(await page.locator('.map-events-panel__filters [data-event-period="future"]').getAttribute('aria-pressed'), 'true');
+      await setPeriod(page, 'future');
+      assert.equal(await page.locator('.map-events-panel__period-toggle').getAttribute('data-event-period'), 'future');
       assert.equal(await page.locator('.map-event-card').count(), 8);
-      await page.locator('.map-events-panel').evaluate(el => { el.scrollTop = el.scrollHeight; });
+      await page.locator('.map-events-panel__body').evaluate(el => { el.scrollTop = el.scrollHeight; });
       await frames(page);
-      const sameScopeScroll = await page.locator('.map-events-panel').evaluate(el => el.scrollTop);
+      const sameScopeScroll = await page.locator('.map-events-panel__body').evaluate(el => el.scrollTop);
       await pickPrefecture(page, '01', input);
-      assert.equal(await page.locator('.map-events-panel').evaluate(el => el.scrollTop), sameScopeScroll, 'repicking the same region preserves panel scroll');
-      assert.equal(await page.locator('.map-events-panel__filters [data-event-period="future"]').getAttribute('aria-pressed'), 'true', 'scope updates preserve period filter');
+      assert.equal(await page.locator('.map-events-panel__body').evaluate(el => el.scrollTop), sameScopeScroll, 'repicking the same region preserves panel scroll');
+      assert.equal(await page.locator('.map-events-panel__period-toggle').getAttribute('data-event-period'), 'future', 'scope updates preserve period filter');
       assert.equal(await page.locator('.map-event-card').count(), 8);
       await pickPrefecture(page, '14', input);
-      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /神奈川県のイベント/);
-      assert.equal(await page.locator('.map-events-panel').evaluate(el => el.scrollTop), 0, 'a changed scope resets panel scroll');
-      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['B event 1', 'B event 2']);
+      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /神奈川県/);
+      assert.equal(await page.locator('.map-events-panel__body').evaluate(el => el.scrollTop), 0, 'a changed scope resets panel scroll');
+      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['B event 1']);
 
       // A delayed catalog replacement must repaint the current C scope, not restore a stale or global scope.
-      await page.locator('.map-events-panel__filters [data-event-period="all"]').click();
+      await setPeriod(page, 'all');
       const catalogArrived = new Promise(resolve => { catalogRequestArrived = resolve; });
       delayNextCatalog = true;
       const refresh = page.evaluate(() => __PIXIEED_MAP_EVENTS__.refreshData());
@@ -250,25 +263,25 @@ try {
       releaseCatalog();
       await refresh;
       await frames(page);
-      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県のイベント/);
+      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県/);
+      await page.locator('.map-events-panel__expand').click();
       assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['C event 1', 'C event 2', 'C refreshed event'], 'late refresh adds current-scope content without changing scope');
 
       // An eventless region replaces stale cards with its own empty state.
-      await page.locator('.map-events-panel__all').click();
       await pickPrefecture(page, '46', input);
-      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /鹿児島県のイベント · 0件/);
-      assert.match(await page.locator('.map-events-panel').textContent(), /この地域の公開イベントはありません/);
+      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /鹿児島県 · 0件/);
+      assert.match(await page.locator('.map-events-panel').textContent(), /この地域の公開イベントはまだ掲載されていません/);
       assert.equal(await page.locator('.map-event-card').count(), 0);
 
-      // Closing keeps the existing source focus contract; picks while closed never reopen the panel.
+      // Closing restores focus; the next event-mode map pick opens a new overview.
       await page.locator('.map-events-panel__close').click();
       assert.equal(await page.locator('.map-events-panel').isVisible(), false);
       await pickPrefecture(page, '11', input);
-      assert.equal(await page.locator('.map-events-panel').isVisible(), false, 'hidden panel stays hidden after a map pick');
-      await page.locator('#viewCellPosts').click();
-      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県のイベント/);
+      assert.equal(await page.locator('.map-events-panel').isVisible(), true, 'event-mode map pick reopens the overview');
+      assert.equal(await page.locator('.map-events-panel').getAttribute('data-view'), 'overview');
+      assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県/);
       await page.locator('.map-events-panel__close').click();
-      assert.equal(await page.evaluate(() => document.activeElement.id), 'viewCellPosts', 'region action focus is restored after close');
+      assert.equal(await page.evaluate(() => { const el = document.activeElement; return Boolean(el?.getClientRects().length) && !el.hidden; }), true, 'close restores focus to a visible action');
 
       // Open from the dock, pick, then close: fallback avoids focusing a dock button hidden by has-selection.
       await page.locator('#clearCellSelection').click();
@@ -301,7 +314,7 @@ try {
       assert.equal(await telescope.evaluate(() => Boolean(globalThis.__PIXIEED_MAP_EVENTS__)), false, 'standalone telescope does not initialize event selection UI');
       assert.equal(await telescope.locator('.map-events-panel').count(), 0);
       await telescope.close();
-      checks.push(`${backend}/${input}: rapid Tokyo→Kanagawa→Saitama physical picks; scoped cards/renderer match; filter and same-region scroll persist; changed scope resets scroll; late catalog update preserves scope; eventless and sea/null handling; closed panel remains closed; focus, posts and telescope behavior`);
+      checks.push(`${backend}/${input}: rapid Tokyo→Kanagawa→Saitama physical picks; scoped cards/renderer match; filter and same-region scroll persist; changed scope resets scroll; late catalog update preserves scope; eventless and sea/null handling; closed panel reopens from an event map pick; focus, posts and telescope behavior`);
     } finally { await context.close(); }
   }
   assert.deepEqual(errors, []);

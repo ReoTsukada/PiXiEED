@@ -1,7 +1,8 @@
-import { initPostUi } from './post-ui.mjs?v=20261006-profile-artwork-1';
-import { initMapEvents } from './map-events.mjs?v=20261007-event-selection-1';
+import { initPostUi } from './post-ui.mjs?v=20261007-map-lazy-1';
+import { initMapEvents } from './map-events.mjs?v=20261007-event-cycle-1';
+import { createMapGeometryLoader } from './map-geometry-loader.mjs?v=20261007-map-lazy-1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
-import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261006-map-startup-1';
+import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261007-map-lazy-1';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
 
 const telescopeTool = new URLSearchParams(location.search).get('tool') === 'telescope';
@@ -31,8 +32,8 @@ let postUi = null;
 let currentSelection = null;
 
 const MAP_CELLS_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
-const MAP_ADMIN1_URL = 'assets/maps/map-admin1-v1.json?v=20261005-admin-boundary-1';
-const MAP_PREFECTURES_URL = 'assets/maps/map-prefectures-v1.json?v=20261006-unassigned-disputed-japanese-islands-1';
+const MAP_ADMIN1_URL = 'assets/maps/map-admin1-mask-v2.json?v=20261007-map-lazy-1';
+const MAP_PREFECTURES_URL = 'assets/maps/map-prefectures-mask-v2.json?v=20261007-map-lazy-1';
 const RASTER_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
 
 function readJson(path) {
@@ -108,7 +109,7 @@ function createPrototypeRenderer(options = {}) {
       if (postUi?.handlePick(selection)) { showSelection(null); return; }
       showCellHover(null);
       showSelection(selection);
-      if (mapContentLayer === 'events') eventUi?.updateSelection(selection);
+      if (mapContentLayer === 'events') eventUi?.selectRegion(selection);
       if (selection && renderer.getSnapshot().camera.projection !== 'mercator') renderer.focusSelection(selection);
     },
     onHover: showCellHover,
@@ -280,6 +281,38 @@ try {
     telescope ? null : (globalThis.__PIXIEED_MAP_ADMIN1__ || readJson(MAP_ADMIN1_URL)).catch(error => { console.warn('Administrative regions unavailable; using countries.', error); return null; })
   ]);
   createPrototypeRenderer(telescope ? { rasterData: decodeRasterData(source) } : { mapCellData: source, mapPrefectureData, mapAdmin1Data });
+  if (!telescope && !renderer.isMapLocationReady()) {
+    const status = document.createElement('p');
+    status.className = 'map-location-status'; status.setAttribute('role', 'status');
+    const message = document.createElement('span'), retry = document.createElement('button');
+    retry.type = 'button'; retry.textContent = '再試行'; retry.hidden = true;
+    status.append(message, retry); globeStage.append(status);
+    const loader = createMapGeometryLoader({
+      assets: [[ 'prefectures', mapPrefectureData ], [ 'admin1', mapAdmin1Data ]]
+        .filter(([, data]) => data?.geometryChecksum)
+        .map(([kind, data]) => ({ kind, url: `assets/maps/map-${kind}-geometry-v2.json`, checksum: data.geometryChecksum })),
+      async apply(geometry, options) {
+        await renderer.setMapGeometry(geometry, options);
+        postUi?.refreshLocations(); eventUi?.refreshLocations(); updateMapContent();
+        if (currentSelection) showSelection(currentSelection);
+        if (currentHover) showCellHover(currentHover);
+        performance.mark?.('map-location-ready');
+      },
+      onState(state) {
+        status.hidden = state === 'ready'; retry.hidden = state !== 'error';
+        message.textContent = state === 'error' ? '場所の確認に必要なデータを読み込めませんでした。' : '投稿・会場の場所を確認中…';
+      }
+    });
+    globalThis.__PIXIEED_MAP_GEOMETRY__ = loader;
+    retry.addEventListener('click', () => { void loader.load({ reload: true }).catch(error => console.warn('Map location data unavailable.', error)); });
+    window.addEventListener('pagehide', event => { if (!event.persisted) loader.destroy(); });
+    message.textContent = '投稿・会場の場所を確認中…';
+    // Let the exact display map reach the screen and accept gestures before parsing polygons.
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+      performance.mark?.('map-location-load-start');
+      void loader.load().catch(error => console.warn('Map location data unavailable.', error));
+    }, 0)));
+  }
   loadStatus.textContent = '';
   openToolFromUrl();
   performance.mark?.('globe-ready');

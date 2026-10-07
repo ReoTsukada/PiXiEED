@@ -25,7 +25,7 @@ import {
 import { normalizeMembershipFeatures, pointInGeometry } from './topology.mjs?v=20261006-map-startup-1';
 import { JAPAN_COUNTRY_ID, JAPAN_REGION_GROUPS, getRegionForPrefecture } from './hierarchy.mjs?v=20260920-g4-precision-1';
 import { createWebGLRenderer } from './webgl-renderer.mjs?v=20261005-admin-boundary-1';
-import { createMapCellIndex, lookupMapCell, resolveMapLocation } from './map-cells.mjs?v=20261006-map-startup-1';
+import { createMapCellIndex, lookupMapCell, resolveMapLocation, attachMapGeometryAsync } from './map-cells.mjs?v=20261007-map-lazy-1';
 import { createMapCellRenderer } from './map-cell-renderer.mjs?v=20261005-admin-boundary-1';
 import { buildMapRegionContent } from './map-region-content.mjs?v=20261006-map-startup-1';
 import { WORLD_LAND_MASK } from '../../assets/maps/world-land-mask-v1.mjs?v=20260920-webgl2-1';
@@ -405,7 +405,7 @@ function reducedMotion() { return typeof window !== 'undefined' && typeof window
 
 export function createGlobeRenderer(canvas, { projection = 'orthographic', initialView = null, onPick = () => {}, onLongPress = null, onZoomLimit = null, skyCanvas = null, onHover = () => {}, onStateChange = () => {}, backgroundElement = null, spaceTexture = '', worldFeatures = [], regionFeatures = [], prefectureFeatures = [], rasterData = null, mapCellData = null, mapPrefectureData = null, mapAdmin1Data = null, forceCanvas = false, grid = DEFAULT_GRID, activeLayer = null, contentCounts = null } = {}) {
   if (!canvas || typeof canvas.getContext !== 'function') throw new TypeError('A Canvas element is required.');
-  const mapIndex = mapCellData ? createMapCellIndex(mapCellData, { prefectureData: mapPrefectureData, admin1Data: mapAdmin1Data }) : null;
+  let mapIndex = mapCellData ? createMapCellIndex(mapCellData, { prefectureData: mapPrefectureData, admin1Data: mapAdmin1Data }) : null;
   let initialRaster = null;
   if (rasterData) {
     try { initialRaster = decodeRasterData(rasterData, grid); } catch (error) { console.warn('Globe raster asset is invalid; using Canvas 2D fallback.', error); }
@@ -456,6 +456,7 @@ export function createGlobeRenderer(canvas, { projection = 'orthographic', initi
   let mapContentLayer = null;
   let mapContentMetrics = Object.freeze({ postPoints: 0, eventPoints: 0, droppedPostPoints: 0, droppedEventPoints: 0, occupiedCells: 0 });
   function contentLocation(longitude, latitude) {
+    if (mapIndex?.precisionReady === false) return null;
     const direct = resolveMapLocation(longitude, latitude, mapIndex);
     // The geometry-derived map must never recover sea from the old coarse land mask.
     if (direct || mapIndex.admin1Data?.landAuthority === 'admin1-geometries' || !mapIndex.countryIndices || !mapIndex.bandOffsets) return direct;
@@ -744,5 +745,7 @@ export function createGlobeRenderer(canvas, { projection = 'orthographic', initi
     const regionIndex = mapIndex.mapRegions?.findIndex(region => region?.id === `country:${countryId}`) ?? -1;
     return Object.freeze({ mapRegionId: `country:${countryId}`, mapRegionLabel: mapIndex.countryLabels?.[countryIndex] || countryId, mapRegionKind: 'country', mapRegionIndex: regionIndex >= 0 ? regionIndex : null, countryId, countryLabel: mapIndex.countryLabels?.[countryIndex] || countryId });
   }, getMapCellRepresentatives() { return mapIndex?.cells || Object.freeze([]); },
+  isMapLocationReady() { return mapIndex?.precisionReady !== false; },
+  async setMapGeometry(geometry, { signal } = {}) { if (!mapIndex || mapIndex.precisionReady !== false) return false; const next = await attachMapGeometryAsync(mapIndex, geometry, { signal }); if (signal?.aborted) throw new Error('Map geometry load cancelled.'); mapIndex = next; return true; },
   setSkyOrientation(orientation) { skyOrientation = orientation || null; if (skyOrientation) ensureSky(); skyWebgl?.setAstronomy(skyOrientation ? { bodies: false, gmstRadians: 0 } : { bodies: true }); requestDraw({ rebuildPlan: false }); }, setLayer(nextLayer, nextCounts = counts) { layer = nextLayer || null; counts = nextCounts; requestDraw(); }, setView(nextView) { setView(nextView); }, flyTo(nextView, { duration = 720 } = {}) { cancelFling(); animateFocus({ centerLongitude: view.centerLongitude, centerLatitude: view.centerLatitude, zoom: view.zoom, ...nextView }, duration); }, focusSelection(selection) { const transition = getFocusTransition(selection); if (transition) animateFocus(transition); return transition; }, zoomIn() { updateView({ zoom: clampZoom(view.zoom * 1.22, view.zoomRange) }); }, zoomOut() { updateView({ zoom: clampZoom(view.zoom * .82, view.zoomRange) }); }, resetView() { cancelFling(); clearCurrentSelection(); updateView(projectionMode === 'mercator' ? DEFAULT_MAP_VIEW : DEFAULT_VIEW); }, pickAt(x, y) { return (webgl || projectionMode === 'mercator') ? pickWebGLCell(x, y) : pickRenderedCellAt(x, y, plan); }, getSnapshot() { return Object.freeze({ view, camera, plan, selected, hovered, metrics: Object.freeze({ backend: webgl ? 'webgl2' : 'canvas2d', ...invalidation.snapshot(), ...lastBatchMetrics, mapContentLayer, mapContent: mapContentMetrics, cellCache: cellCache.snapshot() }) }); }, destroy() { if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame); if (wheelTimer !== null) { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(wheelTimer); clearTimeout(wheelTimer); } clearTimeout(wheelInteractionTimer); cancelFocusAnimation(); cancelFling(); clearLongPress(); observer?.disconnect(); mapRenderer?.destroy(); webgl?.destroy(); skyWebgl?.destroy(); canvas.removeEventListener('pointerdown', onPointerDown); canvas.removeEventListener('pointermove', onPointerMove); canvas.removeEventListener('pointerup', endPointer); canvas.removeEventListener('pointercancel', onPointerCancel); canvas.removeEventListener('lostpointercapture', onLostPointerCapture); canvas.removeEventListener('pointerleave', onPointerLeave); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('dblclick', onDoubleClick); canvas.removeEventListener('keydown', onKeyDown); } });
 }

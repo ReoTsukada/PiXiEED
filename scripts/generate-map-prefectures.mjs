@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { DEFAULT_GRID, mercatorY } from '../js/globe/geometry.mjs';
+import { splitMapPrefectureAsset } from '../js/globe/map-asset-format.mjs';
 
 const root = new URL('../', import.meta.url);
 const source = JSON.parse(readFileSync(new URL('assets/maps/globe-land-mask-v1.json', root), 'utf8'));
@@ -249,4 +250,8 @@ const data = {
   features: simplifiedFeatures, checksum: `fnv1a32-${(hash >>> 0).toString(16).padStart(8, '0')}`
 };
 writeFileSync(new URL('assets/maps/map-prefectures-v1.json', root), `${JSON.stringify(data)}\n`);
-console.log(JSON.stringify({ resolution: RESOLUTION, rowRuns: rowRuns.length, landTiles, featureCount: features.length, bytes: Buffer.byteLength(JSON.stringify(data)), checksum: data.checksum }));
+const split = splitMapPrefectureAsset(data);
+const maskSerialized = `${JSON.stringify(split.mask)}\n`, geometrySerialized = `${JSON.stringify(split.geometry)}\n`;
+writeFileSync(new URL('assets/maps/map-prefectures-mask-v2.json', root), maskSerialized);
+writeFileSync(new URL('assets/maps/map-prefectures-geometry-v2.json', root), geometrySerialized);
+console.log(JSON.stringify({ resolution: RESOLUTION, rowRuns: rowRuns.length, landTiles, featureCount: features.length, bytes: Buffer.byteLength(JSON.stringify(data)), maskBytes: Buffer.byteLength(maskSerialized), geometryBytes: Buffer.byteLength(geometrySerialized), checksum: data.checksum }));

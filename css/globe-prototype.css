@@ -793,6 +793,11 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 
 /* Content layers share the map; changing a layer keeps its camera and cell grid. */
 .map-layers { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; gap: 4px; padding: 4px; border: 1px solid #365362; border-radius: 16px; background: #071520; }
+.map-location-status { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: calc(100% - 24px); margin: 0; padding: 7px 10px; border-radius: 8px; background: #071520e8; color: #b9cdd5; font-size: .75rem; pointer-events: none; }
+.map-location-status[hidden] { display: none; }
+.map-location-status button { margin-left: 8px; min-height: var(--control); padding: 0 8px; pointer-events: auto; }
+.map-location-status button[hidden] { display: none; }
+.map-location-status:has(button:not([hidden])) { z-index: 7; }
 .map-layers button { min-height: var(--control); padding: 0 12px; gap: 7px; border: 1px solid transparent; border-radius: 11px; color: #b9cdd5; font-size: .8rem; white-space: nowrap; }
 .map-layers button i { width: 10px; height: 10px; flex: 0 0 10px; background: #77aaff; border-radius: 2px; }
 .map-layers [data-map-content="events"] i { background: #f2ad55; }
@@ -805,9 +810,6 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 .map-events-dock { position: absolute; bottom: calc(5.3rem + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 3; display: grid; justify-items: center; gap: 5px; width: max-content; max-width: calc(100% - 16px); padding: 6px 8px; border: 1px solid rgba(152, 111, 69, .58); border-radius: 14px; background: rgba(7, 21, 32, .94); color: #dcecef; }
 .map-events-dock__top { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
 .map-events-dock button { min-height: var(--control); padding: 0 10px; border: 1px solid #b68145; border-radius: 999px; background: #241e18; color: #ffe0b3; white-space: nowrap; font-size: .72rem; }
-.map-events-dock__filters, .map-events-panel__filters { display: flex; flex-wrap: wrap; gap: 4px; }
-.map-events-dock__filters button, .map-events-panel__filters button { min-height: var(--control); border: 1px solid #405663; border-radius: 10px; background: #122532; color: #c4d6dd; }
-.map-events-dock__filters button[aria-pressed="true"], .map-events-panel__filters button[aria-pressed="true"] { border-color: #e9b46f; background: #392c20; color: #ffe0b3; }
 .map-events-dock__all { border-color: #b68145 !important; background: #241e18 !important; color: #ffe0b3 !important; }
 .map-events-legend__meaning { display: block; color: #bdcdd2; font-size: .64rem; text-align: center; }
 .map-events-legend__bins { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; }
@@ -849,4 +851,74 @@ button > img { display: block; flex: none; width: var(--control-icon); height: v
 /* Short landscapes keep event controls above the central map gesture area. */
 @media (max-height: 500px) and (min-width: 481px) {
   .map-events-dock { top: 14px; bottom: auto; left: 14px; transform: none; max-width: calc(100% - 240px); }
+}
+
+/* Regional discovery keeps the map visible and puts dates before explanations. */
+.map-events-panel { gap: 8px; padding: 12px; width: min(390px, calc(100% - 28px)); overflow: hidden; border-color: #6a5840; background: #0a1722; }
+.map-events-panel__head { position: static; margin: 0; padding: 0; flex-shrink: 0; gap: 6px; align-items: start; background: transparent; }
+.map-events-panel__head h2 { flex: 1; min-width: 0; padding: 8px 0; font-size: 1rem; line-height: 1.4; }
+.map-events-panel__head-controls { display: flex; flex-shrink: 0; gap: 5px; }
+.map-events-panel__controls { display: grid; gap: 6px; flex-shrink: 0; }
+.map-events-panel__close { flex-shrink: 0; border-radius: 12px; font-size: .75rem; }
+.map-events-panel__expand, .map-events-panel__back, .map-events-panel__past, .map-events-panel__more { min-height: var(--control); padding: 0 12px; border: 1px solid #6e604b; border-radius: 12px; background: #192735; color: #ffe0b3; font-size: .78rem; }
+.map-events-panel__period-toggle, .map-events-dock__period-toggle { inline-size: 152px; min-height: var(--control); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border: 1px solid #425d6c; border-radius: 10px; background: #142431; color: #edf3f5; font-size: .77rem; white-space: nowrap; }
+.map-events-panel__period-toggle[data-event-period="future"], .map-events-dock__period-toggle[data-event-period="future"] { border-color: #e9b46f; background: #392c20; color: #ffe0b3; }
+.map-events-panel__period-toggle:focus-visible, .map-events-dock__period-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.map-events-panel__about { flex-shrink: 0; color: #a6bac6; font-size: .72rem; }
+.map-events-panel__about summary { width: fit-content; padding: 3px 0; cursor: pointer; }
+.map-events-panel__about summary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.map-events-panel__about[open] { max-height: 150px; overflow: auto; }
+.map-events-panel__about p { padding: 6px 0; font-size: .75rem; }
+.map-events-panel__about .map-events-panel__legend { padding: 4px 0; }
+.map-events-panel__body { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 0 2px 2px 0; }
+.map-events-panel__list { gap: 10px; }
+.map-events-panel__all { margin: 0; min-height: var(--control); background: transparent; font-size: .76rem; }
+.map-event-card { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 12px; padding: 12px; border: 1px solid #344b5a; border-radius: 15px; background: #132432; overflow-wrap: anywhere; }
+.map-event-card__date { display: flex; flex-direction: column; align-items: center; justify-content: center; align-self: start; min-height: 78px; gap: 3px; padding: 8px 4px; border: 1px solid #8c7047; border-radius: 10px; background: #263126; color: #ffe6b9; text-align: center; font-size: .76rem; line-height: 1.25; }
+.map-event-card__date strong { font-size: 1.05rem; font-weight: 700; white-space: pre; letter-spacing: -.02em; }
+.map-event-card__date.is-range strong { font-size: .9rem; }
+.map-event-card__date small { color: #decba9; font-size: .65rem; }
+.map-event-card__content { min-width: 0; display: grid; gap: 5px; }
+.map-event-card p.map-event-card__status { width: fit-content; max-width: 100%; padding: 2px 6px; border-radius: 5px; background: #3f3524; color: #f6d8a8; font-size: .67rem; line-height: 1.5; }
+.map-event-card[data-event-period="past"] .map-event-card__date { border-color: #5b6f7b; background: #233341; color: #c8d6de; }
+.map-event-card[data-event-period="past"] .map-event-card__status { background: #293d4a; color: #c8d6de; }
+.map-event-card[data-event-period="cancelled"] .map-event-card__status, .map-event-card[data-event-period="postponed"] .map-event-card__status { background: #49302b; color: #ffd1c2; }
+.map-event-card h3.map-event-card__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: #eff3f4; font-size: .9rem; font-weight: 650; line-height: 1.45; }
+.map-event-card p.map-event-card__meta, .map-event-card p.map-event-card__fee { margin: 0; color: #b7c8d3; font-size: .73rem; line-height: 1.45; }
+.map-event-card p.map-event-card__meta { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.map-event-card__tags { display: flex; flex-wrap: wrap; gap: 4px; color: #c8d5db; font-size: .67rem; }
+.map-event-card__tags span { border-radius: 5px; padding: 2px 5px; background: #233845; }
+.map-event-card__detail { justify-self: end; min-height: var(--control); padding: 0 8px; border-radius: 8px; background: transparent; color: #ffd69d; font-size: .75rem; }
+.map-event-card__detail:hover { background: #27394a; }
+.map-events-panel__detail { display: grid; gap: 16px; padding: 4px 2px 12px; }
+.map-events-panel__detail-title { margin: 0; color: #f2f5f6; font-size: 1.1rem; line-height: 1.5; overflow-wrap: anywhere; }
+.map-events-panel__detail-summary { color: #cfdae0; white-space: pre-line; }
+.map-events-panel__facts { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: .79rem; line-height: 1.6; }
+.map-events-panel__facts dt { color: #8da7b8; }
+.map-events-panel__facts dd { margin: 0; color: #e1e9ed; overflow-wrap: anywhere; white-space: pre-line; }
+.map-events-panel__links { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.map-events-panel__links a { min-height: var(--control); display: inline-flex; align-items: center; padding: 0 10px; border: 1px solid #405b6d; border-radius: 9px; color: #c0ddff; font-size: .78rem; }
+.map-events-panel__source { padding-top: 12px; border-top: 1px solid #2d4352; color: #a9bdca; font-size: .73rem; line-height: 1.6; }
+.map-events-panel__empty { padding: 14px 4px; color: #bccbd3; }
+.map-events-panel__empty + button { margin: 0 4px 12px; }
+.map-events-panel [hidden] { display: none !important; }
+@media (max-width: 680px) {
+  .map-events-panel { top: auto; left: 10px; right: 10px; width: auto; bottom: calc(5.3rem + env(safe-area-inset-bottom)); border-radius: 21px 21px 16px 16px; }
+  .map-events-panel[data-view="overview"] { max-height: 48%; }
+  .map-events-panel[data-view="list"] { max-height: 60%; }
+  .map-events-panel[data-view="detail"] { max-height: 85%; }
+  .map-events-panel__head h2 { font-size: .95rem; }
+  .map-event-card { grid-template-columns: 56px minmax(0, 1fr); gap: 10px; padding: 10px; }
+  .map-event-card__date { min-height: 74px; }
+  .map-event-card__date strong { font-size: .96rem; }
+  .map-event-card__date.is-range strong { font-size: .87rem; }
+}
+@media (max-height: 500px) and (min-width: 681px) {
+  .map-events-panel { top: 10px; right: 10px; width: min(350px, 43%); bottom: 86px; padding: 10px; gap: 6px; }
+  .map-events-panel__head h2 { padding: 4px 0; font-size: .82rem; }
+  .map-events-panel__about { display: none; }
+  .map-event-card { padding: 8px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-events-panel { animation: none; transition: none; }
 }
