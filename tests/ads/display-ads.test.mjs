@@ -75,8 +75,10 @@ for (const [path, key] of pages) test(`${path}: configured hidden flow-layout ad
   assert.equal((source.match(/src="\/js\/display-ads\.mjs/g) || []).length, 1);
   assert.equal((source.match(/href="\/css\/display-ads\.css/g) || []).length, 1);
   if (key === 'home') {
-    assert.ok(ads[0][0].includes('px-display-ad--interactive-clearance'));
-    assert.ok(ads[0].index > source.indexOf('id="hpToys"') && ads[0].index < source.indexOf('GLOBE GALLERY'));
+    const galleryEnd = source.indexOf('</section>', source.indexOf('data-home-feed'));
+    const storesStart = source.indexOf('<section class="section section--paper-deep">');
+    assert.ok(ads[0].index > galleryEnd && ads[0].index < storesStart, 'first home slot follows the gallery and precedes stores');
+    assert.ok(!ads[0][0].includes('px-display-ad--interactive-clearance'), 'the gallery supplies the buffer from interactive toys');
     assert.ok(ads[1].index > source.indexOf('data-home-stores') && ads[1].index < source.indexOf('</main>'));
   }
   if (key === 'tools') {
