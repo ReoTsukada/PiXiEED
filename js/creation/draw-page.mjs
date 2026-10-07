@@ -289,6 +289,8 @@ function updateControls() {
 function syncPlaybackControl() {
   const button = $('#draw-animation-play'), badge = $('#draw-playback-position');
   if (cameraOpening) return;
+  // The result view temporarily owns this control as its return action.
+  if (button.hasAttribute('data-tool-result-return')) return;
   const frames = animationSession.animation.frames;
   button.disabled = Boolean(readOnlyImage) || frames.length < 2;
   button.setAttribute('aria-pressed', String(playing));

@@ -5,13 +5,16 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stores as storeData } from '../data/site-data.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/telescope/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/'];
+const pages = ['/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/'];
+const indexableRoutes = ['/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/pixiee-lens/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
 const images = ['site', 'tools', 'draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object', 'spot-game', 'find-game', 'game', 'camera', 'telescope'];
 const icons = new Map([['/favicon-96.png', 96], ['/apple-touch-icon.png', 180], ['/assets/brand/app-icon-192.png', 192], ['/assets/brand/app-icon-512.png', 512]]);
 const paths = new Map(pages.map((url) => [url, url.endsWith('/') ? `${url}index.html` : url]));
 for (const name of images) paths.set(`/assets/og/${name}.png`, `/assets/og/${name}.png`);
+paths.set('/pixiee-lens/ogp.png', '/pixiee-lens/ogp.png');
 for (const name of [...icons.keys(), '/favicon.ico', '/manifest.webmanifest', '/sitemap.xml', '/robots.txt']) paths.set(name, name);
 const mime = (path) => path.endsWith('.png') ? 'image/png' : path.endsWith('.ico') ? 'image/vnd.microsoft.icon' : path.endsWith('.webmanifest') ? 'application/manifest+json' : path.endsWith('.xml') ? 'application/xml' : path.endsWith('.txt') ? 'text/plain' : 'text/html';
 const server = createServer(async (request, response) => {
@@ -50,9 +53,29 @@ try {
       const canonical = tags.filter((tag) => tag.rel === 'canonical');
       assert.equal(canonical.length, 1);
       assert.equal(canonical[0].href, `https://pixieed.jp${path}`);
+      if (indexableRoutes.includes(path)) {
+        const robots = tags.find((tag) => tag.name === 'robots');
+        assert.ok(!/noindex/i.test(robots?.content || ''), `${path}: indexable sitemap route is not noindex`);
+      }
       assert.equal(meta('og:url'), canonical[0].href);
       assert.equal(meta('og:site_name'), 'PiXiEED');
       assert.equal(meta('og:locale'), 'ja_JP');
+      if (path === '/pixiee-lens/') {
+        // The established lens page uses a compact legacy head; validate its
+        // canonical and factual JSON-LD without imposing the newer OG bundle.
+        assert.ok(meta('description'));
+        assert.ok(meta('og:title'));
+        assert.ok(meta('og:description'));
+        assert.equal(meta('og:image'), 'https://pixieed.jp/pixiee-lens/ogp.png');
+        const image = new URL(meta('og:image'));
+        assert.equal(image.origin, 'https://pixieed.jp');
+        assert.ok(paths.has(image.pathname));
+        const structured = [...html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
+          .map(([, json]) => JSON.parse(json));
+        assert.ok(structured.length > 0, 'lens structured data remains valid JSON');
+        checks++;
+        continue;
+      }
       assert.equal(meta('og:type'), 'website');
       assert.equal(meta('og:image:width'), '1200'); assert.equal(meta('og:image:height'), '630');
       assert.equal(meta('og:image:type'), 'image/png');
@@ -85,8 +108,30 @@ try {
   assert.equal(manifest.name, 'PiXiEED'); assert.equal(manifest.start_url, '/');
   for (const icon of manifest.icons) assert.ok(icons.has(icon.src)); checks++;
   const sitemap = await (await get('/sitemap.xml')).text();
-  for (const path of pages) assert.ok(sitemap.includes(`<loc>https://pixieed.jp${path}</loc>`), `sitemap: ${path}`);
+  const sitemapRoutes = [...sitemap.matchAll(/<loc>https:\/\/pixieed\.jp([^<]*)<\/loc>/g)].map(([, route]) => route);
+  assert.deepEqual(sitemapRoutes, indexableRoutes, 'sitemap contains only the canonical indexable routes in source order');
+  for (const path of ['/game/', '/telescope/', '/collection/']) assert.ok(!sitemapRoutes.includes(path), `${path} is non-indexable`);
   assert.doesNotMatch(sitemap, /https:\/\/pixieed\.jp\/(?:admin|profile|works|shops)\//); checks++;
+  const stores = await (await get('/stores/')).text();
+  assert.equal(stores.length > 0, true);
+  for (const store of storeData) {
+    assert.ok(stores.includes(store.name)); assert.ok(stores.includes(store.status));
+    assert.ok(stores.includes(`/stores/${store.id}.html`));
+  }
+  checks++;
+  const detail = await (await get('/stores/ecowashcafe-nakanoshima.html')).text();
+  for (const store of storeData) {
+    assert.ok(detail.includes(`<h1>${store.name}</h1>`));
+    assert.ok(detail.includes(store.status)); assert.ok(detail.includes(store.address));
+  }
+  checks++;
+  for (const path of ['/game/', '/telescope/', '/collection/']) {
+    const html = await (await get(path)).text();
+    assert.match(html, /<meta name="robots" content="noindex,follow"/i, `${path} stays served but excluded from the sitemap`);
+    checks++;
+  }
+  const retired = await fetch(`${base}/shops/`, { redirect: 'error', signal: AbortSignal.timeout(5000) });
+  assert.equal(retired.status, 404, 'retired shop route has no source fallback'); checks++;
   assert.match(await (await get('/robots.txt')).text(), /Sitemap: https:\/\/pixieed\.jp\/sitemap\.xml/); checks++;
   console.log(`SEO HTTP fixtures: ${checks} checks PASS (JavaScript is not executed; loopback only).`);
   console.log('Production crawling, per-puzzle OGP, and social-platform cache refresh are not tested here.');

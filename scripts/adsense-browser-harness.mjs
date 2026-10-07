@@ -10,15 +10,16 @@ const engine = process.env.PIXIEED_UI_ENGINE || 'chromium';
 assert.ok(['chromium', 'webkit'].includes(engine));
 const modulePath = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 const playwright = await import(pathToFileURL(modulePath).href);
-const browser = await playwright[engine].launch({ headless: true, ...(engine === 'webkit' ? { executablePath: process.env.PIXIEED_WEBKIT_EXECUTABLE || '/Users/tsukadareine/Library/Caches/ms-playwright/webkit-2272/pw_run.sh' } : {}) });
+const browser = await playwright[engine].launch({ headless: true, ...(engine === 'webkit' ? { executablePath: process.env.PIXIEEED_WEBKIT_EXECUTABLE || '/Users/tsukadareine/Library/Caches/ms-playwright/webkit-2272/pw_run.sh' } : {}) });
 const paths = [
   '/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/',
   '/play/spot-difference/', '/play/hidden-object/', '/globe/', '/about/', '/guide/',
   '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/stores/cafe-hoshi.html',
-  '/stores/kaze-machi.html', '/stores/yoru-akari.html',
-  '/pixel-camera.html', '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/'
+  '/stores/kaze-machi.html', '/stores/yoru-akari.html', '/pixel-camera.html',
+  '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/'
 ];
-const source = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+const manualPages = ['/', '/tools/', '/about/', '/guide/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+const sourcePrefix = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
 let checks = 0;
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -26,9 +27,14 @@ try {
   let rewardedRequests = [];
   await context.route('**/*', (route) => {
     const url = route.request().url();
-    if (url === source) {
+    if (url.startsWith(sourcePrefix)) {
       requests.push(url);
-      return route.fulfill({ contentType: 'application/javascript', body: 'window.__PIXIEED_AD_TEST_LOADS__ = (window.__PIXIEED_AD_TEST_LOADS__ || 0) + 1;' });
+      return route.fulfill({
+        contentType: 'application/javascript',
+        body: `window.__PIXIEED_AD_TEST_LOADS__=(window.__PIXIEED_AD_TEST_LOADS__||0)+1;
+          const q=window.adsbygoogle||[]; const fill=()=>{const n=[...document.querySelectorAll('ins.adsbygoogle')].find(x=>!x.dataset.adStatus);if(n){n.dataset.adStatus='filled';n.innerHTML='<iframe title="stub ad"></iframe>'}};
+          window.adsbygoogle={push:()=>{fill();return 1}}; q.forEach(()=>fill());`
+      });
     }
     if (url.includes('securepubads.g.doubleclick.net')) rewardedRequests.push(url);
     return new URL(url).origin === origin ? route.continue() : route.abort();
@@ -37,20 +43,31 @@ try {
   for (const path of paths) {
     requests = []; rewardedRequests = [];
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => window.__PIXIEED_AD_TEST_LOADS__ === 1);
-    const state = await page.evaluate(() => {
-      const nodes = [...document.querySelectorAll('script[src*="adsbygoogle.js"]')];
-      return {
-        scripts: nodes.length,
-        correct: nodes.every((node) => node.parentElement === document.head && node.async && node.crossOrigin === 'anonymous'),
-        pass: localStorage.getItem('pixieed:pass:v1')
-      };
-    });
-    assert.equal(requests.length, 1, `${path}: only the top-level page requests AdSense`);
-    assert.equal(state.scripts, 1, path);
-    assert.equal(state.correct, true, path);
-    assert.equal(state.pass, null, `${path}: ordinary ads grant no pass`);
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), 0, `${path}: no eager Auto ads entrypoint`);
+    if (!manualPages.includes(path)) {
+      assert.equal(await page.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: no loader without a result or manual placement`);
+      assert.equal(requests.length, 0, `${path}: no provider request without a placement`);
+    }
+    assert.equal(await page.evaluate(() => localStorage.getItem('pixieed:pass:v1')), null, `${path}: ordinary ads grant no pass`);
     assert.equal(rewardedRequests.length, 0, `${path}: no unsolicited rewarded ad`);
+    if (manualPages.includes(path)) {
+      const units = page.locator('[data-display-ad]');
+      const count = await units.count();
+      assert.ok(count >= 1, `${path}: static placement exists`);
+      for (let i = 0; i < count; i++) {
+        await units.nth(i).scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => window.__PIXIEED_AD_TEST_LOADS__ > 0);
+      }
+      await page.waitForFunction((expected) => document.querySelectorAll('ins.adsbygoogle[data-ad-status="filled"]').length === expected, count);
+      const state = await page.evaluate(() => {
+        const scripts = [...document.querySelectorAll('script[src*="adsbygoogle.js"]')];
+        return { scripts: scripts.length, correct: scripts.every((node) => node.parentElement === document.head && node.async && node.crossOrigin === 'anonymous') };
+      });
+      assert.equal(requests.length, 1, `${path}: provider loader is deduplicated`);
+      assert.equal(state.scripts, 1, path);
+      assert.equal(state.correct, true, path);
+    }
     checks++;
   }
   for (const path of ['/privacy/', '/profile/', '/collection/', '/admin/', '/game/', '/404.html']) {
@@ -66,23 +83,16 @@ try {
     await page.evaluate((path) => {
       const iframe = document.createElement('iframe'); iframe.id = 'ad-test-frame'; iframe.src = path; document.body.append(iframe);
     }, path);
-    await page.frameLocator('#ad-test-frame').locator('script[src*="adsense-auto.js"]').waitFor({ state: 'attached' });
     const child = page.frames().find((frame) => frame !== page.mainFrame());
     await child.waitForFunction(() => document.readyState !== 'loading');
-    assert.equal(await child.locator('script[src*="adsbygoogle.js"]').count(), 0, path);
+    assert.equal(await child.locator('script[src*="adsbygoogle.js"],script[src*="adsense-auto.js"]').count(), 0, path);
     assert.equal(requests.length, 0, `${path}: iframe never requests ads`);
     checks++;
   }
   await context.close();
 
-  // Check existing touch controls and narrow/desktop layouts with an inert ad response.
   for (const viewport of [{ width: 320, height: 568 }, { width: 1280, height: 800 }]) {
     const layout = await browser.newContext({ viewport });
-    await layout.route('**/*', (route) => {
-      const url = route.request().url();
-      if (url === source) return route.fulfill({ contentType: 'application/javascript', body: '' });
-      return new URL(url).origin === origin ? route.continue() : route.abort();
-    });
     const view = await layout.newPage();
     for (const path of ['/', '/tools/', '/draw/', '/audio/', '/jigsaw/']) {
       await view.goto(base + path, { waitUntil: 'domcontentloaded' });

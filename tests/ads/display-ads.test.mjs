@@ -68,15 +68,16 @@ for (const [path, key] of pages) test(`${path}: configured hidden flow-layout ad
   const mainStart = source.indexOf('<main');
   const mainEnd = source.indexOf('</main>');
   for (const ad of ads) {
-    assert.ok(ad[0].includes(`data-display-ad="${key}"`) && ad[0].includes('hidden'));
+    assert.ok(ad[0].includes(`data-display-ad="${key}"`) && ad[0].includes('data-ad-reserve'));
     assert.ok(ad.index > mainStart && ad.index < mainEnd);
   }
   assert.ok(!source.includes('<ins'), 'AdSense units are created only after a valid ID is configured');
   assert.equal((source.match(/src="\/js\/display-ads\.mjs/g) || []).length, 1);
   assert.equal((source.match(/href="\/css\/display-ads\.css/g) || []).length, 1);
   if (key === 'home') {
-    assert.ok(ads[0].index > source.indexOf('class="hp-go-sub"') && ads[0].index < source.indexOf('aria-labelledby="hpToysTitle"'));
-    assert.ok(ads[1].index > source.indexOf('id="hpToys"') && ads[1].index < source.indexOf('GLOBE GALLERY'));
+    assert.ok(ads[0][0].includes('px-display-ad--interactive-clearance'));
+    assert.ok(ads[0].index > source.indexOf('id="hpToys"') && ads[0].index < source.indexOf('GLOBE GALLERY'));
+    assert.ok(ads[1].index > source.indexOf('data-home-stores') && ads[1].index < source.indexOf('</main>'));
   }
   if (key === 'tools') {
     assert.ok(ads[0].index > source.indexOf('data-tool-preview="game"') && ads[0].index < source.indexOf('tool-shell__head--games'));
@@ -91,9 +92,14 @@ test('working and private HTML has no manual slot or renderer', async () => {
 test('unit CSS reserves size without cropping, floating or animating a creative', async () => {
   const css = await read('css/display-ads.css');
   assert.match(css, /\.px-display-ad\[hidden\]\s*\{\s*display: none !important/);
+  assert.match(css, /\.px-display-ad\[data-ad-reserve\][\s\S]*?min-height: var\(--px-display-ad-reserved-height\)/);
+  assert.match(css, /px-display-ad--interactive-clearance[\s\S]*?margin-block-start: 150px/);
   assert.match(css, /height: 100px/);
   assert.match(css, /height: 90px/);
   assert.doesNotMatch(css, /overflow\s*:\s*hidden|position\s*:\s*(fixed|absolute)|transform\s*:|animation\s*:/);
+  const source = await read('js/display-ads.mjs');
+  assert.match(source, /getAdsenseLoader\(doc, win, resolved\.client\)/);
+  assert.match(source, /node\.hasAttribute\('data-ad-reserve'\)/);
 });
 test('multiple placements mount once each and later calls still mount a newly eligible unit', () => {
   const units = []; let disconnected = 0;
@@ -101,15 +107,19 @@ test('multiple placements mount once each and later calls still mount a newly el
     dataset: { displayAd: 'home' }, hidden: true,
     querySelector() { return { append(unit) { units.push(unit); } }; }
   }));
+  const scripts = [];
   const doc = { visibilityState: 'visible', querySelector: () => null,
-    createElement: () => ({ dataset: {}, style: {}, getBoundingClientRect: () => ({ width: 320 }) }),
+    head: { append(script) { script.isConnected = true; scripts.push(script); } },
+    createElement(tag) { return tag === 'script'
+      ? { addEventListener() {}, isConnected: false }
+      : { dataset: {}, style: {}, getBoundingClientRect: () => ({ width: 320 }) }; },
     addEventListener() {}, removeEventListener() {} };
   const root = { ownerDocument: doc, querySelectorAll: () => nodes };
   const win = { location: { protocol: 'https:', pathname: '/' },
     MutationObserver: class { observe() {} disconnect() { disconnected++; } } };
   win.top = win.self = win;
   const cleanup = mountDisplayAds({ root, win, config, canMount: (node) => node !== nodes[2] });
-  assert.equal(units.length, 2); assert.equal(win.adsbygoogle.length, 2);
+  assert.equal(units.length, 2); assert.equal(win.adsbygoogle.length, 2); assert.equal(scripts.length, 1);
   const laterCleanup = mountDisplayAds({ root, win, config });
   assert.equal(units.length, 3); assert.equal(win.adsbygoogle.length, 3);
   mountDisplayAds({ root, win, config });

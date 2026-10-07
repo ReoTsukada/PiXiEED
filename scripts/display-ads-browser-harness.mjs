@@ -13,22 +13,15 @@ const playwright = await import(pathToFileURL(modulePath).href);
 const browser = await playwright[engine].launch({ headless: true, ...(engine === 'webkit' ? { executablePath: process.env.PIXIEED_WEBKIT_EXECUTABLE || '/Users/tsukadareine/Library/Caches/ms-playwright/webkit-2272/pw_run.sh' } : {}) });
 const configuration = await readFile(new URL('../data/site-config.js', import.meta.url), 'utf8');
 const paths = ['/', '/tools/', '/about/', '/guide/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+const placementCounts = { '/': 2, '/tools/': 2, '/about/': 1, '/guide/': 1, '/stores/': 1, '/stores/ecowashcafe-nakanoshima.html': 1 };
 const captureNames = ['home', 'tools', 'about', 'guide', 'stores', 'store-detail'];
 const frames = (page) => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-async function readAd(page) {
-  // The existing site uses content-visibility above the slot; settle that layout before centering it.
-  await page.locator('[data-display-ad]').evaluate((ad) => ad.scrollIntoView({ block: 'center', behavior: 'instant' }));
-  await frames(page);
-  await page.locator('[data-display-ad]').evaluate((ad) => ad.scrollIntoView({ block: 'center', behavior: 'instant' }));
-  await frames(page);
-}
 const mock = `
-window.__manualAdRequests = 0;
 const queued = window.adsbygoogle || [];
 const push = () => {
+  const unit = [...document.querySelectorAll('ins.px-display-ad__unit')].find(node => !node.dataset.adsbygoogleStatus);
+  if (!unit) throw Error('no unrequested unit');
   window.__manualAdRequests++;
-  const unit = document.querySelector('ins.px-display-ad__unit');
-  if (!unit) throw Error('no prepared unit');
   unit.dataset.adsbygoogleStatus = 'done';
   if (window.__adMockMode === 'pending') return;
   unit.dataset.adStatus = 'filled';
@@ -42,7 +35,7 @@ window.adsbygoogle = { push }; queued.forEach(push);
 let checks = 0;
 async function contextFor({ viewport, configured = false, mode = 'filled' }) {
   const context = await browser.newContext({ viewport });
-  await context.addInitScript((mode) => { window.__adMockMode = mode; }, mode);
+  await context.addInitScript((mode) => { window.__manualAdRequests = 0; window.__adMockMode = mode; }, mode);
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
     if (url.hostname === 'pagead2.googlesyndication.com') return route.fulfill({ contentType: 'application/javascript', body: mock });
@@ -54,8 +47,8 @@ async function contextFor({ viewport, configured = false, mode = 'filled' }) {
   });
   return context;
 }
-async function noOverlap(page, description) {
-  const result = await page.locator('[data-display-ad]').evaluate((ad) => {
+async function noOverlap(page, description, index = 0) {
+  const result = await page.locator('[data-display-ad]').nth(index).evaluate((ad) => {
     const a = ad.getBoundingClientRect();
     const overlaps = [...document.querySelectorAll('button,a,input,select,summary')].filter((el) => {
       if (ad.contains(el)) return false;
@@ -63,8 +56,10 @@ async function noOverlap(page, description) {
       return r.width > 0 && r.height > 0 && r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top;
     }).map((el) => el.id || el.textContent.trim().slice(0, 24));
     const unit = ad.querySelector('ins'); const u = unit.getBoundingClientRect();
-    const content = ad.parentElement.classList.contains('container') ? ad.parentElement : document.querySelector('#main .container:not(.px-display-ad)');
+    const content = ad.classList.contains('container') ? ad : ad.parentElement;
     const c = content.getBoundingClientRect();
+    const canvases = [...document.querySelectorAll('canvas')].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    const canvasClearance = canvases.length ? Math.min(...canvases.map((r) => Math.hypot(Math.max(r.left - a.right, a.left - r.right, 0), Math.max(r.top - a.bottom, a.top - r.bottom, 0)))) : Infinity;
     return { overlaps, inScreen: a.left >= -1 && a.right <= innerWidth + 1,
       unitFits: u.left >= a.left && u.right <= a.right + 1,
       matchesContent: Math.abs(a.left - c.left) <= 1 && Math.abs(a.right - c.right) <= 1,
@@ -73,27 +68,31 @@ async function noOverlap(page, description) {
       labelCentered: getComputedStyle(ad.querySelector('.px-display-ad__label')).textAlign === 'center',
       height: u.height, marginTop: parseFloat(getComputedStyle(ad).marginTop),
       pass: localStorage.getItem('pixieed:pass:v1'),
-      overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+      overflow: document.documentElement.scrollWidth > innerWidth + 1, canvasClearance };
   });
   assert.deepEqual(result.overlaps, [], description);
   assert.equal(result.inScreen, true); assert.equal(result.unitFits, true);
-  assert.equal(result.matchesContent, true, `${description}: align with the content edges`);
-  assert.equal(result.centered, true, `${description}: center the placement`);
+  assert.equal(result.matchesContent, true, `${description}: align with content edges`);
+  assert.equal(result.centered, true, `${description}: center placement`);
   assert.equal(result.unitCentered, true); assert.equal(result.labelCentered, true);
   assert.ok([90, 100].includes(result.height)); assert.ok(result.marginTop >= 48);
   assert.equal(result.overflow, false); assert.equal(result.pass, null);
+  if (new URL(page.url()).pathname === '/') assert.ok(result.canvasClearance >= 149, `${description}: 150px clearance from interactive canvases`);
 }
 try {
   for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1920, height: 1080 }]) {
     const inactive = await contextFor({ viewport }); const page = await inactive.newPage();
     for (const path of paths) {
       await page.goto(base + path, { waitUntil: 'domcontentloaded' }); await frames(page);
-      await page.waitForFunction(() => typeof window.__manualAdRequests === 'number');
-      const ad = page.locator('[data-display-ad]');
-      assert.equal(await ad.count(), 1); assert.equal(await ad.isVisible(), false);
-      assert.equal((await ad.boundingBox()), null, 'unconfigured ads occupy no space');
+      const ads = page.locator('[data-display-ad]');
+      assert.equal(await ads.count(), placementCounts[path]);
+      for (const ad of await ads.all()) {
+        assert.equal(await ad.isVisible(), false, 'blank config collapses its initial reservation');
+        assert.equal(await ad.boundingBox(), null, 'blank configuration occupies no space after resolving');
+      }
       assert.equal(await page.locator('ins.px-display-ad__unit').count(), 0);
       assert.equal(await page.evaluate(() => window.__manualAdRequests), 0);
+      assert.equal(await page.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: no provider before valid unit proximity`);
       checks++;
     }
     await inactive.close();
@@ -101,19 +100,30 @@ try {
     const configured = await contextFor({ viewport, configured: true }); const view = await configured.newPage();
     for (const path of paths) {
       await view.goto(base + path, { waitUntil: 'domcontentloaded' });
-      await view.waitForFunction(() => document.querySelector('[data-display-ad]')?.hidden === false);
-      const ad = view.locator('[data-display-ad]');
-      await readAd(view);
-      await view.waitForFunction(() => document.querySelector('[data-display-ad]')?.dataset.adState === 'filled');
-      assert.equal(await view.evaluate(() => window.__manualAdRequests), 1);
+      const ads = view.locator('[data-display-ad]'); const count = placementCounts[path];
+      assert.equal(await ads.count(), count);
+      const initiallyEligible = await ads.evaluateAll((nodes) => nodes.filter((node) => {
+        const bounds = node.getBoundingClientRect();
+        return bounds.top < innerHeight + 240 && bounds.bottom > -240;
+      }).length);
+      const initiallyRequested = await view.evaluate(() => window.__manualAdRequests);
+      assert.ok(initiallyRequested <= initiallyEligible, `${path}: only near-viewport units can start a request`);
+      if (initiallyEligible === 0) assert.equal(await view.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: distant slots do not load the provider`);
+      for (let index = 0; index < count; index++) {
+        await ads.nth(index).evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        await frames(view);
+        await view.waitForFunction((index) => document.querySelectorAll('[data-display-ad]')[index]?.dataset.adState === 'filled', index);
+      }
+      await view.waitForFunction((count) => window.__manualAdRequests === count, count);
       await view.screenshot({ path: `/tmp/pixieed-ad-current-${engine}.png` });
-      await noOverlap(view, `${path} ${viewport.width}x${viewport.height}`);
-      await readAd(view);
-      assert.equal(await view.evaluate(() => window.__manualAdRequests), 1, 'scrolling never refreshes the unit');
-      // Settle the iframe paint as well as the layout before saving the placement preview.
-      await ad.screenshot({ path: `/tmp/pixieed-ad-unit-${engine}-${viewport.width}-${captureNames[paths.indexOf(path)]}.png` });
-      await frames(view);
+      for (let index = 0; index < count; index++) {
+        await noOverlap(view, `${path} ${viewport.width}x${viewport.height}`, index);
+        await ads.nth(index).evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        await frames(view);
+        await ads.nth(index).screenshot({ path: `/tmp/pixieed-ad-unit-${engine}-${viewport.width}-${captureNames[paths.indexOf(path)]}-${index}.png` });
+      }
       await view.screenshot({ path: `/tmp/pixieed-ad-placement-${engine}-${viewport.width}-${captureNames[paths.indexOf(path)]}.png` });
+      assert.equal(await view.evaluate(() => window.__manualAdRequests), count, 'scrolling never refreshes any unit');
       checks++;
     }
     await configured.close();
@@ -122,33 +132,36 @@ try {
   const pending = await contextFor({ viewport: { width: 390, height: 844 }, configured: true, mode: 'pending' });
   const page = await pending.newPage();
   await page.goto(base + '/tools/', { waitUntil: 'domcontentloaded' });
-  const ad = page.locator('[data-display-ad]'); await readAd(page);
-  await page.waitForFunction(() => window.__manualAdRequests === 1);
+  const ad = page.locator('[data-display-ad]').first();
+  await ad.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' })); await frames(page);
+  await page.waitForFunction(() => window.__manualAdRequests >= 1);
+  const secondAd = page.locator('[data-display-ad]').nth(1);
+  await secondAd.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' })); await frames(page);
+  await page.waitForFunction(() => window.__manualAdRequests === 2);
   const before = await ad.boundingBox();
-  await page.locator('ins.px-display-ad__unit').evaluate((unit) => { unit.dataset.adStatus = 'unfilled'; });
+  await ad.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' })); await frames(page);
+  await ad.locator('ins.px-display-ad__unit').evaluate((unit) => { unit.dataset.adStatus = 'unfilled'; });
   await page.waitForFunction(() => document.querySelector('[data-display-ad]').dataset.adState === 'unfilled');
-  assert.equal(await ad.isVisible(), true, 'no reflow under the finger when an on-screen request is empty');
+  assert.equal(await ad.isVisible(), true, 'no reflow beneath an on-screen request');
   assert.equal((await ad.boundingBox()).height, before.height);
-  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-  await page.waitForFunction(() => document.querySelector('[data-display-ad]').hidden);
+  await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' })); await frames(page);
+  assert.equal(await ad.isVisible(), true, 'normal slots retain their reserved blank area after no-fill');
+  await page.waitForFunction(() => document.querySelector('[data-display-ad]').dataset.adState === 'empty');
+  assert.equal((await ad.boundingBox()).height, before.height);
   checks++;
-  await page.locator('ins.px-display-ad__unit').evaluate((unit) => { unit.dataset.adStatus = 'unfill-optimized'; });
+  await ad.locator('ins.px-display-ad__unit').evaluate((unit) => { unit.dataset.adStatus = 'unfill-optimized'; });
   await page.waitForFunction(() => document.querySelector('[data-display-ad]').dataset.adState === 'filled');
-  assert.equal(await ad.isVisible(), true, 'a late Google optimized creative is never hidden');
-  checks++;
-  const { mountDisplayAds } = await page.evaluate(async () => {
-    const module = await import('/js/display-ads.mjs?rev=20260929-display-units-1');
-    module.mountDisplayAds(); return { mountDisplayAds: true };
-  });
-  assert.equal(mountDisplayAds, true);
-  assert.equal(await page.evaluate(() => window.__manualAdRequests), 1, 'repeat mount is idempotent');
-  assert.equal(await page.locator('ins.px-display-ad__unit').count(), 1); checks++;
+  assert.equal(await ad.isVisible(), true, 'a late optimized creative remains visible'); checks++;
+  await page.evaluate(async () => { const module = await import('/js/display-ads.mjs?rev=20261007-lazy-ads-1'); module.mountDisplayAds(); });
+  assert.equal(await page.evaluate(() => window.__manualAdRequests), 2, 'repeat mount is idempotent across both tools placements');
+  assert.equal(await page.locator('ins.px-display-ad__unit').count(), 2); checks++;
   await pending.close();
 
   const excluded = await contextFor({ viewport: { width: 390, height: 844 }, configured: true }); const view = await excluded.newPage();
   for (const path of ['/draw/', '/audio/', '/jigsaw/', '/privacy/', '/profile/']) {
     await view.goto(base + path, { waitUntil: 'domcontentloaded' });
-    assert.equal(await view.locator('[data-display-ad],ins.px-display-ad__unit').count(), 0); checks++;
+    assert.equal(await view.locator('[data-display-ad],ins.px-display-ad__unit').count(), 0);
+    assert.equal(await view.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: no loader before a result`); checks++;
   }
   await excluded.close();
   console.log(`${engine}: ${checks}/${checks} PASS; stub creatives only, unit IDs are isolated in browser routes; no real ad traffic`);

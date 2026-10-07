@@ -9,6 +9,28 @@ const placements = new Map([
   ['spot-result', ['/play/spot-difference/']], ['find-result', ['/play/hidden-object/']]
 ]);
 const mounted = new WeakSet();
+const loaders = new WeakMap();
+
+function getAdsenseLoader(doc, win, client) {
+  let state = loaders.get(doc);
+  if (state) return state;
+  const source = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
+  const script = doc.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]') || doc.createElement('script');
+  state = { script, failed: false, errors: new Set() };
+  loaders.set(doc, state);
+  script.async = true;
+  script.crossOrigin = 'anonymous';
+  script.addEventListener('error', () => {
+    state.failed = true;
+    for (const onError of [...state.errors]) onError();
+    state.errors.clear();
+  }, { once: true });
+  if (!script.isConnected) {
+    script.src = source;
+    doc.head.append(script);
+  }
+  return state;
+}
 
 export function resolveDisplayAd(config, key, pathname) {
   const path = String(pathname || '').replace(/\/index\.html$/, '/');
@@ -28,7 +50,7 @@ export function mountDisplayAds({ root = document, win = window, config = displa
   for (const node of root.querySelectorAll('[data-display-ad]')) {
     if (mounted.has(node)) continue;
     const resolved = resolveDisplayAd(config, node.dataset.displayAd, pathname);
-    if (!resolved) continue;
+    if (!resolved) { node.hidden = true; continue; }
     const inner = node.querySelector('.px-display-ad__inner');
     if (!inner) continue;
     // A full-screen result may omit this unit before any request when it cannot fit safely.
@@ -48,22 +70,30 @@ export function mountDisplayAds({ root = document, win = window, config = displa
     let requestObserver;
     let emptyObserver;
     let statusObserver;
-    const script = doc.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
+    let loader;
     function dispose() {
       requestObserver?.disconnect();
       emptyObserver?.disconnect();
       statusObserver?.disconnect();
-      script?.removeEventListener('error', markEmpty);
+      loader?.errors.delete(markEmpty);
       doc.removeEventListener('visibilitychange', onVisible);
     }
     function collapseEmpty() {
       // Filled creatives, including Google's optimized unfilled units, must remain untouched.
       if (['filled', 'unfill-optimized'].includes(unit.dataset.adStatus)) { dispose(); return; }
+      if (node.hasAttribute('data-ad-reserve')) {
+        node.dataset.adState = 'empty';
+        requestObserver?.disconnect();
+        emptyObserver?.disconnect();
+        loader?.errors.delete(markEmpty);
+        doc.removeEventListener('visibilitychange', onVisible);
+        return;
+      }
       node.hidden = true;
       node.dataset.adState = 'empty';
       requestObserver?.disconnect();
       emptyObserver?.disconnect();
-      script?.removeEventListener('error', markEmpty);
+      loader?.errors.delete(markEmpty);
       doc.removeEventListener('visibilitychange', onVisible);
       // Keep the status observer so a later Google-optimized fill is never hidden.
     }
@@ -85,7 +115,12 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       queued = true;
       node.dataset.adState = 'requested';
       requestObserver?.disconnect();
-      try { (win.adsbygoogle = win.adsbygoogle || []).push({}); }
+      try {
+        loader = getAdsenseLoader(doc, win, resolved.client);
+        if (loader.failed) { markEmpty(); return; }
+        loader.errors.add(markEmpty);
+        (win.adsbygoogle = win.adsbygoogle || []).push({});
+      }
       catch { markEmpty(); }
     }
     function onVisible() {
@@ -102,7 +137,6 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       }
     });
     statusObserver.observe(unit, { attributes: true, attributeFilter: ['data-ad-status'] });
-    script?.addEventListener('error', markEmpty, { once: true });
     doc.addEventListener('visibilitychange', onVisible);
     if (win.IntersectionObserver) {
       requestObserver = new win.IntersectionObserver((entries) => {

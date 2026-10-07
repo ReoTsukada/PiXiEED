@@ -1,113 +1,68 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
-import vm from 'node:vm';
 
 const root = new URL('../../', import.meta.url);
-export const DIRECT_PAGES = [
-  'index.html', 'tools/index.html', 'draw/index.html', 'audio/index.html', 'jigsaw/index.html',
-  'spot-difference/index.html', 'hidden-object/index.html',
-  'play/spot-difference/index.html', 'play/hidden-object/index.html',
-  'globe/index.html', 'about/index.html', 'guide/index.html', 'stores/index.html',
-  'stores/ecowashcafe-nakanoshima.html', 'stores/cafe-hoshi.html',
-  'stores/kaze-machi.html', 'stores/yoru-akari.html'
+export const MANUAL_PAGES = [
+  'index.html', 'tools/index.html', 'about/index.html', 'guide/index.html',
+  'stores/index.html', 'stores/ecowashcafe-nakanoshima.html'
 ];
-export const STANDALONE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pixiee-lens/index.html'];
+export const RESULT_PAGES = [
+  'pixel-camera.html', 'draw/index.html', 'audio/index.html', 'jigsaw/index.html',
+  'play/spot-difference/index.html', 'play/hidden-object/index.html'
+];
+export const WORKSPACE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pixiee-lens/index.html', 'globe/index.html'];
 const EXCLUDED_PAGES = [
   'privacy/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
-  '404.html', 'shops/index.html', 'game/index.html',
-  'camera-media-test.html', 'pixel-camera-studio.html',
+  '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
-  'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html',
-  // The legacy bookmark entry is only a guide; its header owns pass actions.
-  'pass/index.html'
+  'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html', 'pass/index.html',
+  'stores/cafe-hoshi.html', 'stores/kaze-machi.html', 'stores/yoru-akari.html',
+  'spot-difference/index.html', 'hidden-object/index.html', 'globe-prototype.html', 'pixiee-lens/index.html'
 ];
-const GOOGLE_SOURCE = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
-const LOADER_SOURCE = '/js/adsense-auto.js?rev=20260929-auto-ads-1';
 const html = (path) => readFile(new URL(path, root), 'utf8');
-const scripts = (source) => source.match(/<script\b[^>]*>[\s\S]*?<\/script>/gi) || [];
 
-for (const path of DIRECT_PAGES) test(`${path}: one official asynchronous AdSense script inside head`, async () => {
+for (const path of MANUAL_PAGES) test(`${path}: manual units own their lazy ad requests`, async () => {
   const source = await html(path);
-  const head = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
-  const ads = scripts(source).filter((script) => script.includes('adsbygoogle.js'));
-  assert.equal(ads.length, 1);
-  assert.ok(head.includes(ads[0]));
-  assert.ok(ads[0].includes(`src="${GOOGLE_SOURCE}"`));
-  assert.match(ads[0], /\basync\b/);
-  assert.match(ads[0], /crossorigin="anonymous"/);
-  assert.ok(!source.includes(LOADER_SOURCE), 'no second loader');
-  assert.ok(head.indexOf('adsense-offerwall-policy.js') >= 0 && head.indexOf('adsense-offerwall-policy.js') < head.indexOf('adsbygoogle.js'), 'Offerwall-only policy precedes the provider');
+  assert.match(source, /data-display-ad=/);
+  assert.match(source, /src="\/js\/display-ads\.mjs\?rev=20261007-lazy-ads-1"/);
+  assert.match(source, /href="\/css\/display-ads\.css\?rev=20261007-lazy-ads-1"/);
+  assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
 });
 
-for (const path of STANDALONE_PAGES) test(`${path}: only the embedded-safe loader is present in head`, async () => {
+for (const path of RESULT_PAGES) test(`${path}: editor pages defer provider loading until a result slot requests it`, async () => {
   const source = await html(path);
-  const head = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
-  const ads = scripts(source).filter((script) => script.includes('adsense-auto.js'));
-  assert.equal(ads.length, 1);
-  assert.ok(head.includes(ads[0]));
-  assert.ok(ads[0].includes(`src="${LOADER_SOURCE}"`));
-  assert.match(ads[0], /\bdefer\b/);
-  assert.equal(scripts(source).filter((script) => script.includes('adsbygoogle.js')).length, 0);
-  assert.ok(head.indexOf('adsense-offerwall-policy.js') >= 0 && head.indexOf('adsense-offerwall-policy.js') < head.indexOf('adsense-auto.js'), 'standalone policy precedes the loader');
+  assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
 });
 
-for (const path of EXCLUDED_PAGES) test(`${path}: no Auto ads code on private, disabled, redirect or development pages`, async () => {
+for (const path of WORKSPACE_PAGES) test(`${path}: workspace and map entrypoints never load ads eagerly`, async () => {
   const source = await html(path);
-  assert.equal(scripts(source).filter((script) => /adsense-auto\.js|adsbygoogle\.js/.test(script)).length, 0);
+  assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
 });
 
-test('every non-fixture HTML entry has an explicit advertising decision', async () => {
-  const ignored = new Set(['.git', 'node_modules', 'tests', 'assets']);
+for (const path of EXCLUDED_PAGES) test(`${path}: no eager provider entrypoint`, async () => {
+  const source = await html(path);
+  assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
+});
+
+test('every non-fixture HTML entry has an explicit ad-loading decision', async () => {
+  const ignored = new Set(['.git', 'node_modules', 'tests', 'assets', 'books', 'docs']);
   async function entries(directory = '') {
     const found = [];
     for (const entry of await readdir(new URL(directory || './', root), { withFileTypes: true })) {
       if (entry.name.startsWith('.') || ignored.has(entry.name)) continue;
       const path = `${directory}${entry.name}`;
       if (entry.isDirectory()) found.push(...await entries(`${path}/`));
-      else if (entry.name.endsWith('.html')) found.push(path);
+      else if (entry.name.endsWith('.html') && !path.startsWith('play/hidden-object/puzzles/') && !path.startsWith('play/spot-difference/puzzles/')) found.push(path);
     }
     return found;
   }
-  assert.deepEqual((await entries()).sort(), [...DIRECT_PAGES, ...STANDALONE_PAGES, ...EXCLUDED_PAGES].sort(),
-    'new pages must explicitly opt in or out rather than inheriting ads from the header');
-  assert.equal(new Set([...DIRECT_PAGES, ...STANDALONE_PAGES, ...EXCLUDED_PAGES]).size, 37);
+  const expected = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES])].sort();
+  assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
+  assert.equal(new Set(expected).size, 37);
+  for (const path of expected) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
 });
 
-const loader = await readFile(new URL('js/adsense-auto.js', root), 'utf8');
-function harness({ embedded = false, protocol = 'https:', existing = false, search = '' } = {}) {
-  const added = [];
-  const frame = {};
-  const context = vm.createContext({
-    window: { top: embedded ? {} : frame, self: frame },
-    location: { protocol, search },
-    document: {
-      querySelector: () => existing || added.length ? {} : null,
-      createElement: () => ({}), head: { append: (script) => added.push(script) }
-    }
-  });
-  const run = () => vm.runInContext(loader, context);
-  return { added, run };
-}
-test('standalone tools append the correct official script once, without touching pass state', () => {
-  const h = harness(); h.run(); h.run();
-  assert.equal(h.added.length, 1);
-  assert.deepEqual(h.added[0], { async: true, src: GOOGLE_SOURCE, crossOrigin: 'anonymous' });
-});
-test('an existing AdSense script is never loaded twice', () => {
-  const h = harness({ existing: true }); h.run(); assert.equal(h.added.length, 0);
-});
-test('real iframe context skips Auto ads regardless of the embed query', () => {
-  for (const search of ['', '?embed=1', '?embed=true']) {
-    const h = harness({ embedded: true, search }); h.run(); assert.equal(h.added.length, 0);
-  }
-});
-test('embed=1 in a standalone telescope URL still permits ads', () => {
-  const h = harness({ search: '?embed=1&tool=telescope' }); h.run(); assert.equal(h.added.length, 1);
-});
-test('file preview never sends an ad request', () => {
-  const h = harness({ protocol: 'file:' }); h.run(); assert.equal(h.added.length, 0);
-});
 test('ads.txt seller and privacy disclosure agree with the installed publisher', async () => {
   assert.equal((await html('ads.txt')).trim(), 'google.com, pub-9801602250480253, DIRECT, f08c47fec0942fa0');
   const privacy = await html('privacy/index.html');

@@ -37,7 +37,13 @@ try {
       assert.equal(await page.locator('[data-header-pass],.px-pass').count(), 0, path);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${path}: horizontal fit`);
       assert.equal(await page.evaluate(() => localStorage.getItem('pixieed:pass:v1')), expired, 'old storage retained');
-      assert.deepEqual(await page.evaluate(() => window.__policyArgs), [false, [3]], `${path}: only Offerwall suppressed`);
+      const policyArgs = await page.evaluate(() => {
+        const policy = window.googlefc?.controlledMessagingFunction;
+        if (!policy) return null;
+        window.googlefc.MessageTypeEnum = { OFFERWALL: 3 };
+        let result; policy({ proceed: (...args) => { result = args; } }); return result;
+      });
+      assert.deepEqual(policyArgs, [false, [3]], `${path}: policy still suppresses only Offerwall when invoked`);
       assert.deepEqual(errors, [], `${path}: no application exceptions`);
       checks++;
     }

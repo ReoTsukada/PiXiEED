@@ -9,6 +9,16 @@
   scroll-margin-block: 88px 104px;
 }
 
+/* Source-marked public placements reserve the known configured unit before it loads. */
+.px-display-ad[data-ad-reserve] {
+  min-height: var(--px-display-ad-reserved-height);
+}
+
+/* Keep normal touch-play canvases well clear of the neighboring advertisement. */
+.px-display-ad--interactive-clearance {
+  margin-block-start: 150px;
+}
+
 .container > .px-display-ad {
   width: 100%;
 }
