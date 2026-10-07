@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-07T00:20:54+00:00",
+  "updatedAt": "2026-10-07T00:52:51+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -1660,7 +1660,12 @@
       "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "施設公式講座案内",
-      "mapAreaLocation": { "latitude": 34.352301, "longitude": 134.047461, "precision": "venue", "sourceUrl": "https://www.navitime.co.jp/poi?spot=01315-00003650" },
+      "mapAreaLocation": {
+        "latitude": 34.352301,
+        "longitude": 134.047461,
+        "precision": "venue",
+        "sourceUrl": "https://www.navitime.co.jp/poi?spot=01315-00003650"
+      },
       "locationPrecision": "venue"
     },
     {
@@ -1710,6 +1715,155 @@
         "longitude": 5.394663,
         "precision": "venue",
         "sourceUrl": "https://www.foiredemarseille.com/mobilite/"
+      },
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "jumpzip-pixel-art-market-seoul-2026",
+      "name": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
+      "country": "韓国",
+      "area": "ソウル特別市・龍山区・梨泰院",
+      "venue": "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）",
+      "startDate": "2026-04-25",
+      "endDate": "2026-04-26",
+      "dateLabel": "2026年4月25〜26日。主催者公式サイトの第1回開催記録を確認。",
+      "status": "ended",
+      "sourceUrl": "https://www.jumpzip.net/",
+      "additionalUrls": [
+        "https://www.newswire.co.kr/newsRead.php?no=1030852"
+      ],
+      "description": "韓国初のピクセルアート限定イベント。ピクセルアーティストの作品とグッズを販売するマーケット型展示。",
+      "checkedAt": "2026-10-07T00:46:29+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式サイト・主催者提供告知",
+      "socialUrls": [
+        "https://x.com/JumpZipOfficial"
+      ],
+      "mapAreaLocation": {
+        "latitude": 37.53424,
+        "longitude": 126.99322,
+        "precision": "venue",
+        "sourceUrl": "https://www.myguideseoul.com/no/shopping/hamilton-shirts"
+      },
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "dfwyas-pixel-art-cube-workshop-2026-04-11",
+      "name": "Pixel Art Cube Crafting Workshop — DFW Young & Social Club",
+      "country": "アメリカ",
+      "area": "Farmers Branch, Texas",
+      "venue": "DFW Young & Social Club（2309 Springlake Road Suite 600, Farmers Branch, TX 75234）",
+      "startDate": "2026-04-11",
+      "endDate": "2026-04-11",
+      "dateLabel": "2026年4月11日 12:00–14:00（会場現地時間）",
+      "status": "ended",
+      "sourceUrl": "https://www.dfwyas.com/all-events/pixel-art-cube-crafting-workshop-april-2026",
+      "description": "小さなキューブを組み立ててピクセルアートを作る初心者向けワークショップ。",
+      "checkedAt": "2026-10-07T00:46:29+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者・会場の公式イベント情報",
+      "socialUrls": [],
+      "mapAreaLocation": {
+        "latitude": 32.919878,
+        "longitude": -96.904185,
+        "precision": "venue",
+        "sourceUrl": "https://www.karamap.com/venue/8058/dfw-young-social-club"
+      },
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "keisuke-katsuki-afterglows-2026",
+      "name": "香月恵介個展「Afterglow(s)」",
+      "prefecture": "東京都",
+      "area": "渋谷区・神宮前",
+      "venue": "EUKARYOTE（東京都渋谷区神宮前3-41-3）",
+      "startDate": "2026-09-25",
+      "endDate": "2026-10-18",
+      "dateLabel": "2026年9月25日〜10月18日。月・火休廊。",
+      "status": "active",
+      "sourceUrl": "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex2026/",
+      "additionalUrls": [
+        "https://bijutsutecho.com/exhibitions/18841"
+      ],
+      "description": "香月恵介の個展。RGB画素を絵具に置き換えるPixel Paintingと、ピクセルで構成するVR空間を展示。会場展示と会期中限定のVRChatワールドで構成。",
+      "checkedAt": "2026-10-07T00:52:51+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "会場の公式展覧会情報",
+      "socialUrls": [],
+      "mapAreaLocation": {
+        "latitude": 35.670916,
+        "longitude": 139.7136642,
+        "precision": "venue",
+        "sourceUrl": "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex/"
+      },
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "keisuke-katsuki-on-screen-2026",
+      "name": "香月恵介個展「ON-SCREEN」",
+      "prefecture": "東京都",
+      "area": "台東区・東上野",
+      "venue": "みんなのギャラリー（東京都台東区東上野4-14-3 2F）",
+      "startDate": "2026-03-05",
+      "endDate": "2026-03-22",
+      "dateLabel": "2026年3月5日〜22日。月曜休廊。",
+      "status": "ended",
+      "sourceUrl": "https://www.minnanogallery.com/keisuke-katsuki-on-screen",
+      "additionalUrls": [
+        "https://www.minnanogallery.com/contact"
+      ],
+      "description": "香月恵介の個展。画素を絵具で再現した「3600 Colors」シリーズのピクセルペインティング作品を中心に展示。",
+      "checkedAt": "2026-10-07T00:52:51+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "会場・作家の公式情報",
+      "socialUrls": [],
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "motocross-saito-ultra-dope-2026",
+      "name": "モトクロス斉藤 個展「ウルトラドープ」",
+      "prefecture": "東京都",
+      "area": "江東区・亀戸",
+      "venue": "亀戸アートセンター（東京都江東区亀戸9-17-8 KKビル101）",
+      "startDate": "2026-04-23",
+      "endDate": "2026-05-05",
+      "dateLabel": "2026年4月23日〜5月5日。平日16:00–22:00、土日祝13:00–19:00。",
+      "status": "ended",
+      "sourceUrl": "https://kac.amebaownd.com/posts/58724347",
+      "additionalUrls": [
+        "https://note.com/moot_sai/n/n78942692fff8"
+      ],
+      "description": "ピクセルアーティスト・モトクロス斉藤の初個展。デジタル作品のほか、アクリルプレート、スケートボード、アナログペインティングなどを展示。",
+      "checkedAt": "2026-10-07T00:52:51+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "会場・作家の公式情報",
+      "socialUrls": [],
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "yusuke-shigeta-continuous-discontinuous-migiwa-2026",
+      "name": "重田佑介個展「連続と非連続の汀で」",
+      "prefecture": "東京都",
+      "area": "港区・南青山",
+      "venue": "Otherwise Gallery（東京都港区南青山5-7-17 小原流会館B1F）",
+      "startDate": "2026-06-19",
+      "endDate": "2026-07-25",
+      "dateLabel": "2026年6月19日〜7月25日。日・月・火休廊。",
+      "status": "ended",
+      "sourceUrl": "https://otherwise-gallery.com/jp/tokyo/866/",
+      "additionalUrls": [
+        "https://prtimes.jp/main/html/rd/p/000000017.000142243.html"
+      ],
+      "description": "メディアアーティスト重田佑介の個展。ピクセルを仮想世界と実世界の接点として扱うインスタレーションやピクセル映像作品を展示。",
+      "checkedAt": "2026-10-07T00:52:51+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "会場公式情報・主催者提供告知",
+      "socialUrls": [],
+      "mapAreaLocation": {
+        "latitude": 35.662257,
+        "longitude": 139.712844,
+        "precision": "venue",
+        "sourceUrl": "https://omoharareal.com/navi/gallery/detail/4942"
       },
       "locationPrecision": "venue"
     }
@@ -2864,11 +3018,82 @@
       "additionalUrls": [],
       "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed"
+    },
+    {
+      "id": "jumpzip-pixel-art-market-seoul-2026",
+      "url": "https://www.jumpzip.net/",
+      "additionalUrls": [
+        "https://www.newswire.co.kr/newsRead.php?no=1030852"
+      ],
+      "socialUrls": [
+        "https://x.com/JumpZipOfficial"
+      ],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-07T00:46:29+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式サイトで第1回の会期・ピクセルアート限定企画・会場住所を確認。主催者提供告知でも開催日時と企画を確認。"
+    },
+    {
+      "id": "dfwyas-pixel-art-cube-workshop-2026-04-11",
+      "url": "https://www.dfwyas.com/all-events/pixel-art-cube-crafting-workshop-april-2026",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-07T00:46:29+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者・会場の公式イベント本文で開催日、住所、ピクセルアート制作内容を確認。"
+    },
+    {
+      "id": "keisuke-katsuki-afterglows-2026",
+      "url": "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex2026/",
+      "additionalUrls": [
+        "https://bijutsutecho.com/exhibitions/18841"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-07T00:52:51+00:00",
+      "result": "official-confirmed",
+      "notes": "会場公式ページで会期、個展、Pixel Painting作品、会場住所を確認。会場公式ページ記載の地図リンク座標で開催会場を照合。"
+    },
+    {
+      "id": "keisuke-katsuki-on-screen-2026",
+      "url": "https://www.minnanogallery.com/keisuke-katsuki-on-screen",
+      "additionalUrls": [
+        "https://www.minnanogallery.com/contact"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-07T00:52:51+00:00",
+      "result": "official-confirmed",
+      "notes": "会場公式ページで会期、ピクセルペインティング展示内容、会場住所を確認。地図の数値座標は取得できず東京都内の詳細住所を記録。"
+    },
+    {
+      "id": "motocross-saito-ultra-dope-2026",
+      "url": "https://kac.amebaownd.com/posts/58724347",
+      "additionalUrls": [
+        "https://note.com/moot_sai/n/n78942692fff8"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-07T00:52:51+00:00",
+      "result": "official-confirmed",
+      "notes": "会場告知と作家本人の記事で会期、ピクセルアート個展、会場住所を確認。会場座標は未確認のため東京都内の行政区・住所まで記録。"
+    },
+    {
+      "id": "yusuke-shigeta-continuous-discontinuous-migiwa-2026",
+      "url": "https://otherwise-gallery.com/jp/tokyo/866/",
+      "additionalUrls": [
+        "https://prtimes.jp/main/html/rd/p/000000017.000142243.html"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-07T00:52:51+00:00",
+      "result": "official-confirmed",
+      "notes": "会場公式ページと主催者提供告知で会期、ピクセルを主題に含む個展、会場住所を確認。展示会場所在地の地図情報を照合。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-06T00:08:38+00:00",
-    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。",
+    "checkedAt": "2026-10-07T00:52:51+00:00",
+    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。 2026-10-07追加確認: 韓国語/英語で開催済みイベントを補足。韓国・ソウルのJumpZipと米国テキサス州Farmers Branchのpixel-art cube workshopを公式本文で確認し追加。 2026-10-07国内作家個展調査: 香月恵介「Afterglow(s)」を開催中として追加。香月「ON-SCREEN」、重田佑介「連続と非連続の汀で」、モトクロス斉藤「ウルトラドープ」を開催実績として補足。公式会場・作家ページでpixel painting/ピクセルアートとの関係、会期、会場住所を確認。座標の確認できない会場は行政区・住所のみ。shigemi「DASHI」は作品のピクセルアート関連を確認できず対象外。",
     "searchExamples": [
       "ドット絵 イベント 2026",
       "ピクセルアート 展示 ワークショップ 2026",
@@ -2884,7 +3109,12 @@
       "arte del pixel art evento taller 2026 Colombia",
       "pixel art workshop game design camp Singapore 2026",
       "pixel graphics pixel art demoparty Melbourne November 2026",
-      "Atelier Pixel Art exposition concours octobre 2026 France"
+      "Atelier Pixel Art exposition concours octobre 2026 France",
+      "ピクセルアート 個展 2026 10月 東京 ドット絵 展示 公式",
+      "香月恵介 Afterglow(s) EUKARYOTE 2026 pixel painting",
+      "モトクロス斉藤 個展 ウルトラドープ 亀戸アートセンター 2026",
+      "重田佑介 連続と非連続の汀で ピクセル 2026 Otherwise Gallery",
+      "香月恵介 ON-SCREEN みんなのギャラリー 2026 ピクセルペインティング"
     ],
     "scopeLanguages": [
       "ja",
@@ -2909,7 +3139,12 @@
       "スペイン語圏",
       "東南アジア",
       "中東",
-      "豪州"
+      "豪州",
+      "アメリカ",
+      "東京都・渋谷区",
+      "東京都・台東区",
+      "東京都・江東区",
+      "東京都・港区"
     ],
     "verifiedSourceLanguages": [
       "es",
@@ -2950,7 +3185,18 @@
       "https://villapelle.cz/atelier-pelle/artplay/",
       "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier",
       "https://www.herofestival.fr/",
-      "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/"
+      "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/",
+      "https://www.jumpzip.net/",
+      "https://www.newswire.co.kr/newsRead.php?no=1030852",
+      "https://www.dfwyas.com/all-events/pixel-art-cube-crafting-workshop-april-2026",
+      "https://www.myguideseoul.com/no/shopping/hamilton-shirts",
+      "https://www.karamap.com/venue/8058/dfw-young-social-club",
+      "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex2026/",
+      "https://www.minnanogallery.com/keisuke-katsuki-on-screen",
+      "https://kac.amebaownd.com/posts/58724347",
+      "https://note.com/moot_sai/n/n78942692fff8",
+      "https://otherwise-gallery.com/jp/tokyo/866/",
+      "https://prtimes.jp/main/html/rd/p/000000017.000142243.html"
     ],
     "regionalChecks": [
       {

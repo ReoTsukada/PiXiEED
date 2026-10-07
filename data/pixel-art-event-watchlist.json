@@ -52,6 +52,16 @@
       ]
     },
     {
+      "id": "region-306d5b1c48e24feb",
+      "label": "韓国",
+      "eventIds": [
+        "jumpzip-pixel-art-market-seoul-2026"
+      ],
+      "areas": [
+        "ソウル特別市・龍山区・梨泰院"
+      ]
+    },
+    {
       "id": "region-332d5e21f830bc60",
       "label": "スペイン",
       "eventIds": [
@@ -184,6 +194,9 @@
         "kac-hermippe-pointless-2025",
         "kac-super-nice-thankass-2025",
         "kac-ultra-dope-motocross-2026",
+        "keisuke-katsuki-afterglows-2026",
+        "keisuke-katsuki-on-screen-2026",
+        "motocross-saito-ultra-dope-2026",
         "ntv-imaginarium-2023",
         "pixel-art-park-1",
         "pixel-art-park-2",
@@ -204,12 +217,14 @@
         "summer-dot-daisakusen-2024",
         "the-pixel-street-2023",
         "winter-dot-daisakusen-2026",
-        "winter-dot-daisakusen-watch"
+        "winter-dot-daisakusen-watch",
+        "yusuke-shigeta-continuous-discontinuous-migiwa-2026"
       ],
       "areas": [
         "北千住",
         "千代田区",
         "台東区",
+        "台東区・東上野",
         "新宿区",
         "東京",
         "江東区",
@@ -219,6 +234,8 @@
         "渋谷",
         "渋谷・原宿",
         "渋谷・表参道",
+        "渋谷区・神宮前",
+        "港区・南青山",
         "港区・赤坂",
         "足立区・北千住"
       ]
@@ -246,6 +263,16 @@
         "エッセン",
         "ハンブルク",
         "フェルクリンゲン"
+      ]
+    },
+    {
+      "id": "region-f7f181033c4da3c4",
+      "label": "アメリカ",
+      "eventIds": [
+        "dfwyas-pixel-art-cube-workshop-2026-04-11"
+      ],
+      "areas": [
+        "Farmers Branch, Texas"
       ]
     },
     {
@@ -427,6 +454,18 @@
       ]
     },
     {
+      "id": "venue-27cc5369fc3ce2d7",
+      "label": "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）",
+      "eventIds": [
+        "jumpzip-pixel-art-market-seoul-2026"
+      ],
+      "region": "韓国",
+      "area": "ソウル特別市・龍山区・梨泰院",
+      "sourceUrls": [
+        "https://www.jumpzip.net/"
+      ]
+    },
+    {
       "id": "venue-2f1fe62dcae2e503",
       "label": "表参道・キャットストリート周辺",
       "eventIds": [
@@ -508,6 +547,18 @@
       "area": "エッセン",
       "sourceUrls": [
         "https://moer.tel/"
+      ]
+    },
+    {
+      "id": "venue-5c031931d52017f9",
+      "label": "EUKARYOTE（東京都渋谷区神宮前3-41-3）",
+      "eventIds": [
+        "keisuke-katsuki-afterglows-2026"
+      ],
+      "region": "東京都",
+      "area": "渋谷区・神宮前",
+      "sourceUrls": [
+        "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex2026/"
       ]
     },
     {
@@ -596,6 +647,18 @@
       ]
     },
     {
+      "id": "venue-6c8cb9f9cebb078b",
+      "label": "DFW Young & Social Club（2309 Springlake Road Suite 600, Farmers Branch, TX 75234）",
+      "eventIds": [
+        "dfwyas-pixel-art-cube-workshop-2026-04-11"
+      ],
+      "region": "アメリカ",
+      "area": "Farmers Branch, Texas",
+      "sourceUrls": [
+        "https://www.dfwyas.com/all-events/pixel-art-cube-crafting-workshop-april-2026"
+      ]
+    },
+    {
       "id": "venue-6fbe05cd02f283f4",
       "label": "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
       "eventIds": [
@@ -619,6 +682,18 @@
       "sourceUrls": [
         "https://dot-daisakusen.com/",
         "https://dot-daisakusen.com/2024_summer/"
+      ]
+    },
+    {
+      "id": "venue-7336141d06672c19",
+      "label": "みんなのギャラリー（東京都台東区東上野4-14-3 2F）",
+      "eventIds": [
+        "keisuke-katsuki-on-screen-2026"
+      ],
+      "region": "東京都",
+      "area": "台東区・東上野",
+      "sourceUrls": [
+        "https://www.minnanogallery.com/keisuke-katsuki-on-screen"
       ]
     },
     {
@@ -901,6 +976,18 @@
       ]
     },
     {
+      "id": "venue-e7bad89c70698e89",
+      "label": "亀戸アートセンター（東京都江東区亀戸9-17-8 KKビル101）",
+      "eventIds": [
+        "motocross-saito-ultra-dope-2026"
+      ],
+      "region": "東京都",
+      "area": "江東区・亀戸",
+      "sourceUrls": [
+        "https://kac.amebaownd.com/posts/58724347"
+      ]
+    },
+    {
       "id": "venue-e82d2da4cd115ed3",
       "label": "亀戸アートセンター（KAC）",
       "eventIds": [
@@ -938,6 +1025,18 @@
       "area": "名古屋市中村区",
       "sourceUrls": [
         "https://kids.valed.jp/campaign_autumn2026/"
+      ]
+    },
+    {
+      "id": "venue-fbb9f6a1ac790f4e",
+      "label": "Otherwise Gallery（東京都港区南青山5-7-17 小原流会館B1F）",
+      "eventIds": [
+        "yusuke-shigeta-continuous-discontinuous-migiwa-2026"
+      ],
+      "region": "東京都",
+      "area": "港区・南青山",
+      "sourceUrls": [
+        "https://otherwise-gallery.com/jp/tokyo/866/"
       ]
     }
   ],
@@ -1051,6 +1150,30 @@
       }
     },
     {
+      "id": "source-0c68913235fd4bff",
+      "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
+      "eventIds": [
+        "jumpzip-pixel-art-market-seoul-2026"
+      ],
+      "url": "https://www.newswire.co.kr/newsRead.php?no=1030852",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "韓国"
+      ],
+      "areas": [
+        "ソウル特別市・龍山区・梨泰院"
+      ],
+      "venues": [
+        "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）"
+      ],
+      "lastKnownEventDate": "2026-04-26",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-0cc387cc06fe7104",
       "label": "ヘルミッペ 個展「ポイントレス」",
       "eventIds": [
@@ -1129,6 +1252,31 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-19d70e8807509572",
+      "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
+      "eventIds": [
+        "jumpzip-pixel-art-market-seoul-2026"
+      ],
+      "url": "https://www.jumpzip.net/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "韓国"
+      ],
+      "areas": [
+        "ソウル特別市・龍山区・梨泰院"
+      ],
+      "venues": [
+        "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）"
+      ],
+      "lastKnownEventDate": "2026-04-26",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:46:29+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -1319,6 +1467,33 @@
       }
     },
     {
+      "id": "source-32728cdd83e36e6c",
+      "label": "香月恵介個展「Afterglow(s)」",
+      "eventIds": [
+        "keisuke-katsuki-afterglows-2026"
+      ],
+      "url": "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex2026/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷区・神宮前"
+      ],
+      "venues": [
+        "EUKARYOTE（東京都渋谷区神宮前3-41-3）"
+      ],
+      "lastKnownEventDate": "2026-10-18",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:52:51+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-34e7fa0571b6bea4",
       "label": "ピクセルアートの学校",
       "eventIds": [
@@ -1435,6 +1610,32 @@
       }
     },
     {
+      "id": "source-407b3b3c0f69d6c8",
+      "label": "重田佑介個展「連続と非連続の汀で」",
+      "eventIds": [
+        "yusuke-shigeta-continuous-discontinuous-migiwa-2026"
+      ],
+      "url": "https://prtimes.jp/main/html/rd/p/000000017.000142243.html",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "港区・南青山"
+      ],
+      "venues": [
+        "Otherwise Gallery（東京都港区南青山5-7-17 小原流会館B1F）"
+      ],
+      "lastKnownEventDate": "2026-07-25",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-4252934a8c27eb2d",
       "label": "Newgrounds Pixel Day 2020",
       "eventIds": [
@@ -1479,6 +1680,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-43f2d951681be7aa",
+      "label": "Pixel Art Cube Crafting Workshop — DFW Young & Social Club",
+      "eventIds": [
+        "dfwyas-pixel-art-cube-workshop-2026-04-11"
+      ],
+      "url": "https://www.dfwyas.com/all-events/pixel-art-cube-crafting-workshop-april-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "アメリカ"
+      ],
+      "areas": [
+        "Farmers Branch, Texas"
+      ],
+      "venues": [
+        "DFW Young & Social Club（2309 Springlake Road Suite 600, Farmers Branch, TX 75234）"
+      ],
+      "lastKnownEventDate": "2026-04-11",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:46:29+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1697,6 +1923,32 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-4e220705e4189e54",
+      "label": "モトクロス斉藤 個展「ウルトラドープ」",
+      "eventIds": [
+        "motocross-saito-ultra-dope-2026"
+      ],
+      "url": "https://note.com/moot_sai/n/n78942692fff8",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "江東区・亀戸"
+      ],
+      "venues": [
+        "亀戸アートセンター（東京都江東区亀戸9-17-8 KKビル101）"
+      ],
+      "lastKnownEventDate": "2026-05-05",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -2268,6 +2520,30 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-06T00:08:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-7779e8dc6047f4ba",
+      "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
+      "eventIds": [
+        "jumpzip-pixel-art-market-seoul-2026"
+      ],
+      "url": "https://x.com/JumpZip_",
+      "kind": "social",
+      "prefectures": [],
+      "countries": [
+        "韓国"
+      ],
+      "areas": [
+        "ソウル特別市・龍山区・梨泰院"
+      ],
+      "venues": [
+        "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）"
+      ],
+      "lastKnownEventDate": "2026-04-26",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -3050,6 +3326,30 @@
       }
     },
     {
+      "id": "source-bf3a4ed737478f06",
+      "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
+      "eventIds": [
+        "jumpzip-pixel-art-market-seoul-2026"
+      ],
+      "url": "https://x.com/JumpZipOfficial",
+      "kind": "social",
+      "prefectures": [],
+      "countries": [
+        "韓国"
+      ],
+      "areas": [
+        "ソウル特別市・龍山区・梨泰院"
+      ],
+      "venues": [
+        "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）"
+      ],
+      "lastKnownEventDate": "2026-04-26",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-bffafa0fac34df36",
       "label": "Digital Jove 2026 — ピクセルアート入門ワークショップ",
       "eventIds": [
@@ -3247,7 +3547,8 @@
       "id": "source-cf5285d1a3c899b5",
       "label": "モトクロス斉藤 個展「ウルトラドープ」",
       "eventIds": [
-        "kac-ultra-dope-motocross-2026"
+        "kac-ultra-dope-motocross-2026",
+        "motocross-saito-ultra-dope-2026"
       ],
       "url": "https://kac.amebaownd.com/posts/58724347",
       "kind": "website",
@@ -3261,12 +3562,13 @@
         "江東区・亀戸"
       ],
       "venues": [
-        "亀戸アートセンター（KAC）"
+        "亀戸アートセンター（KAC）",
+        "亀戸アートセンター（東京都江東区亀戸9-17-8 KKビル101）"
       ],
       "lastKnownEventDate": "2026-05-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "lastCheckedAt": "2026-10-07T00:52:51+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3337,6 +3639,33 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d125c752072964ec",
+      "label": "重田佑介個展「連続と非連続の汀で」",
+      "eventIds": [
+        "yusuke-shigeta-continuous-discontinuous-migiwa-2026"
+      ],
+      "url": "https://otherwise-gallery.com/jp/tokyo/866/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "港区・南青山"
+      ],
+      "venues": [
+        "Otherwise Gallery（東京都港区南青山5-7-17 小原流会館B1F）"
+      ],
+      "lastKnownEventDate": "2026-07-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:52:51+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3580,6 +3909,32 @@
       }
     },
     {
+      "id": "source-dab23963123811c1",
+      "label": "香月恵介個展「Afterglow(s)」",
+      "eventIds": [
+        "keisuke-katsuki-afterglows-2026"
+      ],
+      "url": "https://bijutsutecho.com/exhibitions/18841",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷区・神宮前"
+      ],
+      "venues": [
+        "EUKARYOTE（東京都渋谷区神宮前3-41-3）"
+      ],
+      "lastKnownEventDate": "2026-10-18",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-dd2b5bb40b76ae00",
       "label": "名駅教室 — Excel関数でドット絵を作ろう！",
       "eventIds": [
@@ -3631,6 +3986,32 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:24:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-e12874816f75b7b9",
+      "label": "香月恵介個展「ON-SCREEN」",
+      "eventIds": [
+        "keisuke-katsuki-on-screen-2026"
+      ],
+      "url": "https://www.minnanogallery.com/contact",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区・東上野"
+      ],
+      "venues": [
+        "みんなのギャラリー（東京都台東区東上野4-14-3 2F）"
+      ],
+      "lastKnownEventDate": "2026-03-22",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -3767,6 +4148,33 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-ede948c30755f185",
+      "label": "香月恵介個展「ON-SCREEN」",
+      "eventIds": [
+        "keisuke-katsuki-on-screen-2026"
+      ],
+      "url": "https://www.minnanogallery.com/keisuke-katsuki-on-screen",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "台東区・東上野"
+      ],
+      "venues": [
+        "みんなのギャラリー（東京都台東区東上野4-14-3 2F）"
+      ],
+      "lastKnownEventDate": "2026-03-22",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:52:51+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -3923,5 +4331,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-07T00:07:33+00:00"
+  "updatedAt": "2026-10-07T00:53:39+00:00"
 }
