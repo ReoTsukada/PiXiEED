@@ -223,3 +223,6 @@ body .site-settings,body.px-standalone-globe .site-settings{box-sizing:border-bo
 body .site-settings[open],body.px-standalone-globe .site-settings[open]{display:flex;flex-direction:column}
 body .site-settings__head{flex:none;margin:0;padding:1.2rem 1.2rem .8rem}
 body .site-settings__body{min-height:0;padding:0 1.2rem 1.2rem;overflow-y:auto;overscroll-behavior:contain}
+body[data-page="map"] .site-menu__head{padding-top:max(10px,env(safe-area-inset-top,0px));padding-right:10px}
+body[data-page="map"] .site-settings__head{padding-top:max(10px,env(safe-area-inset-top,0px));padding-right:10px}
+body[data-page="map"] :is(.site-menu__close,.site-settings__close){flex:0 0 44px;min-width:44px}
