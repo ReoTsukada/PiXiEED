@@ -25,7 +25,7 @@ export function mountDrawSelectionPanel({ scope, host, getState, onAction, befor
       if (button.textContent !== label) button.textContent = label;
       button.disabled = !enabled;
     });
-    root.querySelector('p').textContent = s.error || (s.pending ? '外をタップで確定 → 次の外タップで解除。取消は× / Esc。' : s.bounds ? '選択内に描画できます。選択ツールで外をタップすると解除。' : s.hasClipboard ? '貼付で前のコピーを使えます。範囲へで新しい範囲を選べます。' : '選択ツールで範囲を囲んでください。');
+    root.querySelector('p').textContent = s.error || (s.pending ? (s.colorMode ? '✓で確定、× / Escで取消。角・中心から変形を続けられます。' : '外をタップで確定 → 次の外タップで解除。取消は× / Esc。') : s.bounds ? (s.colorMode ? '同じ色の全画素を選択中。別の色で選び直し、Escで解除。選択内に描画できます。' : '選択内に描画できます。選択ツールで外をタップすると解除。') : s.hasClipboard ? '貼付で前のコピーを使えます。範囲へで新しい範囲を選べます。' : s.colorMode ? '画素をタップすると、このレイヤーの同じ色をすべて選びます。' : '選択ツールで範囲を囲んでください。');
     const bounds = s.bounds;
     for (const input of fields.querySelectorAll('input[type="number"]')) {
       const field = input.dataset.selectionField, axis = input.dataset.axis;

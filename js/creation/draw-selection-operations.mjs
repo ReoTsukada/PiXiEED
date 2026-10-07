@@ -5,6 +5,26 @@ export const selectionColor = color => {
   if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) throw new TypeError('選択の色が不正です。');
   return color.length === 7 ? `${color.toLowerCase()}ff` : color.toLowerCase();
 };
+
+/** Build a detached full-canvas mask for all cells with the clicked visible RGBA color. */
+export function selectDrawColorMask(doc, point) {
+  validateDrawDocument(doc);
+  const x = Math.floor(point?.x), y = Math.floor(point?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= doc.width || y >= doc.height) return null;
+  const targetIndex = y * doc.width + x, targetValue = doc.pixels[targetIndex];
+  const transparent = value => value < 0 || selectionColor(doc.palette[value]).endsWith('00');
+  const isTransparent = transparent(targetValue);
+  const targetColor = isTransparent ? null : selectionColor(doc.palette[targetValue]);
+  const equivalents = new Set();
+  if (!isTransparent) doc.palette.forEach((color, index) => { if (selectionColor(color) === targetColor) equivalents.add(index); });
+  const mask = new Uint8Array(doc.width * doc.height);
+  for (let index = 0; index < mask.length; index += 1) {
+    const value = doc.pixels[index];
+    if (isTransparent ? transparent(value) : equivalents.has(value)) mask[index] = 1;
+  }
+  const bounds = drawSelectionMaskBounds(mask, doc.width, doc.height);
+  return bounds ? { ...bounds, mask } : null;
+}
 export const DRAW_SELECTION_FORMAT = 'PiXiEED_DRAW_SELECTION';
 const fail = message => { throw new RangeError(message); };
 const dimension = n => Number.isInteger(n) && n >= 1 && n <= 256;

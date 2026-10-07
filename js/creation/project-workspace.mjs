@@ -25,12 +25,13 @@ function button(label, id, action) { const el = node('button', '', label); el.ty
 function download(bytes, name) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); const link = node('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
-export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true }) {
+export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null }) {
   const store = createToolProjectStore(tool); let main = document.querySelector('#main') || document.querySelector('main');
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
+  let transientNavigation = false;
   const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261006-header-controls-1'; document.head.append(css);
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
@@ -425,6 +426,17 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     await importCopy(original);
   }, { close: false }); });
   ready = (async () => {
+    if (initialProject) {
+      try {
+        await session.initialize(initialProject.savedProject || initialProject.project, { persisted: initialProject.persisted === true, apply: false });
+        if (initialProject.savedProject) await session.replace(initialProject.project, { apply: false });
+        editedSinceOpen = initialProject.edited === true;
+        if (editedSinceOpen) session.markDirty();
+        await assertOwnPublicSources(getPxdPublicSources(initialProject.project));
+      } catch (error) { operationError = error.message; say(operationError); failed = true; }
+      finally { locked = false; initialized = true; main.inert = false; main.setAttribute('aria-busy', 'false'); update(); }
+      return session.persisted;
+    }
     await session.initialize(blankProject(), { persisted: false, apply: tool !== 'camera' }); main.inert = true;
     try {
       const params = new URLSearchParams(location.search); let pointer;
@@ -453,7 +465,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   })();
   function scheduleAutoSave() {
     clearTimeout(timer); timer = 0;
-    if (!initialized || locked || initialSelectionPending || !session.dirty || !editedSinceOpen || failed || getPublicSources().length) return;
+    if (transientNavigation || !initialized || locked || initialSelectionPending || !session.dirty || !editedSinceOpen || failed || getPublicSources().length) return;
     timer = setTimeout(() => {
       timer = 0;
       void save().then(() => { if (dialog.open) return refreshList(); })
@@ -467,7 +479,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     session.markDirty(); failed = false; update(); scheduleAutoSave();
   }
   const observer = new MutationObserver(() => { bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true'; }); observer.observe(main, { attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
-  window.addEventListener('beforeunload', (event) => { if (session.dirty && editedSinceOpen || session.busy) { event.preventDefault(); event.returnValue = ''; } });
+  window.addEventListener('beforeunload', (event) => { if (!transientNavigation && (session.dirty && editedSinceOpen || session.busy)) { event.preventDefault(); event.returnValue = ''; } });
   function setModeAdapter(options, { project } = {}) {
     const previousReady = ready;
     const switching = (async () => {
@@ -506,6 +518,12 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     return switching;
   }
   return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, setModeAdapter, async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
+    async pauseForNavigation() {
+      await ready;
+      transientNavigation = true; clearTimeout(timer); timer = 0;
+      await session.wait();
+      return () => { transientNavigation = false; scheduleAutoSave(); };
+    },
     async startNewCaptureProject() {
       if (tool !== 'camera') throw new TypeError('撮影用の新しい作品はカメラから作成してください。');
       await ready;
@@ -523,6 +541,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       }
     },
     async assertCanSave() { await assertOwnPublicSources([...getPxdPublicSources(session.currentProject), ...getPublicSources()]); return true; },
-    get currentProject() { return session.currentProject; }, get heldProject() { return null; }, get busy() { return locked; }
+    get currentProject() { return session.currentProject; }, get heldProject() { return null; }, get busy() { return locked; },
+    get persistedProject() { return session.persistedProject; },
+    get persisted() { return session.persisted; }, get dirty() { return session.dirty && editedSinceOpen; }
   });
 }

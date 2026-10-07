@@ -5,7 +5,7 @@ import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contrac
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
-import { createDrawAnimationSession } from './draw-animation-session.mjs';
+import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261007-draw-handoff-1';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, canvasResizeOffset, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261006-draw-panel-dismiss-1';
@@ -13,13 +13,13 @@ import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261006-header-controls-1';
+import { createPxdProject, encodePxd, decodePxd } from './pxd-codec.mjs';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261007-draw-handoff-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
-import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20260928-draw-timelapse-1';
+import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
@@ -32,17 +32,35 @@ import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261006-draw-
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261006-floating-mouse-2';
-import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs';
+import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261007-color-selection-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
-import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261006-selection-fix-1';
+import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261006-selection-fix-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261007-color-selection-1';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261006-selection-fix-1';
+import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261007-color-selection-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
+let handoffApi = null, returnedCamera = null, initialCameraProject = null, cameraNavigationResume = null;
+const handoffParams = new URLSearchParams(location.search);
+if (handoffParams.has('drawCamera')) {
+  handoffApi = await import('./draw-camera-handoff.mjs?rev=20261007-draw-handoff-1');
+  returnedCamera = handoffApi.takeDrawCameraReturn({ search: location.search, consume: false });
+  if (!returnedCamera) throw new Error('撮影の受け渡しを確認できません。元の一時保存は変更していません。');
+  if (returnedCamera.project?.pxdBase64) initialCameraProject = {
+    project: await decodePxd(decodeCameraBytes(returnedCamera.project.pxdBase64)),
+    ...(returnedCamera.project.savedPxdBase64 ? { savedProject: await decodePxd(decodeCameraBytes(returnedCamera.project.savedPxdBase64)) } : {}),
+    persisted: returnedCamera.project.persisted === true, edited: returnedCamera.project.edited === true
+  };
+}
+function encodeCameraBytes(bytes) {
+  let binary = ''; for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+  return btoa(binary);
+}
+function decodeCameraBytes(text) { return Uint8Array.from(atob(text), c => c.charCodeAt(0)); }
+
 const setTimeout = (callback, delay) => scope.timeout(callback, delay);
 const clearTimeout = (id) => scope.clearTimeout(id);
 const requestAnimationFrame = (callback) => scope.frame(callback);
@@ -54,7 +72,7 @@ const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(
 const viewportOverlays = mountDrawViewportOverlays({ board: $('.draw-board'), canvas, scope });
 let virtualCursor = null;
 applyDrawingToolIcons($('#main'));
-mountToolHeaderControls(document, { selectors: ['.draw-import', '#draw-settings-picker', '#draw-output', '#draw-clear', '#draw-to-globe'] });
+mountToolHeaderControls(document, { selectors: ['.draw-import', '#draw-camera', '#draw-settings-picker', '#draw-output', '#draw-clear', '#draw-to-globe'] });
 const fixedLeft = document.createElement('div'); fixedLeft.className = 'draw-fixed-left';
 fixedLeft.append($('#draw-tool-picker'), $('#draw-animation-controls'), $('#draw-undo'));
 $('.draw-controls').prepend(fixedLeft);
@@ -82,6 +100,7 @@ let selectionTransform = null, selectionPreview = null, selectionPanel = null, s
 let selectionRenderRequest = 0;
 let selectionMaskCache = null, selectionMaskOwner = null;
 let preparedSelectionCommit = null;
+let cameraSession = null, cameraOpening = false, cameraGeneration = 0, cameraUnlock = null, cameraCaptureClickUntil = 0, cameraFailureNotice = null;
 const colorActivationBusy = new WeakSet();
 // Capture held input before the panel dismissal handler releases it.
 scope.listen(document, 'pointerdown', event => {
@@ -109,7 +128,7 @@ mountDrawPanelDismissals({ scope, root: $('#main'), cancelInput: cancelDrawingIn
   closeFloating: () => { closeColorEditor(); animationControls?.close?.(); editorUi.closePanels(); },
   hasFloating: () => Boolean(colorEdit || animationControls?.hasOpenPanels) });
 const selectionControls = mountDrawSelectionOverlay({ scope, board: $('.draw-board'), canvas, getFrame: selectionFrame });
-const TOOL_NAMES = { pen: 'ペン', eraser: '消しゴム', fill: '塗りつぶし', line: '直線', rectangle: '四角形', 'rectangle-fill': '四角塗り', ellipse: '楕円', 'ellipse-fill': '楕円塗り', spray: 'スプレー', select: '範囲移動', picker: 'スポイト' };
+const TOOL_NAMES = { pen: 'ペン', eraser: '消しゴム', fill: '塗りつぶし', line: '直線', rectangle: '四角形', 'rectangle-fill': '四角塗り', ellipse: '楕円', 'ellipse-fill': '楕円塗り', spray: 'スプレー', select: '範囲選択', picker: 'スポイト' };
 const SHAPE_TOOLS = new Set(['line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill']);
 let lastOtherTool = 'fill';
 let playing = false, onion = false, playbackFrame = null, playbackStarted = 0, playbackOffset = 0, playbackRequest = 0;
@@ -145,16 +164,131 @@ function setCanvasDimensions() {
   canvas.setAttribute('aria-label', `${documentData.width}×${documentData.height}の透明なキャンバス。色を選んで描きます。`);
 }
 function drawingInputBusy() { return Boolean(drawing || pendingTap || activePointers.size || virtualCursor?.pressed || virtualCursor?.moving); }
+function cancelCamera() {
+  cameraGeneration++;
+  cameraSession?.cancel(); cameraSession = null; cameraOpening = false;
+  cameraUnlock?.(); cameraUnlock = null;
+}
+function cameraStatus(message) {
+  if (scope.disposed) return;
+  if (!cameraOpening && !cameraSession) cameraFailureNotice = { message, until: performance.now() + 2600 };
+  toast(message);
+}
+// Snapshot the complete work before navigation; no camera data enters the editor yet.
+function freezeCameraEditor() {
+  const nodes = [$('#main'), document.querySelector('body > .site-header')].filter(Boolean);
+  const previous = nodes.map(node => node.inert);
+  nodes.forEach(node => { node.inert = true; });
+  cameraUnlock = () => { nodes.forEach((node, index) => { node.inert = previous[index]; }); };
+}
+async function openCamera() {
+  if (cameraOpening || cameraSession || scope.disposed) return;
+  if (selectionTransform) { toast('選択の変形を✓で確定、×で取消してからカメラを開いてください。'); return; }
+  if (colorEdit || drawingInputBusy()) { toast('現在の色編集・描画操作を終えてからカメラを開いてください。'); return; }
+  if (animationSession.locked) { toast('レイヤーの鍵を外すとカメラを使えます。'); return; }
+  if (!canEdit()) return;
+  const generation = ++cameraGeneration;
+  cameraOpening = true; editorUi.closePanels(); animationControls?.close?.(); selectionPanel?.hide(); hideCursors();
+  freezeCameraEditor(); toast('作品をカメラへ受け渡しています…');
+  try {
+    handoffApi ??= await import('./draw-camera-handoff.mjs?rev=20261007-draw-handoff-1');
+    cameraNavigationResume = await pxdBridge.pauseForNavigation();
+    if (generation !== cameraGeneration || scope.disposed) { cameraNavigationResume?.(); cameraNavigationResume = null; return; }
+    const { chooseCameraPalette } = await import('./draw-camera-core.mjs');
+    const owner = animationSession.snapshot();
+    const encode = handoffApi.encodeDrawCameraAnimation;
+    const timeline = { current: encode(owner.timeline.current), past: owner.timeline.past.map(encode), future: owner.timeline.future.map(encode) };
+    // Rehydration can retain more tile buffers than in-memory COW history.
+    // Prove the return fits its history budget before leaving the working editor.
+    const decode = handoffApi.decodeDrawCameraAnimation;
+    const recovery = createDrawAnimationSession(documentData);
+    recovery.restore({ timeline: { current: decode(timeline.current), past: timeline.past.map(decode), future: timeline.future.map(decode) }, selections: owner.selections });
+    const base = pxdBridge.currentProject;
+    let project = null;
+    if (base) {
+      const pxdBase64 = encodeCameraBytes(await encodePxd(base));
+      const persistedBase64 = pxdBridge.persistedProject ? encodeCameraBytes(await encodePxd(pxdBridge.persistedProject)) : null;
+      project = { pxdBase64, ...(persistedBase64 && persistedBase64 !== pxdBase64 ? { savedPxdBase64: persistedBase64 } : {}), persisted: pxdBridge.persisted, edited: pxdBridge.dirty };
+    }
+    if (generation !== cameraGeneration || scope.disposed) { cameraNavigationResume?.(); cameraNavigationResume = null; return; }
+    const mask = selectionMask();
+    const allowedIndices = chooseCameraPalette(documentData, mask, getAnimationUsedColorIndices(animationSession.animation, { excludeFrameId: animationSession.frameId, excludeLayerId: animationSession.layerId }));
+    const clip = selectionClipboard.read();
+    const url = handoffApi.beginDrawCamera({ animation: animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId,
+      mask, allowedIndices, project, history: { timeline, selections: owner.selections,
+        timelapse: timelapse.snapshot().map(event => ({ ...event, data: encodeCameraBytes(event.data), ...(event.indices ? { indices: [...event.indices] } : {}) })) },
+      view: { editor: getDrawEditorState(), selection: selection && { ...selection, ...(selection.mask ? { mask: [...selection.mask] } : {}) },
+        source, activeDraftId, baseRevisionId, saved, lastInputSide, cursor: virtualCursor?.canvasPosition(),
+        clipboard: clip && { ...clip, indices: [...clip.indices], ...(clip.mask ? { mask: [...clip.mask] } : {}) } }
+    });
+    const id = new URL(url, location.origin).searchParams.get('drawRequest');
+    // Browser Back (with or without BFCache) reaches a recoverable, private snapshot.
+    window.history.replaceState(null, '', `/draw/?drawCamera=${id}`);
+    location.assign(url);
+  } catch (error) {
+    if (generation === cameraGeneration) { cancelCamera(); cameraNavigationResume?.(); cameraNavigationResume = null; paint(); cameraStatus(`カメラへ移動できませんでした：${error.message}`); }
+  }
+}
+async function restoreCameraReturn(record) {
+  const decode = handoffApi.decodeDrawCameraAnimation;
+  if (record.history?.timeline) {
+    const state = record.history;
+    animationSession.restore({ timeline: { current: decode(state.timeline.current), past: state.timeline.past.map(decode), future: state.timeline.future.map(decode) }, selections: state.selections });
+  } else animationSession.load(record.animation, { frameId: record.frameId, layerId: record.layerId });
+  readOnlyImage = null;
+  pxdImageRole = record.view?.editor?.imageRole || 'main';
+  restoreDrawEditorState({ ...record.view?.editor, frameId: record.frameId, layerId: record.layerId });
+  source = record.view?.source || source; activeDraftId = record.view?.activeDraftId ?? null; baseRevisionId = record.view?.baseRevisionId ?? null;
+  saved = record.view?.saved === true; lastInputSide = record.view?.lastInputSide === 'right' ? 'right' : 'left';
+  selection = record.view?.selection ? { ...record.view.selection, ...(record.view.selection.mask ? { mask: Uint8Array.from(record.view.selection.mask) } : {}) } : null;
+  selectionMaskOwner = null; selectionMaskCache = null;
+  if (record.mask) { selectionMaskCache = new Uint8Array(record.mask); selectionMaskOwner = selection; }
+  if (selection) selectionViewStates.set(animationSession.animation, { ...selection });
+  if (record.view?.clipboard) { const clip = record.view.clipboard; selectionClipboard.set({ ...clip, indices: Uint8Array.from(clip.indices), ...(clip.mask ? { mask: Uint8Array.from(clip.mask) } : {}) }); }
+  if (record.history?.timelapse) timelapse.restore(record.history.timelapse.map(event => ({ ...event, data: decodeCameraBytes(event.data), ...(event.indices ? { indices: Uint32Array.from(event.indices) } : {}) })));
+  if (record.indices) {
+    const { prepareCameraTarget, replaceCameraPixels } = await import('./draw-camera-core.mjs');
+    const target = prepareCameraTarget(documentData, record.mask, record.allowedIndices);
+    const next = replaceCameraPixels(documentData, target, record.indices);
+    const prepared = animationSession.prepareDocument(next);
+    const before = animationSession.animation;
+    preparedSelectionCommit = prepared;
+    let changed;
+    try { changed = history.commit(next); } finally { preparedSelectionCommit = null; }
+    if (!changed) {
+      // A shutter press is one animation-history transaction even for identical pixels.
+      prepared();
+      if (selection) { selectionViewStates.set(before, { ...selection }); selectionViewStates.set(animationSession.animation, { ...selection }); }
+      animationControls?.refresh(); pxdBridge?.markDirty();
+    }
+    saved = false;
+  }
+  canvasPrepared = false; renderPalette(); setCanvasDimensions(); paint(); updateCanvasView(); placeSelection(); syncDrawingSettings(); animationControls?.refresh();
+  virtualCursor?.setCanvasPosition(record.view?.cursor);
+  handoffApi.consumeDrawCameraRequest(record);
+  const current = pxdBridge.currentProject;
+  const query = current && pxdBridge.persisted ? `?${new URLSearchParams({ pxd: current.projectId, pxdRevision: current.revisionId })}` : '';
+  window.history.replaceState(null, '', `/draw/${query}`);
+  toast(record.indices ? '撮影を反映しました。1回戻すと撮影前に戻ります。' : '撮影を取消し、元の作品を戻しました。');
+}
+scope.listen($('#draw-camera'), 'click', openCamera);
+scope.listen(document, 'keydown', event => {
+  if (!cameraOpening && !cameraSession) return;
+  if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); cancelCamera(); paint(); toast('カメラを取消しました。'); }
+}, { capture: true });
+scope.listen(window, 'pagehide', cancelCamera);
+scope.listen(document, 'visibilitychange', () => { if (document.hidden) cancelCamera(); });
 function updateControls() {
   const busy = drawingInputBusy();
   $('#draw-undo').disabled = busy || !selectionTransform && !animationSession.canUndo; $('#draw-redo').disabled = busy || Boolean(selectionTransform) || !animationSession.canRedo;
   $('#draw-undo').setAttribute('aria-disabled', String($('#draw-undo').disabled)); $('#draw-redo').setAttribute('aria-disabled', String($('#draw-redo').disabled));
-  status.textContent = saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
+  status.textContent = cameraFailureNotice && performance.now() < cameraFailureNotice.until ? cameraFailureNotice.message : saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
   syncPlaybackControl();
   selectionPanel?.sync();
 }
 function syncPlaybackControl() {
   const button = $('#draw-animation-play'), badge = $('#draw-playback-position');
+  if (cameraOpening || cameraSession) return;
   const frames = animationSession.animation.frames;
   button.disabled = Boolean(readOnlyImage) || frames.length < 2;
   button.setAttribute('aria-pressed', String(playing));
@@ -174,6 +308,7 @@ function paint(changed = null) {
   updateControls();
 }
 function installAnimationDocument(doc) {
+  cancelCamera();
   const changedSize = documentData.width !== doc.width || documentData.height !== doc.height;
   const view = changedSize ? resizeViewStates.get(animationSession.animation) || translatedResizeView(doc.width, doc.height) : null;
   clearSelection();
@@ -233,6 +368,7 @@ function paintOnion(display) {
   onionCanvas.getContext('2d').putImageData(new ImageData(data, display.width, display.height), 0, 0); placeOverlays();
 }
 function handleAnimationAction(action) {
+  if (cameraOpening || cameraSession) return false;
   if (action.type === 'play') return toggleAnimation();
   if (action.type === 'onion') {
     const enabled = typeof action.enabled === 'boolean' ? action.enabled : !onion;
@@ -361,6 +497,7 @@ function usedColorCount(value = documentData) {
   return colors.size;
 }
 function canEdit(value = documentData) {
+  if (cameraOpening || cameraSession) return false;
   if (playing) { toast('再生を止めると編集できます。'); return false; }
   if (readOnlyImage) { toast('原本を表示しています。編集するにはプロジェクトのキャンバス設定でサイズと色を合わせてください。'); return false; }
   const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: usedColorCount(value) }, { passActive: true });
@@ -369,6 +506,7 @@ function canEdit(value = documentData) {
   return false;
 }
 function replaceDocument(nextDocument, nextSource = source, { fromPxd = false } = {}) {
+  cancelCamera();
   endStroke(true); clearSelection();
   if (colorEdit) closeColorEditor();
   const nextAnimationSession = createDrawAnimationSession(nextDocument);
@@ -439,7 +577,8 @@ function clearSelection() { cancelSelectionTransform(); selection = null; select
 function placeSelection() {
   selectionPanel?.sync();
   const selectionTool = (strokeBinding?.tool || inputSettings.bindings[lastInputSide]?.tool || tool) === 'select';
-  selectionControls.render(selection ? selectionFrame() : null, selectionTool && Boolean(selectionTransform || selectionHasPixels()) && !animationSession.locked && !readOnlyImage && !playing, selectionDrag?.handle);
+  const frame = selection?.mask && !selectionTransform && !selectionHasPixels() ? null : selectionFrame();
+  selectionControls.render(frame, selectionTool && Boolean(selectionTransform || selectionHasPixels()) && !animationSession.locked && !readOnlyImage && !playing, selectionDrag?.handle, selection?.mask || null);
 }
 function selectionMask() {
   if (!selection) return null;
@@ -507,9 +646,9 @@ function confirmSelectionTransform() {
 }
 function selectionPanelState() {
   const editable = !playing && !readOnlyImage && !animationSession.locked, busy = drawingInputBusy();
-  return { bounds: selectionFrame(), pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
-    canCopy: Boolean(selectionHasPixels() && !selectionTransform && !playing && !readOnlyImage && !busy),
-    canCut: Boolean(selectionHasPixels() && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(selection && editable) };
+  return { bounds: selectionFrame(), colorMode: selectedMode(lastInputSide) === 'color', pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
+    canCopy: Boolean(selection && !selectionTransform && !playing && !readOnlyImage && !busy),
+    canCut: Boolean(selection && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(selectionHasPixels() && editable) };
 }
 function commitSelectionDocument(next, beforeBounds, afterBounds, prepared = animationSession.prepareDocument(next)) {
   const before = animationSession.animation;
@@ -615,7 +754,7 @@ const overlayObserver = new ResizeObserver(() => { if (!scope.disposed) placeOve
 scope.observe(overlayObserver, $('.draw-board'));
 function pointerPair() { return [...activePointers.values()].slice(0, 2); }
 function startPinch() {
-  const selectionOnly = Boolean(selection || selectionTransform || strokeBinding?.tool === 'select');
+  const selectionOnly = Boolean(selection || selectionTransform || effectiveTool() === 'select');
   if (drawing) endStroke(true);
   const [a, b] = pointerPair(); if (!a || !b) return;
   pinchStart = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoom, panX, panY, centerX: (a.x + b.x) / 2, centerY: (a.y + b.y) / 2, time: performance.now(), moved: 0, fingers: activePointers.size, selectionOnly };
@@ -678,6 +817,22 @@ function pickColorAt(point) {
   const side = strokeBinding?.side || lastInputSide || 'left';
   chooseColor(value, button, side); setTool('pen', side); toast(value < 0 ? '透明をとりました' : 'この色をとりました');
 }
+function selectionToolLabel(mode) { return mode === 'color' ? '同じ色選択' : '四角形選択'; }
+function selectedMode(side) { return inputSettings.bindings[side]?.selectMode || 'rectangle'; }
+function setSelectionMode(mode, side = 'left') {
+  if (!['rectangle', 'color'].includes(mode)) return false;
+  const binding = inputSettings.bindings[side];
+  if (selectedMode(side) !== mode && selectionTransform) { toast('選択を変形中です。✓で確定、×で取消してから選択方式を変えてください。'); return false; }
+  binding.selectMode = mode;
+  syncInputControls();
+  if (side === 'left' && tool === 'select') {
+    const summary = $('#draw-tool-summary'), label = summary?.querySelector('[data-draw-tool-name]');
+    if (label) label.textContent = selectionToolLabel(mode);
+    if (summary) { summary.setAttribute('aria-label', `${selectionToolLabel(mode)}：道具を選ぶ`); summary.title = `${selectionToolLabel(mode)}：道具を選ぶ`; }
+    document.querySelectorAll('.draw-select-tool-modes [data-selection-mode]').forEach(node => node.setAttribute('aria-pressed', String(node.dataset.selectionMode === mode)));
+  }
+  placeSelection(); return true;
+}
 function setTool(next, side = 'left') {
   if (!Object.hasOwn(TOOL_NAMES, next)) return;
   if (selectionTransform && next !== 'select') { toast('変形・貼付を配置中です。✓で確定、×で取消してから描画へ切り替えてください。'); return false; }
@@ -685,21 +840,22 @@ function setTool(next, side = 'left') {
   if (side === 'right') { lastInputSide = side; syncInputControls(); placeSelection(); return true; }
   if (!strokeBinding) lastInputSide = side;
   tool = next; syncDrawingSettings(); syncInputControls();
-  document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next)));
+  document.querySelectorAll('[data-draw-tool]').forEach((node) => node.setAttribute('aria-pressed', String(node.dataset.drawTool === next && (next !== 'select' || (node.dataset.selectionMode || 'rectangle') === selectedMode(side)))));
   const other = next !== 'pen' && next !== 'eraser';
   if (other) lastOtherTool = next;
   const summary = $('#draw-tool-summary');
   if (summary) {
     summary.querySelector('svg')?.replaceWith(createDrawingToolIcon(next));
-    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = TOOL_NAMES[next];
+    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = next === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[next];
     summary.dataset.active = 'true';
-    summary.setAttribute('aria-label', `${TOOL_NAMES[next]}：道具を選ぶ`);
-    summary.title = `${TOOL_NAMES[next]}：道具を選ぶ`;
+    summary.setAttribute('aria-label', `${next === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[next]}：道具を選ぶ`);
+    summary.title = `${next === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[next]}：道具を選ぶ`;
   }
   canvas.dataset.tool = next;
   placeSelection();
 }
 function assignDrawInput({ side, kind, value, target }) {
+  if (kind === 'tool' && value === 'select' && target?.dataset.selectionMode && selectionTransform && selectedMode(side) !== target.dataset.selectionMode) { toast('選択を変形中です。✓で確定、×で取消してから選択方式を変えてください。'); return; }
   const busyActivation = colorActivationBusy.delete(target) || Boolean(strokeBinding)
     || Boolean(document.querySelector('#draw-virtual-controls button[aria-pressed="true"]'));
   const repeatColor = side === 'left' && kind === 'color' && value >= 0 && inputSettings.bindings.left.color === value;
@@ -719,6 +875,8 @@ function assignDrawInput({ side, kind, value, target }) {
   }
   if (!Object.hasOwn(TOOL_NAMES, value)) return;
   const assignedTool = value;
+  const requestedMode = target?.dataset.selectionMode;
+  if (assignedTool === 'select' && requestedMode && !setSelectionMode(requestedMode, side)) return;
   if (setTool(assignedTool, side) !== false) toast(side === 'left' ? `${TOOL_NAMES[assignedTool]}を選びました` : `右ボタンに${TOOL_NAMES[assignedTool]}を割り当てました`);
 }
 const drawAssignmentInput = mountDrawAssignmentInput({ root: $('#main'), onAssign: assignDrawInput });
@@ -751,13 +909,13 @@ function updateSelection(point, event = {}) {
   } else if (!['outside', 'flip', 'empty'].includes(selectionDrag?.mode)) selection = selectionBounds(lineStart, point, documentData.width, documentData.height);
   placeSelection();
 }
-let pendingTap = null; let pendingTapPointerId = null; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
+let pendingTap = null; let pendingTapPointerId = null; let pendingTapMode = null; let pendingTapMask = 1; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
 function handleCanvasPointerDown(event) {
   if (virtualCursor?.realDown(event)) return;
   if (event.button !== undefined && event.button !== 0 && event.button !== 1 && event.button !== 2) return;
   event.preventDefault(); canvas.focus({ preventScroll: true }); if (!event.virtual) canvas.setPointerCapture(event.pointerId);
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; pendingTapPointerId = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
+  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
   // desktop: middle button, or Space held, drags the view
   if (event.button === 1 || spaceHeld) { panDrag = { x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); return; }
   if (activePointers.size > 1 || drawing || pendingTap) return;
@@ -768,6 +926,15 @@ function handleCanvasPointerDown(event) {
   if (inputTool === 'picker' && selection && !selectionMember(pointFromEvent(event))) { activePointers.delete(event.pointerId); return; }
   if (inputTool !== 'picker' && inputTool !== 'select' && animationSession.locked) { toast('レイヤーの鍵を外すと描けます。'); return; }
   if (inputTool !== 'picker' && !canEdit()) return;
+  const touchedPoint = pointFromEvent(event);
+  const selectionHandle = inputTool === 'select' && selection ? selectionHandleAtEvent(event) : null;
+  if (inputTool === 'select' && selectedMode(side) === 'color' && selectionTransform && !selectionHandle && !event.altKey) {
+    activePointers.delete(event.pointerId); toast('選択を変形中です。角・中心の操作を続けるか、✓／×で確定・取消してください。'); return;
+  }
+  if (inputTool === 'select' && selectedMode(side) === 'color' && !selectionTransform && !selectionHandle && !event.altKey) {
+    lastInputSide = side; syncDrawingSettings(); pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'color'; pendingTapMask = binding.mask;
+    return;
+  }
   if (inputTool !== 'picker' && inputTool !== 'fill' && inputTool !== 'select') {
     const value = inputTool === 'eraser' ? -1 : binding.color; const used = new Set(documentData.pixels);
     if (!used.has(value) && usedColorCount() >= 32) {
@@ -777,9 +944,9 @@ function handleCanvasPointerDown(event) {
   }
   lastInputSide = side; strokeBinding = binding; syncDrawingSettings();
   strokeWasSaved = saved;
-  drawing = true; drawingPointerId = event.pointerId; const touchedPoint = pointFromEvent(event); previousPoint = touchedPoint;
+  drawing = true; drawingPointerId = event.pointerId; previousPoint = touchedPoint;
   updateControls();
-  if (inputTool === 'picker' || inputTool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; drawing = false; drawingPointerId = null; previousPoint = null; selectionPanel.sync(); return; }
+  if (inputTool === 'picker' || inputTool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'tap'; drawing = false; drawingPointerId = null; previousPoint = null; selectionPanel.sync(); return; }
   if (inputTool === 'select') {
     lineStart = touchedPoint;
     const handle = selectionHandleAtEvent(event);
@@ -856,7 +1023,7 @@ function handleCanvasPointerMove(event) {
     // zoom about the first centre, then follow the fingers as they move together
     zoomAt(target, pinchStart.centerX, pinchStart.centerY, pinchStart); panX += centerX - pinchStart.centerX; panY += centerY - pinchStart.centerY; updateCanvasView(); return;
   }
-  if (pendingTap && event.pointerId === pendingTapPointerId && event.pointerType === 'mouse' && (event.buttons & (strokeBinding?.mask || 1)) === 0) { releasePointer({ ...event, type: 'pointerup', pointerId: event.pointerId, pointerType: event.pointerType, clientX: event.clientX, clientY: event.clientY, buttons: event.buttons }); return; }
+  if (pendingTap && event.pointerId === pendingTapPointerId && event.pointerType === 'mouse' && (event.buttons & (strokeBinding?.mask || pendingTapMask)) === 0) { releasePointer({ ...event, type: 'pointerup', pointerId: event.pointerId, pointerType: event.pointerType, clientX: event.clientX, clientY: event.clientY, buttons: event.buttons }); return; }
   if (drawing && event.pointerId !== drawingPointerId) return;
   showCursor(event);
   const mousePrimaryReleased = drawing && event.pointerId === drawingPointerId
@@ -931,11 +1098,16 @@ function releasePointer(event) {
   if (!wasActive) return;
   if (panDrag) { if (!activePointers.size) { panDrag = null; canvas.classList.remove('is-panning'); } return; }
   if (pendingTap && event.pointerId === pendingTapPointerId) {
-    const tap = pendingTap; pendingTap = null; pendingTapPointerId = null;
-    if (event.type === 'pointerup' && !pinchStart && activePointers.size === 0) applyTap(tap);
+    const tap = pendingTap, mode = pendingTapMode, side = lastInputSide; pendingTap = null; pendingTapPointerId = null; pendingTapMode = null;
+    if (event.type === 'pointerup' && !pinchStart && activePointers.size === 0) {
+      if (mode === 'color') {
+        const selected = selectDrawColorMask(documentData, tap);
+        if (selected) { lastInputSide = side; selection = selected; selectionDrag = null; selectionPanel?.setMode('select'); placeSelection(); syncDrawingSettings(); toast(`${selectionToolLabel('color')}：${selected.width}×${selected.height}の範囲を選びました。`); }
+      } else applyTap(tap);
+    }
     strokeBinding = null; syncDrawingSettings(); updateControls(); return;
   }
-  if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; }
+  if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; }
   // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
   // still two-finger tap is undo and a three-finger tap is redo
   if (!pinchStart && fingerTap) {
@@ -958,7 +1130,16 @@ function releasePointer(event) {
 canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('pointercancel', releasePointer); canvas.addEventListener('lostpointercapture', releasePointer);
 scope.listen(document, 'pointerup', (event) => { if (event.pointerType === 'mouse') releasePointer(event); });
 scope.listen($('.draw-board'), 'contextmenu', event => event.preventDefault());
-scope.listen($('#draw-animation-play'), 'click', toggleAnimation);
+scope.listen($('#draw-animation-play'), 'click', event => {
+  if (cameraOpening || cameraSession) {
+    event.preventDefault(); event.stopImmediatePropagation();
+    if (!event.currentTarget.disabled) { cameraCaptureClickUntil = performance.now() + 500; cameraSession?.capture(); }
+    return;
+  }
+  // The trailing click of a shutter double-tap must not start animation after close.
+  if (performance.now() < cameraCaptureClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+  toggleAnimation();
+});
 for (const axis of ['x', 'y']) scope.listen($(`#draw-mirror-${axis}`), 'input', event => {
   const inputValue = Number(event.target.value);
   virtualCursor?.release(); endStroke();
@@ -1057,7 +1238,8 @@ function syncInputControls() {
   for (const side of ['left', 'right']) {
     const binding = inputSettings.bindings[side];
     if (binding.color >= documentData.palette.length || binding.color < -1) binding.color = Math.min(side === 'left' ? 2 : 4, documentData.palette.length - 1);
-    const name = `${side === 'left' ? '左' : '右'}：${TOOL_NAMES[binding.tool]}`;
+    const toolName = binding.tool === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[binding.tool];
+    const name = `${side === 'left' ? '左' : '右'}：${toolName}`;
     const icon = $(`[data-button-tool-icon="${side}"]`); if (icon && icon.dataset.tool !== binding.tool) { icon.replaceChildren(createDrawingToolIcon(binding.tool)); icon.dataset.tool = binding.tool; }
     const swatch = $(`[data-button-swatch="${side}"]`); if (swatch) { swatch.style.setProperty('--draw-button-swatch-color', binding.color < 0 ? 'transparent' : documentData.palette[binding.color]); swatch.classList.toggle('is-clear', binding.color < 0 || binding.tool === 'eraser'); }
     const label = $(`[data-button-label="${side}"]`); if (label) label.textContent = side === 'left' ? '左' : '右';
@@ -1139,8 +1321,8 @@ function afterHistoryStep() {
 function undo() { if (drawingInputBusy()) return false; if (selectionTransform) { cancelDrawingInput(); return cancelSelectionTransform(); } if (!canEdit()) return false; closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
 function redo() { if (selectionTransform || drawingInputBusy() || !canEdit()) return false; closeColorEditor(); const doc = animationSession.redo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
 function resetDrawingInput(cancel = true) {
-  virtualCursor?.cancelInputs(cancel); if (!cancel && pendingTap) applyTap(pendingTap);
-  pendingTap = null; pendingTapPointerId = null; endStroke(cancel);
+  virtualCursor?.cancelInputs(cancel); if (!cancel && pendingTap && pendingTapMode !== 'color') applyTap(pendingTap);
+  pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; endStroke(cancel);
   activePointers.clear(); pinchStart = null; fingerTap = null; panDrag = null; spaceHeld = false;
   canvas.classList.remove('is-panning', 'is-grab'); hideCursors();
   updateControls();
@@ -1435,11 +1617,8 @@ async function exportAnimation() {
 }
 $('#draw-timelapse-detail').addEventListener('click', () => exportTimelapse(true));
 
-pxdBridge = mountWorkspace({
-  tool: 'draw',
-  projectWorkspace: true,
-  getEditorState: () => ({ inputSettings: serializeDrawInputSettings(inputSettings, documentData.palette), selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror: symmetry.horizontal, symmetry: { ...symmetry }, mirrorOrigin: { ...mirrorOrigin }, showGrid, imageRole: pxdImageRole, frameId: animationSession.frameId, layerId: animationSession.layerId, onion }),
-  restoreEditorState(state) {
+function getDrawEditorState() { return { inputSettings: serializeDrawInputSettings(inputSettings, documentData.palette), selectedColor, selectedHex: selectedColor < 0 ? null : documentData.palette[selectedColor], brushColors: [...documentData.palette], tool, zoom, panX, panY, mirror: symmetry.horizontal, symmetry: { ...symmetry }, mirrorOrigin: { ...mirrorOrigin }, showGrid, imageRole: pxdImageRole, frameId: animationSession.frameId, layerId: animationSession.layerId, onion }; }
+function restoreDrawEditorState(state) {
     if (state?.imageRole && state.imageRole !== pxdImageRole) state = {};
     if (!readOnlyImage) {
       documentData = animationSession.select(state?.frameId, state?.layerId);
@@ -1462,7 +1641,14 @@ pxdBridge = mountWorkspace({
     mirrorOrigin = Object.fromEntries(['x', 'y'].map(axis => [axis, Number.isFinite(state?.mirrorOrigin?.[axis]) ? Math.max(0, Math.min(1, state.mirrorOrigin[axis])) : .5]));
     if (typeof state?.showGrid === 'boolean') showGrid = state.showGrid;
     renderPalette(); paint(); updateCanvasView(); syncDrawingSettings(); animationControls?.refresh();
-  },
+}
+
+pxdBridge = mountWorkspace({
+  tool: 'draw',
+  projectWorkspace: true,
+  initialProject: initialCameraProject,
+  getEditorState: getDrawEditorState,
+  restoreEditorState: restoreDrawEditorState,
   hasContent: () => Boolean(pxdBridge?.currentProject || pxdBridge?.heldProject || activeDraftId || documentData.pixels.some((pixel) => pixel >= 0)),
   setStatus: (message) => { status.textContent = message; },
   async openProject(project) {
@@ -1636,6 +1822,7 @@ for (const command of DRAW_SHORTCUT_COMMANDS) {
   if (!commandHandlers[command.id]) throw new TypeError('描画コマンドの処理がありません: ' + command.id);
 }
 function keyboardCommandEnabled(id) {
+  if (cameraOpening || cameraSession) return false;
   if (document.body.hasAttribute('data-tool-result-open')) return false;
   if (id === 'selection.copy') return selectionPanelState().canCopy;
   if (id === 'selection.cut') return selectionPanelState().canCut;
@@ -1668,12 +1855,13 @@ let modeDisposed = false;
 function disposeDrawMode() {
   if (modeDisposed) return;
   modeDisposed = true;
+  cancelCamera();
   loadGate.begin();
   activeTimelapseJob?.controller.abort();
   animationExportController?.abort();
   clearToastTimer();
   virtualCursor?.release(true); stopAnimation(); animationControls?.dispose(); if (drawing) endStroke(); clearSelection();
-  activePointers.clear(); pendingTap = null; pendingTapPointerId = null; drawingPointerId = null; pinchStart = null; panDrag = null; fingerTap = null;
+  activePointers.clear(); pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; drawingPointerId = null; pinchStart = null; panDrag = null; fingerTap = null;
   strokeStartPixels = null; drawing = false; previousPoint = null;
   canvas.classList.remove('is-grab', 'is-panning');
   closeColorEditor();
@@ -1684,6 +1872,21 @@ function disposeDrawMode() {
 function clearToastTimer() { clearTimeout(toastTimer); }
 scope.add(disposeDrawMode);
 await pxdBridge.ready;
+if (returnedCamera) {
+  cameraOpening = true; freezeCameraEditor();
+  try { await restoreCameraReturn(returnedCamera); returnedCamera = null; }
+  finally { cancelCamera(); paint(); }
+}
+scope.listen(window, 'pageshow', async event => {
+  if (!event.persisted || !handoffApi || scope.disposed) return;
+  cancelCamera(); cameraNavigationResume?.(); cameraNavigationResume = null;
+  const record = handoffApi.takeDrawCameraReturn({ search: location.search, consume: false });
+  if (record) {
+    cameraOpening = true; freezeCameraEditor();
+    try { await restoreCameraReturn(record); } catch (error) { cameraStatus(`作品を戻せませんでした：${error.message}`); }
+    finally { cancelCamera(); paint(); }
+  }
+});
 if (document.activeElement === document.body) canvas.focus({ preventScroll: true });
 return { workspace: pxdBridge, dispose: disposeDrawMode };
 }

@@ -4,7 +4,9 @@ import { selectionAxes, selectionFrameCorners, selectionDefaultPivot, selectionW
 export function mountDrawSelectionOverlay({ scope, board, canvas, getFrame }) {
   const doc = board.ownerDocument, frameNode = doc.createElement('div');
   frameNode.className = 'draw-selection'; frameNode.setAttribute('aria-hidden', 'true'); board.append(frameNode);
-  const marks = {}, nodes = [frameNode];
+  const maskNode = doc.createElement('canvas'); maskNode.className = 'draw-selection-mask'; maskNode.setAttribute('aria-hidden', 'true'); maskNode.width = canvas.width * 4; maskNode.height = canvas.height * 4; board.append(maskNode);
+  const maskContext = maskNode.getContext('2d');
+  const marks = {}, nodes = [frameNode, maskNode];
   for (const name of ['nw', 'ne', 'sw', 'se', 'pivot', 'flip-x', 'flip-y']) {
     const mark = doc.createElement('span');
     mark.className = name.length === 2 ? 'draw-selection__corner' : `draw-selection__${name}`;
@@ -34,17 +36,38 @@ export function mountDrawSelectionOverlay({ scope, board, canvas, getFrame }) {
     controls['flip-x'] = logical(flips[0]); controls['flip-y'] = logical(flips[1]);
     return { r, b, sx, sy, screen, controls };
   }
-  let visible = false, editable = false, active = '';
+  let visible = false, editable = false, active = '', maskVisible = false, previousMask = null, previousWidth = 0, previousHeight = 0;
   function hover(name = '') {
     for (const [key, node] of Object.entries(marks)) {
       node.dataset.hover = String(name === key); node.dataset.active = String(active === key);
     }
     board.dataset.selectionHover = name;
   }
-  function render(frame, canEdit, dragging = '') {
-    visible = Boolean(frame); editable = canEdit; active = dragging;
+  function render(frame, canEdit, dragging = '', mask = null) {
+    visible = Boolean(frame); editable = canEdit; active = dragging; maskVisible = mask instanceof Uint8Array && mask.length === canvas.width * canvas.height;
     frameNode.hidden = !visible;
-    for (const node of nodes.slice(1)) node.hidden = !visible || !editable;
+    frameNode.dataset.mask = String(maskVisible);
+    for (const node of nodes.slice(2)) node.hidden = !visible || !editable;
+    maskNode.hidden = !maskVisible;
+    if (maskVisible) {
+      if (previousMask !== mask || previousWidth !== canvas.width || previousHeight !== canvas.height) {
+        const width = canvas.width, height = canvas.height, bitmapWidth = width * 4, bitmapHeight = height * 4;
+        if (maskNode.width !== bitmapWidth) maskNode.width = bitmapWidth;
+        if (maskNode.height !== bitmapHeight) maskNode.height = bitmapHeight;
+        const image = maskContext.createImageData(bitmapWidth, bitmapHeight);
+        const write = (x, y, alpha) => { if (x < 0 || y < 0 || x >= bitmapWidth || y >= bitmapHeight) return; const p = (y * bitmapWidth + x) * 4; image.data[p] = 255; image.data[p + 1] = 211; image.data[p + 2] = 90; image.data[p + 3] = alpha; };
+        for (let i = 0; i < mask.length; i++) if (mask[i]) {
+          const x = i % width, y = Math.floor(i / width), boundary = (xx, yy) => xx < 0 || yy < 0 || xx >= width || yy >= height || !mask[yy * width + xx];
+          for (let py = 0; py < 4; py++) for (let px = 0; px < 4; px++) {
+            const edge = boundary(x - 1, y) && px === 0 || boundary(x + 1, y) && px === 3 || boundary(x, y - 1) && py === 0 || boundary(x, y + 1) && py === 3;
+            write(x * 4 + px, y * 4 + py, edge ? 230 : 42);
+          }
+        }
+        maskContext.putImageData(image, 0, 0); previousMask = mask; previousWidth = width; previousHeight = height;
+      }
+      const r = canvas.getBoundingClientRect(), b = board.getBoundingClientRect();
+      Object.assign(maskNode.style, { left: `${r.left - b.left - board.clientLeft}px`, top: `${r.top - b.top - board.clientTop}px`, width: `${r.width}px`, height: `${r.height}px` });
+    }
     if (!visible) { hover(); return; }
     const { r, b, sx, sy, screen, controls } = layout(frame), { c, s } = selectionAxes(frame.angle);
     const offset = p => ({ x: p.x - b.left - board.clientLeft, y: p.y - b.top - board.clientTop });

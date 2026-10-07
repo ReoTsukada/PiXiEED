@@ -23,12 +23,12 @@
   <link rel="stylesheet" href="/css/display-ads.css?rev=20260929-manual-ads-4">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
   <link rel="stylesheet" href="/css/color-panel.css?rev=20261006-panel-close-1">
-  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261006-floating-mouse-2">
+  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261007-color-selection-1">
   <link rel="stylesheet" href="/css/draw-canvas-panel.css?rev=20261006-header-controls-1">
-  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261006-header-controls-1">
+  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261007-color-selection-1">
   <link rel="stylesheet" href="/css/draw-compact-controls.css?rev=20261006-floating-mouse-2">
   <!-- Start the editor dependency graph together with its styles. -->
-  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261006-selection-fix-1">
+  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261007-draw-handoff-1">
   <link rel="modulepreload" href="/js/creation/project-workspace.mjs?rev=20261006-header-controls-1">
   <link rel="modulepreload" href="/js/creation/draw-core.mjs?rev=20261006-draw-startup-1">
   <link rel="modulepreload" href="/js/creation/animation-core.mjs">
@@ -83,13 +83,17 @@
               </section>
               <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-select">
                 <h2 id="draw-tool-group-select" class="draw-tool-group__heading">選ぶ</h2>
-                <button type="button" data-draw-tool="select" data-drawing-icon="select" aria-pressed="false" aria-label="範囲選択" title="範囲選択：範囲を選ぶ"><span data-tool-label>範囲選択</span><small data-tool-description>範囲を選ぶ</small></button>
+                <div class="draw-select-tool-modes" role="group" aria-label="範囲選択の方式">
+                  <button type="button" data-draw-tool="select" data-selection-mode="rectangle" data-drawing-icon="select" aria-pressed="false" aria-label="四角形選択" title="四角形選択：ドラッグで範囲を選ぶ"><span data-tool-label>範囲選択</span><small data-tool-description>四角形をドラッグ</small></button>
+                  <button type="button" data-draw-tool="select" data-selection-mode="color" data-drawing-icon="select" aria-pressed="false" aria-label="同じ色を選択" title="同じ色を選択：クリックした色をすべて選ぶ"><span data-tool-label>同じ色</span><small data-tool-description>色をクリック</small></button>
+                </div>
                 <button type="button" data-draw-tool="picker" data-drawing-icon="picker" aria-pressed="false" aria-label="スポイト" title="スポイト：絵から色をとる"><span data-tool-label>スポイト</span><small data-tool-description>絵から色をとる</small></button>
               </section>
             </div>
           </details>
         </div>
         <div class="draw-toggles">
+        <button id="draw-camera" type="button" aria-label="カメラで撮影" title="カメラで撮影"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h5l2-3h4l2 3h5v15H3Z"/><circle cx="12" cy="13" r="4"/></svg></button>
 
         <details id="draw-settings-picker" class="draw-settings-picker">
           <summary id="draw-settings-summary" data-drawing-icon="settings" aria-label="描き方・表示の設定" title="描き方・表示の設定"></summary>
@@ -119,7 +123,7 @@
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-animation-play" type="button" aria-pressed="false" aria-label="アニメーションを再生" title="再生"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="draw-play-icon" d="m8 5 11 7-11 7Z"/><path class="draw-stop-icon" d="M8 5v14M16 5v14"/></svg></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261006-selection-fix-1"></script>
+  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261007-draw-handoff-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>

@@ -38,7 +38,47 @@ function toDelta(document, indices) {
   const data = new Uint8Array(unique.length * 4); const palette = document.palette.map((color) => rgbaForColor(color));
   for (let slot = 0; slot < unique.length; slot += 1) data.set(palette[document.pixels[unique[slot]]] || [0, 0, 0, 0], slot * 4);
   const indexData = Uint32Array.from(unique);
-  return { type: 'delta', indices: indexData, data, bytes: indexData.byteLength + data.byteLength };
+  return { type: 'delta', width: document.width, height: document.height, indices: indexData, data, bytes: indexData.byteLength + data.byteLength };
+}
+
+function validateEvents(source, { maxBytes, maxFrames }) {
+  if (!Array.isArray(source) || source.length < 1 || source.length > maxFrames || source[0]?.type !== 'keyframe') {
+    throw new TypeError('Invalid Draw timelapse event sequence');
+  }
+  const first = source[0];
+  if (!Number.isSafeInteger(first.width) || !Number.isSafeInteger(first.height) || first.width < 1 || first.height < 1 ||
+      !Number.isSafeInteger(first.width * first.height) || first.width * first.height > Math.floor(Number.MAX_SAFE_INTEGER / 4)) {
+    throw new TypeError('Invalid Draw timelapse dimensions');
+  }
+  const pixelCount = first.width * first.height, dataLength = pixelCount * 4;
+  let totalBytes = 0, sinceKeyframe = 0;
+  const copy = source.map((event, index) => {
+    if (!event || (event.type !== 'keyframe' && event.type !== 'delta') ||
+        event.width !== first.width || event.height !== first.height || !Number.isSafeInteger(event.bytes) || event.bytes < 1) {
+      throw new TypeError('Invalid Draw timelapse event metadata');
+    }
+    if (event.type === 'keyframe') {
+      if (!(event.data instanceof Uint8Array) || event.data.length !== dataLength || event.bytes !== event.data.byteLength) throw new TypeError('Invalid Draw timelapse keyframe');
+      if (event.bytes > maxBytes - totalBytes) throw new RangeError('Draw timelapse snapshot exceeds its memory limit');
+      sinceKeyframe = 0;
+      totalBytes += event.data.byteLength;
+      return { type: 'keyframe', width: first.width, height: first.height, data: new Uint8Array(event.data), bytes: event.bytes };
+    }
+    if (index === 0 || !(event.indices instanceof Uint32Array) || !(event.data instanceof Uint8Array) ||
+        event.indices.length < 1 || event.indices.length > pixelCount || event.data.length !== event.indices.length * 4 ||
+        event.bytes !== event.indices.byteLength + event.data.byteLength) throw new TypeError('Invalid Draw timelapse delta');
+    if (event.bytes > maxBytes - totalBytes) throw new RangeError('Draw timelapse snapshot exceeds its memory limit');
+    const seen = new Set();
+    for (const cell of event.indices) {
+      if (cell >= pixelCount || seen.has(cell)) throw new RangeError('Draw timelapse delta index is out of bounds or duplicated');
+      seen.add(cell);
+    }
+    sinceKeyframe += 1;
+    totalBytes += event.bytes;
+    return { type: 'delta', width: first.width, height: first.height, indices: new Uint32Array(event.indices), data: new Uint8Array(event.data), bytes: event.bytes };
+  });
+  if (totalBytes > maxBytes) throw new RangeError('Draw timelapse snapshot exceeds its memory limit');
+  return { events: copy, bytes: totalBytes, width: first.width, height: first.height, sinceKeyframe };
 }
 
 export function createDrawTimelapse({ maxBytes = DRAW_TIMELAPSE.maxStoredBytes, maxFrames = DRAW_TIMELAPSE.maxStoredFrames, keyframeInterval = DRAW_TIMELAPSE.keyframeInterval } = {}) {
@@ -74,6 +114,10 @@ export function createDrawTimelapse({ maxBytes = DRAW_TIMELAPSE.maxStoredBytes, 
       if (event.type === 'keyframe') sinceKeyframe = 0; else sinceKeyframe += 1;
       trim();
       if (bytes > maxBytes || events.length > maxFrames) replaceWithSnapshot(document);
+    },
+    restore(source) {
+      const restored = validateEvents(source, { maxBytes, maxFrames });
+      events = restored.events; bytes = restored.bytes; width = restored.width; height = restored.height; sinceKeyframe = restored.sinceKeyframe;
     },
     get frameCount() { return events.length; },
     get storedBytes() { return bytes; },

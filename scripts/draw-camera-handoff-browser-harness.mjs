@@ -1,0 +1,122 @@
+/** Draw↔dedicated-camera roundtrip: preserves full PXD animation with masked camera writes. Synthetic camera only. */
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import { createAnimation, writeAnimationCel, addAnimationFrame, addAnimationLayer } from '../js/creation/animation-core.mjs';
+import { createPxdProject, encodePxd } from '../js/creation/pxd-codec.mjs';
+import { writePxdAnimation } from '../js/creation/pxd-animation.mjs';
+
+const base=process.env.PIXIEED_BROWSER_BASE_URL||'http://127.0.0.1:4188';
+assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
+const out=process.env.PIXIEED_DRAW_CAMERA_HANDOFF_OUTPUT||'/tmp/pixieed-draw-camera-handoff-20261007';
+await mkdir(out,{recursive:true});
+const W=16,H=16;
+let animation=createAnimation({width:W,height:H,palette:['#ed2518','#204de8','#39ba51','#eed040']});
+const lower0=Array(W*H).fill(3), upper0=Array(W*H).fill(0);
+for(const [x,y,v] of [[1,1,1],[6,6,1],[8,8,1],[13,13,2],[14,13,2]])upper0[y*W+x]=v;
+animation=writeAnimationCel(animation,animation.frames[0].id,animation.layers[0].id,{width:W,height:H,pixels:lower0});
+animation=addAnimationLayer(animation,{name:'Active foreground'});
+animation=writeAnimationCel(animation,animation.frames[0].id,animation.layers[1].id,{width:W,height:H,pixels:upper0});
+animation=addAnimationFrame(animation,{copy:false});
+const lower1=Array.from({length:W*H},(_,i)=>i%5===0?4:2),upper1=Array.from({length:W*H},(_,i)=>i%7===0?4:0);
+animation=writeAnimationCel(animation,animation.frames[1].id,animation.layers[0].id,{width:W,height:H,pixels:lower1});
+animation=writeAnimationCel(animation,animation.frames[1].id,animation.layers[1].id,{width:W,height:H,pixels:upper1});
+await writeFile(`${out}/animation.pxd`,await encodePxd(await writePxdAnimation(createPxdProject(),animation)));
+
+const modulePath=process.env.PIXIEED_PLAYWRIGHT_MODULE||'/tmp/pixieed-camera-playwright/node_modules/playwright/index.mjs';
+const {chromium,webkit}=await import(pathToFileURL(modulePath).href);
+const engines=process.env.PIXIEED_BROWSER_ENGINES?.split(',')||['chromium','webkit'];
+const viewports=[{width:320,height:568,dpr:2},{width:390,height:844,dpr:3},{width:844,height:390,dpr:2},{width:1280,height:800,dpr:1}];
+const results=[],failures=[];let capturedSnapshot=null;
+const QA_KEY='pixieed:qa:draw-camera-handoff:v1';
+for(const engineName of engines){
+ let browser;
+ try{const engine=({chromium,webkit})[engineName];assert.ok(engine,`unknown engine ${engineName}`);const wk=process.env.PIXIEEED_WEBKIT_EXECUTABLE||'/Users/tsukadareine/Library/Caches/ms-playwright/webkit-2272/pw_run.sh';browser=await engine.launch(engineName==='webkit'&&existsSync(wk)?{executablePath:wk}:{});}catch(error){failures.push({engine:engineName,scenario:'launch',error:error.stack});console.error('LAUNCH FAIL',engineName,error.message);continue;}
+ try{for(const viewport of viewports){
+  const label=`${engineName}-${viewport.width}x${viewport.height}-dpr${viewport.dpr}`;
+  const context=await browser.newContext({viewport,deviceScaleFactor:viewport.dpr,acceptDownloads:true});
+  await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(base).origin?r.continue():r.abort());
+  await context.addInitScript(({qaKey})=>{
+   let log={requests:0,stops:0,constraints:[],facing:[],errors:[]};try{log=JSON.parse(sessionStorage.getItem(qaKey)||'null')||log;}catch{}
+   const persist=()=>sessionStorage.setItem(qaKey,JSON.stringify(log));
+   const state=window.__drawCameraHandoffQA={log,resolvePending:null,tracks:[]};
+   const cameraMode=()=>sessionStorage.getItem(`${qaKey}:mode`)||'ok';
+   const makeStream=()=>{
+    const source=document.createElement('canvas');source.width=320;source.height=240;const c=source.getContext('2d');let frame=0;
+    const paint=()=>{frame^=1;c.fillStyle=frame?'#ed2518':'#e82218';c.fillRect(0,0,160,240);c.fillStyle=frame?'#204de8':'#1748e8';c.fillRect(160,0,160,240);};paint();const timer=setInterval(paint,80);
+    const stream=source.captureStream(15);for(const track of stream.getTracks()){state.tracks.push(track);const stop=track.stop.bind(track);track.stop=()=>{if(!track.__handoffStopped){track.__handoffStopped=true;log.stops++;persist();clearInterval(timer);}return stop();};}return stream;
+   };
+   const media={getUserMedia:constraints=>{log.requests++;log.constraints.push(constraints);log.facing.push(constraints?.video?.facingMode||null);persist();if(constraints?.audio!==false)return Promise.reject(new Error('handoff QA only permits audio:false'));const mode=cameraMode();if(mode==='deny')return Promise.reject(Object.assign(new Error('synthetic denied'),{name:'NotAllowedError'}));if(mode==='missing')return Promise.reject(Object.assign(new Error('synthetic missing'),{name:'NotFoundError'}));if(mode==='deferred')return new Promise(resolve=>{state.resolvePending=()=>resolve(makeStream());});return Promise.resolve(makeStream());}};
+   Object.defineProperty(Navigator.prototype,'mediaDevices',{configurable:true,get:()=>media});
+  },{qaKey:QA_KEY});
+  const page=await context.newPage();page.setDefaultTimeout(9000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const readyDraw=()=>page.waitForFunction(()=>document.documentElement.dataset.drawReady==='true'&&!document.querySelector('#main')?.inert);
+  const pixels=async selector=>page.locator(selector).evaluate(c=>({width:c.width,height:c.height,rgba:[...c.getContext('2d').getImageData(0,0,c.width,c.height).data]}));
+  const projectSnapshot=()=>page.evaluate(async()=>{const {createToolProjectStore}=await import('/js/creation/tool-project-store.mjs');const {readPxdAnimation}=await import('/js/creation/pxd-animation.mjs');const {getAnimationCelDocument,composeAnimationFrame}=await import('/js/creation/animation-core.mjs');const ref=JSON.parse(localStorage.getItem('pixieed:pxd:last:draw'));if(!ref)throw Error('missing saved Draw PXD pointer');const project=await createToolProjectStore('draw').load(ref.projectId,ref.revisionId);const a=await readPxdAnimation(project);const state=project.manifest?.editorState?.draw;return{pointer:ref,palette:a.palette,frames:a.frames.map(f=>({...f})),layers:a.layers.map(l=>({...l})),activeFrame:a.frames.findIndex(f=>f.id===state?.frameId),activeLayer:a.layers.findIndex(l=>l.id===state?.layerId),cels:a.frames.map(f=>a.layers.map(l=>[...getAnimationCelDocument(a,f.id,l.id).pixels])),composites:a.frames.map(f=>[...composeAnimationFrame(a,f.id).pixels])};});
+  const saveProject=async()=>{await page.locator('#pxd-save').evaluate(n=>n.click());await page.waitForFunction(()=>document.querySelector('#project-open')?.dataset.state==='saved'&&!document.querySelector('#main')?.inert);return projectSnapshot();};
+  const privateRequest=()=>page.evaluate(async()=>{const {readDrawCameraRequest}=await import('/js/creation/draw-camera-handoff.mjs');const {getAnimationCelDocument}=await import('/js/creation/animation-core.mjs');const request=readDrawCameraRequest({search:location.search});if(!request)return null;const a=request.animation;return{project:request.project,frameId:request.frameId,layerId:request.layerId,mask:[...request.mask],allowedIndices:request.allowedIndices,view:request.view,animation:{width:a.width,height:a.height,palette:a.palette,frames:a.frames,layers:a.layers,cels:a.frames.map(f=>a.layers.map(l=>[...getAnimationCelDocument(a,f.id,l.id).pixels]))}};});
+  const loadFixture=async()=>{await page.locator('#project-open').click();await page.locator('#project-tab-library').click();const imports=page.locator('.project-imports');if(!await imports.evaluate(n=>n.open))await imports.locator(':scope > summary').click();await page.locator('#pxd-file-input').setInputFiles(`${out}/animation.pxd`);await page.waitForFunction(()=>!document.querySelector('#main')?.inert&&document.querySelectorAll('#draw-palette [data-color-index]').length===5);if(await page.locator('#pxd-panel').evaluate(n=>n.open))await page.locator('#project-close').click();};
+  const setRectSelection=async()=>{
+   await page.locator('#draw-canvas').focus();await page.keyboard.press('Escape');await page.keyboard.press('v');
+   const b=await page.locator('#draw-canvas').boundingBox(),point=(x,y)=>({x:b.x+(x+.5)*b.width/W,y:b.y+(y+.5)*b.height/H}),a=point(4,4),z=point(11,11);
+   await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(z.x,z.y,{steps:5});await page.mouse.up();await page.waitForTimeout(70);
+   return page.locator('.draw-selection').evaluate(n=>Object.fromEntries(['x','y','width','height'].map(k=>[k,Number(n.dataset[k])])));
+  };
+  const beginHandoff=async(waitReady=true)=>{await page.locator('#draw-camera').click();await page.waitForURL(/\/pixel-camera\.html\?to=draw&drawRequest=[0-9a-f-]{36}/);await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.drawCameraHandoff==='true');if(waitReady)await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.ready==='true'&&document.querySelector('#capture')?.disabled===false);const url=new URL(page.url());assert.equal(url.searchParams.get('to'),'draw');assert.match(url.searchParams.get('drawRequest')||'',/^[0-9a-f-]{36}$/i);};
+  const returnToDraw=async()=>{await page.waitForURL(u=>u.pathname==='/draw/');await readyDraw();};
+  const statusQA=()=>page.evaluate(key=>JSON.parse(sessionStorage.getItem(key)||'{}'),QA_KEY);
+  const reportScenario=async(name,run)=>{if(process.env.PIXIEED_DRAW_CAMERA_SCENARIO&&!name.includes(process.env.PIXIEED_DRAW_CAMERA_SCENARIO))return;try{const data=await run();results.push({engine:engineName,viewport,scenario:name,checks:'PASS',data});console.log('PASS',label,name);}catch(error){failures.push({engine:engineName,viewport,scenario:name,error:error.stack});console.error('FAIL',label,name,error.message);await page.screenshot({path:`${out}/${label}-${name}-failure.png`,fullPage:true}).catch(()=>{});if(new URL(page.url()).pathname==='/pixel-camera.html'){await page.locator('.lc-back').click().catch(()=>{});await page.waitForURL(u=>u.pathname==='/draw/').catch(()=>{});await readyDraw().catch(()=>{});}}};
+  try{
+   await page.goto(`${base}/draw/`);await readyDraw();await loadFixture();const starting=await saveProject();assert.equal(starting.frames.length,2);assert.equal(starting.layers.length,2);assert.equal(starting.palette.length,4);assert.equal(starting.activeFrame,0);assert.equal(starting.activeLayer,1);
+   const rect=await setRectSelection();assert.deepEqual(rect,{x:4,y:4,width:8,height:8},'fixture uses an interior rectangle while artwork remains outside');
+   const beforeCanvas=await pixels('#draw-canvas'),pre=await saveProject();assert.deepEqual(pre.cels,starting.cels);assert.ok(starting.cels[0][1].some(v=>v>=0)&&starting.cels[0][1].some(v=>v<0),'active cel contains mixed opaque/transparency');
+   await reportScenario('camera-mode-composite-mask-and-controls',async()=>{
+    await beginHandoff();const studio=page.locator('#pixelStudio');assert.equal(await studio.getAttribute('data-draw-camera-handoff'),'true');
+    assert.deepEqual(await page.locator('#view').evaluate(c=>[c.width,c.height]),[W,H],'view retains full-canvas logical dimensions');
+    const sample=await studio.evaluate(n=>({width:Number(n.dataset.sampleWidth),height:Number(n.dataset.sampleHeight)}));assert.deepEqual(sample,{width:Math.round(rect.width),height:Math.round(rect.height)},'camera samples only the selection bounding box');
+    for(const selector of ['#drawCameraTarget','#drawCameraPalette','.draw-camera-context'])assert.equal(await page.locator(selector).count(),0,`${selector} is not added to the existing camera UI`);
+    for(const selector of ['#toolbar','#cameraSettingsPanel','#resultControls','#cameraImageInput','#cameraChooseImage','#savePng','#postCamera','#useCameraImage','#gifRec'])if(await page.locator(selector).count())assert.equal(await page.locator(selector).isVisible(),false,`${selector} unavailable in Draw camera mode`);
+    assert.equal(await page.locator('#capture').isEnabled(),true);assert.equal(await page.locator('#flipCamera').isEnabled(),true);
+    const view=await pixels('#view'),requestQA=await statusQA(),sealed=await privateRequest();assert.ok(sealed,'matching private request is readable on dedicated camera route');assert.deepEqual(sealed.animation.palette,pre.palette);assert.deepEqual(sealed.animation.frames,pre.frames);assert.deepEqual(sealed.animation.layers,pre.layers);assert.deepEqual(sealed.animation.cels,pre.cels,'sealed private request carries every frame and layer cel');assert.equal(sealed.frameId,pre.frames[pre.activeFrame].id);assert.equal(sealed.layerId,pre.layers[pre.activeLayer].id);assert.equal(sealed.mask.length,W*H);assert.equal(sealed.mask.filter(Boolean).length,rect.width*rect.height);assert.equal(sealed.animation.width,W);assert.equal(sealed.animation.height,H);assert.ok(sealed.allowedIndices.length>0&&sealed.allowedIndices.every(i=>Number.isInteger(i)&&i>=0&&i<pre.palette.length),'private target palette indices are valid');assert.ok(requestQA.requests>=1);assert.ok(requestQA.constraints.every(c=>c.audio===false));
+    const fit=await page.locator('#captureFrame').evaluate(n=>{const f=n.getBoundingClientRect(),s=document.querySelector('#stage').getBoundingClientRect(),t=document.querySelector('.lc-top').getBoundingClientRect(),nav=document.querySelector('.app-tabs').getBoundingClientRect();return{frame:[f.left,f.top,f.right,f.bottom],stage:[s.left,s.top,s.right,s.bottom],topBottom:t.bottom,navTop:nav.top};});assert.ok(fit.frame[0]>=fit.stage[0]-1&&fit.frame[2]<=fit.stage[2]+1&&fit.frame[1]>=fit.topBottom-1&&fit.frame[3]<=fit.navTop+1,`camera artwork fits between top and bottom controls: ${JSON.stringify(fit)}`);
+    // The Draw compositor stays visible outside the selected rectangle while camera colors replace only its target.
+    const at=(image,x,y)=>image.rgba.slice((y*image.width+x)*4,(y*image.width+x)*4+4);for(const [x,y] of [[0,0],[15,0],[0,15],[15,15],[2,8],[13,8]])assert.deepEqual(at(view,x,y),at(beforeCanvas,x,y),`unselected composite cell ${x},${y} remains visible`);
+    assert.notDeepEqual(at(view,5,5),at(beforeCanvas,5,5),'live camera preview appears inside selected region');await page.screenshot({path:`${out}/${label}-draw-camera-live.png`,fullPage:true});
+    return {url:page.url(),sample,requestCount:requestQA.requests,view:[view.width,view.height]};
+   });
+   await reportScenario('flip-restart-and-cancel-restores-all-pxd-content',async()=>{
+    const flipBefore=(await statusQA()).requests;await page.locator('#flipCamera').click();await page.waitForFunction(({key,count})=>JSON.parse(sessionStorage.getItem(key)||'{}').requests>count,{key:QA_KEY,count:flipBefore},{timeout:2500}).catch(async()=>{await page.waitForTimeout(120);});const afterFlip=await statusQA();assert.ok(afterFlip.requests>flipBefore,'front/rear switch asks for a new synthetic track');assert.ok(afterFlip.stops>=1,'old camera track stopped during switch');
+    await page.locator('.lc-back').click();await returnToDraw();const restored=await projectSnapshot();assert.deepEqual(restored.palette,pre.palette);assert.deepEqual(restored.frames,pre.frames);assert.deepEqual(restored.layers,pre.layers);assert.deepEqual(restored.cels,pre.cels,'cancel restores every cel exactly');assert.deepEqual(await pixels('#draw-canvas'),beforeCanvas,'cancel restores complete composite');const qa=await statusQA();assert.ok(qa.stops>=2,'cancel stops switched camera track');await page.screenshot({path:`${out}/${label}-draw-camera-cancel-return.png`});return{cancelUrl:page.url(),stops:qa.stops};
+   });
+   await reportScenario('capture-modifies-only-selected-cel-and-one-undo-redo',async()=>{
+    // Draw selection remains active after cancel; this second request transfers the whole animation again.
+    await beginHandoff();await page.waitForTimeout(180);const selectedView=await pixels('#view');await page.locator('#capture').click();await returnToDraw();const captured=await saveProject();assert.deepEqual(captured.palette,pre.palette);assert.deepEqual(captured.frames,pre.frames);assert.deepEqual(captured.layers,pre.layers);assert.equal(captured.activeFrame,pre.activeFrame);assert.equal(captured.activeLayer,pre.activeLayer);
+    for(let f=0;f<pre.frames.length;f++)for(let l=0;l<pre.layers.length;l++)if(f!==pre.activeFrame||l!==pre.activeLayer)assert.deepEqual(captured.cels[f][l],pre.cels[f][l],`unrelated frame/layer ${f}/${l} unchanged`);
+    const activeBefore=pre.cels[0][1],activeAfter=captured.cels[0][1];let changedInside=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const inside=x>=rect.x&&x<rect.x+rect.width&&y>=rect.y&&y<rect.y+rect.height,offset=y*W+x;if(!inside)assert.equal(activeAfter[offset],activeBefore[offset],`active artwork outside mask ${x},${y} preserved`);else if(activeAfter[offset]!==activeBefore[offset])changedInside++;}assert.ok(changedInside>0,'capture changes target cells inside the mask');assert.deepEqual(await pixels('#draw-canvas'),selectedView,'return Draw pixels match dedicated camera preview');
+    const capturedPointer=captured.pointer;capturedSnapshot=captured;await page.locator('#draw-undo').click();const undoState=await saveProject();assert.deepEqual(undoState.cels,pre.cels,'one Undo restores all original cels');await page.locator('#draw-redo').click();const redoState=await saveProject();assert.deepEqual(redoState.cels,captured.cels,'one Redo restores the capture');
+   await page.locator('#pxd-save').evaluate(n=>n.click());await page.waitForFunction(()=>document.querySelector('#project-open')?.dataset.state==='saved'&&!document.querySelector('#main')?.inert);const saved=await projectSnapshot();await page.reload();await readyDraw();assert.deepEqual((await projectSnapshot()).cels,saved.cels,'capture survives PXD-backed reload');await page.screenshot({path:`${out}/${label}-draw-camera-captured.png`});return{pointer:capturedPointer,changedInside};
+   });
+   await reportScenario('irregular-transparent-mask-preserves-holes-and-full-composite',async()=>{
+    await page.goto(`${base}/draw/`);await readyDraw();await loadFixture();
+    await page.keyboard.press('Escape');await page.keyboard.press('v');const picker=page.locator('#draw-tool-picker');if(!await picker.evaluate(n=>n.open))await page.locator('#draw-tool-summary').click();await page.locator('.draw-select-tool-modes [data-selection-mode="color"]').click();await page.locator('#draw-canvas').focus();
+    const b=await page.locator('#draw-canvas').boundingBox();await page.mouse.click(b.x+.5*b.width/W,b.y+.5*b.height/H);await page.waitForTimeout(70);const before=await saveProject(),original=[...before.cels[before.activeFrame][before.activeLayer]];
+    await beginHandoff();await page.waitForTimeout(220);const sealed=await privateRequest();assert.ok(sealed.mask.some(v=>v===0)&&sealed.mask.some(v=>v===1),'color selection handoff retains irregular holes in its full-canvas mask');assert.equal(sealed.mask.length,W*H);assert.equal(Number((await page.locator('#pixelStudio').getAttribute('data-sample-width'))),W);assert.equal(Number((await page.locator('#pixelStudio').getAttribute('data-sample-height'))),H);assert.deepEqual(sealed.animation.cels,before.cels,'private handoff keeps every cel unchanged while preview is live');const preview=await pixels('#view');
+    if(viewport.width===390)await page.screenshot({path:`${out}/${engineName}-390x844-camera-masked-preview.png`,fullPage:true});
+    await page.locator('#capture').click();await returnToDraw();await page.waitForTimeout(70);const after=await saveProject();assert.deepEqual(await pixels('#draw-canvas'),preview,'full composite preview is returned');for(let i=0;i<original.length;i++)if(!sealed.mask[i])assert.equal(after.cels[before.activeFrame][before.activeLayer][i],original[i],`transparent-mask hole ${i} preserved`);for(let f=0;f<before.cels.length;f++)for(let l=0;l<before.cels[f].length;l++)if(f!==before.activeFrame||l!==before.activeLayer)assert.deepEqual(after.cels[f][l],before.cels[f][l],`unrelated cel ${f}/${l} preserved`);await page.screenshot({path:`${out}/${label}-draw-camera-irregular-mask.png`});return{maskCells:sealed.mask.filter(Boolean).length,holes:sealed.mask.filter(v=>!v).length};
+   });
+   await reportScenario('track-end-browser-back-and-media-denial-preserve-full-work',async()=>{
+    const before=await projectSnapshot();await beginHandoff();const trackEndBefore=(await statusQA()).stops;await page.evaluate(()=>window.__drawCameraHandoffQA.tracks.at(-1).dispatchEvent(new Event('ended')));await page.waitForFunction(({key,count})=>JSON.parse(sessionStorage.getItem(key)||'{}').stops>count,{key:QA_KEY,count:trackEndBefore});assert.equal(new URL(page.url()).pathname,'/pixel-camera.html','track end keeps retry/cancel screen open');await page.locator('.lc-back').click();await returnToDraw();assert.deepEqual((await projectSnapshot()).cels,before.cels,'track end cancel preserves full PXD');
+    await page.evaluate(key=>sessionStorage.setItem(`${key}:mode`,'deny'),QA_KEY);await beginHandoff(false);await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.mode==='idle'&&document.querySelector('#capture')?.disabled===false);assert.equal(await page.locator('#capture').getAttribute('aria-label'),'カメラを再開','denial presents a retry control while retaining the original snapshot');assert.equal(await page.evaluate(k=>JSON.parse(sessionStorage.getItem(k)||'{}').requests>0,QA_KEY),true);await page.locator('.lc-back').click();await returnToDraw();assert.deepEqual((await projectSnapshot()).cels,before.cels,'permission denial cancel preserves cels');
+    await page.evaluate(key=>{sessionStorage.setItem(`${key}:mode`,'ok');},QA_KEY);await beginHandoff();const backStops=(await statusQA()).stops;await page.goBack();await returnToDraw();assert.deepEqual((await projectSnapshot()).cels,before.cels,'browser Back recovers original complete project');assert.ok((await statusQA()).stops>backStops,'pagehide/browser Back stops live track');
+   });
+   await reportScenario('late-camera-resolution-after-visibility-cancellation-is-stopped',async()=>{
+    const before=await projectSnapshot();await page.evaluate(key=>sessionStorage.setItem(`${key}:mode`,'deferred'),QA_KEY);await beginHandoff(false);await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.mode==='loading');assert.equal(await page.locator('#capture').isDisabled(),true,'shutter disabled while camera permission/startup is pending');const hiddenStop=(await statusQA()).stops;await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});window.__drawCameraHandoffQA?.resolvePending?.();});await page.waitForFunction(({key,count})=>JSON.parse(sessionStorage.getItem(key)||'{}').stops>count,{key:QA_KEY,count:hiddenStop},{timeout:2500}).catch(async()=>{await page.waitForTimeout(120);});const state=await statusQA();assert.ok(state.stops>hiddenStop,'late stream after page visibility loss is stopped');await page.locator('.lc-back').click();await returnToDraw();await page.evaluate(key=>sessionStorage.removeItem(`${key}:mode`),QA_KEY);assert.deepEqual((await projectSnapshot()).cels,before.cels,'late cancellation retains complete pre-handoff work');return{stops:state.stops};
+   });
+   assert.deepEqual(errors,[]);
+  }catch(error){failures.push({engine:engineName,viewport,scenario:'setup-or-navigation',error:error.stack});console.error('FAIL',label,'setup',error.message);await page.screenshot({path:`${out}/${label}-setup-failure.png`,fullPage:true}).catch(()=>{});}finally{await context.close();}
+ }}finally{await browser.close();}
+}
+const report={base,generatedAt:new Date().toISOString(),syntheticCamera:true,fixture:'16×16, 2 frames, 2 layers, 4-color palette; active first-frame/top-layer rectangular mask; distinct nonactive cels',results,failures};
+await writeFile(`${out}/report.json`,JSON.stringify(report,null,2));for(const engine of engines)await writeFile(`${out}/${engine}-report.json`,JSON.stringify({...report,results:results.filter(r=>r.engine===engine),failures:failures.filter(f=>f.engine===engine)},null,2));
+console.log(JSON.stringify({results:results.length,failures:failures.length,report:`${out}/report.json`},null,2));if(failures.length)process.exitCode=1;

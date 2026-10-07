@@ -30,9 +30,13 @@ test('camera capture UI no longer offers unrestricted-color looks and uses the u
   const html = read('pixel-camera.html');
   const app = read('js/pixel-lens/app.mjs');
   assert.doesNotMatch(html, /data-look="(?:c256|full)"/);
-  const loaded = html.match(/<script type="module" src="([^\"]*pixel-lens\/app\.mjs\?rev=[^\"]+)"/);
+  const loaded = html.match(/<script type="module" src="([^\"]*pixel-lens\/entry\.mjs\?rev=[^\"]+)"/);
   assert.ok(loaded, 'camera entry must have a versioned runtime');
   assert.ok(html.includes(`rel="modulepreload" href="${loaded[1]}"`), 'preload and runtime must use the same version');
+  const entry = read('js/pixel-lens/entry.mjs');
+  assert.match(entry, /params\.get\('to'\) === 'draw' \|\| params\.has\('drawRequest'\)/);
+  assert.match(entry, /import\('\.\/draw-camera-page\.mjs\?rev=/);
+  assert.match(entry, /else \{\s*await import\('\.\/app\.mjs\?rev=/);
   assert.match(app, /tool: 'camera', projectWorkspace: true/);
   assert.match(app, /if \(sharedProjectBound && sharedImageTarget\) return \{ width: sharedImageTarget\.width, height: sharedImageTarget\.height \}/);
 });

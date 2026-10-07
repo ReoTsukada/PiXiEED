@@ -1,0 +1,3 @@
+body[data-draw-camera="true"] .lc-stage { --lc-context-space: 0rem; }
+body[data-draw-camera="true"] .lc-frame { transition: none; background-color: #26333d; background-image: conic-gradient(#ffffff12 25%, transparent 0 50%, #ffffff12 0 75%, transparent 0); background-size: 16px 16px; }
+body[data-draw-camera="true"] [hidden] { display: none !important; }

@@ -7,7 +7,10 @@ export function normalizeDrawInputSettings(value, palette) {
     const binding = valid.bindings?.[side], fallback = Math.min(side === 'left' ? 2 : 4, palette.length - 1);
     const matching = typeof binding?.colorHex === 'string' ? palette.findIndex(hex => hex.toLowerCase() === binding.colorHex.toLowerCase()) : -1;
     const color = binding?.color === -1 ? -1 : matching >= 0 ? matching : Number.isInteger(binding?.color) && binding.color >= 0 && binding.color < palette.length ? binding.color : fallback;
-    return [side, { tool: DRAW_INPUT_TOOLS.includes(binding?.tool) ? binding.tool : 'pen', color }];
+    const normalized = { tool: DRAW_INPUT_TOOLS.includes(binding?.tool) ? binding.tool : 'pen', color };
+    if (binding?.selectMode === 'color') normalized.selectMode = 'color';
+    else if (binding?.selectMode === 'rectangle') normalized.selectMode = 'rectangle';
+    return [side, normalized];
   }));
   // Older saved settings exposed an editable L/R selector. Keep both bindings and
   // the control placement, but always restore editing to the shared left binding.

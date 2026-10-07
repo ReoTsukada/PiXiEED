@@ -202,6 +202,9 @@ body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > button[
   background: #3a4140 !important;
   box-shadow: inset 0 0 0 1px #ffd35a !important;
 }
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > .draw-select-tool-modes { grid-column: span 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; min-width: 0; }
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-select-tool-modes > button { box-sizing: border-box; display: grid; place-items: center; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 48px; height: 52px; padding: 0; border: 1px solid #ffffff25; border-radius: 12px; background: #2b3742; color: #f5f2e8; text-align: center; white-space: nowrap; }
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-select-tool-modes > button[aria-pressed="true"] { border-color: #ffd35a; background: #3a4140; box-shadow: inset 0 0 0 1px #ffd35a; }
 body[data-page="draw"] .draw-controls .draw-tool-menu .drawing-tool-icon {
   grid-row: auto;
   width: 26px;
@@ -220,6 +223,9 @@ body[data-page="draw"] .draw-controls .draw-tool-menu [data-tool-description] {
   white-space: nowrap !important;
   border: 0 !important;
 }
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-select-tool-modes > button { grid-template-rows: 28px 16px; align-content: center; }
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-select-tool-modes [data-tool-label] { position: static !important; width: auto !important; height: auto !important; margin: 0 !important; overflow: visible !important; clip: auto !important; font-size: .67rem; line-height: 16px; }
+body[data-page="draw"] .draw-board > .draw-selection[data-mask="true"] { background: transparent; }
 body[data-page="draw"] .draw-controls .draw-tool-picker > summary:focus-visible,
 body[data-page="draw"] .draw-controls .draw-tool-menu button:focus-visible {
   outline: 3px solid #8ecdf0 !important;
