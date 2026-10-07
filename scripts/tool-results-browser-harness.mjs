@@ -66,8 +66,12 @@ async function verifyResult(page, configured) {
   const source = await page.evaluate(()=>window.__sourceCanvas?.toDataURL());
   const before = await page.locator('.px-tool-result__preview').first().evaluate((c)=>c.toDataURL());
   if(source) { await page.evaluate(()=>window.__sourceCanvas.getContext('2d').clearRect(0,0,24,24));assert.equal(await page.locator('.px-tool-result__preview').first().evaluate((c)=>c.toDataURL()),before); }
-  const ad=page.locator('[data-display-ad]').first();
+  // Result placeholders exist before the optional runtime registers a display unit.
+  const ad=page.locator('.px-display-ad').first();
   if(configured) {
+    if(await page.locator('.px-tool-result__ad-row[data-reserved="true"]').count()) {
+      await page.waitForFunction(()=>document.querySelector('.px-tool-result__ad-row ins.px-display-ad__unit'));
+    }
     const mounted=await page.locator('ins.px-display-ad__unit').count();
     if(mounted) await page.waitForFunction(()=>document.querySelector('[data-display-ad]')?.dataset.adState==='filled');
     const layout=await ad.evaluate((el)=>{
@@ -81,6 +85,8 @@ async function verifyResult(page, configured) {
       assert.deepEqual(layout.overlaps,[],page.url());assert.ok(layout.center<=1,JSON.stringify({url:page.url(),layout}));assert.equal(layout.fits,true);assert.ok(layout.gap>=24,JSON.stringify({url:page.url(),layout}));
       const requests=await page.evaluate(()=>__resultAdRequests);assert.ok(requests>=1&&requests<=mounted);
       for (const unit of await page.locator('ins.px-display-ad__unit').all()) {
+        // A previously requested secondary unit can be hidden after resizing to mobile.
+        if(!await unit.isVisible()) continue;
         assert.equal(await unit.evaluate((node)=>{
           const r=node.getBoundingClientRect(),p=node.closest('aside').getBoundingClientRect();
           return r.width>0&&r.left>=p.left-1&&r.right<=p.right+1&&p.bottom<=innerHeight+1;
@@ -112,7 +118,7 @@ try {
         await page.waitForFunction(()=>typeof __resultAdRequests==='number');
         assert.equal(await page.locator('[data-display-ad],ins.px-display-ad__unit').count(),0,'working screen has no manual slot');
         await syntheticResult(page,key);await verifyResult(page,configured);
-        if(configured&&[390,1280].includes(viewport.width)) {
+        if(configured&&[390,1280].includes(viewport.width)&&await page.locator('ins.px-display-ad__unit').count()) {
           await page.locator('[data-display-ad]').first().screenshot({path:`/tmp/pixieed-result-unit-${engine}-${viewport.width}-${name}.png`});await frames(page);
           await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await frames(page);
           await page.screenshot({path:`/tmp/pixieed-tool-result-${engine}-${viewport.width}-${name}.png`,fullPage:true});

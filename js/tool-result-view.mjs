@@ -1,11 +1,40 @@
-import { mountDisplayAds } from './display-ads.mjs?rev=20261007-lazy-ads-1';
+import { displayAdConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 
 const views = new WeakMap();
 const keys = new Set(['camera-result', 'draw-result', 'audio-result', 'jigsaw-result', 'spot-result', 'find-result']);
+const resultPaths = new Map([
+  ['camera-result', '/pixel-camera.html'], ['draw-result', '/draw/'], ['audio-result', '/audio/'],
+  ['jigsaw-result', '/jigsaw/'], ['spot-result', '/play/spot-difference/'], ['find-result', '/play/hidden-object/']
+]);
+
+function hasConfiguredResultAd(key, win) {
+  const slot = displayAdConfig?.slots?.[key];
+  const path = String(win.location.pathname || '').replace(/\/index\.html$/, '/');
+  return win.top === win.self && ['http:', 'https:'].includes(win.location.protocol)
+    && resultPaths.get(key) === path
+    && /^ca-pub-\d{16}$/.test(displayAdConfig?.client || '')
+    && typeof slot === 'string' && /^\d{6,20}$/.test(slot.trim());
+}
 
 export function canMountToolResultAd({ availableHeight, contentMinHeight, adHeight, gap = 24 } = {}) {
   return [availableHeight, contentMinHeight, adHeight, gap].every(Number.isFinite)
     && availableHeight >= contentMinHeight + adHeight + gap;
+}
+
+/** Cache one optional module load and invalidate work when its view closes or is disposed. */
+export function createOptionalImportGate(loader) {
+  let modulePromise, version = 0, disposed = false;
+  return {
+    schedule(isCurrent, mount) {
+      const scheduledVersion = ++version;
+      if (!modulePromise) modulePromise = Promise.resolve().then(loader).catch(() => null);
+      return modulePromise.then((module) => {
+        if (module && !disposed && scheduledVersion === version && isCurrent()) mount(module);
+      });
+    },
+    cancel() { version++; },
+    dispose() { disposed = true; version++; }
+  };
 }
 
 /** A normal results page inside the tool, never an advertising overlay or a save gate. */
@@ -14,7 +43,10 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
   if (views.has(main)) return views.get(main);
   const doc = main.ownerDocument; const win = doc.defaultView;
   let section, inner, contentNode, headingNode, actionGroupNode, titleNode, detailNode, previewBox, canvas, media, actionsNode, returnButton, adRow;
-  let opened = false, previousFocus, previousScroll = 0, cleanupAd, controlsPlacement, suspended = [];
+  let opened = false, disposed = false, previousFocus, previousScroll = 0, controlsPlacement, suspended = [];
+  let currentAdEligible = [];
+  const adCleanups = [];
+  const adImportGate = createOptionalImportGate(() => import('./display-ads.mjs?rev=20261007-lazy-ads-1'));
   let navButton, navState;
 
   function element(tag, className, text) {
@@ -50,7 +82,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     actionGroupNode.append(actionsNode, returnButton);
     adRow = element('div', 'px-tool-result__ad-row');
     for (const placement of ['primary', 'secondary']) {
-      const ad = element('aside', 'px-display-ad'); ad.hidden = true; ad.dataset.displayAd = key;
+      const ad = element('aside', 'px-display-ad'); ad.hidden = true; ad.dataset.resultAdKey = key;
       ad.dataset.resultAdPlacement = placement; ad.setAttribute('aria-label', '広告');
       const adInner = element('div', 'px-display-ad__inner');
       adInner.append(element('span', 'px-display-ad__label', '広告')); ad.append(adInner);
@@ -134,7 +166,40 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     const adHeight = Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 145;
     return canMountToolResultAd({ availableHeight, contentMinHeight, adHeight, gap: 24 });
   }
+  function mountEligibleAds() {
+    adImportGate.schedule(() => !disposed && opened && !section.hidden && currentAdEligible.length > 0, (ads) => {
+      // The display-ads module has a document-level initializer. Keep these nodes unregistered
+      // until that initializer has finished, then mount only the configured, budgeted placements.
+      for (const node of currentAdEligible) node.dataset.displayAd = key;
+      try {
+        const priorUnitCount = adRow.querySelectorAll('ins.px-display-ad__unit').length;
+        const cleanup = ads.mountDisplayAds({ root: section, win, canMount: resultAdBudget });
+        if (adRow.querySelectorAll('ins.px-display-ad__unit').length > priorUnitCount && typeof cleanup === 'function') {
+          adCleanups.push(cleanup);
+        }
+      } catch {
+        // Result controls remain usable when optional ad setup fails.
+      }
+    });
+  }
+  function updateAdReservation() {
+    currentAdEligible = hasConfiguredResultAd(key, win)
+      ? [...adRow.children].filter(resultAdBudget) : [];
+    if (!currentAdEligible.length) {
+      currentAdEligible = [];
+      adRow.hidden = true;
+      delete adRow.dataset.reserved;
+      adRow.style.removeProperty('--px-tool-result-ad-reserved-height');
+      return;
+    }
+    const reservedHeight = Number.parseFloat(win.getComputedStyle(currentAdEligible[0]).getPropertyValue('--px-display-ad-reserved-height')) || 145;
+    adRow.hidden = false;
+    adRow.dataset.reserved = 'true';
+    adRow.style.setProperty('--px-tool-result-ad-reserved-height', `${reservedHeight}px`);
+    mountEligibleAds();
+  }
   function show({ title = '完成しました', detail = '', preview, controls, mediaUrl, actions = [] } = {}) {
+    if (disposed) return false;
     beforeShow?.();
     prepare(); restoreControls(); clearPreview();
     titleNode.textContent = title; detailNode.textContent = detail; detailNode.hidden = !detail;
@@ -181,17 +246,12 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     section.hidden = false;
     win.scrollTo({ top: 0, behavior: 'instant' }); returnButton.focus({ preventScroll: true });
     updateNavClearance();
-    const priorUnitCount = adRow.querySelectorAll('ins.px-display-ad__unit').length;
-    const disposeAds = mountDisplayAds({ root: section, win, canMount: resultAdBudget });
-    if (adRow.querySelectorAll('ins.px-display-ad__unit').length > priorUnitCount) {
-      const priorCleanup = cleanupAd;
-      cleanupAd = () => { priorCleanup?.(); disposeAds(); };
-    }
+    updateAdReservation();
     return true;
   }
   function close({ focus = true, notify = true } = {}) {
     if (!opened) return;
-    opened = false; section.hidden = true; restoreControls(); restoreNav(); clearPreview();
+    opened = false; adImportGate.cancel(); currentAdEligible = []; section.hidden = true; restoreControls(); restoreNav(); clearPreview();
     main.style.removeProperty('--px-tool-result-nav-clearance');
     for (const { node, inert } of suspended) { delete node.dataset.toolResultSuspended; node.inert = inert; }
     suspended = []; delete doc.body.dataset.toolResultOpen;
@@ -216,10 +276,16 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     if (opened && event.key === 'Escape' && !doc.querySelector('dialog[open]') && !doc.body.classList.contains('is-menu-open')) { event.preventDefault(); event.stopImmediatePropagation(); returnFromResult(); }
   }
   doc.addEventListener('keydown', onKey, true);
-  win.addEventListener('resize', updateNavClearance);
+  function onResize() {
+    updateNavClearance();
+    if (opened && !disposed) updateAdReservation();
+  }
+  win.addEventListener('resize', onResize);
   function dispose() {
-    close({ focus: false, notify: false }); cleanupAd?.(); doc.removeEventListener('keydown', onKey, true);
-    win.removeEventListener('resize', updateNavClearance);
+    close({ focus: false, notify: false }); disposed = true; adImportGate.dispose();
+    for (const cleanup of adCleanups) cleanup?.();
+    adCleanups.length = 0; doc.removeEventListener('keydown', onKey, true);
+    win.removeEventListener('resize', onResize);
     section?.remove(); views.delete(main); delete main.dataset.toolResultHost;
   }
   const controller = { show, close, dispose };
