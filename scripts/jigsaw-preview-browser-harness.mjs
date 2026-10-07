@@ -43,7 +43,19 @@ try {
   const imageBefore=await page.locator('#jigsaw-preview-canvas').evaluate(c=>c.toDataURL());
   let g=await geometry(page); assert.ok(Math.abs(g.panel.left-16)<1,'old position preference restored');
   assert.notEqual(await toggle.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(255, 255, 255)');
-  const resize=page.locator('#jigsaw-preview-resize');await resize.focus();await page.keyboard.press('Home');g=await geometry(page);
+  const resize=page.locator('#jigsaw-preview-resize');
+  if(width===390&&shape==='square') {
+   const normal=await resize.evaluate(n=>getComputedStyle(n).backgroundColor);
+   await resize.hover();await page.screenshot({animations:'disabled',path:`${out}/jigsaw-390-resize-hover.png`});
+   const hover=await resize.evaluate(n=>getComputedStyle(n).backgroundColor);assert.notEqual(hover,normal);
+   await resize.focus();await page.keyboard.press('ArrowRight');await geometry(page);
+   await page.screenshot({animations:'disabled',path:`${out}/jigsaw-390-resize-focus.png`});
+   const b=await resize.boundingBox();await page.mouse.move(b.x+22,b.y+22);await page.mouse.down();
+   await page.screenshot({animations:'disabled',path:`${out}/jigsaw-390-resize-pressed.png`});
+   await geometry(page);assert.notEqual(await resize.evaluate(n=>getComputedStyle(n).backgroundColor),hover);
+   await page.mouse.up();await frame(page);
+  }
+  await resize.focus();await page.keyboard.press('Home');g=await geometry(page);
   const startWidth=g.canvas.width;const rb=await resize.boundingBox();await page.mouse.move(rb.x+22,rb.y+22);await page.mouse.down();await page.mouse.move(rb.x+52,rb.y+52,{steps:4});await frame(page);
   assert.equal(await page.locator('#jigsaw-preview').getAttribute('data-preview-gesture'),'resize');assert.equal(await page.evaluate(()=>window.qaCapture?.trusted),true);
   await page.mouse.up();await frame(page); assert.equal(await page.locator('#jigsaw-preview').getAttribute('data-preview-gesture'),null);g=await geometry(page);assert.ok(g.canvas.width>startWidth+(shape==='extreme-tall'?0.001:1),'native mouse actually changes image size');

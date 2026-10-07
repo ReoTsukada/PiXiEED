@@ -51,7 +51,7 @@ function build() {
     b.addEventListener('click', () => {
       sfx.pick(TILE.findIndex((t) => t[0] === value));
       if (kind.value !== value) { kind.value = value; kind.dispatchEvent(new Event('change', { bubbles: true })); }
-      if (value === 'file' && !fileInput.files?.[0]) fileInput.click();
+      if (value === 'file' && !fileInput.files?.[0] && !globalThis.__pixieedJigsawPendingSourcePreview?.requireChoice) fileInput.click();
       sync();
     });
     tiles.appendChild(b);
@@ -86,6 +86,7 @@ function build() {
   // ---------- state ----------
   let chosen = Math.min(LEVELS.length - 1, Math.max(0, Number(store.get(LEVEL_KEY) ?? 1) || 0));
   if (store.get(LEVEL_KEY) === null) chosen = 1;
+  const defaultChoice = chosen;
   let dims = null; let plan = []; let picture = null; let applying = false; let fileUrl = null;
   let picksGeneration = 0;
   const thumbs = new Map(); // key -> canvas/img, so rebuilding the row is cheap
@@ -127,26 +128,41 @@ function build() {
   }
   function applyLevel() {
     if (!plan.length) { drawCards(); return; }
+    if (chosen === null) { drawCards(); start.disabled = true; return; }
     if (!plan[chosen]) { const lower = plan.slice(0, chosen).map((p, i) => (p ? i : -1)).filter((i) => i >= 0).pop(); chosen = lower ?? plan.findIndex(Boolean); }
     const p = plan[chosen]; drawCards(); if (!p) return;
     const value = String(p.px);
     if (![...grid.options].some((o) => o.value === value)) grid.add(new Option(`${LEVELS[chosen].name}・約${p.px}px`, value));
     if (grid.value !== value) { applying = true; grid.value = value; grid.dispatchEvent(new Event('change', { bubbles: true })); applying = false; }
+    start.disabled = false;
   }
   grid.addEventListener('change', () => {
     if (applying || !plan.length) return;
     const i = plan.findIndex((p) => p && String(p.px) === grid.value); chosen = i; drawCards(); // a fine choice that is no level lights none
   });
 
-  function setPicture(source, w, h) {
+  function setPicture(source, w, h, { requireChoice = false } = {}) {
     picture = source; dims = w && h ? bounded(w, h) : null; plan = dims ? planLevels(dims.width, dims.height) : [];
+    if (requireChoice && dims) chosen = null;
+    else if (chosen === null) chosen = defaultChoice;
     titleArt.setPicture(source); applyLevel();
   }
-  document.addEventListener('jigsaw:source-ready', ({ detail }) => {
-    if (kind.value === 'file' && (!dims || dims.width !== detail.width || dims.height !== detail.height)) {
-      setPicture(picture, detail.width, detail.height);
+  function acceptSourceReady(detail = {}) {
+    if (detail.rgba && Number.isSafeInteger(detail.width) && Number.isSafeInteger(detail.height) && detail.rgba.length === detail.width * detail.height * 4) {
+      const c = document.createElement('canvas'); c.width = detail.width; c.height = detail.height;
+      c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(detail.rgba), detail.width, detail.height), 0, 0);
+      kind.value = 'file';
+      for (const tile of tiles.children) tile.setAttribute('aria-checked', String(tile.dataset.kind === 'file'));
+      if (detail.requireChoice === true) globalThis.__pixieedJigsawPendingSourcePreview = detail;
+      setPicture(c, detail.width, detail.height, { requireChoice: detail.requireChoice === true });
+      if (detail.requireChoice === true) renderPendingSource(detail, c);
+      return;
     }
-  });
+    if (kind.value === 'file' && (!dims || dims.width !== detail.width || dims.height !== detail.height)) {
+      setPicture(picture, detail.width, detail.height, { requireChoice: detail.requireChoice === true });
+    }
+  }
+  document.addEventListener('jigsaw:source-ready', ({ detail }) => acceptSourceReady(detail));
 
   // ---------- thumbnails ----------
   let adapter = null; let drawRecord = null;
@@ -173,11 +189,28 @@ function build() {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'arc-press arc-pick'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(selected)); b.setAttribute('aria-label', label);
     b.addEventListener('click', onClick); return b;
   }
+  function renderPendingSource(detail, canvas = null) {
+    if (kind.value !== 'file' || fileInput.files?.[0]) return;
+    picksGeneration += 1;
+    picks.replaceChildren();
+    const source = canvas || (() => {
+      const image = document.createElement('canvas'); image.width = detail.width; image.height = detail.height;
+      image.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(detail.rgba), detail.width, detail.height), 0, 0);
+      return image;
+    })();
+    const selected = pickButton(`取り込んだ画像 · ${detail.width}×${detail.height}px`, true, () => {});
+    selected.classList.add('arc-pick--image'); selected.append(copyCanvas(source));
+    picks.appendChild(selected);
+    const add = pickButton('別の画像をえらぶ', false, () => fileInput.click());
+    add.classList.add('arc-pick--add'); add.textContent = '＋'; picks.appendChild(add);
+  }
   async function renderPicks() {
     const generation = ++picksGeneration;
     const k = kind.value; picks.replaceChildren();
     if (k === 'file') {
       const file = fileInput.files?.[0];
+      const pending = globalThis.__pixieedJigsawPendingSourcePreview;
+      if (!file && pending?.requireChoice === true) { renderPendingSource(pending); return; }
       if (file) {
         setPicture(null);
         try {
@@ -233,6 +266,7 @@ function build() {
     select.addEventListener('change', () => { for (const b of picks.children) b.setAttribute?.('aria-checked', String(b.getAttribute('aria-label') === select.selectedOptions[0]?.textContent)); });
   }
   sync();
+  if (globalThis.__pixieedJigsawPendingSourcePreview) acceptSourceReady(globalThis.__pixieedJigsawPendingSourcePreview);
 
   // ---------- playing: heads-up bar, joins, celebration ----------
   const hud = document.createElement('div'); hud.className = 'arc-hud'; hud.setAttribute('aria-live', 'off');

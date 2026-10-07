@@ -78,8 +78,10 @@ body.app-page--tool-jigsaw .px-site-header #jigsaw-preview-toggle[aria-pressed="
 .jigsaw-preview__head button{background:#edf0e7;border:1px solid #8a9681;color:#253221}
 .jigsaw-preview__canvas{flex:none;align-self:center;max-height:none;object-fit:fill}
 .jigsaw-preview__foot{display:flex;align-items:center;justify-content:space-between;gap:4px;flex:none;height:44px;color:#394332;font-size:11px;font-variant-numeric:tabular-nums}
-#jigsaw-preview-resize{box-sizing:border-box;flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:9px;border:1px solid #718265;border-radius:8px;background:#edf0e7;color:#253221;cursor:nwse-resize;touch-action:none}
-#jigsaw-preview-resize svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#jigsaw-preview-resize{box-sizing:border-box;flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:8px;border:1px solid #657383;border-radius:8px;background:#fff;color:#17232d;cursor:nwse-resize;touch-action:none;transition:background-color .14s,border-color .14s,box-shadow .14s}
+#jigsaw-preview-resize svg{display:block;width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#jigsaw-preview-resize:hover{border-color:#6e5510;background:#fff0bf}
+#jigsaw-preview-resize:active{border-color:#6e5510;background:#ffd35a;box-shadow:inset 0 1px 3px #6e551044}
 #jigsaw-preview-resize:focus-visible,#jigsaw-preview-close:focus-visible{outline:3px solid #335cbe;outline-offset:2px}
 .jigsaw-preview[data-preview-gesture]{border-color:#335cbe;box-shadow:0 0 0 2px #335cbe55,0 5px 18px #1f2b1c33}
 body.app-page--tool-jigsaw .jigsaw-more__menu{grid-template-columns:minmax(0,1fr);width:212px;max-width:calc(100vw - 32px);gap:8px}

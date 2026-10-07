@@ -43,7 +43,7 @@ let selectionCache = { layout: null, pieceIds: null, path: null };
 let liftEffect = null; let liftValue = 0;
 let jigsawHint = null;
 let jigsawHintTimer = 0;
-let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
+let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null; let pendingPxdSource = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 let resultRun = 0; let resultShownRun = -1; let resultTimer = 0;
 const MAX_TRAY_DOM = 80;
@@ -160,7 +160,7 @@ function displaySourceFields() {
   $('#jigsaw-shelf')?.classList.toggle('is-off', sourceKind.value !== 'draw');
   $('#jigsaw-public-source').hidden = sourceKind.value !== 'public';
   $('#jigsaw-file-source').hidden = sourceKind.value !== 'file';
-  startButton.disabled = sourceKind.value === 'draw' ? !sourceSelect.value : sourceKind.value === 'public' ? !publicSelect.value : !fileInput.files?.[0];
+  startButton.disabled = pendingPxdSource ? false : sourceKind.value === 'draw' ? !sourceSelect.value : sourceKind.value === 'public' ? !publicSelect.value : !fileInput.files?.[0];
   updatePieceEstimate();
 }
 function updatePieceEstimate(dimensions = null) {
@@ -604,12 +604,18 @@ function requestJigsawHint() {
 
 async function startGame() {
   if (sourceKind.value === 'draw' && !adapter) return;
+  const pendingSource = pendingPxdSource;
   cancelJigsawResult(true); resultShownRun = -1;
   setSourcePreview(null);
   startButton.disabled = true; updateStatus('固定した保存版を確認しています…');
   try {
     const gameId = globalThis.crypto.randomUUID(); let source; let rgba; let width; let height;
-    if (sourceKind.value === 'draw') {
+    if (pendingSource) {
+      source = pendingSource.source;
+      width = pendingSource.image.width; height = pendingSource.image.height;
+      rgba = { width, height, rgba: new Uint8ClampedArray(pendingSource.image.rgba) };
+      sourceLabel.textContent = `PXDの端末画像 · ${width}×${height}px`;
+    } else if (sourceKind.value === 'draw') {
       const draftId = sourceDraftId || pictureDraftId('jigsaw'); const revision = await resolveLocalDrawRevision(adapter, draftId, sourceSelect.value);
       source = { draftId, assetId: revision.asset.assetId, revisionId: revision.revisionId, contentHash: revision.documentHash, hashScheme: revision.hashScheme };
       sourceDraftId = draftId; sourceRevision = revision; width = revision.document.width; height = revision.document.height; rgba = { width, height, rgba: documentRgba(revision.document) };
@@ -658,8 +664,15 @@ async function startGame() {
     pieces = sliceJigsawPieces(rgba, layoutData);
     setSourcePreview(rgba);
     game = createJigsawWorkspace({ gameId, source, layout: layoutData, seed: gameId });
-    pxdOriginalRefs = null; pxdPreservedPayload = null;
-    pxdBridge?.reset();
+    if (pendingSource) {
+      pxdOriginalRefs = pendingSource.portableOriginalRefs;
+      pxdPreservedPayload = pendingSource.preservedPayload || null;
+      pendingPxdSource = null;
+      delete globalThis.__pixieedJigsawPendingSourcePreview;
+    } else {
+      pxdOriginalRefs = null; pxdPreservedPayload = null;
+      pxdBridge?.reset();
+    }
     selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 }; gameDraftId = game.gameId;
     updatePieceEstimate({ width, height }); showGame(); updateStatus(`作成しました。${(layoutData.columns * layoutData.rows).toLocaleString('ja-JP')}ピースを自由に動かせます。`);
   } catch (error) { updateStatus(`パズルを作れませんでした：${error.message}`); }
@@ -757,13 +770,15 @@ async function encodePxdJigsawImage(image) {
 async function openPxdJigsaw(project) {
   cancelJigsawResult(true); resultShownRun = -1;
   if (!draftStore || !adapter) throw new Error('端末内保存を利用できません。');
+  pendingPxdSource = null; delete globalThis.__pixieedJigsawPendingSourcePreview;
   if (!project.entries.length) { game = null; sourceRevision = null; layoutData = null; pieces = []; pxdOriginalRefs = pxdPreservedPayload = null; setSourcePreview(null); delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; return; }
   setSourcePreview(null);
+  const resumesSavedJigsaw = hasPxdPuzzle(project, 'jigsaw');
   let publicRgba = null;
   let materialized;
   const params = new URLSearchParams(location.search);
   const preferredRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : undefined;
-  if (hasPxdPuzzle(project, 'jigsaw')) {
+  if (resumesSavedJigsaw) {
     const loaded = await readPxdPuzzle(project, 'jigsaw');
     materialized = await materializePxdPuzzle(loaded, {
       tool: 'jigsaw', store: draftStore,
@@ -778,6 +793,34 @@ async function openPxdJigsaw(project) {
       encodeJigsawFileImage: encodePxdJigsawImage
     });
   } else materialized = await createPxdPuzzleFromMain(project, { tool: 'jigsaw', store: draftStore, encodeJigsawFileImage: encodePxdJigsawImage, preferredRole });
+  if (!resumesSavedJigsaw) {
+    const nextGame = validateJigsawWorkspace(materialized.document);
+    const image = nextGame.source.type === 'file'
+      ? await (async () => {
+        const bytes = bytesFromDataUrl(nextGame.source.dataUrl);
+        if (await fingerprintBytes(bytes) !== nextGame.source.fingerprint) throw new Error('PXDから復元した画像のfingerprintが一致しません。');
+        return boundedRgba(await decodeImage(nextGame.source.dataUrl));
+      })()
+      : materialized.bindings.source
+        ? { width: materialized.bindings.source.drawDocument.width, height: materialized.bindings.source.drawDocument.height, rgba: documentRgba(materialized.bindings.source.drawDocument) }
+        : null;
+    if (!image || image.width !== (nextGame.source.width || nextGame.layout.width) || image.height !== (nextGame.source.height || nextGame.layout.height) || image.width !== nextGame.layout.width || image.height !== nextGame.layout.height) throw new Error('PXDの画像と寸法が一致しません。');
+    sourceRevision = materialized.bindings.source?.revision || null;
+    sourceDraftId = materialized.bindings.source?.draftId || null;
+    pendingPxdSource = { source: nextGame.source, image: { width: image.width, height: image.height, rgba: new Uint8ClampedArray(image.rgba) }, portableOriginalRefs: materialized.portableOriginalRefs, preservedPayload: materialized.preservedPayload || null };
+    pxdOriginalRefs = pendingPxdSource.portableOriginalRefs; pxdPreservedPayload = pendingPxdSource.preservedPayload;
+    game = null; layoutData = null; pieces = []; gameDraftId = null;
+    clearSelectionCache(); clearDragState(); selectedGroupId = null; trayPage = 0;
+    sourceKind.value = 'file';
+    setSourcePreview(image);
+    const previewDetail = { width: image.width, height: image.height, rgba: new Uint8ClampedArray(image.rgba), requireChoice: true };
+    globalThis.__pixieedJigsawPendingSourcePreview = previewDetail;
+    delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false;
+    displaySourceFields();
+    document.dispatchEvent(new CustomEvent('jigsaw:source-ready', { detail: previewDetail }));
+    updateStatus('PXDの画像を読み込みました。むずかしさを選んでスタートしてください。');
+    return;
+  }
   const nextGame = validateJigsawWorkspace(materialized.document);
   const nextLayout = createJigsawLayout(nextGame.layout);
   let sourcePixels;
@@ -833,6 +876,10 @@ function mountPxdJigsaw() {
 
 startButton.addEventListener('click', startGame);
 const sourceChoiceStatus = () => {
+  if (pendingPxdSource && (sourceKind.value !== 'file' || fileInput.files?.[0])) {
+    pendingPxdSource = null; delete globalThis.__pixieedJigsawPendingSourcePreview;
+    pxdOriginalRefs = null; pxdPreservedPayload = null;
+  }
   displaySourceFields();
   const ready = !startButton.disabled;
   const labels = {
@@ -908,6 +955,7 @@ $('#jigsaw-new').addEventListener('click', () => {
   pxdOriginalRefs = null; pxdPreservedPayload = null;
   delete document.body.dataset.jigsawPlaying; playSection.hidden = true; setupSection.hidden = false; saveButton.disabled = true;
   $('#jigsaw-current').hidden = true;
+  pendingPxdSource = null; delete globalThis.__pixieedJigsawPendingSourcePreview;
   updateStatus('絵とむずかしさを選んでください。');
 });
 $('#jigsaw-current').addEventListener('click', () => { if (game) { showGame(); workspaceElement.focus({ preventScroll: true }); } });
