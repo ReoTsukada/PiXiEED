@@ -258,6 +258,17 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     return cellId ? events.filter(event => event.cellId === cellId) : [];
   }
 
+  function scopeIdentity(selection) {
+    if (!selection) return 'all';
+    const cell = selection.displayCell || selection;
+    const mapRegionId = cell?.mapRegionId || selection.mapRegionId;
+    if (mapRegionId) return `region:${mapRegionId}`;
+    const prefectureId = String(cell?.prefectureId || selection.prefectureId || '').padStart(2, '0');
+    if (prefectureId && prefectureId !== '00') return `prefecture:${prefectureId}`;
+    const cellId = selection.cellId || selection.cell?.id || cell?.cell?.id || selection.id;
+    return cellId ? `cell:${cellId}` : 'empty';
+  }
+
   function renderList() {
     const record = scope?.displayCell || scope;
     const scopedPrefecture = String(record?.prefectureId || scope?.prefectureId || '').padStart(2, '0');
@@ -298,7 +309,28 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
 
   function openCellEvents(selection) { if (panel.hidden) returnFocus = doc.activeElement; scope = selection || null; onOpen(scope); renderList(); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); closeButton.focus({ preventScroll: true }); }
   function openAll() { if (panel.hidden) returnFocus = doc.activeElement; scope = null; onOpen(null); renderList(); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); closeButton.focus({ preventScroll: true }); }
-  function close() { panel.hidden = true; panel.classList.remove('is-open'); stage.classList.remove('has-map-events'); scope = null; if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); returnFocus = null; }
+  function canReceiveFocus(element) {
+    return Boolean(element?.isConnected && !element.hidden && element.getClientRects().length && doc.defaultView?.getComputedStyle(element).visibility !== 'hidden');
+  }
+  function close({ restoreFocus = true } = {}) {
+    panel.hidden = true; panel.classList.remove('is-open'); stage.classList.remove('has-map-events'); scope = null;
+    if (restoreFocus) {
+      const currentSelectionAction = doc.querySelector('#viewCellPosts');
+      const canvas = stage.querySelector('#globeCanvas');
+      const target = canReceiveFocus(returnFocus) ? returnFocus : canReceiveFocus(currentSelectionAction) ? currentSelectionAction : canReceiveFocus(canvas) ? canvas : null;
+      target?.focus({ preventScroll: true });
+    }
+    returnFocus = null;
+  }
+  function updateSelection(selection) {
+    if (panel.hidden) return false;
+    if (!selection) { close({ restoreFocus: false }); return true; }
+    const changed = scopeIdentity(scope) !== scopeIdentity(selection);
+    scope = selection;
+    if (changed) panel.scrollTop = 0;
+    renderList();
+    return true;
+  }
   allButton.addEventListener('click', openAll);
   panelAllButton.addEventListener('click', openAll);
   closeButton.addEventListener('click', close);
@@ -374,7 +406,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     getCellSummary: selection => summarize(selection),
     getDensityEvents: () => events.filter(event => event.mapPeriod === 'upcoming' || event.mapPeriod === 'active' || event.mapPeriod === 'past'),
     getPeriodFilter: () => periodFilter,
-    openCellEvents, openAll, refresh, setActive(value) { active = Boolean(value); if (!active) close(); refresh(); }, close,
+    openCellEvents, openAll, updateSelection, refresh, setActive(value) { active = Boolean(value); if (!active) close(); refresh(); }, close,
     ready, refreshData: () => refreshCatalog(true),
     destroy() { destroyed = true; clearInterval(catalogTimer); clearTimeout(midnightTimer); doc.removeEventListener('visibilitychange', onVisibilityChange); close(); doc.removeEventListener('keydown', onKeydown); dock.remove(); panel.remove(); }
   };

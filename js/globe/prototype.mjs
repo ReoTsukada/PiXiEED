@@ -1,5 +1,5 @@
 import { initPostUi } from './post-ui.mjs?v=20261006-profile-artwork-1';
-import { initMapEvents } from './map-events.mjs?v=20261005-admin-boundary-1';
+import { initMapEvents } from './map-events.mjs?v=20261007-event-selection-1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261006-map-startup-1';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
@@ -108,6 +108,7 @@ function createPrototypeRenderer(options = {}) {
       if (postUi?.handlePick(selection)) { showSelection(null); return; }
       showCellHover(null);
       showSelection(selection);
+      if (mapContentLayer === 'events') eventUi?.updateSelection(selection);
       if (selection && renderer.getSnapshot().camera.projection !== 'mercator') renderer.focusSelection(selection);
     },
     onHover: showCellHover,

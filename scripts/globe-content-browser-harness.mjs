@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { createMapCellIndex } from '../js/globe/map-cells.mjs';
+import { mergeEventCatalog } from '../js/globe/event-catalog.mjs';
+import { uniqueEventEditions } from '../js/globe/event-density.mjs';
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4176';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
 const { chromium } = await import(process.env.PIXIEED_PLAYWRIGHT_MODULE
@@ -17,6 +19,7 @@ const events = [
   { id: 'event-watch', name: 'Next date pending', prefecture: '東京都', status: 'watch', dateLabel: '次回開催情報待ち', sourceUrl: 'javascript:alert(1)' }
 ];
 const researchedCatalog = JSON.parse(await readFile(new URL('../data/pixel-art-events.json', import.meta.url), 'utf8'));
+const researchedEditions = uniqueEventEditions(mergeEventCatalog([], researchedCatalog.events));
 const source = JSON.parse(await readFile(new URL('../assets/maps/globe-land-mask-v1.json', import.meta.url), 'utf8'));
 const exactPoint = createMapCellIndex(source).cells.find(cell=>cell.prefectureId==='13').center;
 events.push({id:'event-precise',name:'Exact coordinates without county',location:{lat:exactPoint.latitude,lng:exactPoint.longitude},dateLabel:'開催日調整中'});
@@ -159,12 +162,12 @@ try {
       await page.screenshot({path:`/tmp/pixieed-map-events-${backend}-${viewport.width}.png`});
       catalogPayload = structuredClone(researchedCatalog);
       await page.evaluate(()=>__PIXIEED_MAP_EVENTS__.refreshData());await frames(page);
-      assert.equal(await page.evaluate(()=>__PIXIEED_MAP_EVENTS__.getEvents().length),events.length+researchedCatalog.events.length);
+      assert.equal(await page.evaluate(()=>__PIXIEED_MAP_EVENTS__.getEvents().length),events.length+researchedEditions.length);
       await page.evaluate(()=>__PIXIEED_MAP_EVENTS__.openAll());
-      assert.equal(await page.locator('.map-event-card').count(),events.length+researchedCatalog.events.length);
-      assert.equal(await page.locator('.map-event-card__placement').filter({hasText:'オンライン開催'}).count(),researchedCatalog.events.filter(e=>e.online).length);
-      assert.equal(await page.locator('.map-event-card__placement').filter({hasText:'情報確認日：'}).count(),researchedCatalog.events.length);
-      assert.equal(await page.locator('.map-event-card a').filter({hasText:'主催者SNS'}).count(),researchedCatalog.events.reduce((sum,e)=>sum+(e.socialUrls?.length||0),0));
+      assert.equal(await page.locator('.map-event-card').count(),events.length+researchedEditions.length);
+      assert.equal(await page.locator('.map-event-card__placement').filter({hasText:'オンライン開催'}).count(),researchedEditions.filter(e=>e.online).length);
+      assert.equal(await page.locator('.map-event-card__placement').filter({hasText:'情報確認日：'}).count(),researchedEditions.length);
+      assert.equal(await page.locator('.map-event-card a').filter({hasText:'主催者SNS'}).count(),researchedEditions.reduce((sum,e)=>sum+(e.socialUrls?.length||0),0));
       assert.ok(await page.evaluate(()=>__PIXIEED_MAP_EVENTS__.getEvents().filter(e=>e.online).every(e=>e.position===null)));
       await page.screenshot({path:`/tmp/pixieed-map-researched-events-${backend}-${viewport.width}.png`});
       catalogPayload.events[0].status='cancelled';
@@ -173,7 +176,7 @@ try {
       // Bad replacement is rejected as a whole, including a request that succeeds with invalid JSON shape.
       catalogPayload={version:1,updatedAt:'invalid',events:[]};
       await page.evaluate(()=>__PIXIEED_MAP_EVENTS__.refreshData());
-      assert.equal(await page.locator('.map-event-card').count(),events.length+researchedCatalog.events.length);
+      assert.equal(await page.locator('.map-event-card').count(),events.length+researchedEditions.length);
       assert.equal(await page.locator('.map-event-card__status').filter({hasText:/^中止$/}).count(),1);
       await page.keyboard.press('Escape');
       checks.push(`${backend} ${viewport.width}x${viewport.height}: no marker overlays, blue/orange cells, hover counts, actual touch selection/pinch, wheel/drag on occupied cell, county list, watch/safe link, layout, camera stable, zero fetch/upload/overlay DOM on zoom, no astronomy; researched catalog refresh, online/no location, verified dates/SNS, cancellation, bad-data retention`);

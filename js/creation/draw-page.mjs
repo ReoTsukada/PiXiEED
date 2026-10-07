@@ -100,7 +100,7 @@ let selectionTransform = null, selectionPreview = null, selectionPanel = null, s
 let selectionRenderRequest = 0;
 let selectionMaskCache = null, selectionMaskOwner = null;
 let preparedSelectionCommit = null;
-let cameraSession = null, cameraOpening = false, cameraGeneration = 0, cameraUnlock = null, cameraCaptureClickUntil = 0, cameraFailureNotice = null;
+let cameraOpening = false, cameraGeneration = 0, cameraUnlock = null, cameraFailureNotice = null;
 const colorActivationBusy = new WeakSet();
 // Capture held input before the panel dismissal handler releases it.
 scope.listen(document, 'pointerdown', event => {
@@ -166,12 +166,12 @@ function setCanvasDimensions() {
 function drawingInputBusy() { return Boolean(drawing || pendingTap || activePointers.size || virtualCursor?.pressed || virtualCursor?.moving); }
 function cancelCamera() {
   cameraGeneration++;
-  cameraSession?.cancel(); cameraSession = null; cameraOpening = false;
+  cameraOpening = false;
   cameraUnlock?.(); cameraUnlock = null;
 }
 function cameraStatus(message) {
   if (scope.disposed) return;
-  if (!cameraOpening && !cameraSession) cameraFailureNotice = { message, until: performance.now() + 2600 };
+  if (!cameraOpening) cameraFailureNotice = { message, until: performance.now() + 2600 };
   toast(message);
 }
 // Snapshot the complete work before navigation; no camera data enters the editor yet.
@@ -182,7 +182,7 @@ function freezeCameraEditor() {
   cameraUnlock = () => { nodes.forEach((node, index) => { node.inert = previous[index]; }); };
 }
 async function openCamera() {
-  if (cameraOpening || cameraSession || scope.disposed) return;
+  if (cameraOpening || scope.disposed) return;
   if (selectionTransform) { toast('選択の変形を✓で確定、×で取消してからカメラを開いてください。'); return; }
   if (colorEdit || drawingInputBusy()) { toast('現在の色編集・描画操作を終えてからカメラを開いてください。'); return; }
   if (animationSession.locked) { toast('レイヤーの鍵を外すとカメラを使えます。'); return; }
@@ -273,7 +273,7 @@ async function restoreCameraReturn(record) {
 }
 scope.listen($('#draw-camera'), 'click', openCamera);
 scope.listen(document, 'keydown', event => {
-  if (!cameraOpening && !cameraSession) return;
+  if (!cameraOpening) return;
   if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); cancelCamera(); paint(); toast('カメラを取消しました。'); }
 }, { capture: true });
 scope.listen(window, 'pagehide', cancelCamera);
@@ -288,7 +288,7 @@ function updateControls() {
 }
 function syncPlaybackControl() {
   const button = $('#draw-animation-play'), badge = $('#draw-playback-position');
-  if (cameraOpening || cameraSession) return;
+  if (cameraOpening) return;
   const frames = animationSession.animation.frames;
   button.disabled = Boolean(readOnlyImage) || frames.length < 2;
   button.setAttribute('aria-pressed', String(playing));
@@ -368,7 +368,7 @@ function paintOnion(display) {
   onionCanvas.getContext('2d').putImageData(new ImageData(data, display.width, display.height), 0, 0); placeOverlays();
 }
 function handleAnimationAction(action) {
-  if (cameraOpening || cameraSession) return false;
+  if (cameraOpening) return false;
   if (action.type === 'play') return toggleAnimation();
   if (action.type === 'onion') {
     const enabled = typeof action.enabled === 'boolean' ? action.enabled : !onion;
@@ -497,7 +497,7 @@ function usedColorCount(value = documentData) {
   return colors.size;
 }
 function canEdit(value = documentData) {
-  if (cameraOpening || cameraSession) return false;
+  if (cameraOpening) return false;
   if (playing) { toast('再生を止めると編集できます。'); return false; }
   if (readOnlyImage) { toast('原本を表示しています。編集するにはプロジェクトのキャンバス設定でサイズと色を合わせてください。'); return false; }
   const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: usedColorCount(value) }, { passActive: true });
@@ -1131,13 +1131,10 @@ canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('p
 scope.listen(document, 'pointerup', (event) => { if (event.pointerType === 'mouse') releasePointer(event); });
 scope.listen($('.draw-board'), 'contextmenu', event => event.preventDefault());
 scope.listen($('#draw-animation-play'), 'click', event => {
-  if (cameraOpening || cameraSession) {
+  if (cameraOpening) {
     event.preventDefault(); event.stopImmediatePropagation();
-    if (!event.currentTarget.disabled) { cameraCaptureClickUntil = performance.now() + 500; cameraSession?.capture(); }
     return;
   }
-  // The trailing click of a shutter double-tap must not start animation after close.
-  if (performance.now() < cameraCaptureClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); return; }
   toggleAnimation();
 });
 for (const axis of ['x', 'y']) scope.listen($(`#draw-mirror-${axis}`), 'input', event => {
@@ -1822,7 +1819,7 @@ for (const command of DRAW_SHORTCUT_COMMANDS) {
   if (!commandHandlers[command.id]) throw new TypeError('描画コマンドの処理がありません: ' + command.id);
 }
 function keyboardCommandEnabled(id) {
-  if (cameraOpening || cameraSession) return false;
+  if (cameraOpening) return false;
   if (document.body.hasAttribute('data-tool-result-open')) return false;
   if (id === 'selection.copy') return selectionPanelState().canCopy;
   if (id === 'selection.cut') return selectionPanelState().canCut;

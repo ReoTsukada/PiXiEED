@@ -450,7 +450,8 @@
       "region": "愛知県",
       "area": "名古屋市中区",
       "sourceUrls": [
-        "https://sites.google.com/view/crosspico/"
+        "https://sites.google.com/view/crosspico/",
+        "https://www.kissa7ban.com/space7ban_access.html"
       ]
     },
     {
@@ -1150,6 +1151,36 @@
       }
     },
     {
+      "id": "source-0c2c4a8ddaafaaef",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://x.com/gamecreator_g",
+      "kind": "social",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-07T06:30:42+00:00",
+        "notes": "Xプロフィール本文は取得できず。検索結果スニペットを本文確認済みとして扱わない。"
+      }
+    },
+    {
       "id": "source-0c68913235fd4bff",
       "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
       "eventIds": [
@@ -1171,6 +1202,36 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-0cb2617a258be11c",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://livepocket.jp/e/crosspico3",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T06:34:18+00:00",
+        "notes": "LivePocketの可視本文で2026年6月13日、11:00–17:00、スペース七番2-A、入場500円・中学生以下無料、pixel-art展示/販売を確認。JSON-LDのEventScheduled時刻は0:00だが可視本文の時間を採用。"
       }
     },
     {
@@ -1225,6 +1286,36 @@
         "result": "unavailable",
         "attemptedAt": "2026-10-06T00:08:38+00:00",
         "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
+      }
+    },
+    {
+      "id": "source-12c139b640331c30",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://lit.link/sikakuihisashi",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T06:34:18+00:00",
+        "notes": "主催者紹介本文で名古屋ドット絵イベント主催、2026年6月13日CROSSPICO名古屋vol.3の名ぴく同時開催、10分ドット体験を確認。年1ペースの記載はあるが次回日付は未発表。"
       }
     },
     {
@@ -1410,6 +1501,36 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-27b939d2b456316d",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://x.com/sikakui_hisashi",
+      "kind": "social",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-07T06:30:42+00:00",
+        "notes": "Xプロフィール本文は取得できず。検索結果スニペットを本文確認済みとして扱わない。"
       }
     },
     {
@@ -2765,6 +2886,36 @@
       }
     },
     {
+      "id": "source-8ff7eed642caae8f",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://x.com/Nagoya_meipiku",
+      "kind": "social",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-10-07T06:30:42+00:00",
+        "notes": "Xプロフィール本文は取得できず。検索結果スニペットを本文確認済みとして扱わない。"
+      }
+    },
+    {
       "id": "source-924c729e9b14c02f",
       "label": "Newgrounds Pixel Day 2026",
       "eventIds": [
@@ -3544,6 +3695,36 @@
       }
     },
     {
+      "id": "source-cf209632206b90a8",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://lit.link/nagoyameipiku",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T06:32:21+00:00",
+        "notes": "主催者公式本文で2026年6月13日、クロスピコナゴヤvol.3、会場2-A、インディーゲーム×ピクセルアート、名ぴくがピクセルアート側を共同開催する旨を確認。"
+      }
+    },
+    {
       "id": "source-cf5285d1a3c899b5",
       "label": "モトクロス斉藤 個展「ウルトラドープ」",
       "eventIds": [
@@ -3722,8 +3903,8 @@
       "lastKnownEventDate": "2026-06-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-07T06:32:21+00:00",
+        "notes": "公式本文で2026年6月13日、会場2-A、インディーゲーム×ピクセルアートを確認。iframeはq=35.171497,136.899095だがll viewportは35.171538,136.89892。q値は地図の検索対象座標で入口位置を示す精密ピンではない。次回日程は当該ページで確認できず。"
       }
     },
     {
@@ -4252,6 +4433,36 @@
       }
     },
     {
+      "id": "source-f52ee73c60128e7b",
+      "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
+      "eventIds": [
+        "crosspico-nagoya-vol-3-2026",
+        "crosspico-nagoya-watch"
+      ],
+      "url": "https://www.kissa7ban.com/space7ban_access.html",
+      "kind": "website",
+      "prefectures": [
+        "愛知県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名古屋市",
+        "名古屋市中区"
+      ],
+      "venues": [
+        "スペース七番（錦2-7-7 オリマチ錦2-A）",
+        "次回会場未発表"
+      ],
+      "lastKnownEventDate": "2026-06-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T06:30:42+00:00",
+        "notes": "会場公式アクセス本文を確認。建物住所はオリマチ錦1-Aと表示し、同ページでオリマチ錦2-Aをレンタルスペースとして別記。イベントの2-Aは建物内の開催区画。"
+      }
+    },
+    {
       "id": "source-fa6b90dd16d33463",
       "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
       "eventIds": [
@@ -4331,5 +4542,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-07T00:53:39+00:00"
+  "updatedAt": "2026-10-07T06:35:45+00:00"
 }
