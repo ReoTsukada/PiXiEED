@@ -45,8 +45,8 @@ test('precise events resolve into prefecture scope while keeping exact coordinat
   ],[hokkaido],resolver);
   assert.deepEqual(events.map(event=>event.prefectureId),['01','01']);
   assert.deepEqual(events.map(event=>event.placement),['prefecture','prefecture']);
-  assert.deepEqual(events.map(event=>event.position),[exactA,exactB]);
-  assert.deepEqual(events.map(event=>event.cellId),[lookupCell(exactA.longitude,exactA.latitude).id,lookupCell(exactB.longitude,exactB.latitude).id]);
+  assert.deepEqual(events.map(event=>event.position),[null,null]);
+  assert.deepEqual(events.map(event=>event.cellId),[null,null]);
   assert.equal(events[0].representativeCell,null);
 });
 test('overseas, sea, and unresolved coordinates do not inherit a Japanese prefecture',()=>{
@@ -95,4 +95,44 @@ test('country-only coordinates fall back to country region; explicit Japan prefe
   assert.equal(events[1].mapRegionIndex,1);
   assert.equal(events[1].countryId,'JPN');
   assert.equal(events[1].prefectureLabel,'北海道');
+});
+test('a verified city name may use an explicitly supplied area point and resolve to its map region',()=>{
+  const resolver=()=>({id:'takamatsu-cell',prefectureId:'37',prefectureLabel:'香川県',mapRegionId:'prefecture:37',mapRegionIndex:37,mapRegionLabel:'香川県',mapRegionKind:'prefecture',countryId:'JPN',countryLabel:'Japan'});
+  const [event]=normalizeMapEvents([{name:'Takamatsu event',country:'日本',area:'高松市',locationPrecision:'area',mapAreaLocation:{latitude:34.3426,longitude:134.0465,precision:'area',sourceUrl:'https://mapcarta.com/Takamatsu'}}],[],resolver);
+  assert.equal(event.mapRegionId,'prefecture:37');
+  assert.equal(event.prefectureLabel,'香川県');
+  assert.equal(event.locationPrecision,'area');
+  assert.equal(event.position,null);
+  assert.equal(event.placement,'prefecture');
+});
+test('a verified venue point maps to its prefecture without creating an exact point',()=>{
+  const resolver=()=>({id:'takamatsu-tower-cell',prefectureId:'37',prefectureLabel:'香川県',mapRegionId:'prefecture:37',mapRegionIndex:37,mapRegionLabel:'香川県',mapRegionKind:'prefecture',countryId:'JPN',countryLabel:'日本'});
+  const point={latitude:34.352301,longitude:134.047461,precision:'venue',sourceUrl:'https://www.navitime.co.jp/poi?spot=01315-00003650'};
+  const [event]=normalizeMapEvents([{name:'e-とぴあ・かがわ',country:'日本',area:'高松市',locationPrecision:'venue',mapAreaLocation:point}],[],resolver);
+  assert.equal(event.mapRegionId,'prefecture:37');
+  assert.equal(event.locationPrecision,'venue');
+  assert.equal(event.position,null);
+  assert.equal(event.cellId,null);
+});
+test('verified venue coordinates for overseas records do not create a city level pin',()=>{
+  const resolve=()=>({id:'bogota-cell',mapRegionId:'admin1:COL:CO-DC',mapRegionIndex:4,mapRegionLabel:'Bogotá D.C.',mapRegionKind:'admin1',countryId:'COL',countryLabel:'Colombia'});
+  const [event]=normalizeMapEvents([{name:'SOFA pixel art talk',country:'コロンビア',area:'Bogotá',locationPrecision:'venue',mapAreaLocation:{latitude:4.629747,longitude:-74.090167}}],[],resolve,()=>null);
+  assert.equal(event.mapRegionId,null);
+  assert.equal(event.countryLevel,true);
+  assert.equal(event.position,null);
+  assert.equal(event.cellId,null);
+});
+test('known country names use country scope without a point, even when a city or building coordinate is known',()=>{
+  const resolver=()=>null;
+  const resolveCountry=id=>id==='TWN'?{mapRegionId:'country:TWN',mapRegionLabel:'Taiwan',mapRegionKind:'country',countryId:id,countryLabel:'Taiwan'}:null;
+  const events=normalizeMapEvents([{name:'Kaohsiung',country:'台湾',area:'高雄市',locationPrecision:'venue',mapAreaLocation:{latitude:22.68901,longitude:120.31028}},{name:'Singapore',country:'シンガポール',area:'Orchard Road, Singapore',locationPrecision:'venue',mapAreaLocation:{latitude:1.30609,longitude:103.82871}}],[],resolver,resolveCountry);
+  assert.equal(events[0].placement,'country');
+  assert.equal(events[0].countryLevel,true);
+  assert.equal(events[0].mapRegionId,null);
+  assert.equal(events[0].position,null);
+  assert.equal(events[0].cellId,null);
+  assert.equal(events[1].placement,'country-unmapped');
+  assert.equal(events[1].position,null);
+  assert.equal(events[1].cellId,null);
+  assert.equal(events[1].countryLabel,'シンガポール');
 });

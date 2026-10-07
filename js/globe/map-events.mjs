@@ -12,6 +12,11 @@ const CACHE_KEY = 'PiXiEED:public-data-cache:v2';
 const SESSION_KEY = 'PiXiEED:public-data-session-cache:v2';
 const CACHE_MAX_AGE = 24 * 60 * 60 * 1000;
 const PREFECTURE_BY_NAME = new Map(JAPAN_PREFECTURES.flatMap(([code, name]) => [[name, code], [name.replace(/[都道府県]$/, ''), code]]));
+const COUNTRY_ID_BY_NAME = new Map([
+  ['オーストラリア', 'AUS'], ['オーストリア', 'AUT'], ['コロンビア', 'COL'], ['シンガポール', 'SGP'],
+  ['スペイン', 'ESP'], ['チェコ', 'CZE'], ['ドイツ', 'DEU'], ['フランス', 'FRA'], ['ブラジル', 'BRA'],
+  ['ポルトガル', 'PRT'], ['ポーランド', 'POL'], ['台湾', 'TWN'], ['日本', 'JPN']
+]);
 
 function prefectureCode(value) {
   const name = String(value || '').trim();
@@ -39,13 +44,14 @@ function canonicalCellId(longitude, latitude) {
 }
 
 function eventRegionName(event) {
-  if (event?.mapRegionKind === 'country') return event.countryLabel || event.mapRegionLabel || '';
+  if (event?.countryLevel || event?.placement === 'country-unmapped') return [...new Set([event.countryLabel || event.country, event.city || event.area].filter(Boolean))].join(' · ');
+  if (event?.mapRegionKind === 'country') return event.countryLabel || event.mapRegionLabel || event.country || '';
   if (event?.mapRegionKind === 'admin1') return [...new Set([event.countryLabel, event.mapRegionLabel].filter(Boolean))].join(' · ');
-  return event?.prefectureLabel || event?.prefecture || event?.mapRegionLabel || '';
+  return event?.prefectureLabel || event?.prefecture || event?.mapRegionLabel || event?.countryLabel || event?.country || '';
 }
 
 /** Normalize public event records without interpreting legacy SVG percentages as coordinates. */
-export function normalizeMapEvents(records, representatives = [], resolveLocation = null) {
+export function normalizeMapEvents(records, representatives = [], resolveLocation = null, resolveCountry = null) {
   const representativeByPrefecture = new Map();
   for (const representative of representatives || []) {
     const code = String(representative?.prefectureId || '').padStart(2, '0');
@@ -55,27 +61,39 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
     if (!source || typeof source !== 'object') return [];
     const record = source;
     if (!String(record.name || record.title || '').trim()) return [];
-    const precise = coordinatesOf(record.location) || coordinatesOf(record.mapAreaLocation) || coordinatesOf({ latitude: record.latitude, longitude: record.longitude, lat: record.lat, lng: record.lng, lon: record.lon });
+    const venueCoordinates = coordinatesOf(record.location) || coordinatesOf(record.mapAreaLocation) || coordinatesOf({ latitude: record.latitude, longitude: record.longitude, lat: record.lat, lng: record.lng, lon: record.lon });
+    const countryName = String(record.country || '').trim();
+    const countryIdFromName = COUNTRY_ID_BY_NAME.get(countryName) || (/^[A-Z]{3}$/.test(countryName) ? countryName : null);
+    const precise = venueCoordinates;
     let resolved = null;
     if (precise && typeof resolveLocation === 'function') {
       try { resolved = resolveLocation(precise.longitude, precise.latitude) || null; } catch { resolved = null; }
     }
+    let countryOnly = null;
+    if (!precise && countryIdFromName && typeof resolveCountry === 'function') {
+      try { countryOnly = resolveCountry(countryIdFromName) || null; } catch { countryOnly = null; }
+    }
     const explicitPrefectureId = prefectureCode(record.prefecture || record.area);
-    const prefectureId = explicitPrefectureId || (resolved?.prefectureId ? String(resolved.prefectureId).padStart(2, '0') : null);
+    const prefectureId = explicitPrefectureId || (resolved?.prefectureId && (!countryIdFromName || countryName === '日本') ? String(resolved.prefectureId).padStart(2, '0') : null);
     const prefectureLabel = prefectureId ? (JAPAN_PREFECTURES.find(([code]) => code === prefectureId)?.[1] || resolved?.prefectureLabel || record.prefecture || record.area || null) : null;
+    const countryLevel = Boolean(countryIdFromName && countryName !== '日本' && !prefectureId);
     const mapRegionId = prefectureId
       ? `prefecture:${prefectureId}`
-      : resolved?.mapRegionId || (resolved?.countryId ? `country:${resolved.countryId}` : null);
-    const mapRegionKind = prefectureId ? 'prefecture' : resolved?.mapRegionKind || (resolved?.countryId ? 'country' : null);
-    const mapRegionLabel = prefectureId ? prefectureLabel : resolved?.mapRegionLabel || resolved?.countryLabel || null;
-    const countryId = prefectureId ? 'JPN' : resolved?.countryId || null;
-    const countryLabel = prefectureId ? '日本' : resolved?.countryLabel || null;
+      : countryLevel ? countryOnly?.mapRegionId || `country:${countryIdFromName}` : resolved?.mapRegionId || (resolved?.countryId ? `country:${resolved.countryId}` : null);
+    const mapRegionKind = prefectureId ? 'prefecture' : countryLevel ? (countryOnly ? 'country' : null) : resolved?.mapRegionKind || (resolved?.countryId ? 'country' : null);
+    const mapRegionLabel = prefectureId ? prefectureLabel : countryOnly?.countryLabel || resolved?.mapRegionLabel || resolved?.countryLabel || null;
+    const countryId = prefectureId ? 'JPN' : countryIdFromName || resolved?.countryId || countryOnly?.countryId || null;
+    const countryLabel = prefectureId ? '日本' : countryOnly?.countryLabel || resolved?.countryLabel || countryName || null;
     const representative = prefectureId ? representativeByPrefecture.get(prefectureId) : null;
-    const placement = mapRegionKind === 'prefecture' ? 'prefecture' : mapRegionId ? 'region' : precise ? 'coordinate' : representative ? 'prefecture' : null;
+    const countryKnownWithoutMap = countryLevel && !countryOnly;
+    const placement = prefectureId ? 'prefecture' : countryLevel ? (countryOnly || typeof resolveCountry !== 'function' || countryIdFromName === 'TWN' ? 'country' : 'country-unmapped') : mapRegionId ? 'region' : precise ? 'coordinate' : representative ? 'prefecture' : null;
     const position = precise || (representative?.center ? {
       longitude: Number(representative.center.longitude), latitude: Number(representative.center.latitude)
     } : null);
-    const positionOk = position && Number.isFinite(position.longitude) && Number.isFinite(position.latitude);
+    let positionOk = position && Number.isFinite(position.longitude) && Number.isFinite(position.latitude);
+    if (countryLevel) positionOk = false;
+    if (prefectureId && precise && resolved?.prefectureId !== prefectureId) positionOk = false;
+    if (prefectureId && !precise && representative?.center) positionOk = true;
     const cellId = precise && positionOk ? (resolved?.id || canonicalCellId(position.longitude, position.latitude)) : representative?.cell?.id || null;
     return [Object.freeze({
       ...record,
@@ -83,15 +101,16 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
       name: String(record.name || record.title).trim(),
       prefectureId,
       prefectureLabel,
-      mapRegionId,
-      mapRegionIndex: prefectureId ? Number(prefectureId) : resolved?.mapRegionIndex ?? null,
+      mapRegionId: countryLevel && !countryOnly ? null : mapRegionId,
+      mapRegionIndex: prefectureId ? Number(prefectureId) : countryLevel ? countryOnly?.mapRegionIndex ?? null : resolved?.mapRegionIndex ?? null,
       mapRegionLabel,
-      mapRegionKind,
+      mapRegionKind: countryLevel && !countryOnly ? null : mapRegionKind,
       countryId,
       countryLabel,
-      position: positionOk ? Object.freeze(position) : null,
-      placement: positionOk ? placement : null,
-      cellId,
+      position: countryLevel || (prefectureId && precise) ? null : positionOk ? Object.freeze(position) : null,
+      placement: positionOk || countryOnly || countryKnownWithoutMap ? placement : null,
+      countryLevel,
+      cellId: countryLevel || (prefectureId && precise) ? null : cellId,
       representativeCell: placement === 'prefecture' && !precise ? representative : null
     })];
   });
@@ -208,7 +227,8 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const prefectureId = String(cell?.prefectureId || selection?.prefectureId || '').padStart(2, '0');
     const mapRegionId = cell?.mapRegionId || selection?.mapRegionId;
     const cellId = selection?.cellId || selection?.cell?.id || cell?.cell?.id || selection?.id;
-    const items = mapRegionId ? events.filter(event => event.mapRegionId === mapRegionId) : prefectureId && prefectureId !== '00' ? events.filter(event => event.prefectureId === prefectureId) : cellId ? events.filter(event => event.cellId === cellId) : [];
+    const countryId = cell?.countryId || selection?.countryId;
+    const items = mapRegionId ? events.filter(event => event.mapRegionId === mapRegionId || (event.countryLevel && event.countryId === countryId)) : prefectureId && prefectureId !== '00' ? events.filter(event => event.prefectureId === prefectureId || (event.countryLevel && event.countryId === countryId)) : cellId ? events.filter(event => event.cellId === cellId) : [];
     return summarizeItems(items);
   }
 
@@ -222,9 +242,10 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const cell = scope.displayCell || scope;
     const cellId = scope.cellId || scope.cell?.id || cell?.cell?.id || scope.id;
     const mapRegionId = cell?.mapRegionId || scope.mapRegionId;
-    if (mapRegionId) return events.filter(event => event.mapRegionId === mapRegionId);
+    const countryId = cell?.countryId || scope.countryId;
+    if (mapRegionId) return events.filter(event => event.mapRegionId === mapRegionId || (event.countryLevel && event.countryId === countryId));
     const prefectureId = String(cell?.prefectureId || scope.prefectureId || '').padStart(2, '0');
-    if (prefectureId && prefectureId !== '00') return events.filter(event => event.prefectureId === prefectureId);
+    if (prefectureId && prefectureId !== '00') return events.filter(event => event.prefectureId === prefectureId || (event.countryLevel && event.countryId === countryId));
     return cellId ? events.filter(event => event.cellId === cellId) : [];
   }
 
@@ -255,7 +276,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
       const details = [event.dateLabel || event.dates || event.date || [event.startDate, event.endDate].filter(Boolean).join('–'), event.venue, eventLocation].filter(value => typeof value === 'string' && value.trim());
       if (details.length) { const meta = doc.createElement('p'); meta.className = 'map-event-card__meta'; meta.textContent = details.join(' · '); card.append(meta); }
       const regionName = eventRegionName(event);
-      const placement = doc.createElement('p'); placement.className = 'map-event-card__placement'; placement.textContent = event.online ? 'オンライン開催' : event.placement === 'coordinate' ? (event.locationPrecision === 'area' ? `${regionName || '地域'}周辺に表示（会場の正確な位置ではありません）` : '公開された位置情報') : event.placement === 'prefecture' ? (event.representativeCell ? `${regionName || '都道府県'}単位でまとめて表示（会場位置ではありません）` : `${regionName || '都道府県'}内のイベント`) : event.placement === 'region' ? `${regionName || '地域'}単位でまとめて表示（会場位置ではありません）` : '地図上の位置情報なし'; card.append(placement);
+      const placement = doc.createElement('p'); placement.className = 'map-event-card__placement'; placement.textContent = event.online ? 'オンライン開催' : event.placement === 'country' ? `${regionName || '国'}単位で表示（開催地の詳細位置は未確認）` : event.placement === 'country-unmapped' ? `${regionName || '国'}は確認済み（地図上に表示可能な範囲がありません）` : event.placement === 'coordinate' ? (event.locationPrecision === 'venue' ? '確認済み会場の位置（建物内の開催場所は未確認）' : event.locationPrecision === 'area' ? `${regionName || '地域'}周辺に表示（開催地の詳細位置は未確認）` : '公開された位置情報') : event.placement === 'prefecture' ? (event.representativeCell ? `${regionName || '都道府県'}単位でまとめて表示（会場位置ではありません）` : event.locationPrecision === 'venue' ? `${regionName || '都道府県'}内の確認済み会場` : event.locationPrecision === 'area' ? `${regionName || '都道府県'}内の地域代表位置（会場位置は未確認）` : `${regionName || '都道府県'}内のイベント`) : event.placement === 'region' ? `${regionName || '地域'}単位でまとめて表示（会場位置ではありません）` : '地図上の位置情報なし'; card.append(placement);
       const statusText = eventStatus(event, today);
       if (statusText) { const status = doc.createElement('p'); status.className = 'map-event-card__status'; status.textContent = statusText; card.append(status); }
       const href = safeUrl(event.url || event.sourceUrl || event.website);
@@ -283,7 +304,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (destroyed) return;
     publicRecords = nextRecords;
     today = tokyoDate();
-    const next = uniqueEventEditions(normalizeMapEvents(mergeEventCatalog(publicRecords, researchRecords), representatives, renderer.getMapLocation?.bind(renderer))).map(event => Object.freeze({ ...event, mapPeriod: classifyEvent(event, today) }));
+    const next = uniqueEventEditions(normalizeMapEvents(mergeEventCatalog(publicRecords, researchRecords), representatives, renderer.getMapLocation?.bind(renderer), renderer.getMapCountry?.bind(renderer))).map(event => Object.freeze({ ...event, mapPeriod: classifyEvent(event, today) }));
     const signature = JSON.stringify(next);
     if (signature === eventSignature) return;
     eventSignature = signature; events = next;

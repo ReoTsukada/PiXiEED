@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-06T04:33:14+00:00",
+  "updatedAt": "2026-10-07T00:20:54+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -16,7 +16,7 @@
       "socialUrls": [
         "https://x.com/pixelartpark"
       ],
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -91,7 +91,7 @@
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -109,7 +109,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -150,12 +150,12 @@
       "country": "ドイツ",
       "area": "ハンブルク",
       "venue": "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
-      "locationPrecision": "area",
+      "locationPrecision": "venue",
       "mapAreaLocation": {
-        "latitude": 53.55,
-        "longitude": 10,
-        "precision": "area",
-        "sourceUrl": "https://marketing.hamburg.de/de/hamburg-medien-service/ueber-hamburg"
+        "latitude": 53.5614,
+        "longitude": 9.98683,
+        "precision": "venue",
+        "sourceUrl": "https://mapcarta.com/de/26234328"
       },
       "startDate": "2026-10-09",
       "endDate": "2026-10-11",
@@ -164,7 +164,7 @@
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展者公式サイト",
       "description": "ピクセルアーティストStefanie Fehling本人による、新しいドット絵作品・プリント等の出展告知。Polaris全体ではなく、この作家の出展情報。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art"
     },
     {
@@ -173,12 +173,12 @@
       "country": "ポーランド",
       "area": "ポズナン",
       "venue": "MTP Poznań（ポーランド・ポズナン／遠隔応募可）",
-      "locationPrecision": "area",
+      "locationPrecision": "venue",
       "mapAreaLocation": {
-        "latitude": 52.40014,
-        "longitude": 16.90498,
-        "precision": "area",
-        "sourceUrl": "https://badam.poznan.pl/nasza-przestrzen/01_powierzchnia/polozenie-i-powierzchnia-miasta/"
+        "latitude": 52.40259933,
+        "longitude": 16.90950012,
+        "precision": "venue",
+        "sourceUrl": "https://www.tradefairdates.com/Exhibition-Centre-Poznan-International-Fair-Grounds-Pozna-ZS516.html"
       },
       "startDate": "2026-10-23",
       "endDate": "2026-10-25",
@@ -186,7 +186,7 @@
       "status": "upcoming",
       "sourceUrl": "https://nrgevent.eu/compo/",
       "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -196,12 +196,12 @@
       "country": "スペイン",
       "area": "バレンシア",
       "venue": "Sala B-0-2, Facultad de Bellas Artes, Edificio 3N, UPV（スペイン・バレンシア）",
-      "locationPrecision": "area",
+      "locationPrecision": "venue",
       "mapAreaLocation": {
-        "latitude": 39.47667,
-        "longitude": -0.37444,
-        "precision": "area",
-        "sourceUrl": "https://www.valencia.es/estadistica/Recull/Recull2021_Castellano.pdf"
+        "latitude": 39.481,
+        "longitude": -0.345,
+        "precision": "venue",
+        "sourceUrl": "https://www.upv.es/plano/index-es.html?entidad=DCRBC"
       },
       "startDate": "2026-11-05",
       "endDate": "2026-11-05",
@@ -219,12 +219,12 @@
       "country": "ドイツ",
       "area": "フェルクリンゲン",
       "venue": "Hermann Neuberger Halle, Stadionstraße, 66333 Völklingen（ドイツ）",
-      "locationPrecision": "area",
+      "locationPrecision": "venue",
       "mapAreaLocation": {
-        "latitude": 49.25,
-        "longitude": 6.85,
-        "precision": "area",
-        "sourceUrl": "https://www.voelklingen.de/voelklingen/stadtportrait-statistik-geschichte/"
+        "latitude": 49.25605,
+        "longitude": 6.86932,
+        "precision": "venue",
+        "sourceUrl": "https://mapcarta.com/de/W26663146"
       },
       "startDate": "2026-11-07",
       "endDate": "2026-11-08",
@@ -232,7 +232,7 @@
       "status": "upcoming",
       "sourceUrl": "https://www.retrosaar.de/",
       "description": "レトロゲーム催事のCreative ZoneでPixel Artを扱う企画。ドット絵だけのイベントではなく、アートやインディーゲームを含むコーナー。出展者の詳細は確認時点で未発表。",
-      "checkedAt": "2026-10-05T14:42:10+09:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -242,12 +242,12 @@
       "country": "スペイン",
       "area": "アルメンドラレホ（バダホス）",
       "venue": "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）",
-      "locationPrecision": "area",
+      "locationPrecision": "venue",
       "mapAreaLocation": {
-        "latitude": 38.68889,
-        "longitude": -6.36111,
-        "precision": "area",
-        "sourceUrl": "https://www.aemet.es/es/eltiempo/observacion/ultimosdatos?datos=det&f=humedad&k=ext&l=4436Y&w=0&x="
+        "latitude": 38.685194,
+        "longitude": -6.406639,
+        "precision": "venue",
+        "sourceUrl": "https://extremadurafilmcommission.es/portfolio/convento-de-san-antonio-de-almedralejo/"
       },
       "startDate": "2026-11-21",
       "endDate": "2026-11-21",
@@ -255,7 +255,7 @@
       "status": "upcoming",
       "sourceUrl": "https://www.festivalfps.com/",
       "description": "FRAME, PLAY & SCREENの公式プログラムに掲載された、Professional Workshop 2「PIXEL ART」。講師と内容の詳細は確認時点で未発表。催事全体は11月20日〜22日。",
-      "checkedAt": "2026-10-05T14:42:10+09:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -1261,7 +1261,7 @@
       "dateLabel": "2026年8月16日募集告知公開（公式記事のdatePublished）。締切10月9日17:00 UTC、結果発表10月16日。受付開始時刻は未記載。",
       "sourceUrl": "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
       "description": "ゲームに収録するドット絵の募集。PNG、最大300×300、100色未満が条件。告知公開日から応募締切日までを掲載。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "socialUrls": []
@@ -1279,9 +1279,16 @@
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展作家の公式カレンダー",
       "description": "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
-      "socialUrls": []
+      "socialUrls": [],
+      "mapAreaLocation": {
+        "latitude": 51.427324,
+        "longitude": 6.994171,
+        "precision": "venue",
+        "sourceUrl": "https://www.coordinatenbepalen.nl/coordinates/96389-messe-essen"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "moertel-viecc-2026",
@@ -1296,9 +1303,16 @@
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展作家の公式カレンダー",
       "description": "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
-      "socialUrls": []
+      "socialUrls": [],
+      "mapAreaLocation": {
+        "latitude": 48.217133,
+        "longitude": 16.407806,
+        "precision": "venue",
+        "sourceUrl": "https://mapy.com/de/?id=1065814350&source=osm"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "kai-whos-game-room-kaohsiung-2026",
@@ -1318,7 +1332,14 @@
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
       "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者・会場の公式情報"
+      "sourceLabel": "主催者・会場の公式情報",
+      "mapAreaLocation": {
+        "latitude": 22.68901,
+        "longitude": 120.31028,
+        "precision": "venue",
+        "sourceUrl": "https://mapcarta.com/W382872848"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "kai-whos-game-room-taoyuan-2026",
@@ -1338,7 +1359,14 @@
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
       "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者・会場の公式情報"
+      "sourceLabel": "主催者・会場の公式情報",
+      "mapAreaLocation": {
+        "latitude": 24.989979,
+        "longitude": 121.312637,
+        "precision": "venue",
+        "sourceUrl": "https://tw.near-place.com/shin-kong-mitsukoshi-taoyuan-station-store-no-19-zhongzheng-road-taoyuan-district"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "kai-whos-game-room-kaohsiung-sanduo-2026",
@@ -1358,7 +1386,14 @@
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
       "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者・会場の公式情報"
+      "sourceLabel": "主催者・会場の公式情報",
+      "mapAreaLocation": {
+        "latitude": 22.61422,
+        "longitude": 120.30683,
+        "precision": "venue",
+        "sourceUrl": "https://mapcarta.com/W591749169"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "kai-whos-game-room-taipei-2026",
@@ -1378,7 +1413,14 @@
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
       "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者・会場の公式情報"
+      "sourceLabel": "主催者・会場の公式情報",
+      "mapAreaLocation": {
+        "latitude": 25.0461089,
+        "longitude": 121.5153249,
+        "precision": "venue",
+        "sourceUrl": "https://tw.near-place.com/shin-kong-mitsukoshi-taipei-station-store-no-66-section-1-zhongxiao-west-road-zhongzheng-district"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "kai-whos-game-room-chiayi-2026",
@@ -1398,7 +1440,14 @@
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
       "checkedAt": "2026-10-06T00:08:38+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者・会場の公式情報"
+      "sourceLabel": "主催者・会場の公式情報",
+      "mapAreaLocation": {
+        "latitude": 23.47338,
+        "longitude": 120.44114,
+        "precision": "venue",
+        "sourceUrl": "https://taiwan.worldplaces.me/review/102188272-shin-kong-mitsukoshi.html"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "scratch-day-pioneiro-pixel-art-2026",
@@ -1443,11 +1492,20 @@
       "dateLabel": "2026年10月7日 15:00–17:00（会場現地表示）",
       "status": "upcoming",
       "sourceUrl": "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
-      "additionalUrls": ["https://www.chateaubourg.fr/contacts/bibliotheque/"],
+      "additionalUrls": [
+        "https://www.chateaubourg.fr/contacts/bibliotheque/"
+      ],
       "description": "市立メディアテークのPixel Art制作体験。アイロンビーズで作品を作る手作業の企画で、デジタル制作ではないことを明記。",
-      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "市公式イベント情報"
+      "sourceLabel": "市公式イベント情報",
+      "mapAreaLocation": {
+        "latitude": 48.10633,
+        "longitude": -1.40596,
+        "precision": "venue",
+        "sourceUrl": "https://www.tofromfrance.com/lieu/les-curiosites-mediatheque-de-chateaubourg"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "riedisheim-en-pixel-closing-2026",
@@ -1460,11 +1518,20 @@
       "dateLabel": "2026年10月10日 14:00–17:30（会場現地表示）",
       "status": "upcoming",
       "sourceUrl": "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/",
-      "additionalUrls": ["https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"],
+      "additionalUrls": [
+        "https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"
+      ],
       "description": "市の若者評議会によるPixel Artコンテスト作品と若者のモザイク作品の展示・年度企画の締めくくり。",
       "checkedAt": "2026-10-06T04:33:14+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "市公式イベント情報"
+      "sourceLabel": "市公式イベント情報",
+      "mapAreaLocation": {
+        "latitude": 47.747778,
+        "longitude": 7.365947,
+        "precision": "venue",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Poubelle_-_Riedisheim_-_6c_rue_du_Mar%C3%A9chal_Foch.jpg"
+      },
+      "locationPrecision": "venue"
     },
     {
       "id": "sofa-nigromante-pixel-art-talk-2026",
@@ -1472,20 +1539,20 @@
       "country": "コロンビア",
       "area": "Bogotá",
       "venue": "Corferias, Geek Academy（Reflejo Verde）, Salón Conector 4",
-      "locationPrecision": "area",
+      "locationPrecision": "venue",
       "mapAreaLocation": {
-        "latitude": 4.6294899,
-        "longitude": -74.0900271,
-        "precision": "area",
-        "sourceUrl": "https://www.enelsofa.com/sofa2026/index.php?page=info"
+        "latitude": 4.629747,
+        "longitude": -74.090167,
+        "precision": "venue",
+        "sourceUrl": "https://www.wikidata.org/wiki/Q5170481"
       },
       "startDate": "2026-10-11",
       "endDate": "2026-10-11",
-      "dateLabel": "2026年10月11日 18:00（プログラム表示。ボゴタ現地時刻）",
+      "dateLabel": "2026年10月11日 17:00（SOFA公式プログラム、ボゴタ現地時刻）",
       "status": "upcoming",
       "sourceUrl": "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
       "description": "SOFA全体ではなく、Jimmy Guazhamboによるピクセルアート制作経験・キャラクターデザイン講演。地図位置は会場Corferiasの敷地代表点で、ステージの正確な位置ではない。",
-      "checkedAt": "2026-10-06T04:33:14+00:00",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式プログラム"
     },
@@ -1503,7 +1570,14 @@
       "description": "デモシーンの催事。ピクセルグラフィック、アニメーション、チップチューンのコンペとpixel art交流を含む。開催場所は登録者向け案内のため地図位置は付けない。",
       "checkedAt": "2026-10-06T04:33:14+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者公式ページ"
+      "sourceLabel": "主催者公式ページ",
+      "mapAreaLocation": {
+        "latitude": -37.8142176,
+        "longitude": 144.9631608,
+        "precision": "area",
+        "sourceUrl": "https://wiki.openstreetmap.org/wiki/Melbourne"
+      },
+      "locationPrecision": "area"
     },
     {
       "id": "lccl-game-design-pixel-art-camp-2026-11-30",
@@ -1536,6 +1610,108 @@
       "checkedAt": "2026-10-06T04:33:14+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者公式プログラム"
+    },
+    {
+      "id": "all-in-pixel-jam-2-2026",
+      "name": "All In Pixel Jam #2 — Pixel Art game theme",
+      "online": true,
+      "venue": "オンライン（itch.io）",
+      "startDate": "2026-09-20",
+      "endDate": "2026-10-10",
+      "dateLabel": "2026年9月20日20:53〜10月10日20:53（itch.io公式表示、タイムゾーン記載なし）",
+      "status": "active",
+      "sourceUrl": "https://itch.io/jam/all-in-pixel-jam-2",
+      "description": "Pixel-based gamesをテーマにしたオンラインゲームジャム。別企画向けに作ったゲームもPixel Art game themeに合えば提出可能と規定。締切が近い。",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式ページ（itch.io）"
+    },
+    {
+      "id": "pixel-deck-jam-1-2026",
+      "name": "PIXEL-DECK JAM #1",
+      "online": true,
+      "venue": "オンライン（itch.io）",
+      "startDate": "2026-12-01",
+      "endDate": "2026-12-08",
+      "dateLabel": "2026年12月1日13:00〜8日13:00（itch.io公式表示、タイムゾーン記載なし）",
+      "status": "upcoming",
+      "sourceUrl": "https://itch.io/jam/-pixel-deck-jam-1",
+      "description": "7日間のオンラインゲームジャム。ゲームでPixel Artまたはピクセル風の画風が意味のある役割を持つことがルールに含まれ、審査にもPixel Art部門がある。",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式ページ（itch.io）"
+    },
+    {
+      "id": "e-topia-kagawa-dot-art-gif-workshop-2026-10-08",
+      "name": "絵が動く！ドット絵GIFアニメづくり",
+      "country": "日本",
+      "prefecture": "香川県",
+      "area": "高松市",
+      "venue": "e-とぴあ・かがわ（会場室名は公式未記載）",
+      "startDate": "2026-10-08",
+      "endDate": "2026-10-08",
+      "dateLabel": "2026年10月8日 10:30〜12:00（日本時間）。申込期間は9月1〜15日。定員未達時の直前受付規定はあるが、この回の現在の受付状況は未確認。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.e-topia.kagawa.jp/lecture/digital-kouza_2026_10/",
+      "additionalUrls": [
+        "https://www.e-topia.kagawa.jp/what/"
+      ],
+      "description": "点を並べてオリジナルのドット絵GIFアニメを作るデジタル講座。会場施設は特定できるが部屋名は公式に記載なし。参加受付が可能かは未確認。",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "施設公式講座案内",
+      "mapAreaLocation": { "latitude": 34.352301, "longitude": 134.047461, "precision": "venue", "sourceUrl": "https://www.navitime.co.jp/poi?spot=01315-00003650" },
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "villa-pelle-analog-pixel-art-2026-11-22",
+      "name": "ART & PLAY 2026/2027 — Analogový pixel art",
+      "country": "チェコ",
+      "area": "Praha 6",
+      "venue": "Klubovna Galerie Villa Pellé（Pelléova 91/10, 160 00 Praha 6）",
+      "startDate": "2026-11-22",
+      "endDate": "2026-11-22",
+      "dateLabel": "2026年11月22日（日）14:00〜、90分（プラハ現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://villapelle.cz/atelier-pelle/artplay/",
+      "description": "Galerie Villa Pelléの子ども向けART & PLAY全8回のうち、アナログPixel Artをテーマにした1回。デジタル制作ではなく、公式ページでは具体的な技法を詳述していない。",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "ギャラリー公式プログラム",
+      "mapAreaLocation": {
+        "latitude": 50.0990367,
+        "longitude": 14.407617,
+        "precision": "venue",
+        "sourceUrl": "https://sk.wander-book.com/villa-pelle-pelleova-91-10-praha-6-p14350.htm"
+      },
+      "locationPrecision": "venue"
+    },
+    {
+      "id": "herofestival-marseille-dendrob-pixel-art-2026",
+      "name": "HeroFestival Marseille — Le Dendrob’AtelierのPixel Art作品出展",
+      "country": "フランス",
+      "area": "Marseille",
+      "venue": "Parc Chanot",
+      "startDate": "2026-11-07",
+      "endDate": "2026-11-08",
+      "dateLabel": "2026年11月7〜8日（フェス内作家ブース出展）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier",
+      "additionalUrls": [
+        "https://www.herofestival.fr/",
+        "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/"
+      ],
+      "description": "HeroFestival全体ではなく、Le Dendrob’Atelierの作家ブース出展を登録。公式紹介は手作りPixel Artの場面作品・アクセサリーと説明し、アイロンビーズや彫刻・彩色した木を使用。会場はParc Chanotで、作家や主催者の所在地と混同しない。",
+      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式の出展者紹介",
+      "mapAreaLocation": {
+        "latitude": 43.272597,
+        "longitude": 5.394663,
+        "precision": "venue",
+        "sourceUrl": "https://www.foiredemarseille.com/mobilite/"
+      },
+      "locationPrecision": "venue"
     }
   ],
   "sources": [
@@ -1546,9 +1722,9 @@
         "https://x.com/pixelartpark"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
       "socialChecks": [
         {
           "url": "https://x.com/pixelartpark",
@@ -1622,9 +1798,9 @@
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
       "socialChecks": [
         {
           "tag": "#gbpixelartjam",
@@ -1641,9 +1817,9 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
       "socialChecks": [
         {
           "tag": "#segmentpixeljam2026",
@@ -1676,9 +1852,9 @@
       "url": "https://moer.tel/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
       "eventIds": [
         "moertel-polaris-2026",
         "moertel-spiel-2026",
@@ -1690,9 +1866,9 @@
       "url": "https://nrgevent.eu/compo/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。",
+      "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。 2026年10月7日に公式本文を再確認。",
       "additionalUrls": [
         "https://nrgevent.eu/"
       ]
@@ -1711,18 +1887,18 @@
       "url": "https://www.retrosaar.de/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。"
+      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。 2026年10月7日に公式本文を再確認。"
     },
     {
       "id": "festival-fps-pixel-art-workshop-2026",
       "url": "https://www.festivalfps.com/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。"
+      "notes": "公式ページ本文でドット絵企画、開催日、会場を確認。公式の数値座標は未確認のため、国・地域・会場を記録して一覧のみ表示。 2026年10月7日に公式本文を再確認。"
     },
     {
       "id": "hokkaido-comitia-24-juni-pixel-art-2026",
@@ -2450,9 +2626,9 @@
       "id": "coloring-pixels-8th-anniversary-art-competition-2026",
       "url": "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
       "socialUrls": [],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で日程と明確なドット絵関連内容を確認。",
+      "notes": "公式本文で日程と明確なドット絵関連内容を確認。 2026年10月7日に公式本文を再確認。",
       "eventIds": [
         "coloring-pixels-8th-anniversary-art-competition-2026"
       ]
@@ -2517,31 +2693,43 @@
       "id": "chateaubourg-pixel-art-workshop-2026-10-07",
       "url": "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
       "socialUrls": [],
-      "additionalUrls": ["https://www.chateaubourg.fr/contacts/bibliotheque/"],
-      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "additionalUrls": [
+        "https://www.chateaubourg.fr/contacts/bibliotheque/"
+      ],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "市公式イベント本文で開催日・時刻・会場とアイロンビーズのPixel Art制作内容を確認。会場住所は市役所住所と区別。",
-      "eventIds": ["chateaubourg-pixel-art-workshop-2026-10-07"]
+      "notes": "市公式イベント本文で開催日・時刻・会場とアイロンビーズのPixel Art制作内容を確認。会場住所は市役所住所と区別。 2026年10月7日に公式本文を再確認。",
+      "eventIds": [
+        "chateaubourg-pixel-art-workshop-2026-10-07"
+      ]
     },
     {
       "id": "riedisheim-en-pixel-closing-2026",
       "url": "https://www.riedisheim.fr/evenement/exposition-du-projet-riedisheim-en-pixel-du-conseil-des-jeunes/",
       "socialUrls": [],
-      "additionalUrls": ["https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"],
+      "additionalUrls": [
+        "https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"
+      ],
       "lastCheckedAt": "2026-10-06T04:33:14+00:00",
       "result": "official-confirmed",
       "notes": "市公式本文でPixel Artコンテスト作品展示、開催日・時間・Maison Jaune会場を確認。市役所住所は会場として扱わない。",
-      "eventIds": ["riedisheim-en-pixel-closing-2026"]
+      "eventIds": [
+        "riedisheim-en-pixel-closing-2026"
+      ]
     },
     {
       "id": "sofa-nigromante-pixel-art-talk-2026",
       "url": "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
       "socialUrls": [],
-      "additionalUrls": ["https://www.enelsofa.com/sofa2026/index.php?page=info"],
-      "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+      "additionalUrls": [
+        "https://www.enelsofa.com/sofa2026/index.php?page=info"
+      ],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
       "result": "official-confirmed",
-      "notes": "主催者公式プログラムで講演内容・10月11日18時・Salón Conector 4を確認。開催地はCorferiasで、主催者の会場案内ページにある地図リンクを使用。",
-      "eventIds": ["sofa-nigromante-pixel-art-talk-2026"]
+      "notes": "主催者公式プログラムで講演内容・10月11日18時・Salón Conector 4を確認。開催地はCorferiasで、主催者の会場案内ページにある地図リンクを使用。 2026年10月7日に公式本文を再確認。",
+      "eventIds": [
+        "sofa-nigromante-pixel-art-talk-2026"
+      ]
     },
     {
       "id": "syntax-demoparty-pixel-art-2026",
@@ -2550,7 +2738,9 @@
       "lastCheckedAt": "2026-10-06T04:33:14+00:00",
       "result": "official-confirmed",
       "notes": "主催者公式本文で日程・ピクセルグラフィック等の競技・Melbourne開催を確認。会場は事前登録後に案内のため所在地を設定しない。",
-      "eventIds": ["syntax-demoparty-pixel-art-2026"]
+      "eventIds": [
+        "syntax-demoparty-pixel-art-2026"
+      ]
     },
     {
       "id": "lccl-game-design-pixel-art-camp-2026",
@@ -2573,6 +2763,107 @@
       "result": "unavailable",
       "attemptedAt": "2026-10-06T00:08:38+00:00",
       "notes": "公式親ページから個別申込ページへ進んだがCache miss。展示会期は親ページで確認済み。個別活動日時は未確認。"
+    },
+    {
+      "id": "all-in-pixel-jam-2-2026",
+      "url": "https://itch.io/jam/all-in-pixel-jam-2",
+      "socialUrls": [],
+      "additionalUrls": [],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日程とPixel Art企画条件を確認。タイムゾーンが明記されない時刻はdateLabelに明記。",
+      "eventIds": [
+        "all-in-pixel-jam-2-2026"
+      ]
+    },
+    {
+      "id": "pixel-deck-jam-1-2026",
+      "url": "https://itch.io/jam/-pixel-deck-jam-1",
+      "socialUrls": [],
+      "additionalUrls": [],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日程とPixel Art企画条件を確認。タイムゾーンが明記されない時刻はdateLabelに明記。",
+      "eventIds": [
+        "pixel-deck-jam-1-2026"
+      ]
+    },
+    {
+      "id": "e-topia-kagawa-dot-art-gif-workshop-2026-10-08",
+      "url": "https://www.e-topia.kagawa.jp/lecture/digital-kouza_2026_10/",
+      "socialUrls": [],
+      "additionalUrls": [
+        "https://www.e-topia.kagawa.jp/what/"
+      ],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed",
+      "notes": "施設公式本文で日程・内容を確認。会場施設の公式案内とイベント会場を区別し、講座本文に部屋名はない。受付状況は未確認。",
+      "eventIds": [
+        "e-topia-kagawa-dot-art-gif-workshop-2026-10-08"
+      ]
+    },
+    {
+      "id": "villa-pelle-analog-pixel-art-2026-11-22",
+      "url": "https://villapelle.cz/atelier-pelle/artplay/",
+      "socialUrls": [],
+      "additionalUrls": [],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日程とPixel Art企画条件を確認。タイムゾーンが明記されない時刻はdateLabelに明記。",
+      "eventIds": [
+        "villa-pelle-analog-pixel-art-2026-11-22"
+      ]
+    },
+    {
+      "id": "herofestival-marseille-dendrob-pixel-art-2026",
+      "url": "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier",
+      "socialUrls": [],
+      "additionalUrls": [
+        "https://www.herofestival.fr/",
+        "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/"
+      ],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式の出展者紹介で開催日と手作りPixel Art作品の出展を確認。Parc Chanot会場情報を作家・主催者住所と区別。",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ]
+    },
+    {
+      "id": "e-topia-venue-address-2026",
+      "url": "https://www.e-topia.kagawa.jp/what/",
+      "notes": "施設公式の案内で所在地を確認。講座会場として案内される施設の所在であり、講座本文に部屋名の記載はない。",
+      "eventIds": [
+        "e-topia-kagawa-dot-art-gif-workshop-2026-10-08"
+      ],
+      "socialUrls": [],
+      "additionalUrls": [],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed"
+    },
+    {
+      "id": "herofestival-marseille-2026",
+      "url": "https://www.herofestival.fr/",
+      "notes": "主催者公式の開催案内でHeroFestivalの日程とParc Chanot会場を確認。",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ],
+      "socialUrls": [],
+      "additionalUrls": [],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed"
+    },
+    {
+      "id": "herofestival-marseille-venue-address-2026",
+      "url": "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/",
+      "notes": "公的観光案内のイベント情報でParc Chanotの会場所在地を確認。作家・主催者住所と区別。",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ],
+      "socialUrls": [],
+      "additionalUrls": [],
+      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "result": "official-confirmed"
     }
   ],
   "research": {
@@ -2627,7 +2918,8 @@
       "en",
       "zh",
       "pt",
-      "fr"
+      "fr",
+      "cs"
     ],
     "verifiedSourceUrls": [
       "https://www.digitaljove.com/talleres",
@@ -2650,7 +2942,15 @@
       "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
       "https://www.enelsofa.com/sofa2026/index.php?page=info",
       "https://www.syntaxparty.org/",
-      "https://www.lcclcoding.com/holidays/game-design/"
+      "https://www.lcclcoding.com/holidays/game-design/",
+      "https://itch.io/jam/all-in-pixel-jam-2",
+      "https://itch.io/jam/-pixel-deck-jam-1",
+      "https://www.e-topia.kagawa.jp/lecture/digital-kouza_2026_10/",
+      "https://www.e-topia.kagawa.jp/what/",
+      "https://villapelle.cz/atelier-pelle/artplay/",
+      "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier",
+      "https://www.herofestival.fr/",
+      "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/"
     ],
     "regionalChecks": [
       {
@@ -2881,8 +3181,29 @@
       },
       {
         "checkedAt": "2026-10-06T04:33:14+00:00",
-        "regions": ["フランス", "コロンビア", "豪州", "シンガポール", "韓国", "中国", "香港", "インドネシア", "中東", "スイス", "ベルギー"],
-        "languages": ["fr", "es", "en", "ko", "zh", "id", "ar", "de"],
+        "regions": [
+          "フランス",
+          "コロンビア",
+          "豪州",
+          "シンガポール",
+          "韓国",
+          "中国",
+          "香港",
+          "インドネシア",
+          "中東",
+          "スイス",
+          "ベルギー"
+        ],
+        "languages": [
+          "fr",
+          "es",
+          "en",
+          "ko",
+          "zh",
+          "id",
+          "ar",
+          "de"
+        ],
         "queries": [
           "Atelier Pixel Art atelier exposition concours octobre 2026 France",
           "pixel art événement exposition atelier France octobre novembre 2026",
@@ -2929,6 +3250,91 @@
           }
         ],
         "notes": "日本語/韓国語/中国語/仏語/西語/英語で名称と語形を検索。未来の日付・Pixel Artとの明確な関係を一次ページで確認した6開催回を追加。会場位置が書面で確認できないSyntaxと数値座標を未確認のFrance/Singapore会場は、住所を主催者住所と誤認せず座標なしで記録。SOFAは企画単位を登録し、Google Mapsリンクで確認したCorferias敷地代表点を使用。韓国/中国語圏/インドネシア/中東は今回、未来の確定新規を確認できず。"
+      },
+      {
+        "checkedAt": "2026-10-07T00:05:03+00:00",
+        "regions": [
+          "日本（香川県・四国）",
+          "チェコ",
+          "フランス",
+          "コロンビア",
+          "ドイツ",
+          "ポーランド",
+          "スペイン",
+          "オンライン",
+          "米国",
+          "カナダ",
+          "インドネシア",
+          "マレーシア",
+          "シンガポール",
+          "インド",
+          "アフリカ",
+          "中東"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "cs",
+          "fr",
+          "es",
+          "pl",
+          "de",
+          "id",
+          "ar"
+        ],
+        "queries": [
+          "香川 高松 ドット絵 GIF アニメ 講座 2026 10月 公式",
+          "2026 pixel art event October November USA Canada official workshop exhibition",
+          "2026 pixel art jam online October November December itch.io Pixel Art rules",
+          "pixel art game jam submission deadline December 2026 official online",
+          "site:itch.io/jam pixel art 2026 October submission contest",
+          "art pixel atelier pixel art Praha listopad 2026 Galerie Villa Pellé",
+          "pixel art Marseille novembre 2026 HeroFestival Le Dendrob Atelier",
+          "2026 pixel art workshop event Indonesia October November official seni piksel",
+          "2026 pixel art workshop Malaysia November event official",
+          "2026 pixel art event India November December official",
+          "فن البكسل ورشة نوفمبر 2026 معرض أفريقيا",
+          "Pixel Art event deadline 2026 October official online"
+        ],
+        "addedIds": [
+          "all-in-pixel-jam-2-2026",
+          "pixel-deck-jam-1-2026",
+          "e-topia-kagawa-dot-art-gif-workshop-2026-10-08",
+          "villa-pelle-analog-pixel-art-2026-11-22",
+          "herofestival-marseille-dendrob-pixel-art-2026"
+        ],
+        "recheckedIds": [
+          "chateaubourg-pixel-art-workshop-2026-10-07",
+          "pixel-art-park-9",
+          "gb-pixel-art-jam-2026",
+          "segment-pixel-jam-2026",
+          "moertel-polaris-2026",
+          "moertel-spiel-2026",
+          "moertel-viecc-2026",
+          "nrg-pixel-art-awards-2026",
+          "coloring-pixels-8th-anniversary-art-competition-2026",
+          "sofa-nigromante-pixel-art-talk-2026",
+          "retrocon-saar-17-pixel-art-2026",
+          "festival-fps-pixel-art-workshop-2026"
+        ],
+        "unconfirmed": [
+          {
+            "name": "Fleisher Art Memorial — Pixel Art in Procreate",
+            "sourceUrl": "https://reg137.imperisoft.com/Fleisher/ProgramDetail/3631373334/Registration.aspx",
+            "reason": "登録ページで内容は確認できたが開催日時欄が読み込まれず、末尾の団体住所が開催教室かも確認できないため未登録。"
+          },
+          {
+            "name": "POSKO VISUAL 26（Malang）",
+            "sourceUrl": "https://poskovisual.com/",
+            "reason": "10月28日〜11月1日の催事と会場は確認できたが、公式情報に明確なPixel Art企画がない。"
+          },
+          {
+            "name": "Villeneuve-d’Ascq Pixel Art LEGO",
+            "sourceUrl": "https://www.lillemetropole.fr/",
+            "reason": "検索結果に開催候補はあるが公式詳細本文を取得できず、未確認のまま。"
+          }
+        ],
+        "notes": "日本・中欧・フランス・米州・オンラインの新規企画を担当別に読み取り専用調査し、公式本文で5開催回を確認。開催地や住所、オンライン区分を根拠範囲に合わせて登録。既存のSOFA講演時刻を17時へ訂正。Pixel Art Park 9、Coloring Pixels応募、GB Pixel Art Jam、Segment Pixel Jam、Moertel、NRG Awards等の開催・締切情報を再確認。公式SNSは本文を読めた場合以外は確認済みにしない。全件網羅を主張しない。 近接開催として、Pixel Art Park 9、RetroCon Saar、Festival FPSなどの既存公式日程も再確認。"
       }
     ],
     "historyCollection": {

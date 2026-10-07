@@ -51,3 +51,12 @@ test('a point overlapped by a region is counted once and retains region preceden
   assert.equal(mask[1], (1 << 4) | (1 << 6));
   assert.equal(mask[2], mask[1]);
 });
+
+test('country-only events fill every tile in their country including Japan', () => {
+  const countries = { resolution: 4, countryTiles: new Map([['JPN', Uint32Array.from([1, 2, 5])], ['TWN', Uint32Array.from([7, 8])]]) };
+  const { mask, stats } = buildMapRegionContent(countries, { events: [{ countryId: 'JPN', countryLevel: true, mapPeriod: 'upcoming' }, { countryId: 'TWN', countryLevel: true, mapPeriod: 'past' }] });
+  for (const key of [1, 2, 5]) assert.equal(mask[key], (1 << 1) | (1 << 6));
+  for (const key of [7, 8]) assert.equal(mask[key], (1 << 4) | (1 << 6));
+  assert.equal(stats.occupiedCells, 5);
+  assert.equal(stats.droppedEventPoints, 0);
+});

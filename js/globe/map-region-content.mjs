@@ -9,14 +9,16 @@ export function buildMapRegionContent(index, { posts = [], events = [] } = {}, r
     return value;
   };
   const regionTiles = index.mapRegionTiles || new Map([...index.prefectureTiles || []].map(([id, tiles]) => [`prefecture:${id}`, tiles]));
+  const countryTiles = index.countryTiles || new Map();
   function regionId(record) {
+    if (record?.countryLevel && countryTiles.has(record.countryId)) return `country:${record.countryId}`;
     const code = record?.countryId && record.countryId !== 'JPN' ? null : index.prefectureIds?.slice(1).includes(record?.prefectureId) ? record.prefectureId : null;
     if (code && regionTiles.has(`prefecture:${code}`)) return `prefecture:${code}`;
     return regionTiles.has(record?.mapRegionId) ? record.mapRegionId : null;
   }
   function target(point, explicit = null) {
     const known = regionId(explicit);
-    if (known) return regionTiles.get(known)?.length ? group(regions, known) : null;
+    if (known) return (regionTiles.get(known) || countryTiles.get(known.slice('country:'.length)))?.length ? group(regions, known) : null;
     if (explicit?.mapRegionId) return null;
     if (!point || !Number.isFinite(point.longitude) || !Number.isFinite(point.latitude)) return null;
     const record = resolveLocation?.(point.longitude, point.latitude);
@@ -52,7 +54,8 @@ export function buildMapRegionContent(index, { posts = [], events = [] } = {}, r
   for (const [key, value] of points) paint(key, encode(value));
   for (const [code, value] of regions) {
     const bits = encode(value);
-    for (const key of regionTiles.get(code)) paint(key, bits);
+    const tiles = regionTiles.get(code) || countryTiles.get(code.slice('country:'.length));
+    for (const key of tiles || []) paint(key, bits);
   }
   return { mask, stats: Object.freeze(stats) };
 }

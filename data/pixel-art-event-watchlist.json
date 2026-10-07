@@ -163,10 +163,12 @@
       "label": "フランス",
       "eventIds": [
         "chateaubourg-pixel-art-workshop-2026-10-07",
+        "herofestival-marseille-dendrob-pixel-art-2026",
         "riedisheim-en-pixel-closing-2026"
       ],
       "areas": [
         "Châteaubourg",
+        "Marseille",
         "Riedisheim"
       ]
     },
@@ -225,7 +227,8 @@
       "id": "region-db3bff9f3e294214",
       "label": "香川県",
       "eventIds": [
-        "doom-loophole-center-sanuki-2026"
+        "doom-loophole-center-sanuki-2026",
+        "e-topia-kagawa-dot-art-gif-workshop-2026-10-08"
       ],
       "areas": [
         "高松市"
@@ -257,6 +260,16 @@
         "福岡・天神",
         "福岡市",
         "福岡市・天神"
+      ]
+    },
+    {
+      "id": "region-ff90337ffe4a0d1f",
+      "label": "チェコ",
+      "eventIds": [
+        "villa-pelle-analog-pixel-art-2026-11-22"
+      ],
+      "areas": [
+        "Praha 6"
       ]
     }
   ],
@@ -547,6 +560,18 @@
       ]
     },
     {
+      "id": "venue-6889b6b05e8a43dd",
+      "label": "e-とぴあ・かがわ（会場室名は公式未記載）",
+      "eventIds": [
+        "e-topia-kagawa-dot-art-gif-workshop-2026-10-08"
+      ],
+      "region": "香川県",
+      "area": "高松市",
+      "sourceUrls": [
+        "https://www.e-topia.kagawa.jp/lecture/digital-kouza_2026_10/"
+      ]
+    },
+    {
       "id": "venue-6b74af714ff12892",
       "label": "Centro Educacional Pioneiro（Quadra Coberta）",
       "eventIds": [
@@ -716,6 +741,30 @@
       "area": "新宿区",
       "sourceUrls": [
         "https://honkbooks.com/asobanight-20/"
+      ]
+    },
+    {
+      "id": "venue-a7d845b9d4644fc7",
+      "label": "Klubovna Galerie Villa Pellé（Pelléova 91/10, 160 00 Praha 6）",
+      "eventIds": [
+        "villa-pelle-analog-pixel-art-2026-11-22"
+      ],
+      "region": "チェコ",
+      "area": "Praha 6",
+      "sourceUrls": [
+        "https://villapelle.cz/atelier-pelle/artplay/"
+      ]
+    },
+    {
+      "id": "venue-af75d046385d0299",
+      "label": "Parc Chanot",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ],
+      "region": "フランス",
+      "area": "Marseille",
+      "sourceUrls": [
+        "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier"
       ]
     },
     {
@@ -941,7 +990,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -976,7 +1025,7 @@
       "lastKnownEventDate": "2026-12-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1324,6 +1373,33 @@
       }
     },
     {
+      "id": "source-3ee07a13b9c8dc4c",
+      "label": "絵が動く！ドット絵GIFアニメづくり",
+      "eventIds": [
+        "e-topia-kagawa-dot-art-gif-workshop-2026-10-08"
+      ],
+      "url": "https://www.e-topia.kagawa.jp/lecture/digital-kouza_2026_10/",
+      "kind": "website",
+      "prefectures": [
+        "香川県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "高松市"
+      ],
+      "venues": [
+        "e-とぴあ・かがわ（会場室名は公式未記載）"
+      ],
+      "lastKnownEventDate": "2026-10-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-3f87b2e45c8c540a",
       "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
       "eventIds": [
@@ -1429,7 +1505,7 @@
       "lastKnownEventDate": "2026-11-03",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1694,7 +1770,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1747,7 +1823,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1971,7 +2047,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2101,6 +2177,33 @@
       }
     },
     {
+      "id": "source-68f66d7e45d03453",
+      "label": "絵が動く！ドット絵GIFアニメづくり",
+      "eventIds": [
+        "e-topia-kagawa-dot-art-gif-workshop-2026-10-08"
+      ],
+      "url": "https://www.e-topia.kagawa.jp/what/",
+      "kind": "website",
+      "prefectures": [
+        "香川県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "高松市"
+      ],
+      "venues": [
+        "e-とぴあ・かがわ（会場室名は公式未記載）"
+      ],
+      "lastKnownEventDate": "2026-10-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "施設公式の案内で所在地を確認。講座会場として案内される施設の所在であり、講座本文に部屋名の記載はない。"
+      }
+    },
+    {
       "id": "source-6ee99d280a9d2c6f",
       "label": "Newgrounds Pixel Day 2018",
       "eventIds": [
@@ -2118,6 +2221,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-71e1cffc3f2b20b3",
+      "label": "HeroFestival Marseille — Le Dendrob’AtelierのPixel Art作品出展",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ],
+      "url": "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Marseille"
+      ],
+      "venues": [
+        "Parc Chanot"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2267,7 +2395,7 @@
       "lastKnownEventDate": "2026-10-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2477,6 +2605,31 @@
       }
     },
     {
+      "id": "source-9b12a6aa49fec6c4",
+      "label": "HeroFestival Marseille — Le Dendrob’AtelierのPixel Art作品出展",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ],
+      "url": "https://www.marseille-tourisme.com/vivez-marseille-blog/agenda/herofestival-marseille-saison-xii-marseille-fr-6596204/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Marseille"
+      ],
+      "venues": [
+        "Parc Chanot"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "公的観光案内のイベント情報でParc Chanotの会場所在地を確認。作家・主催者住所と区別。"
+      }
+    },
+    {
       "id": "source-9b56821e89381cca",
       "label": "PIXELGIRLS: SIDE B",
       "eventIds": [
@@ -2611,7 +2764,7 @@
       "lastKnownEventDate": "2026-11-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2865,7 +3018,7 @@
       "lastKnownEventDate": "2026-10-09",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2917,7 +3070,7 @@
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3118,6 +3271,31 @@
       }
     },
     {
+      "id": "source-cf7cd630124f1d75",
+      "label": "HeroFestival Marseille — Le Dendrob’AtelierのPixel Art作品出展",
+      "eventIds": [
+        "herofestival-marseille-dendrob-pixel-art-2026"
+      ],
+      "url": "https://www.herofestival.fr/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Marseille"
+      ],
+      "venues": [
+        "Parc Chanot"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "主催者公式の開催案内でHeroFestivalの日程とParc Chanot会場を確認。"
+      }
+    },
+    {
       "id": "source-d0a3f6c1459bb6da",
       "label": "Riedisheim en Pixel — Conseil des Jeunes展示・締めくくり企画",
       "eventIds": [
@@ -3139,6 +3317,27 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-d100176b395d5014",
+      "label": "All In Pixel Jam #2 — Pixel Art game theme",
+      "eventIds": [
+        "all-in-pixel-jam-2-2026"
+      ],
+      "url": "https://itch.io/jam/all-in-pixel-jam-2",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（itch.io）"
+      ],
+      "lastKnownEventDate": "2026-10-10",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -3215,7 +3414,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3243,6 +3442,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-d6b741f627b4a511",
+      "label": "ART & PLAY 2026/2027 — Analogový pixel art",
+      "eventIds": [
+        "villa-pelle-analog-pixel-art-2026-11-22"
+      ],
+      "url": "https://villapelle.cz/atelier-pelle/artplay/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "チェコ"
+      ],
+      "areas": [
+        "Praha 6"
+      ],
+      "venues": [
+        "Klubovna Galerie Villa Pellé（Pelléova 91/10, 160 00 Praha 6）"
+      ],
+      "lastKnownEventDate": "2026-11-22",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3351,7 +3575,7 @@
       "lastKnownEventDate": "2026-11-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T14:42:10+09:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3573,6 +3797,27 @@
       }
     },
     {
+      "id": "source-ef7e65c762b1070f",
+      "label": "PIXEL-DECK JAM #1",
+      "eventIds": [
+        "pixel-deck-jam-1-2026"
+      ],
+      "url": "https://itch.io/jam/-pixel-deck-jam-1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（itch.io）"
+      ],
+      "lastKnownEventDate": "2026-12-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-f4bdf3dd12f7065e",
       "label": "Game Design Camp: From Pencil to Pixel — 11月30日開始回",
       "eventIds": [
@@ -3646,7 +3891,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3678,5 +3923,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-06T04:43:01+00:00"
+  "updatedAt": "2026-10-07T00:07:33+00:00"
 }
