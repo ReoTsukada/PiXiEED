@@ -46,7 +46,7 @@ function canonicalCellId(longitude, latitude) {
 function eventRegionName(event) {
   if (event?.countryLevel || event?.placement === 'country-unmapped') return [...new Set([event.countryLabel || event.country, event.city || event.area].filter(Boolean))].join(' · ');
   if (event?.mapRegionKind === 'country') return event.countryLabel || event.mapRegionLabel || event.country || '';
-  if (event?.mapRegionKind === 'admin1') return [...new Set([event.countryLabel, event.mapRegionLabel].filter(Boolean))].join(' · ');
+  if (event?.mapRegionKind === 'admin1') return [...new Set([event.countryLabel || event.country, event.mapRegionLabel].filter(Boolean))].join(' · ');
   return event?.prefectureLabel || event?.prefecture || event?.mapRegionLabel || event?.countryLabel || event?.country || '';
 }
 
@@ -76,22 +76,29 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
     const explicitPrefectureId = prefectureCode(record.prefecture || record.area);
     const prefectureId = explicitPrefectureId || (resolved?.prefectureId && (!countryIdFromName || countryName === '日本') ? String(resolved.prefectureId).padStart(2, '0') : null);
     const prefectureLabel = prefectureId ? (JAPAN_PREFECTURES.find(([code]) => code === prefectureId)?.[1] || resolved?.prefectureLabel || record.prefecture || record.area || null) : null;
-    const countryLevel = Boolean(countryIdFromName && countryName !== '日本' && !prefectureId);
+    const resolvedCountryId = resolved?.countryId || null;
+    const resolvedMatchesCountry = !countryIdFromName || !resolvedCountryId || resolvedCountryId === countryIdFromName;
+    const resolvedAdmin1 = countryName !== '日本' && resolvedMatchesCountry && resolved?.mapRegionKind === 'admin1';
+    const countryAdmin1 = Boolean(countryIdFromName && countryName !== '日本' && resolvedAdmin1);
+    if (countryIdFromName && countryName !== '日本' && precise && !resolvedAdmin1 && typeof resolveCountry === 'function') {
+      try { countryOnly = resolveCountry(countryIdFromName) || null; } catch { countryOnly = null; }
+    }
+    const countryLevel = Boolean(countryIdFromName && countryName !== '日本' && !prefectureId && !resolvedAdmin1);
     const mapRegionId = prefectureId
       ? `prefecture:${prefectureId}`
-      : countryLevel ? countryOnly?.mapRegionId || `country:${countryIdFromName}` : resolved?.mapRegionId || (resolved?.countryId ? `country:${resolved.countryId}` : null);
-    const mapRegionKind = prefectureId ? 'prefecture' : countryLevel ? (countryOnly ? 'country' : null) : resolved?.mapRegionKind || (resolved?.countryId ? 'country' : null);
-    const mapRegionLabel = prefectureId ? prefectureLabel : countryOnly?.countryLabel || resolved?.mapRegionLabel || resolved?.countryLabel || null;
-    const countryId = prefectureId ? 'JPN' : countryIdFromName || resolved?.countryId || countryOnly?.countryId || null;
+      : countryLevel ? countryOnly?.mapRegionId || (countryOnly ? `country:${countryIdFromName}` : null) : resolvedMatchesCountry ? resolved?.mapRegionId || (resolvedCountryId ? `country:${resolvedCountryId}` : null) : null;
+    const mapRegionKind = prefectureId ? 'prefecture' : countryLevel ? (countryOnly ? 'country' : null) : resolvedMatchesCountry ? resolved?.mapRegionKind || (resolvedCountryId ? 'country' : null) : null;
+    const mapRegionLabel = prefectureId ? prefectureLabel : resolvedAdmin1 ? resolved?.mapRegionLabel : countryOnly?.countryLabel || resolved?.mapRegionLabel || resolved?.countryLabel || null;
+    const countryId = prefectureId ? 'JPN' : countryIdFromName || resolvedCountryId || countryOnly?.countryId || null;
     const countryLabel = prefectureId ? '日本' : countryOnly?.countryLabel || resolved?.countryLabel || countryName || null;
     const representative = prefectureId ? representativeByPrefecture.get(prefectureId) : null;
     const countryKnownWithoutMap = countryLevel && !countryOnly;
-    const placement = prefectureId ? 'prefecture' : countryLevel ? (countryOnly || typeof resolveCountry !== 'function' || countryIdFromName === 'TWN' ? 'country' : 'country-unmapped') : mapRegionId ? 'region' : precise ? 'coordinate' : representative ? 'prefecture' : null;
+    const placement = prefectureId ? 'prefecture' : countryLevel ? (countryOnly || typeof resolveCountry !== 'function' || countryIdFromName === 'TWN' ? 'country' : 'country-unmapped') : resolvedAdmin1 ? 'region' : mapRegionId ? 'region' : precise ? 'coordinate' : representative ? 'prefecture' : null;
     const position = precise || (representative?.center ? {
       longitude: Number(representative.center.longitude), latitude: Number(representative.center.latitude)
     } : null);
     let positionOk = position && Number.isFinite(position.longitude) && Number.isFinite(position.latitude);
-    if (countryLevel) positionOk = false;
+    if (countryLevel || countryAdmin1) positionOk = false;
     if (prefectureId && precise && resolved?.prefectureId !== prefectureId) positionOk = false;
     if (prefectureId && !precise && representative?.center) positionOk = true;
     const cellId = precise && positionOk ? (resolved?.id || canonicalCellId(position.longitude, position.latitude)) : representative?.cell?.id || null;
@@ -101,16 +108,16 @@ export function normalizeMapEvents(records, representatives = [], resolveLocatio
       name: String(record.name || record.title).trim(),
       prefectureId,
       prefectureLabel,
-      mapRegionId: countryLevel && !countryOnly ? null : mapRegionId,
-      mapRegionIndex: prefectureId ? Number(prefectureId) : countryLevel ? countryOnly?.mapRegionIndex ?? null : resolved?.mapRegionIndex ?? null,
+      mapRegionId,
+      mapRegionIndex: prefectureId ? Number(prefectureId) : countryLevel ? countryOnly?.mapRegionIndex ?? null : resolvedMatchesCountry ? resolved?.mapRegionIndex ?? null : null,
       mapRegionLabel,
-      mapRegionKind: countryLevel && !countryOnly ? null : mapRegionKind,
+      mapRegionKind,
       countryId,
       countryLabel,
-      position: countryLevel || (prefectureId && precise) ? null : positionOk ? Object.freeze(position) : null,
-      placement: positionOk || countryOnly || countryKnownWithoutMap ? placement : null,
+      position: countryLevel || countryAdmin1 || (prefectureId && precise) ? null : positionOk ? Object.freeze(position) : null,
+      placement: positionOk || countryOnly || countryKnownWithoutMap || resolvedAdmin1 ? placement : null,
       countryLevel,
-      cellId: countryLevel || (prefectureId && precise) ? null : cellId,
+      cellId: countryLevel || countryAdmin1 || (prefectureId && precise) ? null : cellId,
       representativeCell: placement === 'prefecture' && !precise ? representative : null
     })];
   });
@@ -228,7 +235,8 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const mapRegionId = cell?.mapRegionId || selection?.mapRegionId;
     const cellId = selection?.cellId || selection?.cell?.id || cell?.cell?.id || selection?.id;
     const countryId = cell?.countryId || selection?.countryId;
-    const items = mapRegionId ? events.filter(event => event.mapRegionId === mapRegionId || (event.countryLevel && event.countryId === countryId)) : prefectureId && prefectureId !== '00' ? events.filter(event => event.prefectureId === prefectureId || (event.countryLevel && event.countryId === countryId)) : cellId ? events.filter(event => event.cellId === cellId) : [];
+    const isCountryScope = cell?.mapRegionKind === 'country' || selection?.mapRegionKind === 'country';
+    const items = mapRegionId ? events.filter(event => event.mapRegionId === mapRegionId || ((event.countryLevel || isCountryScope) && event.countryId === countryId)) : prefectureId && prefectureId !== '00' ? events.filter(event => event.prefectureId === prefectureId || (event.countryLevel && event.countryId === countryId)) : cellId ? events.filter(event => event.cellId === cellId) : [];
     return summarizeItems(items);
   }
 
@@ -243,7 +251,8 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const cellId = scope.cellId || scope.cell?.id || cell?.cell?.id || scope.id;
     const mapRegionId = cell?.mapRegionId || scope.mapRegionId;
     const countryId = cell?.countryId || scope.countryId;
-    if (mapRegionId) return events.filter(event => event.mapRegionId === mapRegionId || (event.countryLevel && event.countryId === countryId));
+    const isCountryScope = cell?.mapRegionKind === 'country' || scope.mapRegionKind === 'country';
+    if (mapRegionId) return events.filter(event => event.mapRegionId === mapRegionId || ((event.countryLevel || isCountryScope) && event.countryId === countryId));
     const prefectureId = String(cell?.prefectureId || scope.prefectureId || '').padStart(2, '0');
     if (prefectureId && prefectureId !== '00') return events.filter(event => event.prefectureId === prefectureId || (event.countryLevel && event.countryId === countryId));
     return cellId ? events.filter(event => event.cellId === cellId) : [];

@@ -117,8 +117,10 @@ test('a verified venue point maps to its prefecture without creating an exact po
 test('verified venue coordinates for overseas records do not create a city level pin',()=>{
   const resolve=()=>({id:'bogota-cell',mapRegionId:'admin1:COL:CO-DC',mapRegionIndex:4,mapRegionLabel:'Bogotá D.C.',mapRegionKind:'admin1',countryId:'COL',countryLabel:'Colombia'});
   const [event]=normalizeMapEvents([{name:'SOFA pixel art talk',country:'コロンビア',area:'Bogotá',locationPrecision:'venue',mapAreaLocation:{latitude:4.629747,longitude:-74.090167}}],[],resolve,()=>null);
-  assert.equal(event.mapRegionId,null);
-  assert.equal(event.countryLevel,true);
+  assert.equal(event.mapRegionId,'admin1:COL:CO-DC');
+  assert.equal(event.mapRegionKind,'admin1');
+  assert.equal(event.mapRegionLabel,'Bogotá D.C.');
+  assert.equal(event.countryLevel,false);
   assert.equal(event.position,null);
   assert.equal(event.cellId,null);
 });
@@ -128,7 +130,7 @@ test('known country names use country scope without a point, even when a city or
   const events=normalizeMapEvents([{name:'Kaohsiung',country:'台湾',area:'高雄市',locationPrecision:'venue',mapAreaLocation:{latitude:22.68901,longitude:120.31028}},{name:'Singapore',country:'シンガポール',area:'Orchard Road, Singapore',locationPrecision:'venue',mapAreaLocation:{latitude:1.30609,longitude:103.82871}}],[],resolver,resolveCountry);
   assert.equal(events[0].placement,'country');
   assert.equal(events[0].countryLevel,true);
-  assert.equal(events[0].mapRegionId,null);
+  assert.equal(events[0].mapRegionId,'country:TWN');
   assert.equal(events[0].position,null);
   assert.equal(events[0].cellId,null);
   assert.equal(events[1].placement,'country-unmapped');
