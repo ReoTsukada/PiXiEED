@@ -8,7 +8,7 @@ import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261006-draw-startup-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
-import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-4';
+import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-7';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',

@@ -12,9 +12,10 @@
   <div id="controls"></div>
   <p id="state" role="status">形式を選んでください。</p>
   <script type="module">
-    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-5';
+    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-7';
     import { encodeAnimatedGif } from '/js/animated-export.mjs';
     import { encodeCameraPng } from '/js/pixel-studio/png-export.mjs';
+    import { createAudioSong } from '/js/creation/audio-core.mjs?rev=20261005-audio-noise-1';
     import { createPixelLensOutputOptions } from '/js/pixel-lens/output-handoff.mjs?rev=20261008-pixel-lens-output-2';
     const controls = document.querySelector('#controls');
     const state = document.querySelector('#state');
@@ -28,7 +29,7 @@
       controls.append(button);
     }
     async function open(blob, filename, title, metadata = {}, mediaSource = null, route = {}) {
-      const result = await sendToolOutput({ blob, filename, returnUrl: route.returnUrl || '/draw/', returnOutputId: route.returnOutputId === true, source: route.source || 'テスト用サンプル', title, metadata, ...(mediaSource ? { mediaSource } : {}) });
+      const result = await sendToolOutput({ blob, filename, returnUrl: route.returnUrl || '/draw/', returnOutputId: route.returnOutputId === true, source: route.source || 'テスト用サンプル', title, metadata, ...(mediaSource ? { mediaSource } : {}), ...(route.mediaSources ? { mediaSources: route.mediaSources } : {}) });
       if (!result.ok) throw result.error || new Error('出力画面を開けませんでした。');
     }
     add('透明背景つき PNG を開く', async () => {
@@ -50,6 +51,23 @@
       for (let index = 0; index < samples; index++) { view.setInt16(44 + index * 4, Math.sin(index * Math.PI * 2 * 440 / rate) * 5000, true); view.setInt16(46 + index * 4, Math.sin(index * Math.PI * 2 * 440 / rate) * 5000, true); }
       await open(new Blob([bytes], { type: 'audio/wav' }), 'sample-tone.wav', 'WAV を確認', { durationSeconds: 1, sampleRate: rate, loops: 1 });
     });
+    add('音楽素材からWAV・動画を生成', async () => {
+      const song = createAudioSong({ songId: 'output-browser-check', title: '出力確認', tempo: 180 });
+      song.tracks[0].clips[0].notes.push({ noteId: 'output-note', pitch: 60, startTick: 0, durationTicks: 12, velocity: 96 });
+      const frame = { width: 16, height: 16, data: new Uint8ClampedArray(16 * 16 * 4) };
+      for (let index = 0; index < 16 * 16; index += 1) frame.data.set(index % 2 ? [240, 84, 96, 255] : [36, 112, 83, 255], index * 4);
+      const canvas = document.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
+      const context = canvas.getContext('2d'); context.putImageData(new ImageData(frame.data, frame.width, frame.height), 0, 0);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      await open(blob, 'sample-song.png', '音楽の出力を確認', { width: frame.width, height: frame.height, defaultScale: 1 }, null, {
+        returnUrl: '/audio/', source: 'ドットで音楽',
+        mediaSources: [
+          { id: 'canvas', label: '音楽キャンバス', kind: 'rgba-frames', frames: [frame] },
+          { id: 'song', label: '曲の音声', kind: 'audio-song', song },
+          { id: 'video', label: '曲付き動画', kind: 'audio-video', song, image: frame }
+        ]
+      });
+    });
     add('WebM 動画を開く', async () => {
       const response = await fetch('/assets/pixel-studio/test-media/street.webm');
       if (!response.ok) throw new Error('動画サンプルを読み込めませんでした。');
@@ -64,7 +82,7 @@
       const exported = await encodeCameraPng({ width: 16, height: 16, data });
       await open(exported.blob, 'camera-return.png', '撮影画像を確認', { width: 16, height: 16, cameraRatio: 'screen', cameraSize: 256, cameraColors: 'full', cameraFinish: 'soft', cameraEdges: false, cameraFacing: 'environment' }, null, { returnUrl: '/pixel-camera-studio.html', returnOutputId: true, source: 'ピクセルカメラ' });
     });
-    add('PiXiEELENS GIF をプレビューして編集へ戻る', async () => {
+    add('カメラ GIF をプレビューして編集へ戻る', async () => {
       const frames = [0, 1].map((variant) => ({ width: 4, height: 4, data: new Uint8ClampedArray(Array.from({ length: 16 }, (_, pixel) => {
         const color = (pixel + variant) % 2 ? [240, 84, 96, 255] : [36, 112, 83, 255];
         return color;
@@ -79,7 +97,7 @@
       const result = await sendToolOutput(options);
       if (!result.ok) throw result.error || new Error('GIFを準備できませんでした。');
     });
-    add('PiXiEELENS PNG をプレビューして編集へ戻る', async () => {
+    add('カメラ PNG をプレビューして編集へ戻る', async () => {
       const frame = { width: 16, height: 16, data: new Uint8ClampedArray(Array.from({ length: 256 }, (_, pixel) =>
         (pixel % 2) ? [240, 84, 96, 255] : [36, 112, 83, 255]).flat()) };
       const exported = await encodeCameraPng(frame);
@@ -90,6 +108,24 @@
       });
       const result = await sendToolOutput(options);
       if (!result.ok) throw result.error || new Error('PNGを準備できませんでした。');
+    });
+    add('PiXiEELENS GIF をプレビューして編集へ戻る', async () => {
+      const frames = [0, 1].map((variant) => ({ width: 4, height: 4, data: new Uint8Array(Array.from({ length: 16 }, (_, pixel) =>
+        (pixel + variant) % 2 ? [240, 84, 96, 255] : [36, 112, 83, 255]).flat()) }));
+      frames.forEach((frame) => { frame.delayMs = 100; });
+      const exported = await encodeAnimatedGif(frames, { longEdge: 16, workerFactory: () => null });
+      await open(new Blob([exported.bytes], { type: 'image/gif' }), 'pixieed-lens-gif.gif', 'PiXiEELENS アニメーション',
+        { width: 4, height: 4, defaultScale: exported.scale, durationSeconds: 0.2, frameCount: frames.length },
+        { kind: 'gif-frames', frames, loopCount: 0 },
+        { returnUrl: '/pixiee-lens/', returnOutputId: true, source: 'PiXiEELENS' });
+    });
+    add('PiXiEELENS PNG をプレビューして編集へ戻る', async () => {
+      const frame = { width: 16, height: 16, data: new Uint8ClampedArray(Array.from({ length: 256 }, (_, pixel) =>
+        pixel % 2 ? [240, 84, 96, 255] : [36, 112, 83, 255]).flat()) };
+      const exported = await encodeCameraPng(frame);
+      await open(exported.blob, 'pixieed-lens.png', 'PiXiEELENS 画像', { width: 16, height: 16, defaultScale: exported.scale },
+        { kind: 'rgba-frames', frames: [frame] },
+        { returnUrl: '/pixiee-lens/', returnOutputId: true, source: 'PiXiEELENS' });
     });
     window.addEventListener('pageshow', (event) => {
       if (!event.persisted) return;

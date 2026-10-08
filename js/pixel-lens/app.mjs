@@ -17,8 +17,8 @@ import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/sh
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261006-header-controls-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
-import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-5';
-import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-2';
+import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-7';
+import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-3';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';

@@ -25,7 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-3';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-7';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-floating-mouse-2';
@@ -1501,7 +1501,26 @@ $('#draw-export').addEventListener('click', async () => {
     const { blob, width, height, scale } = await enlargedPng(image);
     if (!unchangedSource()) return;
     interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas });
-    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`, returnUrl: currentToolReturnUrl, title: '画像を確認', source: 'かんたんドット', metadata: { width: image.width, height: image.height, defaultScale: scale } }, bridge, unchangedSource);
+    const mediaSources = [{ id: 'current-image', label: '現在のコマ', kind: 'rgba-frames', frames: [{ width: image.width, height: image.height, data: new Uint8Array(image.data) }] }];
+    const animation = animationSession.animation;
+    if (!readOnlyImage && animation.frames.length > 1) {
+      const animationFrames = animation.frames.map((frame) => {
+        const doc = composeAnimationFrame(animation, frame.id);
+        return { width: doc.width, height: doc.height, data: new Uint8Array(documentRgba(doc)), delayMs: Math.max(20, frame.durationMs) };
+      });
+      if (animationFrames[0].width * animationFrames[0].height * animationFrames.length <= 5_000_000) {
+        mediaSources.push({ id: 'animation', label: 'アニメーション', kind: 'rgba-frames', frames: animationFrames, loopCount: 0 });
+      }
+    }
+    const timelapseEvents = timelapse.snapshot();
+    if (timelapseEvents.length > 1) {
+      const timelapseFrames = selectDrawTimelapseFrames(timelapseEvents, { detail: false, fps: TIMELAPSE_FPS })
+        .map((frame) => ({ ...frame, data: new Uint8Array(frame.data), delayMs: 100 }));
+      if (timelapseFrames[0].width * timelapseFrames[0].height * timelapseFrames.length <= 8_000_000) {
+        mediaSources.push({ id: 'drawing-process', label: '描いた過程（3秒）', kind: 'rgba-frames', frames: timelapseFrames, loopCount: 0 });
+      }
+    }
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`, returnUrl: currentToolReturnUrl, title: '作品の出力を確認', source: 'かんたんドット', metadata: { width: image.width, height: image.height, defaultScale: scale }, mediaSources }, bridge, unchangedSource);
     if (staged.ok) return;
     if (staged.reason === 'source_changed') return;
     const result = await saveFile(blob, `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`);
@@ -1604,7 +1623,7 @@ async function exportTimelapse(detail) {
     basicButton.disabled = false; detailButton.disabled = false;
   }
 }
-$('#draw-timelapse').addEventListener('click', () => exportTimelapse(false));
+$('#draw-timelapse')?.addEventListener('click', () => exportTimelapse(false));
 $('#draw-animation-export')?.addEventListener('click', () => exportAnimation());
 let animationExporting = false, animationExportController = null;
 async function exportAnimation() {
@@ -1638,7 +1657,7 @@ async function exportAnimation() {
   } catch (error) { if (!scope.disposed && error.name !== 'AbortError') toast(`GIFを書き出せませんでした：${error.message}`); }
   finally { if (animationExportController === controller) animationExportController = null; animationExporting = false; }
 }
-$('#draw-timelapse-detail').addEventListener('click', () => exportTimelapse(true));
+$('#draw-timelapse-detail')?.addEventListener('click', () => exportTimelapse(true));
 
 function currentToolReturnUrl() { return `${location.pathname}${location.search}${location.hash}`; }
 
@@ -1809,8 +1828,8 @@ const commandHandlers = {
   'open.project': () => { cancelDrawingInput(); commandClick('#draw-output [data-output-project]'); return true; },
   'open.copyLast': () => commandClick('#draw-copy-last'), 'open.resume': () => commandClick('#draw-resume'),
   'open.importImage': () => commandClick('#draw-import-local'),
-  'export.png': () => commandClick('#draw-export'), 'export.gif': () => commandClick('#draw-animation-export'),
-  'export.timelapse': () => commandClick('#draw-timelapse'), 'export.timelapseDetail': () => commandClick('#draw-timelapse-detail'),
+  'export.png': () => commandClick('#draw-export'), 'export.gif': () => commandClick('#draw-export'),
+  'export.timelapse': () => commandClick('#draw-export'), 'export.timelapseDetail': () => commandClick('#draw-export'),
   'post.globe': () => commandClick('#draw-to-globe'),
   'animation.play': () => commandClick('#draw-animation-play'),
   'animation.workspace': () => focusAnimationControl(), 'focus.animation': () => focusAnimationControl(),

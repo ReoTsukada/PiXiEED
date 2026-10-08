@@ -5,7 +5,10 @@ export const TOOL_OUTPUT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const MIME_EXTENSIONS = Object.freeze({
   'image/png': 'png',
+  'image/jpeg': 'jpeg',
+  'image/svg+xml': 'svg',
   'image/gif': 'gif',
+  'image/apng': 'apng',
   'audio/wav': 'wav',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
@@ -136,22 +139,75 @@ function safeMetadata(metadata = {}) {
 
 function cloneMediaSource(mediaSource, mime) {
   if (mediaSource == null) return null;
-  if (mime !== 'image/gif') {
+  if (!String(mime || '').startsWith('image/')) {
     throw new TypeError('アニメーションの書き出し元を確認できません。');
   }
-  if (mediaSource?.kind !== 'gif-frames' || !Array.isArray(mediaSource.frames) || mediaSource.frames.length < 2 || mediaSource.frames.length > 600) return null;
+  if (!['gif-frames', 'rgba-frames'].includes(mediaSource?.kind) || !Array.isArray(mediaSource.frames) || !mediaSource.frames.length || mediaSource.frames.length > 600) return null;
+  if (mediaSource.kind === 'gif-frames' && mediaSource.frames.length < 2) return null;
   const { width, height } = mediaSource.frames[0];
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096) return null;
   if (width * height * mediaSource.frames.length > 8_000_000) return null;
   const valid = mediaSource.frames.every((frame) => frame?.width === width && frame?.height === height
     && ArrayBuffer.isView(frame.data) && frame.data.BYTES_PER_ELEMENT === 1 && frame.data.length === width * height * 4
-    && Number.isFinite(frame.delayMs ?? mediaSource.delayMs) && (frame.delayMs ?? mediaSource.delayMs) >= 20 && (frame.delayMs ?? mediaSource.delayMs) <= 655350);
+    && (mediaSource.frames.length === 1 || (Number.isFinite(frame.delayMs ?? mediaSource.delayMs) && (frame.delayMs ?? mediaSource.delayMs) >= 1 && (frame.delayMs ?? mediaSource.delayMs) <= 3600000)));
   if (!valid) return null;
   const frames = mediaSource.frames.map((frame) => {
     const delayMs = frame.delayMs ?? mediaSource.delayMs;
-    return { width, height, data: Uint8Array.from(frame.data), delayMs };
+    return { width, height, data: Uint8Array.from(frame.data), ...(Number.isFinite(delayMs) ? { delayMs } : {}) };
   });
-  return { kind: 'gif-frames', width, height, frames, loopCount: mediaSource.loopCount === 0 ? 0 : null };
+  return { kind: mediaSource.kind, width, height, frames, loopCount: Number.isSafeInteger(mediaSource.loopCount) && mediaSource.loopCount >= 0 ? mediaSource.loopCount : 0 };
+}
+
+function cloneMediaSources(sources) {
+  if (sources == null) return [];
+  if (!Array.isArray(sources) || sources.length > 8) throw new TypeError('出力素材の数が上限を超えています。');
+  const ids = new Set(); let totalPixels = 0;
+  const cloned = sources.map((source) => {
+    const id = String(source?.id || '');
+    const label = String(source?.label || '').slice(0, 60);
+    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(id) || ids.has(id) || !label) throw new TypeError('出力素材を確認できません。');
+    ids.add(id);
+    if (source.kind === 'rgba-frames') {
+      const storedMedia = source.mediaSource || {};
+      const mediaSource = cloneMediaSource({ kind: 'rgba-frames', frames: source.frames || storedMedia.frames, loopCount: source.loopCount ?? storedMedia.loopCount }, 'image/png');
+      if (!mediaSource) throw new TypeError('画像素材のフレームを確認できません。');
+      totalPixels += mediaSource.width * mediaSource.height * mediaSource.frames.length;
+      if (totalPixels > 12_000_000) throw new RangeError('出力素材が大きすぎます。アニメーションのコマ数を減らしてからお試しください。');
+      return { id, label, kind: 'rgba-frames', mediaSource };
+    }
+    if (source.kind === 'audio-song' || source.kind === 'audio-video') {
+      const song = source.song;
+      let encoded;
+      try { encoded = JSON.stringify(song); } catch { throw new TypeError('音楽素材を読み込めません。'); }
+      if (!song || encoded.length > 2_000_000 || !Number.isFinite(song.tempo) || !Number.isFinite(song.loopTicks) || !Array.isArray(song.tracks)) throw new TypeError('音楽素材を確認できません。');
+      let image = null;
+      if (source.kind === 'audio-video') {
+        image = cloneMediaSource({ kind: 'rgba-frames', frames: [source.image] }, 'image/png');
+        if (!image) throw new TypeError('動画の画像素材を確認できません。');
+        totalPixels += image.width * image.height;
+        if (totalPixels > 12_000_000) throw new RangeError('出力素材が大きすぎます。画面へ戻って素材を減らしてください。');
+      }
+      return { id, label, kind: source.kind, song: JSON.parse(encoded), ...(image ? { image: image.frames[0] } : {}) };
+    }
+    throw new TypeError('未対応の出力素材です。');
+  });
+  return cloned;
+}
+
+function normalizeOutputItems(items, fallback) {
+  if (!Array.isArray(items) || !items.length || items.length > 12) throw new TypeError('出力項目の数が上限を超えています。');
+  const ids = new Set(); const blobs = new Set(); let totalBytes = 0;
+  const normalized = items.map((item) => {
+    const id = String(item?.id || '');
+    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(id) || ids.has(id)) throw new TypeError('出力項目を確認できません。');
+    ids.add(id);
+    const file = assertBlobAndName(item.blob, item.filename);
+    if (!blobs.has(item.blob)) { blobs.add(item.blob); totalBytes += item.blob.size; }
+    if (totalBytes > 128 * 1024 * 1024) throw new RangeError('出力項目の合計が128MBを超えています。不要な項目を削除してください。');
+    return { id, sourceId: String(item.sourceId || ''), mime: file.mime, extension: file.extension, filename: file.filename, blob: item.blob,
+      metadata: safeMetadata(item.metadata) };
+  });
+  return normalized;
 }
 
 async function removeExpired(database, now) {
@@ -173,7 +229,7 @@ async function removeExpired(database, now) {
 }
 
 /** Store finished files locally and return an opaque URL; image data never enters the URL. */
-export async function stageToolOutput({ blob, filename, returnUrl, metadata = {}, mediaSource = null, title = '', source = '' } = {}, {
+export async function stageToolOutput({ blob, filename, returnUrl, metadata = {}, mediaSource = null, mediaSources = null, title = '', source = '' } = {}, {
   indexedDBRef = globalThis.indexedDB,
   cryptoRef = globalThis.crypto,
   locationRef = globalThis.location,
@@ -183,13 +239,15 @@ export async function stageToolOutput({ blob, filename, returnUrl, metadata = {}
   const file = assertBlobAndName(blob, filename);
   const safeReturn = safeReturnUrl(returnUrl, locationRef?.origin);
   const safeMediaSource = cloneMediaSource(mediaSource, file.mime);
+  const safeMediaSources = cloneMediaSources(mediaSources);
   if (!Number.isFinite(ttlMs) || ttlMs < 60_000) throw new RangeError('出力の保存期間を確認できません。');
   const id = newOutputId(cryptoRef);
   const createdAt = now();
   const record = {
     schemaVersion: 1, id, createdAt, expiresAt: createdAt + ttlMs,
     blob, mime: file.mime, extension: file.extension, filename: file.filename,
-    returnUrl: safeReturn, metadata: safeMetadata(metadata), mediaSource: safeMediaSource,
+    returnUrl: safeReturn, metadata: safeMetadata(metadata), mediaSource: safeMediaSource, mediaSources: safeMediaSources,
+    outputs: [{ id: 'default', sourceId: safeMediaSources[0]?.id || '', mime: file.mime, extension: file.extension, filename: file.filename, blob, metadata: {} }],
     title: String(title || '').slice(0, 100), source: String(source || '').slice(0, 60)
   };
   const database = await openDatabase(indexedDBRef);
@@ -220,7 +278,13 @@ export async function readToolOutput(id, { indexedDBRef = globalThis.indexedDB, 
       const current = assertBlobAndName(currentBlob, currentFilename);
       if (current.mime !== record.mime || current.extension !== record.extension) throw new Error('出力設定を確認できません。編集画面へ戻ってもう一度書き出してください。');
     }
+    let outputs = Array.isArray(record.outputs) ? record.outputs : [{ id: 'default', sourceId: record.mediaSources?.[0]?.id || '', mime: record.mime, extension: record.extension, filename: currentFilename, blob: currentBlob, metadata: record.currentMetadata || {} }];
+    outputs = normalizeOutputItems(outputs, { blob: currentBlob, filename: currentFilename });
+    const safeMediaSources = cloneMediaSources(record.mediaSources);
+    const legacyImageSource = !safeMediaSources.length && record.mime.startsWith('image/');
+    if (outputs.some((item) => item.sourceId && !safeMediaSources.some((candidate) => candidate.id === item.sourceId) && !(legacyImageSource && item.sourceId === 'legacy'))) throw new Error('出力素材との関連を確認できません。');
     return { ...record, sourceBlob: record.blob, sourceFilename: record.filename, blob: currentBlob, filename: currentFilename,
+      outputs, mediaSources: safeMediaSources,
       metadata: safeMetadata({ ...record.metadata, ...record.currentMetadata }), mediaSource: cloneMediaSource(record.mediaSource, record.mime) };
   } finally { database.close?.(); }
 }
@@ -250,6 +314,27 @@ export async function saveToolOutputFilename(id, filename, { indexedDBRef = glob
     const current = await transactionResult(database, 'readonly', (store) => store.get(id));
     if (!current?.currentFilename) throw new Error('ファイル名を端末内に保存できませんでした。');
     return current.currentFilename;
+  } finally { database.close?.(); }
+}
+
+/** Persist an independent output-item set while leaving the original staged file intact. */
+export async function saveToolOutputItems(id, items, { indexedDBRef = globalThis.indexedDB, now = Date.now } = {}) {
+  const normalized = normalizeOutputItems(items);
+  const database = await openDatabase(indexedDBRef);
+  try {
+    await updateStoredRecord(database, id, (record) => {
+      const sourceIds = new Set((record.mediaSources || []).map((source) => source.id));
+      const legacyImageSource = sourceIds.size === 0 && record.mime.startsWith('image/');
+      if (normalized.some((item) => item.sourceId && !sourceIds.has(item.sourceId) && !(legacyImageSource && item.sourceId === 'legacy'))) throw new Error('出力素材との関連を確認できません。');
+      record.outputs = normalized;
+      return true;
+    }, now);
+    const verified = await transactionResult(database, 'readonly', (store) => store.get(id));
+    if (!Array.isArray(verified?.outputs) || verified.outputs.length !== normalized.length
+      || verified.outputs.some((item, index) => item.blob?.size !== normalized[index].blob.size || item.filename !== normalized[index].filename)) {
+      throw new Error('出力項目を端末内に保存できませんでした。前の出力は保持されています。');
+    }
+    return verified.outputs.map((item) => ({ ...item }));
   } finally { database.close?.(); }
 }
 

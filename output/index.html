@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://pixieed.jp/output/">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-3">
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-5">
 </head>
 <body data-page="output">
   <a class="output-skip" href="#main">本文へ移動</a>
@@ -42,14 +42,27 @@
       </section>
       <section class="output-settings" aria-labelledby="output-settings-title">
         <div class="output-settings__heading">
-          <div><p id="output-format" class="output-format"></p><h2 id="output-settings-title">保存するファイル</h2></div>
+          <div><p id="output-format" class="output-format"></p><h2 id="output-settings-title">出力するファイル</h2></div>
         </div>
+        <div id="output-items" class="output-items" role="list" aria-label="出力項目"></div>
+        <button id="output-add-item" class="output-button output-button--secondary output-add-item" type="button">＋ 出力項目を追加</button>
+        <div class="output-item-actions">
+          <button id="output-copy-item" class="output-text-button" type="button">この項目を複製</button>
+          <button id="output-delete-item" class="output-text-button output-text-button--danger" type="button">この項目を削除</button>
+        </div>
+        <label id="output-source-label" class="output-field-label" for="output-source">元の素材</label>
+        <select id="output-source" class="output-select"></select>
         <label class="output-field-label" for="output-filename">ファイル名</label>
         <div class="output-filename">
           <input id="output-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="output-filename-help">
-          <span id="output-extension" class="output-extension">.png</span>
+          <button id="output-extension" class="output-extension" type="button" aria-haspopup="listbox" aria-expanded="false">.png <span aria-hidden="true">⌄</span></button>
         </div>
-        <p id="output-filename-help" class="output-help">拡張子はファイル形式に合わせて固定です。</p>
+        <div id="output-format-picker" class="output-format-picker" hidden>
+          <label class="output-field-label" for="output-format-select">対応形式</label>
+          <select id="output-format-select" class="output-select" aria-label="出力形式"></select>
+          <label id="output-jpeg-setting" class="output-jpeg-setting" hidden for="output-jpeg-background">JPEGの背景色 <input id="output-jpeg-background" type="color" value="#ffffff"></label>
+        </div>
+        <p id="output-filename-help" class="output-help">形式を変えると拡張子が合わせて切り替わります。</p>
 
         <section id="output-scale-settings" class="output-media-settings" hidden aria-labelledby="output-scale-title">
           <div class="output-media-settings__title"><h3 id="output-scale-title">画像サイズ</h3><span>プレビューに反映</span></div>
@@ -89,6 +102,6 @@
     </div>
     <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-5"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-10"></script>
 </body>
 </html>

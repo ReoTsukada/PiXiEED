@@ -1,7 +1,7 @@
 import { importAudioImage } from './audio-image.mjs?rev=20260930-audio-timebase-1';
 import { beginAudioCamera, takeAudioCameraReturn, readAudioCameraDraft } from './audio-camera-handoff.mjs?rev=20260930-audio-timebase-1';
 import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20261005-audio-noise-1';
-import { renderAudioVideo } from './audio-video.mjs?rev=20261005-audio-clock-sync-1';
+import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261005-audio-clock-sync-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { saveFile } from '../pixel-export.mjs?rev=20260928-export-1';
 import { createAudioViewport } from './audio-viewport.mjs?rev=20261001-connected-editor-1';
@@ -25,7 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261005-audio-history-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-3';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-7';
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
   audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, getAudioColorInstrument, setAudioColorInstrument, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
@@ -283,8 +283,8 @@ function refreshAudioUi() {
   eraserButton.disabled = false;
   playButton.disabled = false;
   photoButton.disabled = false;
-  exportSoundButton.disabled = audioWavExporting;
-  exportVideoButton.disabled = Boolean(audioVideoController);
+  if (exportSoundButton) exportSoundButton.disabled = audioWavExporting;
+  if (exportVideoButton) exportVideoButton.disabled = Boolean(audioVideoController);
   refreshAudioHistoryButtons();
 }
 function animatedAudioMode() { return Boolean(audioAnimation && pxdLink?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION); }
@@ -1237,7 +1237,9 @@ scope.listen(exportImageButton, 'click', async () => {
   const selectedImage = pxdImage;
   const imageSnapshot = selectedImage ? { width: selectedImage.width, height: selectedImage.height, rgba: new Uint8ClampedArray(selectedImage.rgba) } : null;
   const songSnapshot = structuredClone(song);
-  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current?.projectId === pxdBridge?.currentProject?.projectId && sourceSnapshot.held?.projectId === pxdBridge?.heldProject?.projectId && (!sourceSnapshot.image || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
+  const outputImage = imageSnapshot || audioSongImage(songSnapshot);
+  const outputFrame = { width: outputImage.width, height: outputImage.height, data: new Uint8Array(outputImage.rgba) };
+  const unchangedSource = () => exportEpoch === effectEpoch && sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current?.projectId === pxdBridge?.currentProject?.projectId && sourceSnapshot.held?.projectId === pxdBridge?.heldProject?.projectId && (!sourceSnapshot.image || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
   exportImageButton.disabled = true;
   audioImageExporting = true; refreshAudioHistoryButtons();
   try {
@@ -1247,7 +1249,12 @@ scope.listen(exportImageButton, 'click', async () => {
     const { blob, width, height, scale, baseWidth, baseHeight } = await exportAudioImage(songSnapshot, imageSnapshot ? { image: imageSnapshot } : {});
     if (disposed()) return;
     if (!unchangedSource()) throw new Error('素材が切り替わりました。絵をもう一度保存してください。');
-    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-dot-music-${width}x${height}.png`, returnUrl: currentAudioReturnUrl, title: '音楽の画像を確認', source: 'ドットで音楽', metadata: { width: baseWidth, height: baseHeight, defaultScale: scale } }, sourceSnapshot.bridge, unchangedSource);
+    const mediaSources = [{ id: 'artwork', label: '音楽の画像', kind: 'rgba-frames', frames: [{ ...outputFrame, delayMs: 100 }] }];
+    if (hasSongNotes(songSnapshot)) {
+      mediaSources.push({ id: 'audio', label: '曲の音声', kind: 'audio-song', song: songSnapshot });
+      if (chooseAudioVideoMimeType()) mediaSources.push({ id: 'music-video', label: '絵と音の動画', kind: 'audio-video', song: songSnapshot, image: outputFrame });
+    }
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-dot-music-${width}x${height}.png`, returnUrl: currentAudioReturnUrl, title: '音楽の出力を確認', source: 'ドットで音楽', metadata: { width: baseWidth, height: baseHeight, defaultScale: scale }, mediaSources }, sourceSnapshot.bridge, unchangedSource);
     if (staged.ok) return;
     if (staged.reason === 'source_changed') return;
     if (staged.reason === 'permission_blocked') { setStatus(staged.error?.message || 'この作品はファイルに書き出せません。'); return; }

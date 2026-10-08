@@ -2886,7 +2886,7 @@
         if (!(capturePreviewBlob instanceof Blob) || !capturePreviewFilename || capturePreviewOutputBtn.disabled) return;
         capturePreviewOutputBtn.disabled = true;
         try {
-          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-3');
+          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-7');
           const staged = await sendToolOutput({
             blob: capturePreviewBlob,
             filename: capturePreviewFilename,
@@ -5608,7 +5608,7 @@
     async function restoreOutputCapture() {
       const ids = new URLSearchParams(location.search).getAll('outputId');
       if (ids.length !== 1) throw new Error('撮影データの戻り先を確認できません。もう一度撮影してください。');
-      const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-3');
+      const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-7');
       const entry = await readToolOutput(ids[0]);
       if (entry.source !== 'PiXiEELENS' || !['image/png', 'image/gif'].includes(entry.mime)) {
         throw new Error('この撮影データをPiXiEELENSで開けません。もう一度撮影してください。');

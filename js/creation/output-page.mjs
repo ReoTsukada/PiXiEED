@@ -1,8 +1,10 @@
-import { readToolOutput, saveToolOutputFilename, saveToolOutputVariant, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-4';
-import { inspectPixelPng, withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { resizeRgbaNearest } from './output-render.mjs?rev=20261008-output-1';
+import { readToolOutput, saveToolOutputItems, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-7';
+import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
+import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-2';
+import { renderAudioWav } from './audio-export.mjs?rev=20261008-output-1';
+import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261008-output-1';
 
-const MAX_IMAGE_EDGE = 8192;
+const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 const MAX_GIF_INPUT_PIXELS = 8 * 1000 * 1000;
 const $ = (selector) => document.querySelector(selector);
@@ -38,17 +40,32 @@ const animationSettings = $('#output-animation-settings');
 const animationDetails = $('#output-animation-details');
 const audioSettings = $('#output-audio-settings');
 const audioDetails = $('#output-audio-details');
+const outputItemsList = $('#output-items');
+const addOutputItem = $('#output-add-item');
+const copyOutputItem = $('#output-copy-item');
+const deleteOutputItem = $('#output-delete-item');
+const sourceSelect = $('#output-source');
+const sourceLabel = $('#output-source-label');
+const formatButton = $('#output-extension');
+const formatPicker = $('#output-format-picker');
+const formatSelect = $('#output-format-select');
+const jpegSetting = $('#output-jpeg-setting');
+const formatHelp = $('#output-filename-help');
 
 let record = null;
+let outputItems = [];
+let activeItem = null;
+let mediaSources = [];
+let activeSource = null;
+let generatedDownloadUrls = new Map();
+let generationEpoch = 0;
+let generationController = null;
 let sourceUrl = null;
 let fileUrl = null;
 let currentBlob = null;
-let pngSourceImage = null;
 let pngBaseSize = null;
-let pngMetadata = null;
 let maxScale = 1;
 let currentScale = 1;
-let gifController = null;
 let posterUrl = null;
 let animationStopped = false;
 let pageDisposed = false;
@@ -76,14 +93,128 @@ function outputBaseName(value, ext) {
 }
 
 function currentFilename() {
-  return record ? sanitizeOutputFilename(filename.value, record.extension) : '';
+  return record ? sanitizeOutputFilename(filename.value, activeItem?.extension || record.extension) : '';
+}
+
+function createItemId() {
+  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID().replace(/-/g, '');
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function sourceFrames(source = activeSource) {
+  if (source?.kind === 'rgba-frames') return source.mediaSource.frames;
+  if (source?.kind === 'audio-video' && source.image) return [source.image];
+  return source?.mediaSource?.frames || [];
+}
+
+function sourceFormats(source = activeSource) {
+  if (source?.kind === 'rgba-frames') return source.mediaSource.frames.length > 1
+    ? [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']]
+    : [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+  if (source?.kind === 'audio-song') return [['wav', 'WAV音声']];
+  if (source?.kind === 'audio-video') {
+    const supported = chooseAudioVideoMimeType();
+    return supported ? [[supported.extension, supported.extension.toUpperCase() + '動画']] : [];
+  }
+  if (source?.kind === 'legacy-image' && source.mediaSource?.frames?.length > 1) return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']];
+  if (source?.kind === 'legacy-image') return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+  return source?.mime && source?.extension ? [[source.extension, displayFormat({ mime: source.mime, extension: source.extension })]] : [];
+}
+
+function outputMime(formatValue) {
+  return ({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', mp4: 'video/mp4', webm: 'video/webm', pxd: 'application/octet-stream' })[formatValue] || '';
+}
+
+function setActiveItem(item) {
+  const previousFileUrl = fileUrl;
+  const previousSourceUrl = sourceUrl;
+  activeItem = item;
+  const foundSource = mediaSources.find((source) => source.id === item.sourceId);
+  activeSource = foundSource || mediaSources[0] || null;
+  record.mime = item.mime; record.extension = item.extension; record.filename = item.filename; record.blob = item.blob;
+  record.currentMetadata = item.metadata || {};
+  record.mediaSource = activeSource?.mediaSource || (activeSource?.kind === 'rgba-frames' ? activeSource.mediaSource : null) || null;
+  currentBlob = item.blob;
+  fileUrl = URL.createObjectURL(item.blob);
+  if (previousFileUrl && previousFileUrl !== previousSourceUrl) URL.revokeObjectURL(previousFileUrl);
+  if (previousSourceUrl) URL.revokeObjectURL(previousSourceUrl);
+  sourceUrl = URL.createObjectURL(record.sourceBlob);
+  pageTitle.textContent = record.title || '出力を確認';
+  format.textContent = displayFormat(record);
+  fileExtension.textContent = record.extension.toUpperCase();
+  extension.textContent = `.${item.extension}`;
+  filename.value = outputBaseName(item.filename, item.extension);
+  filename.setAttribute('aria-label', `ファイル名（.${item.extension}は固定）`);
+  returnLink.href = record.returnUrl;
+  displayMetadata(record, item.blob, item.metadata?.outputWidth || item.metadata?.width, item.metadata?.outputHeight || item.metadata?.height);
+  setMedia(record);
+  syncFilename();
+}
+
+function renderOutputItems() {
+  outputItemsList.replaceChildren();
+  for (const item of outputItems) {
+    let url = generatedDownloadUrls.get(item.id);
+    if (!url || item.__urlBlob !== item.blob) {
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(item.blob); generatedDownloadUrls.set(item.id, url); item.__urlBlob = item.blob;
+    }
+    const row = document.createElement('div'); row.className = 'output-item'; row.setAttribute('role', 'listitem'); row.setAttribute('aria-current', String(item.id === activeItem?.id));
+    const select = document.createElement('button'); select.type = 'button'; select.className = 'output-item__select'; select.setAttribute('aria-label', `編集: ${item.filename}`);
+    const type = document.createElement('strong'); type.textContent = item.extension.toUpperCase();
+    const name = document.createElement('span'); name.textContent = item.filename;
+    select.append(type, name); select.addEventListener('click', () => activateItem(item.id));
+    const save = document.createElement('a'); save.className = 'output-item__download'; save.href = url; save.download = item.filename; save.textContent = '保存'; save.setAttribute('aria-label', `${item.filename}をダウンロード`);
+    save.addEventListener('click', () => { status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。'; trackSave('download'); });
+    row.append(select, save); outputItemsList.append(row);
+  }
+  deleteOutputItem.disabled = outputItems.length <= 1;
+  copyOutputItem.disabled = outputItems.length >= 12;
+  addOutputItem.disabled = outputItems.length >= 12;
+}
+
+function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension } = {}) {
+  sourceSelect.replaceChildren();
+  for (const source of mediaSources) {
+    const option = document.createElement('option'); option.value = source.id; option.textContent = source.label; sourceSelect.append(option);
+  }
+  sourceSelect.value = activeSource?.id || '';
+  sourceSelect.hidden = mediaSources.length <= 1;
+  sourceLabel.hidden = mediaSources.length <= 1;
+  const formats = sourceFormats(activeSource);
+  formatSelect.replaceChildren();
+  for (const [value, label] of formats) {
+    const option = document.createElement('option'); option.value = value; option.textContent = `${label}（.${value}）`; formatSelect.append(option);
+  }
+  formatSelect.value = formats.some(([value]) => value === preferredFormat) ? preferredFormat : formats[0]?.[0] || '';
+  formatButton.textContent = `.${formatSelect.value || activeItem?.extension || ''} ⌄`;
+  formatButton.hidden = formats.length <= 1;
+  formatHelp.hidden = formats.length <= 1;
+  jpegSetting.hidden = formatSelect.value !== 'jpeg';
+  formatPicker.hidden = true;
+  formatButton.setAttribute('aria-expanded', 'false');
+}
+
+async function persistOutputItems(nextItems) {
+  const saved = await saveToolOutputItems(record.id, nextItems);
+  outputItems = saved;
+  activeItem = outputItems.find((item) => item.id === activeItem?.id) || outputItems[0];
+  return outputItems;
+}
+
+async function activateItem(id) {
+  const item = outputItems.find((candidate) => candidate.id === id);
+  if (!item || item === activeItem) return;
+  setActiveItem(item); fillSourceAndFormatControls({ preferredFormat: item.extension }); renderOutputItems();
 }
 
 function displayMetadata(entry, blob = currentBlob, width = entry.metadata?.width, height = entry.metadata?.height) {
   const values = [];
+  const itemMetadata = { ...entry.metadata, ...entry.currentMetadata };
   if (width && height) values.push(`${width} × ${height}px`);
-  if (entry.mime === 'image/gif' && entry.mediaSource?.frames?.length) values.push(`${entry.mediaSource.frames.length}フレーム`);
-  if (entry.metadata?.durationSeconds) values.push(`${entry.metadata.durationSeconds}秒`);
+  if (['image/gif', 'image/apng'].includes(entry.mime) && entry.mediaSource?.frames?.length > 1) values.push(`${entry.mediaSource.frames.length}フレーム`);
+  if (itemMetadata.durationSeconds) values.push(`${itemMetadata.durationSeconds}秒`);
   if (blob) values.push(`${(blob.size / (1024 * 1024)).toFixed(blob.size < 1024 * 1024 ? 2 : 1)} MB`);
   metadata.textContent = values.join(' · ');
 }
@@ -109,6 +240,11 @@ function setBusy(busy, canCancel = false) {
   widthInput.disabled = busy;
   heightInput.disabled = busy;
   aspectLock.disabled = busy;
+  sourceSelect.disabled = busy;
+  formatSelect.disabled = busy;
+  addOutputItem.disabled = busy || outputItems.length >= 12;
+  copyOutputItem.disabled = busy || outputItems.length >= 12;
+  deleteOutputItem.disabled = busy || outputItems.length <= 1;
   cancelSettings.hidden = !busy || !canCancel;
   cancelSettings.disabled = false;
   scaleSettings.setAttribute('aria-busy', String(busy));
@@ -119,7 +255,7 @@ function setCurrentBlob(blob, { width = null, height = null, animated = false } 
   currentBlob = blob;
   fileUrl = URL.createObjectURL(blob);
   download.href = fileUrl;
-  if (record.mime === 'image/png' || record.mime === 'image/gif') {
+  if (record.mime.startsWith('image/')) {
     image.src = fileUrl;
     if (animated) {
       animationStopped = false;
@@ -132,6 +268,122 @@ function setCurrentBlob(blob, { width = null, height = null, animated = false } 
   else if (record.mime.startsWith('video/')) video.src = fileUrl;
   if (previous && previous !== sourceUrl) URL.revokeObjectURL(previous);
   displayMetadata(record, blob, width, height);
+}
+
+async function canvasRaster(frame, mime) {
+  const canvas = document.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
+  try {
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context) throw new Error('画像のプレビューを準備できません。');
+    context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+    return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('画像を書き出せませんでした。')), mime));
+  } finally { canvas.width = canvas.height = 1; }
+}
+
+async function createOutputBlob(source, formatValue, dimensions, controller) {
+  if (source?.kind === 'rgba-frames' || source?.kind === 'legacy-image') {
+    const frames = source.kind === 'rgba-frames' ? source.mediaSource.frames : source.mediaSource?.frames;
+    if (!Array.isArray(frames) || !frames.length) throw new Error('画像の元データを確認できません。');
+    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', loopCount: source.mediaSource.loopCount ?? 0 }, { encodeRaster: canvasRaster, signal: controller.signal }), metadata: {} };
+  }
+  if (source?.kind === 'audio-song' && formatValue === 'wav') {
+    const result = await renderAudioWav(source.song);
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, sampleRate: 44100, loops: result.loops } };
+  }
+  if (source?.kind === 'audio-video' && ['mp4', 'webm'].includes(formatValue)) {
+    const frame = source.image;
+    const result = await renderAudioVideo(source.song, { width: frame.width, height: frame.height, rgba: frame.data }, { signal: controller.signal });
+    if (result.extension !== formatValue || result.blob.type.split(';')[0] !== outputMime(formatValue)) throw new Error('動画の形式が選択内容と一致しません。元の項目はそのまま保存できます。');
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height } };
+  }
+  if (source?.kind === 'legacy-file' && source.blob && source.extension === formatValue) return { blob: source.blob, metadata: {} };
+  throw new Error('この素材では選択した形式を書き出せません。');
+}
+
+async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null } = {}) {
+  if (!record || !activeItem || generationController) return;
+  const source = mediaSources.find((item) => item.id === sourceId);
+  if (!source || !sourceFormats(source).some(([value]) => value === formatValue)) { status.textContent = 'この素材では選べない形式です。'; return; }
+  const formats = sourceFormats(source);
+  const extensionValue = formatValue;
+  const framesForSource = sourceFrames(source);
+  let outputDimensions = dimensions;
+  if (!outputDimensions && framesForSource.length) {
+    if (source.id === activeItem.sourceId && Number(widthInput.value) > 0 && Number(heightInput.value) > 0) {
+      outputDimensions = { width: Number(widthInput.value), height: Number(heightInput.value) };
+    } else {
+      const scale = Math.max(1, Math.min(16, Math.round(Number(record.metadata?.defaultScale) || 1)));
+      outputDimensions = { width: framesForSource[0].width * scale, height: framesForSource[0].height * scale };
+    }
+  }
+  const previousItem = activeItem;
+  const epoch = ++generationEpoch;
+  const controller = new AbortController(); generationController = controller;
+  setBusy(true, true); addOutputItem.disabled = true; copyOutputItem.disabled = true; deleteOutputItem.disabled = true;
+  status.textContent = '出力を作成しています…';
+  try {
+    const generatedOutput = await createOutputBlob(source, extensionValue, outputDimensions, controller);
+    const blob = generatedOutput.blob;
+    if (controller.signal.aborted || pageDisposed || epoch !== generationEpoch) return;
+    const baseName = filename.value || outputBaseName(previousItem.filename, previousItem.extension);
+    const nextFilename = sanitizeOutputFilename(baseName, extensionValue);
+    const frames = sourceFrames(source);
+    const animatedOutput = ['gif', 'apng'].includes(extensionValue);
+    const metadataValue = {
+      ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
+      ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
+      ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: frames.reduce((sum, frame) => sum + (frame.delayMs || 100), 0) / 1000, loopCount: source.mediaSource?.loopCount ?? 0 } : {}),
+      ...generatedOutput.metadata
+    };
+    const updated = { ...previousItem, sourceId: source.id, mime: outputMime(extensionValue), extension: extensionValue, filename: nextFilename, blob, metadata: metadataValue };
+    const nextItems = outputItems.map((item) => item.id === previousItem.id ? updated : item);
+    const savedItems = await saveToolOutputItems(record.id, nextItems);
+    if (controller.signal.aborted || pageDisposed || epoch !== generationEpoch) return;
+    outputItems = savedItems;
+    activeItem = outputItems.find((item) => item.id === previousItem.id) || outputItems[0];
+    activeSource = source;
+    record.mime = activeItem.mime; record.extension = activeItem.extension; record.filename = activeItem.filename; record.blob = activeItem.blob;
+    record.currentMetadata = activeItem.metadata; record.mediaSource = source.mediaSource || null;
+    currentScale = outputDimensions?.width && frames[0] && outputDimensions.width % frames[0].width === 0 ? outputDimensions.width / frames[0].width : 1;
+    const outputWidth = generatedOutput.metadata.outputWidth || outputDimensions?.width || frames[0]?.width;
+    const outputHeight = generatedOutput.metadata.outputHeight || outputDimensions?.height || frames[0]?.height;
+    setCurrentBlob(activeItem.blob, { width: outputWidth, height: outputHeight, animated: frames.length > 1 && ['gif', 'apng'].includes(extensionValue) });
+    setMedia(record);
+    format.textContent = displayFormat(record); extension.textContent = `.${activeItem.extension}`; filename.value = outputBaseName(activeItem.filename, activeItem.extension);
+    fillSourceAndFormatControls({ preferredFormat: activeItem.extension });
+    renderOutputItems(); displayMetadata(record, activeItem.blob, outputWidth, outputHeight);
+    status.textContent = `${formats.find(([value]) => value === extensionValue)?.[1] || extensionValue.toUpperCase()}を端末内に準備しました。保存できます。`;
+  } catch (error) {
+    if (error?.name !== 'AbortError') status.textContent = error?.message || '出力を作成できませんでした。前の項目はそのまま保存できます。';
+    fillSourceAndFormatControls({ preferredFormat: previousItem.extension });
+  } finally {
+    if (generationController === controller) generationController = null;
+    if (!pageDisposed) setBusy(false);
+    renderOutputItems();
+  }
+}
+
+async function addOutput(copy = false) {
+  if (!activeItem || outputItems.length >= 12 || generationController) return;
+  const item = { ...activeItem, id: createItemId(), filename: activeItem.filename, metadata: { ...activeItem.metadata } };
+  const next = [...outputItems, item];
+  try {
+    const saved = await saveToolOutputItems(record.id, next);
+    outputItems = saved; activeItem = outputItems.at(-1); setActiveItem(activeItem);
+    fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
+    status.textContent = copy ? '出力項目を複製しました。名前や形式を個別に変更できます。' : '出力項目を追加しました。素材・形式・名前を個別に設定できます。';
+  } catch (error) { status.textContent = error?.message || '出力項目を保存できませんでした。前の項目はそのままです。'; }
+}
+
+async function removeActiveOutput() {
+  if (outputItems.length <= 1 || !activeItem || generationController) return;
+  const id = activeItem.id; const next = outputItems.filter((item) => item.id !== id);
+  try {
+    const saved = await saveToolOutputItems(record.id, next);
+    const url = generatedDownloadUrls.get(id); if (url) URL.revokeObjectURL(url); generatedDownloadUrls.delete(id);
+    outputItems = saved; activeItem = outputItems[0]; setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
+    status.textContent = '出力項目を削除しました。元の素材は保持されています。';
+  } catch (error) { status.textContent = error?.message || '項目を削除できませんでした。出力内容は保持されています。'; }
 }
 
 async function prepareGifPoster(blob, imageNode) {
@@ -228,7 +480,6 @@ async function readPngMetadata(blob) {
 async function preparePngSettings(entry) {
   const sourceBlob = entry.sourceBlob;
   const parsedMetadata = await readPngMetadata(sourceBlob);
-  pngMetadata = parsedMetadata;
   const imageDecoder = new Image();
   imageDecoder.src = sourceUrl;
   await imageDecoder.decode();
@@ -243,7 +494,6 @@ async function preparePngSettings(entry) {
   const startScale = entry.currentMetadata?.scale || entry.metadata?.scale || sourceScale;
   const startWidth = entry.currentMetadata?.outputWidth || pngBaseSize.width * startScale;
   const startHeight = entry.currentMetadata?.outputHeight || pngBaseSize.height * startScale;
-  pngSourceImage = imageDecoder;
   setupScaleInput({ ...pngBaseSize, startScale, startWidth, startHeight, kind: 'png' });
   if (maxScale <= 1) scaleNote.textContent += ' 基準サイズが上限に達しているため、この画像は1倍で書き出します。';
   updateScaleSummary(pngBaseSize.width, pngBaseSize.height, 'png');
@@ -255,80 +505,10 @@ function targetDimensions() {
       || width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
     throw new RangeError('出力サイズが上限を超えています。幅と高さを小さくしてください。');
   }
-  if (record?.mime === 'image/gif' && width * height * record.mediaSource.frames.length > MAX_GIF_INPUT_PIXELS) {
+  if (['gif', 'apng'].includes(activeItem?.extension) && record?.mediaSource?.frames?.length > 1 && width * height * record.mediaSource.frames.length > MAX_GIF_INPUT_PIXELS) {
     throw new RangeError('GIFの全フレーム合計が800万画素を超えています。幅と高さを小さくしてください。');
   }
   return { width, height };
-}
-
-async function renderPngAtSize(outWidth, outHeight) {
-  if (!pngSourceImage || !pngBaseSize || pageDisposed) return;
-  const { width, height } = pngBaseSize;
-  if (outWidth > MAX_IMAGE_EDGE || outHeight > MAX_IMAGE_EDGE || outWidth * outHeight > MAX_IMAGE_PIXELS) throw new RangeError('出力サイズが上限を超えています。倍率を下げてください。');
-  const base = document.createElement('canvas'); const output = document.createElement('canvas');
-  base.width = width; base.height = height; output.width = outWidth; output.height = outHeight;
-  try {
-    const baseContext = base.getContext('2d', { alpha: true });
-    const outputContext = output.getContext('2d', { alpha: true });
-    if (!baseContext || !outputContext) throw new Error('画像の書き出しを開始できません。');
-    baseContext.imageSmoothingEnabled = false;
-    baseContext.drawImage(pngSourceImage, 0, 0, pngSourceImage.naturalWidth, pngSourceImage.naturalHeight, 0, 0, width, height);
-    outputContext.imageSmoothingEnabled = false;
-    outputContext.drawImage(base, 0, 0, width, height, 0, 0, outWidth, outHeight);
-    let blob = await new Promise((resolve) => output.toBlob(resolve, 'image/png'));
-    if (!blob) throw new Error('PNGを書き出せませんでした。');
-    const scaleX = outWidth / width; const scaleY = outHeight / height;
-    const scale = scaleX === scaleY && Number.isSafeInteger(scaleX) && scaleX >= 1 ? scaleX : null;
-    if (pngMetadata && scale) blob = await withPixelPngMetadata(blob, { width, height, scale });
-    if (pageDisposed) return;
-    const nextMetadata = { width, height, outputWidth: outWidth, outputHeight: outHeight, aspectLocked: aspectLock.checked };
-    if (scale) nextMetadata.scale = scale;
-    await saveToolOutputVariant(record.id, blob, nextMetadata);
-    if (pageDisposed) return;
-    currentScale = scale || 1; record.currentMetadata = nextMetadata;
-    setCurrentBlob(blob, { width: outWidth, height: outHeight });
-    updateScaleSummary(width, height, 'png');
-    status.textContent = `${outWidth} × ${outHeight}px のPNGを端末内に準備しました。保存できます。`;
-  } finally { base.width = base.height = output.width = output.height = 1; }
-}
-
-async function renderGifAtSize(outWidth, outHeight) {
-  const source = record?.mediaSource;
-  if (source?.kind !== 'gif-frames' || pageDisposed) return;
-  gifController?.abort();
-  const controller = new AbortController(); gifController = controller;
-  setBusy(true, true); status.textContent = 'アニメーションを再生成しています…';
-  try {
-    const { encodeAnimatedGif } = await import('../animated-export.mjs?v=20261001-animation-1');
-    const resizedFrames = [];
-    for (const frame of source.frames) {
-      if (controller.signal.aborted || pageDisposed) throw new DOMException('生成を中止しました。', 'AbortError');
-      resizedFrames.push({ ...resizeRgbaNearest(frame, outWidth, outHeight, { maxPixels: MAX_GIF_INPUT_PIXELS }), delayMs: frame.delayMs });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-    const result = await encodeAnimatedGif(resizedFrames, { signal: controller.signal, longEdge: Math.max(outWidth, outHeight), maxPixels: MAX_GIF_INPUT_PIXELS, maxInputPixels: MAX_GIF_INPUT_PIXELS });
-    if (controller.signal.aborted || pageDisposed) return;
-    const blob = new Blob([result.bytes], { type: 'image/gif' });
-    const frameDelayMs = source.frames.every((frame) => frame.delayMs === source.frames[0].delayMs) ? source.frames[0].delayMs : undefined;
-    const seconds = source.frames.reduce((total, frame) => total + frame.delayMs, 0) / 1000;
-    const scaleX = outWidth / source.width; const scaleY = outHeight / source.height;
-    const scale = scaleX === scaleY && Number.isSafeInteger(scaleX) && scaleX >= 1 ? scaleX : null;
-    const nextMetadata = { width: source.width, height: source.height, outputWidth: outWidth, outputHeight: outHeight, aspectLocked: aspectLock.checked, frameCount: source.frames.length, durationSeconds: seconds, loopCount: source.loopCount ?? 0 };
-    if (scale) nextMetadata.scale = scale;
-    if (frameDelayMs) nextMetadata.frameDelayMs = frameDelayMs;
-    await saveToolOutputVariant(record.id, blob, nextMetadata);
-    if (controller.signal.aborted || pageDisposed) return;
-    currentScale = scale || 1; record.currentMetadata = nextMetadata;
-    setCurrentBlob(blob, { width: outWidth, height: outHeight, animated: true });
-    updateScaleSummary(source.width, source.height, 'gif', source.frames.length);
-    status.textContent = `${result.width} × ${result.height}px · ${source.frames.length}フレームのGIFを端末内に準備しました。保存できます。`;
-  } catch (error) {
-    if (error?.name === 'AbortError') status.textContent = '生成を中止しました。前のGIFはそのまま保存できます。';
-    else status.textContent = error?.message || 'GIFを書き出せませんでした。前のGIFはそのまま保存できます。';
-  } finally {
-    if (gifController === controller) gifController = null;
-    if (!pageDisposed) setBusy(false);
-  }
 }
 
 async function applySelectedSize() {
@@ -336,16 +516,15 @@ async function applySelectedSize() {
   let dimensions;
   try { dimensions = targetDimensions(); }
   catch (error) { status.textContent = error?.message || '出力サイズを確認してください。'; return; }
-  if (record.mime === 'image/gif') { void renderGifAtSize(dimensions.width, dimensions.height); return; }
-  setBusy(true); status.textContent = 'プレビューを更新しています…';
-  try { await renderPngAtSize(dimensions.width, dimensions.height); }
-  catch (error) { status.textContent = error?.message || 'PNGを書き出せませんでした。前の画像はそのまま保存できます。'; }
-  finally { if (!pageDisposed) setBusy(false); }
+  await generateOutputItem({ dimensions });
 }
 
 function displayFormat(entry) {
   if (entry.mime === 'image/png') return 'PNG画像';
+  if (entry.mime === 'image/jpeg') return 'JPEG画像';
+  if (entry.mime === 'image/svg+xml') return 'SVGベクター画像';
   if (entry.mime === 'image/gif') return 'GIFアニメーション';
+  if (entry.mime === 'image/apng') return 'APNGアニメーション';
   if (entry.mime === 'audio/wav') return 'WAV音声';
   if (entry.mime === 'video/mp4') return 'MP4動画';
   if (entry.mime === 'video/webm') return 'WebM動画';
@@ -354,30 +533,34 @@ function displayFormat(entry) {
 
 function setMedia(entry) {
   const type = entry.mime;
-  if (type === 'image/png' || type === 'image/gif') {
+  image.hidden = audio.hidden = video.hidden = fileCard.hidden = true;
+  scaleSettings.hidden = animationSettings.hidden = audioSettings.hidden = true;
+  if (type.startsWith('image/')) {
     image.hidden = false; image.src = fileUrl;
     image.onload = () => displayMetadata(record, currentBlob, image.naturalWidth, image.naturalHeight);
-    image.alt = `${entry.title || '作品'}の${type === 'image/gif' ? 'アニメーション' : '画像'}プレビュー`;
-    if (type === 'image/png') void preparePngSettings(entry).catch((error) => { scaleSettings.hidden = true; status.textContent = error?.message || '画像サイズを読み込めませんでした。元の画像は保存できます。'; });
-    else if (entry.mediaSource?.kind === 'gif-frames') {
-      const { width, height, frames } = entry.mediaSource;
+    image.alt = `${entry.title || '作品'}の${['image/gif', 'image/apng'].includes(type) ? 'アニメーション' : '画像'}プレビュー`;
+    const frames = sourceFrames(activeSource);
+    if (frames.length) {
+      const { width, height } = frames[0];
       const startScale = entry.currentMetadata?.scale || entry.metadata?.defaultScale || 1;
-      setupScaleInput({ width, height, startScale, startWidth: entry.currentMetadata?.outputWidth || width * startScale, startHeight: entry.currentMetadata?.outputHeight || height * startScale, kind: 'gif', frameCount: frames.length });
-      animationSettings.hidden = false;
-      animationToggle.hidden = true;
-      void prepareGifPoster(entry.blob, image);
+      const animated = frames.length > 1 && ['image/gif', 'image/apng'].includes(type);
+      setupScaleInput({ width, height, startScale, startWidth: entry.currentMetadata?.outputWidth || width * startScale, startHeight: entry.currentMetadata?.outputHeight || height * startScale, kind: animated ? 'gif' : 'png', frameCount: animated ? frames.length : 1 });
+      pngBaseSize = { width, height };
+      animationSettings.hidden = !animated;
+      animationToggle.hidden = !animated;
+      if (animated) void prepareGifPoster(entry.blob, image);
     } else {
-      scaleSettings.hidden = true;
-      animationSettings.hidden = true;
-      status.textContent = 'このGIFのフレームデータはサイズ設定の上限外です。元のアニメーションはそのまま保存できます。';
+      if (type === 'image/png') void preparePngSettings(entry).catch((error) => { scaleSettings.hidden = true; status.textContent = error?.message || '画像サイズを読み込めませんでした。元の画像は保存できます。'; });
+      else { scaleSettings.hidden = true; animationSettings.hidden = true; }
     }
   } else if (type === 'audio/wav') {
     audio.hidden = false; audio.src = fileUrl;
     fileCard.hidden = true;
-    if (entry.metadata?.sampleRate || entry.metadata?.loops) {
-      const rate = entry.metadata.sampleRate ? `${Number((entry.metadata.sampleRate / 1000).toFixed(2))}kHz` : '';
-      const loops = entry.metadata.loops ? `${entry.metadata.loops}回ループ` : '';
-      audioDetails.textContent = ['ステレオ · 16-bit PCM', rate, loops].filter(Boolean).join(' · ');
+    const itemMetadata = { ...entry.metadata, ...entry.currentMetadata };
+    if (itemMetadata.sampleRate || itemMetadata.loops || activeSource?.kind === 'audio-song') {
+      const rate = itemMetadata.sampleRate ? `${Number((itemMetadata.sampleRate / 1000).toFixed(2))}kHz` : '';
+      const loops = itemMetadata.loops ? `${itemMetadata.loops}回ループ` : '';
+      audioDetails.textContent = ['ステレオ · 16-bit PCM', rate, loops].filter(Boolean).join(' · ') || '曲をWAV音声に書き出しました。';
       audioSettings.hidden = false;
     }
   } else if (type.startsWith('video/')) {
@@ -395,36 +578,68 @@ async function mount() {
   if (params.getAll('id').length !== 1) { setError('編集画面から開いた出力データを確認できません。'); return; }
   try {
     record = await readToolOutput(params.get('id'));
-    if (record.mime === 'image/gif' && record.mediaSource?.kind === 'gif-frames') {
-      const total = record.mediaSource.width * record.mediaSource.height * record.mediaSource.frames.length;
-      if (total > MAX_GIF_INPUT_PIXELS) record.mediaSource = null;
-    }
-    currentBlob = record.blob;
-    sourceUrl = URL.createObjectURL(record.sourceBlob);
-    fileUrl = URL.createObjectURL(currentBlob);
     pageTitle.textContent = record.title || '出力を確認';
     intro.textContent = record.extension === 'pxd'
       ? `${record.source || 'PiXiEED'}からのPXDバックアップです。内容を変えず端末へ保存できます。`
       : record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて保存できます。';
-    format.textContent = displayFormat(record);
-    fileExtension.textContent = record.extension.toUpperCase();
-    extension.textContent = `.${record.extension}`;
-    filename.value = outputBaseName(record.filename, record.extension);
-    filename.setAttribute('aria-label', `ファイル名（.${record.extension}は固定）`);
     returnLink.href = record.returnUrl;
     returnLink.textContent = '編集画面へ戻る';
-    displayMetadata(record, currentBlob);
-    setMedia(record);
-    syncFilename();
+    mediaSources = record.mediaSources || [];
+    if (!mediaSources.length && record.mediaSource) mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'legacy-image', mediaSource: record.mediaSource }];
+    if (!mediaSources.length && record.mime.startsWith('image/')) {
+      let sourceUrlToRelease = null; let sourceCanvas = null;
+      try {
+        const original = new Image(); sourceUrlToRelease = URL.createObjectURL(record.sourceBlob); original.src = sourceUrlToRelease; await original.decode();
+        if (original.naturalWidth * original.naturalHeight <= MAX_IMAGE_PIXELS) {
+          sourceCanvas = document.createElement('canvas'); sourceCanvas.width = original.naturalWidth; sourceCanvas.height = original.naturalHeight;
+          const context = sourceCanvas.getContext('2d', { willReadFrequently: true }); context.drawImage(original, 0, 0);
+          const pixels = context.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+          const mediaSource = { kind: 'rgba-frames', width: sourceCanvas.width, height: sourceCanvas.height, frames: [{ width: sourceCanvas.width, height: sourceCanvas.height, data: new Uint8Array(pixels.data) }], loopCount: 0 };
+          mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'rgba-frames', mediaSource }];
+        }
+      } catch { /* Keep the original file downloadable when pixel decoding is unavailable. */ }
+      finally { if (sourceCanvas) sourceCanvas.width = sourceCanvas.height = 1; if (sourceUrlToRelease) URL.revokeObjectURL(sourceUrlToRelease); }
+    }
+    if (!mediaSources.length) mediaSources = [{ id: 'legacy', label: record.source || '元のファイル', kind: 'legacy-file', blob: record.sourceBlob, mime: record.mime, extension: record.extension }];
+    outputItems = record.outputs?.length ? record.outputs : [{ id: 'default', sourceId: mediaSources[0]?.id || '', mime: record.mime, extension: record.extension, filename: record.filename, blob: record.blob, metadata: record.currentMetadata || {} }];
+    activeItem = outputItems[0];
+    if (!activeItem.sourceId) activeItem.sourceId = mediaSources[0]?.id || '';
+    setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
+    filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
   } catch (error) { setError(error?.message || '端末内の出力を開けませんでした。'); }
 }
 
 filename.addEventListener('input', syncFilename);
 filename.addEventListener('change', async () => {
   if (!record) return;
-  try { await saveToolOutputFilename(record.id, currentFilename()); }
-  catch { status.textContent = 'ファイル名を保持できませんでした。画面を閉じる前にもう一度入力してください。'; }
+  try {
+    const updated = { ...activeItem, filename: currentFilename() };
+    await persistOutputItems(outputItems.map((item) => item.id === activeItem.id ? updated : item));
+    record.filename = activeItem.filename; renderOutputItems();
+  } catch { status.textContent = 'ファイル名を保持できませんでした。画面を閉じる前にもう一度入力してください。'; }
 });
+formatButton.addEventListener('click', () => {
+  formatPicker.hidden = !formatPicker.hidden;
+  formatButton.setAttribute('aria-expanded', String(!formatPicker.hidden));
+  if (!formatPicker.hidden) formatSelect.focus();
+});
+sourceSelect.addEventListener('change', () => {
+  const source = mediaSources.find((item) => item.id === sourceSelect.value);
+  const formats = sourceFormats(source);
+  fillSourceAndFormatControls({ preferredFormat: activeItem?.extension });
+  const nextFormat = formats.some(([value]) => value === activeItem?.extension) ? activeItem.extension : formats[0]?.[0];
+  void generateOutputItem({ sourceId: source?.id, formatValue: nextFormat });
+});
+formatSelect.addEventListener('change', () => {
+  jpegSetting.hidden = formatSelect.value !== 'jpeg';
+  void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+});
+jpegSetting.addEventListener('change', () => {
+  if (formatSelect.value === 'jpeg') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+});
+addOutputItem.addEventListener('click', () => { void addOutput(false); });
+copyOutputItem.addEventListener('click', () => { void addOutput(true); });
+deleteOutputItem.addEventListener('click', () => { void removeActiveOutput(); });
 download.addEventListener('click', (event) => {
   if (!record || !fileUrl || !currentBlob) { event.preventDefault(); return; }
   syncFilename();
@@ -433,29 +648,29 @@ download.addEventListener('click', (event) => {
 });
 scaleInput.addEventListener('input', () => {
   if (!record) return;
-  const width = record.mime === 'image/gif' ? record.mediaSource.width : pngBaseSize.width;
-  const height = record.mime === 'image/gif' ? record.mediaSource.height : pngBaseSize.height;
+  const frame = sourceFrames()[0]; const width = frame?.width || pngBaseSize?.width; const height = frame?.height || pngBaseSize?.height;
+  if (!width || !height) return;
   const scale = Math.max(1, Math.min(maxScale, Math.round(Number(scaleInput.value) || 1)));
   widthInput.value = String(width * scale); heightInput.value = String(height * scale);
-  updateScaleSummary(width, height, record.mime === 'image/gif' ? 'gif' : 'png', record.mediaSource?.frames?.length || 1);
+  updateScaleSummary(width, height, sourceFrames().length > 1 ? 'gif' : 'png', sourceFrames().length || 1);
 });
 function onDimensionInput(axis) {
   if (!record) return;
-  const width = record.mime === 'image/gif' ? record.mediaSource.width : pngBaseSize.width;
-  const height = record.mime === 'image/gif' ? record.mediaSource.height : pngBaseSize.height;
+  const frame = sourceFrames()[0]; const width = frame?.width || pngBaseSize?.width; const height = frame?.height || pngBaseSize?.height;
+  if (!width || !height) return;
   if (aspectLock.checked) {
     if (axis === 'width' && Number(widthInput.value) > 0) heightInput.value = String(Math.max(1, Math.round(Number(widthInput.value) * height / width)));
     if (axis === 'height' && Number(heightInput.value) > 0) widthInput.value = String(Math.max(1, Math.round(Number(heightInput.value) * width / height)));
   }
-  updateScaleSummary(width, height, record.mime === 'image/gif' ? 'gif' : 'png', record.mediaSource?.frames?.length || 1);
+  updateScaleSummary(width, height, sourceFrames().length > 1 ? 'gif' : 'png', sourceFrames().length || 1);
 }
 widthInput.addEventListener('input', () => onDimensionInput('width'));
 heightInput.addEventListener('input', () => onDimensionInput('height'));
 aspectLock.addEventListener('change', () => { if (aspectLock.checked) onDimensionInput('width'); });
 applySettings.addEventListener('click', () => { void applySelectedSize(); });
-cancelSettings.addEventListener('click', () => gifController?.abort());
+cancelSettings.addEventListener('click', () => { generationController?.abort(); });
 animationToggle.addEventListener('click', () => {
-  if (!posterUrl || record?.mime !== 'image/gif') return;
+  if (!posterUrl || !['image/gif', 'image/apng'].includes(record?.mime)) return;
   animationStopped = !animationStopped;
   image.src = animationStopped ? posterUrl : fileUrl;
   animationToggle.textContent = animationStopped ? 'アニメーションを再生' : 'アニメーションを停止';
@@ -463,8 +678,9 @@ animationToggle.addEventListener('click', () => {
 });
 window.addEventListener('pagehide', (event) => {
   if (event.persisted) return;
-  pageDisposed = true; gifController?.abort();
-  for (const url of [sourceUrl, fileUrl, posterUrl]) if (url) URL.revokeObjectURL(url);
+  pageDisposed = true;
+  generationController?.abort();
+  for (const url of [sourceUrl, fileUrl, posterUrl, ...generatedDownloadUrls.values()]) if (url) URL.revokeObjectURL(url);
 });
 
 void mount();

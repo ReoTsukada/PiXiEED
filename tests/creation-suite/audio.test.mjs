@@ -550,7 +550,8 @@ test('audio page exposes labeled editing, project save and central playback cont
   const audioTools = page.match(/<[^>]*class="[^"]*\baudio-tools\b[^"]*"[^>]*>/)?.[0] || '';
   assert.match(audioTools, /role="group"/); assert.match(page, /audio-tool-body/);
   const outputMenu = page.match(/<details(?=[^>]*\bid="audio-output")[^>]*>[\s\S]*?<\/details>/)?.[0] || '';
-  assert.match(outputMenu, /<summary[^>]*aria-label="ファイルを開く・保存"/);
+  assert.match(outputMenu, /<summary[^>]*aria-label="出力と保存"/);
+  assert.match(outputMenu, /id="audio-export-image"[^>]*>[^<]*<strong>出力を開く<\/strong>/);
   assert.match(outputMenu, /id="audio-save"[^>]*>[\s\S]*?この作品を保存/);
   assert.match(outputMenu, /id="audio-take-photo"[^>]*aria-label="写真を撮って音楽にする"/);
   assert.doesNotMatch(page, /id="audio-more"|class="[^"]*\baudio-more\b/);

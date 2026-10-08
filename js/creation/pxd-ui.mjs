@@ -4,7 +4,7 @@ import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mj
 import { documentRgba } from './draw-core.mjs?rev=20261006-draw-startup-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261006-header-controls-1';
-import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-4';
+import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-7';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {

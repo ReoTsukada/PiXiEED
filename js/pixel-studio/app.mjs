@@ -2,7 +2,7 @@ import { createFrameLoop } from './frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
-import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-3';
+import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-7';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
 const $ = (selector) => document.querySelector(selector);
@@ -608,7 +608,8 @@ $('#savePng').addEventListener('click', async (event) => {
   const staged = await sendToolOutput({
     blob: snapshot.blob, filename: snapshot.filename, returnUrl: `${location.pathname}${location.search}${location.hash}`,
     returnOutputId: true, title: '画像を確認', source: 'ピクセルカメラ',
-    metadata: { width: snapshot.frame.width, height: snapshot.frame.height, cameraRatio: state.ratio, cameraSize: state.size, cameraColors: state.colorDepth, cameraFinish: state.finish, cameraEdges: state.aiEdges, cameraFacing: state.facing }
+    metadata: { width: snapshot.frame.width, height: snapshot.frame.height, cameraRatio: state.ratio, cameraSize: state.size, cameraColors: state.colorDepth, cameraFinish: state.finish, cameraEdges: state.aiEdges, cameraFacing: state.facing },
+    mediaSource: { kind: 'rgba-frames', frames: [{ width: snapshot.frame.width, height: snapshot.frame.height, data: snapshot.frame.data }] }
   });
   if (staged.ok) return;
   if (!current()) return;

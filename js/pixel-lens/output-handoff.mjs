@@ -78,7 +78,8 @@ export function createPixelLensOutputOptions({ blob, filename, returnUrl, frame,
       ...(frames ? { durationSeconds: frames.length * delayMs / 1000, frameCount: frames.length, frameDelayMs: delayMs, loopCount: 0 } : {}),
       ...cameraMetadata(settings)
     },
-    ...(frames ? { mediaSource: { kind: 'gif-frames', frames, delayMs, loopCount: 0 } } : {})
+    mediaSource: frames ? { kind: 'gif-frames', frames, delayMs, loopCount: 0 }
+      : { kind: 'rgba-frames', frames: [{ width: frame.width, height: frame.height, data: frame.data }] }
   };
 }
 

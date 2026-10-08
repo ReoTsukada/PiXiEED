@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
+import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from '../../js/pixel-lens/output-handoff.mjs';
@@ -99,6 +99,30 @@ test('output data stays in IndexedDB and the route carries only an opaque id', a
   assert.equal(await first.blob.text(), 'pixels');
   assert.equal(await duplicateTab.blob.text(), 'pixels');
   assert.equal(first.returnUrl, '/draw/?pxd=local-id&pxdRevision=revision-id');
+});
+
+test('multiple output items and original RGBA sources persist independently without replacing the source file', async () => {
+  const deps = dependencies();
+  const frame = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 255, 0, 128]) };
+  await stageToolOutput({ ...file(), mediaSources: [{ id: 'art', label: '元の画像', kind: 'rgba-frames', frames: [frame] }] }, deps);
+  const before = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const image = before.outputs[0];
+  const jpeg = { id: 'jpeg', sourceId: 'art', mime: 'image/jpeg', extension: 'jpeg', filename: 'art-matte.jpeg', blob: new Blob(['jpeg bytes'], { type: 'image/jpeg' }), metadata: { width: 2, height: 1 } };
+  const svg = { id: 'svg', sourceId: 'art', mime: 'image/svg+xml', extension: 'svg', filename: 'art.svg', blob: new Blob(['<svg/>'], { type: 'image/svg+xml' }), metadata: { width: 2, height: 1 } };
+  await saveToolOutputItems(validId, [image, jpeg, svg], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const reloaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(reloaded.outputs.length, 3);
+  assert.deepEqual(reloaded.outputs.map((item) => item.extension), ['png', 'jpeg', 'svg']);
+  assert.equal(reloaded.outputs[1].sourceId, 'art');
+  assert.equal(reloaded.mediaSources[0].mediaSource.frames[0].data[7], 128);
+  assert.equal(await reloaded.sourceBlob.text(), 'pixels');
+});
+
+test('output item validation rejects a mismatched extension without changing the saved set', async () => {
+  const deps = dependencies(); await stageToolOutput(file(), deps);
+  await assert.rejects(saveToolOutputItems(validId, [{ id: 'bad', sourceId: '', mime: 'image/png', extension: 'jpeg', filename: 'bad.jpeg', blob: new Blob(['png'], { type: 'image/png' }) }], { indexedDBRef: deps.indexedDBRef, now: deps.now }), /形式/);
+  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(loaded.outputs.length, 1); assert.equal(loaded.outputs[0].filename, 'my-art.png');
 });
 
 test('PXD backups use the common output route while archive bytes remain unchanged', async () => {
