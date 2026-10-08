@@ -96,8 +96,7 @@ export function createEventCalendarSection({ event, doc = globalThis.document, B
   if (status.googleAvailable) {
     const webUrl = createGoogleCalendarUrl(calendarEvent);
     const appUrl = androidAppLink(webUrl, navigatorRef, device);
-    if (appUrl) addLink(appUrl, 'Googleカレンダーアプリで開く', true, false);
-    addLink(webUrl, appUrl ? 'GoogleカレンダーのWeb版で追加' : 'Googleカレンダーで予定を開く', !appUrl);
+    addLink(appUrl || webUrl, 'Googleカレンダーに追加', true, !appUrl);
   }
   let shareFile = null;
   if (status.icsAvailable && typeof navigatorRef?.share === 'function' && typeof navigatorRef?.canShare === 'function' && typeof FileImpl === 'function') {
@@ -150,7 +149,7 @@ export function createEventCalendarSection({ event, doc = globalThis.document, B
   const help = doc.createElement('p');
   help.className = 'event-calendar__note';
   const appHelp = status.googleAvailable && androidAppLink('https://calendar.google.com/', navigatorRef, device)
-    ? 'アプリが対応していない場合はWeb版を開きます。予定画面が出ない場合は「Web版で追加」を選んでください。' : '';
+    ? '対応するアプリがあればアプリを開き、対応しない場合はWeb版を開きます。' : '';
   const fileHelp = device === 'ios'
     ? `${shareFile ? '共有先に「メール」を選ぶか、' : ''}保存した予定ファイルをメールに添付し、自分宛てに送った添付を開くとAppleカレンダーに追加できます。`
     : device === 'mac' ? '保存した予定ファイルを開くとAppleカレンダーに追加できます。'

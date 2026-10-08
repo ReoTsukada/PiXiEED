@@ -174,18 +174,24 @@ test('UI preserves an exact ICS start when only the end time is missing', async 
   assert.doesNotMatch(await exportedBlob.text(), /DTEND|VALUE=DATE/);
 });
 
-test('Android Chrome app route retains a complete Google web fallback and explicit web action', () => {
+test('one Google action retains the complete Android Chrome web fallback', () => {
   const nav = { userAgent: 'Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile' };
   const nodes = calendarNodes(createEventCalendarSection({ event: dated(), doc: calendarDoc(), navigatorRef: nav }));
   const links = nodes.filter(node => node.tag === 'a');
-  assert.equal(links.length, 2);
+  assert.equal(links.length, 1);
+  assert.equal(links[0].textContent, 'Googleカレンダーに追加');
   assert.match(links[0].href, /^intent:\/\/calendar\.google\.com\/calendar\/r\/eventedit/);
   assert.match(links[0].href, /package=com\.google\.android\.calendar/);
-  assert.equal(decodeURIComponent(links[0].href.match(/S\.browser_fallback_url=([^;]+)/)[1]), links[1].href);
-  assert.equal(new URL(links[1].href).searchParams.get('dates'), '20261011/20261013');
+  const fallback = decodeURIComponent(links[0].href.match(/S\.browser_fallback_url=([^;]+)/)[1]);
+  assert.equal(fallback, createGoogleCalendarUrl(createEventDateReminder(dated())));
+  assert.equal(new URL(fallback).searchParams.get('dates'), '20261011/20261013');
   for (const userAgent of ['Mozilla/5.0 (iPhone)', 'Mozilla/5.0 (Linux; Android; wv) Version/4.0 Chrome/130.0', 'Mozilla/5.0 (Linux; Android) Firefox/130.0', 'Mozilla/5.0 (Linux; Android) Chrome/130.0 SamsungBrowser/27']) {
     const others = calendarNodes(createEventCalendarSection({ event: dated(), doc: calendarDoc(), navigatorRef: { userAgent } }));
-    assert.equal(others.some(node => node.href?.startsWith('intent:')), false);
+    const google = others.filter(node => node.tag === 'a');
+    assert.equal(google.length, 1);
+    assert.equal(google[0].textContent, 'Googleカレンダーに追加');
+    assert.ok(google[0].href.startsWith('https://calendar.google.com/'));
+    assert.equal(others.some(node => /Web版で追加/.test(node.textContent)), false);
   }
 });
 

@@ -210,7 +210,7 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
         if (!calendarModule) return null;
         return calendarModule.createEventCalendarSection(args);
       });
-      calendarPromise ||= import('./event-calendar-ui.mjs?rev=20261008-calendar-direct-1').then((module) => { calendarModule = module; return module; }).catch(() => null);
+      calendarPromise ||= import('./event-calendar-ui.mjs?rev=20261008-calendar-direct-2').then((module) => { calendarModule = module; return module; }).catch(() => null);
       calendarPromise.then(() => {
         if (!disposed && currentEventId === safeEvent.id && calendarSlot.isConnected) {
           try {
