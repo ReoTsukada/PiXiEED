@@ -108,6 +108,12 @@ function renderEventDetail(doc, root, event, onClose) {
   header.append(status, title);
   root.append(close, header);
   if (presentation.date) root.append(element(doc, 'p', 'map-event-detail__date', presentation.date));
+  const calendar = element(doc, 'div', 'map-event-detail__calendar-slot');
+  calendar.setAttribute('aria-busy', 'true');
+  const calendarPending = element(doc, 'p', 'map-event-detail__calendar-status', 'カレンダー操作を準備しています…');
+  calendarPending.setAttribute('role', 'status');
+  calendar.append(calendarPending);
+  root.append(calendar);
   const facts = element(doc, 'dl', 'map-event-detail__facts');
   appendFact(doc, facts, '会場', presentation.venue);
   appendFact(doc, facts, '地域', presentation.area);
@@ -120,12 +126,6 @@ function renderEventDetail(doc, root, event, onClose) {
   appendLinks(doc, root, presentation.links);
   const source = [presentation.sourceLabel, presentation.checkedAt ? `確認日：${presentation.checkedAt}` : ''].filter(Boolean).join(' · ');
   if (source) root.append(element(doc, 'p', 'map-event-detail__source', source));
-  const calendar = element(doc, 'div', 'map-event-detail__calendar-slot');
-  calendar.setAttribute('aria-busy', 'true');
-  const calendarPending = element(doc, 'p', 'map-event-detail__calendar-status', 'カレンダー操作を準備しています…');
-  calendarPending.setAttribute('role', 'status');
-  calendar.append(calendarPending);
-  root.append(calendar);
   return calendar;
 }
 
@@ -210,7 +210,7 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
         if (!calendarModule) return null;
         return calendarModule.createEventCalendarSection(args);
       });
-      calendarPromise ||= import('./event-calendar-ui.mjs').then((module) => { calendarModule = module; return module; }).catch(() => null);
+      calendarPromise ||= import('./event-calendar-ui.mjs?rev=20261008-calendar-direct-1').then((module) => { calendarModule = module; return module; }).catch(() => null);
       calendarPromise.then(() => {
         if (!disposed && currentEventId === safeEvent.id && calendarSlot.isConnected) {
           try {

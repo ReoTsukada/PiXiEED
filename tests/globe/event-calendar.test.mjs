@@ -98,7 +98,7 @@ test('UI contains malformed catalog fields and omits date fallback for exact tim
   const doc = { createElement: tag => new Node(tag), body: new Node('body') };
   const flatten = node => [node, ...node.children.flatMap(flatten)];
   const invalid = createEventCalendarSection({ event: { name: 'Partial', startDate: 'not-a-date' }, doc });
-  assert.ok(flatten(invalid).some(node => /カレンダーファイル：/.test(node.textContent)));
+  assert.ok(flatten(invalid).some(node => /確認できません/.test(node.textContent)));
   const exact = createEventCalendarSection({ event: timed({ startDate: '2026-10-11', endDate: '2026-10-11' }), doc });
   assert.equal(flatten(exact).some(node => /日付だけを/.test(node.textContent)), false);
 });
@@ -126,4 +126,108 @@ test('ICS keeps the exact original zone as metadata while instants stay UTC', ()
   assert.match(ics,/DTSTART:20261011T020000Z/);
   const reminder=createEventDateReminder({...timed(),startDate:'2026-10-11'});
   assert.doesNotMatch(createEventIcs(reminder),/X-PIXIEED-ORIGINAL-TIMEZONE|DTSTART:[0-9]+T/);
+});
+
+class CalendarNode {
+  constructor(tag) { this.tag = tag; this.children = []; this.listeners = {}; this.textContent = ''; }
+  append(...nodes) { this.children.push(...nodes); }
+  setAttribute() {}
+  addEventListener(type, listener) { this.listeners[type] = listener; }
+  click() { this.clicked = true; }
+  remove() {}
+}
+const calendarDoc = () => ({ createElement: tag => new CalendarNode(tag), body: new CalendarNode('body') });
+const calendarNodes = node => [node, ...node.children.flatMap(calendarNodes)];
+const dated = overrides => ({ name: 'Pixel Day', startDate: '2026-10-11', endDate: '2026-10-12', venue: 'Hall A', sourceUrl: 'https://example.com/event', ...overrides });
+
+test('date-only catalog records offer direct actions without unavailable or separate reminder blocks', async () => {
+  const doc = calendarDoc();
+  let exportedBlob;
+  const URLImpl = { createObjectURL(blob) { exportedBlob = blob; return 'blob:calendar-test'; }, revokeObjectURL() {} };
+  const section = createEventCalendarSection({ event: dated(), doc, URLImpl, navigatorRef: {} });
+  const nodes = calendarNodes(section);
+  const google = nodes.find(node => node.tag === 'a');
+  assert.equal(new URL(google.href).searchParams.get('dates'), '20261011/20261013');
+  assert.ok(nodes.some(node => /開催日だけ/.test(node.textContent)));
+  assert.equal(nodes.some(node => node.className === 'event-calendar__unavailable' || node.className === 'event-calendar__reminder'), false);
+  const ics = nodes.find(node => node.tag === 'button');
+  ics.listeners.click();
+  assert.match(await exportedBlob.text(), /DTSTART;VALUE=DATE:20261011/);
+  assert.match(doc.body.children[0].download, /\.ics$/);
+});
+
+test('UI never falls back to add invalid or inactive date-only records', () => {
+  for (const event of [dated({ endDate: '2026-10-01' }), dated({ startDate: 'invalid' }), dated({ watch: true }), ...['watch', 'cancelled', 'postponed', 'ended', 'unknown', 'tentative', 'unconfirmed', 'pending'].map(status => dated({ status }))]) {
+    const nodes = calendarNodes(createEventCalendarSection({ event, doc: calendarDoc() }));
+    assert.equal(nodes.some(node => node.tag === 'a' || node.tag === 'button'), false);
+    assert.equal(nodes.filter(node => node.className === 'event-calendar__unavailable').length, 1);
+  }
+});
+
+test('UI preserves an exact ICS start when only the end time is missing', async () => {
+  let exportedBlob;
+  const URLImpl = { createObjectURL(blob) { exportedBlob = blob; return 'blob:calendar-test'; }, revokeObjectURL() {} };
+  const nodes = calendarNodes(createEventCalendarSection({ event: timed({ ...dated(), endDateTime: '' }), doc: calendarDoc(), URLImpl, navigatorRef: {} }));
+  assert.equal(nodes.some(node => node.tag === 'a'), false);
+  nodes.find(node => node.tag === 'button').listeners.click();
+  assert.match(await exportedBlob.text(), /DTSTART:20261011T020000Z/);
+  assert.doesNotMatch(await exportedBlob.text(), /DTEND|VALUE=DATE/);
+});
+
+test('Android Chrome app route retains a complete Google web fallback and explicit web action', () => {
+  const nav = { userAgent: 'Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile' };
+  const nodes = calendarNodes(createEventCalendarSection({ event: dated(), doc: calendarDoc(), navigatorRef: nav }));
+  const links = nodes.filter(node => node.tag === 'a');
+  assert.equal(links.length, 2);
+  assert.match(links[0].href, /^intent:\/\/calendar\.google\.com\/calendar\/r\/eventedit/);
+  assert.match(links[0].href, /package=com\.google\.android\.calendar/);
+  assert.equal(decodeURIComponent(links[0].href.match(/S\.browser_fallback_url=([^;]+)/)[1]), links[1].href);
+  assert.equal(new URL(links[1].href).searchParams.get('dates'), '20261011/20261013');
+  for (const userAgent of ['Mozilla/5.0 (iPhone)', 'Mozilla/5.0 (Linux; Android; wv) Version/4.0 Chrome/130.0', 'Mozilla/5.0 (Linux; Android) Firefox/130.0', 'Mozilla/5.0 (Linux; Android) Chrome/130.0 SamsungBrowser/27']) {
+    const others = calendarNodes(createEventCalendarSection({ event: dated(), doc: calendarDoc(), navigatorRef: { userAgent } }));
+    assert.equal(others.some(node => node.href?.startsWith('intent:')), false);
+  }
+});
+
+test('file sharing runs from the gesture, does not report calendar registration, and never downloads on cancellation', async () => {
+  const doc = calendarDoc();
+  const files = [];
+  const nav = { userAgent: 'iPhone', canShare: payload => payload.files[0].type === 'text/calendar', share: payload => { files.push(payload.files[0]); return Promise.resolve(); } };
+  const nodes = calendarNodes(createEventCalendarSection({ event: dated(), doc, navigatorRef: nav }));
+  const share = nodes.find(node => /共有メニュー/.test(node.textContent));
+  const operation = share.listeners.click();
+  assert.equal(files.length, 1, 'share called before an async boundary');
+  assert.match(await files[0].text(), /DTSTART;VALUE=DATE:20261011/);
+  await operation;
+  const feedback = nodes.find(node => node.className === 'event-calendar__feedback');
+  assert.match(feedback.textContent, /共有先に渡しました/);
+  assert.equal(share.disabled, false);
+  nav.share = () => Promise.reject(Object.assign(new Error('Cancelled'), { name: 'AbortError' }));
+  await share.listeners.click();
+  assert.match(feedback.textContent, /キャンセル/);
+  assert.equal(doc.body.children.length, 0);
+  nav.share = () => { throw new Error('Denied'); };
+  await share.listeners.click();
+  assert.match(feedback.textContent, /共有できません/);
+  assert.equal(share.disabled, false);
+});
+
+test('unsupported ICS sharing remains a save action with device-specific labels, including desktop-mode iPad', () => {
+  for (const [nav, expected] of [
+    [{ userAgent: 'iPhone' }, /iPhone・iPad用/],
+    [{ platform: 'MacIntel', maxTouchPoints: 5 }, /iPhone・iPad用/],
+    [{ platform: 'MacIntel', maxTouchPoints: 0 }, /Appleカレンダー用/],
+    [{ userAgentData: { platform: 'Windows' } }, /Outlook/],
+    [{ userAgent: 'Android' }, /他のカレンダー用/]
+  ]) {
+    const nodes = calendarNodes(createEventCalendarSection({ event: dated(), doc: calendarDoc(), navigatorRef: { ...nav, share() {}, canShare: () => false } }));
+    const buttons = nodes.filter(node => node.tag === 'button');
+    assert.equal(buttons.length, 1);
+    assert.match(buttons[0].textContent, expected);
+  }
+});
+
+test('ICS-only Android records do not recommend an unavailable Google web action', () => {
+  const nodes = calendarNodes(createEventCalendarSection({ event: timed({ endDateTime: '' }), doc: calendarDoc(), navigatorRef: { userAgent: 'Android Chrome/130.0' } }));
+  assert.equal(nodes.some(node => /Web版/.test(node.textContent)), false);
 });

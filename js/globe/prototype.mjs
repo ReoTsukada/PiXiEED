@@ -1,5 +1,5 @@
 import { initPostUi } from './post-ui.mjs?v=20261007-map-lazy-1';
-import { initEnhancedMapEvents as initMapEvents } from './map-event-enhancements.mjs?v=20261008-event-filter-1';
+import { initEnhancedMapEvents as initMapEvents } from './map-event-enhancements.mjs?rev=20261008-calendar-direct-1';
 import { createMapGeometryLoader } from './map-geometry-loader.mjs?v=20261007-map-lazy-1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261007-map-lazy-1';

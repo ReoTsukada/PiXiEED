@@ -1,5 +1,5 @@
 import { initMapEvents } from './map-events.mjs?v=20261008-event-filter-1';
-import { createEventCalendarSection } from './event-calendar-ui.mjs?v=20261008-calendar-1';
+import { createEventCalendarSection } from './event-calendar-ui.mjs?rev=20261008-calendar-direct-1';
 
 // Public event fields only: artwork, accounts and project state never cross this bridge.
 const publicFields = ['id', 'name', 'title', 'startDate', 'endDate', 'startAt', 'endAt',
