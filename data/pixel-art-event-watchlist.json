@@ -174,10 +174,12 @@
       "eventIds": [
         "chateaubourg-pixel-art-workshop-2026-10-07",
         "herofestival-marseille-dendrob-pixel-art-2026",
+        "ingwiller-maison-famille-pixel-art-2026-11-04",
         "riedisheim-en-pixel-closing-2026"
       ],
       "areas": [
         "Châteaubourg",
+        "Ingwiller",
         "Marseille",
         "Riedisheim"
       ]
@@ -965,6 +967,18 @@
       ]
     },
     {
+      "id": "venue-e5c34006f5dd549c",
+      "label": "Maison de la famille（Rue du Fossé, Ingwiller）",
+      "eventIds": [
+        "ingwiller-maison-famille-pixel-art-2026-11-04"
+      ],
+      "region": "フランス",
+      "area": "Ingwiller",
+      "sourceUrls": [
+        "https://www.hanau-lapetitepierre.alsace/evenement/atelier-creation-de-pixel-art/"
+      ]
+    },
+    {
       "id": "venue-e659b4e451ecf892",
       "label": "渋谷ストリームホール、CIRCUS TOKYO",
       "eventIds": [
@@ -1148,6 +1162,31 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-0a7ec2d2c7dcf106",
+      "label": "Atelier création de pixel art — Maison de la famille",
+      "eventIds": [
+        "ingwiller-maison-famille-pixel-art-2026-11-04"
+      ],
+      "url": "https://www.hanau-lapetitepierre.alsace/actualite/programme-maison-de-la-famille-septembre-a-decembre-2026/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Ingwiller"
+      ],
+      "venues": [
+        "Maison de la famille（Rue du Fossé, Ingwiller）"
+      ],
+      "lastKnownEventDate": "2026-11-04",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
+        "notes": "自治体公式の2026年9〜12月プログラムを確認。Ingwiller、Maison de la famille、11月4日10〜12時、4〜8歳向けpixel art講座の掲載を確認。"
       }
     },
     {
@@ -1691,7 +1730,7 @@
       "lastKnownEventDate": "2026-10-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2143,7 +2182,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2196,7 +2235,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2639,7 +2678,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2792,7 +2831,7 @@
       "lastKnownEventDate": "2026-10-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4116,6 +4155,31 @@
       }
     },
     {
+      "id": "source-db6eeb31d86f8f0d",
+      "label": "Atelier création de pixel art — Maison de la famille",
+      "eventIds": [
+        "ingwiller-maison-famille-pixel-art-2026-11-04"
+      ],
+      "url": "https://www.hanau-lapetitepierre.alsace/evenement/atelier-creation-de-pixel-art/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Ingwiller"
+      ],
+      "venues": [
+        "Maison de la famille（Rue du Fossé, Ingwiller）"
+      ],
+      "lastKnownEventDate": "2026-11-04",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-dd2b5bb40b76ae00",
       "label": "名駅教室 — Excel関数でドット絵を作ろう！",
       "eventIds": [
@@ -4542,5 +4606,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-07T06:35:45+00:00"
+  "updatedAt": "2026-10-08T00:03:05+00:00"
 }

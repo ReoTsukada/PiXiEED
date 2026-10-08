@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-07T06:34:18+00:00",
+  "updatedAt": "2026-10-08T00:01:13+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -16,7 +16,7 @@
       "socialUrls": [
         "https://x.com/pixelartpark"
       ],
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-08T00:01:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -84,14 +84,14 @@
       "venue": "オンライン",
       "startDate": "2026-10-09",
       "endDate": "2026-10-11",
-      "dateLabel": "2026年10月9日〜11日（提出期間表示）。規約は10日00:00 GMT開始。開始時刻に1時間の差があるため公式情報を要確認。",
+      "dateLabel": "2026年10月9日〜11日。itchの送信期間表示は10月9日23:00〜11日23:00（UTC）、本文規約の開始時刻は10月10日00:00（UTC）で、開始に1時間差。",
       "status": "upcoming",
       "sourceUrl": "https://itch.io/jam/gb-pixel-art-jam-2026",
       "description": "Game Boy用160×144・4色のドット絵を制作するアートジャム。",
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-08T00:01:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -140,7 +140,7 @@
       "status": "active",
       "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-08T00:01:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -1501,13 +1501,13 @@
       "startDate": "2026-10-07",
       "endDate": "2026-10-07",
       "dateLabel": "2026年10月7日 15:00–17:00（会場現地表示）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.chateaubourg.fr/agenda/atelier-pixel-art/",
       "additionalUrls": [
         "https://www.chateaubourg.fr/contacts/bibliotheque/"
       ],
       "description": "市立メディアテークのPixel Art制作体験。アイロンビーズで作品を作る手作業の企画で、デジタル制作ではないことを明記。",
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-08T00:01:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "市公式イベント情報",
       "mapAreaLocation": {
@@ -1661,14 +1661,14 @@
       "venue": "e-とぴあ・かがわ（会場室名は公式未記載）",
       "startDate": "2026-10-08",
       "endDate": "2026-10-08",
-      "dateLabel": "2026年10月8日 10:30〜12:00（日本時間）。申込期間は9月1〜15日。定員未達時の直前受付規定はあるが、この回の現在の受付状況は未確認。",
+      "dateLabel": "2026年10月8日 10:30〜12:00（日本時間）。無料、定員15名。通常申込期間は終了。定員未達の場合は開講2日前まで先着受付と案内されているが、今回の受付状況は不明。",
       "status": "upcoming",
       "sourceUrl": "https://www.e-topia.kagawa.jp/lecture/digital-kouza_2026_10/",
       "additionalUrls": [
         "https://www.e-topia.kagawa.jp/what/"
       ],
       "description": "点を並べてオリジナルのドット絵GIFアニメを作るデジタル講座。会場施設は特定できるが部屋名は公式に記載なし。参加受付が可能かは未確認。",
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-08T00:01:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "施設公式講座案内",
       "mapAreaLocation": {
@@ -1877,6 +1877,25 @@
         "sourceUrl": "https://omoharareal.com/navi/gallery/detail/4942"
       },
       "locationPrecision": "venue"
+    },
+    {
+      "id": "ingwiller-maison-famille-pixel-art-2026-11-04",
+      "name": "Atelier création de pixel art — Maison de la famille",
+      "country": "フランス",
+      "area": "Ingwiller",
+      "venue": "Maison de la famille（Rue du Fossé, Ingwiller）",
+      "startDate": "2026-11-04",
+      "endDate": "2026-11-04",
+      "dateLabel": "2026年11月4日 10:00〜12:00（現地時間）。無料、事前申込制（開催前日まで）。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.hanau-lapetitepierre.alsace/evenement/atelier-creation-de-pixel-art/",
+      "additionalUrls": [
+        "https://www.hanau-lapetitepierre.alsace/actualite/programme-maison-de-la-famille-septembre-a-decembre-2026/"
+      ],
+      "description": "4〜8歳の子どもと保護者向け。色の小さな四角で描くデジタル・ピクセルアート制作。Valérie Brasse（Graine de Tech）が担当。",
+      "checkedAt": "2026-10-08T00:01:13+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "自治体公式イベントページ"
     }
   ],
   "sources": [
@@ -1887,9 +1906,9 @@
         "https://x.com/pixelartpark"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "lastCheckedAt": "2026-10-08T00:01:13+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。 2026-10-08確認: 主催者公式本文で10月11日11〜18時、パシフィコ横浜Hall A、ピクセルアート催事と出展内容を再確認。公開X本文は未取得の前回記録を維持。",
       "socialChecks": [
         {
           "url": "https://x.com/pixelartpark",
@@ -1963,9 +1982,9 @@
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "lastCheckedAt": "2026-10-08T00:01:13+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。 2026-10-08確認: 公式itch.io本文で160×144・4色のGame Boy用pixel artと応募期間を再確認。送信窓表示10月9日23時開始と規約の10月10日00時（UTC）に1時間差。公開SNSは未取得の前回記録を維持。",
       "socialChecks": [
         {
           "tag": "#gbpixelartjam",
@@ -2008,9 +2027,9 @@
       "url": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-08T00:01:13+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。"
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026-10-08確認: 主催者公式告知で週次pixel art課題、最終締切10月18日、額縁付き提出要件を再確認。"
     },
     {
       "id": "moertel-polaris-2026",
@@ -2879,9 +2898,9 @@
       "additionalUrls": [
         "https://www.chateaubourg.fr/contacts/bibliotheque/"
       ],
-      "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+      "lastCheckedAt": "2026-10-08T00:01:13+00:00",
       "result": "official-confirmed",
-      "notes": "市公式イベント本文で開催日・時刻・会場とアイロンビーズのPixel Art制作内容を確認。会場住所は市役所住所と区別。 2026年10月7日に公式本文を再確認。",
+      "notes": "市公式イベント本文で開催日・時刻・会場とアイロンビーズのPixel Art制作内容を確認。会場住所は市役所住所と区別。 2026年10月7日に公式本文を再確認。 2026-10-08確認: 市公式本文で10月7日15〜17時の会場・Pixel Art制作を確認。日付経過のため開催済み扱いに更新。",
       "eventIds": [
         "chateaubourg-pixel-art-workshop-2026-10-07"
       ]
@@ -3208,11 +3227,36 @@
       "additionalUrls": [
         "https://sites.google.com/view/crosspico/"
       ]
+    },
+    {
+      "id": "ingwiller-maison-famille-pixel-art-2026-11-04",
+      "url": "https://www.hanau-lapetitepierre.alsace/evenement/atelier-creation-de-pixel-art/",
+      "additionalUrls": [
+        "https://www.hanau-lapetitepierre.alsace/actualite/programme-maison-de-la-famille-septembre-a-decembre-2026/"
+      ],
+      "eventIds": [
+        "ingwiller-maison-famille-pixel-art-2026-11-04"
+      ],
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-08T00:01:13+00:00",
+      "notes": "自治体公式イベント本文および2026年9〜12月の公式プログラムで11月4日10〜12時、IngwillerのMaison de la famille、年齢対象、ピクセルアート内容を確認。会場の番地・座標は公式イベント本文にないため記録せず。"
+    },
+    {
+      "id": "ingwiller-family-program-2026",
+      "url": "https://www.hanau-lapetitepierre.alsace/actualite/programme-maison-de-la-famille-septembre-a-decembre-2026/",
+      "eventIds": [
+        "ingwiller-maison-famille-pixel-art-2026-11-04"
+      ],
+      "socialUrls": [],
+      "result": "official-confirmed",
+      "lastCheckedAt": "2026-10-08T00:01:13+00:00",
+      "notes": "自治体公式の2026年9〜12月プログラムを確認。Ingwiller、Maison de la famille、11月4日10〜12時、4〜8歳向けpixel art講座の掲載を確認。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-07T06:34:18+00:00",
-    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。 2026-10-07追加確認: 韓国語/英語で開催済みイベントを補足。韓国・ソウルのJumpZipと米国テキサス州Farmers Branchのpixel-art cube workshopを公式本文で確認し追加。 2026-10-07国内作家個展調査: 香月恵介「Afterglow(s)」を開催中として追加。香月「ON-SCREEN」、重田佑介「連続と非連続の汀で」、モトクロス斉藤「ウルトラドープ」を開催実績として補足。公式会場・作家ページでpixel painting/ピクセルアートとの関係、会期、会場住所を確認。座標の確認できない会場は行政区・住所のみ。shigemi「DASHI」は作品のピクセルアート関連を確認できず対象外。 2026-10-07追加確認: CROSS PICO名古屋vol.3と名古屋ぴくせるあーと すぽっとの共同開催を主催者本文で確認し、開催済み1回を既存IDのまま更新。LivePocket可視時間11:00–17:00（Asia/Tokyo）、料金500円・中学生以下無料。会場2-Aは同建物の1-A住所表記とは別レンタル区画。Google Maps iframeのq座標を記録し、ll viewportとのずれを注記。Xプロフィール本文は取得不能、次回の確定日程は今回確認できず。",
+    "checkedAt": "2026-10-08T00:01:13+00:00",
+    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。 2026-10-07追加確認: 韓国語/英語で開催済みイベントを補足。韓国・ソウルのJumpZipと米国テキサス州Farmers Branchのpixel-art cube workshopを公式本文で確認し追加。 2026-10-07国内作家個展調査: 香月恵介「Afterglow(s)」を開催中として追加。香月「ON-SCREEN」、重田佑介「連続と非連続の汀で」、モトクロス斉藤「ウルトラドープ」を開催実績として補足。公式会場・作家ページでpixel painting/ピクセルアートとの関係、会期、会場住所を確認。座標の確認できない会場は行政区・住所のみ。shigemi「DASHI」は作品のピクセルアート関連を確認できず対象外。 2026-10-07追加確認: CROSS PICO名古屋vol.3と名古屋ぴくせるあーと すぽっとの共同開催を主催者本文で確認し、開催済み1回を既存IDのまま更新。LivePocket可視時間11:00–17:00（Asia/Tokyo）、料金500円・中学生以下無料。会場2-Aは同建物の1-A住所表記とは別レンタル区画。Google Maps iframeのq座標を記録し、ll viewportとのずれを注記。Xプロフィール本文は取得不能、次回の確定日程は今回確認できず。 2026-10-08巡回: フランスIngwillerの11月4日開催ピクセルアート講座を公式イベントページ・公式プログラムで確認し追加。Pixel Art Park 9、GB Pixel Art Jam、Pixelweenを再確認。GB Jamは開始時刻に1時間差。香川の10月8日講座を公式本文で再確認。10月7日開催のChâteaubourg講座は公式本文で日程・内容を確認し終了済みに更新。韓国語圏・日本国内の追加候補は公式根拠を得られず、点描作品展など対象外も確認。",
     "searchExamples": [
       "ドット絵 イベント 2026",
       "ピクセルアート 展示 ワークショップ 2026",
@@ -3321,7 +3365,9 @@
       "https://lit.link/nagoyameipiku",
       "https://lit.link/sikakuihisashi",
       "https://livepocket.jp/e/crosspico3",
-      "https://www.kissa7ban.com/space7ban_access.html"
+      "https://www.kissa7ban.com/space7ban_access.html",
+      "https://www.hanau-lapetitepierre.alsace/evenement/atelier-creation-de-pixel-art/",
+      "https://www.hanau-lapetitepierre.alsace/actualite/programme-maison-de-la-famille-septembre-a-decembre-2026/"
     ],
     "regionalChecks": [
       {
@@ -3706,6 +3752,49 @@
           }
         ],
         "notes": "日本・中欧・フランス・米州・オンラインの新規企画を担当別に読み取り専用調査し、公式本文で5開催回を確認。開催地や住所、オンライン区分を根拠範囲に合わせて登録。既存のSOFA講演時刻を17時へ訂正。Pixel Art Park 9、Coloring Pixels応募、GB Pixel Art Jam、Segment Pixel Jam、Moertel、NRG Awards等の開催・締切情報を再確認。公式SNSは本文を読めた場合以外は確認済みにしない。全件網羅を主張しない。 近接開催として、Pixel Art Park 9、RetroCon Saar、Festival FPSなどの既存公式日程も再確認。"
+      },
+      {
+        "checkedAt": "2026-10-08T00:01:13+00:00",
+        "regions": [
+          "日本（香川県・高松市）",
+          "日本（国内の追加県検索）",
+          "フランス（Ingwiller/Alsace）",
+          "韓国語圏",
+          "オンライン"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "fr",
+          "ko",
+          "es"
+        ],
+        "queries": [
+          "ドット絵 2026年10月 展示 個展",
+          "ピクセルアート 展示会 2026 11月",
+          "絵が動く ドット絵GIFアニメづくり e-とぴあ 2026",
+          "2026 pixel art workshop Ingwiller atelier création novembre France",
+          "픽셀 아트 전시 10월 워크숍 공식",
+          "arte pixel exposición taller concurso 2026"
+        ],
+        "addedIds": [
+          "ingwiller-maison-famille-pixel-art-2026-11-04"
+        ],
+        "recheckedIds": [
+          "pixel-art-park-9",
+          "gb-pixel-art-jam-2026",
+          "pixelween-2026",
+          "e-topia-kagawa-dot-art-gif-workshop-2026-10-08",
+          "chateaubourg-pixel-art-workshop-2026-10-07"
+        ],
+        "unconfirmed": [
+          {
+            "name": "Quand le pixel devient art… (Limeil-Brévannes)",
+            "sourceUrl": "https://www.limeil-brevannes.fr/agenda/quand-le-pixel-devient-art/",
+            "reason": "自治体公式説明によると筆の微細な点描（pixellisme）で、ドット絵/Pixel Artではないため対象外。"
+          }
+        ],
+        "notes": "開催中・直近の既知イベントと近い締切を公式本文で確認し、日程終了の状態を整理。フランスの新しい自治体主催講座を確認。韓国語・スペイン語検索では追加登録できる公式開催情報なし。全件網羅を保証しない。"
       }
     ],
     "historyCollection": {
