@@ -12,8 +12,9 @@
   <div id="controls"></div>
   <p id="state" role="status">形式を選んでください。</p>
   <script type="module">
-    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-2';
+    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-3';
     import { encodeAnimatedGif } from '/js/animated-export.mjs';
+    import { encodeCameraPng } from '/js/pixel-studio/png-export.mjs';
     const controls = document.querySelector('#controls');
     const state = document.querySelector('#state');
     function add(label, run) {
@@ -25,8 +26,8 @@
       });
       controls.append(button);
     }
-    async function open(blob, filename, title, metadata = {}, mediaSource = null) {
-      const result = await sendToolOutput({ blob, filename, returnUrl: '/draw/', source: 'テスト用サンプル', title, metadata, ...(mediaSource ? { mediaSource } : {}) });
+    async function open(blob, filename, title, metadata = {}, mediaSource = null, route = {}) {
+      const result = await sendToolOutput({ blob, filename, returnUrl: route.returnUrl || '/draw/', returnOutputId: route.returnOutputId === true, source: route.source || 'テスト用サンプル', title, metadata, ...(mediaSource ? { mediaSource } : {}) });
       if (!result.ok) throw result.error || new Error('出力画面を開けませんでした。');
     }
     add('透明背景つき PNG を開く', async () => {
@@ -52,6 +53,12 @@
       const response = await fetch('/assets/pixel-studio/test-media/street.webm');
       if (!response.ok) throw new Error('動画サンプルを読み込めませんでした。');
       await open(await response.blob(), 'sample-video.webm', '動画を確認', { durationSeconds: 2 });
+    });
+    add('ピクセルカメラから編集へ戻る', async () => {
+      const data = new Uint8ClampedArray(16 * 16 * 4);
+      for (let index = 0; index < 16 * 16; index += 1) data.set(index % 2 ? [240, 84, 96, 255] : [36, 112, 83, 255], index * 4);
+      const exported = await encodeCameraPng({ width: 16, height: 16, data });
+      await open(exported.blob, 'camera-return.png', '撮影画像を確認', { width: 16, height: 16, cameraRatio: 'screen', cameraSize: 256, cameraColors: 'full', cameraFinish: 'soft', cameraEdges: false, cameraFacing: 'environment' }, null, { returnUrl: '/pixel-camera-studio.html', returnOutputId: true, source: 'ピクセルカメラ' });
     });
     window.addEventListener('pageshow', (event) => {
       if (!event.persisted) return;

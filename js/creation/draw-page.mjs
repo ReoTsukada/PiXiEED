@@ -25,7 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
-import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-2';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-3';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-floating-mouse-2';
@@ -1491,9 +1491,9 @@ $('#draw-output [data-output-project]')?.addEventListener('click', () => {
 $('#draw-export').addEventListener('click', async () => {
   endStroke(); closeColorEditor(); stopAnimation(); paint(); editorUi.closePanels();
   const original = documentData; const originalSource = source;
-  const bridge = pxdBridge; const project = bridge?.currentProject; const held = bridge?.heldProject;
+  const bridge = pxdBridge; let project = bridge?.currentProject; let held = bridge?.heldProject;
   const unchangedSource = () => !scope.disposed && documentData === original && source === originalSource && pxdBridge === bridge
-    && bridge?.currentProject === project && bridge?.heldProject === held;
+    && bridge?.currentProject?.projectId === project?.projectId && bridge?.heldProject?.projectId === held?.projectId;
   const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: original.width, height: original.height, data: documentRgba(composeAnimationFrame(animationSession.animation, animationSession.frameId)) };
   try {
     await bridge?.assertCanSave?.();
@@ -1501,12 +1501,15 @@ $('#draw-export').addEventListener('click', async () => {
     const { blob, width, height, scale } = await enlargedPng(image);
     if (!unchangedSource()) return;
     interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas });
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`, returnUrl: currentToolReturnUrl, title: '画像を確認', source: 'かんたんドット', metadata: { width: image.width, height: image.height, defaultScale: scale } }, bridge, unchangedSource);
+    if (staged.ok) return;
+    if (staged.reason === 'source_changed') return;
     const result = await saveFile(blob, `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`);
     if (result !== 'cancelled' && unchangedSource()) {
-    const staged = await sendToolOutput({ blob, filename: `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`, returnUrl: currentToolReturnUrl(), title: '画像を確認', source: 'かんたんドット', metadata: { width: image.width, height: image.height, defaultScale: scale } });
-    if (staged.ok) return;
       const shared = result === 'shared';
-      status.textContent = shared ? `${width}×${height}pxのPNGを共有画面に渡しました。` : `${width}×${height}pxのPNGのダウンロードを開始しました。`;
+      status.textContent = staged.reason === 'project_save_failed'
+        ? `編集内容を保存できなかったため、この画面に残りました。PNGの${shared ? '共有画面への受け渡し' : 'ダウンロード'}を開始しました。編集内容は保存し直してください。`
+        : shared ? `${width}×${height}pxのPNGを共有画面に渡しました。` : `${width}×${height}pxのPNGのダウンロードを開始しました。`;
       if (readOnlyImage || original.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: shared ? 'PNGを共有画面に渡しました' : 'PNGのダウンロードを開始しました', detail: `${width}×${height}px`, preview: canvas });
     }
   } catch (error) { if (unchangedSource()) status.textContent = `PNGを書き出せませんでした：${error.message}`; }
@@ -1549,8 +1552,8 @@ function timelapseJobIsCurrent(job) {
     && documentData === job.document
     && source === job.source
     && pxdBridge === job.bridge
-    && job.bridge?.currentProject === job.currentProject
-    && job.bridge?.heldProject === job.heldProject;
+    && job.bridge?.currentProject?.projectId === job.currentProject?.projectId
+    && job.bridge?.heldProject?.projectId === job.heldProject?.projectId;
 }
 scope.listen(window, 'pagehide', () => activeTimelapseJob?.controller.abort());
 async function exportTimelapse(detail) {
@@ -1582,12 +1585,15 @@ async function exportTimelapse(detail) {
     if (!timelapseJobIsCurrent(job)) return;
     const blob = new Blob([bytes], { type: 'image/gif' });
     const durationSeconds = frames.reduce((total, frame) => total + (frame.delayMs || 1000 / TIMELAPSE_FPS), 0) / 1000;
-    const staged = await sendToolOutput({ blob, filename: `pixieed-drawing-timelapse-${width}x${height}.gif`, returnUrl: currentToolReturnUrl(), title: '描いた過程を確認', source: 'かんたんドット', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, delayMs: 1000 / TIMELAPSE_FPS, loopCount: 0 } });
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-timelapse-${width}x${height}.gif`, returnUrl: currentToolReturnUrl, title: '描いた過程を確認', source: 'かんたんドット', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, delayMs: 1000 / TIMELAPSE_FPS, loopCount: 0 } }, job.bridge, () => timelapseJobIsCurrent(job));
     if (staged.ok) return;
+    if (staged.reason === 'source_changed') return;
     const result = await saveFile(blob, `pixieed-drawing-timelapse-${width}x${height}.gif`);
     if (result !== 'cancelled' && timelapseJobIsCurrent(job)) {
       const shared = result === 'shared';
-      toast(shared ? 'GIFを共有画面に渡しました。' : 'GIFのダウンロードを開始しました。');
+      toast(staged.reason === 'project_save_failed'
+        ? `編集内容を保存できなかったため、この画面に残りました。GIFの${shared ? '共有画面への受け渡し' : 'ダウンロード'}を開始しました。編集内容は保存し直してください。`
+        : shared ? 'GIFを共有画面に渡しました。' : 'GIFのダウンロードを開始しました。');
       if (job.document.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: shared ? 'GIFを共有画面に渡しました' : 'GIFのダウンロードを開始しました', detail: `${width}×${height}px`, preview: canvas });
     }
   } catch (error) {
@@ -1604,7 +1610,7 @@ let animationExporting = false, animationExportController = null;
 async function exportAnimation() {
   if (animationExporting || readOnlyImage || scope.disposed) return;
   endStroke(); closeColorEditor(); stopAnimation(); editorUi.closePanels();
-  const timeline = animationSession.animation; animationExporting = true;
+  const timeline = animationSession.animation; const exportDocument = documentData; const exportSource = source; const exportBridge = pxdBridge; animationExporting = true;
   animationExportController = new AbortController(); const controller = animationExportController;
   try {
     await pxdBridge?.assertCanSave?.();
@@ -1620,11 +1626,15 @@ async function exportAnimation() {
     if (scope.disposed || controller.signal.aborted) return;
     const blob = new Blob([result.bytes], { type: 'image/gif' });
     const durationSeconds = frames.reduce((total, frame) => total + frame.delayMs, 0) / 1000;
-    const staged = await sendToolOutput({ blob, filename: `pixieed-animation-${result.width}x${result.height}.gif`, returnUrl: currentToolReturnUrl(), title: 'アニメーションを確認', source: 'かんたんドット', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: result.scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, loopCount: 0 } });
+    if (scope.disposed || documentData !== exportDocument || source !== exportSource || pxdBridge !== exportBridge || animationSession.animation !== timeline) return;
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-animation-${result.width}x${result.height}.gif`, returnUrl: currentToolReturnUrl, title: 'アニメーションを確認', source: 'かんたんドット', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: result.scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, loopCount: 0 } }, exportBridge, () => !scope.disposed && documentData === exportDocument && source === exportSource && pxdBridge === exportBridge && animationSession.animation === timeline);
     if (staged.ok) return;
+    if (staged.reason === 'source_changed') return;
     const saved = await saveFile(blob, `pixieed-animation-${result.width}x${result.height}.gif`);
     if (saved === 'cancelled') return;
-    toast(saved === 'shared' ? 'GIFを共有画面に渡しました。' : 'GIFのダウンロードを開始しました。');
+    toast(staged.reason === 'project_save_failed'
+      ? `編集内容を保存できなかったため、この画面に残りました。GIFの${saved === 'shared' ? '共有画面への受け渡し' : 'ダウンロード'}を開始しました。編集内容は保存し直してください。`
+      : saved === 'shared' ? 'GIFを共有画面に渡しました。' : 'GIFのダウンロードを開始しました。');
   } catch (error) { if (!scope.disposed && error.name !== 'AbortError') toast(`GIFを書き出せませんでした：${error.message}`); }
   finally { if (animationExportController === controller) animationExportController = null; animationExporting = false; }
 }

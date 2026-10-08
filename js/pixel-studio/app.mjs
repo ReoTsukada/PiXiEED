@@ -2,7 +2,8 @@ import { createFrameLoop } from './frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
-import { sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-2';
+import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-3';
+import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -604,7 +605,11 @@ $('#savePng').addEventListener('click', async (event) => {
   const link = $('#savePng');
   const snapshot = { generation: downloadGeneration, frame: state.result, url: downloadUrl, blob: downloadBlob, filename: link.download };
   const current = () => snapshot.generation === downloadGeneration && state.mode === 'captured' && state.result === snapshot.frame && downloadUrl === snapshot.url && downloadBlob === snapshot.blob;
-  const staged = await sendToolOutput({ blob: snapshot.blob, filename: snapshot.filename, returnUrl: `${location.pathname}${location.search}${location.hash}`, title: '画像を確認', source: 'ピクセルカメラ' });
+  const staged = await sendToolOutput({
+    blob: snapshot.blob, filename: snapshot.filename, returnUrl: `${location.pathname}${location.search}${location.hash}`,
+    returnOutputId: true, title: '画像を確認', source: 'ピクセルカメラ',
+    metadata: { width: snapshot.frame.width, height: snapshot.frame.height, cameraRatio: state.ratio, cameraSize: state.size, cameraColors: state.colorDepth, cameraFinish: state.finish, cameraEdges: state.aiEdges, cameraFacing: state.facing }
+  });
   if (staged.ok) return;
   if (!current()) return;
   const fallback = document.createElement('a'); fallback.href = snapshot.url; fallback.download = snapshot.filename; fallback.hidden = true;
@@ -642,7 +647,66 @@ document.addEventListener('visibilitychange', () => {
   else resumeCameraIfVisible();
 });
 
+async function restoreReturnedCapture() {
+  const params = new URLSearchParams(location.search);
+  const ids = params.getAll('outputId');
+  if (!ids.length) return false;
+  if (ids.length !== 1) throw new Error('撮影データの戻り先を確認できません。もう一度撮影してください。');
+  const entry = await readToolOutput(ids[0]);
+  if (entry.source !== 'ピクセルカメラ' || entry.mime !== 'image/png') throw new Error('この撮影データをカメラで開けません。もう一度撮影してください。');
+  const inspected = inspectPixelPng(new Uint8Array(await entry.sourceBlob.arrayBuffer()));
+  const width = inspected.metadata?.width || entry.metadata?.width;
+  const height = inspected.metadata?.height || entry.metadata?.height;
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 8192 || height > 8192 || width * height > 16 * 1024 * 1024) {
+    throw new Error('撮影画像のサイズを確認できません。もう一度撮影してください。');
+  }
+  const bitmap = await createImageBitmap(entry.sourceBlob);
+  const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+  try {
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('撮影画像を読み込めません。');
+    context.imageSmoothingEnabled = false;
+    context.drawImage(bitmap, 0, 0, width, height);
+    const data = new Uint8ClampedArray(context.getImageData(0, 0, width, height).data);
+    state.ratio = FRAME_RATIOS.some((item) => item.value === entry.metadata.cameraRatio) ? entry.metadata.cameraRatio : 'screen';
+    state.size = OUTPUT_SIZES.includes(entry.metadata.cameraSize) ? entry.metadata.cameraSize : 256;
+    state.colorDepth = ['2', '4', '8', '16', '24', 'full'].includes(entry.metadata.cameraColors) ? entry.metadata.cameraColors : 'full';
+    state.finish = Object.hasOwn(LENS_FINISH, entry.metadata.cameraFinish) ? entry.metadata.cameraFinish : 'soft';
+    state.aiEdges = entry.metadata.cameraEdges === true;
+    state.facing = ['user', 'environment'].includes(entry.metadata.cameraFacing) ? entry.metadata.cameraFacing : 'environment';
+    const settings = $('#sizePopover');
+    const ratioInput = settings.querySelector('[name="aspect"]');
+    const sizeInput = settings.querySelector('[name="pixels"]');
+    const colorsInput = settings.querySelector('[name="colors"]');
+    const finishInput = settings.querySelector('[name="finish"]');
+    const edgesInput = settings.querySelector('[name="aiEdges"]');
+    if (ratioInput) ratioInput.value = state.ratio;
+    if (sizeInput) sizeInput.value = String(state.size);
+    if (colorsInput) colorsInput.value = state.colorDepth;
+    if (finishInput) finishInput.value = state.finish;
+    if (edgesInput) edgesInput.checked = state.aiEdges;
+    invalidateCaptureDownload();
+    setMode('captured');
+    drawCompleted({ width, height, data, palette: [], stats: { paletteRevision: 0 } });
+    downloadBlob = entry.sourceBlob;
+    downloadUrl = URL.createObjectURL(entry.sourceBlob);
+    const link = $('#savePng'); link.href = downloadUrl; link.download = entry.sourceFilename;
+    updateSaveLinkState();
+    say('撮影した画像を復元しました。設定を変えずに、続けて編集できます。', { visible: true });
+    return true;
+  } finally {
+    bitmap.close?.(); canvas.width = canvas.height = 1;
+  }
+}
+
 root.dataset.ready = 'false';
 fitPreview();
-setMode('loading');
-resumeCameraIfVisible();
+void restoreReturnedCapture().then((restored) => {
+  if (restored) return;
+  setMode('loading');
+  resumeCameraIfVisible();
+}).catch((error) => {
+  setMode('idle');
+  info.textContent = error?.message || '撮影画像を復元できません。';
+  say(info.textContent, { visible: true });
+});

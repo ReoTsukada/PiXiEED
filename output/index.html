@@ -3,93 +3,92 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f8f6">
-  <meta name="description" content="PiXiEEDで作ったファイルを確認し、端末へ保存します。作品データはこの端末内で扱います。">
-  <title>出力を確認｜PiXiEED</title>
+  <meta name="theme-color" content="#f6f7f4">
+  <meta name="description" content="PiXiEEDで作った作品を確認して、この端末に保存します。">
+  <title>作品を保存｜PiXiEED</title>
   <link rel="canonical" href="https://pixieed.jp/output/">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-2">
-  <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-3">
 </head>
 <body data-page="output">
   <a class="output-skip" href="#main">本文へ移動</a>
   <header class="output-header">
-    <a class="output-brand" href="/" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span> PiXiEED</a>
-    <span class="output-header__label">ファイルの確認</span>
+    <a class="output-brand" href="/" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span>PiXiEED</a>
+    <span class="output-header__label">作品を保存</span>
   </header>
   <main id="main" class="output-main">
-    <section class="output-card" aria-labelledby="output-title">
-      <div class="output-copy">
-        <p class="output-eyebrow">この端末で処理しています</p>
-        <h1 id="output-title" tabindex="-1">出力を確認</h1>
-        <p id="output-intro" class="output-intro">プレビューを確認して、ファイル名を決めて保存できます。</p>
-      </div>
-      <div class="output-layout">
-        <section class="output-preview-panel" aria-label="ファイルのプレビュー">
-          <div id="output-preview" class="output-preview">
-            <img id="output-image" alt="作品のプレビュー" hidden>
-            <audio id="output-audio" controls preload="none" hidden></audio>
-            <video id="output-video" controls preload="metadata" playsinline hidden></video>
-            <div id="output-file-card" class="output-file-card" hidden aria-live="polite">
-              <span id="output-file-extension" class="output-file-card__extension">FILE</span>
-              <strong id="output-file-title">ファイルを準備しました</strong>
-              <span id="output-file-description">この形式はPiXiEED内で画像プレビューできません。</span>
-            </div>
+    <div class="output-intro">
+      <p class="output-eyebrow"><span aria-hidden="true">✳</span> この端末で処理しています</p>
+      <h1 id="output-title" tabindex="-1">作品を確認</h1>
+      <p id="output-copy" class="output-copy">プレビューを確認して、必要ならサイズや名前を整えて保存できます。</p>
+    </div>
+    <div class="output-layout">
+      <section class="output-preview-column" aria-label="作品のプレビュー">
+        <div id="output-preview" class="output-preview">
+          <img id="output-image" alt="作品のプレビュー" hidden>
+          <audio id="output-audio" controls preload="none" hidden></audio>
+          <video id="output-video" controls preload="metadata" playsinline hidden></video>
+          <div id="output-file-card" class="output-file-card" hidden aria-live="polite">
+            <span id="output-file-extension" class="output-file-card__extension">FILE</span>
+            <strong id="output-file-title">ファイルを準備しました</strong>
+            <span id="output-file-description">この形式はプレビューできません。</span>
           </div>
-          <div class="output-preview-foot">
-            <p id="output-metadata" class="output-metadata"></p>
-            <button id="output-animation-toggle" class="output-playback" type="button" hidden>アニメーションを停止</button>
-          </div>
-        </section>
-        <section class="output-settings" aria-labelledby="output-settings-title">
-          <div class="output-settings__heading">
-            <span class="output-step" aria-hidden="true">01</span>
-            <div><h2 id="output-settings-title">保存の設定</h2><p id="output-format" class="output-format"></p></div>
-          </div>
-          <label class="output-filename-label" for="output-filename">ファイル名</label>
-          <div class="output-filename">
-            <input id="output-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="output-filename-help">
-            <span id="output-extension" class="output-extension">.png</span>
-          </div>
-          <p id="output-filename-help" class="output-help">拡張子と出力形式は元のツールに合わせています。</p>
-          <section id="output-scale-settings" class="output-media-settings" hidden aria-labelledby="output-scale-title">
-            <h3 id="output-scale-title">画像サイズ</h3>
-            <label class="output-filename-label" for="output-scale">整数倍率</label>
-            <div class="output-scale-input"><input id="output-scale" type="number" min="1" step="1" inputmode="numeric"><span>倍</span></div>
+        </div>
+        <div class="output-preview-foot">
+          <p id="output-metadata" class="output-metadata"></p>
+          <button id="output-animation-toggle" class="output-playback" type="button" hidden>アニメーションを停止</button>
+        </div>
+      </section>
+      <section class="output-settings" aria-labelledby="output-settings-title">
+        <div class="output-settings__heading">
+          <div><p id="output-format" class="output-format"></p><h2 id="output-settings-title">保存するファイル</h2></div>
+        </div>
+        <label class="output-field-label" for="output-filename">ファイル名</label>
+        <div class="output-filename">
+          <input id="output-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="output-filename-help">
+          <span id="output-extension" class="output-extension">.png</span>
+        </div>
+        <p id="output-filename-help" class="output-help">拡張子はファイル形式に合わせて固定です。</p>
+
+        <section id="output-scale-settings" class="output-media-settings" hidden aria-labelledby="output-scale-title">
+          <div class="output-media-settings__title"><h3 id="output-scale-title">画像サイズ</h3><span>プレビューに反映</span></div>
+          <div id="output-scale-presets" class="output-presets" role="group" aria-label="画像サイズの倍率"></div>
+          <p id="output-size-summary" class="output-size-summary"></p>
+          <details class="output-advanced" id="output-advanced">
+            <summary>サイズを細かく指定</summary>
             <fieldset class="output-dimensions">
-              <legend>出力寸法（px）</legend>
+              <legend>出力サイズ（px）</legend>
               <div class="output-dimensions__fields">
                 <label for="output-width">幅<input id="output-width" type="number" min="1" step="1" inputmode="numeric"></label>
                 <span aria-hidden="true">×</span>
                 <label for="output-height">高さ<input id="output-height" type="number" min="1" step="1" inputmode="numeric"></label>
               </div>
-              <label class="output-aspect"><input id="output-aspect-lock" type="checkbox" checked><span>縦横比を固定</span></label>
+              <label class="output-aspect"><input id="output-aspect-lock" type="checkbox" checked><span>縦横比を保つ</span></label>
             </fieldset>
-            <p id="output-size-summary" class="output-size-summary"></p>
             <p id="output-scale-note" class="output-help"></p>
-            <button id="output-apply-settings" class="output-button output-button--primary" type="button">プレビューに反映</button>
+            <button id="output-apply-settings" class="output-button output-button--secondary" type="button">このサイズを使う</button>
             <button id="output-cancel-settings" class="output-button" type="button" hidden>生成を中止</button>
-          </section>
-          <section id="output-animation-settings" class="output-media-settings" hidden aria-live="polite">
-            <h3>アニメーション</h3>
-            <p id="output-animation-details" class="output-help"></p>
-          </section>
-          <section id="output-audio-settings" class="output-media-settings" hidden aria-live="polite">
-            <h3>音声の出力</h3>
-            <p id="output-audio-details" class="output-help"></p>
-          </section>
-          <div class="output-actions">
-            <a id="output-download" class="output-button output-button--primary" href="#" download>ファイルを保存</a>
-            <button id="output-share" class="output-button" type="button" hidden>共有先を選ぶ</button>
-          </div>
-          <p id="output-status" class="output-status" role="status" aria-live="polite"></p>
-          <p class="output-local-note"><span aria-hidden="true">▧</span> 作品ファイルはこの端末内で受け渡しています。画像や音声をURLに含めたり、サーバーへ送ったりしません。</p>
-          <a id="output-return" class="output-return" href="/tools/">編集画面へ戻る <span aria-hidden="true">↗</span></a>
+          </details>
         </section>
-      </div>
-    </section>
+        <section id="output-animation-settings" class="output-media-settings output-media-settings--compact" hidden aria-live="polite">
+          <h3 class="output-visually-hidden">アニメーションの内容</h3>
+          <p id="output-animation-details" class="output-detail"></p>
+        </section>
+        <section id="output-audio-settings" class="output-media-settings output-media-settings--compact" hidden aria-live="polite">
+          <h3 class="output-visually-hidden">音声の内容</h3>
+          <p id="output-audio-details" class="output-detail"></p>
+        </section>
+        <div class="output-actions">
+          <a id="output-download" class="output-button output-button--primary" href="#" download>ダウンロード</a>
+        </div>
+        <p id="output-status" class="output-status" role="status" aria-live="polite"></p>
+        <a id="output-return" class="output-return" href="/tools/">編集画面へ戻る <span aria-hidden="true">←</span></a>
+        <p class="output-local-note"><span aria-hidden="true">⌂</span> 作品はこの端末内で受け渡しています。画像や音声をURLに含めたり、サーバーへ送ったりしません。</p>
+      </section>
+    </div>
+    <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-2"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-3"></script>
 </body>
 </html>

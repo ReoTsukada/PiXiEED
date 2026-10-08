@@ -110,12 +110,14 @@ function outputPageUrl(id, origin = globalThis.location?.origin) {
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'aspectLocked'];
+  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'aspectLocked', 'cameraSize'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];
     if (key === 'description' && typeof value === 'string') result[key] = value.slice(0, 180);
     else if (key === 'aspectLocked' && typeof value === 'boolean') result[key] = value;
+    else if (['cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing'].includes(key) && typeof value === 'string' && value.length <= 24) result[key] = value;
+    else if (key === 'cameraEdges' && typeof value === 'boolean') result[key] = value;
     else if (key !== 'description' && Number.isFinite(value) && value >= 0) result[key] = Math.round(value * (key === 'durationSeconds' ? 10 : 1)) / (key === 'durationSeconds' ? 10 : 1);
   }
   return result;
@@ -244,11 +246,41 @@ export async function sendToolOutput(options, dependencies) {
   try {
     const staged = await stageToolOutput(options, dependencies);
     const locationRef = dependencies?.locationRef || globalThis.location;
+    if (options?.returnOutputId === true) {
+      const database = await openDatabase(dependencies?.indexedDBRef || globalThis.indexedDB);
+      try {
+        await updateStoredRecord(database, staged.id, (record) => {
+          const url = new URL(record.returnUrl, locationRef.origin);
+          url.searchParams.set('outputId', staged.id);
+          record.returnUrl = safeReturnUrl(`${url.pathname}${url.search}${url.hash}`, locationRef.origin);
+        }, dependencies?.now || Date.now);
+      } finally { database.close?.(); }
+    }
     if (typeof locationRef?.assign !== 'function') return { ok: false, reason: 'navigation_unavailable', staged };
     locationRef.assign(staged.url);
     return { ok: true, ...staged };
   } catch (error) {
     return { ok: false, error };
+  }
+}
+
+/** Flush pending editor autosaves before leaving, while keeping a file-save fallback. */
+export async function sendToolOutputAfterSaving(options, workspace, isCurrent = () => true, dependencies) {
+  try {
+    try { await workspace?.assertCanSave?.(); }
+    catch (error) { return { ok: false, reason: 'permission_blocked', error }; }
+    if (workspace?.dirty) {
+      if (typeof workspace.save !== 'function') throw new Error('編集内容を保存できません。元の画面で保存してからもう一度お試しください。');
+      await workspace.save();
+      if (workspace.dirty) throw new Error('編集内容の保存がまだ完了していません。元の画面で保存してからもう一度お試しください。');
+    }
+    if (!isCurrent()) return { ok: false, reason: 'source_changed' };
+    const resolvedOptions = typeof options?.returnUrl === 'function'
+      ? { ...options, returnUrl: options.returnUrl() }
+      : options;
+    return await sendToolOutput(resolvedOptions, dependencies);
+  } catch (error) {
+    return { ok: false, reason: 'project_save_failed', error };
   }
 }
 

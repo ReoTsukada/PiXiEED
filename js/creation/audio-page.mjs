@@ -25,7 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261005-audio-history-1';
-import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-2';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-3';
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
   audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, getAudioColorInstrument, setAudioColorInstrument, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
@@ -1237,7 +1237,7 @@ scope.listen(exportImageButton, 'click', async () => {
   const selectedImage = pxdImage;
   const imageSnapshot = selectedImage ? { width: selectedImage.width, height: selectedImage.height, rgba: new Uint8ClampedArray(selectedImage.rgba) } : null;
   const songSnapshot = structuredClone(song);
-  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current === pxdBridge?.currentProject && sourceSnapshot.held === pxdBridge?.heldProject && (!sourceSnapshot.image || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
+  const unchangedSource = () => sourceSnapshot.song === song && sourceSnapshot.image === pxdImage && sourceSnapshot.link === pxdLink && sourceSnapshot.bridge === pxdBridge && sourceSnapshot.current?.projectId === pxdBridge?.currentProject?.projectId && sourceSnapshot.held?.projectId === pxdBridge?.heldProject?.projectId && (!sourceSnapshot.image || imageSnapshot.rgba.every((value, index) => value === sourceSnapshot.image.rgba[index]));
   exportImageButton.disabled = true;
   audioImageExporting = true; refreshAudioHistoryButtons();
   try {
@@ -1247,8 +1247,10 @@ scope.listen(exportImageButton, 'click', async () => {
     const { blob, width, height, scale, baseWidth, baseHeight } = await exportAudioImage(songSnapshot, imageSnapshot ? { image: imageSnapshot } : {});
     if (disposed()) return;
     if (!unchangedSource()) throw new Error('素材が切り替わりました。絵をもう一度保存してください。');
-    const staged = await sendToolOutput({ blob, filename: `pixieed-dot-music-${width}x${height}.png`, returnUrl: currentAudioReturnUrl(), title: '音楽の画像を確認', source: 'ドットで音楽', metadata: { width: baseWidth, height: baseHeight, defaultScale: scale } });
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-dot-music-${width}x${height}.png`, returnUrl: currentAudioReturnUrl, title: '音楽の画像を確認', source: 'ドットで音楽', metadata: { width: baseWidth, height: baseHeight, defaultScale: scale } }, sourceSnapshot.bridge, unchangedSource);
     if (staged.ok) return;
+    if (staged.reason === 'source_changed') return;
+    if (staged.reason === 'permission_blocked') { setStatus(staged.error?.message || 'この作品はファイルに書き出せません。'); return; }
     const saved = await saveFile(blob, `pixieed-dot-music-${width}x${height}.png`);
     if (disposed()) return;
     if (saved === 'cancelled') return;
@@ -1256,7 +1258,9 @@ scope.listen(exportImageButton, 'click', async () => {
       try { interactionEffects.exportImage({ from: pixelCanvas, to: exportImageButton, image: pixelCanvas }); } catch {}
     }
     const shared = saved === 'shared';
-    setStatus(shared ? `${width}×${height}pxのPNGを共有画面に渡しました。` : `${width}×${height}pxのPNGのダウンロードを開始しました。`);
+    setStatus(staged.reason === 'project_save_failed'
+      ? `編集内容を保存できなかったため、この画面に残りました。PNGの${shared ? '共有画面への受け渡し' : 'ダウンロード'}を開始しました。編集内容は保存し直してください。`
+      : shared ? `${width}×${height}pxのPNGを共有画面に渡しました。` : `${width}×${height}pxのPNGのダウンロードを開始しました。`);
     if (hasAudioArtwork(songSnapshot, imageSnapshot)) showAudioResult({ title: shared ? 'PNGを共有画面に渡しました' : 'PNGのダウンロードを開始しました', detail: `${width}×${height}px` });
   } catch (error) { setStatus(error.message || '絵を保存できませんでした。'); }
   finally { exportImageButton.disabled = false; audioImageExporting = false; refreshAudioHistoryButtons(); }
@@ -1561,7 +1565,7 @@ if (exportSoundButton) scope.listen(exportSoundButton, 'click', async () => {
   try { ensureAudioAnimationProjection(); } catch (error) { setStatus(error.message || '音を準備できませんでした。'); return; }
   const sourceSong = song; const sourceImage = pxdImage; const sourceLink = pxdLink; const sourceBridge = pxdBridge;
   const sourceCurrent = pxdBridge?.currentProject; const sourceHeld = pxdBridge?.heldProject;
-  const unchanged = () => sourceSong === song && sourceImage === pxdImage && sourceLink === pxdLink && sourceBridge === pxdBridge && sourceCurrent === pxdBridge?.currentProject && sourceHeld === pxdBridge?.heldProject;
+  const unchanged = () => sourceSong === song && sourceImage === pxdImage && sourceLink === pxdLink && sourceBridge === pxdBridge && sourceCurrent?.projectId === pxdBridge?.currentProject?.projectId && sourceHeld?.projectId === pxdBridge?.heldProject?.projectId;
   audioWavExporting = true; refreshAudioUi(); setStatus('音を書き出しています…');
   try {
     await sourceBridge?.assertCanSave();
@@ -1571,13 +1575,17 @@ if (exportSoundButton) scope.listen(exportSoundButton, 'click', async () => {
     const { blob, seconds, loops } = await renderAudioWav(songSnapshot);
     if (disposed()) return;
     if (!unchanged()) throw new Error('素材が切り替わりました。音をもう一度保存してください。');
-    const staged = await sendToolOutput({ blob, filename: `pixieed-dot-music-${Math.round(seconds)}s.wav`, returnUrl: currentAudioReturnUrl(), title: '音を確認', source: 'ドットで音楽', metadata: { durationSeconds: seconds, sampleRate: 44100, loops } });
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-dot-music-${Math.round(seconds)}s.wav`, returnUrl: currentAudioReturnUrl, title: '音を確認', source: 'ドットで音楽', metadata: { durationSeconds: seconds, sampleRate: 44100, loops } }, sourceBridge, unchanged);
     if (staged.ok) return;
+    if (staged.reason === 'source_changed') return;
+    if (staged.reason === 'permission_blocked') { setStatus(staged.error?.message || 'この作品はファイルに書き出せません。'); return; }
     const saved = await saveFile(blob, `pixieed-dot-music-${Math.round(seconds)}s.wav`);
     if (disposed()) return;
     if (saved !== 'cancelled' && unchanged()) {
       const shared = saved === 'shared';
-      setStatus(shared ? `${Math.round(seconds)}秒のWAVを共有画面に渡しました。` : `${Math.round(seconds)}秒のWAVのダウンロードを開始しました。`);
+      setStatus(staged.reason === 'project_save_failed'
+        ? `編集内容を保存できなかったため、この画面に残りました。WAVの${shared ? '共有画面への受け渡し' : 'ダウンロード'}を開始しました。編集内容は保存し直してください。`
+        : shared ? `${Math.round(seconds)}秒のWAVを共有画面に渡しました。` : `${Math.round(seconds)}秒のWAVのダウンロードを開始しました。`);
       if (hasSongNotes(songSnapshot)) showAudioResult({ title: shared ? 'WAVを共有画面に渡しました' : 'WAVのダウンロードを開始しました', detail: `${Math.round(seconds)}秒` });
     }
   } catch (error) { setStatus(error.message || '音を保存できませんでした。'); }
@@ -1621,13 +1629,17 @@ if (exportVideoButton) scope.listen(exportVideoButton, 'click', async () => {
     status.textContent = '動画を端末に保存しています…';
     if (!unchangedSource()) return;
     const outputFilename = `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`;
-    const staged = await sendToolOutput({ blob: result.blob, filename: outputFilename, returnUrl: currentAudioReturnUrl(), title: '音付き動画を確認', source: 'ドットで音楽', metadata: { durationSeconds: result.seconds, width: result.width, height: result.height } });
+    const staged = await sendToolOutputAfterSaving({ blob: result.blob, filename: outputFilename, returnUrl: currentAudioReturnUrl, title: '音付き動画を確認', source: 'ドットで音楽', metadata: { durationSeconds: result.seconds, width: result.width, height: result.height } }, sourceSnapshot.bridge, unchangedSource);
     if (staged.ok) return;
+    if (staged.reason === 'source_changed') return;
+    if (staged.reason === 'permission_blocked') { setStatus(staged.error?.message || 'この作品はファイルに書き出せません。'); return; }
     const saved = await saveFile(result.blob, outputFilename);
     if (disposed() || epoch !== audioVideoEpoch) return;
     if (saved !== 'cancelled' && epoch === audioVideoEpoch && !controller.signal.aborted && unchangedSource()) {
       const shared = saved === 'shared';
-      setStatus(shared ? `${Math.round(result.seconds)}秒の音付き動画を共有画面に渡しました。` : `${Math.round(result.seconds)}秒の音付き動画のダウンロードを開始しました。`);
+      setStatus(staged.reason === 'project_save_failed'
+        ? `編集内容を保存できなかったため、この画面に残りました。動画の${shared ? '共有画面への受け渡し' : 'ダウンロード'}を開始しました。編集内容は保存し直してください。`
+        : shared ? `${Math.round(result.seconds)}秒の音付き動画を共有画面に渡しました。` : `${Math.round(result.seconds)}秒の音付き動画のダウンロードを開始しました。`);
       if (hasSongNotes(songSnapshot)) showAudioResult({ title: shared ? '音付き動画を共有画面に渡しました' : '音付き動画のダウンロードを開始しました', detail: `${Math.round(result.seconds)}秒` });
     }
   } catch (error) {

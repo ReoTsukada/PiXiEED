@@ -2886,11 +2886,12 @@
         if (!(capturePreviewBlob instanceof Blob) || !capturePreviewFilename || capturePreviewOutputBtn.disabled) return;
         capturePreviewOutputBtn.disabled = true;
         try {
-          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-2');
+          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-3');
           const staged = await sendToolOutput({
             blob: capturePreviewBlob,
             filename: capturePreviewFilename,
             returnUrl: `${location.pathname}${location.search}${location.hash}`,
+            returnOutputId: true,
             title: capturePreviewFilename.endsWith('.gif') ? 'アニメーションを確認' : '画像を確認',
             source: 'PiXiEELENS',
             metadata: { width: capturePreviewWidth, height: capturePreviewHeight, ...(capturePreviewDuration ? { durationSeconds: capturePreviewDuration } : {}), ...(capturePreviewMediaSource ? { defaultScale: 1, frameCount: capturePreviewMediaSource.frames.length } : {}) },
@@ -5602,6 +5603,28 @@
       if (capturePreviewCloseBtn) {
         capturePreviewCloseBtn.focus({ preventScroll: true });
       }
+    }
+
+    async function restoreOutputCapture() {
+      const ids = new URLSearchParams(location.search).getAll('outputId');
+      if (ids.length !== 1) throw new Error('撮影データの戻り先を確認できません。もう一度撮影してください。');
+      const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-3');
+      const entry = await readToolOutput(ids[0]);
+      if (entry.source !== 'PiXiEELENS' || !['image/png', 'image/gif'].includes(entry.mime)) {
+        throw new Error('この撮影データをPiXiEELENSで開けません。もう一度撮影してください。');
+      }
+      const width = Number(entry.metadata?.outputWidth || entry.metadata?.width);
+      const height = Number(entry.metadata?.outputHeight || entry.metadata?.height);
+      if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 8192 || height > 8192 || width * height > 16 * 1024 * 1024) {
+        throw new Error('撮影画像のサイズを確認できません。もう一度撮影してください。');
+      }
+      const url = URL.createObjectURL(entry.sourceBlob);
+      showCapturePreview({
+        url, filename: entry.sourceFilename, width, height,
+        blob: entry.sourceBlob, fileWidth: width, fileHeight: height,
+        durationSeconds: entry.metadata?.durationSeconds || 0, mediaSource: entry.mediaSource || null,
+        infoMessage: '撮影したファイルを復元しました。必要ならもう一度編集できます。'
+      });
     }
 
     const CAMERA_ICON_SWITCH_CONTENT = [
@@ -12017,7 +12040,10 @@
     updateControlPlacement();
     setQrReadoutVisibility(false);
 
-    if (isIOSStandaloneApp) {
+    if (new URLSearchParams(location.search).has('outputId')) {
+      cameraStartLocked = true;
+      restoreOutputCapture().catch((error) => setStatus(error?.message || '撮影データを復元できません。'));
+    } else if (isIOSStandaloneApp) {
       cameraStartLocked = true;
       showStandaloneBrowserReopenOverlay('ホーム画面版ではブラウザで開き直してご利用ください。自動で開けない場合は「共有してSafariで開く」を押してください。');
       window.setTimeout(() => {

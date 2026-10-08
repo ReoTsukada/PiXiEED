@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, sendToolOutput, stageToolOutput } from '../../js/creation/output-handoff.mjs';
+import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
 
@@ -100,6 +100,18 @@ test('output data stays in IndexedDB and the route carries only an opaque id', a
   assert.equal(first.returnUrl, '/draw/?pxd=local-id&pxdRevision=revision-id');
 });
 
+test('camera output return links carry only the opaque output id for local restoration', async () => {
+  const deps = dependencies();
+  const staged = await sendToolOutput({ ...file('capture.png'), source: 'ピクセルカメラ', returnOutputId: true }, deps);
+  assert.equal(staged.ok, true);
+  assert.equal(deps.assigned.length, 1);
+  assert.match(deps.assigned[0], /^https:\/\/pixieed\.test\/output\/\?id=/);
+  assert.doesNotMatch(deps.assigned[0], /pixels|base64|data:image/);
+  const restored = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(restored.returnUrl, `/draw/?pxd=local-id&pxdRevision=revision-id&outputId=${validId}`);
+  assert.equal(await restored.sourceBlob.text(), 'pixels');
+});
+
 test('expired entries fail clearly and are not consumed by a read', async () => {
   const deps = dependencies(); let now = 1_000;
   await stageToolOutput(file(), { ...deps, now: () => now, ttlMs: 60_000 });
@@ -167,6 +179,50 @@ test('native share failures keep ordinary save available', async () => {
   const result = await shareOutputFile({ name: 'art.png' }, { navigatorRef: { canShare: () => true, share: () => Promise.reject(new Error('blocked')) } });
   assert.equal(result.status, 'failed');
   assert.equal((await shareOutputFile({ name: 'art.png' }, { navigatorRef: {} })).status, 'unavailable');
+});
+
+test('output handoff waits for pending editor autosave and uses the updated return URL', async () => {
+  const calls = [];
+  const indexedDBRef = new FakeIndexedDB();
+  const outputLocation = { origin: 'https://example.test', assigned: '', assign(url) { this.assigned = url; } };
+  const workspace = {
+    dirty: true,
+    currentProject: { projectId: 'project', revisionId: 'old' },
+    async assertCanSave() { calls.push('authorize'); },
+    async save() {
+      calls.push('save'); this.dirty = false;
+      this.currentProject = { projectId: 'project', revisionId: 'new' };
+    }
+  };
+  const result = await sendToolOutputAfterSaving({
+    blob: new Blob(['pixels'], { type: 'image/png' }), filename: 'art.png',
+    returnUrl: () => `/draw/?pxd=project&pxdRevision=${workspace.currentProject.revisionId}`
+  }, workspace, () => true, {
+    indexedDBRef, cryptoRef: { randomUUID: () => validId }, locationRef: outputLocation,
+    now: () => 1000, ttlMs: 60_000
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, ['authorize', 'save']);
+  assert.match(outputLocation.assigned, /^https:\/\/example\.test\/output\/\?id=/);
+  const record = await readToolOutput(result.id, { indexedDBRef, now: () => 1000 });
+  assert.equal(record.returnUrl, '/draw/?pxd=project&pxdRevision=new');
+});
+
+test('output handoff stays on the editor and reports save failure so the caller can use its direct-save fallback', async () => {
+  const outputLocation = { origin: 'https://example.test', assigned: '', assign(url) { this.assigned = url; } };
+  const result = await sendToolOutputAfterSaving({
+    blob: new Blob(['pixels'], { type: 'image/png' }), filename: 'art.png', returnUrl: '/draw/'
+  }, {
+    dirty: true,
+    async assertCanSave() {},
+    async save() { throw new Error('quota'); }
+  }, () => true, {
+    indexedDBRef: new FakeIndexedDB(), cryptoRef: { randomUUID: () => validId }, locationRef: outputLocation,
+    now: () => 1000, ttlMs: 60_000
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'project_save_failed');
+  assert.equal(outputLocation.assigned, '');
 });
 
 test('nearest-neighbor exact resizing retains source alpha and does not mutate the source', () => {

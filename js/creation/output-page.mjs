@@ -1,15 +1,13 @@
-import { readToolOutput, saveToolOutputFilename, saveToolOutputVariant, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-2';
-import { shareOutputFile } from './output-share.mjs?rev=20261008-output-2';
+import { readToolOutput, saveToolOutputFilename, saveToolOutputVariant, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-3';
 import { inspectPixelPng, withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { resizeRgbaNearest } from './output-render.mjs?rev=20261008-output-1';
-import { trackSiteEvent } from '../site-analytics.mjs';
 
 const MAX_IMAGE_EDGE = 8192;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
 const MAX_GIF_INPUT_PIXELS = 8 * 1000 * 1000;
 const $ = (selector) => document.querySelector(selector);
 const pageTitle = $('#output-title');
-const intro = $('#output-intro');
+const intro = $('#output-copy');
 const preview = $('#output-preview');
 const image = $('#output-image');
 const audio = $('#output-audio');
@@ -23,12 +21,12 @@ const format = $('#output-format');
 const filename = $('#output-filename');
 const extension = $('#output-extension');
 const download = $('#output-download');
-const share = $('#output-share');
 const status = $('#output-status');
 const returnLink = $('#output-return');
 const animationToggle = $('#output-animation-toggle');
 const scaleSettings = $('#output-scale-settings');
 const scaleInput = $('#output-scale');
+const presets = $('#output-scale-presets');
 const widthInput = $('#output-width');
 const heightInput = $('#output-height');
 const aspectLock = $('#output-aspect-lock');
@@ -53,7 +51,6 @@ let currentScale = 1;
 let gifController = null;
 let posterUrl = null;
 let animationStopped = false;
-let shareBusy = false;
 let pageDisposed = false;
 
 function setError(message) {
@@ -63,7 +60,6 @@ function setError(message) {
   metadata.textContent = '';
   format.textContent = '';
   download.hidden = true;
-  share.hidden = true;
   filename.disabled = true;
   extension.textContent = '';
   scaleSettings.hidden = true;
@@ -101,18 +97,15 @@ function syncFilename() {
 }
 
 function trackSave(method) {
-  try { trackSiteEvent('file_export', { file_type: record.extension, method, export_status: method === 'shared' ? 'share_handoff' : 'download_started' }); }
-  catch { /* Export remains available when analytics is unavailable. */ }
-}
-
-function mayShare(file) {
-  try { return typeof navigator.share === 'function' && (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] })); }
-  catch { return false; }
+  void import('../site-analytics.mjs').then(({ trackSiteEvent }) => {
+    trackSiteEvent('file_export', { file_type: record.extension, method, export_status: 'download_started' });
+  }).catch(() => { /* Analytics never blocks a local preview or download. */ });
 }
 
 function setBusy(busy, canCancel = false) {
   applySettings.disabled = busy;
   scaleInput.disabled = busy;
+  for (const button of presets.querySelectorAll('button')) button.disabled = busy;
   widthInput.disabled = busy;
   heightInput.disabled = busy;
   aspectLock.disabled = busy;
@@ -172,23 +165,57 @@ function setupScaleInput({ width, height, startScale, startWidth, startHeight, k
   scaleSettings.hidden = false;
   aspectLock.checked = record?.currentMetadata?.aspectLocked !== false;
   scaleNote.textContent = kind === 'png'
-    ? '整数倍率は基準サイズから選べます。幅と高さを直接指定することもできます。最近傍法で拡大・縮小し、PNGの透明部分を保ちます。上限は長辺8,192px・総画素16,777,216です。'
-    : '整数倍率または幅・高さを指定できます。最近傍法で全フレームを処理し、時間と無限ループを保ちます。GIFの上限は長辺8,192px・全フレーム合計800万画素です。';
+    ? 'ピクセルの輪郭と透明部分を保ちます。'
+    : '全フレームと再生時間を保ちます。';
   scaleInput.disabled = maxScale <= 1;
   applySettings.disabled = false;
+  buildScalePresets(width, height, kind, frameCount);
   updateScaleSummary(width, height, kind, frameCount);
 }
 
+function buildScalePresets(width, height, kind, frameCount = 1) {
+  presets.replaceChildren();
+  const candidates = [1, 2, 4, currentScale].filter((value, index, values) => values.indexOf(value) === index && value >= 1 && value <= maxScale);
+  if (maxScale < 4 && !candidates.includes(maxScale)) candidates.push(maxScale);
+  for (const scale of candidates) {
+    const button = document.createElement('button');
+    button.className = 'output-preset'; button.type = 'button'; button.dataset.scale = String(scale);
+    button.setAttribute('aria-pressed', 'false');
+    const heading = document.createElement('strong'); heading.textContent = scale === currentScale && scale > 8 ? '元の書き出し' : `${scale}倍`;
+    const dimensions = document.createElement('span'); dimensions.textContent = `${width * scale} × ${height * scale}px`;
+    button.append(heading, dimensions);
+    button.addEventListener('click', () => {
+      if (applySettings.disabled) return;
+      scaleInput.value = String(scale);
+      widthInput.value = String(width * scale); heightInput.value = String(height * scale);
+      updateScaleSummary(width, height, kind, frameCount);
+      void applySelectedSize();
+    });
+    presets.append(button);
+  }
+  updatePresetSelection(width, height);
+}
+
+function updatePresetSelection(width, height) {
+  const outWidth = Number(widthInput.value); const outHeight = Number(heightInput.value);
+  const scale = outWidth / width;
+  const isPreset = Number.isInteger(scale) && outHeight === height * scale;
+  scaleInput.value = isPreset ? String(scale) : '';
+  for (const button of presets.querySelectorAll('button')) {
+    button.setAttribute('aria-pressed', String(isPreset && Number(button.dataset.scale) === scale));
+  }
+}
+
 function updateScaleSummary(width, height, kind, frameCount = 1) {
-  const requested = Math.max(1, Math.min(maxScale, Math.round(Number(scaleInput.value) || 1)));
-  if (scaleInput.value !== String(requested)) scaleInput.value = String(requested);
+  const requested = Math.max(1, Math.min(maxScale, Math.round(Number(scaleInput.value) || currentScale || 1)));
   const outWidth = Math.max(1, Math.round(Number(widthInput.value) || width * requested));
   const outHeight = Math.max(1, Math.round(Number(heightInput.value) || height * requested));
   const uniformScale = outWidth / width === outHeight / height && Number.isInteger(outWidth / width) && outWidth / width >= 1;
-  sizeSummary.textContent = `${width} × ${height}px → ${outWidth} × ${outHeight}px${uniformScale ? `（${outWidth / width}倍）` : ''}${aspectLock.checked ? ' · 比率固定' : ''}`;
+  sizeSummary.textContent = `${width} × ${height}px → ${outWidth} × ${outHeight}px${uniformScale ? ` · ${outWidth / width}倍` : ''}`;
+  updatePresetSelection(width, height);
   if (kind === 'gif' && record?.mediaSource?.frames?.length) {
     const seconds = record.mediaSource.frames.reduce((total, frame) => total + frame.delayMs, 0) / 1000;
-    animationDetails.textContent = `${frameCount}フレーム · ${seconds.toFixed(1)}秒 · 無限ループ。フレーム時間は維持します。`;
+    animationDetails.textContent = `${frameCount}フレーム · ${seconds.toFixed(1)}秒 · ループ再生`;
   }
 }
 
@@ -304,6 +331,27 @@ async function renderGifAtSize(outWidth, outHeight) {
   }
 }
 
+async function applySelectedSize() {
+  if (!record || applySettings.disabled) return;
+  let dimensions;
+  try { dimensions = targetDimensions(); }
+  catch (error) { status.textContent = error?.message || '出力サイズを確認してください。'; return; }
+  if (record.mime === 'image/gif') { void renderGifAtSize(dimensions.width, dimensions.height); return; }
+  setBusy(true); status.textContent = 'プレビューを更新しています…';
+  try { await renderPngAtSize(dimensions.width, dimensions.height); }
+  catch (error) { status.textContent = error?.message || 'PNGを書き出せませんでした。前の画像はそのまま保存できます。'; }
+  finally { if (!pageDisposed) setBusy(false); }
+}
+
+function displayFormat(entry) {
+  if (entry.mime === 'image/png') return 'PNG画像';
+  if (entry.mime === 'image/gif') return 'GIFアニメーション';
+  if (entry.mime === 'audio/wav') return 'WAV音声';
+  if (entry.mime === 'video/mp4') return 'MP4動画';
+  if (entry.mime === 'video/webm') return 'WebM動画';
+  return `${entry.extension.toUpperCase()}ファイル`;
+}
+
 function setMedia(entry) {
   const type = entry.mime;
   if (type === 'image/png' || type === 'image/gif') {
@@ -325,20 +373,16 @@ function setMedia(entry) {
     }
   } else if (type === 'audio/wav') {
     audio.hidden = false; audio.src = fileUrl;
-    fileTitle.textContent = '音声を再生して確認';
-    fileDescription.textContent = '再生ボタンを押すと、この端末内のWAVを再生します。';
-    fileCard.hidden = false;
+    fileCard.hidden = true;
     if (entry.metadata?.sampleRate || entry.metadata?.loops) {
       const rate = entry.metadata.sampleRate ? `${Number((entry.metadata.sampleRate / 1000).toFixed(2))}kHz` : '';
       const loops = entry.metadata.loops ? `${entry.metadata.loops}回ループ` : '';
-      audioDetails.textContent = ['WAV · 16-bit PCM · ステレオ', rate, loops].filter(Boolean).join(' · ');
+      audioDetails.textContent = ['ステレオ · 16-bit PCM', rate, loops].filter(Boolean).join(' · ');
       audioSettings.hidden = false;
     }
   } else if (type.startsWith('video/')) {
     video.hidden = false; video.src = fileUrl;
-    fileTitle.textContent = '動画を再生して確認';
-    fileDescription.textContent = '再生ボタンを押すと、この端末内の動画を再生します。';
-    fileCard.hidden = false;
+    fileCard.hidden = true;
   } else {
     fileTitle.textContent = 'ファイルを準備しました';
     fileDescription.textContent = 'この形式はPiXiEED内でプレビューできません。';
@@ -360,7 +404,7 @@ async function mount() {
     fileUrl = URL.createObjectURL(currentBlob);
     pageTitle.textContent = record.title || '出力を確認';
     intro.textContent = record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて保存できます。';
-    format.textContent = `${record.extension.toUpperCase()} · ${record.mime}`;
+    format.textContent = displayFormat(record);
     fileExtension.textContent = record.extension.toUpperCase();
     extension.textContent = `.${record.extension}`;
     filename.value = outputBaseName(record.filename, record.extension);
@@ -370,8 +414,6 @@ async function mount() {
     displayMetadata(record, currentBlob);
     setMedia(record);
     syncFilename();
-    const shareFile = typeof File === 'function' ? new File([currentBlob], currentFilename(), { type: record.mime }) : null;
-    share.hidden = !shareFile || !mayShare(shareFile);
   } catch (error) { setError(error?.message || '端末内の出力を開けませんでした。'); }
 }
 
@@ -386,20 +428,6 @@ download.addEventListener('click', (event) => {
   syncFilename();
   status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。';
   trackSave('download');
-});
-share.addEventListener('click', () => {
-  if (!record || shareBusy || typeof File !== 'function' || typeof navigator.share !== 'function') return;
-  const file = new File([currentBlob], currentFilename(), { type: record.mime });
-  if (!mayShare(file)) { status.textContent = 'この端末ではファイル共有を利用できません。「ファイルを保存」をお使いください。'; return; }
-  const sharing = shareOutputFile(file);
-  shareBusy = true; share.disabled = true; status.textContent = '共有先を選んでください。';
-  sharing.then((result) => {
-    if (result.status === 'unavailable') { status.textContent = 'この端末ではファイル共有を利用できません。「ファイルを保存」をお使いください。'; return; }
-    if (result.status === 'failed') { status.textContent = '共有できませんでした。「ファイルを保存」をお使いください。'; return; }
-    if (result.status === 'cancelled') { status.textContent = '共有をキャンセルしました。ファイルはこの画面に残っています。'; return; }
-    status.textContent = '共有画面にファイルを渡しました。保存先で完了を確認してください。';
-    trackSave('shared');
-  }).finally(() => { shareBusy = false; share.disabled = false; });
 });
 scaleInput.addEventListener('input', () => {
   if (!record) return;
@@ -422,17 +450,7 @@ function onDimensionInput(axis) {
 widthInput.addEventListener('input', () => onDimensionInput('width'));
 heightInput.addEventListener('input', () => onDimensionInput('height'));
 aspectLock.addEventListener('change', () => { if (aspectLock.checked) onDimensionInput('width'); });
-applySettings.addEventListener('click', async () => {
-  if (!record || applySettings.disabled) return;
-  let dimensions;
-  try { dimensions = targetDimensions(); }
-  catch (error) { status.textContent = error?.message || '出力サイズを確認してください。'; return; }
-  if (record.mime === 'image/gif') { void renderGifAtSize(dimensions.width, dimensions.height); return; }
-  setBusy(true); status.textContent = 'PNGを書き出しています…';
-  try { await renderPngAtSize(dimensions.width, dimensions.height); }
-  catch (error) { status.textContent = error?.message || 'PNGを書き出せませんでした。前の画像はそのまま保存できます。'; }
-  finally { if (!pageDisposed) setBusy(false); }
-});
+applySettings.addEventListener('click', () => { void applySelectedSize(); });
 cancelSettings.addEventListener('click', () => gifController?.abort());
 animationToggle.addEventListener('click', () => {
   if (!posterUrl || record?.mime !== 'image/gif') return;
