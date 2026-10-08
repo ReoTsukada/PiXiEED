@@ -1,3 +1,5 @@
+import { normalizeProduct, validAmazonUrl } from './books-room-catalog.mjs';
+
 (() => {
   const canvas = document.querySelector('#room-canvas');
   const stage = document.querySelector('#room-stage');
@@ -6,12 +8,14 @@
   const helpButton = document.querySelector('#room-help');
   const helpDialog = document.querySelector('#room-help-dialog');
   const helpClose = document.querySelector('#room-help-close');
-  const productDialog = document.querySelector('#room-product-dialog');
+  const productPanel = document.querySelector('#room-product-panel');
   const productTitle = document.querySelector('#room-product-title');
   const productDescription = document.querySelector('#room-product-description');
   const productFormat = document.querySelector('#room-product-format');
   const productAmazon = document.querySelector('#room-product-amazon');
   const productCommerce = document.querySelector('#room-product-commerce');
+  const productAdLabel = document.querySelector('#room-product-ad-label');
+  const productDisclosure = document.querySelector('#room-product-disclosure');
   const articleActions = document.querySelector('#room-article-actions');
   const articleOpen = document.querySelector('#room-article-open');
   const articleExternal = document.querySelector('#room-article-external');
@@ -25,7 +29,7 @@
   const status = document.querySelector('#room-status');
   const motionToggle = document.querySelector('#room-motion-toggle');
   if (!canvas || !stage || !select || !openProductButton || !helpButton || !helpDialog || !helpClose
-      || !productDialog || !productTitle || !productDescription || !productFormat || !productAmazon
+      || !productPanel || !productTitle || !productDescription || !productFormat || !productAmazon
       || !productClose || !status || !motionToggle) return;
   const readerUiReady = Boolean(articleOpen && articleExternal && readerDialog && readerTitle && readerSource
     && readerFrame && readerExternal && readerClose);
@@ -77,6 +81,7 @@
   let scene = fallbackScene;
   let products = [];
   let articles = [];
+  let commerceConfig = { associateName: '', enrollmentConfirmed: false };
   let productSpots = [];
   let articleSpots = [];
   let itemReturnFocus = null;
@@ -135,17 +140,18 @@
   }
 
   function validProduct(candidate) {
-    if (!candidate || typeof candidate.id !== 'string' || typeof candidate.title !== 'string') return false;
-    const asin = String(candidate.asin || '');
-    if (!/^[A-Z0-9]{10}$/.test(asin)) return false;
-    const url = validAmazonUrl(candidate.amazonUrl, asin);
+    const normalized = normalizeProduct(candidate);
+    if (!normalized) return false;
+    const asin = String(normalized.asin || '');
+    const url = validAmazonUrl(normalized.amazonUrl, asin);
     return {
-      id: candidate.id,
+      ...normalized,
+      id: normalized.id,
       kind: 'product',
       asin,
-      title: candidate.title,
-      description: String(candidate.description || ''),
-      format: String(candidate.format || ''),
+      title: normalized.title,
+      description: String(normalized.description || ''),
+      format: String(normalized.format || ''),
       amazonUrl: url,
     };
   }
@@ -170,7 +176,7 @@
     if (!candidate || typeof candidate.id !== 'string' || typeof candidate.title !== 'string') return false;
     const url = safeArticleUrl(candidate.url);
     const embedUrl = safeArticleUrl(candidate.embedUrl);
-    if (!url || !embedUrl) return false;
+    if (!url || !embedUrl || new URL(embedUrl).origin !== window.location.origin) return false;
     return {
       id: candidate.id,
       kind: 'article',
@@ -182,21 +188,10 @@
     };
   }
 
-  function validAmazonUrl(rawUrl, asin) {
-    try {
-      const url = new URL(rawUrl);
-      if (url.protocol !== 'https:' || url.hostname !== 'www.amazon.co.jp'
-          || url.pathname !== `/dp/${asin}` || url.searchParams.get('tag') !== 'pixieed-22') return '';
-      return url.href;
-    } catch {
-      return '';
-    }
-  }
-
   async function fetchJson(path) {
     const url = new URL(path, window.location.origin);
     if (url.origin !== window.location.origin) throw new Error('same-origin data only');
-    const response = await fetch(url.href, { credentials: 'same-origin' });
+    const response = await fetch(url.href, { credentials: 'same-origin', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error(`request failed: ${response.status}`);
     return response.json();
   }
@@ -302,15 +297,20 @@
     placeholder.textContent = '商品・記事を選ぶ';
     placeholder.selected = true;
     select.append(placeholder);
-    const productGroup = document.createElement('optgroup');
-    productGroup.label = '商品';
+    const productGroups = new Map();
     const articleGroup = document.createElement('optgroup');
     articleGroup.label = '記事';
     for (const item of products) {
       const option = document.createElement('option');
       option.value = item.id;
       option.textContent = item.title;
-      productGroup.append(option);
+      const category = ({ books: '本', toys: 'おもちゃ', tools: '制作道具' })[item.category] || '商品';
+      if (!productGroups.has(category)) {
+        const group = document.createElement('optgroup');
+        group.label = category;
+        productGroups.set(category, group);
+      }
+      productGroups.get(category).append(option);
     }
     for (const item of articles) {
       const option = document.createElement('option');
@@ -318,7 +318,7 @@
       option.textContent = item.title;
       articleGroup.append(option);
     }
-    if (products.length) select.append(productGroup);
+    for (const group of productGroups.values()) select.append(group);
     if (articles.length && readerUiReady) select.append(articleGroup);
     select.disabled = products.length === 0 && (!articles.length || !readerUiReady);
     openProductButton.disabled = select.disabled || !select.value;
@@ -337,7 +337,18 @@
   }
 
   function anyDialogOpen() {
-    return helpDialog.open || productDialog.open || Boolean(readerDialog?.open);
+    return helpDialog.open || Boolean(readerDialog?.open);
+  }
+
+  function detailActive() {
+    return productPanel.dataset.active === 'true';
+  }
+
+  function focusCanvas() {
+    if (window.matchMedia('(max-width: 700px)').matches) {
+      canvas.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+    }
+    canvas.focus({ preventScroll: true });
   }
 
   function openItem(id) {
@@ -349,14 +360,36 @@
     select.value = item.id;
     productTitle.textContent = item.title;
     productDescription.textContent = item.description;
-    productFormat.textContent = item.kind === 'article' ? `出典：${item.source}` : `形式：${item.format}`;
-    productAmazon.hidden = item.kind !== 'product' || !item.amazonUrl;
-    if (productCommerce) productCommerce.hidden = item.kind !== 'product';
+    if (item.kind === 'article') {
+      productFormat.textContent = `出典：${item.source}`;
+    } else {
+      const statusNote = item.sample ? '見本データ／実在の商品ではありません'
+        : item.linkStatus === 'unconfigured' ? 'Amazonリンク未設定'
+          : item.linkStatus === 'invalid' ? 'Amazonリンクを確認中' : '';
+      productFormat.textContent = [`形式：${item.format || '商品ページでご確認ください'}`, statusNote].filter(Boolean).join('／');
+    }
+    const commerceReady = commerceConfig.enrollmentConfirmed === true
+      && typeof commerceConfig.associateName === 'string' && commerceConfig.associateName.trim().length > 0;
+    const validLink = item.kind === 'product' && !item.sample
+      ? validAmazonUrl(item.amazonUrl, item.asin) : '';
+    productAmazon.hidden = item.kind !== 'product' || !commerceReady || !validLink;
+    if (productCommerce) productCommerce.hidden = item.kind !== 'product' || item.sample === true;
     if (articleActions) articleActions.hidden = item.kind !== 'article';
-    productAmazon.href = item.kind === 'product' ? (item.amazonUrl || '#') : '#';
+    productAmazon.href = validLink || '#';
     productAmazon.rel = 'sponsored noopener noreferrer';
     productAmazon.target = '_blank';
-    productAmazon.setAttribute('aria-label', `${item.title}をAmazonで見る（新しいタブ）`);
+    productAmazon.textContent = 'Amazonで商品を見る ↗';
+    productAmazon.setAttribute('aria-label', `${item.title}をAmazonで商品を見る（新しいタブ）`);
+    const disclosureReady = commerceConfig.enrollmentConfirmed === true && commerceReady;
+    if (productAdLabel) productAdLabel.textContent = disclosureReady
+      ? '広告／Amazonアソシエイト'
+      : '広告／Amazonアソシエイト（運営者・加入状況を確認中）';
+    if (productDisclosure) {
+      productDisclosure.hidden = !disclosureReady;
+      productDisclosure.textContent = disclosureReady
+        ? `Amazon のアソシエイトとして、${commerceConfig.associateName.trim()}は適格販売により収入を得ています。`
+        : '';
+    }
     if (articleOpen) {
       articleOpen.hidden = item.kind !== 'article';
       articleOpen.textContent = 'ここで読む';
@@ -369,18 +402,20 @@
       articleExternal.rel = 'noopener noreferrer';
       articleExternal.setAttribute('aria-label', `${item.title}を別のタブで開く`);
     }
-    if (typeof productDialog.showModal === 'function') productDialog.showModal();
-    else productDialog.setAttribute('open', '');
+    productPanel.dataset.active = 'true';
+    productPanel.setAttribute('aria-label', `${item.title}の詳細`);
+    productPanel.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+    productTitle.focus({ preventScroll: true });
   }
 
   function closeReader() {
     if (readerFrame) readerFrame.removeAttribute('src');
     if (readerDialog?.open) closeDialog(readerDialog);
     else stopMovement();
-    const returnTarget = readerReturnFocus?.isConnected && !readerReturnFocus.closest('[open]')
-      ? readerReturnFocus : (canvas.isConnected ? canvas : select);
+    productPanel.dataset.active = 'false';
+    productPanel.removeAttribute('aria-label');
     readerReturnFocus = null;
-    returnTarget?.focus?.({ preventScroll: true });
+    focusCanvas();
   }
 
   function openReader(id, returnFocus = document.activeElement) {
@@ -397,7 +432,6 @@
     readerExternal.target = '_blank';
     readerExternal.rel = 'noopener noreferrer';
     readerExternal.setAttribute('aria-label', `${article.title}を別のタブで開く`);
-    if (productDialog.open) productDialog.close();
     if (typeof readerDialog.showModal === 'function') readerDialog.showModal();
     else readerDialog.setAttribute('open', '');
     readerFrame.src = article.embedUrl;
@@ -461,7 +495,7 @@
   }
 
   function updateMovementFromKeys() {
-    if (anyDialogOpen() || heldKeys.size === 0) {
+    if (anyDialogOpen() || detailActive() || heldKeys.size === 0) {
       if (!pointerGesture?.walking) movement = null;
       return;
     }
@@ -475,7 +509,7 @@
 
   function handlePointerDown(event) {
     if (event.button !== undefined && event.button !== 0) return;
-    if (anyDialogOpen()) return;
+    if (anyDialogOpen() || detailActive()) return;
     stopMovement();
     canvas.focus({ preventScroll: true });
     pointerGesture = {
@@ -565,6 +599,7 @@
   }
 
   function resizeCanvas() {
+    stopMovement();
     const rect = stage.getBoundingClientRect();
     const width = Math.max(1, Math.floor(rect.width || canvas.clientWidth || 1));
     const height = Math.max(1, Math.floor(rect.height || canvas.clientHeight || 1));
@@ -850,7 +885,7 @@
   }
 
   function directionForFrame() {
-    if (anyDialogOpen()) return null;
+    if (anyDialogOpen() || detailActive()) return null;
     if (pointerGesture?.walking) return pointerGesture.direction || movement;
     return movement;
   }
@@ -923,7 +958,9 @@
     const bounds = movementLimits();
     if (x - radius < bounds.left || x + radius > bounds.right
         || y - radius < bounds.top || y + radius > bounds.bottom) return false;
-    return !tilemapRenderer || tilemapRenderer.canStandAt(x, y, radius);
+    if (tilemapRenderer) return tilemapRenderer.canStandAt(x, y, radius);
+    return scene.shelves.every(shelf => x + radius <= shelf.x || x - radius >= shelf.x + shelf.width
+      || y + radius <= shelf.y || y - radius >= shelf.y + shelf.height);
   }
 
   function findWalkableSpawn(spawn, bounds) {
@@ -967,11 +1004,19 @@
   }
 
   async function initialize() {
-    const [sceneResult, productsResult, articlesResult] = await Promise.allSettled([
+    const [sceneResult, productsResult, articlesResult, commerceResult] = await Promise.allSettled([
       fetchJson('/assets/books/room-scene.json'),
       fetchJson('/assets/books/room-products.json'),
       fetchJson('/assets/books/room-articles.json'),
+      fetchJson('/assets/books/room-commerce.json'),
     ]);
+    if (commerceResult.status === 'fulfilled' && commerceResult.value
+        && typeof commerceResult.value === 'object') {
+      commerceConfig = {
+        associateName: typeof commerceResult.value.associateName === 'string' ? commerceResult.value.associateName.trim() : '',
+        enrollmentConfirmed: commerceResult.value.enrollmentConfirmed === true,
+      };
+    }
     if (sceneResult.status === 'fulfilled' && validScene(sceneResult.value)) setScene(sceneResult.value);
     else setScene(fallbackScene);
     if (productsResult.status === 'fulfilled' && Array.isArray(productsResult.value)) {
@@ -1027,6 +1072,15 @@
       openNearestItem();
     }
   });
+  canvas.addEventListener('blur', stopMovement);
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !detailActive() || anyDialogOpen()) return;
+    event.preventDefault();
+    productPanel.dataset.active = 'false';
+    productPanel.removeAttribute('aria-label');
+    stopMovement();
+    focusCanvas();
+  });
   window.addEventListener('keyup', (event) => {
     if (heldKeys.delete(event.key)) updateMovementFromKeys();
   });
@@ -1053,8 +1107,12 @@
   });
   helpButton.addEventListener('click', () => setDialogOpen(helpDialog));
   helpClose.addEventListener('click', () => closeDialog(helpDialog));
-  productClose.addEventListener('click', () => closeDialog(productDialog));
-  productDialog.addEventListener('cancel', stopMovement);
+  productClose.addEventListener('click', () => {
+    productPanel.dataset.active = 'false';
+    productPanel.removeAttribute('aria-label');
+    stopMovement();
+    focusCanvas();
+  });
   helpDialog.addEventListener('cancel', stopMovement);
   motionToggle.addEventListener('click', () => {
     if (isReducedMotion()) return;

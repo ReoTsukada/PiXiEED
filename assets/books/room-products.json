@@ -5,7 +5,9 @@
     "title": "ドット絵教室",
     "description": "ドット絵ソフト「EDGE」を使い、シンプルなモチーフから背景や奥行きのある絵、アニメーションまでを作りながら学べる入門書です。手順を追って描き進めたい方や、表現の幅を広げたい方に向けた一冊です。",
     "amazonUrl": "https://www.amazon.co.jp/dp/B07H7DK5KH?tag=pixieed-22&linkCode=ll2",
-    "format": "Kindle版"
+    "format": "Kindle版",
+    "category": "books",
+    "sample": false
   },
   {
     "id": "product-pochipochi",
@@ -13,7 +15,9 @@
     "title": "ぽちぽちドット絵 自由に描いて楽しもう！",
     "description": "食べ物や動物、身近なものを、自分のペースで描いて楽しむためのドット絵入門。",
     "amazonUrl": "https://www.amazon.co.jp/dp/B0BZGSNDDY?tag=pixieed-22&linkCode=ll2",
-    "format": "Kindle版"
+    "format": "Kindle版",
+    "category": "books",
+    "sample": false
   },
   {
     "id": "product-background",
@@ -21,7 +25,9 @@
     "title": "ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方",
     "description": "色や光、構図などの基礎と、作家のメイキングから背景表現を学ぶ一冊。",
     "amazonUrl": "https://www.amazon.co.jp/dp/4862465021?tag=pixieed-22&linkCode=ll2",
-    "format": "紙の本"
+    "format": "紙の本",
+    "category": "books",
+    "sample": false
   },
   {
     "id": "product-new-pixel-art",
@@ -29,7 +35,9 @@
     "title": "NEW PIXEL ART ニューピクセルアート",
     "description": "多彩な作家の作品とメイキングに触れ、ドット絵の表現の幅を楽しむ作品集。",
     "amazonUrl": "https://www.amazon.co.jp/dp/4862465773?tag=pixieed-22&linkCode=ll2",
-    "format": "紙の本"
+    "format": "紙の本",
+    "category": "books",
+    "sample": false
   },
   {
     "id": "product-famicom",
@@ -37,7 +45,9 @@
     "title": "ファミコンドット絵の素晴らしき世界",
     "description": "さまざまなジャンルのファミコン作品を、ドット絵の魅力から眺めて楽しむ一冊。",
     "amazonUrl": "https://www.amazon.co.jp/dp/B08FMF4JC7?tag=pixieed-22&linkCode=ll2",
-    "format": "Kindle版"
+    "format": "Kindle版",
+    "category": "books",
+    "sample": false
   },
   {
     "id": "product-3d-dot",
@@ -45,7 +55,9 @@
     "title": "立体ドット絵メーカー",
     "description": "色と長さの違うスティックを挿して、平面から立体までドット絵を作って遊べるおもちゃ。",
     "amazonUrl": "https://www.amazon.co.jp/dp/B0FJW7GQ8X?tag=pixieed-22&linkCode=ll2",
-    "format": "くもん出版 RD-10"
+    "format": "くもん出版 RD-10",
+    "category": "toys",
+    "sample": false
   },
   {
     "id": "product-dot-notebook",
@@ -53,6 +65,16 @@
     "title": "ドット絵デザインノート",
     "description": "方眼マスを塗って、自分だけのドット絵づくりを楽しむノート。",
     "amazonUrl": "https://www.amazon.co.jp/dp/B0HJYV517H?tag=pixieed-22&linkCode=ll2",
-    "format": "紙のノート"
+    "format": "紙のノート",
+    "category": "books",
+    "sample": false
+  },
+  {
+    "id": "product-pixel-tool-sample",
+    "title": "方眼ドット絵ツールセット（登録例）",
+    "description": "商品登録と「道具」カテゴリの表示を確認するためのサンプルです。実在の商品・販売リンクではありません。",
+    "format": "サンプル",
+    "category": "tools",
+    "sample": true
   }
 ]

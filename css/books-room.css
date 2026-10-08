@@ -86,10 +86,11 @@ body.room-page {
 }
 .room-help-button { border-color: transparent; color: #fff; background: var(--room-green); }
 .room-main {
-  display: flex;
+  display: grid;
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
 }
 .room-stage {
   position: relative;
@@ -98,7 +99,7 @@ body.room-page {
   flex: 1 1 auto;
   overflow: hidden;
   isolation: isolate;
-  border-bottom: 1px solid var(--room-line);
+  border-bottom: 0;
   background:
     linear-gradient(0deg, rgba(79, 107, 79, .07), rgba(79, 107, 79, .07)),
     repeating-linear-gradient(0deg, transparent 0 31px, rgba(67, 87, 69, .045) 31px 32px),
@@ -106,6 +107,36 @@ body.room-page {
     #dce4d5;
   touch-action: none;
 }
+.room-product-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: .55rem;
+  padding: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--room-line);
+  background: #fffdf8;
+}
+.room-product-panel__content { min-width: 0; }
+.room-product-panel h2 {
+  margin: 0;
+  color: var(--room-ink);
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.room-product-panel .room-dialog__description,
+.room-product-panel .room-dialog__format { overflow-wrap: anywhere; }
+.room-product-panel__fallback {
+  margin: 0;
+  color: var(--room-muted);
+  font-size: .72rem;
+  line-height: 1.4;
+}
+.room-product-panel__fallback a { text-decoration: underline; text-underline-offset: .12em; }
+.room-product-panel:not([data-active="true"]) #room-product-close { visibility: hidden; }
 #room-canvas {
   display: block;
   width: 100%;
@@ -276,6 +307,7 @@ body.room-page {
   font-weight: 750;
   cursor: pointer;
 }
+.room-product-panel .room-dialog__close { width: 100%; margin: 0; }
 .room-amazon-link {
   width: 100%;
   margin-top: .55rem;
@@ -325,6 +357,30 @@ body.room-page {
   .room-help-button { padding-inline: .4rem; font-size: .78rem; }
   .room-header h1 { font-size: .96rem; }
   .room-product-select { min-width: 0; }
+}
+@media (max-width: 700px) {
+  html { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: auto; }
+  body.room-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+  .room-main {
+    display: flex;
+    min-height: 0;
+    flex: 0 0 auto;
+    flex-direction: column;
+  }
+  .room-stage { flex: 0 0 auto; height: min(52dvh, 440px); min-height: 260px; }
+  .room-product-panel {
+    min-height: 240px;
+    overflow: visible;
+    border-top: 1px solid var(--room-line);
+    border-left: 0;
+  }
+  .room-product-panel:not([data-active="true"]) #room-product-close { display: none; }
+  .room-footer { padding-bottom: max(.5rem, env(safe-area-inset-bottom, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .room-page *,
@@ -463,7 +519,7 @@ html[data-pixieed-motion="reduced"] .room-page *::after {
 .room-article-actions[hidden] { display: none !important; }
 .room-article-open { width: 100%; margin-top: .55rem; border-color: #a93c31; color: #fff; background: var(--room-red); }
 .room-article-external { width: 100%; margin-top: .4rem; text-decoration: none; }
-.room-product-dialog #room-product-commerce[hidden] { display: none !important; }
+.room-product-panel #room-product-commerce[hidden] { display: none !important; }
 @media (max-width: 359px) {
   .room-reader-dialog { width: calc(100vw - .5rem); height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - .5rem); }
   .room-reader__header { gap: .4rem; padding: .45rem .5rem; }

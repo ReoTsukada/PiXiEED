@@ -804,3 +804,5 @@ html[data-pixieed-motion="reduced"] .books-product-card:hover { transform: none;
 .books-product-link { margin-top: auto; }
 .books-product-play-link { margin-top: .25rem; }
 .books-product-card[id] { scroll-margin-top: calc(var(--header-h) + 1rem); }
+
+.books-page [data-books-commerce-link][hidden] { display: none !important; }

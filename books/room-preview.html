@@ -9,7 +9,7 @@
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/books-room.css?rev=20261006-panel-close-1">
+  <link rel="stylesheet" href="/css/books-room.css?rev=20261008-shop-1">
 </head>
 <body class="room-page">
   <header class="room-header">
@@ -25,6 +25,29 @@
       </canvas>
       <p class="room-status" id="room-status" role="status" aria-live="polite" aria-atomic="true"></p>
     </section>
+    <section class="room-product-panel" id="room-product-panel" aria-labelledby="room-product-title" aria-describedby="room-product-description">
+      <div class="room-product-panel__content">
+        <p class="room-dialog__eyebrow">商品・記事の案内</p>
+        <h2 id="room-product-title" tabindex="-1">棚を選んでください</h2>
+        <p class="room-dialog__description" id="room-product-description">店内の商品や記事を選ぶと、ここに説明が表示されます。</p>
+        <p class="room-dialog__format" id="room-product-format">商品・記事を選ぶと詳細を表示します。</p>
+        <div id="room-product-commerce" hidden>
+          <p class="room-dialog__ad" id="room-product-ad-label">広告／Amazonアソシエイト（運営者・加入状況を確認中）</p>
+          <p class="room-dialog__disclosure" id="room-product-disclosure" hidden></p>
+          <a class="room-amazon-link" id="room-product-amazon" href="#" target="_blank" rel="sponsored noopener noreferrer" hidden>Amazonで商品を見る <span aria-hidden="true">↗</span></a>
+          <p class="room-dialog__amazon-note">価格や商品詳細はAmazonでご確認ください。</p>
+        </div>
+        <div class="room-article-actions" id="room-article-actions" hidden>
+          <p class="room-dialog__ad">記事を読む</p>
+          <button class="room-amazon-link room-article-open" id="room-article-open" type="button">ここで読む</button>
+          <a class="room-article-external" id="room-article-external" href="#" target="_blank" rel="noopener noreferrer">元の記事を開く <span aria-hidden="true">↗</span></a>
+          <p class="room-dialog__amazon-note">紹介元のページを表示します。</p>
+        </div>
+      </div>
+      <button class="room-dialog__close" id="room-product-close" type="button">探索に戻る</button>
+      <p class="room-product-panel__fallback"><a href="/books/">商品・記事一覧は本棚ページでもご覧いただけます。</a></p>
+      <noscript><p class="room-product-panel__fallback">JavaScriptを有効にすると店内を操作できます。<a href="/books/">本棚ページはこちら</a>。</p></noscript>
+    </section>
   </main>
 
   <footer class="room-footer">
@@ -38,33 +61,6 @@
       <button class="room-motion-toggle" id="room-motion-toggle" type="button" aria-pressed="true">動き ON</button>
     </div>
   </footer>
-
-  <dialog class="room-dialog room-product-dialog" id="room-product-dialog" aria-labelledby="room-product-title" aria-describedby="room-product-description">
-    <div class="room-dialog__layout">
-      <div class="room-dialog__main">
-        <p class="room-dialog__eyebrow">この棚の商品</p>
-        <h2 id="room-product-title">商品を選んでください</h2>
-        <p class="room-dialog__description" id="room-product-description">店内の商品をタップするか、下の一覧から選べます。</p>
-        <p class="room-dialog__format" id="room-product-format">形式：商品ページでご確認ください</p>
-      </div>
-      <div class="room-dialog__actions">
-        <div id="room-product-commerce">
-          <p class="room-dialog__ad">広告／Amazonアソシエイトリンク</p>
-          <p class="room-dialog__disclosure">Amazonのアソシエイトとして、PiXiEEDは適格販売により収入を得ています。</p>
-          <a class="room-amazon-link" id="room-product-amazon" href="https://www.amazon.co.jp/" target="_blank" rel="sponsored noopener noreferrer">Amazonで見る <span aria-hidden="true">↗</span></a>
-          <p class="room-dialog__amazon-note">価格や商品詳細はAmazonでご確認ください。</p>
-        </div>
-        <div class="room-article-actions" id="room-article-actions" hidden>
-          <p class="room-dialog__ad">記事を読む</p>
-          <button class="room-amazon-link room-article-open" id="room-article-open" type="button">ここで読む</button>
-          <a class="room-article-external" id="room-article-external" href="#" target="_blank" rel="noopener noreferrer">元の記事を開く <span aria-hidden="true">↗</span></a>
-          <p class="room-dialog__amazon-note">紹介元のページを表示します。</p>
-        </div>
-      </div>
-    </div>
-    <button class="room-dialog__close" id="room-product-close" type="button">閉じる</button>
-  </dialog>
-
 
   <dialog class="room-reader-dialog" id="room-reader-dialog" aria-labelledby="room-reader-title" aria-describedby="room-reader-note">
     <div class="room-reader__layout">
@@ -99,14 +95,13 @@
         </ol>
       </div>
       <div class="room-dialog__actions">
-        <p class="room-dialog__ad">広告について</p>
-        <p class="room-dialog__disclosure">Amazonのアソシエイトとして、PiXiEEDは適格販売により収入を得ています。</p>
-        <p class="room-dialog__amazon-note">商品詳細と現在の取扱状況はAmazonでご確認ください。</p>
+        <p class="room-dialog__ad">商品リンクについて</p>
+        <p class="room-dialog__amazon-note">商品詳細とリンクの案内は、このページの商品詳細欄に表示します。</p>
       </div>
     </div>
     <button class="room-dialog__close" id="room-help-close" type="button">閉じる</button>
   </dialog>
 
-  <script type="module" src="/js/books-room.mjs?rev=20261005-room-4"></script>
+  <script type="module" src="/js/books-room.mjs?rev=20261008-shop-1"></script>
 </body>
 </html>
