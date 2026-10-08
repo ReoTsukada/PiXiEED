@@ -57,6 +57,39 @@ export function encodeWav(buffer) {
   return new Uint8Array(bytes);
 }
 
+/** Encode a decoded local AudioBuffer without resampling or altering pitch. */
+export async function encodeImportedAudioWav(source, { signal, onProgress = () => {}, yieldTask = () => new Promise((resolve) => setTimeout(resolve, 0)), chunkFrames = 32_768 } = {}) {
+  const channels = source?.channels;
+  if (!Array.isArray(channels) || channels.length < 1 || channels.length > 2 || !Number.isInteger(source.sampleRate)
+      || source.sampleRate < 8000 || source.sampleRate > 48000 || channels.some((channel) => !(channel instanceof Float32Array))
+      || !Number.isSafeInteger(chunkFrames) || chunkFrames < 1024) {
+    throw new TypeError('読み込んだ音声データを確認できません。');
+  }
+  const length = channels[0].length;
+  if (!Number.isSafeInteger(length) || length < 1 || channels.some((channel) => channel.length !== length)) throw new TypeError('読み込んだ音声の長さが一致しません。');
+  const byteLength = 44 + length * channels.length * 2;
+  if (byteLength > AUDIO_EXPORT_MAX_WAV_BYTES || length / source.sampleRate > AUDIO_EXPORT_MAX_SECONDS) throw new RangeError('WAVは2分・64MBまでです。短い範囲を書き出してください。');
+  const bytes = new ArrayBuffer(byteLength); const view = new DataView(bytes);
+  const text = (offset, value) => { for (let index = 0; index < value.length; index += 1) view.setUint8(offset + index, value.charCodeAt(index)); };
+  text(0, 'RIFF'); view.setUint32(4, byteLength - 8, true); text(8, 'WAVE'); text(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels.length, true); view.setUint32(24, source.sampleRate, true);
+  view.setUint32(28, source.sampleRate * channels.length * 2, true); view.setUint16(32, channels.length * 2, true); view.setUint16(34, 16, true);
+  text(36, 'data'); view.setUint32(40, byteLength - 44, true);
+  let offset = 44;
+  for (let start = 0; start < length; start += chunkFrames) {
+    if (signal?.aborted) throw new DOMException('WAVの作成を中止しました。', 'AbortError');
+    const end = Math.min(length, start + chunkFrames);
+    for (let frame = start; frame < end; frame += 1) for (let channel = 0; channel < channels.length; channel += 1) {
+      const sample = Math.max(-1, Math.min(1, channels[channel][frame]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true); offset += 2;
+    }
+    try { onProgress(end / length); } catch { /* progress cannot affect the audio file */ }
+    if (end < length) await yieldTask();
+  }
+  if (signal?.aborted) throw new DOMException('WAVの作成を中止しました。', 'AbortError');
+  return new Blob([bytes], { type: 'audio/wav' });
+}
+
 /**
  * Renders the song with the same instruments as playback into a WAV file (the loop repeated to about 8 s).
  * The player is driven by an offline audio context whose clock we move forward one loop at a time.

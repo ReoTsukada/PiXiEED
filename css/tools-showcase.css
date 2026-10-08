@@ -7,3 +7,4 @@
   .tool-shell__head { align-items: start; gap: .5rem; }
   .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
 }
+.output-tool-card__icon { display: grid; width: min(34%, 88px); aspect-ratio: 1; place-items: center; border: 1px solid rgba(74,116,87,.24); border-radius: 22px; background: rgba(255,255,255,.72); color: #347457; font-size: clamp(2.2rem, 6vw, 3rem); font-weight: 500; }

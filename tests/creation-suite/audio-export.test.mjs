@@ -4,7 +4,7 @@ import { deflateSync } from 'node:zlib';
 import { readPixelPngMetadata } from '../../js/pixel-png-metadata.mjs';
 import { audioImageExportSize } from '../../js/creation/audio-export.mjs';
 import { AUDIO_INSTRUMENTS, AUDIO_MAX_LOOP_TICKS, AUDIO_PPQ, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, createAudioSong, setAudioPixel } from '../../js/creation/audio-core.mjs';
-import { audioExportLoops, encodeWav, exportAudioImage, renderAudioWav } from '../../js/creation/audio-export.mjs';
+import { audioExportLoops, encodeImportedAudioWav, encodeWav, exportAudioImage, renderAudioWav } from '../../js/creation/audio-export.mjs';
 
 function fakeOfflineContextClass() {
   const starts = []; const scheduledStops = [];
@@ -156,4 +156,16 @@ test('long WAV requests are rejected before allocating an OfflineAudioContext', 
 
 test('WAV encoding enforces its byte cap before allocating the output buffer', () => {
   assert.throws(() => encodeWav({ numberOfChannels: 2, sampleRate: 44100, length: 20_000_000, getChannelData() { throw new Error('must not read'); } }), /64MBまで/);
+});
+
+test('imported WAV conversion yields progress, writes PCM safely, and observes cancellation', async () => {
+  const channel = new Float32Array(2050); channel[1] = 0.5; channel[2] = -1;
+  const progress = []; let yields = 0;
+  const blob = await encodeImportedAudioWav({ channels: [channel], sampleRate: 8000 }, { chunkFrames: 1024, onProgress: (value) => progress.push(value), yieldTask: async () => { yields += 1; } });
+  const bytes = new Uint8Array(await blob.arrayBuffer()); const view = new DataView(bytes.buffer);
+  assert.equal(blob.type, 'audio/wav'); assert.equal(String.fromCharCode(...bytes.subarray(0, 4)), 'RIFF');
+  assert.equal(view.getUint32(40, true), channel.length * 2); assert.equal(view.getInt16(46, true), 16383); assert.equal(view.getInt16(48, true), -32768);
+  assert.equal(progress.length, 3); assert.equal(progress.at(-1), 1); assert.equal(yields, 2);
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(encodeImportedAudioWav({ channels: [new Float32Array([0])], sampleRate: 8000 }, { signal: controller.signal }), { name: 'AbortError' });
 });

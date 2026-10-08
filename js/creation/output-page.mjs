@@ -1,8 +1,10 @@
-import { readToolOutput, saveToolOutputItems, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-8';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-10';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-4';
-import { renderAudioWav } from './audio-export.mjs?rev=20261008-output-1';
+import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-6';
+import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
 import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261008-output-1';
+import { renderOutputVideo } from './output-video.mjs?rev=20261008-output-2';
+import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261008-output-2';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -54,6 +56,30 @@ const jpegQualitySetting = $('#output-jpeg-quality-setting');
 const jpegQuality = $('#output-jpeg-quality');
 const jpegQualityValue = $('#output-jpeg-quality-value');
 const formatHelp = $('#output-filename-help');
+const outputStart = $('#output-start');
+const outputLayout = $('#output-layout');
+const fileInput = $('#output-file-input');
+const replacementInput = $('#output-audio-replacement-input');
+const startChoose = $('#output-start-choose');
+const dropTarget = $('#output-drop');
+const importStatus = $('#output-import-status');
+const importProgress = $('#output-import-progress');
+const cancelImport = $('#output-cancel-import');
+const assetsSection = $('#output-assets');
+const assetsList = $('#output-assets-list');
+const assetsNote = $('#output-assets-note');
+const addAssetsButton = $('#output-add-assets');
+const timelineCanvas = $('#output-timeline-preview');
+const timelinePlay = $('#output-timeline-play');
+const sequenceSettings = $('#output-sequence-settings');
+const playbackRate = $('#output-playback-rate');
+const playbackRateValue = $('#output-playback-rate-value');
+const loopField = $('#output-loop-field');
+const loopCount = $('#output-loop-count');
+const sequenceSummary = $('#output-sequence-summary');
+const createVideoButton = $('#output-create-video');
+const generationProgress = $('#output-generation-progress');
+const cancelGeneration = $('#output-cancel-generation');
 
 let record = null;
 let outputItems = [];
@@ -72,8 +98,25 @@ let currentScale = 1;
 let posterUrl = null;
 let animationStopped = false;
 let pageDisposed = false;
+let importController = null;
+let timelineTimer = null;
+let timelineFrameIndex = 0;
+let pendingWrites = new Set();
+let mediaSettings = { playbackRate: 1, loopCount: 0 };
+let lastImportedMedia = null;
+let mediaWritePending = false;
+let itemWritePending = false;
+
+function trackPending(promise) {
+  const tracked = Promise.resolve(promise);
+  pendingWrites.add(tracked);
+  tracked.finally(() => pendingWrites.delete(tracked)).catch(() => {});
+  return tracked;
+}
 
 function setError(message) {
+  outputStart.hidden = true;
+  outputLayout.hidden = true;
   pageTitle.textContent = '出力を開けません';
   intro.textContent = message;
   preview.replaceChildren();
@@ -88,6 +131,15 @@ function setError(message) {
   status.textContent = '元の編集内容は変更していません。';
   returnLink.textContent = 'ツール一覧へ戻る';
   returnLink.href = '/tools/';
+}
+
+function showStart() {
+  outputStart.hidden = false;
+  outputLayout.hidden = true;
+  pageTitle.textContent = '変換・書き出し';
+  intro.textContent = '画像や音声を端末内で確認し、対応形式へ変換できます。';
+  returnLink.href = '/tools/';
+  returnLink.textContent = 'ツール一覧へ戻る';
 }
 
 function outputBaseName(value, ext) {
@@ -112,9 +164,15 @@ function sourceFrames(source = activeSource) {
 }
 
 function sourceFormats(source = activeSource) {
-  if (source?.kind === 'rgba-frames') return source.mediaSource.frames.length > 1
-    ? [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']]
-    : [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+  if (source?.kind === 'rgba-frames') {
+    const frames = source.mediaSource.frames;
+    const formats = frames.length > 1
+      ? [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']]
+      : [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+    const video = chooseAudioVideoMimeType();
+    if (video) formats.push([video.extension, `${video.extension.toUpperCase()}動画`]);
+    return formats;
+  }
   if (source?.kind === 'audio-song') return [['wav', 'WAV音声']];
   if (source?.kind === 'audio-video') {
     const supported = chooseAudioVideoMimeType();
@@ -122,9 +180,12 @@ function sourceFormats(source = activeSource) {
   }
   if (source?.kind === 'legacy-image' && source.mediaSource?.frames?.length > 1) return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']];
   if (source?.kind === 'legacy-image') return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+  if (source?.kind === 'audio-buffer') return [['wav', 'WAV音声']];
   if (source?.kind === 'legacy-file' && source.extension === 'pxd') return [];
   return source?.mime && source?.extension ? [[source.extension, displayFormat({ mime: source.mime, extension: source.extension })]] : [];
 }
+
+function audioBufferSource() { return mediaSources.find((source) => source.kind === 'audio-buffer') || null; }
 
 function outputMime(formatValue) {
   return ({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', mp4: 'video/mp4', webm: 'video/webm' })[formatValue] || '';
@@ -169,6 +230,7 @@ function renderOutputItems() {
     }
     const row = document.createElement('div'); row.className = 'output-item'; row.setAttribute('role', 'listitem'); row.setAttribute('aria-current', String(item.id === activeItem?.id));
     const select = document.createElement('button'); select.type = 'button'; select.className = 'output-item__select'; select.setAttribute('aria-label', `編集: ${item.filename}`);
+    select.disabled = Boolean(itemWritePending || mediaWritePending || generationController);
     const type = document.createElement('strong'); type.textContent = item.extension.toUpperCase();
     const name = document.createElement('span'); name.textContent = item.filename;
     select.append(type, name); select.addEventListener('click', () => activateItem(item.id));
@@ -176,9 +238,9 @@ function renderOutputItems() {
     save.addEventListener('click', () => { status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。'; trackSave('download'); });
     row.append(select, save); outputItemsList.append(row);
   }
-  deleteOutputItem.disabled = outputItems.length <= 1;
-  copyOutputItem.disabled = outputItems.length >= 12;
-  addOutputItem.disabled = outputItems.length >= 12;
+  deleteOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length <= 1;
+  copyOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length >= 12;
+  addOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length >= 12;
 }
 
 function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension } = {}) {
@@ -197,18 +259,269 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   formatSelect.value = formats.some(([value]) => value === preferredFormat) ? preferredFormat : formats[0]?.[0] || '';
   formatButton.textContent = `.${formatSelect.value || activeItem?.extension || ''} ⌄`;
   formatButton.hidden = formats.length <= 1;
+  createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
   formatHelp.hidden = formats.length <= 1;
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
   jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
   formatPicker.hidden = true;
   formatButton.setAttribute('aria-expanded', 'false');
+  updateSequenceControls();
 }
 
-async function persistOutputItems(nextItems) {
-  const saved = await saveToolOutputItems(record.id, nextItems);
-  outputItems = saved;
-  activeItem = outputItems.find((item) => item.id === activeItem?.id) || outputItems[0];
-  return outputItems;
+function frameDuration(frames) { return frames.reduce((sum, frame) => sum + (Number(frame.delayMs) || 500), 0); }
+
+function effectiveFrameDelay(frame, formatValue = formatSelect.value, rate = Number(mediaSettings.playbackRate) || 1) {
+  const scaled = Math.round((Number(frame.delayMs) || 500) / rate);
+  return formatValue === 'gif' ? Math.max(20, scaled) : Math.max(1, scaled);
+}
+
+function stopTimelinePreview() {
+  if (timelineTimer !== null) clearTimeout(timelineTimer);
+  timelineTimer = null;
+  timelinePlay.setAttribute('aria-pressed', 'false');
+  timelinePlay.textContent = 'コマ送りを再生';
+}
+
+function paintTimelineFrame(index) {
+  const frames = sourceFrames();
+  if (!frames.length) return;
+  timelineFrameIndex = Math.max(0, Math.min(frames.length - 1, index));
+  const frame = frames[timelineFrameIndex];
+  timelineCanvas.width = frame.width; timelineCanvas.height = frame.height;
+  const context = timelineCanvas.getContext('2d');
+  context?.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+}
+
+function playTimelineNext() {
+  const frames = sourceFrames();
+  if (frames.length < 2) return;
+  const rate = Number(mediaSettings.playbackRate) || 1;
+  timelineFrameIndex += 1;
+  if (timelineFrameIndex >= frames.length) {
+    const loops = Number(mediaSettings.loopCount) || 0;
+    const currentLoops = Number(timelinePlay.dataset.loop || 0) + 1;
+    timelinePlay.dataset.loop = String(currentLoops);
+    if (loops > 0 && currentLoops >= loops) { stopTimelinePreview(); timelinePlay.dataset.loop = '0'; return; }
+    timelineFrameIndex = 0;
+  }
+  paintTimelineFrame(timelineFrameIndex);
+  const delay = effectiveFrameDelay(frames[timelineFrameIndex], formatSelect.value, rate);
+  timelineTimer = setTimeout(playTimelineNext, delay);
+}
+
+function updateSequenceControls() {
+  const frames = sourceFrames();
+  const isSequence = frames.length > 1;
+  const formatValue = formatSelect.value;
+  sequenceSettings.hidden = !isSequence || !['gif', 'apng', 'mp4', 'webm'].includes(formatValue);
+  if (!isSequence) { animationSettings.hidden = activeItem?.extension !== 'gif' && activeItem?.extension !== 'apng'; return; }
+  animationSettings.hidden = false;
+  playbackRate.value = String(mediaSettings.playbackRate || 1);
+  playbackRateValue.value = `${playbackRate.value}倍`; playbackRateValue.textContent = `${playbackRate.value}倍`;
+  const animatedFormat = ['gif', 'apng'].includes(formatValue);
+  loopField.hidden = !animatedFormat;
+  const loopValue = Number(mediaSettings.loopCount ?? activeSource?.mediaSource?.loopCount ?? 0);
+  for (const option of [...loopCount.options]) if (option.dataset.original === 'true') option.remove();
+  if (![0, 1, 2, 3].includes(loopValue)) {
+    const option = new Option(`元ファイルの回数（${loopValue}）`, String(loopValue)); option.dataset.original = 'true'; loopCount.add(option, 0);
+  }
+  loopCount.value = String(loopValue);
+  const rate = Number(mediaSettings.playbackRate) || 1;
+  const onePassSeconds = ['gif', 'apng'].includes(formatValue)
+    ? frames.reduce((sum, frame) => sum + effectiveFrameDelay(frame, formatValue, rate), 0) / 1000
+    : frameDuration(frames) / 1000 / rate;
+  const audioSource = audioBufferSource();
+  const videoDuration = audioSource ? audioSource.durationSeconds / (Number(mediaSettings.playbackRate) || 1) : onePassSeconds;
+  sequenceSummary.textContent = audioSource
+    ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は音声の終わり（${videoDuration.toFixed(2)}秒）で終了。速度変更で音程も変わります。動画は最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
+    : ['mp4', 'webm'].includes(formatValue)
+      ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は1巡で終了します。最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
+      : `1巡 ${onePassSeconds.toFixed(2)}秒 · GIFは1コマ20ms以上で書き出します。`;
+  animationDetails.textContent = `${frames.length}コマ · 1巡 ${onePassSeconds.toFixed(2)}秒 · 画面操作でプレビューできます。`;
+  timelinePlay.hidden = !(activeSource?.id.startsWith('local-images') && isSequence && ['png', 'jpeg', 'svg'].includes(activeItem?.extension));
+  timelineCanvas.hidden = timelinePlay.hidden;
+  if (!timelineCanvas.hidden) paintTimelineFrame(timelineFrameIndex);
+}
+
+function renderAssets() {
+  assetsList.replaceChildren();
+  const controlsDisabled = mediaWritePending || Boolean(generationController) || Boolean(importController);
+  addAssetsButton.disabled = controlsDisabled;
+  const imageSources = mediaSources.filter((source) => source.kind === 'rgba-frames' && source.id.startsWith('local-images'));
+  const audioSources = mediaSources.filter((source) => source.kind === 'audio-buffer');
+  const localAssets = [...imageSources, ...audioSources];
+  assetsSection.hidden = !localAssets.length;
+  if (!localAssets.length) return;
+  for (const source of imageSources) {
+    const frames = source.mediaSource.frames;
+    frames.forEach((frame, index) => {
+      const row = document.createElement('div'); row.className = 'output-asset-row';
+      const name = document.createElement('span'); name.className = 'output-asset-row__name'; name.textContent = frame.name || `${source.label} · ${index + 1}`;
+      const controls = document.createElement('div'); controls.className = 'output-asset-row__controls';
+      const move = (delta) => {
+        const nextIndex = index + delta; if (nextIndex < 0 || nextIndex >= frames.length) return;
+        const nextFrames = frames.slice(); [nextFrames[index], nextFrames[nextIndex]] = [nextFrames[nextIndex], nextFrames[index]];
+        void persistMediaSources(mediaSources.map((item) => item.id === source.id ? { ...item, mediaSource: { ...item.mediaSource, frames: nextFrames } } : item));
+      };
+      const up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.setAttribute('aria-label', `${name.textContent}を前へ`); up.disabled = index === 0;
+      const down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.setAttribute('aria-label', `${name.textContent}を後ろへ`); down.disabled = index === frames.length - 1;
+      up.disabled ||= controlsDisabled; down.disabled ||= controlsDisabled;
+      up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1)); controls.append(up, down);
+      if (frames.length > 1) {
+        const duration = document.createElement('input'); duration.type = 'number'; duration.min = '20'; duration.max = '5000'; duration.step = '10'; duration.value = String(Math.round(frame.delayMs || 500)); duration.inputMode = 'numeric';
+        duration.setAttribute('aria-label', `${name.textContent}の表示時間（ミリ秒）`);
+        duration.disabled = controlsDisabled;
+        duration.addEventListener('change', () => {
+          const delayMs = Number(duration.value);
+          if (!Number.isFinite(delayMs) || delayMs < 20 || delayMs > 5000) { status.textContent = 'コマの表示時間は20〜5000ミリ秒で指定してください。'; renderAssets(); return; }
+          const nextFrames = frames.map((entry, i) => i === index ? { ...entry, delayMs } : entry);
+          void persistMediaSources(mediaSources.map((item) => item.id === source.id ? { ...item, mediaSource: { ...item.mediaSource, frames: nextFrames } } : item));
+        });
+        controls.append(duration);
+      }
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '削除'; remove.setAttribute('aria-label', `${name.textContent}を削除`); remove.disabled = frames.length <= 1;
+      remove.disabled ||= controlsDisabled;
+      remove.addEventListener('click', () => {
+        if (frames.length <= 1) return;
+        const nextFrames = frames.filter((_, i) => i !== index);
+        void persistMediaSources(mediaSources.map((item) => item.id === source.id ? { ...item, label: `画像 (${nextFrames.length}コマ)`, mediaSource: { ...item.mediaSource, frames: nextFrames } } : item));
+      });
+      controls.append(remove); row.append(name, controls); assetsList.append(row);
+    });
+  }
+  for (const source of audioSources) {
+    const row = document.createElement('div'); row.className = 'output-asset-row';
+    const name = document.createElement('span'); name.className = 'output-asset-row__name'; name.textContent = `${source.label} · ${source.durationSeconds.toFixed(1)}秒 · ${source.channels.length === 1 ? 'モノラル' : 'ステレオ'} ${source.sampleRate}Hz`;
+    const controls = document.createElement('div'); controls.className = 'output-asset-row__controls';
+    const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '削除'; remove.setAttribute('aria-label', `${source.label}を削除`);
+    remove.disabled = outputItems.some((item) => item.sourceId === source.id);
+    remove.disabled ||= controlsDisabled;
+    remove.addEventListener('click', () => void persistMediaSources(mediaSources.filter((item) => item.id !== source.id)));
+    const replace = document.createElement('button'); replace.type = 'button'; replace.textContent = '置き換え'; replace.setAttribute('aria-label', `${source.label}を別の音声に置き換え`); replace.disabled = controlsDisabled;
+    replace.addEventListener('click', () => replacementInput.click());
+    controls.append(remove, replace); row.append(name, controls); assetsList.append(row);
+  }
+  const frames = imageSources.reduce((all, source) => [...all, ...source.mediaSource.frames], []);
+  assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマは20〜5000ms · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
+}
+
+async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
+  if (!record || mediaWritePending || itemWritePending || generationController) {
+    status.textContent = '別の出力処理中です。終わってからもう一度操作してください。';
+    return false;
+  }
+  mediaWritePending = true; renderAssets();
+  try {
+    const saved = await trackPending(saveToolOutputMedia(record.id, nextSources, nextSettings, { expectedRevision: record.revision || 0 }));
+    mediaSources = saved.mediaSources; mediaSettings = saved.mediaSettings;
+    record.revision = saved.revision;
+    activeSource = mediaSources.find((source) => source.id === activeSource?.id) || mediaSources[0] || null;
+    record.mediaSources = mediaSources; record.mediaSettings = mediaSettings; record.mediaSource = activeSource?.mediaSource || null;
+    fillSourceAndFormatControls({ preferredFormat: formatSelect.value || activeItem?.extension });
+    renderAssets(); updateSequenceControls(); setMedia(record);
+    status.textContent = '素材の並びと設定を保存しました。出力ファイルは次の作成時に反映します。';
+    return true;
+  } catch (error) {
+    status.textContent = error?.message || '素材設定を保存できませんでした。前の設定はそのままです。';
+    return false;
+  } finally { mediaWritePending = false; renderAssets(); }
+}
+
+function sourcesFromImport(imported) {
+  const sources = [];
+  if (imported.frames.length) sources.push({ id: 'local-images', label: `画像 (${imported.frames.length}コマ)`, kind: 'rgba-frames', mediaSource: { kind: 'rgba-frames', width: imported.frames[0].width, height: imported.frames[0].height, frames: imported.frames, loopCount: imported.loopCount || 0 } });
+  if (imported.audio) sources.push({ id: 'local-audio', label: imported.audio.name, kind: 'audio-buffer', sampleRate: imported.audio.sampleRate, durationSeconds: imported.audio.durationSeconds, channels: imported.audio.channels });
+  return sources;
+}
+
+async function handleImport(files, { replaceAudio = false } = {}) {
+  if (importController) return;
+  const selected = [...(files || [])]; if (!selected.length) return;
+  const controller = new AbortController(); importController = controller;
+  if (record) renderAssets();
+  const targetStatus = record ? status : importStatus;
+  targetStatus.textContent = 'ファイルを端末内で読み込んでいます…';
+  importProgress.hidden = Boolean(record); importProgress.value = 0;
+  if (record) { generationProgress.hidden = false; generationProgress.value = 0; cancelGeneration.hidden = false; }
+  cancelImport.hidden = false; startChoose.disabled = true; addAssetsButton.disabled = true;
+  try {
+    const imported = await importOutputFiles(selected, { signal: controller.signal, onProgress: ({ current, total, name, frameProgress, framesDone, framesTotal }) => {
+      const portion = Number.isFinite(frameProgress) ? (current - 1 + frameProgress) / total : current / total;
+      const progress = Math.round(portion * 100); importProgress.value = progress; generationProgress.value = progress;
+      targetStatus.textContent = Number.isFinite(frameProgress)
+        ? `${name}のコマを読み込み中（${framesDone}/${framesTotal}）…`
+        : `${name}を読み込み中（${current}/${total}）…`;
+    } });
+    if (controller.signal.aborted || pageDisposed) return;
+    const newSources = sourcesFromImport(imported);
+    if (record) {
+      let next = [...mediaSources];
+      if (replaceAudio) {
+        const existingAudio = audioBufferSource();
+        const replacement = newSources.find((source) => source.kind === 'audio-buffer');
+        if (!existingAudio || selected.length !== 1 || !replacement || imported.frames.length) throw new Error('置き換えには音声ファイルを1つだけ選んでください。画像や既存素材は変更していません。');
+        replacement.id = existingAudio.id;
+        next = next.map((source) => source.id === existingAudio.id ? replacement : source);
+      } else if (imported.audio && audioBufferSource()) {
+        throw new Error('音声素材は1つまでです。音声素材の「置き換え」から新しい音声を選んでください。');
+      }
+      const appendedImages = newSources.find((source) => source.kind === 'rgba-frames');
+      const existingImages = next.find((source) => source.kind === 'rgba-frames' && source.id === 'local-images');
+      if (!replaceAudio && appendedImages && existingImages) {
+        const frames = fitOutputFrames([...existingImages.mediaSource.frames, ...appendedImages.mediaSource.frames]);
+        const merged = { ...existingImages, label: `画像 (${frames.length}コマ)`, mediaSource: { ...existingImages.mediaSource, width: frames[0].width, height: frames[0].height, frames } };
+        next = next.map((source) => source.id === existingImages.id ? merged : source);
+      }
+      const additions = replaceAudio ? [] : newSources.filter((source) => !(appendedImages && existingImages && source === appendedImages));
+      for (const source of additions) {
+        if (next.some((item) => item.id === source.id)) source.id = `${source.id}-${createItemId().slice(0, 8)}`;
+        next.push(source);
+      }
+      if (next.length > 8) throw new RangeError('素材は8種類まで追加できます。不要な素材を削除してください。');
+      if (!(await persistMediaSources(next))) throw new Error('素材を端末内に保存できませんでした。元の素材と出力はそのままです。');
+      if (replaceAudio) {
+        const refreshed = await generateOutputItem({ sourceId: audioBufferSource()?.id, formatValue: 'wav' });
+        if (refreshed) targetStatus.textContent = '音声を置き換え、新しいWAVをプレビューできる状態にしました。';
+      } else targetStatus.textContent = `${selected.length}個のファイルを追加しました。素材の順番と表示時間を調整できます。`;
+      updateSequenceControls(); renderAssets();
+    } else {
+      let initialBlob; let initialFilename; let metadataValue = {};
+      if (imported.frames.length) {
+        initialBlob = await canvasRaster(imported.frames[0], 'image/png');
+        initialFilename = 'pixieed-image.png';
+        metadataValue = { width: imported.frames[0].width, height: imported.frames[0].height, frameCount: imported.frames.length };
+      } else {
+        initialBlob = await encodeImportedAudioWav(newSources.find((source) => source.kind === 'audio-buffer'), {
+          signal: controller.signal,
+          onProgress: (progress) => { const value = 70 + Math.round(progress * 30); importProgress.value = value; targetStatus.textContent = `WAVを書き出しています（${value - 70}%）…`; }
+        });
+        initialFilename = 'pixieed-audio.wav';
+        metadataValue = { durationSeconds: imported.audio.durationSeconds, sampleRate: imported.audio.sampleRate };
+      }
+      const staged = await stageToolOutput({ blob: initialBlob, filename: initialFilename, returnUrl: '/output/', metadata: metadataValue, mediaSources: newSources, mediaSettings: { playbackRate: 1, loopCount: imported.loopCount || 0 }, title: '変換・書き出し', source: 'この端末の素材' });
+      targetStatus.textContent = '端末内に素材を保持しました。出力ページを開いています…';
+      location.assign(staged.url);
+    }
+  } catch (error) {
+    if (error?.name !== 'AbortError') targetStatus.textContent = error?.message || 'ファイルを読み込めませんでした。元の出力と素材はそのままです。';
+    else targetStatus.textContent = '読み込みを中止しました。選択前の素材と出力は保持されています。';
+  } finally {
+    if (importController === controller) importController = null;
+    importProgress.hidden = true; cancelImport.hidden = true; startChoose.disabled = false; addAssetsButton.disabled = false; fileInput.value = ''; replacementInput.value = '';
+    if (record) { generationProgress.hidden = true; cancelGeneration.hidden = true; }
+    if (record) renderAssets();
+  }
+}
+
+async function persistOutputItems(nextItems, { duringGeneration = false } = {}) {
+  if (itemWritePending || mediaWritePending || (generationController && !duringGeneration)) throw new Error('別の出力を保存しています。少し待ってからもう一度お試しください。');
+  itemWritePending = true; renderOutputItems();
+  try {
+    const saved = await trackPending(saveToolOutputItems(record.id, nextItems, { expectedRevision: record.revision || 0 }));
+    outputItems = saved.items; record.revision = saved.revision;
+    activeItem = outputItems.find((item) => item.id === activeItem?.id) || outputItems[0];
+    return outputItems;
+  } finally { itemWritePending = false; renderOutputItems(); }
 }
 
 async function activateItem(id) {
@@ -250,13 +563,19 @@ function setBusy(busy, canCancel = false) {
   aspectLock.disabled = busy;
   sourceSelect.disabled = busy;
   formatSelect.disabled = busy;
+  createVideoButton.disabled = busy;
   addOutputItem.disabled = busy || outputItems.length >= 12;
   copyOutputItem.disabled = busy || outputItems.length >= 12;
   deleteOutputItem.disabled = busy || outputItems.length <= 1;
   cancelSettings.hidden = !busy || !canCancel;
   cancelSettings.disabled = false;
+  cancelGeneration.hidden = !busy || !canCancel;
+  cancelGeneration.disabled = false;
+  generationProgress.hidden = !busy;
+  if (busy) generationProgress.value = 0;
   scaleSettings.setAttribute('aria-busy', String(busy));
   jpegQuality.disabled = busy;
+  renderAssets();
 }
 
 function setCurrentBlob(blob, { width = null, height = null, animated = false } = {}) {
@@ -290,14 +609,31 @@ async function canvasRaster(frame, mime, quality = 0.9) {
 }
 
 async function createOutputBlob(source, formatValue, dimensions, controller) {
-  if (source?.kind === 'rgba-frames' || source?.kind === 'legacy-image') {
-    const frames = source.kind === 'rgba-frames' ? source.mediaSource.frames : source.mediaSource?.frames;
+  if ((source?.kind === 'rgba-frames' || source?.kind === 'legacy-image') && !['mp4', 'webm'].includes(formatValue)) {
+    const originalFrames = source.kind === 'rgba-frames' ? source.mediaSource.frames : source.mediaSource?.frames;
+    const rate = Number(mediaSettings.playbackRate) || 1;
+    const frames = ['gif', 'apng'].includes(formatValue) ? originalFrames.map((frame) => ({ ...frame, delayMs: Math.max(20, (frame.delayMs || 100) / rate) })) : originalFrames;
     if (!Array.isArray(frames) || !frames.length) throw new Error('画像の元データを確認できません。');
-    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', quality: Number(jpegQuality.value) / 100, loopCount: source.mediaSource.loopCount ?? 0 }, { encodeRaster: canvasRaster, signal: controller.signal }), metadata: {} };
+    const loop = mediaSettings.loopCount ?? source.mediaSource.loopCount ?? 0;
+    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', quality: Number(jpegQuality.value) / 100, loopCount: loop }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
     const result = await renderAudioWav(source.song);
     return { blob: result.blob, metadata: { durationSeconds: result.seconds, sampleRate: 44100, loops: result.loops } };
+  }
+  if (source?.kind === 'audio-buffer' && formatValue === 'wav') {
+    const blob = await encodeImportedAudioWav(source, { signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
+    return { blob, metadata: { durationSeconds: source.durationSeconds, sampleRate: source.sampleRate } };
+  }
+  if (source?.kind === 'rgba-frames' && ['mp4', 'webm'].includes(formatValue)) {
+    const audioSource = audioBufferSource();
+    const rate = Number(mediaSettings.playbackRate) || 1;
+    const frames = source.mediaSource.frames;
+    const mimeChoice = chooseAudioVideoMimeType();
+    if (!mimeChoice || mimeChoice.extension !== formatValue) throw new Error('このブラウザーが実際に作成できる動画形式と選択内容が一致しません。画像と音声の元データは保持されています。');
+    const result = await renderOutputVideo(frames, { audioSource, playbackRate: rate, mimeChoice, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
+    if (result.extension !== formatValue || result.blob.type.split(';', 1)[0] !== outputMime(formatValue) || (audioSource && !result.hasAudio)) throw new Error('動画の形式または音声トラックを確認できません。元の素材はそのまま保存できます。');
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(audioSource ? { description: '音声付き動画。再生速度に合わせて音程も変わり、音声の終わりで動画を終了します。' } : { description: '画像のコマを一巡する動画です。' }) } };
   }
   if (source?.kind === 'audio-video' && ['mp4', 'webm'].includes(formatValue)) {
     const frame = source.image;
@@ -310,9 +646,9 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
 }
 
 async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null } = {}) {
-  if (!record || !activeItem || generationController) return;
+  if (!record || !activeItem || generationController || mediaWritePending || itemWritePending) return false;
   const source = mediaSources.find((item) => item.id === sourceId);
-  if (!source || !sourceFormats(source).some(([value]) => value === formatValue)) { status.textContent = 'この素材では選べない形式です。'; return; }
+  if (!source || !sourceFormats(source).some(([value]) => value === formatValue)) { status.textContent = 'この素材では選べない形式です。'; return false; }
   const formats = sourceFormats(source);
   const extensionValue = formatValue;
   const framesForSource = sourceFrames(source);
@@ -329,7 +665,8 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
   const epoch = ++generationEpoch;
   const controller = new AbortController(); generationController = controller;
   setBusy(true, true); addOutputItem.disabled = true; copyOutputItem.disabled = true; deleteOutputItem.disabled = true;
-  status.textContent = '出力を作成しています…';
+  status.textContent = ['mp4', 'webm'].includes(extensionValue) ? '動画を作成しています。画面を開いたままお待ちください…' : '出力を作成しています…';
+  let completed = false;
   try {
     const generatedOutput = await createOutputBlob(source, extensionValue, outputDimensions, controller);
     const blob = generatedOutput.blob;
@@ -342,12 +679,12 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
       ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
       ...(extensionValue === 'jpeg' ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
-      ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: frames.reduce((sum, frame) => sum + (frame.delayMs || 100), 0) / 1000, loopCount: source.mediaSource?.loopCount ?? 0 } : {}),
+      ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: frames.reduce((sum, frame) => sum + (frame.delayMs || 100), 0) / 1000 / (Number(mediaSettings.playbackRate) || 1), loopCount: mediaSettings.loopCount ?? source.mediaSource?.loopCount ?? 0 } : {}),
       ...generatedOutput.metadata
     };
     const updated = { ...previousItem, sourceId: source.id, mime: outputMime(extensionValue), extension: extensionValue, filename: nextFilename, blob, metadata: metadataValue };
     const nextItems = outputItems.map((item) => item.id === previousItem.id ? updated : item);
-    const savedItems = await saveToolOutputItems(record.id, nextItems);
+    const savedItems = await persistOutputItems(nextItems, { duringGeneration: true });
     if (controller.signal.aborted || pageDisposed || epoch !== generationEpoch) return;
     outputItems = savedItems;
     activeItem = outputItems.find((item) => item.id === previousItem.id) || outputItems[0];
@@ -363,36 +700,39 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
     fillSourceAndFormatControls({ preferredFormat: activeItem.extension });
     renderOutputItems(); displayMetadata(record, activeItem.blob, outputWidth, outputHeight);
-    status.textContent = `${formats.find(([value]) => value === extensionValue)?.[1] || extensionValue.toUpperCase()}を端末内に準備しました。保存できます。`;
+    status.textContent = `${formats.find(([value]) => value === extensionValue)?.[1] || extensionValue.toUpperCase()}を端末内に準備しました。ダウンロードを開始できます。`;
+    completed = true;
   } catch (error) {
-    if (error?.name !== 'AbortError') status.textContent = error?.message || '出力を作成できませんでした。前の項目はそのまま保存できます。';
+    if (error?.name === 'AbortError') status.textContent = '作成を中止しました。前の出力と素材はそのまま保存できます。';
+    else status.textContent = error?.message || '出力を作成できませんでした。前の項目はそのまま保存できます。';
     fillSourceAndFormatControls({ preferredFormat: previousItem.extension });
   } finally {
     if (generationController === controller) generationController = null;
     if (!pageDisposed) setBusy(false);
     renderOutputItems();
   }
+  return completed;
 }
 
 async function addOutput(copy = false) {
-  if (!activeItem || outputItems.length >= 12 || generationController) return;
+  if (!activeItem || outputItems.length >= 12 || generationController || mediaWritePending || itemWritePending) return;
   const item = { ...activeItem, id: createItemId(), filename: activeItem.filename, metadata: { ...activeItem.metadata } };
   const next = [...outputItems, item];
   try {
-    const saved = await saveToolOutputItems(record.id, next);
-    outputItems = saved; activeItem = outputItems.at(-1); setActiveItem(activeItem);
+    await persistOutputItems(next);
+    activeItem = outputItems.at(-1); setActiveItem(activeItem);
     fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
     status.textContent = copy ? '出力項目を複製しました。名前や形式を個別に変更できます。' : '出力項目を追加しました。素材・形式・名前を個別に設定できます。';
   } catch (error) { status.textContent = error?.message || '出力項目を保存できませんでした。前の項目はそのままです。'; }
 }
 
 async function removeActiveOutput() {
-  if (outputItems.length <= 1 || !activeItem || generationController) return;
+  if (outputItems.length <= 1 || !activeItem || generationController || mediaWritePending || itemWritePending) return;
   const id = activeItem.id; const next = outputItems.filter((item) => item.id !== id);
   try {
-    const saved = await saveToolOutputItems(record.id, next);
+    await persistOutputItems(next);
     const url = generatedDownloadUrls.get(id); if (url) URL.revokeObjectURL(url); generatedDownloadUrls.delete(id);
-    outputItems = saved; activeItem = outputItems[0]; setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
+    activeItem = outputItems[0]; setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
     status.textContent = '出力項目を削除しました。元の素材は保持されています。';
   } catch (error) { status.textContent = error?.message || '項目を削除できませんでした。出力内容は保持されています。'; }
 }
@@ -545,12 +885,15 @@ function displayFormat(entry) {
 function setMedia(entry) {
   const type = entry.mime;
   image.hidden = audio.hidden = video.hidden = fileCard.hidden = true;
+  timelineCanvas.hidden = true; timelinePlay.hidden = true; stopTimelinePreview();
   scaleSettings.hidden = animationSettings.hidden = audioSettings.hidden = true;
   if (type.startsWith('image/')) {
-    image.hidden = false; image.src = fileUrl;
+    const frames = sourceFrames(activeSource);
+    const useTimeline = activeSource?.id.startsWith('local-images') && frames.length > 1 && !['image/gif', 'image/apng'].includes(type);
+    if (useTimeline) { timelineCanvas.hidden = false; timelinePlay.hidden = false; paintTimelineFrame(0); }
+    else { image.hidden = false; image.src = fileUrl; }
     image.onload = () => displayMetadata(record, currentBlob, image.naturalWidth, image.naturalHeight);
     image.alt = `${entry.title || '作品'}の${['image/gif', 'image/apng'].includes(type) ? 'アニメーション' : '画像'}プレビュー`;
-    const frames = sourceFrames(activeSource);
     if (frames.length) {
       const { width, height } = frames[0];
       const startScale = entry.currentMetadata?.scale || entry.metadata?.defaultScale || 1;
@@ -571,7 +914,8 @@ function setMedia(entry) {
     if (itemMetadata.sampleRate || itemMetadata.loops || activeSource?.kind === 'audio-song') {
       const rate = itemMetadata.sampleRate ? `${Number((itemMetadata.sampleRate / 1000).toFixed(2))}kHz` : '';
       const loops = itemMetadata.loops ? `${itemMetadata.loops}回ループ` : '';
-      audioDetails.textContent = ['ステレオ · 16-bit PCM', rate, loops].filter(Boolean).join(' · ') || '曲をWAV音声に書き出しました。';
+      const channels = activeSource?.kind === 'audio-buffer' ? (activeSource.channels.length === 1 ? 'モノラル' : 'ステレオ') : 'ステレオ';
+      audioDetails.textContent = [`${channels} · 16-bit PCM`, rate, loops].filter(Boolean).join(' · ') || '曲をWAV音声に書き出しました。';
       audioSettings.hidden = false;
     }
   } else if (type.startsWith('video/')) {
@@ -582,17 +926,20 @@ function setMedia(entry) {
     fileDescription.textContent = entry.metadata?.description || 'この形式はPiXiEED内でプレビューできません。';
     fileCard.hidden = false;
   }
+  updateSequenceControls();
 }
 
 async function mount() {
   const params = new URLSearchParams(location.search);
-  if (params.getAll('id').length !== 1) { setError('編集画面から開いた出力データを確認できません。'); return; }
+  if (params.getAll('id').length === 0) { showStart(); return; }
+  if (params.getAll('id').length !== 1) { setError('出力IDが複数あります。ツール一覧から新しく開いてください。'); return; }
   try {
     record = await readToolOutput(params.get('id'));
+    outputStart.hidden = true; outputLayout.hidden = false;
     pageTitle.textContent = record.title || '出力を確認';
     intro.textContent = record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて端末へ保存できます。';
     returnLink.href = record.returnUrl;
-    returnLink.textContent = '編集画面へ戻る';
+    returnLink.textContent = new URL(record.returnUrl, location.origin).pathname === '/output/' ? '素材選択へ戻る' : '編集画面へ戻る';
     mediaSources = record.mediaSources || [];
     if (!mediaSources.length && record.mediaSource) mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'legacy-image', mediaSource: record.mediaSource }];
     if (!mediaSources.length && record.mime.startsWith('image/')) {
@@ -610,13 +957,52 @@ async function mount() {
       finally { if (sourceCanvas) sourceCanvas.width = sourceCanvas.height = 1; if (sourceUrlToRelease) URL.revokeObjectURL(sourceUrlToRelease); }
     }
     if (!mediaSources.length) mediaSources = [{ id: 'legacy', label: record.source || '元のファイル', kind: 'legacy-file', blob: record.sourceBlob, mime: record.mime, extension: record.extension }];
+    const importedLoopCount = mediaSources.find((source) => source.mediaSource?.loopCount !== undefined)?.mediaSource?.loopCount ?? 0;
+    mediaSettings = { playbackRate: record.mediaSettings?.playbackRate || 1, loopCount: record.mediaSettings?.loopCount ?? importedLoopCount };
     outputItems = record.outputs?.length ? record.outputs : [{ id: 'default', sourceId: mediaSources[0]?.id || '', mime: record.mime, extension: record.extension, filename: record.filename, blob: record.blob, metadata: record.currentMetadata || {} }];
     activeItem = outputItems[0];
     if (!activeItem.sourceId) activeItem.sourceId = mediaSources[0]?.id || '';
     setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
+    renderAssets(); updateSequenceControls();
     filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
   } catch (error) { setError(error?.message || '端末内の出力を開けませんでした。'); }
 }
+
+startChoose.addEventListener('click', () => fileInput.click());
+addAssetsButton.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { void handleImport(fileInput.files); });
+replacementInput.addEventListener('change', () => { void handleImport(replacementInput.files, { replaceAudio: true }); });
+cancelImport.addEventListener('click', () => importController?.abort());
+cancelGeneration.addEventListener('click', () => { generationController?.abort(); importController?.abort(); });
+dropTarget.addEventListener('click', (event) => { if (event.target === dropTarget) fileInput.click(); });
+dropTarget.addEventListener('dragover', (event) => { event.preventDefault(); dropTarget.classList.add('is-over'); });
+dropTarget.addEventListener('dragleave', (event) => { if (!dropTarget.contains(event.relatedTarget)) dropTarget.classList.remove('is-over'); });
+dropTarget.addEventListener('drop', (event) => { event.preventDefault(); dropTarget.classList.remove('is-over'); void handleImport(event.dataTransfer?.files); });
+timelinePlay.addEventListener('click', () => {
+  if (timelineTimer !== null) { stopTimelinePreview(); return; }
+  if (sourceFrames().length < 2) return;
+  timelineFrameIndex = 0; timelinePlay.dataset.loop = '0';
+  timelinePlay.setAttribute('aria-pressed', 'true'); timelinePlay.textContent = 'コマ送りを停止';
+  paintTimelineFrame(0);
+  const delay = Math.max(20, Number(sourceFrames()[0].delayMs) || 500) / (Number(mediaSettings.playbackRate) || 1);
+  timelineTimer = setTimeout(playTimelineNext, delay);
+});
+playbackRate.addEventListener('input', () => { playbackRateValue.value = `${playbackRate.value}倍`; playbackRateValue.textContent = `${playbackRate.value}倍`; });
+playbackRate.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, playbackRate: Number(playbackRate.value) }); });
+loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, loopCount: Number(loopCount.value) }); });
+createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
+returnLink.addEventListener('click', async (event) => {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !pendingWrites.size) return;
+  event.preventDefault();
+  const href = returnLink.href;
+  await Promise.allSettled([...pendingWrites]);
+  location.assign(href);
+});
+window.addEventListener('beforeunload', (event) => {
+  if (!pendingWrites.size) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 
 filename.addEventListener('input', syncFilename);
 filename.addEventListener('change', async () => {
@@ -634,14 +1020,21 @@ formatButton.addEventListener('click', () => {
 });
 sourceSelect.addEventListener('change', () => {
   const source = mediaSources.find((item) => item.id === sourceSelect.value);
+  activeSource = source || activeSource;
+  record.mediaSource = activeSource?.mediaSource || null;
   const formats = sourceFormats(source);
+  stopTimelinePreview();
   fillSourceAndFormatControls({ preferredFormat: activeItem?.extension });
   const nextFormat = formats.some(([value]) => value === activeItem?.extension) ? activeItem.extension : formats[0]?.[0];
+  if (['mp4', 'webm'].includes(nextFormat)) { createVideoButton.hidden = false; status.textContent = '動画を作成するには、作成ボタンを押してください。'; return; }
   void generateOutputItem({ sourceId: source?.id, formatValue: nextFormat });
 });
 formatSelect.addEventListener('change', () => {
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
   jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
+  createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
+  updateSequenceControls();
+  if (['mp4', 'webm'].includes(formatSelect.value)) { status.textContent = '動画の作成には少し時間がかかります。「この設定で動画を作る」を押して開始してください。'; return; }
   void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
 jpegSetting.addEventListener('change', () => {

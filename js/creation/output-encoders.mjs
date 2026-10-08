@@ -1,4 +1,4 @@
-import { encodeAnimatedGif } from '../animated-export.mjs';
+import { encodeAnimatedGif } from '../animated-export.mjs?rev=20261008-output-progress-1';
 
 export const OUTPUT_FORMATS = Object.freeze(['png', 'jpeg', 'svg', 'gif', 'apng']);
 export const OUTPUT_MAX_EDGE = 4096;
@@ -211,7 +211,8 @@ async function encodeRaster(frame, format, encoder, signal, quality = 0.9) {
 }
 
 /** Encode one output item from original RGBA frame data. `encodeRaster(frame, mime)` supplies browser canvas encoding. */
-export async function encodeOutput({ format, frames, background = '#ffffff', quality = 0.9, loopCount = 0, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal } = {}) {
+export async function encodeOutput({ format, frames, background = '#ffffff', quality = 0.9, loopCount = 0, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
+  const progress = (value) => { try { onProgress(Math.max(0, Math.min(1, value))); } catch { /* progress cannot affect encoding */ } };
   if (!OUTPUT_FORMATS.includes(format)) throw new TypeError('選択できない画像形式です。');
   const animated = format === 'gif' || format === 'apng';
   checkFrames(frames, animated);
@@ -221,15 +222,20 @@ export async function encodeOutput({ format, frames, background = '#ffffff', qua
   const outputFrames = frames.map((frame) => scaleFrame(frame, scale, width, height));
   checkFrames(outputFrames, animated);
   const framesWithTiming = outputFrames.map((frame) => ({ ...frame, delayMs: frame.delayMs ?? 100 }));
-  if (format === 'svg') return makeBlob(new TextEncoder().encode(svgText(outputFrames[0])), format);
-  if (format === 'png') return makeBlob(await encodeRaster(outputFrames[0], format, rasterEncoder, signal), format);
-  if (format === 'jpeg') return makeBlob(await encodeRaster(flattenFrame(outputFrames[0], background), format, rasterEncoder, signal, quality), format);
+  if (format === 'svg') { const blob = makeBlob(new TextEncoder().encode(svgText(outputFrames[0])), format); progress(1); return blob; }
+  if (format === 'png') { progress(0.25); const blob = makeBlob(await encodeRaster(outputFrames[0], format, rasterEncoder, signal), format); progress(1); return blob; }
+  if (format === 'jpeg') { progress(0.25); const blob = makeBlob(await encodeRaster(flattenFrame(outputFrames[0], background), format, rasterEncoder, signal, quality), format); progress(1); return blob; }
   if (format === 'apng') {
     const pngs = [];
-    for (const frame of framesWithTiming) pngs.push({ bytes: await encodeRaster(frame, 'png', rasterEncoder, signal), delayMs: frame.delayMs });
-    return makeBlob(encodeApng(pngs, loopCount), format);
+    for (let index = 0; index < framesWithTiming.length; index += 1) {
+      const frame = framesWithTiming[index];
+      pngs.push({ bytes: await encodeRaster(frame, 'png', rasterEncoder, signal), delayMs: frame.delayMs });
+      progress((index + 1) / framesWithTiming.length * 0.9);
+    }
+    const blob = makeBlob(encodeApng(pngs, loopCount), format); progress(1); return blob;
   }
   if (!Number.isSafeInteger(loopCount) || loopCount < 0 || loopCount > 65535) throw new RangeError('GIFのループ回数は0〜65535で指定してください。');
-  const encoded = await encodeAnimatedGif(framesWithTiming, { delayMs: 100, maxInputPixels: OUTPUT_MAX_ANIMATED_PIXELS, maxPixels: OUTPUT_MAX_ANIMATED_PIXELS, longEdge: 4096, signal });
-  return makeBlob(setGifLoop(encoded.bytes, loopCount), format);
+  const encoded = await encodeAnimatedGif(framesWithTiming, { delayMs: 100, maxInputPixels: OUTPUT_MAX_ANIMATED_PIXELS, maxPixels: OUTPUT_MAX_ANIMATED_PIXELS, longEdge: 4096, signal, onProgress: (value) => progress(value * 0.9) });
+  progress(0.95);
+  const blob = makeBlob(setGifLoop(encoded.bytes, loopCount), format); progress(1); return blob;
 }

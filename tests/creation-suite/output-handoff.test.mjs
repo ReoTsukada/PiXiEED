@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
+import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, saveToolOutputMedia, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from '../../js/pixel-lens/output-handoff.mjs';
@@ -117,6 +117,40 @@ test('multiple output items and original RGBA sources persist independently with
   assert.equal(reloaded.outputs[1].sourceId, 'art');
   assert.equal(reloaded.mediaSources[0].mediaSource.frames[0].data[7], 128);
   assert.equal(await reloaded.sourceBlob.text(), 'pixels');
+});
+
+test('imported image frames, audio PCM and timeline settings survive reload without exposing payload in the URL', async () => {
+  const deps = dependencies();
+  const frames = [
+    { width: 1, height: 1, data: new Uint8Array([255, 0, 0, 255]), delayMs: 400, name: 'first.png' },
+    { width: 1, height: 1, data: new Uint8Array([0, 0, 255, 255]), delayMs: 800, name: 'second.jpg' }
+  ];
+  const channels = [new Float32Array([0, 0.25, -0.25, 0])];
+  const staged = await stageToolOutput({
+    ...file(), returnUrl: '/output/', mediaSettings: { playbackRate: 1.5, loopCount: 2 },
+    mediaSources: [
+      { id: 'local-images', label: '画像 (2コマ)', kind: 'rgba-frames', mediaSource: { kind: 'rgba-frames', width: 1, height: 1, frames, loopCount: 0 } },
+      { id: 'local-audio', label: 'voice.wav', kind: 'audio-buffer', sampleRate: 8000, channels }
+    ]
+  }, deps);
+  assert.equal(staged.url, `https://pixieed.test/output/?id=${validId}`);
+  assert.doesNotMatch(staged.url, /first|second|voice|255|base64/);
+  let loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const staleRevision = loaded.revision;
+  assert.equal(loaded.mediaSettings.playbackRate, 1.5);
+  assert.equal(loaded.mediaSettings.loopCount, 2);
+  assert.equal(loaded.mediaSources[0].mediaSource.frames[1].name, 'second.jpg');
+  assert.deepEqual([...loaded.mediaSources[1].channels[0]], [0, 0.25, -0.25, 0]);
+  const savedMedia = await saveToolOutputMedia(validId, loaded.mediaSources, { playbackRate: 2, loopCount: 3 }, { indexedDBRef: deps.indexedDBRef, now: deps.now, expectedRevision: staleRevision });
+  assert.equal(savedMedia.revision, staleRevision + 1);
+  await assert.rejects(saveToolOutputItems(validId, loaded.outputs, { indexedDBRef: deps.indexedDBRef, now: deps.now, expectedRevision: staleRevision }), /別のタブ/);
+  loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(loaded.mediaSettings.playbackRate, 2);
+  assert.equal(loaded.mediaSettings.loopCount, 3);
+  assert.equal(loaded.outputs.length, 1, 'stale tab did not overwrite the latest output list');
+  await assert.rejects(saveToolOutputMedia(validId, [loaded.mediaSources[1]], {}, { indexedDBRef: deps.indexedDBRef, now: deps.now }), /使っている素材/);
+  loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(loaded.mediaSources.length, 2, 'failed edit leaves the previous asset record intact');
 });
 
 test('output item validation rejects a mismatched extension without changing the saved set', async () => {

@@ -144,7 +144,7 @@ export function lzwEncode(indices, minCodeSize, out) {
  * frames: [{ width, height, data: RGBA }] all the same size. Returns Uint8Array GIF bytes.
  * `scale` enlarges each dot to scale×scale pixels.
  */
-export function encodeGif(frames, { delayMs = 1000 / GIF_FPS, scale = 1, palette = buildPalette(frames) } = {}) {
+export function encodeGif(frames, { delayMs = 1000 / GIF_FPS, scale = 1, palette = buildPalette(frames), onProgress = () => {} } = {}) {
   if (!frames.length) throw new RangeError('no frames');
   const { width, height } = frames[0];
   const W = width * scale; const H = height * scale;
@@ -162,7 +162,8 @@ export function encodeGif(frames, { delayMs = 1000 / GIF_FPS, scale = 1, palette
   validDelay(delayMs);
   const small = new Uint8Array(width * height);
   const big = new Uint8Array(W * H);
-  for (const frame of frames) {
+  for (let frameIndex = 0; frameIndex < frames.length; frameIndex += 1) {
+    const frame = frames[frameIndex];
     const delay = validDelay(frame.delayMs === undefined ? delayMs : frame.delayMs);
     const d = frame.data;
     for (let p = 0, i = 0; p < small.length; p++, i += 4) small[p] = transparent && d[i + 3] < 128 ? 0 : toIndex(key(d, i)) + (transparent ? 1 : 0);
@@ -175,6 +176,7 @@ export function encodeGif(frames, { delayMs = 1000 / GIF_FPS, scale = 1, palette
     out.bytes([0x21, 0xf9, 4, transparent ? 0x09 : 0x04, delay & 255, delay >> 8, 0, 0]);
     out.byte(0x2c); out.word(0); out.word(0); out.word(W); out.word(H); out.byte(0);
     lzwEncode(indices, Math.max(2, bitsPerColor), out);
+    try { onProgress((frameIndex + 1) / frames.length); } catch { /* progress cannot affect the GIF */ }
   }
   out.byte(0x3b);
   return out.result();

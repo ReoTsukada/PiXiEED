@@ -1,4 +1,4 @@
-import { encodeGif, GIF_LONG_EDGE } from './pixel-lens/gif.mjs?v=20261001-animation-1';
+import { encodeGif, GIF_LONG_EDGE } from './pixel-lens/gif.mjs?v=20261008-output-progress-1';
 
 export const ANIMATED_MAX_INPUT_PIXELS = 8e6;
 export const ANIMATED_MAX_FALLBACK_OUTPUT_PIXELS = 8e6;
@@ -63,7 +63,8 @@ export async function encodeAnimatedGif(frames, {
   longEdge = GIF_LONG_EDGE,
   maxPixels = 80e6,
   maxInputPixels = ANIMATED_MAX_INPUT_PIXELS,
-  workerFactory
+  workerFactory,
+  onProgress = () => {}
 } = {}) {
   if (signal?.aborted) throw abortError();
   if (!Array.isArray(frames) || !frames.length) throw new RangeError('no frames');
@@ -79,7 +80,7 @@ export async function encodeAnimatedGif(frames, {
   }
   let worker;
   try {
-    worker = workerFactory ? workerFactory() : typeof Worker === 'function' ? new Worker(new URL('./gif-export-worker.mjs?v=20261001-animation-1', import.meta.url), { type: 'module' }) : null;
+    worker = workerFactory ? workerFactory() : typeof Worker === 'function' ? new Worker(new URL('./gif-export-worker.mjs?v=20261008-output-progress-1', import.meta.url), { type: 'module' }) : null;
   } catch { /* A small bounded export is still available when workers are blocked. */ }
   if (!worker) {
     const small = animatedGeometry(width, height, frames.length, {
@@ -89,7 +90,7 @@ export async function encodeAnimatedGif(frames, {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     if (signal?.aborted) throw abortError();
-    return { ...small, bytes: encodeGif(frames, { delayMs, scale: small.scale }) };
+    return { ...small, bytes: encodeGif(frames, { delayMs, scale: small.scale, onProgress }) };
   }
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -106,6 +107,7 @@ export async function encodeAnimatedGif(frames, {
     signal?.addEventListener('abort', abort, { once: true });
     worker.onmessage = ({ data }) => {
       if (data?.error) finish(new Error(data.error));
+      else if (Number.isFinite(data?.progress)) { try { onProgress(Math.max(0, Math.min(1, data.progress))); } catch { /* progress cannot affect GIF output */ } }
       else if (data?.bytes instanceof Uint8Array && data.bytes.length) finish(null, data.bytes);
       else finish(new Error('GIFの保存結果を読み込めませんでした。'));
     };

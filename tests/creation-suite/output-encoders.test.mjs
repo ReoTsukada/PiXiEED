@@ -95,7 +95,9 @@ test('APNG rejects incompatible frame PNG headers and does not invent a conversi
 
 test('GIF uses repository encoder, preserves timing fields, and supports finite and infinite loops', async () => {
   for (const loopCount of [0, 3]) {
-    const blob = await encodeOutput({ format: 'gif', frames: [checkerA, checkerB], loopCount }); const bytes = new Uint8Array(await blob.arrayBuffer());
+    const progress = [];
+    const blob = await encodeOutput({ format: 'gif', frames: [checkerA, checkerB], loopCount }, { onProgress: (value) => progress.push(value) }); const bytes = new Uint8Array(await blob.arrayBuffer());
+    assert.deepEqual(progress, [0.45, 0.9, 0.95, 1]);
     assert.equal(blob.type, 'image/gif'); assert.equal(String.fromCharCode(...bytes.subarray(0, 6)), 'GIF89a');
     const app = [...bytes].findIndex((byte, index) => byte === 0x21 && bytes[index + 1] === 0xff && bytes[index + 2] === 0x0b);
     assert.ok(app > 0); assert.equal(bytes[app + 16] | (bytes[app + 17] << 8), loopCount);
