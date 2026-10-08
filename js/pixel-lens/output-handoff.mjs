@@ -128,8 +128,9 @@ export function preparePixelLensOutputRestore(entry) {
     throw new TypeError('この撮影形式はカメラで開けません。もう一度撮影してください。');
   }
   const media = entry.mediaSource;
+  const totalPlays = media?.totalPlays ?? media?.loopCount;
   if (media?.kind !== 'gif-frames' || media.width !== common.width || media.height !== common.height
-    || media.loopCount !== 0 || !Array.isArray(media.frames) || media.frames.length < 2) {
+    || totalPlays !== 0 || !Array.isArray(media.frames) || media.frames.length < 2) {
     throw new TypeError('GIFの撮影フレームを確認できません。もう一度撮影してください。');
   }
   const delays = new Set(media.frames.map((frame) => frame?.delayMs));

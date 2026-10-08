@@ -106,6 +106,30 @@ test('GIF frames repeat through the audio duration at the shared playback speed'
   } finally { harness.restore(); }
 });
 
+test('10ms and long frame timing remain untruncated through video duration at each supported speed', async () => {
+  for (const [delayMs, rates, expected] of [
+    [10, [0.25, 1.5, 4], [0.04, 10 / 1500, 0.0025]],
+    [6000, [0.25, 1.5, 4], [24, 4, 1.5]]
+  ]) {
+    for (let index = 0; index < rates.length; index += 1) {
+      const harness = createMediaHarness(); let clock = 0;
+      try {
+        const result = await renderOutputVideo([frame(delayMs)], {
+          playbackRate: rates[index], mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+          MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+          now: () => clock,
+          requestFrame: (callback) => { clock += 100; callback(clock); return clock; }, cancelFrame: () => {},
+          setTimeoutImpl: (callback, milliseconds) => {
+            if (milliseconds <= expected[index] * 1000 + 1) queueMicrotask(callback);
+            return milliseconds;
+          }, clearTimeoutImpl: () => {}
+        });
+        assert.ok(Math.abs(result.seconds - expected[index]) < 0.000001, `${delayMs}ms at ${rates[index]}x`);
+      } finally { harness.restore(); }
+    }
+  }
+});
+
 test('video cancellation rejects without returning partial chunks and releases tracks', async () => {
   const harness = createMediaHarness(); const controller = new AbortController();
   const rendering = renderOutputVideo([frame(4000)], {

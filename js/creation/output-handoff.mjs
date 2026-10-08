@@ -121,7 +121,7 @@ function outputPageUrl(id, origin = globalThis.location?.origin) {
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
+  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];
@@ -138,6 +138,7 @@ function safeMetadata(metadata = {}) {
       }
       if (Object.keys(tone).length) result[key] = tone;
     }
+    else if (['loopCount', 'totalPlays'].includes(key) && Number.isSafeInteger(value) && value >= 0 && value <= 0xffffffff) result[key] = value;
     else if (key !== 'description' && Number.isFinite(value) && value >= 0) result[key] = Math.round(value * (key === 'durationSeconds' ? 10 : 1)) / (key === 'durationSeconds' ? 10 : 1);
   }
   return result;
@@ -162,7 +163,10 @@ function cloneMediaSource(mediaSource, mime) {
     const name = typeof frame.name === 'string' ? frame.name.slice(0, 80) : '';
     return { width, height, data: Uint8Array.from(frame.data), ...(Number.isFinite(delayMs) ? { delayMs } : {}), ...(name ? { name } : {}) };
   });
-  return { kind: mediaSource.kind, width, height, frames, loopCount: Number.isSafeInteger(mediaSource.loopCount) && mediaSource.loopCount >= 0 ? mediaSource.loopCount : 0 };
+  const totalPlays = mediaSource.totalPlays ?? mediaSource.loopCount;
+  const normalizedTotalPlays = Number.isSafeInteger(totalPlays) && totalPlays >= 0 && totalPlays <= 0xffffffff ? totalPlays : 0;
+  return { kind: mediaSource.kind, width, height, frames, totalPlays: normalizedTotalPlays,
+    ...(mediaSource.kind === 'gif-frames' ? { loopCount: normalizedTotalPlays } : {}) };
 }
 
 function cloneMediaSources(sources) {
@@ -176,7 +180,7 @@ function cloneMediaSources(sources) {
     ids.add(id);
     if (source.kind === 'rgba-frames') {
       const storedMedia = source.mediaSource || {};
-      const mediaSource = cloneMediaSource({ kind: 'rgba-frames', frames: source.frames || storedMedia.frames, loopCount: source.loopCount ?? storedMedia.loopCount }, 'image/png');
+      const mediaSource = cloneMediaSource({ kind: 'rgba-frames', frames: source.frames || storedMedia.frames, totalPlays: source.totalPlays ?? storedMedia.totalPlays ?? source.loopCount ?? storedMedia.loopCount }, 'image/png');
       if (!mediaSource) throw new TypeError('画像素材のフレームを確認できません。');
       totalPixels += mediaSource.width * mediaSource.height * mediaSource.frames.length;
       if (totalPixels > 12_000_000) throw new RangeError('出力素材が大きすぎます。アニメーションのコマ数を減らしてからお試しください。');
@@ -217,7 +221,8 @@ function cloneMediaSources(sources) {
 function safeMediaSettings(settings = {}) {
   const result = {};
   if (Number.isFinite(settings.playbackRate) && settings.playbackRate >= 0.25 && settings.playbackRate <= 4) result.playbackRate = Math.round(settings.playbackRate * 100) / 100;
-  if (Number.isSafeInteger(settings.loopCount) && settings.loopCount >= 0 && settings.loopCount <= 65535) result.loopCount = settings.loopCount;
+  const totalPlays = settings.totalPlays ?? settings.loopCount;
+  if (Number.isSafeInteger(totalPlays) && totalPlays >= 0 && totalPlays <= 0xffffffff) result.totalPlays = totalPlays;
   return result;
 }
 

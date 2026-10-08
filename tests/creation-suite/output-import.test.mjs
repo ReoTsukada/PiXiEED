@@ -23,10 +23,22 @@ function canvasDocument() {
   };
 }
 
-function pngHeader() { return new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]); }
-function gifFile(frameCount = 2, loopCount = 3) {
-  const bytes = [...new TextEncoder().encode('GIF89a'), 1, 0, 1, 0, 0, 0, 0];
-  if (loopCount !== null) bytes.push(0x21, 0xff, 0x0b, ...new TextEncoder().encode('NETSCAPE2.0'), 3, 1, loopCount & 0xff, loopCount >>> 8, 0);
+function pngHeader(width = 1, height = 1, { animatedFrames = null, totalPlays = 1 } = {}) {
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+  const chunk = (name, data) => {
+    const result = new Uint8Array(data.length + 12); new DataView(result.buffer).setUint32(0, data.length);
+    [...name].forEach((char, index) => { result[index + 4] = char.charCodeAt(0); }); result.set(data, 8); return result;
+  };
+  const ihdr = new Uint8Array(13); const view = new DataView(ihdr.buffer); view.setUint32(0, width); view.setUint32(4, height); ihdr[8] = 8; ihdr[9] = 6;
+  const parts = [new Uint8Array(signature), chunk('IHDR', ihdr)];
+  if (animatedFrames !== null) { const actl = new Uint8Array(8); const actlView = new DataView(actl.buffer); actlView.setUint32(0, animatedFrames); actlView.setUint32(4, totalPlays); parts.push(chunk('acTL', actl)); }
+  parts.push(chunk('IEND', new Uint8Array()));
+  const output = new Uint8Array(parts.reduce((sum, item) => sum + item.length, 0)); let offset = 0;
+  for (const item of parts) { output.set(item, offset); offset += item.length; } return output;
+}
+function gifFile(frameCount = 2, repeats = 3, width = 1, height = 1) {
+  const bytes = [...new TextEncoder().encode('GIF89a'), width & 0xff, width >>> 8, height & 0xff, height >>> 8, 0, 0, 0];
+  if (repeats !== null) bytes.push(0x21, 0xff, 0x0b, ...new TextEncoder().encode('NETSCAPE2.0'), 3, 1, repeats & 0xff, repeats >>> 8, 0);
   for (let index = 0; index < frameCount; index += 1) bytes.push(0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 0x44, 0x01, 0);
   bytes.push(0x3b);
   return new Uint8Array(bytes);
@@ -60,7 +72,7 @@ test('later image batches can be normalized into one bounded frame sequence', ()
   assert.throws(() => fitOutputFrames(Array.from({ length: 601 }, () => makeFrame(1, 1, 'too many'))), /600コマ/);
 });
 
-test('animated GIF import decodes every frame, retains timing and reads its loop setting', async () => {
+test('animated GIF import normalizes Netscape repeat extensions to total plays', async () => {
   const closed = []; const decodedIndexes = [];
   class FakeImageDecoder {
     static isTypeSupported(type) { return type === 'image/gif'; }
@@ -79,7 +91,7 @@ test('animated GIF import decodes every frame, retains timing and reads its loop
   });
   assert.deepEqual(decodedIndexes, [0, 1]);
   assert.deepEqual(result.frames.map((frame) => frame.delayMs), [100, 200]);
-  assert.equal(result.loopCount, 3);
+  assert.equal(result.totalPlays, 4);
   assert.deepEqual(closed, [0, 1, 'decoder']);
 });
 
@@ -101,18 +113,19 @@ test('single-frame GIF imports as a still image without requiring the animation 
   });
   assert.equal(result.frames.length, 1);
   assert.equal(result.frames[0].delayMs, 500);
-  assert.equal(result.loopCount, 0);
+  assert.equal(result.totalPlays, 1);
   assert.equal(decoderCreated, false);
   assert.equal(bitmapClosed, true);
 });
 
-test('animated WebP reads ANIM loop count and decodes every frame with ImageDecoder', async () => {
-  const bytes = new Uint8Array(44);
+test('animated WebP retains ANIM total-play count and decodes every frame', async () => {
+  const bytes = new Uint8Array(92);
   const text = (offset, value) => [...value].forEach((char, index) => { bytes[offset + index] = char.charCodeAt(0); });
   const u32le = (offset, value) => { bytes[offset] = value; bytes[offset + 1] = value >> 8; bytes[offset + 2] = value >> 16; bytes[offset + 3] = value >> 24; };
   text(0, 'RIFF'); u32le(4, bytes.length - 8); text(8, 'WEBP');
-  text(12, 'VP8X'); u32le(16, 10); bytes[20] = 0x02;
+  text(12, 'VP8X'); u32le(16, 10); bytes[20] = 0x02; bytes[24] = 0; bytes[27] = 0; bytes[30] = 0;
   text(30, 'ANIM'); u32le(34, 6); bytes[42] = 4;
+  text(44, 'ANMF'); u32le(48, 16); text(68, 'ANMF'); u32le(72, 16);
   const indexes = [];
   class FakeImageDecoder {
     static isTypeSupported(type) { return type === 'image/webp'; }
@@ -122,7 +135,27 @@ test('animated WebP reads ANIM loop count and decodes every frame with ImageDeco
   }
   const result = await importOutputFiles([localFile('loop.webp', bytes)], { ImageDecoderImpl: FakeImageDecoder, documentRef: canvasDocument() });
   assert.deepEqual(indexes, [0, 1]);
-  assert.equal(result.loopCount, 4);
+  assert.equal(result.totalPlays, 4);
+  for (const totalPlays of [0, 1, 2]) {
+    const variant = bytes.slice(); variant[42] = totalPlays; variant[43] = 0;
+    const imported = await importOutputFiles([localFile('loop.webp', variant)], { ImageDecoderImpl: FakeImageDecoder, documentRef: canvasDocument() });
+    assert.equal(imported.totalPlays, totalPlays);
+  }
+});
+
+test('GIF missing extension means one play, raw repeats map to total plays, and APNG/WebP play counts are total', async () => {
+  class FakeImageDecoder {
+    static isTypeSupported() { return true; }
+    constructor({ type }) { this.tracks = { ready: Promise.resolve(), selectedTrack: { animated: true, frameCount: 2 } }; this.type = type; }
+    async decode() { return { image: { displayWidth: 1, displayHeight: 1, duration: 100_000, close() {} } }; }
+    close() {}
+  }
+  for (const [repeatField, expected] of [[null, 1], [0, 0], [1, 2], [3, 4]]) {
+    const result = await importOutputFiles([localFile('loop.gif', gifFile(2, repeatField))], { ImageDecoderImpl: FakeImageDecoder, documentRef: canvasDocument() });
+    assert.equal(result.totalPlays, expected);
+  }
+  const apng = await importOutputFiles([localFile('loop.png', pngHeader(1, 1, { animatedFrames: 2, totalPlays: 2 }))], { ImageDecoderImpl: FakeImageDecoder, documentRef: canvasDocument() });
+  assert.equal(apng.totalPlays, 2);
 });
 
 test('decoded audio is stored as PCM channels and the decode context is released', async () => {
@@ -160,4 +193,61 @@ test('oversized image is rejected before its complete bytes or a decoder are rea
   }), /64MB/);
   assert.equal(completeBytesRead, false);
   assert.equal(imageDecoderCalled, false);
+});
+
+test('oversized PNG dimensions and animation aggregate are rejected before decoder creation', async () => {
+  let decoderCreated = false;
+  class Decoder { static isTypeSupported() { return true; } constructor() { decoderCreated = true; } }
+  await assert.rejects(importOutputFiles([localFile('huge.png', pngHeader(4097, 1))], {
+    ImageDecoderImpl: Decoder, createImageBitmapImpl: async () => { decoderCreated = true; return { width: 1, height: 1, close() {} }; }
+  }), /ヘッダー情報/);
+  await assert.rejects(importOutputFiles([localFile('huge-animation.png', pngHeader(2000, 2000, { animatedFrames: 3 }))], {
+    ImageDecoderImpl: Decoder, createImageBitmapImpl: async () => { decoderCreated = true; return { width: 1, height: 1, close() {} }; }
+  }), /展開サイズ/);
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0, 17, 8, 0, 1, 0x10, 1, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9]);
+  await assert.rejects(importOutputFiles([localFile('wide.jpg', jpeg)], {
+    ImageDecoderImpl: Decoder, createImageBitmapImpl: async () => { decoderCreated = true; return { width: 1, height: 1, close() {} }; }
+  }), /ヘッダー情報/);
+  await assert.rejects(importOutputFiles([localFile('wide.gif', gifFile(1, null, 4097, 1))], {
+    ImageDecoderImpl: Decoder, createImageBitmapImpl: async () => { decoderCreated = true; return { width: 1, height: 1, close() {} }; }
+  }), /ヘッダー情報/);
+  const webp = new Uint8Array(30); webp.set(new TextEncoder().encode('RIFF'), 0); new DataView(webp.buffer).setUint32(4, 22, true); webp.set(new TextEncoder().encode('WEBPVP8X'), 8); new DataView(webp.buffer).setUint32(16, 10, true); webp[25] = 0x10;
+  await assert.rejects(importOutputFiles([localFile('wide.webp', webp)], {
+    ImageDecoderImpl: Decoder, createImageBitmapImpl: async () => { decoderCreated = true; return { width: 1, height: 1, close() {} }; }
+  }), /ヘッダー情報/);
+  assert.equal(decoderCreated, false);
+});
+
+test('known WAV duration is bounded before decodeAudioData starts', async () => {
+  const durationSeconds = 121; const dataBytes = durationSeconds * 48_000;
+  const bytes = new Uint8Array(44 + dataBytes); const view = new DataView(bytes.buffer);
+  bytes.set(new TextEncoder().encode('RIFF'), 0); view.setUint32(4, bytes.length - 8, true); bytes.set(new TextEncoder().encode('WAVEfmt '), 8);
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 48_000, true); view.setUint32(28, 48_000, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+  bytes.set(new TextEncoder().encode('data'), 36); view.setUint32(40, dataBytes, true);
+  let decoded = false;
+  await assert.rejects(importOutputFiles([localFile('long.wav', bytes)], {
+    AudioContextImpl: class { async decodeAudioData() { decoded = true; throw new Error('decode should not run'); } async close() {} }
+  }), /120秒/);
+  assert.equal(decoded, false);
+});
+
+test('MP3 frame headers estimate duration before decodeAudioData starts', async () => {
+  const frameLength = 104; const frameCount = 4601; const bytes = new Uint8Array(frameLength * frameCount);
+  for (let frame = 0; frame < frameCount; frame += 1) bytes.set([0xff, 0xfb, 0x10, 0x64], frame * frameLength);
+  let decoded = false;
+  await assert.rejects(importOutputFiles([localFile('long.mp3', bytes)], {
+    AudioContextImpl: class { async decodeAudioData() { decoded = true; throw new Error('decode should not run'); } async close() {} }
+  }), /120秒/);
+  assert.equal(decoded, false);
+});
+
+test('unknown encoded audio is capped before its full bytes are read', async () => {
+  const unknown = localFile('unknown.audio', new Uint8Array(32));
+  Object.defineProperty(unknown, 'size', { value: 4 * 1024 * 1024 + 1 });
+  let fullRead = false; let decoded = false;
+  unknown.arrayBuffer = async () => { fullRead = true; throw new Error('full unknown audio read'); };
+  await assert.rejects(importOutputFiles([unknown], {
+    AudioContextImpl: class { async decodeAudioData() { decoded = true; throw new Error('decode should not run'); } async close() {} }
+  }), /4MB/);
+  assert.equal(fullRead, false); assert.equal(decoded, false);
 });

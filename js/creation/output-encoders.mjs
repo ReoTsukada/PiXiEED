@@ -1,4 +1,5 @@
 import { encodeAnimatedGif } from '../animated-export.mjs?rev=20261008-output-progress-1';
+import { assertTotalPlays, totalPlaysToGifRepeats } from './output-loop-count.mjs?rev=20261008-loop-count-1';
 
 export const OUTPUT_FORMATS = Object.freeze(['png', 'jpeg', 'svg', 'gif', 'apng']);
 export const OUTPUT_MAX_EDGE = 4096;
@@ -155,8 +156,8 @@ function delayFraction(delayMs) {
   throw new RangeError('APNGのコマ時間を表現できません。');
 }
 
-function encodeApng(pngFrames, loopCount) {
-  if (!Number.isSafeInteger(loopCount) || loopCount < 0 || loopCount > 0xffffffff) throw new RangeError('ループ回数は0以上の整数で指定してください。');
+function encodeApng(pngFrames, totalPlays) {
+  assertTotalPlays(totalPlays);
   const parsed = pngFrames.map(({ bytes }) => parsePng(bytes));
   const ihdr = parsed[0].ihdr;
   if (parsed.some(({ ihdr: candidate }) => !ihdr.every((byte, index) => candidate[index] === byte))) throw new Error('APNGフレーム間でPNGの色形式が一致しません。');
@@ -167,7 +168,7 @@ function encodeApng(pngFrames, loopCount) {
   const width = readU32(ihdr, 0); const height = readU32(ihdr, 4);
   if (!width || !height || ihdr[8] !== 8 || ![2, 6].includes(ihdr[9]) || ihdr[12] !== 0) throw new Error('APNGには8bit RGB/RGBA・非インターレースPNGが必要です。');
   const output = [PNG_SIGNATURE, chunk('IHDR', ihdr), ...colorChunks.map(({ type, data }) => chunk(type, data))];
-  const actl = new Uint8Array(8); writeU32(actl, 0, parsed.length); writeU32(actl, 4, loopCount); output.push(chunk('acTL', actl));
+  const actl = new Uint8Array(8); writeU32(actl, 0, parsed.length); writeU32(actl, 4, totalPlays); output.push(chunk('acTL', actl));
   let sequence = 0;
   pngFrames.forEach((frame, index) => {
     const [numerator, denominator] = delayFraction(pngFrames[index].delayMs ?? 100);
@@ -189,11 +190,21 @@ function encodeApng(pngFrames, loopCount) {
   return bytes;
 }
 
-function setGifLoop(bytes, loopCount) {
-  if (!Number.isSafeInteger(loopCount) || loopCount < 0 || loopCount > 65535) throw new RangeError('GIFのループ回数は0〜65535で指定してください。');
+function setGifLoop(bytes, totalPlays) {
+  const repeats = totalPlaysToGifRepeats(totalPlays);
   const needle = [0x21, 0xff, 0x0b, ...new TextEncoder().encode('NETSCAPE2.0'), 3, 1];
   for (let index = 0; index <= bytes.length - needle.length - 2; index += 1) {
-    if (needle.every((value, i) => bytes[index + i] === value)) { bytes[index + needle.length] = loopCount & 255; bytes[index + needle.length + 1] = loopCount >>> 8; return bytes; }
+    if (needle.every((value, i) => bytes[index + i] === value)) {
+      if (repeats === null) {
+        const extensionEnd = index + needle.length + 2;
+        if (bytes[extensionEnd] !== 0) throw new Error('GIFの1回再生設定を確認できません。');
+        const afterExtension = extensionEnd + 1;
+        const result = new Uint8Array(bytes.length - (afterExtension - index));
+        result.set(bytes.subarray(0, index)); result.set(bytes.subarray(afterExtension), index);
+        return result;
+      }
+      bytes[index + needle.length] = repeats & 255; bytes[index + needle.length + 1] = repeats >>> 8; return bytes;
+    }
   }
   throw new Error('GIFのループ設定を確認できません。');
 }
@@ -211,9 +222,10 @@ async function encodeRaster(frame, format, encoder, signal, quality = 0.9) {
 }
 
 /** Encode one output item from original RGBA frame data. `encodeRaster(frame, mime)` supplies browser canvas encoding. */
-export async function encodeOutput({ format, frames, background = '#ffffff', quality = 0.9, loopCount = 0, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
+export async function encodeOutput({ format, frames, background = '#ffffff', quality = 0.9, totalPlays, loopCount, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
   const progress = (value) => { try { onProgress(Math.max(0, Math.min(1, value))); } catch { /* progress cannot affect encoding */ } };
   if (!OUTPUT_FORMATS.includes(format)) throw new TypeError('選択できない画像形式です。');
+  if (totalPlays === undefined) totalPlays = Number.isSafeInteger(loopCount) ? loopCount : 0; // compatibility with older callers
   const animated = format === 'gif' || format === 'apng';
   checkFrames(frames, animated);
   if (!Number.isSafeInteger(scale) || scale < 1 || scale > 16) throw new RangeError('拡大率は1〜16の整数で指定してください。');
@@ -232,10 +244,10 @@ export async function encodeOutput({ format, frames, background = '#ffffff', qua
       pngs.push({ bytes: await encodeRaster(frame, 'png', rasterEncoder, signal), delayMs: frame.delayMs });
       progress((index + 1) / framesWithTiming.length * 0.9);
     }
-    const blob = makeBlob(encodeApng(pngs, loopCount), format); progress(1); return blob;
+    const blob = makeBlob(encodeApng(pngs, totalPlays), format); progress(1); return blob;
   }
-  if (!Number.isSafeInteger(loopCount) || loopCount < 0 || loopCount > 65535) throw new RangeError('GIFのループ回数は0〜65535で指定してください。');
+  totalPlaysToGifRepeats(totalPlays);
   const encoded = await encodeAnimatedGif(framesWithTiming, { delayMs: 100, maxInputPixels: OUTPUT_MAX_ANIMATED_PIXELS, maxPixels: OUTPUT_MAX_ANIMATED_PIXELS, longEdge: 4096, signal, onProgress: (value) => progress(value * 0.9) });
   progress(0.95);
-  const blob = makeBlob(setGifLoop(encoded.bytes, loopCount), format); progress(1); return blob;
+  const blob = makeBlob(setGifLoop(encoded.bytes, totalPlays), format); progress(1); return blob;
 }

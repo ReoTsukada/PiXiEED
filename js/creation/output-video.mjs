@@ -1,4 +1,5 @@
 import { audioVideoFrameSize, chooseAudioVideoMimeType, AUDIO_VIDEO_MAX_SECONDS } from './audio-video.mjs?rev=20261008-output-1';
+import { getOutputTiming } from './output-timing.mjs?rev=20261008-timing-1';
 
 function abortError() { try { return new DOMException('動画の作成を中止しました。', 'AbortError'); } catch { const error = new Error('動画の作成を中止しました。'); error.name = 'AbortError'; return error; } }
 function assertFrame(frame) {
@@ -26,8 +27,9 @@ export async function renderOutputVideo(frames, {
   if (!Number.isFinite(playbackRate) || playbackRate < 0.25 || playbackRate > 4) throw new RangeError('再生速度は0.25〜4倍で指定してください。');
   if (!mimeChoice || !MediaRecorderImpl || !MediaStreamImpl || !documentRef?.createElement || (audioSource && !AudioContextImpl)) throw new Error('このブラウザーは動画の作成に対応していません。画像と音声の通常保存は引き続き使えます。');
   if (signal?.aborted) throw abortError();
-  const delays = frames.map((frame) => Number.isFinite(frame.delayMs) ? Math.max(20, Math.min(5000, frame.delayMs)) : 500);
-  const imageSeconds = delays.reduce((sum, delay) => sum + delay, 0) / 1000 / playbackRate;
+  const timing = getOutputTiming(frames, { format: 'video', playbackRate });
+  const delays = timing.sourceDelaysMs;
+  const imageSeconds = timing.durationMs / 1000;
   const audioSeconds = audioSource ? audioSource.channels[0].length / audioSource.sampleRate / playbackRate : 0;
   const durationSeconds = audioSource ? audioSeconds : imageSeconds;
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('動画は120秒以内で作成できます。コマ数や音声の長さを短くしてください。');

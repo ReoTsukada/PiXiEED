@@ -62,7 +62,7 @@ test('SVG rejects an oversized vector before building an unbounded output', asyn
 
 test('APNG builds CRC-valid chunks, ordered sequence numbers, per-frame delays, and loop count', async () => {
   const outputs = [checkerA, checkerB];
-  const blob = await encodeOutput({ format: 'apng', frames: outputs, loopCount: 4 }, { encodeRaster: async (value, mime) => new Blob([pngFixture(value.width, value.height, value.data)], { type: mime }) });
+  const blob = await encodeOutput({ format: 'apng', frames: outputs, totalPlays: 4 }, { encodeRaster: async (value, mime) => new Blob([pngFixture(value.width, value.height, value.data)], { type: mime }) });
   const bytes = new Uint8Array(await blob.arrayBuffer()); assert.equal(blob.type, 'image/apng'); assert.deepEqual(bytes.subarray(0, 8), signature);
   let offset = 8; const names = []; const seq = []; const delays = []; let loops = null;
   while (offset < bytes.length) {
@@ -93,17 +93,31 @@ test('APNG rejects incompatible frame PNG headers and does not invent a conversi
   await assert.rejects(encodeOutput({ format: 'apng', frames: [checkerA, checkerB] }, { encodeRaster }), /色形式が一致/);
 });
 
-test('GIF uses repository encoder, preserves timing fields, and supports finite and infinite loops', async () => {
-  for (const loopCount of [0, 3]) {
+test('GIF converts normalized total plays into Netscape repeats and omits the loop extension for one play', async () => {
+  for (const [totalPlays, encodedRepeats] of [[0, 0], [1, null], [2, 1], [4, 3]]) {
     const progress = [];
-    const blob = await encodeOutput({ format: 'gif', frames: [checkerA, checkerB], loopCount }, { onProgress: (value) => progress.push(value) }); const bytes = new Uint8Array(await blob.arrayBuffer());
+    const blob = await encodeOutput({ format: 'gif', frames: [checkerA, checkerB], totalPlays }, { onProgress: (value) => progress.push(value) }); const bytes = new Uint8Array(await blob.arrayBuffer());
     assert.deepEqual(progress, [0.45, 0.9, 0.95, 1]);
     assert.equal(blob.type, 'image/gif'); assert.equal(String.fromCharCode(...bytes.subarray(0, 6)), 'GIF89a');
     const app = [...bytes].findIndex((byte, index) => byte === 0x21 && bytes[index + 1] === 0xff && bytes[index + 2] === 0x0b);
-    assert.ok(app > 0); assert.equal(bytes[app + 16] | (bytes[app + 17] << 8), loopCount);
+    if (encodedRepeats === null) assert.equal(app, -1);
+    else { assert.ok(app > 0); assert.equal(bytes[app + 16] | (bytes[app + 17] << 8), encodedRepeats); }
     const delays = [];
     for (let index = 0; index < bytes.length - 7; index += 1) if (bytes[index] === 0x21 && bytes[index + 1] === 0xf9 && bytes[index + 2] === 4) delays.push((bytes[index + 4] | (bytes[index + 5] << 8)) * 10);
     assert.deepEqual(delays, [40, 170]);
+  }
+});
+
+test('APNG total-play values encode one pass, repeated passes, and infinite playback directly', async () => {
+  for (const totalPlays of [0, 1, 2]) {
+    const blob = await encodeOutput({ format: 'apng', frames: [checkerA, checkerB], totalPlays }, { encodeRaster: raster });
+    const bytes = new Uint8Array(await blob.arrayBuffer()); let offset = 8; let actual = null;
+    while (offset + 12 <= bytes.length) {
+      const length = new DataView(bytes.buffer, bytes.byteOffset + offset, 4).getUint32(0);
+      if (String.fromCharCode(...bytes.subarray(offset + 4, offset + 8)) === 'acTL') actual = new DataView(bytes.buffer, bytes.byteOffset + offset + 12, 4).getUint32(0);
+      offset += length + 12;
+    }
+    assert.equal(actual, totalPlays);
   }
 });
 

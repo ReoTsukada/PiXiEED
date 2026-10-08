@@ -1,10 +1,11 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-10';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-11';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-6';
+import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-7';
 import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
 import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261008-output-1';
-import { renderOutputVideo } from './output-video.mjs?rev=20261008-output-2';
-import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261008-output-2';
+import { renderOutputVideo } from './output-video.mjs?rev=20261008-output-3';
+import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261008-output-3';
+import { getOutputTiming } from './output-timing.mjs?rev=20261008-timing-1';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -102,7 +103,7 @@ let importController = null;
 let timelineTimer = null;
 let timelineFrameIndex = 0;
 let pendingWrites = new Set();
-let mediaSettings = { playbackRate: 1, loopCount: 0 };
+let mediaSettings = { playbackRate: 1, totalPlays: 0 };
 let lastImportedMedia = null;
 let mediaWritePending = false;
 let itemWritePending = false;
@@ -268,11 +269,11 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   updateSequenceControls();
 }
 
-function frameDuration(frames) { return frames.reduce((sum, frame) => sum + (Number(frame.delayMs) || 500), 0); }
+function frameDuration(frames) { return getOutputTiming(frames, { format: 'video' }).sourceDurationMs; }
 
 function effectiveFrameDelay(frame, formatValue = formatSelect.value, rate = Number(mediaSettings.playbackRate) || 1) {
-  const scaled = Math.round((Number(frame.delayMs) || 500) / rate);
-  return formatValue === 'gif' ? Math.max(20, scaled) : Math.max(1, scaled);
+  const target = formatValue === 'gif' ? 'gif' : formatValue === 'apng' ? 'apng' : 'video';
+  return getOutputTiming([frame], { format: target, playbackRate: rate }).previewDelaysMs[0];
 }
 
 function stopTimelinePreview() {
@@ -298,7 +299,7 @@ function playTimelineNext() {
   const rate = Number(mediaSettings.playbackRate) || 1;
   timelineFrameIndex += 1;
   if (timelineFrameIndex >= frames.length) {
-    const loops = Number(mediaSettings.loopCount) || 0;
+    const loops = Number(mediaSettings.totalPlays) || 0;
     const currentLoops = Number(timelinePlay.dataset.loop || 0) + 1;
     timelinePlay.dataset.loop = String(currentLoops);
     if (loops > 0 && currentLoops >= loops) { stopTimelinePreview(); timelinePlay.dataset.loop = '0'; return; }
@@ -320,23 +321,23 @@ function updateSequenceControls() {
   playbackRateValue.value = `${playbackRate.value}倍`; playbackRateValue.textContent = `${playbackRate.value}倍`;
   const animatedFormat = ['gif', 'apng'].includes(formatValue);
   loopField.hidden = !animatedFormat;
-  const loopValue = Number(mediaSettings.loopCount ?? activeSource?.mediaSource?.loopCount ?? 0);
+  const loopValue = Number(mediaSettings.totalPlays ?? activeSource?.mediaSource?.totalPlays ?? activeSource?.mediaSource?.loopCount ?? 0);
   for (const option of [...loopCount.options]) if (option.dataset.original === 'true') option.remove();
   if (![0, 1, 2, 3].includes(loopValue)) {
-    const option = new Option(`元ファイルの回数（${loopValue}）`, String(loopValue)); option.dataset.original = 'true'; loopCount.add(option, 0);
+    const option = new Option(`元ファイルと同じ（${loopValue === 0 ? '無限' : `${loopValue}回`}）`, String(loopValue)); option.dataset.original = 'true'; loopCount.add(option, 0);
   }
   loopCount.value = String(loopValue);
   const rate = Number(mediaSettings.playbackRate) || 1;
-  const onePassSeconds = ['gif', 'apng'].includes(formatValue)
-    ? frames.reduce((sum, frame) => sum + effectiveFrameDelay(frame, formatValue, rate), 0) / 1000
-    : frameDuration(frames) / 1000 / rate;
+  const onePassSeconds = getOutputTiming(frames, { format: ['gif', 'apng'].includes(formatValue) ? formatValue : 'video', playbackRate: rate }).durationMs / 1000;
   const audioSource = audioBufferSource();
   const videoDuration = audioSource ? audioSource.durationSeconds / (Number(mediaSettings.playbackRate) || 1) : onePassSeconds;
   sequenceSummary.textContent = audioSource
     ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は音声の終わり（${videoDuration.toFixed(2)}秒）で終了。速度変更で音程も変わります。動画は最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
     : ['mp4', 'webm'].includes(formatValue)
       ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は1巡で終了します。最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
-      : `1巡 ${onePassSeconds.toFixed(2)}秒 · GIFは1コマ20ms以上で書き出します。`;
+      : formatValue === 'gif'
+        ? `1巡 ${onePassSeconds.toFixed(2)}秒 · GIFは20〜655,350msを10ms単位で書き出します。`
+        : `1巡 ${onePassSeconds.toFixed(2)}秒 · APNGは1ms以上のコマ時間で書き出します。`;
   animationDetails.textContent = `${frames.length}コマ · 1巡 ${onePassSeconds.toFixed(2)}秒 · 画面操作でプレビューできます。`;
   timelinePlay.hidden = !(activeSource?.id.startsWith('local-images') && isSequence && ['png', 'jpeg', 'svg'].includes(activeItem?.extension));
   timelineCanvas.hidden = timelinePlay.hidden;
@@ -368,12 +369,12 @@ function renderAssets() {
       up.disabled ||= controlsDisabled; down.disabled ||= controlsDisabled;
       up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1)); controls.append(up, down);
       if (frames.length > 1) {
-        const duration = document.createElement('input'); duration.type = 'number'; duration.min = '20'; duration.max = '5000'; duration.step = '10'; duration.value = String(Math.round(frame.delayMs || 500)); duration.inputMode = 'numeric';
+        const duration = document.createElement('input'); duration.type = 'number'; duration.min = '1'; duration.max = '3600000'; duration.step = '1'; duration.value = String(Math.round(frame.delayMs || 500)); duration.inputMode = 'numeric';
         duration.setAttribute('aria-label', `${name.textContent}の表示時間（ミリ秒）`);
         duration.disabled = controlsDisabled;
         duration.addEventListener('change', () => {
           const delayMs = Number(duration.value);
-          if (!Number.isFinite(delayMs) || delayMs < 20 || delayMs > 5000) { status.textContent = 'コマの表示時間は20〜5000ミリ秒で指定してください。'; renderAssets(); return; }
+          if (!Number.isFinite(delayMs) || delayMs < 1 || delayMs > 3600000) { status.textContent = 'コマの表示時間は1〜3,600,000ミリ秒で指定してください。'; renderAssets(); return; }
           const nextFrames = frames.map((entry, i) => i === index ? { ...entry, delayMs } : entry);
           void persistMediaSources(mediaSources.map((item) => item.id === source.id ? { ...item, mediaSource: { ...item.mediaSource, frames: nextFrames } } : item));
         });
@@ -402,7 +403,7 @@ function renderAssets() {
     controls.append(remove, replace); row.append(name, controls); assetsList.append(row);
   }
   const frames = imageSources.reduce((all, source) => [...all, ...source.mediaSource.frames], []);
-  assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマは20〜5000ms · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
+  assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマは1〜3,600,000ms · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
 }
 
 async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
@@ -429,7 +430,7 @@ async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
 
 function sourcesFromImport(imported) {
   const sources = [];
-  if (imported.frames.length) sources.push({ id: 'local-images', label: `画像 (${imported.frames.length}コマ)`, kind: 'rgba-frames', mediaSource: { kind: 'rgba-frames', width: imported.frames[0].width, height: imported.frames[0].height, frames: imported.frames, loopCount: imported.loopCount || 0 } });
+  if (imported.frames.length) sources.push({ id: 'local-images', label: `画像 (${imported.frames.length}コマ)`, kind: 'rgba-frames', mediaSource: { kind: 'rgba-frames', width: imported.frames[0].width, height: imported.frames[0].height, frames: imported.frames, totalPlays: imported.totalPlays ?? 1 } });
   if (imported.audio) sources.push({ id: 'local-audio', label: imported.audio.name, kind: 'audio-buffer', sampleRate: imported.audio.sampleRate, durationSeconds: imported.audio.durationSeconds, channels: imported.audio.channels });
   return sources;
 }
@@ -498,7 +499,7 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         initialFilename = 'pixieed-audio.wav';
         metadataValue = { durationSeconds: imported.audio.durationSeconds, sampleRate: imported.audio.sampleRate };
       }
-      const staged = await stageToolOutput({ blob: initialBlob, filename: initialFilename, returnUrl: '/output/', metadata: metadataValue, mediaSources: newSources, mediaSettings: { playbackRate: 1, loopCount: imported.loopCount || 0 }, title: '変換・書き出し', source: 'この端末の素材' });
+      const staged = await stageToolOutput({ blob: initialBlob, filename: initialFilename, returnUrl: '/output/', metadata: metadataValue, mediaSources: newSources, mediaSettings: { playbackRate: 1, totalPlays: imported.totalPlays ?? 1 }, title: '変換・書き出し', source: 'この端末の素材' });
       targetStatus.textContent = '端末内に素材を保持しました。出力ページを開いています…';
       location.assign(staged.url);
     }
@@ -612,10 +613,12 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
   if ((source?.kind === 'rgba-frames' || source?.kind === 'legacy-image') && !['mp4', 'webm'].includes(formatValue)) {
     const originalFrames = source.kind === 'rgba-frames' ? source.mediaSource.frames : source.mediaSource?.frames;
     const rate = Number(mediaSettings.playbackRate) || 1;
-    const frames = ['gif', 'apng'].includes(formatValue) ? originalFrames.map((frame) => ({ ...frame, delayMs: Math.max(20, (frame.delayMs || 100) / rate) })) : originalFrames;
+    const timing = getOutputTiming(originalFrames, { format: formatValue === 'gif' ? 'gif' : 'apng', playbackRate: rate });
+    if (formatValue === 'gif' && timing.frameDelaysMs.some((delay) => delay > 655350)) throw new RangeError('GIFのコマ時間は20〜655,350msです。APNGを選ぶか、再生速度を上げてください。');
+    const frames = originalFrames.map((frame, index) => ({ ...frame, delayMs: timing.frameDelaysMs[index] }));
     if (!Array.isArray(frames) || !frames.length) throw new Error('画像の元データを確認できません。');
-    const loop = mediaSettings.loopCount ?? source.mediaSource.loopCount ?? 0;
-    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', quality: Number(jpegQuality.value) / 100, loopCount: loop }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
+    const totalPlays = mediaSettings.totalPlays ?? source.mediaSource.totalPlays ?? source.mediaSource.loopCount ?? 0;
+    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', quality: Number(jpegQuality.value) / 100, totalPlays }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
     const result = await renderAudioWav(source.song);
@@ -679,7 +682,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
       ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
       ...(extensionValue === 'jpeg' ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
-      ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: frames.reduce((sum, frame) => sum + (frame.delayMs || 100), 0) / 1000 / (Number(mediaSettings.playbackRate) || 1), loopCount: mediaSettings.loopCount ?? source.mediaSource?.loopCount ?? 0 } : {}),
+      ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: getOutputTiming(frames, { format: extensionValue, playbackRate: 1 }).durationMs / 1000, totalPlays: mediaSettings.totalPlays ?? source.mediaSource?.totalPlays ?? source.mediaSource?.loopCount ?? 0 } : {}),
       ...generatedOutput.metadata
     };
     const updated = { ...previousItem, sourceId: source.id, mime: outputMime(extensionValue), extension: extensionValue, filename: nextFilename, blob, metadata: metadataValue };
@@ -817,7 +820,7 @@ function updateScaleSummary(width, height, kind, frameCount = 1) {
   sizeSummary.textContent = `${width} × ${height}px → ${outWidth} × ${outHeight}px${uniformScale ? ` · ${outWidth / width}倍` : ''}`;
   updatePresetSelection(width, height);
   if (kind === 'gif' && record?.mediaSource?.frames?.length) {
-    const seconds = record.mediaSource.frames.reduce((total, frame) => total + frame.delayMs, 0) / 1000;
+    const seconds = getOutputTiming(record.mediaSource.frames, { format: 'gif' }).durationMs / 1000;
     animationDetails.textContent = `${frameCount}フレーム · ${seconds.toFixed(1)}秒 · ループ再生`;
   }
 }
@@ -950,15 +953,15 @@ async function mount() {
           sourceCanvas = document.createElement('canvas'); sourceCanvas.width = original.naturalWidth; sourceCanvas.height = original.naturalHeight;
           const context = sourceCanvas.getContext('2d', { willReadFrequently: true }); context.drawImage(original, 0, 0);
           const pixels = context.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-          const mediaSource = { kind: 'rgba-frames', width: sourceCanvas.width, height: sourceCanvas.height, frames: [{ width: sourceCanvas.width, height: sourceCanvas.height, data: new Uint8Array(pixels.data) }], loopCount: 0 };
+    const mediaSource = { kind: 'rgba-frames', width: sourceCanvas.width, height: sourceCanvas.height, frames: [{ width: sourceCanvas.width, height: sourceCanvas.height, data: new Uint8Array(pixels.data) }], totalPlays: 1 };
           mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'rgba-frames', mediaSource }];
         }
       } catch { /* Keep the original file downloadable when pixel decoding is unavailable. */ }
       finally { if (sourceCanvas) sourceCanvas.width = sourceCanvas.height = 1; if (sourceUrlToRelease) URL.revokeObjectURL(sourceUrlToRelease); }
     }
     if (!mediaSources.length) mediaSources = [{ id: 'legacy', label: record.source || '元のファイル', kind: 'legacy-file', blob: record.sourceBlob, mime: record.mime, extension: record.extension }];
-    const importedLoopCount = mediaSources.find((source) => source.mediaSource?.loopCount !== undefined)?.mediaSource?.loopCount ?? 0;
-    mediaSettings = { playbackRate: record.mediaSettings?.playbackRate || 1, loopCount: record.mediaSettings?.loopCount ?? importedLoopCount };
+  const importedTotalPlays = mediaSources.find((source) => source.mediaSource?.totalPlays !== undefined || source.mediaSource?.loopCount !== undefined)?.mediaSource?.totalPlays ?? mediaSources.find((source) => source.mediaSource?.loopCount !== undefined)?.mediaSource?.loopCount ?? 0;
+  mediaSettings = { playbackRate: record.mediaSettings?.playbackRate || 1, totalPlays: record.mediaSettings?.totalPlays ?? record.mediaSettings?.loopCount ?? importedTotalPlays };
     outputItems = record.outputs?.length ? record.outputs : [{ id: 'default', sourceId: mediaSources[0]?.id || '', mime: record.mime, extension: record.extension, filename: record.filename, blob: record.blob, metadata: record.currentMetadata || {} }];
     activeItem = outputItems[0];
     if (!activeItem.sourceId) activeItem.sourceId = mediaSources[0]?.id || '';
@@ -984,12 +987,12 @@ timelinePlay.addEventListener('click', () => {
   timelineFrameIndex = 0; timelinePlay.dataset.loop = '0';
   timelinePlay.setAttribute('aria-pressed', 'true'); timelinePlay.textContent = 'コマ送りを停止';
   paintTimelineFrame(0);
-  const delay = Math.max(20, Number(sourceFrames()[0].delayMs) || 500) / (Number(mediaSettings.playbackRate) || 1);
+  const delay = effectiveFrameDelay(sourceFrames()[0], formatSelect.value, Number(mediaSettings.playbackRate) || 1);
   timelineTimer = setTimeout(playTimelineNext, delay);
 });
 playbackRate.addEventListener('input', () => { playbackRateValue.value = `${playbackRate.value}倍`; playbackRateValue.textContent = `${playbackRate.value}倍`; });
 playbackRate.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, playbackRate: Number(playbackRate.value) }); });
-loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, loopCount: Number(loopCount.value) }); });
+loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, totalPlays: Number(loopCount.value) }); });
 createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
 returnLink.addEventListener('click', async (event) => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !pendingWrites.size) return;
