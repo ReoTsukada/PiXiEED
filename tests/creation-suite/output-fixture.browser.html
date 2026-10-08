@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>出力画面のブラウザ確認</title>
+  <style>body{font:16px system-ui;max-width:680px;margin:30px auto;padding:0 18px}button{display:block;width:100%;min-height:52px;margin:12px 0;padding:12px;text-align:left}#state{padding:12px;background:#eef3ef}</style>
+</head>
+<body>
+  <h1>出力画面のブラウザ確認</h1>
+  <p>テスト用の一時ファイルだけを同じブラウザー内に作ります。</p>
+  <div id="controls"></div>
+  <p id="state" role="status">形式を選んでください。</p>
+  <script type="module">
+    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-2';
+    import { encodeAnimatedGif } from '/js/animated-export.mjs';
+    const controls = document.querySelector('#controls');
+    const state = document.querySelector('#state');
+    function add(label, run) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.textContent = label;
+      button.addEventListener('click', async () => {
+        button.disabled = true; state.textContent = '端末内に一時データを準備しています…';
+        try { await run(); } catch (error) { state.textContent = error?.message || '準備に失敗しました。'; button.disabled = false; }
+      });
+      controls.append(button);
+    }
+    async function open(blob, filename, title, metadata = {}, mediaSource = null) {
+      const result = await sendToolOutput({ blob, filename, returnUrl: '/draw/', source: 'テスト用サンプル', title, metadata, ...(mediaSource ? { mediaSource } : {}) });
+      if (!result.ok) throw result.error || new Error('出力画面を開けませんでした。');
+    }
+    add('透明背景つき PNG を開く', async () => {
+      const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 16;
+      const context = canvas.getContext('2d'); context.fillStyle = '#ef5264'; context.fillRect(0, 0, 12, 16); context.fillStyle = '#16a878'; context.fillRect(20, 0, 12, 16);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      await open(blob, 'sample-pixel.png', 'PNG を確認', { width: 32, height: 16 });
+    });
+    add('GIF を開く', async () => {
+      const frames = [0, 1].map(red => ({ width: 2, height: 2, data: new Uint8ClampedArray([red * 255, 20, 20, 255, 0, 180, 80, 255, 0, 80, 240, 255, 250, 220, 40, 255]) }));
+      frames.forEach((frame) => { frame.delayMs = 250; });
+      const result = await encodeAnimatedGif(frames, { longEdge: 32, workerFactory: () => null });
+      await open(new Blob([result.bytes], { type: 'image/gif' }), 'sample-animation.gif', 'GIF を確認', { width: 2, height: 2, defaultScale: result.scale, durationSeconds: 0.5, frameCount: frames.length }, { kind: 'gif-frames', frames, loopCount: 0 });
+    });
+    add('WAV を開く', async () => {
+      const rate = 8000, samples = 8000, bytes = new ArrayBuffer(44 + samples * 4), view = new DataView(bytes);
+      const word = (offset, value) => { for (const char of value) view.setUint8(offset++, char.charCodeAt(0)); };
+      word(0, 'RIFF'); view.setUint32(4, bytes.byteLength - 8, true); word(8, 'WAVE'); word(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true); view.setUint32(24, rate, true); view.setUint32(28, rate * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true); word(36, 'data'); view.setUint32(40, samples * 4, true);
+      for (let index = 0; index < samples; index++) { view.setInt16(44 + index * 4, Math.sin(index * Math.PI * 2 * 440 / rate) * 5000, true); view.setInt16(46 + index * 4, Math.sin(index * Math.PI * 2 * 440 / rate) * 5000, true); }
+      await open(new Blob([bytes], { type: 'audio/wav' }), 'sample-tone.wav', 'WAV を確認', { durationSeconds: 1, sampleRate: rate, loops: 1 });
+    });
+    add('WebM 動画を開く', async () => {
+      const response = await fetch('/assets/pixel-studio/test-media/street.webm');
+      if (!response.ok) throw new Error('動画サンプルを読み込めませんでした。');
+      await open(await response.blob(), 'sample-video.webm', '動画を確認', { durationSeconds: 2 });
+    });
+    window.addEventListener('pageshow', (event) => {
+      if (!event.persisted) return;
+      for (const button of controls.querySelectorAll('button')) button.disabled = false;
+      state.textContent = '編集ページは保持されています。もう一度形式を選べます。';
+    });
+  </script>
+</body>
+</html>

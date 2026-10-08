@@ -25,6 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261005-audio-history-1';
+import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-2';
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
   audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, getAudioColorInstrument, setAudioColorInstrument, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
@@ -1243,9 +1244,11 @@ scope.listen(exportImageButton, 'click', async () => {
     await pxdBridge?.assertCanSave();
     if (disposed()) return;
     if (!unchangedSource()) throw new Error('素材が切り替わりました。絵をもう一度保存してください。');
-    const { blob, width, height } = await exportAudioImage(songSnapshot, imageSnapshot ? { image: imageSnapshot } : {});
+    const { blob, width, height, scale, baseWidth, baseHeight } = await exportAudioImage(songSnapshot, imageSnapshot ? { image: imageSnapshot } : {});
     if (disposed()) return;
     if (!unchangedSource()) throw new Error('素材が切り替わりました。絵をもう一度保存してください。');
+    const staged = await sendToolOutput({ blob, filename: `pixieed-dot-music-${width}x${height}.png`, returnUrl: currentAudioReturnUrl(), title: '音楽の画像を確認', source: 'ドットで音楽', metadata: { width: baseWidth, height: baseHeight, defaultScale: scale } });
+    if (staged.ok) return;
     const saved = await saveFile(blob, `pixieed-dot-music-${width}x${height}.png`);
     if (disposed()) return;
     if (saved === 'cancelled') return;
@@ -1565,9 +1568,11 @@ if (exportSoundButton) scope.listen(exportSoundButton, 'click', async () => {
     if (disposed()) return;
     if (!unchanged()) throw new Error('素材が切り替わりました。音をもう一度保存してください。');
     const songSnapshot = structuredClone(sourceSong);
-    const { blob, seconds } = await renderAudioWav(songSnapshot);
+    const { blob, seconds, loops } = await renderAudioWav(songSnapshot);
     if (disposed()) return;
     if (!unchanged()) throw new Error('素材が切り替わりました。音をもう一度保存してください。');
+    const staged = await sendToolOutput({ blob, filename: `pixieed-dot-music-${Math.round(seconds)}s.wav`, returnUrl: currentAudioReturnUrl(), title: '音を確認', source: 'ドットで音楽', metadata: { durationSeconds: seconds, sampleRate: 44100, loops } });
+    if (staged.ok) return;
     const saved = await saveFile(blob, `pixieed-dot-music-${Math.round(seconds)}s.wav`);
     if (disposed()) return;
     if (saved !== 'cancelled' && unchanged()) {
@@ -1615,7 +1620,10 @@ if (exportVideoButton) scope.listen(exportVideoButton, 'click', async () => {
     if (epoch !== audioVideoEpoch || controller.signal.aborted || !unchangedSource()) return;
     status.textContent = '動画を端末に保存しています…';
     if (!unchangedSource()) return;
-    const saved = await saveFile(result.blob, `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`);
+    const outputFilename = `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`;
+    const staged = await sendToolOutput({ blob: result.blob, filename: outputFilename, returnUrl: currentAudioReturnUrl(), title: '音付き動画を確認', source: 'ドットで音楽', metadata: { durationSeconds: result.seconds, width: result.width, height: result.height } });
+    if (staged.ok) return;
+    const saved = await saveFile(result.blob, outputFilename);
     if (disposed() || epoch !== audioVideoEpoch) return;
     if (saved !== 'cancelled' && epoch === audioVideoEpoch && !controller.signal.aborted && unchangedSource()) {
       const shared = saved === 'shared';
@@ -1632,5 +1640,7 @@ if (exportVideoButton) scope.listen(exportVideoButton, 'click', async () => {
   }
 });
 if (cancelVideoButton) scope.listen(cancelVideoButton, 'click', () => audioVideoController?.abort());
+
+function currentAudioReturnUrl() { return `${location.pathname}${location.search}${location.hash}`; }
   return { workspace: pxdBridge, dispose: disposeAudioMode };
 }

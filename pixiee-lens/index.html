@@ -2623,9 +2623,9 @@
       <div class="capture-preview__image-wrap">
         <img alt="撮影した画像のプレビュー" id="capturePreviewImage" loading="lazy"/>
       </div>
-      <p class="capture-preview__info" id="capturePreviewInfo">画像・GIFは撮影後に自動でダウンロードされます。</p>
+      <p class="capture-preview__info" id="capturePreviewInfo">撮影したファイルを確認して保存できます。</p>
       <div class="capture-preview__actions">
-        
+        <button class="capture-preview__button capture-preview__button--primary" hidden="" id="capturePreviewOutputBtn" type="button">保存設定を開く</button>
         <button class="capture-preview__button capture-preview__button--primary" hidden="" id="capturePreviewShareBtn" type="button">共有する</button>
         <button class="capture-preview__button" id="capturePreviewCloseActionBtn" type="button">閉じる</button>
       </div>
@@ -2686,6 +2686,7 @@
     const capturePreviewAd = capturePreviewOverlay ? capturePreviewOverlay.querySelector('.capture-preview__ad') : null;
     const capturePreviewCloseBtn = document.getElementById('capturePreviewCloseBtn');
     const capturePreviewCloseActionBtn = document.getElementById('capturePreviewCloseActionBtn');
+    const capturePreviewOutputBtn = document.getElementById('capturePreviewOutputBtn');
     const capturePreviewShareBtn = document.getElementById('capturePreviewShareBtn');
     const capturePreviewEditBtn = document.getElementById('capturePreviewEditBtn');
     const capturePreviewBackdrop = document.getElementById('capturePreviewBackdrop');
@@ -2878,6 +2879,31 @@
     if (capturePreviewCloseActionBtn) {
       capturePreviewCloseActionBtn.addEventListener('click', () => {
         closeCapturePreview();
+      });
+    }
+    if (capturePreviewOutputBtn) {
+      capturePreviewOutputBtn.addEventListener('click', async () => {
+        if (!(capturePreviewBlob instanceof Blob) || !capturePreviewFilename || capturePreviewOutputBtn.disabled) return;
+        capturePreviewOutputBtn.disabled = true;
+        try {
+          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261008-output-2');
+          const staged = await sendToolOutput({
+            blob: capturePreviewBlob,
+            filename: capturePreviewFilename,
+            returnUrl: `${location.pathname}${location.search}${location.hash}`,
+            title: capturePreviewFilename.endsWith('.gif') ? 'アニメーションを確認' : '画像を確認',
+            source: 'PiXiEELENS',
+            metadata: { width: capturePreviewWidth, height: capturePreviewHeight, ...(capturePreviewDuration ? { durationSeconds: capturePreviewDuration } : {}), ...(capturePreviewMediaSource ? { defaultScale: 1, frameCount: capturePreviewMediaSource.frames.length } : {}) },
+            ...(capturePreviewMediaSource ? { mediaSource: capturePreviewMediaSource } : {})
+          });
+          if (staged.ok) return;
+          const directUrl = URL.createObjectURL(capturePreviewBlob);
+          const anchor = document.createElement('a'); anchor.href = directUrl; anchor.download = capturePreviewFilename; anchor.hidden = true;
+          document.body.append(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(directUrl), 30000);
+          setStatus('端末内の出力画面を使えないため、ファイルのダウンロードを開始しました。');
+        } catch (error) {
+          setStatus(error?.message || 'ファイルを準備できませんでした。共有ボタンから保存できます。');
+        } finally { capturePreviewOutputBtn.disabled = false; }
       });
     }
     if (capturePreviewBackdrop) {
@@ -3126,6 +3152,12 @@
     };
     let capturePreviewObjectUrl = null;
     let capturePreviewSharePayload = null;
+    let capturePreviewBlob = null;
+    let capturePreviewFilename = '';
+    let capturePreviewWidth = 0;
+    let capturePreviewHeight = 0;
+    let capturePreviewDuration = 0;
+    let capturePreviewMediaSource = null;
     let capturePreviewEditPayload = null;
     let capturePreviewLastFocus = null;
     let cameraStartOverlayLastFocus = null;
@@ -5054,6 +5086,11 @@
         capturePreviewImage.src = '';
       }
       capturePreviewSharePayload = null;
+      capturePreviewBlob = null;
+      capturePreviewFilename = '';
+      capturePreviewWidth = capturePreviewHeight = capturePreviewDuration = 0;
+      capturePreviewMediaSource = null;
+      if (capturePreviewOutputBtn) { capturePreviewOutputBtn.hidden = true; capturePreviewOutputBtn.disabled = true; }
       capturePreviewEditPayload = null;
       if (capturePreviewEditBtn) {
         capturePreviewEditBtn.hidden = true;
@@ -5509,7 +5546,7 @@
       }
     }
 
-    function showCapturePreview({ url, filename, width, height, sharePayload, infoMessage, drawPayload }) {
+    function showCapturePreview({ url, filename, width, height, sharePayload, infoMessage, drawPayload, blob, fileWidth, fileHeight, durationSeconds = 0, mediaSource = null }) {
       if (!capturePreviewOverlay || !capturePreviewImage) {
         if (url) {
           window.open(url, '_blank', 'noopener');
@@ -5525,6 +5562,11 @@
       }
       capturePreviewImage.src = url;
       capturePreviewImage.alt = `撮影した画像 ${width}×${height}`;
+      capturePreviewBlob = blob instanceof Blob ? blob : (sharePayload?.file instanceof Blob ? sharePayload.file : null);
+      capturePreviewFilename = typeof filename === 'string' ? filename : '';
+      capturePreviewWidth = Number(fileWidth) || Number(width) || 0; capturePreviewHeight = Number(fileHeight) || Number(height) || 0; capturePreviewDuration = Number(durationSeconds) || 0;
+      capturePreviewMediaSource = mediaSource;
+      if (capturePreviewOutputBtn) { capturePreviewOutputBtn.hidden = !capturePreviewBlob; capturePreviewOutputBtn.disabled = !capturePreviewBlob; }
       if (!infoMessage && drawPayload) {
         infoMessage = '画像を長押しして保存できます。';
       }
@@ -10379,9 +10421,7 @@
         ? options.mimeType
         : 'image/png';
       const enableDrawImport = options.enableDrawImport !== false;
-      const autoShareOnMobile = options.autoShareOnMobile !== false && options.autoShareOnIOS !== false;
       const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
-      const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const drawPayload = enableDrawImport
         ? await createDrawImportPayload(result, filename, options.drawPayloadOptions || {})
         : null;
@@ -10391,8 +10431,8 @@
       }
       let sharePayload = null;
       let infoMessage = drawPayload
-        ? 'iDRAWで編集するか、画像を保存してご利用ください。'
-        : `${formatLabel}を保存してご利用ください。`;
+        ? `${formatLabel}を確認し、保存設定またはiDRAWで続けて編集できます。`
+        : `${formatLabel}を確認して、保存設定または共有先を選べます。`;
       if (blob instanceof Blob) {
         if (blob.size <= 0) {
           setStatus('保存データの生成に失敗しました');
@@ -10400,59 +10440,8 @@
         }
         const shareFile = new File([blob], filename, { type: mimeType });
         const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
-        let autoShareSucceeded = false;
-        // GIFの長押し終了時はすでにユーザー操作の文脈外になるため、
-        // File System Access API の権限要求をここで行うと SecurityError になる。
-        // PiXiEEDrawと同様に、生成済みBlobをそのままダウンロードする。
-        const downloaded = supportsDownloadAttr;
-        if (downloaded) {
-          const downloadUrl = URL.createObjectURL(blob);
-          const anchor = document.createElement('a');
-          anchor.href = downloadUrl;
-          anchor.download = filename;
-          anchor.rel = 'noopener';
-          anchor.style.position = 'absolute';
-          anchor.style.left = '-9999px';
-          document.body.appendChild(anchor);
-          anchor.click();
-          document.body.removeChild(anchor);
-          setTimeout(() => URL.revokeObjectURL(downloadUrl), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
-        }
-        const shouldAutoShare = !downloaded && autoShareOnMobile && isIOSDevice && canShareFiles;
-        if (shouldAutoShare) {
-          try {
-            await navigator.share({
-              files: [shareFile],
-              title: 'PiXiEELENS',
-              text: CAPTURE_SHARE_TEXT
-            });
-            autoShareSucceeded = true;
-          } catch (error) {
-            if (error && error.name !== 'AbortError') {
-              console.warn('Share failed', error);
-            }
-            // continue to fallback preview
-          }
-        }
-        if (downloaded) {
-          infoMessage = drawPayload
-            ? `${formatLabel}をダウンロードしました。「iDRAWで編集」で続けて編集できます。`
-            : `${formatLabel}をダウンロードしました。`;
-        } else if (canShareFiles) {
-          if (autoShareSucceeded) {
-            infoMessage = drawPayload
-            ? '共有を実行しました。必要に応じて「共有する」から端末に保存するか、「iDRAWで編集」で続けて編集できます。'
-              : `共有を実行しました。必要に応じて「共有する」から${formatLabel}を端末に保存してください。`;
-          } else {
-            infoMessage = drawPayload
-            ? '「共有する」ボタンで保存するか、「iDRAWで編集」で編集できます。'
-              : `「共有する」ボタンから${formatLabel}を保存してください。`;
-          }
-        } else {
-          infoMessage = drawPayload
-            ? '画像を長押しして保存できます。'
-            : `${formatLabel}を長押しして保存してください。`;
-        }
+        // Store the generated Blob in the preview. Saving starts only after the
+        // user chooses the shared output screen, preserving the click gesture.
         if (canShareFiles) {
           const shareUrl = previewUrl && previewUrl.startsWith('blob:')
             ? previewUrl
@@ -10485,7 +10474,12 @@
         height: previewHeight,
         sharePayload,
         infoMessage,
-        drawPayload
+        drawPayload,
+        blob,
+        fileWidth: width,
+        fileHeight: height,
+        durationSeconds: options.durationSeconds,
+        mediaSource: options.mediaSource || null
       });
       return true;
     }
@@ -10670,6 +10664,7 @@
             bytes: encoded,
             width: workingWidth,
             height: workingHeight,
+            frames: sampledFrames,
             frameDelayMs: effectiveDelay,
             frameCount: sampledFrames.length,
             stride,
@@ -10752,6 +10747,18 @@
         optimized: best.width !== sourceWidth || best.height !== sourceHeight || best.stride !== 1,
         withinLimit: best.sizeBytes <= byteLimit
       };
+    }
+
+    function indexedCaptureFramesToRgba(frames, width, height, palette, delayMs) {
+      const colors = normalizeGifPalette(Array.isArray(palette) ? palette : GIF_DEFAULT_PALETTE);
+      return frames.map((indexed) => {
+        const data = new Uint8ClampedArray(width * height * 4);
+        for (let pixel = 0, output = 0; pixel < width * height; pixel += 1, output += 4) {
+          const color = colors[indexed[pixel]] || 0;
+          data[output] = (color >>> 16) & 255; data[output + 1] = (color >>> 8) & 255; data[output + 2] = color & 255; data[output + 3] = 255;
+        }
+        return { width, height, data, delayMs };
+      });
     }
 
     function ensureGifScratchCanvas(width, height) {
@@ -11384,11 +11391,17 @@
           cssWidth: optimizedGif.width,
           cssHeight: optimizedGif.height
         };
+        const outputFramePixels = optimizedGif.width * optimizedGif.height * optimizedGif.frames.length;
+        const outputFrames = outputFramePixels <= 8_000_000
+          ? indexedCaptureFramesToRgba(optimizedGif.frames, optimizedGif.width, optimizedGif.height, session.palette, optimizedGif.frameDelayMs)
+          : null;
         const filename = getCaptureFilename('gif');
         const saved = await deliverCaptureResult(result, filename, {
           formatLabel: 'GIF',
           mimeType: 'image/gif',
           enableDrawImport: true,
+          durationSeconds: optimizedGif.frameCount * optimizedGif.frameDelayMs / 1000,
+          mediaSource: outputFrames ? { kind: 'gif-frames', frames: outputFrames, loopCount: 0 } : null,
           drawPayloadOptions: {
             preferDotCanvas: false
           }

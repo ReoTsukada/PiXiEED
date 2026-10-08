@@ -2,6 +2,7 @@ import { createFrameLoop } from './frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
+import { sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-2';
 
 const $ = (selector) => document.querySelector(selector);
 const root = $('#pixelStudio');
@@ -30,6 +31,7 @@ let previousAiStatus = null;
 let loop = null;
 let lastFacing = 'environment';
 let downloadUrl = null;
+let downloadBlob = null;
 let downloadGeneration = 0;
 let resumeOnVisible = true;
 let pendingCameraRequest = null;
@@ -67,6 +69,7 @@ function invalidateCaptureDownload() {
   downloadGeneration++;
   if (downloadUrl) URL.revokeObjectURL(downloadUrl);
   downloadUrl = null;
+  downloadBlob = null;
   const link = $('#savePng');
   link.removeAttribute('href');
   link.removeAttribute('download');
@@ -550,6 +553,7 @@ async function prepareCaptureDownload(frozen) {
     const { blob, width, height } = await encodeCameraPng(frozen);
     if (generation !== downloadGeneration || state.mode !== 'captured' || state.result !== frozen) return;
     downloadUrl = URL.createObjectURL(blob);
+    downloadBlob = blob;
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.png`;
@@ -594,9 +598,18 @@ $('#capture').addEventListener('click', () => {
   else if (action === 'capture') capture();
 });
 $('#stopCamera').addEventListener('click', () => closeCamera({ message: 'カメラを閉じました。', focus: true }));
-$('#savePng').addEventListener('click', (event) => {
-  if ($('#savePng').getAttribute('aria-disabled') === 'true') { event.preventDefault(); return; }
-  sayToast('PNGの保存を開始しました。');
+$('#savePng').addEventListener('click', async (event) => {
+  if ($('#savePng').getAttribute('aria-disabled') === 'true' || !downloadUrl || !downloadBlob || state.mode !== 'captured' || !state.result) { event.preventDefault(); return; }
+  event.preventDefault();
+  const link = $('#savePng');
+  const snapshot = { generation: downloadGeneration, frame: state.result, url: downloadUrl, blob: downloadBlob, filename: link.download };
+  const current = () => snapshot.generation === downloadGeneration && state.mode === 'captured' && state.result === snapshot.frame && downloadUrl === snapshot.url && downloadBlob === snapshot.blob;
+  const staged = await sendToolOutput({ blob: snapshot.blob, filename: snapshot.filename, returnUrl: `${location.pathname}${location.search}${location.hash}`, title: '画像を確認', source: 'ピクセルカメラ' });
+  if (staged.ok) return;
+  if (!current()) return;
+  const fallback = document.createElement('a'); fallback.href = snapshot.url; fallback.download = snapshot.filename; fallback.hidden = true;
+  document.body.append(fallback); fallback.click(); fallback.remove();
+  sayToast('端末内のプレビューを使えないため、PNGの保存を開始しました。');
 });
 
 function suspendCamera() {

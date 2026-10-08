@@ -17,6 +17,7 @@ import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/sh
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261006-header-controls-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
+import { sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-2';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
@@ -1519,13 +1520,14 @@ async function prepareCaptureDownload(frozen) {
   try {
     // Export the completed frame at an integer scale; preview work stays at its
     // original dot resolution, and capture never requests a different frame.
-    const { blob, width, height } = await encodeCameraPng(frozen);
+    const { blob, width, height, scale } = await encodeCameraPng(frozen);
     if (generation !== downloadGeneration || state.mode !== 'captured' || state.result !== frozen) return;
     downloadBlob = blob;
     downloadUrl = URL.createObjectURL(blob);
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.png`;
+    link.dataset.outputScale = String(scale);
     $('#saveLabel').textContent = '画像を保存（PNG）';
     updateSaveLinkState();
     sayToast('撮影しました。PNGを保存できます。');
@@ -2213,13 +2215,14 @@ async function prepareGifDownload(frames) {
   const job = new AbortController(); gifExportJob = job;
   try {
     const fps = frames.fps || GIF_FPS;
-    const { bytes, width, height } = await encodeAnimatedGif(frames, { delayMs: 1000 / fps, signal: job.signal });
+    const { bytes, width, height, scale } = await encodeAnimatedGif(frames, { delayMs: 1000 / fps, signal: job.signal });
     if (generation !== downloadGeneration || state.mode !== 'captured' || job !== gifExportJob) return;
     downloadBlob = new Blob([bytes], { type: 'image/gif' });
     downloadUrl = URL.createObjectURL(downloadBlob);
     const link = $('#savePng');
     link.href = downloadUrl;
     link.download = `pixieed-pixel-camera-${width}x${height}.gif`;
+    link.dataset.outputScale = String(scale);
     $('#saveLabel').textContent = '動画を保存（GIF）';
     root.dataset.gifFrames = String(frames.length);
     root.dataset.gifBytes = String(bytes.length);
@@ -2316,6 +2319,21 @@ $('#savePng').addEventListener('click', async (event) => {
     // Keep the fresh ownership check for restored PXD images. The dialog's own
     // share button supplies a new user gesture after this asynchronous check.
     if (!gif.pending) await cameraPxd.assertCanSave();
+    if (!isCurrent()) return;
+  const gifFrames = snapshot.gif;
+  const gifDelayMs = gifFrames ? 1000 / (gifFrames.fps || GIF_FPS) : null;
+  const staged = await sendToolOutput({
+      blob: snapshot.blob,
+      filename: snapshot.filename,
+      returnUrl: `${location.pathname}${location.search}${location.hash}`,
+      title: snapshot.filename.endsWith('.gif') ? 'アニメーションを確認' : '画像を確認',
+      source: 'ドット絵カメラ',
+    metadata: gifFrames
+      ? { width: gifFrames[0].width, height: gifFrames[0].height, defaultScale: Number(link.dataset.outputScale) || 1, durationSeconds: gifFrames.length * gifDelayMs / 1000, frameCount: gifFrames.length }
+      : { width: snapshot.frame.width, height: snapshot.frame.height, defaultScale: Number(link.dataset.outputScale) || 1 },
+    ...(gifFrames ? { mediaSource: { kind: 'gif-frames', frames: gifFrames, delayMs: gifDelayMs, loopCount: 0 } } : {})
+    });
+    if (staged.ok) return;
     if (!isCurrent()) return;
     if (!fileSave.show({ blob: snapshot.blob, url: snapshot.url, filename: snapshot.filename, isCurrent })) {
       say('保存画面を開けませんでした。ブラウザを更新して、もう一度お試しください。', { visible: true });

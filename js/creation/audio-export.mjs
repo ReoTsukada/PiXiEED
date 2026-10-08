@@ -27,7 +27,7 @@ export async function exportAudioImage(song, { document = globalThis.document, i
   try {
     const blob = await new Promise((resolve) => output.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('画像を保存できませんでした。');
-    return { blob: await withPixelPngMetadata(blob, { width, height, scale: size.scale }), width: size.width, height: size.height };
+    return { blob: await withPixelPngMetadata(blob, { width, height, scale: size.scale }), width: size.width, height: size.height, baseWidth: width, baseHeight: height, scale: size.scale };
   } finally { source.width = source.height = output.width = output.height = 1; }
 }
 
