@@ -26,12 +26,10 @@ let releaseCatalog;
 
 async function frames(page) { await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))); }
 async function setPeriod(page, period) {
-  const toggle = page.locator('.map-events-panel__period-toggle');
-  for (let step = 0; step < 3; step += 1) {
-    if (await toggle.getAttribute('data-event-period') === period) return;
-    await toggle.click();
-  }
-  assert.equal(await toggle.getAttribute('data-event-period'), period, 'single period button reaches the requested mode');
+  const group = page.locator('.map-events-panel__period-toggle');
+  await group.locator(`[data-period-option="${period}"]`).click();
+  assert.equal(await group.getAttribute('data-event-period'), period, 'direct period selection reaches the requested mode');
+  assert.equal(await group.locator(`[data-period-option="${period}"]`).getAttribute('aria-pressed'), 'true');
 }
 async function pickPrefecture(page, code, input, { settle = true } = {}) {
   const target = await page.evaluate(async codeValue => {
@@ -224,8 +222,8 @@ try {
       const rapidSelection = await page.evaluate(() => __PIXIEED_GLOBE__.getSnapshot().selected?.prefectureId || null);
       assert.equal(rapidSelection, '11', `${backend}/${input}: rapid A→B→C picks leave the renderer on C; targets=${JSON.stringify(triplet)}, selected=${rapidSelection}`);
       assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県/);
-      assert.equal(await page.locator('.map-events-panel').getAttribute('data-view'), 'overview');
-      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['C event 1'], 'rapid picks leave the overview scoped to C');
+      assert.equal(await page.locator('.map-events-panel').getAttribute('data-view'), 'list');
+      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['C event 1', 'C event 2'], 'rapid picks leave the overview scoped to C');
       const focusAfterRapidPicks = await page.evaluate(() => document.activeElement.id === 'globeCanvas' ? 'canvas' : document.activeElement.classList.contains('map-events-panel__close') ? 'close' : 'other');
       if (input === 'mouse') assert.equal(focusAfterRapidPicks, 'canvas', 'mouse map picks naturally focus the canvas without stealing focus to a panel control');
       else assert.ok(['canvas', 'close'].includes(focusAfterRapidPicks), 'touch map picks do not focus an unexpected control');
@@ -235,7 +233,7 @@ try {
       await setPeriod(page, 'all');
       await pickPrefecture(page, '01', input);
       assert.match(await page.locator('.map-events-panel__head h2').textContent(), /北海道/);
-      await page.locator('.map-events-panel__expand').click();
+      assert.equal(await page.locator('.map-events-panel__expand').count(), 0);
       assert.equal(await page.locator('.map-event-card').count(), 9, 'all filter includes A future and past events');
       await setPeriod(page, 'future');
       assert.equal(await page.locator('.map-events-panel__period-toggle').getAttribute('data-event-period'), 'future');
@@ -250,7 +248,7 @@ try {
       await pickPrefecture(page, '14', input);
       assert.match(await page.locator('.map-events-panel__head h2').textContent(), /神奈川県/);
       assert.equal(await page.locator('.map-events-panel__body').evaluate(el => el.scrollTop), 0, 'a changed scope resets panel scroll');
-      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['B event 1']);
+      assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['B event 1', 'B event 2']);
 
       // A delayed catalog replacement must repaint the current C scope, not restore a stale or global scope.
       await setPeriod(page, 'all');
@@ -264,7 +262,7 @@ try {
       await refresh;
       await frames(page);
       assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県/);
-      await page.locator('.map-events-panel__expand').click();
+      assert.equal(await page.locator('.map-events-panel__expand').count(), 0);
       assert.deepEqual(await page.locator('.map-event-card h3').allTextContents(), ['C event 1', 'C event 2', 'C refreshed event'], 'late refresh adds current-scope content without changing scope');
 
       // An eventless region replaces stale cards with its own empty state.
@@ -278,7 +276,7 @@ try {
       assert.equal(await page.locator('.map-events-panel').isVisible(), false);
       await pickPrefecture(page, '11', input);
       assert.equal(await page.locator('.map-events-panel').isVisible(), true, 'event-mode map pick reopens the overview');
-      assert.equal(await page.locator('.map-events-panel').getAttribute('data-view'), 'overview');
+      assert.equal(await page.locator('.map-events-panel').getAttribute('data-view'), 'list');
       assert.match(await page.locator('.map-events-panel__head h2').textContent(), /埼玉県/);
       await page.locator('.map-events-panel__close').click();
       assert.equal(await page.evaluate(() => { const el = document.activeElement; return Boolean(el?.getClientRects().length) && !el.hidden; }), true, 'close restores focus to a visible action');

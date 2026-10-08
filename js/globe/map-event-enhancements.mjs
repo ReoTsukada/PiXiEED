@@ -1,4 +1,4 @@
-import { initMapEvents } from './map-events.mjs?v=20261007-event-cycle-1';
+import { initMapEvents } from './map-events.mjs?v=20261008-event-filter-1';
 import { createEventCalendarSection } from './event-calendar-ui.mjs?v=20261008-calendar-1';
 
 // Public event fields only: artwork, accounts and project state never cross this bridge.
@@ -76,9 +76,18 @@ export function initEnhancedMapEvents(options) {
     if (!embedded || message.origin !== win.location.origin || message.source !== win.parent) return;
     const data = message.data;
     if (data?.type === 'pixieed:map-event-detail-host-ready') {
-      hostReady = true; sentSignature = null; schedule();
+      stage.dataset.detailLayout = data.layout === 'wide' ? 'wide' : 'compact';
+      if (!hostReady) sentSignature = null;
+      hostReady = true; schedule();
     } else if (hostReady && data?.type === 'pixieed:map-event-detail-command') {
-      if (data.command === 'back' && panel.dataset.view === 'detail') panel.querySelector('.map-events-panel__back')?.click();
+      if (data.command === 'back' && panel.dataset.view === 'detail') {
+        stage.classList.remove('has-external-event-detail');
+        panel.querySelector('.map-events-panel__back')?.click();
+        win.requestAnimationFrame(() => {
+          const card = [...panel.querySelectorAll('[data-event-id]')].find(node => node.dataset.eventId === selectedId);
+          card?.querySelector('button')?.focus({ preventScroll: true });
+        });
+      }
       else if (data.command === 'close') panel.querySelector('.map-events-panel__close')?.click();
     }
   }

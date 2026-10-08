@@ -95,15 +95,18 @@ function appendLinks(doc, root, links) {
 function renderEventDetail(doc, root, event, onClose) {
   root.replaceChildren();
   const presentation = presentMapEvent({ ...event, venue: event.venue || event.location, description: event.description || event.detail }, todayTokyo());
+  root.dataset.eventId = event.id;
+  root.dataset.eventPeriod = presentation.period;
   const header = element(doc, 'header', 'map-event-detail__header');
   const status = element(doc, 'p', 'map-event-detail__status', presentation.status);
   const title = element(doc, 'h2', 'map-event-detail__title', presentation.title);
-  title.tabIndex = -1;
-  const close = element(doc, 'button', 'map-event-detail__close', '地図に戻る');
+  title.tabIndex = -1; title.id = 'map-event-detail-title';
+  root.setAttribute('aria-labelledby', title.id);
+  const close = element(doc, 'button', 'map-event-detail__close', '一覧に戻る');
   close.type = 'button';
   close.addEventListener('click', onClose);
-  header.append(status, title, close);
-  root.append(header);
+  header.append(status, title);
+  root.append(close, header);
   if (presentation.date) root.append(element(doc, 'p', 'map-event-detail__date', presentation.date));
   const facts = element(doc, 'dl', 'map-event-detail__facts');
   appendFact(doc, facts, '会場', presentation.venue);
@@ -133,21 +136,34 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
   createCalendarSection, loadAds = () => import('../display-ads.mjs?rev=20261008-map-detail-1') } = {}) {
   if (!doc || !win || !iframe || !host || !detail || !ad) return { dispose() {} };
   let ready = false, currentEventId = '', disposed = false, adMounted = false, adFailed = false, adCleanup = null, adsModulePromise, calendarModule;
-  let calendarPromise;
+  let calendarPromise, returnScroll = null;
+  const main = doc.querySelector?.('#main');
+  function backToList() {
+    if (ready) iframe.contentWindow?.postMessage({ type: 'pixieed:map-event-detail-command', command: 'back' }, win.location.origin);
+  }
+  function onKeydown(event) {
+    if (event.key === 'Escape' && !host.hidden) { event.preventDefault(); backToList(); }
+  }
 
   function sendHostReady() {
     if (!disposed && iframe.contentWindow) {
-      try { iframe.contentWindow.postMessage({ type: 'pixieed:map-event-detail-host-ready' }, win.location.origin); } catch { /* frame may be navigating */ }
+      try { iframe.contentWindow.postMessage({ type: 'pixieed:map-event-detail-host-ready', layout: win.matchMedia?.('(min-width: 901px)').matches ? 'wide' : 'compact' }, win.location.origin); } catch { /* frame may be navigating */ }
     }
   }
 
   function hideDetail() {
+    const hadDetailFocus = host.contains?.(doc.activeElement);
     currentEventId = '';
     host.hidden = true;
     detail.hidden = true;
     detail.replaceChildren();
     ad.hidden = true;
-    if (doc.activeElement && host.contains?.(doc.activeElement)) iframe.focus?.({ preventScroll: true });
+    if (hadDetailFocus) iframe.focus?.({ preventScroll: true });
+    if (returnScroll) {
+      if (main) main.scrollTop = returnScroll.main;
+      if (doc.scrollingElement) doc.scrollingElement.scrollTop = returnScroll.page;
+      returnScroll = null;
+    }
   }
 
   function canUseMapAd() {
@@ -179,15 +195,15 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
   function render(event) {
     const safeEvent = validatePublicMapEvent(event);
     if (!safeEvent) { hideDetail(); return; }
+    const changedEvent = currentEventId !== safeEvent.id;
+    if (!currentEventId) returnScroll = { main: main?.scrollTop || 0, page: doc.scrollingElement?.scrollTop || 0 };
     currentEventId = safeEvent.id;
     host.hidden = false;
     detail.hidden = false;
     try {
-      const calendarSlot = renderEventDetail(doc, detail, safeEvent, () => {
-        if (ready) iframe.contentWindow?.postMessage({ type: 'pixieed:map-event-detail-command', command: 'back' }, win.location.origin);
-      });
-      if (win.matchMedia?.('(max-width: 900px)').matches) host.scrollIntoView?.({ block: 'start', behavior: 'instant' });
-      detail.querySelector?.('.map-event-detail__title')?.focus?.({ preventScroll: true });
+      const calendarSlot = renderEventDetail(doc, detail, safeEvent, backToList);
+      if (changedEvent && win.matchMedia?.('(max-width: 900px)').matches) host.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+      if (changedEvent) { host.scrollTop = 0; detail.querySelector?.('.map-event-detail__title')?.focus?.({ preventScroll: true }); }
       ad.hidden = !canUseMapAd() || adFailed || ad.dataset.adState === 'empty';
       mountAd();
       const makeCalendar = createCalendarSection || ((args) => {
@@ -233,10 +249,12 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
     render(message.data.event);
   }
   function onFrameLoad() { ready = true; hideDetail(); sendHostReady(); }
+  doc.addEventListener?.('keydown', onKeydown);
   win.addEventListener('message', onMessage);
+  win.addEventListener('resize', sendHostReady);
   iframe.addEventListener('load', onFrameLoad);
   sendHostReady();
-  return { dispose() { disposed = true; adCleanup?.(); win.removeEventListener('message', onMessage); iframe.removeEventListener('load', onFrameLoad); } };
+  return { dispose() { disposed = true; adCleanup?.(); doc.removeEventListener?.('keydown', onKeydown); win.removeEventListener('resize', sendHostReady); win.removeEventListener('message', onMessage); iframe.removeEventListener('load', onFrameLoad); } };
 }
 
 if (typeof document !== 'undefined' && typeof window !== 'undefined') createMapEventDetailHost();

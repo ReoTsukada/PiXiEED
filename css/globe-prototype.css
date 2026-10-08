@@ -863,7 +863,7 @@ html:not(.is-tool-telescope) .sheet .sheet__close { flex: 0 0 var(--control); mi
 .map-events-panel__head-controls { display: flex; flex-shrink: 0; gap: 5px; }
 .map-events-panel__controls { display: grid; gap: 6px; flex-shrink: 0; }
 .map-events-panel__close { flex-shrink: 0; border-radius: 12px; font-size: .75rem; }
-.map-events-panel__expand, .map-events-panel__back, .map-events-panel__past, .map-events-panel__more { min-height: var(--control); padding: 0 12px; border: 1px solid #6e604b; border-radius: 12px; background: #192735; color: #ffe0b3; font-size: .78rem; }
+.map-events-panel__back, .map-events-panel__past, .map-events-panel__more { min-height: var(--control); padding: 0 12px; border: 1px solid #6e604b; border-radius: 12px; background: #192735; color: #ffe0b3; font-size: .78rem; }
 .map-events-panel__period-toggle, .map-events-dock__period-toggle { inline-size: 152px; min-height: var(--control); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border: 1px solid #425d6c; border-radius: 10px; background: #142431; color: #edf3f5; font-size: .77rem; white-space: nowrap; }
 .map-events-panel__period-toggle[data-event-period="future"], .map-events-dock__period-toggle[data-event-period="future"] { border-color: #e9b46f; background: #392c20; color: #ffe0b3; }
 .map-events-panel__period-toggle:focus-visible, .map-events-dock__period-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -919,7 +919,6 @@ html:not(.is-tool-telescope) .sheet .sheet__close { flex: 0 0 var(--control); mi
 .event-calendar :is(a,button):focus-visible { outline: 3px solid #9bcfff; outline-offset: 3px; }
 @media (max-width: 680px) {
   .map-events-panel { top: auto; left: 10px; right: 10px; width: auto; bottom: calc(5.3rem + env(safe-area-inset-bottom)); border-radius: 21px 21px 16px 16px; }
-  .map-events-panel[data-view="overview"] { max-height: 48%; }
   .map-events-panel[data-view="list"] { max-height: 60%; }
   .map-events-panel[data-view="detail"] { max-height: 85%; }
   .map-events-panel__head h2 { font-size: .95rem; }

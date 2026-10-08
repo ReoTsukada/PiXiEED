@@ -154,7 +154,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   let active = false;
   let scope = null;
   let returnFocus = null;
-  let view = 'overview', detailEventId = null, detailReturnView = 'overview', detailReturnScroll = 0;
+  let view = 'list', detailEventId = null, detailReturnScroll = 0;
   let catalogStatus = 'loading', listLimit = 20;
 
   const dock = doc.createElement('div');
@@ -169,10 +169,9 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   const head = doc.createElement('header'); head.className = 'map-events-panel__head';
   const heading = doc.createElement('h2'); heading.className = 'map-events-panel__heading'; heading.textContent = 'イベント一覧';
   const headControls = doc.createElement('div'); headControls.className = 'map-events-panel__head-controls';
-  const expandButton = doc.createElement('button'); expandButton.type = 'button'; expandButton.className = 'map-events-panel__expand'; expandButton.textContent = '一覧を広げる';
-  const backButton = doc.createElement('button'); backButton.type = 'button'; backButton.className = 'map-events-panel__back'; backButton.textContent = '戻る'; backButton.hidden = true;
+  const backButton = doc.createElement('button'); backButton.type = 'button'; backButton.className = 'map-events-panel__back'; backButton.textContent = '一覧に戻る'; backButton.hidden = true;
   const closeButton = doc.createElement('button'); closeButton.type = 'button'; closeButton.className = 'map-events-panel__close'; closeButton.textContent = '閉じる'; closeButton.setAttribute('aria-label', 'イベント一覧を閉じる');
-  headControls.append(expandButton, backButton, closeButton);
+  headControls.append(backButton, closeButton);
   head.append(heading, headControls);
   const compactControls = doc.createElement('div'); compactControls.className = 'map-events-panel__controls';
   const about = doc.createElement('details'); about.className = 'map-events-panel__about';
@@ -221,20 +220,33 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
 
   function periodLabel(value) { return value === 'future' ? '今後・開催中' : value === 'past' ? '過去' : 'すべて'; }
 
-  function syncPeriodToggle(button) {
-    const label = periodLabel(periodFilter);
-    const next = periodLabel(periodFilter === 'future' ? 'past' : periodFilter === 'past' ? 'all' : 'future');
-    button.dataset.eventPeriod = periodFilter;
-    button.textContent = `${label}　›`;
-    button.setAttribute('aria-label', `期間は「${label}」。クリックで「${next}」に切り替え`);
-    button.title = `現在：${label}／次：${next}`;
+  function syncPeriodToggle(group) {
+    group.dataset.eventPeriod = periodFilter;
+    for (const button of group.querySelectorAll('[data-period-option]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.periodOption === periodFilter));
+    }
   }
 
   function createPeriodToggle(className) {
-    const button = doc.createElement('button'); button.type = 'button'; button.className = className;
-    button.addEventListener('click', () => setPeriodFilter(periodFilter === 'future' ? 'past' : periodFilter === 'past' ? 'all' : 'future'));
-    syncPeriodToggle(button);
-    return button;
+    const group = doc.createElement('div'); group.className = `${className} map-events-period`;
+    group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'イベントの開催時期');
+    for (const value of ['future', 'past', 'all']) {
+      const button = doc.createElement('button'); button.type = 'button'; button.className = 'map-events-period__option';
+      button.dataset.periodOption = value; button.textContent = periodLabel(value);
+      button.addEventListener('click', () => setPeriodFilter(value));
+      group.append(button);
+    }
+    group.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const buttons = [...group.querySelectorAll('button')];
+      const index = buttons.indexOf(doc.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+      buttons[next].focus({ preventScroll: true });
+    });
+    syncPeriodToggle(group);
+    return group;
   }
 
   function createLegend(className) {
@@ -256,7 +268,10 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     syncPeriodToggle(dockPeriodToggle); syncPeriodToggle(panelPeriodToggle);
     if (!changed) return;
     refreshPeriodSummary();
-    if (!panel.hidden && view !== 'detail') { const scroll = view === 'overview' ? 0 : body.scrollTop; renderList(); body.scrollTop = scroll; }
+    if (!panel.hidden) {
+      if (view === 'detail') setView('list', { restoreScroll: 0 });
+      else { const scroll = body.scrollTop; renderList(); body.scrollTop = scroll; }
+    }
     onChange(events);
   }
 
@@ -313,6 +328,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   }
 
   function renderList() {
+    const previousScroll = body.scrollTop;
     const record = scope?.displayCell || scope;
     const scopedPrefecture = String(record?.prefectureId || scope?.prefectureId || '').padStart(2, '0');
     const isPrefectureScope = Boolean(scopedPrefecture && scopedPrefecture !== '00');
@@ -326,15 +342,19 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const visibleItems = sortEventsByDisplayPriority(uniqueEventEditions(items), today).filter(event => matchesEventPeriod(event, periodFilter, today));
     heading.textContent = `${scope ? (isRegionScope ? (regionHeading || 'この地域') : isPrefectureScope ? (mapRegionLabel || 'この県') : 'この付近') : 'イベント一覧'} · ${visibleItems.length}件`;
     refreshPeriodSummary();
+    const focusedId = doc.activeElement?.closest?.('[data-event-id]')?.dataset.eventId;
+    const hadListFocus = list.contains(doc.activeElement);
     list.replaceChildren(); detail.hidden = true;
     if (!visibleItems.length) { renderEmpty(list, items); return; }
-    const count = view === 'overview' ? 1 : Math.min(listLimit, visibleItems.length);
+    const count = Math.min(listLimit, visibleItems.length);
     for (const event of visibleItems.slice(0, count)) list.append(createEventCard(event));
-    if (view === 'list' && visibleItems.length > count) {
+    if (visibleItems.length > count) {
       const more = doc.createElement('button'); more.type = 'button'; more.className = 'map-events-panel__more'; more.textContent = `さらに${Math.min(20, visibleItems.length - count)}件を表示`;
       more.addEventListener('click', () => { const next = Math.min(visibleItems.length, listLimit + 20); for (const event of visibleItems.slice(listLimit, next)) list.insertBefore(createEventCard(event), more); listLimit = next; more.textContent = listLimit < visibleItems.length ? `さらに${Math.min(20, visibleItems.length - listLimit)}件を表示` : ''; more.hidden = listLimit >= visibleItems.length; });
       list.append(more);
     }
+    if (hadListFocus) [...list.querySelectorAll('[data-event-id]')].find(card => card.dataset.eventId === focusedId)?.querySelector('button')?.focus({ preventScroll: true });
+    body.scrollTop = previousScroll;
     if (view === 'detail') renderDetail();
   }
 
@@ -354,18 +374,20 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
       if (end && event.endDate !== event.startDate) { date.classList.add('is-range'); primary.textContent += `\n–${end[1]}/${end[2]}`; }
       const yearText = doc.createElement('small'); yearText.textContent = end && end[0] !== year ? `${year}–${end[0]}年` : `${year}年`;
       date.append(primary, yearText); date.dateTime = event.startDate;
-      if (presentation.time) { const timeNode = doc.createElement('small'); timeNode.textContent = presentation.time; date.append(timeNode); }
     } else date.textContent = presentation.date || '日程未確認';
     const content = doc.createElement('div'); content.className = 'map-event-card__content';
     const status = doc.createElement('p'); status.className = 'map-event-card__status'; status.textContent = presentation.status; content.append(status);
     const title = doc.createElement('h3'); title.className = 'map-event-card__title'; title.textContent = presentation.title; content.append(title);
+    if (presentation.time) { const clock = doc.createElement('p'); clock.className = 'map-event-card__meta'; clock.textContent = presentation.time; content.append(clock); }
     const placement = placementText(event);
     const metaText = [presentation.area, presentation.venue].filter(Boolean).join(' · ');
     if (metaText) { const meta = doc.createElement('p'); meta.className = 'map-event-card__meta'; meta.textContent = metaText; content.append(meta); }
     if (presentation.fee) { const fee = doc.createElement('p'); fee.className = 'map-event-card__fee'; fee.textContent = presentation.fee; content.append(fee); }
     if (presentation.tags.length) { const tags = doc.createElement('p'); tags.className = 'map-event-card__tags'; for (const value of presentation.tags) { const tag = doc.createElement('span'); tag.textContent = value; tags.append(tag); } content.append(tags); }
-    const button = doc.createElement('button'); button.type = 'button'; button.className = 'map-event-card__detail'; button.textContent = '詳細を見る'; button.addEventListener('click', () => openDetail(event)); content.append(button);
+    const button = doc.createElement('button'); button.type = 'button'; button.className = 'map-event-card__detail'; button.textContent = '詳細を見る'; button.setAttribute('aria-label', `${presentation.title}の詳細を見る`); button.setAttribute('aria-expanded', String(event.id === detailEventId && view === 'detail')); button.addEventListener('click', () => openDetail(event)); content.append(button);
     if (event.locationPending) { const pending = doc.createElement('p'); pending.className = 'map-event-card__meta'; pending.textContent = placement; content.insertBefore(pending, button); }
+    card.dataset.selected = String(event.id === detailEventId);
+    if (event.id === detailEventId) card.setAttribute('aria-current', 'true');
     card.append(date, content); return card;
   }
 
@@ -417,24 +439,30 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   }
 
   function setView(next, { restoreScroll = null } = {}) {
-    view = next; panel.dataset.view = view;
+    view = next === 'detail' ? 'detail' : 'list'; panel.dataset.view = view;
+    for (const card of list.querySelectorAll('[data-event-id]')) {
+      const selected = card.dataset.eventId === String(detailEventId);
+      card.dataset.selected = String(selected);
+      if (selected) card.setAttribute('aria-current', 'true'); else card.removeAttribute('aria-current');
+      card.querySelector('button')?.setAttribute('aria-expanded', String(selected && view === 'detail'));
+    }
     list.hidden = view === 'detail'; detail.hidden = view !== 'detail';
-    expandButton.hidden = view !== 'overview';
     backButton.hidden = view !== 'detail';
     if (view === 'detail') renderDetail(); else renderList();
     if (restoreScroll !== null) body.scrollTop = restoreScroll;
   }
 
   function openDetail(event) {
-    detailEventId = event.id; detailReturnView = view; detailReturnScroll = body.scrollTop;
-    setView('detail', { restoreScroll: 0 });
+    detailReturnScroll = body.scrollTop;
+    detailEventId = event.id;
+    setView('detail');
     backButton.focus({ preventScroll: true });
   }
 
   function backFromDetail() {
     if (view !== 'detail') return;
-    const id = detailEventId, returnView = detailReturnView;
-    setView(returnView, { restoreScroll: detailReturnScroll });
+    const id = detailEventId;
+    setView('list', { restoreScroll: detailReturnScroll });
     const target = [...list.querySelectorAll('[data-event-id]')].find(card => card.dataset.eventId === id)?.querySelector('.map-event-card__detail');
     target?.focus({ preventScroll: true });
   }
@@ -443,9 +471,9 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (destroyed) return false;
     if (!selection) { if (!panel.hidden) close({ restoreFocus: false }); return true; }
     const changed = scopeIdentity(scope) !== scopeIdentity(selection);
-    if (panel.hidden) { returnFocus = doc.activeElement; scope = selection; onOpen(scope); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); setView('overview'); return true; }
+    if (panel.hidden) { returnFocus = doc.activeElement; scope = selection; onOpen(scope); panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events'); setView('list'); return true; }
     if (!changed) return true;
-    scope = selection; detailEventId = null; listLimit = 20; body.scrollTop = 0; onOpen(scope); setView('overview');
+    scope = selection; detailEventId = null; listLimit = 20; body.scrollTop = 0; onOpen(scope); setView('list');
     return true;
   }
 
@@ -456,7 +484,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   }
   function close({ restoreFocus = true } = {}) {
     panel.hidden = true; panel.classList.remove('is-open'); stage.classList.remove('has-map-events'); scope = null;
-    body.scrollTop = 0; detailEventId = null; view = 'overview'; panel.dataset.view = view;
+    body.scrollTop = 0; detailEventId = null; view = 'list'; panel.dataset.view = view;
     if (restoreFocus) {
       const currentSelectionAction = doc.querySelector('#viewCellPosts');
       const canvas = stage.querySelector('#globeCanvas');
@@ -470,14 +498,13 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (!selection) { close({ restoreFocus: false }); return true; }
     const changed = scopeIdentity(scope) !== scopeIdentity(selection);
     if (!changed) return true;
-    scope = selection; detailEventId = null; listLimit = 20; body.scrollTop = 0; setView('overview');
+    scope = selection; detailEventId = null; listLimit = 20; body.scrollTop = 0; setView('list');
     return true;
   }
   allButton.addEventListener('click', openAll);
-  expandButton.addEventListener('click', () => { setView('list'); list.querySelector('.map-event-card__detail')?.focus({ preventScroll: true }); });
   backButton.addEventListener('click', backFromDetail);
   closeButton.addEventListener('click', close);
-  function onKeydown(event) { if (event.key === 'Escape' && !panel.hidden) { close(); event.stopPropagation(); } }
+  function onKeydown(event) { if (event.key === 'Escape' && !panel.hidden) { if (view === 'detail') backFromDetail(); else close(); event.stopPropagation(); } }
   doc.addEventListener('keydown', onKeydown);
 
   function refresh() {

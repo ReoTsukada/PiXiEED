@@ -13,8 +13,9 @@
     <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
     <link rel="stylesheet" href="/css/site-header.css?rev=20261007-map-panel-close-1">
     <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
-    <link rel="stylesheet" href="/css/globe-event-detail.css?rev=20261008-map-detail-1">
+    <link rel="stylesheet" href="/css/globe-event-detail.css?rev=20261008-event-filter-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
+    <link rel="stylesheet" href="/css/globe-event-ui.css?rev=20261008-event-filter-1">
 </head>
 <body data-page="map" class="app-page app-page--field app-page--tool-globe">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -24,8 +25,8 @@
   </div></header>
   <nav class="mobile-nav" aria-label="アプリナビゲーション"><a data-nav="home" href="/globe/"><span aria-hidden="true">⌖</span>地図</a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span>絵</a><a data-nav="stores" href="/stores/"><span aria-hidden="true">⌂</span>お店</a><a data-nav="collection" href="/collection/"><span aria-hidden="true">✳</span>集めた</a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span>ツール</a></nav>
   <main id="main">
-    <section class="map-hero map-hero--field" aria-label="PiXiEED 地図"><div class="map-hero__inner"><iframe id="globeFrame" class="map-hero__globe-frame" src="/globe-prototype.html?embed=1&amp;rev=20261008-calendar-detail-1" title="みんなの投稿・イベントを探せるPiXiEED地図" allow="geolocation" loading="eager"></iframe></div></section>
-    <aside id="mapEventDetailHost" class="map-event-detail-host" aria-label="選択したイベント" aria-live="polite" hidden>
+    <section class="map-hero map-hero--field" aria-label="PiXiEED 地図"><div class="map-hero__inner"><iframe id="globeFrame" class="map-hero__globe-frame" src="/globe-prototype.html?embed=1&amp;rev=20261008-event-filter-1" title="みんなの投稿・イベントを探せるPiXiEED地図" allow="geolocation" loading="eager"></iframe></div></section>
+    <aside id="mapEventDetailHost" class="map-event-detail-host" aria-label="選択したイベント" hidden>
       <article id="mapEventDetail" class="globe-event-detail" hidden></article>
       <aside id="mapDetailAd" class="px-display-ad map-event-detail-host__ad" aria-label="広告" hidden>
         <div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div>
@@ -34,6 +35,6 @@
   </main>
     <script type="module" src="/js/app.js?rev=20261006-header-controls-1"></script>
     <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
-    <script type="module" src="/js/globe/event-detail-host.mjs?rev=20261008-map-detail-1"></script>
+    <script type="module" src="/js/globe/event-detail-host.mjs?rev=20261008-event-filter-1"></script>
 </body>
 </html>
