@@ -56,6 +56,42 @@ function gifLoopCount(bytes) {
   return 1;
 }
 
+function gifFrameCount(bytes) {
+  if (bytes.length < 13 || !['GIF87a', 'GIF89a'].includes(String.fromCharCode(...bytes.subarray(0, 6)))) throw new Error('GIFの画像情報が壊れています。');
+  let offset = 13;
+  const screenFlags = bytes[10];
+  if (screenFlags & 0x80) offset += 3 * (1 << ((screenFlags & 0x07) + 1));
+  let frames = 0;
+  while (offset < bytes.length) {
+    const marker = bytes[offset++];
+    if (marker === 0x3b) break;
+    if (marker === 0x2c) {
+      if (offset + 9 > bytes.length) throw new Error('GIFの画像情報が壊れています。');
+      const imageFlags = bytes[offset + 8];
+      offset += 9;
+      if (imageFlags & 0x80) offset += 3 * (1 << ((imageFlags & 0x07) + 1));
+      if (offset >= bytes.length) throw new Error('GIFの画像情報が壊れています。');
+      offset += 1; // LZW minimum code size
+      frames += 1;
+    } else if (marker !== 0x21) {
+      throw new Error('GIFの画像情報が壊れています。');
+    } else {
+      if (offset >= bytes.length) throw new Error('GIFの画像情報が壊れています。');
+      offset += 1; // Extension label
+    }
+    let terminated = false;
+    while (offset < bytes.length) {
+      const blockSize = bytes[offset++];
+      if (blockSize === 0) { terminated = true; break; }
+      if (blockSize > bytes.length - offset) throw new Error('GIFの画像情報が壊れています。');
+      offset += blockSize;
+    }
+    if (!terminated) throw new Error('GIFの画像情報が壊れています。');
+  }
+  if (frames < 1) throw new Error('GIFに画像コマがありません。');
+  return frames;
+}
+
 function webpAnimationInfo(bytes) {
   if (imageType(bytes) !== 'image/webp') return { animated: false, loopCount: 0 };
   if (bytes.length < 20 || readU32LittleEndian(bytes, 4) > bytes.length - 8) throw new Error('WebPの画像情報が壊れています。');
@@ -177,7 +213,7 @@ async function decodeImageFile(file, signal, dependencies) {
   const type = imageType(bytes);
   if (!type) throw new Error(`${file.name || '選択したファイル'}はPNG/JPEG/GIF/WebP画像として確認できません。SVGとその他の形式は読み込めません。`);
   const webpInfo = type === 'image/webp' ? webpAnimationInfo(bytes) : null;
-  if (type === 'image/gif' || (type === 'image/png' && pngAnimationInfo(bytes)?.animated) || webpInfo?.animated) {
+  if ((type === 'image/gif' && gifFrameCount(bytes) > 1) || (type === 'image/png' && pngAnimationInfo(bytes)?.animated) || webpInfo?.animated) {
     const result = await decodeAnimated(file, type, bytes, signal, dependencies);
     return { frames: result.frames.map((frame, index) => ({ ...frame, name: result.frames.length > 1 ? `${file.name || 'アニメーション'} · ${index + 1}` : (file.name || '画像') })), loopCount: result.loopCount };
   }

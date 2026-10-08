@@ -24,7 +24,13 @@ function canvasDocument() {
 }
 
 function pngHeader() { return new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]); }
-function gifHeader() { return new Uint8Array([...new TextEncoder().encode('GIF89a'), ...new TextEncoder().encode('NETSCAPE2.0'), 3, 1, 3, 0]); }
+function gifFile(frameCount = 2, loopCount = 3) {
+  const bytes = [...new TextEncoder().encode('GIF89a'), 1, 0, 1, 0, 0, 0, 0];
+  if (loopCount !== null) bytes.push(0x21, 0xff, 0x0b, ...new TextEncoder().encode('NETSCAPE2.0'), 3, 1, loopCount & 0xff, loopCount >>> 8, 0);
+  for (let index = 0; index < frameCount; index += 1) bytes.push(0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 2, 0x44, 0x01, 0);
+  bytes.push(0x3b);
+  return new Uint8Array(bytes);
+}
 
 test('local static images keep pixel data and fit mixed dimensions with transparent padding', async () => {
   const result = await importOutputFiles([
@@ -68,7 +74,7 @@ test('animated GIF import decodes every frame, retains timing and reads its loop
     }
     close() { closed.push('decoder'); }
   }
-  const result = await importOutputFiles([localFile('walk.gif', gifHeader())], {
+  const result = await importOutputFiles([localFile('walk.gif', gifFile())], {
     ImageDecoderImpl: FakeImageDecoder, documentRef: canvasDocument(), createImageBitmapImpl: () => { throw new Error('animated fallback must not run'); }
   });
   assert.deepEqual(decodedIndexes, [0, 1]);
@@ -80,10 +86,24 @@ test('animated GIF import decodes every frame, retains timing and reads its loop
 test('animated input fails clearly when complete-frame decoding is unavailable', async () => {
   let usedStaticDecoder = false;
   class UnsupportedDecoder { static isTypeSupported() { return false; } }
-  await assert.rejects(importOutputFiles([localFile('walk.gif', gifHeader())], {
+  await assert.rejects(importOutputFiles([localFile('walk.gif', gifFile())], {
     ImageDecoderImpl: UnsupportedDecoder, documentRef: canvasDocument(), createImageBitmapImpl: async () => { usedStaticDecoder = true; return { width: 1, height: 1, close() {} }; }
   }), /全コマ/);
   assert.equal(usedStaticDecoder, false);
+});
+
+test('single-frame GIF imports as a still image without requiring the animation decoder', async () => {
+  let decoderCreated = false; let bitmapClosed = false;
+  const result = await importOutputFiles([localFile('still.gif', gifFile(1, null))], {
+    ImageDecoderImpl: class { static isTypeSupported() { decoderCreated = true; return true; } },
+    documentRef: canvasDocument(),
+    createImageBitmapImpl: async () => ({ width: 1, height: 1, close() { bitmapClosed = true; } })
+  });
+  assert.equal(result.frames.length, 1);
+  assert.equal(result.frames[0].delayMs, 500);
+  assert.equal(result.loopCount, 0);
+  assert.equal(decoderCreated, false);
+  assert.equal(bitmapClosed, true);
 });
 
 test('animated WebP reads ANIM loop count and decodes every frame with ImageDecoder', async () => {
@@ -127,4 +147,17 @@ test('input limits and unsupported files fail before any media state is returned
   await assert.rejects(importOutputFiles([localFile('active.svg', new TextEncoder().encode('<svg><script>bad()</script></svg>'))], {
     AudioContextImpl: class { async decodeAudioData() { throw new Error('not audio'); } async close() {} }
   }), /not audio/);
+});
+
+test('oversized image is rejected before its complete bytes or a decoder are read', async () => {
+  const oversized = localFile('large.png', pngHeader());
+  Object.defineProperty(oversized, 'size', { value: 64 * 1024 * 1024 + 1 });
+  let completeBytesRead = false; let imageDecoderCalled = false;
+  oversized.arrayBuffer = async () => { completeBytesRead = true; throw new Error('full image read before size check'); };
+  await assert.rejects(importOutputFiles([oversized], {
+    ImageDecoderImpl: class { constructor() { imageDecoderCalled = true; } },
+    createImageBitmapImpl: async () => { imageDecoderCalled = true; return { width: 1, height: 1, close() {} }; }
+  }), /64MB/);
+  assert.equal(completeBytesRead, false);
+  assert.equal(imageDecoderCalled, false);
 });

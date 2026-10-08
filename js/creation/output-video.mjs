@@ -123,7 +123,7 @@ export async function renderOutputVideo(frames, {
     await Promise.race([started, resultPromise]);
     if (disposed) return await resultPromise;
     startedAt = now();
-    if (audioNode) { audioStartAt = audioContext.currentTime + 0.05; audioNode.start(audioStartAt); }
+    if (audioNode) { audioStartAt = audioContext.currentTime; audioNode.start(audioStartAt); }
     const step = (time) => {
       if (signal?.aborted || canceled || disposed) return;
       const elapsed = audioNode ? Math.max(0, audioContext.currentTime - audioStartAt) : Math.max(0, (time - startedAt) / 1000);
