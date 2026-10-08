@@ -38,7 +38,10 @@ async function contextFor({ viewport, configured = false, mode = 'filled' }) {
   await context.addInitScript((mode) => { window.__manualAdRequests = 0; window.__adMockMode = mode; }, mode);
   await context.route('**/*', (route) => {
     const url = new URL(route.request().url());
-    if (url.hostname === 'pagead2.googlesyndication.com') return route.fulfill({ contentType: 'application/javascript', body: mock });
+    if (url.hostname === 'pagead2.googlesyndication.com') {
+      if (mode === 'blocked') return route.abort();
+      return route.fulfill({ contentType: 'application/javascript', body: mock });
+    }
     if (url.origin !== origin) return route.abort();
     if (url.pathname === '/data/site-config.js') {
       return route.fulfill({ contentType: 'application/javascript', body: configuration + `\nfor (const key of Object.keys(displayAdConfig.slots)) displayAdConfig.slots[key] = ${configured ? '"1234567890"' : '""'};` });
@@ -53,7 +56,8 @@ async function noOverlap(page, description, index = 0) {
     const overlaps = [...document.querySelectorAll('button,a,input,select,summary')].filter((el) => {
       if (ad.contains(el)) return false;
       const r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top;
+      const inViewport = r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight;
+      return inViewport && r.width > 0 && r.height > 0 && r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top;
     }).map((el) => el.id || el.textContent.trim().slice(0, 24));
     const unit = ad.querySelector('ins'); const u = unit.getBoundingClientRect();
     const content = ad.classList.contains('container') ? ad : ad.parentElement;
@@ -80,7 +84,12 @@ async function noOverlap(page, description, index = 0) {
   if (new URL(page.url()).pathname === '/') assert.ok(result.canvasClearance >= 149, `${description}: 150px clearance from interactive canvases`);
 }
 try {
-  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1280, height: 800 }, { width: 1920, height: 1080 }]) {
+  for (const viewport of [
+    { width: 320, height: 568, label: 'portrait-320' }, { width: 390, height: 844, label: 'portrait-390' },
+    { width: 768, height: 1024, label: 'portrait-768' }, { width: 1280, height: 900, label: 'portrait-1280' },
+    { width: 568, height: 320, label: 'landscape-568' }, { width: 844, height: 390, label: 'landscape-844' },
+    { width: 1024, height: 768, label: 'landscape-1024' }, { width: 1280, height: 720, label: 'landscape-1280' }
+  ]) {
     const inactive = await contextFor({ viewport }); const page = await inactive.newPage();
     for (const path of paths) {
       await page.goto(base + path, { waitUntil: 'domcontentloaded' }); await frames(page);
@@ -115,14 +124,14 @@ try {
         await view.waitForFunction((index) => document.querySelectorAll('[data-display-ad]')[index]?.dataset.adState === 'filled', index);
       }
       await view.waitForFunction((count) => window.__manualAdRequests === count, count);
-      await view.screenshot({ path: `/tmp/pixieed-ad-current-${engine}.png` });
+      await view.screenshot({ path: `/tmp/pixieed-ad-current-${engine}-${viewport.label}.png` });
       for (let index = 0; index < count; index++) {
         await noOverlap(view, `${path} ${viewport.width}x${viewport.height}`, index);
         await ads.nth(index).evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
         await frames(view);
-        await ads.nth(index).screenshot({ path: `/tmp/pixieed-ad-unit-${engine}-${viewport.width}-${captureNames[paths.indexOf(path)]}-${index}.png` });
+        await ads.nth(index).screenshot({ path: `/tmp/pixieed-ad-unit-${engine}-${viewport.label}-${captureNames[paths.indexOf(path)]}-${index}.png` });
       }
-      await view.screenshot({ path: `/tmp/pixieed-ad-placement-${engine}-${viewport.width}-${captureNames[paths.indexOf(path)]}.png` });
+      await view.screenshot({ path: `/tmp/pixieed-ad-placement-${engine}-${viewport.label}-${captureNames[paths.indexOf(path)]}.png` });
       assert.equal(await view.evaluate(() => window.__manualAdRequests), count, 'scrolling never refreshes any unit');
       checks++;
     }
@@ -156,6 +165,44 @@ try {
   assert.equal(await page.evaluate(() => window.__manualAdRequests), 2, 'repeat mount is idempotent across both tools placements');
   assert.equal(await page.locator('ins.px-display-ad__unit').count(), 2); checks++;
   await pending.close();
+
+  const recovery = await contextFor({ viewport: { width: 390, height: 844 }, configured: true });
+  const recoveryPage = await recovery.newPage();
+  await recoveryPage.goto(base + '/about/', { waitUntil: 'domcontentloaded' });
+  const recoveryAd = recoveryPage.locator('[data-display-ad]').first();
+  await recoveryPage.locator('main').evaluate((node) => { node.style.display = 'none'; });
+  await recoveryAd.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' })); await frames(recoveryPage);
+  assert.equal(await recoveryPage.evaluate(() => window.__manualAdRequests), 0, 'a display:none parent cannot request at zero width');
+  await recoveryPage.locator('main').evaluate((node) => { node.style.display = ''; });
+  await recoveryAd.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await recoveryPage.waitForFunction(() => window.__manualAdRequests === 1);
+  await recoveryPage.waitForFunction(() => document.querySelector('[data-display-ad]').dataset.adState === 'filled');
+  assert.equal(await recoveryPage.evaluate(() => window.__manualAdRequests), 1, 'display recovery makes one request'); checks++;
+  await recovery.close();
+
+  const hidden = await contextFor({ viewport: { width: 390, height: 844 }, configured: true });
+  const hiddenPage = await hidden.newPage();
+  await hiddenPage.goto(base + '/about/', { waitUntil: 'domcontentloaded' });
+  const hiddenAd = hiddenPage.locator('[data-display-ad]').first();
+  await hiddenPage.locator('main').evaluate((node) => { node.style.visibility = 'hidden'; });
+  await hiddenAd.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' })); await frames(hiddenPage);
+  assert.equal(await hiddenPage.evaluate(() => window.__manualAdRequests), 0, 'visibility:hidden cannot request');
+  await hiddenPage.locator('main').evaluate((node) => { node.style.visibility = ''; });
+  await hiddenPage.waitForFunction(() => window.__manualAdRequests === 1);
+  assert.equal(await hiddenPage.evaluate(() => window.__manualAdRequests), 1, 'visibility recovery makes one request'); checks++;
+  await hidden.close();
+
+  const blocked = await contextFor({ viewport: { width: 390, height: 844 }, configured: true, mode: 'blocked' });
+  const blockedPage = await blocked.newPage();
+  await blockedPage.goto(base + '/about/', { waitUntil: 'domcontentloaded' });
+  const blockedAd = blockedPage.locator('[data-display-ad]').first();
+  const blockedBefore = await blockedAd.boundingBox();
+  await blockedAd.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await blockedPage.waitForFunction(() => document.querySelector('[data-display-ad]').dataset.adState === 'unfilled');
+  assert.equal(await blockedAd.isVisible(), true, 'a blocked request keeps the reserved normal-page slot');
+  assert.equal((await blockedAd.boundingBox()).height, blockedBefore.height, 'blocked request preserves reserved height'); checks++;
+  assert.equal(await blockedPage.evaluate(() => window.__manualAdRequests), 0, 'blocked provider script never runs');
+  await blocked.close();
 
   const excluded = await contextFor({ viewport: { width: 390, height: 844 }, configured: true }); const view = await excluded.newPage();
   for (const path of ['/draw/', '/audio/', '/jigsaw/', '/privacy/', '/profile/']) {

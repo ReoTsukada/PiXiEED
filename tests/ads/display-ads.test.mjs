@@ -136,3 +136,148 @@ test('multiple placements mount once each and later calls still mount a newly el
   assert.equal(units.length, 3); assert.equal(win.adsbygoogle.length, 3);
   cleanup(); laterCleanup(); assert.equal(disconnected, 3);
 });
+
+test('ordinary flow ads recover once when a hidden zero-width parent becomes measurable', () => {
+  let width = 0; let requests = 0;
+  const observers = { mutation: [], resize: [], intersection: [] };
+  const node = {
+    dataset: { displayAd: 'home' }, hidden: true, parentElement: {},
+    hasAttribute: () => true, getClientRects: () => width ? [{}] : [],
+    getBoundingClientRect: () => ({ width, top: 100, bottom: 245 }),
+    querySelector: () => ({ append() {} })
+  };
+  const doc = { visibilityState: 'visible', querySelector: () => null,
+    head: { append(script) { script.isConnected = true; } },
+    createElement: (tag) => tag === 'script'
+      ? { addEventListener() {}, isConnected: false }
+      : { dataset: {}, style: {}, getBoundingClientRect: () => ({ width }) },
+    addEventListener() {}, removeEventListener() {} };
+  const root = { ownerDocument: doc, querySelectorAll: () => [node] };
+  class Observer {
+    constructor(callback) { this.callback = callback; this.targets = []; this.disconnected = false; }
+    observe(target) { this.targets.push(target); }
+    disconnect() { this.disconnected = true; }
+  }
+  const win = { location: { protocol: 'https:', pathname: '/' }, innerHeight: 800,
+    getComputedStyle: () => ({ visibility: 'visible' }),
+    MutationObserver: class extends Observer { constructor(cb) { super(cb); observers.mutation.push(this); } },
+    ResizeObserver: class extends Observer { constructor(cb) { super(cb); observers.resize.push(this); } },
+    IntersectionObserver: class extends Observer { constructor(cb) { super(cb); observers.intersection.push(this); } } };
+  win.top = win.self = win;
+  win.adsbygoogle = { push() { requests++; } };
+  const cleanup = mountDisplayAds({ root, win, config });
+  observers.intersection[0].callback([{ target: node, isIntersecting: true }]);
+  assert.equal(requests, 0, 'zero-width hidden parent cannot start an ad request');
+  width = 320;
+  observers.resize[0].callback([{ target: node }]);
+  assert.equal(requests, 1, 'the newly measurable in-range placement starts one request');
+  observers.resize[0].callback([{ target: node }]);
+  observers.mutation[1].callback([{ target: node }]);
+  assert.equal(requests, 1, 'later resize and visibility changes cannot request again');
+  assert.equal(observers.resize[0].disconnected, true, 'size watching stops when the request starts');
+  assert.equal(observers.mutation[1].disconnected, true, 'visibility watching stops when the request starts');
+  cleanup();
+  assert.equal(observers.resize[0].disconnected, true);
+  assert.equal(observers.mutation[0].disconnected, true);
+});
+
+test('ordinary flow ads wait while an ancestor is visibility-hidden and recover when shown', () => {
+  let visibility = 'hidden'; let requests = 0;
+  const observers = [];
+  const parent = {};
+  const node = {
+    dataset: { displayAd: 'info' }, hidden: true, parentElement: parent,
+    hasAttribute: () => true, getClientRects: () => [{}],
+    getBoundingClientRect: () => ({ width: 320, top: 100, bottom: 245 }),
+    querySelector: () => ({ append() {} })
+  };
+  const doc = { visibilityState: 'visible', querySelector: () => null,
+    head: { append(script) { script.isConnected = true; } },
+    createElement: (tag) => tag === 'script'
+      ? { addEventListener() {}, isConnected: false }
+      : { dataset: {}, style: {}, getBoundingClientRect: () => ({ width: 320 }) },
+    addEventListener() {}, removeEventListener() {} };
+  const root = { ownerDocument: doc, querySelectorAll: () => [node] };
+  class Observer {
+    constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+    observe() {} disconnect() { this.disconnected = true; }
+  }
+  const win = { location: { protocol: 'https:', pathname: '/about/' }, innerHeight: 800,
+    getComputedStyle: () => ({ visibility }),
+    MutationObserver: Observer, ResizeObserver: Observer, IntersectionObserver: Observer };
+  win.top = win.self = win; win.adsbygoogle = { push() { requests++; } };
+  const cleanup = mountDisplayAds({ root, win, config });
+  observers[3].callback([{ target: node, isIntersecting: true }]);
+  assert.equal(requests, 0, 'visibility:hidden cannot start a request');
+  visibility = 'visible';
+  const visibilityObserver = observers[2];
+  const resizeObserver = observers[1];
+  visibilityObserver.callback([{ target: parent }]);
+  assert.equal(requests, 1, 'an ancestor visibility change retries a nearby placement');
+  assert.equal(resizeObserver.disconnected, true, 'size watching stops when the request starts');
+  assert.equal(visibilityObserver.disconnected, true, 'visibility watching stops when the request starts');
+  cleanup();
+});
+
+test('cleanup before a placement becomes visible prevents a later resize request', () => {
+  let width = 0; let requests = 0; const observers = [];
+  const node = { dataset: { displayAd: 'home' }, hidden: true, parentElement: {},
+    hasAttribute: () => true, getClientRects: () => width ? [{}] : [],
+    getBoundingClientRect: () => ({ width, top: 100, bottom: 245 }),
+    querySelector: () => ({ append() {} }) };
+  const doc = { visibilityState: 'visible', querySelector: () => null,
+    head: { append(script) { script.isConnected = true; } },
+    createElement: (tag) => tag === 'script'
+      ? { addEventListener() {}, isConnected: false }
+      : { dataset: {}, style: {}, getBoundingClientRect: () => ({ width }) },
+    addEventListener() {}, removeEventListener() {} };
+  class Observer {
+    constructor(callback) { this.callback = callback; observers.push(this); }
+    observe() {} disconnect() {}
+  }
+  const win = { location: { protocol: 'https:', pathname: '/' }, innerHeight: 800,
+    getComputedStyle: () => ({ visibility: 'visible' }),
+    MutationObserver: Observer, ResizeObserver: Observer, IntersectionObserver: Observer };
+  win.top = win.self = win; win.adsbygoogle = { push() { requests++; } };
+  const cleanup = mountDisplayAds({ root: { ownerDocument: doc, querySelectorAll: () => [node] }, win, config });
+  cleanup();
+  width = 320;
+  for (const observer of observers) observer.callback([{ target: node, isIntersecting: true }]);
+  assert.equal(requests, 0, 'cleanup closes the one-shot placement before delayed browser callbacks');
+});
+
+test('resize and visibility recovery waits until a hidden document is visible and placement is near', () => {
+  let top = 3000; let requests = 0; const observers = []; const listeners = {};
+  const node = { dataset: { displayAd: 'home' }, hidden: true, parentElement: {},
+    hasAttribute: () => true, getClientRects: () => [{}],
+    getBoundingClientRect: () => ({ width: 320, top, bottom: top + 145 }),
+    querySelector: () => ({ append() {} }) };
+  const doc = { visibilityState: 'hidden', querySelector: () => null,
+    head: { append(script) { script.isConnected = true; } },
+    createElement: (tag) => tag === 'script'
+      ? { addEventListener() {}, isConnected: false }
+      : { dataset: {}, style: {}, getBoundingClientRect: () => ({ width: 320 }) },
+    addEventListener: (name, callback) => { listeners[name] = callback; },
+    removeEventListener: (name) => { delete listeners[name]; } };
+  class Observer {
+    constructor(callback) { this.callback = callback; this.disconnected = false; observers.push(this); }
+    observe() {} disconnect() { this.disconnected = true; }
+  }
+  const win = { location: { protocol: 'https:', pathname: '/' }, innerHeight: 800,
+    getComputedStyle: () => ({ visibility: 'visible' }),
+    MutationObserver: Observer, ResizeObserver: Observer, IntersectionObserver: Observer };
+  win.top = win.self = win; win.adsbygoogle = { push() { requests++; } };
+  const cleanup = mountDisplayAds({ root: { ownerDocument: doc, querySelectorAll: () => [node] }, win, config });
+  observers[3].callback([{ target: node, isIntersecting: true }]);
+  observers[1].callback([{ target: node }]);
+  observers[2].callback([{ target: node }]);
+  assert.equal(requests, 0, 'hidden documents never request from observer callbacks');
+  doc.visibilityState = 'visible';
+  observers[1].callback([{ target: node }]);
+  observers[2].callback([{ target: node }]);
+  assert.equal(requests, 0, 'visible but distant placements still wait');
+  top = 100;
+  listeners.visibilitychange();
+  assert.equal(requests, 1, 'returning to a visible document retries a nearby placement once');
+  cleanup();
+});

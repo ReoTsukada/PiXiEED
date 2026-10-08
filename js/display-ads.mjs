@@ -11,6 +11,7 @@ const placements = new Map([
 ]);
 const mounted = new WeakSet();
 const loaders = new WeakMap();
+const flowPlacements = new Set(['home', 'tools', 'info', 'stores', 'store-detail']);
 
 function getAdsenseLoader(doc, win, client) {
   let state = loaders.get(doc);
@@ -69,11 +70,17 @@ export function mountDisplayAds({ root = document, win = window, config = displa
 
     let queued = false;
     let requestObserver;
+    let sizeObserver;
+    let visibilityObserver;
     let emptyObserver;
     let statusObserver;
     let loader;
+    let disposed = false;
     function dispose() {
+      disposed = true;
       requestObserver?.disconnect();
+      sizeObserver?.disconnect();
+      visibilityObserver?.disconnect();
       emptyObserver?.disconnect();
       statusObserver?.disconnect();
       loader?.errors.delete(markEmpty);
@@ -85,6 +92,8 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       if (node.hasAttribute('data-ad-reserve')) {
         node.dataset.adState = 'empty';
         requestObserver?.disconnect();
+        sizeObserver?.disconnect();
+        visibilityObserver?.disconnect();
         emptyObserver?.disconnect();
         loader?.errors.delete(markEmpty);
         doc.removeEventListener('visibilitychange', onVisible);
@@ -93,6 +102,8 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       node.hidden = true;
       node.dataset.adState = 'empty';
       requestObserver?.disconnect();
+      sizeObserver?.disconnect();
+      visibilityObserver?.disconnect();
       emptyObserver?.disconnect();
       loader?.errors.delete(markEmpty);
       doc.removeEventListener('visibilitychange', onVisible);
@@ -112,8 +123,15 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       }
     }
     function request() {
-      if (queued || node.hidden || doc.visibilityState === 'hidden' || unit.getBoundingClientRect().width <= 0) return;
+      if (disposed || queued || node.hidden || doc.visibilityState === 'hidden' || unit.getBoundingClientRect().width <= 0) return;
+      if (flowPlacements.has(node.dataset.displayAd)) {
+        const style = win.getComputedStyle?.(node);
+        const rects = node.getClientRects?.();
+        if ((rects && !rects.length) || ['hidden', 'collapse'].includes(style?.visibility)) return;
+      }
       queued = true;
+      sizeObserver?.disconnect();
+      visibilityObserver?.disconnect();
       node.dataset.adState = 'requested';
       requestObserver?.disconnect();
       try {
@@ -125,10 +143,15 @@ export function mountDisplayAds({ root = document, win = window, config = displa
       catch { markEmpty(); }
     }
     function onVisible() {
-      if (doc.visibilityState !== 'hidden' && !queued) {
+      if (!disposed && doc.visibilityState !== 'hidden' && !queued) {
         const bounds = node.getBoundingClientRect();
         if (bounds.top < win.innerHeight + 240 && bounds.bottom > -240) request();
       }
+    }
+    function requestIfNear() {
+      if (disposed || queued || doc.visibilityState === 'hidden') return;
+      const bounds = node.getBoundingClientRect();
+      if (bounds.top < win.innerHeight + 240 && bounds.bottom > -240) request();
     }
     statusObserver = new win.MutationObserver(() => {
       if (unit.dataset.adStatus === 'unfilled') markEmpty();
@@ -139,6 +162,18 @@ export function mountDisplayAds({ root = document, win = window, config = displa
     });
     statusObserver.observe(unit, { attributes: true, attributeFilter: ['data-ad-status'] });
     doc.addEventListener('visibilitychange', onVisible);
+    if (flowPlacements.has(node.dataset.displayAd)) {
+      if (win.ResizeObserver) {
+        sizeObserver = new win.ResizeObserver(requestIfNear);
+        sizeObserver.observe(node);
+      }
+      if (win.MutationObserver && node.parentElement) {
+        visibilityObserver = new win.MutationObserver(requestIfNear);
+        for (let ancestor = node; ancestor; ancestor = ancestor.parentElement) {
+          visibilityObserver.observe(ancestor, { attributes: true, attributeFilter: ['class', 'hidden', 'style'] });
+        }
+      }
+    }
     if (win.IntersectionObserver) {
       requestObserver = new win.IntersectionObserver((entries) => {
         if (entries.some((entry) => entry.target === node && entry.isIntersecting)) request();
