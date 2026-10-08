@@ -39,7 +39,8 @@ export function validAmazonUrl(rawUrl, asin) {
 
 /** Normalize untrusted JSON data into a safe, display-ready product record. */
 export function normalizeProduct(candidate) {
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)
+  if (!candidate || candidate.enabled === false || candidate.visible === false
+      || typeof candidate !== 'object' || Array.isArray(candidate)
       || typeof candidate.id !== 'string' || !candidate.id.trim()
       || typeof candidate.title !== 'string' || !candidate.title.trim()) return false;
 

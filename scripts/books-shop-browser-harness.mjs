@@ -105,7 +105,10 @@ try {
   });
   await check('sample without fabricated ASIN stays selectable', async () => {
     const sample = JSON.parse(await readFile(new URL('../assets/books/room-products.json', import.meta.url), 'utf8')).find(p => p.sample);
-    assert.ok(sample); await choose(page, sample.id);
+    assert.ok(sample);
+    const fixture = JSON.parse(await readFile(new URL('../assets/books/room-products.json', import.meta.url), 'utf8')).map(p => ({ ...p, enabled: true }));
+    await page.route('**/assets/books/room-products.json', route => route.fulfill({ json: fixture }));
+    await ready(page); await choose(page, sample.id);
     assert.equal(await page.locator('#room-product-amazon').isVisible(), false);
     assert.match(await page.locator('#room-product-panel').textContent(), /見本|未設定/);
     await page.keyboard.press('Escape');
@@ -126,6 +129,21 @@ try {
   await context.close();
   const safety = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const safePage = await safety.newPage();
+  await check('disabled product excluded from shelf, selection, detail and ordinary catalog', async () => {
+    const data = JSON.parse(await readFile(new URL('../assets/books/room-products.json', import.meta.url), 'utf8')).map(p => ({ ...p, enabled: p.id !== 'product-pochipochi' && p.enabled !== false }));
+    await safePage.route('**/assets/books/room-products.json', route => route.fulfill({ json: data }));
+    await ready(safePage);
+    assert.equal(await safePage.locator('#room-product-select option[value="product-pochipochi"]').count(), 0);
+    assert.equal(await safePage.locator('#room-product-select option[value="product-pixel-tool-sample"]').count(), 0);
+    const canvas = safePage.locator('#room-canvas'), rect = await canvas.boundingBox();
+    const cam = await canvas.evaluate(el => ({ x: +el.dataset.cameraX, y: +el.dataset.cameraY, s: +el.dataset.viewScale }));
+    await safePage.mouse.click(rect.x + (250 - cam.x) * cam.s, rect.y + (208 - cam.y) * cam.s);
+    assert.notEqual(await safePage.locator('#room-product-panel').getAttribute('data-active'), 'true');
+    await safePage.goto(`${base}/books/`);
+    await safePage.waitForFunction(() => document.querySelector('#product-pochipochi').hidden);
+    assert.equal(await safePage.locator('#product-pochipochi').isVisible(), false);
+    await safePage.unroute('**/assets/books/room-products.json');
+  });
   await check('shelf tap selects inline details without external navigation', async () => {
     await ready(safePage);
     const canvas = safePage.locator('#room-canvas');
@@ -136,9 +154,9 @@ try {
     assert.equal(safety.pages().length, 1);
     await safePage.locator('#room-product-close').click();
   });
-  await check('normal catalog retains entry and blocks unconfirmed commerce', async () => {
+  await check('normal catalog has no room entry and blocks unconfirmed commerce', async () => {
     await safePage.goto(`${base}/books/`);
-    await safePage.locator('a[href="/books/room-preview.html"]').waitFor();
+    assert.equal(await safePage.locator('a[href="/books/room-preview.html"]').count(), 0);
     const links = safePage.locator('[data-books-commerce-link]');
     assert.ok(await links.count() >= 7);
     for (let i = 0; i < await links.count(); i++) assert.equal(await links.nth(i).isVisible(), false);

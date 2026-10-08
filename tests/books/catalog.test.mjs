@@ -80,8 +80,14 @@ test('retains all existing catalog records and adds one tools sample with no com
   }
   const sample = data.find((item) => item.sample);
   assert.equal(sample.category, 'tools');
-  assert.equal(normalizeProduct(sample).amazonUrl, '');
+  assert.equal(normalizeProduct(sample), false);
+  assert.equal(normalizeProduct({ ...sample, enabled: true }).amazonUrl, '');
 
   const commerce = JSON.parse(await readFile(new URL('../../assets/books/room-commerce.json', import.meta.url), 'utf8'));
   assert.deepEqual(commerce, { associateName: '', enrollmentConfirmed: false });
+});
+
+test('hidden records are excluded before catalog or shelf selection', () => {
+  assert.equal(normalizeProduct({ id: 'hidden', title: 'hidden', enabled: false }), false);
+  assert.equal(normalizeProduct({ id: 'hidden', title: 'hidden', visible: false }), false);
 });

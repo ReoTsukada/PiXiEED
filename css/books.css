@@ -806,3 +806,5 @@ html[data-pixieed-motion="reduced"] .books-product-card:hover { transform: none;
 .books-product-card[id] { scroll-margin-top: calc(var(--header-h) + 1rem); }
 
 .books-page [data-books-commerce-link][hidden] { display: none !important; }
+
+.books-page article[hidden] { display: none !important; }

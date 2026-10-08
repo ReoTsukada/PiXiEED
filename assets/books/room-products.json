@@ -75,6 +75,7 @@
     "description": "商品登録と「道具」カテゴリの表示を確認するためのサンプルです。実在の商品・販売リンクではありません。",
     "format": "サンプル",
     "category": "tools",
-    "sample": true
+    "sample": true,
+    "enabled": false
   }
 ]

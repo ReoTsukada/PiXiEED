@@ -13,3 +13,20 @@ try {
     links.forEach(link => { link.hidden = false; });
   }
 } catch { /* Remain visibly unconfirmed and keep outbound links disabled. */ }
+
+// Preserve hidden records in the manifest while removing every ordinary-catalog entry.
+try {
+  const response = await fetch('/assets/books/room-products.json', {
+    credentials: 'same-origin', signal: AbortSignal.timeout(5000),
+  });
+  if (response.ok) {
+    const products = await response.json();
+    if (Array.isArray(products)) for (const product of products) {
+      if (product?.enabled !== false && product?.visible !== false) continue;
+      if (typeof product.id !== 'string') continue;
+      const entry = document.getElementById(product.id)
+        || [...document.querySelectorAll('[data-books-product-id]')].find(el => el.dataset.booksProductId === product.id);
+      if (entry) entry.hidden = true;
+    }
+  }
+} catch { /* The room's catalog filtering is independent of this fallback page. */ }
