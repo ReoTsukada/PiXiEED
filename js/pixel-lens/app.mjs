@@ -17,7 +17,8 @@ import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/sh
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261006-header-controls-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
-import { sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-2';
+import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261008-output-5';
+import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-2';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
@@ -25,7 +26,17 @@ import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?v=2
 
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
+const hasOutputReturn = initialParams.has('outputId');
+let outputReturnPending = hasOutputReturn;
 const returnToAudio = initialParams.get('to') === 'audio';
+function clearOutputReturnId() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has('outputId')) return;
+  params.delete('outputId');
+  const query = params.toString();
+  history.replaceState(history.state, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+  outputReturnPending = false;
+}
 let audioCameraRequest = readAudioCameraRequest({ search: location.search });
 let audioCameraInvalid = false;
 if (returnToAudio && !audioCameraRequest) {
@@ -79,7 +90,7 @@ let downloadUrl = null;
 let downloadBlob = null;
 let downloadGeneration = 0;
 let gifExportJob = null;
-let resumeOnVisible = true;
+let resumeOnVisible = !hasOutputReturn;
 let pendingCameraRequest = null;
 let previewSessionStarted = 0;
 let previewCounter = 0;
@@ -99,6 +110,7 @@ let focusRequestToken = 0;
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: normalizeOutputSize(audioCameraRequest?.width ?? 128),
   colorDepth: '16', paletteMode: 'source', gradientMode: 'none', ditherPattern: 'net8', surfaceSimplify: 0, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1, miniature: false };
+let outputHandoffInFlight = false;
 root.dataset.miniature = 'false';
 let sharedImageTarget = null;
 let sharedProjectBound = false;
@@ -1226,6 +1238,7 @@ async function startCamera({ focus = true } = {}) {
     await video.play();
     if (token !== cameraSequence) { stream.getTracks().forEach((track) => track.stop()); return; }
     setupZoomForTrack(stream.getVideoTracks()[0]);
+    if (focus) clearOutputReturnId();
     setMode('live');
     setInfoForMode('live');
     say('最初の画像を仕上げています…');
@@ -2312,27 +2325,28 @@ $('#flipCamera').addEventListener('click', () => { if (state.mode === 'live') fl
 $('#savePng').addEventListener('click', async (event) => {
   event.preventDefault();
   const link = $('#savePng');
-  if (link.getAttribute('aria-disabled') === 'true' || !downloadUrl || !downloadBlob || state.mode !== 'captured' || !state.result) return;
-  const snapshot = { generation: downloadGeneration, frame: state.result, url: downloadUrl, blob: downloadBlob, filename: link.download };
-  const isCurrent = () => snapshot.generation === downloadGeneration && state.mode === 'captured' && state.result === snapshot.frame && downloadUrl === snapshot.url && downloadBlob === snapshot.blob;
+  if (outputHandoffInFlight || link.getAttribute('aria-disabled') === 'true' || !downloadUrl || !downloadBlob || state.mode !== 'captured' || !state.result) return;
+  const snapshot = {
+    generation: downloadGeneration, frame: state.result, gif: gif.pending, url: downloadUrl, blob: downloadBlob, filename: link.download,
+    settings: { ratio: state.ratio, size: state.size, colorDepth: state.colorDepth, paletteMode: state.paletteMode,
+      gradientMode: state.gradientMode, ditherPattern: state.ditherPattern, surfaceSimplify: state.surfaceSimplify,
+      zoom: state.zoom, miniature: state.miniature, facing: state.facing, customLook: state.customLook, camera: { ...state.camera } }
+  };
+  const isCurrent = () => snapshot.generation === downloadGeneration && state.mode === 'captured' && state.result === snapshot.frame
+    && gif.pending === snapshot.gif && downloadUrl === snapshot.url && downloadBlob === snapshot.blob;
+  outputHandoffInFlight = true;
   try {
     // Keep the fresh ownership check for restored PXD images. The dialog's own
     // share button supplies a new user gesture after this asynchronous check.
     if (!gif.pending) await cameraPxd.assertCanSave();
     if (!isCurrent()) return;
-  const gifFrames = snapshot.gif;
-  const gifDelayMs = gifFrames ? 1000 / (gifFrames.fps || GIF_FPS) : null;
-  const staged = await sendToolOutput({
-      blob: snapshot.blob,
-      filename: snapshot.filename,
+    const options = createPixelLensOutputOptions({
+      blob: snapshot.blob, filename: snapshot.filename,
       returnUrl: `${location.pathname}${location.search}${location.hash}`,
-      title: snapshot.filename.endsWith('.gif') ? 'アニメーションを確認' : '画像を確認',
-      source: 'ドット絵カメラ',
-    metadata: gifFrames
-      ? { width: gifFrames[0].width, height: gifFrames[0].height, defaultScale: Number(link.dataset.outputScale) || 1, durationSeconds: gifFrames.length * gifDelayMs / 1000, frameCount: gifFrames.length }
-      : { width: snapshot.frame.width, height: snapshot.frame.height, defaultScale: Number(link.dataset.outputScale) || 1 },
-    ...(gifFrames ? { mediaSource: { kind: 'gif-frames', frames: gifFrames, delayMs: gifDelayMs, loopCount: 0 } } : {})
+      frame: snapshot.frame, gifFrames: snapshot.gif,
+      outputScale: Number(link.dataset.outputScale) || 1, settings: snapshot.settings
     });
+    const staged = await sendToolOutput(options);
     if (staged.ok) return;
     if (!isCurrent()) return;
     if (!fileSave.show({ blob: snapshot.blob, url: snapshot.url, filename: snapshot.filename, isCurrent })) {
@@ -2340,6 +2354,8 @@ $('#savePng').addEventListener('click', async (event) => {
     }
   } catch (error) {
     if (isCurrent()) say(error instanceof Error ? error.message : 'この画像を保存できません。', { visible: true });
+  } finally {
+    outputHandoffInFlight = false;
   }
 });
 if (returnToAudio) $('#postCamera').textContent = '曲を作る';
@@ -2386,7 +2402,7 @@ function suspendCamera() {
 }
 
 function resumeCameraIfVisible() {
-  if (audioCameraInvalid || document.hidden || !resumeOnVisible || state.mode === 'captured') return;
+  if (audioCameraInvalid || outputReturnPending || document.hidden || !resumeOnVisible || state.mode === 'captured') return;
   resumeOnVisible = false;
   if (importedSource) {
     lastImportedFrameAt = 0;
@@ -2439,10 +2455,10 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
     sharedImageTarget = image ? { width: image.width, height: image.height } : null;
     if (!image) {
       sharedImageColorCount = 16;
-      clearStartupWatchdog(); invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = true;
+      clearStartupWatchdog(); invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = !outputReturnPending;
       state.result = null;
       setMode('idle');
-      if (!audioCameraInvalid) { setMode('loading'); resumeCameraIfVisible(); }
+      if (!audioCameraInvalid && !outputReturnPending) { setMode('loading'); resumeCameraIfVisible(); }
       return;
     }
     sharedImageColorCount = countSharedImageColors(image, SHARED_CANVAS_PREMIUM_MAX_COLORS);
@@ -2453,6 +2469,116 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
   }
 });
 const openedCameraPxd = await cameraPxd.ready;
+async function decodeReturnedCameraPng(plan) {
+  const decoded = await decodeCameraImageFile(plan.blob);
+  let canvas;
+  try {
+    const outputWidth = plan.width * plan.scale;
+    const outputHeight = plan.height * plan.scale;
+    if (!Number.isSafeInteger(outputWidth) || !Number.isSafeInteger(outputHeight)
+      || outputWidth > 4096 || outputHeight > 4096 || decoded.width !== outputWidth || decoded.height !== outputHeight) {
+      throw new TypeError('撮影画像と元のピクセルサイズが一致しません。');
+    }
+    canvas = document.createElement('canvas');
+    canvas.width = plan.width;
+    canvas.height = plan.height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('撮影画像を読み込めません。');
+    context.imageSmoothingEnabled = false;
+    context.drawImage(decoded.source, 0, 0, plan.width, plan.height);
+    const pixels = context.getImageData(0, 0, plan.width, plan.height);
+    return { width: plan.width, height: plan.height, data: new Uint8ClampedArray(pixels.data), palette: [] };
+  } finally {
+    decoded.dispose?.();
+    if (canvas) { canvas.width = 1; canvas.height = 1; }
+  }
+}
+
+function applyReturnedCameraSettings(settings) {
+  if (settings.ratio) state.ratio = settings.ratio;
+  if (settings.size) state.size = normalizeOutputSize(settings.size);
+  if (settings.colorDepth) state.colorDepth = settings.colorDepth;
+  if (settings.paletteMode) state.paletteMode = settings.paletteMode;
+  if (settings.gradientMode) state.gradientMode = settings.gradientMode;
+  if (settings.ditherPattern && DITHER_PATTERNS.some((item) => item.id === settings.ditherPattern)) state.ditherPattern = settings.ditherPattern;
+  if (Number.isFinite(settings.surfaceSimplify)) state.surfaceSimplify = settings.surfaceSimplify;
+  if (Number.isFinite(settings.zoom)) state.zoom = settings.zoom;
+  if (typeof settings.miniature === 'boolean') state.miniature = settings.miniature;
+  if (settings.facing) { state.facing = settings.facing; lastFacing = settings.facing; }
+  if (settings.camera) state.camera = { ...CAMERA_SETTING_DEFAULTS, ...settings.camera };
+  state.customLook = settings.customLook && myPalettes.some((palette) => palette.id === settings.customLook) ? settings.customLook : null;
+  syncLens();
+  syncControls();
+  syncZoomStops();
+  syncZoomHud();
+}
+
+async function restoreReturnedCameraOutput() {
+  const params = new URLSearchParams(location.search);
+  const ids = params.getAll('outputId');
+  if (!ids.length) return false;
+  if (ids.length !== 1) throw new Error('撮影データの戻り先を確認できません。もう一度撮影してください。');
+  const entry = await readToolOutput(ids[0]);
+  const plan = preparePixelLensOutputRestore(entry);
+  const frame = plan.kind === 'gif' ? plan.frames.at(-1) : await decodeReturnedCameraPng(plan);
+  const result = { width: frame.width, height: frame.height, data: new Uint8ClampedArray(frame.data), palette: [] };
+  const url = URL.createObjectURL(plan.blob);
+  try {
+    // All stored data, settings, decoded pixels, and the local preview URL have been validated first.
+    clearStartupWatchdog();
+    clearImportedSource();
+    cameraSequence++;
+    invalidatePreview();
+    stopTracks();
+    invalidateCaptureDownload();
+    applyReturnedCameraSettings(plan.settings);
+    resumeOnVisible = false;
+    sharedImageTarget = null;
+    sharedImageColorCount = 16;
+    sharedImageEdited = false;
+    sharedProjectBound = false;
+    gif.pending = plan.kind === 'gif' ? plan.frames : null;
+    gif.fps = plan.kind === 'gif' ? plan.frames.fps : GIF_FPS;
+    gif.recording = false;
+    gif.frames = [];
+    gif.capturePlan = null;
+    setMode('captured');
+    drawCompleted(result);
+    downloadBlob = plan.blob;
+    downloadUrl = url;
+    const link = $('#savePng');
+    link.href = url;
+    link.download = plan.filename;
+    link.dataset.outputScale = String(plan.scale);
+    if (plan.kind === 'gif') {
+      root.dataset.gifFrames = String(plan.frames.length);
+      playGif(plan.frames);
+      $('#saveLabel').textContent = '動画を保存（GIF）';
+      resultView.show({ title: 'GIFを撮影しました', detail: `${(plan.frames.length / gif.fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: url });
+      say('撮影したGIFを復元しました。再生を確認して編集を続けられます。', { visible: true });
+    } else {
+      $('#saveLabel').textContent = '画像を保存（PNG）';
+      resultView.show({ title: '撮影画像を復元しました', preview: view, controls: $('#resultControls') });
+      say('撮影した画像を復元しました。設定を変えずに、続けて編集できます。', { visible: true });
+    }
+    updateSaveLinkState();
+    outputReturnPending = false;
+    return true;
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+if (hasOutputReturn && !audioCameraInvalid) {
+  try { await restoreReturnedCameraOutput(); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : '撮影画像を復元できません。';
+    resumeOnVisible = false;
+    if (!state.result && state.mode !== 'captured') setMode('idle');
+    say(message, { visible: true });
+  }
+}
 $('#useCameraImage').hidden = Boolean(audioCameraRequest);
 $('#useCameraImage').dataset.toolResultTransfer = '';
 $('#useCameraImage').textContent = '他のツールへ';
@@ -2477,6 +2603,8 @@ if (audioCameraInvalid) {
   for (const selector of ['#cameraChooseImage', '#cameraFallbackChoose', '#cameraImageInput']) $(selector).disabled = true;
   say('音楽への受け渡しを確認できません。曲へ戻ってカメラを開き直してください。', { visible: true });
 } else if (!openedCameraPxd) {
-  setMode('loading');
-  resumeCameraIfVisible();
+  if (!hasOutputReturn) {
+    setMode('loading');
+    resumeCameraIfVisible();
+  }
 }

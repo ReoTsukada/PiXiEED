@@ -8,10 +8,12 @@ const MIME_EXTENSIONS = Object.freeze({
   'image/gif': 'gif',
   'audio/wav': 'wav',
   'video/mp4': 'mp4',
-  'video/webm': 'webm'
+  'video/webm': 'webm',
+  'application/octet-stream': 'pxd'
 });
 const RETURN_PATHS = new Set([
-  '/draw/', '/audio/', '/pixel-camera.html', '/pixel-camera-studio.html', '/pixiee-lens/'
+  '/draw/', '/audio/', '/pixel-camera.html', '/pixel-camera-studio.html', '/pixiee-lens/',
+  '/jigsaw/', '/spot-difference/', '/hidden-object/'
 ]);
 const ID_PATTERN = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 
@@ -110,14 +112,23 @@ function outputPageUrl(id, origin = globalThis.location?.origin) {
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'aspectLocked', 'cameraSize'];
+  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'aspectLocked', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];
     if (key === 'description' && typeof value === 'string') result[key] = value.slice(0, 180);
     else if (key === 'aspectLocked' && typeof value === 'boolean') result[key] = value;
-    else if (['cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing'].includes(key) && typeof value === 'string' && value.length <= 24) result[key] = value;
-    else if (key === 'cameraEdges' && typeof value === 'boolean') result[key] = value;
+    else if (['cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern'].includes(key) && typeof value === 'string' && value.length <= 24) result[key] = value;
+    else if (key === 'cameraCustomLook' && typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value)) result[key] = value;
+    else if (['cameraEdges', 'cameraMiniature'].includes(key) && typeof value === 'boolean') result[key] = value;
+    else if (key === 'cameraTone' && value && typeof value === 'object' && !Array.isArray(value)) {
+      const tone = {};
+      for (const name of ['brightness', 'exposure', 'saturation', 'shadows', 'contrast', 'whiteBalance', 'zoom']) {
+        const amount = value[name];
+        if (Number.isFinite(amount) && amount >= -100 && amount <= 100) tone[name] = Math.round(amount);
+      }
+      if (Object.keys(tone).length) result[key] = tone;
+    }
     else if (key !== 'description' && Number.isFinite(value) && value >= 0) result[key] = Math.round(value * (key === 'durationSeconds' ? 10 : 1)) / (key === 'durationSeconds' ? 10 : 1);
   }
   return result;

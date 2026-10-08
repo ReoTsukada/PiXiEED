@@ -1,4 +1,4 @@
-import { readToolOutput, saveToolOutputFilename, saveToolOutputVariant, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-3';
+import { readToolOutput, saveToolOutputFilename, saveToolOutputVariant, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-4';
 import { inspectPixelPng, withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { resizeRgbaNearest } from './output-render.mjs?rev=20261008-output-1';
 
@@ -384,8 +384,8 @@ function setMedia(entry) {
     video.hidden = false; video.src = fileUrl;
     fileCard.hidden = true;
   } else {
-    fileTitle.textContent = 'ファイルを準備しました';
-    fileDescription.textContent = 'この形式はPiXiEED内でプレビューできません。';
+    fileTitle.textContent = entry.extension === 'pxd' ? 'PXDバックアップ' : 'ファイルを準備しました';
+    fileDescription.textContent = entry.metadata?.description || 'この形式はPiXiEED内でプレビューできません。';
     fileCard.hidden = false;
   }
 }
@@ -403,7 +403,9 @@ async function mount() {
     sourceUrl = URL.createObjectURL(record.sourceBlob);
     fileUrl = URL.createObjectURL(currentBlob);
     pageTitle.textContent = record.title || '出力を確認';
-    intro.textContent = record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて保存できます。';
+    intro.textContent = record.extension === 'pxd'
+      ? `${record.source || 'PiXiEED'}からのPXDバックアップです。内容を変えず端末へ保存できます。`
+      : record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて保存できます。';
     format.textContent = displayFormat(record);
     fileExtension.textContent = record.extension.toUpperCase();
     extension.textContent = `.${record.extension}`;

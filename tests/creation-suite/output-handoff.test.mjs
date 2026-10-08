@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
+import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from '../../js/pixel-lens/output-handoff.mjs';
 
 class FakeTransaction {
   error = null;
@@ -100,6 +101,24 @@ test('output data stays in IndexedDB and the route carries only an opaque id', a
   assert.equal(first.returnUrl, '/draw/?pxd=local-id&pxdRevision=revision-id');
 });
 
+test('PXD backups use the common output route while archive bytes remain unchanged', async () => {
+  const deps = dependencies();
+  const backup = {
+    blob: new Blob(['PXD archive bytes'], { type: 'application/octet-stream' }),
+    filename: 'pixieed-project.pxd', returnUrl: '/jigsaw/?pxd=local-id&pxdRevision=revision-id',
+    source: 'ジグソー', title: 'PXDバックアップを確認',
+    metadata: { description: '作品のバックアップです。内容は変換せず保存します。' }
+  };
+  const staged = await stageToolOutput(backup, deps);
+  const read = await readToolOutput(staged.id, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(staged.url, `https://pixieed.test/output/?id=${validId}`);
+  assert.equal(await read.blob.text(), 'PXD archive bytes');
+  assert.equal(read.mime, 'application/octet-stream');
+  assert.equal(read.extension, 'pxd');
+  assert.equal(read.returnUrl, '/jigsaw/?pxd=local-id&pxdRevision=revision-id');
+  assert.equal(read.metadata.description, backup.metadata.description);
+});
+
 test('camera output return links carry only the opaque output id for local restoration', async () => {
   const deps = dependencies();
   const staged = await sendToolOutput({ ...file('capture.png'), source: 'ピクセルカメラ', returnOutputId: true }, deps);
@@ -110,6 +129,78 @@ test('camera output return links carry only the opaque output id for local resto
   const restored = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   assert.equal(restored.returnUrl, `/draw/?pxd=local-id&pxdRevision=revision-id&outputId=${validId}`);
   assert.equal(await restored.sourceBlob.text(), 'pixels');
+});
+
+test('PiXiEELENS GIF output uses its real options builder and restores all animation frames locally', async () => {
+  const deps = dependencies();
+  const gifFrames = [
+    { width: 2, height: 1, data: new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 255]) },
+    { width: 2, height: 1, data: new Uint8ClampedArray([0, 0, 255, 255, 255, 255, 0, 255]) }
+  ];
+  gifFrames.fps = 20;
+  const options = createPixelLensOutputOptions({
+    blob: new Blob(['gif bytes'], { type: 'image/gif' }), filename: 'lens.gif', returnUrl: '/pixel-camera.html?from=globe',
+    frame: gifFrames.at(-1), gifFrames, outputScale: 3,
+    settings: { ratio: '3:4', size: 128, colorDepth: '16', paletteMode: 'source', gradientMode: 'dither',
+      ditherPattern: 'net8', surfaceSimplify: 55, zoom: 2, miniature: true, facing: 'user',
+      camera: { brightness: 4, contrast: -8 }, customLook: 'look_01' }
+  });
+  assert.equal(options.returnOutputId, true);
+  assert.equal(options.source, 'ドット絵カメラ');
+  assert.equal(options.mediaSource.kind, 'gif-frames');
+  const staged = await sendToolOutput(options, deps);
+  assert.equal(staged.ok, true);
+  assert.equal(deps.assigned.length, 1);
+  assert.match(deps.assigned[0], /^https:\/\/pixieed\.test\/output\/\?id=/);
+  assert.doesNotMatch(deps.assigned[0], /gif bytes|data:image|base64/);
+  const entry = await readToolOutput(staged.id, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const restored = preparePixelLensOutputRestore(entry);
+  assert.equal(restored.kind, 'gif');
+  assert.equal(restored.filename, 'lens.gif');
+  assert.equal(restored.delayMs, 50);
+  assert.equal(restored.frames.length, 2);
+  assert.deepEqual([...restored.frames[0].data], [...gifFrames[0].data]);
+  assert.deepEqual([...restored.frames[1].data], [...gifFrames[1].data]);
+  assert.equal(restored.settings.ratio, '3:4');
+  assert.equal(restored.settings.size, 128);
+  assert.equal(restored.settings.colorDepth, '16');
+  assert.equal(restored.settings.camera.contrast, -8);
+  assert.equal(restored.settings.customLook, 'look_01');
+  assert.equal(entry.returnUrl, `/pixel-camera.html?from=globe&outputId=${staged.id}`);
+});
+
+test('invalid PiXiEELENS GIF return data leaves an existing capture untouched', () => {
+  const previousCapture = { id: 'unrelated-capture', width: 12, height: 8 };
+  let currentCapture = previousCapture;
+  const brokenEntry = {
+    source: 'ドット絵カメラ', mime: 'image/gif', sourceFilename: 'lens.gif',
+    sourceBlob: new Blob(['gif'], { type: 'image/gif' }),
+    metadata: { width: 2, height: 1, defaultScale: 1 },
+    mediaSource: { kind: 'gif-frames', width: 2, height: 1, loopCount: 0,
+      frames: [{ width: 2, height: 1, data: new Uint8Array([1, 2]), delayMs: 50 }, { width: 2, height: 1, data: new Uint8Array(8), delayMs: 50 }] }
+  };
+  assert.throws(() => { currentCapture = preparePixelLensOutputRestore(brokenEntry); }, /GIF/);
+  assert.equal(currentCapture, previousCapture);
+  assert.throws(() => preparePixelLensOutputRestore({ ...brokenEntry, source: '別のツール' }), /撮影データ/);
+});
+
+test('PiXiEELENS PNG return keeps its original file and validated capture dimensions', async () => {
+  const deps = dependencies();
+  const frame = { width: 16, height: 8, data: new Uint8ClampedArray(16 * 8 * 4) };
+  const options = createPixelLensOutputOptions({
+    blob: new Blob(['png bytes'], { type: 'image/png' }), filename: 'lens.png', returnUrl: '/pixel-camera.html', frame, outputScale: 4,
+    settings: { ratio: '16:9', size: 256, colorDepth: 'gray', paletteMode: 'gameboy', facing: 'environment', camera: { brightness: 12 } }
+  });
+  const staged = await sendToolOutput(options, deps);
+  const entry = await readToolOutput(staged.id, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const restored = preparePixelLensOutputRestore(entry);
+  assert.equal(restored.kind, 'png');
+  assert.equal(restored.blob, entry.sourceBlob);
+  assert.equal(restored.width, 16);
+  assert.equal(restored.height, 8);
+  assert.equal(restored.scale, 4);
+  assert.equal(restored.settings.colorDepth, 'gray');
+  assert.equal(restored.settings.camera.brightness, 12);
 });
 
 test('expired entries fail clearly and are not consumed by a read', async () => {
@@ -127,6 +218,7 @@ test('missing entries fail without affecting the editing page', async () => {
 test('unsupported types and unsafe return paths are rejected before storage', async () => {
   const deps = dependencies();
   await assert.rejects(stageToolOutput(file('art.jpg', 'image/jpeg'), deps), /まだ対応していません/);
+  await assert.rejects(stageToolOutput(file('backup.jpg', 'application/octet-stream'), deps), /まだ対応していません/);
   await assert.rejects(stageToolOutput({ ...file(), returnUrl: '//other.example/' }, deps), /戻り先/);
   assert.equal(deps.indexedDBRef.state.has('outputs'), false);
 });

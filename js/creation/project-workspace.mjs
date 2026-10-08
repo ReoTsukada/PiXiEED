@@ -8,6 +8,7 @@ import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261006-draw-startup-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-4';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',
@@ -23,6 +24,16 @@ function icon(name) { return `<svg viewBox="0 0 24 24" fill="none" stroke="curre
 function node(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text) el.textContent = text; return el; }
 function button(label, id, action) { const el = node('button', '', label); el.type = 'button'; el.id = id; el.addEventListener('click', action); return el; }
 function download(bytes, name) { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); const link = node('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+async function sendPxdBackup(bytes, name, source, returnUrl) {
+  const result = await sendToolOutput({
+    blob: new Blob([bytes], { type: 'application/octet-stream' }), filename: name, returnUrl,
+    title: 'PXDバックアップを確認', source,
+    metadata: { description: '読み込んだPXDバックアップを内容を変えず保存します。' }
+  });
+  if (result.ok) return true;
+  await download(bytes, name);
+  return false;
+}
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
 export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null }) {
@@ -76,7 +87,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const original = button('読み込んだファイルを保存', 'pxd-export-original', () => void transact(async () => {
     const project = await save(); const entry = project.entries.find(({ path }) => path === 'legacy/original.pxd');
     if (!entry) throw new Error('読み込んだファイルが見つかりません。');
-    download(entry.bytes, 'pixieed-original.pxd');
+    const sourceName = ({ draw: 'ドット絵', audio: 'ドットで音楽', camera: 'カメラ', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' })[tool] || 'プロジェクト';
+    await sendPxdBackup(entry.bytes, 'pixieed-original.pxd', sourceName, `${location.pathname}${location.search}${location.hash}`);
   }, { close: false }));
   actions.append(duplicate, saveButton, original);
   const moreActions = node('details', 'project-files project-more');
