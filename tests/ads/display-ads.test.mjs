@@ -38,6 +38,14 @@ test('private and working screens stay excluded even with a valid unit ID', () =
   }
   assert.equal(resolveDisplayAd(config, 'info', '/stores/cafe-hoshi.html'), null);
 });
+test('map detail has one explicit top-level public route owner and cannot run on embedded or private pages', () => {
+  const mapConfig = { ...config, slots: { 'map-detail': '1234567890' } };
+  assert.deepEqual(resolveDisplayAd(displayAdConfig, 'map-detail', '/globe/'), { client: displayAdConfig.client, slot: '8825932060' });
+  assert.ok(resolveDisplayAd(mapConfig, 'map-detail', '/globe/index.html'));
+  for (const path of ['/globe-prototype.html', '/profile/', '/privacy/', '/stores/']) {
+    assert.equal(resolveDisplayAd(mapConfig, 'map-detail', path), null);
+  }
+});
 test('incorrect publisher and unknown placement are rejected', () => {
   assert.equal(resolveDisplayAd({ ...config, client: '/23379831154/' }, 'home', '/'), null);
   assert.equal(resolveDisplayAd(config, 'draw', '/draw/'), null);

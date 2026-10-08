@@ -60,6 +60,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     section = element('section', 'px-tool-result'); section.hidden = true;
     section.dataset.toolResultView = key;
     titleNode = element('h2', 'px-tool-result__title'); titleNode.id = `px-${key}-title`;
+    titleNode.tabIndex = -1;
     section.setAttribute('aria-labelledby', titleNode.id);
     inner = element('div', 'container px-tool-result__inner');
     contentNode = element('div', 'px-tool-result__content');
@@ -244,7 +245,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
       opened = true; doc.body.dataset.toolResultOpen = key; prepareNav();
     }
     section.hidden = false;
-    win.scrollTo({ top: 0, behavior: 'instant' }); returnButton.focus({ preventScroll: true });
+    win.scrollTo({ top: 0, behavior: 'instant' }); titleNode.focus({ preventScroll: true });
     updateNavClearance();
     updateAdReservation();
     return true;

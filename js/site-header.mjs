@@ -51,7 +51,7 @@ function bindPanelEffects() {
 
 const MENU_MARKUP = `
   <div class="site-menu-backdrop" data-menu-backdrop hidden></div>
-  <aside class="site-menu" id="site-menu" data-site-menu hidden aria-labelledby="site-menu-title">
+  <aside class="site-menu" id="site-menu" data-site-menu hidden role="dialog" aria-modal="true" aria-labelledby="site-menu-title">
     <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">メニュー</h2></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
     <div class="site-menu__body">
     <a class="site-menu__profile" href="/profile/" data-menu-link><span class="site-menu__avatar" aria-hidden="true">P</span><span><strong>自分のページ</strong><small>投稿・いいね・記録</small></span><span aria-hidden="true">›</span></a>
@@ -108,7 +108,17 @@ function mountSiteMenu(header, inner) {
   if (!menu || !backdrop) return;
   let suppressClick = false;
   let start = null;
+  let menuBackground = [];
   const setOpen = (open, returnFocus = false) => {
+    if (open && menu.hidden) {
+      menuBackground = [...document.body.children]
+        .filter(node => ![menu, backdrop, settings].includes(node) && !node.matches('script,style,link'))
+        .map(node => ({ node, inert: node.inert }));
+      for (const { node } of menuBackground) node.inert = true;
+    } else if (!open) {
+      for (const { node, inert } of menuBackground) node.inert = inert;
+      menuBackground = [];
+    }
     menu.hidden = !open;
     backdrop.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));

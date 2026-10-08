@@ -905,6 +905,18 @@ html:not(.is-tool-telescope) .sheet .sheet__close { flex: 0 0 var(--control); mi
 .map-events-panel__empty { padding: 14px 4px; color: #bccbd3; }
 .map-events-panel__empty + button { margin: 0 4px 12px; }
 .map-events-panel [hidden] { display: none !important; }
+.has-external-event-detail .map-events-panel { display: none; }
+.event-calendar { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid #405b6d; }
+.event-calendar h3 { margin: 0; font-size: .95rem; }
+.event-calendar a, .event-calendar button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border: 1px solid #405b6d; border-radius: 9px; color: #c0ddff; background: #192735; font: inherit; }
+.event-calendar p { color: #a9bdca; }
+.event-calendar__actions { display: grid; gap: 8px; }
+.event-calendar__actions .event-calendar__action { gap: 8px; text-decoration: none; text-align: center; line-height: 1.5; }
+.event-calendar__actions .event-calendar__action--primary { color: #fff; background: #b83f34; border-color: #b83f34; }
+.event-calendar__actions .event-calendar__action--secondary { color: #c0ddff; background: #192735; }
+.event-calendar__reminder { display: grid; gap: 10px; padding: 14px; border: 1px solid #405b6d; border-radius: 14px; background: #13202d; }
+.event-calendar__reminder h4, .event-calendar__reminder p { margin: 0; }
+.event-calendar :is(a,button):focus-visible { outline: 3px solid #9bcfff; outline-offset: 3px; }
 @media (max-width: 680px) {
   .map-events-panel { top: auto; left: 10px; right: 10px; width: auto; bottom: calc(5.3rem + env(safe-area-inset-bottom)); border-radius: 21px 21px 16px 16px; }
   .map-events-panel[data-view="overview"] { max-height: 48%; }

@@ -1,9 +1,10 @@
-import { displayAdConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
+import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-1';
 
 // Explicit page ownership prevents accidental ads in editors, private pages or embedded tools.
 const placements = new Map([
   ['home', ['/']], ['tools', ['/tools/']], ['info', ['/about/', '/guide/']],
   ['stores', ['/stores/']], ['store-detail', ['/stores/ecowashcafe-nakanoshima.html']],
+  ['map-detail', ['/globe/']],
   ['camera-result', ['/pixel-camera.html']], ['draw-result', ['/draw/']],
   ['audio-result', ['/audio/']], ['jigsaw-result', ['/jigsaw/']],
   ['spot-result', ['/play/spot-difference/']], ['find-result', ['/play/hidden-object/']]

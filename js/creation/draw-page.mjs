@@ -1502,8 +1502,9 @@ $('#draw-export').addEventListener('click', async () => {
     interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas });
     const result = await saveFile(blob, `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`);
     if (result !== 'cancelled' && unchangedSource()) {
-      status.textContent = `${width}×${height}pxで保存しました`;
-      if (readOnlyImage || original.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: 'PNGを保存しました', detail: `${width}×${height}px`, preview: canvas });
+      const shared = result === 'shared';
+      status.textContent = shared ? `${width}×${height}pxのPNGを共有画面に渡しました。` : `${width}×${height}pxのPNGのダウンロードを開始しました。`;
+      if (readOnlyImage || original.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: shared ? 'PNGを共有画面に渡しました' : 'PNGのダウンロードを開始しました', detail: `${width}×${height}px`, preview: canvas });
     }
   } catch (error) { if (unchangedSource()) status.textContent = `PNGを書き出せませんでした：${error.message}`; }
 });
@@ -1578,8 +1579,9 @@ async function exportTimelapse(detail) {
     if (!timelapseJobIsCurrent(job)) return;
     const result = await saveFile(new Blob([bytes], { type: 'image/gif' }), `pixieed-drawing-timelapse-${width}x${height}.gif`);
     if (result !== 'cancelled' && timelapseJobIsCurrent(job)) {
-      toast(detail ? '詳しい描画過程を保存しました' : '描いた過程を保存しました');
-      if (job.document.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: 'GIFを保存しました', detail: `${width}×${height}px`, preview: canvas });
+      const shared = result === 'shared';
+      toast(shared ? 'GIFを共有画面に渡しました。' : 'GIFのダウンロードを開始しました。');
+      if (job.document.pixels.some((pixel) => pixel >= 0)) resultView.show({ title: shared ? 'GIFを共有画面に渡しました' : 'GIFのダウンロードを開始しました', detail: `${width}×${height}px`, preview: canvas });
     }
   } catch (error) {
     if (timelapseJobIsCurrent(job) && error?.name !== 'AbortError') status.textContent = `GIFを作れませんでした：${error.message}`;
@@ -1609,8 +1611,9 @@ async function exportAnimation() {
     if (scope.disposed || controller.signal.aborted) return;
     const result = await encodeAnimatedGif(frames, { longEdge: 1024, maxPixels: 80e6, maxInputPixels: 128 * 256 * 256, signal: controller.signal });
     if (scope.disposed || controller.signal.aborted) return;
-    await saveFile(new Blob([result.bytes], { type: 'image/gif' }), `pixieed-animation-${result.width}x${result.height}.gif`);
-    toast(`${frames.length}コマのアニメーションを保存しました。`);
+    const saved = await saveFile(new Blob([result.bytes], { type: 'image/gif' }), `pixieed-animation-${result.width}x${result.height}.gif`);
+    if (saved === 'cancelled') return;
+    toast(saved === 'shared' ? 'GIFを共有画面に渡しました。' : 'GIFのダウンロードを開始しました。');
   } catch (error) { if (!scope.disposed && error.name !== 'AbortError') toast(`GIFを書き出せませんでした：${error.message}`); }
   finally { if (animationExportController === controller) animationExportController = null; animationExporting = false; }
 }

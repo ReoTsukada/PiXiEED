@@ -47,6 +47,7 @@ export const displayAdConfig = {
     info: '8825932060', // About・利用ガイド
     stores: '8825932060',
     'store-detail': '8825932060', // 公開中の実店舗詳細
+    'map-detail': '8825932060', // 公開イベント詳細を選択中の地図
     'camera-result': '2995020884', // 撮影結果
     'draw-result': '2995020884', // PNG・GIF書き出し後
     'audio-result': '2995020884', // PNG・音・動画の書き出し後

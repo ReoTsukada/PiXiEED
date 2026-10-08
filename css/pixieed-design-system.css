@@ -13,6 +13,7 @@
   --pixieed-muted: #5f6871;
   --pixieed-line: rgba(27, 32, 37, .11);
   --pixieed-accent: #e75445;
+  --pixieed-accent-strong: #b83f34;
   --pixieed-link: #315fd0;
   --pixieed-dark: #17232d;
   --pixieed-header-height: 64px;
@@ -186,8 +187,8 @@ h2 { font-size: clamp(1.9rem, 4.5vw, 3.4rem); }
 }
 
 .button:hover { transform: translateY(-1px); }
-.button--primary { background: var(--pixieed-accent); box-shadow: none; }
-.button--primary:hover { background: #d9483b; }
+.button--primary { background: var(--pixieed-accent-strong); box-shadow: none; }
+.button--primary:hover { background: #a9362e; }
 .button--quiet { color: var(--pixieed-ink); border: 0; background: var(--pixieed-surface-muted); }
 .button--quiet:hover { border: 0; background: #e4e9e6; }
 .button--light { color: var(--pixieed-dark); background: #fff; }
@@ -220,10 +221,26 @@ input, select, textarea {
   background: var(--pixieed-surface-muted) !important;
 }
 
+/* Keep editable fields distinct from their muted surface without restyling
+   editor controls, color pickers, or the camera's custom interface. */
+.field :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
+.filter-bar :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border: 1px solid rgba(27, 32, 37, .2) !important;
+}
+
+.site-menu__group :is(a, button):is(:hover, :focus-visible) {
+  color: var(--pixieed-accent-strong);
+}
+
+.site-menu__group :is(a, button):focus-visible {
+  outline: 2px solid var(--pixieed-link);
+  outline-offset: 2px;
+}
+
 /* Borderless content surfaces */
 .page-hero { padding-block: clamp(3rem, 7vw, 5rem) 2.5rem; border-bottom: 0; }
 .app-page:not(.app-page--field) .page-hero { padding-block: clamp(2.5rem, 5vw, 4rem) 1.8rem; }
-.filter-bar { border: 0; border-radius: var(--pixieed-radius-md); background: var(--pixieed-surface); box-shadow: none; }
+.filter-bar { border: 1px solid var(--pixieed-line); border-radius: var(--pixieed-radius-md); background: var(--pixieed-surface); box-shadow: none; }
 
 .art-card,
 .store-card,
@@ -252,6 +269,14 @@ input, select, textarea {
 .tool-card:focus-within {
   box-shadow: 0 14px 32px rgba(27, 32, 37, .08);
   transform: translateY(-2px);
+}
+
+.tool-card:focus-visible,
+.route-card:focus-visible,
+.art-card:has(:focus-visible),
+.store-card:has(:focus-visible) {
+  outline: 3px solid var(--pixieed-link);
+  outline-offset: 3px;
 }
 
 .art-card__image,

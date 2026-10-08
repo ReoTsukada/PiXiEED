@@ -87,8 +87,8 @@ html[data-pixieed-motion=reduced] .pxb-burst{display:none}
 .lc-top.px-site-header .px-header-pass[data-state=active] .pxb-main,.px-standalone-globe .px-header-pass[data-state=active] .pxb-main{text-shadow:none}
 .px-site-header .menu-toggle{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;min-width:44px;margin-left:auto;padding:0;border:1px solid #1b20251a;border-radius:12px;color:#1b2025;background:#ffffffd9;cursor:pointer;touch-action:manipulation}
 .px-site-header .menu-toggle:hover,.px-site-header .menu-toggle:focus-visible{color:#b83f34;background:#fff;box-shadow:0 2px 9px #17233312}
-.px-site-header .menu-toggle__lines{width:18px;gap:4px}
-.px-site-header .menu-toggle__lines i{height:2px}
+.px-site-header .menu-toggle__lines{display:grid;width:18px;gap:4px}
+.px-site-header .menu-toggle__lines i{display:block;height:2px;border-radius:999px;background:currentColor}
 .lc-top.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;background:#111923a8}
 .lc-top.px-site-header .menu-toggle:hover,.lc-top.px-site-header .menu-toggle:focus-visible{color:#fff;background:#263440}
 .px-standalone-globe .px-site-header .menu-toggle{color:#edf8f7;border-color:#ffffff38;background:#102330}
@@ -226,3 +226,6 @@ body .site-settings__body{min-height:0;padding:0 1.2rem 1.2rem;overflow-y:auto;o
 body[data-page="map"] .site-menu__head{padding-top:max(10px,env(safe-area-inset-top,0px));padding-right:10px}
 body[data-page="map"] .site-settings__head{padding-top:max(10px,env(safe-area-inset-top,0px));padding-right:10px}
 body[data-page="map"] :is(.site-menu__close,.site-settings__close){flex:0 0 44px;min-width:44px}
+
+/* Menu navigation uses the same thumb-sized targets as the shared toolbar. */
+body .site-menu .site-menu__group :is(a,button){min-height:44px}

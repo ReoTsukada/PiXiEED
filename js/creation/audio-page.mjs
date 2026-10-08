@@ -255,7 +255,7 @@ function setStatus(message) {
   if (disposed()) return;
   status.textContent = message;
   clearTimeout(statusTimer);
-  status.classList.toggle('is-visible', /できません|開けません|見つか|失われ|取り込みました|追加の音色|保存しました|まだ音符|動画|中止|無音|変更先の色|別の音に|同じ色|すでに同じ/.test(message));
+  status.classList.toggle('is-visible', /できません|開けません|見つか|失われ|取り込みました|追加の音色|保存しました|ダウンロードを開始しました|共有画面に渡しました|まだ音符|動画|中止|無音|変更先の色|別の音に|同じ色|すでに同じ/.test(message));
   statusTimer = timeout(() => { if (!disposed()) status.classList.remove('is-visible'); }, 4000);
 }
 function hasSongNotes(candidate) {
@@ -1252,8 +1252,9 @@ scope.listen(exportImageButton, 'click', async () => {
     if (exportEpoch === effectEpoch && !viewport.isGesturing && document.visibilityState === 'visible') {
       try { interactionEffects.exportImage({ from: pixelCanvas, to: exportImageButton, image: pixelCanvas }); } catch {}
     }
-    setStatus(`${width}×${height}pxで保存しました`);
-    if (hasAudioArtwork(songSnapshot, imageSnapshot)) showAudioResult({ title: 'PNGを保存しました', detail: `${width}×${height}px` });
+    const shared = saved === 'shared';
+    setStatus(shared ? `${width}×${height}pxのPNGを共有画面に渡しました。` : `${width}×${height}pxのPNGのダウンロードを開始しました。`);
+    if (hasAudioArtwork(songSnapshot, imageSnapshot)) showAudioResult({ title: shared ? 'PNGを共有画面に渡しました' : 'PNGのダウンロードを開始しました', detail: `${width}×${height}px` });
   } catch (error) { setStatus(error.message || '絵を保存できませんでした。'); }
   finally { exportImageButton.disabled = false; audioImageExporting = false; refreshAudioHistoryButtons(); }
 });
@@ -1570,8 +1571,9 @@ if (exportSoundButton) scope.listen(exportSoundButton, 'click', async () => {
     const saved = await saveFile(blob, `pixieed-dot-music-${Math.round(seconds)}s.wav`);
     if (disposed()) return;
     if (saved !== 'cancelled' && unchanged()) {
-      setStatus(`${Math.round(seconds)}秒の音を保存しました`);
-      if (hasSongNotes(songSnapshot)) showAudioResult({ title: '音を保存しました', detail: `${Math.round(seconds)}秒` });
+      const shared = saved === 'shared';
+      setStatus(shared ? `${Math.round(seconds)}秒のWAVを共有画面に渡しました。` : `${Math.round(seconds)}秒のWAVのダウンロードを開始しました。`);
+      if (hasSongNotes(songSnapshot)) showAudioResult({ title: shared ? 'WAVを共有画面に渡しました' : 'WAVのダウンロードを開始しました', detail: `${Math.round(seconds)}秒` });
     }
   } catch (error) { setStatus(error.message || '音を保存できませんでした。'); }
   finally { audioWavExporting = false; refreshAudioUi(); }
@@ -1616,8 +1618,9 @@ if (exportVideoButton) scope.listen(exportVideoButton, 'click', async () => {
     const saved = await saveFile(result.blob, `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`);
     if (disposed() || epoch !== audioVideoEpoch) return;
     if (saved !== 'cancelled' && epoch === audioVideoEpoch && !controller.signal.aborted && unchangedSource()) {
-      setStatus(`${Math.round(result.seconds)}秒の音付き動画を保存しました。`);
-      if (hasSongNotes(songSnapshot)) showAudioResult({ title: '動画を保存しました', detail: `${Math.round(result.seconds)}秒` });
+      const shared = saved === 'shared';
+      setStatus(shared ? `${Math.round(result.seconds)}秒の音付き動画を共有画面に渡しました。` : `${Math.round(result.seconds)}秒の音付き動画のダウンロードを開始しました。`);
+      if (hasSongNotes(songSnapshot)) showAudioResult({ title: shared ? '音付き動画を共有画面に渡しました' : '音付き動画のダウンロードを開始しました', detail: `${Math.round(result.seconds)}秒` });
     }
   } catch (error) {
     if (epoch !== audioVideoEpoch) return;

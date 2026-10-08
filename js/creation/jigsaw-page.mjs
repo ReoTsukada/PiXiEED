@@ -152,7 +152,7 @@ async function loadPublicOptions() {
     ].filter((row) => row.url);
     publicSelect.replaceChildren(...choices.map((row, index) => new Option(`${String(row.label).slice(0, 80)} · ${index + 1}`, JSON.stringify(row))));
     if (!choices.length) publicSelect.add(new Option('公開作品はありません', ''));
-  } catch (error) { publicSelect.replaceChildren(new Option('公開作品を読み込めません', '')); updateStatus(error.message); }
+  } catch { publicSelect.replaceChildren(new Option('公開作品を読み込めません', '')); updateStatus('公開作品を読み込めませんでした。端末の画像や描いた絵で遊べます。'); }
   displaySourceFields();
 }
 function displaySourceFields() {
