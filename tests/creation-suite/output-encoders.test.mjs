@@ -33,11 +33,13 @@ test('static PNG output retains the requested MIME and valid PNG signature', asy
 
 test('JPEG composites alpha over the explicit background and rejects canvas PNG fallback', async () => {
   let received;
-  const encoder = async (value, mime) => { received = { value, mime }; return new Blob([Uint8Array.of(0xff, 0xd8, 1, 0xff, 0xd9)], { type: mime }); };
-  const blob = await encodeOutput({ format: 'jpeg', frames: [checkerA], background: '#204060' }, { encodeRaster: encoder });
+  const encoder = async (value, mime, quality) => { received = { value, mime, quality }; return new Blob([Uint8Array.of(0xff, 0xd8, 1, 0xff, 0xd9)], { type: mime }); };
+  const blob = await encodeOutput({ format: 'jpeg', frames: [checkerA], background: '#204060', quality: 0.65 }, { encodeRaster: encoder });
   assert.equal(blob.type, 'image/jpeg'); assert.equal(received.mime, 'image/jpeg');
+  assert.equal(received.quality, 0.65);
   assert.deepEqual([...received.value.data.slice(0, 4)], [255, 0, 0, 255]);
   assert.deepEqual([...received.value.data.slice(4, 8)], [32, 64, 96, 255]);
+  await assert.rejects(encodeOutput({ format: 'jpeg', frames: [checkerA], quality: 1.1 }, { encodeRaster: encoder }), /50〜100%/);
   await assert.rejects(encodeOutput({ format: 'jpeg', frames: [checkerA] }, { encodeRaster: async () => new Blob([pngFixture(2, 2, checkerA.data)], { type: 'image/png' }) }), /代替出力/);
 });
 

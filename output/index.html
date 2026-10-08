@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://pixieed.jp/output/">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-5">
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-6">
 </head>
 <body data-page="output">
   <a class="output-skip" href="#main">本文へ移動</a>
@@ -61,6 +61,7 @@
           <label class="output-field-label" for="output-format-select">対応形式</label>
           <select id="output-format-select" class="output-select" aria-label="出力形式"></select>
           <label id="output-jpeg-setting" class="output-jpeg-setting" hidden for="output-jpeg-background">JPEGの背景色 <input id="output-jpeg-background" type="color" value="#ffffff"></label>
+          <label id="output-jpeg-quality-setting" class="output-jpeg-quality-setting" hidden for="output-jpeg-quality"><span>JPEG画質 <output id="output-jpeg-quality-value" for="output-jpeg-quality">90%</output></span><input id="output-jpeg-quality" type="range" min="50" max="100" step="5" value="90"></label>
         </div>
         <p id="output-filename-help" class="output-help">形式を変えると拡張子が合わせて切り替わります。</p>
 
@@ -102,6 +103,6 @@
     </div>
     <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-10"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-13"></script>
 </body>
 </html>

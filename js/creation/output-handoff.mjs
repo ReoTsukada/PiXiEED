@@ -12,6 +12,7 @@ const MIME_EXTENSIONS = Object.freeze({
   'audio/wav': 'wav',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
+  // Retain access to PXD records staged by earlier releases; current PXD tools save directly.
   'application/octet-stream': 'pxd'
 });
 const RETURN_PATHS = new Set([
@@ -115,7 +116,7 @@ function outputPageUrl(id, origin = globalThis.location?.origin) {
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'aspectLocked', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
+  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];

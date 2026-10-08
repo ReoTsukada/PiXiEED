@@ -4,7 +4,6 @@ import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mj
 import { documentRgba } from './draw-core.mjs?rev=20261006-draw-startup-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261006-header-controls-1';
-import { sendToolOutput } from './output-handoff.mjs?rev=20261008-output-7';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {
@@ -20,17 +19,11 @@ function style() {
   const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/css/pxd-tools.css?rev=20261006-panel-close-1'; link.dataset.pxdCss = ''; document.head.append(link);
 }
 function button(text, id, run) { const node = document.createElement('button'); node.type = 'button'; node.textContent = text; node.id = id; node.addEventListener('click', run); return node; }
-function download(bytes, name) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+async function download(bytes, name) {
+  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); return false;
 }
-async function sendPxdBackup(bytes, name, source) {
-  const result = await sendToolOutput({
-    blob: new Blob([bytes], { type: 'application/octet-stream' }), filename: name,
-    returnUrl: `${location.pathname}${location.search}${location.hash}`,
-    title: 'PXDバックアップを確認', source,
-    metadata: { description: 'PiXiEED作品をまとめたバックアップです。内容は変換せず保存します。' }
-  });
-  if (result.ok) return true;
+async function sendPxdBackup(bytes, name) {
   await download(bytes, name);
   return false;
 }
@@ -82,7 +75,7 @@ export function mountPxdTools(options) {
   const actions = document.createElement('div'); actions.className = 'pxd-actions';
   const openButton = button('バックアップを開く（PXD）', 'pxd-open', () => input.click());
   const saveButton = button('プロジェクトを保存', 'pxd-save', () => run(async () => { say('作品を保存しています…'); await save(); say('作品をこの端末に保存しました。'); }));
-  const exportButton = button('バックアップを保存（PXD）', 'pxd-export', () => run(async () => { const project = await save(); const staged = await sendPxdBackup(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`, labels[tool] || 'プロジェクト'); if (!staged) say('PXDバックアップのダウンロードを開始しました。'); }));
+  const exportButton = button('バックアップを保存（PXD）', 'pxd-export', () => run(async () => { const project = await save(); const staged = await sendPxdBackup(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`); if (!staged) say('PXDバックアップのダウンロードを開始しました。'); }));
   actions.append(openButton, saveButton, exportButton);
   const linksHeading = document.createElement('h3'); linksHeading.className = 'pxd-links-heading'; linksHeading.textContent = '同じ作品をほかのツールで使う';
   const links = document.createElement('div'); links.className = 'pxd-links'; links.setAttribute('aria-label', '同じ作品をほかのツールで使う');
@@ -102,7 +95,7 @@ export function mountPxdTools(options) {
     await assertCanSave();
     const original = (held || current)?.entries.find((entry) => entry.path === 'legacy/original.pxd');
     if (!original) throw new Error('旧PXDの原本が見つかりません。');
-    const staged = await sendPxdBackup(original.bytes, 'pixieed-original.pxd', labels[tool] || 'プロジェクト'); if (!staged) say('旧PXDの原本のダウンロードを開始しました。');
+    const staged = await sendPxdBackup(original.bytes, 'pixieed-original.pxd'); if (!staged) say('旧PXDの原本のダウンロードを開始しました。');
   }));
   workingButton.hidden = afterButton.hidden = hiddenImageButton.hidden = drawingImageButton.hidden = originalButton.hidden = true; links.append(workingButton, afterButton, hiddenImageButton, drawingImageButton, originalButton);
   panel.append(title, message, filesNote, input, actions, linksHeading, links); details.append(summary);

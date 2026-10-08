@@ -12,10 +12,11 @@
   <div id="controls"></div>
   <p id="state" role="status">形式を選んでください。</p>
   <script type="module">
-    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-7';
+    import { sendToolOutput } from '/js/creation/output-handoff.mjs?rev=20261008-output-8';
     import { encodeAnimatedGif } from '/js/animated-export.mjs';
     import { encodeCameraPng } from '/js/pixel-studio/png-export.mjs';
     import { createAudioSong } from '/js/creation/audio-core.mjs?rev=20261005-audio-noise-1';
+    import { encodeOutput } from '/js/creation/output-encoders.mjs?rev=20261008-output-4';
     import { createPixelLensOutputOptions } from '/js/pixel-lens/output-handoff.mjs?rev=20261008-pixel-lens-output-2';
     const controls = document.querySelector('#controls');
     const state = document.querySelector('#state');
@@ -32,6 +33,46 @@
       const result = await sendToolOutput({ blob, filename, returnUrl: route.returnUrl || '/draw/', returnOutputId: route.returnOutputId === true, source: route.source || 'テスト用サンプル', title, metadata, ...(mediaSource ? { mediaSource } : {}), ...(route.mediaSources ? { mediaSources: route.mediaSources } : {}) });
       if (!result.ok) throw result.error || new Error('出力画面を開けませんでした。');
     }
+    async function encodeCanvasFrame(frame, mime, quality) {
+      const canvas = document.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
+      const context = canvas.getContext('2d'); context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
+      try { return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(`${mime}を作成できません。`)), mime, mime === 'image/jpeg' ? quality : undefined)); }
+      finally { canvas.width = canvas.height = 1; }
+    }
+    async function decodePixels(blob) {
+      const url = URL.createObjectURL(blob); const image = new Image(); image.src = url;
+      try {
+        await image.decode(); const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(image, 0, 0);
+        const result = { width: canvas.width, height: canvas.height, data: context.getImageData(0, 0, canvas.width, canvas.height).data };
+        canvas.width = canvas.height = 1; return result;
+      } finally { URL.revokeObjectURL(url); }
+    }
+    add('JPEG・SVG・APNGを実デコード確認', async () => {
+      const vector = { width: 2, height: 2, data: new Uint8Array([250, 20, 40, 255, 0, 0, 0, 0, 10, 220, 60, 128, 0, 90, 240, 255]) };
+      const svg = await encodeOutput({ format: 'svg', frames: [vector] }); const svgDecoded = await decodePixels(svg);
+      const svgMismatches = [...svgDecoded.data].flatMap((value, index) => (index % 4 === 3 ? Math.abs(value - vector.data[index]) <= 1 : vector.data[index + 3] === 0 ? true : Math.abs(value - vector.data[index]) <= 1) ? [] : [`${index}:${vector.data[index]}→${value}`]);
+      if (svg.type !== 'image/svg+xml' || svgDecoded.width !== 2 || svgDecoded.height !== 2 || svgMismatches.length) throw new Error(`SVG実デコード不一致 · ${svgDecoded.width}×${svgDecoded.height} · ${svgMismatches.slice(0, 6).join(',')}`);
+      const jpgFrame = { width: 64, height: 64, data: new Uint8Array(64 * 64 * 4) };
+      let seed = 7331;
+      for (let index = 0; index < 64 * 64; index += 1) {
+        seed = (seed * 48271) % 2147483647;
+        jpgFrame.data.set([seed & 255, seed >>> 8 & 255, seed >>> 16 & 255, 255], index * 4);
+      }
+      const matte = { width: 8, height: 8, data: new Uint8Array(8 * 8 * 4) };
+      const jpegBlack = await encodeOutput({ format: 'jpeg', frames: [matte], background: '#000000', quality: 0.92 }, { encodeRaster: encodeCanvasFrame });
+      const jpegWhite = await encodeOutput({ format: 'jpeg', frames: [matte], background: '#ffffff', quality: 0.92 }, { encodeRaster: encodeCanvasFrame });
+      const jpegLow = await encodeOutput({ format: 'jpeg', frames: [jpgFrame], background: '#ffffff', quality: 0.5 }, { encodeRaster: encodeCanvasFrame });
+      const jpegHigh = await encodeOutput({ format: 'jpeg', frames: [jpgFrame], background: '#ffffff', quality: 0.95 }, { encodeRaster: encodeCanvasFrame });
+      const blackPixel = (await decodePixels(jpegBlack)).data; const whitePixel = (await decodePixels(jpegWhite)).data;
+      await decodePixels(jpegLow); await decodePixels(jpegHigh);
+      if ([jpegBlack, jpegWhite, jpegLow, jpegHigh].some((blob) => blob.type !== 'image/jpeg') || blackPixel[0] > 10 || whitePixel[0] < 245 || jpegHigh.size <= jpegLow.size) throw new Error(`JPEG確認失敗 · 黒=${blackPixel[0]} 白=${whitePixel[0]} · 画質50% ${jpegLow.size}B/95% ${jpegHigh.size}B`);
+      const animated = [0, 1].map((variant) => ({ ...vector, data: variant ? new Uint8Array(vector.data.map((value, index) => index % 4 === 0 ? 255 - value : value)) : vector.data, delayMs: variant ? 170 : 40 }));
+      const apng = await encodeOutput({ format: 'apng', frames: animated, loopCount: 4 }, { encodeRaster: encodeCanvasFrame });
+      const apngDecoded = await decodePixels(apng);
+      if (apng.type !== 'image/apng' || apngDecoded.width !== 2 || apngDecoded.height !== 2) throw new Error('APNGの実デコード確認に失敗しました。');
+      state.textContent = `実デコード成功 · SVG 2×2 px 画素一致(±1) · JPEG背景黒=${blackPixel[0]}/白=${whitePixel[0]}、画質50% ${jpegLow.size}B / 95% ${jpegHigh.size}B · APNG 2×2 px 2フレーム`;
+    });
     add('透明背景つき PNG を開く', async () => {
       const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 16;
       const context = canvas.getContext('2d'); context.fillStyle = '#ef5264'; context.fillRect(0, 0, 12, 16); context.fillStyle = '#16a878'; context.fillRect(20, 0, 12, 16);
@@ -72,9 +113,6 @@
       const response = await fetch('/assets/pixel-studio/test-media/street.webm');
       if (!response.ok) throw new Error('動画サンプルを読み込めませんでした。');
       await open(await response.blob(), 'sample-video.webm', '動画を確認', { durationSeconds: 2 });
-    });
-    add('PXD バックアップを開く', async () => {
-      await open(new Blob(['local PXD backup'], { type: 'application/octet-stream' }), 'pixieed-sample.pxd', 'PXDバックアップを確認', { description: '作品のバックアップです。内容は変換せず保存します。' }, null, { returnUrl: '/jigsaw/', source: 'ジグソー' });
     });
     add('ピクセルカメラから編集へ戻る', async () => {
       const data = new Uint8ClampedArray(16 * 16 * 4);

@@ -198,11 +198,11 @@ function setGifLoop(bytes, loopCount) {
   throw new Error('GIFのループ設定を確認できません。');
 }
 
-async function encodeRaster(frame, format, encoder, signal) {
+async function encodeRaster(frame, format, encoder, signal, quality = 0.9) {
   if (signal?.aborted) throw new DOMException('出力を中止しました。', 'AbortError');
   if (typeof encoder !== 'function') throw new Error('画像エンコーダーが利用できません。');
   const mime = MIME[format];
-  const result = await encoder(frame, mime);
+  const result = await encoder(frame, mime, quality);
   if (signal?.aborted) throw new DOMException('出力を中止しました。', 'AbortError');
   if (result instanceof Blob && result.type !== mime) throw new Error(`${mime}形式に対応したエンコードが利用できません。PNGなどへの代替出力は行いません。`);
   const bytes = await bytesOf(result);
@@ -211,18 +211,19 @@ async function encodeRaster(frame, format, encoder, signal) {
 }
 
 /** Encode one output item from original RGBA frame data. `encodeRaster(frame, mime)` supplies browser canvas encoding. */
-export async function encodeOutput({ format, frames, background = '#ffffff', loopCount = 0, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal } = {}) {
+export async function encodeOutput({ format, frames, background = '#ffffff', quality = 0.9, loopCount = 0, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal } = {}) {
   if (!OUTPUT_FORMATS.includes(format)) throw new TypeError('選択できない画像形式です。');
   const animated = format === 'gif' || format === 'apng';
   checkFrames(frames, animated);
   if (!Number.isSafeInteger(scale) || scale < 1 || scale > 16) throw new RangeError('拡大率は1〜16の整数で指定してください。');
+  if (format === 'jpeg' && (!Number.isFinite(quality) || quality < 0.5 || quality > 1)) throw new RangeError('JPEG画質は50〜100%で指定してください。');
   if ((width === null) !== (height === null)) throw new RangeError('幅と高さを両方指定してください。');
   const outputFrames = frames.map((frame) => scaleFrame(frame, scale, width, height));
   checkFrames(outputFrames, animated);
   const framesWithTiming = outputFrames.map((frame) => ({ ...frame, delayMs: frame.delayMs ?? 100 }));
   if (format === 'svg') return makeBlob(new TextEncoder().encode(svgText(outputFrames[0])), format);
   if (format === 'png') return makeBlob(await encodeRaster(outputFrames[0], format, rasterEncoder, signal), format);
-  if (format === 'jpeg') return makeBlob(await encodeRaster(flattenFrame(outputFrames[0], background), format, rasterEncoder, signal), format);
+  if (format === 'jpeg') return makeBlob(await encodeRaster(flattenFrame(outputFrames[0], background), format, rasterEncoder, signal, quality), format);
   if (format === 'apng') {
     const pngs = [];
     for (const frame of framesWithTiming) pngs.push({ bytes: await encodeRaster(frame, 'png', rasterEncoder, signal), delayMs: frame.delayMs });

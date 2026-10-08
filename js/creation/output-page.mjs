@@ -1,6 +1,6 @@
-import { readToolOutput, saveToolOutputItems, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-7';
+import { readToolOutput, saveToolOutputItems, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-8';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-2';
+import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-4';
 import { renderAudioWav } from './audio-export.mjs?rev=20261008-output-1';
 import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261008-output-1';
 
@@ -50,6 +50,9 @@ const formatButton = $('#output-extension');
 const formatPicker = $('#output-format-picker');
 const formatSelect = $('#output-format-select');
 const jpegSetting = $('#output-jpeg-setting');
+const jpegQualitySetting = $('#output-jpeg-quality-setting');
+const jpegQuality = $('#output-jpeg-quality');
+const jpegQualityValue = $('#output-jpeg-quality-value');
 const formatHelp = $('#output-filename-help');
 
 let record = null;
@@ -119,11 +122,12 @@ function sourceFormats(source = activeSource) {
   }
   if (source?.kind === 'legacy-image' && source.mediaSource?.frames?.length > 1) return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']];
   if (source?.kind === 'legacy-image') return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+  if (source?.kind === 'legacy-file' && source.extension === 'pxd') return [];
   return source?.mime && source?.extension ? [[source.extension, displayFormat({ mime: source.mime, extension: source.extension })]] : [];
 }
 
 function outputMime(formatValue) {
-  return ({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', mp4: 'video/mp4', webm: 'video/webm', pxd: 'application/octet-stream' })[formatValue] || '';
+  return ({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', mp4: 'video/mp4', webm: 'video/webm' })[formatValue] || '';
 }
 
 function setActiveItem(item) {
@@ -134,6 +138,9 @@ function setActiveItem(item) {
   activeSource = foundSource || mediaSources[0] || null;
   record.mime = item.mime; record.extension = item.extension; record.filename = item.filename; record.blob = item.blob;
   record.currentMetadata = item.metadata || {};
+  jpegQuality.value = String(item.metadata?.jpegQuality || 90);
+  jpegQualityValue.value = `${jpegQuality.value}%`;
+  jpegQualityValue.textContent = `${jpegQuality.value}%`;
   record.mediaSource = activeSource?.mediaSource || (activeSource?.kind === 'rgba-frames' ? activeSource.mediaSource : null) || null;
   currentBlob = item.blob;
   fileUrl = URL.createObjectURL(item.blob);
@@ -192,6 +199,7 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   formatButton.hidden = formats.length <= 1;
   formatHelp.hidden = formats.length <= 1;
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
+  jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
   formatPicker.hidden = true;
   formatButton.setAttribute('aria-expanded', 'false');
 }
@@ -248,6 +256,7 @@ function setBusy(busy, canCancel = false) {
   cancelSettings.hidden = !busy || !canCancel;
   cancelSettings.disabled = false;
   scaleSettings.setAttribute('aria-busy', String(busy));
+  jpegQuality.disabled = busy;
 }
 
 function setCurrentBlob(blob, { width = null, height = null, animated = false } = {}) {
@@ -270,13 +279,13 @@ function setCurrentBlob(blob, { width = null, height = null, animated = false } 
   displayMetadata(record, blob, width, height);
 }
 
-async function canvasRaster(frame, mime) {
+async function canvasRaster(frame, mime, quality = 0.9) {
   const canvas = document.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height;
   try {
     const context = canvas.getContext('2d', { alpha: true });
     if (!context) throw new Error('画像のプレビューを準備できません。');
     context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
-    return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('画像を書き出せませんでした。')), mime));
+    return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('画像を書き出せませんでした。')), mime, mime === 'image/jpeg' ? quality : undefined));
   } finally { canvas.width = canvas.height = 1; }
 }
 
@@ -284,7 +293,7 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
   if (source?.kind === 'rgba-frames' || source?.kind === 'legacy-image') {
     const frames = source.kind === 'rgba-frames' ? source.mediaSource.frames : source.mediaSource?.frames;
     if (!Array.isArray(frames) || !frames.length) throw new Error('画像の元データを確認できません。');
-    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', loopCount: source.mediaSource.loopCount ?? 0 }, { encodeRaster: canvasRaster, signal: controller.signal }), metadata: {} };
+    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', quality: Number(jpegQuality.value) / 100, loopCount: source.mediaSource.loopCount ?? 0 }, { encodeRaster: canvasRaster, signal: controller.signal }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
     const result = await renderAudioWav(source.song);
@@ -332,6 +341,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     const metadataValue = {
       ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
+      ...(extensionValue === 'jpeg' ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
       ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: frames.reduce((sum, frame) => sum + (frame.delayMs || 100), 0) / 1000, loopCount: source.mediaSource?.loopCount ?? 0 } : {}),
       ...generatedOutput.metadata
     };
@@ -350,6 +360,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     setCurrentBlob(activeItem.blob, { width: outputWidth, height: outputHeight, animated: frames.length > 1 && ['gif', 'apng'].includes(extensionValue) });
     setMedia(record);
     format.textContent = displayFormat(record); extension.textContent = `.${activeItem.extension}`; filename.value = outputBaseName(activeItem.filename, activeItem.extension);
+    filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
     fillSourceAndFormatControls({ preferredFormat: activeItem.extension });
     renderOutputItems(); displayMetadata(record, activeItem.blob, outputWidth, outputHeight);
     status.textContent = `${formats.find(([value]) => value === extensionValue)?.[1] || extensionValue.toUpperCase()}を端末内に準備しました。保存できます。`;
@@ -567,7 +578,7 @@ function setMedia(entry) {
     video.hidden = false; video.src = fileUrl;
     fileCard.hidden = true;
   } else {
-    fileTitle.textContent = entry.extension === 'pxd' ? 'PXDバックアップ' : 'ファイルを準備しました';
+    fileTitle.textContent = 'ファイルを準備しました';
     fileDescription.textContent = entry.metadata?.description || 'この形式はPiXiEED内でプレビューできません。';
     fileCard.hidden = false;
   }
@@ -579,9 +590,7 @@ async function mount() {
   try {
     record = await readToolOutput(params.get('id'));
     pageTitle.textContent = record.title || '出力を確認';
-    intro.textContent = record.extension === 'pxd'
-      ? `${record.source || 'PiXiEED'}からのPXDバックアップです。内容を変えず端末へ保存できます。`
-      : record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて保存できます。';
+    intro.textContent = record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて端末へ保存できます。';
     returnLink.href = record.returnUrl;
     returnLink.textContent = '編集画面へ戻る';
     mediaSources = record.mediaSources || [];
@@ -632,9 +641,14 @@ sourceSelect.addEventListener('change', () => {
 });
 formatSelect.addEventListener('change', () => {
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
+  jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
   void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
 jpegSetting.addEventListener('change', () => {
+  if (formatSelect.value === 'jpeg') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+});
+jpegQuality.addEventListener('input', () => { jpegQualityValue.value = `${jpegQuality.value}%`; jpegQualityValue.textContent = `${jpegQuality.value}%`; });
+jpegQuality.addEventListener('change', () => {
   if (formatSelect.value === 'jpeg') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
 addOutputItem.addEventListener('click', () => { void addOutput(false); });

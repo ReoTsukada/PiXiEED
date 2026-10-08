@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
@@ -125,22 +126,18 @@ test('output item validation rejects a mismatched extension without changing the
   assert.equal(loaded.outputs.length, 1); assert.equal(loaded.outputs[0].filename, 'my-art.png');
 });
 
-test('PXD backups use the common output route while archive bytes remain unchanged', async () => {
-  const deps = dependencies();
-  const backup = {
-    blob: new Blob(['PXD archive bytes'], { type: 'application/octet-stream' }),
-    filename: 'pixieed-project.pxd', returnUrl: '/jigsaw/?pxd=local-id&pxdRevision=revision-id',
-    source: 'ジグソー', title: 'PXDバックアップを確認',
-    metadata: { description: '作品のバックアップです。内容は変換せず保存します。' }
-  };
-  const staged = await stageToolOutput(backup, deps);
-  const read = await readToolOutput(staged.id, { indexedDBRef: deps.indexedDBRef, now: deps.now });
-  assert.equal(staged.url, `https://pixieed.test/output/?id=${validId}`);
-  assert.equal(await read.blob.text(), 'PXD archive bytes');
-  assert.equal(read.mime, 'application/octet-stream');
-  assert.equal(read.extension, 'pxd');
-  assert.equal(read.returnUrl, '/jigsaw/?pxd=local-id&pxdRevision=revision-id');
-  assert.equal(read.metadata.description, backup.metadata.description);
+test('PXD project backups remain on their existing direct-save path', () => {
+  for (const path of ['../../js/creation/pxd-ui.mjs', '../../js/creation/project-workspace.mjs']) {
+    const source = readFileSync(new URL(path, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /output-handoff\.mjs|sendToolOutput/);
+    assert.match(source, /async function sendPxdBackup\(bytes, name\) \{\s*await download\(bytes, name\);\s*return false;/);
+  }
+  const outputPage = readFileSync(new URL('../../js/creation/output-page.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(outputPage, /pxd: 'application\/octet-stream'|extension === 'pxd' \?/);
+  const workspace = readFileSync(new URL('../../js/creation/project-workspace.mjs', import.meta.url), 'utf8');
+  const pxdUi = readFileSync(new URL('../../js/creation/pxd-ui.mjs', import.meta.url), 'utf8');
+  assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);
+  assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
 });
 
 test('camera output return links carry only the opaque output id for local restoration', async () => {

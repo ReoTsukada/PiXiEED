@@ -71,6 +71,10 @@ body[data-page="output"] {
 .output-jpeg-setting { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; color: #4c5f53; font-size: .82rem; font-weight: 700; }
 .output-jpeg-setting[hidden] { display: none; }
 .output-jpeg-setting input { width: 46px; height: 38px; padding: 2px; border: 1px solid #cad7cd; border-radius: 8px; background: #fff; }
+.output-jpeg-quality-setting { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; min-height: 52px; color: #4c5f53; font-size: .82rem; font-weight: 700; }
+.output-jpeg-quality-setting[hidden] { display: none; }
+.output-jpeg-quality-setting output { margin-left: 8px; color: #397357; font-variant-numeric: tabular-nums; }
+.output-jpeg-quality-setting input { grid-column: 1 / -1; width: 100%; min-height: 28px; accent-color: #397357; }
 .output-help { margin: 7px 0 0; color: #748078; font-size: .76rem; line-height: 1.5; }
 .output-media-settings { display: grid; gap: 11px; min-width: 0; margin-top: 25px; padding-top: 20px; border-top: 1px solid #e8ede9; }
 .output-media-settings[hidden] { display: none !important; }
