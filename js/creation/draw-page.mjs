@@ -6,7 +6,7 @@ import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shel
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261009-pointer-selection-1';
 import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261007-draw-handoff-1';
-import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, canvasResizeOffset, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
+import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261009-fps-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
@@ -30,7 +30,10 @@ import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-out
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-floating-mouse-2';
-import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261006-draw-panel-dismiss-1';
+import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261009-sprite-scale-1';
+import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=20261009-sprite-scale-1';
+import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs';
+import { resizeDrawView } from './draw-resize-view.mjs';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
@@ -101,6 +104,7 @@ let animationSession = createDrawAnimationSession(documentData), animationContro
 const trackDrawStart = createToolStartTracker('draw');
 let selection = null, selectionDrag = null, strokeWasSaved = false;
 let selectionTransform = null, selectionPreview = null, selectionPanel = null, selectionError = '';
+let spriteScalePanel = null, spriteScaling = false;
 let selectionRenderRequest = 0;
 let selectionMaskCache = null, selectionMaskOwner = null;
 let preparedSelectionCommit = null;
@@ -117,15 +121,7 @@ const selectionClipboard = createDrawSelectionClipboard(), selectionViewStates =
 const resizeViewStates = new WeakMap();
 function resizeViewState() { return { mirrorOrigin: { ...mirrorOrigin }, selection: selection && { ...selection }, zoom, panX, panY, cursor: virtualCursor?.canvasPosition() }; }
 function translatedResizeView(width, height) {
-  const offset = canvasResizeOffset(documentData.width, documentData.height, width, height, 'center');
-  const point = virtualCursor?.canvasPosition();
-  const clipped = selection && { x: Math.max(0, selection.x + offset.x), y: Math.max(0, selection.y + offset.y),
-    width: Math.min(width, selection.x + offset.x + selection.width) - Math.max(0, selection.x + offset.x),
-    height: Math.min(height, selection.y + offset.y + selection.height) - Math.max(0, selection.y + offset.y) };
-  return { mirrorOrigin: { x: Math.max(0, Math.min(1, (mirrorOrigin.x * documentData.width + offset.x) / width)),
-    y: Math.max(0, Math.min(1, (mirrorOrigin.y * documentData.height + offset.y) / height)) },
-    selection: clipped?.width > 0 && clipped?.height > 0 ? clipped : null,
-    zoom: 1, panX: 0, panY: 0, cursor: point && { x: point.x + offset.x, y: point.y + offset.y } };
+  return resizeDrawView(resizeViewState(), documentData.width, documentData.height, width, height);
 }
 // Register dismissal before any panel or viewport pointer-capture handlers.
 mountDrawPanelDismissals({ scope, root: $('#main'), cancelInput: cancelDrawingInput,
@@ -167,7 +163,7 @@ function setCanvasDimensions() {
   $('#draw-size-label').textContent = `${documentData.width}×${documentData.height}px`;
   canvas.setAttribute('aria-label', `${documentData.width}×${documentData.height}の透明なキャンバス。色を選んで描きます。`);
 }
-function drawingInputBusy() { return Boolean(drawing || pendingTap || activePointers.size || virtualCursor?.pressed || virtualCursor?.moving); }
+function drawingInputBusy() { return Boolean(spriteScaling || drawing || pendingTap || activePointers.size || virtualCursor?.pressed || virtualCursor?.moving); }
 function cancelCamera() {
   cameraGeneration++;
   cameraOpening = false;
@@ -289,6 +285,7 @@ function updateControls() {
   status.textContent = cameraFailureNotice && performance.now() < cameraFailureNotice.until ? cameraFailureNotice.message : saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
   syncPlaybackControl();
   selectionPanel?.sync();
+  spriteScalePanel?.sync();
 }
 function syncPlaybackControl() {
   const button = $('#draw-animation-play'), badge = $('#draw-playback-position');
@@ -374,7 +371,7 @@ function paintOnion(display) {
   onionCanvas.getContext('2d').putImageData(new ImageData(data, display.width, display.height), 0, 0); placeOverlays();
 }
 function handleAnimationAction(action) {
-  if (cameraOpening) return false;
+  if (cameraOpening || spriteScaling) return false;
   if (action.type === 'play') return toggleAnimation();
   if (action.type === 'onion') {
     const enabled = typeof action.enabled === 'boolean' ? action.enabled : !onion;
@@ -504,6 +501,7 @@ function usedColorCount(value = documentData) {
 }
 function canEdit(value = documentData) {
   if (cameraOpening) return false;
+  if (spriteScaling) { toast('倍率変更の確認が終わるまでお待ちください。'); return false; }
   if (playing) { toast('再生を止めると編集できます。'); return false; }
   if (readOnlyImage) { toast('原本を表示しています。編集するにはプロジェクトのキャンバス設定でサイズと色を合わせてください。'); return false; }
   const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: usedColorCount(value) }, { passActive: true });
@@ -1218,6 +1216,57 @@ function resizeCanvas(width, height) {
     status.textContent = `${width}×${height}にしました。${cropped ? '外側を切り取りました。戻すで元に戻せます。' : '絵の1pxはそのまま、余白を広げました。'}`; return true;
   } catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; return false; }
 }
+function spriteScaleBlockedReason() {
+  if (spriteScaling) return '保存容量を確認しています…';
+  if (cameraOpening) return 'カメラの操作を終えてから倍率を変更できます。';
+  if (readOnlyImage) return '原本を表示しています。編集できるサイズ・色数へ合わせてから倍率を変更できます。';
+  if (selectionTransform) return '選択の変形を✓で確定、×で取消してから倍率を変更できます。';
+  if (playing) return '再生を止めてから倍率を変更できます。';
+  if (colorEdit || drawingInputBusy()) return '現在の色編集・描画操作を終えてから倍率を変更できます。';
+  return '';
+}
+async function scaleSpriteCanvas(percent) {
+  const blocked = spriteScaleBlockedReason();
+  if (blocked) { toast(blocked); return false; }
+  let applied = false, outcomeMessage = '';
+  const before = animationSession.animation;
+  try {
+    const plan = planSpriteScale(before, percent);
+    if (!plan.allowed) { outcomeMessage = plan.reason; return false; }
+    if (!plan.changed) { outcomeMessage = '丸め後のサイズが現在と同じため変更はありません。'; return false; }
+    const next = scaleSpriteAnimation(before, percent);
+    const originalSelection = selection, originalDocument = documentData;
+    const bridge = pxdBridge, project = bridge?.currentProject || bridge?.heldProject, role = pxdImageRole;
+    spriteScaling = true; updateControls();
+    // Use the ordinary immutable PXD writer to check combined image/music and
+    // poster capacity before replacing the live document or creating an Undo entry.
+    if (project) {
+      let candidate = await putPxdDrawDocument(project, composeAnimationFrame(next, next.frames[0].id), role);
+      candidate = await writePxdAnimation(candidate, next, { role, posterFrameId: next.frames[0].id });
+    }
+    if (scope.disposed || animationSession.animation !== before || documentData !== originalDocument
+      || selection !== originalSelection || pxdBridge !== bridge || pxdImageRole !== role
+      || (bridge?.currentProject || bridge?.heldProject) !== project || selectionTransform || playing || cameraOpening) {
+      outcomeMessage = '確認中に操作対象が変わりました。現在の作品から倍率を指定し直してください。';
+      return false;
+    }
+    const view = resizeViewState();
+    resizeViewStates.set(before, view);
+    resizeViewStates.set(next, resizeDrawView(view, before.width, before.height, next.width, next.height, { resample: 'nearest' }));
+    closeColorEditor(); sizeWasChosen = true;
+    installAnimationDocument(animationSession.apply(next));
+    syncSizeButtons(true); pxdBridge?.markDirty(); applied = true;
+    outcomeMessage = `${percent}%で${next.width}×${next.height}pxにしました。全コマ・全レイヤーを変更しました。戻すで復元できます。`;
+    return true;
+  } catch (error) {
+    outcomeMessage = `倍率を変更できませんでした：${error.message}`;
+    if (!scope.disposed) spriteScalePanel?.reportFailure?.(outcomeMessage, before, percent);
+    return false;
+  } finally {
+    spriteScaling = false;
+    if (!scope.disposed) { updateControls(); if (applied) canvasSettingsPanel.position(); if (outcomeMessage) toast(outcomeMessage); }
+  }
+}
 sizeSelect.addEventListener('change', () => {
   const size = Number(sizeSelect.value), factor = size / Math.max(documentData.width, documentData.height);
   if (!resizeCanvas(Math.max(1, Math.round(documentData.width * factor)), Math.max(1, Math.round(documentData.height * factor)))) sizeSelect.value = String(Math.max(documentData.width, documentData.height));
@@ -1313,6 +1362,9 @@ const sizeForm = $('#draw-canvas-form'), sizeApply = $('#draw-canvas-apply');
 const canvasPicker = $('.draw-import'); let sizeInputDimensions = '';
 scope.listen(canvasPicker.querySelector('summary'), 'click', () => { if (!canvasPicker.open) syncSizeButtons(true); });
 const canvasSettingsPanel = mountDrawCanvasPanel({ scope, picker: canvasPicker, summary: canvasPicker.querySelector('summary'), panel: $('.draw-canvas-panel') });
+spriteScalePanel = mountDrawSpriteScalePanel({ scope, root: $('.draw-canvas-panel'),
+  getState: () => ({ animation: animationSession.animation, blockedReason: spriteScaleBlockedReason(), readOnlyDimensions: readOnlyImage && { width: readOnlyImage.width, height: readOnlyImage.height } }),
+  plan: planSpriteScale, onApply: scaleSpriteCanvas, onLayout: () => canvasSettingsPanel.position() });
 function syncSizeButtons(resetInputs = false) {
   const width = readOnlyImage?.width ?? documentData.width, height = readOnlyImage?.height ?? documentData.height;
   for (const button of sizeButtons) { button.setAttribute('aria-checked', String(Number(button.dataset.drawSize) === Math.max(width, height))); button.disabled = Boolean(readOnlyImage); }
@@ -1323,6 +1375,7 @@ function syncSizeButtons(resetInputs = false) {
   }
   widthInput.disabled = heightInput.disabled = ratioInput.disabled = Boolean(readOnlyImage);
   sizeApply.disabled = Boolean(readOnlyImage);
+  spriteScalePanel?.sync();
 }
 function syncDimensionRatio(event) {
   if (!ratioInput.checked) return;

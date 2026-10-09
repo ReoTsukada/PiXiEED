@@ -1,5 +1,5 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261009-pointer-selection-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261009-sprite-scale-1';
 
 const scope = createModeScope();
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });

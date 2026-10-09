@@ -21,17 +21,21 @@ export function mountDrawCanvasPanel({ scope, picker, summary, panel } = {}) {
     if (disposed || !picker.open || !panel.isConnected) return false;
     const header = boundsOf('.px-site-header, .site-header, header');
     const nav = boundsOf('.app-tabs, .site-bottom-nav, nav[aria-label="アプリナビゲーション"]');
-    const safeLeft = 8; const safeRight = Math.max(safeLeft, innerWidth - 8);
-    const safeTop = Math.max(8, Math.ceil(Math.max(header?.bottom ?? 0, boundsOf('.project-bar')?.bottom ?? 0)) + 8);
-    const safeBottom = Math.max(safeTop + 80, Math.min(innerHeight - 8, Math.floor(nav?.top ?? innerHeight) - 8));
+    const viewport = window.visualViewport;
+    const viewportLeft = viewport?.offsetLeft ?? 0, viewportTop = viewport?.offsetTop ?? 0;
+    const viewportWidth = viewport?.width ?? innerWidth, viewportHeight = viewport?.height ?? innerHeight;
+    const viewportRight = Math.min(innerWidth, viewportLeft + viewportWidth), viewportBottom = Math.min(innerHeight, viewportTop + viewportHeight);
+    const safeLeft = Math.max(8, viewportLeft + 8); const safeRight = Math.max(safeLeft, viewportRight - 8);
+    const safeTop = Math.max(viewportTop + 8, Math.ceil(Math.max(header?.bottom ?? 0, boundsOf('.project-bar')?.bottom ?? 0)) + 8);
+    const safeBottom = Math.max(safeTop + 80, Math.min(viewportBottom - 8, Math.floor(nav?.top ?? viewportBottom) - 8));
     const safeHeight = Math.max(80, safeBottom - safeTop);
     const anchor = summary.getBoundingClientRect();
     setStyle('position', 'fixed'); setStyle('box-sizing', 'border-box');
-    setStyle('width', 'min(380px, calc(100vw - 16px))');
+    setStyle('width', `${Math.max(80, Math.min(380, viewportWidth - 16))}px`);
     setStyle('max-height', `${safeHeight}px`); setStyle('overflow-y', 'auto');
     setStyle('left', '8px'); setStyle('top', `${safeTop}px`); setStyle('right', 'auto'); setStyle('bottom', 'auto'); setStyle('transform', 'none');
     const panelRect = panel.getBoundingClientRect();
-    const width = Math.min(panelRect.width || 380, innerWidth - 16);
+    const width = Math.min(panelRect.width || 380, viewportWidth - 16);
     const height = Math.min(panelRect.height || panel.scrollHeight, safeHeight);
     const candidates = [
       { side: 'below', x: anchor.right - width, y: anchor.bottom + 8 },
@@ -73,6 +77,10 @@ export function mountDrawCanvasPanel({ scope, picker, summary, panel } = {}) {
   }, { capture: true });
   scope.listen(window, 'resize', position, { passive: true });
   scope.listen(window, 'scroll', position, { passive: true, capture: true });
+  if (window.visualViewport) {
+    scope.listen(window.visualViewport, 'resize', position, { passive: true });
+    scope.listen(window.visualViewport, 'scroll', position, { passive: true });
+  }
 
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(() => { if (picker.open) position(); });

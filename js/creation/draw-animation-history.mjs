@@ -1,7 +1,9 @@
 import { estimateRetainedAnimationBytes, validateAnimation } from './animation-core.mjs';
 
+export const DRAW_ANIMATION_HISTORY_MAX_BYTES = 4 * 1024 * 1024;
+
 /** Draw-only bounded history with a serializable handoff surface. */
-export function createDrawAnimationHistory(initial, { maxBytes = 4 * 1024 * 1024, maxEntries = 100 } = {}) {
+export function createDrawAnimationHistory(initial, { maxBytes = DRAW_ANIMATION_HISTORY_MAX_BYTES, maxEntries = 100 } = {}) {
   validateAnimation(initial);
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || !Number.isSafeInteger(maxEntries) || maxEntries < 1) throw new RangeError('Undo履歴の上限が不正です。');
   let current = initial; const past = []; const future = [];
