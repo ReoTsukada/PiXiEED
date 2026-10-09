@@ -8,7 +8,11 @@ const ENDPOINT = String(mapConfig.analyticsEndpoint || '').trim();
 let analyticsBound = false;
 
 function isAllowed() {
-  try { return localStorage.getItem(CONSENT_KEY) !== 'denied'; } catch { return true; }
+  try {
+    if (typeof window === 'undefined' || window.top !== window.self) return false;
+    if (window.location.protocol !== 'https:' || !['pixieed.jp', 'www.pixieed.jp'].includes(window.location.hostname)) return false;
+    return localStorage.getItem(CONSENT_KEY) !== 'denied';
+  } catch { return false; }
 }
 
 function createId(prefix) {

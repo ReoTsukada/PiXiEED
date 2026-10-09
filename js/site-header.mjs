@@ -1,4 +1,5 @@
-import './site-analytics.mjs?rev=20261001-free-tools-1';
+import './site-analytics.mjs';
+import { installGlobeAnalyticsBridge } from './globe/analytics-bridge.mjs';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261006-header-controls-1';
 export { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261006-header-controls-1';
@@ -208,6 +209,7 @@ export function mountSiteHeader() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return null;
   installSiteInteractions({ document, window });
   if (window.top !== window.self || document.body.hasAttribute('data-admin-page')) return null;
+  if (/^\/globe\/(?:index\.html)?$/.test(window.location?.pathname || '')) installGlobeAnalyticsBridge();
   applyMotionPreference();
   let header = document.querySelector('.site-header, .audio-heading, .lc-top');
   if (!header) {

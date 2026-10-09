@@ -9,6 +9,7 @@
  * On phones the file goes to the share sheet (so it can be saved to Photos); elsewhere it downloads.
  */
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
+import { trackSiteEvent } from './site-analytics.mjs';
 export const EXPORT_LONG_EDGE = 2048;
 export const EXPORT_MAX_EDGE = 4096;
 
@@ -53,7 +54,12 @@ const touchFirst = () => globalThis.matchMedia?.('(pointer: coarse)')?.matches =
 export async function saveFile(blob, filename, options = {}) {
   const result = await saveFileNow(blob, filename, options);
   if (result !== 'cancelled') {
-    try { globalThis.gtag?.('event', 'file_export', { file_type: String(filename).split('.').pop().toLowerCase(), method: result }); } catch {}
+    const fileType = String(filename).split('.').pop().toLowerCase();
+    trackSiteEvent('file_export', {
+      file_type: fileType,
+      method: result,
+      export_status: result === 'shared' ? 'share_handoff' : 'download_started'
+    });
   }
   return result;
 }

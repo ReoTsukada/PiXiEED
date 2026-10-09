@@ -25,6 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261005-audio-history-1';
+import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
@@ -121,6 +122,7 @@ let effectEpoch = 0;
 let playbackColumn = -1;
 let playbackCells = [];
 const audioHistory = createAudioHistory(40);
+const trackAudioStart = createToolStartTracker('audio');
 let activeHistorySnapshot = null;
 let pendingTempoHistorySnapshot = null;
 let pendingColorHistorySnapshot = null;
@@ -168,7 +170,7 @@ function refreshAudioHistoryButtons() {
   }
 }
 function commitAudioHistoryState(snapshot) {
-  if (snapshot && audioHistoryStateChanged(snapshot)) audioHistory.commit(snapshot);
+  if (snapshot && audioHistoryStateChanged(snapshot)) { trackAudioStart(); audioHistory.commit(snapshot); }
   refreshAudioHistoryButtons();
 }
 function beginAudioHistoryTransaction() {

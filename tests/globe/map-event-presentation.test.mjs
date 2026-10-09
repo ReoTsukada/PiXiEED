@@ -22,9 +22,9 @@ test('presentation uses explicit event facts and formats a compact dated card', 
   assert.deepEqual(view.tags, ['展示', '販売']);
   assert.equal(view.checkedAt, '2026年10月7日');
   assert.deepEqual(view.links, [
-    { href: 'https://example.org/event', label: '主催者の公式案内（example.org）' },
-    { href: 'https://tickets.example.org/event', label: 'チケット（tickets.example.org）' },
-    { href: 'https://x.com/example_artist', label: 'SNS（@example_artist）' }
+    { href: 'https://example.org/event', label: '主催者の公式案内（example.org）', linkKind: 'official' },
+    { href: 'https://tickets.example.org/event', label: 'チケット（tickets.example.org）', linkKind: 'ticket' },
+    { href: 'https://x.com/example_artist', label: 'SNS（@example_artist）', linkKind: 'social' }
   ]);
 });
 
@@ -42,6 +42,6 @@ test('untrusted URLs and unsupported values are omitted without invented details
   assert.equal(view.fee, '');
   assert.deepEqual(view.organizer, []);
   assert.deepEqual(view.tags, []);
-  assert.deepEqual(view.links, [{ href: 'https://example.org/info', label: '関連情報（example.org）' }]);
+  assert.deepEqual(view.links, [{ href: 'https://example.org/info', label: '関連情報（example.org）', linkKind: 'related' }]);
   assert.equal(view.checkedAt, '');
 });

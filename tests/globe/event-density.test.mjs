@@ -11,6 +11,14 @@ test('Tokyo-local date determines upcoming, active, and past boundaries inclusiv
   assert.equal(classifyEvent({ date: '2026-10-05' }, '2026-10-05'), 'active');
 });
 
+test('explicit competition deadlines expire at their exact timestamp', () => {
+  const event = { startDate: '2026-08-16', endDate: '2026-10-10', deadlineAt: '2026-10-09T17:00:00+00:00' };
+  const cutoff = Date.parse(event.deadlineAt);
+  assert.equal(classifyEvent(event, '2026-10-10', cutoff - 1), 'active');
+  assert.equal(classifyEvent(event, '2026-10-10', cutoff), 'past');
+  assert.equal(classifyEvent(event, '2026-10-09', cutoff), 'past');
+});
+
 test('date and dates legacy fields are supported; no date never becomes a scheduled event', () => {
   assert.deepEqual(eventDates({ date: '2026/11/1' }), { start: '2026-11-01', end: '2026-11-01' });
   assert.deepEqual(eventDates({ dates: '2026年11月1日（日）〜2026年11月3日（火）' }), { start: '2026-11-01', end: '2026-11-03' });

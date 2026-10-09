@@ -1,6 +1,7 @@
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
 import { createAudioPlayer } from './audio-core.mjs?rev=20261004-audio-outline-color-1';
+import { createLevelTracker } from '../site-analytics.mjs';
 import { createWalkCollectGame, directionForGameKey, moveWalkGame, resolveLocalGameArt, resolveLocalGameSong, resolveWalkGameAssets, restoreWalkGame, setWalkGamePaused, validateWalkGame } from './game-core.mjs?rev=20260927-game-step14-2';
 
 const DRAW_LAST_KEY = 'pixieed.simple-draw.last-draft.v1'; const AUDIO_LAST_KEY = 'pixieed:creation:audio:last-draft:v1'; const LAST_KEY = 'pixieed:creation:game:last-draft:v1';
@@ -8,6 +9,7 @@ const $ = (selector) => document.querySelector(selector); const status = $('#gam
 const selectors = { character: $('#game-character'), background: $('#game-background'), music: $('#game-music') };
 const setup = $('#game-setup'); const playSection = $('#game-play'); const boardCanvas = $('#game-board'); const boardContext = boardCanvas.getContext('2d', { alpha: false });
 let adapter = null; let store = null; let game = null; let gameAssets = null; let activeDraftId = null; let drawRecord = null; let songRecord = null; let busy = false;
+let levelTracker = createLevelTracker('walk');
 const AudioContextConstructor = globalThis.AudioContext || globalThis.webkitAudioContext;
 const audioPlayer = createAudioPlayer({ audioContextFactory: () => { if (!AudioContextConstructor) throw new Error('AudioContext unavailable'); return new AudioContextConstructor(); } });
 
@@ -109,7 +111,7 @@ async function beginNewGame() {
   if (selectedSong) soundTask = audioPlayer.play(selectedSong).catch(() => false); // Called synchronously from the user's central-button gesture.
   await prepareGame();
   if (!game) { audioPlayer.stop(); return; }
-  game = setWalkGamePaused(game, false); drawBoard(); updatePrimary();
+  game = setWalkGamePaused(game, false); levelTracker.start(); drawBoard(); updatePrimary();
   const musicStarted = await soundTask;
   setStatus(musicStarted ? 'ゲーム開始。星を全部集めて旗まで進もう。' : 'ゲーム開始。音が鳴らない場合は曲に音符を追加してください。');
 }
@@ -120,7 +122,7 @@ async function togglePlay() {
   if (game.phase === 'playing') { game = setWalkGamePaused(game, true); audioPlayer.stop(); drawBoard(); updatePrimary(); setStatus('一時停止しました。中央の「遊ぶ」で再開できます。'); return; }
   busy = true; updatePrimary();
   const soundTask = audioPlayer.play(gameAssets.music.document).catch(() => false); // AudioContext is created before the first await.
-  game = setWalkGamePaused(game, false); drawBoard(); updatePrimary();
+  game = setWalkGamePaused(game, false); levelTracker.start(); drawBoard(); updatePrimary();
   const musicStarted = await soundTask; busy = false; drawBoard(); updatePrimary();
   setStatus(musicStarted ? '再開しました。' : '再開しました。音が鳴らない場合は曲に音符を追加してください。');
 }
@@ -131,8 +133,8 @@ function move(direction) {
     const result = moveWalkGame(game, direction); game = result.game;
     drawBoard(); updatePrimary();
     if (result.reason === 'wall' || result.reason === 'edge') setStatus('そこへは進めません。別の方向を試してください。');
+    else if (result.won) { audioPlayer.stop(); levelTracker.end({ success: true, completion_kind: 'goal' }); setStatus('星を全部集めてゴールしました。端末に保存できます。'); }
     else if (result.collected) setStatus(`星を集めました。残り ${game.collectibles.length - game.collectedIds.length}個です。`);
-    else if (result.won) { audioPlayer.stop(); setStatus('星を全部集めてゴールしました。端末に保存できます。'); }
   } catch (error) { setStatus(error.message); }
 }
 
@@ -166,7 +168,7 @@ async function resumeGame() {
 }
 
 function newGame() {
-  audioPlayer.stop(); game = null; gameAssets = null; activeDraftId = null; playSection.hidden = true; setup.hidden = false; $('#game-primary').disabled = !artRevision('character') || !artRevision('background') || !musicRevision(); updatePrimary(); setStatus('キャラクター・背景・音の保存版を選び、ゲームを準備してください。');
+  levelTracker.reset(); levelTracker = createLevelTracker('walk'); audioPlayer.stop(); game = null; gameAssets = null; activeDraftId = null; playSection.hidden = true; setup.hidden = false; $('#game-primary').disabled = !artRevision('character') || !artRevision('background') || !musicRevision(); updatePrimary(); setStatus('キャラクター・背景・音の保存版を選び、ゲームを準備してください。');
 }
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }

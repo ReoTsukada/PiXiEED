@@ -6,6 +6,7 @@ import { lookupCell } from './geometry.mjs?v=20261005-map-layers-1';
 import { readEventCatalog, mergeEventCatalog } from './event-catalog.mjs?v=20261005-event-research-1';
 import { classifyEvent, DEFAULT_EVENT_PERIOD_FILTER, eventPeriodCounts, matchesEventPeriod, nextTokyoMidnightDelay, sortEventsByDisplayPriority, tokyoDate, uniqueEventEditions } from './event-density.mjs';
 import { presentMapEvent } from './map-event-presentation.mjs?v=20261007-event-discovery-1';
+import { trackGlobeEvent } from './analytics-bridge.mjs';
 
 const CATALOG_URL = new URL('../../data/pixel-art-events.json', import.meta.url);
 const CATALOG_REFRESH_MS = 15 * 60 * 1000;
@@ -384,7 +385,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (metaText) { const meta = doc.createElement('p'); meta.className = 'map-event-card__meta'; meta.textContent = metaText; content.append(meta); }
     if (presentation.fee) { const fee = doc.createElement('p'); fee.className = 'map-event-card__fee'; fee.textContent = presentation.fee; content.append(fee); }
     if (presentation.tags.length) { const tags = doc.createElement('p'); tags.className = 'map-event-card__tags'; for (const value of presentation.tags) { const tag = doc.createElement('span'); tag.textContent = value; tags.append(tag); } content.append(tags); }
-    const button = doc.createElement('button'); button.type = 'button'; button.className = 'map-event-card__detail'; button.textContent = '詳細を見る'; button.setAttribute('aria-label', `${presentation.title}の詳細を見る`); button.setAttribute('aria-expanded', String(event.id === detailEventId && view === 'detail')); button.addEventListener('click', () => openDetail(event)); content.append(button);
+    const button = doc.createElement('button'); button.type = 'button'; button.className = 'map-event-card__detail'; button.textContent = '詳細を見る'; button.setAttribute('aria-label', `${presentation.title}の詳細を見る`); button.setAttribute('aria-expanded', String(event.id === detailEventId && view === 'detail')); button.addEventListener('click', activation => openDetail(event, activation)); content.append(button);
     if (event.locationPending) { const pending = doc.createElement('p'); pending.className = 'map-event-card__meta'; pending.textContent = placement; content.insertBefore(pending, button); }
     card.dataset.selected = String(event.id === detailEventId);
     if (event.id === detailEventId) card.setAttribute('aria-current', 'true');
@@ -414,7 +415,14 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     appendFact(facts, '主催', presentation.organizer.join('・'));
     appendFact(facts, 'タグ', presentation.tags.join('・'));
     const links = doc.createElement('div'); links.className = 'map-events-panel__links'; links.setAttribute('aria-label', 'イベント情報のリンク');
-    for (const item of presentation.links) { const anchor = doc.createElement('a'); anchor.href = item.href; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.textContent = item.label; links.append(anchor); }
+    for (const item of presentation.links) {
+      const anchor = doc.createElement('a'); anchor.href = item.href; anchor.target = '_blank'; anchor.rel = 'noopener noreferrer'; anchor.textContent = item.label;
+      anchor.addEventListener('click', activation => {
+        if (!activation.isTrusted || activation.defaultPrevented || activation.button !== 0 || !['official', 'ticket', 'related', 'social'].includes(item.linkKind)) return;
+        trackGlobeEvent('event_outbound', { link_kind: item.linkKind });
+      });
+      links.append(anchor);
+    }
     const source = doc.createElement('p'); source.className = 'map-events-panel__source'; source.textContent = [presentation.sourceLabel, presentation.checkedAt ? `確認日：${presentation.checkedAt}` : ''].filter(Boolean).join(' · ');
     detail.append(title, summary, facts);
     if (presentation.description) { const description = doc.createElement('p'); description.className = 'map-events-panel__description'; description.textContent = presentation.description; detail.append(description); }
@@ -452,9 +460,10 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     if (restoreScroll !== null) body.scrollTop = restoreScroll;
   }
 
-  function openDetail(event) {
+  function openDetail(event, activation) {
     detailReturnScroll = body.scrollTop;
     detailEventId = event.id;
+    if (activation?.isTrusted) trackGlobeEvent('select_content', { content_type: 'event' });
     setView('detail');
     backButton.focus({ preventScroll: true });
   }

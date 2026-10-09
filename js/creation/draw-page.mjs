@@ -25,6 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
+import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
@@ -96,6 +97,7 @@ selectedColor = inputSettings.bindings.left.color; tool = inputSettings.bindings
 function effectiveTool() { return strokeBinding?.tool || tool; }
 function effectiveColor() { return strokeBinding?.color ?? selectedColor; }
 let animationSession = createDrawAnimationSession(documentData), animationControls = null, strokeTracker = null;
+const trackDrawStart = createToolStartTracker('draw');
 let selection = null, selectionDrag = null, strokeWasSaved = false;
 let selectionTransform = null, selectionPreview = null, selectionPanel = null, selectionError = '';
 let selectionRenderRequest = 0;
@@ -525,7 +527,7 @@ function commitChange(operation) {
   if (!canEdit()) return;
   const next = { ...documentData, palette: documentData.palette, pixels: [...documentData.pixels] }; const changed = operation(next);
   if (!canEdit(next)) return;
-  if (history.commit(next)) { saved = false; paint(changed && typeof changed.length === 'number' ? changed : null); }
+  if (history.commit(next)) { trackDrawStart(); saved = false; paint(changed && typeof changed.length === 'number' ? changed : null); }
 }
 function pointFromEvent(event) {
   return rawPixelCellAt(event, canvas.getBoundingClientRect(), documentData.width, documentData.height);
@@ -1044,7 +1046,7 @@ function endStroke(cancel = false, releaseEvent = null) {
   if (drawingPointerId === -7106) { activePointers.delete(drawingPointerId); virtualCursor?.resetPress(); }
   if (drawing && strokeTracker) {
     if (cancel) { cancelDrawStroke(documentData, strokeTracker); saved = strokeWasSaved; }
-    else if (commitDrawStroke(documentData, history, strokeTracker)) saved = false;
+    else if (commitDrawStroke(documentData, history, strokeTracker)) { trackDrawStart(); saved = false; }
     strokeTracker = null; strokeStartPixels = null; paint();
   }
   if (cancel && selectionDrag) {

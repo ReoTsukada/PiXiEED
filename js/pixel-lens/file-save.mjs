@@ -1,3 +1,5 @@
+import { trackSiteEvent } from '../site-analytics.mjs';
+
 function isCurrentSnapshot(snapshot) {
   if (!snapshot || typeof snapshot.isCurrent !== 'function') return false;
   try {
@@ -13,16 +15,12 @@ function clearLink(link) {
 }
 
 function trackSaveMethod(entry, method) {
-  try {
-    if (typeof globalThis.gtag === 'function') {
-      globalThis.gtag('event', 'file_export', {
-        file_type: String(entry.filename).split('.').pop().toLowerCase(),
-        method
-      });
-    }
-  } catch {
-    // Analytics must never interfere with saving.
-  }
+  const fileType = String(entry.filename).split('.').pop().toLowerCase();
+  trackSiteEvent('file_export', {
+    file_type: fileType,
+    method,
+    export_status: method === 'shared' ? 'share_handoff' : 'download_started'
+  });
 }
 
 export function createCameraFileSave({

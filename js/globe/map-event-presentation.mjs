@@ -64,14 +64,14 @@ function linkLabel(value, fallback) {
   } catch { return fallback; }
 }
 
-function pushLinks(output, seen, values, label) {
+function pushLinks(output, seen, values, label, linkKind) {
   for (const item of Array.isArray(values) ? values : [values]) {
     const raw = typeof item === 'string' ? item : item?.url;
     const href = safePresentationUrl(raw);
     if (!href || seen.has(href)) continue;
     seen.add(href);
     const suppliedName = typeof item === 'object' ? cleanText(item.label || item.name) : '';
-    output.push(Object.freeze({ href, label: suppliedName || linkLabel(href, label) }));
+    output.push(Object.freeze({ href, label: suppliedName || linkLabel(href, label), linkKind }));
   }
 }
 
@@ -85,10 +85,10 @@ function listText(value) {
 export function presentMapEvent(event, today) {
   const period = ['ended', 'completed'].includes(String(event?.status || '').toLowerCase()) ? 'past' : classifyEvent(event, today);
   const urls = [], seen = new Set();
-  pushLinks(urls, seen, event?.sourceUrl || event?.url || event?.website, cleanText(event?.sourceLabel) || '公式情報');
-  pushLinks(urls, seen, event?.ticketUrls || event?.ticketUrl || event?.ticketPageUrl || event?.ticketPage, 'チケット');
-  pushLinks(urls, seen, event?.additionalUrls, '関連情報');
-  pushLinks(urls, seen, event?.socialUrls, '公式SNS');
+  pushLinks(urls, seen, event?.sourceUrl || event?.url || event?.website, cleanText(event?.sourceLabel) || '公式情報', 'official');
+  pushLinks(urls, seen, event?.ticketUrls || event?.ticketUrl || event?.ticketPageUrl || event?.ticketPage, 'チケット', 'ticket');
+  pushLinks(urls, seen, event?.additionalUrls, '関連情報', 'related');
+  pushLinks(urls, seen, event?.socialUrls, '公式SNS', 'social');
   const checked = cleanText(event?.checkedAt);
   const checkedAt = Number.isFinite(Date.parse(checked))
     ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(checked))

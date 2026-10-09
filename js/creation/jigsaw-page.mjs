@@ -21,10 +21,13 @@ import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261006-result-list-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
+import { createLevelTracker } from '../site-analytics.mjs';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
 const status = $('#jigsaw-status'); const sourceSelect = $('#jigsaw-source-version');
+let levelTracker = createLevelTracker('jigsaw');
+let levelGameId = null;
 const sourceKind = $('#jigsaw-source-kind'); const publicSelect = $('#jigsaw-public-version'); const fileInput = $('#jigsaw-file');
 const gridSelect = $('#jigsaw-grid-size'); const startButton = $('#jigsaw-start');
 const resumeButton = $('#jigsaw-resume'); const saveButton = $('#jigsaw-save');
@@ -397,7 +400,15 @@ function renderGame() {
   renderTray(); queuePaint(); completionMessage.hidden = !isJigsawWorkspaceComplete(game); saveButton.disabled = false; updateSelectionControls();
   if (jigsawHintButton) jigsawHintButton.disabled = jigsawHintController.getState().pending || isJigsawWorkspaceComplete(game);
   // the arcade layer (HUD, timer, celebration) listens for this
-  document.dispatchEvent(new CustomEvent('jigsaw:state', { detail: { gameId: game.gameId, pieces: layoutData.columns * layoutData.rows, groups: game.groups.length, inTray: game.groups.filter((group) => group.inTray).length, complete: isJigsawWorkspaceComplete(game), width: layoutData.width, height: layoutData.height } }));
+  const complete = isJigsawWorkspaceComplete(game);
+  if (levelGameId !== game.gameId) {
+    levelTracker.reset();
+    levelTracker = createLevelTracker('jigsaw');
+    levelGameId = game.gameId;
+    if (!complete) levelTracker.start();
+  }
+  if (complete) levelTracker.end({ success: true, completion_kind: 'solved' });
+  document.dispatchEvent(new CustomEvent('jigsaw:state', { detail: { gameId: game.gameId, pieces: layoutData.columns * layoutData.rows, groups: game.groups.length, inTray: game.groups.filter((group) => group.inTray).length, complete, width: layoutData.width, height: layoutData.height } }));
   scheduleJigsawResult();
 }
 function renderSourcePreview(image) {
@@ -943,6 +954,7 @@ globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('
 });
 
 $('#jigsaw-new').addEventListener('click', () => {
+  levelTracker.reset(); levelTracker = createLevelTracker('jigsaw'); levelGameId = null;
   cancelJigsawResult(true); resultShownRun = -1;
   setSourcePreview(null);
   window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0;

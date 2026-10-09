@@ -1,4 +1,5 @@
 import { isPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
+import { trackSiteEvent } from '../site-analytics.mjs';
 const GAMES = Object.freeze({ 'spot-difference': 'spot-difference', hidden_object: 'hidden-object', 'hidden-object': 'hidden-object', spot_difference: 'spot-difference' });
 
 export class PuzzleShareError extends Error {
@@ -73,5 +74,6 @@ export async function copyVerifiedPuzzleShareUrl(options, clipboard = globalThis
   if (!clipboard || typeof clipboard.writeText !== 'function') fail('clipboard_unavailable', 'URLをコピーできません。下の欄から手動でコピーしてください。', { url });
   try { await clipboard.writeText(url); }
   catch { fail('clipboard_unavailable', 'URLをコピーできません。下の欄から手動でコピーしてください。', { url }); }
+  trackSiteEvent('link_copy', { method: 'clipboard' });
   return url;
 }

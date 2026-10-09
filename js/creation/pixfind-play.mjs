@@ -12,6 +12,7 @@ import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindVie
 import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261004-legacy-puzzle-share-1';
 import { isLegacyPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { createLevelTracker, trackSiteEvent } from '../site-analytics.mjs';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };
@@ -333,6 +334,7 @@ function mount() {
   const statusGame = document.querySelector('#pixfind-game-status'); const progress = document.querySelector('#pixfind-progress');
   const foundList = document.querySelector('#pixfind-found-list');
   let cell = 1;
+  let levelTracker = null;
   let viewport = { zoom: 1, x: 0, y: 0 }; let baseScale = 1;
   const activePointers = new Map();
   const viewportAreas = () => [playArea, ...(changedArea && changedFigure && !changedFigure.hidden ? [changedArea] : [])].filter((area) => area && !area.hidden).map((area) => ({ width: area.clientWidth, height: area.clientHeight }));
@@ -423,6 +425,7 @@ function mount() {
     }));
     const complete = found.size === regions.length && regions.length > 0 && !readOnly && original && selected;
     if (complete) {
+      levelTracker.end({ success: authoritativeAnswers === true, completion_kind: authoritativeAnswers ? 'solved' : 'candidates_reviewed' });
       statusGame.textContent = authoritativeAnswers ? '全部見つかりました。おめでとうございます！' : '自動検出の候補をすべて確認しました。';
       if (resultShownRun !== resultRun && !resultTimer) {
         const scheduledRun = resultRun; const scheduledPuzzle = selected;
@@ -440,6 +443,8 @@ function mount() {
     paint();
   };
   const start = async (puzzle) => {
+    levelTracker?.reset();
+    levelTracker = createLevelTracker(puzzle?.mode === 'hidden-object' ? 'hidden_object' : 'spot_difference');
     shareRequest += 1;
     if (sharePanel) sharePanel.hidden = true;
     if (shareButton) { shareButton.disabled = false; shareButton.title = '共有URLをコピー'; }
@@ -535,7 +540,7 @@ function mount() {
       currentMask = result.mask;
       if (!readOnly && !regions.length) { readOnly = true; viewMessage = '正解位置を確認できないため、画像のみ表示しています。'; }
       if (readOnly) { primary.disabled = true; primary.setAttribute('aria-label', '正解位置未確認のためプレイできません'); progress.textContent = '閲覧のみ'; foundList.replaceChildren(); statusGame.textContent = viewMessage; }
-      else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; updateProgress(); }
+      else { primary.setAttribute('aria-label', '最初から遊び直す'); statusGame.textContent = viewMessage || answerInstruction || (puzzle.mode === 'hidden-object' ? '絵をタップして、隠れているものを探してください。' : '変化している場所をタップしてください。'); if (!viewMessage) delete statusGame.dataset.visible; if (regions.length) levelTracker.start(); updateProgress(); }
       document.dispatchEvent(new CustomEvent('pixfind:run-start'));
       updateBaseScale(); constrainViewport(); paint();
       if (sharePanel) {
@@ -590,14 +595,16 @@ function mount() {
       if (nativeShare && typeof navigator.share === 'function') {
         try {
           await navigator.share({ title: puzzle.label, url });
+          trackSiteEvent('share', { method: 'native' });
           if (request === shareRequest && selected === puzzle) shareStatus.textContent = '共有しました。';
           return;
-        } catch { /* Cancellation and unsupported share targets fall back to URL copying. */ }
+        } catch (error) { if (error?.name === 'AbortError') return; /* Other share failures fall back to URL copying. */ }
         if (request !== shareRequest || selected !== puzzle) return;
       }
       try {
         if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
         await navigator.clipboard.writeText(url);
+        trackSiteEvent('link_copy', { method: 'clipboard' });
         if (request !== shareRequest || selected !== puzzle) return;
         shareStatus.textContent = '公開ページと共有画像を確認し、URLをコピーしました。';
         shareButton.title = 'もう一度コピー';

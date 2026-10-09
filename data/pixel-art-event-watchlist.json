@@ -1104,8 +1104,8 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -2045,8 +2045,8 @@
       "lastKnownEventDate": "2026-10-10",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -2182,8 +2182,8 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -2235,8 +2235,8 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -2678,8 +2678,8 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -3230,8 +3230,8 @@
       "lastKnownEventDate": "2026-11-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -3481,11 +3481,11 @@
       "venues": [
         "オンライン（ToastieLabs）"
       ],
-      "lastKnownEventDate": "2026-10-09",
+      "lastKnownEventDate": "2026-10-10",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -3858,8 +3858,8 @@
       "lastKnownEventDate": "2026-10-10",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -4124,8 +4124,8 @@
       "lastKnownEventDate": "2026-11-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
+        "notes": "公式イベント本文を今回再確認。"
       }
     },
     {
@@ -4606,5 +4606,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-08T00:03:05+00:00"
+  "updatedAt": "2026-10-09T00:00:37+00:00"
 }

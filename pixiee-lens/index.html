@@ -68,28 +68,15 @@
     }
   })();
 </script>
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-<script>
-    const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
-    const GA_PAGE_PATH = '/pixiee-lens/';
-    const PROJECT_SLUG = 'pixiee-lens';
-    const PROJECT_NAME = 'PiXiEELENS';
-    const PROJECT_TYPE = 'tool';
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID, {
-      page_path: GA_PAGE_PATH,
-      page_title: document.title
-    });
-    gtag('event', 'project_open', {
-      project_slug: PROJECT_SLUG,
-      project_type: PROJECT_TYPE,
-      project_name: PROJECT_NAME
-    });
-    gtag('event', 'project_open_pixiee_lens');
-  </script>
+<script type="module">
+  import { trackSiteEvent } from '../js/site-analytics.mjs';
+  trackSiteEvent('project_open', {
+    project_slug: 'pixiee-lens',
+    project_type: 'tool',
+    project_name: 'PiXiEELENS'
+  });
+  trackSiteEvent('project_open_pixiee_lens');
+</script>
 
 
 

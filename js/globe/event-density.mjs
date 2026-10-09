@@ -48,11 +48,13 @@ export function eventDates(event = {}) {
   return Object.freeze({ start, end });
 }
 
-export function classifyEvent(event, today = tokyoDate()) {
+export function classifyEvent(event, today = tokyoDate(), now = Date.now()) {
   const status = String(event?.status || '').trim().toLowerCase();
   if (event?.watch || TERMINAL_STATUSES.has(status)) return status === 'postponed' ? 'postponed' : status === 'cancelled' || status === 'canceled' ? 'cancelled' : 'watch';
   const interval = eventDates(event);
   if (!interval) return 'unknown';
+  const deadline = Date.parse(event?.deadlineAt || '');
+  if (Number.isFinite(deadline) && Number.isFinite(Number(now)) && Number(now) >= deadline) return 'past';
   if (today < interval.start) return 'upcoming';
   if (today > interval.end) return 'past';
   return 'active';

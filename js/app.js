@@ -1,4 +1,5 @@
 import { mountSiteHeader } from './site-header.mjs?rev=20261006-header-controls-1';
+import { trackSiteEvent } from './site-analytics.mjs';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
 import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
@@ -4309,8 +4310,8 @@ function bindInteractive() {
   document.querySelector('[data-share]')?.addEventListener('click', async () => {
     const shareData = { title: document.title, text: 'この絵を見つけました。', url: window.location.href };
     try {
-      if (navigator.share) await navigator.share(shareData);
-      else { await navigator.clipboard.writeText(window.location.href); showToast('作品ページのリンクをコピーしました。'); }
+      if (navigator.share) { await navigator.share(shareData); trackSiteEvent('share', { method: 'native' }); }
+      else { await navigator.clipboard.writeText(window.location.href); trackSiteEvent('link_copy', { method: 'clipboard' }); showToast('作品ページのリンクをコピーしました。'); }
       trackEvent('work_share', { work_id: document.body.dataset.workId || '' });
     } catch { /* share was cancelled */ }
   });

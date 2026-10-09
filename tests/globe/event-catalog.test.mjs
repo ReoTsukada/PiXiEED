@@ -12,7 +12,7 @@ test('checked-in research has official sources and valid dates without invented 
   assert.equal(new Set(records.map(e=>e.id)).size,records.length);
 });
 test('invalid researched data rejects the entire replacement so callers keep the last good data',()=>{
-  for(const bad of [{...event,sourceUrl:'javascript:alert(1)'},{...event,checkedAt:''},{...event,startDate:'2026-02-30'},{...event,endDate:'2026-10-01'},{...event,status:'watch'},{...event,id:''}]) assert.throws(()=>readEventCatalog(catalog([bad])));
+  for(const bad of [{...event,sourceUrl:'javascript:alert(1)'},{...event,checkedAt:''},{...event,startDate:'2026-02-30'},{...event,endDate:'2026-10-01'},{...event,status:'watch'},{...event,id:''},{...event,deadlineAt:'not-a-time'},{...event,deadlineAt:'2025-12-31T00:00:00Z'}]) assert.throws(()=>readEventCatalog(catalog([bad])));
   assert.throws(()=>readEventCatalog(catalog([event,event])));
   assert.deepEqual(readEventCatalog(catalog([])),[]);
 });

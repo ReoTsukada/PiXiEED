@@ -12,6 +12,8 @@ export function readEventCatalog(payload) {
     if (!event || typeof event.id !== 'string' || !event.id.trim() || ids.has(event.id) || typeof event.name !== 'string' || !event.name.trim() || !safeEventSource(event.sourceUrl) || !Number.isFinite(Date.parse(event.checkedAt))) throw new TypeError('Invalid verified event');
     ids.add(event.id);
     for (const field of ['startDate', 'endDate', 'lastHeldDate']) if (event[field] && !validDate(event[field])) throw new TypeError('Invalid event date');
+    if (event.deadlineAt && (typeof event.deadlineAt !== 'string' || !/(?:Z|[+-]\d\d:\d\d)$/.test(event.deadlineAt) || !Number.isFinite(Date.parse(event.deadlineAt)))) throw new TypeError('Invalid event deadline');
+    if (event.deadlineAt && event.startDate && Date.parse(event.deadlineAt) < Date.parse(`${event.startDate}T00:00:00+09:00`)) throw new TypeError('Event deadline precedes its start date');
     if (event.endDate && (!event.startDate || event.endDate < event.startDate)) throw new TypeError('Invalid event interval');
     if (event.status === 'watch' && (event.startDate || event.endDate)) throw new TypeError('Unannounced event has a scheduled date');
   }

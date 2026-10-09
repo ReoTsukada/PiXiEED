@@ -1,6 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCameraFileSave } from '../../js/pixel-lens/file-save.mjs';
+
+const storage = new Map();
+globalThis.localStorage = { getItem(key) { return storage.get(key) ?? null; } };
+globalThis.location = { hostname: 'pixieed.jp', protocol: 'https:', origin: 'https://pixieed.jp', pathname: '/pixel-camera.html', search: '' };
+globalThis.window = {
+  location: globalThis.location,
+  dataLayer: [],
+  addEventListener() {}
+};
+window.top = window.self = window;
+globalThis.document = {
+  referrer: '',
+  head: { append() {} },
+  addEventListener() {},
+  createElement() { return {}; }
+};
+const { createCameraFileSave } = await import('../../js/pixel-lens/file-save.mjs');
+
+const analyticsRows = () => window.dataLayer.filter((entry) => entry?.[0] === 'event');
 
 class FakeElement {
   constructor() {
@@ -242,32 +260,34 @@ test('download and open actions keep native anchor behavior and give useful inst
 });
 
 test('records existing file_export analytics only for dispatched download or completed share', async () => {
-  const priorGtag = globalThis.gtag;
-  const events = [];
-  globalThis.gtag = (...args) => events.push(args);
-  try {
-    const downloaded = harness();
-    show(downloaded);
-    await downloaded.cameraDownloadFile.click();
-    await downloaded.cameraOpenFile.click();
-    assert.deepEqual(events, [['event', 'file_export', { file_type: 'png', method: 'downloaded' }]]);
+  const baseline = analyticsRows().length;
+  const downloaded = harness();
+  show(downloaded);
+  await downloaded.cameraDownloadFile.click();
+  await downloaded.cameraOpenFile.click();
+  const events = analyticsRows().slice(baseline);
+  assert.equal(events.length, 1);
+  assert.equal(events[0][1], 'file_export');
+  assert.deepEqual({ ...events[0][2] }, {
+    tool: 'pixel-camera', file_type: 'png', method: 'downloaded', export_status: 'download_started'
+  });
 
-    const shared = harness({ navigatorRef: { canShare: () => true, share: () => Promise.resolve() } });
-    show(shared);
-    shared.cameraShareFile.click();
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.deepEqual(events[1], ['event', 'file_export', { file_type: 'png', method: 'shared' }]);
+  const shared = harness({ navigatorRef: { canShare: () => true, share: () => Promise.resolve() } });
+  show(shared);
+  shared.cameraShareFile.click();
+  await new Promise((resolve) => setImmediate(resolve));
+  const afterShare = analyticsRows().slice(baseline + 1);
+  assert.equal(afterShare[0][1], 'file_export');
+  assert.deepEqual({ ...afterShare[0][2] }, {
+    tool: 'pixel-camera', file_type: 'png', method: 'shared', export_status: 'share_handoff'
+  });
 
-    const cancelled = harness({ navigatorRef: {
-      canShare: () => true,
-      share: () => Promise.reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))
-    } });
-    show(cancelled);
-    cancelled.cameraShareFile.click();
-    await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(events.length, 2);
-  } finally {
-    if (priorGtag === undefined) delete globalThis.gtag;
-    else globalThis.gtag = priorGtag;
-  }
+  const cancelled = harness({ navigatorRef: {
+    canShare: () => true,
+    share: () => Promise.reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))
+  } });
+  show(cancelled);
+  cancelled.cameraShareFile.click();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(analyticsRows().length, baseline + 2);
 });

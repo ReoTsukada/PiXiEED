@@ -1,4 +1,5 @@
 import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
+import { createToolStartTracker, trackSiteEvent } from '../site-analytics.mjs';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
@@ -83,6 +84,7 @@ let previewAspect = 0;
 let requestId = 0;
 const workerUnavailable = null;
 let previewReady = false;
+const trackCameraStart = createToolStartTracker('pixel-camera');
 let previousAiStatus = null;
 let loop = null;
 let lastFacing = 'environment';
@@ -1105,6 +1107,7 @@ loop = createFrameLoop({
           : result.aiStatus === 'no-instances' ? ''
           : 'この端末に合わせた画質で表示しています。';
         if (!previewReady || previousAiStatus !== result.aiStatus) {
+          if (!previewReady && !importedSource) trackCameraStart();
           previewReady = true;
           setInfoForMode('live');
           say(previewMessage);
@@ -1446,6 +1449,7 @@ async function capture() {
     say('PNGを準備しています…', { visible: true });
     void prepareCaptureDownload(frozen);
     await cameraPxd.save();
+    if (!importedSource) trackSiteEvent('camera_capture');
   } catch (error) {
     sayToast(error instanceof Error ? error.message : '新しいプロジェクトに保存できませんでした');
   } finally {
@@ -1459,6 +1463,7 @@ function finishAudioCamera(frozen) {
   try {
     if (regionMergeSession) endRegionMerge({ restore: false, resume: false });
     const returnUrl = completeAudioCamera(audioCameraRequest, finalFrame);
+    if (!importedSource) trackSiteEvent('camera_capture');
     audioFrozenFrame = finalFrame;
     invalidatePreview();
     cameraSequence++;
