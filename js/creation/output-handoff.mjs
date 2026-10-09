@@ -11,9 +11,7 @@ const MIME_EXTENSIONS = Object.freeze({
   'image/apng': 'apng',
   'audio/wav': 'wav',
   'video/mp4': 'mp4',
-  'video/webm': 'webm',
-  // PXD backups use the generic local file card, with direct-save fallback in the project tools.
-  'application/octet-stream': 'pxd'
+  'video/webm': 'webm'
 });
 const RETURN_PATHS = new Set([
   '/draw/', '/audio/', '/pixel-camera.html', '/pixel-camera-studio.html', '/pixiee-lens/',

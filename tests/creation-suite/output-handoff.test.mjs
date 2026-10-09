@@ -193,32 +193,34 @@ test('output item validation rejects a mismatched extension without changing the
   assert.equal(loaded.outputs.length, 1); assert.equal(loaded.outputs[0].filename, 'my-art.png');
 });
 
-test('PXD project backups use the shared file card and keep direct save as a failure fallback', async () => {
+test('PXD project backups download directly from the editor and never navigate to the output page', async () => {
   for (const path of ['../../js/creation/pxd-ui.mjs', '../../js/creation/project-workspace.mjs']) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8');
-    assert.match(source, /output-handoff\.mjs\?rev=20261009-output-12/);
-    assert.match(source, /const staged = await sendToolOutput\(/);
-    assert.match(source, /if \(staged\.ok\) return true;/);
-    assert.match(source, /await download\(bytes, name\);\s*return false;/);
+    assert.doesNotMatch(source, /output-handoff\.mjs|sendToolOutput/);
+    assert.match(source, /async function sendPxdBackup\(bytes, name\) \{\s*await download\(bytes, name\);\s*return false;/);
+    assert.match(source, /const staged = await sendPxdBackup\(/);
+    assert.match(source, /URL\.createObjectURL\(blob\).*?link\.download = name; link\.click\(\)/s, 'the project tool creates a local browser download');
   }
   const outputPage = readFileSync(new URL('../../js/creation/output-page.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(outputPage, /pxd: 'application\/octet-stream'|extension === 'pxd' \?/);
-  assert.match(outputPage, /この形式はPiXiEED内でプレビューできません/);
-  assert.match(outputPage, /fileCard\.hidden = false/);
+  assert.doesNotMatch(outputPage, /application\/octet-stream|pxd: 'application/);
+  assert.match(outputPage, /source\?\.kind === 'legacy-file' && source\.extension === 'pxd'\) return \[\]/, 'older staged PXD records cannot enter media conversion');
   const workspace = readFileSync(new URL('../../js/creation/project-workspace.mjs', import.meta.url), 'utf8');
   const pxdUi = readFileSync(new URL('../../js/creation/pxd-ui.mjs', import.meta.url), 'utf8');
   assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
-
+  for (const [path, pattern] of [
+    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261006-header-controls-1/],
+    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261007-draw-handoff-1/],
+    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],
+    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],
+    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],
+    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],
+    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/]
+  ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), pattern, `${path} loads the direct-save PXD module revision`);
+  const { OUTPUT_MIME_EXTENSIONS } = await import('../../js/creation/output-handoff.mjs');
+  assert.equal(OUTPUT_MIME_EXTENSIONS['application/octet-stream'], undefined, 'PXD is not a generic shared output type');
   const deps = dependencies();
-  await stageToolOutput({
-    blob: new Blob(['PXD backup'], { type: 'application/octet-stream' }),
-    filename: 'pixieed-project.pxd', returnUrl: '/draw/', title: 'PXDバックアップを確認',
-    source: 'PXDバックアップ', metadata: { description: 'PiXiEED内で内容のプレビューや変換はできません。' }
-  }, deps);
-  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
-  assert.equal(loaded.mime, 'application/octet-stream');
-  assert.equal(loaded.filename, 'pixieed-project.pxd');
+  await assert.rejects(stageToolOutput({ ...file('pixieed-project.pxd', 'application/octet-stream', 'PXD backup'), returnUrl: '/draw/' }, deps), /このファイル形式にはまだ対応していません/);
 });
 
 test('camera output return links carry only the opaque output id for local restoration', async () => {
