@@ -203,6 +203,8 @@ test('PXD project backups use the shared file card and keep direct save as a fai
   }
   const outputPage = readFileSync(new URL('../../js/creation/output-page.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(outputPage, /pxd: 'application\/octet-stream'|extension === 'pxd' \?/);
+  assert.match(outputPage, /この形式はPiXiEED内でプレビューできません/);
+  assert.match(outputPage, /fileCard\.hidden = false/);
   const workspace = readFileSync(new URL('../../js/creation/project-workspace.mjs', import.meta.url), 'utf8');
   const pxdUi = readFileSync(new URL('../../js/creation/pxd-ui.mjs', import.meta.url), 'utf8');
   assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);

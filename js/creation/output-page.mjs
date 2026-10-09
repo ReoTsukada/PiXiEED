@@ -788,7 +788,7 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     } finally { if (videoSource) { videoSource.pause(); videoSource.removeAttribute('src'); videoSource.load(); } if (videoUrl) URL.revokeObjectURL(videoUrl); }
     const hasMusic = Boolean(audioSource || selectedMusic?.song);
     if (result.extension !== formatValue || result.blob.type.split(';', 1)[0] !== outputMime(formatValue) || (hasMusic && !result.hasAudio)) throw new Error('動画の形式または音声トラックを確認できません。元の素材はそのまま保存できます。');
-    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(hasMusic ? { description: `音声付き動画。音楽は${totalMusicPlays}回、元の速度と音程で再生し、終わりに動画を終了します。` } : { description: '画像または動画の映像を元の速度で記録しました。' }) } };
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(hasMusic ? { description: `元動画の音声は含めず、音楽を${totalMusicPlays}回、元の速度と音程で再生し、終わりに動画を終了します。` } : { description: '画像または動画の映像を元の速度で記録しました。元動画の音声は含みません。' }) } };
   }
   if (source?.kind === 'audio-video' && ['mp4', 'webm'].includes(formatValue)) {
     const frame = source.image;

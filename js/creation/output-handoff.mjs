@@ -12,7 +12,7 @@ const MIME_EXTENSIONS = Object.freeze({
   'audio/wav': 'wav',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
-  // Retain access to PXD records staged by earlier releases; current PXD tools save directly.
+  // PXD backups use the generic local file card, with direct-save fallback in the project tools.
   'application/octet-stream': 'pxd'
 });
 const RETURN_PATHS = new Set([

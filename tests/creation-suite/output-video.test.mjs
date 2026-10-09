@@ -137,6 +137,23 @@ test('selected video visuals keep native playback speed and are muted when music
     assert.equal(videoSource.muted, true); assert.equal(videoSource.defaultMuted, true);
     assert.equal(videoSource.playbackRate, 1); assert.equal(videoSource.played, true); assert.equal(videoSource.paused, true);
     assert.equal(harness.audioNodes[0].playbackRate.value, 1);
+    assert.equal(harness.recorders[0].stream.getAudioTracks().length, 1, 'the output contains only the selected music track, not the source video audio');
+  } finally { harness.restore(); }
+});
+
+test('selected video source audio is omitted when no replacement music is selected', async () => {
+  const harness = createMediaHarness();
+  const videoSource = { videoWidth: 320, videoHeight: 180, duration: 0.04, currentTime: 0, muted: false, defaultMuted: false, playbackRate: 0.5, loop: false, play() { this.played = true; return Promise.resolve(); }, pause() { this.paused = true; } };
+  try {
+    const result = await renderOutputVideo([], {
+      videoSource,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: (callback) => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    });
+    assert.equal(result.hasAudio, false);
+    assert.equal(harness.recorders[0].stream.getAudioTracks().length, 0);
+    assert.equal(videoSource.muted, true);
   } finally { harness.restore(); }
 });
 
