@@ -13,7 +13,8 @@ test('home: tool cards have working toys and creation links lead the page', () =
   assert.match(source, /createToolToys\(\{ note, animate, interactive: true \}\)/, 'home uses the shared interactive previews');
   assert.match(html, /class="hp-creation-links"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
   assert.doesNotMatch(html, /data-toy="game"/);
-  assert.doesNotMatch(html, /PiXiEEDraw|PiXiEELENS|PXDraw/);
+  assert.match(html, /data-toy="editor" href="\/draw\/"[\s\S]*?PiXiEEDraw/);
+  assert.doesNotMatch(html, /PiXiEELENS|PXDraw/);
   assert.match(source, /prefers-reduced-motion/);
 });
 

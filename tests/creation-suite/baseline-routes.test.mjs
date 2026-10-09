@@ -16,7 +16,7 @@ test('the old works route goes to the globe and the tools route remains reachabl
   assert.match(read('js/app.js'), new RegExp(`href="${fixture.routes.tools}"`));
   assert.match(oldWorks, /name="robots" content="noindex,follow"/);
   assert.match(oldWorks, /http-equiv="refresh" content="0;url=\/globe\/"/);
-  assert.match(read('js/site-header.mjs'), /href="\/globe\/" data-menu-link>地図で作品を見る/);
+  assert.match(read('js/site-header.mjs'), /href="\/globe\/" data-menu-link>世界地図で作品を見る/);
   assert.match(read('css/site.css'), /\.mobile-nav a\[href="\/works\/"\]/);
 });
 

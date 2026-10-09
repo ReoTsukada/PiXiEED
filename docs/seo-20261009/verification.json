@@ -1,0 +1,40 @@
+{
+  "baselineSha": "f02ae4418d80254bd59255380eb1a7f0ac728b0c",
+  "allNode": {
+    "files": 261,
+    "tests": 1806,
+    "pass": 1806,
+    "fail": 0,
+    "skip": 0,
+    "command": "node --test $(rg --files tests | rg '\\.test\\.mjs$' | sort)"
+  },
+  "creationSuite": {
+    "suites": 19,
+    "tests": 699,
+    "pass": 699,
+    "command": "node scripts/creation-suite-harness.mjs --all --json"
+  },
+  "relatedFinal": {
+    "tests": 56,
+    "pass": 56
+  },
+  "seoHttp": {
+    "checks": 155,
+    "pass": 155
+  },
+  "browser": {
+    "seoCases": 42,
+    "eventUiViewports": 4,
+    "adsAndOutputCases": 47,
+    "engine": "Chromium"
+  },
+  "build": {
+    "files": 631,
+    "puzzlePages": 6,
+    "eventPages": 86,
+    "output": "/tmp/pixieed-seo-review-audited-20261009"
+  },
+  "pxdHarness": "store CAS passed; draw import status timeout on current and baseline; later cases not run",
+  "libraryUpload": "prepared uploads unavailable; no library_file_id",
+  "published": false
+}

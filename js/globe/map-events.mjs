@@ -7,6 +7,7 @@ import { readEventCatalog, mergeEventCatalog } from './event-catalog.mjs?v=20261
 import { classifyEvent, DEFAULT_EVENT_PERIOD_FILTER, eventPeriodCounts, matchesEventPeriod, nextTokyoMidnightDelay, sortEventsByDisplayPriority, tokyoDate, uniqueEventEditions } from './event-density.mjs';
 import { presentMapEvent } from './map-event-presentation.mjs?v=20261007-event-discovery-1';
 import { trackGlobeEvent } from './analytics-bridge.mjs';
+import { appendEventPageLink } from './event-page-links.mjs';
 
 const CATALOG_URL = new URL('../../data/pixel-art-events.json', import.meta.url);
 const CATALOG_REFRESH_MS = 15 * 60 * 1000;
@@ -403,6 +404,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     const event = events.find(item => item.id === detailEventId);
     detail.replaceChildren();
     if (!event) { detail.hidden = true; return; }
+    detail.dataset.eventPageId = event.id;
     const presentation = presentMapEvent(event, today);
     const title = doc.createElement('h3'); title.className = 'map-events-panel__detail-title'; title.textContent = presentation.title;
     const summary = doc.createElement('p'); summary.className = 'map-events-panel__detail-summary'; summary.textContent = `${presentation.status}${presentation.dateLabel ? ` · ${presentation.dateLabel}` : presentation.date ? ` · ${presentation.date}` : ''}`;
@@ -427,6 +429,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     detail.append(title, summary, facts);
     if (presentation.description) { const description = doc.createElement('p'); description.className = 'map-events-panel__description'; description.textContent = presentation.description; detail.append(description); }
     detail.append(links); if (source.textContent) detail.append(source); detail.hidden = false;
+    void appendEventPageLink(detail, event.id, doc);
   }
 
   function renderEmpty(listNode, allItems) {

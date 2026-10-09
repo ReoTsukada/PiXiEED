@@ -1,4 +1,5 @@
 import { presentMapEvent } from './map-event-presentation.mjs';
+import { appendEventPageLink } from './event-page-links.mjs';
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
 
 const STRING_LIMITS = Object.freeze({
@@ -126,6 +127,7 @@ function renderEventDetail(doc, root, event, onClose) {
   appendLinks(doc, root, presentation.links);
   const source = [presentation.sourceLabel, presentation.checkedAt ? `確認日：${presentation.checkedAt}` : ''].filter(Boolean).join(' · ');
   if (source) root.append(element(doc, 'p', 'map-event-detail__source', source));
+  void appendEventPageLink(root, event.id, doc);
   return calendar;
 }
 

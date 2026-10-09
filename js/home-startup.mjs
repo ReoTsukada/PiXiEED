@@ -4,7 +4,7 @@ import './home-play.mjs?rev=20261009-home-playground-2';
 export function scheduleAppStartup({
   win = globalThis,
   doc = globalThis.document,
-  loadApp = () => import('./app.js?rev=20261006-header-controls-1'),
+  loadApp = () => import('./app.js?rev=20261009-seo-1'),
   onError = (error) => console.error('ホームの追加機能を読み込めませんでした', error),
   maxWait = 500,
 } = {}) {

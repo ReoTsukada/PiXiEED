@@ -4,6 +4,7 @@ import { copyFile, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/pr
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
+import { generateEventPages } from './generate-event-pages.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const excluded = new Set(['docs', 'tests', 'scripts', 'supabase', 'node_modules']);
@@ -21,6 +22,9 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
   const names = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
   const files = names.filter(name => {
     const parts = name.split('/');
+    // Event output is regenerated from the catalog below; stale tracked pages
+    // must not survive a removed/merged catalog record.
+    if (parts[0] === 'events') return false;
     if (parts.some(part => part === '..' || part.startsWith('.')) || excluded.has(parts[0])) return false;
     if (retiredPublicPages.has(name)) return false;
     // Keep the books prototype and its dedicated assets local until publication is requested.
@@ -29,6 +33,22 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     if (/^(?:package(?:-lock)?|deno(?:\.lock)?)\.(?:json|jsonc)$/.test(parts.at(-1))) return false;
     return parts[0] === 'assets' || publicExtension.test(name) || name === 'CNAME';
   });
+  let eventPages = 0;
+  if (await lstat(join(root, 'data/pixel-art-events.json')).catch(error => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  })) {
+    const generated = await generateEventPages({ root });
+    eventPages = generated.eventPages;
+    files.push(...generated.files);
+    // Explicit new public sources are also reviewable in a clean local build
+    // before they are committed. Arbitrary untracked work stays excluded.
+    for (const name of ['css/event-pages.css', 'js/canonical-entry.js', 'js/event-page-analytics.mjs',
+      'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
+      'PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html']) {
+      if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
+    }
+  }
   let puzzlePages = 0;
   for (const game of ['spot-difference', 'hidden-object']) {
     const relative = `play/${game}/puzzles`;
@@ -58,7 +78,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     await copyFile(join(root, name), join(destination, name));
   }
   await writeFile(join(destination, '.nojekyll'), '');
-  return { files: unique.length + 1, puzzlePages, output: destination };
+  return { files: unique.length + 1, puzzlePages, eventPages, output: destination };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

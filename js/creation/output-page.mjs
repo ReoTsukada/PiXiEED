@@ -7,6 +7,7 @@ import { renderOutputVideo } from './output-video.mjs?rev=20261009-output-video-
 import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261009-preview-only-2';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
+import { createOutputPreviewFit } from './output-preview-fit.mjs?rev=20261009-display-fit-5';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -131,6 +132,7 @@ let lastImportedMedia = null;
 let mediaWritePending = false;
 let itemWritePending = false;
 let previewZoom = 1;
+const previewFit = createOutputPreviewFit(preview, [image, timelineCanvas, video], { getZoom: () => previewZoom });
 let rasterSettingsEpoch = 0;
 let rasterSettingsController = null;
 let rasterProfile = null;
@@ -182,11 +184,12 @@ function currentFilename() {
 }
 
 function setPreviewZoom(value) {
-  previewZoom = Math.max(0.5, Math.min(4, Math.round(value * 100) / 100));
-  preview.style.setProperty('--output-preview-zoom', String(previewZoom));
+  // Zoom stays relative to the fit size, so it can never crop the source.
+  previewZoom = Math.max(0.5, Math.min(1, Math.round(value * 100) / 100));
   viewZoomValue.textContent = previewZoom === 1 ? '全体' : `${Math.round(previewZoom * 100)}%`;
   viewZoomOut.disabled = previewZoom <= 0.5;
-  viewZoomIn.disabled = previewZoom >= 4;
+  viewZoomIn.disabled = previewZoom >= 1;
+  previewFit.refresh();
 }
 
 function updatePreviewControls() {
@@ -264,14 +267,30 @@ function hasPixelArtEvidence() {
   return rasterProfile?.sourceId === activeSource?.id && ['detected', 'verified'].includes(rasterProfile.status);
 }
 
+function setPreviewSourceDimensions(element, width, height) {
+  const valid = Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0;
+  delete element.dataset.previewCorrectRatio;
+  if (!valid) {
+    delete element.dataset.previewSourceWidth;
+    delete element.dataset.previewSourceHeight;
+    delete element.dataset.previewCorrectRatio;
+    return;
+  }
+  element.dataset.previewSourceWidth = String(width);
+  element.dataset.previewSourceHeight = String(height);
+}
+
 async function showRasterPreview(blob, { width, height, animated = false, pixelArt = false } = {}) {
   releaseRasterPreview();
   const epoch = previewEpoch;
   image.hidden = true;
   fileCard.hidden = true;
+  image.style.width = 'auto';
+  image.style.height = 'auto';
   image.dataset.pixelArt = String(pixelArt);
   const target = width && height ? boundedPreviewDimensions(width, height) : null;
   const needsDownsample = target && (target.width !== width || target.height !== height);
+  setPreviewSourceDimensions(image, width, height);
   if (!target) {
     fileExtension.textContent = (activeItem?.extension || record?.extension || 'file').toUpperCase();
     fileTitle.textContent = 'プレビューを準備できませんでした';
@@ -498,6 +517,7 @@ function paintTimelineFrame(index) {
   const dimensions = boundedPreviewDimensions(frame.width, frame.height);
   const previewFrame = dimensions.width === frame.width && dimensions.height === frame.height
     ? frame : resizeRgbaNearest(frame, dimensions.width, dimensions.height, { maxEdge: 1536, maxPixels: 2_000_000 });
+  setPreviewSourceDimensions(timelineCanvas, frame.width, frame.height);
   timelineCanvas.width = previewFrame.width; timelineCanvas.height = previewFrame.height;
   const context = timelineCanvas.getContext('2d');
   context?.putImageData(new ImageData(new Uint8ClampedArray(previewFrame.data), previewFrame.width, previewFrame.height), 0, 0);
@@ -567,7 +587,10 @@ function updateSequenceControls() {
   animationDetails.textContent = `${frames.length}コマ · 1巡 ${onePassSeconds.toFixed(2)}秒 · 画面操作でプレビューできます。`;
   timelinePlay.hidden = !(activeSource?.id.startsWith('local-images') && isSequence && ['png', 'jpeg', 'svg'].includes(activeItem?.extension));
   timelineCanvas.hidden = timelinePlay.hidden;
-  if (!timelineCanvas.hidden) paintTimelineFrame(timelineFrameIndex);
+  if (!timelineCanvas.hidden) {
+    image.hidden = true;
+    paintTimelineFrame(timelineFrameIndex);
+  }
   updateSettingsSummaries();
 }
 
@@ -1253,7 +1276,7 @@ async function prepareRasterSettings(entry, frames, { autoResize = true } = {}) 
   for (const node of [image, timelineCanvas]) node.dataset.pixelArt = String(pixelEvidence);
   const animatedPreview = frames.length > 1 && ['image/gif', 'image/apng'].includes(activeItem?.mime);
   if (animatedPreview) void prepareGifPoster(entry.blob);
-  else if (pixelEvidence && activeItem?.mime?.startsWith('image/') && activeItem.mime !== 'image/svg+xml') {
+  else if (timelineCanvas.hidden && pixelEvidence && activeItem?.mime?.startsWith('image/') && activeItem.mime !== 'image/svg+xml') {
     const dimensions = rasterOutputDimensions(entry);
     void showRasterPreview(entry.blob, { ...dimensions, pixelArt: true });
   }
@@ -1339,6 +1362,9 @@ function setMedia(entry) {
     const useTimeline = activeSource?.id.startsWith('local-images') && frames.length > 1 && !['image/gif', 'image/apng'].includes(type);
     const dimensions = rasterOutputDimensions(entry);
     const animated = frames.length > 1 && ['image/gif', 'image/apng'].includes(type);
+    setPreviewSourceDimensions(image, dimensions.width, dimensions.height);
+    image.style.width = 'auto';
+    image.style.height = 'auto';
     image.onload = () => { displayMetadata(record, currentBlob, dimensions.width || image.naturalWidth, dimensions.height || image.naturalHeight); updatePreviewControls(); };
     image.dataset.pixelArt = String(hasPixelArtEvidence());
     image.hidden = true;
@@ -1604,10 +1630,15 @@ animationToggle.addEventListener('click', () => {
   animationToggle.setAttribute('aria-pressed', String(animationStopped));
 });
 window.addEventListener('pagehide', (event) => {
+  previewFit.suspend();
   if (event.persisted) return;
   pageDisposed = true;
+  previewFit.disconnect();
   generationController?.abort();
   for (const url of [sourceUrl, fileUrl, previewUrl, posterUrl, ...generatedDownloadUrls.values()]) if (url) URL.revokeObjectURL(url);
+});
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) previewFit.reconnect();
 });
 
 void mount();

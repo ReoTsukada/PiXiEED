@@ -99,8 +99,8 @@ function updateActions() {
   playLocalButton.disabled = playLocalButton.hidden || !store || !adapter;
   publishButton.hidden = !canPlayLocal;
   publishButton.disabled = !canPlayLocal || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
-  publishButton.setAttribute('aria-label', supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中');
-  publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
+  publishButton.setAttribute('aria-label', supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿機能は準備中');
+  publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
 }
 function showEditor() {
   inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open');

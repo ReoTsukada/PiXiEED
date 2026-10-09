@@ -1,5 +1,5 @@
 /**
- * Each tool keeps its own picture. かんたんドット, 間違い探し, もの探し and ジグソー each hold a
+ * Each tool keeps its own picture. PiXiEEDraw, 間違い探し, もの探し and ジグソー each hold a
  * separate local draft (their own history of saved versions); editing one never changes another.
  * Any tool can bring in another tool's picture with one tap: the newest version is copied into
  * the receiving tool's own draft as a new version, and the original stays where it was.
@@ -9,7 +9,7 @@ import { createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba, validateDrawDocument } from './draw-core.mjs';
 
 export const PICTURE_TOOLS = Object.freeze({
-  draw: Object.freeze({ label: 'かんたんドット', key: 'pixieed.simple-draw.last-draft.v1' }),
+  draw: Object.freeze({ label: 'PiXiEEDraw', key: 'pixieed.simple-draw.last-draft.v1' }),
   'spot-difference': Object.freeze({ label: '間違い探し', key: 'pixieed:picture:spot-difference:v1' }),
   'hidden-object': Object.freeze({ label: 'もの探し', key: 'pixieed:picture:hidden-object:v1' }),
   jigsaw: Object.freeze({ label: 'ジグソー', key: 'pixieed:picture:jigsaw:v1' })

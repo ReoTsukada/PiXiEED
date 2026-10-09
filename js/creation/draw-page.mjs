@@ -1494,7 +1494,7 @@ globeButton.addEventListener('click', async () => {
     if (scope.disposed) return;
     if (!revision) return;
     if (!revision.revisionId) {
-      status.textContent = 'プロジェクトは保存しました。地球儀へ送るコピーを作成できませんでした。';
+      status.textContent = 'プロジェクトは保存しました。世界地図へ送るコピーを作成できませんでした。';
       return;
     }
     globeButton.disabled = true;
@@ -1504,7 +1504,7 @@ globeButton.addEventListener('click', async () => {
     if (scope.disposed) return;
     sessionStorage.setItem(DRAW_HANDOFF_KEY, serialized);
     location.assign('/globe/?from=draw');
-  } catch (error) { if (!scope.disposed) status.textContent = `地球儀へ送れませんでした：${error.message}`; }
+  } catch (error) { if (!scope.disposed) status.textContent = `世界地図へ送れませんでした：${error.message}`; }
   finally { if (!scope.disposed) globeButton.disabled = false; }
 });
 async function loadLastDraft({ copy = false } = {}) {
@@ -1603,7 +1603,7 @@ $('#draw-export').addEventListener('click', async () => {
         mediaSources.push({ id: 'drawing-process', label: '描いた過程（3秒）', kind: 'rgba-frames', frames: timelapseFrames, loopCount: 0 });
       }
     }
-    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`, returnUrl: currentToolReturnUrl, title: '作品の出力を確認', source: 'かんたんドット', metadata: { width: image.width, height: image.height, defaultScale: scale }, mediaSources }, bridge, unchangedSource);
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`, returnUrl: currentToolReturnUrl, title: '作品の出力を確認', source: 'PiXiEEDraw', metadata: { width: image.width, height: image.height, defaultScale: scale }, mediaSources }, bridge, unchangedSource);
     if (staged.ok) return;
     if (staged.reason === 'source_changed') return;
     const result = await saveFile(blob, `pixieed-drawing-${image.width}x${image.height}@${width}x${height}.png`);
@@ -1687,7 +1687,7 @@ async function exportTimelapse(detail) {
     if (!timelapseJobIsCurrent(job)) return;
     const blob = new Blob([bytes], { type: 'image/gif' });
     const durationSeconds = frames.reduce((total, frame) => total + (frame.delayMs || 1000 / TIMELAPSE_FPS), 0) / 1000;
-    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-timelapse-${width}x${height}.gif`, returnUrl: currentToolReturnUrl, title: '描いた過程を確認', source: 'かんたんドット', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, delayMs: 1000 / TIMELAPSE_FPS, loopCount: 0 } }, job.bridge, () => timelapseJobIsCurrent(job));
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-drawing-timelapse-${width}x${height}.gif`, returnUrl: currentToolReturnUrl, title: '描いた過程を確認', source: 'PiXiEEDraw', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, delayMs: 1000 / TIMELAPSE_FPS, loopCount: 0 } }, job.bridge, () => timelapseJobIsCurrent(job));
     if (staged.ok) return;
     if (staged.reason === 'source_changed') return;
     const result = await saveFile(blob, `pixieed-drawing-timelapse-${width}x${height}.gif`);
@@ -1729,7 +1729,7 @@ async function exportAnimation() {
     const blob = new Blob([result.bytes], { type: 'image/gif' });
     const durationSeconds = frames.reduce((total, frame) => total + frame.delayMs, 0) / 1000;
     if (scope.disposed || documentData !== exportDocument || source !== exportSource || pxdBridge !== exportBridge || animationSession.animation !== timeline) return;
-    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-animation-${result.width}x${result.height}.gif`, returnUrl: currentToolReturnUrl, title: 'アニメーションを確認', source: 'かんたんドット', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: result.scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, loopCount: 0 } }, exportBridge, () => !scope.disposed && documentData === exportDocument && source === exportSource && pxdBridge === exportBridge && animationSession.animation === timeline);
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-animation-${result.width}x${result.height}.gif`, returnUrl: currentToolReturnUrl, title: 'アニメーションを確認', source: 'PiXiEEDraw', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: result.scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, loopCount: 0 } }, exportBridge, () => !scope.disposed && documentData === exportDocument && source === exportSource && pxdBridge === exportBridge && animationSession.animation === timeline);
     if (staged.ok) return;
     if (staged.reason === 'source_changed') return;
     const saved = await saveFile(blob, `pixieed-animation-${result.width}x${result.height}.gif`);

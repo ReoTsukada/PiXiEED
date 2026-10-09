@@ -59,7 +59,7 @@ function updateLocalPlayButton() {
   const ready = Boolean(draft?.confirmed && draftId && savedConfirmedDraftId === draftId);
   playLocalButton.hidden = !ready; playLocalButton.disabled = !ready;
   publishButton.hidden = !ready; publishButton.disabled = !ready || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
-  const publishLabel = supabaseConfig.puzzlePublicationEnabled === true ? '地球儀へ投稿' : '投稿は準備中';
+  const publishLabel = supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿は準備中';
   publishButton.setAttribute('aria-label', publishLabel); publishButton.title = publishLabel;
 }
 

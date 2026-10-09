@@ -30,7 +30,7 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
   };
 
   function renderLogin() {
-    root.innerHTML = `<header><h2>以前の公開作品を管理</h2><p>以前のPiXiEEDアカウントに保存した公開作品を確認し、地球儀に表示する場所を設定できます。投稿した新しい絵は、上の一覧で確認できます。</p></header>
+    root.innerHTML = `<header><h2>以前の公開作品を管理</h2><p>以前のPiXiEEDアカウントに保存した公開作品を確認し、世界地図に表示する場所を設定できます。投稿した新しい絵は、上の一覧で確認できます。</p></header>
       <div class="legacy-placement__signin"><button type="button" data-google>Googleでログイン</button>
       <form data-email-form><label>以前使ったメールアドレス<input type="email" name="email" required autocomplete="email" inputmode="email"></label><button type="submit">ログイン用リンクを送る</button></form></div>
       <p class="legacy-placement__message" data-placement-message role="status" aria-live="polite"></p>`;
@@ -60,14 +60,14 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
     }
     article.append(heading);
     const placed = element('p', 'legacy-placement__current');
-    const globeLink = element('a', 'legacy-placement__globe-link', '地球儀でこの作品を見る');
+    const globeLink = element('a', 'legacy-placement__globe-link', '世界地図でこの作品を見る');
     globeLink.href = `/globe/?art=${encodeURIComponent(`showcase:${work.id}`)}`;
     globeLink.hidden = true;
     try {
       const center = getCellById(placedCellId).center;
-      placed.textContent = `地球儀に表示中：${center.latitude.toFixed(2)}°, ${center.longitude.toFixed(2)}°`;
+      placed.textContent = `世界地図に表示中：${center.latitude.toFixed(2)}°, ${center.longitude.toFixed(2)}°`;
       globeLink.hidden = false;
-    } catch { placed.textContent = '地球儀の場所は未設定です。'; }
+    } catch { placed.textContent = '世界地図の場所は未設定です。'; }
     article.append(placed, globeLink);
     const form = element('form', 'legacy-placement__form');
     const label = element('label', '', '表示する場所（Googleマップのリンクか「緯度, 経度」）');
@@ -75,8 +75,8 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
     input.type = 'text'; input.required = true; input.autocomplete = 'off';
     input.placeholder = '35.6895, 139.6917'; input.setAttribute('aria-label', `${heading.textContent}の表示場所`);
     label.append(input);
-    const preview = element('p', 'legacy-placement__preview', '正確な座標は保存せず、選んだ地球儀セルだけを公開します。');
-    const save = element('button', '', placedCellId ? '場所を変更' : '地球儀へ置く');
+    const preview = element('p', 'legacy-placement__preview', '正確な座標は保存せず、選んだ世界地図セルだけを公開します。');
+    const save = element('button', '', placedCellId ? '場所を変更' : '世界地図へ置く');
     save.type = 'submit'; save.disabled = true;
     input.addEventListener('input', () => {
       try {
@@ -92,10 +92,10 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
       showMessage('場所を保存しています…');
       try {
         const cell = await api.place(work.id, input.value);
-        placed.textContent = `地球儀に表示中：${cell.center.latitude.toFixed(2)}°, ${cell.center.longitude.toFixed(2)}°`;
+        placed.textContent = `世界地図に表示中：${cell.center.latitude.toFixed(2)}°, ${cell.center.longitude.toFixed(2)}°`;
         globeLink.hidden = false;
         save.textContent = '場所を変更';
-        showMessage('地球儀の場所を保存しました。');
+        showMessage('世界地図の場所を保存しました。');
       } catch (error) { showMessage(error.message || '保存できませんでした。', true); }
       finally { input.dispatchEvent(new Event('input')); }
     });
@@ -106,7 +106,7 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
   async function renderWorks() {
     root.innerHTML = `<header><h2>以前の公開作品</h2><p>過去のアカウントに保存された公開作品の表示場所を設定できます。</p></header>
       <div class="legacy-placement__toolbar"><button type="button" data-signout>ログアウト</button></div>
-      <section class="legacy-placement__section" aria-labelledby="legacy-old-posts-title"><h3 id="legacy-old-posts-title">以前の公開作品</h3><p class="legacy-placement__section-intro">場所を決めると、地球儀に表示できます。</p><div class="legacy-placement__works" data-works></div><p class="legacy-placement__message" data-placement-message role="status" aria-live="polite"></p></section>`;
+      <section class="legacy-placement__section" aria-labelledby="legacy-old-posts-title"><h3 id="legacy-old-posts-title">以前の公開作品</h3><p class="legacy-placement__section-intro">場所を決めると、世界地図に表示できます。</p><div class="legacy-placement__works" data-works></div><p class="legacy-placement__message" data-placement-message role="status" aria-live="polite"></p></section>`;
     root.querySelector('[data-signout]').addEventListener('click', () => {
       api.signOut();
       document.dispatchEvent(new Event('pixieed:legacy-owner-signed-out'));

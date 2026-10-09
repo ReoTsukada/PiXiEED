@@ -9,7 +9,7 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
     const imageLink = document.createElement('a');
     imageLink.className = 'art-card__image';
     imageLink.href = `/globe/?art=${encodeURIComponent(post.id)}`;
-    imageLink.setAttribute('aria-label', `地球儀で「${post.title}」を見る`);
+    imageLink.setAttribute('aria-label', `世界地図で「${post.title}」を見る`);
     const image = document.createElement('img');
     image.src = post.image.dataUrl;
     image.alt = '';

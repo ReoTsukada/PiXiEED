@@ -1,0 +1,71 @@
+:root {
+  color-scheme: light;
+  --event-ink: #172333;
+  --event-muted: #5f6972;
+  --event-line: #dde3e4;
+  --event-surface: #fff;
+  --event-accent: #185d78;
+  --event-soft: #eef3f3;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--event-ink);
+  background: #f7f8f6;
+  line-height: 1.7;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+a { color: var(--event-accent); text-underline-offset: .16em; }
+a:hover { text-decoration-thickness: 2px; }
+.event-site-header, footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: .9rem max(1.25rem, calc((100% - 72rem) / 2));
+  background: var(--event-surface);
+}
+.event-site-header { border-bottom: 1px solid var(--event-line); font-weight: 700; }
+.event-site-header > a { color: var(--event-ink); text-decoration: none; font-size: 1.2rem; }
+.event-site-header nav { display: flex; gap: 1.1rem; font-size: .92rem; }
+.event-page { width: min(100% - 2rem, 52rem); margin: 0 auto; padding: 1.2rem 0 4rem; }
+.event-index { width: min(100% - 2rem, 72rem); }
+.breadcrumbs { display: flex; flex-wrap: wrap; gap: .5rem; color: var(--event-muted); font-size: .9rem; margin: 0 0 1.4rem; }
+.breadcrumbs a { color: inherit; }
+h1 { margin: 0 0 .8rem; line-height: 1.25; font-size: clamp(1.75rem, 4vw, 2.65rem); letter-spacing: -.025em; }
+h2 { margin: 2rem 0 .7rem; font-size: 1.2rem; }
+.event-status, .event-card-status {
+  display: inline-flex;
+  width: fit-content;
+  color: #a43f2c;
+  background: #fae8df;
+  border-radius: 999px;
+  padding: .16rem .65rem;
+  font-size: .8rem;
+  font-weight: 700;
+}
+.event-status { margin: 0 0 .65rem; }
+.event-summary { margin: 0 0 1.5rem; color: #394551; }
+.event-facts { margin: 1.5rem 0; border-top: 1px solid var(--event-line); }
+.event-fact { display: grid; grid-template-columns: minmax(8rem, 1fr) 2.4fr; gap: 1rem; padding: .75rem .25rem; border-bottom: 1px solid var(--event-line); }
+.event-fact dt { color: var(--event-muted); font-weight: 650; }
+.event-fact dd { margin: 0; overflow-wrap: anywhere; }
+.event-disclosure { padding: .8rem 1rem; background: var(--event-soft); border-left: 3px solid #dd6a4d; color: #5f6972; font-size: .9rem; }
+.event-source { display: inline-flex; padding: .65rem 1rem; border-radius: .6rem; background: var(--event-accent); color: white; font-weight: 700; text-decoration: none; }
+.event-related { margin-top: 2rem; padding: 1rem 1.2rem; border: 1px solid var(--event-line); border-radius: .8rem; background: var(--event-surface); }
+.event-related h2 { margin: 0 0 .4rem; }
+.event-related ul { margin: 0; padding-left: 1.2rem; }
+.event-globe-link { margin-top: 2rem; padding: 1rem 1.2rem; background: var(--event-surface); border: 1px solid var(--event-line); border-radius: .8rem; }
+.event-index-count { color: var(--event-muted); font-size: .9rem; }
+.event-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: .85rem; }
+.event-card { min-width: 0; }
+.event-card a, .event-card--hub-only { height: 100%; display: grid; align-content: start; gap: .45rem; padding: 1rem; color: var(--event-ink); text-decoration: none; background: var(--event-surface); border: 1px solid var(--event-line); border-radius: .8rem; box-shadow: 0 2px 8px #2113460b; }
+.event-card a:hover, .event-card a:focus-visible { border-color: #185d78; outline: 2px solid #185d78; outline-offset: 2px; }
+.event-card strong { line-height: 1.35; }
+.event-card span:not(.event-card-status) { color: var(--event-muted); font-size: .88rem; }
+.event-card-source a { display: inline; padding: 0; color: var(--event-accent); background: none; border: 0; border-radius: 0; box-shadow: none; text-decoration: underline; }
+footer { justify-content: center; border-top: 1px solid var(--event-line); color: var(--event-muted); font-size: .9rem; }
+@media (max-width: 36rem) {
+  .event-site-header { align-items: flex-start; flex-direction: column; }
+  .event-site-header nav { flex-wrap: wrap; }
+  .event-fact { grid-template-columns: 1fr; gap: .15rem; }
+}

@@ -2371,7 +2371,7 @@ $('#postCamera').addEventListener('click', async () => {
   button.disabled = true;
   try {
     await cameraPxd.assertCanSave();
-    if (snapshot.generation !== downloadGeneration || state.mode !== 'captured' || state.result !== snapshot.frame || gif.pending !== snapshot.gif) throw new Error('画像が切り替わったため、地球儀へ送れません。もう一度お試しください。');
+    if (snapshot.generation !== downloadGeneration || state.mode !== 'captured' || state.result !== snapshot.frame || gif.pending !== snapshot.gif) throw new Error('画像が切り替わったため、世界地図へ送れません。もう一度お試しください。');
     const dataUrl = cameraPostDataUrl(snapshot.frame);
     localStorage.setItem('PiXiEED:camera-handoff:v1', JSON.stringify({ dataUrl, createdAt: Date.now() }));
     location.assign(returnToAudio ? '/audio/' : '/globe/?from=pixel-camera');
@@ -2387,7 +2387,7 @@ if (audioCameraRequest) backLink.href = audioCameraCancelUrl({ search: location.
 else if (returnToAudio || audioCameraInvalid) backLink.href = audioCameraCancelUrl({ search: location.search });
 else if (new URLSearchParams(location.search).get('from') === 'globe') {
   backLink.href = '/globe/';
-  backLink.setAttribute('aria-label', '地球儀へ戻る');
+  backLink.setAttribute('aria-label', '世界地図へ戻る');
 }
 
 function suspendCamera() {

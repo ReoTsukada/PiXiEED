@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-08T23:58:48+00:00",
+  "updatedAt": "2026-10-09T17:36:31+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -13,12 +13,19 @@
       "dateLabel": "2026年10月11日（日）11:00–18:00",
       "status": "upcoming",
       "sourceUrl": "https://pixelartpark.com/en/events/pap9/",
+      "additionalUrls": [
+        "https://pixelartpark9.peatix.com/"
+      ],
+      "description": "135組がゲーム、イラスト、アプリ、ツール、ハンドクラフト、ガジェットなどを出展するピクセルアートフェスティバル。チップチューンの演奏も予定。",
+      "edition": "第9回",
+      "participation": "Peatixの公式チケット販売ページからチケットを購入。",
       "socialUrls": [
         "https://x.com/pixelartpark"
       ],
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-09T17:36:31+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "主催者の公式情報"
+      "sourceLabel": "主催者の公式情報",
+      "officialName": "Pixel Art Park 9"
     },
     {
       "id": "shibuya-pixel-art-watch",

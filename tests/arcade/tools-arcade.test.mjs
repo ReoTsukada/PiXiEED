@@ -22,7 +22,7 @@ test('every tool page shares the bottom bar and the logo home', () => {
     const html = read(`${dir}/index.html`);
     const nav = html.match(/<nav class="app-tabs"[^>]*>([\s\S]*?)<\/nav>/)[1];
     const labels = [...nav.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
-    assert.equal(labels[0], '地球儀', dir); assert.equal(labels[1], '撮影', dir); assert.deepEqual(labels.slice(-2), ['ツール', 'マイページ'], dir);
+    assert.equal(labels[0], '世界地図', dir); assert.equal(labels[1], '撮影', dir); assert.deepEqual(labels.slice(-2), ['ツール', 'マイページ'], dir);
     assert.doesNotMatch(nav, /aria-label="ホーム"/, dir);
     if (html.includes('class="brand"')) assert.match(html, /<a class="brand" href="\/"/, dir);
   }

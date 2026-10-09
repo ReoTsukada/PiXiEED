@@ -8,11 +8,15 @@ import { fileURLToPath } from 'node:url';
 import { stores as storeData } from '../data/site-data.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const pages = ['/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/'];
-const indexableRoutes = ['/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/pixiee-lens/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+const eventCatalog = JSON.parse(await readFile(resolve(root, 'events/catalog.json'), 'utf8'));
+const eventRoutes = ['/events/', ...eventCatalog.ids.map(id => `/events/${id}/`)];
+const pages = ['/', '/output/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/'];
+const indexableRoutes = ['/', '/globe/', '/tools/', '/output/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/pixiee-lens/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+indexableRoutes.push(...eventRoutes);
 const images = ['site', 'tools', 'draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object', 'spot-game', 'find-game', 'game', 'camera', 'telescope'];
 const icons = new Map([['/favicon-96.png', 96], ['/apple-touch-icon.png', 180], ['/assets/brand/app-icon-192.png', 192], ['/assets/brand/app-icon-512.png', 512]]);
 const paths = new Map(pages.map((url) => [url, url.endsWith('/') ? `${url}index.html` : url]));
+for (const path of eventRoutes) paths.set(path, `${path}index.html`);
 for (const name of images) paths.set(`/assets/og/${name}.png`, `/assets/og/${name}.png`);
 paths.set('/pixiee-lens/ogp.png', '/pixiee-lens/ogp.png');
 for (const name of [...icons.keys(), '/favicon.ico', '/manifest.webmanifest', '/sitemap.xml', '/robots.txt']) paths.set(name, name);
@@ -91,6 +95,14 @@ try {
       assert.ok(tags.some((tag) => tag.rel === 'manifest' && tag.href === '/manifest.webmanifest'));
       checks++;
     }
+  }
+  for (const path of eventRoutes) {
+    const html = await (await get(path)).text();
+    assert.ok(html.includes(`href="https://pixieed.jp${path}"`));
+    assert.match(html, /<h1[ >]/);
+    assert.doesNotMatch(html, /name="robots"[^>]*noindex/);
+    assert.match(html, /href="\/globe\/"/);
+    checks++;
   }
   for (const [path, width, height] of [...images.map((name) => [`/assets/og/${name}.png`, 1200, 630]), ...[...icons].map(([path, size]) => [path, size, size])]) {
     const response = await get(path); assert.equal(response.headers.get('content-type'), 'image/png');

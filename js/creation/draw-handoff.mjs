@@ -14,8 +14,8 @@ export function validateDrawPixels(document) {
     rgba.push(hex.length === 9 ? Number.parseInt(hex.slice(7, 9), 16) : 255);
     if (rgba[3]) { painted = true; colors.add(rgba.join(',')); } else colors.add('transparent');
   }
-  if (!painted) throw new Error('何か描いてから地球儀へ送ってください。');
-  if (colors.size > 128) throw new Error('地球儀へ送れる色数は透明色を含めて128色までです。');
+  if (!painted) throw new Error('何か描いてから世界地図へ送ってください。');
+  if (colors.size > 128) throw new Error('世界地図へ送れる色数は透明色を含めて128色までです。');
   return colors.size;
 }
 
@@ -42,7 +42,7 @@ function documentRef() { return globalThis.document; }
 export function hasPngSignature(bytes) { return bytes?.length >= 8 && PNG_SIGNATURE.every((value, index) => bytes[index] === value); }
 
 export function serializeDrawHandoff(blob, revisionId, createdAt = Date.now()) {
-  if (!(blob instanceof Blob) || blob.type !== 'image/png' || !blob.size || blob.size > HANDOFF_MAX_BYTES || !revisionId) throw new TypeError('地球儀へ送るPNGを確認できません。');
+  if (!(blob instanceof Blob) || blob.type !== 'image/png' || !blob.size || blob.size > HANDOFF_MAX_BYTES || !revisionId) throw new TypeError('世界地図へ送るPNGを確認できません。');
   return blob.arrayBuffer().then((buffer) => JSON.stringify({ source: 'draw', revisionId, createdAt, dataUrl: `data:image/png;base64,${bytesToBase64(new Uint8Array(buffer))}` }));
 }
 

@@ -58,7 +58,7 @@ const MENU_MARKUP = `
     <a class="site-menu__profile" href="/profile/" data-menu-link><span class="site-menu__avatar" aria-hidden="true">P</span><span><strong>自分のページ</strong><small>投稿・いいね・記録</small></span><span aria-hidden="true">›</span></a>
     <nav class="site-menu__nav" aria-label="補助メニュー">
       <div class="site-menu__group"><span class="site-menu__label">自分の記録</span><a href="/profile/?view=posts" data-menu-link>投稿した絵</a><a href="/profile/?view=likes" data-menu-link>いいねした作品</a><a href="/profile/?view=history" data-menu-link>読み取ったQR</a></div>
-      <div class="site-menu__group"><span class="site-menu__label">探す</span><a href="/globe/" data-menu-link>地図で作品を見る</a><a href="/stores/" data-menu-link>絵に会えるお店</a></div>
+      <div class="site-menu__group"><span class="site-menu__label">探す</span><a href="/globe/" data-menu-link>世界地図で作品を見る</a><a href="/events/" data-menu-link>ドット絵イベントを探す</a><a href="/stores/" data-menu-link>絵に会えるお店</a></div>
       <div class="site-menu__group"><span class="site-menu__label">参加する</span><a href="/globe/?post=1" data-menu-link>ドット絵を投稿する</a></div>
       <div class="site-menu__group"><span class="site-menu__label">案内</span><a href="/about/" data-menu-link>PiXiEEDについて</a><a href="/guide/" data-menu-link>利用ガイド</a><a href="/privacy/" data-menu-link>プライバシー</a></div>
       <div class="site-menu__group"><span class="site-menu__label">設定</span><button type="button" data-menu-setting="display">表示設定</button><button type="button" data-menu-setting="privacy">プライバシー設定</button></div>
@@ -241,7 +241,7 @@ export function mountSiteHeader() {
         : document.body.dataset.page === 'jigsaw' ? ['#jigsaw-preview-toggle', '#jigsaw-hint', '#jigsaw-rotate', '#jigsaw-return', '.jigsaw-more']
           : document.body.dataset.page === 'hidden-object' ? ['[data-hidden-mode="paint"]', '[data-hidden-mode="erase"]']
         : document.body.dataset.page === 'creation-game' ? ['#game-new']
-          : document.body.dataset.toolName === 'ドット絵カメラ' ? ['#cameraChooseImage'] : [] });
+          : document.body.dataset.toolShort === 'カメラ' ? ['#cameraChooseImage'] : [] });
   }
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   inner.querySelectorAll('[data-header-pass]').forEach((button) => button.remove());

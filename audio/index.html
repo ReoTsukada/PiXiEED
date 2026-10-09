@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-<title>ドットで音楽｜絵を描いて作曲｜PiXiEED</title>
-<meta name="description" content="色が音色、ドットが音符。絵を描くように作曲し、写真から音楽を作ったり、描いた絵を保存したりできます。">
+<title>絵を描いて音楽を作る｜ブラウザ作曲ツール｜PiXiEED</title>
+<meta name="description" content="色を音色に割り当て、マス目に音を描いてループ曲を作るブラウザー作曲ツール。テンポやフレームを編集し、音声WAVや画像を書き出せます。">
 <link rel="canonical" href="https://pixieed.jp/audio/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ドットで音楽｜絵を描いて作曲｜PiXiEED"><meta property="og:description" content="色が音色、ドットが音符。絵を描くように作曲し、写真から音楽を作ったり、描いた絵を保存したりできます。"><meta property="og:url" content="https://pixieed.jp/audio/"><meta property="og:image" content="https://pixieed.jp/assets/og/audio.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「音をつくる」のアイコン">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドットで音楽｜絵を描いて作曲｜PiXiEED"><meta name="twitter:description" content="色が音色、ドットが音符。絵を描くように作曲し、写真から音楽を作ったり、描いた絵を保存したりできます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/audio.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「音をつくる」のアイコン">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="絵を描いて音楽を作る｜ブラウザ作曲ツール｜PiXiEED"><meta property="og:description" content="色を音色に割り当て、マス目に音を描いてループ曲を作るブラウザー作曲ツール。テンポやフレームを編集し、音声WAVや画像を書き出せます。"><meta property="og:url" content="https://pixieed.jp/audio/"><meta property="og:image" content="https://pixieed.jp/assets/og/audio.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「音をつくる」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="絵を描いて音楽を作る｜ブラウザ作曲ツール｜PiXiEED"><meta name="twitter:description" content="色を音色に割り当て、マス目に音を描いてループ曲を作るブラウザー作曲ツール。テンポやフレームを編集し、音声WAVや画像を書き出せます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/audio.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「音をつくる」のアイコン">
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
@@ -25,11 +25,11 @@
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
 </head>
-<body data-tool-name="ドットで音楽" data-tool-short="音楽" data-page="audio" class="app-page app-page--tool-audio audio-tool-body creation-editor">
+<body data-tool-name="絵を描いて音楽を作る" data-tool-short="音楽" data-page="audio" class="app-page app-page--tool-audio audio-tool-body creation-editor">
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
   <main id="main" class="audio-page">
-    <h1 class="creation-editor__title">ドットで音楽</h1>
+    <h1 class="creation-editor__title">絵を描いて音楽を作る</h1>
     <p id="audio-status" class="audio-status" role="status" aria-live="polite">1マスに1音。色を選んで描けます。</p>
     <section class="audio-workspace" aria-label="曲の編集">
       <div id="audio-grid-wrap" class="audio-grid-wrap creation-editor__stage" aria-label="音楽ピクセルキャンバス">
@@ -62,13 +62,13 @@
     </section>
   </main>
   <nav class="app-tabs" aria-label="アプリナビゲーション">
-    <a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
+    <a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
     <button id="audio-play-toggle" type="button" aria-label="曲を再生" aria-pressed="false" data-state="idle"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="audio-play-icon" d="M7 4.5v15l12-7.5z"/><path class="audio-stop-icon" d="M6 6h12v12H6z"/></svg></button>
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
   <script type="module" src="/js/creation/audio-entry.mjs?rev=20261006-header-controls-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261009-seo-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261005-audio-history-1"></script>
 </body>
 </html>

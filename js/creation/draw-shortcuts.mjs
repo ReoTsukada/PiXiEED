@@ -52,7 +52,7 @@ export const DRAW_SHORTCUT_COMMANDS = Object.freeze([
   command('open.canvasSettings', 'キャンバス設定', 'サイズ 幅 高さ resize', null), command('open.project', '作品を管理・開く', 'ファイル プロジェクト 読み込み 保存 PXD', null), command('project.save', 'プロジェクトをこのブラウザーに保存', '保存 project browser', null),
   command('open.copyLast', '前回の絵を複製', '前回 復元 copy last', null), command('open.resume', '前回の絵をひらく', '前回 復元 resume', null), command('open.importImage', '画像ファイルを開く', 'PNG WebP 読み込み 複製', null), command('export.png', '画像を保存（PNG）', '書き出し export', null),
   command('export.gif', 'アニメーションを保存（GIF）', '動画 書き出し export', null), command('export.timelapse', '描いた過程を保存', 'タイムラプス GIF export', null),
-  command('export.timelapseDetail', '描いた過程を詳しく保存', 'タイムラプス GIF export', null), command('post.globe', '地球儀へ投稿', '投稿 globe', null),
+  command('export.timelapseDetail', '描いた過程を詳しく保存', 'タイムラプス GIF export', null), command('post.globe', '世界地図へ投稿', '投稿 globe', null),
   command('animation.play', 'アニメーションを再生・停止', '再生 playback', null), command('animation.workspace', 'レイヤー・コマを開く', 'アニメーション フレーム レイヤー', null),
   command('animation.previousFrame', '前のコマ', 'フレーム animation', 'BracketLeft'), command('animation.nextFrame', '次のコマ', 'フレーム animation', 'BracketRight'),
   command('animation.addFrame', 'コマを複製して追加', 'フレーム animation add', null), command('animation.addBlankFrame', '空のコマを追加', 'フレーム 白紙 blank animation', null), command('animation.deleteFrame', '選択中のコマを削除', 'フレーム animation delete', null),

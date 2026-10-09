@@ -1,0 +1,359 @@
+{
+  "snapshotDateTokyo": "2026-10-10",
+  "source": "data/pixel-art-events.json",
+  "version": 1,
+  "updatedAt": "2026-10-09T17:36:31+00:00",
+  "rawRecords": 102,
+  "datedRecords": 97,
+  "datedUniqueEditions": 96,
+  "watchRecords": 5,
+  "generatedPages": 86,
+  "allRawSourceAndChecked": 102,
+  "generatedSourceAndChecked": 86,
+  "storedStatuses": {
+    "upcoming": 27,
+    "watch": 5,
+    "active": 7,
+    "ended": 63
+  },
+  "computedRawStatuses": {
+    "upcoming": 23,
+    "watch": 5,
+    "active": 9,
+    "past": 65
+  },
+  "computedLeafStatuses": {
+    "upcoming": 19,
+    "active": 8,
+    "past": 59
+  },
+  "hubOnly": [
+    {
+      "id": "shibuya-pixel-art-watch",
+      "kind": "watch",
+      "reason": "次回の日程が未発表。前回開催日と過去回へのリンクを一覧に掲載。"
+    },
+    {
+      "id": "winter-dot-daisakusen-watch",
+      "kind": "watch",
+      "reason": "次回の日程が未発表。前回開催日と過去回へのリンクを一覧に掲載。"
+    },
+    {
+      "id": "kyushu-pixel-marche-watch",
+      "kind": "watch",
+      "reason": "次回の日程が未発表。前回開催日と過去回へのリンクを一覧に掲載。"
+    },
+    {
+      "id": "crosspico-nagoya-watch",
+      "kind": "watch",
+      "reason": "次回の日程が未発表。前回開催日と過去回へのリンクを一覧に掲載。"
+    },
+    {
+      "id": "newgrounds-pixel-day-watch",
+      "kind": "watch",
+      "reason": "次回の日程が未発表。前回開催日と過去回へのリンクを一覧に掲載。"
+    },
+    {
+      "id": "pixel-art-park-1",
+      "kind": "hub-only",
+      "reason": "開催記録はあるが、個別紹介に必要な説明は確認できない。"
+    },
+    {
+      "id": "kai-whos-game-room-kaohsiung-2026",
+      "kind": "hub-only",
+      "reason": "巡回展の会期・店舗別の詳報を確認できない。"
+    },
+    {
+      "id": "kai-whos-game-room-taoyuan-2026",
+      "kind": "hub-only",
+      "reason": "巡回展の会期・店舗別の詳報を確認できない。"
+    },
+    {
+      "id": "kai-whos-game-room-kaohsiung-sanduo-2026",
+      "kind": "hub-only",
+      "reason": "巡回展の会期・店舗別の詳報を確認できない。"
+    },
+    {
+      "id": "kai-whos-game-room-taipei-2026",
+      "kind": "hub-only",
+      "reason": "巡回展の会期・店舗別の詳報を確認できない。"
+    },
+    {
+      "id": "kai-whos-game-room-chiayi-2026",
+      "kind": "hub-only",
+      "reason": "巡回展の会期・店舗別の詳報を確認できない。"
+    },
+    {
+      "id": "beppu-minecraft-pixel-art-2026-10-18",
+      "kind": "hub-only",
+      "reason": "同一プログラムの共通案内を使う個別回。詳しい回別内容は確認できない。"
+    },
+    {
+      "id": "beppu-minecraft-pixel-art-2026-11-15",
+      "kind": "hub-only",
+      "reason": "同一プログラムの共通案内を使う個別回。詳しい回別内容は確認できない。"
+    },
+    {
+      "id": "lccl-game-design-pixel-art-camp-2026-11-30",
+      "kind": "hub-only",
+      "reason": "共通のキャンプ案内を使う別開催回。回別のPixel Art詳細がない。"
+    },
+    {
+      "id": "lccl-game-design-pixel-art-camp-2026-12-08",
+      "kind": "hub-only",
+      "reason": "共通のキャンプ案内を使う別開催回。回別のPixel Art詳細がない。"
+    },
+    {
+      "id": "motocross-saito-ultra-dope-2026",
+      "kind": "duplicate",
+      "reason": "同じ名称・日程・公式出典の重複レコード。個別ページはkac-ultra-dope-motocross-2026を参照。",
+      "canonicalId": "kac-ultra-dope-motocross-2026"
+    }
+  ],
+  "descriptionMissing": [
+    "shibuya-pixel-art-watch",
+    "winter-dot-daisakusen-watch",
+    "kyushu-pixel-marche-watch"
+  ],
+  "shortDescriptions": [
+    {
+      "id": "shibuya-pixel-art-watch",
+      "description": ""
+    },
+    {
+      "id": "winter-dot-daisakusen-watch",
+      "description": ""
+    },
+    {
+      "id": "kyushu-pixel-marche-watch",
+      "description": ""
+    },
+    {
+      "id": "gb-pixel-art-jam-2026",
+      "description": "Game Boy用160×144・4色のドット絵を制作するアートジャム。"
+    },
+    {
+      "id": "segment-pixel-jam-2026",
+      "description": "ドット絵を使用するゲームが参加条件のゲームジャム。"
+    },
+    {
+      "id": "newgrounds-pixel-day-watch",
+      "description": "ドット絵・ピクセルアニメーションなどのオンライン作品投稿イベント。"
+    },
+    {
+      "id": "pixelween-2026",
+      "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。"
+    },
+    {
+      "id": "pixel-art-park-1",
+      "description": "公式記録で日程・会場、ドット絵イベントを確認。"
+    },
+    {
+      "id": "pixel-art-park-2",
+      "description": "ドット絵作品展示・販売・ワークショップ。"
+    },
+    {
+      "id": "pixel-art-park-3",
+      "description": "48組のドット絵作品展示等。"
+    },
+    {
+      "id": "pixel-art-park-4",
+      "description": "ドット絵作品を扱う年次イベント。"
+    },
+    {
+      "id": "pixel-art-park-5",
+      "description": "77組のドット絵creator/企業による展示即売。"
+    },
+    {
+      "id": "pixel-art-park-6",
+      "description": "77組のドット絵creator/企業による展示即売。"
+    },
+    {
+      "id": "shibuya-pixel-art-2018",
+      "description": "ピクセルアートを街中で展示するイベント。"
+    },
+    {
+      "id": "shibuya-pixel-art-2020",
+      "description": "ドット絵受賞作品・特別企画展。オンラインと現地開催。"
+    },
+    {
+      "id": "shibuya-pixel-art-2021",
+      "description": "主催者の複数のピクセルアート展示・受賞展示。"
+    },
+    {
+      "id": "shibuya-pixel-art-2022",
+      "description": "入選作品・審査員・招致アーティストの展示。"
+    },
+    {
+      "id": "shibuya-pixel-art-2023",
+      "description": "公式がピクセルアート祭典と説明。9会場で展示等。"
+    },
+    {
+      "id": "shibuya-pixel-art-2024",
+      "description": "100名以上のピクセルアーティスト参加。"
+    },
+    {
+      "id": "shibuya-pixel-art-2025",
+      "description": "コンテスト受賞展示、講義、出展・ライブ。既存watchの前回edition。"
+    },
+    {
+      "id": "the-pixel-street-2023",
+      "description": "約80組のドット絵creatorが出展するマーケット。"
+    },
+    {
+      "id": "winter-dot-daisakusen-2026",
+      "description": "ドット絵の体験・即売会。"
+    },
+    {
+      "id": "kyushu-pixel-marche-2024-05",
+      "description": "主催公式過去回にpixel作品出展とworkshopを記載。"
+    },
+    {
+      "id": "kyushu-pixel-marche-2026",
+      "description": "主催公式にpixel art展示即売会と日程・会場。"
+    },
+    {
+      "id": "summer-dot-daisakusen-2024",
+      "description": "ドット絵体験・即売会。46名出展。"
+    },
+    {
+      "id": "pixelgirls-side-b-2025",
+      "description": "PIXELGIRLS作品を含むピクセル表現の夜間展示・制作体験。"
+    },
+    {
+      "id": "ntv-imaginarium-2023",
+      "description": "日テレ主催ページで実展示開始日を確認。フェス全体の会期2023-12-09〜2024-03-03とは区別。"
+    },
+    {
+      "id": "pixel-school-stage-2-2024",
+      "description": "風景ピクセルアート作家APO+による講義。"
+    },
+    {
+      "id": "pixel-dot-party-2024",
+      "description": "pictSQUARE公式カレンダーにドット絵オンリーオンラインイベントと掲載。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2021",
+      "description": "Newgrounds公式の年次pixel artとチップチューンの祝祭。作品投稿とコンテストを実施。"
+    },
+    {
+      "id": "newgrounds-pixel-day-2023",
+      "description": "Newgrounds公式の年次pixel art、アニメーション、ゲーム、チップチューンイベント。"
+    },
+    {
+      "id": "pixelween-2020",
+      "description": "Pixel Joint主催のドット絵コンテスト。4週にわたりホラー映画の場面を指定パレット・サイズで制作。"
+    },
+    {
+      "id": "pixelween-2022",
+      "description": "Pixel Joint主催のpixel artコンテスト。ホラーゲームの画面を4週連作で制作。"
+    },
+    {
+      "id": "pixelween-2024",
+      "description": "Pixel Joint主催のpixel artコンテスト。週替わりのホラー小説の表紙を制作。"
+    },
+    {
+      "id": "pixelween-2025",
+      "description": "Pixel Joint主催のpixel artコンテスト。4枚の横長風景をつなげてパノラマ作品にする。"
+    },
+    {
+      "id": "iwamisawa-ibox-tahara-2025",
+      "description": "ピクセルアートによる日常風景を展示した学生個展。"
+    },
+    {
+      "id": "frosted-vibes-sapporo-2025",
+      "description": "北海道情報大学の合同アート展に、北海道の銘菓30点を描いたドット絵作品が出展。催事全体は複数の表現を扱う。"
+    },
+    {
+      "id": "asaha-tokyo-pixel-exhibition-2023",
+      "description": "ピクセルアートのアニメーションと、キャラクターの原画を展示。"
+    },
+    {
+      "id": "asaha-mendako-tokyo-pixel-2026",
+      "description": "メンダコを題材にしたピクセルアートのアニメーション、原画、グッズを展示。8月8日に関連ワークショップ。"
+    },
+    {
+      "id": "kac-ultra-dope-motocross-2026",
+      "description": "ピクセルアート制作10年の節目の個展。デジタル作品、アクリル、スケートボードなど多様な媒体を展示。"
+    },
+    {
+      "id": "kac-super-nice-thankass-2025",
+      "description": "2人のピクセルアーティストによるピクセルアートを中心に、版画や絵画などを展示。"
+    },
+    {
+      "id": "kac-hermippe-pointless-2025",
+      "description": "ピクセルアートを主軸とする作家による風景の連作とカード作品を展示。"
+    },
+    {
+      "id": "riedisheim-en-pixel-closing-2026",
+      "description": "市の若者評議会によるPixel Artコンテスト作品と若者のモザイク作品の展示・年度企画の締めくくり。"
+    },
+    {
+      "id": "jumpzip-pixel-art-market-seoul-2026",
+      "description": "韓国初のピクセルアート限定イベント。ピクセルアーティストの作品とグッズを販売するマーケット型展示。"
+    },
+    {
+      "id": "dfwyas-pixel-art-cube-workshop-2026-04-11",
+      "description": "小さなキューブを組み立ててピクセルアートを作る初心者向けワークショップ。"
+    }
+  ],
+  "sameDescriptions": {
+    "EMPTY": [
+      "shibuya-pixel-art-watch",
+      "winter-dot-daisakusen-watch",
+      "kyushu-pixel-marche-watch"
+    ],
+    "77組のドット絵creator/企業による展示即売。": [
+      "pixel-art-park-5",
+      "pixel-art-park-6"
+    ],
+    "ブロックを組み合わせたプログラムでMinecraft内にドット絵を自動生成し、オリジナル作品を制作する体験。生徒作品の展示あり。10月と11月は別の実施日として登録し、その間を連続開催期間にしない。": [
+      "beppu-minecraft-pixel-art-2026-10-18",
+      "beppu-minecraft-pixel-art-2026-11-15"
+    ],
+    "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。": [
+      "moertel-spiel-2026",
+      "moertel-viecc-2026"
+    ],
+    "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。": [
+      "kai-whos-game-room-kaohsiung-2026",
+      "kai-whos-game-room-taoyuan-2026",
+      "kai-whos-game-room-kaohsiung-sanduo-2026",
+      "kai-whos-game-room-taipei-2026",
+      "kai-whos-game-room-chiayi-2026"
+    ],
+    "子ども向けゲームデザインキャンプ全体の開催回。2日目にpixel artのスプライトを制作する。Pixel Art単独講座ではないため、含まれる企画の範囲を明記。": [
+      "lccl-game-design-pixel-art-camp-2026-11-30",
+      "lccl-game-design-pixel-art-camp-2026-12-08"
+    ]
+  },
+  "sameLeafDescriptions": {
+    "77組のドット絵creator/企業による展示即売。": [
+      "pixel-art-park-5",
+      "pixel-art-park-6"
+    ],
+    "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。": [
+      "moertel-spiel-2026",
+      "moertel-viecc-2026"
+    ]
+  },
+  "checkedDays": {
+    "2026-10-09": 1,
+    "2026-10-06": 13,
+    "2026-10-08": 10,
+    "2026-10-07": 17,
+    "2026-10-05": 61
+  },
+  "fieldCoverage": {
+    "officialName": 1,
+    "organizer": 0,
+    "participation": 1
+  },
+  "userPostFields": [],
+  "schemaCount": 0,
+  "canonicalUnique": 87,
+  "sitemapEventUrls": 87,
+  "all102PresentOnHub": true,
+  "auditErrors": [],
+  "verificationLimit": "出典・確認日の存在を検査。全102件の公式本文を今回再確認したものではない。"
+}

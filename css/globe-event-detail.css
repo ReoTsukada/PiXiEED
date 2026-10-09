@@ -1,5 +1,8 @@
 /* The public event detail and its optional ad belong to the top-level route,
    outside the embedded map's interactive canvas and controls. */
+.map-event-directory { grid-column: 1 / -1; width: 100%; padding-block: 2rem; }
+.map-event-directory h2 { font-size: clamp(1.2rem, 3vw, 1.6rem); }
+.map-event-directory p { line-height: 1.8; }
 body.app-page--tool-globe {
   --globe-detail-width: clamp(300px, 36vw, 430px);
   height: auto;

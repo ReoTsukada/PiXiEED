@@ -838,7 +838,7 @@ function getWork(id) {
   return works.find((work) => !isSampleWork(work) && hasPublicMapPlacement(work) && work.id === id) || null;
 }
 
-// 旧データの分類を保持する。公開ギャラリーの入口は地球儀に一本化する。
+// 旧データの分類を保持する。公開ギャラリーの入口は世界地図に一本化する。
 // 外部データ側の命名揺れを吸収できるよう、投稿フラグは複数の形を受け入れる。
 function isMapOnlyWork(work) {
   return Boolean(work?.mapOnly || work?.userSubmitted || work?.ownerType === 'user' || work?.source === 'user' || work?.visibility === 'map-only');
@@ -1162,7 +1162,7 @@ function workCard(work) {
   const firstStore = getStoresForWork(work.id)[0];
   return `
     <article class="market-card">
-      <a class="market-card__image" href="/globe/" aria-label="地球儀で${escapeHtml(work.title)}を探す" data-analytics-event="work_open" data-work-id="${escapeHtml(work.id)}">
+      <a class="market-card__image" href="/globe/" aria-label="世界地図で${escapeHtml(work.title)}を探す" data-analytics-event="work_open" data-work-id="${escapeHtml(work.id)}">
         <img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" loading="lazy" decoding="async" width="1254" height="1254">
         <span class="market-card__badge">作品</span>
         ${found ? '<span class="market-card__found">FOUND</span>' : ''}
@@ -1173,7 +1173,7 @@ function workCard(work) {
         <p class="market-card__subtitle">${escapeHtml(work.subtitle)}</p>
         <div class="market-card__footer">
           <span class="market-card__place">${firstStore ? escapeHtml(firstStore.name) : '店舗情報準備中'}</span>
-          <a class="button button--quiet" href="/globe/" data-analytics-event="work_open" data-work-id="${escapeHtml(work.id)}">地球儀で探す</a>
+          <a class="button button--quiet" href="/globe/" data-analytics-event="work_open" data-work-id="${escapeHtml(work.id)}">世界地図で探す</a>
         </div>
       </div>
     </article>`;
@@ -3033,7 +3033,7 @@ function renderDiscoveryMap(root) {
     popover.style.setProperty('--popover-y', `${Math.min(Math.max(point.y, 8), 52)}%`);
     const detailImage = `<div class="map-work map-work--detail"><img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" loading="lazy" decoding="async" width="1254" height="1254"><span><strong>${escapeHtml(work.title)}</strong><small>${escapeHtml(isMapOnlyWork(work) ? '地図で見つけた作品' : '公式作品')}</small></span></div>`;
     const returnMarkup = options.clusterId ? `<button class="button button--quiet" type="button" data-map-cluster-return="${escapeHtml(options.clusterId)}">一覧に戻る</button>` : '';
-    const actionMarkup = `<p class="map-popover__empty">地球儀に置かれた作品です。</p>${returnMarkup}`;
+    const actionMarkup = `<p class="map-popover__empty">世界地図に置かれた作品です。</p>${returnMarkup}`;
     popover.innerHTML = `<div class="map-popover__top"><span class="tag tag--sample">作品</span><button type="button" class="map-popover__close" data-map-close aria-label="作品情報を閉じる">×</button></div><h3>${escapeHtml(work.title)}</h3><p>${escapeHtml(work.subtitle || work.story || '')}</p><div class="map-popover__works map-popover__works--single">${detailImage}</div>${actionMarkup}`;
     popover.hidden = false;
   };
@@ -4046,8 +4046,8 @@ function renderPublicShell() {
   tabs.setAttribute('aria-label', 'アプリナビゲーション');
   const page = document.body.dataset.page || 'home';
   const actions = {
-    home: '<a href="/draw/" aria-label="かんたんドットで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
-    tools: '<a href="/draw/" aria-label="かんたんドットで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
+    home: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
+    tools: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
     map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>',
     works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
     stores: '<a href="/globe/" aria-label="地図でお店を探す"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>',
@@ -4055,7 +4055,7 @@ function renderPublicShell() {
     profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>'
   };
   const contextAction = actions[page] || '<a href="/globe/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>';
-  tabs.innerHTML = `<a data-nav="map" href="/globe/" aria-label="地球儀"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>`;
+  tabs.innerHTML = `<a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>`;
   const openGlobeComposer = () => {
     const globe = document.querySelector('.map-hero__globe-frame');
     if (!globe) return;
@@ -4166,7 +4166,7 @@ function renderWorkDetail() {
   const work = getWork(document.body.dataset.workId);
   if (!work) {
     document.title = '作品が見つかりません｜PiXiEED';
-    root.innerHTML = '<div class="empty-state"><h1>この作品は見つかりません。</h1><p>地球儀から、いま見られる絵を探せます。</p><a class="button button--quiet" href="/globe/">地球儀を見る</a></div>';
+    root.innerHTML = '<div class="empty-state"><h1>この作品は見つかりません。</h1><p>世界地図から、いま見られる絵を探せます。</p><a class="button button--quiet" href="/globe/">世界地図を見る</a></div>';
     return;
   }
   const from = new URLSearchParams(window.location.search).get('from');
@@ -4175,7 +4175,7 @@ function renderWorkDetail() {
   const relatedStores = getStoresForWork(work.id);
   const relatedStoreMarkup = relatedStores.length ? relatedStores.map((store) => `<article class="store-mini"><h3>${escapeHtml(store.name)}</h3><p>${escapeHtml(store.area)}<br>${escapeHtml(store.status)}</p><a class="text-link" href="/stores/${store.id}.html" data-analytics-event="store_open" data-store-id="${escapeHtml(store.id)}">お店をのぞく</a></article>`).join('') : '<div class="empty-state">会えるお店が決まったら、ここにお知らせします。</div>';
   root.innerHTML = `
-    <div class="breadcrumbs"><a href="/globe/">地球儀</a><span>/</span><span>${escapeHtml(work.title)}</span></div>
+    <div class="breadcrumbs"><a href="/globe/">世界地図</a><span>/</span><span>${escapeHtml(work.title)}</span></div>
     ${fromStore ? `<div class="context-banner">${escapeHtml(fromStore.name)}で見つけた作品として表示しています。</div>` : ''}
     <div class="detail-hero">
       <div class="detail-art"><img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" fetchpriority="high" decoding="async" width="1254" height="1254"><button class="detail-art__zoom" type="button" data-open-image>画像を大きく見る</button></div>
@@ -4217,10 +4217,10 @@ function renderCollection() {
   const found = loadFound();
   const foundWorks = officialWorks.filter((work) => found.includes(work.id));
   const collectionGrid = foundWorks.length
-    ? foundWorks.map((work) => `<article class="collection-item is-found"><div class="collection-item__image"><img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" loading="lazy" decoding="async" width="1254" height="1254"></div><span class="collection-item__mark" aria-label="見つけた作品">✓</span><div class="collection-item__body"><h3>${escapeHtml(work.title)}</h3><p>見つけた作品</p><a class="text-link" href="/globe/">地球儀を見る</a></div></article>`).join('')
-    : '<div class="empty-state">地球儀で出会った作品を、ここに残せます。<br><a class="button button--quiet" href="/globe/">地球儀を見る</a></div>';
+    ? foundWorks.map((work) => `<article class="collection-item is-found"><div class="collection-item__image"><img src="${work.image}" alt="${escapeHtml(work.title)}の作品画像" loading="lazy" decoding="async" width="1254" height="1254"></div><span class="collection-item__mark" aria-label="見つけた作品">✓</span><div class="collection-item__body"><h3>${escapeHtml(work.title)}</h3><p>見つけた作品</p><a class="text-link" href="/globe/">世界地図を見る</a></div></article>`).join('')
+    : '<div class="empty-state">世界地図で出会った作品を、ここに残せます。<br><a class="button button--quiet" href="/globe/">世界地図を見る</a></div>';
   root.innerHTML = `
-    <div class="collection-head"><div><span class="eyebrow">your finds</span><h1>見つけた絵を、<br>ここに残す。</h1><p class="lead">作品ページで「見つけた」を押すと、この端末に記録されます。</p></div><div class="progress-card"><div class="progress-card__top"><strong>${foundWorks.length}</strong><span>見つけた作品</span></div><p>地球儀で出会った作品の記録です。</p></div></div>
+    <div class="collection-head"><div><span class="eyebrow">your finds</span><h1>見つけた絵を、<br>ここに残す。</h1><p class="lead">作品ページで「見つけた」を押すと、この端末に記録されます。</p></div><div class="progress-card"><div class="progress-card__top"><strong>${foundWorks.length}</strong><span>見つけた作品</span></div><p>世界地図で出会った作品の記録です。</p></div></div>
     <div class="collection-grid">${collectionGrid}</div>
     <div class="collection-empty" style="margin-top:1.5rem">このコレクションはログインなしで、この端末にだけ保存されます。機種変更やブラウザのデータ削除で消える場合があります。</div>`;
 }

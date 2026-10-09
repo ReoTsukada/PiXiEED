@@ -17,7 +17,7 @@ export const PERKS = new Map([
   ['audio.canvas-wide', 'すべての制作ツール：256px・32色の共通キャンバス'],
   ['project.canvas-expanded', 'すべての制作ツール：256px・32色の共通キャンバス'],
   ['audio.instruments-extra', 'ドットで音楽：追加の音色'],
-  ['draw.timelapse-detail', 'かんたんドット：工程多め・8秒のタイムラプス'],
+  ['draw.timelapse-detail', 'PiXiEEDraw：工程多め・8秒のタイムラプス'],
   ['pixfind.hint', '間違い探し・かくれもの：追加ヒント'],
   ['jigsaw.hint', 'ジグソー：追加ヒント']
 ]);

@@ -782,7 +782,7 @@ function mount() {
       document.querySelector('#pixfind-author').textContent = '';
       progress.textContent = '読み込み中'; status.textContent = '公開問題を確認しています。';
       if (publicPostId === null || query.has('localSpot') || query.has('localHidden')) {
-        status.textContent = '問題の指定が正しくありません。地球儀の投稿から開き直してください。'; statusGame.textContent = status.textContent; progress.textContent = 'プレイできません'; return;
+        status.textContent = '問題の指定が正しくありません。世界地図の投稿から開き直してください。'; statusGame.textContent = status.textContent; progress.textContent = 'プレイできません'; return;
       }
       try { const puzzle = await fetchPublicPostPuzzle(publicPostId); await start(puzzle); }
       catch (error) { status.textContent = error instanceof Error ? error.message : '公開問題を読み込めませんでした。'; statusGame.textContent = status.textContent; progress.textContent = 'プレイできません'; primary.disabled = true; }
