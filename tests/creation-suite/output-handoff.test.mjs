@@ -119,6 +119,23 @@ test('multiple output items and original RGBA sources persist independently with
   assert.equal(await reloaded.sourceBlob.text(), 'pixels');
 });
 
+test('explicit original pixel-size choice survives output-item persistence and reload', async () => {
+  const deps = dependencies();
+  await stageToolOutput(file(), deps);
+  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const original = { ...loaded.outputs[0], metadata: { width: 8, height: 8, outputWidth: 64, outputHeight: 64, pixelOriginChoice: 'original' } };
+  const derivative = { ...loaded.outputs[0], id: 'pixel-derivative', filename: 'my-art-pixel.png', blob: new Blob(['pixel derivative'], { type: 'image/png' }), metadata: { width: 8, height: 8, outputWidth: 8, outputHeight: 8 } };
+  await saveToolOutputItems(validId, [original, derivative], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const reloaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(reloaded.outputs[0].metadata.pixelOriginChoice, 'original');
+  assert.equal(reloaded.outputs[1].filename, 'my-art-pixel.png');
+  assert.equal(await reloaded.sourceBlob.text(), 'pixels');
+  const invalidChoice = { ...reloaded.outputs[0], metadata: { ...reloaded.outputs[0].metadata, pixelOriginChoice: 'pixel' } };
+  await saveToolOutputItems(validId, [invalidChoice, reloaded.outputs[1]], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const sanitized = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(sanitized.outputs[0].metadata.pixelOriginChoice, undefined, 'only the explicit original choice is accepted');
+});
+
 test('imported image frames, audio PCM and timeline settings survive reload without exposing payload in the URL', async () => {
   const deps = dependencies();
   const frames = [

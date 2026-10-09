@@ -148,12 +148,13 @@ export function clearToolOutputReturnId(locationRef = globalThis.location, histo
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
+  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'pixelOriginChoice', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];
     if (key === 'description' && typeof value === 'string') result[key] = value.slice(0, 180);
     else if (key === 'aspectLocked' && typeof value === 'boolean') result[key] = value;
+    else if (key === 'pixelOriginChoice' && value === 'original') result[key] = value;
     else if (['cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern'].includes(key) && typeof value === 'string' && value.length <= 24) result[key] = value;
     else if (key === 'cameraCustomLook' && typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value)) result[key] = value;
     else if (['cameraEdges', 'cameraMiniature'].includes(key) && typeof value === 'boolean') result[key] = value;

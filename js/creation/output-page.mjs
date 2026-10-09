@@ -1,4 +1,4 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261009-output-12';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261009-output-origin-restore-2';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-7';
 import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
@@ -6,6 +6,7 @@ import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?re
 import { renderOutputVideo } from './output-video.mjs?rev=20261009-output-video-1';
 import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261009-output-video-1';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
+import { inferIntegerPixelScale, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-2';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -89,6 +90,17 @@ const createVideoButton = $('#output-create-video');
 const generationProgress = $('#output-generation-progress');
 const cancelGeneration = $('#output-cancel-generation');
 const musicTotalPlaysControl = $('#output-music-total-plays');
+const viewControls = $('#output-view-controls');
+const viewFitButton = $('#output-view-fit');
+const viewZoomIn = $('#output-view-zoom-in');
+const viewZoomOut = $('#output-view-zoom-out');
+const viewZoomValue = $('#output-view-zoom-value');
+const fileSettingsSummary = $('#output-file-summary');
+const scaleSettingsSummary = $('#output-scale-summary');
+const animationSettingsSummary = $('#output-animation-summary');
+const audioSettingsSummary = $('#output-audio-summary');
+const originHint = $('#output-origin-hint');
+const originRestore = $('#output-origin-restore');
 
 let record = null;
 let outputItems = [];
@@ -116,6 +128,12 @@ let mediaSettings = { playbackRate: 1, totalPlays: 0, musicTotalPlays: 1, musicS
 let lastImportedMedia = null;
 let mediaWritePending = false;
 let itemWritePending = false;
+let previewZoom = 1;
+let rasterSettingsEpoch = 0;
+let rasterSettingsController = null;
+let rasterProfile = null;
+let originRestoreItemId = '';
+let originResizeActiveItemId = '';
 
 function trackPending(promise) {
   const tracked = Promise.resolve(promise);
@@ -159,6 +177,34 @@ function outputBaseName(value, ext) {
 
 function currentFilename() {
   return record ? sanitizeOutputFilename(filename.value, activeItem?.extension || record.extension) : '';
+}
+
+function setPreviewZoom(value) {
+  previewZoom = Math.max(0.5, Math.min(4, Math.round(value * 100) / 100));
+  preview.style.setProperty('--output-preview-zoom', String(previewZoom));
+  viewZoomValue.textContent = previewZoom === 1 ? '全体' : `${Math.round(previewZoom * 100)}%`;
+  viewZoomOut.disabled = previewZoom <= 0.5;
+  viewZoomIn.disabled = previewZoom >= 4;
+}
+
+function updatePreviewControls() {
+  const hasVisual = !image.hidden || !video.hidden || !timelineCanvas.hidden;
+  viewControls.hidden = !hasVisual;
+  if (!hasVisual) setPreviewZoom(1);
+}
+
+function updateSettingsSummaries() {
+  if (fileSettingsSummary) {
+    const filenameText = activeItem?.filename || record?.filename || '出力を準備しています';
+    const count = outputItems.length > 1 ? `${outputItems.length}項目 · ` : '';
+    fileSettingsSummary.textContent = `${count}${filenameText}`;
+  }
+  if (scaleSettingsSummary) {
+    const width = Number(widthInput.value); const height = Number(heightInput.value);
+    scaleSettingsSummary.textContent = width > 0 && height > 0 ? `${width} × ${height}px` : '出力サイズ';
+  }
+  if (animationSettingsSummary) animationSettingsSummary.textContent = animationDetails.textContent || 'FPS・再生回数';
+  if (audioSettingsSummary) audioSettingsSummary.textContent = audioDetails.textContent || '音声の設定';
 }
 
 function createItemId() {
@@ -282,6 +328,7 @@ function setActiveItem(item) {
   const previousFileUrl = fileUrl;
   const previousSourceUrl = sourceUrl;
   activeItem = item;
+  setPreviewZoom(1);
   const foundSource = mediaSources.find((source) => source.id === item.sourceId);
   activeSource = foundSource || mediaSources[0] || null;
   record.mime = item.mime; record.extension = item.extension; record.filename = item.filename; record.blob = item.blob;
@@ -305,6 +352,7 @@ function setActiveItem(item) {
   displayMetadata(record, item.blob, item.metadata?.outputWidth || item.metadata?.width, item.metadata?.outputHeight || item.metadata?.height);
   setMedia(record);
   syncFilename();
+  updateSettingsSummaries();
 }
 
 function renderOutputItems() {
@@ -328,6 +376,7 @@ function renderOutputItems() {
   deleteOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length <= 1;
   copyOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length >= 12;
   addOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length >= 12;
+  updateSettingsSummaries();
 }
 
 function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension } = {}) {
@@ -357,6 +406,7 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   formatButton.setAttribute('aria-expanded', 'false');
   updateMusicPlayControl();
   updateSequenceControls();
+  updateSettingsSummaries();
 }
 
 function frameDuration(frames) { return getOutputTiming(frames, { format: 'video' }).sourceDurationMs; }
@@ -408,7 +458,7 @@ function updateSequenceControls() {
   const settingsDisabled = mediaWritePending || itemWritePending || Boolean(generationController) || Boolean(importController);
   fpsInput.disabled = settingsDisabled || !isSequence;
   applyFps.disabled = settingsDisabled || !isSequence;
-  if (!isSequence) { animationSettings.hidden = activeItem?.extension !== 'gif' && activeItem?.extension !== 'apng'; return; }
+  if (!isSequence) { animationSettings.hidden = activeItem?.extension !== 'gif' && activeItem?.extension !== 'apng'; updateSettingsSummaries(); return; }
   animationSettings.hidden = false;
   const targetFormat = formatValue === 'gif' ? 'gif' : formatValue === 'apng' ? 'apng' : 'video';
   const fps = getEffectiveOutputFps(frames, { format: targetFormat, playbackRate: Number(mediaSettings.playbackRate) || 1 });
@@ -448,6 +498,7 @@ function updateSequenceControls() {
   timelinePlay.hidden = !(activeSource?.id.startsWith('local-images') && isSequence && ['png', 'jpeg', 'svg'].includes(activeItem?.extension));
   timelineCanvas.hidden = timelinePlay.hidden;
   if (!timelineCanvas.hidden) paintTimelineFrame(timelineFrameIndex);
+  updateSettingsSummaries();
 }
 
 function renderAssets() {
@@ -726,6 +777,7 @@ function setCurrentBlob(blob, { width = null, height = null, animated = false } 
   else if (record.mime.startsWith('video/')) video.src = fileUrl;
   if (previous && previous !== sourceUrl) URL.revokeObjectURL(previous);
   displayMetadata(record, blob, width, height);
+  updatePreviewControls();
 }
 
 async function canvasRaster(frame, mime, quality = 0.9) {
@@ -813,7 +865,7 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
   throw new Error('この素材では選択した形式を書き出せません。');
 }
 
-async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null } = {}) {
+async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false } = {}) {
   if (!record || !activeItem || generationController || mediaWritePending || itemWritePending) return false;
   const source = mediaSources.find((item) => item.id === sourceId);
   if (!source || !sourceFormats(source).some(([value]) => value === formatValue)) { status.textContent = 'この素材では選べない形式です。'; return false; }
@@ -822,7 +874,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
   const framesForSource = sourceFrames(source);
   let outputDimensions = dimensions;
   if (!outputDimensions && framesForSource.length) {
-    if (source.id === activeItem.sourceId && Number(widthInput.value) > 0 && Number(heightInput.value) > 0) {
+    if ((source.id === activeItem.sourceId || rasterProfile?.sourceId === source.id) && Number(widthInput.value) > 0 && Number(heightInput.value) > 0) {
       outputDimensions = { width: Number(widthInput.value), height: Number(heightInput.value) };
     } else {
       const scale = Math.max(1, Math.min(16, Math.round(Number(record.metadata?.defaultScale) || 1)));
@@ -830,6 +882,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     }
   }
   const previousItem = activeItem;
+  if (preservePrevious && outputItems.length >= 12) { status.textContent = '出力項目が上限のため、新しいサイズは作成できません。元のファイルはそのままです。'; return false; }
   const epoch = ++generationEpoch;
   const controller = new AbortController(); generationController = controller;
   setBusy(true, true); addOutputItem.disabled = true; copyOutputItem.disabled = true; deleteOutputItem.disabled = true;
@@ -840,22 +893,24 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     const blob = generatedOutput.blob;
     if (controller.signal.aborted || pageDisposed || epoch !== generationEpoch) return;
     const baseName = filename.value || outputBaseName(previousItem.filename, previousItem.extension);
-    const nextFilename = sanitizeOutputFilename(baseName, extensionValue);
+    const nextFilename = sanitizeOutputFilename(autoPixelOrigin ? `${baseName}-pixel` : baseName, extensionValue);
     const frames = sourceFrames(source);
     const animatedOutput = ['gif', 'apng'].includes(extensionValue);
     const metadataValue = {
       ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
+      ...(previousItem.metadata?.pixelOriginChoice ? { pixelOriginChoice: previousItem.metadata.pixelOriginChoice } : {}),
       ...(extensionValue === 'jpeg' ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
       ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: getOutputTiming(frames, { format: extensionValue, playbackRate: 1 }).durationMs / 1000, totalPlays: mediaSettings.totalPlays ?? source.mediaSource?.totalPlays ?? source.mediaSource?.loopCount ?? 0 } : {}),
       ...generatedOutput.metadata
     };
-    const updated = { ...previousItem, sourceId: source.id, mime: outputMime(extensionValue), extension: extensionValue, filename: nextFilename, blob, metadata: metadataValue };
-    const nextItems = outputItems.map((item) => item.id === previousItem.id ? updated : item);
+    const updated = { ...previousItem, ...(autoPixelOrigin ? { id: createItemId() } : {}), sourceId: source.id, mime: outputMime(extensionValue), extension: extensionValue, filename: nextFilename, blob, metadata: metadataValue };
+    const nextItems = autoPixelOrigin ? [...outputItems, updated] : outputItems.map((item) => item.id === previousItem.id ? updated : item);
     const savedItems = await persistOutputItems(nextItems, { duringGeneration: true });
     if (controller.signal.aborted || pageDisposed || epoch !== generationEpoch) return;
     outputItems = savedItems;
-    activeItem = outputItems.find((item) => item.id === previousItem.id) || outputItems[0];
+    activeItem = outputItems.find((item) => item.id === updated.id) || outputItems[0];
+    if (autoPixelOrigin) { originRestoreItemId = previousItem.id; originResizeActiveItemId = updated.id; }
     activeSource = source;
     record.mime = activeItem.mime; record.extension = activeItem.extension; record.filename = activeItem.filename; record.blob = activeItem.blob;
     record.currentMetadata = activeItem.metadata; record.mediaSource = source.mediaSource || null;
@@ -985,6 +1040,7 @@ function updateScaleSummary(width, height, kind, frameCount = 1) {
   const uniformScale = outWidth / width === outHeight / height && Number.isInteger(outWidth / width) && outWidth / width >= 1;
   sizeSummary.textContent = `${width} × ${height}px → ${outWidth} × ${outHeight}px${uniformScale ? ` · ${outWidth / width}倍` : ''}`;
   updatePresetSelection(width, height);
+  updateSettingsSummaries();
   if (kind === 'gif' && record?.mediaSource?.frames?.length) {
     const seconds = getOutputTiming(record.mediaSource.frames, { format: 'gif' }).durationMs / 1000;
     animationDetails.textContent = `${frameCount}フレーム · ${seconds.toFixed(1)}秒 · ループ再生`;
@@ -997,26 +1053,116 @@ async function readPngMetadata(blob) {
   catch { return null; }
 }
 
-async function preparePngSettings(entry) {
-  const sourceBlob = entry.sourceBlob;
-  const parsedMetadata = await readPngMetadata(sourceBlob);
-  const imageDecoder = new Image();
-  imageDecoder.src = sourceUrl;
-  await imageDecoder.decode();
-  const savedDimensions = entry.currentMetadata?.width && entry.currentMetadata?.height
-    ? entry.currentMetadata
-    : (entry.metadata?.width && entry.metadata?.height ? entry.metadata : null);
-  pngBaseSize = parsedMetadata
-    ? { width: parsedMetadata.width, height: parsedMetadata.height }
-    : savedDimensions ? { width: savedDimensions.width, height: savedDimensions.height }
-      : { width: imageDecoder.naturalWidth, height: imageDecoder.naturalHeight };
-  const sourceScale = parsedMetadata?.scale || entry.metadata?.defaultScale || 1;
-  const startScale = entry.currentMetadata?.scale || entry.metadata?.scale || sourceScale;
-  const startWidth = entry.currentMetadata?.outputWidth || pngBaseSize.width * startScale;
-  const startHeight = entry.currentMetadata?.outputHeight || pngBaseSize.height * startScale;
-  setupScaleInput({ ...pngBaseSize, startScale, startWidth, startHeight, kind: 'png' });
-  if (maxScale <= 1) scaleNote.textContent += ' 基準サイズが上限に達しているため、この画像は1倍で書き出します。';
-  updateScaleSummary(pngBaseSize.width, pngBaseSize.height, 'png');
+function sameFrameSize(frames, width, height) {
+  return Number.isSafeInteger(width) && Number.isSafeInteger(height)
+    && frames.length > 0 && frames.every((frame) => frame.width === width && frame.height === height);
+}
+
+async function resolveRasterOrigin(entry, frames, actualSize, signal) {
+  if (!frames.length) return { status: 'skip', reason: 'no-frames' };
+  const embedded = entry.mime === 'image/png' ? await readPngMetadata(entry.sourceBlob) : null;
+  const transport = entry.metadata || {};
+  const claims = [];
+  if (embedded) claims.push({ ...embedded, source: 'png-metadata', verified: true });
+  if (Number.isSafeInteger(transport.width) && Number.isSafeInteger(transport.height)) {
+    claims.push({ width: transport.width, height: transport.height, scale: Math.max(1, Math.round(transport.defaultScale || 1)), source: 'handoff-metadata', verified: false });
+  }
+  for (const claim of claims) {
+    if (actualSize.width !== claim.width * claim.scale || actualSize.height !== claim.height * claim.scale) continue;
+    if (sameFrameSize(frames, claim.width, claim.height)) {
+      return { status: 'verified', width: claim.width, height: claim.height, scale: 1, source: claim.source, preferredScale: claim.scale };
+    }
+    const claimed = await verifyPixelScaleClaim(frames, claim, { signal });
+    if (claimed.status === 'verified') return { ...claimed, source: claim.source, preferredScale: claim.scale };
+  }
+  if (!sameFrameSize(frames, actualSize.width, actualSize.height)) return { status: 'skip', reason: 'frame-size-mismatch' };
+  return inferIntegerPixelScale(frames, { signal });
+}
+
+function updateOriginMessage(detection, isAutoOutput = false) {
+  originHint.hidden = true;
+  originRestore.hidden = true;
+  if (detection?.status === 'candidate') {
+    originHint.textContent = `整数倍のまとまり（${detection.scale}倍）がありますが、単純な形のため原寸とは断定できません。サイズは変更していません。`;
+    originHint.hidden = false;
+  } else if (detection?.status === 'detected' && detection.confidence === 'pixel-evidence') {
+    originHint.textContent = `画素から${detection.scale}倍の整数拡大を検出しました。原寸の意図は画像だけでは確定できません。元の画像データは保持しています。`;
+    originHint.hidden = false;
+  } else if (detection?.status === 'verified') {
+    originHint.textContent = `PiXiEEDの寸法情報から${detection.preferredScale || detection.scale}倍の出力を確認しました。元のフレームは保持しています。`;
+    originHint.hidden = false;
+  }
+  if (isAutoOutput && originRestoreItemId && activeItem?.id === originResizeActiveItemId) {
+    originRestore.hidden = false;
+  }
+}
+
+async function prepareRasterSettings(entry, frames, { autoResize = true } = {}) {
+  rasterSettingsController?.abort();
+  const controller = new AbortController(); rasterSettingsController = controller;
+  const epoch = ++rasterSettingsEpoch;
+  const sourceId = activeSource?.id;
+  const itemId = activeItem?.id;
+  if (image.getAttribute('src') && typeof image.decode === 'function') await image.decode().catch(() => {});
+  if (controller.signal.aborted || epoch !== rasterSettingsEpoch || sourceId !== activeSource?.id || itemId !== activeItem?.id) return;
+  const actualSize = { width: image.naturalWidth, height: image.naturalHeight };
+  const detection = await resolveRasterOrigin(entry, frames, actualSize, controller.signal).catch((error) => {
+    if (error?.name === 'AbortError') return { status: 'skip', reason: 'cancelled' };
+    return { status: 'skip', reason: 'inference-error' };
+  });
+  if (controller.signal.aborted || epoch !== rasterSettingsEpoch || sourceId !== activeSource?.id || itemId !== activeItem?.id) return;
+  const trusted = detection.status === 'verified';
+  const reduced = detection.status === 'detected';
+  const canUseOrigin = trusted || reduced;
+  const width = canUseOrigin ? detection.width : frames[0].width;
+  const height = canUseOrigin ? detection.height : frames[0].height;
+  const declaredScale = trusted ? detection.preferredScale : 1;
+  const sameSourceItem = activeItem?.sourceId === sourceId;
+  const visibleWidth = !image.hidden && image.naturalWidth ? image.naturalWidth : frames[0].width;
+  const visibleHeight = !image.hidden && image.naturalHeight ? image.naturalHeight : frames[0].height;
+  const existingOutputWidth = sameSourceItem ? visibleWidth : frames[0].width;
+  const existingOutputHeight = sameSourceItem ? visibleHeight : frames[0].height;
+  const savedWidth = sameSourceItem && entry.currentMetadata?.outputWidth > 0 ? entry.currentMetadata.outputWidth : 0;
+  const savedHeight = sameSourceItem && entry.currentMetadata?.outputHeight > 0 ? entry.currentMetadata.outputHeight : 0;
+  const startWidth = savedWidth || (canUseOrigin ? width : width * declaredScale);
+  const startHeight = savedHeight || (canUseOrigin ? height : height * declaredScale);
+  rasterProfile = { sourceId, width, height, status: detection.status, preferredScale: declaredScale, canUseOrigin };
+  pngBaseSize = { width, height };
+  setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight, kind: frames.length > 1 ? 'gif' : 'png', frameCount: frames.length });
+  scaleNote.textContent = canUseOrigin
+    ? '原寸候補を基準に設定しました。表示倍率とは別に出力サイズを変更できます。'
+    : '元フレームを保持したまま、出力サイズだけを変更できます。';
+  updateScaleSummary(width, height, frames.length > 1 ? 'gif' : 'png', frames.length);
+  const pixelEvidence = reduced || trusted;
+  for (const node of [image, timelineCanvas]) node.dataset.pixelArt = String(pixelEvidence);
+  const currentWidth = existingOutputWidth || frames[0].width;
+  const currentHeight = existingOutputHeight || frames[0].height;
+  const needsAutoResize = autoResize && sameSourceItem && pixelEvidence && (currentWidth > width || currentHeight > height)
+    && (currentWidth !== width || currentHeight !== height);
+  const shouldAutoSelectOrigin = shouldAutoSelectPixelOrigin({
+    selection: activeItem?.metadata?.pixelOriginChoice || record.currentMetadata?.pixelOriginChoice,
+    needsAutoResize
+  });
+  const matchingOutput = outputItems.find((item) => item.id !== activeItem?.id && item.sourceId === sourceId
+    && Number(item.metadata?.outputWidth) === width && Number(item.metadata?.outputHeight) === height
+    && item.extension === activeItem?.extension);
+  if (matchingOutput && shouldAutoSelectOrigin) {
+    originRestoreItemId = activeItem.id;
+    originResizeActiveItemId = matchingOutput.id;
+    updateOriginMessage(detection, true);
+    setActiveItem(matchingOutput); fillSourceAndFormatControls({ preferredFormat: matchingOutput.extension }); renderOutputItems();
+    return;
+  }
+  updateOriginMessage(detection, activeItem?.id === originResizeActiveItemId);
+  if (shouldAutoSelectOrigin && !matchingOutput) {
+    if (outputItems.length >= 12) {
+      status.textContent = '原寸候補は見つかりましたが、出力項目が上限です。元のファイルはそのまま保存できます。';
+      return;
+    }
+    originRestoreItemId = activeItem.id;
+    status.textContent = '整数倍の拡大を確認しました。元のファイルを残し、原寸候補の出力を準備しています…';
+    await generateOutputItem({ sourceId, formatValue: activeItem.extension, dimensions: { width, height }, preservePrevious: true, autoPixelOrigin: true });
+  }
 }
 
 function targetDimensions() {
@@ -1056,25 +1202,27 @@ function setMedia(entry) {
   image.hidden = audio.hidden = video.hidden = fileCard.hidden = true;
   timelineCanvas.hidden = true; timelinePlay.hidden = true; stopTimelinePreview();
   scaleSettings.hidden = animationSettings.hidden = audioSettings.hidden = true;
+  originHint.hidden = originRestore.hidden = true;
+  rasterSettingsController?.abort();
   if (type.startsWith('image/')) {
     const frames = sourceFrames(activeSource);
     const useTimeline = activeSource?.id.startsWith('local-images') && frames.length > 1 && !['image/gif', 'image/apng'].includes(type);
+    image.onload = () => { displayMetadata(record, currentBlob, image.naturalWidth, image.naturalHeight); updatePreviewControls(); };
+    image.src = fileUrl;
     if (useTimeline) { timelineCanvas.hidden = false; timelinePlay.hidden = false; paintTimelineFrame(0); }
-    else { image.hidden = false; image.src = fileUrl; }
-    image.onload = () => displayMetadata(record, currentBlob, image.naturalWidth, image.naturalHeight);
+    else { image.hidden = false; }
     image.alt = `${entry.title || '作品'}の${['image/gif', 'image/apng'].includes(type) ? 'アニメーション' : '画像'}プレビュー`;
     if (frames.length) {
-      const { width, height } = frames[0];
-      const startScale = entry.currentMetadata?.scale || entry.metadata?.defaultScale || 1;
       const animated = frames.length > 1 && ['image/gif', 'image/apng'].includes(type);
-      setupScaleInput({ width, height, startScale, startWidth: entry.currentMetadata?.outputWidth || width * startScale, startHeight: entry.currentMetadata?.outputHeight || height * startScale, kind: animated ? 'gif' : 'png', frameCount: animated ? frames.length : 1 });
-      pngBaseSize = { width, height };
       animationSettings.hidden = !animated;
       animationToggle.hidden = !animated;
       if (animated) void prepareGifPoster(entry.blob, image);
+      scaleSettings.hidden = false;
+      void prepareRasterSettings(entry, frames);
     } else {
-      if (type === 'image/png') void preparePngSettings(entry).catch((error) => { scaleSettings.hidden = true; status.textContent = error?.message || '画像サイズを読み込めませんでした。元の画像は保存できます。'; });
-      else { scaleSettings.hidden = true; animationSettings.hidden = true; }
+      scaleSettings.hidden = true;
+      if (type === 'image/png') status.textContent = '画像の元ピクセルを読み込めないため、サイズ変更は使えません。元のファイルはそのまま保存できます。';
+      animationSettings.hidden = true;
     }
   } else if (type === 'audio/wav') {
     audio.hidden = false; audio.src = fileUrl;
@@ -1095,6 +1243,8 @@ function setMedia(entry) {
     fileDescription.textContent = entry.metadata?.description || 'この形式はPiXiEED内でプレビューできません。';
     fileCard.hidden = false;
   }
+  updatePreviewControls();
+  updateSettingsSummaries();
   updateSequenceControls();
 }
 
@@ -1215,13 +1365,19 @@ formatButton.addEventListener('click', () => {
 sourceSelect.addEventListener('change', () => {
   const source = mediaSources.find((item) => item.id === sourceSelect.value);
   activeSource = source || activeSource;
+  rasterProfile = null;
   record.mediaSource = activeSource?.mediaSource || null;
   const formats = sourceFormats(source);
   stopTimelinePreview();
   fillSourceAndFormatControls({ preferredFormat: activeItem?.extension });
   const nextFormat = formats.some(([value]) => value === activeItem?.extension) ? activeItem.extension : formats[0]?.[0];
   if (['mp4', 'webm'].includes(nextFormat)) { createVideoButton.hidden = false; status.textContent = '動画を作成するには、作成ボタンを押してください。'; return; }
-  void generateOutputItem({ sourceId: source?.id, formatValue: nextFormat });
+  const frames = sourceFrames(source);
+  void (async () => {
+    if (frames.length) await prepareRasterSettings(record, frames, { autoResize: false });
+    if (source?.id !== activeSource?.id) return;
+    await generateOutputItem({ sourceId: source?.id, formatValue: nextFormat });
+  })();
 });
 formatSelect.addEventListener('change', () => {
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
@@ -1248,9 +1404,32 @@ download.addEventListener('click', (event) => {
   status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。';
   trackSave('download');
 });
+viewFitButton.addEventListener('click', () => setPreviewZoom(1));
+viewZoomOut.addEventListener('click', () => setPreviewZoom(previewZoom / 1.25));
+viewZoomIn.addEventListener('click', () => setPreviewZoom(previewZoom * 1.25));
+originRestore.addEventListener('click', async () => {
+  const previous = outputItems.find((item) => item.id === originRestoreItemId);
+  if (!previous) { originRestore.hidden = true; return; }
+  rasterSettingsController?.abort();
+  rasterSettingsEpoch += 1;
+  const selected = { ...previous, metadata: { ...previous.metadata, pixelOriginChoice: 'original' } };
+  try {
+    await persistOutputItems(outputItems.map((item) => item.id === selected.id ? selected : item));
+  } catch (error) {
+    status.textContent = error?.message || '元のサイズを選択として保存できませんでした。出力は保持されています。';
+    return;
+  }
+  originRestoreItemId = '';
+  originResizeActiveItemId = '';
+  const restored = outputItems.find((item) => item.id === selected.id) || selected;
+  setActiveItem(restored);
+  fillSourceAndFormatControls({ preferredFormat: restored.extension });
+  renderOutputItems();
+  status.textContent = '元のサイズの出力を選択しました。';
+});
 scaleInput.addEventListener('input', () => {
   if (!record) return;
-  const frame = sourceFrames()[0]; const width = frame?.width || pngBaseSize?.width; const height = frame?.height || pngBaseSize?.height;
+  const frame = sourceFrames()[0]; const width = pngBaseSize?.width || frame?.width; const height = pngBaseSize?.height || frame?.height;
   if (!width || !height) return;
   const scale = Math.max(1, Math.min(maxScale, Math.round(Number(scaleInput.value) || 1)));
   widthInput.value = String(width * scale); heightInput.value = String(height * scale);
@@ -1258,7 +1437,7 @@ scaleInput.addEventListener('input', () => {
 });
 function onDimensionInput(axis) {
   if (!record) return;
-  const frame = sourceFrames()[0]; const width = frame?.width || pngBaseSize?.width; const height = frame?.height || pngBaseSize?.height;
+  const frame = sourceFrames()[0]; const width = pngBaseSize?.width || frame?.width; const height = pngBaseSize?.height || frame?.height;
   if (!width || !height) return;
   if (aspectLock.checked) {
     if (axis === 'width' && Number(widthInput.value) > 0) heightInput.value = String(Math.max(1, Math.round(Number(widthInput.value) * height / width)));
