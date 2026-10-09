@@ -16,15 +16,17 @@ const paths = [
   '/play/spot-difference/', '/play/hidden-object/', '/globe/', '/about/', '/guide/',
   '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/stores/cafe-hoshi.html',
   '/stores/kaze-machi.html', '/stores/yoru-akari.html', '/pixel-camera.html',
-  '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/'
+  '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/', '/output/', '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 ];
 const manualPages = ['/', '/tools/', '/about/', '/guide/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+const offerwallPage = '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const sourcePrefix = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
 let checks = 0;
 try {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
   let requests = [];
   let rewardedRequests = [];
+  await context.addInitScript(() => { window.googlefc = { MessageTypeEnum: { OFFERWALL: 3 } }; });
   await context.route('**/*', (route) => {
     const url = route.request().url();
     if (url.startsWith(sourcePrefix)) {
@@ -44,10 +46,25 @@ try {
     requests = []; rewardedRequests = [];
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(150);
-    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), 0, `${path}: no eager Auto ads entrypoint`);
-    if (!manualPages.includes(path)) {
+    const isOfferwallPage = path === offerwallPage;
+    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), isOfferwallPage ? 1 : 0, `${path}: only the output workspace loads the existing AdSense entrypoint`);
+    if (!manualPages.includes(path) && !isOfferwallPage) {
       assert.equal(await page.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: no loader without a result or manual placement`);
       assert.equal(requests.length, 0, `${path}: no provider request without a placement`);
+    }
+    if (isOfferwallPage) {
+      assert.equal(requests.length, 1, 'the private output workspace uses the existing provider script once');
+      assert.deepEqual(await page.evaluate(() => {
+        let args;
+        window.googlefc?.controlledMessagingFunction?.({ proceed: (...values) => { args = values; } });
+        return args;
+      }), [true], 'the exact output workspace pathname permits Offerwall policy');
+    } else if (path !== '/output/' && await page.evaluate(() => typeof window.googlefc?.controlledMessagingFunction === 'function')) {
+      assert.deepEqual(await page.evaluate(() => {
+        let args;
+        window.googlefc.controlledMessagingFunction({ proceed: (...values) => { args = values; } });
+        return args;
+      }), [false, [3]], `${path}: other pages suppress Offerwall only`);
     }
     assert.equal(await page.evaluate(() => localStorage.getItem('pixieed:pass:v1')), null, `${path}: ordinary ads grant no pass`);
     assert.equal(rewardedRequests.length, 0, `${path}: no unsolicited rewarded ad`);
@@ -70,6 +87,48 @@ try {
     }
     checks++;
   }
+  // Browser-history and reload checks use only a local fixture and IndexedDB-staged pixels.
+  await page.goto(`${base}/tests/creation-suite/output-fixture.browser.html`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: '透明背景つき PNG を開く' }).click();
+  await page.waitForURL(/\/output\/work\/\?id=/);
+  await page.waitForFunction(() => document.querySelector('#output-download')?.href.startsWith('blob:'));
+  const firstOutputUrl = page.url();
+  await page.goBack();
+  await page.waitForURL(/\/tests\/creation-suite\/output-fixture\.browser\.html$/);
+  await page.goForward();
+  await page.waitForURL(/\/output\/work\/\?id=/);
+  await page.waitForFunction(() => document.querySelector('#output-download')?.href.startsWith('blob:'));
+  assert.equal(page.url(), firstOutputUrl, 'Forward restores the same opaque output id');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => document.querySelector('#output-download')?.href.startsWith('blob:'));
+  assert.equal(page.url(), firstOutputUrl, 'reload keeps the IndexedDB output id and download available');
+  const readyDownload = page.waitForEvent('download');
+  await page.locator('#output-download').click();
+  await readyDownload;
+  checks += 4;
+
+  // The loader may fail or return without an ad fill; the ordinary download remains usable.
+  const blockedContext = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+  const blockedRequests = [];
+  await blockedContext.route('**/*', (route) => {
+    const url = route.request().url();
+    if (url.startsWith(sourcePrefix)) { blockedRequests.push(url); return route.abort(); }
+    if (new URL(url).origin === origin) return route.continue();
+    return route.abort();
+  });
+  const blockedPage = await blockedContext.newPage();
+  await blockedPage.goto(`${base}/tests/creation-suite/output-fixture.browser.html`, { waitUntil: 'domcontentloaded' });
+  await blockedPage.getByRole('button', { name: '透明背景つき PNG を開く' }).click();
+  await blockedPage.waitForURL(/\/output\/work\/\?id=/);
+  await blockedPage.waitForFunction(() => document.querySelector('#output-download')?.href.startsWith('blob:'));
+  assert.equal(await blockedPage.locator('#output-download').isEnabled(), true, 'output is ready with the provider blocked');
+  const blockedDownload = blockedPage.waitForEvent('download');
+  await blockedPage.locator('#output-download').click();
+  await blockedDownload;
+  assert.match(await blockedPage.locator('#output-status').textContent(), /ダウンロードを開始しました/, 'a blocked provider does not replace or disable normal save');
+  assert.equal(blockedRequests.length, 1, 'the existing provider request was intercepted locally');
+  await blockedContext.close();
+  checks += 2;
   for (const path of ['/privacy/', '/profile/', '/collection/', '/admin/', '/game/', '/404.html']) {
     requests = []; rewardedRequests = [];
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
@@ -105,5 +164,5 @@ try {
     }
     await layout.close();
   }
-  console.log(`${engine}: ${checks}/${checks} PASS; local stub only, real ad delivery UNTESTED`);
+  console.log(`${engine}: ${checks}/${checks} PASS; local provider stub/block only, real ad delivery UNTESTED`);
 } finally { await browser.close(); }

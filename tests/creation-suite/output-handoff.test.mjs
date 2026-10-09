@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, saveToolOutputMedia, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
+import { clearToolOutputReturnId, readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, saveToolOutputMedia, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from '../../js/pixel-lens/output-handoff.mjs';
@@ -78,7 +78,7 @@ function dependencies({ indexedDBRef = new FakeIndexedDB(), now = () => 1_000, i
     indexedDBRef,
     now,
     cryptoRef: { randomUUID: () => id },
-    locationRef: { origin: 'https://pixieed.test', assign: (url) => assigned.push(url) }
+    locationRef: { origin: 'https://pixieed.test', pathname: '/output-fixture.html', search: '', hash: '', assign: (url) => assigned.push(url) }
   };
 }
 function file(filename = 'my-art.png', type = 'image/png', contents = 'pixels') {
@@ -233,6 +233,47 @@ test('camera output return links carry only the opaque output id for local resto
   const restored = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   assert.equal(restored.returnUrl, `/draw/?pxd=local-id&pxdRevision=revision-id&outputId=${validId}`);
   assert.equal(await restored.sourceBlob.text(), 'pixels');
+});
+
+test('returnOutputId updates only the matching allowed browser history entry for cold restoration', async () => {
+  const deps = dependencies();
+  deps.locationRef.pathname = '/pixel-camera.html';
+  deps.locationRef.search = '?from=globe';
+  const historyCalls = [];
+  deps.historyRef = { state: { camera: 'preserve' }, replaceState: (...args) => historyCalls.push(args) };
+  const staged = await sendToolOutput({ ...file('capture.png'), returnUrl: '/pixel-camera.html?from=globe', returnOutputId: true }, deps);
+  assert.equal(staged.ok, true);
+  assert.deepEqual(historyCalls, [[{ camera: 'preserve' }, '', `/pixel-camera.html?from=globe&outputId=${validId}`]]);
+
+  const nonMatching = dependencies({ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' });
+  nonMatching.historyRef = { state: null, replaceState() { assert.fail('must not mutate a different editor history entry'); } };
+  await sendToolOutput({ ...file('capture.png'), returnUrl: '/pixel-camera.html?from=globe', returnOutputId: true }, nonMatching);
+});
+
+test('explicit retake clears only outputId while preserving other query parameters and hash', () => {
+  const calls = [];
+  const locationRef = { origin: 'https://pixieed.test', pathname: '/pixel-camera.html', search: '?from=globe&outputId=old-id&mode=edit', hash: '#capture' };
+  const historyRef = { state: { camera: 'preserve' }, replaceState: (...args) => calls.push(args) };
+  assert.equal(clearToolOutputReturnId(locationRef, historyRef), true);
+  assert.deepEqual(calls, [[{ camera: 'preserve' }, '', '/pixel-camera.html?from=globe&mode=edit#capture']]);
+
+  locationRef.search = '?from=globe&mode=edit';
+  assert.equal(clearToolOutputReturnId(locationRef, historyRef), false);
+  assert.equal(calls.length, 1, 'an ordinary camera start leaves history untouched');
+});
+
+test('overlapping output gestures stage one record and issue one navigation', async () => {
+  const deps = dependencies();
+  let nextId = 0;
+  deps.cryptoRef.randomUUID = () => `aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa${nextId++}`;
+  const first = sendToolOutput(file('first.png'), deps);
+  const duplicate = sendToolOutput(file('second.png'), deps);
+  assert.equal(first, duplicate, 'the in-flight page handoff is shared');
+  const [a, b] = await Promise.all([first, duplicate]);
+  assert.equal(a.ok, true);
+  assert.equal(b.id, a.id);
+  assert.equal(deps.assigned.length, 1);
+  assert.equal(deps.indexedDBRef.state.get('outputs').size, 1);
 });
 
 test('PiXiEELENS GIF output uses its real options builder and restores all animation frames locally', async () => {

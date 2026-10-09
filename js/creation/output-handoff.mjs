@@ -18,6 +18,7 @@ const RETURN_PATHS = new Set([
   '/jigsaw/', '/spot-difference/', '/hidden-object/', '/output/'
 ]);
 const ID_PATTERN = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
+const inFlightHandoffs = new WeakMap();
 
 function mimeOf(blob) { return String(blob?.type || '').split(';', 1)[0].trim().toLowerCase(); }
 function extensionOf(filename) { return String(filename || '').split('.').pop().toLowerCase(); }
@@ -116,6 +117,34 @@ function newOutputId(cryptoRef = globalThis.crypto) {
 function outputPageUrl(id, origin = globalThis.location?.origin) {
   if (!ID_PATTERN.test(id) || !origin) throw new TypeError('出力ページを開けません。');
   return new URL(`/output/work/?id=${encodeURIComponent(id)}`, origin).href;
+}
+
+function addOutputIdToCurrentHistory(returnUrl, id, locationRef, historyRef) {
+  if (!locationRef?.origin || typeof historyRef?.replaceState !== 'function') return;
+  try {
+    const returnPath = safeReturnUrl(returnUrl, locationRef.origin);
+    const current = new URL(`${locationRef.pathname || '/'}${locationRef.search || ''}${locationRef.hash || ''}`, locationRef.origin);
+    const target = new URL(returnPath, locationRef.origin);
+    if (current.origin !== target.origin || current.pathname !== target.pathname || current.search !== target.search || current.hash !== target.hash) return;
+    target.searchParams.set('outputId', id);
+    historyRef.replaceState(historyRef.state, '', `${target.pathname}${target.search}${target.hash}`);
+  } catch {
+    // The output page remains usable even when this browser cannot update its history entry.
+  }
+}
+
+/** Remove only the staged-return token when an editor explicitly starts a new capture. */
+export function clearToolOutputReturnId(locationRef = globalThis.location, historyRef = globalThis.history) {
+  if (!locationRef?.origin || typeof historyRef?.replaceState !== 'function') return false;
+  try {
+    const current = new URL(`${locationRef.pathname || '/'}${locationRef.search || ''}${locationRef.hash || ''}`, locationRef.origin);
+    if (!current.searchParams.has('outputId')) return false;
+    current.searchParams.delete('outputId');
+    historyRef.replaceState(historyRef.state, '', `${current.pathname}${current.search}${current.hash}`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function safeMetadata(metadata = {}) {
@@ -410,7 +439,7 @@ export async function saveToolOutputMedia(id, mediaSources, mediaSettings = {}, 
   } finally { database.close?.(); }
 }
 
-export async function sendToolOutput(options, dependencies) {
+async function performToolOutput(options, dependencies) {
   try {
     const staged = await stageToolOutput(options, dependencies);
     const locationRef = dependencies?.locationRef || globalThis.location;
@@ -423,6 +452,7 @@ export async function sendToolOutput(options, dependencies) {
           record.returnUrl = safeReturnUrl(`${url.pathname}${url.search}${url.hash}`, locationRef.origin);
         }, dependencies?.now || Date.now);
       } finally { database.close?.(); }
+      addOutputIdToCurrentHistory(options.returnUrl, staged.id, locationRef, dependencies?.historyRef || globalThis.history);
     }
     if (typeof locationRef?.assign !== 'function') return { ok: false, reason: 'navigation_unavailable', staged };
     locationRef.assign(staged.url);
@@ -430,6 +460,23 @@ export async function sendToolOutput(options, dependencies) {
   } catch (error) {
     return { ok: false, error };
   }
+}
+
+/** Coalesce overlapping save gestures in one page so they stage and navigate only once. */
+export function sendToolOutput(options, dependencies) {
+  const locationRef = dependencies?.locationRef || globalThis.location;
+  if (!locationRef || (typeof locationRef !== 'object' && typeof locationRef !== 'function')) {
+    return performToolOutput(options, dependencies);
+  }
+  const existing = inFlightHandoffs.get(locationRef);
+  if (existing) return existing;
+  const operation = performToolOutput(options, dependencies);
+  let tracked;
+  tracked = operation.finally(() => {
+    if (inFlightHandoffs.get(locationRef) === tracked) inFlightHandoffs.delete(locationRef);
+  });
+  inFlightHandoffs.set(locationRef, tracked);
+  return tracked;
 }
 
 /** Flush pending editor autosaves before leaving, while keeping a file-save fallback. */

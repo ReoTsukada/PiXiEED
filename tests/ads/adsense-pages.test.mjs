@@ -12,11 +12,12 @@ export const RESULT_PAGES = [
   'play/spot-difference/index.html', 'play/hidden-object/index.html'
 ];
 export const WORKSPACE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pixiee-lens/index.html', 'globe/index.html'];
+const OFFERWALL_PAGE = 'output/work/index.html';
 const EXCLUDED_PAGES = [
   'privacy/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
-  'output/index.html', 'output/work/index.html',
+  'output/index.html',
   'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html', 'pass/index.html',
   'stores/cafe-hoshi.html', 'stores/kaze-machi.html', 'stores/yoru-akari.html',
   'spot-difference/index.html', 'hidden-object/index.html', 'globe-prototype.html', 'pixiee-lens/index.html'
@@ -58,10 +59,13 @@ test('every non-fixture HTML entry has an explicit ad-loading decision', async (
     }
     return found;
   }
-  const expected = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES])].sort();
+  const expected = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES, OFFERWALL_PAGE])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
   assert.equal(new Set(expected).size, 39);
-  for (const path of expected) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
+  for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
+  const output = await html(OFFERWALL_PAGE);
+  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=[^"]+"><\/script>\s*<script src="\/js\/adsense-auto\.js\?rev=[^"]+"><\/script>/);
+  assert.doesNotMatch(await html('output/index.html'), /adsbygoogle\.js|adsense-auto\.js/);
 });
 
 test('ads.txt seller and privacy disclosure agree with the installed publisher', async () => {

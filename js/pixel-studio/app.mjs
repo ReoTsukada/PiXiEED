@@ -2,7 +2,7 @@ import { createFrameLoop } from './frame-loop.mjs';
 import { encodeCameraPng, pngExportGeometry } from './png-export.mjs';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
-import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261009-output-12';
+import { clearToolOutputReturnId, readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261009-output-13';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
 const $ = (selector) => document.querySelector(selector);
@@ -538,6 +538,7 @@ view.addEventListener('keydown', (event) => {
 });
 
 function retake() {
+  clearToolOutputReturnId();
   invalidateCaptureDownload();
   state.result = null;
   view.width = 1;
