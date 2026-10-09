@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { inferIntegerPixelScale, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from '../../js/creation/output-render.mjs';
 
 function informativeFrame(width = 8, height = 8, seed = 1) {
@@ -90,4 +91,48 @@ test('persisted original-size choice prevents automatic re-selection of the pixe
   assert.equal(shouldAutoSelectPixelOrigin({ selection: 'original', needsAutoResize: true }), false);
   assert.equal(shouldAutoSelectPixelOrigin({ selection: undefined, needsAutoResize: true }), true);
   assert.equal(shouldAutoSelectPixelOrigin({ selection: 'original', needsAutoResize: false }), false);
+});
+
+test('preview CSS uses intrinsic ratio and contain sizing for raster and video media', () => {
+  const css = readFileSync(new URL('../../css/tool-output.css', import.meta.url), 'utf8');
+  const rasterRule = css.match(/\.output-preview\s*>\s*:is\(img,canvas\)\s*\{([^}]*)\}/)?.[1];
+  const videoRule = css.match(/\.output-preview\s*>\s*video\s*\{([^}]*)\}/)?.[1];
+  for (const rule of [rasterRule, videoRule]) {
+    assert.ok(rule, 'the preview media rule exists');
+    assert.match(rule, /\bwidth:\s*auto\s*;/);
+    assert.match(rule, /\bheight:\s*auto\s*;/);
+    assert.match(rule, /\bmax-width:\s*100%\s*;/);
+    assert.match(rule, /\bmax-height:\s*100%\s*;/);
+    assert.match(rule, /\bobject-fit:\s*contain\s*;/);
+    assert.doesNotMatch(rule, /(?:^|;)\s*(?:width|height):\s*100%\s*;/, 'stretch dimensions are not used');
+  }
+});
+
+test('extreme portrait and landscape art fits mobile and desktop preview bounds without cropping or stretching', () => {
+  const contain = (width, height, boxWidth, boxHeight) => {
+    const factor = Math.min(boxWidth / width, boxHeight / height);
+    return { width: width * factor, height: height * factor };
+  };
+  const viewports = [
+    { name: '320px mobile', boxWidth: 276, boxHeight: 230 },
+    { name: '1280px desktop', boxWidth: 690, boxHeight: 563 }
+  ];
+  for (const { name, boxWidth, boxHeight } of viewports) for (const [width, height] of [[8, 512], [512, 8]]) {
+    const fitted = contain(width, height, boxWidth, boxHeight);
+    assert.ok(fitted.width <= boxWidth && fitted.height <= boxHeight, `${name} ${width}×${height} fits the preview box`);
+    assert.ok(Math.abs(fitted.width / fitted.height - width / height) < 1e-10, `${name} ${width}×${height} retains its intrinsic ratio`);
+  }
+});
+
+test('detects 5x and maximum 32x integer scaling, skips heuristic 37x, but verifies a 37x metadata claim', async () => {
+  for (const scale of [5, 32]) {
+    const result = await inferIntegerPixelScale([enlarge(informativeFrame(8, 8), scale)]);
+    assert.equal(result.status, 'detected', `${scale}x is within the heuristic cap`);
+    assert.equal(result.scale, scale);
+  }
+  const frame37 = enlarge(informativeFrame(8, 8), 37);
+  assert.deepEqual(await inferIntegerPixelScale([frame37]), { status: 'skip', reason: 'no-exact-scale' });
+  assert.deepEqual(await verifyPixelScaleClaim([frame37], { width: 8, height: 8, scale: 37 }), {
+    status: 'verified', width: 8, height: 8, scale: 37, source: 'metadata'
+  });
 });
