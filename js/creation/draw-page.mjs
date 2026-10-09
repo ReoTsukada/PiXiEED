@@ -8,7 +8,7 @@ import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER
 import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261007-draw-handoff-1';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, canvasResizeOffset, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261006-draw-panel-dismiss-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261009-fps-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';

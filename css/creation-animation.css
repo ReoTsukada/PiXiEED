@@ -47,6 +47,7 @@
 .animation-controls__button.is-selected { border-color: var(--creation-yellow, #ffd35a); color: var(--creation-yellow, #ffd35a); }
 .animation-controls__button:focus-visible,
 .animation-controls__duration-input:focus-visible,
+.animation-controls__fps-preset:focus-visible,
 .animation-controls__rename:focus-visible { outline: 3px solid var(--creation-yellow, #ffd35a); outline-offset: 2px; }
 .animation-controls__play { font-size: 16px; }
 .animation-controls__export { flex-basis: 50px; width: 50px; font-size: 11px; }
@@ -267,7 +268,9 @@
 .animation-controls__layer .animation-controls__button { flex-basis: 44px; width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: 9px; font-size: 15px; }
 .animation-controls__wide-button { display: flex; width: 100%; min-height: 44px; margin-top: 6px; font-size: 12px; }
 .animation-controls__duration-input { width: 100%; min-height: 44px; padding: 7px 10px; border: 1px solid var(--creation-panel-edge, #52606a); border-radius: 9px; background: #141c22; color: inherit; font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; }
+.animation-controls__fps-preset { width: 100%; min-height: 44px; padding: 7px 10px; border: 1px solid var(--creation-panel-edge, #52606a); border-radius: 9px; background: #141c22; color: inherit; font: inherit; font-size: 14px; }
 .animation-controls__unit { display: block; margin-top: 4px; color: var(--creation-muted, #b8c0c2); text-align: right; }
+.animation-controls__timing-note { margin: 6px 0 0; color: var(--creation-muted, #b8c0c2); font-size: 11px; line-height: 1.45; }
 .animation-controls__status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .animation-controls.is-audio { color: var(--audio-ink, #193b4a); }
 .animation-controls.is-audio .animation-controls__button { border-color: #193b4a26; background: var(--audio-paper, #fffdf8); color: var(--audio-ink, #193b4a); }

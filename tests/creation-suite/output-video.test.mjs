@@ -73,7 +73,7 @@ test('output video waits for MediaRecorder start and keeps the requested WebM co
   } finally { harness.restore(); }
 });
 
-test('audio-composed video fixes tracks before recording and ends with the decoded audio', async () => {
+test('audio-composed video fixes tracks before recording and preserves audio speed and duration', async () => {
   const harness = createMediaHarness({ audio: true, duration: 0.05 });
   try {
     const result = await renderOutputVideo([frame(100)], {
@@ -82,14 +82,15 @@ test('audio-composed video fixes tracks before recording and ends with the decod
       AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
       requestFrame: (callback) => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
     });
-    assert.equal(result.hasAudio, true); assert.equal(result.seconds, 0.04);
+    assert.equal(result.hasAudio, true); assert.equal(result.seconds, 0.05);
+    assert.equal(harness.audioNodes[0].playbackRate.value, 1, 'visual FPS changes never alter audio speed or pitch');
     assert.ok(harness.recorders[0].startedTracks.some((track) => track.kind === 'audio' && track.readyState === 'live' && track.enabled));
     assert.ok(harness.recorders[0].stream.getAudioTracks().every((track) => track.readyState === 'ended'));
     assert.ok(harness.tracks.every((track) => track.stopped));
   } finally { harness.restore(); }
 });
 
-test('GIF frames repeat through the audio duration at the shared playback speed', async () => {
+test('frames follow the selected visual speed through the unchanged audio duration', async () => {
   const harness = createMediaHarness({ audio: true, duration: 0.12, deterministicAudioClock: true });
   try {
     const result = await renderOutputVideo([frame(25), { ...frame(25), data: new Uint8Array([20, 20, 20, 255]) }], {
@@ -98,8 +99,8 @@ test('GIF frames repeat through the audio duration at the shared playback speed'
       AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
       requestFrame: (callback) => { harness.advanceAudioClock(0.02); return setTimeout(() => callback(performance.now()), 0); }, cancelFrame: clearTimeout
     });
-    assert.equal(result.seconds, 0.08);
-    assert.equal(harness.audioNodes[0].playbackRate.value, 1.5);
+    assert.equal(result.seconds, 0.12);
+    assert.equal(harness.audioNodes[0].playbackRate.value, 1);
     assert.equal(harness.audioNodes[0].startTime, 0);
     assert.ok(harness.paintedPixels.filter((pixel) => pixel === 10).length >= 2);
     assert.ok(harness.paintedPixels.filter((pixel) => pixel === 20).length >= 2);

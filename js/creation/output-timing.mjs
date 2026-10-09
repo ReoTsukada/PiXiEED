@@ -25,3 +25,20 @@ export function getOutputTiming(frames, { format = 'apng', playbackRate = 1 } = 
     : frameDelaysMs.reduce((sum, delay) => sum + delay, 0);
   return { sourceDelaysMs, frameDelaysMs, previewDelaysMs, sourceDurationMs, durationMs };
 }
+
+/** Return a single effective FPS only when every frame has the same output delay. */
+export function getEffectiveOutputFps(frames, options = {}) {
+  if (!Array.isArray(frames) || !frames.length) return null;
+  const delays = getOutputTiming(frames, options).previewDelaysMs;
+  const first = delays[0];
+  if (!Number.isFinite(first) || first <= 0 || delays.some((delay) => Math.abs(delay - first) > 1e-7)) return null;
+  return 1000 / first;
+}
+
+/** Validate a user-entered FPS and convert it to an unrounded frame delay. */
+export function outputFpsToDelayMs(fps, { minDelayMs = 1, maxDelayMs = 3600000 } = {}) {
+  if (!Number.isFinite(fps) || fps <= 0) throw new RangeError('FPSは0より大きい数値で指定してください。');
+  const delayMs = 1000 / fps;
+  if (delayMs < minDelayMs || delayMs > maxDelayMs) throw new RangeError(`FPSは${(1000 / maxDelayMs).toPrecision(6)}〜${(1000 / minDelayMs).toPrecision(6)}の範囲で指定してください。`);
+  return delayMs;
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnimation, createAnimationFromDraw, getAnimationCelDocument, setLayerProperties, writeAnimationCel } from '../../js/creation/animation-core.mjs';
+import { createAnimation, createAnimationFromDraw, getAnimationCelDocument, setAnimationFrameDuration, setLayerProperties, writeAnimationCel } from '../../js/creation/animation-core.mjs';
 import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdBytes, setPxdJson } from '../../js/creation/pxd-codec.mjs';
 import { readPxdAnimation, writePxdAnimation } from '../../js/creation/pxd-animation.mjs';
 
@@ -27,6 +27,14 @@ test('legacy Draw conversion serializes exact poster pixels while keeping PXD im
   assert.equal(project.entries.some(({ path }) => path === 'draw/state.json'), false);
   const restored = await readPxdAnimation(project);
   assert.deepEqual(getAnimationCelDocument(restored, restored.frames[0].id, restored.layers[0].id).pixels, [-1, 0]);
+});
+
+test('fractional frame delays for exact FPS values survive PXD save and reload', async () => {
+  const original = createAnimation({ width: 1, height: 1 });
+  const delayMs = 1000 / 24;
+  const animation = setAnimationFrameDuration(original, original.frames[0].id, delayMs);
+  const restored = await readPxdAnimation(await writePxdAnimation(createPxdProject(), animation));
+  assert.equal(restored.frames[0].durationMs, delayMs);
 });
 
 test('a changed payload hash, incomplete pair, or unknown animation version is rejected without modifying the PXD', async () => {

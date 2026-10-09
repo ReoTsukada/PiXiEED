@@ -17,7 +17,7 @@ import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSha
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, pxdImageToAudioDocument, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261005-frame-cell-pitch-1';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { addAnimationFrame, composeAnimationFrame, createAnimationFromDraw, getAnimationCelDocument, getAnimationUsedColorIndices, moveAnimationFrame, removeAnimationFrame, removeAnimationLayer, setAnimationPalette, setLayerProperties, writeAnimationCel } from './animation-core.mjs';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261004-audio-frame-previews-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261009-fps-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261001-audio-animation-1';
 import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261005-frame-cell-pitch-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';

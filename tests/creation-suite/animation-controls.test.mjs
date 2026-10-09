@@ -147,7 +147,7 @@ test('animation controls emit typed actions, preserve one-frame collapse, and di
   assert.deepEqual(actions.at(-1), { type: 'move-layer', layerId: 'l1', index: 1 });
   const rename = doc.body.querySelectorAll('[data-rename-layer]').find((input) => input.dataset.renameLayer === 'l2'); rename.value = 'Color edits'; rename.fire('focusout');
   assert.deepEqual(actions.at(-1), { type: 'rename-layer', layerId: 'l2', name: 'Color edits' });
-  const duration = doc.body.querySelector('[data-duration-input]'); duration.value = '360'; duration.fire('change');
+  const duration = doc.body.querySelector('[data-duration-input]'); duration.value = String(1000 / 360); duration.fire('change');
   assert.deepEqual(actions.at(-1), { type: 'duration', frameId: 'f2', durationMs: 360 });
 
   root.querySelector('[data-action="add-frame"]').fire('click');
@@ -190,6 +190,31 @@ test('a single frame begins collapsed and GIF export is hidden in audio mode', (
   assert.equal(root.querySelector('[data-action="play"]').hidden, true);
   assert.equal(root.querySelector('[data-action="onion"]').hidden, true);
   assert.equal(root.querySelector('[data-action="toggle-duration"]').hidden, true);
+  ui.dispose();
+});
+
+test('frame timing is shown and edited as FPS without changing source timing on open or invalid input', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 40 }, { id: 'f2', durationMs: 80 }], layers: [{ id: 'l1', name: 'Layer', visible: true }], frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false };
+  const actions = [];
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction(action) {
+    actions.push(action);
+    if (action.type === 'duration') state.frames.find((frame) => frame.id === action.frameId).durationMs = action.durationMs;
+  } });
+  const root = host.children[0]; const input = doc.body.querySelector('[data-duration-input]');
+  assert.equal(input.value, '25'); assert.equal(input.max, '50', 'the dot editor is bounded by the GIF timeline it exports');
+  root.querySelector('[data-action="toggle-duration"]').fire('click');
+  assert.equal(input.getAttribute('aria-label'), '選択中コマのFPS');
+  input.fire('change'); assert.deepEqual(actions, [], 'opening and committing the displayed value does not rewrite timing');
+  input.value = ''; input.fire('change');
+  assert.deepEqual(actions, [], 'empty input is rejected'); assert.equal(state.frames[0].durationMs, 40);
+  input.value = '50'; input.fire('change');
+  assert.deepEqual(actions.at(-1), { type: 'duration', frameId: 'f1', durationMs: 20 });
+  const preset = doc.body.querySelector('[data-fps-preset]'); preset.value = '25'; preset.fire('change');
+  assert.deepEqual(actions.at(-1), { type: 'duration', frameId: 'f1', durationMs: 40 });
+  state.audioMode = true; ui.refresh();
+  assert.equal(doc.body.querySelector('[data-action="toggle-duration"]').hidden, true);
+  assert.equal(doc.body.querySelector('[data-duration-input]').parentElement.hidden, true, 'audio mode does not expose animation FPS');
   ui.dispose();
 });
 

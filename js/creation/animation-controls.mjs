@@ -79,7 +79,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     toolbar.append(button('前のコマ', '‹', 'previous-frame'));
     toolbar.append(button('次のコマ', '›', 'next-frame'));
     toolbar.append(button('コマを複製して追加', '+', 'add-frame'));
-    const durationButton = button('表示時間', '◷', 'toggle-duration');
+    const durationButton = button('選択コマのFPS', 'FPS', 'toggle-duration');
     timingToggle = durationButton; toolbar.append(durationButton);
     const layerButton = button('レイヤー', '▤', 'toggle-layers');
     layerToggle = layerButton; if (!frameOnly) toolbar.append(layerButton);
@@ -105,13 +105,19 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const addLayer = button('レイヤーを追加', '+', 'add-layer', 'animation-controls__wide-button');
     layers.append(layerHeading, layerList, addLayer);
 
-    timing = node('div', 'animation-controls__timing'); timing.hidden = true; timing.setAttribute('role', 'group'); timing.setAttribute('aria-label', 'コマの表示時間');
-    const timingHeading = node('label', 'animation-controls__panel-heading', 'コマの表示時間');
-    const timingClose = button('表示時間を閉じる', '×', 'close-duration');
+    timing = node('div', 'animation-controls__timing'); timing.hidden = true; timing.setAttribute('role', 'group'); timing.setAttribute('aria-label', 'コマのFPS');
+    const timingHeading = node('div', 'animation-controls__panel-heading', '選択コマのFPS');
+    const timingClose = button('FPS設定を閉じる', '×', 'close-duration');
+    const fpsPreset = node('select', 'animation-controls__fps-preset');
+    fpsPreset.dataset.fpsPreset = 'true'; fpsPreset.setAttribute('aria-label', '選択コマのFPSプリセット');
+    for (const [label, value] of [['プリセット', ''], ['5 FPS', '5'], ['10 FPS', '10'], ['12.5 FPS', '12.5'], ['20 FPS', '20'], ['25 FPS', '25'], ['50 FPS', '50']]) {
+      const option = node('option', '', label); option.value = value; fpsPreset.append(option);
+    }
     const durationInput = node('input', 'animation-controls__duration-input');
-    durationInput.type = 'number'; durationInput.min = '20'; durationInput.max = '10000'; durationInput.step = '10';
-    durationInput.setAttribute('aria-label', '選択中コマの表示時間（ミリ秒）'); durationInput.dataset.durationInput = 'true';
-    timingHeading.append(timingClose); timing.append(timingHeading, durationInput, node('span', 'animation-controls__unit', 'ミリ秒'));
+    durationInput.type = 'number'; durationInput.min = String(1000 / 60000); durationInput.max = '50'; durationInput.step = 'any';
+    durationInput.setAttribute('aria-label', '選択中コマのFPS'); durationInput.dataset.durationInput = 'true';
+    const timingUnit = node('span', 'animation-controls__unit', 'FPS');
+    timingHeading.append(timingClose); timing.append(timingHeading, fpsPreset, durationInput, timingUnit, node('p', 'animation-controls__timing-note', 'GIFは20ms以上・10ms単位で書き出します。'));
 
     status = node('span', 'animation-controls__status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     if (hasWorkspace) {
@@ -372,14 +378,19 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     root.classList.toggle('is-audio', Boolean(state.audioMode));
     for (const portal of [workspacePanel, frameMenu, layers, timing]) portal?.classList.toggle('is-audio', Boolean(state.audioMode));
     for (const action of ['play', 'onion', 'toggle-duration']) { const control = actionElement(action); if (control) control.hidden = Boolean(state.audioMode); }
+    if (state.audioMode) { timing.hidden = true; timingToggle.setAttribute('aria-expanded', 'false'); }
     if (!state.audioMode && typeof getCelContent === 'function') renderCelGrid(state);
     else { frames.classList.toggle('is-cel-grid', false); renderFrameStrip(state); }
     layerToggle.hidden = frameOnly;
     if (!frameOnly) renderLayers(state);
     const selected = state.frames.find((frame) => frame.id === state.frameId);
     const durationInput = timing.querySelector('[data-duration-input]');
-    durationInput.value = String(Number.isFinite(selected?.durationMs) ? selected.durationMs : 100);
+    const currentDurationMs = Number.isFinite(selected?.durationMs) ? selected.durationMs : 100;
+    const currentFps = Number((1000 / currentDurationMs).toPrecision(12));
+    durationInput.value = String(currentFps);
+    durationInput.dataset.currentFps = String(currentFps);
     durationInput.disabled = Boolean(state.readOnly) || pending > 0 || !selected;
+    timing.querySelector('[data-fps-preset]').disabled = Boolean(state.readOnly) || pending > 0 || !selected;
     setPressed('play', state.playing); setPressed('onion', state.onion);
     const playButton = actionElement('play');
     replaceButtonIcon(playButton, state.playing ? 'pause' : 'play');
@@ -530,14 +541,24 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (action === 'export-gif') { request({ type: 'export-gif' }); return; }
   }
 
+  function applyFrameFps(target, fps) {
+    const state = stateNow(); const frame = state.frames.find((item) => item.id === state.frameId);
+    const minFps = 1000 / 60000;
+    const durationMs = 1000 / fps;
+    if (frame && fps === Number(target.dataset.currentFps)) return;
+    if (frame && Number.isFinite(fps) && fps >= minFps && fps <= 50 && durationMs >= 20 && durationMs <= 60000) request({ type: 'duration', frameId: frame.id, durationMs });
+    else { status.textContent = `GIF用FPSは${Number(minFps.toPrecision(6))}〜50の範囲で指定してください`; refresh(); }
+  }
+
   function onChange(event) {
     const target = event.target;
-    if (target.matches('[data-duration-input]')) {
-      const state = stateNow(); const frame = state.frames.find((item) => item.id === state.frameId);
-      const durationMs = Number(target.value);
-      if (frame && Number.isInteger(durationMs) && durationMs >= 20 && durationMs <= 10000) request({ type: 'duration', frameId: frame.id, durationMs });
-      else { status.textContent = '表示時間は20〜10000ミリ秒で指定してください'; refresh(); }
+    if (target.matches('[data-fps-preset]')) {
+      const fps = Number(target.value);
+      target.value = '';
+      if (fps > 0) applyFrameFps(timing.querySelector('[data-duration-input]'), fps);
+      return;
     }
+    if (target.matches('[data-duration-input]')) applyFrameFps(target, Number(target.value));
   }
 
   function onBlur(event) {

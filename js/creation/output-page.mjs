@@ -3,9 +3,9 @@ import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-ro
 import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-7';
 import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
 import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261008-output-1';
-import { renderOutputVideo } from './output-video.mjs?rev=20261008-output-3';
+import { renderOutputVideo } from './output-video.mjs?rev=20261009-fps-1';
 import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261008-output-3';
-import { getOutputTiming } from './output-timing.mjs?rev=20261008-timing-1';
+import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -73,8 +73,11 @@ const addAssetsButton = $('#output-add-assets');
 const timelineCanvas = $('#output-timeline-preview');
 const timelinePlay = $('#output-timeline-play');
 const sequenceSettings = $('#output-sequence-settings');
-const playbackRate = $('#output-playback-rate');
-const playbackRateValue = $('#output-playback-rate-value');
+const fpsInput = $('#output-fps');
+const fpsPreset = $('#output-fps-preset');
+const applyFps = $('#output-apply-fps');
+const fpsCurrent = $('#output-fps-current');
+const fpsHelp = $('#output-fps-help');
 const loopField = $('#output-loop-field');
 const loopCount = $('#output-loop-count');
 const sequenceSummary = $('#output-sequence-summary');
@@ -315,10 +318,25 @@ function updateSequenceControls() {
   const isSequence = frames.length > 1;
   const formatValue = formatSelect.value;
   sequenceSettings.hidden = !isSequence || !['gif', 'apng', 'mp4', 'webm'].includes(formatValue);
+  const settingsDisabled = mediaWritePending || itemWritePending || Boolean(generationController) || Boolean(importController);
+  fpsInput.disabled = settingsDisabled || !isSequence;
+  applyFps.disabled = settingsDisabled || !isSequence;
   if (!isSequence) { animationSettings.hidden = activeItem?.extension !== 'gif' && activeItem?.extension !== 'apng'; return; }
   animationSettings.hidden = false;
-  playbackRate.value = String(mediaSettings.playbackRate || 1);
-  playbackRateValue.value = `${playbackRate.value}倍`; playbackRateValue.textContent = `${playbackRate.value}倍`;
+  const targetFormat = formatValue === 'gif' ? 'gif' : formatValue === 'apng' ? 'apng' : 'video';
+  const fps = getEffectiveOutputFps(frames, { format: targetFormat, playbackRate: Number(mediaSettings.playbackRate) || 1 });
+  const fpsText = fps === null ? '' : Number(fps.toPrecision(8)).toString();
+  fpsInput.value = fpsText;
+  fpsCurrent.textContent = fps === null ? '可変' : `現在 ${fpsText} FPS`;
+  fpsInput.min = String(targetFormat === 'gif' ? 1000 / 655350 : 1000 / 3600000);
+  fpsInput.max = String(targetFormat === 'gif' ? 50 : 1000);
+  fpsHelp.textContent = fps === null
+    ? 'この素材は可変FPSです。数値を全コマに適用すると統一できます。'
+    : targetFormat === 'gif'
+      ? 'GIFは20〜655,350msを10ms単位で記録します。'
+      : targetFormat === 'video'
+        ? '動画の映像コマは最大60fpsで記録します。短いコマは記録間隔で近似されます。音声は元の速度で再生します。'
+        : 'APNGは1ms以上のコマ時間で記録します。';
   const animatedFormat = ['gif', 'apng'].includes(formatValue);
   loopField.hidden = !animatedFormat;
   const loopValue = Number(mediaSettings.totalPlays ?? activeSource?.mediaSource?.totalPlays ?? activeSource?.mediaSource?.loopCount ?? 0);
@@ -330,9 +348,9 @@ function updateSequenceControls() {
   const rate = Number(mediaSettings.playbackRate) || 1;
   const onePassSeconds = getOutputTiming(frames, { format: ['gif', 'apng'].includes(formatValue) ? formatValue : 'video', playbackRate: rate }).durationMs / 1000;
   const audioSource = audioBufferSource();
-  const videoDuration = audioSource ? audioSource.durationSeconds / (Number(mediaSettings.playbackRate) || 1) : onePassSeconds;
+  const videoDuration = audioSource ? audioSource.durationSeconds : onePassSeconds;
   sequenceSummary.textContent = audioSource
-    ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は音声の終わり（${videoDuration.toFixed(2)}秒）で終了。速度変更で音程も変わります。動画は最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
+    ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は音声の終わり（${videoDuration.toFixed(2)}秒）で終了。映像FPSを変えても音声の速度と音程は変わりません。動画は最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
     : ['mp4', 'webm'].includes(formatValue)
       ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は1巡で終了します。最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
       : formatValue === 'gif'
@@ -369,12 +387,16 @@ function renderAssets() {
       up.disabled ||= controlsDisabled; down.disabled ||= controlsDisabled;
       up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1)); controls.append(up, down);
       if (frames.length > 1) {
-        const duration = document.createElement('input'); duration.type = 'number'; duration.min = '1'; duration.max = '3600000'; duration.step = '1'; duration.value = String(Math.round(frame.delayMs || 500)); duration.inputMode = 'numeric';
-        duration.setAttribute('aria-label', `${name.textContent}の表示時間（ミリ秒）`);
+        const duration = document.createElement('input'); duration.type = 'number'; duration.min = String(1000 / 3600000); duration.max = '1000'; duration.step = 'any'; duration.value = String(Number((1000 / (frame.delayMs || 500)).toPrecision(12))); duration.inputMode = 'decimal';
+        duration.dataset.currentFps = duration.value;
+        duration.setAttribute('aria-label', `${name.textContent}のFPS`);
         duration.disabled = controlsDisabled;
         duration.addEventListener('change', () => {
-          const delayMs = Number(duration.value);
-          if (!Number.isFinite(delayMs) || delayMs < 1 || delayMs > 3600000) { status.textContent = 'コマの表示時間は1〜3,600,000ミリ秒で指定してください。'; renderAssets(); return; }
+          const fps = Number(duration.value);
+          if (fps === Number(duration.dataset.currentFps)) return;
+          let delayMs;
+          try { delayMs = outputFpsToDelayMs(fps); }
+          catch { status.textContent = 'FPSは0.000278〜1000の範囲で指定してください。'; renderAssets(); return; }
           const nextFrames = frames.map((entry, i) => i === index ? { ...entry, delayMs } : entry);
           void persistMediaSources(mediaSources.map((item) => item.id === source.id ? { ...item, mediaSource: { ...item.mediaSource, frames: nextFrames } } : item));
         });
@@ -403,7 +425,7 @@ function renderAssets() {
     controls.append(remove, replace); row.append(name, controls); assetsList.append(row);
   }
   const frames = imageSources.reduce((all, source) => [...all, ...source.mediaSource.frames], []);
-  assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマは1〜3,600,000ms · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
+  assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマのFPSを編集 · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
 }
 
 async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
@@ -636,7 +658,7 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     if (!mimeChoice || mimeChoice.extension !== formatValue) throw new Error('このブラウザーが実際に作成できる動画形式と選択内容が一致しません。画像と音声の元データは保持されています。');
     const result = await renderOutputVideo(frames, { audioSource, playbackRate: rate, mimeChoice, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
     if (result.extension !== formatValue || result.blob.type.split(';', 1)[0] !== outputMime(formatValue) || (audioSource && !result.hasAudio)) throw new Error('動画の形式または音声トラックを確認できません。元の素材はそのまま保存できます。');
-    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(audioSource ? { description: '音声付き動画。再生速度に合わせて音程も変わり、音声の終わりで動画を終了します。' } : { description: '画像のコマを一巡する動画です。' }) } };
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(audioSource ? { description: '音声付き動画。映像のFPSを変えても音声の速度は変わらず、音声の終わりで動画を終了します。' } : { description: '画像のコマを一巡する動画です。' }) } };
   }
   if (source?.kind === 'audio-video' && ['mp4', 'webm'].includes(formatValue)) {
     const frame = source.image;
@@ -990,8 +1012,22 @@ timelinePlay.addEventListener('click', () => {
   const delay = effectiveFrameDelay(sourceFrames()[0], formatSelect.value, Number(mediaSettings.playbackRate) || 1);
   timelineTimer = setTimeout(playTimelineNext, delay);
 });
-playbackRate.addEventListener('input', () => { playbackRateValue.value = `${playbackRate.value}倍`; playbackRateValue.textContent = `${playbackRate.value}倍`; });
-playbackRate.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, playbackRate: Number(playbackRate.value) }); });
+fpsPreset.addEventListener('change', () => { if (fpsPreset.value) fpsInput.value = fpsPreset.value; });
+applyFps.addEventListener('click', () => {
+  if (mediaWritePending || generationController || importController || !activeSource) return;
+  const frames = sourceFrames();
+  if (frames.length < 2) return;
+  const formatValue = formatSelect.value;
+  const options = formatValue === 'gif' ? { minDelayMs: 20, maxDelayMs: 655350 } : { minDelayMs: 1, maxDelayMs: 3600000 };
+  let delayMs;
+  try { delayMs = outputFpsToDelayMs(Number(fpsInput.value), options); }
+  catch { status.textContent = formatValue === 'gif' ? 'GIFに設定できるFPSは約0.00153〜50です。' : 'FPSは0.000278〜1000の範囲で指定してください。'; return; }
+  const selectedSourceId = activeSource.id;
+  const nextFrames = frames.map((frame) => ({ ...frame, delayMs }));
+  void persistMediaSources(mediaSources.map((source) => source.id === selectedSourceId
+    ? { ...source, mediaSource: { ...source.mediaSource, frames: nextFrames } }
+    : source), { ...mediaSettings, playbackRate: 1 });
+});
 loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, totalPlays: Number(loopCount.value) }); });
 createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
 returnLink.addEventListener('click', async (event) => {

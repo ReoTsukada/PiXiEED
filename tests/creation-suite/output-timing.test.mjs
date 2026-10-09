@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getOutputTiming } from '../../js/creation/output-timing.mjs';
+import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from '../../js/creation/output-timing.mjs';
 
 test('preview, animated export summaries, and video share speed-adjusted frame timing', () => {
   const cases = [
@@ -26,4 +26,19 @@ test('GIF timing matches its 20ms floor and 10ms centisecond quantization withou
   assert.equal(getOutputTiming([{ delayMs: 25 }], { format: 'gif' }).durationMs, 30);
   assert.equal(getOutputTiming([{ delayMs: 6000 }], { format: 'gif' }).durationMs, 6000);
   assert.equal(getOutputTiming([{ delayMs: 100000 }], { format: 'apng' }).durationMs, 100000);
+});
+
+test('effective FPS is only reported for a uniform output timeline', () => {
+  assert.equal(getEffectiveOutputFps([{ delayMs: 40 }, { delayMs: 40 }]), 25);
+  assert.equal(getEffectiveOutputFps([{ delayMs: 40 }, { delayMs: 80 }]), null);
+  assert.equal(getEffectiveOutputFps([{ delayMs: 21 }, { delayMs: 24 }], { format: 'gif' }), 50, 'GIF quantization may make distinct source delays uniform');
+  assert.equal(getEffectiveOutputFps([{ delayMs: 40 }, { delayMs: 40 }], { format: 'video', playbackRate: 2 }), 50);
+});
+
+test('FPS input converts to precise frame delays and rejects delays outside the output format range', () => {
+  assert.equal(outputFpsToDelayMs(25), 40);
+  assert.equal(outputFpsToDelayMs(12.5), 80);
+  assert.ok(Math.abs(outputFpsToDelayMs(24) - 1000 / 24) < 1e-12);
+  assert.throws(() => outputFpsToDelayMs(0), RangeError);
+  assert.throws(() => outputFpsToDelayMs(51, { minDelayMs: 20, maxDelayMs: 655350 }), RangeError);
 });

@@ -67,9 +67,15 @@ body[data-page="output"] {
 .output-sequence-settings { display: grid; gap: 9px; padding: 11px; border-radius: 11px; background: #f5f8f5; }
 .output-sequence-settings[hidden] { display: none; }
 .output-sequence-field { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; color: #4c5f53; font-size: .82rem; font-weight: 700; }
-.output-sequence-field output { color: #397357; font-variant-numeric: tabular-nums; }
-.output-sequence-field input[type="range"] { grid-column: 1 / -1; width: 100%; min-height: 28px; accent-color: #397357; }
-.output-sequence-field .output-select { grid-column: 1 / -1; margin: 0; }
+.output-sequence-current { color: #397357; font-variant-numeric: tabular-nums; }
+.output-sequence-fps { display: grid; gap: 7px; min-width: 0; }
+.output-sequence-fps__controls { display: grid; grid-template-columns: minmax(92px, .65fr) minmax(0, 1fr); gap: 7px; min-width: 0; }
+.output-fps-input { width: 100%; min-width: 0; min-height: 48px; padding: 8px 10px; border: 1px solid #cad7cd; border-radius: 11px; background: #fff; color: #26352e; font: inherit; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.output-sequence-fps__controls .output-select { width: 100%; min-width: 0; margin: 0; padding-inline: 8px; }
+.output-sequence-fps__controls .output-inline-button { grid-column: 1 / -1; width: 100%; min-height: 44px; font-size: .82rem; }
+.output-fps-input:focus-visible, .output-sequence-fps__controls .output-select:focus-visible, .output-sequence-fps__controls .output-inline-button:focus-visible { outline: 3px solid rgba(39,117,83,.3); outline-offset: 2px; }
+.output-sequence-fps__controls .output-inline-button:disabled { opacity: .55; cursor: not-allowed; }
+.output-sequence-fps .output-help { margin: 0; }
 .output-settings__heading { display: flex; align-items: center; margin: 0 0 23px; }
 .output-settings h2 { margin: 2px 0 0; font-size: 1.16rem; line-height: 1.3; letter-spacing: -.02em; }
 .output-format { display: inline-flex; margin: 0; padding: 5px 9px; border: 1px solid #dce8df; border-radius: 6px 10px 10px 10px; background: #f2f7f2; color: #397357; font-size: .74rem; font-weight: 850; letter-spacing: .045em; }

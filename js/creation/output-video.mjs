@@ -1,5 +1,5 @@
 import { audioVideoFrameSize, chooseAudioVideoMimeType, AUDIO_VIDEO_MAX_SECONDS } from './audio-video.mjs?rev=20261008-output-1';
-import { getOutputTiming } from './output-timing.mjs?rev=20261008-timing-1';
+import { getOutputTiming } from './output-timing.mjs?rev=20261009-fps-1';
 
 function abortError() { try { return new DOMException('動画の作成を中止しました。', 'AbortError'); } catch { const error = new Error('動画の作成を中止しました。'); error.name = 'AbortError'; return error; } }
 function assertFrame(frame) {
@@ -30,7 +30,7 @@ export async function renderOutputVideo(frames, {
   const timing = getOutputTiming(frames, { format: 'video', playbackRate });
   const delays = timing.sourceDelaysMs;
   const imageSeconds = timing.durationMs / 1000;
-  const audioSeconds = audioSource ? audioSource.channels[0].length / audioSource.sampleRate / playbackRate : 0;
+  const audioSeconds = audioSource ? audioSource.channels[0].length / audioSource.sampleRate : 0;
   const durationSeconds = audioSource ? audioSeconds : imageSeconds;
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('動画は120秒以内で作成できます。コマ数や音声の長さを短くしてください。');
 
@@ -105,7 +105,7 @@ export async function renderOutputVideo(frames, {
       const audioTrack = audioStream.stream.getAudioTracks()[0];
       if (!audioTrack || audioTrack.readyState !== 'live' || !audioTrack.enabled) throw new Error('音声トラックを準備できません。');
       streamTracks.push(audioTrack); tracks.add(audioTrack);
-      audioNode = audioContext.createBufferSource(); audioNode.buffer = audioBuffer; audioNode.playbackRate.value = playbackRate; audioNode.connect(audioStream);
+      audioNode = audioContext.createBufferSource(); audioNode.buffer = audioBuffer; audioNode.playbackRate.value = 1; audioNode.connect(audioStream);
       audioNode.onended = () => { if (recorder?.state === 'recording') stopRecording(); };
     }
     stream = new MediaStreamImpl(streamTracks);

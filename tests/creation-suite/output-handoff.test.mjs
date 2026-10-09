@@ -122,7 +122,7 @@ test('multiple output items and original RGBA sources persist independently with
 test('imported image frames, audio PCM and timeline settings survive reload without exposing payload in the URL', async () => {
   const deps = dependencies();
   const frames = [
-    { width: 1, height: 1, data: new Uint8Array([255, 0, 0, 255]), delayMs: 400, name: 'first.png' },
+    { width: 1, height: 1, data: new Uint8Array([255, 0, 0, 255]), delayMs: 1000 / 24, name: 'first.png' },
     { width: 1, height: 1, data: new Uint8Array([0, 0, 255, 255]), delayMs: 800, name: 'second.jpg' }
   ];
   const channels = [new Float32Array([0, 0.25, -0.25, 0])];
@@ -140,6 +140,7 @@ test('imported image frames, audio PCM and timeline settings survive reload with
   assert.equal(loaded.mediaSettings.playbackRate, 1.5);
   assert.equal(loaded.mediaSettings.totalPlays, 2, 'legacy loopCount settings migrate to normalized total plays');
   assert.equal(loaded.mediaSources[0].mediaSource.totalPlays, 0);
+  assert.equal(loaded.mediaSources[0].mediaSource.frames[0].delayMs, 1000 / 24, 'fractional frame delays survive local persistence exactly');
   assert.equal(loaded.mediaSources[0].mediaSource.frames[1].name, 'second.jpg');
   assert.deepEqual([...loaded.mediaSources[1].channels[0]], [0, 0.25, -0.25, 0]);
   const savedMedia = await saveToolOutputMedia(validId, loaded.mediaSources, { playbackRate: 2, totalPlays: 3 }, { indexedDBRef: deps.indexedDBRef, now: deps.now, expectedRevision: staleRevision });
@@ -148,6 +149,7 @@ test('imported image frames, audio PCM and timeline settings survive reload with
   loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   assert.equal(loaded.mediaSettings.playbackRate, 2);
   assert.equal(loaded.mediaSettings.totalPlays, 3);
+  assert.equal(loaded.mediaSources[0].mediaSource.frames[0].delayMs, 1000 / 24);
   assert.equal(loaded.outputs.length, 1, 'stale tab did not overwrite the latest output list');
   await assert.rejects(saveToolOutputMedia(validId, [loaded.mediaSources[1]], {}, { indexedDBRef: deps.indexedDBRef, now: deps.now }), /使っている素材/);
   loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });

@@ -9,7 +9,7 @@
   <link rel="canonical" href="https://pixieed.jp/output/">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261008-output-9">
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261009-fps-1">
 </head>
 <body data-page="output">
   <a class="output-skip" href="#main">本文へ移動</a>
@@ -106,7 +106,17 @@
           <h3 class="output-visually-hidden">アニメーションの内容</h3>
           <p id="output-animation-details" class="output-detail"></p>
           <div id="output-sequence-settings" class="output-sequence-settings" hidden>
-            <label class="output-sequence-field" for="output-playback-rate">再生速度 <span><output id="output-playback-rate-value" for="output-playback-rate">1倍</output></span><input id="output-playback-rate" type="range" min="0.25" max="4" step="0.25" value="1"></label>
+            <div class="output-sequence-fps">
+              <label class="output-sequence-field" for="output-fps">全コマのFPS <span id="output-fps-current" class="output-sequence-current">可変</span></label>
+              <div class="output-sequence-fps__controls">
+                <input id="output-fps" class="output-fps-input" type="number" min="0.000278" max="1000" step="any" inputmode="decimal" aria-label="全コマに適用するFPS">
+                <select id="output-fps-preset" class="output-select" aria-label="FPSプリセット">
+                  <option value="">プリセット</option><option value="5">5 FPS</option><option value="10">10 FPS</option><option value="12.5">12.5 FPS</option><option value="20">20 FPS</option><option value="25">25 FPS</option><option value="50">50 FPS</option>
+                </select>
+                <button id="output-apply-fps" class="output-inline-button" type="button">全コマに適用</button>
+              </div>
+              <p id="output-fps-help" class="output-help">FPSを入力して、選択中の素材の全コマへ適用します。</p>
+            </div>
             <label id="output-loop-field" class="output-sequence-field" for="output-loop-count">合計再生回数<select id="output-loop-count" class="output-select"><option value="0">ずっと</option><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option></select></label>
             <p id="output-sequence-summary" class="output-help"></p>
           </div>
@@ -130,6 +140,6 @@
     <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
     <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261008-output-17"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261009-fps-1"></script>
 </body>
 </html>
