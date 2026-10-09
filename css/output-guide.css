@@ -1,4 +1,4 @@
-/* Output guide keeps its own illustration while using PiXiEED's shared page shell. */
+/* Output guide uses the shared PiXiEED page shell. */
 .output-guide-page {
   --output-green: #637c60;
   --output-green-soft: #e9eee4;
@@ -44,22 +44,15 @@
 .output-guide-page .action--primary { border-color: var(--coral, #dd6a4d); background: var(--coral, #dd6a4d); color: var(--white, #fffdf8); box-shadow: 0 8px 22px rgba(221, 106, 77, .22); }
 .output-guide-page :is(.action, .breadcrumbs a, .tool-card a):focus-visible { outline: 3px solid rgba(221, 106, 77, .55); outline-offset: 3px; }
 
-.output-guide-page .hero-art { display: grid; min-height: 240px; place-items: center; overflow: hidden; border: 1px solid color-mix(in srgb, var(--output-green) 25%, var(--line)); border-radius: var(--radius-md, 20px); background: radial-gradient(ellipse at 30% 30%, #e4ebd8 0, #f5f2e8 48%, #ece8da 100%); }
-.output-guide-page .media-stack { position: relative; width: min(74%, 270px); aspect-ratio: 1.12; }
-.output-guide-page .media-sheet { position: absolute; width: 78%; height: 78%; border: 1px solid rgba(45, 91, 63, .16); border-radius: 18px; background: rgba(255, 253, 248, .92); box-shadow: 0 12px 30px rgba(31, 71, 48, .12); }
-.output-guide-page .media-sheet:nth-child(1) { inset: 4% 8% auto auto; transform: rotate(8deg); }
-.output-guide-page .media-sheet:nth-child(2) { inset: 12% auto auto 6%; transform: rotate(-8deg); }
-.output-guide-page .media-sheet:nth-child(3) { inset: 15% 13% auto auto; display: grid; place-items: center; transform: rotate(2deg); }
-.output-guide-page .pixel-scene { display: grid; width: 112px; height: 112px; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(7, 1fr); gap: 3px; }
-.output-guide-page .pixel-scene i { border-radius: 4px; background: #c7e1ca; }
-.output-guide-page .pixel-scene i:nth-child(3n) { background: #8eaa76; }
-.output-guide-page .pixel-scene i:nth-child(4n) { background: #637c60; }
-.output-guide-page .pixel-scene i:nth-child(5n) { background: #e9bd55; }
-.output-guide-page .sound-bars { position: absolute; right: 5%; bottom: 12%; display: flex; height: 32px; align-items: center; gap: 4px; }
-.output-guide-page .sound-bars i { width: 5px; border-radius: 9px; background: var(--coral, #dd6a4d); }
-.output-guide-page .sound-bars i:nth-child(3n) { height: 28px; }
-.output-guide-page .sound-bars i:nth-child(3n+1) { height: 14px; }
-.output-guide-page .sound-bars i:nth-child(3n+2) { height: 21px; }
+.output-guide-page .output-hero-visual { display: flex; min-width: 0; align-items: center; justify-content: center; gap: clamp(.45rem, 1.4vw, 1rem); margin: 0; padding: 1rem .25rem; }
+.output-guide-page .output-hero-visual__sources { display: flex; align-items: center; gap: clamp(.3rem, 1vw, .75rem); }
+.output-guide-page .output-hero-visual__item { display: grid; justify-items: center; gap: .55rem; color: var(--ink-soft, #4f5964); font-size: clamp(.68rem, 1vw, .78rem); font-weight: 700; line-height: 1.35; text-align: center; white-space: nowrap; }
+.output-guide-page .output-hero-visual__icon { display: grid; width: clamp(3.5rem, 5vw, 4.4rem); aspect-ratio: 1; place-items: center; border: 1px solid color-mix(in srgb, var(--output-green) 24%, var(--line)); border-radius: 1.2rem; background: color-mix(in srgb, var(--output-green-soft) 78%, var(--white, #fffdf8)); }
+.output-guide-page .output-hero-visual__icon img { display: block; width: 2rem; height: 2rem; }
+.output-guide-page .output-hero-visual__plus { color: var(--output-green); font-size: 1.5rem; font-weight: 500; }
+.output-guide-page .output-hero-visual__arrow { flex: 0 0 auto; width: clamp(1.25rem, 2.5vw, 1.8rem); color: var(--coral, #dd6a4d); }
+.output-guide-page .output-hero-visual__icon--video { width: clamp(4.5rem, 7vw, 5.4rem); aspect-ratio: 1.15; border-color: color-mix(in srgb, var(--coral, #dd6a4d) 36%, var(--line)); background: color-mix(in srgb, var(--white, #fffdf8) 78%, var(--coral, #dd6a4d)); }
+.output-guide-page .output-hero-visual__icon--video svg { display: block; width: 78%; height: auto; }
 
 .output-guide-page .section { margin-top: clamp(3rem, 7vw, 5rem); padding: 0; content-visibility: visible; }
 .output-guide-page .section-heading { display: block; max-width: 42rem; margin-bottom: 1.25rem; }
@@ -85,7 +78,7 @@
 
 @media (max-width: 760px) {
   .output-guide-page .landing-hero { grid-template-columns: minmax(0, 1fr); }
-  .output-guide-page .hero-art { min-height: 210px; }
+  .output-guide-page .output-hero-visual { justify-content: flex-start; }
   .output-guide-page .feature-grid, .output-guide-page .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -96,7 +89,13 @@
   .output-guide-page .landing-hero h1 { font-size: clamp(1.8rem, 8vw, 2.35rem); }
   .output-guide-page .hero-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
   .output-guide-page .action { width: 100%; }
-  .output-guide-page .hero-art { min-height: 190px; }
+  .output-guide-page .output-hero-visual { justify-content: center; gap: .45rem; padding: .35rem 0; }
+  .output-guide-page .output-hero-visual__sources { gap: .35rem; }
+  .output-guide-page .output-hero-visual__item { font-size: .68rem; }
+  .output-guide-page .output-hero-visual__icon { width: clamp(3.15rem, 16vw, 4rem); border-radius: 1rem; }
+  .output-guide-page .output-hero-visual__icon img { width: 1.8rem; height: 1.8rem; }
+  .output-guide-page .output-hero-visual__arrow { width: 1.2rem; }
+  .output-guide-page .output-hero-visual__icon--video { width: clamp(4rem, 19vw, 4.75rem); }
   .output-guide-page .feature-grid, .output-guide-page .tool-grid { grid-template-columns: minmax(0, 1fr); }
   .output-guide-page .feature { padding: 1.1rem; }
   .output-guide-page .tool-card { min-height: 8.25rem; }
