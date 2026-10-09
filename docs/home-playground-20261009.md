@@ -39,3 +39,21 @@ Chromeで色の矢印キー選択、Escape、停止、Enter/Space/矢印描画�
 開始時のローカルHEADは `c162cfae898b18e8798225ff772ef75f397ca97b`（既存のホーム改善コミット）。指定の `f18270080eb426cd84ef29a411100252700bacf7` はその一つ前。開始時はclean。変更はホームHTML/CSS/JSと専用テスト・本報告だけ。Amazonショップの内部リンクを増やさずbuild除外を維持、望遠鏡は非表示を維持、共通出力・Offerwall・PXD直接保存に変更なし。
 
 Lunaにヒーロー操作部分だけを委任し、受入修正と全体のUI/検証はSOLで実施。利用枠は共有アカウントの週使用24%→25%で、個別タスク消費の厳密な計測値ではない。
+
+
+## 追加検証（3ed3db68のまま、コード変更なし）
+
+通常の状態確認でChromeのAXウインドウと実画面が取得でき、ロック画面ではなかった。前回の一時的なnoWindowsAvailableの根本原因は特定できない。今回もCDP経由のドラッグとclick入力はInput.dispatchMouseEventのタイムアウトになったが、Macの通常のアクセシビリティ操作とキーボード入力では操作できた。ロック解除を必要とする証拠はない。
+
+Chrome Responsiveの390×844と320×568で最終コミットを再確認。実機タッチ確認ではなく、Mac上の端末幅エミュレーション。パレット開閉・色5の選択、描画モードでtouch-actionがnone/終了後pan-y、Escape、Spaceと矢印で描画、Undo、停止/再開、明示的音ON（Chromeのオーディオ再生中表示）、reload後の色5・停止ON保持と音OFFを確認した。音の聴感は確認していない。
+
+320×568では5操作とも44px以上で下端466.30px、横溢れなし。パレットはtop150.31px〜bottom407.90pxで画面内。キャンバスにフォーカスしたままPageDownでscrollY472pxへ進め、キーボードによるスクロール脱出も確認。指のスワイプと実機タッチ/センサー、横画面表示は未確認。
+
+390×844をChrome DevToolsの正規Capture screenshotでDownloadsへ保存し、780×1688pxの画像を実際に開いて、黒い余白も誤った拡大倍率もないことを確認した。画像はホーム上端からの表示、色5・停止ON・音OFFの状態。Library登録とローカルxattrs適用を完了。
+
+- 正式なmobile確認画像: `/tmp/pixieed-home-next/home-mobile-final.png`
+- Library ID: `libfile_97fd8839e1f881918b5a0143441e0ecb`
+- file_id: `file_000000000784820696ac2a9493f1159d`
+- [画像を開く](https://chatgpt.com/api/library/files/libfile_97fd8839e1f881918b5a0143441e0ecb/download)
+
+参照添付画像の403には追加アクセスも迂回もしていない。新たなコード不具合は見つからず、アプリのコードは3ed3db68のまま。追加変更はこの検証報告だけで、pushなし。
