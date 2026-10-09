@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles } from '../../js/creation/output-import.mjs';
+import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from '../../js/creation/output-import.mjs';
 
 function localFile(name, bytes) {
   const blob = new Blob([bytes]);
@@ -30,6 +30,18 @@ test('bounded preview dimensions keep extreme portrait and landscape images insi
     assert.ok(result.width * result.height <= 500_000);
     assert.ok(Math.abs(result.width / result.height - width / height) <= 1 / Math.max(result.width, result.height));
   }
+});
+
+test('preview dimensions fall back through item, current, and record metadata when item metadata is empty', () => {
+  assert.deepEqual(resolveRasterPreviewDimensions({
+    itemMetadata: {}, currentMetadata: {}, recordMetadata: { width: 4000, height: 3000, previewOnly: true }
+  }), { width: 4000, height: 3000 });
+  assert.deepEqual(resolveRasterPreviewDimensions({
+    itemMetadata: {}, currentMetadata: { outputWidth: 1000, outputHeight: 750 }, recordMetadata: { width: 4000, height: 3000 }
+  }), { width: 1000, height: 750 });
+  assert.deepEqual(resolveRasterPreviewDimensions({
+    itemMetadata: { width: 8, height: 8 }, currentMetadata: { width: 16, height: 16 }, recordMetadata: { width: 4000, height: 3000 }, sourceMatches: false
+  }), { width: 16, height: 16 });
 });
 
 test('downsample preview requests decoder resize and allocates only a bounded canvas', async () => {
@@ -73,10 +85,65 @@ function pngHeader(width = 1, height = 1, { animatedFrames = null, totalPlays = 
   const ihdr = new Uint8Array(13); const view = new DataView(ihdr.buffer); view.setUint32(0, width); view.setUint32(4, height); ihdr[8] = 8; ihdr[9] = 6;
   const parts = [new Uint8Array(signature), chunk('IHDR', ihdr)];
   if (animatedFrames !== null) { const actl = new Uint8Array(8); const actlView = new DataView(actl.buffer); actlView.setUint32(0, animatedFrames); actlView.setUint32(4, totalPlays); parts.push(chunk('acTL', actl)); }
-  parts.push(chunk('IEND', new Uint8Array()));
+  parts.push(chunk('IDAT', new Uint8Array([0])), chunk('IEND', new Uint8Array()));
   const output = new Uint8Array(parts.reduce((sum, item) => sum + item.length, 0)); let offset = 0;
   for (const item of parts) { output.set(item, offset); offset += item.length; } return output;
 }
+
+function typedFile(name, bytes, type) {
+  const blob = new Blob([bytes], { type });
+  Object.defineProperty(blob, 'name', { value: name });
+  return blob;
+}
+
+function jpegHeader(width, height) {
+  return new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, height >> 8, height & 0xff,
+    width >> 8, width & 0xff, 3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xff, 0xd9]);
+}
+
+test('static PNG above the editing cap enters preview-only without invoking a decoder', async () => {
+  let decoderCalled = false;
+  const file = typedFile('large.png', pngHeader(4096, 2048), 'image/png');
+  const result = await importOutputFiles([file], { createImageBitmapImpl: () => { decoderCalled = true; } });
+  assert.deepEqual(result.frames, []);
+  assert.equal(result.previewOnly.file, file);
+  assert.deepEqual([result.previewOnly.width, result.previewOnly.height], [4096, 2048]);
+  assert.equal(decoderCalled, false);
+});
+
+test('static JPEG preview-only preflight scans bounded header and retains the original Blob', async () => {
+  let decoderCalled = false;
+  const file = typedFile('photo.jpg', jpegHeader(4000, 3000), 'image/jpeg');
+  const result = await importOutputFiles([file], { createImageBitmapImpl: () => { decoderCalled = true; } });
+  assert.equal(result.previewOnly.file, file);
+  assert.equal(result.previewOnly.mime, 'image/jpeg');
+  assert.deepEqual([result.previewOnly.width, result.previewOnly.height], [4000, 3000]);
+  assert.equal(decoderCalled, false);
+});
+
+test('preview-only preflight rejects animated PNG, over-limit dimensions, and oversized compressed files before decode', async () => {
+  const deps = { createImageBitmapImpl: () => { throw new Error('decoder must not run'); } };
+  await assert.rejects(importOutputFiles([typedFile('motion.png', pngHeader(4096, 2048, { animatedFrames: 2 }), 'image/png')], deps), /アニメーションPNG/);
+  await assert.rejects(importOutputFiles([typedFile('too-wide.png', pngHeader(4097, 2048), 'image/png')], deps), /各辺4096px/);
+  await assert.rejects(importOutputFiles([typedFile('too-many-pixels.png', pngHeader(4000, 4001), 'image/png')], deps), /1,600万画素/);
+  const huge = {
+    name: 'compressed.png', type: 'image/png', size: 32 * 1024 * 1024 + 1,
+    slice(start, end) { return new Blob([pngHeader(4096, 2048).slice(start, end)]); },
+    async arrayBuffer() { throw new Error('full compressed source must not be read'); }
+  };
+  await assert.rejects(importOutputFiles([huge], deps), /圧縮ファイル32MiB/);
+});
+
+test('preview-only images cannot be mixed with other selections', async () => {
+  const large = typedFile('large.png', pngHeader(4096, 2048), 'image/png');
+  const small = typedFile('small.png', pngHeader(), 'image/png');
+  let decoderCalled = false;
+  await assert.rejects(importOutputFiles([large, small], {
+    createImageBitmapImpl: async () => { decoderCalled = true; return { width: 1, height: 1, close() {} }; },
+    documentRef: canvasDocument()
+  }), /1ファイルずつ/);
+  assert.equal(decoderCalled, false);
+});
 function gifFile(frameCount = 2, repeats = 3, width = 1, height = 1) {
   const bytes = [...new TextEncoder().encode('GIF89a'), width & 0xff, width >>> 8, height & 0xff, height >>> 8, 0, 0, 0];
   if (repeats !== null) bytes.push(0x21, 0xff, 0x0b, ...new TextEncoder().encode('NETSCAPE2.0'), 3, 1, repeats & 0xff, repeats >>> 8, 0);

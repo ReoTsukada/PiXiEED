@@ -1,10 +1,10 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261009-output-origin-restore-2';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261009-preview-only-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-7';
 import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
 import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261009-music-plays-1';
 import { renderOutputVideo } from './output-video.mjs?rev=20261009-output-video-1';
-import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261009-output-video-2';
+import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261009-preview-only-2';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
 
@@ -249,14 +249,9 @@ function sourceFormats(source = activeSource) {
 
 function rasterOutputDimensions(entry = record) {
   const activeItemMatchesSource = !activeItem?.sourceId || activeItem.sourceId === activeSource?.id;
-  const metadata = activeItemMatchesSource
-    ? (activeItem?.metadata || entry?.currentMetadata || entry?.metadata || {})
-    : (entry?.metadata || {});
   const frames = sourceFrames();
-  return {
-    width: Number(metadata.outputWidth || metadata.width || frames[0]?.width || 0),
-    height: Number(metadata.outputHeight || metadata.height || frames[0]?.height || 0)
-  };
+  return resolveRasterPreviewDimensions({ itemMetadata: activeItem?.metadata, currentMetadata: entry?.currentMetadata,
+    recordMetadata: entry?.metadata, sourceMatches: activeItemMatchesSource, frameWidth: frames[0]?.width, frameHeight: frames[0]?.height });
 }
 
 function releaseRasterPreview() {
@@ -396,7 +391,8 @@ function setActiveItem(item) {
   const foundSource = mediaSources.find((source) => source.id === item.sourceId);
   activeSource = foundSource || mediaSources[0] || null;
   record.mime = item.mime; record.extension = item.extension; record.filename = item.filename; record.blob = item.blob;
-  record.currentMetadata = item.metadata || {};
+  item.metadata = { ...(record.metadata || {}), ...(item.metadata || {}) };
+  record.currentMetadata = item.metadata;
   jpegQuality.value = String(item.metadata?.jpegQuality || 90);
   jpegQualityValue.value = `${jpegQuality.value}%`;
   jpegQualityValue.textContent = `${jpegQuality.value}%`;
@@ -470,6 +466,13 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   formatButton.setAttribute('aria-expanded', 'false');
   updateMusicPlayControl();
   updateSequenceControls();
+  const previewOnly = Boolean(record?.metadata?.previewOnly || activeItem?.metadata?.previewOnly);
+  if (previewOnly) {
+    formatButton.hidden = true; formatSelect.disabled = true; formatPicker.hidden = true;
+    addOutputItem.hidden = copyOutputItem.hidden = deleteOutputItem.hidden = true;
+    applySettings.disabled = true; scaleSettings.hidden = true; animationSettings.hidden = audioSettings.hidden = true;
+    createVideoButton.hidden = true;
+  }
   updateSettingsSummaries();
 }
 
@@ -697,6 +700,7 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         : `${name}を読み込み中（${current}/${total}）…`;
     } });
     if (controller.signal.aborted || pageDisposed) return;
+    if (imported.previewOnly && record) throw new Error('この画像はプレビュー専用のため、既存の出力素材には追加できません。現在の出力は保持されています。');
     const newSources = sourcesFromImport(imported);
     if (record) {
       let next = [...mediaSources];
@@ -730,7 +734,15 @@ async function handleImport(files, { replaceAudio = false } = {}) {
       updateSequenceControls(); renderAssets();
     } else {
       let initialBlob; let initialFilename; let metadataValue = {};
-      if (imported.frames.length) {
+      if (imported.previewOnly) {
+        initialBlob = imported.previewOnly.file;
+        const suffix = imported.previewOnly.mime === 'image/jpeg' ? 'jpeg' : 'png';
+        const sourceName = String(imported.previewOnly.file.name || `original.${suffix}`).split(/[\\/]/).pop();
+        const stem = sourceName.replace(/\.[a-z0-9]{1,8}$/i, '') || 'original';
+        initialFilename = `${stem}.${suffix}`;
+        metadataValue = { width: imported.previewOnly.width, height: imported.previewOnly.height, previewOnly: true,
+          description: 'プレビューのみ。編集・変換はできません。原本ファイルを保存できます。' };
+      } else if (imported.frames.length) {
         initialBlob = await canvasRaster(imported.frames[0], 'image/png');
         initialFilename = 'pixieed-image.png';
         metadataValue = { width: imported.frames[0].width, height: imported.frames[0].height, frameCount: imported.frames.length };
@@ -803,14 +815,15 @@ function trackSave(method) {
 }
 
 function setBusy(busy, canCancel = false) {
-  applySettings.disabled = busy;
+  const previewOnly = Boolean(record?.metadata?.previewOnly || activeItem?.metadata?.previewOnly);
+  applySettings.disabled = busy || previewOnly;
   scaleInput.disabled = busy;
   for (const button of presets.querySelectorAll('button')) button.disabled = busy;
   widthInput.disabled = busy;
   heightInput.disabled = busy;
   aspectLock.disabled = busy;
   sourceSelect.disabled = busy;
-  formatSelect.disabled = busy;
+  formatSelect.disabled = busy || previewOnly;
   createVideoButton.disabled = busy;
   addOutputItem.disabled = busy || outputItems.length >= 12;
   copyOutputItem.disabled = busy || outputItems.length >= 12;
@@ -932,6 +945,10 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
 
 async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false } = {}) {
   if (!record || !activeItem || generationController || mediaWritePending || itemWritePending) return false;
+  if (record.metadata?.previewOnly || activeItem.metadata?.previewOnly) {
+    status.textContent = 'この画像はプレビュー専用です。編集・変換はできません。原本ファイルを保存できます。';
+    return false;
+  }
   const source = mediaSources.find((item) => item.id === sourceId);
   if (!source || !sourceFormats(source).some(([value]) => value === formatValue)) { status.textContent = 'この素材では選べない形式です。'; return false; }
   const formats = sourceFormats(source);
@@ -1347,6 +1364,12 @@ function setMedia(entry) {
       if (type === 'image/png') status.textContent = '画像の元ピクセルを読み込めないため、サイズ変更は使えません。元のファイルはそのまま保存できます。';
       animationSettings.hidden = true;
     }
+    if (record.metadata?.previewOnly || activeItem?.metadata?.previewOnly) {
+      status.textContent = 'プレビューのみ · 編集・変換はできません · 原本を保存できます。';
+      scaleSettings.hidden = animationSettings.hidden = audioSettings.hidden = true;
+      applySettings.disabled = true;
+      image.alt = `${entry.title || entry.filename || '原本'}のプレビュー（編集・変換不可）`;
+    }
   } else if (type === 'audio/wav') {
     audio.hidden = false; audio.src = fileUrl;
     fileCard.hidden = true;
@@ -1384,7 +1407,7 @@ async function mount() {
     returnLink.textContent = new URL(record.returnUrl, location.origin).pathname === '/output/' ? '素材選択へ戻る' : '編集画面へ戻る';
     mediaSources = record.mediaSources || [];
     if (!mediaSources.length && record.mediaSource) mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'legacy-image', mediaSource: record.mediaSource }];
-    if (!mediaSources.length && record.mime.startsWith('image/')) {
+    if (!mediaSources.length && record.mime.startsWith('image/') && !record.metadata?.previewOnly) {
       let sourceUrlToRelease = null; let sourceCanvas = null;
       try {
         const original = new Image(); sourceUrlToRelease = URL.createObjectURL(record.sourceBlob); original.src = sourceUrlToRelease; await original.decode();

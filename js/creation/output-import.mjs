@@ -5,6 +5,9 @@ const MAX_FILE_BYTES = 64 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 128 * 1024 * 1024;
 const MAX_EDGE = 4096;
 const MAX_STILL_PIXELS = 8_000_000;
+const MAX_PREVIEW_ONLY_BYTES = 32 * 1024 * 1024;
+const MAX_PREVIEW_ONLY_PIXELS = 16_000_000;
+const MAX_JPEG_HEADER_BYTES = 1024 * 1024;
 const MAX_TIMELINE_PIXELS = 8_000_000;
 const MAX_FRAMES = 600;
 const MAX_AUDIO_SECONDS = 120;
@@ -20,6 +23,14 @@ export function boundedPreviewDimensions(width, height, { maxEdge = 1536, maxPix
   }
   const factor = Math.min(1, maxEdge / Math.max(width, height), Math.sqrt(maxPixels / (width * height)));
   return { width: Math.max(1, Math.floor(width * factor)), height: Math.max(1, Math.floor(height * factor)) };
+}
+
+export function resolveRasterPreviewDimensions({ itemMetadata = {}, currentMetadata = {}, recordMetadata = {}, sourceMatches = true, frameWidth = 0, frameHeight = 0 } = {}) {
+  const metadata = { ...recordMetadata, ...currentMetadata, ...(sourceMatches ? itemMetadata : {}) };
+  return {
+    width: Number(metadata.outputWidth || metadata.width || frameWidth || 0),
+    height: Number(metadata.outputHeight || metadata.height || frameHeight || 0)
+  };
 }
 
 /** Decode a local Blob at a bounded display resolution; the input Blob is never modified. */
@@ -215,7 +226,7 @@ function webpAnimationInfo(bytes) {
 
 function readU24LittleEndian(bytes, offset) { return bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16); }
 
-function jpegDimensions(bytes) {
+function jpegDimensions(bytes, { allowPreviewOnly = false } = {}) {
   if (imageType(bytes) !== 'image/jpeg') return null;
   let offset = 2;
   while (offset < bytes.length) {
@@ -230,12 +241,61 @@ function jpegDimensions(bytes) {
     if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
       if (length < 7) throw new Error('JPEGの画像情報が壊れています。');
       const height = (bytes[offset + 3] << 8) | bytes[offset + 4]; const width = (bytes[offset + 5] << 8) | bytes[offset + 6];
-      assertImageHeaderBounds({ width, height });
+      if (!allowPreviewOnly) assertImageHeaderBounds({ width, height });
       return { width, height, frames: 1, totalPlays: 1, animated: false };
     }
     offset += length;
   }
   throw new Error('JPEGのサイズを確認できません。元のファイルは変更していません。');
+}
+
+// Recognize only static PNG/JPEG files that exceed the editing pixel cap. This
+// path retains the original Blob and never creates a full-resolution RGBA copy.
+async function previewOnlyRasterInfo(file, { signal } = {}) {
+  if (!file || !['image/png', 'image/jpeg'].includes(file.type)) return null;
+  const signature = new Uint8Array(await file.slice(0, 24).arrayBuffer());
+  checkAbort(signal);
+  const mime = imageType(signature);
+  if (!mime || mime !== file.type) return null;
+  let dimensions;
+  if (mime === 'image/png') {
+    if (signature.length < 24 || String.fromCharCode(...signature.subarray(12, 16)) !== 'IHDR') return null;
+    dimensions = { width: readU32(signature, 16), height: readU32(signature, 20) };
+  } else {
+    const header = new Uint8Array(await file.slice(0, Math.min(file.size, MAX_JPEG_HEADER_BYTES)).arrayBuffer());
+    checkAbort(signal);
+    try { dimensions = jpegDimensions(header, { allowPreviewOnly: true }); } catch { return null; }
+  }
+  if (!dimensions) return null;
+  const { width, height } = dimensions;
+  const pixels = width * height;
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1
+      || width > MAX_EDGE || height > MAX_EDGE || !Number.isSafeInteger(pixels)) {
+    throw new RangeError('プレビュー専用画像は各辺4096pxまでです。画像サイズを下げてください。');
+  }
+  if (pixels <= MAX_STILL_PIXELS) return null;
+  if (file.size > MAX_PREVIEW_ONLY_BYTES) throw new RangeError('編集上限を超える画像は圧縮ファイル32MiBまでプレビューできます。元ファイルは選択元に残っています。');
+  if (pixels > MAX_PREVIEW_ONLY_PIXELS) throw new RangeError('プレビュー専用画像は1,600万画素までです。サイズを下げてください。');
+  if (mime === 'image/png') {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    checkAbort(signal);
+    let offset = 8; let sawHeader = false; let sawData = false; let sawEnd = false;
+    while (offset + 12 <= bytes.length) {
+      const length = readU32(bytes, offset);
+      if (length > bytes.length - offset - 12) throw new Error('PNGのチャンクが壊れています。元ファイルは変更していません。');
+      const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
+      if (type === 'IHDR') {
+        if (offset !== 8 || length !== 13) throw new Error('PNGの画像情報が壊れています。');
+        sawHeader = true;
+      }
+      if (type === 'IDAT') sawData = true;
+      if (type === 'acTL') throw new Error('アニメーションPNGはプレビュー専用経路に対応していません。8MP以下の素材を選んでください。');
+      if (type === 'IEND') { sawEnd = true; break; }
+      offset += length + 12;
+    }
+    if (!sawHeader || !sawData || !sawEnd) throw new Error('静止PNGの全体情報を確認できません。元ファイルは変更していません。');
+  }
+  return { file, mime, width, height, size: file.size };
 }
 
 function decodeCanvasImage(blob, signal, { createImageBitmapImpl = globalThis.createImageBitmap, documentRef = globalThis.document } = {}) {
@@ -517,6 +577,15 @@ export async function importOutputFiles(files, { signal, onProgress = () => {}, 
   if (selected.length > MAX_FILES) throw new RangeError('一度に8ファイルまで追加できます。');
   const bytes = selected.reduce((sum, file) => sum + (Number(file?.size) || 0), 0);
   if (bytes > MAX_TOTAL_BYTES) throw new RangeError('選んだファイルの合計が128MBを超えています。数を減らしてください。');
+  const previewOnlyCandidates = [];
+  for (const file of selected) {
+    const candidate = await previewOnlyRasterInfo(file, { signal });
+    if (candidate) previewOnlyCandidates.push(candidate);
+  }
+  if (previewOnlyCandidates.length) {
+    if (selected.length !== 1) throw new RangeError('8MPを超える画像は1ファイルずつプレビューできます。既存素材や複数選択には追加できません。');
+    return { frames: [], totalPlays: 1, audio: null, video: null, previewOnly: previewOnlyCandidates[0] };
+  }
   const output = { frames: [], totalPlays: 1, audio: null, video: null };
   let audioContext = null;
   try {
@@ -554,4 +623,4 @@ export async function importOutputFiles(files, { signal, onProgress = () => {}, 
   } finally { try { await audioContext?.close?.(); } catch { /* release decoded input context */ } }
 }
 
-export const OUTPUT_IMPORT_LIMITS = Object.freeze({ MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_EDGE, MAX_STILL_PIXELS, MAX_TIMELINE_PIXELS, MAX_FRAMES, MAX_AUDIO_SECONDS, MAX_AUDIO_DECODED_BYTES, MAX_UNKNOWN_AUDIO_BYTES, MAX_VIDEO_SECONDS, MAX_VIDEO_PIXELS });
+export const OUTPUT_IMPORT_LIMITS = Object.freeze({ MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_EDGE, MAX_STILL_PIXELS, MAX_PREVIEW_ONLY_BYTES, MAX_PREVIEW_ONLY_PIXELS, MAX_JPEG_HEADER_BYTES, MAX_TIMELINE_PIXELS, MAX_FRAMES, MAX_AUDIO_SECONDS, MAX_AUDIO_DECODED_BYTES, MAX_UNKNOWN_AUDIO_BYTES, MAX_VIDEO_SECONDS, MAX_VIDEO_PIXELS });

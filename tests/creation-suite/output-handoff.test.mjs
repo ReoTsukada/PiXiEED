@@ -102,6 +102,28 @@ test('output data stays in IndexedDB and the route carries only an opaque id', a
   assert.equal(first.returnUrl, '/draw/?pxd=local-id&pxdRevision=revision-id');
 });
 
+test('preview-only PNG/JPEG markers and the original Blob survive reload without RGBA media sources', async () => {
+  for (const [id, filename, mime] of [
+    ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'large.png', 'image/png'],
+    ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'large.jpeg', 'image/jpeg']
+  ]) {
+    const deps = dependencies({ id });
+    const original = new Blob(['original compressed image'], { type: mime });
+    const staged = await stageToolOutput({
+      ...file(filename, mime), blob: original,
+      metadata: { width: 4000, height: 3000, previewOnly: true, description: 'preview only' },
+      mediaSources: []
+    }, deps);
+    const reloaded = await readToolOutput(id, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+    assert.equal(staged.filename, filename);
+    assert.equal(reloaded.metadata.previewOnly, true);
+    assert.deepEqual([reloaded.metadata.width, reloaded.metadata.height], [4000, 3000]);
+    assert.equal(reloaded.sourceBlob.type, mime);
+    assert.equal(await reloaded.sourceBlob.text(), 'original compressed image');
+    assert.equal(reloaded.mediaSources.length, 0);
+  }
+});
+
 test('multiple output items and original RGBA sources persist independently without replacing the source file', async () => {
   const deps = dependencies();
   const frame = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 255, 0, 128]) };
