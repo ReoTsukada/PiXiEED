@@ -13,6 +13,56 @@ const MAX_UNKNOWN_AUDIO_BYTES = 4 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 120;
 const MAX_VIDEO_PIXELS = 8_000_000;
 
+export function boundedPreviewDimensions(width, height, { maxEdge = 1536, maxPixels = 2_000_000 } = {}) {
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1
+      || !Number.isSafeInteger(maxEdge) || maxEdge < 1 || !Number.isSafeInteger(maxPixels) || maxPixels < 1) {
+    throw new TypeError('プレビュー画像のサイズを確認できません。');
+  }
+  const factor = Math.min(1, maxEdge / Math.max(width, height), Math.sqrt(maxPixels / (width * height)));
+  return { width: Math.max(1, Math.floor(width * factor)), height: Math.max(1, Math.floor(height * factor)) };
+}
+
+/** Decode a local Blob at a bounded display resolution; the input Blob is never modified. */
+export async function createBoundedRasterPreview(blob, {
+  width,
+  height,
+  maxEdge = 1536,
+  maxPixels = 2_000_000,
+  resizeQuality = 'high',
+  createImageBitmapImpl = globalThis.createImageBitmap,
+  documentRef = globalThis.document
+} = {}) {
+  const target = boundedPreviewDimensions(width, height, { maxEdge, maxPixels });
+  if (typeof createImageBitmapImpl !== 'function') throw new Error('このブラウザーは縮小プレビューの準備に対応していません。元ファイルは保存できます。');
+  if (!documentRef?.createElement) throw new Error('プレビューを表示できません。元ファイルは保存できます。');
+  let bitmap;
+  try {
+    bitmap = await createImageBitmapImpl(blob, {
+      resizeWidth: target.width,
+      resizeHeight: target.height,
+      resizeQuality
+    });
+    const actualWidth = bitmap.width || target.width;
+    const actualHeight = bitmap.height || target.height;
+    if (!actualWidth || !actualHeight || actualWidth > maxEdge || actualHeight > maxEdge || actualWidth * actualHeight > maxPixels) {
+      throw new RangeError('ブラウザーがプレビューを安全なサイズへ縮小できませんでした。元ファイルは保存できます。');
+    }
+    const canvas = documentRef.createElement('canvas');
+    canvas.width = actualWidth; canvas.height = actualHeight;
+    try {
+      const context = canvas.getContext('2d', { alpha: true });
+      if (!context) throw new Error('プレビュー用の描画領域を作れません。元ファイルは保存できます。');
+      context.drawImage(bitmap, 0, 0, actualWidth, actualHeight);
+      return await new Promise((resolve, reject) => canvas.toBlob((result) => result
+        ? resolve(result)
+        : reject(new Error('縮小プレビューを書き出せません。元ファイルは保存できます。')), 'image/png'));
+    } finally { canvas.width = canvas.height = 1; }
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new Error(error?.message || '縮小プレビューを準備できません。元ファイルは保存できます。');
+  } finally { bitmap?.close?.(); }
+}
+
 function abortError() { return new DOMException('読み込みを中止しました。', 'AbortError'); }
 
 function checkAbort(signal) { if (signal?.aborted) throw abortError(); }

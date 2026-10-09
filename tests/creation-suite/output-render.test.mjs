@@ -40,6 +40,7 @@ test('rejects nonmultiple dimensions and rasters without exact repeated blocks',
   frame.data[0] ^= 1;
   assert.deepEqual(await inferIntegerPixelScale([frame]), { status: 'skip', reason: 'no-exact-scale' });
   assert.deepEqual(await inferIntegerPixelScale([informativeFrame(13, 10)]), { status: 'skip', reason: 'no-exact-scale' });
+  assert.deepEqual(await inferIntegerPixelScale([informativeFrame(7, 5)]), { status: 'skip', reason: 'no-exact-scale' }, 'an already-minimal image stays at its current size');
 });
 
 test('RGBA comparison includes alpha and hidden RGB channels', async () => {
@@ -50,22 +51,50 @@ test('RGBA comparison includes alpha and hidden RGB channels', async () => {
   }
 });
 
-test('marks simple low-information enlargement as a candidate without shrinking', async () => {
+test('accepts a mathematically exact low-information grid and monochrome minimum', async () => {
   const source = { width: 4, height: 4, data: new Uint8Array(4 * 4 * 4) };
   for (let y = 0; y < 4; y += 1) for (let x = 0; x < 4; x += 1) {
     const offset = (y * 4 + x) * 4; const color = x === 0 || x === 3 || y === 0 || y === 3 ? 255 : 60;
     source.data.set([color, color, color, 255], offset);
   }
   const result = await inferIntegerPixelScale([enlarge(source, 2)]);
-  assert.equal(result.status, 'candidate');
-  assert.equal(result.reason, 'low-information');
+  assert.equal(result.status, 'detected');
   assert.equal(result.scale, 2);
+  assert.deepEqual([result.width, result.height], [4, 4]);
+  const monochrome = { width: 12, height: 8, data: new Uint8Array(12 * 8 * 4) };
+  for (let offset = 3; offset < monochrome.data.length; offset += 4) monochrome.data[offset] = 255;
+  assert.deepEqual(await inferIntegerPixelScale([monochrome]), {
+    status: 'detected', scale: 4, width: 3, height: 2, confidence: 'pixel-evidence'
+  });
 });
 
-test('does not reduce animation when frames have different largest exact scales', async () => {
-  const two = enlarge(informativeFrame(8, 8, 1), 2);
-  const four = enlarge(informativeFrame(4, 4, 2), 4);
-  assert.deepEqual(await inferIntegerPixelScale([two, four]), { status: 'skip', reason: 'mixed-scales' });
+test('finds the greatest common scale when animation frames have different individual maxima', async () => {
+  const two = enlarge(informativeFrame(16, 16, 1), 2);
+  const four = enlarge(informativeFrame(8, 8, 2), 4);
+  const result = await inferIntegerPixelScale([two, four]);
+  assert.deepEqual([result.status, result.scale, result.width, result.height], ['detected', 2, 16, 16]);
+});
+
+test('detects >32x and 1600-to-160 pixel grids without an arbitrary scale cap', async () => {
+  for (const scale of [37, 40]) {
+    const result = await inferIntegerPixelScale([enlarge(informativeFrame(8, 8), scale)]);
+    assert.equal(result.status, 'detected');
+    assert.equal(result.scale, scale);
+  }
+  const source = informativeFrame(160, 160);
+  const result = await inferIntegerPixelScale([enlarge(source, 10)]);
+  assert.deepEqual([result.status, result.scale, result.width, result.height], ['detected', 10, 160, 160]);
+});
+
+test('uses one uniform integer scale for non-square source dimensions', async () => {
+  const result = await inferIntegerPixelScale([enlarge(informativeFrame(8, 4), 3)]);
+  assert.deepEqual([result.status, result.scale, result.width, result.height], ['detected', 3, 8, 4]);
+});
+
+test('one noisy boundary pixel prevents JPEG-like non-exact pixel reduction', async () => {
+  const frame = enlarge(informativeFrame(8, 8), 4);
+  frame.data.set([frame.data[0] ^ 1, frame.data[1], frame.data[2], frame.data[3]], (1 * frame.width + 1) * 4);
+  assert.deepEqual(await inferIntegerPixelScale([frame]), { status: 'skip', reason: 'no-exact-scale' });
 });
 
 test('honors the pixel work limit and verifies metadata against frame pixels', async () => {
@@ -85,6 +114,17 @@ test('cancels between scan chunks', async () => {
   const task = inferIntegerPixelScale([frame], { signal: controller.signal });
   controller.abort();
   await assert.rejects(task, { name: 'AbortError' });
+});
+
+test('reports row progress while examining large frames', async () => {
+  const progress = [];
+  const result = await inferIntegerPixelScale([enlarge(informativeFrame(64, 64), 2)], {
+    onProgress: (value) => progress.push(value)
+  });
+  assert.equal(result.status, 'detected');
+  assert.equal(result.scale, 2);
+  assert.ok(progress.length > 0);
+  assert.ok(progress.every((value) => value.rowsTotal === 128 && value.frameCount === 1));
 });
 
 test('persisted original-size choice prevents automatic re-selection of the pixel derivative', () => {
@@ -124,14 +164,13 @@ test('extreme portrait and landscape art fits mobile and desktop preview bounds 
   }
 });
 
-test('detects 5x and maximum 32x integer scaling, skips heuristic 37x, but verifies a 37x metadata claim', async () => {
-  for (const scale of [5, 32]) {
+test('detects 5x, 32x, 37x and 40x integer scaling; metadata claims remain verified against pixels', async () => {
+  for (const scale of [5, 32, 37, 40]) {
     const result = await inferIntegerPixelScale([enlarge(informativeFrame(8, 8), scale)]);
-    assert.equal(result.status, 'detected', `${scale}x is within the heuristic cap`);
+    assert.equal(result.status, 'detected');
     assert.equal(result.scale, scale);
   }
   const frame37 = enlarge(informativeFrame(8, 8), 37);
-  assert.deepEqual(await inferIntegerPixelScale([frame37]), { status: 'skip', reason: 'no-exact-scale' });
   assert.deepEqual(await verifyPixelScaleClaim([frame37], { width: 8, height: 8, scale: 37 }), {
     status: 'verified', width: 8, height: 8, scale: 37, source: 'metadata'
   });

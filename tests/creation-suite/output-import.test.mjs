@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fitOutputFrames, importOutputFiles } from '../../js/creation/output-import.mjs';
+import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles } from '../../js/creation/output-import.mjs';
 
 function localFile(name, bytes) {
   const blob = new Blob([bytes]);
@@ -22,6 +22,47 @@ function canvasDocument() {
     }
   };
 }
+
+test('bounded preview dimensions keep extreme portrait and landscape images inside edge and pixel caps', () => {
+  for (const [width, height] of [[8192, 1024], [1024, 8192], [4096, 4096]]) {
+    const result = boundedPreviewDimensions(width, height, { maxEdge: 1024, maxPixels: 500_000 });
+    assert.ok(result.width <= 1024 && result.height <= 1024);
+    assert.ok(result.width * result.height <= 500_000);
+    assert.ok(Math.abs(result.width / result.height - width / height) <= 1 / Math.max(result.width, result.height));
+  }
+});
+
+test('downsample preview requests decoder resize and allocates only a bounded canvas', async () => {
+  const calls = []; let bitmapClosed = false; let canvas;
+  const sourceBlob = new Blob(['original source bytes'], { type: 'image/png' });
+  const preview = await createBoundedRasterPreview(sourceBlob, {
+    width: 4096, height: 2048, maxEdge: 1024, maxPixels: 500_000,
+    createImageBitmapImpl: async (blob, options) => {
+      assert.equal(blob, sourceBlob);
+      calls.push(options);
+      return { width: options.resizeWidth, height: options.resizeHeight, close() { bitmapClosed = true; } };
+    },
+    documentRef: { createElement() {
+      canvas = { width: 0, height: 0, getContext() { return { drawImage(bitmap, x, y, width, height) { calls.push([bitmap.width, bitmap.height, x, y, width, height]); } }; }, toBlob(callback, mime) { callback(new Blob(['preview'], { type: mime })); } };
+      return canvas;
+    } }
+  });
+  assert.equal(preview.type, 'image/png');
+  assert.deepEqual(calls[0], { resizeWidth: 1000, resizeHeight: 500, resizeQuality: 'high' });
+  assert.deepEqual(calls[1], [1000, 500, 0, 0, 1000, 500]);
+  assert.equal(bitmapClosed, true);
+  assert.deepEqual([canvas.width, canvas.height], [1, 1]);
+  assert.equal(await sourceBlob.text(), 'original source bytes');
+});
+
+test('preview decoder/allocation failures remain explicit and reject unsafe bitmap dimensions', async () => {
+  await assert.rejects(createBoundedRasterPreview(new Blob(['x']), { width: 10, height: 10, createImageBitmapImpl: null }), /縮小プレビュー/);
+  await assert.rejects(createBoundedRasterPreview(new Blob(['x']), {
+    width: 4096, height: 4096, maxEdge: 512, maxPixels: 300_000,
+    createImageBitmapImpl: async () => ({ width: 4096, height: 4096, close() {} }),
+    documentRef: canvasDocument()
+  }), /安全なサイズ/);
+});
 
 function pngHeader(width = 1, height = 1, { animatedFrames = null, totalPlays = 1 } = {}) {
   const signature = [137, 80, 78, 71, 13, 10, 26, 10];

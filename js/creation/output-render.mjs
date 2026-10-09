@@ -23,7 +23,6 @@ export function resizeRgbaNearest(frame, width, height, { maxPixels = 16_777_216
 
 const MAX_INFERENCE_FRAMES = 600;
 const DEFAULT_INFERENCE_PIXELS = 4_000_000;
-const DEFAULT_MAX_SCALE = 32;
 
 /** Respect an explicit output-size choice made by the user over automatic pixel-origin selection. */
 export function shouldAutoSelectPixelOrigin({ selection, needsAutoResize }) {
@@ -45,34 +44,45 @@ function yieldTask() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function informativeReducedGrid(frame, scale) {
-  const width = frame.width / scale;
-  const height = frame.height / scale;
-  if (width < 4 || height < 4) return false;
-  const colors = new Set();
-  let horizontalChanges = 0;
-  let verticalChanges = 0;
-  let inspectedRows = 0;
-  for (let y = 0; y < height; y += 1) {
-    let previous = -1;
-    for (let x = 0; x < width; x += 1) {
-      const offset = ((y * scale) * frame.width + x * scale) * 4;
-      const key = `${frame.data[offset]},${frame.data[offset + 1]},${frame.data[offset + 2]},${frame.data[offset + 3]}`;
-      colors.add(key);
-      if (x > 0 && key !== previous) horizontalChanges += 1;
-      previous = key;
-      if (y > 0) {
-        const above = ((y - 1) * scale * frame.width + x * scale) * 4;
-        if (frame.data[above] !== frame.data[offset] || frame.data[above + 1] !== frame.data[offset + 1]
-            || frame.data[above + 2] !== frame.data[offset + 2] || frame.data[above + 3] !== frame.data[offset + 3]) verticalChanges += 1;
+function gcd(left, right) {
+  let a = left; let b = right;
+  while (b) { const next = a % b; a = b; b = next; }
+  return a;
+}
+
+async function largestExactGridScale(frame, signal, onProgress = () => {}, frameIndex = 0, frameCount = 1) {
+  let scale = gcd(frame.width, frame.height);
+  let rowsSinceYield = 0;
+  for (let y = 0; y < frame.height; y += 1) {
+    checkSignal(signal);
+    const row = y * frame.width * 4;
+    for (let x = 1; x < frame.width; x += 1) {
+      const left = row + (x - 1) * 4; const right = row + x * 4;
+      if (frame.data[left] !== frame.data[right] || frame.data[left + 1] !== frame.data[right + 1]
+          || frame.data[left + 2] !== frame.data[right + 2] || frame.data[left + 3] !== frame.data[right + 3]) {
+        scale = gcd(scale, x);
+      }
+      if (scale === 1) return 1;
+    }
+    if (y > 0) {
+      const above = row - frame.width * 4;
+      for (let x = 0; x < frame.width; x += 1) {
+        const offset = row + x * 4; const previous = above + x * 4;
+        if (frame.data[previous] !== frame.data[offset] || frame.data[previous + 1] !== frame.data[offset + 1]
+            || frame.data[previous + 2] !== frame.data[offset + 2] || frame.data[previous + 3] !== frame.data[offset + 3]) {
+          scale = gcd(scale, y);
+        }
+        if (scale === 1) return 1;
       }
     }
-    inspectedRows += 1;
+    rowsSinceYield += 1;
+    if (rowsSinceYield >= 32 || y === frame.height - 1) {
+      onProgress({ frameIndex, frameCount, rowsDone: y + 1, rowsTotal: frame.height });
+      rowsSinceYield = 0;
+      await yieldTask(); checkSignal(signal);
+    }
   }
-  const cells = width * height;
-  return colors.size >= 4 && horizontalChanges > 0 && verticalChanges > 0
-    && horizontalChanges + verticalChanges >= Math.max(12, Math.ceil(cells * 0.08))
-    && inspectedRows >= 4;
+  return scale;
 }
 
 async function hasExactBlocks(frame, scale, signal) {
@@ -102,15 +112,11 @@ async function hasExactBlocks(frame, scale, signal) {
  */
 export async function inferIntegerPixelScale(frames, {
   maxPixels = DEFAULT_INFERENCE_PIXELS,
-  maxScale = DEFAULT_MAX_SCALE,
-  minBaseEdge = 4,
   signal = null,
-  preferredScale = null
+  onProgress = () => {}
 } = {}) {
   if (!Array.isArray(frames) || frames.length < 1 || frames.length > MAX_INFERENCE_FRAMES
-      || !Number.isSafeInteger(maxPixels) || maxPixels < 1
-      || !Number.isSafeInteger(maxScale) || maxScale < 2 || maxScale > 64
-      || !Number.isSafeInteger(minBaseEdge) || minBaseEdge < 2) {
+      || !Number.isSafeInteger(maxPixels) || maxPixels < 1 || typeof onProgress !== 'function') {
     return { status: 'skip', reason: 'invalid-input' };
   }
   const first = frames[0];
@@ -121,33 +127,12 @@ export async function inferIntegerPixelScale(frames, {
   const sourcePixels = first.width * first.height * frames.length;
   if (sourcePixels > maxPixels) return { status: 'skip', reason: 'pixel-limit' };
   checkSignal(signal);
-
-  const candidates = preferredScale === null
-    ? Array.from({ length: maxScale - 1 }, (_, index) => maxScale - index)
-    : [preferredScale];
-  const perFrameScales = Array(frames.length).fill(null);
-  let attempts = 0;
-  for (const scale of candidates) {
-    if (!Number.isSafeInteger(scale) || scale < 2 || scale > maxScale
-        || first.width % scale !== 0 || first.height % scale !== 0
-        || first.width / scale < minBaseEdge || first.height / scale < minBaseEdge) continue;
-    attempts += 1;
-    // Cap aggregate comparison work separately from resident frame memory.
-    if (sourcePixels * attempts > maxPixels * 8) return { status: 'skip', reason: 'work-limit' };
-    for (let index = 0; index < frames.length; index += 1) {
-      if (perFrameScales[index] !== null) continue;
-      if (await hasExactBlocks(frames[index], scale, signal)) perFrameScales[index] = scale;
-    }
-    if (perFrameScales.every((value) => value !== null)) break;
+  let scale = gcd(first.width, first.height);
+  for (let index = 0; index < frames.length; index += 1) {
+    scale = gcd(scale, await largestExactGridScale(frames[index], signal, onProgress, index, frames.length));
+    if (scale === 1) return { status: 'skip', reason: 'no-exact-scale' };
   }
-  const found = perFrameScales.filter((value) => value !== null);
-  if (!found.length) return { status: 'skip', reason: 'no-exact-scale' };
-  if (found.length !== frames.length || !perFrameScales.every((value) => value === perFrameScales[0])) {
-    return { status: 'skip', reason: 'mixed-scales' };
-  }
-  const scale = perFrameScales[0];
   const result = { scale, width: first.width / scale, height: first.height / scale };
-  if (!frames.every((frame) => informativeReducedGrid(frame, scale))) return { status: 'candidate', ...result, reason: 'low-information' };
   return { status: 'detected', ...result, confidence: 'pixel-evidence' };
 }
 
