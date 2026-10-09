@@ -1,8 +1,8 @@
 /**
- * PiXiEED home: the page is a set of small working toys.
+ * PiXiEED home: creation tools first, with a small playable introduction.
  *
- * The first screen is a pixel canvas — drag to draw, every new dot plays a note (a taste of the editor and
- * the sound tool together). Below it, each tool card runs a tiny live version of that tool. Toys animate only
+ * The contained mini canvas lets visitors draw and hear notes (a taste of the editor and sound tool).
+ * Other tool cards run a tiny live version of that tool. Toys animate only
  * while on screen. Reduced motion caps updates at 30 FPS and suppresses the letter entrance and wave.
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
@@ -147,7 +147,6 @@ const WORD_COLORS = [C.red, C.yellow, C.sky, C.yellow, C.green, C.pink, C.orange
 // 10×10 icons for the invitations
 const ICONS = {
   editor: ['..........', '.......kk.', '......kyyk', '.....kyyk.', '....kyyk..', '...kyyk...', '..kyyk....', '.kpyk.....', '.kkk......', '..........'],
-  game: ['..........', '..........', '.kkkkkkkk.', 'kwwwwwwwwk', 'kwkwwwwrwk', 'kkkkwwbwrk', 'kwkwwwwgwk', 'kwwwwwwwwk', '.kkk..kkk.', '..........'],
   find: ['..........', '..kkkk....', '.kssssk...', 'kswsssk...', 'kswssssk..', '.kssssk...', '..kkkkkk..', '......kkk.', '.......kkk', '........k.'],
   sound: ['..........', '....kkkkk.', '....kvvvk.', '....k...k.', '....k...k.', '..kkk.kkk.', '.kvvk.kvvk', '.kvvk.kvvk', '..kk...kk.', '..........']
 };
@@ -380,7 +379,7 @@ function hero() {
           }
           flashes.push({ y, life: 1 }); cleared += 1;
         }
-        if (cleared) { lines += cleared; invite('game'); }
+        if (cleared) lines += cleared;
         // keep the pile from filling the stage: the bottom row slowly melts away when it is tall
         const tall = F - Math.floor(F * 0.45); let filled = 0; grains = 0;
         for (let x = 0; x < W; x++) if (sand[tall * W + x]) filled++;
@@ -563,10 +562,9 @@ function hero() {
   // ---- a gentle nudge toward the tool that matches what they are doing ----
   const shown = new Set(); let inviteTimer = 0;
   const INVITES = {
-    editor: { toys: ['editor'], text: 'ドット絵、しっかり描いてみる？' },
-    game: { toys: ['game', 'diff', 'find'], text: 'ゲームで遊んでみる？' },
+    editor: { toys: ['editor'], text: 'ドット絵ツールで作品をつくる？' },
     find: { toys: ['find', 'diff'], text: 'かくれた絵、さがしてみる？' },
-    sound: { toys: ['sound'], text: 'ドットで音楽つくってみる？' }
+    sound: { toys: ['sound'], text: '作曲ツールで曲をつくってみる？' }
   };
   function invite(kind) {
     const spec = INVITES[kind]; if (!spec || shown.has(kind)) return;
@@ -608,6 +606,7 @@ function hero() {
 // =========================================================================================================
 hero();
 const homeToys = createToolToys({ note, animate, interactive: true });
+const staticCreationToys = createToolToys({ note, animate, interactive: false });
 // cards that open something come first and large; the "もうすぐ" ones gather, smaller, below them
 (function groupToys() {
   const grid = document.getElementById('hpToys'); if (!grid) return;
@@ -633,7 +632,8 @@ const initializedToys = new WeakSet();
 function initializeToy(el) {
   if (initializedToys.has(el)) return;
   initializedToys.add(el);
-  try { homeToys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
+  const toys = el.classList.contains('hp-entry-card') ? staticCreationToys : homeToys;
+  try { toys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
 }
 // Cards rise in one after another as they come into view.
 const reveal = typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => entries.forEach((entry) => {

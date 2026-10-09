@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <script>(() => { const q = new URLSearchParams(location.search); if (['art', 'post', 'from'].some((k) => q.has(k))) location.replace('/globe/' + location.search + location.hash); })();</script>
-<title>ホーム｜ドット絵であそぶ PiXiEED</title>
-<meta name="description" content="ドット絵カメラ、地球儀、ドット絵や音楽づくり、ジグソーや間違い探しを楽しめるPiXiEEDのホームです。">
+<title>ドット絵・音楽をつくる、パズルで遊ぶ｜PiXiEED</title>
+<meta name="description" content="ブラウザーでドット絵や音楽を制作。ドット絵カメラ、地球儀の作品探し、ジグソー、間違い探し、もの探しも楽しめます。PiXiEEDで、つくる・あそぶ・つながる。">
 <link rel="canonical" href="https://pixieed.jp/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ホーム｜ドット絵であそぶ PiXiEED"><meta property="og:description" content="ドット絵カメラ、地球儀、ドット絵や音楽づくり、ジグソーや間違い探しを楽しめるPiXiEEDのホームです。"><meta property="og:url" content="https://pixieed.jp/"><meta property="og:image" content="https://pixieed.jp/assets/og/site.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ホーム｜ドット絵であそぶ PiXiEED"><meta name="twitter:description" content="ドット絵カメラ、地球儀、ドット絵や音楽づくり、ジグソーや間違い探しを楽しめるPiXiEEDのホームです。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ドット絵・音楽をつくる、パズルで遊ぶ｜PiXiEED"><meta property="og:description" content="ブラウザーでドット絵や音楽を制作。ドット絵カメラ、地球儀の作品探し、ジグソー、間違い探し、もの探しも楽しめます。PiXiEEDで、つくる・あそぶ・つながる。"><meta property="og:url" content="https://pixieed.jp/"><meta property="og:image" content="https://pixieed.jp/assets/og/site.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドット絵・音楽をつくる、パズルで遊ぶ｜PiXiEED"><meta name="twitter:description" content="ブラウザーでドット絵や音楽を制作。ドット絵カメラ、地球儀の作品探し、ジグソー、間違い探し、もの探しも楽しめます。PiXiEEDで、つくる・あそぶ・つながる。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>try { if (localStorage.getItem('PiXiEED:motion-preference:v1') === 'reduced') document.documentElement.dataset.pixieedMotion = 'reduced'; } catch { /* storage may be blocked */ }</script>
-  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261006-header-controls-1">
-  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261002-ux-polish-1">
+  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261009-home-creation-1">
+  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261009-home-creation-1">
   <link rel="modulepreload" href="/js/home-animation.mjs?rev=20261001-hero-rates-2">
   <link rel="modulepreload" href="/js/tool-toys.mjs?rev=20260929-shared-toys-2">
   <link rel="modulepreload" href="/js/home-motion.mjs?rev=20261002-gyro-360-1">
   <link rel="modulepreload" href="/js/home-sand.mjs?rev=20261002-gyro-360-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/home.css?rev=20261002-hero-controls-1">
+  <link rel="stylesheet" href="/css/home.css?rev=20261009-home-creation-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261006-header-controls-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
@@ -31,70 +31,86 @@
   </div></header>
   <nav class="mobile-nav" aria-label="アプリナビゲーション"></nav>
   <main id="main">
-    <!-- The first screen is a toy: drag to draw, every new dot plays a note -->
+    <!-- Creation tools lead; the mini experience is a small taste of the products. -->
     <section class="hp-hero" aria-labelledby="hpTitle">
-      <div class="hp-stage" id="hpStage">
-        <canvas id="hpCanvas" aria-label="ドット絵のあそび場。描いて指をはなすと落ち、横一列そろうと消えます。文字をたたくと弾け、星はつかまえられます。矢印キーで動かし、スペースでペン、Enterでたたけます" role="img"></canvas>
-        <output class="hp-score" id="hpScore" hidden>★ 0</output>
-        <output class="hp-gyro-status visually-hidden" id="hpGyroStatus" aria-live="polite"></output>
-        <div class="hp-hero-copy">
-          <h1 id="hpTitle">ドットで、<br>あそぼう。</h1>
-          <p class="hp-hint" id="hpHint"><span aria-hidden="true">☝</span> 描いて、はなして、そろえて消す</p>
+      <div class="hp-hero-layout container">
+        <div class="hp-intro">
+          <p class="hp-kicker">つくる・あそぶ・つながる</p>
+          <h1 id="hpTitle">ドット絵も、音楽も。<br>ここからつくろう。</h1>
+          <p class="hp-intro-copy">色を置いて絵を描く。ドットを並べて曲をつくる。ブラウザーで、すぐに制作を始められます。</p>
+          <nav class="hp-creation-links" aria-label="制作ツール">
+            <a class="hp-toy hp-entry-card" data-toy="editor" href="/draw/" style="--tone:#f1eee6" aria-label="ドット絵を描くツールを開く">
+              <canvas aria-hidden="true"></canvas>
+              <span class="hp-entry-content"><span class="hp-entry-action">ドット絵を描く</span><span class="hp-entry-product">かんたんドット</span><span class="hp-toy-line">最大256px・32色。アニメーションにも対応。</span><span class="hp-entry-cta">描くツールを開く <span aria-hidden="true">→</span></span></span>
+            </a>
+            <a class="hp-toy hp-entry-card" data-toy="sound" href="/audio/" style="--tone:#231a33" aria-label="ドットで音楽をつくるツールを開く">
+              <canvas aria-hidden="true"></canvas>
+              <span class="hp-entry-content"><span class="hp-entry-action">音楽をつくる</span><span class="hp-entry-product">ドットで音楽</span><span class="hp-toy-line">色と音色を選んで、テンポを変えてループ再生。</span><span class="hp-entry-cta">作曲ツールを開く <span aria-hidden="true">→</span></span></span>
+            </a>
+          </nav>
+          <p class="hp-demo-note">ミニ体験はここだけのお試しです。描いた内容は保存されません。保存や編集は各制作ツールでどうぞ。</p>
         </div>
-        <div class="hp-tools" role="toolbar" aria-label="描く色">
-          <div class="hp-colors" id="hpColors" role="radiogroup" aria-label="色"></div>
-          <button class="hp-icon" id="hpSound" type="button" aria-pressed="true" aria-label="音"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="hp-wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
-          <button class="hp-icon" id="hpClear" type="button" aria-label="消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button>
+        <div class="hp-demo">
+          <div class="hp-demo-heading"><strong>音が鳴るミニ体験</strong></div>
+          <div class="hp-stage" id="hpStage">
+            <canvas id="hpCanvas" aria-label="ドット絵のあそび場。描いて指をはなすと落ち、横一列そろうと消えます。文字をたたくと弾け、星はつかまえられます。矢印キーで動かし、スペースでペン、Enterでたたけます" role="img"></canvas>
+            <output class="hp-score" id="hpScore" hidden>★ 0</output>
+            <output class="hp-gyro-status visually-hidden" id="hpGyroStatus" aria-live="polite"></output>
+            <div class="hp-hero-copy"><p class="hp-hint" id="hpHint"><span aria-hidden="true">☝</span> ここで描いて遊べます</p></div>
+            <div class="hp-tools" role="toolbar" aria-label="描く色">
+              <div class="hp-colors" id="hpColors" role="radiogroup" aria-label="色"></div>
+              <button class="hp-icon" id="hpSound" type="button" aria-pressed="true" aria-label="音"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="hp-wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+              <button class="hp-icon" id="hpClear" type="button" aria-label="消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button>
+            </div>
+          </div>
         </div>
       </div>
-      <nav class="hp-go" aria-label="はじめる">
-        <a class="hp-go-main" href="/globe/">地図で絵をさがす</a>
-        <a class="hp-go-sub" href="/pixel-camera.html">カメラで撮る</a>
+      <nav class="hp-go container" aria-label="次のあそび">
+        <a class="hp-discovery-link" href="#hpToysTitle">次のあそびを見つける <span aria-hidden="true">↓</span></a>
+        <span class="hp-discovery-copy">撮る・見つける・組み立てる</span>
       </nav>
     </section>
 
-    <!-- Every card is a small working toy of the tool it stands for -->
+    <!-- More playable tools and published destinations -->
     <section class="hp-section" aria-labelledby="hpToysTitle">
       <div class="container">
-        <h2 class="hp-heading" id="hpToysTitle">あそべるもの</h2>
-        <div class="hp-toys" id="hpToys">
-          <a class="hp-toy" href="/pixel-camera.html" data-toy="camera" style="--tone:#1f2b36">
+        <h2 class="hp-heading" id="hpToysTitle">まだまだ、あそべる。</h2>
+        <p class="hp-section-lede">撮る。見つける。組み立てる。</p>
+        <div class="hp-activity-grid" id="hpToys">
+          <div class="hp-feature-grid">
+          <a class="hp-toy hp-feature-card hp-feature-card--camera" href="/pixel-camera.html" data-toy="camera" style="--tone:#1f2b36" aria-label="ドット絵カメラを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵カメラ</span><span class="hp-toy-line">景色をドット絵に</span><span class="hp-chip is-open">ひらく</span>
+            <span class="hp-toy-name">カメラで撮る</span><span class="hp-toy-line">景色が、ドット絵に。</span><span class="hp-chip is-open">撮ってみる</span>
           </a>
-          <a class="hp-toy" href="/globe/" data-toy="map" style="--tone:#10202e">
+          <a class="hp-toy hp-feature-card hp-feature-card--map" href="/globe/" data-toy="map" style="--tone:#10202e" aria-label="地球儀で作品を見る">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵マップ</span><span class="hp-toy-line">街にいる絵をさがす</span><span class="hp-chip is-open">ひらく</span>
+            <span class="hp-toy-name">地球儀を見る</span><span class="hp-toy-line">地球儀で、絵に出会う。</span><span class="hp-chip is-open">見つけにいく</span>
           </a>
           <a hidden class="hp-toy" href="/telescope/" data-toy="telescope" style="display:none;--tone:#0c1320">
             <canvas aria-hidden="true"></canvas>
             <span class="hp-toy-name">望遠鏡</span><span class="hp-toy-line">月と星をのぞく</span><span class="hp-chip is-open">ひらく</span>
           </a>
-          <a class="hp-toy" data-toy="editor" href="/draw/" style="--tone:#f1eee6" aria-label="かんたんドットを開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">かんたんドット</span><span class="hp-toy-line">小さな絵を描く</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <a class="hp-toy" data-toy="sound" href="/audio/" style="--tone:#231a33" aria-label="ドットで音楽を開く">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドットで音楽</span><span class="hp-toy-line">色と音で曲をつくる</span><span class="hp-chip is-open">ひらく</span>
-          </a>
-          <div class="hp-toy" data-toy="game" style="--tone:#bfe3f2" aria-label="かんたんゲーム・もうすぐ">
-            <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">かんたんゲーム</span><span class="hp-toy-line">自分の絵で遊ぶ</span><span class="hp-chip">もうすぐ</span>
           </div>
-          <a class="hp-toy" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6" aria-label="かんたんジグソーを開く">
+          <div class="hp-compact-grid">
+          <a class="hp-toy hp-compact-card" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6" aria-label="かんたんジグソーを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">かんたんジグソー</span><span class="hp-toy-line">絵や写真をパズルに</span><span class="hp-chip is-open">ひらく</span>
+            <span class="hp-toy-name">ジグソー</span><span class="hp-toy-line">一枚を、組み立てる。</span><span class="hp-chip is-open">あそぶ</span>
           </a>
-          <a class="hp-toy" data-toy="diff" href="/play/spot-difference/" style="--tone:#e6edf3" aria-label="ドット絵間違い探しを開く">
+          <a class="hp-toy hp-compact-card" data-toy="diff" href="/play/spot-difference/" style="--tone:#e6edf3" aria-label="ドット絵間違い探しを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵間違い探し</span><span class="hp-toy-line">絵のちがいを見つける</span><span class="hp-chip is-open">ひらく</span>
+            <span class="hp-toy-name">間違い探し</span><span class="hp-toy-line">どこが、ちがう？</span><span class="hp-chip is-open">さがす</span>
           </a>
-          <a class="hp-toy" data-toy="find" href="/play/hidden-object/" style="--tone:#dcebd2" aria-label="ドット絵もの探しを開く">
+          <a class="hp-toy hp-compact-card" data-toy="find" href="/play/hidden-object/" style="--tone:#dcebd2" aria-label="ドット絵もの探しを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ドット絵もの探し</span><span class="hp-toy-line">かくれたものを探す</span><span class="hp-chip is-open">ひらく</span>
+            <span class="hp-toy-name">もの探し</span><span class="hp-toy-line">かくれた絵を、探そう。</span><span class="hp-chip is-open">さがす</span>
           </a>
+          </div>
         </div>
+        <a class="hp-output-card" href="/output/" aria-label="変換・書き出しツールへ">
+          <span class="hp-output-visual" aria-hidden="true"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>♫</span></span>
+          <span class="hp-output-copy"><strong>変換・書き出し</strong><span>絵と音を、ひとつに。</span><small>画像・動画と音楽を組み合わせて出力</small></span>
+          <span class="hp-output-cta">出力ツールを開く <span aria-hidden="true">→</span></span>
+        </a>
       </div>
     </section>
 
@@ -104,7 +120,7 @@
     <aside class="container px-display-ad" data-display-ad="home" data-ad-reserve aria-label="広告"><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
-  <script type="module" src="/js/home-startup.mjs?rev=20261006-header-controls-1"></script>
+  <script type="module" src="/js/home-startup.mjs?rev=20261009-home-creation-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/display-ads.mjs?rev=20261007-lazy-ads-1"></script>
 </body>

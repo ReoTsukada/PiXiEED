@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('home: every tool card has a working toy and a plain name', () => {
+test('home: tool cards have working toys and creation links lead the page', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs'); const toysSource = read('js/tool-toys.mjs');
   const toys = [...html.matchAll(/data-toy="([a-z]+)"/g)].map((m) => m[1]);
-  assert.ok(toys.length >= 9);
+  assert.ok(toys.length >= 8);
   for (const toy of toys) assert.match(toysSource, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
   assert.match(source, /createToolToys\(\{ note, animate, interactive: true \}\)/, 'home uses the shared interactive previews');
+  assert.match(html, /class="hp-creation-links"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
+  assert.doesNotMatch(html, /data-toy="game"/);
   assert.doesNotMatch(html, /PiXiEEDraw|PiXiEELENS|PXDraw/);
   assert.match(source, /prefers-reduced-motion/);
 });
@@ -40,16 +42,20 @@ test('home hero: a tap and a drag never mix — a stroke draws and knocks letter
 test('home hero: the play leads somewhere — invitations matched to what the visitor enjoys', () => {
   const source = read('js/home-play.mjs');
   assert.match(source, /interest\.ink === \d+\) invite\('editor'\)/);
-  assert.match(source, /invite\('game'\)/); assert.match(source, /invite\('sound'\)/); assert.match(source, /invite\('find'\)/);
-  for (const kind of ['editor', 'game', 'find', 'sound']) assert.match(source, new RegExp(`\\n  ${kind}: \\[`), `icon ${kind}`);
+  assert.doesNotMatch(source, /invite\('game'\)/);
+  assert.match(source, /invite\('sound'\)/); assert.match(source, /invite\('find'\)/);
+  for (const kind of ['editor', 'find', 'sound']) assert.match(source, new RegExp(`\\n  ${kind}: \\[`), `icon ${kind}`);
   // keyboard play
   assert.match(source, /canvas\.tabIndex = 0/); assert.match(source, /ArrowLeft/);
 });
 
-test('home: two doors under the playground, soon-cards grouped, real posts drifting by', () => {
+test('home: discovery follows the mini experience and links to published tools', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
-  assert.match(html, /class="hp-go"[\s\S]*?href="\/globe\/"[^>]*>地図で絵をさがす[\s\S]*?href="\/pixel-camera\.html"[^>]*>カメラで撮る/);
-  assert.match(source, /function groupToys\(/); assert.match(source, /もうすぐ/);
+  assert.match(html, /class="hp-go container"[\s\S]*?href="#hpToysTitle"[\s\S]*?次のあそびを見つける/);
+  for (const path of ['/pixel-camera.html', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
+  assert.match(html, /hp-feature-card--camera/); assert.match(html, /hp-feature-card--map/); assert.match(html, /hp-compact-grid/); assert.match(html, /hp-output-card/);
+  assert.match(html, /保存や編集は各制作ツールでどうぞ/);
+  assert.match(source, /function groupToys\(/);
   assert.match(html, /data-home-feed hidden/); assert.match(source, /async function feed\(/);
 });
 
@@ -78,7 +84,7 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
   assert.match(source, /createHomeMotion\(\{ status: gyroStatus, alwaysOn: true, activationTarget: stage,/);
   assert.doesNotMatch(source, /gyroButton/);
   const homeCss = read('css/home.css');
-  assert.match(homeCss, /\.hp-invite \{ position: absolute; top: 1rem; left: 1rem;/);
+  assert.match(homeCss, /\.hp-invite \{ position: absolute; top: 3\.25rem; left: 1rem;/);
   assert.match(homeCss, /\.hp-invite \{[^}]*max-width: calc\(100% - 7rem\); min-height: 44px;/);
   assert.doesNotMatch(html, /猫|ネコ|ねこ/);
 });
