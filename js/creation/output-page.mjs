@@ -1,10 +1,10 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261008-output-11';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261009-output-12';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-7';
 import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
-import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261008-output-1';
-import { renderOutputVideo } from './output-video.mjs?rev=20261009-fps-1';
-import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261008-output-3';
+import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261009-music-plays-1';
+import { renderOutputVideo } from './output-video.mjs?rev=20261009-output-video-1';
+import { fitOutputFrames, importOutputFiles } from './output-import.mjs?rev=20261009-output-video-1';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 
 const MAX_IMAGE_EDGE = 4096;
@@ -43,6 +43,10 @@ const animationSettings = $('#output-animation-settings');
 const animationDetails = $('#output-animation-details');
 const audioSettings = $('#output-audio-settings');
 const audioDetails = $('#output-audio-details');
+const musicSourceField = $('#output-music-source-field');
+const musicSourceSelect = $('#output-music-source');
+const musicTotalPlaysHelp = $('#output-music-total-plays-help');
+const musicTotalPlaysField = $('#output-music-total-plays-field');
 const outputItemsList = $('#output-items');
 const addOutputItem = $('#output-add-item');
 const copyOutputItem = $('#output-copy-item');
@@ -84,6 +88,7 @@ const sequenceSummary = $('#output-sequence-summary');
 const createVideoButton = $('#output-create-video');
 const generationProgress = $('#output-generation-progress');
 const cancelGeneration = $('#output-cancel-generation');
+const musicTotalPlaysControl = $('#output-music-total-plays');
 
 let record = null;
 let outputItems = [];
@@ -105,8 +110,9 @@ let pageDisposed = false;
 let importController = null;
 let timelineTimer = null;
 let timelineFrameIndex = 0;
+let assetPreviewUrls = [];
 let pendingWrites = new Set();
-let mediaSettings = { playbackRate: 1, totalPlays: 0 };
+let mediaSettings = { playbackRate: 1, totalPlays: 0, musicTotalPlays: 1, musicSourceId: '' };
 let lastImportedMedia = null;
 let mediaWritePending = false;
 let itemWritePending = false;
@@ -185,14 +191,91 @@ function sourceFormats(source = activeSource) {
   if (source?.kind === 'legacy-image' && source.mediaSource?.frames?.length > 1) return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']];
   if (source?.kind === 'legacy-image') return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
   if (source?.kind === 'audio-buffer') return [['wav', 'WAV音声']];
+  if (source?.kind === 'video-source') {
+    const supported = chooseAudioVideoMimeType();
+    return supported ? [[supported.extension, `${supported.extension.toUpperCase()}動画`]] : [];
+  }
   if (source?.kind === 'legacy-file' && source.extension === 'pxd') return [];
   return source?.mime && source?.extension ? [[source.extension, displayFormat({ mime: source.mime, extension: source.extension })]] : [];
 }
 
-function audioBufferSource() { return mediaSources.find((source) => source.kind === 'audio-buffer') || null; }
+function availableMusicSources() {
+  const audioSources = mediaSources.filter((source) => ['audio-buffer', 'audio-song'].includes(source.kind));
+  return audioSources.length ? audioSources : mediaSources.filter((source) => source.kind === 'audio-video');
+}
+
+function selectedMusicSource() {
+  const sources = availableMusicSources();
+  return sources.find((source) => source.id === mediaSettings.musicSourceId) || sources.at(-1) || null;
+}
+
+function musicDurationSeconds(source) {
+  if (source?.kind === 'audio-buffer') return source.durationSeconds;
+  if (source?.song) return source.song.loopTicks * 60 / source.song.tempo / 480;
+  return 0;
+}
+
+function audioBufferSource() {
+  const source = selectedMusicSource();
+  return source?.kind === 'audio-buffer' ? source : null;
+}
+
+function updateMusicPlayControl() {
+  if (!musicTotalPlaysControl) return;
+  const musicSources = availableMusicSources();
+  const musicSource = selectedMusicSource();
+  const hasMusic = Boolean(musicSource);
+  const hasVideoFormat = ['mp4', 'webm'].includes(formatSelect.value) && Boolean(chooseAudioVideoMimeType());
+  const songSeconds = musicDurationSeconds(musicSource);
+  const musicViaWav = Boolean(musicSource?.song && activeSource?.kind !== 'audio-video');
+  const maximumSeconds = musicViaWav ? 118.8 : 120;
+  const maximumPlays = songSeconds > 0 ? Math.max(1, Math.min(8, Math.floor(maximumSeconds / songSeconds))) : 8;
+  const visible = hasMusic && hasVideoFormat;
+  if (musicSourceSelect) {
+    musicSourceSelect.replaceChildren();
+    for (const source of musicSources) {
+      const option = document.createElement('option'); option.value = source.id;
+      option.textContent = source.label || (source.kind === 'audio-buffer' ? '読み込んだ音声' : '曲の音声');
+      musicSourceSelect.append(option);
+    }
+    musicSourceSelect.value = musicSource?.id || '';
+    musicSourceField.hidden = !visible || musicSources.length < 2;
+    musicSourceSelect.disabled = mediaWritePending || itemWritePending || Boolean(generationController) || Boolean(importController) || !visible;
+  }
+  if (musicTotalPlaysField) musicTotalPlaysField.hidden = !visible;
+  musicTotalPlaysControl.hidden = !visible;
+  if (musicTotalPlaysHelp) musicTotalPlaysHelp.hidden = !visible;
+  if (audioSettings) audioSettings.hidden = !visible;
+  musicTotalPlaysControl.disabled = mediaWritePending || itemWritePending || Boolean(generationController) || Boolean(importController) || !visible;
+  for (const option of [...musicTotalPlaysControl.options]) option.disabled = Number(option.value) > maximumPlays;
+  const selectedPlays = Math.max(1, Math.min(maximumPlays, Number(mediaSettings.musicTotalPlays) || 1));
+  if (hasMusic) {
+    mediaSettings.musicSourceId = musicSource.id;
+    musicTotalPlaysControl.value = String(selectedPlays);
+    audioDetails.textContent = [musicSource.label, songSeconds > 0 ? `${songSeconds.toFixed(2)}秒` : ''].filter(Boolean).join(' · ');
+  }
+}
 
 function outputMime(formatValue) {
   return ({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', mp4: 'video/mp4', webm: 'video/webm' })[formatValue] || '';
+}
+
+async function renderSongAudioSource(source, totalPlays, signal) {
+  if (!source?.song) throw new TypeError('音楽素材を読み込めません。');
+  const rendered = await renderAudioWav(source.song, { loops: totalPlays });
+  if (signal?.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
+  const AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!AudioContextImpl) throw new Error('このブラウザーでは音楽を動画に合成できません。画像と曲の元データは保持されています。');
+  const context = new AudioContextImpl();
+  try {
+    const decoded = await context.decodeAudioData(await rendered.blob.arrayBuffer());
+    const frames = Math.min(decoded.length, Math.ceil(rendered.seconds * decoded.sampleRate));
+    return {
+      sampleRate: decoded.sampleRate,
+      durationSeconds: frames / decoded.sampleRate,
+      channels: Array.from({ length: Math.min(2, decoded.numberOfChannels) }, (_, channel) => decoded.getChannelData(channel).slice(0, frames))
+    };
+  } finally { if (context.state !== 'closed') { try { await context.close(); } catch {} } }
 }
 
 function setActiveItem(item) {
@@ -265,10 +348,14 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   formatButton.hidden = formats.length <= 1;
   createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
   formatHelp.hidden = formats.length <= 1;
+  addOutputItem.hidden = formats.length === 0;
+  copyOutputItem.hidden = formats.length === 0;
+  deleteOutputItem.hidden = formats.length === 0;
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
   jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
   formatPicker.hidden = true;
   formatButton.setAttribute('aria-expanded', 'false');
+  updateMusicPlayControl();
   updateSequenceControls();
 }
 
@@ -347,10 +434,11 @@ function updateSequenceControls() {
   loopCount.value = String(loopValue);
   const rate = Number(mediaSettings.playbackRate) || 1;
   const onePassSeconds = getOutputTiming(frames, { format: ['gif', 'apng'].includes(formatValue) ? formatValue : 'video', playbackRate: rate }).durationMs / 1000;
-  const audioSource = audioBufferSource();
-  const videoDuration = audioSource ? audioSource.durationSeconds : onePassSeconds;
-  sequenceSummary.textContent = audioSource
-    ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は音声の終わり（${videoDuration.toFixed(2)}秒）で終了。映像FPSを変えても音声の速度と音程は変わりません。動画は最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
+  const musicSource = ['mp4', 'webm'].includes(formatValue) ? selectedMusicSource() : null;
+  const musicPlays = Math.max(1, Math.min(8, Number(mediaSettings.musicTotalPlays) || 1));
+  const videoDuration = musicSource ? musicDurationSeconds(musicSource) * musicPlays : onePassSeconds;
+  sequenceSummary.textContent = musicSource
+    ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は音楽${musicPlays}回の終わり（約${videoDuration.toFixed(2)}秒）で終了。映像FPSを変えても音楽の速度と音程は変わりません。動画は最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
     : ['mp4', 'webm'].includes(formatValue)
       ? `1巡 ${onePassSeconds.toFixed(2)}秒 · 動画は1巡で終了します。最大60fpsで記録するため、短いコマはブラウザーの記録間隔で近似されます。`
       : formatValue === 'gif'
@@ -363,12 +451,15 @@ function updateSequenceControls() {
 }
 
 function renderAssets() {
+  for (const url of assetPreviewUrls) URL.revokeObjectURL(url);
+  assetPreviewUrls = [];
   assetsList.replaceChildren();
   const controlsDisabled = mediaWritePending || Boolean(generationController) || Boolean(importController);
   addAssetsButton.disabled = controlsDisabled;
   const imageSources = mediaSources.filter((source) => source.kind === 'rgba-frames' && source.id.startsWith('local-images'));
   const audioSources = mediaSources.filter((source) => source.kind === 'audio-buffer');
-  const localAssets = [...imageSources, ...audioSources];
+  const videoSources = mediaSources.filter((source) => source.kind === 'video-source');
+  const localAssets = [...imageSources, ...audioSources, ...videoSources];
   assetsSection.hidden = !localAssets.length;
   if (!localAssets.length) return;
   for (const source of imageSources) {
@@ -424,6 +515,17 @@ function renderAssets() {
     replace.addEventListener('click', () => replacementInput.click());
     controls.append(remove, replace); row.append(name, controls); assetsList.append(row);
   }
+  for (const source of videoSources) {
+    const row = document.createElement('div'); row.className = 'output-asset-row';
+    const name = document.createElement('span'); name.className = 'output-asset-row__name'; name.textContent = `${source.label} · ${source.durationSeconds.toFixed(1)}秒 · ${source.width}×${source.height}`;
+    const sourceVideo = document.createElement('video'); sourceVideo.className = 'output-asset-row__video-preview'; sourceVideo.controls = true; sourceVideo.playsInline = true; sourceVideo.preload = 'metadata'; sourceVideo.setAttribute('aria-label', `${source.label}の動画プレビュー`);
+    const previewUrl = URL.createObjectURL(source.blob); assetPreviewUrls.push(previewUrl); sourceVideo.src = previewUrl;
+    const controls = document.createElement('div'); controls.className = 'output-asset-row__controls';
+    const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '削除'; remove.setAttribute('aria-label', `${source.label}を削除`);
+    remove.disabled = controlsDisabled || outputItems.some((item) => item.sourceId === source.id);
+    remove.addEventListener('click', () => void persistMediaSources(mediaSources.filter((item) => item.id !== source.id)));
+    controls.append(remove); row.append(name, sourceVideo, controls); assetsList.append(row);
+  }
   const frames = imageSources.reduce((all, source) => [...all, ...source.mediaSource.frames], []);
   assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマのFPSを編集 · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
 }
@@ -441,7 +543,7 @@ async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
     activeSource = mediaSources.find((source) => source.id === activeSource?.id) || mediaSources[0] || null;
     record.mediaSources = mediaSources; record.mediaSettings = mediaSettings; record.mediaSource = activeSource?.mediaSource || null;
     fillSourceAndFormatControls({ preferredFormat: formatSelect.value || activeItem?.extension });
-    renderAssets(); updateSequenceControls(); setMedia(record);
+    renderAssets(); updateSequenceControls(); setMedia(record); updateMusicPlayControl();
     status.textContent = '素材の並びと設定を保存しました。出力ファイルは次の作成時に反映します。';
     return true;
   } catch (error) {
@@ -454,6 +556,7 @@ function sourcesFromImport(imported) {
   const sources = [];
   if (imported.frames.length) sources.push({ id: 'local-images', label: `画像 (${imported.frames.length}コマ)`, kind: 'rgba-frames', mediaSource: { kind: 'rgba-frames', width: imported.frames[0].width, height: imported.frames[0].height, frames: imported.frames, totalPlays: imported.totalPlays ?? 1 } });
   if (imported.audio) sources.push({ id: 'local-audio', label: imported.audio.name, kind: 'audio-buffer', sampleRate: imported.audio.sampleRate, durationSeconds: imported.audio.durationSeconds, channels: imported.audio.channels });
+  if (imported.video) sources.push({ id: 'local-video', label: imported.video.name, kind: 'video-source', blob: imported.video.blob, mime: imported.video.mime, width: imported.video.width, height: imported.video.height, durationSeconds: imported.video.durationSeconds });
   return sources;
 }
 
@@ -513,6 +616,10 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         initialBlob = await canvasRaster(imported.frames[0], 'image/png');
         initialFilename = 'pixieed-image.png';
         metadataValue = { width: imported.frames[0].width, height: imported.frames[0].height, frameCount: imported.frames.length };
+      } else if (imported.video?.poster) {
+        initialBlob = await canvasRaster(imported.video.poster, 'image/png');
+        initialFilename = 'pixieed-video-preview.png';
+        metadataValue = { width: imported.video.width, height: imported.video.height, durationSeconds: imported.video.durationSeconds, description: '動画の最初の映像コマをプレビューしています。' };
       } else {
         initialBlob = await encodeImportedAudioWav(newSources.find((source) => source.kind === 'audio-buffer'), {
           signal: controller.signal,
@@ -521,7 +628,7 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         initialFilename = 'pixieed-audio.wav';
         metadataValue = { durationSeconds: imported.audio.durationSeconds, sampleRate: imported.audio.sampleRate };
       }
-      const staged = await stageToolOutput({ blob: initialBlob, filename: initialFilename, returnUrl: '/output/', metadata: metadataValue, mediaSources: newSources, mediaSettings: { playbackRate: 1, totalPlays: imported.totalPlays ?? 1 }, title: '変換・書き出し', source: 'この端末の素材' });
+      const staged = await stageToolOutput({ blob: initialBlob, filename: initialFilename, returnUrl: '/output/', metadata: metadataValue, mediaSources: newSources, mediaSettings: { playbackRate: 1, totalPlays: imported.totalPlays ?? 1, musicTotalPlays: 1 }, title: '変換・書き出し', source: 'この端末の素材' });
       targetStatus.textContent = '端末内に素材を保持しました。出力ページを開いています…';
       location.assign(staged.url);
     }
@@ -650,21 +757,57 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     const blob = await encodeImportedAudioWav(source, { signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
     return { blob, metadata: { durationSeconds: source.durationSeconds, sampleRate: source.sampleRate } };
   }
-  if (source?.kind === 'rgba-frames' && ['mp4', 'webm'].includes(formatValue)) {
+  if (['rgba-frames', 'video-source'].includes(source?.kind) && ['mp4', 'webm'].includes(formatValue)) {
+    const selectedMusic = selectedMusicSource();
     const audioSource = audioBufferSource();
+    const totalMusicPlays = Math.max(1, Math.min(8, Number(mediaSettings.musicTotalPlays) || 1));
     const rate = Number(mediaSettings.playbackRate) || 1;
-    const frames = source.mediaSource.frames;
+    const frames = source.kind === 'rgba-frames' ? source.mediaSource.frames : [];
     const mimeChoice = chooseAudioVideoMimeType();
     if (!mimeChoice || mimeChoice.extension !== formatValue) throw new Error('このブラウザーが実際に作成できる動画形式と選択内容が一致しません。画像と音声の元データは保持されています。');
-    const result = await renderOutputVideo(frames, { audioSource, playbackRate: rate, mimeChoice, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
-    if (result.extension !== formatValue || result.blob.type.split(';', 1)[0] !== outputMime(formatValue) || (audioSource && !result.hasAudio)) throw new Error('動画の形式または音声トラックを確認できません。元の素材はそのまま保存できます。');
-    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(audioSource ? { description: '音声付き動画。映像のFPSを変えても音声の速度は変わらず、音声の終わりで動画を終了します。' } : { description: '画像のコマを一巡する動画です。' }) } };
+    let videoSource = null; let videoUrl = null;
+    if (source.kind === 'video-source') {
+      videoUrl = URL.createObjectURL(source.blob); videoSource = document.createElement('video');
+      videoSource.muted = true; videoSource.defaultMuted = true; videoSource.playsInline = true; videoSource.preload = 'auto'; videoSource.src = videoUrl;
+      await new Promise((resolve, reject) => {
+        const finish = (error) => { videoSource.removeEventListener('loadeddata', ready); videoSource.removeEventListener('error', failed); controller.signal.removeEventListener('abort', aborted); error ? reject(error) : resolve(); };
+        const ready = () => finish(); const failed = () => finish(new Error('動画の映像コマを読み込めませんでした。元の動画は保持されています。'));
+        const aborted = () => finish(new DOMException('動画の作成を中止しました。', 'AbortError'));
+        videoSource.addEventListener('loadeddata', ready, { once: true }); videoSource.addEventListener('error', failed, { once: true }); controller.signal.addEventListener('abort', aborted, { once: true });
+        videoSource.load(); if (videoSource.readyState >= 2) ready();
+      });
+    }
+    let result;
+    try {
+      if (!audioSource && selectedMusic?.song) {
+        const renderedMusic = await renderSongAudioSource(selectedMusic, totalMusicPlays, controller.signal);
+        result = await renderOutputVideo(frames, { audioSource: renderedMusic, videoSource, playbackRate: rate, mimeChoice, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
+      } else {
+        result = await renderOutputVideo(frames, { audioSource, audioTotalPlays: audioSource ? totalMusicPlays : 1, videoSource, playbackRate: rate, mimeChoice, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
+      }
+    } finally { if (videoSource) { videoSource.pause(); videoSource.removeAttribute('src'); videoSource.load(); } if (videoUrl) URL.revokeObjectURL(videoUrl); }
+    const hasMusic = Boolean(audioSource || selectedMusic?.song);
+    if (result.extension !== formatValue || result.blob.type.split(';', 1)[0] !== outputMime(formatValue) || (hasMusic && !result.hasAudio)) throw new Error('動画の形式または音声トラックを確認できません。元の素材はそのまま保存できます。');
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, ...(hasMusic ? { description: `音声付き動画。音楽は${totalMusicPlays}回、元の速度と音程で再生し、終わりに動画を終了します。` } : { description: '画像または動画の映像を元の速度で記録しました。' }) } };
   }
   if (source?.kind === 'audio-video' && ['mp4', 'webm'].includes(formatValue)) {
     const frame = source.image;
-    const result = await renderAudioVideo(source.song, { width: frame.width, height: frame.height, rgba: frame.data }, { signal: controller.signal });
-    if (result.extension !== formatValue || result.blob.type.split(';')[0] !== outputMime(formatValue)) throw new Error('動画の形式が選択内容と一致しません。元の項目はそのまま保存できます。');
-    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height } };
+    const selectedMusic = selectedMusicSource();
+    const musicTotalPlays = Math.max(1, Math.min(8, Number(mediaSettings.musicTotalPlays) || 1));
+    let result;
+    if (selectedMusic?.song) {
+      result = await renderAudioVideo(selectedMusic.song, { width: frame.width, height: frame.height, rgba: frame.data }, { totalPlays: musicTotalPlays, signal: controller.signal });
+    } else if (selectedMusic?.kind === 'audio-buffer') {
+      const mimeChoice = chooseAudioVideoMimeType();
+      if (!mimeChoice || mimeChoice.extension !== formatValue) throw new Error('このブラウザーが実際に作成できる動画形式と選択内容が一致しません。画像と音楽の元データは保持されています。');
+      result = await renderOutputVideo([{ width: frame.width, height: frame.height, data: frame.data, delayMs: 100 }], {
+        audioSource: selectedMusic, audioTotalPlays: musicTotalPlays, mimeChoice,
+        signal: controller.signal,
+        onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); }
+      });
+    } else throw new Error('動画に重ねる音楽を選べません。画像と音楽の元データは保持されています。');
+    if (result.extension !== formatValue || result.blob.type.split(';')[0] !== outputMime(formatValue) || !result.hasAudio) throw new Error('動画の形式または音声トラックを確認できません。元の項目はそのまま保存できます。');
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, width: result.width, height: result.height, outputWidth: result.width, outputHeight: result.height, description: `音楽は${musicTotalPlays}回、元の速度と音程で再生します。` } };
   }
   if (source?.kind === 'legacy-file' && source.blob && source.extension === formatValue) return { blob: source.blob, metadata: {} };
   throw new Error('この素材では選択した形式を書き出せません。');
@@ -721,6 +864,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     const outputHeight = generatedOutput.metadata.outputHeight || outputDimensions?.height || frames[0]?.height;
     setCurrentBlob(activeItem.blob, { width: outputWidth, height: outputHeight, animated: frames.length > 1 && ['gif', 'apng'].includes(extensionValue) });
     setMedia(record);
+    updateMusicPlayControl();
     format.textContent = displayFormat(record); extension.textContent = `.${activeItem.extension}`; filename.value = outputBaseName(activeItem.filename, activeItem.extension);
     filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
     fillSourceAndFormatControls({ preferredFormat: activeItem.extension });
@@ -983,7 +1127,7 @@ async function mount() {
     }
     if (!mediaSources.length) mediaSources = [{ id: 'legacy', label: record.source || '元のファイル', kind: 'legacy-file', blob: record.sourceBlob, mime: record.mime, extension: record.extension }];
   const importedTotalPlays = mediaSources.find((source) => source.mediaSource?.totalPlays !== undefined || source.mediaSource?.loopCount !== undefined)?.mediaSource?.totalPlays ?? mediaSources.find((source) => source.mediaSource?.loopCount !== undefined)?.mediaSource?.loopCount ?? 0;
-  mediaSettings = { playbackRate: record.mediaSettings?.playbackRate || 1, totalPlays: record.mediaSettings?.totalPlays ?? record.mediaSettings?.loopCount ?? importedTotalPlays };
+    mediaSettings = { playbackRate: record.mediaSettings?.playbackRate || 1, totalPlays: record.mediaSettings?.totalPlays ?? record.mediaSettings?.loopCount ?? importedTotalPlays, musicTotalPlays: Math.max(1, Math.min(8, Number(record.mediaSettings?.musicTotalPlays) || 1)), musicSourceId: record.mediaSettings?.musicSourceId || '' };
     outputItems = record.outputs?.length ? record.outputs : [{ id: 'default', sourceId: mediaSources[0]?.id || '', mime: record.mime, extension: record.extension, filename: record.filename, blob: record.blob, metadata: record.currentMetadata || {} }];
     activeItem = outputItems[0];
     if (!activeItem.sourceId) activeItem.sourceId = mediaSources[0]?.id || '';
@@ -1029,6 +1173,17 @@ applyFps.addEventListener('click', () => {
     : source), { ...mediaSettings, playbackRate: 1 });
 });
 loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, totalPlays: Number(loopCount.value) }); });
+musicTotalPlaysControl?.addEventListener('change', () => {
+  const plays = Number(musicTotalPlaysControl.value);
+  const maximum = Math.max(1, ...[...musicTotalPlaysControl.options].filter((option) => !option.disabled).map((option) => Number(option.value) || 1));
+  if (!Number.isSafeInteger(plays) || plays < 1 || plays > maximum) { musicTotalPlaysControl.value = String(mediaSettings.musicTotalPlays || 1); return; }
+  void persistMediaSources(mediaSources, { ...mediaSettings, musicTotalPlays: plays });
+});
+musicSourceSelect?.addEventListener('change', () => {
+  const source = availableMusicSources().find((item) => item.id === musicSourceSelect.value);
+  if (!source) { updateMusicPlayControl(); return; }
+  void persistMediaSources(mediaSources, { ...mediaSettings, musicSourceId: source.id });
+});
 createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
 returnLink.addEventListener('click', async (event) => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !pendingWrites.size) return;
@@ -1072,6 +1227,7 @@ formatSelect.addEventListener('change', () => {
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
   jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
   createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
+  updateMusicPlayControl();
   updateSequenceControls();
   if (['mp4', 'webm'].includes(formatSelect.value)) { status.textContent = '動画の作成には少し時間がかかります。「この設定で動画を作る」を押して開始してください。'; return; }
   void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });

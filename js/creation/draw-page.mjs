@@ -14,7 +14,7 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261007-draw-handoff-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261009-output-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -25,7 +25,7 @@ import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-contr
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261008-output-10';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-floating-mouse-2';
@@ -1463,7 +1463,7 @@ async function importImage(file, importSource) {
     const prepared = prepareSharedCanvasImage(original, { passActive: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261006-header-controls-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261009-output-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }

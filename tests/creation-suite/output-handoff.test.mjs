@@ -93,7 +93,7 @@ test('filename settings preserve the original extension and remove path characte
 test('output data stays in IndexedDB and the route carries only an opaque id', async () => {
   const deps = dependencies();
   const staged = await stageToolOutput(file(), { ...deps, now: deps.now });
-  assert.equal(staged.url, 'https://pixieed.test/output/?id=' + validId);
+  assert.equal(staged.url, 'https://pixieed.test/output/work/?id=' + validId);
   assert.doesNotMatch(staged.url, /pixels|data:image|base64/);
   const first = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   const duplicateTab = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
@@ -133,7 +133,7 @@ test('imported image frames, audio PCM and timeline settings survive reload with
       { id: 'local-audio', label: 'voice.wav', kind: 'audio-buffer', sampleRate: 8000, channels }
     ]
   }, deps);
-  assert.equal(staged.url, `https://pixieed.test/output/?id=${validId}`);
+  assert.equal(staged.url, `https://pixieed.test/output/work/?id=${validId}`);
   assert.doesNotMatch(staged.url, /first|second|voice|255|base64/);
   let loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   const staleRevision = loaded.revision;
@@ -143,17 +143,47 @@ test('imported image frames, audio PCM and timeline settings survive reload with
   assert.equal(loaded.mediaSources[0].mediaSource.frames[0].delayMs, 1000 / 24, 'fractional frame delays survive local persistence exactly');
   assert.equal(loaded.mediaSources[0].mediaSource.frames[1].name, 'second.jpg');
   assert.deepEqual([...loaded.mediaSources[1].channels[0]], [0, 0.25, -0.25, 0]);
-  const savedMedia = await saveToolOutputMedia(validId, loaded.mediaSources, { playbackRate: 2, totalPlays: 3 }, { indexedDBRef: deps.indexedDBRef, now: deps.now, expectedRevision: staleRevision });
+  const savedMedia = await saveToolOutputMedia(validId, loaded.mediaSources, { playbackRate: 2, totalPlays: 3, musicTotalPlays: 2, musicSourceId: 'local-audio' }, { indexedDBRef: deps.indexedDBRef, now: deps.now, expectedRevision: staleRevision });
   assert.equal(savedMedia.revision, staleRevision + 1);
   await assert.rejects(saveToolOutputItems(validId, loaded.outputs, { indexedDBRef: deps.indexedDBRef, now: deps.now, expectedRevision: staleRevision }), /別のタブ/);
   loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   assert.equal(loaded.mediaSettings.playbackRate, 2);
   assert.equal(loaded.mediaSettings.totalPlays, 3);
+  assert.equal(loaded.mediaSettings.musicTotalPlays, 2);
+  assert.equal(loaded.mediaSettings.musicSourceId, 'local-audio');
   assert.equal(loaded.mediaSources[0].mediaSource.frames[0].delayMs, 1000 / 24);
   assert.equal(loaded.outputs.length, 1, 'stale tab did not overwrite the latest output list');
   await assert.rejects(saveToolOutputMedia(validId, [loaded.mediaSources[1]], {}, { indexedDBRef: deps.indexedDBRef, now: deps.now }), /使っている素材/);
   loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   assert.equal(loaded.mediaSources.length, 2, 'failed edit leaves the previous asset record intact');
+});
+
+test('video source Blobs and finite music-play settings survive local storage, while unsafe video records are rejected', async () => {
+  const deps = dependencies();
+  const video = new Blob(['local video bytes'], { type: 'video/webm' });
+  await stageToolOutput({
+    ...file(),
+    mediaSettings: { musicTotalPlays: 4 },
+    mediaSources: [{ id: 'local-video', label: 'clip.webm', kind: 'video-source', blob: video, mime: 'video/webm', width: 320, height: 180, durationSeconds: 2.5 }]
+  }, deps);
+  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(loaded.mediaSettings.musicTotalPlays, 4);
+  assert.equal(loaded.mediaSources[0].kind, 'video-source');
+  assert.equal(loaded.mediaSources[0].blob.size, video.size);
+  assert.equal(loaded.mediaSources[0].durationSeconds, 2.5);
+  await assert.rejects(saveToolOutputMedia(validId, [{ ...loaded.mediaSources[0], durationSeconds: 120.1 }], {}, { indexedDBRef: deps.indexedDBRef, now: deps.now }), /動画素材/);
+  const afterFailure = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(afterFailure.mediaSources[0].durationSeconds, 2.5, 'failed video edits preserve the stored source');
+});
+
+test('video staging limits aggregate source payloads instead of accepting eight maximum-size videos', async () => {
+  const deps = dependencies();
+  const sources = Array.from({ length: 3 }, (_, index) => ({
+    id: `video-${index}`, label: `clip-${index}.webm`, kind: 'video-source',
+    blob: { size: 64 * 1024 * 1024, type: 'video/webm', slice() {} },
+    mime: 'video/webm', width: 320, height: 180, durationSeconds: 2
+  }));
+  await assert.rejects(stageToolOutput({ ...file(), mediaSources: sources }, deps), /素材の合計は128MB/);
 });
 
 test('output item validation rejects a mismatched extension without changing the saved set', async () => {
@@ -163,11 +193,13 @@ test('output item validation rejects a mismatched extension without changing the
   assert.equal(loaded.outputs.length, 1); assert.equal(loaded.outputs[0].filename, 'my-art.png');
 });
 
-test('PXD project backups remain on their existing direct-save path', () => {
+test('PXD project backups use the shared file card and keep direct save as a failure fallback', async () => {
   for (const path of ['../../js/creation/pxd-ui.mjs', '../../js/creation/project-workspace.mjs']) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8');
-    assert.doesNotMatch(source, /output-handoff\.mjs|sendToolOutput/);
-    assert.match(source, /async function sendPxdBackup\(bytes, name\) \{\s*await download\(bytes, name\);\s*return false;/);
+    assert.match(source, /output-handoff\.mjs\?rev=20261009-output-12/);
+    assert.match(source, /const staged = await sendToolOutput\(/);
+    assert.match(source, /if \(staged\.ok\) return true;/);
+    assert.match(source, /await download\(bytes, name\);\s*return false;/);
   }
   const outputPage = readFileSync(new URL('../../js/creation/output-page.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(outputPage, /pxd: 'application\/octet-stream'|extension === 'pxd' \?/);
@@ -175,6 +207,16 @@ test('PXD project backups remain on their existing direct-save path', () => {
   const pxdUi = readFileSync(new URL('../../js/creation/pxd-ui.mjs', import.meta.url), 'utf8');
   assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
+
+  const deps = dependencies();
+  await stageToolOutput({
+    blob: new Blob(['PXD backup'], { type: 'application/octet-stream' }),
+    filename: 'pixieed-project.pxd', returnUrl: '/draw/', title: 'PXDバックアップを確認',
+    source: 'PXDバックアップ', metadata: { description: 'PiXiEED内で内容のプレビューや変換はできません。' }
+  }, deps);
+  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(loaded.mime, 'application/octet-stream');
+  assert.equal(loaded.filename, 'pixieed-project.pxd');
 });
 
 test('camera output return links carry only the opaque output id for local restoration', async () => {
@@ -182,7 +224,7 @@ test('camera output return links carry only the opaque output id for local resto
   const staged = await sendToolOutput({ ...file('capture.png'), source: 'ピクセルカメラ', returnOutputId: true }, deps);
   assert.equal(staged.ok, true);
   assert.equal(deps.assigned.length, 1);
-  assert.match(deps.assigned[0], /^https:\/\/pixieed\.test\/output\/\?id=/);
+  assert.match(deps.assigned[0], /^https:\/\/pixieed\.test\/output\/work\/\?id=/);
   assert.doesNotMatch(deps.assigned[0], /pixels|base64|data:image/);
   const restored = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   assert.equal(restored.returnUrl, `/draw/?pxd=local-id&pxdRevision=revision-id&outputId=${validId}`);
@@ -209,7 +251,7 @@ test('PiXiEELENS GIF output uses its real options builder and restores all anima
   const staged = await sendToolOutput(options, deps);
   assert.equal(staged.ok, true);
   assert.equal(deps.assigned.length, 1);
-  assert.match(deps.assigned[0], /^https:\/\/pixieed\.test\/output\/\?id=/);
+  assert.match(deps.assigned[0], /^https:\/\/pixieed\.test\/output\/work\/\?id=/);
   assert.doesNotMatch(deps.assigned[0], /gif bytes|data:image|base64/);
   const entry = await readToolOutput(staged.id, { indexedDBRef: deps.indexedDBRef, now: deps.now });
   const restored = preparePixelLensOutputRestore(entry);
@@ -353,7 +395,7 @@ test('output handoff waits for pending editor autosave and uses the updated retu
   });
   assert.equal(result.ok, true);
   assert.deepEqual(calls, ['authorize', 'save']);
-  assert.match(outputLocation.assigned, /^https:\/\/example\.test\/output\/\?id=/);
+  assert.match(outputLocation.assigned, /^https:\/\/example\.test\/output\/work\/\?id=/);
   const record = await readToolOutput(result.id, { indexedDBRef, now: () => 1000 });
   assert.equal(record.returnUrl, '/draw/?pxd=project&pxdRevision=new');
 });

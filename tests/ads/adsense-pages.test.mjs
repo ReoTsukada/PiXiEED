@@ -16,6 +16,7 @@ const EXCLUDED_PAGES = [
   'privacy/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
+  'output/index.html', 'output/work/index.html',
   'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html', 'pass/index.html',
   'stores/cafe-hoshi.html', 'stores/kaze-machi.html', 'stores/yoru-akari.html',
   'spot-difference/index.html', 'hidden-object/index.html', 'globe-prototype.html', 'pixiee-lens/index.html'
@@ -59,7 +60,7 @@ test('every non-fixture HTML entry has an explicit ad-loading decision', async (
   }
   const expected = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(new Set(expected).size, 37);
+  assert.equal(new Set(expected).size, 39);
   for (const path of expected) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
 });
 

@@ -59,6 +59,7 @@ body[data-page="output"] {
 .output-assets-list { display: grid; gap: 7px; }
 .output-asset-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 1px solid #e1e8e2; border-radius: 10px; background: #fff; }
 .output-asset-row__name { overflow: hidden; color: #43564a; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+.output-asset-row__video-preview { grid-column: 1 / -1; display: block; width: min(100%, 480px); max-height: 260px; aspect-ratio: 16 / 9; border-radius: 8px; background: #18231d; object-fit: contain; }
 .output-asset-row__controls { display: flex; align-items: center; gap: 4px; }
 .output-asset-row__controls button { min-width: 38px; min-height: 38px; border: 1px solid #d5e0d7; border-radius: 9px; background: #fff; color: #315d43; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
 .output-asset-row__controls input { width: 72px; min-height: 38px; padding: 4px 7px; border: 1px solid #d5e0d7; border-radius: 9px; font: inherit; font-size: .78rem; text-align: right; }

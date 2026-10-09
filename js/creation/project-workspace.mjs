@@ -27,6 +27,18 @@ async function download(bytes, name) {
   const url = URL.createObjectURL(blob); const link = node('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); return false;
 }
 async function sendPxdBackup(bytes, name) {
+  try {
+    const { sendToolOutput } = await import('./output-handoff.mjs?rev=20261009-output-12');
+    const staged = await sendToolOutput({
+      blob: new Blob([bytes], { type: 'application/octet-stream' }),
+      filename: name,
+      returnUrl: `${location.pathname}${location.search}${location.hash}`,
+      title: 'PXDバックアップを確認',
+      source: 'PXDバックアップ',
+      metadata: { description: 'PXDプロジェクトのバックアップです。PiXiEED内で内容のプレビューや変換はできません。' }
+    });
+    if (staged.ok) return true;
+  } catch { /* The project backup stays available through the direct-save fallback. */ }
   await download(bytes, name);
   return false;
 }

@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const pages = [
-  ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'site'], ['tools/index.html', '/tools/', 'tools'],
+  ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'site'], ['tools/index.html', '/tools/', 'tools'], ['output/index.html', '/output/', 'site'],
   ['draw/index.html', '/draw/', 'draw'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
   ['play/spot-difference/index.html', '/play/spot-difference/', 'spot-game'], ['play/hidden-object/index.html', '/play/hidden-object/', 'find-game'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],
@@ -77,6 +77,21 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
   }
 });
 
+test('output landing describes supported capabilities and legacy work links to the private route', () => {
+  const source = read('output/index.html');
+  assert.match(source, /id="page-title"/);
+  assert.match(source, /href="\/output\/work\/"/);
+  assert.match(source, /<table class="capability-table">/);
+  assert.match(source, /GIF・動画\＋音楽/);
+  assert.match(source, /GIFの映像を音楽に合わせた長さで繰り返し/);
+  assert.match(source, /PNG・JPEG・SVG/);
+  assert.doesNotMatch(source, /WebPを(?:含む)?出力|WebPで出力/);
+  assert.match(source, /location\.replace\(`\/output\/work\/\?id=\$\{encodeURIComponent\(ids\[0\]\)\}`\)/);
+  assert.doesNotMatch(source, /\$\{current\.search\}|current\.hash/);
+  assert.doesNotMatch(source, /name=['"]robots['"][^>]+noindex/);
+  assert.doesNotMatch(source, /ratingValue|aggregateRating|priceCurrency/);
+});
+
 test('pages use the unified brand icons and app manifest', () => {
   assert.deepEqual(pngDimensions('favicon-96.png'), [96, 96]);
   assert.deepEqual(pngDimensions('apple-touch-icon.png'), [180, 180]);
@@ -117,6 +132,25 @@ test('sitemap URLs point to indexable canonical pages without redirects or tempo
     assert.doesNotMatch(head, /<meta\b(?=[^>]*\bname=["'](?:robots|googlebot)["'])[^>]*\b(?:noindex|none)\b/i, `${file}: allows indexing`);
     assert.doesNotMatch(head, /<meta\b[^>]*\bhttp-equiv=["']refresh["']/i, `${file}: not a forwarding page`);
   }
+});
+
+
+test('private output workspace is excluded from indexing and keeps only generic metadata', () => {
+  const source = read('output/work/index.html');
+  const head = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
+  assert.ok(head);
+  assert.match(head, /<meta name="robots" content="noindex, nofollow">/);
+  assert.doesNotMatch(head, /<link\b(?=[^>]*\brel=["']canonical["'])/i);
+  assert.doesNotMatch(head, /property=["']og:url["']|twitter:url/i);
+  assert.doesNotMatch(head, /<meta[^>]+(?:personal|private|作品名|ファイル名)/i);
+  assert.match(source, /id="output-music-total-plays"/);
+  assert.match(source, /id="output-music-source"/);
+  assert.match(source, /<option value="1" selected>1回（初期設定）<\/option>/);
+  assert.match(source, /<option value="8">8回<\/option>/);
+  assert.match(source, /video\/mp4,video\/webm,\.mp4,\.webm/);
+  assert.match(source, /音声の再生回数/);
+  assert.match(source, /音楽の速さや高さは変わりません/);
+  assert.doesNotMatch(read('sitemap.xml'), /https:\/\/pixieed\.jp\/output\/work/);
 });
 
 test('robots.txt announces the root sitemap without blocking its public routes', () => {

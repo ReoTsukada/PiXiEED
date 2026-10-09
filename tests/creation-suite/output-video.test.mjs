@@ -33,7 +33,7 @@ function createMediaHarness({ audio = false, duration = 0.04, deterministicAudio
     createBuffer(channelCount, length, sampleRate) { return { channelCount, length, sampleRate, copyToChannel() {} }; }
     createMediaStreamDestination() { return { stream: new Stream([new Track('audio')]) }; }
     createBufferSource() {
-      const node = { playbackRate: { value: 1 }, connect() {}, disconnect() {}, start: (when) => { node.startTime = when; node.timer = setTimeout(() => node.onended?.(), duration / node.playbackRate.value * 1000); }, stop: () => clearTimeout(node.timer) };
+      const node = { playbackRate: { value: 1 }, loop: false, connect() {}, disconnect() {}, start: (when) => { node.startTime = when; if (!node.loop) node.timer = setTimeout(() => node.onended?.(), duration / node.playbackRate.value * 1000); }, stop: (when) => { if (Number.isFinite(when)) { node.stopTime = when; clearTimeout(node.timer); node.timer = setTimeout(() => node.onended?.(), Math.max(0, (when - node.startTime) * 1000)); } else clearTimeout(node.timer); } };
       audioNodes.push(node);
       return node;
     }
@@ -104,6 +104,51 @@ test('frames follow the selected visual speed through the unchanged audio durati
     assert.equal(harness.audioNodes[0].startTime, 0);
     assert.ok(harness.paintedPixels.filter((pixel) => pixel === 10).length >= 2);
     assert.ok(harness.paintedPixels.filter((pixel) => pixel === 20).length >= 2);
+  } finally { harness.restore(); }
+});
+
+test('music repeats a finite number of times at native speed and sets the video duration to the song total', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 0.05 });
+  try {
+    const result = await renderOutputVideo([frame(25), { ...frame(25), data: new Uint8Array([20, 20, 20, 255]) }], {
+      audioSource: harness.audioSource, audioTotalPlays: 3, playbackRate: 2,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: (callback) => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    });
+    assert.ok(Math.abs(result.seconds - 0.15) < 1e-12);
+    assert.equal(harness.audioNodes[0].loop, true);
+    assert.equal(harness.audioNodes[0].playbackRate.value, 1, 'music pitch and speed are independent of visual speed');
+    assert.ok(Math.abs(harness.audioNodes[0].stopTime - 0.15) < 0.002, 'the repeating buffer is stopped at exactly N song lengths');
+  } finally { harness.restore(); }
+});
+
+test('selected video visuals keep native playback speed and are muted when music is added', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 0.05 });
+  const videoSource = { videoWidth: 320, videoHeight: 180, duration: 0.04, currentTime: 0, muted: false, defaultMuted: false, playbackRate: 0.5, loop: false, play() { this.played = true; return Promise.resolve(); }, pause() { this.paused = true; } };
+  try {
+    const result = await renderOutputVideo([], {
+      videoSource, audioSource: harness.audioSource, audioTotalPlays: 2, playbackRate: 3,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: (callback) => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    });
+    assert.equal(result.seconds, 0.1);
+    assert.equal(videoSource.muted, true); assert.equal(videoSource.defaultMuted, true);
+    assert.equal(videoSource.playbackRate, 1); assert.equal(videoSource.played, true); assert.equal(videoSource.paused, true);
+    assert.equal(harness.audioNodes[0].playbackRate.value, 1);
+  } finally { harness.restore(); }
+});
+
+test('music playback count cannot exceed the 120-second recording limit', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 61 });
+  try {
+    await assert.rejects(renderOutputVideo([frame()], {
+      audioSource: harness.audioSource, audioTotalPlays: 2,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef
+    }), /120秒以内/);
+    assert.equal(harness.recorders.length, 0, 'oversized composition is rejected before recording starts');
   } finally { harness.restore(); }
 });
 

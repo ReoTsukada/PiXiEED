@@ -62,6 +62,46 @@ test('local static images keep pixel data and fit mixed dimensions with transpar
   assert.equal(result.audio, null);
 });
 
+test('video import keeps only a locally decoded, bounded MP4/WebM Blob and reads an actual poster frame', async () => {
+  const file = new Blob(['local-video'], { type: 'video/webm' });
+  Object.defineProperty(file, 'name', { value: 'clip.webm' });
+  const revoked = []; const urls = [];
+  class FakeVideo {
+    constructor() { this.listeners = new Map(); this.readyState = 0; this.videoWidth = 320; this.videoHeight = 180; this.duration = 2.5; }
+    addEventListener(type, callback) { this.listeners.set(type, callback); }
+    removeEventListener(type) { this.listeners.delete(type); }
+    emit(type) { this.listeners.get(type)?.(); }
+    load() { this.readyState = 1; this.emit('loadedmetadata'); }
+    set currentTime(value) { this.time = value; this.readyState = 2; this.emit('seeked'); }
+    pause() {}
+    removeAttribute() {}
+  }
+  const result = await importOutputFiles([file], {
+    documentRef: { createElement: (tag) => tag === 'video' ? new FakeVideo() : canvasDocument().createElement(tag) },
+    URLImpl: { createObjectURL(blob) { urls.push(blob); return 'blob:local-only'; }, revokeObjectURL(url) { revoked.push(url); } }
+  });
+  assert.equal(result.video.mime, 'video/webm'); assert.equal(result.video.durationSeconds, 2.5);
+  assert.equal(result.video.blob, file); assert.equal(result.video.poster.data.length, 320 * 180 * 4);
+  assert.equal(urls[0], file); assert.deepEqual(revoked, ['blob:local-only']);
+});
+
+test('video import rejects unsupported types, oversize files, and durations over two minutes', async () => {
+  const fakeDeps = { documentRef: { createElement: () => ({}) }, URLImpl: { createObjectURL: () => 'blob:x', revokeObjectURL() {} } };
+  const wrong = new Blob(['not video'], { type: 'video/quicktime' }); Object.defineProperty(wrong, 'name', { value: 'clip.mov' });
+  await assert.rejects(importOutputFiles([wrong], fakeDeps), /対応していない形式/);
+  const large = new Blob([new Uint8Array(64 * 1024 * 1024 + 1)], { type: 'video/mp4' }); Object.defineProperty(large, 'name', { value: 'large.mp4' });
+  await assert.rejects(importOutputFiles([large], fakeDeps), /64MB/);
+  const tooLong = new Blob(['local-video'], { type: 'video/mp4' }); Object.defineProperty(tooLong, 'name', { value: 'long.mp4' });
+  class LongVideo {
+    constructor() { this.listeners = new Map(); this.readyState = 0; this.videoWidth = 1; this.videoHeight = 1; this.duration = 120.1; }
+    addEventListener(type, callback) { this.listeners.set(type, callback); }
+    removeEventListener(type) { this.listeners.delete(type); }
+    load() { this.readyState = 1; this.listeners.get('loadedmetadata')?.(); }
+    pause() {} removeAttribute() {}
+  }
+  await assert.rejects(importOutputFiles([tooLong], { ...fakeDeps, documentRef: { createElement: () => new LongVideo() } }), /120秒/);
+});
+
 test('later image batches can be normalized into one bounded frame sequence', () => {
   const makeFrame = (width, height, name) => ({ width, height, data: new Uint8Array(width * height * 4).fill(255), delayMs: 500, name });
   const frames = fitOutputFrames([makeFrame(2, 1, 'wide'), makeFrame(1, 2, 'tall')]);

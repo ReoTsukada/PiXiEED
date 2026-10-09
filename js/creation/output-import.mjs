@@ -10,6 +10,8 @@ const MAX_FRAMES = 600;
 const MAX_AUDIO_SECONDS = 120;
 const MAX_AUDIO_DECODED_BYTES = 64 * 1024 * 1024;
 const MAX_UNKNOWN_AUDIO_BYTES = 4 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 120;
+const MAX_VIDEO_PIXELS = 8_000_000;
 
 function abortError() { return new DOMException('読み込みを中止しました。', 'AbortError'); }
 
@@ -402,14 +404,70 @@ async function decodeAudioFile(file, audioContext, signal) {
   return { sampleRate: audio.sampleRate, durationSeconds: audio.duration, channels, name: file.name || '音声' };
 }
 
+function videoCandidate(file) {
+  const mime = String(file?.type || '').split(';', 1)[0].toLowerCase();
+  const extension = String(file?.name || '').split('.').pop().toLowerCase();
+  return ['video/mp4', 'video/webm'].includes(mime) || ['mp4', 'webm'].includes(extension);
+}
+
+async function decodeVideoFile(file, signal, { documentRef = globalThis.document, URLImpl = globalThis.URL } = {}) {
+  if (!videoCandidate(file)) throw new Error(`${file.name || '選択したファイル'}は対応していない形式です。動画はブラウザーが読み込めるMP4/WebMに対応しています。`);
+  if (file.size < 1 || file.size > MAX_FILE_BYTES) throw new RangeError('動画は1ファイル64MBまで読み込めます。');
+  const mime = String(file.type || '').split(';', 1)[0].toLowerCase();
+  if (mime && mime !== 'application/octet-stream' && !['video/mp4', 'video/webm'].includes(mime)) throw new Error('動画はMP4/WebMに対応しています。');
+  if (typeof URLImpl?.createObjectURL !== 'function' || !documentRef?.createElement) throw new Error('このブラウザーでは動画を確認できません。');
+  checkAbort(signal);
+  const url = URLImpl.createObjectURL(file);
+  const video = documentRef.createElement('video');
+  video.muted = true; video.defaultMuted = true; video.playsInline = true; video.preload = 'metadata'; video.src = url;
+  const cleanup = () => { video.pause?.(); video.removeAttribute?.('src'); video.load?.(); URLImpl.revokeObjectURL?.(url); };
+  try {
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error) => { if (settled) return; settled = true; video.removeEventListener?.('loadedmetadata', onReady); video.removeEventListener?.('error', onError); signal?.removeEventListener('abort', onAbort); error ? reject(error) : resolve(); };
+      const onReady = () => finish();
+      const onError = () => finish(new Error('動画をデコードできませんでした。MP4/WebMの別ファイルを選んでください。'));
+      const onAbort = () => finish(abortError());
+      video.addEventListener?.('loadedmetadata', onReady, { once: true }); video.addEventListener?.('error', onError, { once: true }); signal?.addEventListener('abort', onAbort, { once: true });
+      video.src = url; video.load?.();
+      if (video.readyState >= 1) finish();
+    });
+    checkAbort(signal);
+    const { videoWidth: width, videoHeight: height, duration: durationSeconds } = video;
+    if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > MAX_EDGE || height > MAX_EDGE || width * height > MAX_VIDEO_PIXELS) throw new RangeError('動画の画像サイズは4096px以下・800万画素以下にしてください。');
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > MAX_VIDEO_SECONDS) throw new RangeError('動画は120秒以内のファイルを選んでください。');
+    if (video.readyState < 2) {
+      await new Promise((resolve, reject) => {
+        const finish = (error) => { video.removeEventListener?.('seeked', onReady); video.removeEventListener?.('error', onError); signal?.removeEventListener('abort', onAbort); error ? reject(error) : resolve(); };
+        const onReady = () => finish(); const onError = () => finish(new Error('動画の映像コマを読み込めませんでした。'));
+        const onAbort = () => finish(abortError());
+        video.addEventListener?.('seeked', onReady, { once: true }); video.addEventListener?.('error', onError, { once: true }); signal?.addEventListener('abort', onAbort, { once: true });
+        try { video.currentTime = Math.min(0.05, durationSeconds / 2); } catch (error) { finish(error); }
+      });
+    }
+    checkAbort(signal);
+    const canvas = documentRef.createElement('canvas'); canvas.width = width; canvas.height = height;
+    let poster;
+    try {
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('動画のプレビュー画像を作れませんでした。');
+      context.imageSmoothingEnabled = false; context.drawImage(video, 0, 0, width, height);
+      const pixels = context.getImageData(0, 0, width, height);
+      poster = { width, height, data: new Uint8Array(pixels.data), delayMs: 500, name: file.name || '動画' };
+    } finally { canvas.width = canvas.height = 1; }
+    const normalizedMime = ['video/mp4', 'video/webm'].includes(mime) ? mime : (String(file.name || '').toLowerCase().endsWith('.webm') ? 'video/webm' : 'video/mp4');
+    return { blob: file, mime: normalizedMime, width, height, durationSeconds, name: file.name || '動画', poster };
+  } finally { cleanup(); }
+}
+
 /** Decode only locally selected files. No input bytes, filenames, or URLs leave this page. */
-export async function importOutputFiles(files, { signal, onProgress = () => {}, AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext, createImageBitmapImpl = globalThis.createImageBitmap, ImageDecoderImpl = globalThis.ImageDecoder, documentRef = globalThis.document } = {}) {
+export async function importOutputFiles(files, { signal, onProgress = () => {}, AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext, createImageBitmapImpl = globalThis.createImageBitmap, ImageDecoderImpl = globalThis.ImageDecoder, documentRef = globalThis.document, URLImpl = globalThis.URL } = {}) {
   const selected = [...(files || [])];
   if (!selected.length) throw new Error('ファイルを選んでください。');
   if (selected.length > MAX_FILES) throw new RangeError('一度に8ファイルまで追加できます。');
   const bytes = selected.reduce((sum, file) => sum + (Number(file?.size) || 0), 0);
   if (bytes > MAX_TOTAL_BYTES) throw new RangeError('選んだファイルの合計が128MBを超えています。数を減らしてください。');
-  const output = { frames: [], totalPlays: 1, audio: null };
+  const output = { frames: [], totalPlays: 1, audio: null, video: null };
   let audioContext = null;
   try {
     for (let index = 0; index < selected.length; index += 1) {
@@ -424,7 +482,11 @@ export async function importOutputFiles(files, { signal, onProgress = () => {}, 
         if (output.frames.length + decoded.frames.length > MAX_FRAMES) throw new RangeError('画像の合計は600コマまでです。');
         if (!output.frames.length && decoded.frames.length > 1) output.totalPlays = decoded.totalPlays;
         output.frames.push(...decoded.frames);
+      } else if (videoCandidate(file)) {
+        if (output.video) throw new Error('動画は1つずつ読み込んでください。');
+        output.video = await decodeVideoFile(file, signal, { documentRef, URLImpl });
       } else {
+        if (String(file.type || '').startsWith('video/')) throw new Error(`${file.name || '選択したファイル'}は対応していない形式です。動画はMP4/WebMに対応しています。`);
         if (!AudioContextImpl) throw new Error('このブラウザーでは音声の読み込みに対応していません。');
         if (output.audio) throw new Error('音声は1つずつ追加してください。先に現在の音声を削除できます。');
         audioContext ||= new AudioContextImpl();
@@ -437,9 +499,9 @@ export async function importOutputFiles(files, { signal, onProgress = () => {}, 
       const totalPixels = output.frames[0].width * output.frames[0].height * output.frames.length;
       if (totalPixels > MAX_TIMELINE_PIXELS) throw new RangeError('画像の合計が800万画素を超えています。サイズを下げるかコマ数を減らしてください。');
     }
-    if (!output.frames.length && !output.audio) throw new Error('選んだファイルを読み込めませんでした。');
+    if (!output.frames.length && !output.audio && !output.video) throw new Error('選んだファイルを読み込めませんでした。');
     return output;
   } finally { try { await audioContext?.close?.(); } catch { /* release decoded input context */ } }
 }
 
-export const OUTPUT_IMPORT_LIMITS = Object.freeze({ MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_EDGE, MAX_STILL_PIXELS, MAX_TIMELINE_PIXELS, MAX_FRAMES, MAX_AUDIO_SECONDS, MAX_AUDIO_DECODED_BYTES, MAX_UNKNOWN_AUDIO_BYTES });
+export const OUTPUT_IMPORT_LIMITS = Object.freeze({ MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_EDGE, MAX_STILL_PIXELS, MAX_TIMELINE_PIXELS, MAX_FRAMES, MAX_AUDIO_SECONDS, MAX_AUDIO_DECODED_BYTES, MAX_UNKNOWN_AUDIO_BYTES, MAX_VIDEO_SECONDS, MAX_VIDEO_PIXELS });

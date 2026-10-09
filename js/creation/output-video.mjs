@@ -12,7 +12,7 @@ function containerMatches(blob, extension) {
 
 /** Record a frame timeline locally. Audio and video tracks are fixed before recording starts. */
 export async function renderOutputVideo(frames, {
-  audioSource = null, playbackRate = 1, mimeChoice = chooseAudioVideoMimeType(),
+  audioSource = null, audioTotalPlays = 1, videoSource = null, playbackRate = 1, mimeChoice = chooseAudioVideoMimeType(),
   MediaRecorderImpl = globalThis.MediaRecorder, AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext,
   MediaStreamImpl = globalThis.MediaStream, documentRef = globalThis.document,
   signal, onProgress = () => {}, now = globalThis.performance?.now?.bind(globalThis.performance) || Date.now,
@@ -20,18 +20,26 @@ export async function renderOutputVideo(frames, {
   requestFrame = globalThis.requestAnimationFrame?.bind(globalThis) || ((callback) => setTimeoutImpl(() => callback(now()), 33)),
   cancelFrame = globalThis.cancelAnimationFrame?.bind(globalThis) || clearTimeoutImpl
 } = {}) {
-  if (!Array.isArray(frames) || !frames.length || frames.length > 600) throw new TypeError('動画に使うコマを読み込めません。');
-  frames.forEach(assertFrame);
-  const width = frames[0].width; const height = frames[0].height;
-  if (frames.some((frame) => frame.width !== width || frame.height !== height)) throw new TypeError('動画のコマのサイズをそろえてください。');
+  const hasVideoSource = Boolean(videoSource);
+  if (hasVideoSource) {
+    if (!Number.isSafeInteger(videoSource.videoWidth) || !Number.isSafeInteger(videoSource.videoHeight) || videoSource.videoWidth < 1 || videoSource.videoHeight < 1 || !Number.isFinite(videoSource.duration) || videoSource.duration <= 0 || videoSource.duration > AUDIO_VIDEO_MAX_SECONDS) throw new TypeError('動画素材をデコードできません。');
+  } else {
+    if (!Array.isArray(frames) || !frames.length || frames.length > 600) throw new TypeError('動画に使うコマを読み込めません。');
+    frames.forEach(assertFrame);
+    const width = frames[0].width; const height = frames[0].height;
+    if (frames.some((frame) => frame.width !== width || frame.height !== height)) throw new TypeError('動画のコマのサイズをそろえてください。');
+  }
+  const width = hasVideoSource ? videoSource.videoWidth : frames[0].width;
+  const height = hasVideoSource ? videoSource.videoHeight : frames[0].height;
   if (!Number.isFinite(playbackRate) || playbackRate < 0.25 || playbackRate > 4) throw new RangeError('再生速度は0.25〜4倍で指定してください。');
+  if (!Number.isSafeInteger(audioTotalPlays) || audioTotalPlays < 1 || audioTotalPlays > 8) throw new RangeError('音声の再生回数は1〜8回です。');
   if (!mimeChoice || !MediaRecorderImpl || !MediaStreamImpl || !documentRef?.createElement || (audioSource && !AudioContextImpl)) throw new Error('このブラウザーは動画の作成に対応していません。画像と音声の通常保存は引き続き使えます。');
   if (signal?.aborted) throw abortError();
-  const timing = getOutputTiming(frames, { format: 'video', playbackRate });
-  const delays = timing.sourceDelaysMs;
-  const imageSeconds = timing.durationMs / 1000;
+  const timing = hasVideoSource ? null : getOutputTiming(frames, { format: 'video', playbackRate });
+  const delays = timing?.sourceDelaysMs || [];
+  const imageSeconds = hasVideoSource ? videoSource.duration : timing.durationMs / 1000;
   const audioSeconds = audioSource ? audioSource.channels[0].length / audioSource.sampleRate : 0;
-  const durationSeconds = audioSource ? audioSeconds : imageSeconds;
+  const durationSeconds = audioSource ? audioSeconds * audioTotalPlays : imageSeconds;
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('動画は120秒以内で作成できます。コマ数や音声の長さを短くしてください。');
 
   const frameSize = audioVideoFrameSize(width, height);
@@ -43,6 +51,11 @@ export async function renderOutputVideo(frames, {
   for (const delay of delays) { frameStarts.push(cursor); cursor += delay / 1000; }
   const totalTimelineSeconds = cursor;
   const paint = (elapsedSeconds) => {
+    if (hasVideoSource) {
+      context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(videoSource, 0, 0, canvas.width, canvas.height);
+      return;
+    }
     let timelineSeconds = elapsedSeconds * playbackRate;
     if (audioSource) timelineSeconds %= totalTimelineSeconds;
     else timelineSeconds = Math.min(Math.max(0, timelineSeconds), Math.max(0, totalTimelineSeconds - 0.000001));
@@ -60,6 +73,7 @@ export async function renderOutputVideo(frames, {
       context.drawImage(source, 0, 0, canvas.width, canvas.height);
     } finally { source.width = source.height = 1; }
   };
+  if (hasVideoSource) { videoSource.muted = true; videoSource.defaultMuted = true; videoSource.playbackRate = 1; videoSource.loop = Boolean(audioSource); }
   paint(0);
 
   let canvasStream = null; let audioContext = null; let audioStream = null; let stream = null; let recorder = null; let audioNode = null; let raf = null; let stopTimer = null; let watchdog = null;
@@ -105,7 +119,7 @@ export async function renderOutputVideo(frames, {
       const audioTrack = audioStream.stream.getAudioTracks()[0];
       if (!audioTrack || audioTrack.readyState !== 'live' || !audioTrack.enabled) throw new Error('音声トラックを準備できません。');
       streamTracks.push(audioTrack); tracks.add(audioTrack);
-      audioNode = audioContext.createBufferSource(); audioNode.buffer = audioBuffer; audioNode.playbackRate.value = 1; audioNode.connect(audioStream);
+      audioNode = audioContext.createBufferSource(); audioNode.buffer = audioBuffer; audioNode.playbackRate.value = 1; audioNode.loop = audioTotalPlays > 1; audioNode.connect(audioStream);
       audioNode.onended = () => { if (recorder?.state === 'recording') stopRecording(); };
     }
     stream = new MediaStreamImpl(streamTracks);
@@ -125,7 +139,12 @@ export async function renderOutputVideo(frames, {
     await Promise.race([started, resultPromise]);
     if (disposed) return await resultPromise;
     startedAt = now();
-    if (audioNode) { audioStartAt = audioContext.currentTime; audioNode.start(audioStartAt); }
+    if (audioNode) { audioStartAt = audioContext.currentTime; audioNode.start(audioStartAt); if (audioTotalPlays > 1) audioNode.stop(audioStartAt + durationSeconds); }
+    if (hasVideoSource) {
+      videoSource.currentTime = 0;
+      const playResult = videoSource.play?.();
+      if (playResult?.catch) await playResult.catch(() => { throw new Error('動画の再生を開始できませんでした。画像と音声の元データは保持されています。'); });
+    }
     const step = (time) => {
       if (signal?.aborted || canceled || disposed) return;
       const elapsed = audioNode ? Math.max(0, audioContext.currentTime - audioStartAt) : Math.max(0, (time - startedAt) / 1000);
@@ -151,6 +170,7 @@ export async function renderOutputVideo(frames, {
     if (recorder?.state === 'recording') { try { recorder.stop(); } catch {} }
     try { audioNode?.stop(); } catch {}
     audioNode?.disconnect?.();
+    if (hasVideoSource) { try { videoSource.pause?.(); } catch {} videoSource.loop = false; }
     tracks.forEach((track) => { try { track.stop(); } catch {} });
     if (audioContext && audioContext.state !== 'closed') { try { await audioContext.close(); } catch {} }
     canvas.width = canvas.height = 1;

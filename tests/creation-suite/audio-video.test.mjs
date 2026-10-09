@@ -112,6 +112,33 @@ test('records exactly one loop to a routed audio track and releases every record
   assert.equal(harness.listeners.size, 0);
 });
 
+test('generated-song video records a finite selected play count at the unchanged tempo', async () => {
+  let tick = 0; let stopRequests = 0;
+  const playerFactory = () => ({
+    get currentTick() { return tick; },
+    async play() { return true; },
+    stopAfterCurrentLoop() { stopRequests += 1; return true; },
+    stop() {}, async dispose() {}
+  });
+  const harness = makeHarness({ playerFactory }); const { song, image } = fixture();
+  const pending = renderAudioVideo(song, image, { ...harness.dependencies, totalPlays: 3 });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(stopRequests, 0, 'the first two musical loops are allowed to continue');
+  const progress = harness.intervals[0].callback;
+  tick = 100; progress(); tick = 0; progress();
+  assert.equal(stopRequests, 0, 'one detected loop boundary leaves two plays remaining');
+  tick = 100; progress(); tick = 0; progress();
+  assert.equal(stopRequests, 1, 'the final requested musical loop is stopped at its end');
+  const completion = harness.timers.find(({ delay, cleared }) => !cleared && delay > 6000 && delay < 7000);
+  assert.ok(completion, 'the recorder is sized to three times the source song length');
+  while (harness.runNextTimer(completion.due - 1)) {}
+  harness.runNextTimer(completion.due);
+  const result = await pending;
+  assert.equal(result.seconds, 6);
+  assert.equal(result.totalPlays, 3);
+  assert.equal(result.hasAudio, true);
+});
+
 test('real player lookahead schedules late notes and one frame records through the full music loop and release tail', async () => {
   const harness = makeHarness({ playerFactory: createAudioPlayer });
   const { image } = fixture();
@@ -181,6 +208,17 @@ test('long video requests are rejected before creating media or canvas resources
   assert.equal(harness.contexts.length, 0);
   assert.equal(harness.recorder, undefined);
   assert.equal(harness.draws.length, 0);
+});
+
+test('generated-song play count respects the 120-second total recording bound', async () => {
+  const harness = makeHarness();
+  const song = setAudioPixel(createAudioSong({ loopTicks: AUDIO_MAX_LOOP_TICKS, tempo: 120 }), {
+    trackId: 'track-square', pitch: 84, startTick: 0, noteId: 'long-multi-play-note'
+  });
+  const image = { width: 16, height: 16, rgba: new Uint8Array(16 * 16 * 4) };
+  await assert.rejects(renderAudioVideo(song, image, { ...harness.dependencies, totalPlays: 2 }), /合計120秒以内/);
+  assert.equal(harness.contexts.length, 0);
+  assert.equal(harness.recorder, undefined);
 });
 
 test('invalid animation video frames are rejected before recording resources are created', async () => {

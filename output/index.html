@@ -4,142 +4,136 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f7f4">
-  <meta name="description" content="画像や音声をプレビューし、対応形式へ変換してこの端末に保存できます。">
-  <title>プレビュー・出力｜PiXiEED</title>
+  <meta name="description" content="GIFやMP4/WebM動画を映像素材にして音楽を重ね、対応ブラウザーでMP4/WebMに出力できます。画像や音声の変換も端末内で行えます。">
+  <title>GIF・動画に音楽を重ねる｜PiXiEED</title>
   <link rel="canonical" href="https://pixieed.jp/output/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="GIF・動画に音楽を重ねる｜PiXiEED">
+  <meta property="og:description" content="GIFやMP4/WebM動画を映像素材にして音楽を重ね、対応ブラウザーでMP4/WebMに出力できます。画像や音声の変換も端末内で行えます。">
+  <meta property="og:url" content="https://pixieed.jp/output/">
+  <meta property="og:image" content="https://pixieed.jp/assets/og/site.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="GIF・動画に音楽を重ねる｜PiXiEED">
+  <meta name="twitter:description" content="GIFやMP4/WebM動画を映像素材にして音楽を重ね、対応ブラウザーでMP4/WebMに出力できます。画像や音声の変換も端末内で行えます。">
+  <meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png">
+  <meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261009-fps-1">
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #f6f7f4; color: #26352e; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", Meiryo, system-ui, sans-serif; }
+    a { color: inherit; }
+    .landing-skip { position: absolute; z-index: 5; top: 8px; left: 8px; transform: translateY(-160%); padding: 10px 14px; border-radius: 8px; background: #fff; color: #174a39; }
+    .landing-skip:focus { transform: none; }
+    .landing-header { min-height: 66px; display: flex; align-items: center; padding: 0 max(20px, calc((100vw - 1120px) / 2)); border-bottom: 1px solid #e4e9e4; background: rgba(255,255,255,.82); }
+    .landing-brand { display: inline-flex; align-items: center; gap: 9px; color: #26352e; font-weight: 850; text-decoration: none; letter-spacing: .01em; }
+    .landing-brand__mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #256b50; color: #fff; font-weight: 900; }
+    .landing-main { width: min(100% - 32px, 1040px); margin: 0 auto; padding: 30px 0 64px; }
+    .breadcrumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 24px; color: #758078; font-size: .78rem; }
+    .breadcrumbs a { color: #397357; text-underline-offset: 3px; }
+    .landing-hero { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(240px,.8fr); gap: clamp(24px,5vw,64px); align-items: center; padding: clamp(24px,5vw,56px); border: 1px solid #e0e8e1; border-radius: 28px; background: linear-gradient(135deg,#fff 0%,#f1f7f2 100%); box-shadow: 0 16px 44px rgba(34,66,47,.07); }
+    .eyebrow { margin: 0 0 12px; color: #397357; font-size: .78rem; font-weight: 800; letter-spacing: .08em; }
+    h1 { max-width: 620px; margin: 0; color: #20372a; font-size: clamp(2rem,5vw,3.4rem); line-height: 1.16; letter-spacing: -.045em; }
+    .hero-copy { max-width: 620px; margin: 18px 0 0; color: #596a60; font-size: clamp(.96rem,1.6vw,1.1rem); line-height: 1.85; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+    .action { display: inline-flex; min-height: 52px; align-items: center; justify-content: center; padding: 12px 18px; border: 1px solid #cad7cd; border-radius: 12px; background: #fff; color: #29493a; font-size: .94rem; font-weight: 780; text-align: center; text-decoration: none; }
+    .action--primary { border-color: #256b50; background: #256b50; color: white; box-shadow: 0 3px 0 #194b3a; }
+    :is(.action,.landing-brand,.breadcrumbs a,.tool-card a):focus-visible { outline: 3px solid rgba(39,117,83,.55); outline-offset: 3px; }
+    .hero-art { display: grid; min-height: 240px; place-items: center; overflow: hidden; border: 1px solid #dce8dd; border-radius: 22px; background: radial-gradient(ellipse at 30% 30%, #d9ecd9 0, #eef5ed 48%, #e9f0e9 100%); }
+    .media-stack { position: relative; width: min(74%,270px); aspect-ratio: 1.12; }
+    .media-sheet { position: absolute; width: 78%; height: 78%; border: 1px solid rgba(45,91,63,.16); border-radius: 18px; background: rgba(255,255,255,.88); box-shadow: 0 12px 30px rgba(31,71,48,.12); }
+    .media-sheet:nth-child(1) { inset: 4% 8% auto auto; transform: rotate(8deg); }
+    .media-sheet:nth-child(2) { inset: 12% auto auto 6%; transform: rotate(-8deg); }
+    .media-sheet:nth-child(3) { inset: 15% 13% auto auto; display: grid; place-items: center; transform: rotate(2deg); }
+    .pixel-scene { display: grid; width: 112px; height: 112px; grid-template-columns: repeat(7,1fr); grid-template-rows: repeat(7,1fr); gap: 3px; }
+    .pixel-scene i { border-radius: 4px; background: #c7e1ca; }
+    .pixel-scene i:nth-child(3n) { background: #74aa81; }.pixel-scene i:nth-child(4n) { background: #317456; }.pixel-scene i:nth-child(5n) { background: #e9b66e; }
+    .sound-bars { position: absolute; right: 5%; bottom: 12%; display: flex; height: 32px; align-items: center; gap: 4px; }
+    .sound-bars i { width: 5px; border-radius: 9px; background: #397357; }.sound-bars i:nth-child(3n) { height: 28px; }.sound-bars i:nth-child(3n+1) { height: 14px; }.sound-bars i:nth-child(3n+2) { height: 21px; }
+    .section { margin-top: clamp(38px,7vw,70px); }
+    .section-heading { max-width: 660px; margin-bottom: 20px; }
+    .section-heading h2 { margin: 0; color: #263a2e; font-size: clamp(1.4rem,3vw,2rem); letter-spacing: -.025em; }
+    .section-heading p { margin: 9px 0 0; color: #6a786f; font-size: .93rem; line-height: 1.7; }
+    .feature-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+    .feature { min-width: 0; padding: 21px; border: 1px solid #e1e8e2; border-radius: 18px; background: white; }
+    .feature-mark { display: grid; width: 38px; height: 38px; place-items: center; margin-bottom: 15px; border-radius: 12px; background: #eff6f0; color: #347354; font-size: 1.15rem; font-weight: 800; }
+    .feature h3 { margin: 0; color: #304538; font-size: 1rem; }.feature p { margin: 9px 0 0; color: #6b7870; font-size: .84rem; line-height: 1.7; }
+    .tool-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+    .tool-card { display: flex; min-height: 144px; flex-direction: column; align-items: flex-start; padding: 19px; border: 1px solid #dfe7e0; border-radius: 16px; background: #fff; }
+    .tool-card h3 { margin: 0; color: #33493c; font-size: 1rem; }.tool-card p { margin: 8px 0 16px; color: #6c7971; font-size: .8rem; line-height: 1.6; }
+    .tool-card a { display: inline-flex; min-height: 42px; align-items: center; margin-top: auto; color: #347354; font-size: .83rem; font-weight: 780; text-underline-offset: 4px; }
+    .capability-table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid #e0e8e1; border-radius: 16px; background: #fff; }
+    .capability-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .82rem; line-height: 1.6; }
+    .capability-table caption { padding: 15px 17px 11px; color: #33493c; font-weight: 800; text-align: left; }
+    .capability-table :is(th,td) { min-width: 140px; padding: 12px 15px; border-top: 1px solid #edf1ed; vertical-align: top; }
+    .capability-table thead th { color: #68786d; font-size: .75rem; }
+    .capability-table tbody th { color: #347354; white-space: nowrap; }
+    .capability-table td { color: #617067; }
+    .note { margin-top: 20px; padding: 15px 17px; border-left: 3px solid #7da98b; border-radius: 0 12px 12px 0; background: #edf4ee; color: #596a60; font-size: .81rem; line-height: 1.75; }
+    .landing-footer { margin-top: 54px; padding-top: 18px; border-top: 1px solid #dfe6e0; color: #718078; font-size: .8rem; }
+    .landing-footer a { color: #397357; text-underline-offset: 3px; }
+    @media (max-width: 760px) { .landing-hero { grid-template-columns: minmax(0,1fr); }.hero-art { min-height: 210px; }.feature-grid,.tool-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 480px) { .landing-header { min-height: 58px; padding-inline: 16px; }.landing-main { width: min(100% - 24px, 1040px); padding-top: 20px; }.breadcrumbs { margin-bottom: 17px; }.landing-hero { gap: 22px; padding: 22px 18px; border-radius: 20px; }.hero-actions { display: grid; grid-template-columns: minmax(0,1fr); }.action { width: 100%; }.hero-art { min-height: 190px; }.feature-grid,.tool-grid { grid-template-columns: minmax(0,1fr); }.feature { padding: 18px; }.tool-card { min-height: 132px; }.landing-footer { margin-top: 38px; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+  <script type="application/ld+json">
+    {"@context":"https://schema.org","@type":"WebPage","name":"GIF・動画に音楽を重ねる｜PiXiEED","url":"https://pixieed.jp/output/","inLanguage":"ja","isPartOf":{"@type":"WebSite","name":"PiXiEED","url":"https://pixieed.jp/"}}
+  </script>
+  <script>
+    // Compatibility for old handoff URLs; new private workspaces use /output/work/ directly.
+    (() => {
+      const current = new URL(location.href);
+      const ids = current.searchParams.getAll('id');
+      if (ids.length === 1 && /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(ids[0])) {
+        location.replace(`/output/work/?id=${encodeURIComponent(ids[0])}`);
+      }
+    })();
+  </script>
 </head>
-<body data-page="output">
-  <a class="output-skip" href="#main">本文へ移動</a>
-  <header class="output-header">
-    <a class="output-brand" href="/" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span>PiXiEED</a>
-    <span class="output-header__label">作品を保存</span>
-  </header>
-  <main id="main" class="output-main">
-    <div class="output-intro">
-      <p class="output-eyebrow"><span aria-hidden="true">✳</span> この端末で処理しています</p>
-      <h1 id="output-title" tabindex="-1">作品を確認</h1>
-      <p id="output-copy" class="output-copy">プレビューを確認して、必要ならサイズや名前を整えて保存できます。</p>
-    </div>
-    <section id="output-start" class="output-start" aria-labelledby="output-start-title" hidden>
-        <div class="output-start__copy"><p class="output-eyebrow">端末の中で変換</p><h2 id="output-start-title">画像や音声を選ぶ</h2><p>選んだファイルはこの端末内で読み込みます。PNG、JPEG、GIF、APNG、WebP画像と、ブラウザーがデコードできる音声を試せます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p></div>
-      <div id="output-drop" class="output-drop" aria-label="画像または音声ファイルをここにドロップ">
-        <span class="output-drop__mark" aria-hidden="true">＋</span><strong>ファイルを選ぶ</strong><span>複数の画像を並べてGIF・APNG・対応動画にできます</span>
-        <button id="output-start-choose" class="output-button output-button--primary" type="button">端末からファイルを選ぶ</button>
+<body>
+  <a class="landing-skip" href="#main">本文へ移動</a>
+  <header class="landing-header"><a class="landing-brand" href="/" aria-label="PiXiEED ホーム"><span class="landing-brand__mark" aria-hidden="true">P</span>PiXiEED</a></header>
+  <main id="main" class="landing-main">
+    <nav class="breadcrumbs" aria-label="パンくずリスト"><a href="/">ホーム</a><span aria-hidden="true">›</span><span aria-current="page">プレビュー・出力</span></nav>
+    <section class="landing-hero" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">PREVIEW · CONVERT · SAVE</p>
+        <h1 id="page-title">GIFや動画に音楽を重ねて、<br>MP4 / WebMに。</h1>
+        <p class="hero-copy">GIFアニメーションやMP4/WebM動画を映像素材として読み込み、音楽を重ねた動画を作れます。画像と音楽の組み合わせにも対応。プレビューと書き出しはこの端末で行います。</p>
+        <div class="hero-actions"><a class="action action--primary" href="/output/work/">素材を選んでプレビュー</a><a class="action" href="/tools/">制作ツールを見る</a></div>
       </div>
-      <p id="output-import-status" class="output-status" role="status" aria-live="polite"></p>
-      <progress id="output-import-progress" class="output-progress" max="100" value="0" aria-label="素材の読み込み状況" hidden></progress>
-      <button id="output-cancel-import" class="output-button output-button--secondary" type="button" hidden>読み込みを中止</button>
+      <div class="hero-art" aria-hidden="true"><div class="media-stack"><div class="media-sheet"></div><div class="media-sheet"></div><div class="media-sheet"><div class="pixel-scene"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div class="sound-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
     </section>
-    <div id="output-layout" class="output-layout" hidden>
-      <section class="output-preview-column" aria-label="作品のプレビュー">
-        <div id="output-preview" class="output-preview">
-          <canvas id="output-timeline-preview" aria-label="画像のコマプレビュー" hidden></canvas>
-          <img id="output-image" alt="作品のプレビュー" hidden>
-          <audio id="output-audio" controls preload="none" hidden></audio>
-          <video id="output-video" controls preload="metadata" playsinline hidden></video>
-          <div id="output-file-card" class="output-file-card" hidden aria-live="polite">
-            <span id="output-file-extension" class="output-file-card__extension">FILE</span>
-            <strong id="output-file-title">ファイルを準備しました</strong>
-            <span id="output-file-description">この形式はプレビューできません。</span>
-          </div>
-        </div>
-        <div class="output-preview-foot">
-          <p id="output-metadata" class="output-metadata"></p>
-          <button id="output-timeline-play" class="output-playback" type="button" hidden aria-pressed="false">コマ送りを再生</button>
-          <button id="output-animation-toggle" class="output-playback" type="button" hidden>アニメーションを停止</button>
-        </div>
-      </section>
-      <section class="output-settings" aria-labelledby="output-settings-title">
-        <div class="output-settings__heading">
-          <div><p id="output-format" class="output-format"></p><h2 id="output-settings-title">出力するファイル</h2></div>
-        </div>
-        <section id="output-assets" class="output-assets" hidden aria-labelledby="output-assets-title">
-          <div class="output-media-settings__title"><h3 id="output-assets-title">素材</h3><button id="output-add-assets" class="output-inline-button" type="button">素材を追加</button></div>
-          <div id="output-assets-list" class="output-assets-list"></div>
-          <p id="output-assets-note" class="output-help"></p>
-        </section>
-        <div id="output-items" class="output-items" role="list" aria-label="出力項目"></div>
-        <button id="output-add-item" class="output-button output-button--secondary output-add-item" type="button">＋ 出力項目を追加</button>
-        <div class="output-item-actions">
-          <button id="output-copy-item" class="output-text-button" type="button">この項目を複製</button>
-          <button id="output-delete-item" class="output-text-button output-text-button--danger" type="button">この項目を削除</button>
-        </div>
-        <label id="output-source-label" class="output-field-label" for="output-source">元の素材</label>
-        <select id="output-source" class="output-select"></select>
-        <label class="output-field-label" for="output-filename">ファイル名</label>
-        <div class="output-filename">
-          <input id="output-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="output-filename-help">
-          <button id="output-extension" class="output-extension" type="button" aria-haspopup="listbox" aria-expanded="false">.png <span aria-hidden="true">⌄</span></button>
-        </div>
-        <div id="output-format-picker" class="output-format-picker" hidden>
-          <label class="output-field-label" for="output-format-select">対応形式</label>
-          <select id="output-format-select" class="output-select" aria-label="出力形式"></select>
-          <label id="output-jpeg-setting" class="output-jpeg-setting" hidden for="output-jpeg-background">JPEGの背景色 <input id="output-jpeg-background" type="color" value="#ffffff"></label>
-          <label id="output-jpeg-quality-setting" class="output-jpeg-quality-setting" hidden for="output-jpeg-quality"><span>JPEG画質 <output id="output-jpeg-quality-value" for="output-jpeg-quality">90%</output></span><input id="output-jpeg-quality" type="range" min="50" max="100" step="5" value="90"></label>
-        </div>
-        <p id="output-filename-help" class="output-help">形式を変えると拡張子が合わせて切り替わります。</p>
-
-        <section id="output-scale-settings" class="output-media-settings" hidden aria-labelledby="output-scale-title">
-          <div class="output-media-settings__title"><h3 id="output-scale-title">画像サイズ</h3><span>プレビューに反映</span></div>
-          <div id="output-scale-presets" class="output-presets" role="group" aria-label="画像サイズの倍率"></div>
-          <p id="output-size-summary" class="output-size-summary"></p>
-          <details class="output-advanced" id="output-advanced">
-            <summary>サイズを細かく指定</summary>
-            <fieldset class="output-dimensions">
-              <legend>出力サイズ（px）</legend>
-              <div class="output-dimensions__fields">
-                <label for="output-width">幅<input id="output-width" type="number" min="1" step="1" inputmode="numeric"></label>
-                <span aria-hidden="true">×</span>
-                <label for="output-height">高さ<input id="output-height" type="number" min="1" step="1" inputmode="numeric"></label>
-              </div>
-              <label class="output-aspect"><input id="output-aspect-lock" type="checkbox" checked><span>縦横比を保つ</span></label>
-            </fieldset>
-            <p id="output-scale-note" class="output-help"></p>
-            <button id="output-apply-settings" class="output-button output-button--secondary" type="button">このサイズを使う</button>
-            <button id="output-cancel-settings" class="output-button" type="button" hidden>生成を中止</button>
-          </details>
-        </section>
-        <section id="output-animation-settings" class="output-media-settings output-media-settings--compact" hidden aria-live="polite">
-          <h3 class="output-visually-hidden">アニメーションの内容</h3>
-          <p id="output-animation-details" class="output-detail"></p>
-          <div id="output-sequence-settings" class="output-sequence-settings" hidden>
-            <div class="output-sequence-fps">
-              <label class="output-sequence-field" for="output-fps">全コマのFPS <span id="output-fps-current" class="output-sequence-current">可変</span></label>
-              <div class="output-sequence-fps__controls">
-                <input id="output-fps" class="output-fps-input" type="number" min="0.000278" max="1000" step="any" inputmode="decimal" aria-label="全コマに適用するFPS">
-                <select id="output-fps-preset" class="output-select" aria-label="FPSプリセット">
-                  <option value="">プリセット</option><option value="5">5 FPS</option><option value="10">10 FPS</option><option value="12.5">12.5 FPS</option><option value="20">20 FPS</option><option value="25">25 FPS</option><option value="50">50 FPS</option>
-                </select>
-                <button id="output-apply-fps" class="output-inline-button" type="button">全コマに適用</button>
-              </div>
-              <p id="output-fps-help" class="output-help">FPSを入力して、選択中の素材の全コマへ適用します。</p>
-            </div>
-            <label id="output-loop-field" class="output-sequence-field" for="output-loop-count">合計再生回数<select id="output-loop-count" class="output-select"><option value="0">ずっと</option><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option></select></label>
-            <p id="output-sequence-summary" class="output-help"></p>
-          </div>
-        </section>
-        <section id="output-audio-settings" class="output-media-settings output-media-settings--compact" hidden aria-live="polite">
-          <h3 class="output-visually-hidden">音声の内容</h3>
-          <p id="output-audio-details" class="output-detail"></p>
-        </section>
-        <div class="output-actions">
-          <button id="output-create-video" class="output-button output-button--secondary" type="button" hidden>この設定で動画を作る</button>
-          <a id="output-download" class="output-button output-button--primary" href="#" download>ダウンロード</a>
-          <progress id="output-generation-progress" class="output-progress" max="100" value="0" aria-label="出力作成の進行状況" hidden></progress>
-          <button id="output-cancel-generation" class="output-button output-button--secondary" type="button" hidden>作成を中止</button>
-        </div>
-        <p id="output-status" class="output-status" role="status" aria-live="polite"></p>
-        <a id="output-return" class="output-return" href="/tools/">編集画面へ戻る <span aria-hidden="true">←</span></a>
-        <p class="output-local-note"><span aria-hidden="true">⌂</span> 作品はこの端末内で受け渡しています。画像や音声をURLに含めたり、サーバーへ送ったりしません。</p>
-      </section>
-    </div>
-    <input id="output-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/apng,image/webp,audio/*" multiple hidden>
-    <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
-    <input id="output-scale" type="hidden" value="1">
+    <section class="section" aria-labelledby="features-title">
+      <div class="section-heading"><p class="eyebrow">WORKSPACE</p><h2 id="features-title">プレビューから保存まで</h2><p>ファイルを選んで、プレビューを確認。素材に合う設定だけを使って書き出せます。</p></div>
+      <div class="feature-grid">
+        <article class="feature"><span class="feature-mark" aria-hidden="true">▧</span><h3>画像を変換・調整</h3><p>PNG、JPEG、GIF、APNG、WebP画像を読み込みます。静止画はPNG・JPEG・SVG、複数コマの画像はGIF・APNGにも出力できます。アニメーション画像は、全コマを読み取れる環境で扱えます。</p></article>
+        <article class="feature"><span class="feature-mark" aria-hidden="true">♫</span><h3>音声を確認</h3><p>ブラウザーが読み込める音声を再生して確認し、WAV形式で保存できます。再生はプレビュー上の操作で始まります。</p></article>
+        <article class="feature"><span class="feature-mark" aria-hidden="true">▶</span><h3>GIF・動画に音楽を重ねる</h3><p>GIFの映像を繰り返しながら音楽に合わせた長さの動画を作れます。MP4/WebM動画も映像素材にでき、選んだ音楽でMP4またはWebMに書き出せます。</p></article>
+      </div>
+      <div class="capability-table-wrap"><table class="capability-table"><caption>プレビュー・出力で扱える素材と出力</caption><thead><tr><th scope="col">素材</th><th scope="col">読み込み・出力</th><th scope="col">条件</th></tr></thead><tbody><tr><th scope="row">画像</th><td>PNG・JPEG・GIF・APNG・WebP画像を読み込み。PNG・JPEG・SVGで出力し、複数コマはGIF・APNGにも出力</td><td>アニメーション画像は全コマ読み込み機能が必要です。WebPは入力に対応。</td></tr><tr><th scope="row">音声</th><td>ブラウザーがデコードできる音声をプレビューし、WAVで出力</td><td>再生はユーザー操作で開始します。</td></tr><tr><th scope="row">GIF・動画＋音楽</th><td>GIFの映像を音楽に合わせた長さで繰り返し、MP4/WebM動画に合成。MP4/WebM動画も映像素材として読み込み可能</td><td>映像素材は元の再生速度で使います。動画形式はブラウザーのMediaRecorder対応状況によります。</td></tr></tbody></table></div>
+      <p class="note">素材はこの端末のブラウザー内で処理します。作品の画像や音声をURLに入れたり、変換のためにサーバーへアップロードしたりしません。利用できる形式や動画出力は、ブラウザーの対応状況によって異なります。</p>
+    </section>
+    <section class="section" aria-labelledby="tools-title">
+      <div class="section-heading"><p class="eyebrow">CREATE WITH PIXIEED</p><h2 id="tools-title">作品づくりから始める</h2><p>制作ツールから作品を作り、そのままプレビュー・出力へ進めます。</p></div>
+      <div class="tool-grid">
+        <article class="tool-card"><h3>ドット絵を描く</h3><p>キャンバスで描いた絵やアニメーションを書き出します。</p><a href="/draw/">ドット絵ツールへ →</a></article>
+        <article class="tool-card"><h3>ドットで音楽を作る</h3><p>絵から音楽を作り、音声や画像を保存します。</p><a href="/audio/">音楽ツールへ →</a></article>
+        <article class="tool-card"><h3>写真をドット絵にする</h3><p>カメラや画像からドット絵を作ります。</p><a href="/pixel-camera.html">ピクセルカメラへ →</a></article>
+      </div>
+    </section>
+    <footer class="landing-footer"><a href="/">PiXiEED</a> · <a href="/guide/">利用ガイド</a> · <a href="/privacy/">プライバシー</a></footer>
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261009-fps-1"></script>
 </body>
 </html>

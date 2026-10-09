@@ -75,6 +75,7 @@ function abortError() {
 
 /** Record one complete loop with the same synthesizer used by playback. */
 export async function renderAudioVideo(song, image, {
+  totalPlays = 1,
   MediaRecorderImpl = globalThis.MediaRecorder,
   AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext,
   MediaStreamImpl = globalThis.MediaStream,
@@ -100,7 +101,9 @@ export async function renderAudioVideo(song, image, {
 
   const frameSize = audioVideoFrameSize(image.width, image.height);
   const loopSeconds = song.loopTicks * 60 / song.tempo / AUDIO_PPQ;
-  if (!Number.isFinite(loopSeconds) || loopSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('この曲は長いため動画にできません。曲を120秒以内にしてください。プロジェクト保存と再生は続けられます。');
+  if (!Number.isSafeInteger(totalPlays) || totalPlays < 1 || totalPlays > 8) throw new RangeError('音楽の再生回数は1〜8回です。');
+  const durationSeconds = loopSeconds * totalPlays;
+  if (!Number.isFinite(durationSeconds) || durationSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('この曲は長いため動画にできません。音楽を合計120秒以内にしてください。プロジェクト保存と再生は続けられます。');
   const releaseSeconds = Math.max(0, ...events.map(({ instrument }) => { const profile = getAudioInstrument(instrument); return profile?.drum?.duration || profile?.release || 0; }));
   const tailMs = Math.ceil(releaseSeconds * 1000) + 80;
   const chunks = []; const allTracks = new Set();
@@ -118,7 +121,7 @@ export async function renderAudioVideo(song, image, {
     if (!chunks.length) { finishError(new Error('このブラウザーでは動画を記録できませんでした。PNGとWAVは引き続き保存できます。')); return; }
     settled = true;
     const actualMime = recorder?.mimeType || mime.mimeType;
-    resolveRecording({ blob: new Blob(chunks, { type: actualMime }), mimeType: actualMime, extension: actualMime.includes('mp4') ? 'mp4' : 'webm', seconds: loopSeconds, width: frameSize.width, height: frameSize.height });
+    resolveRecording({ blob: new Blob(chunks, { type: actualMime }), mimeType: actualMime, extension: actualMime.includes('mp4') ? 'mp4' : 'webm', seconds: durationSeconds, totalPlays, hasAudio: true, width: frameSize.width, height: frameSize.height });
   };
   const listen = (target, type, callback) => {
     if (typeof target.addEventListener === 'function') target.addEventListener(type, callback);
@@ -158,7 +161,7 @@ export async function renderAudioVideo(song, image, {
     documentRef.addEventListener?.('visibilitychange', hiddenListener);
     recorder.start(1000);
     startedRecording = true;
-    watchdogTimer = setTimeoutImpl(() => finishError(new Error('動画の記録が時間内に完了しませんでした。もう一度お試しください。')), Math.ceil((loopSeconds + 0.035) * 1000 + tailMs + 5000));
+    watchdogTimer = setTimeoutImpl(() => finishError(new Error('動画の記録が時間内に完了しませんでした。もう一度お試しください。')), Math.ceil((durationSeconds + 0.035) * 1000 + tailMs + 5000));
     player = playerFactory({
       audioContextFactory: () => routedContext,
       schedule: (callback, delay) => {
@@ -181,9 +184,7 @@ export async function renderAudioVideo(song, image, {
     if (!played) throw new Error('この曲を動画にできませんでした。');
     if (signal?.aborted) throw abortError();
     if (failure) throw failure;
-    if (typeof player.stopAfterCurrentLoop !== 'function' || !player.stopAfterCurrentLoop()) {
-      throw new Error('曲の再生をループ終端で停止できませんでした。');
-    }
+    if (typeof player.stopAfterCurrentLoop !== 'function' || (totalPlays === 1 && !player.stopAfterCurrentLoop())) throw new Error('曲の再生をループ終端で停止できませんでした。');
     startedAt = Date.now() + 35;
     completionTimer = setTimeoutImpl(() => {
       completionTimer = null;
@@ -193,16 +194,24 @@ export async function renderAudioVideo(song, image, {
       progressTimer = null;
       player?.stop();
       if (recorder?.state === 'recording') recorder.stop();
-    }, Math.ceil((loopSeconds + 0.035) * 1000 + tailMs));
+    }, Math.ceil((durationSeconds + 0.035) * 1000 + tailMs));
+    let lastTick = null; let completedLoops = 0;
     progressTimer = setIntervalImpl(() => {
       if (settled) return;
       // Keep the picture on the same clock as the scheduled notes. A wall
       // clock can drift from AudioContext.currentTime while a long recording
       // is under load, which makes the animation lead or lag the music.
       const tick = player?.currentTick;
+      if (Number.isFinite(tick)) {
+        if (lastTick !== null && tick < lastTick) {
+          completedLoops += 1;
+          if (completedLoops >= totalPlays - 1 && !player.stopAfterCurrentLoop()) finishError(new Error('曲の再生を指定回数で停止できませんでした。'));
+        }
+        lastTick = tick;
+      }
       const progress = Number.isFinite(tick)
         ? Math.min(1, tick / song.loopTicks)
-        : Math.min(1, (Date.now() - startedAt) / (loopSeconds * 1000));
+        : Math.min(1, (Date.now() - startedAt) / (durationSeconds * 1000));
       draw(progress);
       try { onProgress(progress); } catch {}
     }, 1000 / 24);

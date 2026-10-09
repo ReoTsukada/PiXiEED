@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f4">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="素材をプレビューし、対応する形式と設定を選んで端末に保存します。">
+  <title>作品のプレビュー・保存｜PiXiEED</title>
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261009-output-video-1">
+</head>
+<body data-page="output">
+  <a class="output-skip" href="#main">本文へ移動</a>
+  <header class="output-header">
+    <a class="output-brand" href="/" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span>PiXiEED</a>
+    <span class="output-header__label">作品を保存</span>
+  </header>
+  <main id="main" class="output-main">
+    <div class="output-intro">
+      <p class="output-eyebrow"><span aria-hidden="true">✳</span> この端末で処理しています</p>
+      <h1 id="output-title" tabindex="-1">作品を確認</h1>
+      <p id="output-copy" class="output-copy">プレビューを確認して、必要ならサイズや名前を整えて保存できます。</p>
+    </div>
+    <section id="output-start" class="output-start" aria-labelledby="output-start-title" hidden>
+        <div class="output-start__copy"><p class="output-eyebrow">端末の中で変換</p><h2 id="output-start-title">画像・動画・音声を選ぶ</h2><p>選んだファイルはこの端末内で読み込みます。PNG、JPEG、GIF、APNG、WebP画像、MP4/WebM動画と、ブラウザーがデコードできる音声を読み込めます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p></div>
+      <div id="output-drop" class="output-drop" aria-label="画像・動画または音声ファイルをここにドロップ">
+        <span class="output-drop__mark" aria-hidden="true">＋</span><strong>ファイルを選ぶ</strong><span>複数の画像を並べてGIF・APNG・対応動画にできます</span>
+        <button id="output-start-choose" class="output-button output-button--primary" type="button">端末からファイルを選ぶ</button>
+      </div>
+      <p id="output-import-status" class="output-status" role="status" aria-live="polite"></p>
+      <progress id="output-import-progress" class="output-progress" max="100" value="0" aria-label="素材の読み込み状況" hidden></progress>
+      <button id="output-cancel-import" class="output-button output-button--secondary" type="button" hidden>読み込みを中止</button>
+    </section>
+    <div id="output-layout" class="output-layout" hidden>
+      <section class="output-preview-column" aria-label="作品のプレビュー">
+        <div id="output-preview" class="output-preview">
+          <canvas id="output-timeline-preview" aria-label="画像のコマプレビュー" hidden></canvas>
+          <img id="output-image" alt="作品のプレビュー" hidden>
+          <audio id="output-audio" controls preload="none" hidden></audio>
+          <video id="output-video" controls preload="metadata" playsinline hidden></video>
+          <div id="output-file-card" class="output-file-card" hidden aria-live="polite">
+            <span id="output-file-extension" class="output-file-card__extension">FILE</span>
+            <strong id="output-file-title">ファイルを準備しました</strong>
+            <span id="output-file-description">この形式はプレビューできません。</span>
+          </div>
+        </div>
+        <div class="output-preview-foot">
+          <p id="output-metadata" class="output-metadata"></p>
+          <button id="output-timeline-play" class="output-playback" type="button" hidden aria-pressed="false">コマ送りを再生</button>
+          <button id="output-animation-toggle" class="output-playback" type="button" hidden>アニメーションを停止</button>
+        </div>
+      </section>
+      <section class="output-settings" aria-labelledby="output-settings-title">
+        <div class="output-settings__heading">
+          <div><p id="output-format" class="output-format"></p><h2 id="output-settings-title">出力するファイル</h2></div>
+        </div>
+        <section id="output-assets" class="output-assets" hidden aria-labelledby="output-assets-title">
+          <div class="output-media-settings__title"><h3 id="output-assets-title">素材</h3><button id="output-add-assets" class="output-inline-button" type="button">素材を追加</button></div>
+          <div id="output-assets-list" class="output-assets-list"></div>
+          <p id="output-assets-note" class="output-help"></p>
+        </section>
+        <div id="output-items" class="output-items" role="list" aria-label="出力項目"></div>
+        <button id="output-add-item" class="output-button output-button--secondary output-add-item" type="button">＋ 出力項目を追加</button>
+        <div class="output-item-actions">
+          <button id="output-copy-item" class="output-text-button" type="button">この項目を複製</button>
+          <button id="output-delete-item" class="output-text-button output-text-button--danger" type="button">この項目を削除</button>
+        </div>
+        <label id="output-source-label" class="output-field-label" for="output-source">元の素材</label>
+        <select id="output-source" class="output-select"></select>
+        <label class="output-field-label" for="output-filename">ファイル名</label>
+        <div class="output-filename">
+          <input id="output-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="output-filename-help">
+          <button id="output-extension" class="output-extension" type="button" aria-haspopup="listbox" aria-expanded="false">.png <span aria-hidden="true">⌄</span></button>
+        </div>
+        <div id="output-format-picker" class="output-format-picker" hidden>
+          <label class="output-field-label" for="output-format-select">対応形式</label>
+          <select id="output-format-select" class="output-select" aria-label="出力形式"></select>
+          <label id="output-jpeg-setting" class="output-jpeg-setting" hidden for="output-jpeg-background">JPEGの背景色 <input id="output-jpeg-background" type="color" value="#ffffff"></label>
+          <label id="output-jpeg-quality-setting" class="output-jpeg-quality-setting" hidden for="output-jpeg-quality"><span>JPEG画質 <output id="output-jpeg-quality-value" for="output-jpeg-quality">90%</output></span><input id="output-jpeg-quality" type="range" min="50" max="100" step="5" value="90"></label>
+        </div>
+        <p id="output-filename-help" class="output-help">形式を変えると拡張子が合わせて切り替わります。</p>
+
+        <section id="output-scale-settings" class="output-media-settings" hidden aria-labelledby="output-scale-title">
+          <div class="output-media-settings__title"><h3 id="output-scale-title">画像サイズ</h3><span>プレビューに反映</span></div>
+          <div id="output-scale-presets" class="output-presets" role="group" aria-label="画像サイズの倍率"></div>
+          <p id="output-size-summary" class="output-size-summary"></p>
+          <details class="output-advanced" id="output-advanced">
+            <summary>サイズを細かく指定</summary>
+            <fieldset class="output-dimensions">
+              <legend>出力サイズ（px）</legend>
+              <div class="output-dimensions__fields">
+                <label for="output-width">幅<input id="output-width" type="number" min="1" step="1" inputmode="numeric"></label>
+                <span aria-hidden="true">×</span>
+                <label for="output-height">高さ<input id="output-height" type="number" min="1" step="1" inputmode="numeric"></label>
+              </div>
+              <label class="output-aspect"><input id="output-aspect-lock" type="checkbox" checked><span>縦横比を保つ</span></label>
+            </fieldset>
+            <p id="output-scale-note" class="output-help"></p>
+            <button id="output-apply-settings" class="output-button output-button--secondary" type="button">このサイズを使う</button>
+            <button id="output-cancel-settings" class="output-button" type="button" hidden>生成を中止</button>
+          </details>
+        </section>
+        <section id="output-animation-settings" class="output-media-settings output-media-settings--compact" hidden aria-live="polite">
+          <h3 class="output-visually-hidden">アニメーションの内容</h3>
+          <p id="output-animation-details" class="output-detail"></p>
+          <div id="output-sequence-settings" class="output-sequence-settings" hidden>
+            <div class="output-sequence-fps">
+              <label class="output-sequence-field" for="output-fps">全コマのFPS <span id="output-fps-current" class="output-sequence-current">可変</span></label>
+              <div class="output-sequence-fps__controls">
+                <input id="output-fps" class="output-fps-input" type="number" min="0.000278" max="1000" step="any" inputmode="decimal" aria-label="全コマに適用するFPS">
+                <select id="output-fps-preset" class="output-select" aria-label="FPSプリセット">
+                  <option value="">プリセット</option><option value="5">5 FPS</option><option value="10">10 FPS</option><option value="12.5">12.5 FPS</option><option value="20">20 FPS</option><option value="25">25 FPS</option><option value="50">50 FPS</option>
+                </select>
+                <button id="output-apply-fps" class="output-inline-button" type="button">全コマに適用</button>
+              </div>
+              <p id="output-fps-help" class="output-help">FPSを入力して、選択中の素材の全コマへ適用します。</p>
+            </div>
+            <label id="output-loop-field" class="output-sequence-field" for="output-loop-count">合計再生回数<select id="output-loop-count" class="output-select"><option value="0">ずっと</option><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option></select></label>
+            <p id="output-sequence-summary" class="output-help"></p>
+          </div>
+        </section>
+        <section id="output-audio-settings" class="output-media-settings output-media-settings--compact" hidden aria-live="polite">
+          <h3 class="output-visually-hidden">音声の内容</h3>
+          <p id="output-audio-details" class="output-detail"></p>
+          <label id="output-music-source-field" class="output-sequence-field" for="output-music-source" hidden>動画に重ねる音楽
+            <select id="output-music-source" class="output-select"></select>
+          </label>
+          <label id="output-music-total-plays-field" class="output-sequence-field" for="output-music-total-plays" hidden>音声の再生回数
+            <select id="output-music-total-plays" class="output-select">
+              <option value="1" selected>1回（初期設定）</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option><option value="6">6回</option><option value="7">7回</option><option value="8">8回</option>
+            </select>
+          </label>
+          <p id="output-music-total-plays-help" class="output-help" hidden>選んだ回数だけ音楽を繰り返し、動画の長さを合わせます。音楽の速さや高さは変わりません。</p>
+        </section>
+        <div class="output-actions">
+          <button id="output-create-video" class="output-button output-button--secondary" type="button" hidden>この設定で動画を作る</button>
+          <a id="output-download" class="output-button output-button--primary" href="#" download>ダウンロード</a>
+          <progress id="output-generation-progress" class="output-progress" max="100" value="0" aria-label="出力作成の進行状況" hidden></progress>
+          <button id="output-cancel-generation" class="output-button output-button--secondary" type="button" hidden>作成を中止</button>
+        </div>
+        <p id="output-status" class="output-status" role="status" aria-live="polite"></p>
+        <a id="output-return" class="output-return" href="/tools/">編集画面へ戻る <span aria-hidden="true">←</span></a>
+        <p class="output-local-note"><span aria-hidden="true">⌂</span> 作品はこの端末内で受け渡しています。画像や音声をURLに含めたり、サーバーへ送ったりしません。</p>
+      </section>
+    </div>
+    <input id="output-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/apng,image/webp,audio/*,video/mp4,video/webm,.mp4,.webm" multiple hidden>
+    <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
+    <input id="output-scale" type="hidden" value="1">
+  </main>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261009-output-video-1"></script>
+</body>
+</html>

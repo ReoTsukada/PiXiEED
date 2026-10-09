@@ -117,7 +117,7 @@ function newOutputId(cryptoRef = globalThis.crypto) {
 
 function outputPageUrl(id, origin = globalThis.location?.origin) {
   if (!ID_PATTERN.test(id) || !origin) throw new TypeError('出力ページを開けません。');
-  return new URL(`/output/?id=${encodeURIComponent(id)}`, origin).href;
+  return new URL(`/output/work/?id=${encodeURIComponent(id)}`, origin).href;
 }
 
 function safeMetadata(metadata = {}) {
@@ -172,7 +172,7 @@ function cloneMediaSource(mediaSource, mime) {
 function cloneMediaSources(sources) {
   if (sources == null) return [];
   if (!Array.isArray(sources) || sources.length > 8) throw new TypeError('出力素材の数が上限を超えています。');
-  const ids = new Set(); let totalPixels = 0; let totalAudioBytes = 0;
+  const ids = new Set(); let totalPixels = 0; let totalAudioBytes = 0; let totalMediaBytes = 0;
   const cloned = sources.map((source) => {
     const id = String(source?.id || '');
     const label = String(source?.label || '').slice(0, 60);
@@ -183,6 +183,8 @@ function cloneMediaSources(sources) {
       const mediaSource = cloneMediaSource({ kind: 'rgba-frames', frames: source.frames || storedMedia.frames, totalPlays: source.totalPlays ?? storedMedia.totalPlays ?? source.loopCount ?? storedMedia.loopCount }, 'image/png');
       if (!mediaSource) throw new TypeError('画像素材のフレームを確認できません。');
       totalPixels += mediaSource.width * mediaSource.height * mediaSource.frames.length;
+      totalMediaBytes += mediaSource.width * mediaSource.height * mediaSource.frames.length * 4;
+      if (totalMediaBytes > 128 * 1024 * 1024) throw new RangeError('出力素材の合計は128MBまでです。素材を減らしてからお試しください。');
       if (totalPixels > 12_000_000) throw new RangeError('出力素材が大きすぎます。アニメーションのコマ数を減らしてからお試しください。');
       return { id, label, kind: 'rgba-frames', mediaSource };
     }
@@ -197,7 +199,21 @@ function cloneMediaSources(sources) {
       if (!Number.isSafeInteger(length) || length < 1 || channels.some((channel) => channel.length !== length)) throw new TypeError('音声の長さが一致しません。');
       totalAudioBytes += channels.reduce((sum, channel) => sum + channel.byteLength, 0);
       if (totalAudioBytes > 64 * 1024 * 1024 || length / sampleRate > 120) throw new RangeError('音声素材は120秒・64MBまでです。');
+      totalMediaBytes += channels.reduce((sum, channel) => sum + channel.byteLength, 0);
+      if (totalMediaBytes > 128 * 1024 * 1024) throw new RangeError('出力素材の合計は128MBまでです。素材を減らしてからお試しください。');
       return { id, label, kind: 'audio-buffer', sampleRate, durationSeconds: length / sampleRate, channels: channels.map((channel) => new Float32Array(channel)) };
+    }
+    if (source.kind === 'video-source') {
+      const blob = source.blob;
+      const mime = mimeOf(blob);
+      const width = source.width; const height = source.height; const durationSeconds = source.durationSeconds;
+      if (!blob || typeof blob.slice !== 'function' || !Number.isSafeInteger(blob.size) || blob.size < 1 || blob.size > 64 * 1024 * 1024
+          || !['video/mp4', 'video/webm'].includes(mime)
+          || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > 4096 || height > 4096 || width * height > 8_000_000
+          || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > 120) throw new TypeError('動画素材を確認できません。MP4/WebM・120秒・64MBまでの素材を選んでください。');
+      totalMediaBytes += blob.size;
+      if (totalMediaBytes > 128 * 1024 * 1024) throw new RangeError('出力素材の合計は128MBまでです。素材を減らしてからお試しください。');
+      return { id, label, kind: 'video-source', blob, mime, width, height, durationSeconds };
     }
     if (source.kind === 'audio-song' || source.kind === 'audio-video') {
       const song = source.song;
@@ -209,6 +225,8 @@ function cloneMediaSources(sources) {
         image = cloneMediaSource({ kind: 'rgba-frames', frames: [source.image] }, 'image/png');
         if (!image) throw new TypeError('動画の画像素材を確認できません。');
         totalPixels += image.width * image.height;
+        totalMediaBytes += image.width * image.height * 4;
+        if (totalMediaBytes > 128 * 1024 * 1024) throw new RangeError('出力素材の合計は128MBまでです。素材を減らしてからお試しください。');
         if (totalPixels > 12_000_000) throw new RangeError('出力素材が大きすぎます。画面へ戻って素材を減らしてください。');
       }
       return { id, label, kind: source.kind, song: JSON.parse(encoded), ...(image ? { image: image.frames[0] } : {}) };
@@ -223,6 +241,9 @@ function safeMediaSettings(settings = {}) {
   if (Number.isFinite(settings.playbackRate) && settings.playbackRate >= 0.25 && settings.playbackRate <= 4) result.playbackRate = Math.round(settings.playbackRate * 100) / 100;
   const totalPlays = settings.totalPlays ?? settings.loopCount;
   if (Number.isSafeInteger(totalPlays) && totalPlays >= 0 && totalPlays <= 0xffffffff) result.totalPlays = totalPlays;
+  const musicTotalPlays = settings.musicTotalPlays ?? 1;
+  if (Number.isSafeInteger(musicTotalPlays) && musicTotalPlays >= 1 && musicTotalPlays <= 8) result.musicTotalPlays = musicTotalPlays;
+  if (typeof settings.musicSourceId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(settings.musicSourceId)) result.musicSourceId = settings.musicSourceId;
   return result;
 }
 

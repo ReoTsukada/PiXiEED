@@ -213,7 +213,7 @@ test('frame timing is shown and edited as FPS without changing source timing on 
   const preset = doc.body.querySelector('[data-fps-preset]'); preset.value = '25'; preset.fire('change');
   assert.deepEqual(actions.at(-1), { type: 'duration', frameId: 'f1', durationMs: 40 });
   state.audioMode = true; ui.refresh();
-  assert.equal(doc.body.querySelector('[data-action="toggle-duration"]').hidden, true);
+  assert.equal(root.querySelector('[data-action="toggle-duration"]').hidden, true);
   assert.equal(doc.body.querySelector('[data-duration-input]').parentElement.hidden, true, 'audio mode does not expose animation FPS');
   ui.dispose();
 });
