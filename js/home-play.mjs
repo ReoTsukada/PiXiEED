@@ -1,5 +1,5 @@
 /**
- * PiXiEED home: creation tools first, with a small playable introduction.
+ * PiXiEED home: a playable introduction with clear routes into creation tools.
  *
  * The contained mini canvas lets visitors draw and hear notes (a taste of the editor and sound tool).
  * Other tool cards run a tiny live version of that tool. Toys animate only
@@ -9,6 +9,7 @@ import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=202610
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
 import { createHomeMotion } from './home-motion.mjs?rev=20261002-gyro-360-1';
 import { stepGravitySand } from './home-sand.mjs?rev=20261002-gyro-360-1';
+import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, settleHomePlayPieces, finishHomePlayIntro, HOME_PLAY_STORAGE_KEY } from './home-play-state.mjs';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced';
@@ -36,10 +37,11 @@ const KEY = { k: C.ink, w: C.white, W: C.paper, r: C.red, b: C.blue, s: C.sky, y
 const sprite = (rows) => rows.map((row) => [...row].map((c) => KEY[c] ?? null));
 
 // ---------- tiny audio: one soft square-ish voice, created on the first touch ----------
-let audio = null; let soundOn = true;
+let audio = null; let soundOn = false; let audioVisible = false;
+const setAudioVisible = (visible) => { audioVisible = Boolean(visible); if (!audioVisible && audio?.state === 'running') void audio.suspend().catch(() => {}); };
 const SCALE = [0, 2, 4, 7, 9]; // pentatonic: any dots sound good together
 function note(step, { length = 0.16, volume = 0.05, type = 'triangle' } = {}) {
-  if (!soundOn) return;
+  if (!soundOn || !audioVisible) return;
   try {
     audio ??= new AudioContext();
     if (audio.state === 'suspended') audio.resume();
@@ -57,7 +59,7 @@ function note(step, { length = 0.16, volume = 0.05, type = 'triangle' } = {}) {
 const INSTRUMENTS = ['ピアノ', '鉄琴', 'マリンバ', 'フルート', 'ベース', 'オルゴール', 'ドラム'];
 let noiseBuffer = null;
 function play(inst, step, { volume = 0.05 } = {}) {
-  if (!soundOn) return;
+  if (!soundOn || !audioVisible) return;
   try {
     audio ??= new AudioContext();
     if (audio.state === 'suspended') audio.resume();
@@ -160,20 +162,30 @@ function hero() {
   //  ・文字 — dragging through PiXiEED knocks letters loose, a tap bursts one; flying dots catch stars they hit
   //  ・星 — tap a star to catch it; a shooting star is worth five
   //  ・楽譜 — a light sweeps the pile left to right and plays it: height is pitch, colour is instrument
-  //  ・ジャイロ — the first play gesture grants motion permission; shaking loosens the pile
+  //  ・ジャイロ — an explicit palette option enables motion; shaking loosens the pile
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
   const gyroStatus = document.getElementById('hpGyroStatus');
   // (older markup has neither the score nor the new hint: supply them)
   let score = document.getElementById('hpScore');
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
-  hint.innerHTML = '<span aria-hidden="true">☝</span> 描いて、はなして、そろえて消す';
+  hint.innerHTML = '<span aria-hidden="true">☝</span> 文字はタップ。指で描くなら「描く」。';
   const colors = [C.red, C.yellow, C.green, C.sky, C.blue, C.pink, C.white];
   const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
   const RGB = colors.map(rgb); const WORD_RGB = WORD_COLORS.map(rgb);
   const NIGHT = rgb(C.night); const WHITE = [255, 255, 255]; const GOLD = rgb(C.yellow);
   const BR = 2;                   // brush: 2×2 cells
   let color = 0; let W = 108; let H = 60; let F = 60; let cell = 4; let K = 2; // F: floor row; K: cells per old 9px dot
+  let frozen = false; let freezeTime = 0; let history = []; let historyBusy = false;
+  const status = document.getElementById('hpStatus');
+  const say = (message) => { if (status) status.textContent = message; };
+  const drawMode = document.getElementById('hpDrawMode'); const freezeButton = document.getElementById('hpFreeze');
+  drawMode?.setAttribute('aria-label', '描く');
+  const setFreezeUI = (value) => {
+    freezeButton?.setAttribute('aria-pressed', String(value)); freezeButton?.setAttribute('aria-label', value ? '絵を動かす' : '絵をとめる');
+    freezeButton?.setAttribute('title', value ? '絵を動かす' : '絵をとめる');
+    const label = freezeButton?.querySelector('span'); if (label) label.textContent = value ? '動かす' : 'とめる';
+  };
   let img = null; let nightFrame = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
@@ -186,24 +198,61 @@ function hero() {
   // what this visitor seems to enjoy: after enough of one play, the matching tool is offered once
   const interest = { ink: 0, letters: 0 };
   let cursor = null; let pen = false; // keyboard play
-  const colorBox = document.getElementById('hpColors');
+  const colorBox = document.getElementById('hpColors'); const palette = document.getElementById('hpPalette');
+  const paletteToggle = document.getElementById('hpPaletteToggle'); const currentColor = document.getElementById('hpCurrentColor');
   colors.forEach((c, i) => {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.style.setProperty('--c', c);
     b.setAttribute('aria-label', `色 ${i + 1}（${INSTRUMENTS[i]}）`); b.title = INSTRUMENTS[i];
-    b.addEventListener('click', () => { color = i; syncColors(); [5, 7, 9].forEach((n, k) => setTimeout(() => play(i, n), k * 110)); });
+    b.addEventListener('click', () => selectColor(i, { close: true, returnFocus: true }));
     colorBox.appendChild(b);
   });
-  const syncColors = () => [...colorBox.children].forEach((b, i) => b.setAttribute('aria-checked', String(i === color)));
+  function selectColor(i, { close = false, returnFocus = false } = {}) {
+    color = i; syncColors(); syncCurrentColor();
+    if (close) { closePalette(); if (returnFocus) paletteToggle?.focus(); }
+    persist(); say(`${INSTRUMENTS[i]}を選択`);
+  }
+  const syncColors = () => [...colorBox.children].forEach((b, i) => { const selected = i === color; b.setAttribute('aria-checked', String(selected)); b.tabIndex = selected ? 0 : -1; });
+  colorBox.addEventListener('keydown', (e) => {
+    const current = [...colorBox.children].indexOf(document.activeElement);
+    if (current < 0) return;
+    let next = current;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (current + 1) % colors.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (current + colors.length - 1) % colors.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = colors.length - 1;
+    else return;
+    e.preventDefault(); selectColor(next); colorBox.children[next].focus();
+  });
+  function syncCurrentColor() { if (currentColor) currentColor.style.setProperty('--c', colors[color]); }
+  function closePalette() { if (!palette || !paletteToggle) return; palette.hidden = true; paletteToggle.setAttribute('aria-expanded', 'false'); }
+  paletteToggle?.addEventListener('click', () => { const open = palette.hidden; palette.hidden = !open; paletteToggle.setAttribute('aria-expanded', String(open)); if (open) colorBox.querySelector('[aria-checked="true"]')?.focus(); });
+  document.addEventListener('pointerdown', (e) => { if (palette && !palette.hidden && !palette.contains(e.target) && !paletteToggle?.contains(e.target)) closePalette(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const wasOpen = Boolean(palette && !palette.hidden);
+      closePalette();
+      if (wasOpen) paletteToggle?.focus();
+      if (pen) { pen = false; stop(); }
+      if (drawMode?.getAttribute('aria-pressed') === 'true') { drawMode.setAttribute('aria-pressed', 'false'); drawMode.setAttribute('aria-label', '描く'); stage.classList.remove('is-drawing-mode'); }
+      redraw();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.target.closest?.('input, textarea, [contenteditable], dialog[open]')) { e.preventDefault(); document.getElementById('hpUndo')?.click(); }
+  });
+  syncCurrentColor();
   syncColors();
 
   const cellFor = (width) => (width < 520 ? 3.6 : width < 900 ? 5 : 7);
   // every dot is a whole number of screen pixels, so nothing shimmers or wobbles as it moves across the stage
   const gridFor = (r) => {
-    const dpr = globalThis.devicePixelRatio || 1; const c = Math.max(2, Math.round(cellFor(r.width) * dpr)) / dpr;
-    return { c, w: Math.max(40, Math.ceil(r.width / c)), h: Math.max(30, Math.ceil(r.height / c)), dpr };
+    const dpr = globalThis.devicePixelRatio || 1; let c = Math.max(2, Math.round(cellFor(r.width) * dpr)) / dpr;
+    let w = Math.max(40, Math.ceil(r.width / c)); let h = Math.max(30, Math.ceil(r.height / c));
+    while (w * h > 20_000) { c *= Math.sqrt((w * h) / 20_000) * 1.01; w = Math.max(40, Math.ceil(r.width / c)); h = Math.max(30, Math.ceil(r.height / c)); }
+    return { c, w, h, dpr };
   };
   const newStar = () => ({ x: 2 + Math.random() * (W - 4) | 0, y: 2 + Math.random() * (H * 0.55) | 0, p: Math.random() * 6.28, s: 0.6 + Math.random() * 1.4, big: Math.random() < 0.3 });
   function layout() {
+    let saved = null;
+    if (sand) saved = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen });
+    else { try { saved = JSON.parse(sessionStorage.getItem(HOME_PLAY_STORAGE_KEY) || 'null'); } catch { saved = null; } }
     const r = stage.getBoundingClientRect();
     const grid = gridFor(r); cell = grid.c; K = 9 / cell; W = grid.w; H = grid.h;
     canvas.style.width = `${W * cell}px`; canvas.style.height = `${H * cell}px`;
@@ -214,6 +263,11 @@ function hero() {
     sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; grains = 0; ink.clear();
     const bar = document.querySelector('.hp-tools').getBoundingClientRect();
     F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / cell)));
+    if (saved) {
+      const restored = restoreHomePlayState(saved, W, H, F);
+      if (restored) { sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color; frozen = restored.frozen; setFreezeUI(frozen); grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); }
+    }
+    syncColors(); syncCurrentColor();
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
     const scale = Math.max(2, Math.min(4, Math.floor((W - 8) / wordWidth)));
     let x0 = Math.floor((W - wordWidth * scale) / 2); const y0 = Math.floor(H * 0.2);
@@ -229,6 +283,7 @@ function hero() {
       x0 += (FONT[ch][0].length + 1) * scale;
     });
     stars = Array.from({ length: Math.max(14, Math.min(40, Math.round(W * H / 380))) }, newStar);
+    if (frozen || reduced) finishIntroDots();
   }
   const isSolid = (x, y) => y >= F || y < 0 || x < 0 || x >= W || sand[y * W + x] > 0;
   const reach = (px) => Math.max(1, Math.ceil(px / cell)); // a finger-sized distance in cells
@@ -236,6 +291,7 @@ function hero() {
   // ---- letters: a tap or a stroke bursts a letter, dots bounce, then fly home ----
   function burstLetter(li, fromX, fromY) {
     let any = false;
+    if (frozen || reduced) { any = dots.some((d) => d.li === li && d.state !== 'free'); if (any) say('文字にタッチしました'); return any; }
     for (const d of dots) {
       if (d.li !== li || d.state === 'free') continue;
       any = true; d.state = 'free'; d.burst = burstNo + 1; d.until = performance.now() + 2600 + Math.random() * 500;
@@ -285,7 +341,7 @@ function hero() {
   }
   // ---- the pile is a score: a light sweeps it and plays each column's top grain ----
   const STEPS = 16; const BAR_MS = 4000; let lastStep = -1;
-  function playPile(now) {
+  function playPile(now, { animateBeat = true } = {}) {
     const stepIndex = Math.floor((now % BAR_MS) / (BAR_MS / STEPS));
     if (stepIndex === lastStep) return; lastStep = stepIndex;
     if (!grains) return;
@@ -295,12 +351,12 @@ function hero() {
     if (tx < 0) return;
     const v = sand[top * W + tx]; const height = (F - top) / F;
     play(v - 1, 2 + Math.round(height * 12), { volume: 0.035 });
-    beats.push({ x: tx, y: top, life: 1 });
+    if (animateBeat && soundOn && !reduced) beats.push({ x: tx, y: top, life: 1 });
   }
 
   // ---- phones: screen-plane gravity follows a full turn, without a scalar angle seam ----
   let stageVisible = true;
-  const gyro = createHomeMotion({ status: gyroStatus, alwaysOn: true, activationTarget: stage,
+  const gyro = createHomeMotion({ button: document.getElementById('hpMotion'), status: gyroStatus,
     onGravity: (value) => { fall = value; }, onShake: shake,
     isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
   if (typeof IntersectionObserver === 'function') {
@@ -309,6 +365,7 @@ function hero() {
     motionVisibility.observe(stage);
   }
   function shake() {
+    if (frozen || reduced) return;
     let moved = 0;
     for (let x = 0; x < W; x++) {
       let top = -1; for (let y = 0; y < F; y++) if (sand[y * W + x]) { top = y; break; }
@@ -322,6 +379,10 @@ function hero() {
     if (moved) [0, 3, 1, 4, 2].forEach((n, i) => setTimeout(() => play(i % 2 ? 4 : 6, n + 2, { volume: 0.04 }), i * 50));
   }
 
+  function finishIntroDots() {
+    finishHomePlayIntro(dots);
+  }
+
   let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
   const TICK = 1 / 60; let tickNo = 0; let sandBudget = 0;
   function sandStep(now) {
@@ -329,6 +390,7 @@ function hero() {
   }
   function step(now) {
     const dt = Math.max(0, Math.min(0.1, (now - lastT) / 1000)); lastT = now;
+    if (frozen || reduced) { playPile(now, { animateBeat: false }); return; }
     // Keep the simulation's speed at both the normal 60 FPS and reduced 30 FPS display rates.
     sandTick += dt;
     while (sandTick >= TICK) {
@@ -437,12 +499,12 @@ function hero() {
   }
   function draw(t) {
     if (!img) return;
-    const now = t || performance.now(); const time = (now - start) / 1000;
+    const now = t || performance.now(); const time = ((frozen ? freezeTime : now) - start) / 1000;
     step(now);
     const d = img.data;
     d.set(nightFrame);
     for (const s of stars) {
-      const a = 0.35 + 0.45 * Math.sin(time * s.s + s.p);
+      const a = frozen || reduced ? 0.62 : 0.35 + 0.45 * Math.sin(time * s.s + s.p);
       if (a <= 0.4) continue;
       if (s.big) { put(s.x, s.y, GOLD, a); if (a > 0.6) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(s.x + dx, s.y + dy, GOLD, a * 0.45); }
       else put(s.x, s.y, WHITE, a);
@@ -450,7 +512,7 @@ function hero() {
     if (shooter) for (let i = 0; i < 10; i++) { const k = i / 10; put(shooter.x - shooter.vx * 0.03 * i, shooter.y - shooter.vy * 0.03 * i, i < 2 ? GOLD : WHITE, 1 - k); if (i === 0) for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) put(shooter.x + dx, shooter.y + dy, GOLD); }
     for (let x = 0; x < W; x++) put(x, F, WHITE, 0.07);
     // the light that plays the pile
-    if (grains) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
+    if (grains && soundOn && !reduced) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
     for (let i = 0; i < F * W; i++) if (sand[i]) { const c = RGB[sand[i] - 1]; const o = i * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; }
     for (const b of beats) put(b.x, b.y, WHITE, b.life);
     for (const dt of dots) {
@@ -463,12 +525,72 @@ function hero() {
     for (const [, dk] of ink) put(dk.x, dk.y, now - dk.born < 200 ? WHITE : RGB[dk.color]);
     for (const b of bursts) put(Math.round(b.x), Math.round(b.y), b.color, Math.min(1, b.life));
     if (cursor && document.activeElement === canvas) {
-      const on = Math.floor(now / 400) % 2 === 0;
+      const on = reduced || Math.floor(now / 400) % 2 === 0;
       for (let sy = 0; sy < BR; sy++) for (let sx = 0; sx < BR; sx++) put(cursor.x + sx, cursor.y + sy, pen ? RGB[color] : WHITE, pen || on ? 1 : 0.35);
     }
     ctx.putImageData(img, 0, 0);
   }
   const redraw = animate(stage, draw, { fps: 60, throttleRedraw: true });
+  const settleReducedIntro = () => { if (reduced) { finishIntroDots(); redraw(); } };
+  if (motionPreference.addEventListener) motionPreference.addEventListener('change', settleReducedIntro);
+  else motionPreference.addListener?.(settleReducedIntro);
+  new MutationObserver(settleReducedIntro).observe(document.documentElement, { attributes: true, attributeFilter: ['data-pixieed-motion'] });
+
+  function drawingSnapshot() {
+    return captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen });
+  }
+  function remember() { if (historyBusy) return; history = pushHomePlayHistory(history, drawingSnapshot()); syncUndo(); }
+  function syncUndo() { const undo = document.getElementById('hpUndo'); if (undo) undo.disabled = !history.length; }
+  function restoreSnapshot(s) {
+    const restored = restoreHomePlayState(s, W, H, F); if (!restored) return;
+    sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color; frozen = restored.frozen;
+    stage.classList.toggle('is-drawing-mode', Boolean(drawMode?.getAttribute('aria-pressed') === 'true'));
+    setFreezeUI(frozen);
+    grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); freezeTime = lastT = performance.now(); syncColors(); syncCurrentColor(); persist(); redraw();
+  }
+  function persist() {
+    try { const state = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen }); if (state) sessionStorage.setItem(HOME_PLAY_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage may be blocked */ }
+  }
+  document.getElementById('hpUndo')?.addEventListener('click', () => { const previous = history.pop(); if (previous) { historyBusy = true; restoreSnapshot(previous); historyBusy = false; syncUndo(); say('ひとつ戻しました'); } });
+  drawMode?.addEventListener('click', () => { const enabled = drawMode.getAttribute('aria-pressed') !== 'true'; drawMode.setAttribute('aria-pressed', String(enabled)); drawMode.setAttribute('aria-label', enabled ? '描くのをやめる' : '描く'); stage.classList.toggle('is-drawing-mode', enabled); say(enabled ? '指で描けます' : '指で画面を動かせます'); });
+  freezeButton?.addEventListener('click', () => {
+    if (!frozen && drawing) stop();
+    remember(); frozen = !frozen;
+    if (frozen) {
+      const settled = settleHomePlayPieces(sand, pieces, W, H, F);
+      if (settled) { sand = settled.sand; pieces = settled.pieces; grains = settled.grains; }
+      finishIntroDots();
+    }
+    lastT = performance.now(); freezeTime = lastT; setFreezeUI(frozen); say(frozen ? '絵をとめました' : '絵を動かしました'); persist(); redraw();
+  });
+  const soundButton = document.getElementById('hpSound');
+  soundButton?.setAttribute('aria-pressed', 'false'); soundButton?.setAttribute('aria-label', '音を聴く');
+  const syncSoundUI = () => { soundButton?.setAttribute('aria-pressed', String(soundOn)); soundButton?.setAttribute('aria-label', soundOn ? '音を消す' : '音を聴く'); soundButton?.setAttribute('title', soundOn ? '音を消す' : '音を聴く'); const label = soundButton?.querySelector('span'); if (label) label.textContent = soundOn ? '消音' : '聴く'; };
+  soundButton?.addEventListener('click', () => {
+    soundOn = !soundOn; syncSoundUI();
+    if (soundOn) {
+      try { audio ??= new AudioContext(); if (audio.state === 'suspended') void audio.resume(); } catch { /* no audio */ }
+      if (audioVisible) note(7);
+    } else if (audio?.state === 'running') void audio.suspend().catch(() => {});
+    say(soundOn ? '音を聴けます' : '音を消しました');
+  });
+  const clearDialog = document.getElementById('hpClearDialog'); const clearButton = document.getElementById('hpClear');
+  const performClear = () => {
+    remember(); ink.clear(); sand.fill(0); grains = 0; caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
+    for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12 * K; d.delay = d.li * 90 + Math.random() * 260; }
+    if (frozen || reduced) finishIntroDots();
+    start = performance.now(); persist(); say('絵を消しました'); redraw();
+  };
+  clearButton?.addEventListener('click', () => {
+    if (clearDialog?.showModal) clearDialog.showModal();
+    else if (typeof window.confirm === 'function' && window.confirm('あそび場を消しますか？')) performClear();
+  });
+  document.getElementById('hpClearCancel')?.addEventListener('click', () => clearDialog?.close());
+  document.getElementById('hpClearConfirm')?.addEventListener('click', () => { clearDialog?.close(); performClear(); });
+  window.addEventListener('pagehide', persist);
+  document.addEventListener('visibilitychange', () => { setAudioVisible(document.visibilityState !== 'hidden' && stageVisible); lastT = performance.now(); });
+  if (typeof IntersectionObserver === 'function') new IntersectionObserver(([entry]) => { stageVisible = Boolean(entry?.isIntersecting); setAudioVisible(stageVisible && document.visibilityState !== 'hidden'); gyro.setVisible(); }).observe(stage);
+  else setAudioVisible(document.visibilityState !== 'hidden');
 
   let lastInkNote = 0;
   function inkAt(x, y) {
@@ -494,44 +616,56 @@ function hero() {
   // (shooting star, cat, letter, star, or else one dot). A long still press counts as drawing a dot.
   const SLOP = 8; const TAP_MS = 400;
   let press = null;
+  const canDraw = (e) => e.pointerType !== 'touch' || drawMode?.getAttribute('aria-pressed') === 'true';
   canvas.addEventListener('pointerdown', (e) => {
     if (press || !e.isPrimary) return;
     const { x, y } = cellOf(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
     hint.classList.add('is-used');
-    canvas.setPointerCapture(e.pointerId);
+    if (canDraw(e)) canvas.setPointerCapture(e.pointerId);
     press = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x, y, t: performance.now() }; downAt = { x, y };
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!press || e.pointerId !== press.id) return;
+    if (!canDraw(e)) return;
     const { x, y } = cellOf(e);
     if (!drawing) {
       if (Math.hypot(e.clientX - press.cx, e.clientY - press.cy) < SLOP) return;
+      remember();
       drawing = true; last = null; inkAt(press.x, press.y);
     }
     if (x < 0 || y < 0 || x >= W || y >= H) return;
     inkAt(x, y); redraw();
   });
   function cellOf(e) { const r = canvas.getBoundingClientRect(); return { x: Math.floor(((e.clientX - r.left) / r.width) * W), y: Math.floor(((e.clientY - r.top) / r.height) * H) }; }
-  function tap(x, y, quick) {
+  function tap(x, y, quick, { drawBlank = true } = {}) {
     if (quick) {
       if (catchShooter(x, y)) return;
       const li = letterAt(x, y, reach(10));
       if (li >= 0) { lettersWereHit = burstLetter(li, x, y) || lettersWereHit; return; }
       if (catchStar(x, y)) return;
     }
-    last = null; inkAt(x, y); release(); last = null;
+    if (!drawBlank) return;
+    remember(); last = null; inkAt(x, y); release(); last = null; persist();
   }
   canvas.addEventListener('pointerup', (e) => {
     if (!press || e.pointerId !== press.id) return;
-    if (drawing) stop(); else tap(press.x, press.y, performance.now() - press.t < TAP_MS);
+    if (drawing) { stop(); persist(); } else tap(press.x, press.y, performance.now() - press.t < TAP_MS, { drawBlank: canDraw(e) });
     press = null; redraw();
   });
-  canvas.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) { stop(); press = null; } });
+  canvas.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) { if (drawing) { cancelStroke(); persist(); } press = null; redraw(); } });
   // letting go drops the drawing
   function release() {
     const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: d.color + 1 }));
     ink.clear();
-    if (cells.length) pieces.push({ cells, vx: fall.x * 0.2 * K, vy: fall.y * 0.2 * K, ax: 0, ay: 0, landed: false });
+    if (!cells.length) return;
+    if (frozen || reduced) {
+      for (const c of cells) sand[c.y * W + c.x] = c.v;
+      grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0);
+    } else pieces.push({ cells, vx: fall.x * 0.2 * K, vy: fall.y * 0.2 * K, ax: 0, ay: 0, landed: false });
+  }
+  function cancelStroke() {
+    for (const d of ink.values()) if (d.y >= 0 && d.y < F && d.x >= 0 && d.x < W) sand[d.y * W + d.x] = d.color + 1;
+    grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); ink.clear(); drawing = false; last = null;
   }
   const stop = () => { if (drawing) release(); drawing = false; last = null; };
   // keyboard: arrows move a dot cursor, Space lifts / lowers the pen, Enter taps (letters, stars, one dot)
@@ -545,20 +679,13 @@ function hero() {
     cursor ??= { x: W >> 1, y: Math.floor(F * 0.7) };
     if (move) {
       cursor = { x: Math.max(0, Math.min(W - BR, cursor.x + move[0] * BR)), y: Math.max(0, Math.min(F - BR, cursor.y + move[1] * BR)) };
-      if (pen) inkAt(cursor.x + 1, cursor.y + 1);
+      if (pen) { inkAt(cursor.x + 1, cursor.y + 1); persist(); }
     } else if (e.key === ' ') {
       if (e.repeat) return;
-      pen = !pen; if (pen) { drawing = true; last = null; inkAt(cursor.x + 1, cursor.y + 1); } else stop();
+      pen = !pen; if (pen) { remember(); drawing = true; last = null; inkAt(cursor.x + 1, cursor.y + 1); } else { stop(); persist(); }
     } else if (!pen) tap(cursor.x + 1, cursor.y + 1, true);
     redraw();
   });
-  document.getElementById('hpClear').addEventListener('click', () => {
-    ink.clear(); sand.fill(0); grains = 0; caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
-    for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12 * K; d.delay = d.li * 90 + Math.random() * 260; }
-    start = performance.now(); note(0, { length: 0.25 }); note(4, { length: 0.25 }); redraw();
-  });
-  const soundButton = document.getElementById('hpSound');
-  soundButton.addEventListener('click', () => { soundOn = !soundOn; soundButton.setAttribute('aria-pressed', String(soundOn)); if (soundOn) note(7); });
   // ---- a gentle nudge toward the tool that matches what they are doing ----
   const shown = new Set(); let inviteTimer = 0;
   const INVITES = {

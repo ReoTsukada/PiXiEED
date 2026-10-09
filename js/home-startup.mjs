@@ -1,4 +1,4 @@
-import './home-play.mjs?rev=20261009-home-creation-1';
+import './home-play.mjs?rev=20261009-home-playground-2';
 
 /** Start the non-hero site code once the first paint has had an idle opportunity. */
 export function scheduleAppStartup({

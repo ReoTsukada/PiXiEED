@@ -11,15 +11,15 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>try { if (localStorage.getItem('PiXiEED:motion-preference:v1') === 'reduced') document.documentElement.dataset.pixieedMotion = 'reduced'; } catch { /* storage may be blocked */ }</script>
-  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261009-home-creation-1">
-  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261009-home-creation-1">
+  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261009-home-playground-2">
+  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261009-home-playground-2">
   <link rel="modulepreload" href="/js/home-animation.mjs?rev=20261001-hero-rates-2">
   <link rel="modulepreload" href="/js/tool-toys.mjs?rev=20260929-shared-toys-2">
   <link rel="modulepreload" href="/js/home-motion.mjs?rev=20261002-gyro-360-1">
   <link rel="modulepreload" href="/js/home-sand.mjs?rev=20261002-gyro-360-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/home.css?rev=20261009-home-creation-1">
+  <link rel="stylesheet" href="/css/home.css?rev=20261009-home-playground-2">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261006-header-controls-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
@@ -31,60 +31,60 @@
   </div></header>
   <nav class="mobile-nav" aria-label="アプリナビゲーション"></nav>
   <main id="main">
-    <!-- Creation tools lead; the mini experience is a small taste of the products. -->
-    <section class="hp-hero" aria-labelledby="hpTitle">
-      <div class="hp-hero-layout container">
-        <div class="hp-intro">
-          <p class="hp-kicker">つくる・あそぶ・つながる</p>
-          <h1 id="hpTitle">ドット絵も、音楽も。<br>ここからつくろう。</h1>
-          <p class="hp-intro-copy">色を置いて絵を描く。ドットを並べて曲をつくる。ブラウザーで、すぐに制作を始められます。</p>
-          <nav class="hp-creation-links" aria-label="制作ツール">
-            <a class="hp-toy hp-entry-card" data-toy="editor" href="/draw/" style="--tone:#f1eee6" aria-label="ドット絵を描くツールを開く">
-              <canvas aria-hidden="true"></canvas>
-              <span class="hp-entry-content"><span class="hp-entry-action">ドット絵を描く</span><span class="hp-entry-product">かんたんドット</span><span class="hp-toy-line">最大256px・32色。アニメーションにも対応。</span><span class="hp-entry-cta">描くツールを開く <span aria-hidden="true">→</span></span></span>
-            </a>
-            <a class="hp-toy hp-entry-card" data-toy="sound" href="/audio/" style="--tone:#231a33" aria-label="ドットで音楽をつくるツールを開く">
-              <canvas aria-hidden="true"></canvas>
-              <span class="hp-entry-content"><span class="hp-entry-action">音楽をつくる</span><span class="hp-entry-product">ドットで音楽</span><span class="hp-toy-line">色と音色を選んで、テンポを変えてループ再生。</span><span class="hp-entry-cta">作曲ツールを開く <span aria-hidden="true">→</span></span></span>
-            </a>
-          </nav>
-          <p class="hp-demo-note">ミニ体験はここだけのお試しです。描いた内容は保存されません。保存や編集は各制作ツールでどうぞ。</p>
+    <!-- A playable introduction, followed by the real creation and discovery tools. -->
+    <section class="hp-hero container" aria-labelledby="hpTitle">
+      <div class="hp-intro">
+        <p class="hp-kicker">つくる・あそぶ・つながる</p>
+        <h1 id="hpTitle">ひと粒から、あそぼう。</h1>
+        <p class="hp-intro-copy">描いて、落として、音になる。</p>
+      </div>
+      <div class="hp-play-shell">
+        <div class="hp-stage" id="hpStage">
+          <span class="hp-demo-badge">ホームのミニ体験</span>
+          <canvas id="hpCanvas" aria-label="ドット絵のあそび場。タップで文字や星に触れる。描くを選んで指で描く。矢印キーで移動、スペースでペン、Enterでタップ、Escapeで描画を終了" role="img"></canvas>
+          <output class="hp-score" id="hpScore" hidden>★ 0</output>
+          <output class="hp-gyro-status visually-hidden" id="hpGyroStatus" aria-live="polite"></output>
+          <div class="hp-hero-copy"><p class="hp-hint" id="hpHint">文字はタップ。指で描くなら「描く」。</p></div>
         </div>
-        <div class="hp-demo">
-          <div class="hp-demo-heading"><strong>音が鳴るミニ体験</strong></div>
-          <div class="hp-stage" id="hpStage">
-            <canvas id="hpCanvas" aria-label="ドット絵のあそび場。描いて指をはなすと落ち、横一列そろうと消えます。文字をたたくと弾け、星はつかまえられます。矢印キーで動かし、スペースでペン、Enterでたたけます" role="img"></canvas>
-            <output class="hp-score" id="hpScore" hidden>★ 0</output>
-            <output class="hp-gyro-status visually-hidden" id="hpGyroStatus" aria-live="polite"></output>
-            <div class="hp-hero-copy"><p class="hp-hint" id="hpHint"><span aria-hidden="true">☝</span> ここで描いて遊べます</p></div>
-            <div class="hp-tools" role="toolbar" aria-label="描く色">
-              <div class="hp-colors" id="hpColors" role="radiogroup" aria-label="色"></div>
-              <button class="hp-icon" id="hpSound" type="button" aria-pressed="true" aria-label="音"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="hp-wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
-              <button class="hp-icon" id="hpClear" type="button" aria-label="消す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg></button>
-            </div>
+        <div class="hp-controls">
+          <div class="hp-tools" role="toolbar" aria-label="あそび場の操作">
+            <button class="hp-control hp-draw-mode" id="hpDrawMode" type="button" aria-pressed="false" aria-label="指で描くモード"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 16 12-12 4 4-12 12H4zM13 7l4 4"/></svg><span>描く</span></button>
+            <button class="hp-control" id="hpPaletteToggle" type="button" aria-expanded="false" aria-controls="hpPalette"><span id="hpCurrentColor" class="hp-current-color" aria-hidden="true"></span><span>色</span><span class="hp-palette-chevron" aria-hidden="true">⌃</span></button>
+            <button class="hp-control hp-action" id="hpFreeze" type="button" aria-pressed="false" aria-label="絵をとめる" title="絵をとめる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span>とめる</span></button>
+            <button class="hp-control hp-action" id="hpSound" type="button" aria-pressed="false" aria-label="音を聴く" title="音を聴く"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="hp-wave" d="M17 8a6 6 0 0 1 0 8"/></svg><span>聴く</span></button>
+            <button class="hp-control hp-undo" id="hpUndo" type="button" disabled aria-label="ひとつ戻す" title="ひとつ戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h9a6 6 0 0 1 0 12"/></svg></button>
+          </div>
+          <div class="hp-palette" id="hpPalette" hidden>
+            <p>色で、音色も変わる。</p>
+            <div class="hp-colors" id="hpColors" role="radiogroup" aria-label="色と音色"></div>
+            <button class="hp-palette-clear" id="hpMotion" type="button" aria-pressed="false">端末を傾けて遊ぶ</button>
+            <button class="hp-palette-clear" id="hpClear" type="button">あそび場を消す</button>
           </div>
         </div>
       </div>
-      <nav class="hp-go container" aria-label="次のあそび">
-        <a class="hp-discovery-link" href="#hpToysTitle">次のあそびを見つける <span aria-hidden="true">↓</span></a>
-        <span class="hp-discovery-copy">撮る・見つける・組み立てる</span>
-      </nav>
+      <output id="hpStatus" class="visually-hidden" aria-live="polite"></output>
+      <div class="hp-hero-foot"><p>とめて「聴く」で、絵が音になる。</p><a class="hp-discovery-link" href="#hpToysTitle">この先で、作品をつくる <span aria-hidden="true">↓</span></a></div>
+      <dialog class="hp-clear-dialog" id="hpClearDialog" aria-labelledby="hpClearTitle"><h2 id="hpClearTitle">あそび場を消しますか？</h2><p>描いたドットが消えます。消した後も「ひとつ戻す」で取り消せます。</p><div><button id="hpClearCancel" type="button" autofocus>残して戻る</button><button id="hpClearConfirm" type="button">消す</button></div></dialog>
     </section>
 
-    <!-- More playable tools and published destinations -->
     <section class="hp-section" aria-labelledby="hpToysTitle">
       <div class="container">
-        <h2 class="hp-heading" id="hpToysTitle">まだまだ、あそべる。</h2>
-        <p class="hp-section-lede">撮る。見つける。組み立てる。</p>
+        <h2 class="hp-heading" id="hpToysTitle">あそびから、作品へ。</h2>
+        <p class="hp-section-lede">ホームの体験はお試し。保存・編集は、制作ツールで。</p>
+        <nav class="hp-creation-links" aria-label="制作ツール">
+          <a class="hp-toy hp-entry-card" data-toy="editor" href="/draw/" style="--tone:#f1eee6" aria-label="ドット絵を描くツールを開く"><canvas aria-hidden="true"></canvas><span class="hp-entry-content"><span class="hp-entry-product">かんたんドット</span><span class="hp-entry-action">一粒ずつ、動く絵まで。</span><span class="hp-toy-line">最大256px・32色。レイヤーとコマで描く。</span><span class="hp-entry-cta">ドット絵を描く <span aria-hidden="true">→</span></span></span></a>
+          <a class="hp-toy hp-entry-card" data-toy="sound" href="/audio/" style="--tone:#231a33" aria-label="ドットで音楽をつくるツールを開く"><canvas aria-hidden="true"></canvas><span class="hp-entry-content"><span class="hp-entry-product">ドットで音楽</span><span class="hp-entry-action">色を並べて、曲になる。</span><span class="hp-toy-line">音色とテンポを選んで、ループをつくる。</span><span class="hp-entry-cta">音楽をつくる <span aria-hidden="true">→</span></span></span></a>
+        </nav>
+        <div class="hp-discovery-heading"><h3>まだまだ、あそべる。</h3><span>撮る・出会う・組み立てる</span></div>
         <div class="hp-activity-grid" id="hpToys">
           <div class="hp-feature-grid">
           <a class="hp-toy hp-feature-card hp-feature-card--camera" href="/pixel-camera.html" data-toy="camera" style="--tone:#1f2b36" aria-label="ドット絵カメラを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">カメラで撮る</span><span class="hp-toy-line">景色が、ドット絵に。</span><span class="hp-chip is-open">撮ってみる</span>
+            <span class="hp-toy-name">カメラで撮る</span><span class="hp-toy-line">撮った景色を、PNGに。</span><span class="hp-chip is-open">撮ってみる</span>
           </a>
           <a class="hp-toy hp-feature-card hp-feature-card--map" href="/globe/" data-toy="map" style="--tone:#10202e" aria-label="地球儀で作品を見る">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">地球儀を見る</span><span class="hp-toy-line">地球儀で、絵に出会う。</span><span class="hp-chip is-open">見つけにいく</span>
+            <span class="hp-toy-name">地球儀を見る</span><span class="hp-toy-line">その場所で、絵に出会う。</span><span class="hp-chip is-open">見つけにいく</span>
           </a>
           <a hidden class="hp-toy" href="/telescope/" data-toy="telescope" style="display:none;--tone:#0c1320">
             <canvas aria-hidden="true"></canvas>
@@ -94,21 +94,21 @@
           <div class="hp-compact-grid">
           <a class="hp-toy hp-compact-card" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6" aria-label="かんたんジグソーを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">ジグソー</span><span class="hp-toy-line">一枚を、組み立てる。</span><span class="hp-chip is-open">あそぶ</span>
+            <span class="hp-toy-name">ジグソー</span><span class="hp-toy-line">好きな画像を、組み立てる。</span><span class="hp-chip is-open">あそぶ</span>
           </a>
           <a class="hp-toy hp-compact-card" data-toy="diff" href="/play/spot-difference/" style="--tone:#e6edf3" aria-label="ドット絵間違い探しを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">間違い探し</span><span class="hp-toy-line">どこが、ちがう？</span><span class="hp-chip is-open">さがす</span>
+            <span class="hp-toy-name">間違い探し</span><span class="hp-toy-line">2枚の絵、どこが違う？</span><span class="hp-chip is-open">さがす</span>
           </a>
           <a class="hp-toy hp-compact-card" data-toy="find" href="/play/hidden-object/" style="--tone:#dcebd2" aria-label="ドット絵もの探しを開く">
             <canvas aria-hidden="true"></canvas>
-            <span class="hp-toy-name">もの探し</span><span class="hp-toy-line">かくれた絵を、探そう。</span><span class="hp-chip is-open">さがす</span>
+            <span class="hp-toy-name">もの探し</span><span class="hp-toy-line">絵の中のお題を、探そう。</span><span class="hp-chip is-open">さがす</span>
           </a>
           </div>
         </div>
         <a class="hp-output-card" href="/output/" aria-label="変換・書き出しツールへ">
           <span class="hp-output-visual" aria-hidden="true"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>♫</span></span>
-          <span class="hp-output-copy"><strong>変換・書き出し</strong><span>絵と音を、ひとつに。</span><small>画像・動画と音楽を組み合わせて出力</small></span>
+          <span class="hp-output-copy"><strong>変換・書き出し</strong><span>絵と音を、ひとつに。</span><small>画像・動画に音楽を重ねて出力</small></span>
           <span class="hp-output-cta">出力ツールを開く <span aria-hidden="true">→</span></span>
         </a>
       </div>
@@ -120,7 +120,7 @@
     <aside class="container px-display-ad" data-display-ad="home" data-ad-reserve aria-label="広告"><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
-  <script type="module" src="/js/home-startup.mjs?rev=20261009-home-creation-1"></script>
+  <script type="module" src="/js/home-startup.mjs?rev=20261009-home-playground-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
   <script type="module" src="/js/display-ads.mjs?rev=20261007-lazy-ads-1"></script>
 </body>
