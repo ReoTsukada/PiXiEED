@@ -27,66 +27,10 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <style>
-    :root { color-scheme: light; }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { margin: 0; background: #f6f7f4; color: #26352e; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", Meiryo, system-ui, sans-serif; }
-    a { color: inherit; }
-    .landing-skip { position: absolute; z-index: 5; top: 8px; left: 8px; transform: translateY(-160%); padding: 10px 14px; border-radius: 8px; background: #fff; color: #174a39; }
-    .landing-skip:focus { transform: none; }
-    .landing-header { min-height: 66px; display: flex; align-items: center; padding: 0 max(20px, calc((100vw - 1120px) / 2)); border-bottom: 1px solid #e4e9e4; background: rgba(255,255,255,.82); }
-    .landing-brand { display: inline-flex; align-items: center; gap: 9px; color: #26352e; font-weight: 850; text-decoration: none; letter-spacing: .01em; }
-    .landing-brand__mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #256b50; color: #fff; font-weight: 900; }
-    .landing-main { width: min(100% - 32px, 1040px); margin: 0 auto; padding: 30px 0 64px; }
-    .breadcrumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 24px; color: #758078; font-size: .78rem; }
-    .breadcrumbs a { color: #397357; text-underline-offset: 3px; }
-    .landing-hero { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(240px,.8fr); gap: clamp(24px,5vw,64px); align-items: center; padding: clamp(24px,5vw,56px); border: 1px solid #e0e8e1; border-radius: 28px; background: linear-gradient(135deg,#fff 0%,#f1f7f2 100%); box-shadow: 0 16px 44px rgba(34,66,47,.07); }
-    .eyebrow { margin: 0 0 12px; color: #397357; font-size: .78rem; font-weight: 800; letter-spacing: .08em; }
-    h1 { max-width: 620px; margin: 0; color: #20372a; font-size: clamp(2rem,5vw,3.4rem); line-height: 1.16; letter-spacing: -.045em; }
-    .hero-copy { max-width: 620px; margin: 18px 0 0; color: #596a60; font-size: clamp(.96rem,1.6vw,1.1rem); line-height: 1.85; }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-    .action { display: inline-flex; min-height: 52px; align-items: center; justify-content: center; padding: 12px 18px; border: 1px solid #cad7cd; border-radius: 12px; background: #fff; color: #29493a; font-size: .94rem; font-weight: 780; text-align: center; text-decoration: none; }
-    .action--primary { border-color: #256b50; background: #256b50; color: white; box-shadow: 0 3px 0 #194b3a; }
-    :is(.action,.landing-brand,.breadcrumbs a,.tool-card a):focus-visible { outline: 3px solid rgba(39,117,83,.55); outline-offset: 3px; }
-    .hero-art { display: grid; min-height: 240px; place-items: center; overflow: hidden; border: 1px solid #dce8dd; border-radius: 22px; background: radial-gradient(ellipse at 30% 30%, #d9ecd9 0, #eef5ed 48%, #e9f0e9 100%); }
-    .media-stack { position: relative; width: min(74%,270px); aspect-ratio: 1.12; }
-    .media-sheet { position: absolute; width: 78%; height: 78%; border: 1px solid rgba(45,91,63,.16); border-radius: 18px; background: rgba(255,255,255,.88); box-shadow: 0 12px 30px rgba(31,71,48,.12); }
-    .media-sheet:nth-child(1) { inset: 4% 8% auto auto; transform: rotate(8deg); }
-    .media-sheet:nth-child(2) { inset: 12% auto auto 6%; transform: rotate(-8deg); }
-    .media-sheet:nth-child(3) { inset: 15% 13% auto auto; display: grid; place-items: center; transform: rotate(2deg); }
-    .pixel-scene { display: grid; width: 112px; height: 112px; grid-template-columns: repeat(7,1fr); grid-template-rows: repeat(7,1fr); gap: 3px; }
-    .pixel-scene i { border-radius: 4px; background: #c7e1ca; }
-    .pixel-scene i:nth-child(3n) { background: #74aa81; }.pixel-scene i:nth-child(4n) { background: #317456; }.pixel-scene i:nth-child(5n) { background: #e9b66e; }
-    .sound-bars { position: absolute; right: 5%; bottom: 12%; display: flex; height: 32px; align-items: center; gap: 4px; }
-    .sound-bars i { width: 5px; border-radius: 9px; background: #397357; }.sound-bars i:nth-child(3n) { height: 28px; }.sound-bars i:nth-child(3n+1) { height: 14px; }.sound-bars i:nth-child(3n+2) { height: 21px; }
-    .section { margin-top: clamp(38px,7vw,70px); }
-    .section-heading { max-width: 660px; margin-bottom: 20px; }
-    .section-heading h2 { margin: 0; color: #263a2e; font-size: clamp(1.4rem,3vw,2rem); letter-spacing: -.025em; }
-    .section-heading p { margin: 9px 0 0; color: #6a786f; font-size: .93rem; line-height: 1.7; }
-    .feature-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
-    .feature { min-width: 0; padding: 21px; border: 1px solid #e1e8e2; border-radius: 18px; background: white; }
-    .feature-mark { display: grid; width: 38px; height: 38px; place-items: center; margin-bottom: 15px; border-radius: 12px; background: #eff6f0; color: #347354; font-size: 1.15rem; font-weight: 800; }
-    .feature h3 { margin: 0; color: #304538; font-size: 1rem; }.feature p { margin: 9px 0 0; color: #6b7870; font-size: .84rem; line-height: 1.7; }
-    .tool-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
-    .tool-card { display: flex; min-height: 144px; flex-direction: column; align-items: flex-start; padding: 19px; border: 1px solid #dfe7e0; border-radius: 16px; background: #fff; }
-    .tool-card h3 { margin: 0; color: #33493c; font-size: 1rem; }.tool-card p { margin: 8px 0 16px; color: #6c7971; font-size: .8rem; line-height: 1.6; }
-    .tool-card a { display: inline-flex; min-height: 42px; align-items: center; margin-top: auto; color: #347354; font-size: .83rem; font-weight: 780; text-underline-offset: 4px; }
-    .capability-table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid #e0e8e1; border-radius: 16px; background: #fff; }
-    .capability-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .82rem; line-height: 1.6; }
-    .capability-table caption { padding: 15px 17px 11px; color: #33493c; font-weight: 800; text-align: left; }
-    .capability-table :is(th,td) { min-width: 140px; padding: 12px 15px; border-top: 1px solid #edf1ed; vertical-align: top; }
-    .capability-table thead th { color: #68786d; font-size: .75rem; }
-    .capability-table tbody th { color: #347354; white-space: nowrap; }
-    .capability-table td { color: #617067; }
-    .note { margin-top: 20px; padding: 15px 17px; border-left: 3px solid #7da98b; border-radius: 0 12px 12px 0; background: #edf4ee; color: #596a60; font-size: .81rem; line-height: 1.75; }
-    .landing-footer { margin-top: 54px; padding-top: 18px; border-top: 1px solid #dfe6e0; color: #718078; font-size: .8rem; }
-    .landing-footer a { color: #397357; text-underline-offset: 3px; }
-    @media (max-width: 760px) { .landing-hero { grid-template-columns: minmax(0,1fr); }.hero-art { min-height: 210px; }.feature-grid,.tool-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-    @media (max-width: 480px) { .landing-header { min-height: 58px; padding-inline: 16px; }.landing-main { width: min(100% - 24px, 1040px); padding-top: 20px; }.breadcrumbs { margin-bottom: 17px; }.landing-hero { gap: 22px; padding: 22px 18px; border-radius: 20px; }.hero-actions { display: grid; grid-template-columns: minmax(0,1fr); }.action { width: 100%; }.hero-art { min-height: 190px; }.feature-grid,.tool-grid { grid-template-columns: minmax(0,1fr); }.feature { padding: 18px; }.tool-card { min-height: 132px; }.landing-footer { margin-top: 38px; } }
-    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-  </style>
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261006-header-controls-1">
+  <link rel="stylesheet" href="/css/output-guide.css?rev=20261009-shell-1">
   <script type="application/ld+json">
     {"@context":"https://schema.org","@type":"WebPage","name":"GIF・動画に音楽を重ねる｜PiXiEED","url":"https://pixieed.jp/output/","inLanguage":"ja","isPartOf":{"@type":"WebSite","name":"PiXiEED","url":"https://pixieed.jp/"}}
   </script>
@@ -101,9 +45,13 @@
     })();
   </script>
 </head>
-<body>
-  <a class="landing-skip" href="#main">本文へ移動</a>
-  <header class="landing-header"><a class="landing-brand" href="/" aria-label="PiXiEED ホーム"><span class="landing-brand__mark" aria-hidden="true">P</span>PiXiEED</a></header>
+<body data-page="tools" class="app-page output-guide-page">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner">
+    <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
+    <nav class="site-nav" aria-label="メインナビゲーション"><a data-nav="home" href="/globe/">地図</a><a data-nav="works" href="/works/">絵</a><a data-nav="stores" href="/stores/">お店</a><a data-nav="collection" href="/collection/">集めた</a><a data-nav="tools" href="/tools/">ツール</a></nav>
+  </div></header>
+  <nav class="mobile-nav" aria-label="アプリナビゲーション"><a data-nav="home" href="/globe/"><span aria-hidden="true">⌖</span>地図</a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span>絵</a><a data-nav="stores" href="/stores/"><span aria-hidden="true">⌂</span>お店</a><a data-nav="collection" href="/collection/"><span aria-hidden="true">✳</span>集めた</a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span>ツール</a></nav>
   <main id="main" class="landing-main">
     <nav class="breadcrumbs" aria-label="パンくずリスト"><a href="/">ホーム</a><span aria-hidden="true">›</span><span aria-current="page">プレビュー・出力</span></nav>
     <section class="landing-hero" aria-labelledby="page-title">
@@ -133,7 +81,9 @@
         <article class="tool-card"><h3>写真をドット絵にする</h3><p>カメラや画像からドット絵を作ります。</p><a href="/pixel-camera.html">ピクセルカメラへ →</a></article>
       </div>
     </section>
-    <footer class="landing-footer"><a href="/">PiXiEED</a> · <a href="/guide/">利用ガイド</a> · <a href="/privacy/">プライバシー</a></footer>
   </main>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
+  <script type="module" src="/js/app.js?rev=20261006-header-controls-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261006-header-controls-1"></script>
 </body>
 </html>

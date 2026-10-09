@@ -9,6 +9,7 @@ const TOOLS = new Set([
   'profile', 'pass', 'tools', 'draw', 'animation', 'audio', 'game', 'jigsaw', 'hidden-object',
   'spot-difference', 'pixfind', 'pixel-camera', 'pixel-camera-studio', 'pixiee-lens', 'telescope',
   'training', 'play', 'play-spot-difference', 'play-hidden-object', 'creation-suite', 'store', 'event',
+  'output', 'output-work',
   'hidden-object', 'spot-difference'
 ]);
 const EVENTS = new Set([

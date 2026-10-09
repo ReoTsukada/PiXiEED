@@ -4117,7 +4117,7 @@ function setActiveNav() {
         : target === 'camera'
           ? path.includes('pixel-camera')
         : target === 'tools'
-          ? path.includes('/tools/')
+          ? path.includes('/tools/') || path.startsWith('/output/')
           : target === 'profile' && path.includes('/profile/');
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
