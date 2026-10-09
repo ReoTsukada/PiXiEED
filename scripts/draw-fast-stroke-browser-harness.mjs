@@ -120,7 +120,7 @@ async function chooseTool(page, tool) {
   } else {
     await page.locator('#draw-tool-summary').click();
     await page.waitForFunction(() => document.querySelector('#draw-tool-picker')?.open);
-    await page.locator(`.draw-tool-menu button[data-draw-tool="${tool}"]`).click();
+    await page.locator(`.draw-tool-menu button[data-draw-tool="${tool}"]`).first().click();
   }
   await page.waitForFunction((name) => document.querySelector('#draw-canvas')?.dataset.tool === name, tool);
 }

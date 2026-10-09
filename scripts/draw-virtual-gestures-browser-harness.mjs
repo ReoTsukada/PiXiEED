@@ -164,20 +164,40 @@ try {
       await dispatch('touchEnd', []); await page.keyboard.press('0');
       checks.push('two-finger pan/pinch; actual pointer-id audit confirms 2→1 lift reanchors the surviving contact; 19px crosshair remains screen-sized');
 
-      // Captured pointer movement outside the board pauses, then the first re-entry sample re-anchors.
-      center = await boardPoint(); const outsideStart = await marker();
-      await dispatch('touchStart', [pointer(6, center)]);
+      // Captured movement keeps consuming finger deltas outside the board.
+      // Reversing direction beyond the edge must move the cursor immediately.
       const board = await rect('.draw-board');
+      center = { x: board.x + board.width - 24, y: board.y + board.height / 2 };
+      const outsideStart = await marker();
+      await dispatch('touchStart', [pointer(6, center)]);
       const outsideX = board.x + board.width + 12;
       await dispatch('touchMove', [pointer(6, { x: outsideX, y: center.y })]);
-      assert.ok(Math.hypot((await marker()).x - outsideStart.x, (await marker()).y - outsideStart.y) < 1.5, 'captured outside movement pauses');
-      const reentry = await boardPoint(-12, 8);
+      assert.ok(Math.abs((await marker()).x - outsideStart.x - 36) < 1.5, 'captured outside movement updates the virtual cursor');
+      await dispatch('touchMove', [pointer(6, { x: outsideX - 8, y: center.y })]);
+      assert.ok(Math.abs((await marker()).x - outsideStart.x - 28) < 1.5, 'direction reversal beyond the edge moves immediately');
+      const reentry = { x: board.x + board.width - 12, y: center.y + 8 };
       await dispatch('touchMove', [pointer(6, reentry)]);
-      assert.ok(Math.hypot((await marker()).x - outsideStart.x, (await marker()).y - outsideStart.y) < 1.5, 'first re-entry sample does not jump');
+      assert.ok(Math.abs((await marker()).x - outsideStart.x - 12) < 1.5, 're-entry consumes its actual delta');
       await dispatch('touchMove', [pointer(6, { ...reentry, x: reentry.x + 9 })]);
-      assert.ok(Math.abs((await marker()).x - outsideStart.x - 9) < 1.5, 'movement resumes from re-entry anchor');
+      assert.ok(Math.abs((await marker()).x - outsideStart.x - 21) < 1.5, 'movement continues by the latest delta after re-entry');
       await dispatch('touchEnd', []);
-      checks.push('out-of-board captured motion freezes and re-entry reanchors without a jump');
+      checks.push('out-of-board captured motion tracks every sample, including immediate direction reversal and re-entry');
+
+      // Drive the virtual cursor past its right clamp, then reverse by only
+      // one small sample while the captured finger remains outside the board.
+      center = await boardPoint();
+      await dispatch('touchStart', [pointer(27, center)]);
+      const farOutsideX = board.x + board.width * 3;
+      await dispatch('touchMove', [pointer(27, { x: farOutsideX, y: center.y })]);
+      const clampedRight = await page.locator('.draw-board').evaluate(node => {
+        const boardRect = node.getBoundingClientRect(), canvasRect = document.querySelector('#draw-canvas').getBoundingClientRect();
+        return Math.min(boardRect.left + node.clientLeft + node.clientWidth, canvasRect.right) - .01;
+      });
+      assert.ok(Math.abs((await marker()).x - clampedRight) < 1.5, 'large outside delta clamps the virtual cursor at the right edge');
+      await dispatch('touchMove', [pointer(27, { x: farOutsideX - 8, y: center.y })]);
+      assert.ok(Math.abs((await marker()).x - clampedRight + 8) < 1.5, 'small reversal outside the board moves immediately away from the clamp');
+      await dispatch('touchEnd', []);
+      checks.push('virtual cursor clamps at the canvas edge and responds immediately to a small outside reversal');
 
       // A real pointercancel of one pad pointer aborts both contacts. Neither
       // surviving touch id may move the crosshair until it lifts and re-enters.
@@ -346,8 +366,14 @@ try {
       await dispatch('touchEnd', [pointer(23, pngButton)]); await dispatch('touchEnd', [pointer(24, { ...center, x: center.x + 15, y: center.y + 8 })]);
       const sourcePixels = await page.locator('#draw-canvas').evaluate(canvas => [...canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data]);
       assert.ok(sourcePixels.some((channel, index) => index % 4 === 3 && channel > 0), 'virtual drawing creates a source pixel for export');
-      const pendingDownload = page.waitForEvent('download');
+      const outputPage = page.waitForURL(url => url.pathname === '/output/work/' && url.searchParams.has('id'));
       await page.locator('#draw-export').evaluate(node => node.click());
+      await outputPage;
+      const outputDownload = page.locator('#output-download');
+      await outputDownload.waitFor({ state: 'visible' });
+      await page.waitForFunction(() => document.querySelector('#output-download')?.href.startsWith('blob:'));
+      const pendingDownload = page.waitForEvent('download');
+      await outputDownload.click();
       const download = await pendingDownload, pngPath = `${output}/${viewport.width}x${viewport.height}-virtual-export.png`;
       await download.saveAs(pngPath);
       const pngData = (await readFile(pngPath)).toString('base64');

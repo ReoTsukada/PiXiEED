@@ -4,7 +4,7 @@ import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261009-pointer-selection-1';
 import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261007-draw-handoff-1';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, composeAnimationFrame, resizeAnimation, canvasResizeOffset, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
@@ -24,7 +24,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261006-draw-startup-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261009-pointer-selection-1';
 import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 
@@ -33,15 +33,16 @@ import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=202610
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261006-draw-panel-dismiss-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
-import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261006-floating-mouse-2';
+import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261007-color-selection-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261007-color-selection-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261009-pointer-selection-1';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261007-color-selection-1';
+import { selectionInputOperation, combineDrawInputSelection } from './draw-selection-input.mjs?rev=20261009-pointer-selection-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
@@ -579,6 +580,10 @@ function placeOverlays() {
 }
 function selectionFrame() { return selectionTransform?.state || (selection && { ...selection, angle: 0, pivot: selection.pivot || selectionDefaultPivot(selection) }); }
 function clearSelection() { cancelSelectionTransform(); selection = null; selectionDrag = null; selectionControls.render(null, false); selectionPanel?.sync(); }
+function confirmAndDeselect() {
+  if (selectionTransform && !confirmSelectionTransform()) return false;
+  clearSelection(); toast('編集を確定し、選択を解除しました。'); return true;
+}
 function placeSelection() {
   selectionPanel?.sync();
   const selectionTool = (strokeBinding?.tool || inputSettings.bindings[lastInputSide]?.tool || tool) === 'select';
@@ -651,9 +656,10 @@ function confirmSelectionTransform() {
 }
 function selectionPanelState() {
   const editable = !playing && !readOnlyImage && !animationSession.locked, busy = drawingInputBusy();
+  const hasPixels = selectionHasPixels();
   return { bounds: selectionFrame(), colorMode: selectedMode(lastInputSide) === 'color', pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
-    canCopy: Boolean(selection && !selectionTransform && !playing && !readOnlyImage && !busy),
-    canCut: Boolean(selection && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(selectionHasPixels() && editable) };
+    canCopy: Boolean(hasPixels && !selectionTransform && !playing && !readOnlyImage && !busy),
+    canCut: Boolean(hasPixels && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(hasPixels && editable) };
 }
 function commitSelectionDocument(next, beforeBounds, afterBounds, prepared = animationSession.prepareDocument(next)) {
   const before = animationSession.animation;
@@ -911,18 +917,23 @@ function updateSelection(point, event = {}) {
       selectionTransform.update(translateSelectionFrame(state, dx, dy));
     }
     previewSelectionTransform();
+  } else if (selectionDrag?.mode === 'modify') {
+    if (selectionDrag.colorPoint) return;
+    selectionDrag.range = selectionBounds(lineStart, point, documentData.width, documentData.height);
+    if (!selectionTransform) selection = combineDrawInputSelection(selectionDrag.bounds, selectionDrag.range, selectionDrag.operation, documentData.width, documentData.height);
   } else if (!['outside', 'flip', 'empty'].includes(selectionDrag?.mode)) selection = selectionBounds(lineStart, point, documentData.width, documentData.height);
   placeSelection();
 }
-let pendingTap = null; let pendingTapPointerId = null; let pendingTapMode = null; let pendingTapMask = 1; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
+let pendingTap = null; let pendingTapPointerId = null; let pendingTapMode = null; let pendingTapMask = 1; let pendingTapOperation = 'replace'; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
 function handleCanvasPointerDown(event) {
   if (virtualCursor?.realDown(event)) return;
   if (event.button !== undefined && event.button !== 0 && event.button !== 1 && event.button !== 2) return;
-  event.preventDefault(); canvas.focus({ preventScroll: true }); if (!event.virtual) canvas.setPointerCapture(event.pointerId);
+  event.preventDefault(); canvas.focus({ preventScroll: true });
+  if (!event.virtual) { try { canvas.setPointerCapture(event.pointerId); } catch { /* Synthetic input has no native capture. */ } }
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
   // desktop: middle button, or Space held, drags the view
-  if (event.button === 1 || spaceHeld) { panDrag = { x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); return; }
+  if (event.button === 1 || spaceHeld) { if (!panDrag && !drawing && !pendingTap) { panDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); } return; }
   if (activePointers.size > 1 || drawing || pendingTap) return;
   const side = event.pointerType === 'touch' ? 'left' : event.button === 2 ? 'right' : 'left';
   const binding = { ...inputSettings.bindings[side], side, mask: side === 'right' ? 2 : 1 };
@@ -933,11 +944,10 @@ function handleCanvasPointerDown(event) {
   if (inputTool !== 'picker' && !canEdit()) return;
   const touchedPoint = pointFromEvent(event);
   const selectionHandle = inputTool === 'select' && selection ? selectionHandleAtEvent(event) : null;
-  if (inputTool === 'select' && selectedMode(side) === 'color' && selectionTransform && !selectionHandle && !event.altKey) {
-    activePointers.delete(event.pointerId); toast('選択を変形中です。角・中心の操作を続けるか、✓／×で確定・取消してください。'); return;
-  }
-  if (inputTool === 'select' && selectedMode(side) === 'color' && !selectionTransform && !selectionHandle && !event.altKey) {
-    lastInputSide = side; syncDrawingSettings(); pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'color'; pendingTapMask = binding.mask;
+  const selectionOperation = selectionInputOperation(event);
+  if (inputTool === 'select' && selectedMode(side) === 'color' && !selectionTransform && !selectionHandle
+      && (!selection || selectionOperation !== 'replace')) {
+    lastInputSide = side; strokeBinding = binding; syncDrawingSettings(); pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'color'; pendingTapMask = binding.mask; pendingTapOperation = selectionOperation;
     return;
   }
   if (inputTool !== 'picker' && inputTool !== 'fill' && inputTool !== 'select') {
@@ -958,7 +968,11 @@ function handleCanvasPointerDown(event) {
     const inside = selectionTransform ? selectionContains(selectionFrame(), exactSelectionPoint(event)) : selectionMember(touchedPoint);
     const hadTransform = Boolean(selectionTransform);
     const origin = exactSelectionPoint(event), screenOrigin = { x: event.clientX, y: event.clientY };
-    if (handle?.startsWith('flip')) {
+    if (!handle && selectionOperation !== 'replace') {
+      selectionDrag = { mode: 'modify', operation: selectionOperation, origin, screenOrigin, pointerType: event.pointerType, bounds: selection, transaction: selectionTransform,
+        ...(selectedMode(side) === 'color' ? { colorPoint: touchedPoint } : {}), range: selectionBounds(touchedPoint, touchedPoint, documentData.width, documentData.height) };
+      if (!selectionTransform) selection = combineDrawInputSelection(selectionDrag.bounds, selectionDrag.range, selectionOperation, documentData.width, documentData.height);
+    } else if (handle?.startsWith('flip')) {
       selectionDrag = { mode: 'flip', handle, origin, screenOrigin, pointerType: event.pointerType };
     } else if ((handle || inside) && !animationSession.locked && startSelectionTransform()) {
       const state = selectionTransform.state, r = canvas.getBoundingClientRect(), minRadius = 6 / Math.min(r.width / canvas.width, r.height / canvas.height);
@@ -1018,8 +1032,13 @@ function applyPointerMoveSamples(event) {
 function handleCanvasPointerMove(event) {
   if (virtualCursor?.realMove(event)) return;
   if (activePointers.has(event.pointerId)) activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (panDrag) { panX = panDrag.panX + event.clientX - panDrag.x; panY = panDrag.panY + event.clientY - panDrag.y; updateCanvasView(); return; }
+  if (panDrag) {
+    if (event.pointerId !== panDrag.pointerId) return;
+    if (event.pointerType === 'mouse' && event.buttons === 0) { releasePointer({ type: 'pointerup', pointerId: event.pointerId, pointerType: event.pointerType, buttons: 0 }); return; }
+    panX = panDrag.panX + event.clientX - panDrag.x; panY = panDrag.panY + event.clientY - panDrag.y; updateCanvasView(); return;
+  }
   if (pinchStart && activePointers.size >= 2) {
+    if (!activePointers.has(event.pointerId)) return;
     const [a, b] = pointerPair(); const distance = Math.hypot(a.x - b.x, a.y - b.y);
     const centerX = (a.x + b.x) / 2; const centerY = (a.y + b.y) / 2;
     const target = Math.max(1, Math.min(ZOOM_MAX, pinchStart.zoom * distance / Math.max(1, pinchStart.distance)));
@@ -1070,10 +1089,18 @@ function finishSelectionRelease(drag, event) {
     if (distance <= threshold && selectionHandleAtEvent(event) === drag.handle) runSelectionAction(drag.handle);
     return;
   }
+  if (drag.mode === 'modify') {
+    if (selectionTransform !== drag.transaction && drag.transaction) return;
+    if (selectionTransform && !confirmSelectionTransform()) return;
+    const base = drag.transaction ? selection : drag.bounds;
+    const incoming = drag.colorPoint ? selectDrawColorMask(documentData, drag.colorPoint) : drag.range;
+    selection = combineDrawInputSelection(base, incoming, drag.operation, documentData.width, documentData.height);
+    selectionPanel.setMode('select'); placeSelection(); return;
+  }
   if (drag.mode !== 'outside' || selectionTransform !== drag.transaction) return;
   if (distance <= threshold) {
-    if (selectionTransform) confirmSelectionTransform();
-    else { clearSelection(); toast('選択を解除しました。画素は変更していません。'); }
+    const viewport = $('.draw-board').getBoundingClientRect();
+    if (event.clientX >= viewport.left && event.clientX < viewport.right && event.clientY >= viewport.top && event.clientY < viewport.bottom) confirmAndDeselect();
     return;
   }
   if (selectionTransform && !confirmSelectionTransform()) return;
@@ -1086,14 +1113,13 @@ function applyTap(point) {
 }
 function releasePointer(event) {
   if (virtualCursor?.realRelease(event)) return;
-  const ownsMouseStroke = drawing && event.pointerType === 'mouse' && event.pointerId === drawingPointerId;
   if (event.type === 'pointerup' && event.pointerType === 'mouse' && strokeBinding && typeof event.buttons === 'number' && (event.buttons & strokeBinding.mask)) return;
-  if (event.type === 'lostpointercapture' && ownsMouseStroke && activePointers.has(event.pointerId)) {
-    // A mouse capture loss ends the gesture at its last accepted sample. Do not draw the
-    // capture-loss event's coordinates, which may be outside the canvas or stale.
-    activePointers.delete(event.pointerId);
-    endStroke(effectiveTool() === 'select');
-    return;
+  if (event.type === 'lostpointercapture' && event.pointerType === 'mouse' && drawing
+      && event.pointerId === drawingPointerId && activePointers.has(event.pointerId)) {
+    // Some desktop releases/chords deliver capture loss before their up. Preserve
+    // only already accepted drawing samples, as in the existing mouse-release fix.
+    // Selection gestures restore their checkpoint; pending taps never execute here.
+    activePointers.delete(event.pointerId); endStroke(effectiveTool() === 'select'); return;
   }
   if (event.type === 'pointerup' && drawing && event.pointerId === drawingPointerId && activePointers.has(event.pointerId)) {
     applyDrawPoint(pointFromEvent(event), event);
@@ -1101,18 +1127,19 @@ function releasePointer(event) {
   const wasActive = activePointers.delete(event.pointerId);
   // A late lostpointercapture or a non-owning pointer must not finish a newer gesture.
   if (!wasActive) return;
-  if (panDrag) { if (!activePointers.size) { panDrag = null; canvas.classList.remove('is-panning'); } return; }
+  if (panDrag) { if (event.pointerId === panDrag.pointerId) { panDrag = null; canvas.classList.remove('is-panning'); } return; }
   if (pendingTap && event.pointerId === pendingTapPointerId) {
     const tap = pendingTap, mode = pendingTapMode, side = lastInputSide; pendingTap = null; pendingTapPointerId = null; pendingTapMode = null;
     if (event.type === 'pointerup' && !pinchStart && activePointers.size === 0) {
       if (mode === 'color') {
         const selected = selectDrawColorMask(documentData, tap);
-        if (selected) { lastInputSide = side; selection = selected; selectionDrag = null; selectionPanel?.setMode('select'); placeSelection(); syncDrawingSettings(); toast(`${selectionToolLabel('color')}：${selected.width}×${selected.height}の範囲を選びました。`); }
+        if (selected) { lastInputSide = side; selection = combineDrawInputSelection(selection, selected, pendingTapOperation, documentData.width, documentData.height); selectionDrag = null; selectionPanel?.setMode('select'); placeSelection(); syncDrawingSettings(); toast(`${selectionToolLabel('color')}の選択を更新しました。`); }
       } else applyTap(tap);
     }
     strokeBinding = null; syncDrawingSettings(); updateControls(); return;
   }
   if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; }
+  if (event.type !== 'pointerup' && (pinchStart || fingerTap)) { cancelDrawingInput(); return; }
   // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
   // still two-finger tap is undo and a three-finger tap is redo
   if (!pinchStart && fingerTap) {
@@ -1128,12 +1155,13 @@ function releasePointer(event) {
     drawing = false; drawingPointerId = null; previousPoint = null; strokeStartPixels = null; return;
   }
   if (drawing && event.pointerId !== drawingPointerId) return;
-  const viewport = $('.draw-board').getBoundingClientRect();
-  const outsideViewport = selectionDrag && (event.clientX < viewport.left || event.clientX >= viewport.right || event.clientY < viewport.top || event.clientY >= viewport.bottom);
-  endStroke(event.type !== 'pointerup' || Boolean(outsideViewport), event);
+  endStroke(event.type !== 'pointerup', event);
 }
 canvas.addEventListener('pointerup', releasePointer); canvas.addEventListener('pointercancel', releasePointer); canvas.addEventListener('lostpointercapture', releasePointer);
-scope.listen(document, 'pointerup', (event) => { if (event.pointerType === 'mouse') releasePointer(event); });
+// Only pointers registered by the canvas (or its selection controls) may continue here.
+// This also supplies a fallback for a missing capture without taking UI-started input.
+scope.listen(document, 'pointermove', event => { if (!event.virtual && event.target !== canvas && activePointers.has(event.pointerId)) handleCanvasPointerMove(event); });
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) scope.listen(document, type, event => { if (event.target !== canvas && activePointers.has(event.pointerId)) releasePointer(event); });
 scope.listen($('.draw-board'), 'contextmenu', event => event.preventDefault());
 scope.listen($('#draw-animation-play'), 'click', event => {
   if (cameraOpening) {

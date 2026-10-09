@@ -115,8 +115,12 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     const b = bounds();
     if (b.maxX <= b.minX || b.maxY <= b.minY) { finishGesture(true, false); marker.hidden = true; return; }
     position ||= { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
-    position.x = Math.max(b.minX + .01, Math.min(b.maxX - .01, position.x));
-    position.y = Math.max(b.minY + .01, Math.min(b.maxY - .01, position.y));
+    // Keep the screen-space cursor anchored while the canvas moves beneath a
+    // captured two-finger gesture. The next relative pad sample clamps again.
+    if (!viewportGestureActive) {
+      position.x = Math.max(b.minX + .01, Math.min(b.maxX - .01, position.x));
+      position.y = Math.max(b.minY + .01, Math.min(b.maxY - .01, position.y));
+    }
     marker.style.left = `${position.x - b.board.left - board.clientLeft}px`;
     marker.style.top = `${position.y - b.board.top - board.clientTop}px`;
     marker.hidden = false; onHover?.(event('pointermove'));
@@ -124,7 +128,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   function move(dx, dy) {
     if (!enabled) return;
     if (activeSide && gestureOwner?.kind === 'button') { gestureOwner.role = 'draw'; sync(); }
-    place(); if (marker.hidden) return;
+    if (!position || marker.hidden) place(); if (marker.hidden) return;
     const b = bounds();
     position.x = Math.max(b.minX + .01, Math.min(b.maxX - .01, position.x + dx));
     position.y = Math.max(b.minY + .01, Math.min(b.maxY - .01, position.y + dy));
@@ -154,16 +158,10 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     const records = [...pads.entries()].filter(([, record]) => record.kind === 'pad');
     if (activeSide) {
       endViewportGesture(true); gestureSuspended = false;
-      padOwner = records.find(([, record]) => record.inside)?.[0] ?? records[0]?.[0] ?? null;
+      padOwner = records.some(([id]) => id === padOwner) ? padOwner : records[0]?.[0] ?? null;
       return;
     }
     if (records.length >= 2) {
-      const insideAll = records.every(([, record]) => record.inside);
-      if (!insideAll) {
-        endViewportGesture(cancelled);
-        gestureSuspended = true; padOwner = null;
-        return;
-      }
       gestureSuspended = false; padOwner = null; hover = null;
       const metrics = viewportMetrics(records.slice(0, 2).map(([pointerId, record]) => ({ pointerId, x: record.x, y: record.y })));
       if (!viewportGestureActive) { viewportGestureActive = true; onViewportGestureStart?.(metrics); }
@@ -298,17 +296,20 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
     if (record) {
       const inViewport = inside(e.clientX, e.clientY, b);
       if (record.kind === 'mouse') {
-        if (inViewport && record.inside) move(e.clientX - record.x, e.clientY - record.y);
+        // Pointer capture keeps delivering samples after the initiating press
+        // leaves the board. Keep consuming those deltas; move() clamps only
+        // the virtual cursor, so a direction change at an edge responds at once.
+        move(e.clientX - record.x, e.clientY - record.y);
         record.x = e.clientX; record.y = e.clientY; record.inside = inViewport;
         const held = e.buttons || 0;
         if (activeSide && gestureOwner === record && !(held & (activeSide === 'right' ? 2 : 1))) finishGesture(false);
       } else {
-        const wasInside = record.inside, dx = e.clientX - record.x, dy = e.clientY - record.y;
+        const dx = e.clientX - record.x, dy = e.clientY - record.y;
         record.x = e.clientX; record.y = e.clientY; record.inside = inViewport;
         const padCount = [...pads.values()].filter(item => item.kind === 'pad').length;
         if (activeSide) {
           updateViewportGesture();
-          if (inViewport && wasInside && padOwner === e.pointerId) {
+          if (padOwner === e.pointerId) {
             if (gestureOwner?.kind !== 'button' || gestureOwner.role === 'draw') move(dx, dy);
             else {
               record.pendingDx = (record.pendingDx || 0) + dx; record.pendingDy = (record.pendingDy || 0) + dy;
@@ -316,7 +317,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
             }
           }
         } else if (padCount >= 2 || viewportGestureActive || gestureSuspended) updateViewportGesture();
-        else if (inViewport && wasInside && padOwner === e.pointerId) move(dx, dy);
+        else if (padOwner === e.pointerId) move(dx, dy);
       }
     } else if (e.pointerType === 'mouse') {
       if (!inside(e.clientX, e.clientY, b)) { hover = null; return; }
@@ -360,7 +361,7 @@ export function mountDrawVirtualCursor({ scope, board, canvas, toggle, controls,
   scope.listen(board, 'pointerenter', () => { hover = null; });
   scope.listen(board, 'pointerleave', e => {
     hover = null;
-    const record = pads.get(e.pointerId); if (record) { record.inside = false; if (record.kind === 'pad') updateViewportGesture(); }
+    const record = pads.get(e.pointerId); if (record) record.inside = false;
   });
   scope.listen(board, 'contextmenu', e => { if (enabled) stop(e); }, { capture: true });
   for (const node of [left, right]) scope.listen(node, 'contextmenu', e => { if (enabled) stop(e); }, { capture: true });

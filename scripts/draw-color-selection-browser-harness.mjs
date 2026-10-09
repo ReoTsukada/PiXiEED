@@ -138,12 +138,14 @@ for (const engineName of engines) {
         await group('mask rotation and copy paste preserve transparent holes', async () => {
           await loadFixture(); await setTool(); await setMode('color'); await clickCell(3, 4); const original = await saveCels();
           await command('selection.rotateRight'); assert.equal(await page.locator('#draw-selection-controls').getAttribute('data-pending'), 'true');
-          const pending = await rgba(); await clickCell(0, 0);
-          assert.equal(await page.locator('#draw-selection-controls').getAttribute('data-pending'), 'true', 'same-color click does not silently confirm an active transform');
-          assert.deepEqual(await rgba(), pending); await page.locator('[data-selection-action="confirm"]').click();
-          const rotated = await saveCels();
           const selectedCount = await page.locator('.draw-selection-mask').evaluate(canvas => { const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; let count = 0; for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (data[((y * 4 + 1) * canvas.width + x * 4 + 1) * 4 + 3] > 0) count++; return count; });
-          assert.equal(selectedCount, 6, 'quarter turn retains exactly six selected cells');
+          assert.equal(selectedCount, 6, 'quarter turn retains exactly six selected cells before deselection');
+          const pending = await rgba(); await clickCell(0, 0);
+          assert.equal(await page.locator('#draw-selection-controls').getAttribute('data-pending'), 'false', 'outside tap confirms the pending transform');
+          assert.equal(await page.locator('.draw-selection-mask').evaluate(canvas => canvas.hidden), true, 'select-tool outside tap also deselects');
+          const rotated = await saveCels();
+          assert.notDeepEqual(rotated.cels[0][1], original.cels[0][1], 'the saved document contains the confirmed turn');
+          assert.deepEqual(await rgba(), pending, 'outside tap retains all transformed preview pixels');
           await page.locator('#draw-undo').click(); assert.deepEqual((await saveCels()).cels[0][1], original.cels[0][1], 'one undo restores the artwork before the transform');
           await loadFixture(); await setTool(); await setMode('color'); await clickCell(3, 4); const before = await saveCels();
           await page.locator('[data-selection-action="copy"]').click(); await page.locator('[data-selection-action="paste"]').click();

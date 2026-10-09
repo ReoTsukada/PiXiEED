@@ -1,7 +1,8 @@
-import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
+import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261009-pointer-selection-1';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { symmetryPoints } from './drawing-symmetry.mjs';
 import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
+import { boundedPixelLine } from './draw-pointer-geometry.mjs';
 
 const MAX_SIDE = 512;
 const MAX_COORDINATE_FACTOR = 4;
@@ -14,8 +15,7 @@ function boundedPoints(from, to, width, height) {
   if (!from || !to || ![from.x, from.y, to.x, to.y].every(Number.isFinite)) return null;
   const x0 = Math.floor(from.x); const y0 = Math.floor(from.y);
   const x1 = Math.floor(to.x); const y1 = Math.floor(to.y);
-  const limit = Math.max(width, height) * MAX_COORDINATE_FACTOR;
-  if ([x0, y0, x1, y1].some((coordinate) => !Number.isSafeInteger(coordinate) || Math.abs(coordinate) > limit)) return null;
+  if (![x0, y0, x1, y1].every(Number.isSafeInteger)) return null;
   return { x0, y0, x1, y1, minX: Math.min(x0, x1), maxX: Math.max(x0, x1), minY: Math.min(y0, y1), maxY: Math.max(y0, y1) };
 }
 
@@ -98,7 +98,7 @@ export function sprayPixels(document, from, to, value, { radius = 2, random = Ma
   if (typeof random !== 'function' || typeof mirror !== 'boolean') throw new TypeError('Invalid spray options');
   const symmetryFlags = combineSymmetry(symmetry, mirror);
   const hasSymmetry = symmetryFlags.horizontal || symmetryFlags.vertical || symmetryFlags.diagonalDown || symmetryFlags.diagonalUp;
-  const points = boundedPoints(from, to, document.width, document.height);
+  const points = boundedPixelLine(from, to, document.width, document.height, { margin: radius, preserveDistance: MAX_COORDINATE_FACTOR });
   if (!points) return new Uint32Array(0);
   const cells = new Set();
   const sampleCount = radius === 0 ? 1 : Math.min(24, Math.max(1, Math.ceil(Math.PI * radius * radius / 2)));

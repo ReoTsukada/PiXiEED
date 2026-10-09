@@ -1,4 +1,5 @@
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
+import { boundedPixelLine } from './draw-pointer-geometry.mjs';
 
 export const DRAW_SIZES = Object.freeze([16, 32, 64, 128, 256, 512]);
 export const DRAW_SIZE = 16;
@@ -56,11 +57,10 @@ export function strokePixels(document, from, to, value, { trusted = false, track
   // Pointer moves operate on an already validated document; importing and committing still validate fully.
   if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
-  const x0 = Math.floor(from.x); const y0 = Math.floor(from.y); const x1 = Math.floor(to.x); const y1 = Math.floor(to.y);
-  if (![x0, y0, x1, y1].every(Number.isFinite)) return [];
-  if ([x0, y0, x1, y1].some((coordinate) => Math.abs(coordinate) > Math.max(document.width, document.height) * 4)) return [];
+  const line = boundedPixelLine(from, to, document.width, document.height);
+  if (!line) return [];
   const changed = [];
-  for (const { x, y } of pixelLineCells({ x: x0, y: y0 }, { x: x1, y: y1 })) {
+  for (const { x, y } of pixelLineCells({ x: line.x0, y: line.y0 }, { x: line.x1, y: line.y1 })) {
     const index = pointIndex(x, y, document.width, document.height);
     if (index >= 0 && (!mask || mask[index]) && document.pixels[index] !== value) { writeTrackedPixel(document, tracker, index, value); changed.push(index); }
   }

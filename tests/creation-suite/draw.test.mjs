@@ -56,7 +56,8 @@ test('new 16x16 document is transparent and line drawing bridges pointer gaps', 
   assert.deepEqual(changed, [33, 34, 35, 36, 37, 38]);
   assert.deepEqual(document.pixels.slice(32, 40), [-1, 2, 2, 2, 2, 2, 2, -1]);
   strokePixels(document, { x: -1, y: 15 }, { x: 0, y: 15 }, 1); assert.equal(document.pixels[240], 1);
-  const before = [...document.pixels]; strokePixels(document, { x: 15, y: 15 }, { x: 1000000, y: 15 }, 3); assert.deepEqual(document.pixels, before);
+  const changedAtEdge = strokePixels(document, { x: 15, y: 15 }, { x: 1000000, y: 15 }, 3);
+  assert.deepEqual(changedAtEdge, [255]); assert.equal(document.pixels[255], 3);
 });
 
 test('size conversion uses nearest-neighbour pixels and keeps transparent cells', () => {

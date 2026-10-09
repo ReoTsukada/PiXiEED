@@ -92,7 +92,7 @@ try {
       }
       return { button, pad: currentPad, ids: await readPointerIds() };
     };
-    const assertOnlyColor = async color => assert.ok((await pixels()).length && (await pixels()).every(p => p.rgba.join(',') === color));
+    const assertOnlyColor = async color => assert.ok((await pixels()).length && (await pixels()).every(p => p.rgba.join(',') === color), JSON.stringify(await page.evaluate(() => window.__drawAuditPointerEvents.slice(-25))));
 
     try {
       await page.goto(`${base}/draw/`, { waitUntil: 'domcontentloaded' });
@@ -153,7 +153,7 @@ try {
       await assign('right', 'pen', 4); await assign('left', 'line', 2);
       checks.push('pointercancel, Escape, and blur roll back both native sides for pen and line; fresh strokes work');
 
-      // Capture loss commits accepted samples at the last in-canvas point; one Undo restores blank.
+      // Owned mouse drawing preserves accepted samples on capture loss; normal post-up loss is idempotent.
       for (const side of ['left', 'right']) {
         const p = await pixelPoint(3, 4); await page.mouse.move(p.x, p.y); await page.mouse.down({ button: side });
         const end = await pixelPoint(8, 4); await page.mouse.move(end.x, end.y);
@@ -162,10 +162,13 @@ try {
         await page.locator('#draw-canvas').evaluate((canvas, pointerId) => canvas.releasePointerCapture(pointerId), id);
         await page.waitForTimeout(50); await nativeUp(side);
         assert.ok(await page.evaluate(state => window.__drawAuditLostCaptures.slice(state.before).some(event => event.id === state.id), { before: lostBefore, id }), `native ${side} generated lostpointercapture`);
-        assert.ok((await pixels()).some(pixel => pixel.x === 8 && pixel.y === 4), `${side} capture loss keeps last accepted sample`);
-        await undo(); await assertClean(`${side} lost capture has one undo`);
+        assert.ok((await pixels()).some(pixel => pixel.x === 8 && pixel.y === 4), `${side} capture loss preserves only accepted drawing samples`);
+        await undo(); await assertClean(`${side} capture loss has one undo`);
+        await startNative(side, [[3, 4], [8, 4]]); await nativeUp(side);
+        assert.ok((await pixels()).some(pixel => pixel.x === 8 && pixel.y === 4), `${side} normal up and implicit capture loss retain the committed stroke`);
+        await undo(); await assertClean(`${side} normal up has one undo`);
       }
-      checks.push('native lostpointercapture commits only accepted samples and one Undo restores blank');
+      checks.push('owned mouse drawing capture loss preserves accepted samples; normal up commits once and implicit capture loss is harmless');
 
       // Releasing the non-owner chord bit preserves the gesture; releasing its owner commits.
       for (const owner of ['left', 'right']) {
@@ -175,8 +178,8 @@ try {
         assert.deepEqual(await pixels(), beforeSecondaryUp, `${owner} owner survives secondary release`);
         await page.mouse.move(c.x, c.y); await page.mouse.up({ button: owner }); const committed = await pixels();
         await page.mouse.move((await pixelPoint(14, 3)).x, (await pixelPoint(14, 3)).y);
-        assert.deepEqual(await pixels(), committed, `${owner} owner release ends drawing while secondary remains held`);
-        await page.mouse.up({ button: secondary }); await assertOnlyColor(owner === 'left' ? '231,84,69,255' : '76,130,195,255'); await undo(); await assertClean('native chord Undo');
+        assert.deepEqual(await pixels(), committed, `${owner} owner release ends drawing after secondary was released`);
+        await assertOnlyColor(owner === 'left' ? '231,84,69,255' : '76,130,195,255'); await undo(); await assertClean('native chord Undo');
       }
       checks.push('native left/right chords keep first side as owner through secondary release; remaining side cannot continue');
 
@@ -266,16 +269,18 @@ try {
       }
       checks.push('virtual-mode native left/right mouse capture loss generates browser lostpointercapture and rolls back');
 
-      // Captured pad movement outside the board pauses; first re-entry anchors, subsequent movement applies.
+      // Captured pad samples move the clamped cursor; reversal outside the board is immediate.
       await virtualPlace(7, 7); // Keep enough viewport headroom for the measured 7px re-entry move.
       const pad = await center('.draw-board', 51); await touch('touchStart', [pad]); const before = await page.locator('.draw-virtual-marker').boundingBox();
       const boardRect = await page.locator('.draw-board').boundingBox();
       await touch('touchMove', [{ ...pad, y: boardRect.y + boardRect.height + 20 }]);
-      assert.deepEqual(await page.locator('.draw-virtual-marker').boundingBox(), before, 'outside-board sample cannot move marker');
-      await touch('touchMove', [{ ...pad, y: pad.y + 10 }]); assert.deepEqual(await page.locator('.draw-virtual-marker').boundingBox(), before, 'first re-entry sample only anchors');
+      const outside = await page.locator('.draw-virtual-marker').boundingBox(); assert.ok(outside.y > before.y, 'outside-board sample moves marker to its clamp');
+      await touch('touchMove', [{ ...pad, y: boardRect.y + boardRect.height + 12 }]);
+      const reversed = await page.locator('.draw-virtual-marker').boundingBox(); assert.ok(Math.abs(reversed.y - outside.y + 8) < 1, 'outside reversal immediately consumes its delta');
+      await touch('touchMove', [{ ...pad, y: pad.y + 10 }]);
       await touch('touchMove', [{ ...pad, x: pad.x + 7, y: pad.y + 10 }]);
       const after = await page.locator('.draw-virtual-marker').boundingBox(); assert.ok(Math.abs(after.x - before.x - 7) < 1, JSON.stringify({ before, after, pad, boardRect, pointerIds: await readPointerIds(), moves: await page.evaluate(() => window.__drawAuditPointerMoves.slice(-8)), lost: await page.evaluate(() => window.__drawAuditLostCaptures.slice(-8)) }));
-      await touch('touchEnd', [pad]); checks.push('virtual pad pauses outside board and re-entry does not jump');
+      await touch('touchEnd', [pad]); checks.push('virtual pad follows outside deltas, reversal, and re-entry');
 
       // Layout changes cancel; switching virtual mode off commits a held virtual gesture.
       const layoutGesture = await startVirtual('left');
