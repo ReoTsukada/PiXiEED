@@ -10,6 +10,7 @@ import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shar
 import { createHomeMotion } from './home-motion.mjs?rev=20261002-gyro-360-1';
 import { stepGravitySand } from './home-sand.mjs?rev=20261002-gyro-360-1';
 import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, settleHomePlayPieces, finishHomePlayIntro, HOME_PLAY_STORAGE_KEY } from './home-play-state.mjs';
+import { createHomeAudio } from './home-audio.mjs';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced';
@@ -33,24 +34,24 @@ const C = {
   yellow: '#ffd35a', green: '#5fb36b', leaf: '#2f7a45', orange: '#f29b52', pink: '#f3a6c0', brown: '#8a5a3c',
   white: '#ffffff', grey: '#9aa6b2', purple: '#8b6ad8'
 };
+const HOME_SOUND_STOPPED_KEY = 'pixieed:home-sound-stopped:v1';
 const KEY = { k: C.ink, w: C.white, W: C.paper, r: C.red, b: C.blue, s: C.sky, y: C.yellow, g: C.green, G: C.leaf, o: C.orange, p: C.pink, n: C.brown, e: C.grey, v: C.purple };
 const sprite = (rows) => rows.map((row) => [...row].map((c) => KEY[c] ?? null));
 
-// ---------- tiny audio: one soft square-ish voice, created on the first touch ----------
-let audio = null; let soundOn = false; let audioVisible = false;
-const setAudioVisible = (visible) => { audioVisible = Boolean(visible); if (!audioVisible && audio?.state === 'running') void audio.suspend().catch(() => {}); };
+// ---------- audio: starts only from a drawing gesture or the explicit resume control ----------
+let homeAudio = null;
 const SCALE = [0, 2, 4, 7, 9]; // pentatonic: any dots sound good together
 function note(step, { length = 0.16, volume = 0.05, type = 'triangle' } = {}) {
-  if (!soundOn || !audioVisible) return;
+  if (!homeAudio?.canPlay()) return;
   try {
-    audio ??= new AudioContext();
-    if (audio.state === 'suspended') audio.resume();
+    const audio = homeAudio.context;
     const octave = Math.floor(step / SCALE.length); const degree = SCALE[((step % SCALE.length) + SCALE.length) % SCALE.length];
     const freq = 261.63 * 2 ** ((octave * 12 + degree) / 12);
     const t = audio.currentTime; const osc = audio.createOscillator(); const gain = audio.createGain();
     osc.type = type; osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, t); gain.gain.exponentialRampToValueAtTime(volume, t + 0.01); gain.gain.exponentialRampToValueAtTime(0.0001, t + length);
-    osc.connect(gain).connect(audio.destination); osc.start(t); osc.stop(t + length + 0.02);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+    osc.connect(gain).connect(homeAudio.output); osc.start(t); osc.stop(t + length + 0.02);
   } catch { /* no audio */ }
 }
 
@@ -59,17 +60,26 @@ function note(step, { length = 0.16, volume = 0.05, type = 'triangle' } = {}) {
 const INSTRUMENTS = ['ピアノ', '鉄琴', 'マリンバ', 'フルート', 'ベース', 'オルゴール', 'ドラム'];
 let noiseBuffer = null;
 function play(inst, step, { volume = 0.05 } = {}) {
-  if (!soundOn || !audioVisible) return;
+  if (!homeAudio?.canPlay()) return;
   try {
-    audio ??= new AudioContext();
-    if (audio.state === 'suspended') audio.resume();
+    const audio = homeAudio.context;
     const t = audio.currentTime;
     const octave = Math.floor(step / SCALE.length); const degree = SCALE[((step % SCALE.length) + SCALE.length) % SCALE.length];
     const f = 261.63 * 2 ** ((octave * 12 + degree) / 12);
-    const out = audio.createGain(); out.gain.value = 1; out.connect(audio.destination);
+    const out = audio.createGain(); out.gain.value = 1; out.connect(homeAudio.output);
+    let activeVoices = 0;
+    const track = (source, nodes = []) => {
+      activeVoices++;
+      source.onended = () => {
+        source.disconnect(); nodes.forEach((node) => node.disconnect());
+        if (--activeVoices === 0) out.disconnect();
+      };
+      return source;
+    };
     // one partial: frequency, wave, peak, attack, decay
     const tone = (freq, type, peak, attack, decay, from = t) => {
       const o = audio.createOscillator(); const g = audio.createGain();
+      track(o, [g]);
       o.type = type; o.frequency.value = freq;
       g.gain.setValueAtTime(0.0001, from); g.gain.exponentialRampToValueAtTime(peak, from + attack); g.gain.exponentialRampToValueAtTime(0.0001, from + attack + decay);
       o.connect(g).connect(out); o.start(from); o.stop(from + attack + decay + 0.05); return o;
@@ -79,6 +89,7 @@ function play(inst, step, { volume = 0.05 } = {}) {
       const src = audio.createBufferSource(); src.buffer = noiseBuffer;
       const filter = audio.createBiquadFilter(); filter.type = filterType; filter.frequency.value = freq;
       const g = audio.createGain(); g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      track(src, [filter, g]);
       src.connect(filter).connect(g).connect(out); src.start(t); src.stop(t + decay + 0.05);
     };
     switch (inst) {
@@ -90,12 +101,12 @@ function play(inst, step, { volume = 0.05 } = {}) {
         tone(f / 2, 'sine', volume * 1.3, 0.003, 0.32); tone(f * 2, 'sine', volume * 0.35, 0.002, 0.06); break;
       case 3: { // フルート: breathy, soft start, a little vibrato
         const o = tone(f * 2, 'sine', volume * 0.9, 0.06, 0.38);
-        const lfo = audio.createOscillator(); const depth = audio.createGain(); lfo.frequency.value = 5.5; depth.gain.value = f * 0.012;
+        const lfo = audio.createOscillator(); const depth = audio.createGain(); track(lfo, [depth]); lfo.frequency.value = 5.5; depth.gain.value = f * 0.012;
         lfo.connect(depth).connect(o.frequency); lfo.start(t); lfo.stop(t + 0.5);
         noise('bandpass', f * 2, volume * 0.12, 0.12); break;
       }
       case 4: { // ベース: a low saw through a closing filter
-        const o = audio.createOscillator(); const filter = audio.createBiquadFilter(); const g = audio.createGain();
+        const o = audio.createOscillator(); const filter = audio.createBiquadFilter(); const g = audio.createGain(); track(o, [filter, g]);
         o.type = 'sawtooth'; o.frequency.value = f / 4; filter.type = 'lowpass'; filter.Q.value = 6;
         filter.frequency.setValueAtTime(900, t); filter.frequency.exponentialRampToValueAtTime(160, t + 0.3);
         g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(volume * 1.6, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
@@ -105,7 +116,7 @@ function play(inst, step, { volume = 0.05 } = {}) {
         tone(f * 4, 'sine', volume * 0.7, 0.001, 0.7); tone(f * 4 * 1.003, 'triangle', volume * 0.2, 0.001, 0.4); break;
       default: { // ドラム: height picks the drum — low = kick, middle = snare, high = hi-hat
         const kind = ((step % 3) + 3) % 3;
-        if (kind === 0) { const o = audio.createOscillator(); const g = audio.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18); g.gain.setValueAtTime(volume * 2.4, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22); o.connect(g).connect(out); o.start(t); o.stop(t + 0.25); }
+        if (kind === 0) { const o = audio.createOscillator(); const g = audio.createGain(); track(o, [g]); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18); g.gain.setValueAtTime(volume * 2.4, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22); o.connect(g).connect(out); o.start(t); o.stop(t + 0.25); }
         else if (kind === 1) { noise('bandpass', 1800, volume * 1.6, 0.16); tone(190, 'triangle', volume * 0.8, 0.001, 0.08); }
         else noise('highpass', 7000, volume * 0.9, 0.05);
       }
@@ -169,7 +180,7 @@ function hero() {
   // (older markup has neither the score nor the new hint: supply them)
   let score = document.getElementById('hpScore');
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
-  hint.innerHTML = '<span aria-hidden="true">☝</span> 文字はタップ。指で描くなら「描く」。';
+  hint.innerHTML = '<span aria-hidden="true">☝</span> 指で描けます。文字や星はタップ。';
   const colors = [C.red, C.yellow, C.green, C.sky, C.blue, C.pink, C.white];
   const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
   const RGB = colors.map(rgb); const WORD_RGB = WORD_COLORS.map(rgb);
@@ -179,13 +190,26 @@ function hero() {
   let frozen = false; let freezeTime = 0; let history = []; let historyBusy = false;
   const status = document.getElementById('hpStatus');
   const say = (message) => { if (status) status.textContent = message; };
-  const drawMode = document.getElementById('hpDrawMode'); const freezeButton = document.getElementById('hpFreeze');
-  drawMode?.setAttribute('aria-label', '描く');
+  const freezeButton = document.getElementById('hpFreeze');
+  const audioStateText = { waiting: '最初のタップで音が出ます', playing: '演奏中', stopped: '演奏停止', standby: '演奏待機', unavailable: '音を開始できません' };
+  let soundStopped = false;
+  try { soundStopped = sessionStorage.getItem(HOME_SOUND_STOPPED_KEY) === '1'; } catch { /* storage may be blocked */ }
+  homeAudio = createHomeAudio({ initialOn: !soundStopped, onChange: (state) => {
+    const output = document.getElementById('hpAudioState'); if (output) output.textContent = audioStateText[state];
+    const button = document.getElementById('hpSound');
+    button?.setAttribute('aria-pressed', String(!(homeAudio?.enabled ?? true)));
+    button?.setAttribute('data-audio-state', state);
+    const label = homeAudio?.enabled ? '演奏を停止' : '演奏を再開';
+    button?.setAttribute('aria-label', label); button?.setAttribute('title', label);
+    const text = button?.querySelector('span'); if (text) text.textContent = label;
+  } });
+  const initialAudioState = document.getElementById('hpAudioState'); if (initialAudioState) initialAudioState.textContent = audioStateText[homeAudio.state];
   const setFreezeUI = (value) => {
-    freezeButton?.setAttribute('aria-pressed', String(value)); freezeButton?.setAttribute('aria-label', value ? '絵を動かす' : '絵をとめる');
-    freezeButton?.setAttribute('title', value ? '絵を動かす' : '絵をとめる');
-    const label = freezeButton?.querySelector('span'); if (label) label.textContent = value ? '動かす' : 'とめる';
+    freezeButton?.setAttribute('aria-pressed', String(value)); freezeButton?.setAttribute('aria-label', value ? '動きを再開' : '動きを停止');
+    freezeButton?.setAttribute('title', value ? '動きを再開' : '動きを停止');
+    const label = freezeButton?.querySelector('span'); if (label) label.textContent = value ? '動きを再開' : '動きを停止';
   };
+  setFreezeUI(frozen);
   let img = null; let nightFrame = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
@@ -233,7 +257,6 @@ function hero() {
       closePalette();
       if (wasOpen) paletteToggle?.focus();
       if (pen) { pen = false; stop(); }
-      if (drawMode?.getAttribute('aria-pressed') === 'true') { drawMode.setAttribute('aria-pressed', 'false'); drawMode.setAttribute('aria-label', '描く'); stage.classList.remove('is-drawing-mode'); }
       redraw();
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.target.closest?.('input, textarea, [contenteditable], dialog[open]')) { e.preventDefault(); document.getElementById('hpUndo')?.click(); }
   });
@@ -351,7 +374,7 @@ function hero() {
     if (tx < 0) return;
     const v = sand[top * W + tx]; const height = (F - top) / F;
     play(v - 1, 2 + Math.round(height * 12), { volume: 0.035 });
-    if (animateBeat && soundOn && !reduced) beats.push({ x: tx, y: top, life: 1 });
+    if (animateBeat && homeAudio.canPlay() && !reduced) beats.push({ x: tx, y: top, life: 1 });
   }
 
   // ---- phones: screen-plane gravity follows a full turn, without a scalar angle seam ----
@@ -361,8 +384,22 @@ function hero() {
     isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
   if (typeof IntersectionObserver === 'function') {
     stageVisible = false;
-    const motionVisibility = new IntersectionObserver(([entry]) => { stageVisible = Boolean(entry?.isIntersecting); gyro.setVisible(); }, { threshold: 0 });
+    const motionVisibility = new IntersectionObserver(([entry]) => {
+      stageVisible = Boolean(entry?.isIntersecting);
+      homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
+      gyro.setVisible();
+    }, { threshold: 0 });
     motionVisibility.observe(stage);
+  } else {
+    const syncStageVisibility = () => {
+      const r = stage.getBoundingClientRect();
+      stageVisible = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+      homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
+      gyro.setVisible();
+    };
+    syncStageVisibility();
+    window.addEventListener('scroll', syncStageVisibility, { passive: true });
+    window.addEventListener('resize', syncStageVisibility, { passive: true });
   }
   function shake() {
     if (frozen || reduced) return;
@@ -512,7 +549,7 @@ function hero() {
     if (shooter) for (let i = 0; i < 10; i++) { const k = i / 10; put(shooter.x - shooter.vx * 0.03 * i, shooter.y - shooter.vy * 0.03 * i, i < 2 ? GOLD : WHITE, 1 - k); if (i === 0) for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) put(shooter.x + dx, shooter.y + dy, GOLD); }
     for (let x = 0; x < W; x++) put(x, F, WHITE, 0.07);
     // the light that plays the pile
-    if (grains && soundOn && !reduced) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
+    if (grains && homeAudio.canPlay() && !reduced) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
     for (let i = 0; i < F * W; i++) if (sand[i]) { const c = RGB[sand[i] - 1]; const o = i * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; }
     for (const b of beats) put(b.x, b.y, WHITE, b.life);
     for (const dt of dots) {
@@ -544,7 +581,6 @@ function hero() {
   function restoreSnapshot(s) {
     const restored = restoreHomePlayState(s, W, H, F); if (!restored) return;
     sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color; frozen = restored.frozen;
-    stage.classList.toggle('is-drawing-mode', Boolean(drawMode?.getAttribute('aria-pressed') === 'true'));
     setFreezeUI(frozen);
     grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); freezeTime = lastT = performance.now(); syncColors(); syncCurrentColor(); persist(); redraw();
   }
@@ -552,7 +588,6 @@ function hero() {
     try { const state = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen }); if (state) sessionStorage.setItem(HOME_PLAY_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage may be blocked */ }
   }
   document.getElementById('hpUndo')?.addEventListener('click', () => { const previous = history.pop(); if (previous) { historyBusy = true; restoreSnapshot(previous); historyBusy = false; syncUndo(); say('ひとつ戻しました'); } });
-  drawMode?.addEventListener('click', () => { const enabled = drawMode.getAttribute('aria-pressed') !== 'true'; drawMode.setAttribute('aria-pressed', String(enabled)); drawMode.setAttribute('aria-label', enabled ? '描くのをやめる' : '描く'); stage.classList.toggle('is-drawing-mode', enabled); say(enabled ? '指で描けます' : '指で画面を動かせます'); });
   freezeButton?.addEventListener('click', () => {
     if (!frozen && drawing) stop();
     remember(); frozen = !frozen;
@@ -564,15 +599,16 @@ function hero() {
     lastT = performance.now(); freezeTime = lastT; setFreezeUI(frozen); say(frozen ? '絵をとめました' : '絵を動かしました'); persist(); redraw();
   });
   const soundButton = document.getElementById('hpSound');
-  soundButton?.setAttribute('aria-pressed', 'false'); soundButton?.setAttribute('aria-label', '音を聴く');
-  const syncSoundUI = () => { soundButton?.setAttribute('aria-pressed', String(soundOn)); soundButton?.setAttribute('aria-label', soundOn ? '音を消す' : '音を聴く'); soundButton?.setAttribute('title', soundOn ? '音を消す' : '音を聴く'); const label = soundButton?.querySelector('span'); if (label) label.textContent = soundOn ? '消音' : '聴く'; };
+  soundButton?.setAttribute('aria-pressed', String(!homeAudio.enabled)); soundButton?.setAttribute('aria-label', homeAudio.enabled ? '演奏を停止' : '演奏を再開'); soundButton?.setAttribute('title', homeAudio.enabled ? '演奏を停止' : '演奏を再開'); soundButton?.setAttribute('data-audio-state', homeAudio.state);
+  const soundLabel = soundButton?.querySelector('span'); if (soundLabel) soundLabel.textContent = homeAudio.enabled ? '演奏を停止' : '演奏を再開';
   soundButton?.addEventListener('click', () => {
-    soundOn = !soundOn; syncSoundUI();
-    if (soundOn) {
-      try { audio ??= new AudioContext(); if (audio.state === 'suspended') void audio.resume(); } catch { /* no audio */ }
-      if (audioVisible) note(7);
-    } else if (audio?.state === 'running') void audio.suspend().catch(() => {});
-    say(soundOn ? '音を聴けます' : '音を消しました');
+    if (homeAudio.enabled) {
+      try { sessionStorage.setItem(HOME_SOUND_STOPPED_KEY, '1'); } catch { /* storage may be blocked */ }
+      homeAudio.stop(); say('演奏を停止しました');
+    } else {
+      try { sessionStorage.removeItem(HOME_SOUND_STOPPED_KEY); } catch { /* storage may be blocked */ }
+      void homeAudio.resumeByControl().then((resumed) => { if (resumed) note(7); }); say('演奏を再開します');
+    }
   });
   const clearDialog = document.getElementById('hpClearDialog'); const clearButton = document.getElementById('hpClear');
   const performClear = () => {
@@ -587,10 +623,9 @@ function hero() {
   });
   document.getElementById('hpClearCancel')?.addEventListener('click', () => clearDialog?.close());
   document.getElementById('hpClearConfirm')?.addEventListener('click', () => { clearDialog?.close(); performClear(); });
-  window.addEventListener('pagehide', persist);
-  document.addEventListener('visibilitychange', () => { setAudioVisible(document.visibilityState !== 'hidden' && stageVisible); lastT = performance.now(); });
-  if (typeof IntersectionObserver === 'function') new IntersectionObserver(([entry]) => { stageVisible = Boolean(entry?.isIntersecting); setAudioVisible(stageVisible && document.visibilityState !== 'hidden'); gyro.setVisible(); }).observe(stage);
-  else setAudioVisible(document.visibilityState !== 'hidden');
+  window.addEventListener('pagehide', () => { persist(); homeAudio.setVisible(false); });
+  window.addEventListener('pageshow', () => homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible));
+  document.addEventListener('visibilitychange', () => { homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible); lastT = performance.now(); });
 
   let lastInkNote = 0;
   function inkAt(x, y) {
@@ -616,17 +651,22 @@ function hero() {
   // (shooting star, cat, letter, star, or else one dot). A long still press counts as drawing a dot.
   const SLOP = 8; const TAP_MS = 400;
   let press = null;
-  const canDraw = (e) => e.pointerType !== 'touch' || drawMode?.getAttribute('aria-pressed') === 'true';
+  let audioGestureFeedback = false;
+  const activateCanvasAudio = () => {
+    void homeAudio.activateFromGesture().then((started) => {
+      if (started && !audioGestureFeedback) { audioGestureFeedback = true; note(7); }
+    });
+  };
   canvas.addEventListener('pointerdown', (e) => {
     if (press || !e.isPrimary) return;
     const { x, y } = cellOf(e); if (x < 0 || y < 0 || x >= W || y >= H) return;
     hint.classList.add('is-used');
-    if (canDraw(e)) canvas.setPointerCapture(e.pointerId);
+    if (e.isTrusted) activateCanvasAudio();
+    canvas.setPointerCapture(e.pointerId);
     press = { id: e.pointerId, cx: e.clientX, cy: e.clientY, x, y, t: performance.now() }; downAt = { x, y };
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!press || e.pointerId !== press.id) return;
-    if (!canDraw(e)) return;
     const { x, y } = cellOf(e);
     if (!drawing) {
       if (Math.hypot(e.clientX - press.cx, e.clientY - press.cy) < SLOP) return;
@@ -649,7 +689,7 @@ function hero() {
   }
   canvas.addEventListener('pointerup', (e) => {
     if (!press || e.pointerId !== press.id) return;
-    if (drawing) { stop(); persist(); } else tap(press.x, press.y, performance.now() - press.t < TAP_MS, { drawBlank: canDraw(e) });
+    if (drawing) { stop(); persist(); } else tap(press.x, press.y, performance.now() - press.t < TAP_MS);
     press = null; redraw();
   });
   canvas.addEventListener('pointercancel', (e) => { if (press && e.pointerId === press.id) { if (drawing) { cancelStroke(); persist(); } press = null; redraw(); } });
@@ -676,6 +716,7 @@ function hero() {
     const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     if (!move && e.key !== ' ' && e.key !== 'Enter') return;
     e.preventDefault(); hint.classList.add('is-used');
+    if (e.isTrusted && (e.key === ' ' || e.key === 'Enter')) activateCanvasAudio();
     cursor ??= { x: W >> 1, y: Math.floor(F * 0.7) };
     if (move) {
       cursor = { x: Math.max(0, Math.min(W - BR, cursor.x + move[0] * BR)), y: Math.max(0, Math.min(F - BR, cursor.y + move[1] * BR)) };
@@ -732,8 +773,7 @@ function hero() {
 // Toys
 // =========================================================================================================
 hero();
-const homeToys = createToolToys({ note, animate, interactive: true });
-const staticCreationToys = createToolToys({ note, animate, interactive: false });
+const homeToys = createToolToys({ note, animate, interactive: false });
 // cards that open something come first and large; the "もうすぐ" ones gather, smaller, below them
 (function groupToys() {
   const grid = document.getElementById('hpToys'); if (!grid) return;
@@ -759,8 +799,7 @@ const initializedToys = new WeakSet();
 function initializeToy(el) {
   if (initializedToys.has(el)) return;
   initializedToys.add(el);
-  const toys = el.classList.contains('hp-entry-card') ? staticCreationToys : homeToys;
-  try { toys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
+  try { homeToys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
 }
 // Cards rise in one after another as they come into view.
 const reveal = typeof IntersectionObserver === 'function' ? new IntersectionObserver((entries) => entries.forEach((entry) => {

@@ -83,11 +83,11 @@ for (const [path, key] of pages) test(`${path}: configured hidden flow-layout ad
   assert.equal((source.match(/src="\/js\/display-ads\.mjs/g) || []).length, 1);
   assert.equal((source.match(/href="\/css\/display-ads\.css/g) || []).length, 1);
   if (key === 'home') {
-    const galleryEnd = source.indexOf('</section>', source.indexOf('data-home-feed'));
-    const storesStart = source.indexOf('<section class="section section--paper-deep">');
-    assert.ok(ads[0].index > galleryEnd && ads[0].index < storesStart, 'first home slot follows the gallery and precedes stores');
-    assert.ok(!ads[0][0].includes('px-display-ad--interactive-clearance'), 'the gallery supplies the buffer from interactive toys');
-    assert.ok(ads[1].index > source.indexOf('data-home-stores') && ads[1].index < source.indexOf('</main>'));
+    const creationEnd = source.indexOf('</nav>', source.indexOf('aria-label="制作ツール"'));
+    const puzzlesStart = source.indexOf('aria-labelledby="hpPlayTitle"');
+    assert.ok(ads[0].index > creationEnd && ads[0].index < puzzlesStart, 'first home slot follows complete linked creation cards and precedes puzzles');
+    assert.ok(!ads[0][0].includes('px-display-ad--interactive-clearance'), 'the static destination cards buffer ads from the hero');
+    assert.ok(ads[1].index > source.indexOf('href="/stores/"') && ads[1].index < source.indexOf('</main>'));
   }
   if (key === 'tools') {
     assert.ok(ads[0].index > source.indexOf('data-tool-preview="game"') && ads[0].index < source.indexOf('tool-shell__head--games'));

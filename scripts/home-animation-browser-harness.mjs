@@ -51,7 +51,7 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
       }, scenario);
       await page.route('**/*', (route) => new URL(route.request().url()).origin === new URL(BASE).origin ? route.continue() : route.fulfill({ status: 200, json: [] }));
       await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => document.querySelectorAll('#hpColors button').length === 7 && document.querySelectorAll('.hp-view').length >= 9);
+      await page.waitForFunction(() => document.querySelectorAll('#hpColors button').length === 7 && document.querySelectorAll('.hp-view').length === 7);
       const count = () => page.evaluate(() => ({ ...__homePaintCounts }));
       const changedWhileVisible = async () => {
         const before = await count(); await page.waitForTimeout(500); const after = await count();
@@ -67,6 +67,7 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
       if (scenario.reduced) assert.ok(automaticFrames >= 10 && automaticFrames <= 18, `${engine}: reduced hero should paint near 30 FPS, got ${automaticFrames} frames in 500ms`);
 
       if (scenario.reduced) {
+        await page.locator('#hpPaletteToggle').click();
         await page.locator('#hpColors button').nth(4).click();
         const box = await page.locator('#hpCanvas').boundingBox();
         const x = box.x + box.width * 0.12, y = box.y + box.height * 0.45;
@@ -80,7 +81,7 @@ for (const [engine, type] of [['Chrome', chromium], ['WebKit', webkit]]) {
         });
         await page.waitForTimeout(150); const before = await blueCenter();
         await page.waitForTimeout(650); const after = await blueCenter();
-        assert.ok(before !== null && after !== null && after > before, `${engine}/${scenario.name}: released drawing must keep falling without another drag`);
+        assert.ok(before !== null && after !== null && after === before, `${engine}/${scenario.name}: reduced motion keeps the drawing visible without automatic falling`);
       }
 
       await page.evaluate(() => window.scrollTo({ top: document.querySelector('#hpToysTitle').getBoundingClientRect().top + scrollY, behavior: 'instant' }));

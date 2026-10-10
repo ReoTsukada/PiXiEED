@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home browser review fixture</title>
+<style>body{margin:0;font:12px monospace}header{position:fixed;top:0;left:0;right:0;z-index:100;background:#fff;border-bottom:1px solid #888;padding:4px}button{min-height:30px}output{display:block;white-space:pre-wrap}iframe{display:block;border:0;width:100%;height:100vh}</style>
+<header><button id="visibility">hide / show fixture</button><button id="page">pagehide / pageshow fixture</button><button id="fresh">Fresh test artwork</button><output id="metrics">Loading current home source…</output></header>
+<iframe title="Current home under review"></iframe>
+<script>
+// Test instrumentation only. The production build excludes tests/.
+async function boot() {
+  const mode = new URLSearchParams(location.search).get('mode') || 'normal';
+  const probe = function (mode) {
+    const frame = parent.document.querySelector('iframe');
+    if (frame.dataset.fresh) {
+      sessionStorage.removeItem('pixieed:home-play:v1');
+      sessionStorage.removeItem('pixieed:home-sound-stopped:v1');
+      delete frame.dataset.fresh;
+    }
+    const m = window.__homeReview = { mode, frames: 0, changes: 0, checksum: 0, audioContexts: 0, resumes: 0, suspends: 0, sources: 0, rmsPeak: 0, errors: [], hidden: false, cached: false };
+    let last = null;
+    const put = CanvasRenderingContext2D.prototype.putImageData;
+    CanvasRenderingContext2D.prototype.putImageData = function(image, ...args) {
+      if (this.canvas.id === 'hpCanvas') {
+        m.frames++;
+        let hash = 0; for (let i = 0; i < image.data.length; i++) hash = (hash + image.data[i] * (i % 113)) % 1000000007;
+        if (last !== null && last !== hash) m.changes++;
+        last = m.checksum = hash;
+      }
+      return put.call(this, image, ...args);
+    };
+    if (mode === 'reduced') {
+      const original = window.matchMedia.bind(window);
+      window.matchMedia = (query) => query.includes('prefers-reduced-motion') ? { matches: true, media: query, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){} } : original(query);
+      document.documentElement.dataset.pixieedMotion = 'reduced';
+    }
+    if (mode === 'no-observer') window.IntersectionObserver = window.ResizeObserver = undefined;
+    if (mode === 'touch') for (const event of ['pointerdown','pointermove','pointerup']) addEventListener(event, e => Object.defineProperty(e, 'pointerType', {value:'touch'}), true);
+    const NativeAudio = window.AudioContext;
+    const analyzers = [];
+    if (mode === 'audio-failure') window.AudioContext = class { constructor(){ throw new Error('Intentional audio failure fixture'); } };
+    else if (NativeAudio) window.AudioContext = class extends NativeAudio {
+      constructor(...args) { super(...args); m.audioContexts++; m.context = this; }
+      resume() { m.resumes++; return super.resume(); }
+      suspend() { m.suspends++; return super.suspend(); }
+    };
+    const connect = AudioNode.prototype.connect;
+    AudioNode.prototype.connect = function(destination, ...args) {
+      if (destination === this.context.destination) {
+        const analyzer = this.context.createAnalyser(); analyzer.fftSize = 256;
+        connect.call(this, analyzer); analyzers.push(analyzer);
+      }
+      return connect.call(this, destination, ...args);
+    };
+    for (const kind of [OscillatorNode, AudioBufferSourceNode]) {
+      const start = kind.prototype.start;
+      kind.prototype.start = function(...args) { m.sources++; return start.apply(this, args); };
+    }
+    addEventListener('error', e => m.errors.push(String(e.message)));
+    addEventListener('unhandledrejection', e => m.errors.push(String(e.reason)));
+    setInterval(() => {
+      for (const analyzer of analyzers) {
+        const samples = new Float32Array(analyzer.fftSize); analyzer.getFloatTimeDomainData(samples);
+        const rms = Math.sqrt(samples.reduce((sum, v) => sum + v*v, 0) / samples.length);
+        m.rmsPeak = Math.max(m.rmsPeak, rms);
+      }
+      const c = document.querySelector('#hpCanvas'); let red = 0, redY = 0;
+      if (c?.width) { const pixels = c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+        for (let i=0;i<pixels.length;i+=4) if(pixels[i]===231&&pixels[i+1]===84&&pixels[i+2]===69){red++;redY+=Math.floor(i/4/c.width);} }
+      m.redCells = red; m.redCenterY = red ? +(redY/red).toFixed(2) : null;
+      const state = document.querySelector('#hpAudioState')?.textContent || document.querySelector('#hpSound')?.getAttribute('aria-label');
+      parent.document.querySelector('#metrics').textContent = JSON.stringify({mode,frames:m.frames,changes:m.changes,checksum:m.checksum,redCells:m.redCells,redCenterY:m.redCenterY,audioContexts:m.audioContexts,audioState:m.context?.state||'none',resumes:m.resumes,suspends:m.suspends,sources:m.sources,rmsPeak:+m.rmsPeak.toFixed(5),ui:state,hidden:m.hidden,cached:m.cached,errors:m.errors});
+    }, 250);
+  };
+  let html = await (await fetch('/index.html?review=' + Date.now(), { cache: 'no-store' })).text();
+  if (mode === 'no-ads') html = html.replace(/<script[^>]+src="[^\"]*(?:display-ads|adsense-offerwall-policy)[^\"]*"[^>]*><\/script>/g, '');
+  const injected = '<base href="/"><script>(' + probe.toString() + ')(' + JSON.stringify(mode) + ')<\/script>';
+  html = html.replace('<head>', '<head>' + injected);
+  const frame = document.querySelector('iframe'); frame.srcdoc = html;
+  document.querySelector('#fresh').onclick = () => {
+    frame.dataset.fresh = '1';
+    frame.srcdoc = html;
+  };
+  document.querySelector('#visibility').onclick = () => {
+    const win = frame.contentWindow, doc = win.document, m = win.__homeReview; m.hidden = !m.hidden;
+    Object.defineProperty(doc,'hidden',{configurable:true,get:()=>m.hidden});
+    Object.defineProperty(doc,'visibilityState',{configurable:true,get:()=>m.hidden?'hidden':'visible'});
+    doc.dispatchEvent(new win.Event('visibilitychange'));
+  };
+  document.querySelector('#page').onclick = () => {
+    const win = frame.contentWindow, m = win.__homeReview; m.cached = !m.cached;
+    win.dispatchEvent(new win.PageTransitionEvent(m.cached?'pagehide':'pageshow',{persisted:true}));
+  };
+}
+boot().catch(e => document.querySelector('#metrics').textContent = String(e));
+</script>
+</html>

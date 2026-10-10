@@ -43,7 +43,8 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     files.push(...generated.files);
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['css/event-pages.css', 'js/canonical-entry.js', 'js/event-page-analytics.mjs',
+    for (const name of ['css/event-pages.css', 'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
+      'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
       'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
       'PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html']) {
       if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);

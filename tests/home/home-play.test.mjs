@@ -8,10 +8,10 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), '
 test('home: tool cards have working toys and creation links lead the page', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs'); const toysSource = read('js/tool-toys.mjs');
   const toys = [...html.matchAll(/data-toy="([a-z]+)"/g)].map((m) => m[1]);
-  assert.ok(toys.length >= 8);
+  assert.ok(toys.length >= 7);
   for (const toy of toys) assert.match(toysSource, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
-  assert.match(source, /createToolToys\(\{ note, animate, interactive: true \}\)/, 'home uses the shared interactive previews');
-  assert.match(html, /class="hp-creation-links"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
+  assert.match(source, /createToolToys\(\{ note, animate, interactive: false \}\)/, 'linked cards use non-interactive previews');
+  assert.match(html, /class="hp-card-grid hp-create-grid"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
   assert.doesNotMatch(html, /data-toy="game"/);
   assert.match(html, /data-toy="editor" href="\/draw\/"[\s\S]*?PiXiEEDraw/);
   assert.doesNotMatch(html, /PiXiEELENS|PXDraw/);
@@ -21,7 +21,7 @@ test('home: tool cards have working toys and creation links lead the page', () =
 test('home hero: draw, let go and it drops; a full row clears; letters burst; stars can be caught', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html + source, /hpScore/);
-  assert.match(source, /文字はタップ。指で描くなら「描く」。/);
+  assert.match(source, /指で描けます。文字や星はタップ。/);
   for (const fn of ['burstLetter', 'catchStar', 'inkAt', 'release', 'invite']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
   assert.match(source, /isSolid = \(x, y\) => y >= F/, 'pieces and letters land above the colour bar');
   assert.match(source, /const stop = \(\) => \{ if \(drawing\) release\(\);/, 'the drawing drops only when the finger lifts');
@@ -29,7 +29,7 @@ test('home hero: draw, let go and it drops; a full row clears; letters burst; st
   assert.match(source, /a full row vanishes/);
 });
 
-test('home hero: a tap and a drag never mix — a stroke draws and knocks letters loose, but never catches a star', () => {
+test('home hero: pointer drawing is available immediately; a stroke draws and knocks letters loose, but never catches a star', () => {
   const source = read('js/home-play.mjs');
   assert.match(source, /const SLOP = \d+;/);
   assert.match(source, /Math\.hypot\(e\.clientX - press\.cx, e\.clientY - press\.cy\) < SLOP/);
@@ -38,7 +38,8 @@ test('home hero: a tap and a drag never mix — a stroke draws and knocks letter
   assert.match(ink, /burstLetter/, 'a stroke through the word still knocks letters loose');
   assert.doesNotMatch(ink, /catchStar|takeStar/, 'a stroke never catches a star');
   const down = source.match(/canvas\.addEventListener\('pointerdown'[\s\S]*?\n  \}\);/)[0];
-  assert.doesNotMatch(down, /burstLetter|catchStar|inkAt/, 'nothing happens on touch-down');
+  assert.match(down, /activateCanvasAudio/, 'a trusted canvas gesture activates sound');
+  assert.doesNotMatch(source, /hpDrawMode|drawMode/, 'drawing has no mode toggle');
 });
 
 test('home hero: the play leads somewhere — invitations matched to what the visitor enjoys', () => {
@@ -55,10 +56,10 @@ test('home: discovery follows the mini experience and links to published tools',
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /この先で、作品をつくる/);
   for (const path of ['/pixel-camera.html', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
-  assert.match(html, /hp-feature-card--camera/); assert.match(html, /hp-feature-card--map/); assert.match(html, /hp-compact-grid/); assert.match(html, /hp-output-card/);
-  assert.match(html, /ホームの体験はお試し。保存・編集は、制作ツールで。/);
+  assert.match(html, /hp-link-card" data-toy="camera"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card/);
+  assert.match(html, /気になるカードから、すぐにはじめられます。/);
   assert.match(source, /function groupToys\(/);
-  assert.match(html, /data-home-feed hidden/); assert.match(source, /async function feed\(/);
+  assert.match(html, /class="hp-card-grid hp-discover-grid"/);
 });
 
 test('home hero: each colour is its own instrument — drawing, landing and cleared rows all play it', () => {
@@ -111,14 +112,14 @@ test('home hero state: undo snapshots stay one operation and bounded', () => {
   assert.deepEqual(pushHomePlayHistory(history, 99), [...history.slice(1), 99]);
 });
 
-test('home hero controls expose opt-in sound, guarded clear, freeze, draw mode and undo contracts', () => {
+test('home hero controls expose gesture-gated sound, guarded clear, freeze, and undo contracts', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /id="hpPaletteToggle"[^>]*aria-expanded="false" aria-controls="hpPalette"/);
   assert.match(html, /id="hpPalette" hidden/); assert.match(html, /id="hpUndo"[^>]*disabled/);
   assert.match(html, /id="hpClearDialog"/); assert.match(html, /id="hpStatus"[^>]*aria-live="polite"/);
-  assert.match(source, /let audio = null; let soundOn = false/);
-  assert.match(source, /if \(!soundOn \|\| !audioVisible\) return/);
-  assert.match(source, /hpClearConfirm/); assert.match(source, /hpFreeze/); assert.match(source, /hpDrawMode/);
+  assert.match(source, /createHomeAudio/);
+  assert.match(source, /homeAudio\.canPlay\(\)/);
+  assert.match(source, /hpClearConfirm/); assert.match(source, /hpFreeze/); assert.doesNotMatch(source, /hpDrawMode/);
   assert.match(source, /ArrowRight.*ArrowDown/); assert.match(source, /b\.tabIndex = selected \? 0 : -1/);
   assert.match(source, /selectColor\(next\); colorBox\.children\[next\]\.focus\(\)/);
   assert.doesNotMatch(source.match(/colorBox\.addEventListener\('keydown'[\s\S]*?\n  \}\);/)[0], /\.click\(\)/);

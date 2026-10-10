@@ -13,7 +13,7 @@ const eventRoutes = ['/events/', ...eventCatalog.ids.map(id => `/events/${id}/`)
 const pages = ['/', '/output/', '/globe/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/'];
 const indexableRoutes = ['/', '/globe/', '/tools/', '/output/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/pixiee-lens/', '/about/', '/guide/', '/privacy/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
 indexableRoutes.push(...eventRoutes);
-const images = ['site', 'tools', 'draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object', 'spot-game', 'find-game', 'game', 'camera', 'telescope'];
+const images = ['site', 'tools', 'draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object', 'spot-game', 'find-game', 'game', 'camera', 'telescope', 'output', 'globe', 'events', 'stores'];
 const icons = new Map([['/favicon-96.png', 96], ['/apple-touch-icon.png', 180], ['/assets/brand/app-icon-192.png', 192], ['/assets/brand/app-icon-512.png', 512]]);
 const paths = new Map(pages.map((url) => [url, url.endsWith('/') ? `${url}index.html` : url]));
 for (const path of eventRoutes) paths.set(path, `${path}index.html`);

@@ -1,0 +1,342 @@
+{
+  "date": "2026-10-10",
+  "publication": "unpublished; no commit/push/deployment",
+  "designDirection": "Public 2f79456e simple paper/whitespace/line-icon layout retained; only a modest TAP TO START cue added at lower center as requested.",
+  "protection": {
+    "protectedFiles": 125,
+    "unexpectedChanges": 0,
+    "permittedMetadataChanges": [
+      "draw/index.html",
+      "pixel-camera.html",
+      "audio/index.html",
+      "output/index.html",
+      "jigsaw/index.html",
+      "play/spot-difference/index.html",
+      "play/hidden-object/index.html",
+      "globe/index.html",
+      "stores/index.html",
+      "events/index.html",
+      "scripts/generate-event-pages.mjs",
+      "tests/creation-suite/seo.test.mjs",
+      "events/all-in-pixel-jam-2-2026/index.html",
+      "events/asaha-mendako-tokyo-pixel-2026/index.html",
+      "events/asaha-tokyo-pixel-exhibition-2023/index.html",
+      "events/beyond-pixel-art-award-exhibition-2021/index.html",
+      "events/chateaubourg-pixel-art-workshop-2026-10-07/index.html",
+      "events/coloring-pixels-8th-anniversary-art-competition-2026/index.html",
+      "events/crosspico-nagoya-vol-3-2026/index.html",
+      "events/dfwyas-pixel-art-cube-workshop-2026-04-11/index.html",
+      "events/digital-jove-pixel-art-workshop-2026/index.html",
+      "events/doom-loophole-center-sanuki-2026/index.html",
+      "events/e-topia-kagawa-dot-art-gif-workshop-2026-10-08/index.html",
+      "events/festival-fps-pixel-art-workshop-2026/index.html",
+      "events/frosted-vibes-sapporo-2025/index.html",
+      "events/gb-pixel-art-jam-2023/index.html",
+      "events/gb-pixel-art-jam-2024/index.html",
+      "events/gb-pixel-art-jam-2025/index.html",
+      "events/gb-pixel-art-jam-2026/index.html",
+      "events/herofestival-marseille-dendrob-pixel-art-2026/index.html",
+      "events/hokkaido-comitia-24-juni-pixel-art-2026/index.html",
+      "events/honkbooks-asobanight-special-weekend-pixel-art-2026/index.html",
+      "events/ingwiller-maison-famille-pixel-art-2026-11-04/index.html",
+      "events/iwamisawa-ibox-tahara-2025/index.html",
+      "events/jumpzip-pixel-art-market-seoul-2026/index.html",
+      "events/juuni-comitia-158-pixel-art-2026/index.html",
+      "events/juuni-niigata-comitia-63-2026/index.html",
+      "events/kac-hermippe-pointless-2025/index.html",
+      "events/kac-super-nice-thankass-2025/index.html",
+      "events/kac-ultra-dope-motocross-2026/index.html",
+      "events/keisuke-katsuki-afterglows-2026/index.html",
+      "events/keisuke-katsuki-on-screen-2026/index.html",
+      "events/kyushu-pixel-marche-2024-05/index.html",
+      "events/kyushu-pixel-marche-2026/index.html",
+      "events/moertel-polaris-2026/index.html",
+      "events/moertel-spiel-2026/index.html",
+      "events/moertel-viecc-2026/index.html",
+      "events/newgrounds-pixel-day-2017/index.html",
+      "events/newgrounds-pixel-day-2018/index.html",
+      "events/newgrounds-pixel-day-2019/index.html",
+      "events/newgrounds-pixel-day-2020/index.html",
+      "events/newgrounds-pixel-day-2021/index.html",
+      "events/newgrounds-pixel-day-2022/index.html",
+      "events/newgrounds-pixel-day-2023/index.html",
+      "events/newgrounds-pixel-day-2024/index.html",
+      "events/newgrounds-pixel-day-2025/index.html",
+      "events/newgrounds-pixel-day-2026/index.html",
+      "events/noboribetsu-barrier-free-toy-expo-dot-art-2026/index.html",
+      "events/nova-fct-pixel-art-alternative-interfaces-2026/index.html",
+      "events/nrg-pixel-art-awards-2026/index.html",
+      "events/ntv-imaginarium-2023/index.html",
+      "events/pixel-art-park-2/index.html",
+      "events/pixel-art-park-3/index.html",
+      "events/pixel-art-park-4/index.html",
+      "events/pixel-art-park-5/index.html",
+      "events/pixel-art-park-6/index.html",
+      "events/pixel-art-park-9/index.html",
+      "events/pixel-deck-jam-1-2026/index.html",
+      "events/pixel-dot-party-2024/index.html",
+      "events/pixel-school-stage-2-2024/index.html",
+      "events/pixelgirls-side-b-2025/index.html",
+      "events/pixelween-2020/index.html",
+      "events/pixelween-2021/index.html",
+      "events/pixelween-2022/index.html",
+      "events/pixelween-2023/index.html",
+      "events/pixelween-2024/index.html",
+      "events/pixelween-2025/index.html",
+      "events/pixelween-2026/index.html",
+      "events/retrocon-saar-17-pixel-art-2026/index.html",
+      "events/riedisheim-en-pixel-closing-2026/index.html",
+      "events/sapporo-game-odyssey-commentator-2026/index.html",
+      "events/scratch-day-pioneiro-pixel-art-2026/index.html",
+      "events/segment-pixel-jam-2026/index.html",
+      "events/shibuya-pixel-art-2018/index.html",
+      "events/shibuya-pixel-art-2020/index.html",
+      "events/shibuya-pixel-art-2021/index.html",
+      "events/shibuya-pixel-art-2022/index.html",
+      "events/shibuya-pixel-art-2023/index.html",
+      "events/shibuya-pixel-art-2024/index.html",
+      "events/shibuya-pixel-art-2025/index.html",
+      "events/sofa-nigromante-pixel-art-talk-2026/index.html",
+      "events/summer-dot-daisakusen-2024/index.html",
+      "events/syntax-demoparty-pixel-art-2026/index.html",
+      "events/the-pixel-street-2023/index.html",
+      "events/valedkids-meieki-pixel-workshop-autumn-2026/index.html",
+      "events/villa-pelle-analog-pixel-art-2026-11-22/index.html",
+      "events/winter-dot-daisakusen-2026/index.html",
+      "events/yusuke-shigeta-continuous-discontinuous-migiwa-2026/index.html"
+    ],
+    "head": "281b2dbb96d102ebaa20febf657a66edb819a324"
+  },
+  "cards": [
+    {
+      "name": "draw",
+      "route": "draw/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "6b1373071d375f1b0309bb338991d1a8e22ce0d7538b9e74668da108a3c17453",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/draw.png",
+          "twitterImage": "https://pixieed.jp/assets/og/draw.png",
+          "alt": "PiXiEEDのロゴと「ドット絵を描く」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/draw.png",
+          "twitterImage": "https://pixieed.jp/assets/og/draw.png",
+          "alt": "PiXiEEDのロゴと「ドット絵を描く」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "camera",
+      "route": "pixel-camera.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "a88b1fa582bb5387693dbd35413111de5fae25c016e566a21cf1283a043182b6",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/camera.png",
+          "twitterImage": "https://pixieed.jp/assets/og/camera.png",
+          "alt": "PiXiEEDのロゴと「写真をドット絵に変換」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/camera.png",
+          "twitterImage": "https://pixieed.jp/assets/og/camera.png",
+          "alt": "PiXiEEDのロゴと「写真をドット絵に変換」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "audio",
+      "route": "audio/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "6d8c5c75a6813791f01d005d9be6d6107e84fa6c4d9c5d245a8f0d3be7ae825d",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/audio.png",
+          "twitterImage": "https://pixieed.jp/assets/og/audio.png",
+          "alt": "PiXiEEDのロゴと「音をつくる」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/audio.png",
+          "twitterImage": "https://pixieed.jp/assets/og/audio.png",
+          "alt": "PiXiEEDのロゴと「音をつくる」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "output",
+      "route": "output/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "2091bd1a9c92e8ca2de0d81ffb8a37ec02c1694d0622a0f4215930d5500b3e84",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/output.png",
+          "twitterImage": "https://pixieed.jp/assets/og/output.png",
+          "alt": "PiXiEEDのロゴと「画像・動画と音楽を合成」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/output.png",
+          "twitterImage": "https://pixieed.jp/assets/og/output.png",
+          "alt": "PiXiEEDのロゴと「画像・動画と音楽を合成」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "jigsaw",
+      "route": "jigsaw/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "23adf3a415d200d558fef71a5083781150a6b16bddf867ca68a2023a5b604fbe",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/jigsaw.png",
+          "twitterImage": "https://pixieed.jp/assets/og/jigsaw.png",
+          "alt": "PiXiEEDのロゴと「ジグソーパズル」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/jigsaw.png",
+          "twitterImage": "https://pixieed.jp/assets/og/jigsaw.png",
+          "alt": "PiXiEEDのロゴと「ジグソーパズル」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "spot-game",
+      "route": "play/spot-difference/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "d26978c5c403158492747d063886d8bcb147d2ba58601e3a4e176bed4ecfd585",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/spot-game.png",
+          "twitterImage": "https://pixieed.jp/assets/og/spot-game.png",
+          "alt": "PiXiEEDのロゴと「ドット絵間違い探し」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/spot-game.png",
+          "twitterImage": "https://pixieed.jp/assets/og/spot-game.png",
+          "alt": "PiXiEEDのロゴと「ドット絵間違い探し」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "find-game",
+      "route": "play/hidden-object/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "f7f607d66c1e7632fde81d8890f04b50bee1a4dd482e5e75bddc6769309ac581",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/find-game.png",
+          "twitterImage": "https://pixieed.jp/assets/og/find-game.png",
+          "alt": "PiXiEEDのロゴと「ドット絵もの探し」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/find-game.png",
+          "twitterImage": "https://pixieed.jp/assets/og/find-game.png",
+          "alt": "PiXiEEDのロゴと「ドット絵もの探し」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "globe",
+      "route": "globe/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "516ef056578e0d31c6590b21c9b476da29d4a923efd14d37ea1ccc295f13bafa",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/globe.png",
+          "twitterImage": "https://pixieed.jp/assets/og/globe.png",
+          "alt": "PiXiEEDのロゴと「世界地図で作品を探す」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/globe.png",
+          "twitterImage": "https://pixieed.jp/assets/og/globe.png",
+          "alt": "PiXiEEDのロゴと「世界地図で作品を探す」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "events",
+      "route": "events/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "26a86fbb4d0cdce35a1ecb1b4410accaebcac9e6c96356587113998b8b7b4a47",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/events.png",
+          "twitterImage": "https://pixieed.jp/assets/og/events.png",
+          "alt": "PiXiEEDのロゴと「ドット絵イベント」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/events.png",
+          "twitterImage": "https://pixieed.jp/assets/og/events.png",
+          "alt": "PiXiEEDのロゴと「ドット絵イベント」のアイコン"
+        }
+      ]
+    },
+    {
+      "name": "stores",
+      "route": "stores/index.html",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "c80a7a9f12cdb20665b2c48f5957939063b025b61dc3f2bc353ce941da51de93",
+      "checks": [
+        {
+          "location": "source",
+          "ogImage": "https://pixieed.jp/assets/og/stores.png",
+          "twitterImage": "https://pixieed.jp/assets/og/stores.png",
+          "alt": "PiXiEEDのロゴと「作品に会えるお店」のアイコン"
+        },
+        {
+          "location": "build",
+          "ogImage": "https://pixieed.jp/assets/og/stores.png",
+          "twitterImage": "https://pixieed.jp/assets/og/stores.png",
+          "alt": "PiXiEEDのロゴと「作品に会えるお店」のアイコン"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-10",
+  "designDirection": "ユーザーの最新指示に合わせ、シンプルな紙色背景・余白・通常の線画アイコンを維持。",
+  "originalDefects": [
+    "当初の未公開版では矢印・カーソルが縮小時に不明瞭で、生成元とPNGも一致していなかった。",
+    "カメラの輪郭だけが角張ったピクセル形状で、他の通常の線画アイコンと不揃いだった。",
+    "カメラの小さなフラッシュ線とレンズ、店舗の窓・入口とひさしに不要な接触があった。",
+    "出力アイコンの音符は符頭が不足していた。"
+  ],
+  "fixes": [
+    "公開旧版2f79456eのシンプルな構成に戻し、大きなCTA・矢印・作品例の装飾を除去。",
+    "10枚すべてにTAP TO STARTを中央下部へ配置（中心x600px、下余白72px）。",
+    "OGP限定のカメラを同じ紺色・1.8px・丸い線端の通常線画に統一。共有UIアイコンは変更せず。",
+    "カメラのフラッシュを短くし、店舗の窓を閉じた輪郭としてひさしから離し、入口との間隔を調整。",
+    "出力に画像と二つの符頭付き音符、イベントにカレンダー、店舗に店頭の専用アイコンを使用。",
+    "OG/Twitter画像のaltを現在のロゴ・見出し・アイコンの説明に揃えた。"
+  ],
+  "visualReview": {
+    "originalSize": [
+      1200,
+      630
+    ],
+    "reducedWidths": [
+      600,
+      300
+    ],
+    "cardsReviewed": 10,
+    "content": "最終PNGを実ピクセルで確認。文字・中央下部の案内の切れや重なりなし。各機能のアイコンを識別可能。",
+    "illustrations": "通常のSVG線画。PiXiEEDrawで実制作した作品という宣伝はしていない。",
+    "tap": "OGカード全体を押してページを開く案内。画像内の独立した実リンクではない。",
+    "finalIconChangesOnly": [
+      "camera",
+      "stores"
+    ]
+  },
+  "validation": {
+    "tests": "21/21 pass",
+    "http": "159 checks PASS; loopback only",
+    "build": "637 files, 6 puzzle pages, 86 event pages; final PNG hashes and metadata match",
+    "protection": "Existing home/content modifications protected; HEAD unchanged; no commit/push/deployment"
+  },
+  "changes": [
+    "assets/og/{draw,camera,audio,output,jigsaw,spot-game,find-game,globe,events,stores}.png",
+    "scripts/lib/tool-ogp-design.mjs",
+    "scripts/generate-site-brand-assets.mjs",
+    "tests/creation-suite/tool-ogp-design.test.mjs",
+    "96 HTML files: only OG/Twitter image alt fields",
+    "scripts/generate-event-pages.mjs: only four image alt strings",
+    "tests/creation-suite/seo.test.mjs: matching alt expectations",
+    "docs/ogp-audit-20261010/"
+  ],
+  "remaining": [
+    "未公開のため本番配信とSNSキャッシュ更新は未検証。",
+    "正規Libraryアップロード機能が実行環境で利用できず、library_file_idは未発行。迂回アップロードは行っていない。"
+  ],
+  "evidence": {
+    "overview": "PiXiEED-OGP-after.png",
+    "comparison": "comparison.png",
+    "render": "after/verification.json",
+    "metadata": "metadata-verification.json",
+    "build": "build-verification.json",
+    "tests": "tests.tap",
+    "http": "http-verification.json",
+    "library": "library-delivery.json"
+  }
+}

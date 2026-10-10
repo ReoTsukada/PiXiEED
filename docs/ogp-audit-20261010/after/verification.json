@@ -1,0 +1,603 @@
+{
+  "size": [
+    1200,
+    630
+  ],
+  "externalRequests": "blocked",
+  "sources": {
+    "scripts/lib/tool-ogp-design.mjs": "5496073f7b8a26d6828b590a7ac2df058ec4ef2a06d48787c7928bb110a3e7e7",
+    "scripts/generate-site-brand-assets.mjs": "8c02c66dba2b4b3f8a82c6e22e9c8f5b5c6bd0da198f68fdf7cd7d3b4dbc1d3a"
+  },
+  "cards": [
+    {
+      "name": "draw",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "6b1373071d375f1b0309bb338991d1a8e22ce0d7538b9e74668da108a3c17453",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 361.3125,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "audio",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "6d8c5c75a6813791f01d005d9be6d6107e84fa6c4d9c5d245a8f0d3be7ae825d",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 281.140625,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "jigsaw",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "23adf3a415d200d558fef71a5083781150a6b16bddf867ca68a2023a5b604fbe",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 361.3125,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "spot-game",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "d26978c5c403158492747d063886d8bcb147d2ba58601e3a4e176bed4ecfd585",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 439.984375,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "find-game",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "f7f607d66c1e7632fde81d8890f04b50bee1a4dd482e5e75bddc6769309ac581",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 400.640625,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "camera",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "a88b1fa582bb5387693dbd35413111de5fae25c016e566a21cf1283a043182b6",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 479.3125,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "output",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "2091bd1a9c92e8ca2de0d81ffb8a37ec02c1694d0622a0f4215930d5500b3e84",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 518.640625,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "globe",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "516ef056578e0d31c6590b21c9b476da29d4a923efd14d37ea1ccc295f13bafa",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 479.3125,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "events",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "26a86fbb4d0cdce35a1ecb1b4410accaebcac9e6c96356587113998b8b7b4a47",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 396.84375,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    },
+    {
+      "name": "stores",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "sha256": "c80a7a9f12cdb20665b2c48f5957939063b025b61dc3f2bc353ce941da51de93",
+      "bounds": [
+        {
+          "name": "eyebrow",
+          "x": 86,
+          "y": 72,
+          "right": 1114,
+          "bottom": 93.59375,
+          "overflow": false
+        },
+        {
+          "name": "brand",
+          "x": 86,
+          "y": 147.59375,
+          "right": 1114,
+          "bottom": 224.03125,
+          "overflow": false
+        },
+        {
+          "name": "title",
+          "x": 86,
+          "y": 250.03125,
+          "right": 399.5,
+          "bottom": 301.328125,
+          "overflow": false
+        },
+        {
+          "name": "tap-hint",
+          "x": 475.46875,
+          "y": 524.40625,
+          "right": 724.53125,
+          "bottom": 558,
+          "overflow": false
+        },
+        {
+          "name": "tile",
+          "x": 831,
+          "y": 158,
+          "right": 1095,
+          "bottom": 422,
+          "overflow": false
+        }
+      ],
+      "pixelGeometry": {
+        "cells": 0,
+        "invalid": [],
+        "clipped": []
+      },
+      "illustrationGeometry": {
+        "shapes": 0,
+        "clipped": []
+      }
+    }
+  ]
+}

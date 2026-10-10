@@ -5,12 +5,12 @@ import { resolve } from 'node:path';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const pages = [
-  ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'site'], ['tools/index.html', '/tools/', 'tools'], ['output/index.html', '/output/', 'site'],
+  ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'globe'], ['tools/index.html', '/tools/', 'tools'], ['output/index.html', '/output/', 'output'],
   ['draw/index.html', '/draw/', 'draw'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
   ['play/spot-difference/index.html', '/play/spot-difference/', 'spot-game'], ['play/hidden-object/index.html', '/play/hidden-object/', 'find-game'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],
   ['telescope/index.html', '/telescope/', 'telescope'], ['about/index.html', '/about/', 'site'], ['guide/index.html', '/guide/', 'site'],
-  ['privacy/index.html', '/privacy/', 'site'], ['stores/index.html', '/stores/', 'site'],
+  ['privacy/index.html', '/privacy/', 'site'], ['stores/index.html', '/stores/', 'stores'],
   ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html', 'site'], ['collection/index.html', '/collection/', 'site'],
 ];
 const sitemapExcludedPaths = new Set(['/game/', '/telescope/', '/collection/']);
@@ -24,6 +24,15 @@ const artworkLabels = {
   site: 'つくる・あそぶ・つながる', tools: '制作ツール', draw: 'ドット絵を描く', audio: '音をつくる',
   jigsaw: 'ジグソーパズル', 'spot-difference': 'まちがい探し', 'hidden-object': 'もの探し',
   'spot-game': 'ドット絵間違い探し', 'find-game': 'ドット絵もの探し', game: 'ゲームをつくる', camera: 'ドットカメラ', telescope: '天体を見つける',
+};
+const toolArtworkAlts = {
+  draw: 'PiXiEEDのロゴと「ドット絵を描く」のアイコン', camera: 'PiXiEEDのロゴと「写真をドット絵に変換」のアイコン',
+  audio: 'PiXiEEDのロゴと「音をつくる」のアイコン', output: 'PiXiEEDのロゴと「画像・動画と音楽を合成」のアイコン',
+  jigsaw: 'PiXiEEDのロゴと「ジグソーパズル」のアイコン',
+  'spot-game': 'PiXiEEDのロゴと「ドット絵間違い探し」のアイコン',
+  'find-game': 'PiXiEEDのロゴと「ドット絵もの探し」のアイコン',
+  globe: 'PiXiEEDのロゴと「世界地図で作品を探す」のアイコン',
+  stores: 'PiXiEEDのロゴと「作品に会えるお店」のアイコン',
 };
 
 function read(relativePath) { return readFileSync(resolve(root, relativePath), 'utf8'); }
@@ -63,7 +72,7 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.equal(values(head, 'property', 'og:image:type')[0], 'image/png');
     assert.equal(values(head, 'property', 'og:image:width')[0], '1200');
     assert.equal(values(head, 'property', 'og:image:height')[0], '630');
-    const expectedAlt = `PiXiEEDのロゴと「${artworkLabels[imageName]}」${imageName === 'site' ? '' : 'のアイコン'}`;
+    const expectedAlt = toolArtworkAlts[imageName] || `PiXiEEDのロゴと「${artworkLabels[imageName]}」${imageName === 'site' ? '' : 'のアイコン'}`;
     assert.equal(values(head, 'property', 'og:image:alt')[0], expectedAlt);
     assert.deepEqual(values(head, 'name', 'twitter:card'), ['summary_large_image']);
     for (const name of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image', 'twitter:image:alt']) {
@@ -77,6 +86,14 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.equal((head.match(/rel=["']canonical["']/gi) || []).length, 1);
     assert.doesNotMatch(head, /assets\/brand\/pixieed-logo.*(?:og:image|twitter:image)/i);
   }
+});
+
+test('generated event pages share the event preview image and a visual description', () => {
+  const generator = read('scripts/generate-event-pages.mjs');
+  assert.equal((generator.match(/assets\/og\/events\.png/g) || []).length, 4, 'hub and event pages set both OGP and Twitter images');
+  assert.equal((generator.match(/PiXiEEDのロゴと「ドット絵イベント」のアイコン/g) || []).length, 4, 'both image descriptions are included for hub and event pages');
+  assert.equal((generator.match(/twitter:image:alt/g) || []).length, 2, 'both templates include Twitter image descriptions');
+  assert.doesNotMatch(generator, /assets\/og\/site\.png/);
 });
 
 test('output landing describes supported capabilities and legacy work links to the private route', () => {

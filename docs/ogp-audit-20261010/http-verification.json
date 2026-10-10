@@ -1,0 +1,5 @@
+{
+  "status": "pass",
+  "checks": 159,
+  "output": "SEO HTTP fixtures: 159 checks PASS (JavaScript is not executed; loopback only).\nProduction crawling, per-puzzle OGP, and social-platform cache refresh are not tested here.\n"
+}

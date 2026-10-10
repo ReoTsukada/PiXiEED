@@ -53,9 +53,12 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
   await writeFile(join(root,'events/removed/index.html'),'obsolete');
   execFileSync('git',['add','.'],{cwd:root});
   await writeFile(join(root,'unreviewed.html'),'private experiment');
+  await mkdir(join(root,'js'));
+  await writeFile(join(root,'js/home-audio.mjs'),'export const audioReview = true;');
   const result=await buildPagesSite({root,output:join(scratch,'site')});
   assert.equal(result.eventPages,1);
   assert.match(await readFile(join(result.output,'events/verified-edition/index.html'),'utf8'),/Verified Pixel Exhibition/);
+  assert.equal(await readFile(join(result.output,'js/home-audio.mjs'),'utf8'),'export const audioReview = true;', 'the reviewed home module is present in pre-commit builds');
   const sitemap=await readFile(join(result.output,'sitemap.xml'),'utf8');
   assert.match(sitemap,/https:\/\/pixieed.jp\/events\/verified-edition\//);
   assert.doesNotMatch(sitemap,/events\/removed/);

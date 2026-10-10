@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: Pages artifact includes tracked site and generated OGP, excludes private and untracked work
+ok 1 - Pages artifact includes tracked site and generated OGP, excludes private and untracked work
+  ---
+  duration_ms: 78.009917
+  type: 'test'
+  ...
+# Subtest: Pages artifact regenerates event pages and removes stale event URLs while leaving unrelated untracked work out
+ok 2 - Pages artifact regenerates event pages and removes stale event URLs while leaving unrelated untracked work out
+  ---
+  duration_ms: 58.363
+  type: 'test'
+  ...
+# Subtest: pages carry one canonical, branded OGP and Twitter preview with the assigned artwork
+ok 3 - pages carry one canonical, branded OGP and Twitter preview with the assigned artwork
+  ---
+  duration_ms: 6.872584
+  type: 'test'
+  ...
+# Subtest: generated event pages share the event preview image and a visual description
+ok 4 - generated event pages share the event preview image and a visual description
+  ---
+  duration_ms: 0.36575
+  type: 'test'
+  ...
+# Subtest: output landing describes supported capabilities and legacy work links to the private route
+ok 5 - output landing describes supported capabilities and legacy work links to the private route
+  ---
+  duration_ms: 0.254334
+  type: 'test'
+  ...
+# Subtest: pages use the unified brand icons and app manifest
+ok 6 - pages use the unified brand icons and app manifest
+  ---
+  duration_ms: 1.020625
+  type: 'test'
+  ...
+# Subtest: sitemap lists the clean public page URLs without retired and private routes
+ok 7 - sitemap lists the clean public page URLs without retired and private routes
+  ---
+  duration_ms: 0.252
+  type: 'test'
+  ...
+# Subtest: sitemap URLs point to indexable canonical pages without redirects or temporary parameters
+ok 8 - sitemap URLs point to indexable canonical pages without redirects or temporary parameters
+  ---
+  duration_ms: 3.507542
+  type: 'test'
+  ...
+# Subtest: private output workspace is excluded from indexing and keeps only generic metadata
+ok 9 - private output workspace is excluded from indexing and keeps only generic metadata
+  ---
+  duration_ms: 0.246375
+  type: 'test'
+  ...
+# Subtest: robots.txt announces the root sitemap without blocking its public routes
+ok 10 - robots.txt announces the root sitemap without blocking its public routes
+  ---
+  duration_ms: 0.422458
+  type: 'test'
+  ...
+# Subtest: the ten cards retain the simple catalog, route titles, and established line icon keys
+ok 11 - the ten cards retain the simple catalog, route titles, and established line icon keys
+  ---
+  duration_ms: 0.737042
+  type: 'test'
+  ...
+# Subtest: markup keeps the original spacious paper card, simple title and icon tile
+ok 12 - markup keeps the original spacious paper card, simple title and icon tile
+  ---
+  duration_ms: 0.967542
+  type: 'test'
+  ...
+# Subtest: markup escapes title, alt and data URI attributes and requires both images
+ok 13 - markup escapes title, alt and data URI attributes and requires both images
+  ---
+  duration_ms: 0.249417
+  type: 'test'
+  ...
+# Subtest: indexable events have a checked source and unique, substantive dated edition
+ok 14 - indexable events have a checked source and unique, substantive dated edition
+  ---
+  duration_ms: 0.582792
+  type: 'test'
+  ...
+# Subtest: a dated record without a substantive description is not given a leaf page
+ok 15 - a dated record without a substantive description is not given a leaf page
+  ---
+  duration_ms: 0.27825
+  type: 'test'
+  ...
+# Subtest: event page discloses unknown fields, source provenance, and introduction status
+ok 16 - event page discloses unknown fields, source provenance, and introduction status
+  ---
+  duration_ms: 10.285666
+  type: 'test'
+  ...
+# Subtest: watch records are hub-only with previous-date facts and links to available history
+ok 17 - watch records are hub-only with previous-date facts and links to available history
+  ---
+  duration_ms: 0.711042
+  type: 'test'
+  ...
+# Subtest: shared-description KAI, Beppu, and LCCL entries remain hub-only with their individual facts
+ok 18 - shared-description KAI, Beppu, and LCCL entries remain hub-only with their individual facts
+  ---
+  duration_ms: 36.873917
+  type: 'test'
+  ...
+# Subtest: leaf pages use public-facing summaries where catalog descriptions contain editor notes
+ok 19 - leaf pages use public-facing summaries where catalog descriptions contain editor notes
+  ---
+  duration_ms: 1.744625
+  type: 'test'
+  ...
+# Subtest: hub has one anchor per source record and accurate record, edition, watch, and page counts
+ok 20 - hub has one anchor per source record and accurate record, edition, watch, and page counts
+  ---
+  duration_ms: 38.841875
+  type: 'test'
+  ...
+# Subtest: generated canonical pages and sitemap contain only unique leaf URLs and are repeatable
+ok 21 - generated canonical pages and sitemap contain only unique leaf URLs and are repeatable
+  ---
+  duration_ms: 191.811417
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 328.923166

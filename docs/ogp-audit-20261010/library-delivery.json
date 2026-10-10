@@ -1,0 +1,60 @@
+{
+  "status": "not_saved",
+  "reason": "The official Library upload route on this connected Mac does not expose the required upload capability.",
+  "library_file_ids": [],
+  "files": [
+    {
+      "name": "PiXiEED-OGP-before.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "PiXiEED-OGP-after.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "comparison.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "draw.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "camera.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "audio.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "output.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "jigsaw.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "spot-game.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "find-game.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "globe.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "events.png",
+      "status": "not_saved"
+    },
+    {
+      "name": "stores.png",
+      "status": "not_saved"
+    }
+  ],
+  "workaroundUsed": false
+}
