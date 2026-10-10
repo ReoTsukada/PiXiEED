@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-09T17:36:31+00:00",
+  "updatedAt": "2026-10-10T00:02:53+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -22,7 +22,7 @@
       "socialUrls": [
         "https://x.com/pixelartpark"
       ],
-      "checkedAt": "2026-10-09T17:36:31+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報",
       "officialName": "Pixel Art Park 9"
@@ -92,13 +92,13 @@
       "startDate": "2026-10-09",
       "endDate": "2026-10-11",
       "dateLabel": "2026年10月9日〜11日。itchの送信期間表示は10月9日23:00〜11日23:00（UTC）、本文規約の開始時刻は10月10日00:00（UTC）で、開始に1時間差。",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://itch.io/jam/gb-pixel-art-jam-2026",
       "description": "Game Boy用160×144・4色のドット絵を制作するアートジャム。",
       "socialTags": [
         "#gbpixelartjam"
       ],
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -116,7 +116,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -147,7 +147,7 @@
       "status": "active",
       "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -167,11 +167,11 @@
       "startDate": "2026-10-09",
       "endDate": "2026-10-11",
       "dateLabel": "2026年10月9日〜11日",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展者公式サイト",
       "description": "ピクセルアーティストStefanie Fehling本人による、新しいドット絵作品・プリント等の出展告知。Polaris全体ではなく、この作家の出展情報。",
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art"
     },
     {
@@ -1276,11 +1276,11 @@
       "startDate": "2026-08-16",
       "endDate": "2026-10-10",
       "deadlineAt": "2026-10-09T17:00:00+00:00",
-      "status": "active",
-      "dateLabel": "2026年8月16日募集告知公開（公式記事のdatePublished）。締切10月9日17:00 UTC（日本時間10月10日02:00）、結果発表10月16日。受付開始時刻は未記載。",
+      "status": "ended",
+      "dateLabel": "2026年8月16日募集告知公開（公式記事のdatePublished）。締切10月9日17:00 UTC（日本時間10月10日02:00）、受付終了。結果発表10月16日。",
       "sourceUrl": "https://www.toastielabs.co.uk/post/coloring-pixels-8th-anniversary-pixel-art-competition",
       "description": "ゲームに収録するドット絵の募集。PNG、最大300×300、100色未満が条件。告知公開日から応募締切日までを掲載。",
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "socialUrls": []
@@ -1541,7 +1541,7 @@
         "https://mag.mulhouse-alsace.fr/evenement/la-tete-dans-les-etoiles-a-la-maison-jaune-a-riedisheim-2025/"
       ],
       "description": "市の若者評議会によるPixel Artコンテスト作品と若者のモザイク作品の展示・年度企画の締めくくり。",
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "市公式イベント情報",
       "mapAreaLocation": {
@@ -1571,7 +1571,7 @@
       "status": "upcoming",
       "sourceUrl": "https://www.enelsofa.com/sofa2026/index.php?loc=acaV&page=programacion-item",
       "description": "SOFA全体ではなく、Jimmy Guazhamboによるピクセルアート制作経験・キャラクターデザイン講演。地図位置は会場Corferiasの敷地代表点で、ステージの正確な位置ではない。",
-      "checkedAt": "2026-10-08T23:58:48+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式プログラム"
     },
@@ -1641,7 +1641,7 @@
       "status": "active",
       "sourceUrl": "https://itch.io/jam/all-in-pixel-jam-2",
       "description": "Pixel-based gamesをテーマにしたオンラインゲームジャム。別企画向けに作ったゲームもPixel Art game themeに合えば提出可能と規定。締切が近い。",
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-10T00:02:53+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者公式ページ（itch.io）"
     },
@@ -3263,8 +3263,8 @@
     }
   ],
   "research": {
-    "checkedAt": "2026-10-08T23:58:48+00:00",
-    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。 2026-10-07追加確認: 韓国語/英語で開催済みイベントを補足。韓国・ソウルのJumpZipと米国テキサス州Farmers Branchのpixel-art cube workshopを公式本文で確認し追加。 2026-10-07国内作家個展調査: 香月恵介「Afterglow(s)」を開催中として追加。香月「ON-SCREEN」、重田佑介「連続と非連続の汀で」、モトクロス斉藤「ウルトラドープ」を開催実績として補足。公式会場・作家ページでpixel painting/ピクセルアートとの関係、会期、会場住所を確認。座標の確認できない会場は行政区・住所のみ。shigemi「DASHI」は作品のピクセルアート関連を確認できず対象外。 2026-10-07追加確認: CROSS PICO名古屋vol.3と名古屋ぴくせるあーと すぽっとの共同開催を主催者本文で確認し、開催済み1回を既存IDのまま更新。LivePocket可視時間11:00–17:00（Asia/Tokyo）、料金500円・中学生以下無料。会場2-Aは同建物の1-A住所表記とは別レンタル区画。Google Maps iframeのq座標を記録し、ll viewportとのずれを注記。Xプロフィール本文は取得不能、次回の確定日程は今回確認できず。 2026-10-08巡回: フランスIngwillerの11月4日開催ピクセルアート講座を公式イベントページ・公式プログラムで確認し追加。Pixel Art Park 9、GB Pixel Art Jam、Pixelweenを再確認。GB Jamは開始時刻に1時間差。香川の10月8日講座を公式本文で再確認。10月7日開催のChâteaubourg講座は公式本文で日程・内容を確認し終了済みに更新。韓国語圏・日本国内の追加候補は公式根拠を得られず、点描作品展など対象外も確認。 2026-10-09巡回: スペイン語/英語でスペインFestival FPSの11月21日Pixel Art講座を公式プログラムで確認。韓国語・中国語圏で韓国の6月個展候補を確認したが終了済みの追加余地なし。日本国内はPixel Art Park等の既存情報を再確認し新規登録なし。直近イベントの公式ページを再読し、Coloring Pixels応募締切は10月9日17:00 UTC（日本時間10月10日02:00）、GB Jamは開始時刻に1時間差、SOFA公式個別プログラムで17:00を再確認。Riedisheim、Moertel Polaris、Pixel Art Park 9、Pixelween、All In Pixel Jamの開催・締切情報に変更告知なし。SNS本文は未確認のまま。",
+    "checkedAt": "2026-10-10T00:02:53+00:00",
+    "notes": "複数エージェントで調査。公式本文を確認できたスペイン2件・ドイツ1件を追加。フランスのLEGO制作企画と作家出展は検索結果の候補段階にとどまり未登録。SNS全件取得やイベント全件網羅を保証しない。中国語・ポルトガル語など追加の検索対象は次回以降の定期調査に含める。 searchExamplesは検索方針の例であり、実行した全クエリの履歴ではない。 北海道では札幌のドット絵作家委託出展と登別の立体ドット絵共同制作の2件を公式本文で確認し追加。地域別の検索語・過去開催例・未確認候補はregionalChecksに記録。 2026-10-06巡回: 今後・開催中4件、終了済み6件を追加し、既存9件を再確認。中国語・ポルトガル語と未調査の国内7県を補完。SNS取得不能は維持。 2026-10-07追加確認: 韓国語/英語で開催済みイベントを補足。韓国・ソウルのJumpZipと米国テキサス州Farmers Branchのpixel-art cube workshopを公式本文で確認し追加。 2026-10-07国内作家個展調査: 香月恵介「Afterglow(s)」を開催中として追加。香月「ON-SCREEN」、重田佑介「連続と非連続の汀で」、モトクロス斉藤「ウルトラドープ」を開催実績として補足。公式会場・作家ページでpixel painting/ピクセルアートとの関係、会期、会場住所を確認。座標の確認できない会場は行政区・住所のみ。shigemi「DASHI」は作品のピクセルアート関連を確認できず対象外。 2026-10-07追加確認: CROSS PICO名古屋vol.3と名古屋ぴくせるあーと すぽっとの共同開催を主催者本文で確認し、開催済み1回を既存IDのまま更新。LivePocket可視時間11:00–17:00（Asia/Tokyo）、料金500円・中学生以下無料。会場2-Aは同建物の1-A住所表記とは別レンタル区画。Google Maps iframeのq座標を記録し、ll viewportとのずれを注記。Xプロフィール本文は取得不能、次回の確定日程は今回確認できず。 2026-10-08巡回: フランスIngwillerの11月4日開催ピクセルアート講座を公式イベントページ・公式プログラムで確認し追加。Pixel Art Park 9、GB Pixel Art Jam、Pixelweenを再確認。GB Jamは開始時刻に1時間差。香川の10月8日講座を公式本文で再確認。10月7日開催のChâteaubourg講座は公式本文で日程・内容を確認し終了済みに更新。韓国語圏・日本国内の追加候補は公式根拠を得られず、点描作品展など対象外も確認。 2026-10-09巡回: スペイン語/英語でスペインFestival FPSの11月21日Pixel Art講座を公式プログラムで確認。韓国語・中国語圏で韓国の6月個展候補を確認したが終了済みの追加余地なし。日本国内はPixel Art Park等の既存情報を再確認し新規登録なし。直近イベントの公式ページを再読し、Coloring Pixels応募締切は10月9日17:00 UTC（日本時間10月10日02:00）、GB Jamは開始時刻に1時間差、SOFA公式個別プログラムで17:00を再確認。Riedisheim、Moertel Polaris、Pixel Art Park 9、Pixelween、All In Pixel Jamの開催・締切情報に変更告知なし。SNS本文は未確認のまま。 2026-10-10巡回: 日本国内、東アジア/東南アジア、既知の近接イベントを公式ページで再確認。Pixel Art Park 9、Riedisheim en Pixel、Moertel Polaris、GB Pixel Art Jam、Coloring Pixels、All In Pixel Jam、Pixelween、Segment Pixel Jamは既存記録と照合。Coloring Pixelsは10月10日02:00 JSTに締切済み、PolarisとGB Jamは開催中。日本・韓国/中国語圏で新規確定なし。Segment Pixel Jamも既存IDを確認し重複追加せず。香港のモザイク体験は主催者公式根拠を確認できず未登録。公式SNS本文の未読は確認済みに扱わない。",
     "searchExamples": [
       "ドット絵 イベント 2026",
       "ピクセルアート 展示 ワークショップ 2026",
@@ -3865,6 +3865,65 @@
           }
         ],
         "notes": "スペイン公式プログラムでイベント全体20〜22日と会場、11月21日17:00〜19:00のPIXEL ART専門講座を確認。独立イベント情報は既存IDがあったため、時刻と説明の最新性を再確認。近接イベントの公式ページ本文を読み、未確認SNSとは分けて記録。"
+      },
+      {
+        "checkedAt": "2026-10-10T00:02:53+00:00",
+        "regions": [
+          "日本（東京・神奈川・福岡ほか国内候補）",
+          "ドイツ（ハンブルク）",
+          "フランス（Riedisheim）",
+          "オンライン",
+          "韓国・台湾・香港・中国・マカオ・東南アジア"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "fr",
+          "ko",
+          "zh"
+        ],
+        "queries": [
+          "ドット絵 展示 2026 10月 11月",
+          "ピクセルアート 個展 2026 日本",
+          "site:tokyopixel.shopinfo.jp 2026 ドット絵 個展",
+          "ドット絵 ワークショップ 2026 11月",
+          "2026 픽셀 아트 전시 워크숍 10월 11월",
+          "像素艺术 展览 工作坊 10月 11月 台湾 中国 香港",
+          "台灣 像素畫 工作坊 展覽",
+          "pixel art jam Asia 2026 October November Taiwan Korea",
+          "2026 pixel art deadline event October official Riedisheim Polaris"
+        ],
+        "addedIds": [],
+        "recheckedIds": [
+          "pixel-art-park-9",
+          "riedisheim-en-pixel-closing-2026",
+          "moertel-polaris-2026",
+          "gb-pixel-art-jam-2026",
+          "coloring-pixels-8th-anniversary-art-competition-2026",
+          "all-in-pixel-jam-2-2026",
+          "pixelween-2026",
+          "segment-pixel-jam-2026",
+          "kai-whos-game-room-kaohsiung-2026",
+          "keisuke-katsuki-afterglows-2026"
+        ],
+        "unconfirmed": [
+          {
+            "name": "香港のモザイクコースター体験",
+            "sourceUrl": "https://www.klook.com/zh-CN/activity/79981-lcmleather-nftmosaiccoasterworkshop-causewaybay/",
+            "reason": "販売/紹介ページは見つかったが、主催者の公式告知を確認できず。Pixel Art企画かも確定できないため未登録。"
+          },
+          {
+            "name": "shigemi個展「DASHI」",
+            "sourceUrl": "https://tokyopixel.shopinfo.jp/posts/59109718",
+            "reason": "10月16〜26日の会期・会場は確認できたが、今回の作品とPixel Artとの関係が公式本文で確認できず。"
+          },
+          {
+            "name": "cotton cat「浮き浮き猫画展」",
+            "sourceUrl": "https://artne.jp/event/3216",
+            "reason": "点描・半立体クラフトの可能性があり、Pixel Artとの関係を裏付ける主催者公式説明を確認できず。"
+          }
+        ],
+        "notes": "韓国・中国語圏の検索と国内個展/展示調査では未登録の確定イベントなし。タイムゾーンを推測せず、itch.io All In Pixel Jamの締切は公式UI表示時刻のまま扱う。"
       }
     ],
     "historyCollection": {
