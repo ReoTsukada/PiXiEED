@@ -37,15 +37,17 @@ import { resizeDrawView } from './draw-resize-view.mjs';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
-import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261007-color-selection-1';
+import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261010-lasso-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261009-pointer-selection-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261010-selection-toolbar-1';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261007-color-selection-1';
-import { selectionInputOperation, combineDrawInputSelection } from './draw-selection-input.mjs?rev=20261009-pointer-selection-1';
+import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261010-selection-handles-1';
+import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261010-pending-lasso-1';
+import { mountDrawColorAdjustmentPanel } from './draw-color-adjustment-panel.mjs?rev=20261010-features-1';
+import { mountDrawTextPanel } from './draw-text-panel.mjs?rev=20261010-features-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
@@ -104,6 +106,7 @@ let animationSession = createDrawAnimationSession(documentData), animationContro
 const trackDrawStart = createToolStartTracker('draw');
 let selection = null, selectionDrag = null, strokeWasSaved = false;
 let selectionTransform = null, selectionPreview = null, selectionPanel = null, selectionError = '';
+let featureSession = null, featurePreviewAnimation = null, featureInertSnapshot = null;
 let spriteScalePanel = null, spriteScaling = false;
 let selectionRenderRequest = 0;
 let selectionMaskCache = null, selectionMaskOwner = null;
@@ -182,6 +185,7 @@ function freezeCameraEditor() {
   cameraUnlock = () => { nodes.forEach((node, index) => { node.inert = previous[index]; }); };
 }
 async function openCamera() {
+  if (featureSession) { toast('プレビューを適用またはキャンセルしてから使ってください。'); return; }
   if (cameraOpening || scope.disposed) return;
   if (selectionTransform) { toast('選択の変形を✓で確定、×で取消してからカメラを開いてください。'); return; }
   if (colorEdit || drawingInputBusy()) { toast('現在の色編集・描画操作を終えてからカメラを開いてください。'); return; }
@@ -279,7 +283,7 @@ scope.listen(document, 'keydown', event => {
 scope.listen(window, 'pagehide', cancelCamera);
 scope.listen(document, 'visibilitychange', () => { if (document.hidden) cancelCamera(); });
 function updateControls() {
-  const busy = drawingInputBusy();
+  const busy = drawingInputBusy() || Boolean(featureSession);
   $('#draw-undo').disabled = busy || !selectionTransform && !animationSession.canUndo; $('#draw-redo').disabled = busy || Boolean(selectionTransform) || !animationSession.canRedo;
   $('#draw-undo').setAttribute('aria-disabled', String($('#draw-undo').disabled)); $('#draw-redo').setAttribute('aria-disabled', String($('#draw-redo').disabled));
   status.textContent = cameraFailureNotice && performance.now() < cameraFailureNotice.until ? cameraFailureNotice.message : saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
@@ -293,7 +297,7 @@ function syncPlaybackControl() {
   // The result view temporarily owns this control as its return action.
   if (button.hasAttribute('data-tool-result-return')) return;
   const frames = animationSession.animation.frames;
-  button.disabled = Boolean(readOnlyImage) || frames.length < 2;
+  button.disabled = Boolean(readOnlyImage || featureSession) || frames.length < 2;
   button.setAttribute('aria-pressed', String(playing));
   const label = playing ? 'アニメーションを停止' : frames.length < 2 ? '2コマ以上でアニメーションを再生できます' : 'アニメーションを再生';
   button.setAttribute('aria-label', label); button.title = label;
@@ -305,7 +309,9 @@ function paint(changed = null) {
   if (readOnlyImage) { setCanvasDimensions(); canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(readOnlyImage.rgba), readOnlyImage.width, readOnlyImage.height), 0, 0); updateControls(); return; }
   if (!canvasPrepared || canvas.width !== documentData.width || canvas.height !== documentData.height) setCanvasDimensions();
   if (selectionTransform) changed = null;
-  const display = playing ? composeAnimationFrame(animationSession.animation, playbackFrame || animationSession.frameId) : animationSession.composite(selectionPreview || documentData, changed);
+  const display = playing ? composeAnimationFrame(animationSession.animation, playbackFrame || animationSession.frameId)
+    : featurePreviewAnimation ? composeAnimationFrame(featurePreviewAnimation, animationSession.frameId)
+      : animationSession.composite(selectionPreview || documentData, changed);
   pixelSurface.paint(display.pixels, display.palette, playing ? null : changed);
   paintOnion(display);
   updateControls();
@@ -371,7 +377,7 @@ function paintOnion(display) {
   onionCanvas.getContext('2d').putImageData(new ImageData(data, display.width, display.height), 0, 0); placeOverlays();
 }
 function handleAnimationAction(action) {
-  if (cameraOpening || spriteScaling) return false;
+  if (cameraOpening || spriteScaling || featureSession) return false;
   if (action.type === 'play') return toggleAnimation();
   if (action.type === 'onion') {
     const enabled = typeof action.enabled === 'boolean' ? action.enabled : !onion;
@@ -500,6 +506,7 @@ function usedColorCount(value = documentData) {
   return colors.size;
 }
 function canEdit(value = documentData) {
+  if (featureSession) { toast('プレビューを適用またはキャンセルしてから編集できます。'); return false; }
   if (cameraOpening) return false;
   if (spriteScaling) { toast('倍率変更の確認が終わるまでお待ちください。'); return false; }
   if (playing) { toast('再生を止めると編集できます。'); return false; }
@@ -655,7 +662,7 @@ function confirmSelectionTransform() {
 function selectionPanelState() {
   const editable = !playing && !readOnlyImage && !animationSession.locked, busy = drawingInputBusy();
   const hasPixels = selectionHasPixels();
-  return { bounds: selectionFrame(), colorMode: selectedMode(lastInputSide) === 'color', pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
+  return { bounds: selectionFrame(), colorMode: selectedMode(lastInputSide) === 'color', selectTool: effectiveTool() === 'select', pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
     canCopy: Boolean(hasPixels && !selectionTransform && !playing && !readOnlyImage && !busy),
     canCut: Boolean(hasPixels && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(hasPixels && editable) };
 }
@@ -671,9 +678,11 @@ function commitSelectionDocument(next, beforeBounds, afterBounds, prepared = ani
   } finally { preparedSelectionCommit = null; }
 }
 function runSelectionAction(action, fields = {}) {
+  if (featureSession) return false;
   if (action === 'back') { setTool('select'); canvas.focus({ preventScroll: true }); return true; }
+  if (action === 'deselect') { endStroke(); return confirmAndDeselect(); }
   if (action === 'cancel') { cancelDrawingInput(); return cancelSelectionTransform(); }
-  if (action === 'confirm') { endStroke(); return confirmSelectionTransform(); }
+  if (action === 'confirm') { endStroke(); return confirmAndDeselect(); }
   if (action === 'copy' || action === 'cut') {
     if (!selection || selectionTransform || playing || readOnlyImage || action === 'cut' && animationSession.locked) return false;
     cancelDrawingInput();
@@ -717,6 +726,107 @@ function runSelectionAction(action, fields = {}) {
 }
 selectionPanel = mountDrawSelectionPanel({ scope, host: $('.draw-control-dock'), auxiliaryHost: $('.draw-input-settings'), getState: selectionPanelState, onAction: runSelectionAction,
   beforeOpen: () => { cancelDrawingInput(); $('#draw-settings-picker').open = true; placeSettingsPanel(); } });
+function featureBlockedReason() {
+  if (cameraOpening) return 'カメラを閉じてから使ってください。';
+  if (spriteScaling) return '倍率変更の確認が終わってから使ってください。';
+  if (playing) return '再生を止めてから使ってください。';
+  if (readOnlyImage) return '原本表示中は編集できません。';
+  if (animationSession.locked) return 'レイヤーの鍵を外してから使ってください。';
+  if (!evaluateSharedCanvasPolicy({ width: documentData.width, height: documentData.height, colorCount: usedColorCount() }, { passActive: true }).supported)
+    return 'キャンバスは256px・32色まで編集できます。';
+  if (selectionTransform) return '選択の変形を確定または取消してから使ってください。';
+  return '';
+}
+function featureGetState() {
+  return { document: documentData, animation: animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId,
+    selectionMask: selectionMask(), colorIndex: Math.max(0, effectiveColor()), maxPalette: 32, blockedReason: featureBlockedReason() };
+}
+function restoreFeatureInert() {
+  featureInertSnapshot?.forEach(([node, inert]) => { if (node.isConnected) node.inert = inert; });
+  featureInertSnapshot = null;
+}
+function setFeatureInert(panel) {
+  if (!featureInertSnapshot) featureInertSnapshot = [...$('#main').children].map(node => [node, node.inert]);
+  for (const node of $('#main').children) node.inert = node === panel ? false : true;
+}
+function beginDrawFeature(kind) {
+  if (featureSession) return false;
+  const reason = featureBlockedReason(); if (reason) { toast(reason); return false; }
+  endStroke(); cancelDrawingInput(); closeColorEditor(); editorUi.closePanels(); animationControls?.close?.(); selectionPanel.hide();
+  const panel = kind === 'color' ? colorAdjustmentPanel?.panel : textPanel?.panel;
+  featureSession = { kind, animation: animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId, document: documentData };
+  featurePreviewAnimation = null; selectionPreview = null;
+  if (kind === 'color' && panel) setFeatureInert(panel);
+  updateControls(); return true;
+}
+function featureSourceMatches(payload = {}) {
+  const owner = featureSession;
+  return owner && owner.animation === animationSession.animation && owner.frameId === animationSession.frameId && owner.layerId === animationSession.layerId
+    && owner.document === documentData && (!payload.sourceDocument || payload.sourceDocument === owner.document);
+}
+function featureDocumentWithinPolicy(doc) {
+  const colors = new Set(), add = value => {
+    const hex = value < 0 ? '#00000000' : doc.palette[value].toLowerCase();
+    colors.add(hex.length === 7 ? `${hex}ff` : hex);
+  };
+  for (const index of getAnimationUsedColorIndices(animationSession.animation, { excludeFrameId: animationSession.frameId, excludeLayerId: animationSession.layerId })) {
+    const hex = index < 0 ? '#00000000' : animationSession.animation.palette[index]?.toLowerCase();
+    if (hex) colors.add(hex.length === 7 ? `${hex}ff` : hex);
+  }
+  for (const index of doc.pixels) add(index);
+  return evaluateSharedCanvasPolicy({ width: doc.width, height: doc.height, colorCount: colors.size }, { passActive: true }).supported;
+}
+function previewDrawFeature(value) {
+  if (!featureSourceMatches()) return false;
+  const data = value?.document || value?.doc ? value : { document: value };
+  featurePreviewAnimation = data.animation || null;
+  selectionPreview = data.document || data.doc || (featurePreviewAnimation ? composeAnimationFrame(featurePreviewAnimation, featureSession.frameId) : null);
+  if (!selectionPreview) return false;
+  paint(); return true;
+}
+function clearDrawFeature() {
+  featureSession = null; featurePreviewAnimation = null; selectionPreview = null; restoreFeatureInert(); paint(); updateControls();
+}
+function applyDrawFeature(value) {
+  if (!featureSourceMatches(value)) return false;
+  const session = featureSession, nextDocument = value?.document || value?.doc || (Array.isArray(value?.pixels) ? value : null), nextAnimation = value?.animation || null;
+  featureSession = null;
+  try {
+    if (nextAnimation) {
+      const activeDocument = nextDocument || composeAnimationFrame(nextAnimation, session.frameId);
+      validateDrawDocument(activeDocument);
+      const colors = new Set([...getAnimationUsedColorIndices(nextAnimation)].map(index => index < 0 ? '#00000000' : nextAnimation.palette[index]?.toLowerCase()));
+      if (!evaluateSharedCanvasPolicy({ width: activeDocument.width, height: activeDocument.height, colorCount: colors.size }, { passActive: true }).supported) {
+        featureSession = session; toast('この編集は256px・32色の範囲を超えています。'); updateControls(); return false;
+      }
+      installAnimationDocument(animationSession.apply(nextAnimation, { frameId: session.frameId, layerId: session.layerId }));
+      pxdBridge?.markDirty();
+    } else {
+      validateDrawDocument(nextDocument);
+      if (!featureDocumentWithinPolicy(nextDocument)) { featureSession = session; toast('この編集は256px・32色の範囲を超えています。'); updateControls(); return false; }
+      // Validate palette and sparse animation budgets before the live history
+      // document can mutate. A rejected preview must remain safe to cancel.
+      const prepared = animationSession.prepareDocument(nextDocument);
+      preparedSelectionCommit = prepared;
+      let committed;
+      try { committed = history.commit(nextDocument); } finally { preparedSelectionCommit = null; }
+      if (!committed) { featureSession = session; updateControls(); return false; }
+      renderPalette(); showCurrentColor(); paint();
+    }
+    selectionPreview = null; featurePreviewAnimation = null; saved = false; clearDrawFeature(); toast('編集を1回で適用しました。戻す操作で元に戻せます。'); return true;
+  } catch (error) { featureSession = session; updateControls(); throw error; }
+}
+let colorAdjustmentPanel = null, textPanel = null;
+colorAdjustmentPanel = mountDrawColorAdjustmentPanel({ scope, host: $('#main'), getState: featureGetState, onBegin: beginDrawFeature,
+  onPreview: previewDrawFeature, onApply: applyDrawFeature, onCancel: clearDrawFeature, onLayout: placeOverlays });
+textPanel = mountDrawTextPanel({ scope, host: $('#main'), getState: featureGetState, onBegin: beginDrawFeature,
+  onPreview: previewDrawFeature, onApply: applyDrawFeature, onCancel: clearDrawFeature });
+const featureActions = $('.draw-feature-actions');
+if (featureActions) {
+  const textOpener = textPanel.opener || $('#main .draw-text-opener');
+  featureActions.append(colorAdjustmentPanel.opener, selectionPanel.deselectButton);
+  if (textOpener) featureActions.insertBefore(textOpener, selectionPanel.deselectButton);
+}
 function placeToolMenu() {
   const menu = $('.draw-tool-menu'), summary = $('#draw-tool-summary'); if (!menu || !summary) return;
   const r = summary.getBoundingClientRect(), header = Math.max(document.querySelector('body > .site-header')?.getBoundingClientRect().bottom || 64, document.querySelector('.project-bar')?.getBoundingClientRect().bottom || 0);
@@ -826,10 +936,10 @@ function pickColorAt(point) {
   const side = strokeBinding?.side || lastInputSide || 'left';
   chooseColor(value, button, side); setTool('pen', side); toast(value < 0 ? '透明をとりました' : 'この色をとりました');
 }
-function selectionToolLabel(mode) { return mode === 'color' ? '同じ色選択' : '四角形選択'; }
+function selectionToolLabel(mode) { return mode === 'color' ? '同じ色選択' : mode === 'lasso' ? '投げ縄選択' : '四角形選択'; }
 function selectedMode(side) { return inputSettings.bindings[side]?.selectMode || 'rectangle'; }
 function setSelectionMode(mode, side = 'left') {
-  if (!['rectangle', 'color'].includes(mode)) return false;
+  if (!['rectangle', 'color', 'lasso'].includes(mode)) return false;
   const binding = inputSettings.bindings[side];
   if (selectedMode(side) !== mode && selectionTransform) { toast('選択を変形中です。✓で確定、×で取消してから選択方式を変えてください。'); return false; }
   binding.selectMode = mode;
@@ -919,17 +1029,27 @@ function updateSelection(point, event = {}) {
     if (selectionDrag.colorPoint) return;
     selectionDrag.range = selectionBounds(lineStart, point, documentData.width, documentData.height);
     if (!selectionTransform) selection = combineDrawInputSelection(selectionDrag.bounds, selectionDrag.range, selectionDrag.operation, documentData.width, documentData.height);
+  } else if (selectionDrag?.mode === 'lasso') {
+    const points = selectionDrag.points, previous = points.at(-1), distance = Math.hypot(point.x - previous.x, point.y - previous.y);
+    if (distance > .01) points.push(point);
+    // Polygon edges are straight already; keep raw input points and cap the
+    // scanline rasterizer to a bounded amount of work on very long gestures.
+    if (points.length > 512) selectionDrag.points = [points[0], ...points.slice(1, -1).filter((_, index) => index % 2 === 0), points.at(-1)];
+    else selectionDrag.points = points;
+    const incoming = lassoDrawSelection(selectionDrag.points, documentData.width, documentData.height);
+    selection = incoming ? combineDrawInputSelection(selectionDrag.bounds, incoming, selectionDrag.operation, documentData.width, documentData.height) : selectionDrag.bounds;
   } else if (!['outside', 'flip', 'empty'].includes(selectionDrag?.mode)) selection = selectionBounds(lineStart, point, documentData.width, documentData.height);
   placeSelection();
 }
-let pendingTap = null; let pendingTapPointerId = null; let pendingTapMode = null; let pendingTapMask = 1; let pendingTapOperation = 'replace'; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
+let pendingTap = null; let pendingTapPointerId = null; let pendingTapMode = null; let pendingTapMask = 1; let pendingTapOperation = 'replace'; let pendingTapScreenOrigin = null; let pendingTapClearOutside = false; let drawingPointerId = null; let panDrag = null; let spaceHeld = false; let fingerTap = null;
 function handleCanvasPointerDown(event) {
   if (virtualCursor?.realDown(event)) return;
+  if (featureSession) return;
   if (event.button !== undefined && event.button !== 0 && event.button !== 1 && event.button !== 2) return;
   event.preventDefault(); canvas.focus({ preventScroll: true });
   if (!event.virtual) { try { canvas.setPointerCapture(event.pointerId); } catch { /* Synthetic input has no native capture. */ } }
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
+  if (event.pointerType === 'touch' && activePointers.size >= 2) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; pendingTapScreenOrigin = null; pendingTapClearOutside = false; if (fingerTap && !pinchStart) { const tail = fingerTap; fingerTap = null; startPinch(); Object.assign(pinchStart, { time: tail.time, fingers: Math.max(tail.fingers, activePointers.size), moved: tail.moved }); return; } if (pinchStart) { pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size); return; } startPinch(); return; }
   // desktop: middle button, or Space held, drags the view
   if (event.button === 1 || spaceHeld) { if (!panDrag && !drawing && !pendingTap) { panDrag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX, panY }; canvas.classList.add('is-panning'); } return; }
   if (activePointers.size > 1 || drawing || pendingTap) return;
@@ -942,10 +1062,13 @@ function handleCanvasPointerDown(event) {
   if (inputTool !== 'picker' && !canEdit()) return;
   const touchedPoint = pointFromEvent(event);
   const selectionHandle = inputTool === 'select' && selection ? selectionHandleAtEvent(event) : null;
-  const selectionOperation = selectionInputOperation(event);
+  const selectionOperation = (event.pointerType === 'touch' || event.virtual) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? 'add' : selectionInputOperation(event);
   if (inputTool === 'select' && selectedMode(side) === 'color' && !selectionTransform && !selectionHandle
       && (!selection || selectionOperation !== 'replace')) {
     lastInputSide = side; strokeBinding = binding; syncDrawingSettings(); pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'color'; pendingTapMask = binding.mask; pendingTapOperation = selectionOperation;
+    pendingTapScreenOrigin = { x: event.clientX, y: event.clientY };
+    pendingTapClearOutside = Boolean(selection && (event.pointerType === 'touch' || event.virtual)
+      && !event.ctrlKey && !event.metaKey && !event.shiftKey && !selectionMember(touchedPoint));
     return;
   }
   if (inputTool !== 'picker' && inputTool !== 'fill' && inputTool !== 'select') {
@@ -966,8 +1089,12 @@ function handleCanvasPointerDown(event) {
     const inside = selectionTransform ? selectionContains(selectionFrame(), exactSelectionPoint(event)) : selectionMember(touchedPoint);
     const hadTransform = Boolean(selectionTransform);
     const origin = exactSelectionPoint(event), screenOrigin = { x: event.clientX, y: event.clientY };
-    if (!handle && selectionOperation !== 'replace') {
-      selectionDrag = { mode: 'modify', operation: selectionOperation, origin, screenOrigin, pointerType: event.pointerType, bounds: selection, transaction: selectionTransform,
+    const gestureKind = selectionGestureKind({ selectionMode: selectedMode(side), operation: selectionOperation, handle, altKey: event.altKey });
+    if (gestureKind === 'lasso') {
+      const bounds = selectionTransform ? { ...selectionTransform.rect, mask: selectionTransform.mask(documentData.width, documentData.height) } : selection;
+      selectionDrag = { mode: 'lasso', operation: selectionOperation, bounds, transaction: selectionTransform, points: [origin], origin, screenOrigin, pointerType: event.pointerType, virtual: Boolean(event.virtual) };
+    } else if (gestureKind === 'modify') {
+      selectionDrag = { mode: 'modify', operation: selectionOperation, origin, screenOrigin, pointerType: event.pointerType, virtual: Boolean(event.virtual), bounds: selection, transaction: selectionTransform,
         ...(selectedMode(side) === 'color' ? { colorPoint: touchedPoint } : {}), range: selectionBounds(touchedPoint, touchedPoint, documentData.width, documentData.height) };
       if (!selectionTransform) selection = combineDrawInputSelection(selectionDrag.bounds, selectionDrag.range, selectionOperation, documentData.width, documentData.height);
     } else if (handle?.startsWith('flip')) {
@@ -980,7 +1107,7 @@ function handleCanvasPointerDown(event) {
       }
       selectionDrag = { mode: handle === 'pivot' ? 'pivot' : corner ? 'corner' : 'move', handle, origin, screenOrigin, bounds: { ...selection }, state,
         createdTransaction: !hadTransform, minRadius, lastBearing: Math.atan2(origin.y - state.pivot.y, origin.x - state.pivot.x), angleDelta: 0 };
-    } else if (inside) {
+    } else if (inside && event.pointerType !== 'touch' && !event.virtual) {
       selectionDrag = { mode: 'empty' };
     } else if (selection) {
       selectionDrag = { mode: 'outside', origin, screenOrigin, pointerType: event.pointerType, bounds: selection, transaction: selectionTransform };
@@ -1070,9 +1197,9 @@ function endStroke(cancel = false, releaseEvent = null) {
     if (selectionDrag.state && selectionTransform) { selectionTransform.update(selectionDrag.state); previewSelectionTransform(); }
     else if (Object.hasOwn(selectionDrag, 'bounds')) selection = selectionDrag.bounds;
   }
-  const selected = drawing && effectiveTool() === 'select' && selectionDrag?.mode === 'select' && !cancel;
+  const selected = drawing && effectiveTool() === 'select' && ['select', 'lasso'].includes(selectionDrag?.mode) && !cancel;
   drawing = false; drawingPointerId = null; previousPoint = null; lineStart = null; selectionDrag = null; strokeBinding = null; placeSelection(); if (hadBinding) syncDrawingSettings();
-  if (selected && selection) { selectionPanel.setMode('select'); toast('四隅で拡縮＋回転、二重リングで中心、↔ / ↕で反転。内側で移動、外タップで確定・解除。'); }
+  if (selected && selection) { selectionPanel.setMode('select'); toast('専用の移動ハンドルで移動、四隅で拡縮＋回転、反転ハンドルで反転。外をタップすると確定・解除。タッチドラッグで追加選択。'); }
   if (endedSelectionDrag?.createdTransaction && selectionTransform && (cancel || sameSelectionFrame(endedSelectionDrag.state, selectionTransform.state))) cancelSelectionTransform();
   if (!cancel && releaseEvent?.type === 'pointerup' && endedSelectionDrag) finishSelectionRelease(endedSelectionDrag, releaseEvent);
   updateControls();
@@ -1083,6 +1210,14 @@ function sameSelectionFrame(a, b) {
 }
 function finishSelectionRelease(drag, event) {
   const distance = Math.max(drag.maxDistance || 0, Math.hypot(event.clientX - drag.screenOrigin?.x, event.clientY - drag.screenOrigin?.y)), threshold = drag.pointerType === 'touch' ? 10 : 6;
+  if (distance <= threshold && ['modify', 'lasso'].includes(drag.mode) && (drag.operation === 'replace' || drag.pointerType === 'touch' || drag.pointerType === 'virtual' || drag.virtual)) {
+    const withinViewport = (() => { const r = $('.draw-board').getBoundingClientRect(); return event.clientX >= r.left && event.clientX < r.right && event.clientY >= r.top && event.clientY < r.bottom; })();
+    const originSelected = drag.bounds && drawSelectionMask(drag.bounds, documentData.width, documentData.height)?.[Math.floor(drag.origin.y) * documentData.width + Math.floor(drag.origin.x)];
+    if (withinViewport && drag.bounds && !originSelected) {
+      if (selectionTransform && !confirmSelectionTransform()) return;
+      clearSelection(); toast('編集を確定し、選択を解除しました。'); return;
+    }
+  }
   if (drag.mode === 'flip') {
     if (distance <= threshold && selectionHandleAtEvent(event) === drag.handle) runSelectionAction(drag.handle);
     return;
@@ -1093,6 +1228,14 @@ function finishSelectionRelease(drag, event) {
     const base = drag.transaction ? selection : drag.bounds;
     const incoming = drag.colorPoint ? selectDrawColorMask(documentData, drag.colorPoint) : drag.range;
     selection = combineDrawInputSelection(base, incoming, drag.operation, documentData.width, documentData.height);
+    selectionPanel.setMode('select'); placeSelection(); return;
+  }
+  if (drag.mode === 'lasso') {
+    if (drag.transaction && selectionTransform !== drag.transaction) return;
+    if (selectionTransform && !confirmSelectionTransform()) return;
+    const base = drag.transaction ? selection : drag.bounds;
+    selection = combineDrawLassoSelection(base, drag.points, drag.operation, documentData.width, documentData.height,
+      selectionBounds(drag.origin, drag.origin, documentData.width, documentData.height));
     selectionPanel.setMode('select'); placeSelection(); return;
   }
   if (drag.mode !== 'outside' || selectionTransform !== drag.transaction) return;
@@ -1128,15 +1271,22 @@ function releasePointer(event) {
   if (panDrag) { if (event.pointerId === panDrag.pointerId) { panDrag = null; canvas.classList.remove('is-panning'); } return; }
   if (pendingTap && event.pointerId === pendingTapPointerId) {
     const tap = pendingTap, mode = pendingTapMode, side = lastInputSide; pendingTap = null; pendingTapPointerId = null; pendingTapMode = null;
+    const clearOutside = pendingTapClearOutside && pendingTapScreenOrigin
+      && Math.hypot(event.clientX - pendingTapScreenOrigin.x, event.clientY - pendingTapScreenOrigin.y) <= (event.pointerType === 'touch' ? 10 : 6)
+      && (() => { const r = $('.draw-board').getBoundingClientRect(); return event.clientX >= r.left && event.clientX < r.right && event.clientY >= r.top && event.clientY < r.bottom; })();
+    pendingTapScreenOrigin = null; pendingTapClearOutside = false;
     if (event.type === 'pointerup' && !pinchStart && activePointers.size === 0) {
       if (mode === 'color') {
-        const selected = selectDrawColorMask(documentData, tap);
-        if (selected) { lastInputSide = side; selection = combineDrawInputSelection(selection, selected, pendingTapOperation, documentData.width, documentData.height); selectionDrag = null; selectionPanel?.setMode('select'); placeSelection(); syncDrawingSettings(); toast(`${selectionToolLabel('color')}の選択を更新しました。`); }
+        if (clearOutside && pendingTapOperation === 'add' && selection && !selectionMember(tap)) { clearSelection(); toast('編集を確定し、選択を解除しました。'); }
+        else {
+          const selected = selectDrawColorMask(documentData, tap);
+          if (selected) { lastInputSide = side; selection = combineDrawInputSelection(selection, selected, pendingTapOperation, documentData.width, documentData.height); selectionDrag = null; selectionPanel?.setMode('select'); placeSelection(); syncDrawingSettings(); toast(`${selectionToolLabel('color')}の選択を更新しました。`); }
+        }
       } else applyTap(tap);
     }
     strokeBinding = null; syncDrawingSettings(); updateControls(); return;
   }
-  if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; }
+  if (!activePointers.size) { pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; pendingTapScreenOrigin = null; pendingTapClearOutside = false; }
   if (event.type !== 'pointerup' && (pinchStart || fingerTap)) { cancelDrawingInput(); return; }
   // fingers rarely lift at the same moment: remember the gesture until the last one is up, then a quick,
   // still two-finger tap is undo and a three-finger tap is redo
@@ -1401,11 +1551,11 @@ function afterHistoryStep() {
   saved = false; const step = history.lastStep;
   if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
 }
-function undo() { if (drawingInputBusy()) return false; if (selectionTransform) { cancelDrawingInput(); return cancelSelectionTransform(); } if (!canEdit()) return false; closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
-function redo() { if (selectionTransform || drawingInputBusy() || !canEdit()) return false; closeColorEditor(); const doc = animationSession.redo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
+function undo() { if (featureSession || drawingInputBusy()) return false; if (selectionTransform) { cancelDrawingInput(); return cancelSelectionTransform(); } if (!canEdit()) return false; closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
+function redo() { if (featureSession || selectionTransform || drawingInputBusy() || !canEdit()) return false; closeColorEditor(); const doc = animationSession.redo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); return true; }
 function resetDrawingInput(cancel = true) {
   virtualCursor?.cancelInputs(cancel); if (!cancel && pendingTap && pendingTapMode !== 'color') applyTap(pendingTap);
-  pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; endStroke(cancel);
+  pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; pendingTapScreenOrigin = null; pendingTapClearOutside = false; endStroke(cancel);
   activePointers.clear(); pinchStart = null; fingerTap = null; panDrag = null; spaceHeld = false;
   canvas.classList.remove('is-panning', 'is-grab'); hideCursors();
   updateControls();
@@ -1434,6 +1584,7 @@ $('#draw-zoom-label').addEventListener('click', resetView); $('#draw-zoom-label'
 canvas.addEventListener('dblclick', (event) => { if (tool === 'picker' || tool === 'fill') return; event.preventDefault(); });
 $('#draw-clear').addEventListener('click', () => commitChange((next) => { next.pixels.fill(-1); return null; }));
 async function saveRevision() {
+  if (featureSession) { toast('プレビューを適用またはキャンセルしてから保存できます。'); return null; }
   if (scope.disposed) return null;
   if (!store && !pxdBridge?.currentProject && !pxdBridge?.heldProject) return;
   if (readOnlyImage) { await pxdBridge?.save(); if (!scope.disposed) status.textContent = '原本をそのままプロジェクトに保存しました。'; return null; }
@@ -1875,7 +2026,7 @@ function animateCommand(type, fields = {}) {
 }
 const commandHandlers = {
   'selection.copy': () => runSelectionAction('copy'), 'selection.cut': () => runSelectionAction('cut'), 'selection.paste': () => runSelectionAction('paste'),
-  'selection.confirm': confirmSelectionTransform, 'selection.operations': () => { selectionPanel.focus(); return true; },
+  'selection.confirm': confirmAndDeselect, 'selection.operations': () => { selectionPanel.focus(); return true; },
   'selection.rotateLeft': () => runSelectionAction('rotate-left'), 'selection.rotateRight': () => runSelectionAction('rotate-right'),
   'selection.flipX': () => runSelectionAction('flip-x'), 'selection.flipY': () => runSelectionAction('flip-y'),
   'selection.cancel': () => { cancelDrawingInput(); if (!cancelSelectionTransform()) clearSelection(); selectionPanel?.hide(); return true; },
@@ -1885,7 +2036,7 @@ const commandHandlers = {
   'view.zoomIn': () => { const r = canvas.getBoundingClientRect(); zoomAt(zoom * 1.5, r.left + r.width / 2, r.top + r.height / 2); return true; },
   'view.zoomOut': () => { const r = canvas.getBoundingClientRect(); zoomAt(zoom / 1.5, r.left + r.width / 2, r.top + r.height / 2); return true; },
   'pan.hold': () => { spaceHeld = true; canvas.classList.add('is-grab'); return true; },
-  'cursor.left': () => selectionTransform ? confirmSelectionTransform() : virtualCursor?.enabled ? virtualCursor.pressKeyboard('left') : selection ? (clearSelection(), true) : false,
+  'cursor.left': () => selectionTransform || selection ? confirmAndDeselect() : virtualCursor?.enabled ? virtualCursor.pressKeyboard('left') : false,
   'cursor.right': () => virtualCursor?.enabled && virtualCursor.pressKeyboard('right'),
   'cursor.moveLeft': event => keyboardMove(-1, 0, event), 'cursor.moveRight': event => keyboardMove(1, 0, event),
   'cursor.moveUp': event => keyboardMove(0, -1, event), 'cursor.moveDown': event => keyboardMove(0, 1, event),
@@ -1949,6 +2100,7 @@ for (const command of DRAW_SHORTCUT_COMMANDS) {
   if (!commandHandlers[command.id]) throw new TypeError('描画コマンドの処理がありません: ' + command.id);
 }
 function keyboardCommandEnabled(id) {
+  if (featureSession) return false;
   if (cameraOpening) return false;
   if (document.body.hasAttribute('data-tool-result-open')) return false;
   if (id === 'selection.copy') return selectionPanelState().canCopy;
@@ -1988,7 +2140,7 @@ function disposeDrawMode() {
   animationExportController?.abort();
   clearToastTimer();
   virtualCursor?.release(true); stopAnimation(); animationControls?.dispose(); if (drawing) endStroke(); clearSelection();
-  activePointers.clear(); pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; drawingPointerId = null; pinchStart = null; panDrag = null; fingerTap = null;
+  activePointers.clear(); pendingTap = null; pendingTapPointerId = null; pendingTapMode = null; pendingTapScreenOrigin = null; pendingTapClearOutside = false; drawingPointerId = null; pinchStart = null; panDrag = null; fingerTap = null;
   strokeStartPixels = null; drawing = false; previousPoint = null;
   canvas.classList.remove('is-grab', 'is-panning');
   closeColorEditor();

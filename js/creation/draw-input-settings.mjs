@@ -9,6 +9,7 @@ export function normalizeDrawInputSettings(value, palette) {
     const color = binding?.color === -1 ? -1 : matching >= 0 ? matching : Number.isInteger(binding?.color) && binding.color >= 0 && binding.color < palette.length ? binding.color : fallback;
     const normalized = { tool: DRAW_INPUT_TOOLS.includes(binding?.tool) ? binding.tool : 'pen', color };
     if (binding?.selectMode === 'color') normalized.selectMode = 'color';
+    else if (binding?.selectMode === 'lasso') normalized.selectMode = 'lasso';
     else if (binding?.selectMode === 'rectangle') normalized.selectMode = 'rectangle';
     return [side, normalized];
   }));

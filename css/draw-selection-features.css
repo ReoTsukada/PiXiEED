@@ -1,0 +1,67 @@
+/* Persistent feature row above the editor controls. It remains reachable even
+   when the selection mask is empty or the whole drawing is transparent. */
+body.creation-editor[data-page="draw"] .draw-feature-actions {
+  flex: 0 0 44px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+body[data-page="draw"] .draw-feature-actions > button {
+  position: static;
+  z-index: auto;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 4px 3px;
+  overflow-wrap: anywhere;
+  border: 1px solid #ffffff38;
+  border-radius: 11px;
+  background: #26333d;
+  color: #f3f6f7;
+  font: 700 12px/1.15 system-ui, sans-serif;
+  box-shadow: 0 2px 0 #0003;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+body[data-page="draw"] .draw-feature-actions > .draw-selection-controls__deselect {
+  border-color: #ffd35a;
+  background: #ffd35a !important;
+  color: #17232d !important;
+}
+body[data-page="draw"] .draw-feature-actions > button:focus-visible {
+  outline: 3px solid #8ecdf0;
+  outline-offset: 2px;
+}
+body[data-page="draw"] #draw-selection-controls > p { display: none; }
+body[data-page="draw"] #draw-selection-controls .draw-selection-controls__deselect { display: grid; }
+body[data-page="draw"] .draw-control-dock { max-height: min(270px, calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 194px)); }
+body[data-page="draw"] .draw-board > .draw-selection__move {
+  position: absolute;
+  z-index: 7;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 30px;
+  border: 2px solid #17232d;
+  border-radius: 8px;
+  background: #fff6d5;
+  color: #17232d;
+  box-shadow: 0 0 0 1px #fffbe9, 0 1px 5px #000b;
+  transform: translate(-50%, -50%);
+  font: 700 18px/1 system-ui;
+  pointer-events: none;
+}
+body[data-page="draw"] .draw-board > .draw-selection__move[hidden] { display: none !important; }
+body[data-page="draw"] .draw-board[data-selection-hover="move"] canvas { cursor: move; }
+@media (max-width: 560px) {
+  body[data-page="draw"] .draw-feature-actions { gap: 4px; }
+  body[data-page="draw"] .draw-feature-actions > button { font-size: 11px; }
+}

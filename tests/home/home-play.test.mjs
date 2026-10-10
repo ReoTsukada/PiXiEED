@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, settleHomePlayPieces, finishHomePlayIntro, HOME_PLAY_MAX_CELLS, HOME_PLAY_MAX_HISTORY } from '../../js/home-play-state.mjs';
+import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, finishHomePlayIntro, HOME_PLAY_MAX_CELLS, HOME_PLAY_MAX_HISTORY } from '../../js/home-play-state.mjs';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
@@ -39,6 +39,7 @@ test('home hero: pointer drawing is available immediately; a stroke draws and kn
   assert.doesNotMatch(ink, /catchStar|takeStar/, 'a stroke never catches a star');
   const down = source.match(/canvas\.addEventListener\('pointerdown'[\s\S]*?\n  \}\);/)[0];
   assert.match(down, /activateCanvasAudio/, 'a trusted canvas gesture activates sound');
+  assert.match(down, /if \(e\.isTrusted\) activateCanvasAudio\(\)/, 'audio activation runs inside the user gesture');
   assert.doesNotMatch(source, /hpDrawMode|drawMode/, 'drawing has no mode toggle');
 });
 
@@ -95,12 +96,14 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
 test('home hero state: sparse drawings remap between portrait and landscape grids and reject invalid or oversized data', () => {
   const sand = new Uint8Array(8 * 12); sand[2 * 8 + 3] = 4; sand[10 * 8 + 6] = 2;
   const ink = new Map([['4,3', { x: 4, y: 3, color: 2, born: 10 }]]);
-  const saved = captureHomePlayState({ width: 8, height: 12, floor: 11, sand, pieces: [{ cells: [{ x: 1, y: 4, v: 7 }] }], ink, color: 3, frozen: true });
+  const saved = captureHomePlayState({ width: 8, height: 12, floor: 11, sand, pieces: [{ cells: [{ x: 1, y: 4, v: 7 }] }], ink, color: 3 });
   const restored = restoreHomePlayState(saved, 12, 8, 7);
   assert.ok(restored); assert.equal(restored.sand[1 * 12 + 5], 4);
   assert.deepEqual(restored.pieces[0].cells[0], { x: 2, y: 3, v: 7 });
   assert.deepEqual([...restored.ink.values()][0], { x: 6, y: 2, color: 2, born: 0 });
-  assert.equal(restored.color, 3); assert.equal(restored.frozen, true);
+  assert.equal(restored.color, 3); assert.equal('frozen' in restored, false);
+  assert.equal('frozen' in saved, false, 'new snapshots no longer persist the old stop flag');
+  assert.equal('frozen' in restoreHomePlayState({ ...saved, frozen: true }, 12, 8, 7), false, 'legacy stopped sessions reopen with motion enabled');
   assert.equal(restoreHomePlayState({ ...saved, settled: [[NaN, 0, 2]] }, 12, 8, 7), null);
   assert.equal(restoreHomePlayState({ ...saved, pieces: Array(HOME_PLAY_MAX_CELLS + 1).fill([0, 0, 1]) }, 12, 8, 7), null);
   const dense = new Uint8Array((HOME_PLAY_MAX_CELLS + 1) * 2); dense.fill(1);
@@ -112,20 +115,24 @@ test('home hero state: undo snapshots stay one operation and bounded', () => {
   assert.deepEqual(pushHomePlayHistory(history, 99), [...history.slice(1), 99]);
 });
 
-test('home hero controls expose gesture-gated sound, guarded clear, freeze, and undo contracts', () => {
+test('home hero controls keep gesture-gated sound, guarded clear and undo without stop controls', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /id="hpPaletteToggle"[^>]*aria-expanded="false" aria-controls="hpPalette"/);
   assert.match(html, /id="hpPalette" hidden/); assert.match(html, /id="hpUndo"[^>]*disabled/);
   assert.match(html, /id="hpClearDialog"/); assert.match(html, /id="hpStatus"[^>]*aria-live="polite"/);
   assert.match(source, /createHomeAudio/);
   assert.match(source, /homeAudio\.canPlay\(\)/);
-  assert.match(source, /hpClearConfirm/); assert.match(source, /hpFreeze/); assert.doesNotMatch(source, /hpDrawMode/);
+  assert.match(source, /hpClearConfirm/); assert.doesNotMatch(source, /hpFreeze|hpSound|HOME_SOUND_STOPPED_KEY|home-sound-stopped/); assert.doesNotMatch(source, /hpDrawMode/);
   assert.match(source, /ArrowRight.*ArrowDown/); assert.match(source, /b\.tabIndex = selected \? 0 : -1/);
   assert.match(source, /selectColor\(next\); colorBox\.children\[next\]\.focus\(\)/);
   assert.doesNotMatch(source.match(/colorBox\.addEventListener\('keydown'[\s\S]*?\n  \}\);/)[0], /\.click\(\)/);
-  assert.match(source, /settleHomePlayPieces\(sand, pieces, W, H, F\)/);
-  assert.match(source, /if \(frozen \|\| reduced\) finishIntroDots\(\)/);
+  assert.match(html, /id="hpAudioState"/);
+  assert.doesNotMatch(html, /id="hpFreeze"|id="hpSound"/);
+  assert.match(source, /if \(reduced\) finishIntroDots\(\)/);
   assert.match(source, /motionPreference\.addEventListener\('change', settleReducedIntro\)/);
+  assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{ persist\(\); homeAudio\.setVisible\(false\); \}\)/);
+  assert.match(source, /window\.addEventListener\('pageshow', \(\) => homeAudio\.setVisible\(/);
+  assert.match(source, /document\.addEventListener\('visibilitychange', \(\) => \{ homeAudio\.setVisible\(/);
   assert.match(source, /HOME_PLAY_STORAGE_KEY/); assert.match(source, /pointercancel/);
 });
 
@@ -140,11 +147,7 @@ test('home state: restoring an identical grid preserves every floor-adjacent cel
   assert.deepEqual(restored.pieces[0].cells, pieces[0].cells);
 });
 
-test('home state: freezing settles moving pieces into the pile and paused intro letters become visible', () => {
-  const sand = new Uint8Array(12 * 10); sand[7 * 12 + 2] = 1;
-  const result = settleHomePlayPieces(sand, [{ cells: [{ x: 4, y: 6, v: 5 }, { x: 5, y: 6, v: 3 }] }], 12, 10, 9);
-  assert.equal(result.sand[6 * 12 + 4], 5); assert.equal(result.sand[6 * 12 + 5], 3);
-  assert.deepEqual(result.pieces, []); assert.equal(result.grains, 3);
+test('home state: reduced motion settles the intro to its static positions', () => {
   const dots = [{ state: 'intro', x: 0, y: -8, hx: 7, hy: 4, vx: 8, vy: 9 }, { state: 'free', x: 3, y: 2 }];
   assert.equal(finishHomePlayIntro(dots), dots);
   assert.deepEqual(dots[0], { state: 'home', x: 7, y: 4, hx: 7, hy: 4, vx: 0, vy: 0 });

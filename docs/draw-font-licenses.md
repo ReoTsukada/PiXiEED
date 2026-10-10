@@ -1,0 +1,10 @@
+# Draw text font licenses
+
+The text tool includes two upstream SIL Open Font License fonts. Both are loaded only when selected. If a browser cannot load a bundled font, rendering falls back to the installed generic sans family; Japanese text remains available through the device's Japanese font fallback. The generic sans, serif, and monospace choices are always available offline.
+
+| Family | Use | Binary and full license | Official upstream |
+| --- | --- | --- | --- |
+| DotGothic16 | Japanese pixel-inspired Gothic and Latin | [`DotGothic16-Regular.ttf`](../assets/fonts/DotGothic16/DotGothic16-Regular.ttf) (2,069,236 bytes; SHA-256 `3ad9af88726d42b40f7f365f0dcac785af73cf20ea6f1d5b44e57cc21150b8f1`), [`OFL.txt`](../assets/fonts/DotGothic16/OFL.txt) (4,492 bytes) | [Google Fonts upstream directory](https://github.com/google/fonts/tree/main/ofl/dotgothic16); [Fontworks project](https://github.com/fontworks-fonts/DotGothic16) |
+| Press Start 2P | Pixel-style Latin | [`PressStart2P-Regular.ttf`](../assets/fonts/PressStart2P/PressStart2P-Regular.ttf) (118,204 bytes; SHA-256 `034c77f1f05ec89421e4a63f0e3a4ca1ecf852cc6d2bf611f126f275728e017d`), [`OFL.txt`](../assets/fonts/PressStart2P/OFL.txt) (4,413 bytes) | [Google Fonts upstream directory](https://github.com/google/fonts/tree/main/ofl/pressstart2p) |
+
+The binaries and complete OFL text files were downloaded from the official Google Fonts repository's `main` branch on 2026-10-10 and are unmodified. The SHA-256 values above identify the exact font bytes in this checkout. Press Start 2P declares `Press Start 2P` as a Reserved Font Name, so do not rename or modify it. For future font updates, retain the full upstream copyright/license text and verify any Reserved Font Name conditions. A third option, Noto Sans JP, was considered but not included because its full Japanese file is significantly larger than the two focused options above. The Google Fonts repository documents that each family carries its own license file and that most families use OFL 1.1; check the chosen family's exact upstream `OFL.txt` before copying any new binary.

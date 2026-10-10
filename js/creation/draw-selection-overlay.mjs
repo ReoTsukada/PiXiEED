@@ -7,14 +7,15 @@ export function mountDrawSelectionOverlay({ scope, board, canvas, getFrame }) {
   const maskNode = doc.createElement('canvas'); maskNode.className = 'draw-selection-mask'; maskNode.setAttribute('aria-hidden', 'true'); maskNode.width = canvas.width * 4; maskNode.height = canvas.height * 4; board.append(maskNode);
   const maskContext = maskNode.getContext('2d');
   const marks = {}, nodes = [frameNode, maskNode];
-  for (const name of ['nw', 'ne', 'sw', 'se', 'pivot', 'flip-x', 'flip-y']) {
+  for (const name of ['nw', 'ne', 'sw', 'se', 'pivot', 'move', 'flip-x', 'flip-y']) {
     const mark = doc.createElement('span');
     mark.className = name.length === 2 ? 'draw-selection__corner' : `draw-selection__${name}`;
     mark.dataset.selectionControl = name;
     if (name.length === 2) mark.dataset.selectionCorner = name;
     mark.setAttribute('aria-hidden', 'true');
+    if (name === 'move') mark.textContent = '↕';
     if (name.startsWith('flip')) mark.textContent = name === 'flip-x' ? '↔' : '↕';
-    mark.title = name === 'pivot' ? '回転中心を移動（絵は動きません）' : name.startsWith('flip') ? (name === 'flip-x' ? '枠の左右を反転' : '枠の上下を反転') : '中心を基準に拡縮＋回転。Shift：90度、Alt：吸着なし';
+    mark.title = name === 'pivot' ? '回転中心を移動（絵は動きません）' : name === 'move' ? '選択した絵を移動' : name.startsWith('flip') ? (name === 'flip-x' ? '枠の左右を反転' : '枠の上下を反転') : '中心を基準に拡縮＋回転。Shift：90度、Alt：吸着なし';
     board.append(mark); marks[name] = mark; nodes.push(mark);
   }
   function layout(frame) {
@@ -23,10 +24,15 @@ export function mountDrawSelectionOverlay({ scope, board, canvas, getFrame }) {
     const logical = p => ({ x: (p.x - r.left) / sx, y: (p.y - r.top) / sy });
     const controls = { ...selectionFrameCorners(frame), pivot: frame.pivot || selectionDefaultPivot(frame) };
     const { c, s } = selectionAxes(frame.angle);
-    const edges = [[frame.width / 2, 0, s, -c], [frame.width, frame.height / 2, c, s]];
     const clamp = p => ({ x: Math.max(b.left + 23, Math.min(b.right - 23, p.x)), y: Math.max(b.top + 23, Math.min(b.bottom - 23, p.y)) });
+    const moveAnchor = screen(selectionWorldPoint(frame, frame.width / 2, 0));
+    const moveInset = 34;
+    // The move affordance stays inside the board, so a full-canvas selection
+    // still has a visible, hittable control on a touch screen.
+    controls.move = logical(clamp({ x: moveAnchor.x - s * moveInset, y: moveAnchor.y + c * moveInset }));
+    const edges = [[frame.width / 2, 0, s, -c], [frame.width, frame.height / 2, c, s]];
     let flips = edges.map(([x, y, nx, ny]) => { const a = screen(selectionWorldPoint(frame, x, y)), norm = Math.hypot(nx * sx, ny * sy); return clamp({ x: a.x + nx * sx / norm * 28, y: a.y + ny * sy / norm * 28 }); });
-    const corners = Object.values(controls).map(screen);
+    const corners = Object.values(selectionFrameCorners(frame)).map(screen);
     if (flips.some(f => corners.some(p => Math.hypot(f.x - p.x, f.y - p.y) < 42)) || Math.hypot(flips[0].x - flips[1].x, flips[0].y - flips[1].y) < 44) {
       // A small or clipped selection keeps both tap controls apart at a viewport edge.
       const rows = [b.top + 24, b.bottom - 24];

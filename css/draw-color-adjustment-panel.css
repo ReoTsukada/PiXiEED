@@ -1,0 +1,33 @@
+body[data-page="draw"] .draw-color-adjustment-open { display: grid; place-items: center; box-sizing: border-box; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border: 1px solid #ffffff38; border-radius: 10px; background: #26333d; color: #f3f6f7; font: 700 12px/1 system-ui, sans-serif; cursor: pointer; }
+body[data-page="draw"] .draw-color-adjustment-open[aria-expanded="true"] { background: #38615d; }
+body[data-page="draw"] .draw-color-adjustment { position: fixed; z-index: 1002; left: 64px; top: 50%; transform: translateY(-50%); box-sizing: border-box; width: min(360px, calc(100vw - 80px)); max-height: min(86dvh, 720px); overflow: auto; padding: 14px; border: 1px solid #ffffff26; border-radius: 16px; background: #172129; color: #edf2f3; box-shadow: 0 16px 48px #0009; font: 13px/1.45 system-ui, sans-serif; }
+body[data-page="draw"] .draw-color-adjustment[hidden] { display: none; }
+body[data-page="draw"] .draw-color-adjustment header, body[data-page="draw"] .draw-color-adjustment footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+body[data-page="draw"] .draw-color-adjustment h2 { margin: 0; font-size: 16px; }
+body[data-page="draw"] .draw-color-adjustment button { min-height: 38px; padding: 7px 13px; border: 1px solid #ffffff30; border-radius: 9px; background: #ffffff12; color: inherit; font: inherit; cursor: pointer; }
+body[data-page="draw"] .draw-color-adjustment button[data-apply] { background: #7ee0b4; border-color: #7ee0b4; color: #13221f; font-weight: 700; }
+body[data-page="draw"] .draw-color-adjustment button:disabled { opacity: .42; cursor: default; }
+body[data-page="draw"] .draw-color-adjustment__scope { display: grid; gap: 7px; margin: 9px 0 13px; padding: 8px 10px; border: 1px solid #ffffff20; border-radius: 10px; color: #b5c2c8; font-size: 12px; }
+body[data-page="draw"] .draw-color-adjustment__scope label { display: flex; align-items: center; gap: 5px; }
+body[data-page="draw"] .draw-color-adjustment__scope input { accent-color: #7ee0b4; }
+body[data-page="draw"] .draw-color-adjustment__preview { display: grid; justify-items: start; gap: 4px; margin: 6px 0 10px; color: #b5c2c8; font-size: 11px; }
+body[data-page="draw"] .draw-color-adjustment__preview canvas { display: block; max-width: 160px; max-height: 100px; border: 1px solid #ffffff38; border-radius: 4px; background-color: #ced4d7; background-image: linear-gradient(45deg, #aab3b8 25%, transparent 25%), linear-gradient(-45deg, #aab3b8 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #aab3b8 75%), linear-gradient(-45deg, transparent 75%, #aab3b8 75%); background-position: 0 0, 0 4px, 4px -4px, -4px 0; background-size: 8px 8px; image-rendering: pixelated; }
+body[data-page="draw"] .draw-color-adjustment__slider { display: grid; grid-template-columns: 92px minmax(80px, 1fr) 34px; align-items: center; gap: 8px; margin: 8px 0; }
+body[data-page="draw"] .draw-color-adjustment__slider input { width: 100%; accent-color: #7ee0b4; }
+body[data-page="draw"] .draw-color-adjustment__slider output { text-align: right; font-variant-numeric: tabular-nums; }
+body[data-page="draw"] .draw-color-adjustment__palette { display: flex; gap: 12px; margin: 12px 0; padding: 8px 10px; border: 1px solid #ffffff20; border-radius: 10px; }
+body[data-page="draw"] .draw-color-adjustment__palette legend { padding: 0 4px; color: #b5c2c8; }
+body[data-page="draw"] .draw-color-adjustment__palette label { display: flex; align-items: center; gap: 5px; }
+body[data-page="draw"] .draw-color-adjustment__palette input { accent-color: #7ee0b4; }
+body[data-page="draw"] .draw-color-adjustment__curve { display: grid; gap: 4px; }
+body[data-page="draw"] .draw-color-adjustment__curve > label { font-weight: 650; }
+body[data-page="draw"] .draw-color-adjustment__curve svg { display: block; width: min(100%, 260px); aspect-ratio: 1; margin: 0 auto; overflow: visible; border: 1px solid #ffffff2b; border-radius: 7px; background: linear-gradient(135deg, #fff2, #0002); touch-action: none; }
+body[data-page="draw"] .draw-color-adjustment__curve .grid { fill: none; stroke: #ffffff26; stroke-width: 1; }
+body[data-page="draw"] .draw-color-adjustment__curve [data-line] { fill: none; stroke: #7ee0b4; stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+body[data-page="draw"] .draw-color-adjustment__curve circle { fill: #f5fff9; stroke: #1e6658; stroke-width: 2; cursor: ns-resize; vector-effect: non-scaling-stroke; }
+body[data-page="draw"] .draw-color-adjustment__curve circle:focus-visible { stroke: #fff; stroke-width: 4; }
+body[data-page="draw"] .draw-color-adjustment__curve small { color: #b5c2c8; }
+body[data-page="draw"] .draw-color-adjustment__status { min-height: 20px; margin: 10px 0; color: #c7d5d9; font-size: 12px; }
+body[data-page="draw"] .draw-color-adjustment footer { justify-content: flex-end; }
+@media (max-width: 560px) { body[data-page="draw"] .draw-color-adjustment { left: 8px; top: auto; bottom: max(64px, env(safe-area-inset-bottom)); transform: none; width: calc(100vw - 16px); max-height: min(78dvh, 640px); } }
+@media (prefers-reduced-motion: reduce) { body[data-page="draw"] .draw-color-adjustment-open { scroll-behavior: auto; } }

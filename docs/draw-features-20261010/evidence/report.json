@@ -1,0 +1,60 @@
+{
+  "base": "http://127.0.0.1:4189",
+  "viewports": [
+    {
+      "name": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "dpr": 1
+      },
+      "checks": [
+        "fixed confirm action is reachable on empty and full-canvas masks",
+        "lasso unions disconnected masks and Shift/Control/Meta modifiers add and subtract",
+        "outside touch tap clears; outside drag adds without a modifier",
+        "color-selection touch tap outside clears after its threshold is passed",
+        "confirming a moved selection commits the pixels and clears its mask as one undoable action",
+        "touch and Shift lasso add to a pending moved polygon, with one pixel undo",
+        "virtual cursor selects lasso cells and canceled pointer restores the previous mask",
+        "offscreen raw pointer delta keeps the move pending and pinch zoom leaves artwork unchanged",
+        "exact palette change survives one-undo/redo and saved-PXD round-trip",
+        "color adjustment selection preview cancels exactly, applies once, undoes/redoes, and round-trips saved PXD",
+        "color adjustment can apply across every existing frame and layer",
+        "Japanese text system fallback, lazy font, clipping, binary edge coverage, cancel/apply, undo/redo, and saved-PXD round-trip"
+      ],
+      "pageErrors": [],
+      "consoleErrors": []
+    },
+    {
+      "name": "mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 3
+      },
+      "checks": [
+        "fixed confirm action is reachable on empty and full-canvas masks",
+        "lasso unions disconnected masks and Shift/Control/Meta modifiers add and subtract",
+        "outside touch tap clears; outside drag adds without a modifier",
+        "color-selection touch tap outside clears after its threshold is passed",
+        "confirming a moved selection commits the pixels and clears its mask as one undoable action",
+        "touch and Shift lasso add to a pending moved polygon, with one pixel undo",
+        "virtual cursor selects lasso cells and canceled pointer restores the previous mask",
+        "offscreen raw pointer delta keeps the move pending and pinch zoom leaves artwork unchanged",
+        "exact palette change survives one-undo/redo and saved-PXD round-trip",
+        "color adjustment selection preview cancels exactly, applies once, undoes/redoes, and round-trips saved PXD",
+        "color adjustment can apply across every existing frame and layer",
+        "Japanese text system fallback, lazy font, clipping, binary edge coverage, cancel/apply, undo/redo, and saved-PXD round-trip"
+      ],
+      "pageErrors": [],
+      "consoleErrors": []
+    }
+  ],
+  "status": "PARTIAL",
+  "limitations": [
+    "Headless Chromium screenshots are local browser evidence, not physical device/browser validation. External origins are blocked by the harness."
+  ],
+  "untested": [
+    "Downloadable PXD file export: current Draw project workspace has local PXD save/import but no downloadable PXD export control."
+  ]
+}

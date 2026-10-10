@@ -46,6 +46,11 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     for (const name of ['css/event-pages.css', 'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
       'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
       'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
+      'js/creation/draw-color-adjustment-panel.mjs', 'js/creation/draw-color-adjustments.mjs',
+      'js/creation/draw-text-panel.mjs', 'js/creation/draw-text.mjs',
+      'css/draw-color-adjustment-panel.css', 'css/draw-selection-features.css', 'css/draw-text-panel.css',
+      'assets/fonts/DotGothic16/DotGothic16-Regular.ttf', 'assets/fonts/DotGothic16/OFL.txt',
+      'assets/fonts/PressStart2P/PressStart2P-Regular.ttf', 'assets/fonts/PressStart2P/OFL.txt',
       'PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html']) {
       if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
     }

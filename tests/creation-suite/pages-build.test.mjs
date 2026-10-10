@@ -55,10 +55,29 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
   await writeFile(join(root,'unreviewed.html'),'private experiment');
   await mkdir(join(root,'js'));
   await writeFile(join(root,'js/home-audio.mjs'),'export const audioReview = true;');
+  await mkdir(join(root,'js/creation'), { recursive: true });
+  await mkdir(join(root,'css'), { recursive: true });
+  await mkdir(join(root,'assets/fonts/DotGothic16'), { recursive: true });
+  await mkdir(join(root,'assets/fonts/PressStart2P'), { recursive: true });
+  const drawFeatureFiles = {
+    'js/creation/draw-color-adjustment-panel.mjs': 'export const colorPanel = true;',
+    'js/creation/draw-color-adjustments.mjs': 'export const colorMath = true;',
+    'js/creation/draw-text-panel.mjs': 'export const textPanel = true;',
+    'js/creation/draw-text.mjs': 'export const textRaster = true;',
+    'css/draw-color-adjustment-panel.css': '.color-panel{}',
+    'css/draw-selection-features.css': '.selection-features{}',
+    'css/draw-text-panel.css': '.text-panel{}',
+    'assets/fonts/DotGothic16/DotGothic16-Regular.ttf': 'font-a',
+    'assets/fonts/DotGothic16/OFL.txt': 'license-a',
+    'assets/fonts/PressStart2P/PressStart2P-Regular.ttf': 'font-b',
+    'assets/fonts/PressStart2P/OFL.txt': 'license-b',
+  };
+  for (const [name, value] of Object.entries(drawFeatureFiles)) await writeFile(join(root, name), value);
   const result=await buildPagesSite({root,output:join(scratch,'site')});
   assert.equal(result.eventPages,1);
   assert.match(await readFile(join(result.output,'events/verified-edition/index.html'),'utf8'),/Verified Pixel Exhibition/);
   assert.equal(await readFile(join(result.output,'js/home-audio.mjs'),'utf8'),'export const audioReview = true;', 'the reviewed home module is present in pre-commit builds');
+  for (const [name, value] of Object.entries(drawFeatureFiles)) assert.equal(await readFile(join(result.output, name), 'utf8'), value, `${name} is included in pre-commit builds`);
   const sitemap=await readFile(join(result.output,'sitemap.xml'),'utf8');
   assert.match(sitemap,/https:\/\/pixieed.jp\/events\/verified-edition\//);
   assert.doesNotMatch(sitemap,/events\/removed/);

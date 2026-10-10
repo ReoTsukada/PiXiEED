@@ -9,7 +9,7 @@ import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=202610
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
 import { createHomeMotion } from './home-motion.mjs?rev=20261002-gyro-360-1';
 import { stepGravitySand } from './home-sand.mjs?rev=20261002-gyro-360-1';
-import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, settleHomePlayPieces, finishHomePlayIntro, HOME_PLAY_STORAGE_KEY } from './home-play-state.mjs';
+import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, finishHomePlayIntro, HOME_PLAY_STORAGE_KEY } from './home-play-state.mjs?rev=20261010-home-stop-removal-1';
 import { createHomeAudio } from './home-audio.mjs';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
@@ -34,11 +34,10 @@ const C = {
   yellow: '#ffd35a', green: '#5fb36b', leaf: '#2f7a45', orange: '#f29b52', pink: '#f3a6c0', brown: '#8a5a3c',
   white: '#ffffff', grey: '#9aa6b2', purple: '#8b6ad8'
 };
-const HOME_SOUND_STOPPED_KEY = 'pixieed:home-sound-stopped:v1';
 const KEY = { k: C.ink, w: C.white, W: C.paper, r: C.red, b: C.blue, s: C.sky, y: C.yellow, g: C.green, G: C.leaf, o: C.orange, p: C.pink, n: C.brown, e: C.grey, v: C.purple };
 const sprite = (rows) => rows.map((row) => [...row].map((c) => KEY[c] ?? null));
 
-// ---------- audio: starts only from a drawing gesture or the explicit resume control ----------
+// ---------- audio: starts only from a trusted play gesture ----------
 let homeAudio = null;
 const SCALE = [0, 2, 4, 7, 9]; // pentatonic: any dots sound good together
 function note(step, { length = 0.16, volume = 0.05, type = 'triangle' } = {}) {
@@ -187,29 +186,14 @@ function hero() {
   const NIGHT = rgb(C.night); const WHITE = [255, 255, 255]; const GOLD = rgb(C.yellow);
   const BR = 2;                   // brush: 2×2 cells
   let color = 0; let W = 108; let H = 60; let F = 60; let cell = 4; let K = 2; // F: floor row; K: cells per old 9px dot
-  let frozen = false; let freezeTime = 0; let history = []; let historyBusy = false;
+  let history = []; let historyBusy = false;
   const status = document.getElementById('hpStatus');
   const say = (message) => { if (status) status.textContent = message; };
-  const freezeButton = document.getElementById('hpFreeze');
-  const audioStateText = { waiting: '最初のタップで音が出ます', playing: '演奏中', stopped: '演奏停止', standby: '演奏待機', unavailable: '音を開始できません' };
-  let soundStopped = false;
-  try { soundStopped = sessionStorage.getItem(HOME_SOUND_STOPPED_KEY) === '1'; } catch { /* storage may be blocked */ }
-  homeAudio = createHomeAudio({ initialOn: !soundStopped, onChange: (state) => {
+  const audioStateText = { waiting: '最初のタップで音が出ます', playing: '演奏中', standby: 'タップすると音が出ます', unavailable: '音を開始できません' };
+  homeAudio = createHomeAudio({ onChange: (state) => {
     const output = document.getElementById('hpAudioState'); if (output) output.textContent = audioStateText[state];
-    const button = document.getElementById('hpSound');
-    button?.setAttribute('aria-pressed', String(!(homeAudio?.enabled ?? true)));
-    button?.setAttribute('data-audio-state', state);
-    const label = homeAudio?.enabled ? '演奏を停止' : '演奏を再開';
-    button?.setAttribute('aria-label', label); button?.setAttribute('title', label);
-    const text = button?.querySelector('span'); if (text) text.textContent = label;
   } });
   const initialAudioState = document.getElementById('hpAudioState'); if (initialAudioState) initialAudioState.textContent = audioStateText[homeAudio.state];
-  const setFreezeUI = (value) => {
-    freezeButton?.setAttribute('aria-pressed', String(value)); freezeButton?.setAttribute('aria-label', value ? '動きを再開' : '動きを停止');
-    freezeButton?.setAttribute('title', value ? '動きを再開' : '動きを停止');
-    const label = freezeButton?.querySelector('span'); if (label) label.textContent = value ? '動きを再開' : '動きを停止';
-  };
-  setFreezeUI(frozen);
   let img = null; let nightFrame = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
@@ -274,7 +258,7 @@ function hero() {
   const newStar = () => ({ x: 2 + Math.random() * (W - 4) | 0, y: 2 + Math.random() * (H * 0.55) | 0, p: Math.random() * 6.28, s: 0.6 + Math.random() * 1.4, big: Math.random() < 0.3 });
   function layout() {
     let saved = null;
-    if (sand) saved = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen });
+    if (sand) saved = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color });
     else { try { saved = JSON.parse(sessionStorage.getItem(HOME_PLAY_STORAGE_KEY) || 'null'); } catch { saved = null; } }
     const r = stage.getBoundingClientRect();
     const grid = gridFor(r); cell = grid.c; K = 9 / cell; W = grid.w; H = grid.h;
@@ -288,7 +272,7 @@ function hero() {
     F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / cell)));
     if (saved) {
       const restored = restoreHomePlayState(saved, W, H, F);
-      if (restored) { sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color; frozen = restored.frozen; setFreezeUI(frozen); grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); }
+      if (restored) { sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color; grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); }
     }
     syncColors(); syncCurrentColor();
     const wordWidth = WORD.reduce((s, ch) => s + FONT[ch][0].length + 1, -1);
@@ -306,7 +290,7 @@ function hero() {
       x0 += (FONT[ch][0].length + 1) * scale;
     });
     stars = Array.from({ length: Math.max(14, Math.min(40, Math.round(W * H / 380))) }, newStar);
-    if (frozen || reduced) finishIntroDots();
+    if (reduced) finishIntroDots();
   }
   const isSolid = (x, y) => y >= F || y < 0 || x < 0 || x >= W || sand[y * W + x] > 0;
   const reach = (px) => Math.max(1, Math.ceil(px / cell)); // a finger-sized distance in cells
@@ -314,7 +298,7 @@ function hero() {
   // ---- letters: a tap or a stroke bursts a letter, dots bounce, then fly home ----
   function burstLetter(li, fromX, fromY) {
     let any = false;
-    if (frozen || reduced) { any = dots.some((d) => d.li === li && d.state !== 'free'); if (any) say('文字にタッチしました'); return any; }
+    if (reduced) { any = dots.some((d) => d.li === li && d.state !== 'free'); if (any) say('文字にタッチしました'); return any; }
     for (const d of dots) {
       if (d.li !== li || d.state === 'free') continue;
       any = true; d.state = 'free'; d.burst = burstNo + 1; d.until = performance.now() + 2600 + Math.random() * 500;
@@ -402,7 +386,7 @@ function hero() {
     window.addEventListener('resize', syncStageVisibility, { passive: true });
   }
   function shake() {
-    if (frozen || reduced) return;
+    if (reduced) return;
     let moved = 0;
     for (let x = 0; x < W; x++) {
       let top = -1; for (let y = 0; y < F; y++) if (sand[y * W + x]) { top = y; break; }
@@ -427,7 +411,7 @@ function hero() {
   }
   function step(now) {
     const dt = Math.max(0, Math.min(0.1, (now - lastT) / 1000)); lastT = now;
-    if (frozen || reduced) { playPile(now, { animateBeat: false }); return; }
+    if (reduced) { playPile(now, { animateBeat: false }); return; }
     // Keep the simulation's speed at both the normal 60 FPS and reduced 30 FPS display rates.
     sandTick += dt;
     while (sandTick >= TICK) {
@@ -536,12 +520,12 @@ function hero() {
   }
   function draw(t) {
     if (!img) return;
-    const now = t || performance.now(); const time = ((frozen ? freezeTime : now) - start) / 1000;
+    const now = t || performance.now(); const time = (now - start) / 1000;
     step(now);
     const d = img.data;
     d.set(nightFrame);
     for (const s of stars) {
-      const a = frozen || reduced ? 0.62 : 0.35 + 0.45 * Math.sin(time * s.s + s.p);
+      const a = reduced ? 0.62 : 0.35 + 0.45 * Math.sin(time * s.s + s.p);
       if (a <= 0.4) continue;
       if (s.big) { put(s.x, s.y, GOLD, a); if (a > 0.6) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(s.x + dx, s.y + dy, GOLD, a * 0.45); }
       else put(s.x, s.y, WHITE, a);
@@ -574,47 +558,24 @@ function hero() {
   new MutationObserver(settleReducedIntro).observe(document.documentElement, { attributes: true, attributeFilter: ['data-pixieed-motion'] });
 
   function drawingSnapshot() {
-    return captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen });
+    return captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color });
   }
   function remember() { if (historyBusy) return; history = pushHomePlayHistory(history, drawingSnapshot()); syncUndo(); }
   function syncUndo() { const undo = document.getElementById('hpUndo'); if (undo) undo.disabled = !history.length; }
   function restoreSnapshot(s) {
     const restored = restoreHomePlayState(s, W, H, F); if (!restored) return;
-    sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color; frozen = restored.frozen;
-    setFreezeUI(frozen);
-    grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); freezeTime = lastT = performance.now(); syncColors(); syncCurrentColor(); persist(); redraw();
+    sand = restored.sand; pieces = restored.pieces; ink = restored.ink; color = restored.color;
+    grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0); lastT = performance.now(); syncColors(); syncCurrentColor(); persist(); redraw();
   }
   function persist() {
-    try { const state = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color, frozen }); if (state) sessionStorage.setItem(HOME_PLAY_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage may be blocked */ }
+    try { const state = captureHomePlayState({ width: W, height: H, floor: F, sand, pieces, ink, color }); if (state) sessionStorage.setItem(HOME_PLAY_STORAGE_KEY, JSON.stringify(state)); } catch { /* storage may be blocked */ }
   }
   document.getElementById('hpUndo')?.addEventListener('click', () => { const previous = history.pop(); if (previous) { historyBusy = true; restoreSnapshot(previous); historyBusy = false; syncUndo(); say('ひとつ戻しました'); } });
-  freezeButton?.addEventListener('click', () => {
-    if (!frozen && drawing) stop();
-    remember(); frozen = !frozen;
-    if (frozen) {
-      const settled = settleHomePlayPieces(sand, pieces, W, H, F);
-      if (settled) { sand = settled.sand; pieces = settled.pieces; grains = settled.grains; }
-      finishIntroDots();
-    }
-    lastT = performance.now(); freezeTime = lastT; setFreezeUI(frozen); say(frozen ? '絵をとめました' : '絵を動かしました'); persist(); redraw();
-  });
-  const soundButton = document.getElementById('hpSound');
-  soundButton?.setAttribute('aria-pressed', String(!homeAudio.enabled)); soundButton?.setAttribute('aria-label', homeAudio.enabled ? '演奏を停止' : '演奏を再開'); soundButton?.setAttribute('title', homeAudio.enabled ? '演奏を停止' : '演奏を再開'); soundButton?.setAttribute('data-audio-state', homeAudio.state);
-  const soundLabel = soundButton?.querySelector('span'); if (soundLabel) soundLabel.textContent = homeAudio.enabled ? '演奏を停止' : '演奏を再開';
-  soundButton?.addEventListener('click', () => {
-    if (homeAudio.enabled) {
-      try { sessionStorage.setItem(HOME_SOUND_STOPPED_KEY, '1'); } catch { /* storage may be blocked */ }
-      homeAudio.stop(); say('演奏を停止しました');
-    } else {
-      try { sessionStorage.removeItem(HOME_SOUND_STOPPED_KEY); } catch { /* storage may be blocked */ }
-      void homeAudio.resumeByControl().then((resumed) => { if (resumed) note(7); }); say('演奏を再開します');
-    }
-  });
   const clearDialog = document.getElementById('hpClearDialog'); const clearButton = document.getElementById('hpClear');
   const performClear = () => {
     remember(); ink.clear(); sand.fill(0); grains = 0; caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
     for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12 * K; d.delay = d.li * 90 + Math.random() * 260; }
-    if (frozen || reduced) finishIntroDots();
+    if (reduced) finishIntroDots();
     start = performance.now(); persist(); say('絵を消しました'); redraw();
   };
   clearButton?.addEventListener('click', () => {
@@ -698,7 +659,7 @@ function hero() {
     const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: d.color + 1 }));
     ink.clear();
     if (!cells.length) return;
-    if (frozen || reduced) {
+    if (reduced) {
       for (const c of cells) sand[c.y * W + c.x] = c.v;
       grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0);
     } else pieces.push({ cells, vx: fall.x * 0.2 * K, vy: fall.y * 0.2 * K, ax: 0, ay: 0, landed: false });
