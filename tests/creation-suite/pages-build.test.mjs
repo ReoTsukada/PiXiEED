@@ -77,6 +77,8 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
     'js/creation/creation-mode-motion.mjs': 'export const modeMotion = true;',
     'js/creation/draw-music-model.mjs': 'export const sharedMusicModel = true;',
     'js/creation/creation-output-core.mjs': 'export const sharedMusicOutput = true;',
+    'js/creation/music-output-preferences.mjs': 'export const projectOutputPreferences = true;',
+    'js/creation/pxd-original-backup.mjs': 'export const originalBackup = true;',
     'js/creation/music-video-timing.mjs': 'export const musicTiming = true;',
     'css/creation-modes.css': '.creation-suite{}',
     'js/creation/draw-music.mjs': 'export const drawMusic = true;',

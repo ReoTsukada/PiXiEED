@@ -58,6 +58,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     <label class="draw-music-check"><input type="checkbox" id="draw-music-output-layer">音楽レイヤーを絵として出力</label>
     <label class="draw-music-check"><input type="checkbox" id="draw-music-output-audio" checked>動画に音声を含める</label>
     <canvas id="draw-music-output-preview" class="draw-music-output-preview" aria-label="動画の先頭コマの出力プレビュー"></canvas>
+    <p id="draw-music-export-summary" aria-live="polite"></p>
     <button type="button" id="draw-music-wav">音を保存（WAV）</button><button type="button" id="draw-music-video">動画を保存</button>
     <p id="draw-music-timing">音楽レイヤーのページを順に演奏します。絵のコマとBPMは独立しています。透明は無音。</p>
     <p id="draw-music-color" aria-live="polite"></p><p id="draw-music-status" role="status" aria-live="polite"></p></div>`;
@@ -73,9 +74,34 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   }
   const play = document.createElement('button'); play.type = 'button'; play.id = 'draw-music-play'; play.className = 'draw-playback-control';
   play.textContent = '▶'; play.setAttribute('aria-label', '音楽を再生'); nav.insertBefore(play, nav.children[2]);
+  const feedback = document.createElement('div'); feedback.id = 'draw-music-feedback'; feedback.className = 'draw-music-feedback'; feedback.hidden = true;
+  const transportStatus = document.createElement('p'); transportStatus.id = 'draw-music-transport-status'; transportStatus.className = 'draw-music-transport-status'; transportStatus.setAttribute('role', 'status'); transportStatus.setAttribute('aria-live', 'polite');
+  const voiceCta = document.createElement('button'); voiceCta.type = 'button'; voiceCta.id = 'draw-music-voice-cta'; voiceCta.textContent = '音色を設定'; voiceCta.hidden = true;
+  const recoveryCta = document.createElement('button'); recoveryCta.type = 'button'; recoveryCta.id = 'draw-music-recovery-cta'; recoveryCta.textContent = '作品一覧を開く'; recoveryCta.hidden = true;
+  const dismissFeedback = document.createElement('button'); dismissFeedback.type = 'button'; dismissFeedback.id = 'draw-music-feedback-dismiss'; dismissFeedback.textContent = '閉じる'; dismissFeedback.setAttribute('aria-label', '音楽の案内を閉じる');
+  feedback.append(transportStatus, voiceCta, recoveryCta, dismissFeedback); nav.append(feedback);
   const position = document.createElement('span'); position.className = 'draw-music-position'; position.hidden = true; document.querySelector('.draw-board').append(position);
-  const say = message => { status.textContent = message; };
+  let lastFeedbackMessage = '', feedbackDismissed = false;
+  const say = (message, { voice = false, recovery = false } = {}) => {
+    if (message !== lastFeedbackMessage) feedbackDismissed = false;
+    lastFeedbackMessage = message;
+    status.textContent = message;
+    transportStatus.textContent = message;
+    voiceCta.hidden = !voice;
+    recoveryCta.hidden = !recovery || typeof draw.workspace?.openRecovery !== 'function';
+    feedback.hidden = !message || feedbackDismissed;
+  };
+  scope.listen(dismissFeedback, 'click', () => { feedbackDismissed = true; feedback.hidden = true; });
+  scope.listen(voiceCta, 'click', () => {
+    settings.open = true;
+    requestAnimationFrame(() => { if (!scope.disposed && !instrument.disabled) instrument.focus(); });
+  });
+  scope.listen(recoveryCta, 'click', () => {
+    say('');
+    Promise.resolve().then(() => draw.workspace.openRecovery()).catch(error => say(`原本を保持しています。作品一覧を開けませんでした：${error.message}`, { recovery: true }));
+  });
   function updateTransport(playing, starting) {
+    if (playing || starting) say('');
     play.dataset.state = playing ? 'playing' : starting ? 'starting' : 'idle'; play.textContent = playing || starting ? '■' : '▶';
     play.setAttribute('aria-label', playing || starting ? '音楽を停止' : '音楽を再生'); play.setAttribute('aria-pressed', String(playing));
     if (!playing) { position.hidden = true; cancelAnimationFrame(positionFrame); positionFrame = 0; }
@@ -94,10 +120,13 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     pages.disabled=musicModel.readOnly || exporting;
     const pageIndex=frames.findIndex(frame=>frame.id===state.musicPageId);
     for (const action of ['add','copy','before','after','delete']) settings.querySelector(`#draw-music-page-${action}`).disabled=musicModel.readOnly || exporting || (action==='delete'&&frames.length<2) || (action==='before'&&pageIndex<1) || (action==='after'&&pageIndex>=frames.length-1);
-    settings.querySelector('#draw-music-output-layer').checked=Boolean(draw.getOutputPreferences?.().includeMusic);
+    const preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
+    settings.querySelector('#draw-music-output-layer').checked=Boolean(preferences.includeMusic);
+    settings.querySelector('#draw-music-output-audio').checked=Boolean(preferences.includeAudio);
+    settings.querySelector('#draw-music-loops').value=String(preferences.loops);
     renderOutputPreview();
     for(const id of ['#draw-music-output-layer','#draw-music-output-audio','#draw-music-loops']) settings.querySelector(id).disabled=exporting;
-    if (musicModel.error) say(musicModel.error);
+    if (musicModel.error) say(`${musicModel.error} 原本と音楽データは保持しています。`, { recovery: true });
     const id = selectedColorId(), slot = id ? state.link?.colorToSlot?.[id] : null;
     instrument.value = slot ? getAudioColorInstrument(state.song, id, slot) : '';
     instrument.disabled = musicModel.readOnly || !id || id.endsWith('00');
@@ -143,11 +172,16 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   function renderOutputPreview() {
     const preview=settings.querySelector('#draw-music-output-preview'),timeline=draw.getTimeline();
     if (!timeline || !draw.getOutputFrame) return;
-    const doc=draw.getOutputFrame(timeline.frames[0].id),context=preview.getContext('2d');
+    const preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
+    const doc=draw.getOutputFrame(timeline.frames[0].id, { includeMusic: preferences.includeMusic }),context=preview.getContext('2d');
     preview.width=doc.width;preview.height=doc.height;
     context.putImageData(new ImageData(new Uint8ClampedArray(documentRgba({...doc,pixels:Array.from(doc.pixels)})),doc.width,doc.height),0,0);
+    const loopSeconds = Number(state?.song?.loopTicks || 0) * 60 / Math.max(1, Number(state?.song?.tempo || 120)) / 480;
+    settings.querySelector('#draw-music-export-summary').textContent = `動画の出力：音楽レイヤー${preferences.includeMusic ? 'あり' : 'なし'}・音声${preferences.includeAudio ? 'あり' : 'なし'}・${preferences.loops}回再生（約${(loopSeconds * preferences.loops).toFixed(1)}秒）。絵は設定したコマ時間で繰り返します。`;
   }
   scope.listen(settings.querySelector('#draw-music-output-layer'),'change',event=> { draw.setOutputPreferences?.({includeMusic:event.target.checked});renderOutputPreview(); });
+  scope.listen(settings.querySelector('#draw-music-output-audio'),'change',event=> { draw.setOutputPreferences?.({includeAudio:event.target.checked});renderOutputPreview(); });
+  scope.listen(settings.querySelector('#draw-music-loops'),'change',event=> { draw.setOutputPreferences?.({loops:Number(event.target.value)});renderOutputPreview(); });
   scope.listen(tempo, 'change', () => settingChange(value => changeDrawMusicTempo(value, Number(tempo.value))));
   scope.listen(instrument, 'change', () => settingChange(value => changeDrawMusicColor(value, { colorId: selectedColorId(), slotId: instrument.value ? value.link?.colorToSlot?.[selectedColorId()] || 'square' : null, instrument: instrument.value || null })));
   scope.listen(window, 'click', () => { if (isActive()) requestAnimationFrame(() => { if (!scope.disposed) refresh(); }); }, { capture: true });
@@ -165,32 +199,36 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     positionFrame = requestAnimationFrame(paintPosition);
   }
   scope.listen(play, 'click', async () => {
+    feedbackDismissed = false;
     try {
       if (player.isPlaying || player.isStarting) { player.stop(); return; }
       state = projected(); const token = epoch;
       if (await player.play(state.song)) { if (!isActive() || token !== epoch) player.stop(); else paintPosition(); }
-      else say('まだ音がありません。描く色に音を割り当ててください。');
-    } catch (error) { say(error.message); }
+      else say('まだ音がありません。描く色に音を割り当ててください。', { voice: true });
+    } catch (error) { say(`再生できませんでした：${error.message}`, { voice: !musicModel.readOnly }); }
   });
   scope.listen(settings.querySelector('#draw-music-stop-loop'), 'click', () => { player.stopAfterCurrentLoop(); });
   async function output(kind) {
     if (exporting || !isActive()) return;
     draw.suspend(); player.stop(); state = projected();
-    const source = state, timeline = draw.getTimeline(), token = epoch, includeMusic=Boolean(draw.getOutputPreferences?.().includeMusic), includeAudio=settings.querySelector('#draw-music-output-audio').checked;
-    const unchanged = () => isActive() && !scope.disposed && token === epoch && state === source && draw.getTimeline() === timeline;
+    const source = state, timeline = draw.getTimeline(), token = epoch, preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
+    const includeMusic = Boolean(preferences.includeMusic), includeAudio = Boolean(preferences.includeAudio), loops = preferences.loops;
+    const unchanged = () => isActive() && !scope.disposed && token === epoch && state === source && draw.getTimeline() === timeline
+      && JSON.stringify(draw.getOutputPreferences?.() || preferences) === JSON.stringify(preferences);
     exporting = true; refresh();
     try {
       const workspace = draw.workspace;
       await workspace.assertCanSave(); if (!unchanged()) return;
-      const loops = Number(settings.querySelector('#draw-music-loops').value); let result, filename;
+      let result, filename;
       if (kind === 'wav') { const { renderAudioWav } = await import('./audio-export.mjs'); if (!unchanged()) return; result = await renderAudioWav(source.song, { loops }); filename = `pixieed-dot-music-${Math.round(result.seconds)}s.wav`; }
       else {
         const { renderAudioVideo } = await import('./audio-video.mjs'); if (!unchanged()) return; videoController = new AbortController();
-        const frames = timeline.frames.map(frame => { const doc = draw.getOutputFrame(frame.id); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba({ ...doc, pixels: Array.from(doc.pixels) })) }; });
+        const frames = timeline.frames.map(frame => { const doc = draw.getOutputFrame(frame.id, { includeMusic }); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba({ ...doc, pixels: Array.from(doc.pixels) })) }; });
         result = await renderAudioVideo(source.song, frames[0], { totalPlays: loops, frameImages: frames, frameDurationsMs: timeline.frames.map(frame=>frame.durationMs), includeAudio, signal: videoController.signal });
         filename = `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`;
       }
       if (!unchanged()) return;
+      if (kind === 'video') say(`動画を準備しました：音楽レイヤー${includeMusic ? 'あり' : 'なし'}・音声${includeAudio ? 'あり' : 'なし'}・${loops}回再生。`);
       const staged = await sendToolOutputAfterSaving({ blob: result.blob, filename, returnUrl: () => `${location.pathname}${location.search}`, title: kind === 'wav' ? '音を確認' : '動画を確認', source: 'ドットで音楽', metadata: { durationSeconds: result.seconds, loops, ...(kind==='video'? {includeMusicLayer:includeMusic,includeAudio:result.hasAudio,visualFrameDurationsMs:timeline.frames.map(frame=>frame.durationMs)}:{}) } }, workspace, unchanged);
       if (!staged.ok && staged.reason !== 'source_changed') say(staged.error?.message || '出力画面を開けませんでした。作品は保持しています。');
     } finally { exporting = false; videoController = null; refresh(); }
@@ -200,7 +238,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   scope.listen(document, 'visibilitychange', () => { if (document.hidden) suspend(); });
   scope.listen(window, 'pagehide', suspend);
   scope.add(suspend);
-  return { get workspace() { return draw.workspace; }, nodes: [settings.closest('.px-tool-header-slot') || settings, play, position], suspend,
+  return { get workspace() { return draw.workspace; }, nodes: [settings.closest('.px-tool-header-slot') || settings, play, position, feedback], suspend,
     resume() { musicModel.selectMusicLayer(); changed(); refresh(); },
     importImage(image) { draw.importImage(image); changed(); },
     getImage: () => draw.getImage()

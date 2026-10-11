@@ -74,6 +74,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   let lastPreview = null;
   let syncing = false;
   let revision = 0;
+  let applying = false;
   const timeline = () => draw.getTimeline();
   const ratioOf = value => value === 'free' ? null : value.split(':').map(Number).reduce((a, b) => a / b);
   const selectedPalette = () => palette.value.split(/[\s,]+/).filter(Boolean).slice(0, Number(colorCount.value) || 32);
@@ -82,7 +83,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     return { width: Number(width.value), height: Number(height.value), palette: selectedPalette(), aspectLocked: ratio.checked, aspectRatio: aspect.value,
       sourceWidth: animation.width, sourceHeight: animation.height, sourcePalette: [...animation.palette] };
   };
-  function sync({ force = false } = {}) {
+  function sync({ force = false, preserveStatus = false } = {}) {
     if (syncing) return;
     const animation = timeline(); if (!animation) return;
     syncing = true;
@@ -93,7 +94,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
       colorCount.value = String(COLOR_COUNTS.find(count => count >= animation.palette.length) || 32);
       aspect.value = 'free';
       root.dataset.signature = signature;
-      invalidatePreview('作品が変わったため、プレビューを更新してください。');
+      invalidatePreview(preserveStatus ? '' : '作品が変わったため、プレビューを更新してください。');
     }
     for (const button of presetRow.querySelectorAll('[data-long-side]')) button.setAttribute('aria-pressed', String(Number(button.dataset.longSide) === Math.max(animation.width, animation.height)));
     syncing = false;
@@ -106,7 +107,10 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
       input.addEventListener('input',()=>{const colors=palette.value.split(/[\s,]+/).filter(Boolean);colors[index]=input.value;palette.value=colors.join('\n');palettePreset.value='current';invalidatePreview();}); swatches.append(input);
     });
   }
-  function invalidatePreview(message = '') { revision++; lastPreview = null; applyButton.disabled = true; previewCanvas.hidden = true; if (message) preview.textContent = message; }
+  function invalidatePreview(message = '設定に未適用の変更があります。適用前にもう一度プレビューしてください。') {
+    revision++; lastPreview = null; applyButton.disabled = true; previewCanvas.hidden = true;
+    if (message) preview.textContent = message;
+  }
   function renderThumbnail(animation) {
     if (!animation?.frames?.length) { previewCanvas.hidden = true; return; }
     const preferredFrame = draw.getEditorState?.().frameId;
@@ -127,13 +131,13 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   async function makePreview() {
     const settings = currentSettings();
     if (!Number.isInteger(settings.width) || !Number.isInteger(settings.height) || settings.width < 1 || settings.height < 1 || settings.width > 256 || settings.height > 256) {
-      preview.textContent = '幅と高さは1〜256の整数で入力してください。'; invalidatePreview(); return;
+      invalidatePreview(); preview.textContent = '幅と高さは1〜256の整数で入力してください。'; return;
     }
     if (!settings.palette.length || settings.palette.length > 32 || settings.palette.some(color => !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color))) {
-      preview.textContent = 'パレットは有効なHEXカラーを1〜32色入力してください。'; invalidatePreview(); return;
+      invalidatePreview(); preview.textContent = 'パレットは有効なHEXカラーを1〜32色入力してください。'; return;
     }
     if (typeof draw.previewProjectSettings !== 'function') {
-      preview.textContent = '設定プレビューAPIを読み込めません。'; invalidatePreview(); return;
+      invalidatePreview(); preview.textContent = '設定プレビューAPIを読み込めません。'; return;
     }
     previewButton.disabled = true; preview.textContent = 'プレビューを作成しています…';
     const requestedRevision = revision;
@@ -146,7 +150,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
       const summary = formatSummary(result?.summary || result);
       preview.textContent = `${settings.sourceWidth}×${settings.sourceHeight} → ${settings.width}×${settings.height} px${summary ? `。${summary}` : ''}`;
       applyButton.disabled = false;
-    } catch (error) { preview.textContent = error?.message || 'プレビューを作成できませんでした。'; invalidatePreview(); }
+    } catch (error) { invalidatePreview(); preview.textContent = error?.message || 'プレビューを作成できませんでした。'; }
     finally { previewButton.disabled = false; }
   }
   const adjustRatio = event => {
@@ -159,15 +163,25 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     const computed = source === width ? Math.round(sourceValue / ratioValue) : Math.round(sourceValue * ratioValue);
     other.value = String(Math.min(256, Math.max(1, computed))); invalidatePreview();
   };
-  scope.listen(launcher, 'click', () => { panel.hidden = !panel.hidden; launcher.setAttribute('aria-expanded', String(!panel.hidden)); if (!panel.hidden) sync({ force: true }); });
-  scope.listen(spriteScale, 'click', () => { panel.hidden = true; launcher.setAttribute('aria-expanded', 'false'); draw.openSpriteScale?.(); });
-  scope.listen(close, 'click', () => { panel.hidden = true; launcher.setAttribute('aria-expanded', 'false'); });
+  function closePanel({ restoreFocus = true } = {}) {
+    if (panel.hidden) return false;
+    panel.hidden = true; launcher.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) launcher.focus({ preventScroll: true });
+    return true;
+  }
+  function openPanel() {
+    draw.cancelInput?.();
+    panel.hidden = false; launcher.setAttribute('aria-expanded', 'true'); sync({ force: true });
+  }
+  scope.listen(launcher, 'click', () => { if (panel.hidden) openPanel(); else closePanel({ restoreFocus: false }); });
+  scope.listen(spriteScale, 'click', () => { closePanel({ restoreFocus: false }); draw.openSpriteScale?.(); });
+  scope.listen(close, 'click', () => closePanel());
   scope.listen(width, 'input', adjustRatio); scope.listen(height, 'input', adjustRatio);
   scope.listen(aspect, 'change', () => { ratio.checked = aspect.value !== 'free'; adjustRatio({ target: width }); });
-  scope.listen(form, 'input', invalidatePreview);
+  scope.listen(form, 'input', () => invalidatePreview());
   scope.listen(palette, 'input', renderSwatches);
   scope.listen(palettePreset, 'change', () => { const colors = palettePresets.get(palettePreset.value); if (!colors) return; palette.value=colors.join('\n');colorCount.value=String(COLOR_COUNTS.find(count=>count>=colors.length)||32);renderSwatches();invalidatePreview(); });
-  scope.listen(colorCount, 'change', invalidatePreview);
+  scope.listen(colorCount, 'change', () => invalidatePreview());
   scope.listen(palette, 'input', () => { const count = palette.value.split(/[\s,]+/).filter(Boolean).length; if (count <= 32) colorCount.value = String(COLOR_COUNTS.find(size => size >= count) || 32); invalidatePreview(); });
   scope.listen(previewButton, 'click', () => void makePreview());
   scope.listen(presetRow, 'click', event => {
@@ -180,15 +194,32 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   });
   scope.listen(form, 'submit', async event => {
     event.preventDefault();
+    if (applying) return;
     if (!lastPreview || typeof draw.setProjectSettings !== 'function') { await makePreview(); return; }
     const settings = currentSettings();
     if (lastPreview.owner !== timeline() || lastPreview.revision !== revision || JSON.stringify(settings) !== JSON.stringify(lastPreview.settings)) { invalidatePreview(); await makePreview(); return; }
+    const previewToApply = lastPreview;
     applyButton.disabled = true;
-    try { await draw.setProjectSettings(settings, { expectedOwner: lastPreview.owner, preview: lastPreview.result }); preview.textContent = '共通設定を適用し、Undoに記録しました。'; sync({ force: true }); }
-    catch (error) { preview.textContent = error?.message || '設定を適用できませんでした。'; }
+    previewButton.disabled = true; applying = true; form.inert = true;
+    try {
+      invalidatePreview('');
+      const changed = await draw.setProjectSettings(settings, { expectedOwner: previewToApply.owner, preview: previewToApply.result });
+      sync({ force: true, preserveStatus: true });
+      preview.textContent = changed === false ? '設定に変更はありません。作品の状態はそのままです。' : '共通設定を適用し、Undoに記録しました。';
+    } catch (error) {
+      sync({ force: true, preserveStatus: true }); invalidatePreview();
+      preview.textContent = error?.message || '設定を適用できませんでした。もう一度プレビューしてください。';
+    } finally {
+      form.inert = false; applying = false; previewButton.disabled = false;
+      applyButton.disabled = true;
+    }
   });
-  const unsubscribe = draw.subscribe(() => { invalidatePreview('作品が変わったため、プレビューを更新してください。'); sync(); });
+  const unsubscribe = draw.subscribe(() => {
+    if (applying) { sync({ preserveStatus: true }); return; }
+    invalidatePreview('作品が変わったため、プレビューを更新してください。'); sync();
+  });
   scope.add(() => { unsubscribe?.(); });
   sync({ force: true });
-  return { nodes: [root], root, launcher, panel, open(value = {}) { panel.hidden = false; launcher.setAttribute('aria-expanded', 'true'); sync({ force: true }); if (value.width) width.value = String(value.width); if (value.height) height.value = String(value.height); }, sync, close() { panel.hidden = true; launcher.setAttribute('aria-expanded', 'false'); } };
+  return { nodes: [root], root, launcher, panel, open(value = {}) { openPanel(); if (value.width) width.value = String(value.width); if (value.height) height.value = String(value.height); }, sync,
+    isOpen() { return !panel.hidden; }, close: closePanel };
 }

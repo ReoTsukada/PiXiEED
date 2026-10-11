@@ -29,7 +29,7 @@ test('camera transparency occupies no palette slot and partial alpha rejects the
   assert.deepEqual(result.additions, ['#0c2238']);
   assert.deepEqual([0, 2, 17].map(i => result.document.pixels[i]), [-1, 2, -1]);
   for (const paletteFixed of [true, false]) {
-    assert.throws(() => planCameraReplacement(snapshot, samples([12, 34, 56, 255], [1, 2, 3, 128], [9, 8, 7, 255]), { paletteFixed }), /半透明/);
+    assert.throws(() => planCameraReplacement(snapshot, samples([12, 34, 56, 255], [1, 2, 3, 128], [9, 8, 7, 255]), { paletteFixed }), error => error.code === 'camera-partial-alpha' && /半透明/.test(error.message) && /選び直してください/.test(error.message));
     assert.deepEqual(doc, before); assert.deepEqual(snapshot.document, before);
   }
 });

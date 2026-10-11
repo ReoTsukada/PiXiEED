@@ -1,6 +1,6 @@
 import { centerCrop } from '../pixel-studio/framing.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261011-unified-project-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261011-polish-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
 function scopedRules(rules) {
@@ -78,12 +78,60 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const targetSummary = document.createElement('p'); targetSummary.id = 'creation-camera-target';
   targetSummary.setAttribute('role', 'status'); targetSummary.style.cssText = 'margin:0;font-size:12px;line-height:1.5;text-align:center;max-width:100%;';
   controls.querySelector('#resultControls').append(targetSummary);
+  const recoveryActions = document.createElement('div');
+  recoveryActions.className = 'creation-camera-recovery';
+  recoveryActions.hidden = true;
+  recoveryActions.setAttribute('role', 'group');
+  recoveryActions.setAttribute('aria-label', '適用できない画像の次の操作');
+  recoveryActions.style.cssText = 'display:none;flex-wrap:wrap;justify-content:center;gap:8px;width:100%;';
+  controls.querySelector('#resultControls').append(recoveryActions);
+  const clearApplyRecovery = () => { recoveryActions.replaceChildren(); recoveryActions.hidden = true; recoveryActions.style.display = 'none'; };
+  const retakeWithSharedPalette = async () => {
+    if (surface.dataset.mode === 'captured') shutter.click();
+    const deadline = Date.now() + 15000;
+    while (surface.dataset.mode !== 'live' && Date.now() < deadline && !scope?.disposed) {
+      await new Promise(resolve => window.setTimeout(resolve, 80));
+    }
+    if (scope?.disposed || surface.dataset.mode !== 'live') {
+      targetSummary.textContent = 'カメラを再開できませんでした。画像を選び直すか、ブラウザーのカメラ許可を確認してください。';
+      return;
+    }
+    const fixedPalette = controlHost.querySelector('#cameraPaletteFixed');
+    if (!fixedPalette || fixedPalette.disabled) {
+      targetSummary.textContent = '共有パレットを利用できません。共通設定を確認するか、画像を選び直してください。';
+      return;
+    }
+    fixedPalette.checked = true;
+    fixedPalette.dispatchEvent(new Event('change', { bubbles: true }));
+    targetSummary.textContent = '共有パレット固定にしました。プレビュー更新後、中央のボタンで撮影してください。';
+    clearApplyRecovery();
+  };
+  const showApplyRecovery = (error) => {
+    clearApplyRecovery();
+    const addAction = (label, handler) => {
+      const button = document.createElement('button');
+      button.type = 'button'; button.textContent = label;
+      button.style.cssText = 'min-height:44px;max-width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.3);border-radius:10px;background:#263744;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;';
+      button.addEventListener('click', handler);
+      recoveryActions.append(button);
+    };
+    if (error?.code === 'camera-palette-overflow') {
+      addAction('共有パレット固定で撮り直す', () => { void retakeWithSharedPalette(); });
+      addAction('共通パレット設定を開く', () => onProjectSettings?.());
+      addAction('色数を減らした画像を選び直す', () => surface.querySelector('#cameraImageInput')?.click());
+    } else if (error?.code === 'camera-partial-alpha') {
+      addAction('不透明な画像を選び直す', () => surface.querySelector('#cameraImageInput')?.click());
+    }
+    recoveryActions.hidden = recoveryActions.childElementCount === 0;
+    recoveryActions.style.display = recoveryActions.hidden ? 'none' : 'flex';
+  };
   let targetEpoch = 0;
   const updateTarget = async () => {
     const epoch = ++targetEpoch;
     try {
       const snapshot = await draw.cameraTarget();
       if (epoch !== targetEpoch || scope?.disposed) return;
+      clearApplyRecovery();
       applyButton.disabled = false;
       targetSummary.textContent = `適用先：${snapshot.description}`;
       applyButton.title = `${snapshot.description}へ適用。選択範囲外と他のレイヤー・フレームは保持し、画像と追加色を一緒にUndoできます。`;
@@ -135,6 +183,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
         // The camera's stage notice sits behind its completed-image view.
         // Keep an apply failure readable alongside the preserved result controls.
         targetSummary.textContent = error.message;
+        showApplyRecovery(error);
         throw error;
       }
     }

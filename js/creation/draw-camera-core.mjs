@@ -75,7 +75,11 @@ export function planCameraReplacement(target, rgba, { paletteFixed = false } = {
   for (let n = 0; n < target.cells.length; n++) {
     const offset = n * 4, alpha = rgba[offset + 3];
     if (alpha === 0) { pixels[target.cells[n]] = -1; continue; }
-    if (alpha !== 255) throw new TypeError('半透明の画素は共通作品に適用できません。不透明な画像または完全な透明画素を使用してください。撮影画像と作品は保持しています。');
+    if (alpha !== 255) {
+      const error = new TypeError('半透明の画素は共通作品に適用できません。撮影画像と作品は保持しています。不透明な画像、または完全な透明画素だけの画像を選び直してください。');
+      error.code = 'camera-partial-alpha';
+      throw error;
+    }
     if (paletteFixed) { pixels[target.cells[n]] = fixedPixels[n]; continue; }
     const hex = '#' + Array.from(rgba.slice(offset, offset + 3), value => value.toString(16).padStart(2, '0')).join('');
     let index = slots.get(hex);

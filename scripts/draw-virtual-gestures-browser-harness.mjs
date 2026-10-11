@@ -99,6 +99,27 @@ try {
       checks.push('native direct two-touch zoom remains active while virtual cursor is off');
 
       await setVirtual(true);
+      // On a compact viewport the movable mouse panel can cover the geometric
+      // board center. Exercise its normal drag operation before touching the
+      // pad; a contact on panel chrome is intentionally not a pad contact.
+      const initialPad = await boardPoint();
+      const panelCoversPad = await page.evaluate(point => Boolean(document.elementFromPoint(point.x, point.y)?.closest('#draw-virtual-controls')), initialPad);
+      if (panelCoversPad) {
+        const panel = await rect('#draw-virtual-controls'), board = await rect('.draw-board'), nav = await rect('.app-tabs');
+        const destinationTop = board.y + board.height + 10;
+        assert.ok(destinationTop + panel.height <= nav.y - 8, 'mouse panel has room below the pad for gesture QA');
+        const button = await rect('[data-virtual-left]');
+        const start = { x: button.x + button.width / 2, y: button.y + button.height / 2 };
+        const end = { x: start.x, y: start.y + destinationTop - panel.y };
+        const beforePlacement = await pixels();
+        await dispatch('touchStart', [pointer(40, start)]);
+        await dispatch('touchMove', [pointer(40, end)]);
+        await dispatch('touchEnd', [pointer(40, end)]);
+        assert.deepEqual(await pixels(), beforePlacement, 'mouse panel relocation preserves artwork');
+        checks.push('compact viewport mouse panel is moved clear of the pad using its normal drag operation');
+      }
+      assert.equal(await page.evaluate(point => Boolean(document.elementFromPoint(point.x, point.y)?.closest('.draw-board')), await boardPoint()), true,
+        'relative movement starts on the exposed drawing pad');
       const pad = await boardPoint(), before = await marker();
       const crosshair = await markerStyle();
       assert.equal(crosshair.rect.width, 20); assert.equal(crosshair.rect.height, 20, 'crosshair box stays screen-sized');

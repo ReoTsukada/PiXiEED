@@ -9,6 +9,7 @@ import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER
 import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261011-shared-music-2';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { composeOutputFrame } from './creation-output-core.mjs';
+import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261011-shared-music-2';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
@@ -16,7 +17,7 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261011-unified-project-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261011-polish-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
@@ -31,7 +32,7 @@ import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
-import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261006-floating-mouse-2';
+import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261009-sprite-scale-1';
 import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=20261009-sprite-scale-1';
 import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs';
@@ -104,7 +105,7 @@ let animationSession = createDrawAnimationSession(documentData, { musicLayer }),
 if (musicLayer) documentData = animationSession.select(animationSession.frameId, animationSession.animation.layers.findLast(layer => layer.role !== 'music').id);
 let lastArtLayerId = animationSession.layerId;
 let musicReadOnlyReason = '';
-let outputPreferences = { includeMusic: false };
+let outputPreferences = { ...DEFAULT_MUSIC_OUTPUT_PREFERENCES };
 // Every creation mode edits this one immutable timeline and history.
 const editorListeners = new Set(), projectHooks = new Set();
 let currentOpenedProject = null, projectSettingsRequest = null, musicSettingsPlanner = null;
@@ -138,7 +139,7 @@ function translatedResizeView(width, height) {
   return resizeDrawView(resizeViewState(), documentData.width, documentData.height, width, height);
 }
 // Register dismissal before any panel or viewport pointer-capture handlers.
-mountDrawPanelDismissals({ scope, root: $('#main'), cancelInput: cancelDrawingInput,
+const panelDismissals = mountDrawPanelDismissals({ scope, root: $('#main'), cancelInput: cancelDrawingInput,
   closeFloating: () => { closeColorEditor(); animationControls?.close?.(); editorUi.closePanels(); },
   hasFloating: () => Boolean(colorEdit || animationControls?.hasOpenPanels) });
 const selectionControls = mountDrawSelectionOverlay({ scope, board: $('.draw-board'), canvas, getFrame: selectionFrame });
@@ -1714,12 +1715,34 @@ function updateOutputPreview() {
   preview.width = image.width; preview.height = image.height;
   preview.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(documentRgba(image)), image.width, image.height), 0, 0);
 }
+function applyOutputPreferences(preferences = {}, { persist = true } = {}) {
+  if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) throw new TypeError('出力設定が不正です。');
+  const next = { ...outputPreferences };
+  if (Object.hasOwn(preferences, 'includeMusic')) {
+    if (typeof preferences.includeMusic !== 'boolean') throw new TypeError('出力設定が不正です。');
+    next.includeMusic = Boolean(musicLayer && preferences.includeMusic);
+  }
+  if (Object.hasOwn(preferences, 'includeAudio')) {
+    if (typeof preferences.includeAudio !== 'boolean') throw new TypeError('出力設定が不正です。');
+    next.includeAudio = preferences.includeAudio;
+  }
+  if (Object.hasOwn(preferences, 'loops')) {
+    if (![1, 2, 4, 8].includes(preferences.loops)) throw new TypeError('再生回数は1・2・4・8から選んでください。');
+    next.loops = preferences.loops;
+  }
+  const changed = next.includeMusic !== outputPreferences.includeMusic || next.includeAudio !== outputPreferences.includeAudio || next.loops !== outputPreferences.loops;
+  outputPreferences = next;
+  const checkbox = $('#draw-output-music-layer'); if (checkbox) checkbox.checked = outputPreferences.includeMusic;
+  if (persist && changed) pxdBridge?.markDirty();
+  updateOutputPreview();
+  return { ...outputPreferences, includeMusic: Boolean(musicLayer && outputPreferences.includeMusic) };
+}
 if (musicLayer) {
   const panel = $('#draw-output .creation-output__panel');
   const section = document.createElement('section'); section.className = 'creation-output__music';
   const label = document.createElement('label'); label.htmlFor = 'draw-output-music-layer';
   const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.id = 'draw-output-music-layer'; checkbox.checked = false;
-  checkbox.addEventListener('change', () => { outputPreferences = { includeMusic: checkbox.checked }; updateOutputPreview(); });
+  checkbox.addEventListener('change', () => { applyOutputPreferences({ includeMusic: checkbox.checked }); });
   label.append(checkbox, document.createTextNode('出力に音楽レイヤーを含める'));
   const preview = document.createElement('canvas'); preview.id = 'draw-output-music-preview'; preview.setAttribute('aria-label', '出力画像プレビュー');
   preview.style.cssText = 'display:block;width:min(160px,100%);max-width:100%;max-height:96px;height:auto;image-rendering:pixelated;margin-top:.5rem;border:1px solid currentColor';
@@ -1959,12 +1982,13 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261011-shared-music-2');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261011-polish-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
       currentOpenedProject = project;
       for (const hook of projectHooks) await hook.onOpen?.(project, animationSession.animation);
+      applyOutputPreferences(readMusicOutputPreferences(project), { persist: false });
       notifiedAnimation = null; notifyEditorChange();
     };
     const params = new URLSearchParams(location.search); const requestedRole = params.get('pxd') === project.projectId && params.getAll('pxdImage').length === 1 ? params.get('pxdImage') : null;
@@ -2016,7 +2040,8 @@ const drawProjectOptions = {
     const snapshot = composeOutputFrame(timeline, timeline.frames[0].id, { includeMusic: false }); const role = musicLayer ? 'main' : pxdImageRole;
     let next = project || createPxdProject();
     if (!next.manifest.creationProject && currentOpenedProject?.entries.length) next = setPxdBytes(next, 'legacy/creation-original.pxd', await encodePxd(currentOpenedProject), 'application/octet-stream');
-    next = { ...next, manifest: { ...next.manifest, creationProject: { schemaVersion: 1, imageRole: role } } };
+    next = { ...next, manifest: { ...next.manifest, creationProject: { ...next.manifest.creationProject, schemaVersion: 1, imageRole: role } } };
+    next = writeMusicOutputPreferences(next, outputPreferences);
     next = await putPxdDrawDocument(next, snapshot, role);
     next = await writePxdAnimation(next, timeline, { role, posterFrameId: timeline.frames[0].id });
     for (const hook of projectHooks) if (hook.onSave) next = await hook.onSave(next, timeline, { imageRole: role });
@@ -2243,10 +2268,14 @@ return {
   subscribe(listener) { editorListeners.add(listener); return () => editorListeners.delete(listener); },
   async attachProjectHooks(hooks) {
     await pxdBridge.ready;
-    await hooks.onOpen?.(currentOpenedProject || pxdBridge.currentProject || createPxdProject(), animationSession.animation);
+    const project = currentOpenedProject || pxdBridge.currentProject || createPxdProject();
+    await hooks.onOpen?.(project, animationSession.animation);
+    applyOutputPreferences(readMusicOutputPreferences(project), { persist: false });
     projectHooks.add(hooks); return () => projectHooks.delete(hooks);
   },
   setProjectSettingsRequest(callback) { projectSettingsRequest = callback; },
+  setSharedSettingsDismissal(settings) { return scope.add(panelDismissals.registerSharedSettings(settings)); },
+  cancelInput() { cancelDrawingInput(); },
   setMusicSettingsPlanner(callback) {
     if (callback != null && typeof callback !== 'function') throw new TypeError('音楽設定プランナーが不正です。');
     musicSettingsPlanner = callback;
@@ -2321,14 +2350,8 @@ return {
     musicReadOnlyReason = reason ? String(reason) : '';
     return musicReadOnlyReason;
   },
-  getOutputPreferences() { return { ...outputPreferences }; },
-  setOutputPreferences(preferences = {}) {
-    if (!preferences || typeof preferences.includeMusic !== 'boolean') throw new TypeError('出力設定が不正です。');
-    outputPreferences = { includeMusic: musicLayer && preferences.includeMusic };
-    const checkbox = $('#draw-output-music-layer'); if (checkbox) checkbox.checked = outputPreferences.includeMusic;
-    updateOutputPreview();
-    return { ...outputPreferences };
-  },
+  getOutputPreferences() { return { ...outputPreferences, includeMusic: Boolean(musicLayer && outputPreferences.includeMusic) }; },
+  setOutputPreferences(preferences = {}, options = {}) { return applyOutputPreferences(preferences, options); },
   getOutputFrame(frameId = animationSession.frameId, options = {}) {
     return composeCurrentOutputFrame(frameId, options);
   },
@@ -2371,7 +2394,7 @@ return {
   },
   async applyCameraRgba(snapshot, rgba, options) {
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
-    const { planCameraReplacement } = await import('./draw-camera-core.mjs?rev=20261011-camera-colors-1');
+    const { planCameraReplacement } = await import('./draw-camera-core.mjs?rev=20261011-polish-1');
     if (animationSession.animation !== snapshot.owner || animationSession.frameId !== snapshot.frameId || animationSession.layerId !== snapshot.layerId) throw new Error('撮影対象が変更されました。撮り直してください。');
     const mask = selectionMask();
     if (Boolean(mask) !== Boolean(snapshot.target.mask) || mask && mask.some((value, index) => value !== snapshot.target.mask[index])) throw new Error('適用中に選択範囲が変わりました。対象を確認してもう一度適用してください。');

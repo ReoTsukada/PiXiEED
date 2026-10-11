@@ -53,6 +53,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     for (const name of ['css/event-pages.css', 'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
       'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
       'js/books-catalog.mjs',
+      'js/creation/music-output-preferences.mjs', 'js/creation/pxd-original-backup.mjs',
       'js/creation/creation-modes.mjs', 'js/creation/creation-camera.mjs', 'js/creation/creation-mode-motion.mjs', 'js/creation/music-video-timing.mjs', 'js/creation/draw-music-model.mjs', 'js/creation/creation-output-core.mjs', 'js/creation/draw-music.mjs', 'js/creation/draw-music-core.mjs', 'js/creation/mode-entry.mjs', 'js/creation/shared-project-settings.mjs', 'js/creation/shared-project-core.mjs', 'css/creation-modes.css',
       'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
       'js/creation/draw-color-adjustment-panel.mjs', 'js/creation/draw-color-adjustments.mjs',

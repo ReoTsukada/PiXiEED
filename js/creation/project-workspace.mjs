@@ -8,6 +8,7 @@ import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261011-unified-project-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',
@@ -82,10 +83,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }));
   const saveButton = button('保存し直す', 'pxd-save', () => void transact(async () => { await save(); say('この作品を保存し直しました。'); await refreshList(); }, { close: false }));
   const original = button('読み込んだファイルを保存', 'pxd-export-original', () => void transact(async () => {
-    const project = await save(); const entry = project.entries.find(({ path }) => path === 'legacy/original.pxd');
-    if (!entry) throw new Error('読み込んだファイルが見つかりません。');
-    const staged = await sendPxdBackup(entry.bytes, 'pixieed-original.pxd');
-    if (!staged) say('旧PXDの原本のダウンロードを開始しました。');
+    const backup = findPxdOriginalBackup(session.currentProject, { copyBytes: true });
+    if (!backup) throw new Error('保存できるPXD原本が見つかりません。現在の作品は保持しています。');
+    // Download the archived bytes directly, even when editing/saving is unavailable.
+    const staged = await sendPxdBackup(backup.bytes, backup.filename);
+    if (!staged) say(`${backup.label}：ダウンロードを開始しました。現在の作品は変更していません。`);
   }, { close: false }));
   actions.append(duplicate, saveButton, original);
   const moreActions = node('details', 'project-files project-more');
@@ -221,7 +223,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     identityMeta.textContent = [state, dimensions].filter(Boolean).join(' · ');
     identity.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     for (const el of dialog.querySelectorAll('button')) el.disabled = locked;
-    original.hidden = !project?.entries.some(({ path }) => path === 'legacy/original.pxd');
+    const backup = findPxdOriginalBackup(project);
+    original.hidden = !backup; if (backup) original.textContent = backup.label;
     if (!titleInput.matches(':focus')) titleInput.value = name;
     const canTransfer = Boolean(!getPublicSources().length && hasContent());
     transferSection.hidden = !canTransfer;
@@ -441,6 +444,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     message.textContent = operationError || ''; await Promise.all([refreshList(), refreshImports(), refreshTrash()]);
     if (focusTransfer) transferTargets.find(({ el }) => !el.hidden && !el.disabled)?.el.focus();
   }
+  async function openRecovery() {
+    await showProjects({ pane: 'current' });
+    if (!dialog.open) return;
+    moreActions.open = true;
+    say('原本や統合前のPXDを保存できます。複製は別作品として保持しますが、音楽の編集制限は引き継ぎます。');
+    const action = original.hidden ? duplicate : original;
+    action.focus({ preventScroll: true }); action.scrollIntoView({ block: 'nearest' });
+  }
   document.addEventListener('pixieed:open-tool-transfer', () => {
     if (!isActive()) return;
     if (bar.hidden || locked) return;
@@ -548,7 +559,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     ready = switching;
     return switching;
   }
-  return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, setModeAdapter, activate: update,
+  return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, activate: update,
     dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); for (const cleanup of cardContextCleanups) cleanup(); dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); css.remove(); },
     async importProject(project) { await ready; await transact(() => importCopy(project)); },
     async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },

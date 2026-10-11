@@ -216,3 +216,39 @@ BPMと絵のFPSを独立させた。Draw frame.durationMsだけの変更では�
 宛先・内容監査と会話情報除去の後、ユーザー承認に基づき監査済み133ファイルの限定コミット・通常pushを再開する。宛先は確認済みの公開リポジトリ `https://github.com/ReoTsukada/PiXiEED.git`、branch `main`。新しいファイルの増減はない。最終の全体テストとstage差分を確認し、既存のCI／Pages公開結果を確認する。
 
 再開時の最終全体テストは277 mjsファイル・1,917件成功、失敗／skip0（会話metadataの回帰1件追加）。`/tmp/pixieed-release-all-tests-final.tap`。fetch後のHEADとorigin/mainの分岐は0／0。Offerwall／広告設定／CI workflow／V2別workspaceは今回変更していない。
+
+## 共有制作画面の操作・保存の追加改善（2026-10-11、ローカル未公開）
+
+別々の入口から同じPiXiEEDrawの各モードを開く構成と既存配置を維持した。今回の変更は次の範囲。
+
+- 空の曲・未割当色・旧曲の編集制限を再生操作の近くへ表示し、音色設定／原本保存への操作と閉じるボタンを追加。音色設定へキーボードフォーカスを移し、状態を読み上げる。明示的な再生再試行では閉じた理由を再表示する。
+- 共通設定のEscape・外側クリック・フォーカス復帰をDrawの入力管理へ接続。キャンバス上の最初の外側操作はパネルを閉じるだけで画素を変えない。適用中はフォームを無効化し、同期通知による成功表示の上書きを防止。未適用入力・無変更・失敗・Undo/Redo後を区別する。
+- 音楽画素出力／動画音声／再生回数を作品の `creationProject.musicOutput` にversion 1で保存。値を検証し、旧作品・未知version・不正値は既定false／true／1へ復帰。同じversionの未知項目と他のmanifest情報は保持。作品切替・再読込み・プレビュー・実出力の条件を揃え、動画出力条件を画面へ表示する。
+- カメラの32色超過に固定パレットでの撮り直し・共通設定・画像選び直しを追加。半透明拒否は別の理由と不透明画像の選択案内を返す。自動減色や透過除去は行わない。
+- 旧曲の編集制限から作品操作を開ける。読み込んだ原本または統合前PXDの保存は現在作品の再保存を必要とせず、保管済みbytesをそのまま出力。複製は別作品となり、元作品と原曲を保持するが、編集制限は引き継ぐ。
+
+最終コードでNode 279 mjsファイル・1,921テスト成功、失敗・skip 0。`/tmp/pixieed-polish-all-tests-complete.tap`。隔離buildは `/tmp/pixieed-polish-build-complete-20261011`、669ファイル・イベント86ページ・パズル6ページ。変更した配信16ファイルはソースとbytes一致。`/tmp/pixieed-polish-build-byte-audit.json`。
+
+ChromiumのPC1280×800／モバイル390×844／320×568で共有設定・音楽案内・フォーカス・保存／作品切替・ネイティブBack/Forwardを36項目成功。現ソース `/tmp/pixieed-polish-chromium/results.json`、隔離build `/tmp/pixieed-polish-built-complete/results.json`。音楽ページ・Undo/Redo・保存再読込みの18項目も成功。`/tmp/pixieed-polish-music-layer/results.json`。カメラの模擬権限拒否から画像選択／撮影／適用と32色超過の回復操作はPC／モバイルで成功。`/tmp/pixieed-shared-camera-audit.mjs`。半透明の拒否はNodeで確認し、ブラウザーでの回復操作全体は未検証。
+
+PNG/GIF実保存画素4条件成功。`/tmp/pixieed-music-image-output/results.json`。実MediaRecorder動画の静止画／アニメーション・音声ON/OFFはPC／モバイル8条件成功。`/tmp/pixieed-music-video-browser/results.json`。音声OFFではAudioContext生成0、全録画トラックの終了と共通 `/output/work/` の保存を確認。退出リソース3シナリオと途中切替で音声Context終了・ノード切断・タイマー／RAF／合成ストリーム停止を確認。`/tmp/pixieed-polish-resources-final/results.json`。既存単体カメラ／音楽の6色・保存パレット・撮影／再撮影・5トラック・再生／停止も成功。旧独立ツールの全コピー操作harnessは現在の非表示コマUIへ未対応で、全体の検証完了とはしていない。
+
+旧PXDは読み込み・保存・原本ダウンロード・複製後に音符の全項目、参照画像RGBA、未知manifest／entry、原本SHA-256が一致。複製元のrevisionとPXDハッシュも不変。`/tmp/pixieed-legacy-polish-fixed-qa/summary.json`。文字列化時のキー順による比較結果は判定に使わず、構造とbytesを比較した。
+
+仮想カーソルの初回検査はPC／390px成功、320pxの相対移動assertionは変更前と現行で同じ失敗。その後、下記の追調査で検査のタッチ対象が操作パネルであることを特定し、検査準備だけを修正して4サイズ成功した。floating mouseは変更前・現行とも4画面40項目成功。実機Safari・カメラ・音の聴取・OS safe area・実際の背景化は未検証。既存WebKitバイナリは起動できたが、現Playwrightとの組合せでページ作成が完了せず、WebKitの画面検証には使用できなかった。ブラウザーや依存のインストールはしていない。
+
+実機での最小確認は、カメラ拒否後に画像選択で復帰できること、許可した場合に撮影→描画→Undo/Redo→再入場でカメラが解放／再開すること、音楽の再生／停止とモード退出で実音が止まること。権限許可は端末利用者の操作で行う。
+
+画面PNGは `/tmp/pixieed-polish-built-complete/1280-settings-success.png`、`/tmp/pixieed-polish-built-complete/390-empty-play-visible.png`。Libraryのprepared uploadで `prepare_uploads` を利用できず、新しいLibrary IDは取得していない。ショップ／Books／nav・Offerwall・共通出力設定・V2停止を保持。HEADは `dd17f5e315a7bf3d36a780b14b50f25e1ebcc02b` のまま、今回コミット・push・本番公開はしていない。
+
+### QA1〜5対応と320px仮想カーソルの追調査
+
+QA1は再生付近の理由表示・音色設定へのボタン・フォーカス／ARIA、QA2は共通設定のEscape／外側操作・最初のパッド操作の入力消費・Back後の状態保持、QA3は適用と同期通知の競合・成功／未適用／失敗／無変更・Undo/Redo後の値、QA4は作品別の出力3設定の保存と値検証・再読込／他作品への独立性・プレビュー／出力の条件一致、QA5は色数／半透明／旧曲制限の理由と次操作・原本保存／元を変えない複製に対応した。半透明のブラウザー回復操作全体だけは未検証である。
+
+320px再現はChromium、viewport320×568、DPR3、touchあり、空作品で `/draw/` を開き、仮想カーソルOFFで中央付近の2本指ピンチ後に0キーで100%へ戻し、仮想カーソルONにして描画面中央 `(160,182)` へ1本指を置き、右へ12px動かす。元のassertionは `abs(actualDelta - 12) < 1.5`。開始／終了のカーソルはともに `(160,182)`、実測0pxだった。描画boardは `(6,104)`、308×156px、操作パネルは `(120,180)`、184×70pxで、`elementFromPoint(160,182)` は描画boardでなく `.draw-virtual-controls.draw-floating-mouse` を返す。パッドのpointerdownも生成されていない。つまり操作パネル上のタッチをパッド移動として期待していた検査前提の不一致。
+
+変更前の `/tmp/pixieed-integration-build-review-LSH6ZG/site` と現行workspaceを同じ診断harnessで別localhostポートへ配信し、外部通信遮断・同じ座標／viewport／DPR／assertionで再実行した。両方が同じpanel boundsと0pxを記録。診断は `/tmp/pixieed-virtual-baseline-diagnostic/diagnostic.json`、`/tmp/pixieed-virtual-current-diagnostic/diagnostic.json`。HEAD／変更前build／現行の `draw-virtual-cursor.mjs` SHA-256は全て `fcc93c5b9bc21e5a08ea0214f6def94ef6edf4aa8b5090b53ea28027b91800bd` で、製品入力コードは今回未変更。
+
+検査を削除したり誤差を緩めず、中央がパネルに隠れている場合だけ通常のボタンドラッグでパネルをboard下へ移す前処理をharnessへ追加した。移動時の画素不変と開始点が実際にboardへhitすることもassertする。準備後は320pxで `(160,182) → (172,182)`、期待／実測とも12px。元の全52項目と配置の画素保持1項目、計53項目が4サイズで変更前／現行とも成功。現行 `/tmp/pixieed-virtual-gestures-exposed-pad/results.json`、変更前 `/tmp/pixieed-virtual-exposed-baseline/results.json`、実測 `/tmp/pixieed-virtual-exposed-current-numeric/relative-motion.json`。製品UIの初期位置と入力処理は維持した。
+
+ユーザー影響は、操作パネルに隠れた場所ではパッド移動ができないこと。露出した描画面へ触れるか、既存のボタンドラッグでパネルを移せば操作できる。パッド自体の移動・描画・ピンチ・キャンセル／capture喪失・左右ボタン・Undo・実PNG出力は修正後の検査で成功し、この再現で作品の消失は確認されていない。初期位置を変える製品改修は既存外観保持の要望に反するため行っていない。commit／pushは引き続き行っていない。

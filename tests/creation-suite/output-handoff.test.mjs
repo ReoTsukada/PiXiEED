@@ -248,8 +248,8 @@ test('PXD project backups download directly from the editor and never navigate t
   assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
   for (const [path, pattern] of [
-    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261011-unified-project-1/],
-    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261011-unified-project-1/],
+    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261011-polish-1/],
+    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261011-polish-1/],
     ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],
     ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],
     ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261006-header-controls-1/],

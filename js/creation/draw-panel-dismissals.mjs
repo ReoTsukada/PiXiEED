@@ -1,6 +1,7 @@
 /** Draw-only dismissal chrome and input isolation for its floating editor panels. */
 export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloating, hasFloating }) {
   const doc = root.ownerDocument;
+  let sharedSettings = null;
   const panels = [
     ['#draw-settings-picker', '.draw-settings-panel', '描き方・表示の設定'],
     ['#draw-tool-picker', '.draw-tool-menu', '道具'],
@@ -70,7 +71,11 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
     const historyButton = event.target.closest?.('#draw-undo, #draw-redo');
     if (historyButton?.disabled) { event.preventDefault(); event.stopImmediatePropagation(); return; }
     const onBoard = event.target.closest?.('.draw-board');
-    if (onBoard && (detailsList().length || hasFloating())) {
+    const isSharedSettingsTarget = sharedSettings?.root?.contains(event.target)
+      || sharedSettings?.launcher?.contains(event.target);
+    const outsideSharedSettings = sharedSettings?.isOpen?.() && !isSharedSettingsTarget;
+    if (outsideSharedSettings) sharedSettings.close({ restoreFocus: false });
+    if (onBoard && (detailsList().length || hasFloating() || outsideSharedSettings)) {
       cancelInput(); closeFloating(); event.preventDefault(); event.stopImmediatePropagation(); return;
     }
     // Mode OFF owns its existing commit-and-release path; do not roll its accepted pixels back.
@@ -79,11 +84,22 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
   scope.listen(doc, 'keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
     const details = detailsList().at(-1);
-    if (!details) return;
-    // The native dialog handles Escape only after its inner disclosure closes.
-    event.preventDefault(); event.stopImmediatePropagation(); dismiss(details);
+    if (details) {
+      // The native dialog handles Escape only after its inner disclosure closes.
+      event.preventDefault(); event.stopImmediatePropagation(); dismiss(details); return;
+    }
+    if (doc.querySelector('dialog[open]')) return;
+    if (sharedSettings?.isOpen?.()) {
+      event.preventDefault(); event.stopImmediatePropagation(); sharedSettings.close({ restoreFocus: true });
+    }
   }, { capture: true });
   scope.listen(doc, 'toggle', event => {
     if (event.target.matches?.('#pxd-panel details')) event.target.querySelector('summary')?.setAttribute('aria-expanded', String(event.target.open));
   }, { capture: true });
+  return {
+    registerSharedSettings(settings) {
+      sharedSettings = settings && typeof settings.isOpen === 'function' && typeof settings.close === 'function' ? settings : null;
+      return () => { if (sharedSettings === settings) sharedSettings = null; };
+    }
+  };
 }
