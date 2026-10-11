@@ -38,7 +38,7 @@ test('drawing and music strokes visit identical connected cells in every directi
   }
 });
 
-test('independent entry pages start only their own mode factory and do not start shared mode routing', () => {
+test('entrances share the Draw shell and retain a lazy standalone Audio implementation', () => {
   for (const mode of ['draw', 'audio']) {
     const html = readFileSync(new URL(`../../${mode}/index.html`, import.meta.url), 'utf8');
     assert.match(html, new RegExp(`src="/js/creation/${mode}-entry\\.mjs\\?rev=`));
@@ -47,8 +47,18 @@ test('independent entry pages start only their own mode factory and do not start
     assert.match(source, new RegExp(`export async function mount${mode === 'draw' ? 'Draw' : 'Audio'}Mode`));
     assert.match(source, /pxdBridge = mountWorkspace\(/);
     const entry = readFileSync(new URL(`../../js/creation/${mode}-entry.mjs`, import.meta.url), 'utf8');
-    assert.match(entry, new RegExp(`import \\{ mount${mode === 'draw' ? 'Draw' : 'Audio'}Mode \\} from './${mode}-page\\.mjs`));
-    assert.match(entry, /await mount(?:Draw|Audio)Mode\(\{ scope \}\)/);
+    if (mode === 'draw') assert.match(entry, /import \{ mountDrawMode \} from '.\/draw-page\.mjs/);
+    if (mode === 'draw') {
+      assert.match(entry, /await mountDrawMode\(\{ scope: drawScope/);
+      assert.ok(entry.indexOf('await mountDrawMode') < entry.indexOf("await import('./creation-modes.mjs"));
+      assert.doesNotMatch(entry, /from ['"][^'"]*(?:audio-page|pixel-lens\/app)/);
+    } else {
+      assert.match(entry, /creationModeEntryUrl\('audio', location.search\)/);
+      assert.match(entry, /await import\('\.\/audio-page\.mjs/);
+      assert.doesNotMatch(entry, /import \{ mountAudioMode \} from/);
+      assert.match(entry, /await mountAudioMode\(\{ scope \}\)/);
+      assert.doesNotMatch(entry, /creation-modes\.mjs/);
+    }
     assert.doesNotMatch(entry, /popstate|setModeAdapter|creation-app/);
   }
 });

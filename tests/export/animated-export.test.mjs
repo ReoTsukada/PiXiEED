@@ -78,3 +78,12 @@ test('blocked workers never force an unbounded export on the main thread', async
   const source = Array.from({ length: 40 }, () => ({ width: 512, height: 512, data: new Uint8Array(512 * 512 * 4) }));
   await assert.rejects(encodeAnimatedGif(source, { workerFactory() { throw new Error('blocked'); } }), RangeError);
 });
+
+
+test('aborting before the worker-free deferred start does not begin synchronous compression', async () => {
+  const controller = new AbortController(); let progress = 0;
+  const pending = encodeAnimatedGif(frames(), { workerFactory: () => null, signal: controller.signal, onProgress: () => progress++ });
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(progress, 0);
+});

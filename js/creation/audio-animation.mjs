@@ -2,13 +2,34 @@ import { composeAnimationFrame, getAnimationCelDocument, validateAnimation, writ
 import {
   AUDIO_PPQ, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_TICKS, AUDIO_SHARED_IMAGE_MAX_DIMENSION,
   createAudioRowPitchMap, extendAudioLoopForImage, validateAudioSong
-} from './audio-core.mjs';
+} from './audio-core.mjs?rev=20261011-legacy-frames-1';
 
 export const AUDIO_ANIMATION_LINK_VERSION = 'shared-animation-v1';
 export const AUDIO_ANIMATION_MAX_NOTES = 100_000;
 export const AUDIO_ANIMATION_MAX_COLORS = 32;
 
 const rgbaId = (color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}`;
+
+// Optional timing for old compressed images. Standard links retain the exact v1 representation.
+export function audioAnimationFrameTicks(link, width = link?.width) {
+  if (!link?.timing) return width * AUDIO_PIXEL_TICKS;
+  const timing = link.timing;
+  if (timing.rulesVersion !== 'loop-ratio-v1' || !Number.isSafeInteger(timing.ticksPerFrame)
+      || timing.ticksPerFrame < width) throw new TypeError('保存したコマの時間情報が不正です。');
+  return timing.ticksPerFrame;
+}
+export function audioAnimationCellTiming(link, x, frameIndex = 0, width = link?.width) {
+  const frameTicks = audioAnimationFrameTicks(link, width);
+  const localStart = Math.floor(x * frameTicks / width);
+  return { startTick: frameIndex * frameTicks + localStart,
+    durationTicks: Math.max(1, Math.floor((x + 1) * frameTicks / width) - localStart) };
+}
+export function audioAnimationSequenceColumn(link, tick, width = link?.width) {
+  const frameTicks = audioAnimationFrameTicks(link, width);
+  const frameIndex = Math.floor(tick / frameTicks), localTick = tick % frameTicks;
+  // Invert the rounded column boundaries (31 columns may alternate 61/62 ticks).
+  return frameIndex * width + Math.min(width - 1, Math.ceil((localTick + 1) * width / frameTicks) - 1);
+}
 
 function validatePitchMap(rowPitchMap, height) {
   if (!Array.isArray(rowPitchMap) || rowPitchMap.length !== height) return false;
@@ -106,7 +127,7 @@ function validateSequenceLink(song, animation, { rowPitchMap, frameRowPitchMaps 
   }
 }
 
-export function createAudioAnimationLink(song, animation, { rowPitchMap = null, frameRowPitchMaps = null, frameCellPitchMaps = null, colorToSlot = null, projectionReady = false } = {}) {
+export function createAudioAnimationLink(song, animation, { rowPitchMap = null, frameRowPitchMaps = null, frameCellPitchMaps = null, colorToSlot = null, projectionReady = false, timing = null } = {}) {
   validateAudioSong(song); validateAnimation(animation);
   if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('音楽に使えるアニメーションは256pxまでです。');
   if (animation.palette.length > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える色は32色までです。');
@@ -116,6 +137,7 @@ export function createAudioAnimationLink(song, animation, { rowPitchMap = null, 
   const mapping = { ...(colorToSlot || {}) };
   for (const color of animation.palette) { const id = rgbaId(color); if (!Object.hasOwn(mapping, id)) mapping[id] = null; }
   validateSequenceLink(song, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping });
+  const frameTicks = audioAnimationFrameTicks({ timing }, animation.width);
   return {
     rulesVersion: AUDIO_ANIMATION_LINK_VERSION,
     imageRole: 'audio',
@@ -127,7 +149,8 @@ export function createAudioAnimationLink(song, animation, { rowPitchMap = null, 
     ...(Object.keys(cellPitches).length ? { frameCellPitchMaps: cellPitches } : {}),
     ticksPerCell: AUDIO_PIXEL_TICKS,
     colorToSlot: mapping,
-    sequenceTicks: animation.frames.length * animation.width * AUDIO_PIXEL_TICKS,
+    sequenceTicks: animation.frames.length * frameTicks,
+    ...(timing ? { timing: { ...timing, frameOffsets: animation.frames.map((_, index) => index * frameTicks) } } : {}),
     loopTicks: song.loopTicks,
     projectionReady: Boolean(projectionReady)
   };
@@ -164,7 +187,8 @@ export function prepareAudioAnimationImport(song, animation, {
   frameCellPitchMaps = null,
   colorToSlot = null,
   composeFrame = composeAnimationFrame,
-  maxNotes = AUDIO_ANIMATION_MAX_NOTES
+  maxNotes = AUDIO_ANIMATION_MAX_NOTES,
+  timing = null
 } = {}) {
   validateAudioSong(song); validateAnimation(animation);
   if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('音楽に使えるアニメーションは256pxまでです。');
@@ -182,7 +206,8 @@ export function prepareAudioAnimationImport(song, animation, {
   }
   validateSequenceLink(song, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping });
 
-  const nextSong = extendAudioLoopForImage(song, animation.width, { frameCount: animation.frames.length });
+  const frameTicks = audioAnimationFrameTicks({ timing }, animation.width);
+  const nextSong = extendAudioLoopForImage(song, animation.width, { frameCount: animation.frames.length, frameTicks });
   const tracks = fillClipGaps(nextSong).map((track) => ({
     ...track,
     clips: track.clips.map((clip) => ({
@@ -213,16 +238,16 @@ export function prepareAudioAnimationImport(song, animation, {
     if (!slotId || pitch === null) return;
     if (++noteCount > maxNotes) throw new RangeError(`音符が上限（${maxNotes.toLocaleString()}個）を超えました。フレーム数か描画量を減らしてください。`);
     const sequenceX = frameIndex * animation.width + x;
-    const startTick = sequenceX * AUDIO_PIXEL_TICKS;
+    const { startTick, durationTicks } = audioAnimationCellTiming({ timing }, x, frameIndex, animation.width);
     const track = tracksBySlot.get(slotId);
-    const clip = track?.clips.find((item) => startTick >= item.startTick && startTick + AUDIO_PIXEL_TICKS <= item.startTick + item.lengthTicks);
+    const clip = track?.clips.find((item) => startTick >= item.startTick && startTick + durationTicks <= item.startTick + item.lengthTicks);
     if (!clip) throw new RangeError('音楽ページの時間範囲を作れませんでした。曲の内容は保持されています。');
     const prior = priorCells.get(`animation:${frame.id}:${x}:${y}`)?.find((note) => {
       const source = note.sourceCell;
       return Number.isInteger(source.frameIndex)
         && source.x === source.frameIndex * animation.width + source.localX
-        && note.startTick === source.x * AUDIO_PIXEL_TICKS
-        && note.pitch === pitch && note.durationTicks === AUDIO_PIXEL_TICKS && note.colorId === colorId;
+        && note.startTick === audioAnimationCellTiming({ timing }, source.localX, source.frameIndex, animation.width).startTick
+        && note.pitch === pitch && note.durationTicks === durationTicks && note.colorId === colorId;
     });
     let noteId = prior?.noteId && !usedIds.has(prior.noteId)
       ? prior.noteId
@@ -230,7 +255,7 @@ export function prepareAudioAnimationImport(song, animation, {
     let suffix = 1;
     while (usedIds.has(noteId)) noteId = `animation-${song.songId}-${frame.id}-${x}-${y}-${suffix++}`;
     usedIds.add(noteId);
-    clip.notes.push({ ...(prior || {}), noteId, pitch, startTick, durationTicks: AUDIO_PIXEL_TICKS, velocity: prior?.velocity ?? 96,
+    clip.notes.push({ ...(prior || {}), noteId, pitch, startTick, durationTicks, velocity: prior?.velocity ?? 96,
       colorId, sourceCell: { kind: 'audio-animation', frameId: frame.id, frameIndex, x: sequenceX, localX: x, y } });
   };
 
@@ -254,7 +279,7 @@ export function prepareAudioAnimationImport(song, animation, {
   const resultSong = validateAudioSong({ ...nextSong, tracks });
   return {
     song: resultSong,
-    link: createAudioAnimationLink(resultSong, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping, projectionReady: true }),
+    link: createAudioAnimationLink(resultSong, animation, { rowPitchMap: pitches, frameRowPitchMaps: framePitches, frameCellPitchMaps: cellPitches, colorToSlot: mapping, projectionReady: true, timing }),
     animation,
     noteCount,
     durationSeconds: resultSong.loopTicks * 60 / resultSong.tempo / AUDIO_PPQ
@@ -264,10 +289,12 @@ export function prepareAudioAnimationImport(song, animation, {
 export function validateAudioAnimationBinding(song, animation, link) {
   validateAudioSong(song); validateAnimation(animation);
   if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.palette.length > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える絵は256px、32色までです。');
+  const frameTicks = audioAnimationFrameTicks(link, animation.width);
+  if (link?.timing && JSON.stringify(link.timing.frameOffsets) !== JSON.stringify(animation.frames.map((_, index) => index * frameTicks))) throw new TypeError('保存したコマの時間オフセットが一致しません。');
   if (link?.rulesVersion !== AUDIO_ANIMATION_LINK_VERSION || link.imageRole !== 'audio'
       || link.width !== animation.width || link.height !== animation.height
       || !Array.isArray(link.frameIds) || JSON.stringify(link.frameIds) !== JSON.stringify(animation.frames.map(({ id }) => id))
-      || link.ticksPerCell !== AUDIO_PIXEL_TICKS || link.sequenceTicks !== animation.frames.length * animation.width * AUDIO_PIXEL_TICKS
+      || link.ticksPerCell !== AUDIO_PIXEL_TICKS || link.sequenceTicks !== animation.frames.length * frameTicks
       || link.loopTicks !== song.loopTicks) throw new TypeError('音楽ページとアニメーションの保存情報が一致しません。');
   validateSequenceLink(song, animation, link);
   // A pending external frame edit intentionally retains the last projected
@@ -281,7 +308,8 @@ export function validateAudioAnimationBinding(song, animation, link) {
     if (frameIndex < 0 || frameIndex !== source.frameIndex || source.x !== frameIndex * animation.width + source.localX
         || source.y < 0 || source.y >= animation.height || source.localX < 0 || source.localX >= animation.width
         || note.pitch !== getAudioAnimationCellPitch(link, source.frameId, source.localX, source.y)
-        || note.startTick !== source.x * AUDIO_PIXEL_TICKS) throw new TypeError('アニメーション音符の位置が不正です。');
+        || note.startTick !== audioAnimationCellTiming(link, source.localX, frameIndex).startTick
+        || (link.timing && note.durationTicks !== audioAnimationCellTiming(link, source.localX, frameIndex).durationTicks)) throw new TypeError('アニメーション音符の位置が不正です。');
   }
   return song;
 }

@@ -352,7 +352,7 @@ try {
     } finally { await context.close(); }
   }
 
-  // The unpublished room preview keeps product/help close buttons exposed over long synthetic dialog content.
+  // The room preview presents the full catalog as ordinary scrollable product cards.
   for (const viewport of [
     { width: 320, height: 568 },
     { width: 390, height: 844 },
@@ -369,50 +369,41 @@ try {
     });
     try {
       await page.goto(`${base}/books/room-preview.html`, { waitUntil: 'domcontentloaded' });
-      await page.locator('#room-help').waitFor();
-      await page.waitForFunction(() => {
-        const select = document.querySelector('#room-product-select');
-        return select && [...select.options].some((option) => option.value === 'product-dot-classroom');
+      const products = page.locator('[data-books-product-id]');
+      await products.first().waitFor();
+      const catalogRecords = JSON.parse(await readFile(join(process.cwd(), 'assets/books/room-products.json'), 'utf8'));
+      const expectedProductCount = catalogRecords.filter(p => p && p.enabled !== false && p.visible !== false && !p.sample).length;
+      assert.equal(await products.count(), expectedProductCount, 'room preview has every enabled static product article');
+      assert.equal(await page.locator('canvas, #room-help-dialog, #room-product-dialog, #room-help, #room-product-open').count(), 0,
+        'room preview has no canvas or legacy operation dialogs/controls');
+      assert.match(await page.locator('meta[name="robots"]').getAttribute('content') || '', /noindex/i,
+        'room preview remains noindex');
+
+      await products.first().locator('.product-card__description').evaluate((node) => {
+        node.textContent = '長い合成商品説明です。'.repeat(1200);
       });
-      for (const kind of ['help', 'product']) {
-        if (kind === 'help') {
-          await page.locator('#room-help').click();
-          await page.locator('#room-help-dialog').evaluate((dialog) => {
-            const step = dialog.querySelector('.room-help-steps li');
-            step.textContent = '長い合成ヘルプ本文です。'.repeat(1200);
-          });
-        } else {
-          await page.locator('#room-product-select').selectOption('product-dot-classroom');
-          await page.locator('#room-product-open').click();
-          await page.locator('#room-product-dialog').waitFor({ state: 'visible' });
-          await page.locator('#room-product-description').evaluate((node) => { node.textContent = '長い合成商品説明です。'.repeat(1200); });
-        }
-        const dialog = page.locator(kind === 'help' ? '#room-help-dialog' : '#room-product-dialog');
-        const scrollArea = dialog.locator('.room-dialog__layout');
-        const maxScroll = await scrollArea.evaluate((node) => node.scrollHeight - node.clientHeight);
-        assert.ok(maxScroll > 200, `room ${kind} has scroll range at ${viewport.width}x${viewport.height}: ${maxScroll}`);
-        for (const point of ['top', 'middle', 'bottom']) {
-          const stateAtPoint = await scrollArea.evaluate((node, point) => {
-            const max = node.scrollHeight - node.clientHeight;
-            node.scrollTop = point === 'top' ? 0 : point === 'middle' ? max / 2 : max;
-            const close = node.parentElement.querySelector('.room-dialog__close');
-            const rect = close.getBoundingClientRect();
-            const dialogRect = node.parentElement.getBoundingClientRect();
-            const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-            const hit = document.elementFromPoint(center.x, center.y);
-            return { scrollTop: node.scrollTop, width: rect.width, height: rect.height, rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, dialog: { left: dialogRect.left, right: dialogRect.right, top: dialogRect.top, bottom: dialogRect.bottom }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === close || close.contains(hit) };
-          }, point);
-          assert.ok(stateAtPoint.width >= 44 && stateAtPoint.height >= 44, `room ${kind} close touch size ${point}: ${JSON.stringify(stateAtPoint)}`);
-          assert.ok(stateAtPoint.rect.left >= 0 && stateAtPoint.rect.right <= viewport.width && stateAtPoint.rect.top >= 0 && stateAtPoint.rect.bottom <= viewport.height, `room ${kind} close is in viewport ${point}: ${JSON.stringify(stateAtPoint)}`);
-          assert.ok(stateAtPoint.rect.left >= stateAtPoint.dialog.left && stateAtPoint.rect.right <= stateAtPoint.dialog.right && stateAtPoint.rect.top >= stateAtPoint.dialog.top && stateAtPoint.rect.bottom <= stateAtPoint.dialog.bottom, `room ${kind} close is in dialog ${point}: ${JSON.stringify(stateAtPoint)}`);
-          assert.ok(stateAtPoint.hit, `room ${kind} close receives elementFromPoint ${point}: ${JSON.stringify(stateAtPoint)}`);
-        }
-        const closeRect = await dialog.locator('.room-dialog__close').boundingBox();
-        await page.mouse.click(closeRect.x + closeRect.width / 2, closeRect.y + closeRect.height / 2);
-        await dialog.waitFor({ state: 'hidden' });
-      }
+      const layout = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('[data-books-product-id]')];
+        const last = cards[cards.length - 1].getBoundingClientRect();
+        return {
+          scrollHeight: document.documentElement.scrollHeight,
+          clientHeight: document.documentElement.clientHeight,
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+          productCount: cards.length,
+          lastTop: last.top,
+        };
+      });
+      assert.ok(layout.scrollHeight > layout.clientHeight, `catalog scrolls vertically: ${JSON.stringify(layout)}`);
+      assert.ok(layout.scrollWidth <= layout.clientWidth, `catalog has no horizontal overflow: ${JSON.stringify(layout)}`);
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      const lastCard = products.last();
+      await lastCard.scrollIntoViewIfNeeded();
+      const lastCardBox = await lastCard.boundingBox();
+      assert.ok(lastCardBox && lastCardBox.y + lastCardBox.height > 0 && lastCardBox.y < viewport.height,
+        `last product enters the viewport after scrolling: ${JSON.stringify({ layout, lastCardBox })}`);
       assertNoPageErrors();
-      check(`books preview help/product close top/middle/bottom ${viewport.width}x${viewport.height}`);
+      check(`books preview catalog scroll/no-overflow ${viewport.width}x${viewport.height}`);
     } finally { await context.close(); }
   }
 

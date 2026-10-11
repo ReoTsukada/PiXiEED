@@ -3,6 +3,7 @@ export const ANIMATION_SCHEMA_VERSION = 1;
 export const ANIMATION_TILE_SIZE = 32;
 export const ANIMATION_MAX_DIMENSION = 256;
 export const ANIMATION_MAX_LAYERS = 8;
+export const ANIMATION_MAX_LAYERS_WITH_MUSIC = ANIMATION_MAX_LAYERS + 1;
 export const ANIMATION_MAX_FRAMES = 128;
 export const ANIMATION_MAX_COLORS = 32;
 export const ANIMATION_PIXEL_BUDGET = 32 * 1024 * 1024;
@@ -43,6 +44,17 @@ function ensureCell(animation, frameId, layerId) {
   if (!animation.frames.some((item) => item.id === frameId)) throw new TypeError('指定したフレームがありません。');
   if (!animation.layers.some((item) => item.id === layerId)) throw new TypeError('指定したレイヤーがありません。');
 }
+function musicLayer(animation) { return animation.layers.find((layer) => layer.role === 'music') ?? null; }
+function canonicalFrameId(animation, frameId, layerId) { return musicLayer(animation)?.id === layerId ? animation.frames[0].id : frameId; }
+function validateMusicLayers(layers) {
+  const indices = [];
+  layers.forEach((layer, index) => {
+    if (Object.hasOwn(layer, 'role') && typeof layer.role !== 'string') throw new TypeError('レイヤーの役割情報が不正です。');
+    if (layer.role === 'music') indices.push(index);
+  });
+  if (indices.length > 1 || indices.length === 1 && indices[0] !== 0) throw new TypeError('音楽レイヤーは最下段に1枚だけ配置できます。');
+  if (layers.length > ANIMATION_MAX_LAYERS + (indices.length ? 1 : 0)) throw new RangeError('レイヤーは通常8枚と音楽1枚までです。');
+}
 function dimensionsFor(animation, tx, ty) { const x = tx * ANIMATION_TILE_SIZE; const y = ty * ANIMATION_TILE_SIZE; return { x, y, width: Math.min(ANIMATION_TILE_SIZE, animation.width - x), height: Math.min(ANIMATION_TILE_SIZE, animation.height - y) }; }
 function blankTile(animation, tx, ty) { const { width, height } = dimensionsFor(animation, tx, ty); return new Uint8Array(width * height); }
 function payloadSize(pool) { let total = 0; for (const entry of pool.values()) total += entry.bytes.byteLength; return total; }
@@ -81,7 +93,7 @@ function writeCelMaps(animation, cels, pool, hashIndex, frameId, layerId, source
   if (payloadSize(pool) > ANIMATION_PIXEL_BUDGET) throw new RangeError('アニメーション画素の保存上限を超えます。');
 }
 function renderPixels(animation, frameId, layerId, { visibleOnly = false, composition = null } = {}) {
-  ensureCell(animation, frameId, layerId); const pixels = new Uint8Array(animation.width * animation.height); const data = internal(animation);
+  ensureCell(animation, frameId, layerId); frameId = canonicalFrameId(animation, frameId, layerId); const pixels = new Uint8Array(animation.width * animation.height); const data = internal(animation);
   const tiles = data.cels.get(keyOf(frameId, layerId)) ?? new Map();
   for (const [key, id] of tiles) {
     const [tx, ty] = key.split(',').map(Number); const { x, y, width, height } = dimensionsFor(animation, tx, ty); const bytes = data.pool.get(id)?.bytes;
@@ -115,12 +127,13 @@ export function validateAnimation(animation) {
   if (validatedSnapshots.has(animation)) return animation;
   if (!animation || animation.schemaVersion !== ANIMATION_SCHEMA_VERSION || !Number.isInteger(animation.width) || !Number.isInteger(animation.height)) throw new TypeError('アニメーション形式に対応していません。');
   dimensions(animation.width, animation.height); assertPalette(animation.palette);
-  if (!Array.isArray(animation.frames) || animation.frames.length < 1 || animation.frames.length > ANIMATION_MAX_FRAMES || !Array.isArray(animation.layers) || animation.layers.length < 1 || animation.layers.length > ANIMATION_MAX_LAYERS) throw new RangeError('コマまたはレイヤーの上限を超えています。');
+  if (!Array.isArray(animation.frames) || animation.frames.length < 1 || animation.frames.length > ANIMATION_MAX_FRAMES || !Array.isArray(animation.layers) || animation.layers.length < 1 || animation.layers.length > ANIMATION_MAX_LAYERS_WITH_MUSIC) throw new RangeError('コマまたはレイヤーの上限を超えています。');
+  validateMusicLayers(animation.layers);
   const ids = new Set();
   for (const frame of animation.frames) { if (!frame || typeof frame.id !== 'string' || ids.has(frame.id) || !Number.isFinite(frame.durationMs) || frame.durationMs < 1 || frame.durationMs > 60000) throw new TypeError('フレーム情報が不正です。'); ids.add(frame.id); }
   ids.clear(); for (const layer of animation.layers) { if (!layer || typeof layer.id !== 'string' || ids.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') throw new TypeError('レイヤー情報が不正です。'); ids.add(layer.id); }
   const data = internals.get(animation); if (!data) throw new TypeError('このアニメーションは内部状態を持ちません。');
-  for (const [key, tiles] of data.cels) { const [frameId, layerId] = key.split('\u0000'); ensureCell(animation, frameId, layerId); if (!(tiles instanceof Map)) throw new TypeError('アニメーションの参照表が壊れています。'); for (const [position, id] of tiles) { const [tx, ty] = position.split(',').map(Number); const { width, height } = dimensionsFor(animation, tx, ty); const entry = data.pool.get(id); if (!Number.isInteger(tx) || !Number.isInteger(ty) || tx < 0 || ty < 0 || tx * ANIMATION_TILE_SIZE >= animation.width || ty * ANIMATION_TILE_SIZE >= animation.height || !entry || entry.bytes.length !== width * height) throw new TypeError('アニメーションのタイル参照が壊れています。'); } }
+  for (const [key, tiles] of data.cels) { const [frameId, layerId] = key.split('\u0000'); ensureCell(animation, frameId, layerId); if (musicLayer(animation)?.id === layerId && frameId !== animation.frames[0].id) fail('PXD_ANIMATION_MUSIC_CEL', '音楽レイヤーに非共有コマがあります。'); if (!(tiles instanceof Map)) throw new TypeError('アニメーションの参照表が壊れています。'); for (const [position, id] of tiles) { const [tx, ty] = position.split(',').map(Number); const { width, height } = dimensionsFor(animation, tx, ty); const entry = data.pool.get(id); if (!Number.isInteger(tx) || !Number.isInteger(ty) || tx < 0 || ty < 0 || tx * ANIMATION_TILE_SIZE >= animation.width || ty * ANIMATION_TILE_SIZE >= animation.height || !entry || entry.bytes.length !== width * height) throw new TypeError('アニメーションのタイル参照が壊れています。'); } }
   for (const entry of data.pool.values()) if (containsOutOfRangeValue(entry.bytes, animation.palette.length)) throw new TypeError('アニメーションのタイル参照が壊れています。');
   if (payloadSize(data.pool) > ANIMATION_PIXEL_BUDGET) throw new RangeError('アニメーション画素の保存上限を超えています。');
   validatedSnapshots.add(animation);
@@ -130,7 +143,7 @@ export function getAnimationCelDocument(animation, frameId, layerId) { return do
 /** Return whether a cel has any non-transparent sparse tiles without materializing its pixel array. */
 export function hasAnimationCelContent(animation, frameId, layerId) {
   ensureCell(animation, frameId, layerId);
-  return internal(animation).cels.get(keyOf(frameId, layerId))?.size > 0;
+  return internal(animation).cels.get(keyOf(canonicalFrameId(animation, frameId, layerId), layerId))?.size > 0;
 }
 /** Return legacy Draw palette indices used outside one optionally active cel (transparent is -1). */
 export function getAnimationUsedColorIndices(animation, { excludeFrameId, excludeLayerId } = {}) {
@@ -140,8 +153,8 @@ export function getAnimationUsedColorIndices(animation, { excludeFrameId, exclud
   const used = new Set(); const checkedTiles = new Set(); const data = internal(animation);
   const expectedTileCount = Math.ceil(animation.width / ANIMATION_TILE_SIZE) * Math.ceil(animation.height / ANIMATION_TILE_SIZE);
   for (const frame of animation.frames) for (const layer of animation.layers) {
-    if (frame.id === excludeFrameId && layer.id === excludeLayerId) continue;
-    const tiles = data.cels.get(keyOf(frame.id, layer.id));
+    if ((layer.id === excludeLayerId && layer.role === 'music') || (frame.id === excludeFrameId && layer.id === excludeLayerId)) continue;
+    const tiles = data.cels.get(keyOf(canonicalFrameId(animation, frame.id, layer.id), layer.id));
     if (!tiles?.size || tiles.size < expectedTileCount) used.add(-1);
     for (const id of tiles?.values() ?? []) {
       if (checkedTiles.has(id)) continue;
@@ -153,18 +166,18 @@ export function getAnimationUsedColorIndices(animation, { excludeFrameId, exclud
   }
   return used;
 }
-export function composeAnimationFrame(animation, frameId, { layerIds } = {}) {
+export function composeAnimationFrame(animation, frameId, { layerIds, excludeMusic = false } = {}) {
   if (!animation.frames.some((frame) => frame.id === frameId)) throw new TypeError('指定したフレームがありません。');
   const pixels = new Uint8Array(animation.width * animation.height);
   const selected = layerIds === undefined ? null : new Set(layerIds);
   if (selected && [...selected].some((id) => !animation.layers.some((layer) => layer.id === id))) throw new TypeError('合成するレイヤーを確認してください。');
-  for (const layer of animation.layers) if (layer.visible && (!selected || selected.has(layer.id))) { const next = renderPixels(animation, frameId, layer.id); for (let i = 0; i < pixels.length; i += 1) if (next[i]) pixels[i] = next[i]; }
+  for (const layer of animation.layers) if ((!excludeMusic || layer.role !== 'music') && layer.visible && (!selected || selected.has(layer.id))) { const next = renderPixels(animation, frameId, layer.id); for (let i = 0; i < pixels.length; i += 1) if (next[i]) pixels[i] = next[i]; }
   return docFromPixels(animation, pixels);
 }
 export function writeAnimationCel(animation, frameId, layerId, document) {
-  validateAnimation(animation); if (document?.width !== animation.width || document?.height !== animation.height) throw new RangeError('コマの大きさはキャンバスと一致させてください。');
+  validateAnimation(animation); ensureCell(animation, frameId, layerId); if (document?.width !== animation.width || document?.height !== animation.height) throw new RangeError('コマの大きさはキャンバスと一致させてください。');
   const source = document.pixels; const result = cloneState(animation); const data = internals.get(result);
-  writeCelMaps(result, data.cels, data.pool, data.hashIndex, frameId, layerId, source); return result;
+  writeCelMaps(result, data.cels, data.pool, data.hashIndex, canonicalFrameId(result, frameId, layerId), layerId, source); return result;
 }
 export function addAnimationFrame(animation, { sourceFrameId = animation.frames.at(-1)?.id, durationMs, copy = true } = {}) {
   validateAnimation(animation); if (animation.frames.length >= ANIMATION_MAX_FRAMES) throw new RangeError('コマは128枚までです.');
@@ -172,27 +185,42 @@ export function addAnimationFrame(animation, { sourceFrameId = animation.frames.
   if (typeof copy !== 'boolean') throw new TypeError('コマの複製設定が不正です。');
   const result = cloneState(animation); const source = result.frames.find(({ id }) => id === sourceFrameId); const frame = { id: newId('frame'), durationMs: durationMs ?? source.durationMs };
   const meta = { ...result, frames: [...result.frames, frame] }; const data = internals.get(result);
-  if (copy) for (const layer of result.layers) { const tiles = data.cels.get(keyOf(sourceFrameId, layer.id)); if (tiles) data.cels.set(keyOf(frame.id, layer.id), new Map(tiles)); }
+  if (copy) for (const layer of result.layers) { if (layer.role === 'music') continue; const tiles = data.cels.get(keyOf(sourceFrameId, layer.id)); if (tiles) data.cels.set(keyOf(frame.id, layer.id), new Map(tiles)); }
   return makeAnimation(meta, data.cels, data.pool, { share: true });
 }
 export function removeAnimationFrame(animation, frameId) {
   validateAnimation(animation); if (animation.frames.length <= 1) throw new RangeError('最後のコマは削除できません。'); if (!animation.frames.some(({ id }) => id === frameId)) throw new TypeError('指定したフレームがありません。');
-  const result = cloneState(animation); const data = internals.get(result); for (const layer of result.layers) data.cels.delete(keyOf(frameId, layer.id)); gc(data.pool, data.hashIndex, data.cels); return makeAnimation({ ...result, frames: result.frames.filter(({ id }) => id !== frameId) }, data.cels, data.pool, { share: true });
+  const result = cloneState(animation); const data = internals.get(result); const frames = result.frames.filter(({ id }) => id !== frameId); const nextFirstId = frames[0].id;
+  for (const layer of result.layers) {
+    if (layer.role === 'music') {
+      if (frameId === animation.frames[0].id) { const cel = data.cels.get(keyOf(frameId, layer.id)); data.cels.delete(keyOf(frameId, layer.id)); if (cel) data.cels.set(keyOf(nextFirstId, layer.id), cel); }
+    } else data.cels.delete(keyOf(frameId, layer.id));
+  }
+  gc(data.pool, data.hashIndex, data.cels); return makeAnimation({ ...result, frames }, data.cels, data.pool, { share: true });
 }
-export function moveAnimationFrame(animation, frameId, index) { validateAnimation(animation); const frames = [...animation.frames]; const from = frames.findIndex(({ id }) => id === frameId); if (from < 0 || !Number.isInteger(index) || index < 0 || index >= frames.length) throw new RangeError('コマの順序を確認してください。'); frames.splice(index, 0, frames.splice(from, 1)[0]); return makeAnimation({ ...animation, frames }, internal(animation).cels, internal(animation).pool, { share: true }); }
+export function moveAnimationFrame(animation, frameId, index) { validateAnimation(animation); const frames = [...animation.frames]; const from = frames.findIndex(({ id }) => id === frameId); if (from < 0 || !Number.isInteger(index) || index < 0 || index >= frames.length) throw new RangeError('コマの順序を確認してください。'); frames.splice(index, 0, frames.splice(from, 1)[0]); const data = internal(animation); const cels = new Map(data.cels); const music = musicLayer(animation); if (music && frames[0].id !== animation.frames[0].id) { const cel = cels.get(keyOf(animation.frames[0].id, music.id)); cels.delete(keyOf(animation.frames[0].id, music.id)); if (cel) cels.set(keyOf(frames[0].id, music.id), cel); } return makeAnimation({ ...animation, frames }, cels, data.pool, { share: true }); }
 export function addAnimationLayer(animation, { name = `Layer ${animation.layers.length + 1}`, visible = true, locked = false } = {}) {
-  validateAnimation(animation); if (animation.layers.length >= ANIMATION_MAX_LAYERS) throw new RangeError('レイヤーは8枚までです。');
+  validateAnimation(animation); if (animation.layers.filter((layer) => layer.role !== 'music').length >= ANIMATION_MAX_LAYERS) throw new RangeError('通常レイヤーは8枚までです。');
   if (typeof name !== 'string' || typeof visible !== 'boolean' || typeof locked !== 'boolean') throw new TypeError('レイヤー情報が不正です。');
   return makeAnimation({ ...animation, layers: [...animation.layers, { id: newId('layer'), name, visible, locked }] }, internal(animation).cels, internal(animation).pool, { share: true });
 }
+export function ensureAnimationMusicLayer(animation) {
+  validateAnimation(animation);
+  if (musicLayer(animation)) return animation;
+  const layer = { id: newId('layer'), name: 'Music', visible: false, locked: false, role: 'music' };
+  return makeAnimation({ ...animation, layers: [layer, ...animation.layers] }, internal(animation).cels, internal(animation).pool, { share: true });
+}
 export function removeAnimationLayer(animation, layerId) {
   validateAnimation(animation); if (animation.layers.length <= 1) throw new RangeError('最後のレイヤーは削除できません。'); if (!animation.layers.some(({ id }) => id === layerId)) throw new TypeError('指定したレイヤーがありません。');
+  if (animation.layers.find(({ id }) => id === layerId)?.role === 'music') throw new TypeError('音楽レイヤーは削除できません。');
   const result = cloneState(animation); const data = internals.get(result); for (const frame of result.frames) data.cels.delete(keyOf(frame.id, layerId)); gc(data.pool, data.hashIndex, data.cels); return makeAnimation({ ...result, layers: result.layers.filter(({ id }) => id !== layerId) }, data.cels, data.pool, { share: true });
 }
-export function moveAnimationLayer(animation, layerId, index) { validateAnimation(animation); const layers = [...animation.layers]; const from = layers.findIndex(({ id }) => id === layerId); if (from < 0 || !Number.isInteger(index) || index < 0 || index >= layers.length) throw new RangeError('レイヤーの順序を確認してください。'); layers.splice(index, 0, layers.splice(from, 1)[0]); return makeAnimation({ ...animation, layers }, internal(animation).cels, internal(animation).pool, { share: true }); }
+export function moveAnimationLayer(animation, layerId, index) { validateAnimation(animation); const layers = [...animation.layers]; const from = layers.findIndex(({ id }) => id === layerId); if (from < 0 || !Number.isInteger(index) || index < 0 || index >= layers.length) throw new RangeError('レイヤーの順序を確認してください。'); const layer = layers[from]; if (layer.role === 'music' && index !== 0 || layer.role !== 'music' && index === 0 && musicLayer(animation)) throw new TypeError('音楽レイヤーは最下段に固定されています。'); layers.splice(index, 0, layers.splice(from, 1)[0]); validateMusicLayers(layers); return makeAnimation({ ...animation, layers }, internal(animation).cels, internal(animation).pool, { share: true }); }
 export function setLayerProperties(animation, layerId, properties = {}) {
   validateAnimation(animation); const layer = animation.layers.find(({ id }) => id === layerId); if (!layer) throw new TypeError('指定したレイヤーがありません。');
+  if (layer.role === 'music' && Object.hasOwn(properties, 'role') && properties.role !== 'music' || layer.role !== 'music' && properties.role === 'music') throw new TypeError('音楽レイヤーの役割は変更できません。');
   const updated = { ...layer, ...properties, id: layer.id }; if (typeof updated.name !== 'string' || typeof updated.visible !== 'boolean' || typeof updated.locked !== 'boolean') throw new TypeError('レイヤー情報が不正です。');
+  validateMusicLayers(animation.layers.map((item) => item.id === layerId ? updated : item));
   return makeAnimation({ ...animation, layers: animation.layers.map((item) => item.id === layerId ? updated : item) }, internal(animation).cels, internal(animation).pool, { share: true });
 }
 export function setAnimationPalette(animation, palette) {
@@ -220,6 +248,7 @@ export function resizeAnimation(animation, width, height, options = {}) {
   if (resample !== undefined && resample !== 'nearest') throw new TypeError('再標本化方式は nearest から選んでください。');
   const resized = { ...animation, width, height }; const cels = new Map(); const pool = new Map(); const hashIndex = new Map();
   for (const frame of animation.frames) for (const layer of animation.layers) {
+    if (layer.role === 'music' && frame.id !== animation.frames[0].id) continue;
     const doc = getAnimationCelDocument(animation, frame.id, layer.id); const pixels = new Uint8Array(width * height);
     if (resample === 'nearest') {
       for (let y = 0; y < height; y += 1) {
@@ -244,10 +273,12 @@ export function resizeAnimation(animation, width, height, options = {}) {
 export function serializeAnimationPool(animation) {
   validateAnimation(animation); const data = internal(animation); const tiles = [];
   const copied = new Set();
-  for (const frame of animation.frames) for (const layer of animation.layers) for (const [position, id] of data.cels.get(keyOf(frame.id, layer.id)) ?? []) {
+  for (const frame of animation.frames) for (const layer of animation.layers) {
+    if (layer.role === 'music' && frame.id !== animation.frames[0].id) continue;
+    for (const [position, id] of data.cels.get(keyOf(frame.id, layer.id)) ?? []) {
     const [tx, ty] = position.split(',').map(Number); const { x, y, width, height } = dimensionsFor(animation, tx, ty); const firstReference = !copied.has(id); copied.add(id);
     tiles.push({ frameId: frame.id, layerId: layer.id, tileId: id, x, y, width, height, bytes: firstReference ? new Uint8Array(data.pool.get(id).bytes) : null });
-  }
+  }}
   return tiles;
 }
 /** Hydrate validated state and copied bytes from the PXD adapter. */
@@ -255,8 +286,10 @@ export function createAnimationFromSerialized(meta, serializedTiles) {
   if (!meta || meta.schemaVersion !== ANIMATION_SCHEMA_VERSION) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています。');
   dimensions(meta.width, meta.height); assertPalette(meta.palette);
   meta = structuredClone(meta);
+  validateMusicLayers(meta.layers);
   const animation = makeAnimation(meta, new Map(), new Map(), { trusted: false }); validateAnimation(animation);
   if (!Array.isArray(serializedTiles)) throw new TypeError('タイル一覧が不正です。');
+  const music = musicLayer(animation); if (music && serializedTiles.some((tile) => tile.layerId === music.id && tile.frameId !== animation.frames[0].id)) fail('PXD_ANIMATION_MUSIC_CEL', '音楽レイヤーの共有コマ保存が曖昧です。');
   const cels = new Map(); const pool = new Map(); const hashIndex = new Map();
   for (const tile of serializedTiles) {
     ensureCell(animation, tile.frameId, tile.layerId); if (!(tile.bytes instanceof Uint8Array)) throw new TypeError('タイル画素が不正です。');

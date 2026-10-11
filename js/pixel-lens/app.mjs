@@ -16,8 +16,8 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261001-free-tools-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261001-free-tools-1';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261006-header-controls-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261002-tool-transfer-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261011-unified-project-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261011-integrated-1';
 import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261009-output-12';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-3';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
@@ -25,6 +25,9 @@ import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=202610
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
 import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?v=20261005-miniature-1';
 
+export async function mountPixelLensMode({ autoStart = true, isActive = () => true, mountWorkspace = mountPxdTools, onUseImage = null, draw = null, integratedShared = false, onProjectSettings = null, initialProjectSettings = null } = {}) {
+  const lifecycle = new AbortController();
+  const listenGlobal = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...(typeof options === 'boolean' ? { capture:options } : options), signal:lifecycle.signal });
 const $ = (selector) => document.querySelector(selector);
 const initialParams = new URLSearchParams(location.search);
 const hasOutputReturn = initialParams.has('outputId');
@@ -51,6 +54,9 @@ if (returnToAudio && !audioCameraRequest) {
   } else audioCameraInvalid = true;
 } else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
+if (integratedShared) {
+  root.dataset.integratedShared = 'true';
+}
 root.dataset.regionMerge = 'false';
 root.dataset.mergeMaskVisible = 'false';
 root.dataset.source = 'camera';
@@ -92,7 +98,7 @@ let downloadUrl = null;
 let downloadBlob = null;
 let downloadGeneration = 0;
 let gifExportJob = null;
-let resumeOnVisible = !hasOutputReturn;
+let resumeOnVisible = autoStart && !hasOutputReturn;
 let pendingCameraRequest = null;
 let previewSessionStarted = 0;
 let previewCounter = 0;
@@ -118,6 +124,46 @@ let sharedImageTarget = null;
 let sharedProjectBound = false;
 let sharedImageEdited = false;
 let sharedImageColorCount = 16;
+let sharedPaletteHex = [];
+let cameraPaletteFixed = false;
+let paletteBeforeSharedFixed = null;
+let paletteBeforeSharedFixedEdited = false;
+const colorHex = (color) => {
+  if (typeof color === 'string' && /^#[\da-f]{6}(?:ff)?$/i.test(color)) return color.slice(0, 7).toLowerCase();
+  if (Array.isArray(color) && color.length >= 3) return `#${color.slice(0, 3).map((v) => Math.max(0, Math.min(255, Number(v) || 0)).toString(16).padStart(2, '0')).join('')}`;
+  return null;
+};
+function syncSharedProjectSettings(settings) {
+  if (!integratedShared || !settings || !Number.isInteger(settings.width) || !Number.isInteger(settings.height)) return;
+  const previous = JSON.stringify([sharedImageTarget, sharedPaletteHex]);
+  sharedImageTarget = { width: settings.width, height: settings.height };
+  sharedProjectBound = true;
+  sharedPaletteHex = (settings.palette ?? []).map(colorHex).filter(Boolean);
+  sharedImageColorCount = sharedPaletteHex.length;
+  state.ratio = `shared:${settings.width}:${settings.height}`;
+  state.size = Math.max(settings.width, settings.height);
+  const changed = previous !== JSON.stringify([sharedImageTarget, sharedPaletteHex]);
+  if (cameraPaletteFixed) { syncLens(); ensureSharedLensPalette(); }
+  if (state.mode === 'live' && changed) restartPreview({ preserveCompleted: true });
+  else if (state.mode === 'captured' && changed) {
+    invalidateCaptureDownload(); invalidatePreview(); state.result = null; setMode('idle');
+    if (importedSource) {
+      lastImportedFrameAt = 0; clearPreview(); setMode('live'); setInfoForMode('live');
+      if (isActive() && !document.hidden && !workerUnavailable) loop?.start();
+    } else {
+      resumeOnVisible = false;
+      say('共有設定が変わりました。カメラ開始ボタンで撮り直してください。', { visible: true });
+    }
+  }
+  syncControls(); updateSharedCaptureControls(); updateSizeSummary(); fitPreview(state.result);
+}
+function ensureSharedLensPalette() {
+  if (!integratedShared || !cameraPaletteFixed || !sharedPaletteHex.length) return;
+  const desired = sharedPaletteHex.map(hex => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]);
+  const current = lensPalette();
+  if (current.length === desired.length && current.every((color, index) => color.every((channel, c) => channel === desired[index][c]))) return;
+  setLensPalette(desired);
+}
 let zoomInfo = zoomRange(null);
 const zoomController = createCameraZoomController({ onChange: (snapshot) => {
   zoomInfo = snapshot.range;
@@ -141,7 +187,8 @@ const autoSurface = (depth) => (depth === '8' || depth === '16' ? 55 : 0);
 // A little more punch than the raw camera by default; the tone sliders still read 0 at this standard look.
 const BASE_TONE = { contrast: 15, saturation: 20 };
 const withBaseTone = (camera) => { const out = { ...camera }; for (const [key, add] of Object.entries(BASE_TONE)) out[key] = Math.max(-100, Math.min(100, (out[key] ?? 0) + add)); return out; };
-function syncLens() { setLensSettings({ colorDepth: state.colorDepth, paletteMode: state.paletteMode, gradientMode: state.gradientMode, ditherPattern: state.ditherPattern, surfaceSimplify: autoSurface(state.colorDepth), cameraSettings: withBaseTone(state.camera) }); }
+function lensColorDepth() { return cameraPaletteFixed && sharedPaletteHex.length ? String(sharedPaletteHex.length) : state.colorDepth; }
+function syncLens() { const depth = lensColorDepth(); setLensSettings({ colorDepth: depth, paletteMode: cameraPaletteFixed ? 'source' : state.paletteMode, gradientMode: state.gradientMode, ditherPattern: state.ditherPattern, surfaceSimplify: autoSurface(depth), cameraSettings: withBaseTone(state.camera) }); }
 syncLens();
 const COLOR_LABELS = { 2: '2色', 4: '4色', 8: '8色', 16: '16色', gray: 'グレー', 256: '256色', full: 'フルカラー' };
 
@@ -209,7 +256,7 @@ function focusMergeTarget() {
 
 function focusVisible(selector) {
   requestAnimationFrame(() => {
-    if (document.visibilityState === 'hidden') return;
+    if (document.visibilityState === 'hidden' || !isActive()) return;
     const target = $(selector);
     if (target && !target.hidden && !target.disabled) target.focus({ preventScroll: true });
   });
@@ -255,6 +302,7 @@ function setMode(mode) {
   updatePrimaryAction();
   updateSharedCaptureControls();
   const flipButton = $('#flipCamera');
+  if (integratedShared) syncCameraPaletteFixedUi();
   flipButton.disabled = mode !== 'live';
   const opensCamera = mode === 'live' && Boolean(importedSource);
   flipButton.setAttribute('aria-label', opensCamera ? 'カメラを開く' : 'インカメラと外カメラを切り替え');
@@ -283,15 +331,17 @@ function updatePrimaryAction() {
   if (gifHelp) button.setAttribute('aria-description', gifHelp);
   else button.removeAttribute('aria-description');
   button.title = gifHelp ? `${label}（${gifHelp}）` : label;
-  button.disabled = primary.disabled;
+  button.disabled = primary.disabled || (integratedShared && state.mode === 'live' && state.result?.paletteFixed !== cameraPaletteFixed);
   let policyNotice = '';
   if (state.mode === 'live') {
     const dimensions = captureDimensions();
-    const policy = evaluateSharedCanvasPolicy({
-      width: dimensions.width,
-      height: dimensions.height,
-      colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16)
-    }, { passActive: sharedPassActive() });
+    const policy = integratedShared
+      ? { supported: dimensions.width <= 256 && dimensions.height <= 256, reason: dimensions.width > 256 || dimensions.height > 256 ? 'canvas-over-256px' : '' }
+      : evaluateSharedCanvasPolicy({
+        width: dimensions.width,
+        height: dimensions.height,
+        colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16)
+      }, { passActive: sharedPassActive() });
     if (!policy.supported) {
       button.disabled = true;
       policyNotice = policy.reason === 'canvas-over-256px'
@@ -346,7 +396,9 @@ function updateSharedCaptureControls() {
     button.setAttribute('aria-disabled', String(button.disabled));
   }
   const dimensions = captureDimensions();
-  const preliminary = evaluateSharedCanvasPolicy({ width: dimensions.width, height: dimensions.height, colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16) }, { passActive });
+  const preliminary = integratedShared
+    ? { supported: dimensions.width <= 256 && dimensions.height <= 256, locked: false }
+    : evaluateSharedCanvasPolicy({ width: dimensions.width, height: dimensions.height, colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16) }, { passActive });
   const lockedTarget = Boolean(sharedProjectBound && sharedImageTarget && (!preliminary.supported || preliminary.locked));
   root.dataset.sharedCanvasLocked = String(lockedTarget);
   root.dataset.sharedCanvasPass = String(passActive);
@@ -364,7 +416,7 @@ function updatePalettePreview(result) {
   if (revision === displayedPaletteRevision) return;
   displayedPaletteRevision = revision;
   tintSwatches(result.palette);
-  renderPaletteStrip(result.palette);
+  if (!integratedShared || !cameraPaletteFixed) renderPaletteStrip(result.palette);
 }
 
 function fitPreview(frame) {
@@ -425,7 +477,7 @@ function restartPreview({ preserveCompleted = false } = {}) {
   } else clearPreview();
   setInfoForMode('live');
   if (preserveCompleted && state.result) say('画面に合わせてプレビューを更新しています…');
-  if (!workerUnavailable) loop.start();
+  if (!workerUnavailable && isActive() && !document.hidden) loop.start();
 }
 
 function drawCompleted(result) {
@@ -999,7 +1051,7 @@ function clearStartupWatchdog() {
 }
 
 const resizeObserver = new ResizeObserver(() => {
-  if (root.ownerDocument.body.dataset.toolResultOpen === 'camera-result') return;
+  if (!isActive() || root.ownerDocument.body.dataset.toolResultOpen === 'camera-result') return;
   if (state.mode === 'live' && !regionMergeSession && state.ratio === 'screen' && Math.abs(currentAspect() - previewAspect) > 0.0001) restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
@@ -1065,17 +1117,18 @@ function renderLens(frame) {
   const started = performance.now();
   const sourceData = new Uint8ClampedArray(frame.image.data);
   const image = frame.image;
+  if (cameraPaletteFixed) ensureSharedLensPalette();
   processLensFrame(image);
   const { width, height } = image;
   // Gray can have more shades than the existing shared-capture colour limit.
   // In miniature mode show that final reduction live, so capture does not change
   // the displayed pixels. OFF retains the old live pipeline byte-for-byte.
-  const data = frame.miniature && state.colorDepth === 'gray'
+  const data = !integratedShared && frame.miniature && state.colorDepth === 'gray'
     ? new Uint8ClampedArray(prepareSharedCanvasImage({ width, height, rgba: image.data }, {
       passActive: sharedPassActive(), width, height, maxColors: sharedPassActive() ? 32 : 16
     }).image.rgba)
     : image.data;
-  return { width, height, data, sourceData, aspect: frame.aspect, palette: lensPalette(), processingMs: performance.now() - started + frame.miniatureMs, miniature: frame.miniature, miniatureMs: frame.miniatureMs, miniatureSourceWidth: frame.miniatureSourceWidth, miniatureSourceHeight: frame.miniatureSourceHeight, aiStatus: 'disabled' };
+  return { width, height, data, sourceData, aspect: frame.aspect, palette: cameraPaletteFixed ? sharedPaletteHex.map(hex => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]) : lensPalette(), ...(integratedShared ? { paletteFixed: cameraPaletteFixed } : {}), processingMs: performance.now() - started + frame.miniatureMs, miniature: frame.miniature, miniatureMs: frame.miniatureMs, miniatureSourceWidth: frame.miniatureSourceWidth, miniatureSourceHeight: frame.miniatureSourceHeight, aiStatus: 'disabled' };
 }
 
 loop = createFrameLoop({
@@ -1182,7 +1235,7 @@ function closeCamera({ idle = true, message = '', focus = false, visible = false
 }
 
 async function startCamera({ focus = true } = {}) {
-  if (audioCameraInvalid) return;
+  if (audioCameraInvalid || !isActive()) return;
   imageSelectionSequence++;
   clearImportedSource();
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
@@ -1319,10 +1372,9 @@ async function loadCameraImage(file) {
   root.dataset.source = 'image';
   lastImportedFrameAt = 0;
 
-  sharedImageTarget = null;
-  sharedImageColorCount = 16;
-  sharedImageEdited = false;
-  sharedProjectBound = false;
+  if (!integratedShared) {
+    sharedImageTarget = null; sharedImageColorCount = 16; sharedImageEdited = false; sharedProjectBound = false;
+  }
   state.zoom = 1;
   zoomInfo = zoomRange(null);
   zoomController.setZoom(1);
@@ -1396,6 +1448,31 @@ async function capture() {
     }
     const rgba = new Uint8ClampedArray(prepared.image.rgba);
     finishAudioCamera({ ...state.result, width: target.width, height: target.height, data: rgba, palette: paletteFromRgba(rgba) });
+    return;
+  }
+  if (integratedShared) {
+    captureInFlight = true;
+    try {
+      const frame = state.result;
+      if (!frame || frame.width !== sharedImageTarget?.width || frame.height !== sharedImageTarget?.height) {
+        sayToast('共有キャンバスの設定が変わりました。プレビューを更新してください');
+        return;
+      }
+      if (frame.paletteFixed !== cameraPaletteFixed) {
+        sayToast('色設定に合わせてプレビューを更新しています。更新後に撮影してください');
+        return;
+      }
+      invalidateCaptureDownload();
+      gif.pending = null;
+      invalidatePreview();
+      cameraSequence++;
+      stopTracks();
+      state.result = { ...frame, data: new Uint8ClampedArray(frame.data), sourceData: new Uint8ClampedArray(frame.sourceData ?? frame.data) };
+      setMode('captured');
+      drawCompleted(state.result);
+      updateSharedCaptureControls();
+      void prepareCaptureDownload(state.result);
+    } finally { captureInFlight = false; }
     return;
   }
   const passActive = sharedPassActive();
@@ -1511,10 +1588,9 @@ async function retake() {
   }
   gif.pending = null;
   invalidateCaptureDownload();
-  sharedImageTarget = null;
-  sharedImageColorCount = 16;
-  sharedImageEdited = false;
-  sharedProjectBound = false;
+  if (!integratedShared) {
+    sharedImageTarget = null; sharedImageColorCount = 16; sharedImageEdited = false; sharedProjectBound = false;
+  }
   state.result = null;
   view.width = 1;
   view.height = 1;
@@ -1549,8 +1625,10 @@ async function prepareCaptureDownload(frozen) {
     $('#saveLabel').textContent = '画像を保存（PNG）';
     updateSaveLinkState();
     sayToast('撮影しました。PNGを保存できます。');
-    if (!audioCameraRequest) resultView.show({ title: '撮影できました', preview: view, controls: $('#resultControls') });
-    focusVisible('#savePng');
+    if (isActive()) {
+      if (!audioCameraRequest) resultView.show({ title: '撮影できました', preview: view, controls: $('#resultControls') });
+      focusVisible('#savePng');
+    }
   } catch (error) {
     if (generation !== downloadGeneration || state.mode !== 'captured' || state.result !== frozen) return;
     updateSaveLinkState();
@@ -1583,8 +1661,29 @@ function applyChange({ restart = false } = {}) {
   updateSizeSummary();
   updateSharedCaptureControls();
 }
+function setCameraPaletteFixed(enabled) {
+  const next = Boolean(enabled);
+  if (!integratedShared || next === cameraPaletteFixed || (next && !sharedPaletteHex.length)) return;
+  if (next) {
+    paletteBeforeSharedFixed = lensPalette().map(color => [...color]);
+    paletteBeforeSharedFixedEdited = lensPaletteEdited();
+    cameraPaletteFixed = true;
+    syncLens(); ensureSharedLensPalette();
+  } else {
+    cameraPaletteFixed = false;
+    syncLens();
+    if (paletteBeforeSharedFixedEdited && paletteBeforeSharedFixed?.length) setLensPalette(paletteBeforeSharedFixed);
+    else resetLensPalette();
+    paletteBeforeSharedFixed = null;
+    paletteBeforeSharedFixedEdited = false;
+    renderPaletteStrip(lensPalette());
+  }
+  syncCameraPaletteFixedUi();
+  applyChange({ restart: true });
+}
 function selectLook(button) {
   if (!button || state.mode === 'captured' || audioCameraRequest) return;
+  if (cameraPaletteFixed) return;
   const mine = myPalettes.find((p) => `my-${p.id}` === button.dataset.look);
   setPaletteEditing(-1);
   if (mine) {
@@ -1615,6 +1714,21 @@ const CONTEXT_LABELS = { look: '色', dither: 'ディザ', pixels: 'ドット', 
 const toolbarContextHead = $('#toolbarContextHead');
 const toolbarContextLabel = $('#toolbarContextLabel');
 const toolbarMore = $('#toolbarContextMore');
+let cameraPaletteFixedInput = null;
+if (integratedShared) {
+  const lookPanel = tray.querySelector('[data-panel="look"]');
+  const label = document.createElement('label');
+  const input = document.createElement('input');
+  input.id = 'cameraPaletteFixed'; input.type = 'checkbox';
+  label.className = 'lc-palette-fixed-control';
+  label.style.cssText = 'display:flex;align-items:center;gap:.3rem;flex:0 0 auto;min-height:48px;padding:0 .4rem;font-size:.72rem;white-space:nowrap;';
+  label.append(input, document.createTextNode('パレット固定'));
+  lookPanel.insertBefore(label, $('#paletteStrip'));
+  lookPanel.style.display = 'flex'; lookPanel.style.alignItems = 'center'; lookPanel.style.gap = '.25rem';
+  $('#looks').style.flex = '1 1 0'; $('#looks').style.minWidth = '0';
+  cameraPaletteFixedInput = input;
+  input.addEventListener('change', () => setCameraPaletteFixed(input.checked));
+}
 function contextOptionButtons(tool) {
   if (tool === 'look') return [...document.querySelectorAll('#looks [data-look]')];
   if (tool === 'merge') return [...document.querySelectorAll('#regionMergePalette [data-target-index]')];
@@ -1675,7 +1789,7 @@ toolbarMore.addEventListener('click', () => {
   root.dataset.settingsExpanded = String(root.dataset.settingsExpanded !== 'true');
   syncContextOptions(openTool);
 });
-window.addEventListener('resize', () => syncContextOptions());
+listenGlobal(window, 'resize', () => syncContextOptions());
 const NO_DITHER_DEPTHS = new Set(['full', 'gray']);
 const TONES = [['brightness', '明るさ'], ['exposure', '露出'], ['contrast', 'コントラスト'], ['saturation', '彩度'], ['shadows', '影'], ['whiteBalance', '色温度']];
 let toneKey = 'contrast';
@@ -1748,18 +1862,33 @@ function syncZoomFace() {
   zoomFace.title = `ズーム ${formatZoom(state.zoom)}`;
   zoomFace.setAttribute('aria-label', `ズーム ${formatZoom(state.zoom)}（タップで倍率を選ぶ）`);
 }
+function syncCameraPaletteFixedUi() {
+  if (!cameraPaletteFixedInput) return;
+  cameraPaletteFixedInput.checked = cameraPaletteFixed;
+  cameraPaletteFixedInput.disabled = !sharedPaletteHex.length || state.mode === 'captured';
+  for (const button of document.querySelectorAll('#looks [data-look]')) button.disabled = cameraPaletteFixed || state.mode === 'captured' || Boolean(audioCameraRequest);
+  if (cameraPaletteFixed) {
+    $('#paletteStrip').hidden = true; paletteEditor.hidden = true;
+    if (editIndex >= 0) setPaletteEditing(-1);
+  } else if (openTool === 'look') $('#paletteStrip').hidden = false;
+}
 function syncToolbar() {
   const lookButton = document.querySelector(`#looks [data-look="${currentLook()}"]`);
   const face = (tool) => toolbar.querySelector(`[data-tool="${tool}"]`);
-  face('look').querySelector('.lc-tool-sw').setAttribute('style', lookButton?.querySelector('.lc-sw')?.getAttribute('style') ?? '');
+  const swatch = face('look').querySelector('.lc-tool-sw');
+  swatch.setAttribute('style', lookButton?.querySelector('.lc-sw')?.getAttribute('style') ?? '');
+  if (integratedShared && cameraPaletteFixed && sharedPaletteHex.length) {
+    const colors = sharedPaletteHex.slice(0, 4);
+    ['--a', '--b', '--c', '--d'].forEach((key, index) => swatch.style.setProperty(key, colors[index] ?? colors.at(-1)));
+  }
   face('look').querySelector('.lc-tool-sw').className = `lc-tool-sw lc-sw ${(lookButton?.querySelector('.lc-sw')?.className ?? '').replace(/\blc-sw\b/, '').trim()}`;
   const lookFace = face('look');
-  const fullLookLabel = audioCameraRequest ? '写真16色' : (lookButton?.textContent.trim() ?? '色');
+  const fullLookLabel = cameraPaletteFixed ? '共有パレット固定' : audioCameraRequest ? '写真16色' : (lookButton?.textContent.trim() ?? '色');
   const compactLookLabel = fullLookLabel.startsWith('写真') ? '写真' : fullLookLabel;
   lookFace.querySelector('b').textContent = compactLookLabel;
   lookFace.title = `色：${fullLookLabel}`;
   lookFace.setAttribute('aria-label', `色：${fullLookLabel}（タップで色を選ぶ）`);
-  const available = !NO_DITHER_DEPTHS.has(state.colorDepth);
+  const available = !NO_DITHER_DEPTHS.has(lensColorDepth());
   const pattern = available && state.gradientMode === 'dither' ? DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) : null;
   const dither = face('dither');
   dither.dataset.state = !available ? 'na' : pattern ? 'on' : 'off';
@@ -1804,8 +1933,9 @@ function syncToolbar() {
 function syncControls() {
   const look = currentLook();
   for (const button of document.querySelectorAll('#looks [data-look]')) button.setAttribute('aria-checked', String(button.dataset.look === look));
-  if (NO_DITHER_DEPTHS.has(state.colorDepth) && openTool === 'dither') syncContextOptions('dither');
+  if (NO_DITHER_DEPTHS.has(lensColorDepth()) && openTool === 'dither') syncContextOptions('dither');
   syncToolbar();
+  syncCameraPaletteFixedUi();
 }
 
 function lockAudioCameraControls() {
@@ -1821,10 +1951,11 @@ function lockAudioCameraControls() {
 toolbar.addEventListener('click', (event) => {
   const button = event.target.closest('[data-tool]'); if (!button || state.mode === 'captured' || regionMergeSession) return;
   const tool = button.dataset.tool;
+  if (integratedShared && ['pixels', 'aspect'].includes(tool)) { onProjectSettings?.(); return; }
   if (audioCameraRequest && ['look', 'dither', 'pixels', 'aspect'].includes(tool)) return;
   navigator.vibrate?.(6);
   if (tool === 'dither') {
-    if (NO_DITHER_DEPTHS.has(state.colorDepth)) { sayToast('この色ではディザを使いません'); return; }
+    if (NO_DITHER_DEPTHS.has(lensColorDepth())) { sayToast('この色ではディザを使いません'); return; }
     if (state.gradientMode !== 'dither') {
       state.gradientMode = 'dither'; applyChange(); openTray('dither');
       sayToast(`ディザ ON：${DITHER_PATTERNS.find((pattern) => pattern.id === state.ditherPattern).label}`);
@@ -1871,7 +2002,7 @@ $('#miniatureToggle').addEventListener('click', () => {
   navigator.vibrate?.(6);
   applyChange({ restart: true });
 });
-document.addEventListener('pointerdown', (event) => {
+listenGlobal(document, 'pointerdown', (event) => {
   if (!settingsPanel.contains(event.target) && stage.contains(event.target) && openTool) closeCameraSettings();
 }, true);
 // ---------- Palette: tap a colour of the current look to change it by hand ----------
@@ -1918,6 +2049,10 @@ function renderMyPaletteChips() {
   });
 }
 function renderPaletteStrip(palette = lensPalette()) {
+  if (integratedShared && cameraPaletteFixed) {
+    $('#paletteStrip').hidden = true;
+    return;
+  }
   shownPalette = palette ?? [];
   const editable = (EDITABLE_DEPTHS.has(state.colorDepth) || Boolean(state.customLook)) && shownPalette.length > 0;
   // the strip keeps its place even when this look has no palette to edit, so the rows below never jump
@@ -2009,13 +2144,15 @@ $('#paletteDelete').addEventListener('click', () => {
 });
 renderMyPaletteChips();
 lockAudioCameraControls();
-document.addEventListener('keydown', (event) => {
+listenGlobal(document, 'keydown', (event) => {
+  if (!isActive()) return;
   if (event.key !== 'Escape') return;
   if (regionMergeSession) { event.preventDefault(); returnToLiveAfterRegionMerge(); return; }
   if (openTool) { closeCameraSettings(); $('#toolbarHome [data-tool]')?.focus({ preventScroll: true }); }
 });
 paintSwatches();
 syncControls();
+if (integratedShared) syncSharedProjectSettings(initialProjectSettings);
 
 // ---------- Pinch-first zoom ----------
 const zoomHud = $('#zoomHud'); let hudTimer = 0;
@@ -2228,6 +2365,7 @@ function playGif(frames) {
 }
 function stopGifPlayback() { if (gif.playTimer) { window.clearInterval(gif.playTimer); gif.playTimer = 0; } }
 async function prepareGifDownload(frames) {
+  if (!isActive()) return;
   const generation = downloadGeneration;
   gifExportJob?.abort();
   const job = new AbortController(); gifExportJob = job;
@@ -2247,8 +2385,10 @@ async function prepareGifDownload(frames) {
     updateSaveLinkState();
     sayToast(`GIFを撮影しました（${(frames.length / fps).toFixed(1)}秒）`);
     stopGifPlayback();
-    if (!audioCameraRequest) resultView.show({ title: 'GIFを撮影しました', detail: `${(frames.length / fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: downloadUrl });
-    focusVisible('#savePng');
+    if (isActive()) {
+      if (!audioCameraRequest) resultView.show({ title: 'GIFを撮影しました', detail: `${(frames.length / fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: downloadUrl });
+      focusVisible('#savePng');
+    }
   } catch (error) {
     if (generation !== downloadGeneration || error.name === 'AbortError' || job !== gifExportJob) return;
     updateSaveLinkState();
@@ -2407,7 +2547,7 @@ function suspendCamera() {
 }
 
 function resumeCameraIfVisible() {
-  if (audioCameraInvalid || outputReturnPending || document.hidden || !resumeOnVisible || state.mode === 'captured') return;
+  if (audioCameraInvalid || outputReturnPending || document.hidden || !resumeOnVisible || state.mode === 'captured' || !isActive()) return;
   resumeOnVisible = false;
   if (importedSource) {
     lastImportedFrameAt = 0;
@@ -2418,30 +2558,37 @@ function resumeCameraIfVisible() {
     if (!workerUnavailable) loop.start();
     return;
   }
-  void startCamera({ focus: false });
+  if (autoStart) void startCamera({ focus: false });
 }
 
-window.addEventListener('pagehide', () => {
+listenGlobal(window, 'pagehide', () => {
   imageSelectionSequence++;
   if (gif.recording) stopGifUi();
   suspendCamera();
   invalidateCaptureDownload();
 });
-window.addEventListener('pageshow', () => {
+listenGlobal(window, 'pageshow', () => {
   // A captured frame can return through the back/forward cache after its URL was released.
   if (state.mode === 'captured' && state.result && !downloadUrl) {
     invalidateCaptureDownload();
     if (gif.pending) { playGif(gif.pending); void prepareGifDownload(gif.pending); }
     else { say('PNGを準備しています…', { visible: true }); void prepareCaptureDownload(state.result); }
   }
-  resumeCameraIfVisible();
+  if (isActive()) resumeCameraIfVisible();
 });
-document.addEventListener('visibilitychange', () => {
+listenGlobal(document, 'visibilitychange', () => {
   if (document.hidden) suspendCamera();
-  else resumeCameraIfVisible();
+  else if (isActive()) resumeCameraIfVisible();
 });
 
-const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirty() {}, reset() {} } : mountPxdTools({
+const cameraPxd = integratedShared
+  ? {
+      ready: Promise.resolve(false), markDirty() {}, reset() {}, async startNewCaptureProject() {},
+      async save(...args) { return draw?.workspace?.save?.(...args); },
+      async assertCanSave(...args) { return draw?.workspace?.assertCanSave?.(...args); },
+      async showProjects(...args) { return draw?.workspace?.showProjects?.(...args); }
+    }
+  : audioCameraRequest ? { ready: Promise.resolve(false), markDirty() {}, reset() {} } : mountWorkspace({
   tool: 'camera', projectWorkspace: true, hasContent: () => state.mode === 'captured' && Boolean(state.result) && !gif.pending,
   setStatus: (message) => say(message, { visible: true }),
   async getProject(project) {
@@ -2463,7 +2610,7 @@ const cameraPxd = audioCameraRequest ? { ready: Promise.resolve(false), markDirt
       clearStartupWatchdog(); invalidatePreview(); cameraSequence++; stopTracks(); gif.pending = null; resumeOnVisible = !outputReturnPending;
       state.result = null;
       setMode('idle');
-      if (!audioCameraInvalid && !outputReturnPending) { setMode('loading'); resumeCameraIfVisible(); }
+      if (!audioCameraInvalid && !outputReturnPending && isActive()) { setMode('loading'); resumeCameraIfVisible(); }
       return;
     }
     sharedImageColorCount = countSharedImageColors(image, SHARED_CANVAS_PREMIUM_MAX_COLORS);
@@ -2538,10 +2685,12 @@ async function restoreReturnedCameraOutput() {
     invalidateCaptureDownload();
     applyReturnedCameraSettings(plan.settings);
     resumeOnVisible = false;
+  if (!integratedShared) {
     sharedImageTarget = null;
     sharedImageColorCount = 16;
     sharedImageEdited = false;
     sharedProjectBound = false;
+  }
     gif.pending = plan.kind === 'gif' ? plan.frames : null;
     gif.fps = plan.kind === 'gif' ? plan.frames.fps : GIF_FPS;
     gif.recording = false;
@@ -2589,6 +2738,11 @@ $('#useCameraImage').dataset.toolResultTransfer = '';
 $('#useCameraImage').textContent = '他のツールへ';
 $('#useCameraImage').addEventListener('click', async () => {
   if (state.mode !== 'captured' || !state.result || gif.pending) return;
+  if (typeof onUseImage === 'function') {
+    try { await onUseImage(getImage()); }
+    catch (error) { say(error instanceof Error ? error.message : '撮影画像を渡せませんでした。', { visible: true }); }
+    return;
+  }
   const generation = downloadGeneration;
   const button = $('#useCameraImage'); button.disabled = true;
   try {
@@ -2608,8 +2762,61 @@ if (audioCameraInvalid) {
   for (const selector of ['#cameraChooseImage', '#cameraFallbackChoose', '#cameraImageInput']) $(selector).disabled = true;
   say('音楽への受け渡しを確認できません。曲へ戻ってカメラを開き直してください。', { visible: true });
 } else if (!openedCameraPxd) {
-  if (!hasOutputReturn) {
+  if (autoStart && isActive() && !hasOutputReturn) {
     setMode('loading');
     resumeCameraIfVisible();
+  } else if (!hasOutputReturn) {
+    setMode('idle');
+    say('中央のボタンでカメラを開始、または画像を選んでください。', { visible: true });
   }
+}
+  function suspend() {
+    imageSelectionSequence++;
+    window.clearTimeout(holdTimer); window.clearTimeout(hudTimer);
+    hideFocusMarker(); clearStartupWatchdog(); window.clearTimeout(toastTimer); toastTimer = null;
+    cancelKeyboardShutter();
+    stopGifPlayback();
+    gifExportJob?.abort(); gifExportJob = null;
+    suspendCamera();
+    loop?.stop();
+    resumeOnVisible = false;
+  }
+  function resume({ start = false } = {}) {
+    if (!isActive() || document.hidden) return false;
+    fitPreview();
+    if (state.mode === 'captured') {
+      if (gif.pending) {
+        playGif(gif.pending);
+        if (!downloadBlob && !gifExportJob) void prepareGifDownload(gif.pending);
+      }
+    } else if (importedSource) {
+      lastImportedFrameAt = 0;
+      setMode('live'); setInfoForMode('live');
+      say('画像をプレビューしています…');
+      if (!workerUnavailable) loop?.start();
+    }
+    if (start && state.mode !== 'captured' && !audioCameraInvalid && !outputReturnPending) void startCamera({ focus: false });
+    return true;
+  }
+  function getImage() {
+    const frame = state.mode === 'captured' ? state.result : null;
+    return frame ? {
+      width: frame.width,
+      height: frame.height,
+      data: new Uint8ClampedArray(frame.data),
+      ...(integratedShared ? { paletteFixed: frame.paletteFixed === true } : {})
+    } : null;
+  }
+  function closeResult() { resultView.close({ focus: false, notify: false }); }
+  function dispose() {
+    suspend(); lifecycle.abort(); resizeObserver.disconnect(); resultView.dispose?.(); cameraPxd.dispose?.();
+    resumeOnVisible = false;
+    if (gif.recording) stopGifUi();
+    if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
+    closeCamera({ idle: true, message: '', focus: false });
+    invalidateCaptureDownload();
+    clearImportedSource();
+  }
+  return { suspend, resume, getImage, closeResult, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
+    syncProjectSettings(settings) { syncSharedProjectSettings(settings); } };
 }

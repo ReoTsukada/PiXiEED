@@ -14,13 +14,15 @@ test('video frame sizing preserves the source aspect ratio and stays bounded', (
 test('video format prefers a supported MP4 encoder and falls back to WebM', () => {
   class Mp4Recorder { static isTypeSupported(type) { return type.startsWith('video/mp4'); } }
   class WebmRecorder { static isTypeSupported(type) { return type === 'video/webm;codecs=vp8,opus'; } }
+  class VideoOnlyRecorder { static isTypeSupported(type) { return type === 'video/webm;codecs=vp8'; } }
   assert.deepEqual(chooseAudioVideoMimeType(Mp4Recorder), { mimeType: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', extension: 'mp4' });
   assert.deepEqual(chooseAudioVideoMimeType(WebmRecorder), { mimeType: 'video/webm;codecs=vp8,opus', extension: 'webm' });
+  assert.deepEqual(chooseAudioVideoMimeType(VideoOnlyRecorder, { includeAudio: false }), { mimeType: 'video/webm;codecs=vp8', extension: 'webm' });
   assert.equal(chooseAudioVideoMimeType(class Unsupported { static isTypeSupported() { return false; } }), null);
 });
 
 function makeHarness({ failRecorder = false, playerFactory } = {}) {
-  const timers = []; const intervals = []; const audioTracks = []; const videoTracks = []; const contexts = []; const sources = [];
+  const timers = []; const intervals = []; const audioTracks = []; const videoTracks = []; const contexts = []; const sources = []; const captureRates = [];
   let now = 0;
   const draws = []; const listeners = new Map(); let recorderInstance; let observedDestination; let mediaDestination;
   class Track { constructor(kind) { this.kind = kind; this.stopped = false; } stop() { this.stopped = true; } }
@@ -33,7 +35,7 @@ function makeHarness({ failRecorder = false, playerFactory } = {}) {
       drawImage(...args) { draws.push(['image', ...args]); }
     }; }
     getContext() { return this.context; }
-    captureStream() { const track = new Track('video'); videoTracks.push(track); return { getTracks: () => [track], getVideoTracks: () => [track] }; }
+    captureStream(rate) { captureRates.push(rate); const track = new Track('video'); videoTracks.push(track); return { getTracks: () => [track], getVideoTracks: () => [track] }; }
   }
   const documentRef = {
     visibilityState: 'visible', createElement: () => new FakeCanvas(),
@@ -78,7 +80,7 @@ function makeHarness({ failRecorder = false, playerFactory } = {}) {
     if (!timer) return null;
     timer.cleared = true; now = timer.due; timer.callback(); return timer;
   }
-  return { dependencies, timers, intervals, audioTracks, videoTracks, contexts, draws, listeners, sources, runNextTimer, get now() { return now; }, get recorder() { return recorderInstance; }, get observedDestination() { return observedDestination; }, get mediaDestination() { return mediaDestination; } };
+  return { dependencies, timers, intervals, audioTracks, videoTracks, contexts, draws, listeners, sources, captureRates, runNextTimer, setNow(value) { now = value; }, get now() { return now; }, get recorder() { return recorderInstance; }, get observedDestination() { return observedDestination; }, get mediaDestination() { return mediaDestination; } };
 }
 
 function fixture() {
@@ -181,6 +183,66 @@ test('multi-frame video holds its final frame through audio completion', async (
   await pending;
   const finalPixels = harness.draws.filter(([kind]) => kind === 'pixels').at(-1)[1];
   assert.deepEqual(finalPixels.slice(0, 4), [88, 88, 88, 88]);
+});
+
+test('duration-based visual loop repeats independently of the two-second music clock', async () => {
+  const harness = makeHarness(); const { song, image } = fixture();
+  const second = { width: image.width, height: image.height, rgba: new Uint8ClampedArray(image.rgba.length).fill(88) };
+  let tick = 0;
+  const playerFactory = () => ({
+    get currentTick() { return tick; },
+    async play() { return true; }, stopAfterCurrentLoop() { return true; }, stop() {}, async dispose() {}
+  });
+  const pending = renderAudioVideo(song, image, { ...harness.dependencies, playerFactory,
+    frameImages: [image, second], frameDurationsMs: [199.5, 200.5] });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(harness.captureRates, [50], 'new visual timing captures at the supported 50 fps ceiling');
+  const progress = harness.intervals[0].callback;
+  for (const time of [0, 192, 384, 576, 768, 960, 1152, 1344, 1536, 1728]) { tick = time; progress(); }
+  const framePixels = harness.draws.filter(([kind]) => kind === 'pixels').map(([, pixels]) => pixels[0]);
+  assert.deepEqual(framePixels, [37, 37, 88, 37, 88, 37, 88, 37, 88, 37, 88], '200 ms frame durations repeat five times within the two-second music loop');
+  const completion = harness.timers.find(({ delay, cleared }) => !cleared && delay === 2035);
+  assert.ok(completion, 'duration-based recordings stop at the music endpoint plus the 35 ms recorder lead, without release tail');
+  harness.runNextTimer(completion.due);
+  const result = await pending;
+  assert.equal(result.seconds, 2, 'reported duration remains the nominal music length');
+  assert.equal(result.recordLeadMs, 35);
+  assert.equal(result.hasAudio, true);
+});
+
+test('visual-only timing supports still images without audio notes, context, or player', async () => {
+  const harness = makeHarness(); const { song, image } = fixture();
+  song.tracks = song.tracks.map((track) => ({ ...track, clips: [] }));
+  let playerCalls = 0; const progressValues = [];
+  const pending = renderAudioVideo(song, image, { ...harness.dependencies, includeAudio: false,
+    AudioContextImpl: null, playerFactory: () => { playerCalls++; throw new Error('must not instantiate playback'); },
+    frameDurationsMs: [2000], onProgress: (value) => progressValues.push(value), nowImpl: () => harness.now });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.captureRates[0], 50);
+  assert.equal(harness.recorder.stream.tracks.length, 1, 'the video stream has no audio track');
+  assert.equal(harness.contexts.length, 0);
+  assert.equal(harness.audioTracks.length, 0);
+  assert.equal(playerCalls, 0);
+  harness.setNow(1035); harness.intervals[0].callback();
+  assert.ok(progressValues.some((value) => Math.abs(value - 0.5) < 0.001), 'wall-clock samples follow the nominal two-second music-length timing');
+  const completion = harness.timers.find(({ delay, cleared }) => !cleared && delay === 2035);
+  assert.ok(completion, JSON.stringify(harness.timers.map(({ delay, due, cleared }) => ({ delay, due, cleared }))));
+  harness.runNextTimer(completion.due);
+  const result = await pending;
+  assert.equal(result.seconds, 2);
+  assert.equal(result.hasAudio, false);
+  assert.equal(result.recordLeadMs, 35);
+  assert.equal(playerCalls, 0);
+  assert.ok(harness.videoTracks.every((track) => track.stopped));
+});
+
+test('duration-based visual timing rejects malformed duration lists before allocating resources', async () => {
+  const harness = makeHarness(); const { song, image } = fixture();
+  const second = { ...image, rgba: new Uint8Array(image.rgba.length) };
+  await assert.rejects(renderAudioVideo(song, image, { ...harness.dependencies, frameImages: [image, second], frameDurationsMs: [200] }), /表示時間がコマ数と一致/);
+  await assert.rejects(renderAudioVideo(song, image, { ...harness.dependencies, frameDurationsMs: [0] }), /表示時間/);
+  assert.equal(harness.contexts.length, 0);
+  assert.equal(harness.draws.length, 0);
 });
 
 test('abort rejects promptly, stops recorder, tracks, and audio context', async () => {

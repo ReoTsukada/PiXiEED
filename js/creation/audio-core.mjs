@@ -83,11 +83,12 @@ export function resizeAudioCanvas(song, columns) {
 }
 
 /** Give each shared-image column one 16th note, without shortening existing music. */
-export function extendAudioLoopForImage(song, width, { frameCount = 1 } = {}) {
+export function extendAudioLoopForImage(song, width, { frameCount = 1, frameTicks = width * AUDIO_PIXEL_TICKS } = {}) {
   validateAudioSong(song);
   if (!Number.isInteger(width) || width < 1 || width > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('画像の横幅は1〜256列です');
   if (!Number.isInteger(frameCount) || frameCount < 1 || frameCount > 128) throw new RangeError('音楽に取り込むコマは1〜128枚です');
-  const requiredTicks = Math.ceil(width * frameCount * AUDIO_PIXEL_TICKS / AUDIO_BAR_TICKS) * AUDIO_BAR_TICKS;
+  if (!Number.isSafeInteger(frameTicks) || frameTicks < width) throw new RangeError('コマの時間範囲が不正です');
+  const requiredTicks = Math.ceil(frameTicks * frameCount / AUDIO_BAR_TICKS) * AUDIO_BAR_TICKS;
   if (requiredTicks > AUDIO_MAX_LOOP_TICKS) throw new RangeError('アニメーションを取り込む曲が長すぎます');
   return resizeAudioLoop(song, Math.max(song.loopTicks, requiredTicks));
 }

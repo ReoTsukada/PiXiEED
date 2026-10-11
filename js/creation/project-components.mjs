@@ -57,7 +57,8 @@ export async function replaceProjectComponentImage(project, tool, image, { store
     if (animation) {
       const copy = cloneAnimation(animation);
       const plan = prepareAudioAnimationImport(song, copy, { colorToSlot: link?.colorToSlot || null,
-        rowPitchMap: link?.rowPitchMap?.length === copy.height ? link.rowPitchMap : null });
+        rowPitchMap: link?.rowPitchMap?.length === copy.height ? link.rowPitchMap : null,
+        timing: link?.timing || null });
       next = await writePxdAudioState(next, plan.song, { image, link: plan.link, animation: copy });
       next = await writePxdAnimation(next, copy, { role: 'audio', posterFrameId: copy.frames[0].id });
       return putPxdDrawDocument(next, composeAnimationFrame(copy, copy.frames[0].id), 'audio');

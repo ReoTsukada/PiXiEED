@@ -1,5 +1,5 @@
 const ASIN_PATTERN = /^[A-Z0-9]{10}$/;
-const CATEGORIES = new Set(['books', 'toys', 'tools']);
+const CATEGORIES = new Set(['books', 'toys', 'tools', 'gadgets']);
 const AMAZON_HOST = 'www.amazon.co.jp';
 const EXISTING_ASSOCIATE_TAG = 'pixieed-22';
 const EXISTING_LINK_CODE = 'll2';
@@ -20,7 +20,7 @@ export function validAmazonUrl(rawUrl, asin) {
     const url = new URL(rawUrl);
     if (url.protocol !== 'https:' || url.hostname !== AMAZON_HOST
         || url.username || url.password || url.port
-        || url.pathname !== `/dp/${asin}` || url.hash) return '';
+        || !new RegExp(`^/(?:[A-Za-z0-9-]+/)?dp/${asin}$`).test(url.pathname) || url.hash) return '';
 
     const entries = [...url.searchParams.entries()];
     if (entries.length) {
@@ -28,8 +28,12 @@ export function validAmazonUrl(rawUrl, asin) {
       if (new Set(keys).size !== keys.length) return '';
       const params = Object.fromEntries(entries);
       if (params.tag !== EXISTING_ASSOCIATE_TAG
-          || Object.keys(params).some((key) => key !== 'tag' && key !== 'linkCode')
-          || (params.linkCode !== undefined && params.linkCode !== EXISTING_LINK_CODE)) return '';
+          || Object.keys(params).some((key) => !['tag', 'linkCode', 'linkId', 'ref_', 'th', 'psc'].includes(key))
+          || (params.linkCode !== undefined && params.linkCode !== EXISTING_LINK_CODE)
+          || (params.linkId !== undefined && !/^[a-f0-9]{32}$/.test(params.linkId))
+          || (params.ref_ !== undefined && params.ref_ !== 'as_li_ss_tl')
+          || (params.th !== undefined && params.th !== '1')
+          || (params.psc !== undefined && params.psc !== '1')) return '';
     }
     return url.href;
   } catch {

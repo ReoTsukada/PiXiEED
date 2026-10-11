@@ -1,11 +1,11 @@
 import { createPxdProject, decodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261006-draw-startup-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261011-unified-project-1';
 import { createProjectSession } from './project-session.mjs?rev=20261001-free-tools-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261001-free-tools-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
-import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261006-draw-startup-1';
+import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261011-unified-project-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 
@@ -32,8 +32,9 @@ async function sendPxdBackup(bytes, name) {
 }
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
-export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null }) {
-  const store = createToolProjectStore(tool); let main = document.querySelector('#main') || document.querySelector('main');
+export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, root = null, idPrefix = '', routePointer = true, isActive = () => true }) {
+  const store = createToolProjectStore(tool); let main = root || document.querySelector('#main') || document.querySelector('main');
+  const lifecycle = new AbortController();
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
@@ -163,13 +164,20 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   currentPane.append(identity, currentRow, moreActions, transferSection);
   libraryPane.append(search, count, list, noMatches, trash, importSection);
   dialog.append(header, message, currentPane, libraryPane); selectPane('library'); document.body.append(dialog);
+  // Retained editors share the shell, but each owns its project controls and route pointer.
+  if (idPrefix) for (const container of [bar, dialog]) {
+    for (const el of [container, ...container.querySelectorAll('[id]')]) if (el.id) el.id = idPrefix + el.id;
+    for (const el of container.querySelectorAll('[for], [aria-controls], [aria-labelledby], [aria-describedby]')) {
+      for (const attr of ['for', 'aria-controls', 'aria-labelledby', 'aria-describedby']) if (el.hasAttribute(attr)) el.setAttribute(attr, el.getAttribute(attr).split(' ').map(id => idPrefix + id).join(' '));
+    }
+  }
   dialog.addEventListener('close', () => { if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
     async capture(base) {
       const state = structuredClone(getEditorState()); const safe = await freezeProjectComponents(base); const captured = getProject(safe);
       return Promise.resolve(captured).then((candidate) => {
-        candidate.manifest = { ...candidate.manifest, toolProject: { schemaVersion: 1, tool }, lastMode: tool, editorState: { [tool]: state } }; return candidate;
+        candidate.manifest = { ...candidate.manifest, toolProject: { schemaVersion: 1, tool }, lastMode: tool, editorState: { ...candidate.manifest.editorState, [tool]: state } }; return candidate;
       });
     },
     async apply(project) {
@@ -206,7 +214,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const state = failed ? '保存失敗' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
     launcher.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     launcher.setAttribute('aria-label', `${name}・${state}。作品を開く`); launcher.title = `${name} · ${state}`;
-    document.body.dataset.toolTransferReady = String(getPublicSources().length === 0 && hasContent());
+    if (isActive()) document.body.dataset.toolTransferReady = String(getPublicSources().length === 0 && hasContent());
     identity.querySelector('svg').innerHTML = icons[tool] || icons.folder;
     identityName.textContent = name;
     const dimensions = activeCanvas?.width && activeCanvas?.height ? `${activeCanvas.width} × ${activeCanvas.height}px` : '';
@@ -231,10 +239,19 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function remember(project) {
     failed = false;
     try { localStorage.setItem(`pixieed:pxd:last:${tool}`, JSON.stringify({ projectId: project.projectId, revisionId: project.revisionId })); } catch {}
+    if (tool === 'draw' && document.body.classList.contains('creation-suite')) try { localStorage.setItem('pixieed:pxd:last:creation', JSON.stringify({ projectId: project.projectId, revisionId: project.revisionId })); } catch {}
+    if (!routePointer) {
+      if (initialPointer) {
+        const params = new URLSearchParams(location.search);
+        params.set('modeProjectTool', tool); params.set('modePxd', project.projectId); params.set('modePxdRevision', project.revisionId);
+        history.replaceState(history.state, '', `${location.pathname}?${params}`);
+      }
+      return;
+    }
     const params = new URLSearchParams(location.search); params.set('pxd', project.projectId); params.set('pxdRevision', project.revisionId);
     history.replaceState({ ...history.state, projectWorkspaceSelection: true }, '', `${location.pathname}?${params}`);
   }
-  function resetPointer() { const params = new URLSearchParams(location.search); for (const key of ['pxd', 'pxdRevision', 'pxdImage']) params.delete(key); const state = { ...history.state }; delete state.projectWorkspaceSelection; history.replaceState(state, '', `${location.pathname}${params.size ? `?${params}` : ''}`); }
+  function resetPointer() { if (!routePointer) return; const params = new URLSearchParams(location.search); for (const key of ['pxd', 'pxdRevision', 'pxdImage']) params.delete(key); const state = { ...history.state }; delete state.projectWorkspaceSelection; history.replaceState(state, '', `${location.pathname}${params.size ? `?${params}` : ''}`); }
   async function transact(work, { close: closeSheet = true } = {}) {
     if (locked) return;
     locked = true; clearTimeout(timer); main.inert = true; main.setAttribute('aria-busy', 'true'); update();
@@ -425,9 +442,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (focusTransfer) transferTargets.find(({ el }) => !el.hidden && !el.disabled)?.el.focus();
   }
   document.addEventListener('pixieed:open-tool-transfer', () => {
+    if (!isActive()) return;
     if (bar.hidden || locked) return;
     void showProjects({ pane: 'current', focusTransfer: true });
-  });
+  }, { signal: lifecycle.signal });
   input.addEventListener('change', () => { const file = input.files?.[0]; input.value = ''; if (!file) return; void transact(async () => {
     if (file.size > 64 * 1024 * 1024) throw new Error('PXDは64MBまで読み込めます。');
     const original = await decodePxd(new Uint8Array(await file.arrayBuffer())); if (session.persisted || editedSinceOpen) await save();
@@ -449,7 +467,12 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     try {
       const params = new URLSearchParams(location.search); let pointer;
       // An explicit revision remains authoritative when the current tab reloads.
-      if (params.has('pxd')) {
+      if (!routePointer) {
+        if (initialPointer) pointer = initialPointer;
+        else try { pointer = JSON.parse(localStorage.getItem(`pixieed:pxd:last:${tool}`) || 'null'); } catch { /* No remembered selection. */ }
+      }
+      if (routePointer && !params.has('pxd') && initialPointer) pointer = initialPointer;
+      if (routePointer && params.has('pxd')) {
         if (params.getAll('pxd').length !== 1 || params.getAll('pxdRevision').length !== 1 || !params.get('pxdRevision')) throw new Error('作品の保存版を特定できません。作品一覧から開いてください。');
         pointer = { projectId: params.get('pxd'), revisionId: params.get('pxdRevision') };
       }
@@ -487,7 +510,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     session.markDirty(); failed = false; update(); scheduleAutoSave();
   }
   const observer = new MutationObserver(() => { bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true'; }); observer.observe(main, { attributes: true, attributeFilter: ['hidden', 'aria-hidden'] });
-  window.addEventListener('beforeunload', (event) => { if (!transientNavigation && (session.dirty && editedSinceOpen || session.busy)) { event.preventDefault(); event.returnValue = ''; } });
+  window.addEventListener('beforeunload', (event) => { if (!transientNavigation && (session.dirty && editedSinceOpen || session.busy)) { event.preventDefault(); event.returnValue = ''; } }, { signal: lifecycle.signal });
   function setModeAdapter(options, { project } = {}) {
     const previousReady = ready;
     const switching = (async () => {
@@ -525,7 +548,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     ready = switching;
     return switching;
   }
-  return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, setModeAdapter, async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
+  return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, setModeAdapter, activate: update,
+    dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); for (const cleanup of cardContextCleanups) cleanup(); dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); css.remove(); },
+    async importProject(project) { await ready; await transact(() => importCopy(project)); },
+    async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
     async pauseForNavigation() {
       await ready;
       transientNavigation = true; clearTimeout(timer); timer = 0;

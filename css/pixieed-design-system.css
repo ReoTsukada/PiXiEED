@@ -403,6 +403,16 @@ input, select, textarea {
 .app-tabs > :nth-child(3) img { width: 26px; height: 26px; opacity: 1; filter: brightness(0) invert(1); }
 .app-tabs > :nth-child(3):disabled { opacity: .46; box-shadow: none; cursor: default; }
 .app-tabs a[aria-current='page'] { color: var(--pixieed-accent); background: rgba(231, 84, 69, .09); }
+.app-tabs--labeled { width: min(34rem, calc(100% - 1rem)); gap: .18rem; padding: .3rem; }
+.app-tabs--labeled a, .app-tabs--labeled button { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; gap: .06rem; min-height: 3.25rem; }
+.app-tabs--labeled img { width: 20px; height: 20px; }
+.app-tabs--labeled .app-tab-label { max-width: 100%; overflow: hidden; font-size: .58rem; font-weight: 750; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.app-tabs--labeled [data-nav="map"] { border: 1px solid #cfe3e9; color: #205f73; background: #edf6f8; }
+.app-tabs--labeled [data-nav="map"] img { opacity: 1; }
+.app-tabs--labeled > :nth-child(3) { width: auto; min-width: 0; min-height: 3.25rem; padding-inline: .25rem; border-radius: .85rem; }
+.app-tabs--labeled > :nth-child(3) img { width: 20px; height: 20px; }
+.app-tabs--labeled > :nth-child(3) .app-tab-label { color: #fff; }
+.app-tabs--labeled :is(a, button):focus-visible { outline: 3px solid #125b91; outline-offset: 2px; }
 body.is-menu-open { overflow: hidden; overscroll-behavior: none; }
 .menu-toggle { display: grid; place-items: center; width: 2.55rem; height: 2.55rem; padding: 0; border: 0; border-radius: .72rem; color: var(--pixieed-ink); background: transparent; cursor: pointer; }
 .menu-toggle:hover, .menu-toggle:focus-visible { color: var(--pixieed-accent); background: rgba(231, 84, 69, .08); }
@@ -520,5 +530,9 @@ body.arc-jigsaw .jigsaw-workspace { --pixel-frame: #245446; }
   .app-tabs { bottom: max(.35rem, env(safe-area-inset-bottom)); width: min(25rem, calc(100% - 1.2rem)); padding: .2rem; border-radius: .95rem; }
   .app-tabs a, .app-tabs button { min-height: 2.6rem; }
   .app-tabs > :nth-child(3) { width: 2.9rem; min-height: 2.9rem; }
+  .app-tabs--labeled { width: min(34rem, calc(100% - .75rem)); padding: .16rem; gap: .08rem; }
+  .app-tabs--labeled a, .app-tabs--labeled button { min-height: 2.8rem; }
+  .app-tabs--labeled .app-tab-label { font-size: .54rem; }
+  .app-tabs--labeled > :nth-child(3) { width: auto; min-height: 2.8rem; }
   .app-page { padding-bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
 }

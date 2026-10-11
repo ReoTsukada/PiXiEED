@@ -1,11 +1,12 @@
-import { createAnimationFromDraw, getAnimationCelDocument, composeAnimationFrame, writeAnimationCel, setAnimationPalette } from './animation-core.mjs';
+import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, writeAnimationCel, setAnimationPalette } from './animation-core.mjs';
 import { createDrawAnimationHistory } from './draw-animation-history.mjs';
 import { validateDrawDocument } from './draw-core.mjs';
 
 /** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */
-export function createDrawAnimationSession(document) {
+export function createDrawAnimationSession(document, { musicLayer: musicMode = false } = {}) {
   let animation = createAnimationFromDraw(document);
-  let frameId = animation.frames[0].id, layerId = animation.layers[0].id;
+  if (musicMode) animation = ensureAnimationMusicLayer(animation);
+  let frameId = animation.frames[0].id, layerId = musicMode ? animation.layers.find((layer) => layer.role === 'music').id : animation.layers[0].id;
   let history = createDrawAnimationHistory(animation), below, above, composed;
   let selectionPast = [], selectionFuture = [];
   let currentSelection = { frameId, layerId };
@@ -44,6 +45,16 @@ export function createDrawAnimationSession(document) {
       commitHistory(next); animation = next; remember();
     };
   }
+  function prepareTimeline(next, selection = currentSelection, preferMusic = false) {
+    if (!musicMode) return { next, selection };
+    const wasMusic = animation.layers.find((layer) => layer.id === selection?.layerId)?.role === 'music';
+    next = ensureAnimationMusicLayer(next);
+    const nextMusic = next.layers.find((layer) => layer.role === 'music');
+    const chosen = { ...selection };
+    if (!next.frames.some((frame) => frame.id === chosen.frameId)) chosen.frameId = next.frames[0].id;
+    if (!next.layers.some((layer) => layer.id === chosen.layerId) || wasMusic || preferMusic) chosen.layerId = nextMusic.id;
+    return { next, selection: chosen };
+  }
   function restore(next, selection = currentSelection) {
     animation = next;
     frameId = animation.frames.some((frame) => frame.id === selection?.frameId) ? selection.frameId : animation.frames[0].id;
@@ -55,6 +66,7 @@ export function createDrawAnimationSession(document) {
     get animation() { return animation; }, get frameId() { return frameId; }, get layerId() { return layerId; },
     get canUndo() { return history.canUndo; }, get canRedo() { return history.canRedo; },
     get locked() { return animation.layers.find((layer) => layer.id === layerId)?.locked; },
+    get musicLayerId() { return animation.layers.find((layer) => layer.role === 'music')?.id ?? null; },
     document() { return getAnimationCelDocument(animation, frameId, layerId); },
     /** Preserve each immutable timeline snapshot's active frame and layer. */
     snapshot() {
@@ -87,30 +99,51 @@ export function createDrawAnimationSession(document) {
     },
     select(frame, layer) { return restore(animation, { frameId: frame ?? frameId, layerId: layer ?? layerId }); },
     load(next, selection) {
-      const nextFrame = selection?.frameId ?? next.frames[0].id, nextLayer = selection?.layerId ?? next.layers.at(-1).id;
-      assertSelection(next, { frameId: nextFrame, layerId: nextLayer });
+      const preferred = selection ?? { frameId: next.frames[0].id, layerId: musicMode ? null : next.layers.at(-1).id };
+      const prepared = prepareTimeline(next, preferred, musicMode && !selection);
+      next = prepared.next;
+      const chosen = musicMode ? prepared.selection : { frameId: selection?.frameId ?? next.frames[0].id, layerId: selection?.layerId ?? next.layers.at(-1).id };
+      assertSelection(next, chosen);
       history = createDrawAnimationHistory(next); selectionPast = []; selectionFuture = [];
-      return restore(next, { frameId: nextFrame, layerId: nextLayer });
+      return restore(next, chosen);
     },
     prepareDocument,
     commitDocument(doc) { prepareDocument(doc)(); },
     apply(next, selection) {
-      const chosen = selection ?? currentSelection;
+      const prepared = prepareTimeline(next, selection ?? currentSelection);
+      next = prepared.next;
+      const chosen = prepared.selection;
       assertSelection(next, chosen);
       commitHistory(next, chosen);
       return restore(history.current, chosen);
     },
     undo() {
       if (!history.undo()) return null;
-      selectionFuture.push({ ...currentSelection }); currentSelection = selectionPast.pop() ?? { frameId: history.current.frames[0].id, layerId: history.current.layers.at(-1).id };
+      selectionFuture.push({ ...currentSelection }); currentSelection = selectionPast.pop() ?? { frameId: history.current.frames[0].id, layerId: musicMode ? history.current.layers.find((layer) => layer.role === 'music').id : history.current.layers.at(-1).id };
       return restore(history.current, currentSelection);
     },
     redo() {
       if (!history.redo()) return null;
-      selectionPast.push({ ...currentSelection }); trimSelectionPast(); currentSelection = selectionFuture.pop() ?? { frameId: history.current.frames[0].id, layerId: history.current.layers.at(-1).id };
+      selectionPast.push({ ...currentSelection }); trimSelectionPast(); currentSelection = selectionFuture.pop() ?? { frameId: history.current.frames[0].id, layerId: musicMode ? history.current.layers.find((layer) => layer.role === 'music').id : history.current.layers.at(-1).id };
       return restore(history.current, currentSelection);
     },
+    replaceMusicDocument(doc, { record = true } = {}) {
+      if (!musicMode) throw new TypeError('音楽レイヤーが有効なセッションではありません。');
+      if (typeof record !== 'boolean') throw new TypeError('履歴オプションが不正です。');
+      validateDrawDocument(doc);
+      const original = animation, originalFrame = frameId, originalLayer = layerId;
+      let next = animation;
+      if (doc.palette.some((color, index) => color !== next.palette[index]) || doc.palette.length !== next.palette.length) next = setAnimationPalette(next, doc.palette);
+      const musicId = next.layers.find((layer) => layer.role === 'music')?.id;
+      next = writeAnimationCel(next, frameId, musicId, { width: doc.width, height: doc.height, pixels: Uint8Array.from(doc.pixels, (value) => value + 1) });
+      if (animation !== original || frameId !== originalFrame || layerId !== originalLayer) throw new TypeError('選択の対象が変わりました。');
+      if (record) commitHistory(next, currentSelection);
+      else { history.reset(next); selectionPast = []; selectionFuture = []; }
+      animation = next; remember(); rebuild();
+      return getAnimationCelDocument(animation, frameId, musicId);
+    },
     composite(doc, changed = null) {
+      if (musicMode && animation.layers.find((layer) => layer.id === layerId)?.role === 'music') return { ...doc, pixels: new Int16Array(doc.pixels) };
       const visible = animation.layers.find((layer) => layer.id === layerId)?.visible;
       const put = (index) => { composed[index] = above[index] >= 0 ? above[index] : visible && doc.pixels[index] >= 0 ? doc.pixels[index] : below[index]; };
       if (changed) { for (const index of changed) put(index); } else for (let index = 0; index < composed.length; index++) put(index);

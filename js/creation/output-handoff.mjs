@@ -148,11 +148,13 @@ export function clearToolOutputReturnId(locationRef = globalThis.location, histo
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'previewOnly', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'pixelOriginChoice', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
+  const allowed = ['includeMusicLayer', 'includeAudio', 'visualFrameDurationsMs', 'width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'previewOnly', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'pixelOriginChoice', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];
-    if (key === 'description' && typeof value === 'string') result[key] = value.slice(0, 180);
+    if (['includeMusicLayer','includeAudio'].includes(key) && typeof value === 'boolean') result[key] = value;
+    else if (key === 'visualFrameDurationsMs' && Array.isArray(value) && value.length >= 1 && value.length <= 128 && value.every(ms=>Number.isFinite(ms)&&ms>=1&&ms<=60000)) result[key] = [...value];
+    else if (key === 'description' && typeof value === 'string') result[key] = value.slice(0, 180);
     else if (key === 'previewOnly' && typeof value === 'boolean') result[key] = value;
     else if (key === 'aspectLocked' && typeof value === 'boolean') result[key] = value;
     else if (key === 'pixelOriginChoice' && value === 'original') result[key] = value;

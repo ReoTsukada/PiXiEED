@@ -306,19 +306,21 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     addLayer.setAttribute('aria-rowindex', String(state.layers.length + 2)); addLayer.setAttribute('aria-colindex', '1');
     addLayer.style.gridRow = String(state.layers.length + 2); addLayer.style.gridColumn = '1';
     orderedLayers.forEach(({ layer, modelIndex }, rowIndex) => {
-      const layerNumber = button(`レイヤー ${modelIndex + 1} を選択`, String(modelIndex + 1), 'select-layer', 'animation-controls__layer-number');
-      layerNumber.dataset.layerId = String(layer.id); layerNumber.setAttribute('role', 'rowheader');
+      const musicLayer = layer.role === 'music';
+      const layerLabel = musicLayer ? '音楽（全コマ共通）' : `レイヤー ${modelIndex + 1}`;
+      const layerNumber = button(`${layerLabel}を選択`, musicLayer ? '音楽' : String(modelIndex + 1), 'select-layer', 'animation-controls__layer-number');
+      layerNumber.dataset.layerId = String(layer.id); if (musicLayer) layerNumber.dataset.layerRole = 'music'; layerNumber.setAttribute('role', 'rowheader');
       layerNumber.setAttribute('aria-rowindex', String(rowIndex + 2)); layerNumber.setAttribute('aria-colindex', '1');
       layerNumber.style.gridRow = String(rowIndex + 2); layerNumber.style.gridColumn = '1';
       layerNumber.setAttribute('aria-pressed', String(layer.id === state.layerId));
       layerNumber.classList.toggle('is-selected', layer.id === state.layerId);
-      layerNumber.title = `${layer.name || `レイヤー ${modelIndex + 1}`}を選択`;
+      layerNumber.title = `${musicLayer ? layerLabel : layer.name || layerLabel}を選択`;
       layerNumber.draggable = false;
       frames.append(layerNumber);
       frameList.forEach((frame, columnIndex) => {
         const hasContent = Boolean(getCelHasContent(frame.id, layer.id));
         const isSelected = frame.id === state.frameId && layer.id === state.layerId;
-        const label = `コマ ${columnIndex + 1}、レイヤー ${modelIndex + 1}${hasContent ? '（描画あり）' : '（空）'}`;
+        const label = `コマ ${columnIndex + 1}、${layerLabel}${hasContent ? '（描画あり）' : '（空）'}`;
         const cell = button(label, '', 'select-cel', 'animation-controls__cel');
         cell.dataset.frameId = String(frame.id); cell.dataset.layerId = String(layer.id);
         cell.dataset.hasContent = String(hasContent); cell.setAttribute('role', 'gridcell');
@@ -341,13 +343,17 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   function renderLayers(state) {
     const list = layers.querySelector('[data-layer-list]'); list.replaceChildren();
     const orderedLayers = state.layers.map((layer, modelIndex) => ({ layer, modelIndex })).reverse();
+    const hasMusicLayer = state.layers.some((layer) => layer.role === 'music');
+    const normalLayerCount = state.layers.filter((layer) => layer.role !== 'music').length;
     for (const { layer, modelIndex } of orderedLayers) {
+      const musicLayer = layer.role === 'music';
+      const layerLabel = musicLayer ? '音楽（全コマ共通）' : layer.name || `レイヤー ${modelIndex + 1}`;
       const row = node('div', 'animation-controls__layer');
       row.classList.toggle('is-selected', layer.id === state.layerId);
-      const select = button(layer.name || `レイヤー ${modelIndex + 1}`, layer.name || `レイヤー ${modelIndex + 1}`, 'select-layer', 'animation-controls__layer-name');
+      const select = button(layerLabel, layerLabel, 'select-layer', 'animation-controls__layer-name');
       select.dataset.layerId = String(layer.id); select.setAttribute('aria-pressed', String(layer.id === state.layerId));
       const rename = node('input', 'animation-controls__rename'); rename.type = 'text'; rename.value = String(layer.name || ''); rename.maxLength = 80;
-      rename.setAttribute('aria-label', `${layer.name || `レイヤー ${modelIndex + 1}`}の名前`); rename.dataset.renameLayer = String(layer.id);
+      rename.setAttribute('aria-label', `${layerLabel}の名前`); rename.dataset.renameLayer = String(layer.id);
       const eye = button(layer.visible === false ? 'レイヤーを表示' : 'レイヤーを隠す', layer.visible === false ? '○' : '◉', 'visibility');
       eye.dataset.layerId = String(layer.id); eye.setAttribute('aria-pressed', String(layer.visible !== false));
       const lock = button(layer.locked ? 'レイヤーのロックを解除' : 'レイヤーをロック', '', 'lock');
@@ -358,10 +364,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const remove = button('レイヤーを削除', '×', 'delete-layer'); remove.dataset.layerId = String(layer.id);
       const disabled = Boolean(state.readOnly) || pending > 0;
       for (const control of [rename, eye, lock, up, down, remove]) control.disabled = disabled || Boolean(layer.locked && control !== lock && control !== eye);
-      up.disabled ||= modelIndex === state.layers.length - 1; down.disabled ||= modelIndex === 0; remove.disabled ||= state.layers.length <= 1;
+      rename.disabled ||= musicLayer;
+      up.disabled ||= modelIndex === state.layers.length - 1 || musicLayer;
+      down.disabled ||= modelIndex === (hasMusicLayer ? 1 : 0) || musicLayer;
+      remove.disabled ||= state.layers.length <= 1 || musicLayer;
       row.append(select, rename, eye, lock, up, down, remove); list.append(row);
     }
-    const add = layers.querySelector('[data-action="add-layer"]'); add.disabled = Boolean(state.readOnly) || pending > 0;
+    const add = layers.querySelector('[data-action="add-layer"]'); add.disabled = Boolean(state.readOnly) || pending > 0 || normalLayerCount >= 8;
   }
 
   function showPlaybackFrame(frameId) {
@@ -401,6 +410,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       if (control.dataset.action === 'play' || control.dataset.action === 'onion' || control.dataset.action === 'export-gif' || control.dataset.action === 'toggle-frames' || control.dataset.action === 'toggle-layers' || control.dataset.action === 'toggle-duration' || control.dataset.action === 'close-frame-menu' || control.dataset.action === 'close-animation' || control.dataset.action === 'close-layers' || control.dataset.action === 'close-duration') continue;
       if (control.dataset.action === 'select-frame' || control.dataset.action === 'select-layer' || control.dataset.action === 'select-cel' || control.dataset.action === 'previous-frame' || control.dataset.action === 'next-frame') control.disabled = pending > 0;
       else control.disabled = Boolean(state.readOnly) || pending > 0;
+    }
+    if (state.layers.filter((layer) => layer.role !== 'music').length >= 8) {
+      for (const container of [root, workspacePanel, layers]) for (const control of container?.querySelectorAll('[data-action="add-layer"]') ?? []) control.disabled = true;
     }
     const previous = actionElement('previous-frame'); if (previous) previous.disabled ||= pending > 0 || state.frames.findIndex((frame) => frame.id === state.frameId) <= 0;
     const next = actionElement('next-frame'); if (next) next.disabled ||= pending > 0 || state.frames.findIndex((frame) => frame.id === state.frameId) >= state.frames.length - 1;
@@ -448,14 +460,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     } else {
       const layer = state.layers.find((item) => item.id === id); if (!layer) return;
       frameMenu.setAttribute('aria-label', `${layer.name || 'レイヤー'}の操作`);
+      const musicLayer = layer.role === 'music';
       add(layer.visible === false ? '表示する' : '隠す', layer.visible === false ? '○' : '◉', 'visibility', state.readOnly || pending > 0);
       const lock = add(layer.locked ? 'ロック解除' : 'ロック', '', 'lock', state.readOnly || pending > 0);
       replaceButtonIcon(lock, layer.locked ? 'unlocked' : 'locked');
       lock.append(node('span', 'animation-controls__context-label', layer.locked ? 'ロック解除' : 'ロック'));
       const rename = node('input', 'animation-controls__context-rename'); rename.type = 'text'; rename.value = String(layer.name || ''); rename.maxLength = 80;
-      rename.dataset.contextRename = String(layer.id); rename.setAttribute('aria-label', 'レイヤー名'); rename.disabled = state.readOnly || pending > 0 || Boolean(layer.locked); rename.placeholder = 'レイヤー名'; frameMenu.append(rename);
+      rename.dataset.contextRename = String(layer.id); rename.setAttribute('aria-label', 'レイヤー名'); rename.disabled = musicLayer || state.readOnly || pending > 0 || Boolean(layer.locked); rename.placeholder = 'レイヤー名'; frameMenu.append(rename);
       add('名前を適用', '✓', 'rename', rename.disabled);
-      add('削除', '×', 'delete-layer', state.readOnly || pending > 0 || state.layers.length <= 1 || Boolean(layer.locked));
+      add('削除', '×', 'delete-layer', musicLayer || state.readOnly || pending > 0 || state.layers.length <= 1 || Boolean(layer.locked));
     }
     frameMenu.classList.toggle('is-cel-menu', true); frameMenu.classList.toggle('is-layer-menu', kind === 'layer');
     frameMenu.hidden = false;
@@ -565,7 +578,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const target = event.target;
     if (!target.matches('[data-rename-layer]')) return;
     const layerId = target.dataset.renameLayer; const name = target.value.trim(); const layer = stateNow().layers.find((item) => item.id === layerId);
-    if (layer && name && name !== layer.name) request({ type: 'rename-layer', layerId, name });
+    if (layer && layer.role !== 'music' && name && name !== layer.name) request({ type: 'rename-layer', layerId, name });
   }
 
   function onKeydown(event) {
@@ -603,6 +616,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
 
   function onPointerDown(event) {
     const target = event.target.closest?.(hasCelMatrix ? '[data-action="select-frame"], [data-action="select-layer"]' : '[data-action="select-frame"]'); if (!target || stateNow().readOnly || pending > 0) return;
+    if (target.dataset.layerId && stateNow().layers.find((layer) => layer.id === target.dataset.layerId)?.role === 'music') return;
     if (pointerHold && pointerHold.pointerId !== event.pointerId) return;
     clearLongPress();
     if (hasCelMatrix) {
@@ -665,7 +679,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       if (Number.isInteger(index)) request({ type: 'move-frame', frameId: hold.id, index });
     } else if (hold.type === 'layer' && target.dataset.layerId) {
       const row = Number(target.getAttribute('aria-rowindex')) - 2;
-      const index = state.layers.length - 1 - row;
+      const index = Math.max(state.layers.some((layer) => layer.role === 'music') ? 1 : 0, state.layers.length - 1 - row);
       if (Number.isInteger(index) && index >= 0 && index < state.layers.length) request({ type: 'move-layer', layerId: hold.id, index });
     }
   }

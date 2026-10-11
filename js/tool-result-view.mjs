@@ -104,7 +104,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     if (event.type === 'click') returnFromResult();
   }
   function prepareNav() {
-    navButton = doc.querySelector('.app-tabs button');
+    navButton = [...doc.querySelectorAll('.app-tabs > button')].find(button => !button.inert && !button.hidden && button.getClientRects().length);
     if (!navButton) return;
     navState = { label: navButton.getAttribute('aria-label'), title: navButton.getAttribute('title'), disabled: navButton.disabled, children: [...navButton.childNodes] };
     navButton.dataset.toolResultReturn = ''; navButton.disabled = false;

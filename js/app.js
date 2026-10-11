@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261006-header-controls-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261011-catalog-entry-1';
 import { trackSiteEvent } from './site-analytics.mjs';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
@@ -4042,20 +4042,20 @@ function renderPublicShell() {
     tabs = document.createElement('nav');
     header.insertAdjacentElement('afterend', tabs);
   }
-  tabs.className = 'app-tabs';
+  tabs.className = 'app-tabs app-tabs--labeled';
   tabs.setAttribute('aria-label', 'アプリナビゲーション');
   const page = document.body.dataset.page || 'home';
   const actions = {
-    home: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
-    tools: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""></a>',
-    map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>',
-    works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>',
-    stores: '<a href="/globe/" aria-label="地図でお店を探す"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>',
-    shops: '<a href="/stores/" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""></a>',
-    profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""></a>'
+    home: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">描く</span></a>',
+    tools: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">描く</span></a>',
+    map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿</span></button>',
+    works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">集めた絵</span></a>',
+    stores: '<a class="app-tab-context app-tab-context--stores" href="#store-search" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店を探す</span></a>',
+    shops: '<a href="/stores/" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店</span></a>',
+    profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">投稿した絵</span></a>'
   };
-  const contextAction = actions[page] || '<a href="/globe/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></a>';
-  tabs.innerHTML = `<a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>`;
+  const contextAction = actions[page] || '<a href="/globe/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿</span></a>';
+  tabs.innerHTML = `<a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""><span class="app-tab-label">世界地図</span></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""><span class="app-tab-label">撮影</span></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""><span class="app-tab-label">ツール</span></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""><span class="app-tab-label">マイページ</span></a>`;
   const openGlobeComposer = () => {
     const globe = document.querySelector('.map-hero__globe-frame');
     if (!globe) return;
@@ -4204,7 +4204,7 @@ function renderStoreDetail() {
   const storeWorks = store.works.map(getWork).filter(Boolean);
   root.innerHTML = `
     <div class="breadcrumbs"><a href="/stores/">お店を探す</a><span>/</span><span>${escapeHtml(store.name)}</span></div>
-    <div class="store-hero"><div class="store-hero__visual"><span>${escapeHtml(store.route)}</span></div><article class="store-hero__copy"><div class="tag-list"><span class="tag tag--sample">${storeWorks.length ? '作品に会えるお店' : '絵が届く予定'}</span></div><h1>${escapeHtml(store.name)}</h1><p>${escapeHtml(store.description)}</p><dl class="store-facts"><div class="store-fact"><strong>エリア</strong><span>${escapeHtml(store.area)}</span></div><div class="store-fact"><strong>掲載状態</strong><span>${escapeHtml(store.status)}</span></div><div class="store-fact"><strong>住所</strong><span>${escapeHtml(store.address)}</span></div><div class="store-fact"><strong>営業時間</strong><span>${escapeHtml(store.hours)}</span></div></dl><a class="button button--primary" href="/globe/">地図でお店を探す</a></article></div>
+    <div class="store-hero"><div class="store-hero__visual"><span>${escapeHtml(store.route)}</span></div><article class="store-hero__copy"><div class="tag-list"><span class="tag tag--sample">${storeWorks.length ? '作品に会えるお店' : '絵が届く予定'}</span></div><h1>${escapeHtml(store.name)}</h1><p>${escapeHtml(store.description)}</p><dl class="store-facts"><div class="store-fact"><strong>エリア</strong><span>${escapeHtml(store.area)}</span></div><div class="store-fact"><strong>掲載状態</strong><span>${escapeHtml(store.status)}</span></div><div class="store-fact"><strong>住所</strong><span>${escapeHtml(store.address)}</span></div><div class="store-fact"><strong>営業時間</strong><span>${escapeHtml(store.hours)}</span></div></dl><a class="button button--primary" href="/globe/">世界地図を見る</a></article></div>
     <section class="subsection"><div class="store-location"><div class="store-location__map" data-store-map-root="${store.id}"><div class="store-map-fallback" data-store-map-fallback><span class="store-location__route">${escapeHtml(store.route)}</span><span class="store-location__pin">✦</span><span class="store-location__line store-location__line--one"></span><span class="store-location__line store-location__line--two"></span><span class="store-location__label">${escapeHtml(store.area)}</span></div></div><div class="store-location__copy"><span class="eyebrow">store map</span><h2>このお店はここ。</h2><p>PiXiEEDの地図で、このお店の場所を見られます。実際の道順を調べるときは、外部の地図も開けます。</p>${storeMapLink(store, '行き方を調べる')}<a class="text-link" href="/stores/">地図に戻って、別のお店を見る</a></div></div></section>
     <section class="subsection"><div class="section-heading"><div><span class="eyebrow">at this store</span><h2>このお店で会える絵</h2></div><p>${storeWorks.length ? 'いま置いている絵を紹介しています。' : '絵が届くと、ここに並びます。'}</p></div><div class="related-grid">${storeWorks.length ? storeWorks.map(workCard).join('') : ''}</div></section>
     `;

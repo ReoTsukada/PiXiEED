@@ -1,11 +1,43 @@
+import { readCreationModePointer } from './mode-entry.mjs?rev=20261011-unified-project-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261010-pending-lasso-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261011-shared-music-2';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261011-unified-project-1';
 
 const scope = createModeScope();
+let modes = null, starting = true;
+const startupMain = document.querySelector('#main');
+if (startupMain) startupMain.inert = true;
+// Retained modes gate global drawing shortcuts while keeping Draw's undo timeline alive.
+const drawScope = Object.create(scope);
+drawScope.listen = (target, type, callback, options) => scope.listen(target, type, event => {
+  if ((starting || modes?.mode === 'camera' || document.body.hasAttribute('data-creation-transition')) && /^(key|pointer|wheel)/.test(type)) return;
+  callback(event);
+}, options);
+for (const type of ['pointerdown','click','keydown']) scope.listen(document,type,event=> {
+  if (!starting || event.target.closest?.('dialog,[role="dialog"]')) return;
+  if (event.target.closest?.('#main,.px-tool-header-slot') || type==='keydown') {event.preventDefault();event.stopImmediatePropagation();}
+},{capture:true});
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });
 try {
-  await mountDrawMode({ scope });
+  let retainedDrawPointer = null;
+  const params = new URLSearchParams(location.search), requestedMode = params.get('mode');
+  if (['audio', 'camera'].includes(requestedMode) && params.has('modePxd')) retainedDrawPointer = readCreationModePointer(requestedMode, params);
+  else if (!params.has('pxd')) {
+    try { const pointer = JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || localStorage.getItem('pixieed:pxd:last:draw') || 'null');
+      if (pointer?.projectId && pointer?.revisionId) retainedDrawPointer = pointer;
+    } catch { /* Existing standalone works remain available through explicit imports. */ }
+  }
+  const draw = await mountDrawMode({ scope: drawScope, musicLayer: true, isActive: () => !modes || modes.mode !== 'camera',
+    mountWorkspace: options => mountProjectWorkspace({ ...options, initialPointer: retainedDrawPointer, isActive: () => true,
+      onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
+  try {
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261011-shared-music-2');
+    if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
+  } catch (error) {
+    const status = document.querySelector('#draw-status');
+    if (status) status.textContent = `モード切替を準備できませんでした。描画は続けられます：${error?.message || ''}`;
+  }
 } catch (error) {
   scope.dispose();
   const status = document.querySelector('#draw-status');
@@ -14,3 +46,5 @@ try {
     status.classList.add('is-visible');
   }
 }
+
+finally { starting = false; if (startupMain) startupMain.inert = false; }

@@ -1,3 +1,5 @@
+import { ANIMATION_MAX_COLORS } from './animation-core.mjs';
+
 /** Keep the whole artwork within 32 used colours, including remaining transparency. */
 export function chooseCameraPalette(doc, mask, otherUsedIndices = []) {
   const required = new Set(otherUsedIndices);
@@ -60,4 +62,29 @@ export function replaceCameraPixels(doc, target, indices) {
     pixels[target.cells[n]] = value;
   }
   return { ...doc, palette: [...doc.palette], pixels };
+}
+/** Stage the selected output pixels and appended colors without mutating the
+ * project. A failed plan leaves the captured image available for another choice. */
+export function planCameraReplacement(target, rgba, { paletteFixed = false } = {}) {
+  if (!rgba || rgba.length !== target.cells.length * 4) throw new TypeError('撮影画像の画素数が一致しません。');
+  const palette = [...target.palette], normalize = hex => hex.slice(0, 7).toLowerCase();
+  const slots = new Map();
+  palette.forEach((hex, index) => { if (!slots.has(normalize(hex))) slots.set(normalize(hex), index); });
+  const pixels = [...target.document.pixels], additions = [];
+  const fixedPixels = paletteFixed ? cameraPixels(rgba, palette, target.allowedIndices) : null;
+  for (let n = 0; n < target.cells.length; n++) {
+    const offset = n * 4, alpha = rgba[offset + 3];
+    if (alpha === 0) { pixels[target.cells[n]] = -1; continue; }
+    if (alpha !== 255) throw new TypeError('半透明の画素は共通作品に適用できません。不透明な画像または完全な透明画素を使用してください。撮影画像と作品は保持しています。');
+    if (paletteFixed) { pixels[target.cells[n]] = fixedPixels[n]; continue; }
+    const hex = '#' + Array.from(rgba.slice(offset, offset + 3), value => value.toString(16).padStart(2, '0')).join('');
+    let index = slots.get(hex);
+    if (index === undefined) { index = palette.length; slots.set(hex, index); palette.push(hex); additions.push(hex); }
+    pixels[target.cells[n]] = index;
+  }
+  if (palette.length > ANIMATION_MAX_COLORS) {
+    const error = new RangeError(`使用色を追加すると${palette.length}色になります。共通作品の上限は${ANIMATION_MAX_COLORS}色です。色数の少ない撮影モードか「パレット固定」を選んで撮り直してください。画像と作品は変更していません。`);
+    error.code = 'camera-palette-overflow'; throw error;
+  }
+  return { document: { ...target.document, palette, pixels }, additions };
 }

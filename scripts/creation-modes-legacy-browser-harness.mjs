@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+const { chromium } = await import(pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs').href);
+const base=process.env.PIXIEED_BROWSER_BASE_URL||'http://127.0.0.1:4188',out=process.env.PIXIEED_LEGACY_OUTPUT||'/tmp/pixieed-compressed-browser';
+assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname)); await mkdir(out,{recursive:true});
+const browser=await chromium.launch({headless:true}),results=[];
+try{for(const width of [390,1280]){
+ const context=await browser.newContext({viewport:{width,height:844}});await context.route('**/*',r=>new URL(r.request().url()).origin===base?r.continue():r.abort());
+ await context.addInitScript(()=>Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:()=>{throw Error('Devices disabled');}}));
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(15000);
+ const ready=mode=>page.waitForFunction(mode=>document.documentElement.dataset.creationModesReady==='true'&&document.body.dataset.creationMode===mode&&!document.querySelector('#creation-mode-menu').hasAttribute('aria-busy'),mode);
+ const switchMode=async mode=>{if(!await page.locator('#creation-mode-menu').evaluate(n=>n.open))await page.locator('#creation-mode-menu > summary').click();await page.locator(`[data-creation-mode="${mode}"]`).click();await ready(mode);};
+ await page.goto(base+'/draw/');await ready('draw');
+ const fixture=await page.evaluate(async()=>{
+   const codec=await import('/js/creation/pxd-codec.mjs'),audio=await import('/js/creation/audio-core.mjs'),pxd=await import('/js/creation/pxd-draw-audio.mjs'),stores=await import('/js/creation/tool-project-store.mjs');
+   const image={width:32,height:16,rgba:new Uint8Array(32*16*4)};image.rgba.set([73,100,60,255],(5*32+24)*4);
+   const link={rulesVersion:'shared-canvas-v1',imageRole:'audio',width:32,height:16,ticksPerCell:60,rowPitchMap:audio.createAudioRowPitchMap(16),colorToSlot:{'rgba-49643cff':'square'},futureField:{keep:1}};
+   const projected=pxd.projectLegacySharedAudioImage(audio.createAudioSong({songId:'compressed-browser',tempo:137}),image,link);
+   projected.song.tracks[0].clips[0].notes[0].velocity=47;projected.song.tracks[0].clips[0].notes[0].futureNote={keep:2};
+   let project=codec.createPxdProject({manifest:{lastMode:'audio',toolProject:{schemaVersion:1,tool:'audio'}}});project=await pxd.writePxdAudioState(project,projected.song,{image,link});
+   const saved=await stores.createToolProjectStore('audio').save(project,{expectedRevisionId:null});return {id:saved.projectId,revision:saved.revisionId,song:projected.song};
+ });
+ const open=async rev=>{await page.goto(`${base}/audio/?pxd=${fixture.id}&pxdRevision=${rev}`);await ready('audio');};
+ const stored=()=>page.evaluate(async id=>{const stores=await import('/js/creation/tool-project-store.mjs'),pxd=await import('/js/creation/pxd-draw-audio.mjs'),anim=await import('/js/creation/pxd-animation.mjs');const p=await stores.createToolProjectStore('audio').load(id);const a=await anim.readPxdAnimation(p,'audio-legacy-editor');return {revision:p.revisionId,song:pxd.readPxdAudioState(p),link:pxd.readPxdAudioLink(p),layers:a?.layers.length};},fixture.id);
+ await open(fixture.revision);assert.equal(await page.locator('#draw-music-tempo').inputValue(),'137');await page.locator('#draw-music-play').click();await page.waitForFunction(()=>document.querySelector('#draw-music-play').dataset.state==='playing');await page.locator('#draw-music-play').click();
+ await switchMode('draw');let saved=await stored();assert.deepEqual(saved.song,fixture.song);await switchMode('audio');
+ const paint=async x=>{const box=await page.locator('#draw-canvas').boundingBox();await page.mouse.click(box.x+box.width*(x+.5)/32,box.y+box.height*5.5/16);};await paint(1);
+ await page.locator('#draw-animation-controls [data-action="toggle-frames"]').click();await page.locator('.animation-controls__layer-add').click();
+ await page.locator('#draw-music-settings summary').click();await page.locator('#draw-music-instrument').selectOption('triangle');
+ await page.locator('#draw-undo').click();assert.equal(await page.locator('#draw-music-instrument').inputValue(),'square');await page.locator('#draw-redo').click();assert.equal(await page.locator('#draw-music-instrument').inputValue(),'triangle');
+ await switchMode('draw');saved=await stored();assert.equal(saved.song.loopTicks,1920);assert.equal(saved.layers,2);assert.equal(saved.link.legacyEditorRole,'audio-legacy-editor');
+ const notes=saved.song.tracks.flatMap(t=>t.clips.flatMap(c=>c.notes));assert.deepEqual(notes.find(n=>n.sourceCell?.x===24),fixture.song.tracks[0].clips[0].notes[0]);assert.equal(notes.find(n=>n.sourceCell?.x===1).startTick,60);assert.equal(notes.find(n=>n.sourceCell?.x===1).durationTicks,60);
+ await open(saved.revision);await switchMode('draw');const reopened=await stored();assert.deepEqual(reopened.song,saved.song);assert.equal(reopened.layers,2);
+ await page.goto(`${base}/audio/?standalone=1&pxd=${fixture.id}&pxdRevision=${reopened.revision}`);await page.waitForFunction(()=>document.documentElement.dataset.audioReady==='true'&&!document.querySelector('#main').inert);
+ await page.locator('#audio-play-toggle').click();await page.waitForFunction(()=>document.querySelector('#audio-play-toggle').dataset.state==='playing');await page.locator('#audio-play-toggle').click();
+ await page.locator('#project-open').click();await page.locator('#project-tab-current').click();await page.locator('#pxd-panel .project-more').evaluate(n=>{n.open=true;});await page.locator('#pxd-save').click();await page.waitForFunction(()=>document.querySelector('#pxd-file-status').textContent.includes('保存し直しました'));
+ const standalone=await stored();assert.deepEqual(standalone.song,saved.song,'standalone marker open/save must retain exact timing');
+ assert.deepEqual(errors,[]);results.push({width,passed:true,checks:['unchanged exact replay/save','Draw cell added with 60-tick ratio','old note ID/velocity/future fields retained','sound undo/redo','two layers saved/reloaded','standalone exact replay/save'],errors});console.log('PASS',width);await context.close();
+}}finally{await browser.close();await writeFile(out+'/results.json',JSON.stringify({results,permissions:'never granted',realCamera:'UNTESTED'},null,2));}

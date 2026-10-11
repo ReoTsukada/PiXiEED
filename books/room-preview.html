@@ -2,106 +2,361 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,follow">
-  <meta name="description" content="歩いて、見つけて、選ぶ。ドットのお店の試作です。">
-  <title>ドットのお店（試作）｜PiXiEED</title>
+  <meta name="description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
+  <link rel="canonical" href="https://pixieed.jp/books/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="ドット絵の本と道具｜PiXiEED">
+  <meta property="og:description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
+  <meta property="og:url" content="https://pixieed.jp/books/">
+  <meta property="og:image" content="https://pixieed.jp/assets/og/site.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ドット絵の本と道具｜PiXiEED">
+  <meta name="twitter:description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
+  <meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png">
+  <meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261006-panel-close-1">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261001-free-tools-1">
-  <link rel="stylesheet" href="/css/books-room.css?rev=20261008-shop-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261011-catalog-entry-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261011-catalog-refine-2">
+  <title>ドット絵の本と道具｜PiXiEED</title>
 </head>
-<body class="room-page">
-  <header class="room-header">
-    <a class="room-back" href="/books/" aria-label="ドットのあそび棚へ戻る"><span aria-hidden="true">←</span> 棚へ</a>
-    <h1>ドットのお店 <span>試作</span></h1>
-    <button class="room-help-button" id="room-help" type="button" aria-haspopup="dialog" aria-controls="room-help-dialog">遊び方</button>
-  </header>
+<body class="books-page">
+  <a class="skip-link" href="#catalog">商品一覧へ</a>
+  <header class="catalog-header"><div class="catalog-header__inner"><a href="/" class="catalog-brand" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span> PiXiEED</a><p>PIXEL PLAY · CATALOG</p></div></header>
+  <main id="catalog">
+    <section class="catalog-intro" aria-labelledby="page-title"><div class="catalog-wrap catalog-intro__inner">
+      <p class="catalog-eyebrow">BOOKS · TOYS · TOOLS · GADGETS</p>
+      <h1 id="page-title">ドット絵の本と道具</h1>
+      <p class="catalog-lead">描く、眺める、手を動かす。気になる一冊や道具を探せます。</p>
+      <p class="catalog-disclosure" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています。価格・販売条件は販売先のAmazonでご確認ください。</p>
+    </div></section>
+    <section class="catalog-section catalog-wrap" aria-labelledby="catalog-title">
+      <div class="catalog-heading"><div><p class="catalog-eyebrow">THE SHELF</p><h2 id="catalog-title">商品一覧</h2></div><p class="catalog-count" data-product-count aria-live="polite">25件</p></div>
+      <noscript><p class="catalog-noscript">商品一覧と商品情報は以下でご覧いただけます。絞り込み操作にはJavaScriptが必要です。</p></noscript>
+      <form class="catalog-filters" id="catalog-filters" role="search" hidden>
+        <label class="catalog-search-label" for="catalog-query">商品名・説明・著者・出版社で検索</label>
+        <div class="catalog-search"><input id="catalog-query" name="q" type="search" autocomplete="off" placeholder="例：背景、Kindle、著者名"><button type="button" data-clear-search aria-label="検索文字をクリア">クリア</button></div>
+        <fieldset class="catalog-category-filter"><legend>カテゴリ</legend><div class="catalog-chips" role="group" aria-label="カテゴリ。横にスクロールできます">
+          <button type="button" data-category-filter="all" data-category-label="すべて" aria-label="すべて 25件" aria-pressed="true"><span>すべて</span><span class="catalog-chip-count" data-category-count>25</span></button><button type="button" data-category-filter="books" data-category-label="本" aria-label="本 14件" aria-pressed="false"><span>本</span><span class="catalog-chip-count" data-category-count>14</span></button><button type="button" data-category-filter="toys" data-category-label="おもちゃ" aria-label="おもちゃ 6件" aria-pressed="false"><span>おもちゃ</span><span class="catalog-chip-count" data-category-count>6</span></button><button type="button" data-category-filter="tools" data-category-label="制作道具" aria-label="制作道具 1件" aria-pressed="false"><span>制作道具</span><span class="catalog-chip-count" data-category-count>1</span></button><button type="button" data-category-filter="gadgets" data-category-label="ガジェット" aria-label="ガジェット 4件" aria-pressed="false"><span>ガジェット</span><span class="catalog-chip-count" data-category-count>4</span></button>
+        </div></fieldset>
+        <details class="catalog-more-filters" id="catalog-more-filters">
+          <summary><span>種別・並び替え</span><span class="catalog-more-filters__selection" data-extra-filter-summary>指定なし</span></summary>
+          <div class="catalog-filter-row">
+            <label for="catalog-format">種別・仕様<select id="catalog-format" name="format"><option value="all">すべて</option></select></label>
+            <label for="catalog-sort">並び順<select id="catalog-sort" name="sort"><option value="listed">掲載順</option><option value="name">名前順</option></select></label>
+          </div>
+        </details>
+      </form>
+      <p class="catalog-image-note">商品画像は使用許諾未確認のため未掲載です。確認待ち情報は各商品の詳細をご覧ください。</p>
+      <div class="catalog-filter-status" hidden><p data-filter-summary aria-live="polite"></p><button type="button" data-reset-filters hidden>条件を解除</button></div>
+      <div class="product-grid" data-product-grid>
+        <article class="product-card" id="product-dot-classroom" data-product-id="product-dot-classroom" data-books-product-id="product-dot-classroom" data-asin="B07H7DK5KH" data-category="books" data-format="Kindle版" data-title="ドット絵教室" data-description="EDGEの基本から背景・人物・アニメーションまで、59点の描き方を作例に沿って学べる入門書。" data-author="中川 悠京 著" data-publisher="エムディエヌコーポレーション" data-source-label="出版社の紹介" data-source-url="https://books.mdn.co.jp/books/3218303007/" data-image-src="" data-work-id="" data-metadata-note="">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">01</span><span class="product-card__placeholder-title">ドット絵教室</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ドット絵教室</h3>
+            <p class="product-card__description">EDGEの基本から背景・人物・アニメーションまで、59点の描き方を作例に沿って学べる入門書。</p>
+            <p class="product-card__byline">中川 悠京 著 · エムディエヌコーポレーション</p>
 
-  <main class="room-main">
-    <section class="room-stage" id="room-stage" aria-label="ドットのお店の店内">
-      <canvas id="room-canvas" width="960" height="640" aria-label="店内を歩いて商品を選ぶドット絵の試作">
-        この画面にはCanvasを表示できません。下の一覧から商品を選べます。
-      </canvas>
-      <p class="room-status" id="room-status" role="status" aria-live="polite" aria-atomic="true"></p>
-    </section>
-    <section class="room-product-panel" id="room-product-panel" aria-labelledby="room-product-title" aria-describedby="room-product-description">
-      <div class="room-product-panel__content">
-        <p class="room-dialog__eyebrow">商品・記事の案内</p>
-        <h2 id="room-product-title" tabindex="-1">棚を選んでください</h2>
-        <p class="room-dialog__description" id="room-product-description">店内の商品や記事を選ぶと、ここに説明が表示されます。</p>
-        <p class="room-dialog__format" id="room-product-format">商品・記事を選ぶと詳細を表示します。</p>
-        <div id="room-product-commerce" hidden>
-          <p class="room-dialog__ad" id="room-product-ad-label">広告／Amazonアソシエイト（運営者・加入状況を確認中）</p>
-          <p class="room-dialog__disclosure" id="room-product-disclosure" hidden></p>
-          <a class="room-amazon-link" id="room-product-amazon" href="#" target="_blank" rel="sponsored noopener noreferrer" hidden>Amazonで商品を見る <span aria-hidden="true">↗</span></a>
-          <p class="room-dialog__amazon-note">価格や商品詳細はAmazonでご確認ください。</p>
-        </div>
-        <div class="room-article-actions" id="room-article-actions" hidden>
-          <p class="room-dialog__ad">記事を読む</p>
-          <button class="room-amazon-link room-article-open" id="room-article-open" type="button">ここで読む</button>
-          <a class="room-article-external" id="room-article-external" href="#" target="_blank" rel="noopener noreferrer">元の記事を開く <span aria-hidden="true">↗</span></a>
-          <p class="room-dialog__amazon-note">紹介元のページを表示します。</p>
-        </div>
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-dot-classroom" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ドット絵教室の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://books.mdn.co.jp/books/3218303007/" target="_blank" rel="noopener noreferrer">出版社の紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-pochipochi" data-product-id="product-pochipochi" data-books-product-id="product-pochipochi" data-asin="B0BZGSNDDY" data-category="books" data-format="Kindle版" data-title="ぽちぽちドット絵 自由に描いて楽しもう！" data-description="食べ物や動物など74モチーフを、2段階の仕上げで描くドット絵入門。" data-author="中川 悠京 著" data-publisher="エムディエヌコーポレーション" data-source-label="出版社の紹介" data-source-url="https://books.mdn.co.jp/books/3222303001/" data-image-src="" data-work-id="" data-metadata-note="">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">02</span><span class="product-card__placeholder-title">ぽちぽちドット絵 自由に描いて楽しもう！</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ぽちぽちドット絵 自由に描いて楽しもう！</h3>
+            <p class="product-card__description">食べ物や動物など74モチーフを、2段階の仕上げで描くドット絵入門。</p>
+            <p class="product-card__byline">中川 悠京 著 · エムディエヌコーポレーション</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-pochipochi" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ぽちぽちドット絵 自由に描いて楽しもう！の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://books.mdn.co.jp/books/3222303001/" target="_blank" rel="noopener noreferrer">出版社の紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-background" data-product-id="product-background" data-books-product-id="product-background" data-asin="4862465021" data-category="books" data-format="紙の本" data-title="ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方" data-description="色や光、構図の基礎と作家のメイキングから、背景表現を学ぶ一冊。" data-author="APO+・モトクロス斉藤・せたも 著" data-publisher="ボーンデジタル" data-source-label="ボーンデジタルの商品紹介" data-source-url="https://www.borndigital.co.jp/book/20926/" data-image-src="" data-work-id="ultimate-pixel-crew-report" data-metadata-note="同じ作品の紙版（Kindle版も掲載）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">03</span><span class="product-card__placeholder-title">ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>紙の本</span></div>
+            <h3>ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方</h3>
+            <p class="product-card__description">色や光、構図の基礎と作家のメイキングから、背景表現を学ぶ一冊。</p>
+            <p class="product-card__byline">APO+・モトクロス斉藤・せたも 著 · ボーンデジタル</p>
+            <p class="product-card__byline product-card__metadata-note">同じ作品の紙版（Kindle版も掲載）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-background" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://www.borndigital.co.jp/book/20926/" target="_blank" rel="noopener noreferrer">ボーンデジタルの商品紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-background-kindle" data-product-id="product-background-kindle" data-books-product-id="product-background-kindle" data-asin="B0B6Z7Y4GV" data-category="books" data-format="Kindle版" data-title="ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方" data-description="色や光、構図の基礎と作家のメイキングから、背景表現を学ぶ一冊。" data-author="APO+・モトクロス斉藤・せたも 著" data-publisher="ボーンデジタル" data-source-label="出版社の作品紹介（紙版）" data-source-url="https://www.borndigital.co.jp/book/20926/" data-image-src="" data-work-id="ultimate-pixel-crew-report" data-metadata-note="同じ作品のKindle版。ASINと形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">04</span><span class="product-card__placeholder-title">ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方</h3>
+            <p class="product-card__description">色や光、構図の基礎と作家のメイキングから、背景表現を学ぶ一冊。</p>
+            <p class="product-card__byline">APO+・モトクロス斉藤・せたも 著 · ボーンデジタル</p>
+            <p class="product-card__byline product-card__metadata-note">同じ作品のKindle版。ASINと形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-background-kindle" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ULTIMATE PIXEL CREW REPORT ピクセルアートではじめる背景の描き方の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://www.borndigital.co.jp/book/20926/" target="_blank" rel="noopener noreferrer">出版社の作品紹介（紙版） <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-new-pixel-art" data-product-id="product-new-pixel-art" data-books-product-id="product-new-pixel-art" data-asin="4862465773" data-category="books" data-format="紙の本" data-title="NEW PIXEL ART ニューピクセルアート" data-description="多彩な作家の作品とメイキングに触れ、ドット絵表現の幅を楽しむ作品集。" data-author="ボーンデジタル編集部 編・APO+ 監修" data-publisher="ボーンデジタル" data-source-label="ボーンデジタルの商品紹介" data-source-url="https://www.borndigital.co.jp/book/31795/" data-image-src="" data-work-id="" data-metadata-note="">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">05</span><span class="product-card__placeholder-title">NEW PIXEL ART ニューピクセルアート</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>紙の本</span></div>
+            <h3>NEW PIXEL ART ニューピクセルアート</h3>
+            <p class="product-card__description">多彩な作家の作品とメイキングに触れ、ドット絵表現の幅を楽しむ作品集。</p>
+            <p class="product-card__byline">ボーンデジタル編集部 編・APO+ 監修 · ボーンデジタル</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-new-pixel-art" aria-haspopup="dialog" aria-controls="product-detail" aria-label="NEW PIXEL ART ニューピクセルアートの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://www.borndigital.co.jp/book/31795/" target="_blank" rel="noopener noreferrer">ボーンデジタルの商品紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-famicom" data-product-id="product-famicom" data-books-product-id="product-famicom" data-asin="B08FMF4JC7" data-category="books" data-format="Kindle版" data-title="ファミコンドット絵の素晴らしき世界" data-description="さまざまなジャンルのファミコン作品を、ドット絵の魅力から眺めて楽しむ一冊。" data-author="レトロゲーム愛好会 編" data-publisher="" data-source-label="出版社発表（PR TIMES）" data-source-url="https://prtimes.jp/main/html/rd/p/000000636.000007785.html" data-image-src="" data-work-id="" data-metadata-note="">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">06</span><span class="product-card__placeholder-title">ファミコンドット絵の素晴らしき世界</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ファミコンドット絵の素晴らしき世界</h3>
+            <p class="product-card__description">さまざまなジャンルのファミコン作品を、ドット絵の魅力から眺めて楽しむ一冊。</p>
+            <p class="product-card__byline">レトロゲーム愛好会 編</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-famicom" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ファミコンドット絵の素晴らしき世界の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://prtimes.jp/main/html/rd/p/000000636.000007785.html" target="_blank" rel="noopener noreferrer">出版社発表（PR TIMES） <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-dot-final-fantasy" data-product-id="product-dot-final-fantasy" data-books-product-id="product-dot-final-fantasy" data-asin="B09GS15X9P" data-category="books" data-format="Kindle版" data-title="DOT Pixel Art Final Fantasy" data-description="Final Fantasyを含むタイトルで提供された電子書籍。正式な書名と内容は確認待ち。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名は提供URL由来の暫定表記。形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">07</span><span class="product-card__placeholder-title">DOT Pixel Art Final Fantasy</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>DOT Pixel Art Final Fantasy</h3>
+            <p class="product-card__description">Final Fantasyを含むタイトルで提供された電子書籍。正式な書名と内容は確認待ち。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名は提供URL由来の暫定表記。形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-dot-final-fantasy" aria-haspopup="dialog" aria-controls="product-detail" aria-label="DOT Pixel Art Final Fantasyの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-girls-collection-02" data-product-id="product-girls-collection-02" data-books-product-id="product-girls-collection-02" data-asin="B0G7T5VKRP" data-category="books" data-format="Kindle版" data-title="ピクセルアート GIRLS COLLECTION Vol.02｜ドット絵 イラスト集｜Pixelart" data-description="ピクセルアートのイラスト集として紹介されたVol.02。第01巻とは別の商品。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">08</span><span class="product-card__placeholder-title">ピクセルアート GIRLS COLLECTION Vol.02｜ドット絵 イラスト集｜Pixelart</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ピクセルアート GIRLS COLLECTION Vol.02｜ドット絵 イラスト集｜Pixelart</h3>
+            <p class="product-card__description">ピクセルアートのイラスト集として紹介されたVol.02。第01巻とは別の商品。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-girls-collection-02" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ピクセルアート GIRLS COLLECTION Vol.02｜ドット絵 イラスト集｜Pixelartの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-pixel-girl-snaps" data-product-id="product-pixel-girl-snaps" data-books-product-id="product-pixel-girl-snaps" data-asin="B0CYPD1P9V" data-category="books" data-format="Kindle版" data-title="ななみ雪ピクセルアート作品集 PIXEL GIRL SNAPS" data-description="日常の少女や風景をドットで描く、ななみ雪のイラスト集。" data-author="ななみ雪" data-publisher="" data-source-label="刊行記念展示の公式案内" data-source-url="https://wps-jp.fujifilm.com/nanamiyuki_202403/" data-image-src="" data-work-id="" data-metadata-note="作品と作者は展示の公式案内で確認。商品名の表記・ASIN・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">09</span><span class="product-card__placeholder-title">ななみ雪ピクセルアート作品集 PIXEL GIRL SNAPS</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ななみ雪ピクセルアート作品集 PIXEL GIRL SNAPS</h3>
+            <p class="product-card__description">日常の少女や風景をドットで描く、ななみ雪のイラスト集。</p>
+            <p class="product-card__byline">ななみ雪</p>
+            <p class="product-card__byline product-card__metadata-note">作品と作者は展示の公式案内で確認。商品名の表記・ASIN・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-pixel-girl-snaps" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ななみ雪ピクセルアート作品集 PIXEL GIRL SNAPSの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://wps-jp.fujifilm.com/nanamiyuki_202403/" target="_blank" rel="noopener noreferrer">刊行記念展示の公式案内 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-dot-macrame" data-product-id="product-dot-macrame" data-books-product-id="product-dot-macrame" data-asin="B0BQ6GD3PY" data-category="books" data-format="Kindle版" data-title="ドット絵でデザインして作るドット絵マクラメ 1巻" data-description="ドット絵でデザインするマクラメを題材にした電子書籍の第1巻。" data-author="ZAPOTECO" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・著者・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">10</span><span class="product-card__placeholder-title">ドット絵でデザインして作るドット絵マクラメ 1巻</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ドット絵でデザインして作るドット絵マクラメ 1巻</h3>
+            <p class="product-card__description">ドット絵でデザインするマクラメを題材にした電子書籍の第1巻。</p>
+            <p class="product-card__byline">ZAPOTECO</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・著者・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-dot-macrame" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ドット絵でデザインして作るドット絵マクラメ 1巻の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-pixel-girl-magic" data-product-id="product-pixel-girl-magic" data-books-product-id="product-pixel-girl-magic" data-asin="B0CD1PYFHH" data-category="books" data-format="Kindle版" data-title="ピクセルガール・マジック Pixel Girl Magic ＜AIイラスト集＞" data-description="「Pixel Girl Magic」のAIイラスト集。JumKujiraの電子書籍として登録。" data-author="JumKujira" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・著者・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">11</span><span class="product-card__placeholder-title">ピクセルガール・マジック Pixel Girl Magic ＜AIイラスト集＞</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>ピクセルガール・マジック Pixel Girl Magic ＜AIイラスト集＞</h3>
+            <p class="product-card__description">「Pixel Girl Magic」のAIイラスト集。JumKujiraの電子書籍として登録。</p>
+            <p class="product-card__byline">JumKujira</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・著者・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-pixel-girl-magic" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ピクセルガール・マジック Pixel Girl Magic ＜AIイラスト集＞の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-dot-course" data-product-id="product-dot-course" data-books-product-id="product-dot-course" data-asin="4839914664" data-category="books" data-format="紙の本" data-title="ドット絵講座" data-description="R研究所の「ドット絵講座」として紹介された紙の本。内容の一次資料は確認待ち。" data-author="R研究所" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・著者・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">12</span><span class="product-card__placeholder-title">ドット絵講座</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>紙の本</span></div>
+            <h3>ドット絵講座</h3>
+            <p class="product-card__description">R研究所の「ドット絵講座」として紹介された紙の本。内容の一次資料は確認待ち。</p>
+            <p class="product-card__byline">R研究所</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・著者・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-dot-course" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ドット絵講座の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-dot-sticker-masterpieces" data-product-id="product-dot-sticker-masterpieces" data-books-product-id="product-dot-sticker-masterpieces" data-asin="4591191109" data-category="books" data-format="紙の本" data-title="ドット絵シールパズル 世界の名画" data-description="数字やアルファベットに沿って、1500枚以上のドット形シールで世界の名画を完成させるパズルブック。" data-author="相馬章宏" data-publisher="ポプラ社" data-source-label="ポプラ社の書籍紹介" data-source-url="https://www.poplar.co.jp/book/search/result/archive/8008573.html" data-image-src="" data-work-id="" data-metadata-note="書名・著者・内容・ISBN 978-4-591-19110-1は出版社書誌で確認。Amazon商品との対応は公式未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">13</span><span class="product-card__placeholder-title">ドット絵シールパズル 世界の名画</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>紙の本</span></div>
+            <h3>ドット絵シールパズル 世界の名画</h3>
+            <p class="product-card__description">数字やアルファベットに沿って、1500枚以上のドット形シールで世界の名画を完成させるパズルブック。</p>
+            <p class="product-card__byline">相馬章宏 · ポプラ社</p>
+            <p class="product-card__byline product-card__metadata-note">書名・著者・内容・ISBN 978-4-591-19110-1は出版社書誌で確認。Amazon商品との対応は公式未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-dot-sticker-masterpieces" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ドット絵シールパズル 世界の名画の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://www.poplar.co.jp/book/search/result/archive/8008573.html" target="_blank" rel="noopener noreferrer">ポプラ社の書籍紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-girls-collection-01" data-product-id="product-girls-collection-01" data-books-product-id="product-girls-collection-01" data-asin="B09PB3DKVL" data-category="books" data-format="Kindle版" data-title="Pixel Art Girls Collection 01" data-description="「Pixel Art Girls Collection」の第01巻として紹介された電子書籍。Vol.02と別に探せます。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">14</span><span class="product-card__placeholder-title">Pixel Art Girls Collection 01</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>本</span><span>Kindle版</span></div>
+            <h3>Pixel Art Girls Collection 01</h3>
+            <p class="product-card__description">「Pixel Art Girls Collection」の第01巻として紹介された電子書籍。Vol.02と別に探せます。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-girls-collection-01" aria-haspopup="dialog" aria-controls="product-detail" aria-label="Pixel Art Girls Collection 01の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-3d-dot" data-product-id="product-3d-dot" data-books-product-id="product-3d-dot" data-asin="B0FJW7GQ8X" data-category="toys" data-format="くもん出版 RD-10" data-title="立体ドット絵メーカー" data-description="色と長さの違うスティックを挿して、平面から立体まで作って遊べるおもちゃ。" data-author="" data-publisher="くもん出版" data-source-label="くもん出版の商品紹介" data-source-url="https://shop.kumonshuppan.com/view/item/000000003708" data-image-src="" data-work-id="" data-metadata-note="">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">15</span><span class="product-card__placeholder-title">立体ドット絵メーカー</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>おもちゃ</span><span>くもん出版 RD-10</span></div>
+            <h3>立体ドット絵メーカー</h3>
+            <p class="product-card__description">色と長さの違うスティックを挿して、平面から立体まで作って遊べるおもちゃ。</p>
+            <p class="product-card__byline">くもん出版</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-3d-dot" aria-haspopup="dialog" aria-controls="product-detail" aria-label="立体ドット絵メーカーの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://shop.kumonshuppan.com/view/item/000000003708" target="_blank" rel="noopener noreferrer">くもん出版の商品紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-rin-wooden-puzzle" data-product-id="product-rin-wooden-puzzle" data-books-product-id="product-rin-wooden-puzzle" data-asin="B0GHSKJYM7" data-category="toys" data-format="木製パズル" data-title="【Rin JP】テトリス tetris 木製パズル モンテッソーリ 学びブロック" data-description="テトリスを題材とする名称で紹介された木製パズル。ライセンスは未確認。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・形式は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">16</span><span class="product-card__placeholder-title">【Rin JP】テトリス tetris 木製パズル モンテッソーリ 学びブロック</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>おもちゃ</span><span>木製パズル</span></div>
+            <h3>【Rin JP】テトリス tetris 木製パズル モンテッソーリ 学びブロック</h3>
+            <p class="product-card__description">テトリスを題材とする名称で紹介された木製パズル。ライセンスは未確認。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・形式は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-rin-wooden-puzzle" aria-haspopup="dialog" aria-controls="product-detail" aria-label="【Rin JP】テトリス tetris 木製パズル モンテッソーリ 学びブロックの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-lego-white-baseplate-11026" data-product-id="product-lego-white-baseplate-11026" data-books-product-id="product-lego-white-baseplate-11026" data-asin="B09BNVC2GB" data-category="toys" data-format="ホワイト11026" data-title="LEGO クラシック 基礎板 ホワイト11026" data-description="LEGOクラシックの白い基礎板。ブロックを並べる土台として紹介しています。" data-author="" data-publisher="" data-source-label="LEGOの製品紹介" data-source-url="https://www.lego.com/ja-jp/product/white-baseplate-11026" data-image-src="" data-work-id="" data-metadata-note="製品名はLEGO公式情報で確認。指定ASINは利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">17</span><span class="product-card__placeholder-title">LEGO クラシック 基礎板 ホワイト11026</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>おもちゃ</span><span>ホワイト11026</span></div>
+            <h3>LEGO クラシック 基礎板 ホワイト11026</h3>
+            <p class="product-card__description">LEGOクラシックの白い基礎板。ブロックを並べる土台として紹介しています。</p>
+            <p class="product-card__byline product-card__metadata-note">製品名はLEGO公式情報で確認。指定ASINは利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-lego-white-baseplate-11026" aria-haspopup="dialog" aria-controls="product-detail" aria-label="LEGO クラシック 基礎板 ホワイト11026の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://www.lego.com/ja-jp/product/white-baseplate-11026" target="_blank" rel="noopener noreferrer">LEGOの製品紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-wyswyg-building-blocks-1200" data-product-id="product-wyswyg-building-blocks-1200" data-books-product-id="product-wyswyg-building-blocks-1200" data-asin="B0B49R5XQM" data-category="toys" data-format="1200ピース" data-title="WYSWYG 1200ピース クラシックビルディングブロック" data-description="WYSWYGのブロックセット。LEGO純正品ではなく、互換性は未確認。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・ブランド・ピース数は利用者提供情報（公式未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">18</span><span class="product-card__placeholder-title">WYSWYG 1200ピース クラシックビルディングブロック</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>おもちゃ</span><span>1200ピース</span></div>
+            <h3>WYSWYG 1200ピース クラシックビルディングブロック</h3>
+            <p class="product-card__description">WYSWYGのブロックセット。LEGO純正品ではなく、互換性は未確認。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・ブランド・ピース数は利用者提供情報（公式未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-wyswyg-building-blocks-1200" aria-haspopup="dialog" aria-controls="product-detail" aria-label="WYSWYG 1200ピース クラシックビルディングブロックの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-block-baseplates-eight" data-product-id="product-block-baseplates-eight" data-books-product-id="product-block-baseplates-eight" data-asin="B0CFQH8QR5" data-category="toys" data-format="4色8枚セット" data-title="ブロック基礎板 4色8枚セット" data-description="ブロックを並べる土台のセット。LEGO純正品としては確認されていません。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名はAmazonの通常ページ閲覧で確認。メーカー・仕様・互換性は未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">19</span><span class="product-card__placeholder-title">ブロック基礎板 4色8枚セット</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>おもちゃ</span><span>4色8枚セット</span></div>
+            <h3>ブロック基礎板 4色8枚セット</h3>
+            <p class="product-card__description">ブロックを並べる土台のセット。LEGO純正品としては確認されていません。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名はAmazonの通常ページ閲覧で確認。メーカー・仕様・互換性は未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-block-baseplates-eight" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ブロック基礎板 4色8枚セットの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-cat-block-set" data-product-id="product-cat-block-set" data-books-product-id="product-cat-block-set" data-asin="B0HDNWKD9Y" data-category="toys" data-format="ブロックセット" data-title="猫のブロックセット" data-description="猫を題材にしたブロックセット。販売先の表記に猫種が混在し、選択種類は確認待ち。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="販売先の商品名に複数の猫種が混在。選択種類・猫種・ブランド・互換性・対象年齢・知育効果は未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">20</span><span class="product-card__placeholder-title">猫のブロックセット</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>おもちゃ</span><span>ブロックセット</span></div>
+            <h3>猫のブロックセット</h3>
+            <p class="product-card__description">猫を題材にしたブロックセット。販売先の表記に猫種が混在し、選択種類は確認待ち。</p>
+            <p class="product-card__byline product-card__metadata-note">販売先の商品名に複数の猫種が混在。選択種類・猫種・ブランド・互換性・対象年齢・知育効果は未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-cat-block-set" aria-haspopup="dialog" aria-controls="product-detail" aria-label="猫のブロックセットの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-dot-notebook" data-product-id="product-dot-notebook" data-books-product-id="product-dot-notebook" data-asin="B0HJYV517H" data-category="tools" data-format="紙のノート" data-title="ドット絵デザインノート 方眼マスを塗って自分だけの絵をつくる｜16×16／24×24／32×32｜A4・全80ページ" data-description="方眼マスを塗って、自分だけのドット絵づくりを楽しむノート。" data-author="きろくノート工房" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・著者・サイズ・ページ数は利用者提供情報（公式仕様は未確認）。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">21</span><span class="product-card__placeholder-title">ドット絵デザインノート 方眼マスを塗って自分だけの絵をつくる｜16×16／24×24／32×32｜A4・全80ページ</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>制作道具</span><span>紙のノート</span></div>
+            <h3>ドット絵デザインノート 方眼マスを塗って自分だけの絵をつくる｜16×16／24×24／32×32｜A4・全80ページ</h3>
+            <p class="product-card__description">方眼マスを塗って、自分だけのドット絵づくりを楽しむノート。</p>
+            <p class="product-card__byline">きろくノート工房</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・著者・サイズ・ページ数は利用者提供情報（公式仕様は未確認）。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-dot-notebook" aria-haspopup="dialog" aria-controls="product-detail" aria-label="ドット絵デザインノート 方眼マスを塗って自分だけの絵をつくる｜16×16／24×24／32×32｜A4・全80ページの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-divoom-pixoo-64" data-product-id="product-divoom-pixoo-64" data-books-product-id="product-divoom-pixoo-64" data-asin="B09MTLJKMY" data-category="gadgets" data-format="ピクセルアートフレーム" data-title="Divoom Pixoo 64 ピクセルアートフレーム" data-description="Pixoo 64の名称で登録されたピクセルアートフレーム。現行の64Ⅱとは区別して確認が必要。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名・形式は利用者提供情報。メーカーの現行ページはPixoo 64Ⅱを掲載しているため、指定ASINのモデル・仕様は公式未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">22</span><span class="product-card__placeholder-title">Divoom Pixoo 64 ピクセルアートフレーム</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>ガジェット</span><span>ピクセルアートフレーム</span></div>
+            <h3>Divoom Pixoo 64 ピクセルアートフレーム</h3>
+            <p class="product-card__description">Pixoo 64の名称で登録されたピクセルアートフレーム。現行の64Ⅱとは区別して確認が必要。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名・形式は利用者提供情報。メーカーの現行ページはPixoo 64Ⅱを掲載しているため、指定ASINのモデル・仕様は公式未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-divoom-pixoo-64" aria-haspopup="dialog" aria-controls="product-detail" aria-label="Divoom Pixoo 64 ピクセルアートフレームの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-divoom-ditoo-pro-white" data-product-id="product-divoom-ditoo-pro-white" data-books-product-id="product-divoom-ditoo-pro-white" data-asin="B08LQ4SBXD" data-category="gadgets" data-format="ホワイト" data-title="Divoom Ditoo-Pro ホワイト" data-description="ピクセルアート表示とスピーカーを備えたDitoo-Pro。登録色はホワイト。" data-author="" data-publisher="" data-source-label="Divoomの製品紹介" data-source-url="https://divoom.com/products/divoom-pro" data-image-src="" data-work-id="" data-metadata-note="モデルと白色展開はメーカー情報で確認。指定ASIN・販売仕様は公式未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">23</span><span class="product-card__placeholder-title">Divoom Ditoo-Pro ホワイト</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>ガジェット</span><span>ホワイト</span></div>
+            <h3>Divoom Ditoo-Pro ホワイト</h3>
+            <p class="product-card__description">ピクセルアート表示とスピーカーを備えたDitoo-Pro。登録色はホワイト。</p>
+            <p class="product-card__byline product-card__metadata-note">モデルと白色展開はメーカー情報で確認。指定ASIN・販売仕様は公式未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-divoom-ditoo-pro-white" aria-haspopup="dialog" aria-controls="product-detail" aria-label="Divoom Ditoo-Pro ホワイトの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><a class="product-card__source" href="https://divoom.com/products/divoom-pro" target="_blank" rel="noopener noreferrer">Divoomの製品紹介 <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-divoom-timebox-evo-black" data-product-id="product-divoom-timebox-evo-black" data-books-product-id="product-divoom-timebox-evo-black" data-asin="B0GQYVXZJD" data-category="gadgets" data-format="ブラック" data-title="Divoom Timebox Evo ピクセルアートスピーカー ブラック" data-description="ピクセルアートスピーカーのTimebox Evo。登録色はブラック。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名はAmazonの通常ページ閲覧で確認。メーカー仕様・保証は未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">24</span><span class="product-card__placeholder-title">Divoom Timebox Evo ピクセルアートスピーカー ブラック</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>ガジェット</span><span>ブラック</span></div>
+            <h3>Divoom Timebox Evo ピクセルアートスピーカー ブラック</h3>
+            <p class="product-card__description">ピクセルアートスピーカーのTimebox Evo。登録色はブラック。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名はAmazonの通常ページ閲覧で確認。メーカー仕様・保証は未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-divoom-timebox-evo-black" aria-haspopup="dialog" aria-controls="product-detail" aria-label="Divoom Timebox Evo ピクセルアートスピーカー ブラックの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
+        <article class="product-card" id="product-divoom-pixoo-max-black" data-product-id="product-divoom-pixoo-max-black" data-books-product-id="product-divoom-pixoo-max-black" data-asin="B08D2Z2N87" data-category="gadgets" data-format="ブラック" data-title="Divoom Pixoo Max LEDピクセルディスプレイ ブラック" data-description="LEDピクセルディスプレイのPixoo Max。登録色はブラック。" data-author="" data-publisher="" data-source-label="" data-source-url="" data-image-src="" data-work-id="" data-metadata-note="商品名はAmazonの通常ページ閲覧で確認。メーカー仕様・保証は未確認。">
+          <div class="product-card__image product-card__image--empty"><div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">25</span><span class="product-card__placeholder-title">Divoom Pixoo Max LEDピクセルディスプレイ ブラック</span><small>商品画像未掲載</small></div></div>
+          <div class="product-card__body">
+            <div class="product-card__meta"><span>ガジェット</span><span>ブラック</span></div>
+            <h3>Divoom Pixoo Max LEDピクセルディスプレイ ブラック</h3>
+            <p class="product-card__description">LEDピクセルディスプレイのPixoo Max。登録色はブラック。</p>
+            <p class="product-card__byline product-card__metadata-note">商品名はAmazonの通常ページ閲覧で確認。メーカー仕様・保証は未確認。</p>
+
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="product-divoom-pixoo-max-black" aria-haspopup="dialog" aria-controls="product-detail" aria-label="Divoom Pixoo Max LEDピクセルディスプレイ ブラックの詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button><span class="product-card__source product-card__source--missing">出典情報未登録</span><a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+          </div>
+        </article>
       </div>
-      <button class="room-dialog__close" id="room-product-close" type="button">探索に戻る</button>
-      <p class="room-product-panel__fallback">画面下の商品・記事一覧からも選べます。</p>
-      <noscript><p class="room-product-panel__fallback">JavaScriptを有効にすると店内を操作できます。</p></noscript>
+      <div class="catalog-empty" data-empty-state hidden><p>条件に合う商品はありません。</p></div>
     </section>
+    <section class="catalog-extra catalog-wrap" aria-labelledby="catalog-extra-title" hidden><div class="catalog-extra__copy"><p class="catalog-eyebrow">COMING LATER</p><h2 id="catalog-extra-title">PiXiEEDのグッズ</h2><p>準備ができたら、PiXiEEDのオリジナルグッズをこちらで紹介します。</p></div><div class="catalog-ad-slot" aria-label="広告掲載予定"><span>広告掲載予定</span></div></section>
   </main>
 
-  <footer class="room-footer">
-    <p class="room-hint">スワイプで歩く <span aria-hidden="true">·</span> 商品・記事をタップして見る <span class="room-hint__keyboard">· 矢印キーでも移動</span></p>
-    <div class="room-footer__controls">
-      <label class="room-sr-only" for="room-product-select">商品・記事を選ぶ</label>
-      <select class="room-product-select" id="room-product-select" aria-label="商品・記事を選ぶ">
-        <option value="" selected>商品・記事を選ぶ</option>
-      </select>
-      <button class="room-product-open" id="room-product-open" type="button" aria-label="選んだ商品や記事を見る">見る</button>
-      <button class="room-motion-toggle" id="room-motion-toggle" type="button" aria-pressed="true">動き ON</button>
-    </div>
-  </footer>
-
-  <dialog class="room-reader-dialog" id="room-reader-dialog" aria-labelledby="room-reader-title" aria-describedby="room-reader-note">
-    <div class="room-reader__layout">
-      <header class="room-reader__header">
-        <div class="room-reader__heading">
-          <p class="room-dialog__eyebrow">ARTICLE READER</p>
-          <h2 id="room-reader-title">選んだ記事</h2>
-          <p id="room-reader-source" class="room-reader__source"></p>
-        </div>
-        <button class="room-reader__close" id="room-reader-close" type="button" aria-label="記事を閉じる">閉じる</button>
-      </header>
-      <div class="room-reader__body">
-        <p class="room-reader__note" id="room-reader-note">表示できないサイトは、元の記事を開いてください。</p>
-        <iframe id="room-reader-frame" title="選んだ記事" sandbox="allow-scripts" referrerpolicy="no-referrer" loading="lazy"></iframe>
-      </div>
-      <footer class="room-reader__footer">
-        <a class="room-reader__external" id="room-reader-external" href="#" target="_blank" rel="noopener noreferrer">元の記事を開く <span aria-hidden="true">↗</span></a>
-      </footer>
-    </div>
+  <dialog class="product-detail" id="product-detail" aria-labelledby="product-detail-title">
+    <div class="product-detail__header"><span>商品詳細</span><button type="button" data-detail-close aria-label="詳細を閉じて一覧に戻る">一覧に戻る <span aria-hidden="true">×</span></button></div>
+    <div class="product-detail__content" data-detail-body></div>
+    <p class="product-detail__notice">購入手続きは外部販売先のAmazonで行います。販売先のリンクは新しいタブで開きます。</p>
+    <p class="product-detail__gate">商品リンクを確認できないため、購入リンクは利用できません。</p>
   </dialog>
-
-  <dialog class="room-dialog room-help-dialog" id="room-help-dialog" aria-labelledby="room-help-title">
-    <div class="room-dialog__layout">
-      <div class="room-dialog__main">
-        <p class="room-dialog__eyebrow">HOW TO PLAY</p>
-        <h2 id="room-help-title">お店を歩いてみよう</h2>
-        <ol class="room-help-steps">
-          <li>画面を上下左右にスワイプすると、その方向へ歩きます。</li>
-          <li>気になる商品・記事をタップすると、説明を見られます。</li>
-          <li>下の一覧から商品・記事を選ぶこともできます。</li>
-          <li>店内と商品は仮のドット絵です。描いた画像に差し替えられます。</li>
-        </ol>
-      </div>
-      <div class="room-dialog__actions">
-        <p class="room-dialog__ad">商品リンクについて</p>
-        <p class="room-dialog__amazon-note">商品詳細とリンクの案内は、このページの商品詳細欄に表示します。</p>
-      </div>
-    </div>
-    <button class="room-dialog__close" id="room-help-close" type="button">閉じる</button>
-  </dialog>
-
-  <script type="module" src="/js/books-room.mjs?rev=20261008-shop-1"></script>
+  <script type="module" src="/js/books-catalog.mjs?rev=20261011-catalog-refine-2"></script>
+  <script type="module" src="/js/books-commerce.mjs?rev=20261011-catalog-refine-2"></script>
 </body>
 </html>

@@ -6,9 +6,9 @@ import {
   readPxdDrawDocument as readProjectDrawDocument, readPxdImage,
   readPxdSharedImage, putPxdSharedImage
 } from './pxd-project.mjs?rev=20261001-free-tools-1';
-import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20261005-audio-color-instruments-1';
+import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_COLUMN_OPTIONS, AUDIO_PIXEL_PALETTE, AUDIO_SHARED_IMAGE_MAX_DIMENSION, audioPixelColumns, audioSongPixels, createAudioRowPitchMap, extendAudioLoopForImage, resizeAudioCanvas, validateAudioSharedImage, validateAudioSong } from './audio-core.mjs?rev=20261011-legacy-frames-1';
 import { DRAW_SIZES, documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
-import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261005-frame-cell-pitch-1';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261011-legacy-frames-1';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
 const AUDIO_LINK_PATH = 'audio/link.json';
@@ -155,7 +155,7 @@ function sharedSlotRgba(song, link, slotId) {
 }
 
 function sharedCellTicks(song, x, width, link) {
-  if (link.ticksPerCell === AUDIO_PIXEL_TICKS && song.loopTicks >= width * AUDIO_PIXEL_TICKS) {
+  if (link.legacyEditorRole !== 'audio-legacy-editor' && link.ticksPerCell === AUDIO_PIXEL_TICKS && song.loopTicks >= width * AUDIO_PIXEL_TICKS) {
     return { startTick: x * AUDIO_PIXEL_TICKS, durationTicks: AUDIO_PIXEL_TICKS };
   }
   // Read older PXD links using their original compressed timing until import migrates them.
@@ -196,6 +196,14 @@ function sharedImageNotes(song, image, link, { preserve = true } = {}) {
     }
   }
   return validateAudioSong({ ...song, tracks });
+}
+
+/** Rebuild legacy shared cells using the stored loop ratio, without timing migration. */
+export function projectLegacySharedAudioImage(song, image, link) {
+  validateAudioSong(song);
+  const nextSong = sharedImageNotes(song, image, link);
+  assertSharedAudioBinding(nextSong, image, link);
+  return { song: nextSong, image, link: clone(link) };
 }
 
 export function prepareSharedAudioImageImport(song, image, options = {}) {
@@ -308,7 +316,7 @@ export async function updatePxdAudioAnimationLink(project, animation) {
   const frameCellPitchMaps = dimensionsUnchanged && prior?.rulesVersion === AUDIO_ANIMATION_LINK_VERSION
     ? Object.fromEntries(Object.entries(prior.frameCellPitchMaps || {}).filter(([frameId]) => animation.frames.some((frame) => frame.id === frameId)))
     : null;
-  const link = createAudioAnimationLink(song, animation, { colorToSlot: colors, rowPitchMap, frameRowPitchMaps, frameCellPitchMaps, projectionReady: false });
+  const link = createAudioAnimationLink(song, animation, { colorToSlot: colors, rowPitchMap, frameRowPitchMaps, frameCellPitchMaps, projectionReady: false, timing: prior?.timing || null });
   return writePxdAudioState(project, song, { link, animation });
 }
 

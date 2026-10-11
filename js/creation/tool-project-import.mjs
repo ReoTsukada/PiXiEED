@@ -1,11 +1,15 @@
+import { encodePxd, setPxdBytes } from './pxd-codec.mjs';
 import { cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
-import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261006-draw-startup-1';
+import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261011-unified-project-1';
 import { putPxdSharedImage, readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
 
 /** Copy into a fresh tool-owned project; never save or mutate the source. */
 export async function importToolProject(source, tool) {
+  const original = source;
+  if (tool === 'draw' && source.entries.some(entry => entry.path === 'audio/state.json')) { const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261011-unified-project-3'); source = await prepareSharedMusicProject(source); }
   let project = cloneAsToolProject(source, tool);
+  if (tool === 'draw') project = setPxdBytes(project, 'legacy/import-source.pxd', await encodePxd(original), 'application/octet-stream');
   const sourceTool = source.manifest?.toolProject?.tool || source.manifest?.lastMode;
   if (sourceTool === tool) return project;
   const role = componentImageRole(source, sourceTool || 'draw');
@@ -29,7 +33,7 @@ export async function importToolProject(source, tool) {
   } else if (tool === 'draw') {
     const animation = await readPxdAnimation(source, role);
     if (animation) project = await writePxdAnimation(project, animation, { role: 'main', posterFrameId: animation.frames[0].id });
-    project.manifest.editorState = { draw: { imageRole: 'main' } };
+    project.manifest.editorState = { ...source.manifest.editorState, draw: { ...source.manifest.editorState?.draw, imageRole: 'main' } };
   }
   return project;
 }

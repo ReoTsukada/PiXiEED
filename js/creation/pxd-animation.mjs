@@ -82,14 +82,16 @@ export async function readPxdAnimation(project, role = 'main') {
   if (!Number.isInteger(state.width) || !Number.isInteger(state.height) || state.width < 1 || state.height < 1 || state.width > 256 || state.height > 256
     || !Array.isArray(state.palette) || state.palette.length < 1 || state.palette.length > 32 || state.palette.some((color) => typeof color !== 'string' || !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color) || color.length === 9 && color.slice(7).toLowerCase() !== 'ff')
     || !Array.isArray(state.frames) || state.frames.length < 1 || state.frames.length > 128
-    || !Array.isArray(state.layers) || state.layers.length < 1 || state.layers.length > 8
+    || !Array.isArray(state.layers) || state.layers.length < 1 || state.layers.length > 9
     || !Array.isArray(state.cels)) throw new TypeError('アニメーションのコマ一覧が壊れています。');
   const frameIds = new Set(); for (const frame of state.frames) {
     if (!frame || typeof frame.id !== 'string' || frameIds.has(frame.id) || !Number.isFinite(frame.durationMs) || frame.durationMs < 1 || frame.durationMs > 60000) throw new TypeError('フレーム情報が壊れています。'); frameIds.add(frame.id);
   }
   const layerIds = new Set(); for (const layer of state.layers) {
-    if (!layer || typeof layer.id !== 'string' || layerIds.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') throw new TypeError('レイヤー情報が壊れています。'); layerIds.add(layer.id);
+    if (!layer || typeof layer.id !== 'string' || layerIds.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean' || Object.hasOwn(layer, 'role') && typeof layer.role !== 'string') throw new TypeError('レイヤー情報が壊れています。'); layerIds.add(layer.id);
   }
+  const musicLayers = state.layers.map((layer, index) => layer.role === 'music' ? index : -1).filter((index) => index >= 0);
+  if (musicLayers.length > 1 || musicLayers.length === 1 && musicLayers[0] !== 0 || state.layers.length > 8 + Number(musicLayers.length === 1)) throw new TypeError('音楽レイヤーの位置またはレイヤー数が不正です。');
   if (state.posterFrameId !== undefined && !frameIds.has(state.posterFrameId)) throw new TypeError('表紙コマの参照が壊れています。');
   const celIds = new Set();
   for (const cel of state.cels) {
@@ -109,6 +111,8 @@ export async function readPxdAnimation(project, role = 'main') {
       tileRows.push({ frameId: cel.frameId, layerId: cel.layerId, x, y, width, height, offset, length, digest });
     }
   }
+  const musicLayerId = musicLayers.length ? state.layers[0].id : null;
+  if (musicLayerId && state.cels.some((cel) => cel.layerId === musicLayerId && cel.frameId !== state.frames[0].id)) throw new TypeError('音楽レイヤーの共有コマ保存が曖昧です。');
   const intervals = new Map(); for (const tile of tileRows) intervals.set(`${tile.offset}:${tile.length}`, { start: tile.offset, end: tile.offset + tile.length });
   let end = 0; for (const interval of [...intervals.values()].sort((a, b) => a.start - b.start)) { if (interval.start !== end) throw new TypeError('アニメーション画素プールに欠落または余分なbytesがあります。'); end = interval.end; }
   if (end !== pool.byteLength) throw new TypeError('アニメーション画素プールに余分なbytesがあります。');
