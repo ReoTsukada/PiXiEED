@@ -1,5 +1,19 @@
+/** Selection transactions take priority over the currently used input's settings. */
+export function drawSelectionActionSlots(state, mode = 'select', binding = {}, side = 'left') {
+  const action = (key, label, enabled) => ({ key, label, enabled: Boolean(enabled), kind: 'action' });
+  if (state.pending) return [action('confirm', '✓ 確定', !state.busy), action('cancel', '× 取消', !state.busy)];
+  if (mode === 'paste' && state.hasClipboard) return [action('paste', '貼り付け', state.canPaste), action('back', '範囲へ', !state.busy)];
+  if (state.bounds || state.selectTool) return [action('copy', 'コピー', state.canCopy), action('cut', 'カット', state.canCut)];
+  const empty = () => ({ key: 'empty', kind: 'empty', label: '—', enabled: false });
+  const prefix = side === 'right' ? '右' : '左';
+  const option = (key, label, value) => ({ key, kind: 'option', side, value, label: `${prefix} ${label} ${value ? 'ON' : 'OFF'}`, enabled: !state.busy && state.canConfigure !== false });
+  if (/^(rectangle|ellipse)(-fill)?$/.test(binding.tool || '')) return [option('filled', '塗り', binding.tool.endsWith('-fill')), empty()];
+  if (binding.tool === 'fill') return [option('contiguous', '隣接', binding.contiguous !== false), empty()];
+  return [empty(), empty()];
+}
+
 /** Two fixed contextual action slots, separate from held mouse-button inputs. */
-export function mountDrawSelectionPanel({ scope, host, getState, onAction, beforeOpen, auxiliaryHost }) {
+export function mountDrawSelectionPanel({ scope, host, getState, onAction, beforeOpen, auxiliaryHost, getToolOptions = () => ({}), onToolOption = () => false }) {
   const doc = host.ownerDocument, root = doc.createElement('section');
   root.id = 'draw-selection-controls'; root.className = 'draw-selection-controls'; root.setAttribute('aria-label', '選択と貼り付け');
   root.innerHTML = `<div class="draw-selection-controls__row"><button type="button" data-selection-slot="0"></button><button type="button" data-selection-slot="1"></button></div><button type="button" class="draw-selection-controls__deselect" data-selection-action="deselect">確定・選択解除</button><p data-selection-status aria-live="polite"></p>`;
@@ -12,14 +26,17 @@ export function mountDrawSelectionPanel({ scope, host, getState, onAction, befor
   function sync() {
     const s = getState();
     if (wasPending && !s.pending) mode = s.hasClipboard ? 'paste' : 'select';
-    if (!s.bounds && s.hasClipboard) mode = 'paste';
+    if (mode !== 'tool' && !s.bounds && s.hasClipboard && !s.selectTool) mode = 'paste';
     wasPending = s.pending;
-    root.dataset.pending = String(s.pending); root.dataset.mode = s.pending ? 'pending' : mode; root.dataset.active = String(Boolean(s.selectTool || s.bounds || s.pending));
-    const actions = s.pending ? [['confirm', '✓ 確定', !s.busy], ['cancel', '× 取消', !s.busy]]
-      : mode === 'paste' ? [['paste', '貼り付け', s.canPaste], ['back', '範囲へ', !s.busy]]
-        : [['copy', 'コピー', s.canCopy], ['cut', 'カット', s.canCut]];
+    const options = getToolOptions();
+    const actions = drawSelectionActionSlots(s, mode, options.binding, options.side);
+    root.dataset.pending = String(s.pending); root.dataset.mode = s.pending ? 'pending' : actions[0].kind === 'action' ? mode : 'settings'; root.dataset.active = String(Boolean(s.selectTool || s.bounds || s.pending));
     buttons.forEach((button, i) => {
-      const [action, label, enabled] = actions[i]; button.dataset.selectionAction = action;
+      const { key: action, label, enabled, kind, side, value } = actions[i]; button.dataset.selectionAction = action;
+      button.dataset.slotKind = kind; button.dataset.inputSide = side || '';
+      if (kind === 'option') button.setAttribute('aria-pressed', String(value)); else button.removeAttribute('aria-pressed');
+      button.setAttribute('aria-label', kind === 'empty' ? 'この道具の追加設定はありません' : label);
+      button.title = action === 'contiguous' ? (value ? '隣接する同じ色だけを塗る' : '離れた同じ色もすべて塗る') : kind === 'option' ? '図形の塗りを切り替える' : label;
       // Preserve the pressed text node: WebKit can drop a native mouse click
       // when pointerdown synchronization replaces that node with the same label.
       if (button.textContent !== label) button.textContent = label;
@@ -36,15 +53,16 @@ export function mountDrawSelectionPanel({ scope, host, getState, onAction, befor
   }
   scope.listen(root, 'pointerdown', event => {
     const button = event.target.closest('button'); if (!button || button.disabled) return;
-    held.set(event.pointerId, { button, action: button.dataset.selectionAction, phase: root.dataset.mode });
+    held.set(event.pointerId, { button, action: button.dataset.selectionAction, phase: root.dataset.mode, side: button.dataset.inputSide, value: button.getAttribute('aria-pressed') });
   });
   scope.listen(root, 'pointercancel', event => held.delete(event.pointerId));
   scope.listen(root, 'click', event => {
     const button = event.target.closest('button'); if (!button || button.disabled) return;
     const record = held.get(event.pointerId); held.clear();
-    if (record && (record.button !== button || record.action !== button.dataset.selectionAction || record.phase !== root.dataset.mode)) return;
+    if (record && (record.button !== button || record.action !== button.dataset.selectionAction || record.phase !== root.dataset.mode || record.side !== button.dataset.inputSide || record.value !== button.getAttribute('aria-pressed'))) return;
     const action = record?.action || button.dataset.selectionAction;
-    if (action === 'back') { mode = 'select'; onAction('back'); }
+    if (button.dataset.slotKind === 'option') onToolOption(action, button.dataset.inputSide, button.getAttribute('aria-pressed') !== 'true');
+    else if (action === 'back') { mode = 'select'; onAction('back'); }
     else if (onAction(action) && ['copy', 'cut'].includes(action)) mode = 'paste';
     sync();
   });

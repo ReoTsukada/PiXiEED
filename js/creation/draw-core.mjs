@@ -53,25 +53,55 @@ function pointIndex(x, y, width, height) {
   return px < 0 || py < 0 || px >= width || py >= height ? -1 : py * width + px;
 }
 
-export function strokePixels(document, from, to, value, { trusted = false, tracker = null, mask = null } = {}) {
+const IDENTITY_BRUSH_TRANSFORM = Object.freeze([Object.freeze([1, 0]), Object.freeze([0, 1])]);
+function validateBrushTransform(transform) {
+  if (!Array.isArray(transform) || transform.length !== 2 || transform.some((row) => !Array.isArray(row) || row.length !== 2
+      || row.some((entry) => !Number.isInteger(entry) || Math.abs(entry) > 1))) throw new TypeError('Brush transform must be a signed orthogonal 2x2 matrix');
+  const [[a, b], [c, d]] = transform;
+  if (a * a + b * b !== 1 || c * c + d * d !== 1 || a * c + b * d !== 0) throw new TypeError('Brush transform must be a signed orthogonal 2x2 matrix');
+}
+
+export function strokePixels(document, from, to, value, { trusted = false, tracker = null, mask = null, brushSize = 1, brushTransform = IDENTITY_BRUSH_TRANSFORM } = {}) {
   // Pointer moves operate on an already validated document; importing and committing still validate fully.
   if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
-  const line = boundedPixelLine(from, to, document.width, document.height);
+  if (!Number.isInteger(brushSize) || brushSize < 1 || brushSize > 16) throw new RangeError('Brush size must be an integer from 1 to 16');
+  validateBrushTransform(brushTransform);
+  const [[a, b], [c, d]] = brushTransform;
+  const negativeOffset = -Math.floor((brushSize - 1) / 2);
+  const positiveOffset = negativeOffset + brushSize - 1;
+  const line = boundedPixelLine(from, to, document.width, document.height, { margin: brushSize, preserveDistance: 4 });
   if (!line) return [];
   const changed = [];
   for (const { x, y } of pixelLineCells({ x: line.x0, y: line.y0 }, { x: line.x1, y: line.y1 })) {
-    const index = pointIndex(x, y, document.width, document.height);
-    if (index >= 0 && (!mask || mask[index]) && document.pixels[index] !== value) { writeTrackedPixel(document, tracker, index, value); changed.push(index); }
+    for (let dy = negativeOffset; dy <= positiveOffset; dy += 1) for (let dx = negativeOffset; dx <= positiveOffset; dx += 1) {
+      const index = pointIndex(x + a * dx + b * dy, y + c * dx + d * dy, document.width, document.height);
+      if (index >= 0 && (!mask || mask[index]) && document.pixels[index] !== value) { writeTrackedPixel(document, tracker, index, value); changed.push(index); }
+    }
   }
   return changed;
 }
 
-export function floodFill(document, x, y, value, { trusted = false, tracker = null, queue = null, mask = null } = {}) {
+export function floodFill(document, x, y, value, { trusted = false, tracker = null, queue = null, mask = null, contiguous = true } = {}) {
   if (!trusted) validateDrawDocument(document);
   if (!Number.isInteger(value) || value < -1 || value >= document.palette.length) throw new TypeError('Invalid pixel value');
+  if (typeof contiguous !== 'boolean') throw new TypeError('contiguous must be a boolean');
   const start = pointIndex(x, y, document.width, document.height);
   if (start < 0 || mask && !mask[start]) return [];
+  if (!contiguous) {
+    const rgbaKey = (pixel) => {
+      if (pixel < 0) return '0,0,0,0';
+      const hex = document.palette[pixel]; const rgba = colorRgba(hex);
+      return rgba[3] === 0 ? '0,0,0,0' : rgba.join(',');
+    };
+    const target = rgbaKey(document.pixels[start]); const changed = [];
+    for (let index = 0; index < document.pixels.length; index += 1) {
+      if ((!mask || mask[index]) && rgbaKey(document.pixels[index]) === target && document.pixels[index] !== value) {
+        writeTrackedPixel(document, tracker, index, value); changed.push(index);
+      }
+    }
+    return Uint32Array.from(changed);
+  }
   const target = document.pixels[start];
   if (target === value) return [];
   const changed = queue ?? new Uint32Array(document.pixels.length);

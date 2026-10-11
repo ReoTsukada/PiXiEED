@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4188';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Only localhost QA is allowed');
 const out = process.env.PIXIEED_RESOURCE_OUTPUT || '/tmp/pixieed-resource-qa';
 await mkdir(out, { recursive: true });
-const { chromium } = await import(pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs').href);
+const { chromium } = await import(pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE || join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')).href);
 const browser = await chromium.launch({ headless: true });
 const report = { base, permissions: 'never granted', realCamera: 'UNTESTED', externalApi: 'blocked', scenarios: [], limitations: [
   'Only browser-observable and instrumented callbacks are measured; this is not a real camera/device test.',
@@ -92,6 +94,9 @@ try {
   await page.mouse.click(box.x + box.width * 2.5 / logical.width, box.y + box.height * 2.5 / logical.height);
   assert.ok(await canvas.evaluate(node => node.getContext('2d').getImageData(0, 0, node.width, node.height).data.some((value, index) => index % 4 === 3 && value > 0)), 'fixture must contain a painted pixel');
   await switchMode('audio');
+  // Music owns a dedicated layer; the earlier art pixel is retained independently.
+  box = await canvas.boundingBox();
+  await page.mouse.click(box.x + box.width * 2.5 / logical.width, box.y + box.height * 2.5 / logical.height);
   await page.locator('#draw-music-settings').evaluate(node => node.open = true);
   await page.locator('#draw-music-instrument').selectOption('triangle');
   await page.locator('#draw-music-settings').evaluate(node => node.open = false);

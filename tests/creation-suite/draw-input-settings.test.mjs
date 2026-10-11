@@ -4,12 +4,23 @@ import { normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSe
 const palette = ['#111111', '#ffffff', '#ff0000', '#00ff00', '#0000ff'];
 test('defaults and corrupt or unavailable preference storage keep valid independent bindings', () => {
   const initial = normalizeDrawInputSettings(null, palette);
-  assert.deepEqual(initial.bindings, { left: { tool: 'pen', color: 2 }, right: { tool: 'pen', color: 4 } });
+  assert.deepEqual(initial.bindings, { left: { tool: 'pen', color: 2, brushSize: 1, spraySize: 5, contiguous: true }, right: { tool: 'pen', color: 4, brushSize: 1, spraySize: 5, contiguous: true } });
   assert.deepEqual(readDrawInputSettings({ getItem() { throw Error('blocked'); } }, palette), initial);
   assert.deepEqual(readDrawInputSettings({ getItem() { return '{bad'; } }, palette), initial);
   const corrupt = normalizeDrawInputSettings({ version: 1, bindings: { left: { tool: 'bad', color: 99 }, right: { tool: 'eraser', color: -1 } }, editedSide: 'bad', controlsSide: 'left' }, palette);
-  assert.deepEqual(corrupt.bindings, { left: { tool: 'pen', color: 2 }, right: { tool: 'eraser', color: -1 } });
+  assert.deepEqual(corrupt.bindings, { left: { tool: 'pen', color: 2, brushSize: 1, spraySize: 5, contiguous: true }, right: { tool: 'eraser', color: -1, brushSize: 1, spraySize: 5, contiguous: true } });
   assert.equal(corrupt.editedSide, 'left'); assert.equal(corrupt.controlsSide, 'left');
+});
+test('brush, spray, and flood preferences migrate safely per binding', () => {
+  const state = normalizeDrawInputSettings({ version: 1, bindings: {
+    left: { tool: 'rectangle-fill', color: 2, brushSize: 8, spraySize: 1, contiguous: false, selectMode: 'lasso' },
+    right: { tool: 'spray', color: 4, brushSize: 99, spraySize: 18, contiguous: 'no' }
+  } }, palette);
+  assert.deepEqual(state.bindings.left, { tool: 'rectangle-fill', color: 2, brushSize: 8, spraySize: 1, contiguous: false, selectMode: 'lasso' });
+  assert.deepEqual(state.bindings.right, { tool: 'spray', color: 4, brushSize: 1, spraySize: 5, contiguous: true });
+  const restored = normalizeDrawInputSettings(serializeDrawInputSettings(state, palette), palette);
+  assert.deepEqual(restored.bindings.left, { ...state.bindings.left, colorHex: palette[2] });
+  assert.deepEqual(restored.bindings.right, { ...state.bindings.right, colorHex: palette[4] });
 });
 test('serialized assignments follow matching colors after palette reorder without modifying artwork', () => {
   const state = normalizeDrawInputSettings({ version: 1, bindings: { left: { tool: 'line', color: 2 }, right: { tool: 'pen', color: 4 } }, editedSide: 'right', controlsSide: 'left' }, palette);

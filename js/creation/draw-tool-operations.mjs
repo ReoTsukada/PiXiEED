@@ -38,11 +38,12 @@ function paintCells(document, cells, value, tracker, mask) {
 }
 
 /** Draw a normalized, inclusive rectangle or ellipse and return the changed pixel indices. */
-export function drawShapePixels(document, from, to, value, { shape = 'rectangle', filled = false, mirror = false, symmetry = {}, tracker = null, mask = null } = {}) {
+export function drawShapePixels(document, from, to, value, { shape = 'rectangle', filled = false, brushSize = 1, mirror = false, symmetry = {}, tracker = null, mask = null } = {}) {
   validateDrawDocument(document);
   validateValue(document, value);
   if (shape !== 'rectangle' && shape !== 'ellipse') throw new RangeError('Shape must be rectangle or ellipse');
   if (typeof filled !== 'boolean' || typeof mirror !== 'boolean') throw new TypeError('Shape options must be boolean');
+  if (!Number.isInteger(brushSize) || brushSize < 1 || brushSize > 16) throw new RangeError('Brush size must be an integer from 1 to 16');
   const symmetryFlags = combineSymmetry(symmetry, mirror);
   const hasSymmetry = symmetryFlags.horizontal || symmetryFlags.vertical || symmetryFlags.diagonalDown || symmetryFlags.diagonalUp;
   const points = boundedPoints(from, to, document.width, document.height);
@@ -62,22 +63,36 @@ export function drawShapePixels(document, from, to, value, { shape = 'rectangle'
     const span = radiusX * Math.sqrt(Math.max(0, 1 - vertical * vertical));
     return { left: Math.max(minX, Math.floor(centerX - span)), right: Math.min(maxX, Math.ceil(centerX + span)) };
   };
+  const innerEllipseRow = (y) => {
+    const innerLeft = minX + brushSize; const innerRight = maxX - brushSize;
+    const innerTop = minY + brushSize; const innerBottom = maxY - brushSize;
+    const innerWidth = innerRight - innerLeft + 1; const innerHeight = innerBottom - innerTop + 1;
+    if (innerWidth < 1 || innerHeight < 1 || y < innerTop || y > innerBottom) return null;
+    if (innerWidth <= 2 || innerHeight <= 2) return { left: innerLeft, right: innerRight };
+    const cx = (innerLeft + innerRight) / 2; const cy = (innerTop + innerBottom) / 2;
+    const rx = (innerWidth - 1) / 2; const ry = (innerHeight - 1) / 2;
+    const vertical = (y - cy) / ry; const span = rx * Math.sqrt(Math.max(0, 1 - vertical * vertical));
+    return { left: Math.max(innerLeft, Math.floor(cx - span)), right: Math.min(innerRight, Math.ceil(cx + span)) };
+  };
   const cells = new Set();
   for (let y = top; y <= bottom; y += 1) {
     const row = shape === 'ellipse' ? ellipseRow(y) : { left: minX, right: maxX };
     if (!row) continue;
     const rowLeft = Math.max(left, row.left); const rowRight = Math.min(right, row.right);
     if (rowLeft > rowRight) continue;
-    const above = shape === 'ellipse' && !filled ? ellipseRow(y - 1) : null;
-    const below = shape === 'ellipse' && !filled ? ellipseRow(y + 1) : null;
+    const above = shape === 'ellipse' && !filled && brushSize === 1 ? ellipseRow(y - 1) : null;
+    const below = shape === 'ellipse' && !filled && brushSize === 1 ? ellipseRow(y + 1) : null;
+    const inner = shape === 'ellipse' && !filled && brushSize > 1 ? innerEllipseRow(y) : null;
     for (let x = rowLeft; x <= rowRight; x += 1) {
       let include;
       if (shape === 'rectangle') {
-        include = filled || x === minX || x === maxX || y === minY || y === maxY;
+        include = filled || (brushSize === 1
+          ? x === minX || x === maxX || y === minY || y === maxY
+          : x < minX + brushSize || x > maxX - brushSize || y < minY + brushSize || y > maxY - brushSize);
       } else {
-        include = filled || x === row.left || x === row.right
-          || !above || x < above.left || x > above.right
-          || !below || x < below.left || x > below.right;
+        include = filled || (brushSize === 1
+          ? x === row.left || x === row.right || !above || x < above.left || x > above.right || !below || x < below.left || x > below.right
+          : !inner || x < inner.left || x > inner.right);
       }
       if (!include) continue;
       if (hasSymmetry) {

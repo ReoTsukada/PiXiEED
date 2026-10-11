@@ -4,8 +4,8 @@ body.creation-editor[data-page="draw"] .draw-feature-actions {
   flex: 0 0 44px;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
   min-width: 0;
 }
 body[data-page="draw"] .draw-feature-actions > button {

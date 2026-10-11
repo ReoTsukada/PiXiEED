@@ -5,7 +5,7 @@ import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261009-pointer-selection-1';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261011-shared-music-2';
 import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs';
 import { composeOutputFrame } from './creation-output-core.mjs';
@@ -27,7 +27,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261011-integ
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261009-pointer-selection-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261011-tool-size-1';
 import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 
@@ -40,16 +40,17 @@ import { resizeDrawView } from './draw-resize-view.mjs';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
-import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261010-lasso-1';
+import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261010-selection-toolbar-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261011-tool-size-1';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261010-selection-handles-1';
-import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261010-pending-lasso-1';
+import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261011-selection-body-1';
 import { mountDrawColorAdjustmentPanel } from './draw-color-adjustment-panel.mjs?rev=20261010-features-1';
+import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawTextPanel } from './draw-text-panel.mjs?rev=20261010-features-1';
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools, isActive = () => true, musicLayer = false } = {}) {
@@ -119,7 +120,7 @@ const trackDrawStart = createToolStartTracker('draw');
 let selection = null, selectionDrag = null, strokeWasSaved = false;
 let selectionTransform = null, selectionPreview = null, selectionPanel = null, selectionError = '';
 let featureSession = null, featurePreviewAnimation = null, featureInertSnapshot = null;
-let spriteScalePanel = null, spriteScaling = false;
+let spriteScalePanel = null, spriteScaling = false, brushSettingsPanel = null;
 let selectionRenderRequest = 0;
 let selectionMaskCache = null, selectionMaskOwner = null;
 let preparedSelectionCommit = null;
@@ -252,6 +253,7 @@ function updateControls() {
   syncPlaybackControl();
   selectionPanel?.sync();
   spriteScalePanel?.sync();
+  brushSettingsPanel?.sync();
 }
 function syncPlaybackControl() {
   const button = $('#draw-animation-play'), badge = $('#draw-playback-position');
@@ -589,7 +591,9 @@ function selectionHasPixels() {
 }
 function selectionMember(point) {
   const x = Math.floor(point.x), y = Math.floor(point.y);
-  return x >= 0 && y >= 0 && x < documentData.width && y < documentData.height && Boolean(selectionMask()?.[y * documentData.width + x]);
+  if (x < 0 || y < 0 || x >= documentData.width || y >= documentData.height) return false;
+  const mask = selectionTransform ? selectionTransform.mask(documentData.width, documentData.height) : selectionMask();
+  return Boolean(mask?.[y * documentData.width + x]);
 }
 function selectionOwner() { return { animation: animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId }; }
 function selectionOwnerMatches() {
@@ -645,7 +649,7 @@ function confirmSelectionTransform() {
 function selectionPanelState() {
   const editable = !playing && !readOnlyImage && !animationSession.locked, busy = drawingInputBusy();
   const hasPixels = selectionHasPixels();
-  return { bounds: selectionFrame(), colorMode: selectedMode(lastInputSide) === 'color', selectTool: effectiveTool() === 'select', pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
+  return { bounds: selectionFrame(), colorMode: selectedMode(lastInputSide) === 'color', selectTool: inputSettings.bindings[lastInputSide].tool === 'select', canConfigure: editable && !featureSession && !cameraOpening, pending: Boolean(selectionTransform), busy, hasClipboard: selectionClipboard.hasValue, error: selectionError,
     canCopy: Boolean(hasPixels && !selectionTransform && !playing && !readOnlyImage && !busy),
     canCut: Boolean(hasPixels && !selectionTransform && editable && !busy), canPaste: Boolean(selectionClipboard.hasValue && editable && !selectionTransform && !busy), canTransform: Boolean(hasPixels && editable) };
 }
@@ -708,6 +712,14 @@ function runSelectionAction(action, fields = {}) {
   previewSelectionTransform(); return true;
 }
 selectionPanel = mountDrawSelectionPanel({ scope, host: $('.draw-control-dock'), auxiliaryHost: $('.draw-input-settings'), getState: selectionPanelState, onAction: runSelectionAction,
+  getToolOptions: () => ({ binding: inputSettings.bindings[lastInputSide], side: lastInputSide }),
+  onToolOption: (key, side, value) => {
+    if (!selectionPanelState().canConfigure || drawingInputBusy() || selection || selectionTransform) return false;
+    const binding = inputSettings.bindings[side];
+    if (key === 'filled' && /^(rectangle|ellipse)(-fill)?$/.test(binding.tool)) return setTool(binding.tool.replace(/-fill$/, '') + (value ? '-fill' : ''), side);
+    if (key !== 'contiguous' || binding.tool !== 'fill') return false;
+    binding.contiguous = value; syncInputControls(); return true;
+  },
   beforeOpen: () => { cancelDrawingInput(); $('#draw-settings-picker').open = true; placeSettingsPanel(); } });
 function featureBlockedReason() {
   if (cameraOpening) return 'カメラを閉じてから使ってください。';
@@ -804,11 +816,21 @@ colorAdjustmentPanel = mountDrawColorAdjustmentPanel({ scope, host: $('#main'), 
   onPreview: previewDrawFeature, onApply: applyDrawFeature, onCancel: clearDrawFeature, onLayout: placeOverlays });
 textPanel = mountDrawTextPanel({ scope, host: $('#main'), getState: featureGetState, onBegin: beginDrawFeature,
   onPreview: previewDrawFeature, onApply: applyDrawFeature, onCancel: clearDrawFeature });
+brushSettingsPanel = mountDrawBrushSettings({ scope, host: $('#main'),
+  getState: () => ({ bindings: inputSettings.bindings, side: lastInputSide, toolNames: TOOL_NAMES,
+    blockedReason: featureBlockedReason() || (featureSession ? '開いている編集を閉じてから使ってください。' : '') }),
+  beforeOpen: () => { cancelDrawingInput(); closeColorEditor(); editorUi.closePanels(); animationControls?.close?.(); selectionPanel.hide(); },
+  onChange: (side, key, value) => {
+    if (featureBlockedReason() || featureSession) return false;
+    cancelDrawingInput(); inputSettings.bindings[side][key] = value; syncInputControls(); return true;
+  }
+});
+$('.draw-settings-panel').prepend($('#draw-mirror-rail'));
 const featureActions = $('.draw-feature-actions');
 if (featureActions) {
   const textOpener = textPanel.opener || $('#main .draw-text-opener');
-  featureActions.append(colorAdjustmentPanel.opener, selectionPanel.deselectButton);
-  if (textOpener) featureActions.insertBefore(textOpener, selectionPanel.deselectButton);
+  featureActions.append(colorAdjustmentPanel.opener, brushSettingsPanel.opener, selectionPanel.deselectButton);
+  if (textOpener) featureActions.insertBefore(textOpener, brushSettingsPanel.opener);
 }
 function placeToolMenu() {
   const menu = $('.draw-tool-menu'), summary = $('#draw-tool-summary'); if (!menu || !summary) return;
@@ -909,7 +931,7 @@ function syncDrawingSettings() {
 function markSegment(from, to, value) {
   const changed = [];
   const flags = drawingSymmetry();
-  for (const matrix of symmetryTransforms(flags)) changed.push(...strokePixels(documentData, symmetryPoint(from, documentData.width, documentData.height, matrix, flags.origin), symmetryPoint(to, documentData.width, documentData.height, matrix, flags.origin), value, { trusted: true, tracker: strokeTracker, mask: selectionMask() }));
+  for (const matrix of symmetryTransforms(flags)) changed.push(...strokePixels(documentData, symmetryPoint(from, documentData.width, documentData.height, matrix, flags.origin), symmetryPoint(to, documentData.width, documentData.height, matrix, flags.origin), value, { trusted: true, tracker: strokeTracker, mask: selectionMask(), brushSize: (strokeBinding || inputSettings.bindings[lastInputSide]).brushSize, brushTransform: matrix }));
   return changed;
 }
 function pickColorAt(point) {
@@ -939,6 +961,7 @@ function setTool(next, side = 'left') {
   if (!Object.hasOwn(TOOL_NAMES, next)) return;
   if (selectionTransform && next !== 'select') { toast('変形・貼付を配置中です。✓で確定、×で取消してから描画へ切り替えてください。'); return false; }
   inputSettings.bindings[side].tool = next;
+  if (next !== 'select') selectionPanel?.setMode('tool');
   if (side === 'right') { lastInputSide = side; syncInputControls(); placeSelection(); return true; }
   if (!strokeBinding) lastInputSide = side;
   tool = next; syncDrawingSettings(); syncInputControls();
@@ -985,9 +1008,9 @@ const drawAssignmentInput = mountDrawAssignmentInput({ root: $('#main'), onAssig
 scope.add(() => drawAssignmentInput.dispose());
 function markShape(from, to) {
   if (effectiveTool() === 'line') return markSegment(from, to, selectedPixelValue());
-  return drawShapePixels(documentData, from, to, selectedPixelValue(), { shape: effectiveTool().startsWith('rectangle') ? 'rectangle' : 'ellipse', filled: effectiveTool().endsWith('-fill'), symmetry: drawingSymmetry(), tracker: strokeTracker, mask: selectionMask() });
+  return drawShapePixels(documentData, from, to, selectedPixelValue(), { shape: effectiveTool().startsWith('rectangle') ? 'rectangle' : 'ellipse', filled: effectiveTool().endsWith('-fill'), brushSize: (strokeBinding || inputSettings.bindings[lastInputSide]).brushSize, symmetry: drawingSymmetry(), tracker: strokeTracker, mask: selectionMask() });
 }
-function markSpray(from, to) { return sprayPixels(documentData, from, to, selectedPixelValue(), { symmetry: drawingSymmetry(), tracker: strokeTracker, mask: selectionMask() }); }
+function markSpray(from, to) { return sprayPixels(documentData, from, to, selectedPixelValue(), { radius: ((strokeBinding || inputSettings.bindings[lastInputSide]).spraySize - 1) / 2, symmetry: drawingSymmetry(), tracker: strokeTracker, mask: selectionMask() }); }
 function updateSelection(point, event = {}) {
   if (selectionDrag?.screenOrigin && Number.isFinite(event.clientX)) selectionDrag.maxDistance = Math.max(selectionDrag.maxDistance || 0,
     Math.hypot(event.clientX - selectionDrag.screenOrigin.x, event.clientY - selectionDrag.screenOrigin.y));
@@ -1045,8 +1068,11 @@ function handleCanvasPointerDown(event) {
   if (inputTool !== 'picker' && !canEdit()) return;
   const touchedPoint = pointFromEvent(event);
   const selectionHandle = inputTool === 'select' && selection ? selectionHandleAtEvent(event) : null;
+  const inside = inputTool === 'select' && selectionMember(touchedPoint);
+  const selectionModified = Boolean(event.ctrlKey || event.metaKey || event.shiftKey);
   const selectionOperation = (event.pointerType === 'touch' || event.virtual) && !event.ctrlKey && !event.metaKey && !event.shiftKey ? 'add' : selectionInputOperation(event);
   if (inputTool === 'select' && selectedMode(side) === 'color' && !selectionTransform && !selectionHandle
+      && (!inside || selectionModified)
       && (!selection || selectionOperation !== 'replace')) {
     lastInputSide = side; strokeBinding = binding; syncDrawingSettings(); pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'color'; pendingTapMask = binding.mask; pendingTapOperation = selectionOperation;
     pendingTapScreenOrigin = { x: event.clientX, y: event.clientY };
@@ -1068,11 +1094,10 @@ function handleCanvasPointerDown(event) {
   if (inputTool === 'picker' || inputTool === 'fill') { pendingTap = touchedPoint; pendingTapPointerId = event.pointerId; pendingTapMode = 'tap'; drawing = false; drawingPointerId = null; previousPoint = null; selectionPanel.sync(); return; }
   if (inputTool === 'select') {
     lineStart = touchedPoint;
-    const handle = selectionHandleAtEvent(event);
-    const inside = selectionTransform ? selectionContains(selectionFrame(), exactSelectionPoint(event)) : selectionMember(touchedPoint);
+    const handle = selectionHandle;
     const hadTransform = Boolean(selectionTransform);
     const origin = exactSelectionPoint(event), screenOrigin = { x: event.clientX, y: event.clientY };
-    const gestureKind = selectionGestureKind({ selectionMode: selectedMode(side), operation: selectionOperation, handle, altKey: event.altKey });
+    const gestureKind = selectionGestureKind({ selectionMode: selectedMode(side), operation: selectionOperation, handle, altKey: event.altKey, inside, modified: selectionModified });
     if (gestureKind === 'lasso') {
       const bounds = selectionTransform ? { ...selectionTransform.rect, mask: selectionTransform.mask(documentData.width, documentData.height) } : selection;
       selectionDrag = { mode: 'lasso', operation: selectionOperation, bounds, transaction: selectionTransform, points: [origin], origin, screenOrigin, pointerType: event.pointerType, virtual: Boolean(event.virtual) };
@@ -1084,7 +1109,7 @@ function handleCanvasPointerDown(event) {
       selectionDrag = { mode: 'flip', handle, origin, screenOrigin, pointerType: event.pointerType };
     } else if ((handle || inside) && !animationSession.locked && startSelectionTransform()) {
       const state = selectionTransform.state, r = canvas.getBoundingClientRect(), minRadius = 6 / Math.min(r.width / canvas.width, r.height / canvas.height);
-      const corner = handle && handle !== 'pivot';
+      const corner = ['nw', 'ne', 'sw', 'se'].includes(handle);
       if (corner && Math.hypot(origin.x - state.pivot.x, origin.y - state.pivot.y) <= minRadius) {
         drawing = false; drawingPointerId = null; strokeBinding = null; if (!hadTransform) cancelSelectionTransform(); placeSelection(); toast('中心に近い角です。別の角、中心の移動、または数値補助で調整してください。'); return;
       }
@@ -1182,7 +1207,7 @@ function endStroke(cancel = false, releaseEvent = null) {
   }
   const selected = drawing && effectiveTool() === 'select' && ['select', 'lasso'].includes(selectionDrag?.mode) && !cancel;
   drawing = false; drawingPointerId = null; previousPoint = null; lineStart = null; selectionDrag = null; strokeBinding = null; placeSelection(); if (hadBinding) syncDrawingSettings();
-  if (selected && selection) { selectionPanel.setMode('select'); toast('専用の移動ハンドルで移動、四隅で拡縮＋回転、反転ハンドルで反転。外をタップすると確定・解除。タッチドラッグで追加選択。'); }
+  if (selected && selection) { selectionPanel.setMode('select'); toast('選択の内側をドラッグして移動、四隅で拡縮＋回転。外をタップすると確定・解除。外からタッチドラッグで追加選択。'); }
   if (endedSelectionDrag?.createdTransaction && selectionTransform && (cancel || sameSelectionFrame(endedSelectionDrag.state, selectionTransform.state))) cancelSelectionTransform();
   if (!cancel && releaseEvent?.type === 'pointerup' && endedSelectionDrag) finishSelectionRelease(endedSelectionDrag, releaseEvent);
   updateControls();
@@ -1233,7 +1258,7 @@ function finishSelectionRelease(drag, event) {
 }
 function applyTap(point) {
   if (effectiveTool() === 'picker') { pickColorAt(point); return; }
-  commitChange((next) => symmetryPoints(point, next.width, next.height, drawingSymmetry()).flatMap(p => [...floodFill(next, p.x, p.y, selectedPixelValue(), { mask: selectionMask() })]));
+  commitChange((next) => symmetryPoints(point, next.width, next.height, drawingSymmetry()).flatMap(p => [...floodFill(next, p.x, p.y, selectedPixelValue(), { mask: selectionMask(), contiguous: (strokeBinding || inputSettings.bindings[lastInputSide]).contiguous })]));
 }
 function releasePointer(event) {
   if (virtualCursor?.realRelease(event)) return;
@@ -1448,6 +1473,7 @@ scope.listen($('#draw-animation-controls'), 'click', (event) => {
   settingsPicker.open = false;
 });
 function syncInputControls() {
+  brushSettingsPanel?.sync(); selectionPanel?.sync();
   for (const side of ['left', 'right']) {
     const binding = inputSettings.bindings[side];
     if (binding.color >= documentData.palette.length || binding.color < -1) binding.color = Math.min(side === 'left' ? 2 : 4, documentData.palette.length - 1);
@@ -1510,6 +1536,7 @@ function syncSizeButtons(resetInputs = false) {
   widthInput.disabled = heightInput.disabled = ratioInput.disabled = Boolean(readOnlyImage);
   sizeApply.disabled = Boolean(readOnlyImage);
   spriteScalePanel?.sync();
+  brushSettingsPanel?.sync();
 }
 function syncDimensionRatio(event) {
   if (!ratioInput.checked) return;

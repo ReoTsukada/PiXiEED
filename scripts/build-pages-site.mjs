@@ -57,7 +57,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
       'js/creation/creation-modes.mjs', 'js/creation/creation-camera.mjs', 'js/creation/creation-mode-motion.mjs', 'js/creation/music-video-timing.mjs', 'js/creation/draw-music-model.mjs', 'js/creation/creation-output-core.mjs', 'js/creation/draw-music.mjs', 'js/creation/draw-music-core.mjs', 'js/creation/mode-entry.mjs', 'js/creation/shared-project-settings.mjs', 'js/creation/shared-project-core.mjs', 'css/creation-modes.css',
       'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
       'js/creation/draw-color-adjustment-panel.mjs', 'js/creation/draw-color-adjustments.mjs',
-      'js/creation/draw-text-panel.mjs', 'js/creation/draw-text.mjs',
+      'js/creation/draw-text-panel.mjs', 'js/creation/draw-text.mjs', 'js/creation/draw-brush-settings.mjs', 'css/draw-brush-settings.css',
       'css/draw-color-adjustment-panel.css', 'css/draw-selection-features.css', 'css/draw-text-panel.css',
       'assets/fonts/DotGothic16/DotGothic16-Regular.ttf', 'assets/fonts/DotGothic16/OFL.txt',
       'assets/fonts/PressStart2P/PressStart2P-Regular.ttf', 'assets/fonts/PressStart2P/OFL.txt',

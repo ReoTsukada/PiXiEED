@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { createAnimation, writeAnimationCel, addAnimationFrame, addAnimationLayer } from '../js/creation/animation-core.mjs';
 import { createPxdProject, encodePxd } from '../js/creation/pxd-codec.mjs';
 import { writePxdAnimation } from '../js/creation/pxd-animation.mjs';
@@ -15,6 +17,7 @@ const W = 16, H = 16;
 const colors = ['#ed2518', '#204de8', '#39ba51', '#eed040'];
 let animation = createAnimation({ width: W, height: H, palette: colors });
 const f0 = animation.frames[0].id, l0 = animation.layers[0].id;
+const artLayer = (snapshot, index) => snapshot.layers.filter(layer => layer.role !== 'music')[index];
 const lower0 = Array(W * H).fill(3), upper0 = Array(W * H).fill(-1);
 for (const [x, y, color] of [[1, 1, 1], [4, 4, 1], [6, 6, 1], [8, 8, 2], [13, 13, 2], [14, 13, 2]]) upper0[y * W + x] = color;
 animation = writeAnimationCel(animation, f0, l0, { width: W, height: H, pixels: Uint8Array.from(lower0, value => value + 1) });
@@ -35,7 +38,7 @@ const readOnlyProject = await putPxdImage(createPxdProject(), {
 }, 'main');
 await writeFile(`${out}/readonly-image.pxd`, await encodePxd(readOnlyProject));
 
-const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
 const { chromium } = await import(pathToFileURL(runtime));
 const browser = await chromium.launch({ headless: true });
 const reports = [];
@@ -139,7 +142,7 @@ for (const viewport of viewports) {
     await mode('draw');
     await loadPxd(`${out}/target-animation.pxd`);
     const state = await saveProject();
-    assert.equal(state.frames.length, 2); assert.equal(state.layers.length, 2); assert.equal(state.palette.length, 4);
+    assert.equal(state.frames.length, 2); assert.equal(state.layers.filter(layer => layer.role !== 'music').length, 2); assert.equal(state.layers.filter(layer => layer.role === 'music').length, 1); assert.equal(state.palette.length, 4);
     const launch = page.locator('#draw-animation-controls [data-action="toggle-frames"]');
     if (!await page.locator('#draw-animation-controls-panel').isVisible().catch(() => false)) await launch.click();
     await page.locator('#draw-animation-controls-panel [data-action="select-cel"]').first().waitFor({ state: 'visible' });
@@ -150,7 +153,7 @@ for (const viewport of viewports) {
     assert.deepEqual(domIds.frames, state.frames.map(frame => String(frame.id)).sort(), 'visible animation frame IDs match the PXD revision loaded from the active pointer');
     assert.deepEqual(domIds.layers, state.layers.map(layer => String(layer.id)).sort(), 'visible animation layer IDs match the PXD revision loaded from the active pointer');
     await launch.click().catch(() => {});
-    await selectCel(state.frames[0].id, state.layers[1].id);
+    await selectCel(state.frames[0].id, artLayer(state, 1).id);
     return saveProject();
   };
   const selectCel = async (frameId, layerId) => {
@@ -260,7 +263,8 @@ for (const viewport of viewports) {
     const targetBefore = await saveProject();
     await cameraMode(); await uploadAndCapture(); await applyCaptured();
     const after = await saveProject();
-    const metrics = assertOnlyMaskChanged(targetBefore, after, frameIndex, layerIndex, mask, name);
+    const targetLayerIndex = targetBefore.layers.findIndex(layer => layer.id === artLayer(targetBefore, layerIndex).id);
+    const metrics = assertOnlyMaskChanged(targetBefore, after, frameIndex, targetLayerIndex, mask, name);
     const prefix = targetBefore.palette;
     assert.deepEqual(after.palette.slice(0, prefix.length), prefix, `${name}: existing palette is a stable prefix`);
     assert.ok(after.palette.length <= 32, `${name}: palette limit`);
@@ -285,24 +289,24 @@ for (const viewport of viewports) {
     await ready('draw');
     await loadPxd(`${out}/target-animation.pxd`);
     const initial = await saveProject();
-    assert.equal(initial.frames.length, 2); assert.equal(initial.layers.length, 2);
+    assert.equal(initial.frames.length, 2); assert.equal(initial.layers.filter(layer => layer.role !== 'music').length, 2); assert.equal(initial.layers.filter(layer => layer.role === 'music').length, 1);
     assert.equal(new URL(page.url()).pathname, '/draw/');
     assert.equal(await page.locator('#draw-camera:visible').count(), 0, 'legacy standalone camera action is not visible in Draw');
     checks.push({ name: 'creation routes preserve /draw/ while camera mode is selected from the mode menu' });
 
     const rectRun = await applyScenario({ name: 'mouse rectangle includes transparent selected cel cells', select: async () => {
-      await selectCel(initial.frames[0].id, initial.layers[1].id); await rectangle([3, 3], [12, 12]);
+      await selectCel(initial.frames[0].id, artLayer(initial, 1).id); await rectangle([3, 3], [12, 12]);
     } });
     assert.ok(rectRun.metrics.selectedWasTransparent > 0, 'rectangle includes transparent cells in the active cel');
     assert.ok(rectRun.metrics.transparentNowOpaque > 0, 'camera writes opaque pixels into selected transparent cells');
 
     await applyScenario({ name: 'touch lasso irregular selection', select: async () => {
-      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, fresh.layers[1].id);
+      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, artLayer(fresh, 1).id);
       await setSelectionMode('lasso'); await touchPath([[2, 2], [10, 3], [7, 10], [3, 8], [2, 2]]);
     } });
 
     await applyScenario({ name: 'multi-region Shift lasso selection', select: async () => {
-      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, fresh.layers[1].id);
+      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, artLayer(fresh, 1).id);
       await setSelectionMode('lasso'); await dragMousePath([[1, 2], [5, 2], [4, 6], [1, 2]]);
       const first = await readMask(); assert.ok(first.length > 0);
       await page.keyboard.down('Shift'); await dragMousePath([[10, 9], [15, 10], [13, 15], [10, 9]]); await page.keyboard.up('Shift');
@@ -311,7 +315,7 @@ for (const viewport of viewports) {
     } });
 
     await applyScenario({ name: 'virtual cursor selection mask', select: async () => {
-      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, fresh.layers[1].id);
+      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, artLayer(fresh, 1).id);
       await setSelectionMode('lasso');
       await page.locator('#draw-settings-summary').click(); await page.locator('#draw-virtual-toggle').click(); await page.keyboard.press('Escape');
       const board = await page.locator('.draw-board').boundingBox(), button = await page.locator('[data-virtual-left]').boundingBox();
@@ -331,11 +335,11 @@ for (const viewport of viewports) {
     // The captured image survives mode changes; application targets the current
     // frame, layer, and selection at the moment the user applies it.
     const baseline = await importProject();
-    await selectCel(baseline.frames[0].id, baseline.layers[1].id); await rectangle([2, 2], [7, 7]);
+    await selectCel(baseline.frames[0].id, artLayer(baseline, 1).id); await rectangle([2, 2], [7, 7]);
     const capturedTarget = await readMask();
     await cameraMode(); await uploadAndCapture();
     await mode('draw');
-    const newTargetFrame = baseline.frames[1].id, newTargetLayer = baseline.layers[0].id;
+    const newTargetFrame = baseline.frames[1].id, newTargetLayer = artLayer(baseline, 0).id;
     await selectCel(newTargetFrame, newTargetLayer); await rectangle([9, 9], [14, 14]);
     const newMask = await readMask(); assert.ok(newMask.length > 0);
     const beforeApply = await saveProject();
@@ -343,7 +347,7 @@ for (const viewport of viewports) {
     assert.equal(await page.locator('#useCameraImage').isDisabled(), false, 'current target enables apply action');
     const currentTargetStatus = (await page.locator('#creation-camera-target').textContent()).trim();
     assert.ok(currentTargetStatus, 'target status describes the current target');
-    assert.ok(currentTargetStatus.includes(`フレーム2・${baseline.layers[0].name}・選択範囲`), 'target status names the newly selected frame, layer, and selection');
+    assert.ok(currentTargetStatus.includes(`フレーム2・${artLayer(baseline, 0).name}・選択範囲`), 'target status names the newly selected frame, layer, and selection');
     assert.equal(await page.locator('#pixelStudio').getAttribute('data-mode'), 'captured', 'captured image survives mode switch');
     const staleFrame = await page.locator('#view').evaluate(canvas => [canvas.width, canvas.height]);
     assert.ok(staleFrame[0] > 1 && staleFrame[1] > 1, 'captured image remains available for a fresh target');
@@ -366,22 +370,22 @@ for (const viewport of viewports) {
     checks.push({ name: 'captured image targets current frame/layer/selection at apply time', oldMaskCells: capturedTarget.length, newMaskCells: newMask.length, targetFrameIndex, targetLayerIndex, ...retargetMetrics });
 
     await applyScenario({ name: 'without selection only the current frame and layer change', whole: true, frameIndex: 1, layerIndex: 0, select: async () => {
-      const fresh = await projectSnapshot(); await selectCel(fresh.frames[1].id, fresh.layers[0].id);
+      const fresh = await projectSnapshot(); await selectCel(fresh.frames[1].id, artLayer(fresh, 0).id);
       assert.equal((await readMask()).length, 0, 'freshly opened frame has no selection');
     } });
     await applyScenario({ name: 'hidden active layer stays hidden and other cels are preserved', whole: true, select: async () => {
-      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, fresh.layers[1].id);
+      const fresh = await projectSnapshot(); await selectCel(fresh.frames[0].id, artLayer(fresh, 1).id);
       const launch = page.locator('#draw-animation-controls [data-action="toggle-frames"]'); await launch.click();
-      await page.locator(`#draw-animation-controls-panel [data-action="select-layer"][data-layer-id="${fresh.layers[1].id}"]`).click({ button: 'right' });
+      await page.locator(`#draw-animation-controls-panel [data-action="select-layer"][data-layer-id="${artLayer(fresh, 1).id}"]`).click({ button: 'right' });
       await page.locator('[data-frame-menu-action="visibility"]').click(); await launch.click();
       assert.equal((await readMask()).length, 0);
     } });
 
     // The pre-existing lock/read-only protections must prevent shared-canvas application.
     const lockState = await importProject();
-    await selectCel(lockState.frames[0].id, lockState.layers[1].id);
+    await selectCel(lockState.frames[0].id, artLayer(lockState, 1).id);
     const launch = page.locator('#draw-animation-controls [data-action="toggle-frames"]'); await launch.click();
-    await page.locator(`#draw-animation-controls-panel [data-action="select-layer"][data-layer-id="${lockState.layers[1].id}"]`).click({ button: 'right' });
+    await page.locator(`#draw-animation-controls-panel [data-action="select-layer"][data-layer-id="${artLayer(lockState, 1).id}"]`).click({ button: 'right' });
     await page.locator('[data-frame-menu-action="lock"]').click(); await launch.click();
     await cameraMode();
     assert.equal(await page.locator('#useCameraImage').isDisabled(), true, 'locked active layer disables image application');

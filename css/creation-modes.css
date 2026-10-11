@@ -4,7 +4,9 @@ body.creation-suite[data-creation-mode="camera"] [data-mode-owner]:not([data-mod
 body.creation-suite[data-creation-mode="audio"] [data-mode-owner]:not([data-mode-owner="audio"]):not([data-mode-owner="editor"]):not([data-mode-owner="shared"]) { display: none !important; }
 body.creation-suite .draw-viewport { grid-area: stage; display:flex; flex-direction:column; min-height:0; min-width:0; gap:4px; }
 body.creation-suite .draw-viewport > .draw-board { flex:1; grid-area:auto; position:relative; }
-body.creation-suite .draw-control-dock { grid-area:controls; display:flex; flex-direction:column; min-height:0; min-width:0; gap:6px; }
+body.creation-suite.px-tool-header.project-workspace-ready.creation-editor #main { padding-top:4px !important; padding-bottom:4px !important; }
+body.creation-suite .draw-page { gap:4px; }
+body.creation-suite .draw-control-dock { grid-area:controls; display:flex; flex-direction:column; min-height:0; min-width:0; gap:4px; }
 body.creation-suite .draw-control-dock { position:relative; }
 /* Override the legacy arcade parent surface, while retaining every child control. */
 body.creation-suite.creation-editor :is(.draw-control-dock,.draw-controls,.creation-camera-controls) { background:transparent !important; border-color:transparent; box-shadow:none; }

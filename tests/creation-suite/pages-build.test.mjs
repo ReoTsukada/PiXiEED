@@ -93,6 +93,8 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
     'css/draw-color-adjustment-panel.css': '.color-panel{}',
     'css/draw-selection-features.css': '.selection-features{}',
     'css/draw-text-panel.css': '.text-panel{}',
+    'css/draw-brush-settings.css': '.brush-settings{}',
+    'js/creation/draw-brush-settings.mjs': 'export const brushSettings = true;',
     'assets/fonts/DotGothic16/DotGothic16-Regular.ttf': 'font-a',
     'assets/fonts/DotGothic16/OFL.txt': 'license-a',
     'assets/fonts/PressStart2P/PressStart2P-Regular.ttf': 'font-b',

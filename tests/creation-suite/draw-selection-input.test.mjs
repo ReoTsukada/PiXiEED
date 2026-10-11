@@ -34,6 +34,20 @@ test('lasso remains the gesture mode for additive drags and Alt keeps the establ
   assert.equal(selectionGestureKind({ selectionMode: 'rectangle', operation: 'add' }), 'modify');
 });
 
+test('unmodified body drags move in every selection mode, including additive touch and virtual input', () => {
+  for (const selectionMode of ['rectangle', 'lasso', 'color']) {
+    for (const operation of ['replace', 'add']) {
+      assert.equal(selectionGestureKind({ selectionMode, operation, inside: true }), 'standard');
+    }
+    assert.equal(selectionGestureKind({ selectionMode, operation: 'add', inside: true, modified: true }), selectionMode === 'lasso' ? 'lasso' : 'modify');
+    assert.equal(selectionGestureKind({ selectionMode, operation: 'subtract', inside: true, modified: true }), selectionMode === 'lasso' ? 'lasso' : 'modify');
+    assert.equal(selectionGestureKind({ selectionMode, operation: 'add', inside: false }), selectionMode === 'lasso' ? 'lasso' : 'modify');
+    assert.equal(selectionGestureKind({ selectionMode, operation: 'add', inside: true, handle: 'move' }), 'standard');
+    assert.equal(selectionGestureKind({ selectionMode, operation: 'subtract', inside: true, handle: 'move', modified: true }), selectionMode === 'lasso' ? 'lasso' : 'modify');
+    assert.equal(selectionGestureKind({ selectionMode, operation: 'subtract', inside: true, handle: 'nw', modified: true }), 'standard');
+  }
+});
+
 test('lasso union after a pending transform uses the transformed pixel mask, not its frame bounds', () => {
   const document = { schemaVersion: 1, width: 6, height: 4, palette: ['#000000ff'], pixels: new Array(24).fill(-1) };
   document.pixels[1 * 6 + 1] = document.pixels[2 * 6 + 3] = 0;

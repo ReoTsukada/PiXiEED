@@ -1,0 +1,14 @@
+body[data-page="draw"] dialog.draw-brush-settings { box-sizing: border-box; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 12px; color: #edf2f3; background: #192630; border: 1px solid #ffffff38; border-radius: 12px; font: 12px/1.4 system-ui; }
+.draw-brush-settings::backdrop { background: #10182090; }
+.draw-brush-settings header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.draw-brush-settings h2 { margin: 0; font-size: 16px; }
+.draw-brush-settings p { margin: 8px 0; }
+.draw-brush-settings button, .draw-brush-settings input { box-sizing: border-box; min-height: 44px; }
+.draw-brush-settings button { min-width: 44px; border: 1px solid #ffffff38; border-radius: 9px; padding: 6px 10px; background: #26333d; color: #edf2f3; font: inherit; cursor: pointer; }
+.draw-brush-settings button[aria-pressed="true"] { background: #ffd35a; color: #17232d; border-color: #ffd35a; }
+.draw-brush-settings button:focus-visible, .draw-brush-settings input:focus-visible { outline: 3px solid #8ecdf0; outline-offset: 2px; }
+.draw-brush-settings__sides { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.draw-brush-settings__value { display: flex; align-items: center; gap: 6px; }
+.draw-brush-settings__value input { width: 100%; min-width: 0; background: #101820; color: #edf2f3; border: 1px solid #ffffff38; border-radius: 8px; padding: 8px; }
+.draw-brush-settings input[type="range"] { width: 100%; margin: 4px 0; accent-color: #ffd35a; }
+.draw-brush-settings [data-brush-status] { min-height: 1.4em; }

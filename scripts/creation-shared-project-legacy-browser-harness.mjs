@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4188';
 const out = process.env.PIXIEED_SHARED_LEGACY_OUTPUT || '/tmp/pixieed-shared-project-legacy';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'This harness only accepts a localhost base URL.');
 await mkdir(out, { recursive: true });
-const { chromium } = await import(pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs').href);
+const { chromium } = await import(pathToFileURL(process.env.PIXIEED_PLAYWRIGHT_MODULE || join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')).href);
 const browser = await chromium.launch({ headless: true });
 const results = [];
 
@@ -119,16 +121,16 @@ try {
       assert.equal(await page.locator('.animation-controls__frame').count(), 2);
       await switchMode('audio');
       current = await currentDrawProject(); copy = await inspectProject(current.pointer.projectId, current.pointer.revisionId);
-      assert.equal(copy.timeline.frameCount, 2); assert.equal(copy.audioTimeline?.frameCount, 2);
+      assert.equal(copy.timeline.frameCount, 2); assert.equal(copy.audioTimeline?.frameCount, 1, 'art frames do not duplicate music pages');
       assert.equal(copy.song.futureAudio.preserved, 'old source');
-      assert.equal(copy.song.loopTicks, 3840);
+      assert.equal(copy.song.loopTicks, 1920, 'music duration stays independent of art frames');
       assert.equal(copy.link.timing?.rulesVersion, canvasWidth === 32 ? 'loop-ratio-v1' : undefined);
       if (canvasWidth === 32) assert.equal(copy.link.timing.ticksPerFrame, 1920, 'compressed 32-column timing is retained per frame');
       const kept = copy.notes.find(item => item.noteId === fixture.note.noteId);
       assert.ok(kept); assert.equal(kept.velocity, 47); assert.equal(kept.startTick, fixture.note.startTick);
       assert.equal(kept.durationTicks, fixture.note.durationTicks); assert.deepEqual(kept.futureNote, { preserved:'old note' });
       const second = copy.notes.find(item => item.sourceCell?.frameIndex === 1);
-      assert.ok(second); assert.equal(second.startTick, 1920 + fixture.note.startTick);
+      assert.equal(second, undefined, 'adding an art frame does not create a second music page or note');
       assert.deepEqual(copy.oldAudioImage, fixture.image, 'music projection does not replace the prior independent audio image');
 
       await page.locator('#draw-undo').click();
@@ -140,7 +142,7 @@ try {
       await page.locator('#draw-redo').click();
       await switchMode('draw'); assert.equal(await page.locator('.animation-controls__frame').count(), 2);
       await switchMode('audio'); current = await currentDrawProject(); copy = await inspectProject(current.pointer.projectId, current.pointer.revisionId);
-      assert.equal(copy.timeline.frameCount, 2); assert.equal(copy.song.loopTicks, 3840);
+      assert.equal(copy.timeline.frameCount, 2); assert.equal(copy.song.loopTicks, 1920, 'music duration stays independent of art frames');
 
       const audioStoreCheck = await page.evaluate(async ({ id, revision }) => {
         const stores = await import('/js/creation/tool-project-store.mjs'); const codec = await import('/js/creation/pxd-codec.mjs');
@@ -158,7 +160,7 @@ try {
       const reopened = await currentDrawProject();
       assert.equal(reopened.pointer.projectId, current.pointer.projectId);
       copy = await inspectProject(reopened.pointer.projectId, reopened.pointer.revisionId);
-      assert.equal(copy.timeline.frameCount, 2); assert.equal(copy.song.loopTicks, 3840);
+      assert.equal(copy.timeline.frameCount, 2); assert.equal(copy.song.loopTicks, 1920, 'music duration stays independent of art frames');
       assert.equal(copy.link.timing?.ticksPerFrame, canvasWidth === 32 ? 1920 : undefined);
 
       await page.goto(`${base}/audio/?standalone=1&pxd=${copy.projectId}&pxdRevision=${copy.revisionId}`);
@@ -185,7 +187,7 @@ try {
       await page.locator('#audio-play-toggle').click(); await page.waitForFunction(() => document.querySelector('#audio-play-toggle').dataset.state === 'playing');
       await page.locator('#audio-play-toggle').click();
       results.push({ label, passed:errors.length === 0, sourceId:fixture.id, sourceRevision:fixture.revision, drawCopyId:copy.projectId,
-        canvas:{ width:canvasWidth, height:16 }, checks:['legacy PXD redirected to Draw-owned copy','source ID/revision and encoded bytes unchanged','nested import-source archive exact','canonical Draw pixels and dimensions retained','shared Draw frame add/Undo/Redo','music notes and timing survive save/reopen','prior audio image retained','standalone new-copy and original-source playback'], errors });
+        canvas:{ width:canvasWidth, height:16 }, checks:['legacy PXD redirected to Draw-owned copy','source ID/revision and encoded bytes unchanged','nested import-source archive exact','canonical Draw pixels and dimensions retained','art frame add/Undo/Redo keeps music pages and duration independent','music notes and timing survive save/reopen','prior audio image retained','standalone new-copy and original-source playback'], errors });
       console.log('PASS', label);
     } catch (error) {
       await page.screenshot({ path:`${out}/${label}-failure.png` }).catch(() => {});

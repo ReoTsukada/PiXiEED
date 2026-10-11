@@ -1,11 +1,11 @@
 /* Fixed side columns and three palette rows never reflow with tool or mouse mode. */
 body.creation-editor[data-page="draw"] .draw-controls {
   display: grid !important; grid-template-columns: 44px minmax(0, 1fr) 44px !important;
-  grid-template-rows: 150px !important; gap: 6px !important; padding: 4px !important;
+  grid-template-rows: 150px !important; gap: 4px !important; padding: 4px !important;
   flex: 0 0 158px !important; min-height: 158px !important; overflow: visible !important;
 }
 body[data-page="draw"] .draw-controls > .draw-control-row { grid-column: 2; grid-row: 1; min-width: 0; height: 150px; }
-body[data-page="draw"] .draw-fixed-left { grid-column: 1; grid-row: 1; display: grid; grid-template-rows: repeat(3, 44px); gap: 6px; align-content: start; min-width: 0; }
+body[data-page="draw"] .draw-fixed-left { grid-column: 1; grid-row: 1; display: grid; grid-template-rows: repeat(3, 44px); gap: 4px; align-content: start; min-width: 0; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-picker { position: static; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-summary { width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; display: grid !important; place-items: center; border-radius: 10px; background: #28333d; color: #f5f2e8; border: 1px solid #ffffff30; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-summary [data-draw-tool-name] { display: none; }
@@ -25,10 +25,13 @@ body.project-workspace-ready.creation-editor[data-page="draw"] #draw-palette {
 body[data-page="draw"] .draw-fixed-left .draw-tool-menu { position: fixed !important; z-index: 80 !important; width: min(196px, calc(100vw - 24px)) !important; scroll-padding-block: 54px 8px; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-picker:not([open]) .draw-tool-menu { display: none !important; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-picker[open] .draw-tool-menu { display: flex !important; flex-direction: column !important; }
-body[data-page="draw"] .draw-fixed-right { grid-column: 3; grid-row: 1; display: grid; grid-template-rows: repeat(3, 44px); gap: 6px; height: 150px; min-width: 0; }
+body[data-page="draw"] .draw-fixed-right { grid-column: 3; grid-row: 1; display: grid; grid-template-rows: repeat(3, 44px); gap: 4px; height: 150px; min-width: 0; }
 body[data-page="draw"] #draw-selection-controls { grid-row: 1 / span 2; width: 44px; min-width: 0; height: 94px; padding: 0; border: 0; background: none; }
 body[data-page="draw"] #draw-selection-controls .draw-selection-controls__row { display: grid; grid-template-columns: 44px; grid-template-rows: 44px 44px; gap: 6px; height: auto; }
 body[data-page="draw"] #draw-selection-controls button { width: 44px; height: 44px; min-height: 44px; padding: 2px; font-size: 10px; overflow-wrap: anywhere; }
+body[data-page="draw"] #draw-selection-controls .draw-selection-controls__row > button[data-slot-kind="option"] { border-color: #ffffff50; background: #26333d !important; color: #d6e0e6; font-weight: 800; line-height: 1.1; }
+body[data-page="draw"] #draw-selection-controls .draw-selection-controls__row > button[data-slot-kind="option"][aria-pressed="true"] { border-color: #ffd35a !important; background: #ffd35a !important; color: #17232d !important; box-shadow: inset 0 0 0 1px #fff5b7, 0 2px 0 #b88f1d; }
+body[data-page="draw"] #draw-selection-controls .draw-selection-controls__row > button[data-slot-kind="option"]:focus-visible { outline: 3px solid #8ecdf0; outline-offset: 2px; }
 body[data-page="draw"] #draw-selection-controls > p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 body[data-page="draw"] .draw-controls :is(#draw-undo, #draw-redo) { box-sizing: border-box; width: 44px; min-width: 44px; height: 44px; min-height: 44px; display: grid; place-items: center; padding: 0; border: 1px solid #ffffff35; border-radius: 10px; background: #26333d; color: #edf2f3; }
 body[data-page="draw"] .draw-controls :is(#draw-undo, #draw-redo) svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }

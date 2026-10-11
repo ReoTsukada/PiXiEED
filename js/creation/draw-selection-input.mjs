@@ -8,9 +8,15 @@ export function selectionInputOperation(event) {
 
 /** Lasso stays the drag mode while a transform preview is pending; transforms
  * are finalized on release, after tap/outside classification has run. */
-export function selectionGestureKind({ selectionMode, operation, handle = null, altKey = false }) {
-  if (!handle && selectionMode === 'lasso' && !altKey) return 'lasso';
-  if (!handle && operation !== 'replace') return 'modify';
+export function selectionGestureKind({ selectionMode, operation, handle = null, altKey = false, inside = false, modified = false }) {
+  // A screen-sized move target can overlap the body of a small selection.
+  // Explicit range modifiers must keep their meaning in that overlap.
+  const transformHandle = handle && !(handle === 'move' && modified);
+  // Touch/virtual default to additive selection only when starting outside.
+  // Explicit Shift/primary modifiers still add/subtract from an inside start.
+  if (!transformHandle && inside && !modified) return 'standard';
+  if (!transformHandle && selectionMode === 'lasso' && !altKey) return 'lasso';
+  if (!transformHandle && operation !== 'replace') return 'modify';
   return 'standard';
 }
 
