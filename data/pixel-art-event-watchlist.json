@@ -2045,7 +2045,7 @@
       "lastKnownEventDate": "2026-10-10",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-11T00:04:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4606,5 +4606,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-10T00:04:38+00:00"
+  "updatedAt": "2026-10-11T00:06:55+00:00"
 }
