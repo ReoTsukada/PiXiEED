@@ -32,7 +32,7 @@ try {
       onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
   try {
-    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261012-animation-core-contract-1');
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261012-original-nav-1');
     if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
   } catch (error) {
     delete document.documentElement.dataset.creationStartup;

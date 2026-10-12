@@ -218,18 +218,6 @@ function mountSiteMenu(header, inner) {
   mountedMenus.add(header);
 }
 
-function separateWorkNavigation() {
-  if (document.body.dataset.page === 'draw') return; // The shared mode controller owns this row.
-  for (const nav of document.querySelectorAll('.app-tabs,.globe-app-tabs')) {
-    for (const link of nav.querySelectorAll(':scope > a[href]')) {
-      if (!link.getAttribute('href').startsWith('#')) link.remove();
-    }
-    if (!nav.querySelector(':scope > a,:scope > button')) { nav.hidden = true; continue; }
-    nav.classList.add('app-tabs--work');
-    nav.setAttribute('aria-label', 'この画面の操作');
-  }
-}
-
 /** Preserve each page's own controls and its central navigation action. */
 export function mountSiteHeader() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return null;
@@ -274,7 +262,6 @@ export function mountSiteHeader() {
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   inner.querySelectorAll('[data-header-pass]').forEach((button) => button.remove());
   mountSiteMenu(header, inner);
-  separateWorkNavigation();
   document.documentElement.classList.add('px-header-ready');
   bindPanelEffects();
   return header;

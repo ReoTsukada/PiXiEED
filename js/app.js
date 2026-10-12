@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261012-page-roles-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261012-original-nav-1';
 import { trackSiteEvent } from './site-analytics.mjs';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
@@ -4046,14 +4046,16 @@ function renderPublicShell() {
   tabs.setAttribute('aria-label', 'アプリナビゲーション');
   const page = document.body.dataset.page || 'home';
   const actions = {
-    map: '<button type="button" data-page-action="view" aria-label="地図の投稿を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">見る</span></button><button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿する</span></button>',
-    stores: '<a class="app-tab-context app-tab-context--stores" href="#store-search" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店を探す</span></a>'
+    home: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">描く</span></a>',
+    tools: '<a href="/draw/" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">描く</span></a>',
+    map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿</span></button>',
+    works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">集めた絵</span></a>',
+    stores: '<a class="app-tab-context app-tab-context--stores" href="#store-search" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店を探す</span></a>',
+    shops: '<a href="/stores/" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店</span></a>',
+    profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">投稿した絵</span></a>'
   };
-  const contextAction = actions[page] || '';
-  tabs.innerHTML = `${contextAction}`;
-  tabs.className = 'app-tabs app-tabs--labeled app-tabs--work';
-  tabs.setAttribute('aria-label', 'この画面の操作');
-  tabs.hidden = !contextAction;
+  const contextAction = actions[page] || '<a href="/globe/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿</span></a>';
+  tabs.innerHTML = `<a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""><span class="app-tab-label">世界地図</span></a><a data-nav="camera" href="/pixel-camera.html" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""><span class="app-tab-label">撮影</span></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""><span class="app-tab-label">ツール</span></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""><span class="app-tab-label">マイページ</span></a>`;
   const openGlobeComposer = () => {
     const globe = document.querySelector('.map-hero__globe-frame');
     if (!globe) return;

@@ -4,7 +4,7 @@ import './home-play.mjs?rev=20261010-home-stop-removal-1';
 export function scheduleAppStartup({
   win = globalThis,
   doc = globalThis.document,
-  loadApp = () => import('./app.js?rev=20261012-page-roles-1'),
+  loadApp = () => import('./app.js?rev=20261012-original-nav-1'),
   onError = (error) => console.error('ホームの追加機能を読み込めませんでした', error),
   maxWait = 500,
 } = {}) {

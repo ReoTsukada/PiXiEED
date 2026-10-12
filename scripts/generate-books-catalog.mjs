@@ -97,11 +97,11 @@ function render(route) {
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/css/site.css?rev=20261012-page-roles-1">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-page-roles-1">
+  <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/books.css?rev=20261011-catalog-refine-2">
   <title>ドット絵の本と道具｜PiXiEED</title>
-<link rel="stylesheet" href="/css/site-header.css?rev=20261012-page-roles-1">
+<link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body class="books-page">
   <a class="skip-link" href="#catalog">商品一覧へ</a>
@@ -148,7 +148,7 @@ ${preview ? '' : `  <footer class="catalog-footer"><div class="catalog-wrap"><p>
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261011-catalog-refine-2"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261011-catalog-refine-2"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261012-page-roles-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
 </body>
 </html>
 `;

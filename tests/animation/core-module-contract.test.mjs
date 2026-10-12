@@ -9,6 +9,10 @@ import * as secondFacade from '../../js/creation/animation-core.mjs?identity-tes
 const root = new URL('../../', import.meta.url);
 const REV = '20261012-animation-core-contract-1';
 const CORE = 'js/creation/animation-core.mjs';
+// Only the motion controller/entry changed after the animation contract release.
+// Their newer URLs still import the unchanged shared core through its contract.
+const expectedRevision = target => ['js/creation/draw-entry.mjs','js/creation/creation-modes.mjs'].includes(target)
+  ? '20261012-original-nav-1' : REV;
 const specifiers = source => [...source.matchAll(/['"]([^'"\s]+\.mjs(?:\?[^'"\s]*)?)['"]/g)].map(match => match[1]);
 const targetFor = (owner, value) => {
   const path = value.split('?')[0];
@@ -38,7 +42,7 @@ test('bare and revisioned animation facades share functions and module-private c
   assert.equal(music.schemaVersion, animation.schemaVersion);
 });
 
-test('every browser dependency leading to the animation contract uses the same cache revision', async () => {
+test('every browser dependency leading to the animation contract uses its exact cache revision', async () => {
   const names = await runtimeFiles();
   const edges = new Map();
   for (const name of names) edges.set(name, specifiers(await readFile(new URL(name,root),'utf8')).map(value=>({value,target:targetFor(name,value)})));
@@ -47,11 +51,11 @@ test('every browser dependency leading to the animation contract uses the same c
   while (growing) { growing=false; for (const [name,targets] of edges) if (!affected.has(name) && targets.some(({target})=>affected.has(target))) {affected.add(name);growing=true;} }
   assert.ok(affected.size>1, 'runtime consumers are present');
   for (const [name,targets] of edges) for (const {value,target} of targets) if (affected.has(target)) {
-    assert.equal(new URL(value,'https://test.invalid/'+name).searchParams.get('rev'),REV,`${name} must fetch the cache-busted ${target}`);
+    assert.equal(new URL(value,'https://test.invalid/'+name).searchParams.get('rev'),expectedRevision(target),`${name} must fetch the cache-busted ${target}`);
   }
   for (const name of ['draw/index.html','audio/index.html','jigsaw/index.html','hidden-object/index.html','spot-difference/index.html','pixel-camera.html']) {
     for (const value of specifiers(await readFile(new URL(name,root),'utf8'))) if(affected.has(targetFor(name,value))) {
-      assert.equal(new URL(value,'https://test.invalid/'+name).searchParams.get('rev'),REV,`${name} preload/entry must match its transitive contract`);
+      assert.equal(new URL(value,'https://test.invalid/'+name).searchParams.get('rev'),expectedRevision(targetFor(name,value)),`${name} preload/entry must match its transitive contract`);
     }
   }
 });

@@ -2,7 +2,7 @@ import { mountToolHeaderControls } from '../tool-header-controls.mjs';
 import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261012-animation-core-contract-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261012-animation-core-contract-1';
-import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261011-black-motion-2';
+import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';
 
 
 /** One shell, project, palette and history. Mode changes never copy artwork. */
@@ -14,7 +14,7 @@ export async function mountCreationModes({ draw, scope }) {
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261012-page-roles-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261012-original-nav-1';
   const styled = new Promise((resolve, reject) => { css.addEventListener('load', resolve, { once:true }); css.addEventListener('error', () => reject(new Error('共通の制作画面の表示を読み込めません。')), { once:true }); });
   document.head.append(css); await styled;
   const owned = new Map([['shared', new Set()], ['editor', new Set()], ['draw', new Set()], ['audio', new Set()], ['camera', new Set()]]);
@@ -28,27 +28,13 @@ export async function mountCreationModes({ draw, scope }) {
   for (const node of document.querySelectorAll('.project-bar')) own(node, 'shared');
   own(document.querySelector('#draw-animation-play'), 'draw');
   const launcher = nav.querySelector('[data-nav="camera"]');
-  const modeButtons = ['draw', 'camera', 'audio'].map((name, index) => {
-    const button = document.createElement('button');
-    button.type = 'button'; button.dataset.creationMode = name;
-    button.setAttribute('aria-pressed', String(index === 0));
-    button.textContent = { draw: '描く', camera: 'カメラ', audio: '音楽' }[name];
-    button.setAttribute('aria-label', `${button.textContent}モード`);
-    return button;
-  });
-  const [drawModeButton, cameraModeButton, audioModeButton] = modeButtons;
-  launcher.replaceWith(drawModeButton, cameraModeButton);
-  for (const node of nav.querySelectorAll('[data-nav="map"],[data-nav="tools"],[data-nav="profile"]')) node.remove();
-  // Keep the existing third-child insertion point used by the lazy camera and
-  // music modules. Their action buttons remain in the fourth visual column.
-  const drawAction = nav.querySelector('#draw-animation-play');
-  drawAction.after(audioModeButton);
+  const menu = document.createElement('details'); menu.id = 'creation-mode-menu';
+  menu.innerHTML = `<summary aria-label="制作モードを切り替え" title="制作モード"><img src="/assets/icons/pixieed/shoot.svg" alt=""><span class="visually-hidden">制作モード</span></summary><div class="creation-mode-menu__panel" role="group" aria-label="制作モード"><button type="button" data-creation-mode="draw" aria-pressed="true">描画</button><button type="button" data-creation-mode="camera" aria-pressed="false">カメラ</button><button type="button" data-creation-mode="audio" aria-pressed="false">音楽</button><p>同じ作品・キャンバス・パレットを使います。音楽は全コマ共通の専用レイヤーで編集します。</p><p>以前の独立作品は「作品を管理 → 取り込む」で選べます。元の作品を残したコピーとして開きます。</p><p class="creation-mode-error" role="status" aria-live="polite"></p></div>`;
+  launcher.replaceWith(menu);
+  const modeButtons = [...menu.querySelectorAll('[data-creation-mode]')];
+  const errorNode = menu.querySelector('.creation-mode-error');
   nav.setAttribute('aria-label', '制作モードと操作');
-  const errorNode = document.createElement('p');
-  errorNode.className = 'creation-mode-error'; errorNode.setAttribute('role', 'status');
-  errorNode.setAttribute('aria-live', 'polite'); errorNode.hidden = true;
-  nav.append(errorNode);
-  const say = error => { errorNode.textContent = error?.message || String(error); errorNode.hidden = false; };
+  const say = error => { errorNode.textContent = error?.message || String(error); menu.open = true; };
   const settings = mountSharedProjectSettings({ draw, scope });
   draw.setSharedSettingsDismissal(settings);
   for (const node of settings.nodes) { if (!node.isConnected) document.body.append(node); own(node, 'shared'); }
@@ -87,7 +73,7 @@ export async function mountCreationModes({ draw, scope }) {
   };
   // Mode buttons stay usable so a rapid new request can replace an old one.
   const guardInput = event => {
-    if (!switching || event.target.closest?.('button[data-creation-mode]')) return;
+    if (!switching || menu.contains(event.target)) return;
     if (event.target.closest?.('#main,.px-tool-header-slot,.app-tabs button') || event.type === 'keydown') {
       event.preventDefault(); event.stopImmediatePropagation();
     }
@@ -99,6 +85,9 @@ export async function mountCreationModes({ draw, scope }) {
     body.classList.remove('audio-tool-body');
     for (const [name, nodes] of owned) for (const node of nodes) node.inert = name === 'shared' ? false : name === 'editor' ? owner === 'camera' : name !== owner;
     for (const button of modeButtons) button.setAttribute('aria-pressed', String(button.dataset.creationMode === owner));
+    const label = { draw:'描画', camera:'カメラ', audio:'音楽' }[owner];
+    menu.querySelector('summary').setAttribute('aria-label', `${label}モード。制作モードを切り替え`);
+    menu.querySelector('summary img').src = `/assets/icons/pixieed/${owner === 'audio' ? 'music' : 'shoot'}.svg`;
   }
   async function ensureAudio(version) {
     if (audio) return audio;
@@ -136,8 +125,6 @@ export async function mountCreationModes({ draw, scope }) {
     if (!['draw', 'camera', 'audio'].includes(next)) return;
     if (!running && next === mode) return;
     if (!running && (document.querySelector('dialog[open]') || (body.hasAttribute('data-tool-result-open') && mode !== 'camera'))) throw new Error('開いている画面を閉じてから切り替えてください。');
-    const activeModeButton = document.activeElement?.closest?.('button[data-creation-mode]');
-    if (activeModeButton) focusModeAfterSwitch = activeModeButton;
     requestedMode = next; requestVersion++;
     motion.cancel(); initializingScope?.dispose();
     // Stop even when an earlier request is still waiting for a loader or animation.
@@ -152,7 +139,7 @@ export async function mountCreationModes({ draw, scope }) {
         const version = requestVersion, next = requestedMode, previous = mode;
         stopCurrent();
         switching = true; main.inert = true; body.dataset.creationTransition = 'true';
-        nav.setAttribute('aria-busy', 'true'); errorNode.textContent = ''; errorNode.hidden = true; settings.close();
+        menu.setAttribute('aria-busy', 'true'); errorNode.textContent = ''; settings.close();
         const skipStartupTransition = startupSwitchPending && previous === 'draw' && next === 'camera';
         const leaving = skipStartupTransition ? Promise.resolve() : motion.leave(previous);
         try {
@@ -164,7 +151,7 @@ export async function mountCreationModes({ draw, scope }) {
           if (next === 'camera') { await ensureCamera(version); await camera.enter(previous === 'audio' ? 'audio' : 'draw'); }
           await leaving;
           if (!currentRequest(version)) continue;
-          mode = next; show(mode);
+          mode = next; show(mode); menu.open = false;
           const params = new URLSearchParams(location.search); if (mode === 'draw') params.delete('mode'); else params.set('mode', mode);
           history.replaceState(history.state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
           // Keep editors stopped until the reveal finishes; no media start is simulated.
@@ -178,7 +165,7 @@ export async function mountCreationModes({ draw, scope }) {
     } catch (error) { requestedMode = mode; throw error; }
     finally {
       motion.cancel(); main.inert = wasInert; delete body.dataset.creationTransition;
-      switching = false; nav.removeAttribute('aria-busy');
+      switching = false; menu.removeAttribute('aria-busy');
       resumeCurrent(); if (!scope.disposed) draw.workspace.activate();
       if (focusModeAfterSwitch?.isConnected) focusModeAfterSwitch.focus({ preventScroll:true });
       focusModeAfterSwitch = null;
@@ -191,17 +178,24 @@ export async function mountCreationModes({ draw, scope }) {
     await switchMode(tool);
     if (project && project.projectId !== draw.workspace.currentProject?.projectId) await draw.workspace.importProject(project);
   }
-  scope.listen(nav, 'click', event => {
-    const button = event.target.closest('button[data-creation-mode]'); if (button) void switchMode(button.dataset.creationMode).catch(say);
+  scope.listen(menu, 'click', event => {
+    const button = event.target.closest('button[data-creation-mode]');
+    if (!button) return;
+    focusModeAfterSwitch = menu.querySelector('summary');
+    void switchMode(button.dataset.creationMode).catch(say);
   });
+  scope.listen(document, 'pointerdown', event => { if (!menu.contains(event.target)) menu.open = false; });
+  scope.listen(document, 'keydown', event => { if (event.key === 'Escape' && menu.open) menu.open = false; });
   const api = { get mode() { return mode; }, get switching() { return switching; }, switchMode: next => switchMode(next).catch(say), navigate };
   scope.listen(document, 'pixieed:creation-mode-request', event => {
     const requested = event.detail?.mode;
     if (!['draw', 'camera', 'audio'].includes(requested)) return;
     event.preventDefault();
     const target = modeButtons.find(button => button.dataset.creationMode === requested);
-    if (target && requested === mode && !running) { target.focus({ preventScroll:true }); return; }
-    focusModeAfterSwitch = target || null;
+    if (target && requested === mode && !running) {
+      menu.open = true; target.focus({ preventScroll:true }); return;
+    }
+    focusModeAfterSwitch = menu.querySelector('summary');
     void api.switchMode(requested);
   });
   if (startupMode) {

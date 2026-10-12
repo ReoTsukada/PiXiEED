@@ -5,16 +5,21 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const labels = (nav) => [...nav.matchAll(/<a\b[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
 
-test('public work navigation separates local map/store actions from page destinations', () => {
+test('public navigation restores four historical entrances around the page primary action', () => {
   const app = read('js/app.js');
   const nav = app.match(/tabs\.innerHTML = `([^`]*)`/)[1];
-  assert.equal(nav, '${contextAction}');
-  assert.match(app, /data-page-action="view"[^>]*aria-label="地図の投稿を見る"/);
+  assert.deepEqual(labels(nav), ['世界地図', '撮影', 'ツール', 'マイページ']);
+  assert.deepEqual([...nav.matchAll(/data-nav="([^"]+)"/g)].map(match => match[1]), ['map','camera','tools','profile']);
+  const sides = nav.split('${contextAction}');
+  assert.equal(sides.length, 2);
+  assert.equal((sides[0].match(/<a\b/g) || []).length, 2, 'two entrances precede the original primary');
+  assert.equal((sides[1].match(/<a\b/g) || []).length, 2, 'two entrances follow the original primary');
   assert.match(app, /data-page-action="post"[^>]*aria-label="ドット絵を投稿する"/);
   assert.match(app, /href="#store-search" aria-label="お店を探す"/);
   assert.match(read('stores/index.html'), /id="store-search" name="search" type="search"/);
-  assert.match(app, /tabs\.hidden = !contextAction/);
-  assert.match(app, /tabs\.setAttribute\('aria-label', 'この画面の操作'\)/);
+  assert.doesNotMatch(app, /tabs\.hidden = !contextAction/);
+  assert.doesNotMatch(read('js/site-header.mjs'), /function separateWorkNavigation/);
+  assert.match(app, /tabs\.setAttribute\('aria-label', 'アプリナビゲーション'\)/);
   assert.match(app, /brandLink\.setAttribute\('href', '\/'\)/);
 });
 

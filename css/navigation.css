@@ -123,3 +123,63 @@ body :is(.px-header-brand, .menu-toggle, .site-menu__close, .site-settings__clos
 body :is(.app-tabs,.globe-app-tabs,.mobile-nav) > :is(a,button):is(:disabled,[aria-disabled="true"]) {
   opacity: .46; cursor: default; box-shadow: none; transform: none;
 }
+
+/* Polish the existing rows without changing their actions, order, columns,
+   visibility or 44px targets. The page/controller retains every state. */
+body :is(.app-tabs,.globe-app-tabs) {
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(180deg,rgba(255,255,255,.99),rgba(247,249,249,.98));
+  box-shadow: 0 8px 24px rgba(11,35,47,.12), 0 1px 3px rgba(11,35,47,.06), inset 0 0 0 1px rgba(11,35,47,.12), inset 0 1px 0 #fff;
+  grid-template-columns: repeat(5,minmax(0,1fr));
+  grid-template-rows: 44px;
+}
+/* Local rows used to leave a wide empty surface around one or two actions.
+   Keep those actions centered at their original location in a fitted frame. */
+body .app-tabs--work {
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  padding-inline: 8px;
+  gap: 8px;
+}
+body :is(.app-tabs,.globe-app-tabs) > :is(a,button) {
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+body :is(.app-tabs,.globe-app-tabs) > :is(a,button):not(:disabled):not([aria-disabled="true"]):hover {
+  box-shadow: inset 0 0 0 1px rgba(11,35,47,.07);
+}
+body :is(.app-tabs,.globe-app-tabs) > :is(a,button):not(:disabled):not([aria-disabled="true"]):active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px rgba(11,35,47,.14);
+}
+body :is(.app-tabs,.globe-app-tabs) > :is(a,button):focus-visible {
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  body :is(.app-tabs,.globe-app-tabs) > :is(a,button) { transition: none; }
+  body :is(.app-tabs,.globe-app-tabs) > :is(a,button):active { transform: none; }
+}
+html[data-pixieed-motion="reduced"] body :is(.app-tabs,.globe-app-tabs) > :is(a,button) { transition: none; }
+html[data-pixieed-motion="reduced"] body :is(.app-tabs,.globe-app-tabs) > :is(a,button):active { transform: none; }
+
+/* The historical middle slot remains the page's own play/capture/save action.
+   Its larger surface overflows a fixed 44px grid row, preserving viewport room. */
+html body[class] .app-tabs > :is(#draw-animation-play,#draw-music-play,#capture,#audio-play-toggle,#jigsaw-save,#game-primary,#spot-save,#hidden-save,#pixfind-primary),
+html body .globe-app-tabs > #globePrimaryAction,
+html body .app-tabs--labeled > :nth-child(3) {
+  width: 58px !important; min-width: 58px !important;
+  height: 58px !important; min-height: 58px !important;
+  padding: 0 !important; border-radius: 50% !important;
+  background: var(--pixieed-accent,#e75445); color: #fff;
+  box-shadow: 0 5px 13px #e7544538, inset 0 1px 0 #ffffff55;
+  justify-self: center; align-self: center;
+}
+html body .app-tabs--labeled > :nth-child(3) .app-tab-label { max-width:54px; font-size:10px; }
+html body .app-tabs > :is(#draw-animation-play,#draw-music-play,#capture,#audio-play-toggle,#jigsaw-save,#game-primary,#spot-save,#hidden-save,#pixfind-primary):disabled,
+html body .globe-app-tabs > #globePrimaryAction:disabled { box-shadow:none; }
+html body.creation-suite .app-tabs > #creation-mode-menu,
+html body.creation-suite .app-tabs > #creation-mode-menu > summary {
+  box-sizing:border-box; width:44px !important; min-width:44px !important;
+  height:44px !important; min-height:44px !important; border-radius:10px !important;
+}
