@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { PAGE_DESTINATIONS } from '../../js/page-navigation.mjs';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
@@ -13,10 +14,11 @@ test('the old works route goes to the globe and the tools route remains reachabl
   const oldWorks = read('works/index.html');
   assert.match(home, new RegExp(`href="${fixture.routes.tools}"`));
   assert.match(tools, /src="\/js\/site-header\.mjs\?/);
-  assert.match(read('js/app.js'), new RegExp(`href="${fixture.routes.tools}"`));
+  assert.ok(PAGE_DESTINATIONS.flatMap(group => group.links).some(([href]) => href === fixture.routes.tools));
   assert.match(oldWorks, /name="robots" content="noindex,follow"/);
   assert.match(oldWorks, /http-equiv="refresh" content="0;url=\/globe\/"/);
-  assert.match(read('js/site-header.mjs'), /href="\/globe\/" data-menu-link>世界地図で作品を見る/);
+  assert.ok(PAGE_DESTINATIONS.flatMap(group => group.links).some(([href, label]) => href === '/globe/' && label === '世界地図で作品を見る'));
+  assert.match(read('js/site-header.mjs'), /PAGE_DESTINATIONS/);
   assert.match(read('css/site.css'), /\.mobile-nav a\[href="\/works\/"\]/);
 });
 

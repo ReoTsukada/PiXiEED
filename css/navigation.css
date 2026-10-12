@@ -1,0 +1,125 @@
+/* Navigation geometry follows PiXiEEDraw. Deliberately scoped: canvas tools,
+   palettes and content cards keep their own geometry. !important protects this
+   contract from page styles loaded after the shared shell and landscape rules. */
+:root { --px-nav-size: 44px; --px-nav-radius: 10px; --px-nav-icon: 24px; --px-nav-padding: 12px; }
+
+body :is(.px-header-brand, .admin-header .brand, .catalog-brand, .output-brand,
+  .site-nav a, .footer-links a, .breadcrumbs a, .event-site-header a,
+  .event-page + footer a, .event-globe-link a, .event-source,
+  .room-back, .cmt-back, .lens-back, .puzzle-list-back,
+  .px-tool-help__close, .px-tool-help__back, .catalog-footer a,
+  .creation-mode-menu__panel button,
+  [data-detail-close], .map-events-panel__back, #passBack, #shops-back, .page-hero .button,
+  .site-footer .brand,
+  [data-current-editor], .site-menu__profile,
+  .site-menu__group a, .site-menu__group button, .site-menu__utilities button, .site-settings__actions button) {
+  box-sizing: border-box;
+  min-width: var(--px-nav-size) !important;
+  min-height: var(--px-nav-size) !important;
+  border-radius: var(--px-nav-radius) !important;
+  padding: 8px var(--px-nav-padding);
+  align-items: center;
+  overflow-wrap: anywhere;
+  touch-action: manipulation;
+}
+body :is(.site-nav a, .footer-links a, .breadcrumbs a, .event-site-header a,
+  .event-page + footer a, .event-globe-link a, .event-source, .catalog-footer a, [data-current-editor]) { display: inline-flex; }
+body :is(.breadcrumbs, .footer-links) { align-items: center; }
+body .site-menu__profile > span:nth-child(2) { min-width: 0; }
+
+body :is(.menu-toggle, .site-menu__close, .site-settings__close,
+  .px-tool-header-panel-close, .px-tool-header-control:is(button,a),
+  .px-tool-header-control > summary, .project-bar > button, .pixfind-back,
+  #creation-mode-menu > summary,
+  .map-events-panel__close, .map-post-drawer__close, .map-popover__close,
+  .sheet__close, .post-modal__close, .dialog__close) {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: var(--px-nav-size) !important;
+  width: var(--px-nav-size);
+  min-height: var(--px-nav-size) !important;
+  height: var(--px-nav-size);
+  border-radius: var(--px-nav-radius) !important;
+  touch-action: manipulation;
+}
+body :is(.site-menu__close, .site-settings__close) { padding: 0; font-size: var(--px-nav-icon); }
+body .px-site-header .menu-toggle__lines { width: var(--px-nav-icon); }
+body .px-site-header .px-tool-header-control:is(#game-new,#cameraChooseImage),
+body .px-site-header .px-tool-header-control:is(#creation-project-undo,#creation-project-redo),
+body .px-site-header .spot-settings > summary { width: auto; padding-inline: var(--px-nav-padding); }
+body[data-tool-name] .px-site-header .px-header-brand--tool {
+  flex: 0 0 var(--px-nav-size); width: var(--px-nav-size); padding: 0;
+}
+body .px-site-header .px-header-brand { padding: 0; }
+body .px-header-brand :is(img,.brand-mark) { border-radius: var(--px-nav-radius); }
+/* Draw's local picker has its own !important geometry. Only its header
+   launcher adopts navigation geometry; the palette/picker contents stay local. */
+html body[data-page] .px-site-header .px-tool-header-control > summary {
+  min-width: var(--px-nav-size) !important; min-height: var(--px-nav-size) !important;
+  border-radius: var(--px-nav-radius) !important;
+}
+body[data-tool-name] .px-site-header .px-header-brand--tool { height: var(--px-nav-size) !important; }
+body :is(.project-bar > button, .pixfind-back) { width: var(--px-nav-size) !important; height: var(--px-nav-size) !important; }
+body.creation-suite #creation-mode-menu,
+body.creation-suite #creation-mode-menu > summary { width: var(--px-nav-size); height: var(--px-nav-size); }
+body .project-bar svg { width: var(--px-nav-icon); height: var(--px-nav-icon); }
+body.app-page:not([data-page]) main.container.section > p > a {
+  display: inline-flex; align-items: center; min-height: var(--px-nav-size);
+  padding: 8px var(--px-nav-padding); border-radius: var(--px-nav-radius); overflow-wrap: anywhere;
+}
+
+/* Equal square targets for icon-only navigation, including the centre action.
+   Labels may use their grid cell width; height and icon size stay identical. */
+body :is(.app-tabs, .globe-app-tabs, .mobile-nav) > :is(a,button) {
+  box-sizing: border-box;
+  min-width: var(--px-nav-size) !important;
+  width: var(--px-nav-size) !important;
+  min-height: var(--px-nav-size) !important;
+  height: var(--px-nav-size) !important;
+  padding: 0 !important;
+  place-self: center;
+  border-radius: var(--px-nav-radius) !important;
+  touch-action: manipulation;
+}
+body :is(.app-tabs--labeled, .mobile-nav) > :is(a,button) {
+  width: 100% !important;
+  padding-inline: 2px !important;
+  gap: 2px;
+}
+body :is(.app-tabs, .globe-app-tabs) > :is(a,button) :is(img,svg),
+body .px-tool-header-control svg {
+  width: var(--px-nav-icon) !important;
+  height: var(--px-nav-icon) !important;
+  flex: none;
+}
+body .mobile-nav a > span[aria-hidden] { width: var(--px-nav-icon); height: var(--px-nav-icon); font-size: var(--px-nav-icon); line-height: 1; }
+/* Camera capture remains a shutter symbol within the common square target. */
+body .pc-nav-shutter { width: var(--px-nav-icon); height: var(--px-nav-icon); }
+/* The integrated camera retains the white shutter/retry icon. Give it the
+   camera's accent surface so it stays visible in the light bottom navigation. */
+body.creation-suite .app-tabs > #capture { background: var(--lc-accent, #e75445) !important; color: #fff; }
+
+body :is(.event-site-header, .event-site-header nav, .event-page + footer) { flex-wrap: wrap; }
+body .event-site-header nav { gap: 4px; }
+body .event-page + footer { justify-content: flex-start; gap: 4px; }
+
+body :is(.px-header-brand, .menu-toggle, .site-menu__close, .site-settings__close,
+  .px-tool-header-control, .px-tool-header-control > summary, .px-tool-header-panel-close,
+  .site-menu__profile, .site-menu__group a, .site-menu__group button, .site-menu__utilities button,
+  .site-settings__actions button, .app-tabs > a, .app-tabs > button,
+  .globe-app-tabs > a, .globe-app-tabs > button, .mobile-nav > a,
+  .site-nav a, .footer-links a, .breadcrumbs a, .event-site-header a,
+  .event-page + footer a, .event-globe-link a, .event-source,
+  #creation-mode-menu > summary, .creation-mode-menu__panel button,
+  .admin-header .brand, .catalog-brand, .output-brand, .room-back, .cmt-back, .lens-back,
+  .puzzle-list-back, .pixfind-back, .project-bar > button,
+  .px-tool-help__close, .px-tool-help__back, .catalog-footer a, [data-detail-close],
+  .map-events-panel__back, .map-events-panel__close, .map-post-drawer__close,
+  .map-popover__close, .sheet__close, .post-modal__close, .dialog__close,
+  #passBack, #shops-back, .site-footer .brand, .page-hero .button, [data-current-editor]):focus-visible {
+  outline: 3px solid #2588bb;
+  outline-offset: -3px;
+}
+body :is(.app-tabs,.globe-app-tabs,.mobile-nav) > :is(a,button):is(:disabled,[aria-disabled="true"]) {
+  opacity: .46; cursor: default; box-shadow: none; transform: none;
+}

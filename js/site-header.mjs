@@ -1,4 +1,5 @@
 import './site-analytics.mjs';
+import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261012-page-roles-1';
 import { installGlobeAnalyticsBridge } from './globe/analytics-bridge.mjs';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261006-header-controls-1';
@@ -53,16 +54,12 @@ function bindPanelEffects() {
 const MENU_MARKUP = `
   <div class="site-menu-backdrop" data-menu-backdrop hidden></div>
   <aside class="site-menu" id="site-menu" data-site-menu hidden role="dialog" aria-modal="true" aria-labelledby="site-menu-title">
-    <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">メニュー</h2></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
+    <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">ページ</h2></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
     <div class="site-menu__body">
-    <a class="site-menu__profile" href="/profile/" data-menu-link><span class="site-menu__avatar" aria-hidden="true">P</span><span><strong>自分のページ</strong><small>投稿・いいね・記録</small></span><span aria-hidden="true">›</span></a>
-    <nav class="site-menu__nav" aria-label="補助メニュー">
-      <div class="site-menu__group"><span class="site-menu__label">自分の記録</span><a href="/profile/?view=posts" data-menu-link>投稿した絵</a><a href="/profile/?view=likes" data-menu-link>いいねした作品</a><a href="/profile/?view=history" data-menu-link>読み取ったQR</a></div>
-      <div class="site-menu__group"><span class="site-menu__label">探す</span><a href="/globe/" data-menu-link>世界地図で作品を見る</a><a href="/events/" data-menu-link>ドット絵イベントを探す</a><a href="/stores/" data-menu-link>絵に会えるお店</a><a href="/books/" data-menu-link>ドット絵の本・グッズ</a></div>
-      <div class="site-menu__group"><span class="site-menu__label">参加する</span><a href="/globe/?post=1" data-menu-link>ドット絵を投稿する</a></div>
-      <div class="site-menu__group"><span class="site-menu__label">案内</span><a href="/about/" data-menu-link>PiXiEEDについて</a><a href="/guide/" data-menu-link>利用ガイド</a><a href="/privacy/" data-menu-link>プライバシー</a></div>
-      <div class="site-menu__group"><span class="site-menu__label">設定</span><button type="button" data-menu-setting="display">表示設定</button><button type="button" data-menu-setting="privacy">プライバシー設定</button></div>
+    <nav class="site-menu__nav" aria-label="ページ移動">
+      ${PAGE_DESTINATIONS.map(group => `<div class="site-menu__group"><span class="site-menu__label">${group.label}</span>${group.links.map(([href, label]) => `<a href="${href}" data-menu-link><span>${label}</span><span class="site-menu__current" hidden>現在</span></a>`).join('')}</div>`).join('')}
     </nav>
+    <div class="site-menu__utilities"><button type="button" data-menu-setting="all">設定を開く<span>表示・プライバシー</span></button></div>
     </div>
   </aside>
   <dialog class="site-settings" data-site-settings aria-labelledby="site-settings-title">
@@ -87,7 +84,7 @@ function analyticsAllowed() {
   try { return localStorage.getItem(ANALYTICS_CONSENT_KEY) !== 'denied'; } catch { return true; }
 }
 function menuToggleMarkup() {
-  return '<button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="メニューを開く"><span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i><i></i></span></button>';
+  return '<button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="ページを開く"><span class="menu-toggle__lines" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-toggle__label">ページ</span></button>';
 }
 
 function mountSiteMenu(header, inner) {
@@ -97,7 +94,8 @@ function mountSiteMenu(header, inner) {
   toggle.classList.add('px-header-menu-toggle', 'px-header-utilities');
   toggle.setAttribute('aria-controls', 'site-menu');
   toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-label', 'メニューを開く');
+  toggle.setAttribute('aria-label', 'ページを開く');
+  toggle.innerHTML = menuToggleMarkup().match(/<button[^>]*>([\s\S]*)<\/button>/)[1];
   if (!document.querySelector('[data-site-menu]')) document.body.insertAdjacentHTML('beforeend', MENU_MARKUP);
   const menu = document.querySelector('[data-site-menu]');
   const backdrop = document.querySelector('[data-menu-backdrop]');
@@ -123,15 +121,23 @@ function mountSiteMenu(header, inner) {
     menu.hidden = !open;
     backdrop.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
-    toggle.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く');
+    toggle.setAttribute('aria-label', open ? 'ページを閉じる' : 'ページを開く');
     document.body.classList.toggle('is-menu-open', open);
-    if (open) window.requestAnimationFrame(() => close?.focus({ preventScroll: true }));
+    if (open) {
+      const current = currentPageDestination(window.location, document.body.dataset.creationMode);
+      for (const link of menu.querySelectorAll('[data-menu-link]')) {
+        const selected = link.getAttribute('href') === current;
+        if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
+        link.querySelector('.site-menu__current').hidden = !selected;
+      }
+      window.requestAnimationFrame(() => close?.focus({ preventScroll: true }));
+    }
     else if (returnFocus) toggle.focus({ preventScroll: true });
   };
   const openSettings = (mode = 'display') => {
     if (!settings) return;
     setOpen(false);
-    settings.querySelectorAll('[data-settings-panel]').forEach((panel) => { panel.hidden = panel.dataset.settingsPanel !== mode; });
+    settings.querySelectorAll('[data-settings-panel]').forEach((panel) => { panel.hidden = mode !== 'all' && panel.dataset.settingsPanel !== mode; });
     if (motionSetting) motionSetting.checked = applyMotionPreference();
     if (analyticsSetting) analyticsSetting.checked = analyticsAllowed();
     if (settingsStatus) settingsStatus.textContent = '';
@@ -185,7 +191,15 @@ function mountSiteMenu(header, inner) {
     if (!suppressClick) return;
     event.preventDefault(); event.stopPropagation(); suppressClick = false;
   }, true);
-  menu.querySelectorAll('[data-menu-link]').forEach((link) => link.addEventListener('click', () => setOpen(false)));
+  menu.querySelectorAll('[data-menu-link]').forEach((link) => link.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const mode = creationModeDestination(link.href, window.location);
+    if (mode && document.body.classList.contains('creation-suite')) {
+      // Restore the workspace's inert state before the controller snapshots it.
+      setOpen(false, true);
+      if (!document.dispatchEvent(new CustomEvent('pixieed:creation-mode-request', { cancelable: true, detail: { mode } }))) event.preventDefault();
+    } else setOpen(false);
+  }));
   menu.addEventListener('click', (event) => {
     const setting = event.target.closest('[data-menu-setting]');
     if (!setting) return;
@@ -204,6 +218,18 @@ function mountSiteMenu(header, inner) {
   mountedMenus.add(header);
 }
 
+function separateWorkNavigation() {
+  if (document.body.dataset.page === 'draw') return; // The shared mode controller owns this row.
+  for (const nav of document.querySelectorAll('.app-tabs,.globe-app-tabs')) {
+    for (const link of nav.querySelectorAll(':scope > a[href]')) {
+      if (!link.getAttribute('href').startsWith('#')) link.remove();
+    }
+    if (!nav.querySelector(':scope > a,:scope > button')) { nav.hidden = true; continue; }
+    nav.classList.add('app-tabs--work');
+    nav.setAttribute('aria-label', 'この画面の操作');
+  }
+}
+
 /** Preserve each page's own controls and its central navigation action. */
 export function mountSiteHeader() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return null;
@@ -211,7 +237,7 @@ export function mountSiteHeader() {
   if (window.top !== window.self || document.body.hasAttribute('data-admin-page')) return null;
   if (/^\/globe\/(?:index\.html)?$/.test(window.location?.pathname || '')) installGlobeAnalyticsBridge();
   applyMotionPreference();
-  let header = document.querySelector('.site-header, .audio-heading, .lc-top');
+  let header = document.querySelector('.site-header, .audio-heading, .lc-top, .catalog-header, .output-header, .event-site-header, .hud-top__bar, .pc-header');
   if (!header) {
     header = document.createElement('header');
     header.className = 'site-header';
@@ -221,13 +247,15 @@ export function mountSiteHeader() {
   }
   header.classList.add('px-site-header');
   header.setAttribute('aria-label', 'PiXiEED 共通ヘッダー');
-  const inner = header.querySelector('.header-inner') || header;
+  const inner = header.querySelector('.header-inner, .catalog-header__inner') || header;
   inner.classList.add('px-header-inner');
-  let brand = inner.querySelector('.brand');
-  if (!brand) inner.prepend(brand = brandedLink());
-  brand.classList.add('px-header-brand');
-  brand.href = '/';
-  brand.setAttribute('aria-label', 'PiXiEED ホーム');
+  let brand = inner.querySelector('.brand, .catalog-brand, .output-brand, .pc-brand') || (header.matches('.event-site-header') ? inner.querySelector('a[href="/"]') : null);
+  if (!brand && !header.matches('.hud-top__bar')) inner.prepend(brand = brandedLink());
+  if (brand) {
+    brand.classList.add('brand', 'px-header-brand');
+    brand.href = '/';
+    brand.setAttribute('aria-label', 'PiXiEED ホーム');
+  }
   // Tool names remain in document titles and headings; editing chrome uses the space for controls.
   const toolName = document.body.dataset.toolName;
   if (toolName) {
@@ -246,6 +274,7 @@ export function mountSiteHeader() {
   inner.querySelectorAll('.menu-toggle, .audio-header-actions, .lc-top-left, .lc-top-right').forEach((el) => el.classList.add('px-header-utilities'));
   inner.querySelectorAll('[data-header-pass]').forEach((button) => button.remove());
   mountSiteMenu(header, inner);
+  separateWorkNavigation();
   document.documentElement.classList.add('px-header-ready');
   bindPanelEffects();
   return header;

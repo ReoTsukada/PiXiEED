@@ -32,13 +32,17 @@ try {
       onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
   try {
-    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261011-tool-size-1');
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261012-page-roles-1');
     if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
   } catch (error) {
+    delete document.documentElement.dataset.creationStartup;
+    document.documentElement.dataset.creationModesReady = 'true';
     const status = document.querySelector('#draw-status');
     if (status) status.textContent = `モード切替を準備できませんでした。描画は続けられます：${error?.message || ''}`;
   }
 } catch (error) {
+  delete document.documentElement.dataset.creationStartup;
+  document.documentElement.dataset.creationModesReady = 'true';
   scope.dispose();
   const status = document.querySelector('#draw-status');
   if (status) {

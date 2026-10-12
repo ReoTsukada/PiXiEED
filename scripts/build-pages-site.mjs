@@ -50,7 +50,8 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     files.push(...generated.files);
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['css/event-pages.css', 'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
+    for (const name of ['js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
+      'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
       'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
       'js/books-catalog.mjs',
       'js/creation/music-output-preferences.mjs', 'js/creation/pxd-original-backup.mjs',

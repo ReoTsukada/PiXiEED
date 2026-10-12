@@ -7,3 +7,10 @@ Claude outputs/
 # OGP pages are generated into the Pages deployment artifact.
 /play/spot-difference/puzzles/
 /play/hidden-object/puzzles/
+
+# Local QA evidence may contain private account observations and machine paths.
+# Public summaries and representative screenshots live outside these folders.
+/docs/nav-camera-review-20261012/evidence/
+/docs/nav-camera-review-20261012/reverification/
+/docs/navigation-roles-review-20261012/evidence/
+/docs/gam-rewarded-test-20261012/evidence/

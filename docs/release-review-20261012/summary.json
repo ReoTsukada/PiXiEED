@@ -1,0 +1,69 @@
+{
+  "checkedAt": "2026-10-12T10:59:15.924517+00:00",
+  "sourceHead": "14be3245464ecd2dc81cb9f6daf5a58e2c3d0577",
+  "sourceFingerprint": "b4d02da617eb8648255ae229451d34dd86818316cd64cb2e545093b39edeaba2",
+  "node": {
+    "files": 285,
+    "passed": 1964,
+    "failed": 0,
+    "skipped": 0
+  },
+  "deno": {
+    "files": 9,
+    "passed": 51,
+    "failed": 0
+  },
+  "isolatedDb": {
+    "integrationPassed": 2,
+    "acceptancePassed": true,
+    "productionVerified": false
+  },
+  "functionTypeChecks": {
+    "passed": 3
+  },
+  "build": {
+    "files": 687,
+    "puzzlePages": 6,
+    "eventPages": 92
+  },
+  "navigation": {
+    "entryCount": 140,
+    "viewportCount": 4,
+    "counts": {
+      "NAV_PASS": 528,
+      "NAV_EXCLUDED": 8,
+      "REDIRECT_VERIFIED": 24
+    },
+    "failures": 0
+  },
+  "roles": {
+    "passed": 56,
+    "failed": 0
+  },
+  "camera": {
+    "passed": 24,
+    "failed": 0,
+    "physicalDevicesVerified": false
+  },
+  "project": {
+    "passed": 4,
+    "failed": 0
+  },
+  "mock": {
+    "viewportCount": 4,
+    "scenarioCount": 10,
+    "failed": 0,
+    "externalRequestAttempts": 0,
+    "liveDeliveryEnabled": false,
+    "noindex": true,
+    "inCommonNavigationOrSitemap": false
+  },
+  "privacy": {
+    "rawEvidencePublic": false,
+    "privateAccountObservationsPublic": false,
+    "secretsDetectedInCandidates": false
+  },
+  "offerwallConfigurationChanged": false,
+  "separateAdvertisingPatchImported": false,
+  "productionVerified": false
+}

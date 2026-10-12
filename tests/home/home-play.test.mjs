@@ -56,7 +56,7 @@ test('home hero: the play leads somewhere — invitations matched to what the vi
 test('home: discovery follows the mini experience and links to published tools', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /この先で、作品をつくる/);
-  for (const path of ['/pixel-camera.html', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
+  for (const path of ['/draw/?mode=camera', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
   assert.match(html, /hp-link-card" data-toy="camera"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card/);
   assert.match(html, /気になるカードから、すぐにはじめられます。/);
   assert.match(source, /function groupToys\(/);

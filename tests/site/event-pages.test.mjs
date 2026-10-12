@@ -11,8 +11,8 @@ const idSet = new Set(events.map((event) => event.id));
 const allIds = new Set(catalog.events.map((event) => event.id));
 
 test('indexable events have a checked source and unique, substantive dated edition', () => {
-  assert.equal(catalog.events.length, 102);
-  assert.equal(events.length, 86);
+  assert.equal(catalog.events.length, 108);
+  assert.equal(events.length, 92);
   for (const event of events) {
     assert.ok(event.sourceUrl.startsWith('https://'));
     assert.ok(event.checkedAt);
@@ -28,6 +28,14 @@ test('indexable events have a checked source and unique, substantive dated editi
   assert.ok(idSet.has('kac-ultra-dope-motocross-2026'));
   assert.ok(!idSet.has('motocross-saito-ultra-dope-2026'));
   assert.ok([...idSet].every((id) => allIds.has(id)));
+  for (const id of [
+    'sydney-haymarket-pixel-art-workshop-2026-10-20',
+    'pixxelpoint-pixel-art-workshop-2026-10-21',
+    'lyon-pixel-art-graffiti-saint-rambert-2026-10-21',
+    'lyon-pixel-art-graffiti-part-dieu-2026-11-07',
+    'lyon-pixel-art-graffiti-la-duchere-2026-11-25',
+    'la-bourboule-pixel-art-serigraphie-2026-11-07'
+  ]) assert.ok(idSet.has(id), `${id} remains an eligible, individually indexed event`);
 });
 
 test('a dated record without a substantive description is not given a leaf page', () => {
@@ -95,7 +103,7 @@ test('leaf pages use public-facing summaries where catalog descriptions contain 
 
 test('hub has one anchor per source record and accurate record, edition, watch, and page counts', () => {
   const hub = indexPage(events, catalog.events);
-  assert.match(hub, /102レコード（開催日付き97記録・重複1件を除く96開催回・次回未定5件）。個別紹介ページ86件。/);
+  assert.match(hub, /108レコード（開催日付き103記録・重複1件を除く102開催回・次回未定5件）。個別紹介ページ92件。/);
   assert.match(hub, /PiXiEEDが独自に調査・編集した一覧です/);
   for (const event of catalog.events) assert.ok(hub.includes(`id="${event.id}"`));
 });
@@ -107,7 +115,7 @@ test('generated canonical pages and sitemap contain only unique leaf URLs and ar
     await writeFile(join(root, 'data/pixel-art-events.json'), JSON.stringify(catalog));
     await writeFile(join(root, 'sitemap.xml'), '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://pixieed.jp/</loc></url><url><loc>https://pixieed.jp/events/old/</loc></url></urlset>');
     const first = await generateEventPages({ root });
-    assert.equal(first.eventPages, 86);
+    assert.equal(first.eventPages, 92);
     const sitemapPath = join(root, 'sitemap.xml');
     const sitemap = await readFile(sitemapPath, 'utf8');
     const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) => url);

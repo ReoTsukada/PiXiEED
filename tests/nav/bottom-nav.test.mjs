@@ -5,26 +5,20 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const labels = (nav) => [...nav.matchAll(/<a\b[^>]*aria-label="([^"]+)"/g)].map((m) => m[1]);
 
-test('public shell labels all five destinations and sends the stores action to its real search field', () => {
+test('public work navigation separates local map/store actions from page destinations', () => {
   const app = read('js/app.js');
   const nav = app.match(/tabs\.innerHTML = `([^`]*)`/)[1];
-  assert.deepEqual(labels(nav), ['世界地図', '撮影', 'ツール', 'マイページ']);
-  assert.match(nav, /data-nav="map"[^>]*aria-label="世界地図"[\s\S]*app-tab-label">世界地図/);
-  assert.match(nav, /data-nav="camera"[^>]*aria-label="撮影"[\s\S]*app-tab-label">撮影/);
-  assert.match(nav, /\$\{contextAction\}[\s\S]*app-tab-label">ツール[\s\S]*app-tab-label">マイページ/);
-  assert.match(app, /stores: '<a class="app-tab-context app-tab-context--stores" href="#store-search" aria-label="お店を探す"><img src="\/assets\/icons\/pixieed\/home\.svg" alt=""><span class="app-tab-label">お店を探す<\/span><\/a>'/);
-  assert.doesNotMatch(app.match(/stores: '([^']+)'/)[1], /telescope\.svg|href="\/globe\//);
+  assert.equal(nav, '${contextAction}');
+  assert.match(app, /data-page-action="view"[^>]*aria-label="地図の投稿を見る"/);
+  assert.match(app, /data-page-action="post"[^>]*aria-label="ドット絵を投稿する"/);
+  assert.match(app, /href="#store-search" aria-label="お店を探す"/);
   assert.match(read('stores/index.html'), /id="store-search" name="search" type="search"/);
-  assert.match(app, /href="\/globe\/">世界地図を見る<\/a>/);
-  assert.match(app, /home: '<a href="\/draw\/" aria-label="PiXiEEDrawで絵を描く"><img src="\/assets\/icons\/pixieed\/add\.svg" alt=""><span class="app-tab-label">描く/);
+  assert.match(app, /tabs\.hidden = !contextAction/);
+  assert.match(app, /tabs\.setAttribute\('aria-label', 'この画面の操作'\)/);
   assert.match(app, /brandLink\.setAttribute\('href', '\/'\)/);
-  assert.match(app, /tabs\.className = 'app-tabs app-tabs--labeled'/);
-  assert.match(read('css/pixieed-design-system.css'), /\.app-tabs--labeled \.app-tab-label/);
 });
 
-test('shop entrances appear in the common menu and the home discovery section', () => {
-  const menu = read('js/site-header.mjs');
-  assert.match(menu, /href="\/books\/" data-menu-link>ドット絵の本・グッズ<\/a>/);
+test('shop entrances remain visible in the home discovery section', () => {
   const home = read('index.html');
   assert.match(home, /class="hp-card-grid hp-discover-grid"[\s\S]*class="hp-link-card hp-catalog-card" href="\/books\/"/);
   assert.match(home, /<h3 class="hp-toy-name">ドット絵の本・グッズ<\/h3><span class="hp-toy-line">本、おもちゃ、制作道具を探す<\/span>[\s\S]*商品を見る/);

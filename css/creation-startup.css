@@ -1,0 +1,41 @@
+/* Hide the Draw shell while a requested camera mode is being mounted. */
+/* Restoring an older multi-image project may ask which image to open. Keep
+   native restoration dialogs visible above the loading surface. */
+html[data-creation-startup="camera"] body > :not(#creation-startup):not(dialog[open]) {
+  visibility: hidden !important;
+}
+
+.creation-startup-placeholder {
+  display: none;
+}
+
+html[data-creation-startup="camera"] #creation-startup {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  color: #e9f6f7;
+  background: #08121c;
+  font: 700 1rem/1.5 system-ui, -apple-system, sans-serif;
+  text-align: center;
+}
+
+.creation-startup-placeholder__mark {
+  width: 2rem;
+  height: 2rem;
+  border: 3px solid #e9f6f740;
+  border-top-color: #e9f6f7;
+  border-radius: 50%;
+  animation: creation-startup-spin .8s linear infinite;
+}
+
+@keyframes creation-startup-spin { to { transform: rotate(1turn); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .creation-startup-placeholder__mark { animation: none; }
+}
+html[data-pixieed-motion="reduced"] .creation-startup-placeholder__mark { animation: none; }

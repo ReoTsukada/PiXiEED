@@ -1,3 +1,4 @@
+@import url('./navigation.css?rev=20261012-page-roles-1');
 /* One compact header for public pages and full-screen tools. */
 :root{--px-header-height:64px;--header-h:var(--px-header-height);--px-press-time:140ms;--px-press-ease:cubic-bezier(.2,.7,.2,1)}
 .px-header-ready body .site-header.px-site-header{display:block;position:sticky;top:0;z-index:35;min-height:var(--px-header-height);border:0;background:rgba(247,248,246,.97);box-shadow:0 1px 0 #1b202510}
@@ -97,22 +98,22 @@ html[data-pixieed-motion=reduced] .pxb-burst{display:none}
 .site-menu{z-index:160}
 .site-menu__close,.site-settings__close{width:44px;height:44px}
 /* The common header is also used by standalone tools that do not load the design system. */
-body.px-standalone-globe .site-menu-backdrop{position:fixed;inset:0;z-index:159;background:rgba(16,24,30,.3)}
-body.px-standalone-globe .site-menu-backdrop[hidden],body.px-standalone-globe .site-menu[hidden]{display:none}
-body.px-standalone-globe .site-menu{position:fixed;top:0;right:0;bottom:0;z-index:160;display:grid;align-content:start;width:min(22.5rem,100vw);padding:1.4rem 1.25rem calc(6rem + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;color:#1b2025;background:rgba(247,248,246,.98);box-shadow:-18px 0 45px rgba(27,32,37,.12);animation:pixieed-menu-in .24s cubic-bezier(.2,.7,.2,1) both}
-body.px-standalone-globe :is(.site-menu__head,.site-settings__head){display:flex;align-items:start;justify-content:space-between;gap:1rem;margin-bottom:1.1rem}
-body.px-standalone-globe :is(.site-menu__head h2,.site-settings__head h2){margin:.15rem 0 0;font-size:1.55rem}
-body.px-standalone-globe :is(.site-menu__close,.site-settings__close){display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;color:#59636c;background:#e9eceb;font-size:1.35rem;line-height:1;cursor:pointer}
-body.px-standalone-globe .site-menu__profile{display:flex;align-items:center;gap:.75rem;min-height:4.3rem;padding:.75rem;border-radius:1rem;color:inherit;background:#e9eceb;text-decoration:none}
-body.px-standalone-globe .site-menu__profile>span:nth-child(2){display:grid;flex:1;gap:.18rem}body.px-standalone-globe .site-menu__profile strong{font-size:.9rem}body.px-standalone-globe .site-menu__profile small{color:#59636c;font-size:.72rem}
-body.px-standalone-globe .site-menu__avatar{display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:.65rem;color:#fff;background:#e75445;font-size:.82rem;font-weight:800}
-body.px-standalone-globe .site-menu__nav{display:grid;gap:1.1rem;margin-top:1.35rem}body.px-standalone-globe .site-menu__group{display:grid;gap:.12rem}body.px-standalone-globe .site-menu__label{margin:0 0 .25rem .15rem;color:#59636c;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-body.px-standalone-globe .site-menu__group a,body.px-standalone-globe .site-menu__group button{display:flex;align-items:center;min-height:2.55rem;padding:.5rem .65rem;border:0;border-radius:.65rem;color:#1b2025;background:transparent;font:inherit;font-size:.84rem;text-align:left;text-decoration:none;cursor:pointer}
-body.px-standalone-globe .site-menu__group :is(a,button):is(:hover,:focus-visible){color:#b83f34;background:#e7544512}
-body.px-standalone-globe .site-settings{width:min(31rem,calc(100% - 2rem));margin:auto;padding:1.2rem;border:0;border-radius:1.15rem;color:#1b2025;background:#fff;box-shadow:0 24px 70px rgba(27,32,37,.22)}
-body.px-standalone-globe .site-settings::backdrop{background:rgba(16,24,30,.34)}body.px-standalone-globe .site-settings section h3{margin-bottom:.65rem;font-size:1.1rem}body.px-standalone-globe .site-settings section p{color:#59636c;font-size:.8rem;line-height:1.7}
-body.px-standalone-globe .site-settings__switch{display:flex;align-items:start;gap:.7rem;padding:.85rem;border-radius:.85rem;background:#f1f2ef;cursor:pointer}body.px-standalone-globe .site-settings__switch input{flex:0 0 auto;width:1.1rem;height:1.1rem;margin:.1rem 0 0;accent-color:#e75445}body.px-standalone-globe .site-settings__switch span{display:grid;gap:.22rem}body.px-standalone-globe .site-settings__switch small{color:#59636c;font-size:.72rem;line-height:1.5}
-body.px-standalone-globe .site-settings section .button{margin-top:.8rem;min-height:44px;font-size:.76rem}body.px-standalone-globe .site-settings__status{min-height:1.2rem;margin:.65rem 0 0;color:#b83f34!important}body.px-standalone-globe .site-settings__actions{display:flex;justify-content:end;margin-top:1.25rem}body.px-standalone-globe .site-settings__actions .button{min-height:44px}
+body .site-menu-backdrop{position:fixed;inset:0;z-index:159;background:rgba(16,24,30,.3)}
+body .site-menu-backdrop[hidden],body .site-menu[hidden]{display:none}
+body .site-menu{position:fixed;top:0;right:0;bottom:0;z-index:160;display:grid;align-content:start;width:min(22.5rem,100vw);padding:1.4rem 1.25rem calc(6rem + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;color:#1b2025;background:rgba(247,248,246,.98);box-shadow:-18px 0 45px rgba(27,32,37,.12);animation:pixieed-menu-in .24s cubic-bezier(.2,.7,.2,1) both}
+body :is(.site-menu__head,.site-settings__head){display:flex;align-items:start;justify-content:space-between;gap:1rem;margin-bottom:1.1rem}
+body :is(.site-menu__head h2,.site-settings__head h2){margin:.15rem 0 0;font-size:1.55rem}
+body :is(.site-menu__close,.site-settings__close){display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;color:#59636c;background:#e9eceb;font-size:1.35rem;line-height:1;cursor:pointer}
+body .site-menu__profile{display:flex;align-items:center;gap:.75rem;min-height:4.3rem;padding:.75rem;border-radius:1rem;color:inherit;background:#e9eceb;text-decoration:none}
+body .site-menu__profile>span:nth-child(2){display:grid;flex:1;gap:.18rem}body .site-menu__profile strong{font-size:.9rem}body .site-menu__profile small{color:#59636c;font-size:.72rem}
+body .site-menu__avatar{display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:.65rem;color:#fff;background:#e75445;font-size:.82rem;font-weight:800}
+body .site-menu__nav{display:grid;gap:1.1rem;margin-top:1.35rem}body .site-menu__group{display:grid;gap:.12rem}body .site-menu__label{margin:0 0 .25rem .15rem;color:#59636c;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+body .site-menu__group a,body .site-menu__group button{display:flex;align-items:center;min-height:2.55rem;padding:.5rem .65rem;border:0;border-radius:.65rem;color:#1b2025;background:transparent;font:inherit;font-size:.84rem;text-align:left;text-decoration:none;cursor:pointer}
+body .site-menu__group :is(a,button):is(:hover,:focus-visible){color:#b83f34;background:#e7544512}
+body .site-settings{width:min(31rem,calc(100% - 2rem));margin:auto;padding:1.2rem;border:0;border-radius:1.15rem;color:#1b2025;background:#fff;box-shadow:0 24px 70px rgba(27,32,37,.22)}
+body .site-settings::backdrop{background:rgba(16,24,30,.34)}body .site-settings section h3{margin-bottom:.65rem;font-size:1.1rem}body .site-settings section p{color:#59636c;font-size:.8rem;line-height:1.7}
+body .site-settings__switch{display:flex;align-items:start;gap:.7rem;padding:.85rem;border-radius:.85rem;background:#f1f2ef;cursor:pointer}body .site-settings__switch input{flex:0 0 auto;width:1.1rem;height:1.1rem;margin:.1rem 0 0;accent-color:#e75445}body .site-settings__switch span{display:grid;gap:.22rem}body .site-settings__switch small{color:#59636c;font-size:.72rem;line-height:1.5}
+body .site-settings section .button{margin-top:.8rem;min-height:44px;font-size:.76rem}body .site-settings__status{min-height:1.2rem;margin:.65rem 0 0;color:#b83f34!important}body .site-settings__actions{display:flex;justify-content:end;margin-top:1.25rem}body .site-settings__actions .button{min-height:44px}
 .px-site-header :is(a,button,summary):focus-visible{outline:3px solid #357bb3;outline-offset:2px}
 .px-site-header .px-header-utilities{flex:none}
 .px-header-ready [data-pass-slot]{display:none!important}
@@ -229,3 +230,32 @@ body[data-page="map"] :is(.site-menu__close,.site-settings__close){flex:0 0 44px
 
 /* Menu navigation uses the same thumb-sized targets as the shared toolbar. */
 body .site-menu .site-menu__group :is(a,button){min-height:44px}
+
+/* The fixed header keeps the same height; its page entry has a visible name. */
+body .px-site-header .menu-toggle{display:flex;justify-content:center;gap:7px;width:auto!important;flex:0 0 auto;padding-inline:10px}
+body .px-site-header .menu-toggle__lines{flex:none;width:24px}
+body .px-site-header .menu-toggle__label{font:650 12px/1 system-ui,sans-serif;white-space:nowrap}
+body .site-menu__nav{margin-top:0}
+body .site-menu__group a{display:flex;justify-content:space-between;gap:8px}
+body .site-menu__current{flex:none;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+body .site-menu__current[hidden]{display:none}
+body .site-menu__group a[aria-current="page"]{font-weight:700;background:#2588bb12}
+body .site-menu__utilities{border-top:1px solid #1b202520;margin-top:16px;padding-top:12px}
+body .site-menu__utilities button{display:flex;flex-direction:column;align-items:flex-start;width:100%;gap:4px;border:0;background:#e9eceb;color:#1b2025;font:600 14px/1.4 system-ui,sans-serif;cursor:pointer}
+body .site-menu__utilities button span{font-size:11px;font-weight:400}
+body .app-tabs--work{display:flex;justify-content:center;gap:8px}
+body .app-tabs--work[hidden]{display:none!important}
+body .app-tabs--work > :is(a,button){width:auto!important;min-width:44px!important;flex:0 1 auto;padding-inline:12px!important}
+
+/* Adapt existing catalog/event/output headers instead of inserting a second row. */
+body .px-site-header .site-nav,body .event-site-header.px-site-header > nav{display:none}
+@media(max-width:600px){body .catalog-header .px-header-inner > p,body .output-header.px-site-header .output-header__label{display:none}}
+
+/* Legacy Lens keeps its existing HUD row and full camera viewport. */
+body .hud-top__bar.px-site-header.px-header-inner{min-height:44px;padding:0;gap:6px}
+body .hud-top__bar.px-site-header .hud-top__actions{min-width:44px;flex:0 1 auto;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+body .hud-top__bar.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;background:#111923d9}
+
+body .hud-top__bar.px-site-header .menu-toggle{pointer-events:auto}
+body .pc-header.px-site-header.px-header-inner{width:auto;min-height:44px;padding:0;gap:6px}
+body .pc-header.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;background:#111923d9}
