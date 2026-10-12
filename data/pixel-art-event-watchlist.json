@@ -45,10 +45,12 @@
       "id": "region-23d678706afded83",
       "label": "オーストラリア",
       "eventIds": [
+        "sydney-haymarket-pixel-art-workshop-2026-10-20",
         "syntax-demoparty-pixel-art-2026"
       ],
       "areas": [
-        "Melbourne"
+        "Melbourne",
+        "Sydney / Haymarket"
       ]
     },
     {
@@ -175,11 +177,19 @@
         "chateaubourg-pixel-art-workshop-2026-10-07",
         "herofestival-marseille-dendrob-pixel-art-2026",
         "ingwiller-maison-famille-pixel-art-2026-11-04",
+        "la-bourboule-pixel-art-serigraphie-2026-11-07",
+        "lyon-pixel-art-graffiti-la-duchere-2026-11-25",
+        "lyon-pixel-art-graffiti-part-dieu-2026-11-07",
+        "lyon-pixel-art-graffiti-saint-rambert-2026-10-21",
         "riedisheim-en-pixel-closing-2026"
       ],
       "areas": [
         "Châteaubourg",
         "Ingwiller",
+        "La Bourboule",
+        "Lyon",
+        "Lyon / Part-Dieu",
+        "Lyon / Saint-Rambert",
         "Marseille",
         "Riedisheim"
       ]
@@ -240,6 +250,16 @@
         "港区・南青山",
         "港区・赤坂",
         "足立区・北千住"
+      ]
+    },
+    {
+      "id": "region-d5af60fa162e1724",
+      "label": "スロベニア",
+      "eventIds": [
+        "pixxelpoint-pixel-art-workshop-2026-10-21"
+      ],
+      "areas": [
+        "Nova Gorica"
       ]
     },
     {
@@ -352,6 +372,18 @@
       ]
     },
     {
+      "id": "venue-0dd158e95109a0a7",
+      "label": "Akademija umetnosti Univerze v Novi Gorici（Nova Gorica School of Arts）",
+      "eventIds": [
+        "pixxelpoint-pixel-art-workshop-2026-10-21"
+      ],
+      "region": "スロベニア",
+      "area": "Nova Gorica",
+      "sourceUrls": [
+        "https://www.pixxelpoint.org/artists.html"
+      ]
+    },
+    {
       "id": "venue-126377f1b75608ce",
       "label": "NOVA FCT図書館 Auditório（Piso -1）／Sala Estúdio（Piso 0）",
       "eventIds": [
@@ -385,6 +417,18 @@
       "area": "渋谷・原宿",
       "sourceUrls": [
         "https://pixel-art.jp/spa2023/"
+      ]
+    },
+    {
+      "id": "venue-187f08825e881838",
+      "label": "Bibliothèque du 9e la Duchère（4 place Gisèle Halimi, 69009 Lyon）",
+      "eventIds": [
+        "lyon-pixel-art-graffiti-la-duchere-2026-11-25"
+      ],
+      "region": "フランス",
+      "area": "Lyon",
+      "sourceUrls": [
+        "https://www.bm-lyon.fr/agenda/pixel-art-graffiti-0"
       ]
     },
     {
@@ -444,6 +488,18 @@
       ]
     },
     {
+      "id": "venue-1fcb95eddbed30f8",
+      "label": "Bibliothèque de Saint-Rambert",
+      "eventIds": [
+        "lyon-pixel-art-graffiti-saint-rambert-2026-10-21"
+      ],
+      "region": "フランス",
+      "area": "Lyon / Saint-Rambert",
+      "sourceUrls": [
+        "https://www.bm-lyon.fr/agenda/pixel-art-graffiti-0"
+      ]
+    },
+    {
       "id": "venue-214a176d78463b43",
       "label": "スペース七番（錦2-7-7 オリマチ錦2-A）",
       "eventIds": [
@@ -466,6 +522,18 @@
       "area": "ソウル特別市・龍山区・梨泰院",
       "sourceUrls": [
         "https://www.jumpzip.net/"
+      ]
+    },
+    {
+      "id": "venue-2c444dd70ac85c6d",
+      "label": "Médiathèque La Bourboule（Avenue Guillaume-Duliège, 63150 La Bourboule）",
+      "eventIds": [
+        "la-bourboule-pixel-art-serigraphie-2026-11-07"
+      ],
+      "region": "フランス",
+      "area": "La Bourboule",
+      "sourceUrls": [
+        "https://www.sancy.com/fr/fiche/fete-et-manifestation/animation-atelier-pixel-art-serigraphie-la-bourboule-festival-connexions-2026-la-bourboule_TFO7996777/"
       ]
     },
     {
@@ -505,6 +573,18 @@
       ]
     },
     {
+      "id": "venue-347a140e4788d18f",
+      "label": "Darling Square Library（Levels 1 and 2, The Exchange, 1 Little Pier Street, Haymarket NSW 2000）",
+      "eventIds": [
+        "sydney-haymarket-pixel-art-workshop-2026-10-20"
+      ],
+      "region": "オーストラリア",
+      "area": "Sydney / Haymarket",
+      "sourceUrls": [
+        "https://whatson.cityofsydney.nsw.gov.au/events/v2homeschool-maker-time-laser-cut-from-nature-12-16yrsv2"
+      ]
+    },
+    {
       "id": "venue-361d285c14e30c4b",
       "label": "Shibuya Sakura Stage 4階 404 Not Found",
       "eventIds": [
@@ -526,6 +606,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://tryme12.2-d.jp/12/"
+      ]
+    },
+    {
+      "id": "venue-54c350e68479a8e7",
+      "label": "Bibliothèque de la Part-Dieu",
+      "eventIds": [
+        "lyon-pixel-art-graffiti-part-dieu-2026-11-07"
+      ],
+      "region": "フランス",
+      "area": "Lyon / Part-Dieu",
+      "sourceUrls": [
+        "https://www.bm-lyon.fr/agenda/pixel-art-graffiti-0"
       ]
     },
     {
@@ -1104,7 +1196,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1517,6 +1609,31 @@
       }
     },
     {
+      "id": "source-2386c04f39b4b8de",
+      "label": "Homeschool maker time: Pixel art（公式タイトル10–15歳、本文12–16歳）",
+      "eventIds": [
+        "sydney-haymarket-pixel-art-workshop-2026-10-20"
+      ],
+      "url": "https://whatson.cityofsydney.nsw.gov.au/events/v2homeschool-maker-time-laser-cut-from-nature-12-16yrsv2",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "オーストラリア"
+      ],
+      "areas": [
+        "Sydney / Haymarket"
+      ],
+      "venues": [
+        "Darling Square Library（Levels 1 and 2, The Exchange, 1 Little Pier Street, Haymarket NSW 2000）"
+      ],
+      "lastKnownEventDate": "2026-10-20",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-12T00:02:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-242724d6da743f33",
       "label": "バリアフリーおもちゃ博 in のぼりべつ — 立体ドット絵の共同制作",
       "eventIds": [
@@ -1839,7 +1956,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1865,6 +1982,37 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-07T00:46:29+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-4588cbc7b8fd1017",
+      "label": "Pixel Art & graffiti — Saint-Rambert開催回",
+      "eventIds": [
+        "lyon-pixel-art-graffiti-la-duchere-2026-11-25",
+        "lyon-pixel-art-graffiti-part-dieu-2026-11-07",
+        "lyon-pixel-art-graffiti-saint-rambert-2026-10-21"
+      ],
+      "url": "https://www.bm-lyon.fr/agenda/pixel-art-graffiti-0",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Lyon",
+        "Lyon / Part-Dieu",
+        "Lyon / Saint-Rambert"
+      ],
+      "venues": [
+        "Bibliothèque de Saint-Rambert",
+        "Bibliothèque de la Part-Dieu",
+        "Bibliothèque du 9e la Duchère（4 place Gisèle Halimi, 69009 Lyon）"
+      ],
+      "lastKnownEventDate": "2026-11-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-12T00:01:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2081,7 +2229,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2182,7 +2330,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:06:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2235,7 +2383,7 @@
       "lastKnownEventDate": "2026-10-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:02:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2678,7 +2826,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2756,6 +2904,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-7a13aa2bae0f759e",
+      "label": "Pixxelpoint 2026 — Pixel-artワークショップ（Marko Drpić / tipoRenesansa）",
+      "eventIds": [
+        "pixxelpoint-pixel-art-workshop-2026-10-21"
+      ],
+      "url": "https://www.pixxelpoint.org/artists.html",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スロベニア"
+      ],
+      "areas": [
+        "Nova Gorica"
+      ],
+      "venues": [
+        "Akademija umetnosti Univerze v Novi Gorici（Nova Gorica School of Arts）"
+      ],
+      "lastKnownEventDate": "2026-10-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-12T00:01:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3230,7 +3403,7 @@
       "lastKnownEventDate": "2026-11-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3858,7 +4031,7 @@
       "lastKnownEventDate": "2026-10-10",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:06:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3947,6 +4120,31 @@
       }
     },
     {
+      "id": "source-d3d24fc5b29c1a89",
+      "label": "Atelier Pixel Art / Sérigraphie — Festival Connexions 2026",
+      "eventIds": [
+        "la-bourboule-pixel-art-serigraphie-2026-11-07"
+      ],
+      "url": "https://www.sancy.com/fr/fiche/fete-et-manifestation/animation-atelier-pixel-art-serigraphie-la-bourboule-festival-connexions-2026-la-bourboule_TFO7996777/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "La Bourboule"
+      ],
+      "venues": [
+        "Médiathèque La Bourboule（Avenue Guillaume-Duliège, 63150 La Bourboule）"
+      ],
+      "lastKnownEventDate": "2026-11-07",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-d4a17eb54e781372",
       "label": "Segment Pixel Jam 2026",
       "eventIds": [
@@ -3963,7 +4161,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-10T00:02:53+00:00",
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4124,8 +4322,8 @@
       "lastKnownEventDate": "2026-11-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-08T23:58:48+00:00",
-        "notes": "公式イベント本文を今回再確認。"
+        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -4606,5 +4804,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-11T00:06:55+00:00"
+  "updatedAt": "2026-10-12T00:07:04+00:00"
 }
