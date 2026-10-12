@@ -1,11 +1,11 @@
 import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261011-legacy-frames-1';
 import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs';
-import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261011-shared-music-2';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
-import { composeAnimationFrame } from './animation-core.mjs';
-import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261011-legacy-frames-1';
+import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261012-animation-core-contract-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
+import { composeAnimationFrame } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
 import { documentRgba } from './draw-core.mjs';
-import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261011-legacy-frames-1';
+import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1';
 import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs';
 import { setPxdJson } from './pxd-codec.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';

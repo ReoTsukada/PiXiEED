@@ -1,7 +1,7 @@
 import { getAudioColorInstrument } from './audio-core.mjs?rev=20261005-audio-color-instruments-1';
-import { setAnimationPalette } from './animation-core.mjs';
-import { validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261001-audio-animation-1';
-import { validatePxdAudioBinding } from './pxd-draw-audio.mjs?rev=20261005-audio-color-instruments-1';
+import { setAnimationPalette } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
+import { validatePxdAudioBinding } from './pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1';
 import { hexToHsl, hslToHex } from './color-utils.mjs?rev=20261004-symmetry-color-panel-1';
 
 const rgbaPattern = /^rgba-([\da-f]{8})$/i;

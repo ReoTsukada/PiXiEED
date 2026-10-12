@@ -1,4 +1,4 @@
-import { canvasResizeOffset } from './animation-core.mjs';
+import { canvasResizeOffset } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs';
 
 /** Resize transient editor coordinates using the same sampling as the pixel operation.

@@ -3,8 +3,8 @@ import {
   describeDrawMusicProjection,
   getDrawMusicPageDocument, moveDrawMusicPage, projectDrawMusic, removeDrawMusicPage,
   selectDrawMusicPage, writeDrawMusicProject
-} from './draw-music-core.mjs';
-import { planSharedProjectSettings } from './shared-project-core.mjs';
+} from './draw-music-core.mjs?rev=20261012-animation-core-contract-1';
+import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261012-animation-core-contract-1';
 import { setPxdJson } from './pxd-codec.mjs';
 
 const AUDIO_STATE_PATH = 'audio/state.json';

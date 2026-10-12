@@ -1,8 +1,8 @@
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
 import { imageToDrawDocument, putPxdDrawDocument, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
-import { cloneAnimation, composeAnimationFrame } from './animation-core.mjs';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
+import { cloneAnimation, composeAnimationFrame } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 export const COMPONENTS = Object.freeze([
   { tool: 'draw', label: '絵', role: 'main' },
@@ -42,7 +42,7 @@ export async function freezeProjectComponents(project, { resolveSourceImage } = 
     next = await freezePxdPuzzleImages(next, { resolveSourceImage: resolve });
   }
   if (!has(next, 'audio/state.json')) { readPxdAudioLink(next); return next; }
-  const { detachPxdAudioImage } = await import('./pxd-draw-audio.mjs?rev=20261006-draw-startup-1');
+  const { detachPxdAudioImage } = await import('./pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1');
   return detachPxdAudioImage(next);
 }
 
@@ -51,7 +51,7 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   if (!hasProjectComponent(project, tool) || tool === 'draw') throw new Error('先に曲やパズルを作ってください。');
   let next = await freezeProjectComponents(project);
   if (tool === 'audio') {
-    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261006-draw-startup-1'), import('./audio-animation.mjs')]);
+    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1'), import('./audio-animation.mjs?rev=20261012-animation-core-contract-1')]);
     const song = readPxdAudioState(next); const link = readPxdAudioLink(next);
     const animation = await readPxdAnimation(next, componentImageRole(next, 'draw'));
     if (animation) {

@@ -1,7 +1,7 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261011-polish-1';
+import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261012-animation-core-contract-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261011-shared-music-2';
+import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261012-animation-core-contract-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261011-black-motion-2';
 
 

@@ -1,5 +1,5 @@
-import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, writeAnimationCel, setAnimationPalette } from './animation-core.mjs';
-import { createDrawAnimationHistory } from './draw-animation-history.mjs';
+import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261012-animation-core-contract-1';
 import { validateDrawDocument } from './draw-core.mjs';
 
 /** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */

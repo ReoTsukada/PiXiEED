@@ -1,4 +1,4 @@
-import { composeAnimationFrame } from './animation-core.mjs';
+import { composeAnimationFrame } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 const PRESETS = [16, 32, 64, 128, 256];
 const ASPECTS = [['free', '自由'], ['1:1', '1:1'], ['3:4', '3:4'], ['9:16', '9:16'], ['4:3', '4:3'], ['16:9', '16:9']];

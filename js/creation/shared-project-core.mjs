@@ -1,4 +1,4 @@
-import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized } from './animation-core.mjs';
+import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 const normalized = color => color.toLowerCase().slice(0, 7);
 const rgb = color => [1, 3, 5].map(at => parseInt(color.slice(at, at + 2), 16));

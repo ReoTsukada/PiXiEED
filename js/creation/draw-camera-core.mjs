@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_COLORS } from './animation-core.mjs';
+import { ANIMATION_MAX_COLORS } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 /** Keep the whole artwork within 32 used colours, including remaining transparency. */
 export function chooseCameraPalette(doc, mask, otherUsedIndices = []) {

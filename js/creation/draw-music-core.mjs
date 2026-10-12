@@ -1,16 +1,16 @@
-import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport } from './audio-animation.mjs?rev=20261011-legacy-frames-1';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
 import {
   AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, createAudioRowPitchMap, createAudioSong,
   setAudioColorInstrument, setAudioTempo, validateAudioSong
 } from './audio-core.mjs?rev=20261011-legacy-frames-1';
-import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261011-legacy-frames-1';
+import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1';
 import { documentRgba } from './draw-core.mjs';
 import { getPxdJson, setPxdJson } from './pxd-codec.mjs';
 import { readPxdImage, readPxdSharedImage } from './pxd-project.mjs';
 import { addAnimationFrame, composeAnimationFrame, createAnimation, createAnimationFromSerialized,
   getAnimationCelDocument, moveAnimationFrame, removeAnimationFrame, serializeAnimationPool,
-  resizeAnimation, validateAnimation, writeAnimationCel } from './animation-core.mjs';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs';
+  resizeAnimation, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
 
 const colorId = (color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}`;
 const clone = (value) => structuredClone(value);

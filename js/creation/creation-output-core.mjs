@@ -1,4 +1,4 @@
-import { composeAnimationFrame, setLayerProperties } from './animation-core.mjs';
+import { composeAnimationFrame, setLayerProperties } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 /** Compose an export image without changing the saved layer visibility. */
 export function composeOutputFrame(animation, frameId, { includeMusic = false } = {}) {

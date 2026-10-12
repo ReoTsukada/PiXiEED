@@ -1,4 +1,4 @@
-import { estimateRetainedAnimationBytes, validateAnimation } from './animation-core.mjs';
+import { estimateRetainedAnimationBytes, validateAnimation } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 export const DRAW_ANIMATION_HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 

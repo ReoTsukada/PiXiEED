@@ -1,6 +1,6 @@
 import { centerCrop } from '../pixel-studio/framing.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261011-polish-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261012-animation-core-contract-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
 function scopedRules(rules) {
@@ -147,7 +147,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   };
   let unsubscribeDraw = null;
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261011-camera-target-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261012-animation-core-contract-1');
   assertCurrent();
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,
     initialProjectSettings: readProjectSettings(),

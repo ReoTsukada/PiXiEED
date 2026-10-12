@@ -1,4 +1,4 @@
-import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261001-free-tools-1';
+import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261012-animation-core-contract-1';
 import { readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 
 const shapes = {

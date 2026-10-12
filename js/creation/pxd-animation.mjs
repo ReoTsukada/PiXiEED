@@ -1,5 +1,5 @@
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson, PXD_MAX_BYTES } from './pxd-codec.mjs';
-import { ANIMATION_METADATA_BUDGET, ANIMATION_PIXEL_BUDGET, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, serializeAnimationPool, validateAnimation } from './animation-core.mjs';
+import { ANIMATION_METADATA_BUDGET, ANIMATION_PIXEL_BUDGET, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 
 const encoder = new TextEncoder();
 const rolePattern = /^[a-z][a-z0-9-]{0,47}$/;

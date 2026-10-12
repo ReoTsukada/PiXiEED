@@ -1,7 +1,7 @@
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261011-unified-project-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261011-tool-size-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261011-polish-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261012-animation-core-contract-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261012-animation-core-contract-1';
 
 const scope = createModeScope();
 let modes = null, starting = true;
@@ -32,7 +32,7 @@ try {
       onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
   try {
-    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261012-page-roles-1');
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261012-animation-core-contract-1');
     if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
   } catch (error) {
     delete document.documentElement.dataset.creationStartup;

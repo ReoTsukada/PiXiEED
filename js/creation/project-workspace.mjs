@@ -1,11 +1,11 @@
 import { createPxdProject, decodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261001-free-tools-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261011-unified-project-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261012-animation-core-contract-1';
 import { createProjectSession } from './project-session.mjs?rev=20261001-free-tools-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261001-free-tools-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
-import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261011-unified-project-1';
+import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261012-animation-core-contract-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';

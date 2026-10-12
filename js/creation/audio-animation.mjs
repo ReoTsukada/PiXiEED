@@ -1,4 +1,4 @@
-import { composeAnimationFrame, getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs';
+import { composeAnimationFrame, getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 import {
   AUDIO_PPQ, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_TICKS, AUDIO_SHARED_IMAGE_MAX_DIMENSION,
   createAudioRowPitchMap, extendAudioLoopForImage, validateAudioSong
