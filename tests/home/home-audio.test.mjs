@@ -89,3 +89,48 @@ test('failed context creation or resume reports unavailable and does not report 
   assert.equal(audio.state, 'unavailable'); assert.equal(audio.canPlay(), false);
   assert.equal(f.calls.values.at(-1), 0);
 });
+
+test('opt-in visible restoration resumes only audio authorized by a gesture', async () => {
+  const f = fakeContext(); let created = 0;
+  const audio = createHomeAudio({ resumeOnVisible: true, createContext: () => { created++; return f.ctx; } });
+  audio.setVisible(false); audio.setVisible(true);
+  assert.equal(created, 0); assert.equal(f.calls.resume, 0, 'initial restoration cannot unlock audio');
+  await audio.activateFromGesture();
+  audio.setVisible(false); assert.equal(f.calls.values.at(-1), 0);
+  audio.setVisible(true); await Promise.resolve(); await Promise.resolve();
+  assert.equal(f.calls.resume, 2); assert.equal(audio.canPlay(), true);
+  audio.setVisible(true); assert.equal(f.calls.resume, 2, 'same visibility does not repeat resume');
+  audio.stop(); audio.setVisible(false); audio.setVisible(true);
+  assert.equal(f.calls.resume, 2); assert.equal(audio.canPlay(), false, 'explicit pause stays paused');
+});
+
+test('a blocked automatic restoration can recover on the next gesture', async () => {
+  let attempts = 0;
+  const f = fakeContext({ resume: () => ++attempts === 2 ? Promise.reject(new Error('gesture required')) : Promise.resolve() });
+  const audio = createHomeAudio({ resumeOnVisible: true, createContext: () => f.ctx });
+  await audio.activateFromGesture(); audio.setVisible(false); audio.setVisible(true);
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(audio.state, 'standby'); assert.equal(audio.canPlay(), false);
+  assert.equal(await audio.activateFromGesture(), true);
+  assert.equal(audio.canPlay(), true);
+});
+
+test('stopping during an automatic restoration keeps output muted', async () => {
+  let release; let attempts = 0;
+  const f = fakeContext({ resume: () => ++attempts === 2 ? new Promise(r => { release = r; }) : Promise.resolve() });
+  const audio = createHomeAudio({ resumeOnVisible: true, createContext: () => f.ctx });
+  await audio.activateFromGesture(); audio.setVisible(false); audio.setVisible(true); audio.stop();
+  release(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(audio.state, 'stopped'); assert.equal(audio.canPlay(), false); assert.equal(f.calls.values.at(-1), 0);
+});
+
+test('a stale automatic rejection cannot mute a newer gesture activation', async () => {
+  let rejectOld; let attempts = 0;
+  const f = fakeContext({ resume: () => ++attempts === 2 ? new Promise((_, reject) => { rejectOld = reject; }) : Promise.resolve() });
+  const audio = createHomeAudio({ resumeOnVisible: true, createContext: () => f.ctx });
+  await audio.activateFromGesture(); audio.setVisible(false); audio.setVisible(true);
+  assert.equal(await audio.activateFromGesture(), true);
+  rejectOld(new Error('old restoration blocked'));
+  await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+  assert.equal(audio.canPlay(), true); assert.equal(f.calls.values.at(-1), .55);
+});

@@ -185,10 +185,12 @@ test('motion shakes only after permission and valid samples; a delayed tilt can 
   noData.calls.timers.at(-1).fn();
   assert.equal(noData.controller.state.enabled, true);
   assert.equal(noData.controller.state.running, true);
-  assert.match(noData.status.textContent, /端末を傾けてください/);
+  assert.match(noData.status.textContent, /傾き情報を取得できません.*タッチ/);
+  assert.equal(noData.controller.state.sawSample, false, 'API presence does not prove sensor availability');
   assert.equal(noData.button.getAttribute('aria-label'), 'ジャイロをオフ');
   noData.target.emit('deviceorientation', { beta: 0, gamma: 0 });
   noData.target.emit('deviceorientation', { beta: 0, gamma: 20 });
+  assert.equal(noData.controller.state.sawSample, true);
   assert.match(noData.status.textContent, /傾けて遊ぶ/);
   noData.button.click();
   assert.equal(noData.controller.state.enabled, false, 'the user can turn off after waiting');
@@ -204,7 +206,30 @@ test('destroy during unresolved permission cannot attach sensors when it resolve
   assert.equal(h.controller.state.enabled, false);
 });
 
-test('unsupported devices hide the gyro control', () => {
-  const button = new FakeButton(); const controller = createHomeMotion({ orientation: null, button });
+test('unsupported devices hide the gyro control and explain the touch alternative', () => {
+  const button = new FakeButton(); const status = { textContent: '' }; const controller = createHomeMotion({ orientation: null, button, status });
   assert.equal(controller.supported, false); assert.equal(button.hidden, true);
+  assert.match(status.textContent, /傾きを利用できません.*タッチ/);
+});
+
+test('permission resolving after pagehide waits for pageshow before attaching sensors', async () => {
+  let resolveOrientation;
+  const h = harness({ orientationPermission: () => new Promise((resolve) => { resolveOrientation = resolve; }) });
+  h.button.click(); h.target.emit('pagehide'); resolveOrientation('granted'); await waitTurn();
+  assert.equal(h.controller.state.enabled, true);
+  assert.equal(h.target.count('deviceorientation'), 0);
+  h.controller.setVisible();
+  assert.equal(h.target.count('deviceorientation'), 0, 'viewport changes cannot restart a page that has been hidden');
+  h.target.emit('pageshow');
+  assert.equal(h.target.count('deviceorientation'), 1);
+  h.controller.destroy();
+});
+
+test('document visibility stops sensors even if a custom visibility callback stays true', async () => {
+  const h = harness(); h.button.click(); await waitTurn();
+  h.doc.visibilityState = 'hidden'; h.doc.emit('visibilitychange');
+  assert.equal(h.controller.state.running, false);
+  h.doc.visibilityState = 'visible'; h.doc.emit('visibilitychange');
+  assert.equal(h.controller.state.running, true);
+  h.controller.destroy();
 });

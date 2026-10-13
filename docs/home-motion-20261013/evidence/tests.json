@@ -1,0 +1,23 @@
+{
+  "related": {
+    "tests": 78,
+    "passed": 78,
+    "failed": 0
+  },
+  "full": {
+    "files": 288,
+    "tests": 1984,
+    "passed": 1981,
+    "failed": 3,
+    "failures": [
+      "tests/site/event-pages.test.mjs:13 (113 != 108)",
+      "tests/site/event-pages.test.mjs:104 (summary counts 113/96 != 108/92)",
+      "tests/site/event-pages.test.mjs:111 (96 != 92)"
+    ]
+  },
+  "syntax": "PASS",
+  "diffCheck": "PASS",
+  "physicalAndroid": "UNTESTED",
+  "commitPushPublish": "Not performed during local verification; explicitly authorized afterwards.",
+  "specification": "Home hero autoplays in normal/reduced motion; previously gesture-authorized audio resumes on visibility restoration."
+}

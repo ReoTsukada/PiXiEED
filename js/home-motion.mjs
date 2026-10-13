@@ -35,7 +35,8 @@ export function createHomeMotion({
   let enabled = false; let running = false; let permission = { orientation: false, motion: false };
   let smoothed = 0; let gravity = { x: 0, y: 1 }; let smoothedGravity = null; let lastEuler = null; let sampleTimer = 0; let sawSample = false; let lastStatus = ''; let pending = false; let disposed = false;
   let previousAcceleration = null; let lastShake = 0; let motionListening = false;
-  let activationConsumed = false;
+  let activationConsumed = false; let pageHidden = false;
+  const canRun = () => !pageHidden && document?.visibilityState !== 'hidden' && isVisible();
 
   const setStatus = (message) => { if (status && lastStatus !== message) { status.textContent = message; lastStatus = message; } };
   const setBusy = (busy) => button?.setAttribute('aria-busy', String(busy));
@@ -91,7 +92,7 @@ export function createHomeMotion({
     running = false; previousAcceleration = null; lastEuler = null; clearTimer(sampleTimer); sampleTimer = 0; resetBaseline();
   }
   function start() {
-    if (!enabled || running || !isVisible()) return;
+    if (!enabled || running || !canRun()) return;
     running = true; sawSample = false; resetBaseline();
     target.addEventListener('deviceorientation', handleOrientation, { passive: true });
     if (permission.motion && !motionListening) {
@@ -102,11 +103,11 @@ export function createHomeMotion({
     sampleTimer = setTimer(() => {
       if (!running || sawSample) return;
       sampleTimer = 0;
-      setStatus('端末を傾けてください');
+      setStatus('傾き情報を取得できません。タッチで描いて遊べます。');
     }, 3000);
   }
   function syncVisibility() {
-    if (enabled && isVisible()) start();
+    if (enabled && canRun()) start();
     else { stop(); if (enabled) setStatus('画面外では一時停止中'); }
   }
   function handleScreenChange() {
@@ -145,7 +146,7 @@ export function createHomeMotion({
     }
     if (!permission.orientation) {
       enabled = false; setPressed(false);
-      setStatus(alwaysOn ? '端末の動きを許可してください' : '許可が必要です');
+      setStatus(alwaysOn ? '端末の動きを許可してください。タッチでも遊べます。' : '傾きの許可が必要です。タッチで描いて遊べます。');
       return;
     }
     enabled = true; setPressed(true);
@@ -178,7 +179,9 @@ export function createHomeMotion({
     await requestPermissions();
   }
 
-  if (!supported) { if (button) button.hidden = true; }
+  const onPageHide = () => { pageHidden = true; syncVisibility(); };
+  const onPageShow = () => { pageHidden = false; syncVisibility(); };
+  if (!supported) { if (button) button.hidden = true; setStatus('このブラウザーでは傾きを利用できません。タッチで描いて遊べます。'); }
   else {
     button?.addEventListener('click', handleButton);
     if (alwaysOn) {
@@ -198,14 +201,14 @@ export function createHomeMotion({
     document?.addEventListener?.('visibilitychange', syncVisibility);
     screen?.orientation?.addEventListener?.('change', handleScreenChange);
     target.addEventListener('orientationchange', handleScreenChange, { passive: true });
-    target.addEventListener('pagehide', stop);
-    target.addEventListener('pageshow', syncVisibility);
+    target.addEventListener('pagehide', onPageHide);
+    target.addEventListener('pageshow', onPageShow);
   }
   return {
     supported,
     activate: handleActivation,
     setVisible: syncVisibility,
-    destroy() { disposed = true; enabled = false; stop(); button?.removeEventListener('click', handleButton); activationTarget?.removeEventListener?.('pointerup', handleActivation, true); activationTarget?.removeEventListener?.('click', handleActivation, true); document?.removeEventListener?.('visibilitychange', syncVisibility); screen?.orientation?.removeEventListener?.('change', handleScreenChange); target.removeEventListener('orientationchange', handleScreenChange); target.removeEventListener('pagehide', stop); target.removeEventListener('pageshow', syncVisibility); },
-    get state() { return { enabled, running, permission: { ...permission }, tilt: smoothed, gravity: { ...gravity } }; },
+    destroy() { disposed = true; enabled = false; stop(); button?.removeEventListener('click', handleButton); activationTarget?.removeEventListener?.('pointerup', handleActivation, true); activationTarget?.removeEventListener?.('click', handleActivation, true); document?.removeEventListener?.('visibilitychange', syncVisibility); screen?.orientation?.removeEventListener?.('change', handleScreenChange); target.removeEventListener('orientationchange', handleScreenChange); target.removeEventListener('pagehide', onPageHide); target.removeEventListener('pageshow', onPageShow); },
+    get state() { return { enabled, running, sawSample, permission: { ...permission }, tilt: smoothed, gravity: { ...gravity } }; },
   };
 }

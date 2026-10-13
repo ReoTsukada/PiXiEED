@@ -1,0 +1,129 @@
+{
+  "browser": "151.0.7922.34",
+  "physicalAndroid": "UNTESTED",
+  "scenarios": [
+    {
+      "name": "published-source-reproduction",
+      "result": "PASS: reduced motion freezes pixels while audio runs"
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "preference": "reduce",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "preference": "no-preference",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "preference": "reduce",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "preference": "no-preference",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "preference": "reduce",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "preference": "no-preference",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "preference": "reduce",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "preference": "no-preference",
+      "result": "PASS",
+      "touch": true,
+      "syntheticTilt": true,
+      "cycles": 3,
+      "lifecycle": true
+    },
+    {
+      "sensor": "unsupported",
+      "storedPreference": true,
+      "observerFallback": true,
+      "result": "PASS"
+    },
+    {
+      "sensor": "denied",
+      "storedPreference": true,
+      "observerFallback": true,
+      "result": "PASS"
+    },
+    {
+      "sensor": "no-data",
+      "storedPreference": true,
+      "observerFallback": true,
+      "result": "PASS"
+    },
+    {
+      "name": "touch-drag-rotation-visibility-scroll",
+      "result": "PASS",
+      "gestureAuthorizedAudioResumes": true
+    }
+  ]
+}

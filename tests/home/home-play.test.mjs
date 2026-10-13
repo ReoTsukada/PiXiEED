@@ -83,8 +83,13 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
   assert.doesNotMatch(source, /catchCat|nextCat|wordTop|wordBottom|CAT\s*=/);
   assert.match(source, /ctx\.putImageData\(img, 0, 0\)/, 'drawn through one ImageData');
   const html = read('index.html');
-  assert.doesNotMatch(html, /id="hpGyro"/, 'motion starts from a play gesture without a visible start control');
-  assert.match(html, /class="hp-gyro-status visually-hidden" id="hpGyroStatus" aria-live="polite"/);
+  assert.match(html, /id="hpPlayback"[^>]*>一時停止<\/button>/, 'hero motion has a visible play/pause control');
+  assert.match(html, /id="hpPlaybackStatus" aria-live="polite"/);
+  assert.match(source, /let playbackPaused = false;/, 'the hero starts automatically even when reduced motion is enabled');
+  assert.match(source, /const heroMotionEnabled = \(\) => !playbackPaused;/, 'only the explicit control pauses hero playback');
+  assert.match(source, /createHomeAudio\(\{ resumeOnVisible: true, onChange:/, 'audio resumes after visibility changes once activated by the visitor');
+  assert.doesNotMatch(source, /onHeroPreferenceChange|playbackOverride/, 'global motion preference changes do not pause or override the hero');
+  assert.match(html, /class="hp-gyro-status" id="hpGyroStatus" aria-live="polite"/, 'sensor status is visible below the controls');
   assert.match(source, /createHomeMotion\(\{ button: document.getElementById\('hpMotion'\), status: gyroStatus,/);
   assert.doesNotMatch(source, /gyroButton/);
   const homeCss = read('css/home.css');
@@ -115,7 +120,7 @@ test('home hero state: undo snapshots stay one operation and bounded', () => {
   assert.deepEqual(pushHomePlayHistory(history, 99), [...history.slice(1), 99]);
 });
 
-test('home hero controls keep gesture-gated sound, guarded clear and undo without stop controls', () => {
+test('home hero controls keep gesture-gated sound, guarded clear and undo with scoped playback', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /id="hpPaletteToggle"[^>]*aria-expanded="false" aria-controls="hpPalette"/);
   assert.match(html, /id="hpPalette" hidden/); assert.match(html, /id="hpUndo"[^>]*disabled/);
@@ -128,10 +133,10 @@ test('home hero controls keep gesture-gated sound, guarded clear and undo withou
   assert.doesNotMatch(source.match(/colorBox\.addEventListener\('keydown'[\s\S]*?\n  \}\);/)[0], /\.click\(\)/);
   assert.match(html, /id="hpAudioState"/);
   assert.doesNotMatch(html, /id="hpFreeze"|id="hpSound"/);
-  assert.match(source, /if \(reduced\) finishIntroDots\(\)/);
+  assert.match(source, /if \(heroReducedMotion\(\)\) finishIntroDots\(\)/);
   assert.match(source, /motionPreference\.addEventListener\('change', settleReducedIntro\)/);
   assert.match(source, /window\.addEventListener\('pagehide', \(\) => \{ persist\(\); homeAudio\.setVisible\(false\); \}\)/);
-  assert.match(source, /window\.addEventListener\('pageshow', \(\) => homeAudio\.setVisible\(/);
+  assert.match(source, /window\.addEventListener\('pageshow', \(\) => \{ lastT = performance\.now\(\); sandTick = 0; sandBudget = 0; homeAudio\.setVisible\(/);
   assert.match(source, /document\.addEventListener\('visibilitychange', \(\) => \{ homeAudio\.setVisible\(/);
   assert.match(source, /HOME_PLAY_STORAGE_KEY/); assert.match(source, /pointercancel/);
 });

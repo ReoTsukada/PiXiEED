@@ -3,14 +3,14 @@
  *
  * The contained mini canvas lets visitors draw and hear notes (a taste of the editor and sound tool).
  * Other tool cards run a tiny live version of that tool. Toys animate only
- * while on screen. Reduced motion caps updates at 30 FPS and suppresses the letter entrance and wave.
+ * while on screen. Reduced motion caps shared animation updates at 30 FPS; the hero keeps its own playback.
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
-import { createHomeMotion } from './home-motion.mjs?rev=20261002-gyro-360-1';
+import { createHomeMotion } from './home-motion.mjs?rev=20261013-home-motion-1';
 import { stepGravitySand } from './home-sand.mjs?rev=20261002-gyro-360-1';
 import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, finishHomePlayIntro, HOME_PLAY_STORAGE_KEY } from './home-play-state.mjs?rev=20261010-home-stop-removal-1';
-import { createHomeAudio } from './home-audio.mjs';
+import { createHomeAudio } from './home-audio.mjs?rev=20261013-hero-autoplay-2';
 
 const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 let reduced = motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced';
@@ -18,7 +18,8 @@ const animationScheduler = createVisibleAnimationScheduler(globalThis);
 animationScheduler.setReducedMotion(reduced);
 const cardAnimations = new Set();
 const updateMotionPreference = (event) => {
-  reduced = Boolean(event?.matches || motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced');
+  const nextReduced = Boolean(event?.matches || motionPreference.matches || document.documentElement.dataset.pixieedMotion === 'reduced');
+  reduced = nextReduced;
   animationScheduler.setReducedMotion(reduced);
   for (const animation of cardAnimations) {
     animation.stop?.();
@@ -189,11 +190,41 @@ function hero() {
   let history = []; let historyBusy = false;
   const status = document.getElementById('hpStatus');
   const say = (message) => { if (status) status.textContent = message; };
-  const audioStateText = { waiting: '最初のタップで音が出ます', playing: '演奏中', standby: 'タップすると音が出ます', unavailable: '音を開始できません' };
-  homeAudio = createHomeAudio({ onChange: (state) => {
+  const audioStateText = { waiting: '最初のタップで音が出ます', playing: '演奏中', standby: 'タップすると音が出ます', stopped: '一時停止中', unavailable: '音を開始できません' };
+  homeAudio = createHomeAudio({ resumeOnVisible: true, onChange: (state) => {
     const output = document.getElementById('hpAudioState'); if (output) output.textContent = audioStateText[state];
   } });
   const initialAudioState = document.getElementById('hpAudioState'); if (initialAudioState) initialAudioState.textContent = audioStateText[homeAudio.state];
+  const playbackButton = document.getElementById('hpPlayback');
+  const playbackStatus = document.getElementById('hpPlaybackStatus');
+  const motionButton = document.getElementById('hpMotion');
+  let playbackPaused = false;
+  let audioBlockedUntilPlay = false;
+  const heroMotionEnabled = () => !playbackPaused;
+  const heroReducedMotion = () => !heroMotionEnabled();
+  function syncHeroPlayback({ resumeAudio = false, stopAudio = false, blockCanvasAudio = false } = {}) {
+    const playing = heroMotionEnabled();
+    if (playbackButton) {
+      playbackButton.textContent = playing ? '一時停止' : '再生';
+      playbackButton.setAttribute('aria-label', playing ? 'あそび場の動きを一時停止' : 'あそび場の動きを再生');
+      playbackButton.setAttribute('aria-pressed', String(playing));
+    }
+    if (playbackStatus) playbackStatus.textContent = playing ? 'あそび場を再生中です。' : '一時停止中。再生ボタンで再開できます。';
+    if (motionButton) motionButton.disabled = !playing;
+    lastT = performance.now(); sandTick = 0; sandBudget = 0;
+    if (resumeAudio) { audioBlockedUntilPlay = false; void homeAudio.resumeByControl(); }
+    else if (stopAudio) { audioBlockedUntilPlay = blockCanvasAudio; homeAudio.stop(); }
+    homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
+    gyro?.setVisible();
+    if (gyro?.supported && gyroStatus) gyroStatus.textContent = !playing
+      ? '再生すると、端末の傾きを有効にできます。'
+      : (!gyro.state.enabled ? '「色・編集」の「端末を傾けて遊ぶ」で有効にできます。' : gyroStatus.textContent);
+    redraw();
+  }
+  playbackButton?.addEventListener('click', () => {
+    if (heroMotionEnabled()) { playbackPaused = true; syncHeroPlayback({ stopAudio: true, blockCanvasAudio: true }); }
+    else { playbackPaused = false; syncHeroPlayback({ resumeAudio: true }); }
+  });
   let img = null; let nightFrame = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
   let sand = null;                // settled / falling sand: colour index + 1 per cell, 0 = empty
@@ -290,7 +321,7 @@ function hero() {
       x0 += (FONT[ch][0].length + 1) * scale;
     });
     stars = Array.from({ length: Math.max(14, Math.min(40, Math.round(W * H / 380))) }, newStar);
-    if (reduced) finishIntroDots();
+    if (heroReducedMotion()) finishIntroDots();
   }
   const isSolid = (x, y) => y >= F || y < 0 || x < 0 || x >= W || sand[y * W + x] > 0;
   const reach = (px) => Math.max(1, Math.ceil(px / cell)); // a finger-sized distance in cells
@@ -298,7 +329,7 @@ function hero() {
   // ---- letters: a tap or a stroke bursts a letter, dots bounce, then fly home ----
   function burstLetter(li, fromX, fromY) {
     let any = false;
-    if (reduced) { any = dots.some((d) => d.li === li && d.state !== 'free'); if (any) say('文字にタッチしました'); return any; }
+    if (heroReducedMotion()) { any = dots.some((d) => d.li === li && d.state !== 'free'); if (any) say('文字にタッチしました'); return any; }
     for (const d of dots) {
       if (d.li !== li || d.state === 'free') continue;
       any = true; d.state = 'free'; d.burst = burstNo + 1; d.until = performance.now() + 2600 + Math.random() * 500;
@@ -358,18 +389,21 @@ function hero() {
     if (tx < 0) return;
     const v = sand[top * W + tx]; const height = (F - top) / F;
     play(v - 1, 2 + Math.round(height * 12), { volume: 0.035 });
-    if (animateBeat && homeAudio.canPlay() && !reduced) beats.push({ x: tx, y: top, life: 1 });
+    if (animateBeat && homeAudio.canPlay() && !heroReducedMotion()) beats.push({ x: tx, y: top, life: 1 });
   }
 
   // ---- phones: screen-plane gravity follows a full turn, without a scalar angle seam ----
+  let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
+  const TICK = 1 / 60; let tickNo = 0; let sandBudget = 0;
   let stageVisible = true;
   const gyro = createHomeMotion({ button: document.getElementById('hpMotion'), status: gyroStatus,
     onGravity: (value) => { fall = value; }, onShake: shake,
-    isVisible: () => document.visibilityState !== 'hidden' && stageVisible });
+    isVisible: () => document.visibilityState !== 'hidden' && stageVisible && heroMotionEnabled() });
   if (typeof IntersectionObserver === 'function') {
     stageVisible = false;
     const motionVisibility = new IntersectionObserver(([entry]) => {
       stageVisible = Boolean(entry?.isIntersecting);
+      lastT = performance.now(); sandTick = 0; sandBudget = 0;
       homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
       gyro.setVisible();
     }, { threshold: 0 });
@@ -378,6 +412,7 @@ function hero() {
     const syncStageVisibility = () => {
       const r = stage.getBoundingClientRect();
       stageVisible = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
+      lastT = performance.now(); sandTick = 0; sandBudget = 0;
       homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
       gyro.setVisible();
     };
@@ -386,7 +421,7 @@ function hero() {
     window.addEventListener('resize', syncStageVisibility, { passive: true });
   }
   function shake() {
-    if (reduced) return;
+    if (heroReducedMotion()) return;
     let moved = 0;
     for (let x = 0; x < W; x++) {
       let top = -1; for (let y = 0; y < F; y++) if (sand[y * W + x]) { top = y; break; }
@@ -404,14 +439,12 @@ function hero() {
     finishHomePlayIntro(dots);
   }
 
-  let start = performance.now(); let lastT = performance.now(); let sandTick = 0; let lastLand = 0;
-  const TICK = 1 / 60; let tickNo = 0; let sandBudget = 0;
   function sandStep(now) {
     stepGravitySand(sand, W, F, fall, { onLand: (x, y, v) => maybeLand(now, x, y, v - 1) });
   }
   function step(now) {
     const dt = Math.max(0, Math.min(0.1, (now - lastT) / 1000)); lastT = now;
-    if (reduced) { playPile(now, { animateBeat: false }); return; }
+    if (!heroMotionEnabled()) return;
     // Keep the simulation's speed at both the normal 60 FPS and reduced 30 FPS display rates.
     sandTick += dt;
     while (sandTick >= TICK) {
@@ -476,7 +509,7 @@ function hero() {
     const returnEase = 1 - Math.pow(23 / 30, dt * 30);
     for (const d of dots) {
       if (d.state === 'intro') {
-        const p = reduced ? 1 : Math.min(1, Math.max(0, (now - start - d.delay) / 520));
+        const p = heroReducedMotion() ? 1 : Math.min(1, Math.max(0, (now - start - d.delay) / 520));
         const e = 1 - (1 - p) ** 3; d.y = (-2 - 8 * K) * (1 - e) + d.hy * e; d.x = d.hx;
         if (p >= 1) d.state = 'home';
       } else if (d.state === 'free') {
@@ -525,7 +558,7 @@ function hero() {
     const d = img.data;
     d.set(nightFrame);
     for (const s of stars) {
-      const a = reduced ? 0.62 : 0.35 + 0.45 * Math.sin(time * s.s + s.p);
+      const a = heroReducedMotion() ? 0.62 : 0.35 + 0.45 * Math.sin(time * s.s + s.p);
       if (a <= 0.4) continue;
       if (s.big) { put(s.x, s.y, GOLD, a); if (a > 0.6) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) put(s.x + dx, s.y + dy, GOLD, a * 0.45); }
       else put(s.x, s.y, WHITE, a);
@@ -533,12 +566,12 @@ function hero() {
     if (shooter) for (let i = 0; i < 10; i++) { const k = i / 10; put(shooter.x - shooter.vx * 0.03 * i, shooter.y - shooter.vy * 0.03 * i, i < 2 ? GOLD : WHITE, 1 - k); if (i === 0) for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) put(shooter.x + dx, shooter.y + dy, GOLD); }
     for (let x = 0; x < W; x++) put(x, F, WHITE, 0.07);
     // the light that plays the pile
-    if (grains && homeAudio.canPlay() && !reduced) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
+    if (grains && homeAudio.canPlay() && !heroReducedMotion()) { const px = Math.floor(((now % BAR_MS) / BAR_MS) * W); for (let y = 0; y < F; y++) put(px, y, WHITE, 0.05); }
     for (let i = 0; i < F * W; i++) if (sand[i]) { const c = RGB[sand[i] - 1]; const o = i * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; }
     for (const b of beats) put(b.x, b.y, WHITE, b.life);
     for (const dt of dots) {
       if (dt.state === 'intro' && dt.y < -1) continue;
-      const wave = dt.state === 'home' && !reduced ? Math.round(Math.sin(time * 2.4 - dt.li * 0.7) * 0.75 * K) : 0;
+      const wave = dt.state === 'home' && !heroReducedMotion() ? Math.round(Math.sin(time * 2.4 - dt.li * 0.7) * 0.75 * K) : 0;
       put(Math.round(dt.x), Math.round(dt.y) + wave, dt.color);
     }
     for (const piece of pieces) for (const c of piece.cells) put(c.x, c.y, RGB[c.v - 1]);
@@ -546,13 +579,13 @@ function hero() {
     for (const [, dk] of ink) put(dk.x, dk.y, now - dk.born < 200 ? WHITE : RGB[dk.color]);
     for (const b of bursts) put(Math.round(b.x), Math.round(b.y), b.color, Math.min(1, b.life));
     if (cursor && document.activeElement === canvas) {
-      const on = reduced || Math.floor(now / 400) % 2 === 0;
+      const on = heroReducedMotion() || Math.floor(now / 400) % 2 === 0;
       for (let sy = 0; sy < BR; sy++) for (let sx = 0; sx < BR; sx++) put(cursor.x + sx, cursor.y + sy, pen ? RGB[color] : WHITE, pen || on ? 1 : 0.35);
     }
     ctx.putImageData(img, 0, 0);
   }
   const redraw = animate(stage, draw, { fps: 60, throttleRedraw: true });
-  const settleReducedIntro = () => { if (reduced) { finishIntroDots(); redraw(); } };
+  const settleReducedIntro = () => { if (heroReducedMotion()) { finishIntroDots(); redraw(); } };
   if (motionPreference.addEventListener) motionPreference.addEventListener('change', settleReducedIntro);
   else motionPreference.addListener?.(settleReducedIntro);
   new MutationObserver(settleReducedIntro).observe(document.documentElement, { attributes: true, attributeFilter: ['data-pixieed-motion'] });
@@ -575,7 +608,7 @@ function hero() {
   const performClear = () => {
     remember(); ink.clear(); sand.fill(0); grains = 0; caught = 0; score.hidden = true; pen = false; drawing = false; pieces = []; flashes = []; beats = []; lines = 0;
     for (const d of dots) { d.state = 'intro'; d.y = -2 - Math.random() * 12 * K; d.delay = d.li * 90 + Math.random() * 260; }
-    if (reduced) finishIntroDots();
+    if (heroReducedMotion()) finishIntroDots();
     start = performance.now(); persist(); say('絵を消しました'); redraw();
   };
   clearButton?.addEventListener('click', () => {
@@ -585,8 +618,8 @@ function hero() {
   document.getElementById('hpClearCancel')?.addEventListener('click', () => clearDialog?.close());
   document.getElementById('hpClearConfirm')?.addEventListener('click', () => { clearDialog?.close(); performClear(); });
   window.addEventListener('pagehide', () => { persist(); homeAudio.setVisible(false); });
-  window.addEventListener('pageshow', () => homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible));
-  document.addEventListener('visibilitychange', () => { homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible); lastT = performance.now(); });
+  window.addEventListener('pageshow', () => { lastT = performance.now(); sandTick = 0; sandBudget = 0; homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible); });
+  document.addEventListener('visibilitychange', () => { homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible); lastT = performance.now(); sandTick = 0; sandBudget = 0; });
 
   let lastInkNote = 0;
   function inkAt(x, y) {
@@ -614,6 +647,7 @@ function hero() {
   let press = null;
   let audioGestureFeedback = false;
   const activateCanvasAudio = () => {
+    if (audioBlockedUntilPlay) return;
     void homeAudio.activateFromGesture().then((started) => {
       if (started && !audioGestureFeedback) { audioGestureFeedback = true; note(7); }
     });
@@ -659,7 +693,7 @@ function hero() {
     const cells = [...ink.values()].filter((d) => d.x >= 0 && d.x < W && d.y >= 0 && d.y < F).map((d) => ({ x: d.x, y: d.y, v: d.color + 1 }));
     ink.clear();
     if (!cells.length) return;
-    if (reduced) {
+    if (heroReducedMotion()) {
       for (const c of cells) sand[c.y * W + c.x] = c.v;
       grains = sand.reduce((n, v) => n + Number(Boolean(v)), 0);
     } else pieces.push({ cells, vx: fall.x * 0.2 * K, vy: fall.y * 0.2 * K, ax: 0, ay: 0, landed: false });
@@ -725,6 +759,7 @@ function hero() {
   layout();
   redraw(); // animate() is registered before layout(), so render the initialized canvas now.
   nextShooter = performance.now() + 6000;
+  syncHeroPlayback();
   const resizeHero = () => { const g = gridFor(stage.getBoundingClientRect()); if (g.w !== W || g.h !== H || g.c !== cell) { layout(); redraw(); } };
   if (typeof ResizeObserver === 'function') new ResizeObserver(resizeHero).observe(stage);
   else addEventListener('resize', resizeHero, { passive: true });

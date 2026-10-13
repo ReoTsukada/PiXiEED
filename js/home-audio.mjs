@@ -3,6 +3,7 @@ export function createHomeAudio({
   createContext = () => new AudioContext(),
   onChange = () => {},
   initialOn = true,
+  resumeOnVisible = false,
 } = {}) {
   let context = null;
   let output = null;
@@ -47,7 +48,7 @@ export function createHomeAudio({
       return false;
     }
   };
-  async function resume() {
+  async function resume({ automatic = false } = {}) {
     const token = ++generation;
     if (!soundOn || !visible || !context) return false;
     try {
@@ -65,8 +66,10 @@ export function createHomeAudio({
       publish();
       return true;
     } catch {
-      unavailable = true;
-      activated = false;
+      if (token !== generation) return false;
+      // A browser may require another gesture after restoration. Keep that
+      // gesture available instead of latching a failed automatic resume.
+      if (!automatic) { unavailable = true; activated = false; }
       setOutput(0);
       publish();
       return false;
@@ -101,14 +104,17 @@ export function createHomeAudio({
       publish();
     },
     setVisible(value) {
+      const wasVisible = visible;
       visible = Boolean(value);
       if (!visible) {
         generation++;
-        activated = false;
+        if (!resumeOnVisible) activated = false;
         setOutput(0);
         if (context?.state === 'running') void context.suspend().catch(() => {});
       }
-      // Becoming visible never resumes audio; a fresh drawing gesture is needed.
+      // Only an already gesture-activated context may resume automatically.
+      // Merely loading or showing the page cannot create/activate audio.
+      if (!wasVisible && visible && resumeOnVisible && activated && soundOn && !unavailable && context) void resume({ automatic: true });
       publish();
     },
   };
