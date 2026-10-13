@@ -7,7 +7,7 @@ import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shel
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261012-animation-core-contract-1';
-import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, getAnimationCelDocument, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
 import { composeOutputFrame } from './creation-output-core.mjs?rev=20261012-animation-core-contract-1';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
@@ -30,6 +30,7 @@ import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-ico
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261011-tool-size-1';
 import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
+import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261012-animation-core-contract-1';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
@@ -2424,6 +2425,38 @@ return {
     const area = mask ? `選択範囲 ${target.bounds.width}×${target.bounds.height}（${target.cells.length}ドット）` : 'レイヤー全体';
     return { target, owner: animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId,
       description: `フレーム${frameNumber}・${layer.name}${layer.visible ? '' : '（非表示）'}・${area}` };
+  },
+  cameraPlacementTarget() {
+    const image = readOnlyImage ? { width:readOnlyImage.width, height:readOnlyImage.height } : null;
+    const animation = animationSession.animation;
+    const frameId = animationSession.frameId;
+    const layerId = animationSession.layerId;
+    const frameNumber = animation.frames.findIndex(frame => frame.id === frameId) + 1;
+    const layer = animation.layers.find(item => item.id === layerId);
+    if (readOnlyImage) {
+      const width = image.width, height = image.height;
+      return { width, height, supported:false, previewAllowed:false, frameNumber:1, layerName:'原本', layerVisible:true, layerLocked:true,
+        description:'原本を表示中・撮影画像の配置プレビューは利用できません' };
+    }
+    const width = animation.width, height = animation.height;
+    if (width > 256 || height > 256) return { width, height, supported:false, previewAllowed:false, frameNumber, layerName:layer?.name || 'レイヤー',
+      description:`フレーム${frameNumber}・${layer?.name || 'レイヤー'}・このサイズでは配置プレビューを表示できません` };
+    const mask = selectionTransform?.mask(width, height) || selectionMask();
+    // prepareCameraTarget also supplies the exact cell list and bounds used by apply.
+    const target = prepareCameraTarget(documentData, mask);
+    const activeIndex = animation.layers.findIndex(item => item.id === layerId);
+    const active = getAnimationCelDocument(animation, frameId, layerId);
+    const below = composeAnimationFrame(animation, frameId, { layerIds:animation.layers.slice(0, activeIndex).map(item => item.id) });
+    const above = composeAnimationFrame(animation, frameId, { layerIds:animation.layers.slice(activeIndex + 1).map(item => item.id) });
+    const musicOnly = Boolean(musicLayer && layer?.role === 'music');
+    const musicReadOnly = Boolean(musicLayer && musicReadOnlyReason && layer?.role === 'music');
+    const busy = selectionTransform || featureSession || colorEdit || playing || drawingInputBusy();
+    const description = `フレーム${frameNumber}・${layer?.name || 'レイヤー'}${layer?.visible ? '' : '（非表示）'}・${mask ? `選択範囲 ${target.bounds.width}×${target.bounds.height}（${target.cells.length}ドット）` : 'レイヤー全体'}`;
+    return { width, height, supported:true, palette:[...animation.palette], below:Int16Array.from(below.pixels), active:Int16Array.from(active.pixels), above:Int16Array.from(above.pixels),
+      activeVisible:Boolean(layer?.visible), activeLocked:Boolean(layer?.locked), previewAllowed:!busy && !musicReadOnly, musicOnly,
+      allowedIndices:[...animation.palette.keys()], frameId, layerId, frameNumber, layerName:layer?.name || 'レイヤー', layerVisible:Boolean(layer?.visible), layerLocked:Boolean(layer?.locked),
+      mask:mask ? new Uint8Array(mask) : null, bounds:{ ...target.bounds }, cells:Uint32Array.from(target.cells), description,
+      applyReason:layer?.locked ? '選択レイヤーはロック中です。ロックを解除すると撮影画像を適用できます。' : musicReadOnly ? musicReadOnlyReason : '' };
   },
   previewCamera(target, indices) { return animationSession.composite({ ...target.document, pixels: Array.from(indices) }); },
   async applyCamera(snapshot, indices) {

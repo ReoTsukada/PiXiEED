@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Two-phase, real HTTP-cache regression for the creation operation-bar update.
- * The same isolated Chromium context crosses from ba545e29 sources to the
- * working tree. No Playwright routing is used because it disables HTTP cache.
+ * Two-phase, real HTTP-cache regression for camera placement while preserving
+ * the operation-bar cache. The same isolated Chromium context crosses from
+ * the published 2f646775 baseline to the working tree. No Playwright routing
+ * is used because it disables HTTP cache.
  */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -14,16 +15,25 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const baseline = process.env.PIXIEED_CACHE_BASELINE || 'ba545e2972c01876e3bf1b057a3a946dc657f858';
-const revision = '20261012-operation-bar-1';
+const baseline = process.env.PIXIEED_CACHE_BASELINE || '2f6467750ab08bc418a904dbaa2e9fb764eca502';
+const operationBarRevision = '20261012-operation-bar-1';
+const cameraPlacementRevision = '20261013-camera-placement-1';
 const defaultTargets = [
   'css/creation-modes.css', 'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs',
   'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs', 'js/creation/draw-entry.mjs',
   'js/creation/draw-page.mjs', 'js/creation/jigsaw-page.mjs', 'js/creation/pixfind-play.mjs',
   'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-result-view.mjs',
-  'js/creation/draw-selection-panel.mjs', 'css/draw-selection-features.css', 'css/draw-compact-controls.css'
+  'js/creation/draw-selection-panel.mjs', 'css/draw-selection-features.css', 'css/draw-compact-controls.css',
+  'js/creation/camera-placement-preview.mjs'
 ];
 const targets = defaultTargets;
+const cameraPlacementTargets = new Set([
+  'css/creation-modes.css', 'js/creation/camera-placement-preview.mjs',
+  'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs',
+  'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs',
+  'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs'
+]);
+const expectedRevision = path => cameraPlacementTargets.has(path) ? cameraPlacementRevision : operationBarRevision;
 const output = process.env.PIXIEED_OPERATION_CACHE_OUTPUT || '/tmp/pixieed-operation-bar-20261012/cache-upgrade';
 const playwrightPath = process.env.PIXIEED_PLAYWRIGHT_MODULE || join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
 const { chromium } = await import(pathToFileURL(playwrightPath).href);
@@ -32,7 +42,7 @@ const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8'
 
 await mkdir(output, { recursive: true });
 const beforeFiles = git('ls-tree', '-r', '--name-only', baseline).split('\n').filter(p => /\.(?:html|mjs|js|css)$/.test(p));
-const afterFiles = git('ls-files').split('\n').filter(p => /\.(?:html|mjs|js|css)$/.test(p));
+const afterFiles = [...new Set([...git('ls-files').split('\n').filter(p => /\.(?:html|mjs|js|css)$/.test(p)), ...targets])];
 const beforeBytes = new Map();
 const readBefore = path => {
   if (!beforeBytes.has(path)) beforeBytes.set(path, execFileSync('git', ['show', `${baseline}:${path}`], { cwd: root, maxBuffer: 16 * 1024 * 1024 }));
@@ -65,11 +75,13 @@ async function refsAt(files, read, target, revOnly = false) {
 }
 const oldRefs = {}, currentRefs = {}, targetHashes = { old: {}, current: {} };
 for (const path of targets) {
-  oldRefs[path] = await refsAt(beforeFiles, async p => readBefore(p), path, true);
-  currentRefs[path] = [`/${path}?rev=${revision}`];
-  targetHashes.old[path] = hash(readBefore(path));
+  const existsAtBaseline = beforeFiles.includes(path);
+  oldRefs[path] = existsAtBaseline ? await refsAt(beforeFiles, async p => readBefore(p), path, true) : [];
+  currentRefs[path] = await refsAt(afterFiles, async p => readFile(resolve(root, p)), path, true);
+  assert.ok(currentRefs[path].length, `current production reference exists: ${path}`);
+  if (existsAtBaseline) targetHashes.old[path] = hash(readBefore(path));
   targetHashes.current[path] = hash(await readFile(resolve(root, path)));
-  if (!oldRefs[path].length) oldRefs[path] = [`/${path}?rev=baseline-${baseline.slice(0, 8)}`];
+  if (existsAtBaseline && !oldRefs[path].length) oldRefs[path] = [`/${path}?rev=baseline-${baseline.slice(0, 8)}`];
 }
 
 let phase = 'before';
@@ -101,7 +113,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true });
 const startedAt = new Date().toISOString();
 const report = {
-  baseline, revision, startedAt, output, base, routing: false,
+  baseline, revisions: { operationBar: operationBarRevision, cameraPlacement: cameraPlacementRevision }, startedAt, output, base, routing: false,
   cacheControl: 'public, max-age=600', htmlCacheControl: 'no-store',
   isolatedContext: true, userProfileStorage: false, hardwarePermissions: false,
   externalNetwork: 'blocked by Chromium CDP and same-origin CSP', oldRefs, currentRefs,
@@ -150,6 +162,45 @@ try {
       url: location.pathname + location.search + location.hash
     };
   });
+  const clickFirstVisible = async (...selectors) => {
+    for (const selector of selectors) {
+      const locator = page.locator(selector).first();
+      if (await locator.count() && await locator.isVisible().catch(() => false) && await locator.isEnabled().catch(() => false)) {
+        await locator.click(); return selector;
+      }
+    }
+    throw new Error(`No visible enabled control found: ${selectors.join(', ')}`);
+  };
+  const saveEditedProject = async () => {
+    const initial = await page.evaluate(() => ({
+      pointer: JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || 'null'),
+      state: document.querySelector('#project-open')?.dataset.state
+    }));
+    const needsRevision = initial.state !== 'saved';
+    await clickFirstVisible('#creation-file-open', '#project-open');
+    await page.locator('#pxd-panel').waitFor({ state: 'visible' });
+    await page.locator('#project-tab-current').click();
+    const morePanel = page.locator('#project-current-pane .project-more');
+    const more = morePanel.locator(':scope > summary');
+    if (await more.count() && await more.isVisible().catch(() => false)
+      && !await morePanel.evaluate(node => node.open)) await more.click();
+    const projectSave = page.locator('#pxd-save');
+    const shouldSave = await projectSave.isEnabled().catch(() => false);
+    if (shouldSave) await projectSave.click();
+    await page.waitForFunction(({ before, needsRevision }) => {
+      const pointer = JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || 'null');
+      return pointer?.revisionId && (!needsRevision || pointer.revisionId !== before?.pointer?.revisionId)
+        && document.querySelector('#project-open')?.dataset.state === 'saved'
+        && !document.querySelector('#main')?.inert;
+    }, { before: initial, needsRevision }, { timeout: 15000 });
+    const after = await page.evaluate(() => ({
+      pointer: JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || 'null'),
+      state: document.querySelector('#project-open')?.dataset.state
+    }));
+    (report.projectSaves ||= []).push({ before: initial, needsRevision, saveButtonEnabled: shouldSave, after });
+    if (await page.locator('#project-close').isVisible().catch(() => false)) await page.locator('#project-close').click();
+    await page.locator('#pxd-panel').waitFor({ state: 'hidden' });
+  };
 
   // Seed an actual saved PXD project in the isolated context, then let the
   // baseline production editor restore it through its ordinary startup path.
@@ -186,12 +237,7 @@ try {
   await page.mouse.click(canvasBox.x + canvasBox.width * 0.64, canvasBox.y + canvasBox.height * 0.61);
   const painted = await snapshot();
   assert.notDeepEqual(painted.canvas.rgba, report.before.canvas.rgba, 'actual canvas pointer input changes pixels');
-  await page.locator('#draw-output > summary').click();
-  await page.locator('#draw-save').click();
-  await page.waitForFunction(() => {
-    const pointer = JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || 'null');
-    return pointer?.revisionId && pointer.revisionId !== window.__cacheHarness.initialRevision;
-  }, null, { timeout: 15000 });
+  await saveEditedProject();
   const beforeProject = await page.evaluate(async pointer => {
     const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs?rev=20261001-free-tools-1');
     const current = JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || 'null');
@@ -205,11 +251,12 @@ try {
   report.beforeSaved = beforeProject;
   report.checks.push('baseline actual pointer edit saved as PXD while original revision stayed addressable');
 
-  // Warm every actual baseline reference URL through fetch with normal cache
-  // semantics. URLs are then retained while the server switches to new bytes.
+  // Warm every available baseline reference URL through fetch with normal cache
+  // semantics. A new target has no old URL or hash to warm.
   const warmed = await page.evaluate(async urls => {
     const out = [];
     for (const [target, candidates] of Object.entries(urls)) {
+      if (!candidates.length) continue;
       const url = candidates[0];
       const response = await fetch(url, { cache: 'default' });
       const bytes = new Uint8Array(await response.arrayBuffer());
@@ -223,7 +270,7 @@ try {
     assert.equal(row.sha256, targetHashes.old[row.target], `baseline response matches old source: ${row.target}`);
   }
   report.warmedOldRefs = warmed;
-  report.checks.push(`warmed ${warmed.length} baseline target URLs over real HTTP`);
+  report.checks.push(`warmed ${warmed.length} baseline target URLs over real HTTP; ${targets.length - warmed.length} targets were absent from baseline`);
 
   // Flip only the source served by the local origin. HTML is no-store, all
   // module/CSS URLs remain cacheable, and the same browser context is reused.
@@ -233,6 +280,20 @@ try {
   assert.deepEqual(report.afterInitial.canvas.rgba, painted.canvas.rgba, 'operation-bar startup restores the saved drawing');
   assert.equal(report.afterInitial.pointer.projectId, report.fixture.projectId);
   report.checks.push('fresh current HTML loads new entry graph and retains baseline PXD pixels/project pointer');
+
+  const newlyIntroduced = targets.filter(path => !oldRefs[path].length);
+  for (const target of newlyIntroduced) {
+    const [url] = currentRefs[target];
+    const response = await page.evaluate(async url => {
+      const response = await fetch(url, { cache: 'default' });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      return { status: response.status, sha256: [...new Uint8Array(digest)].map(v => v.toString(16).padStart(2, '0')).join('') };
+    }, url);
+    assert.equal(response.status, 200, `new target fetched over HTTP: ${url}`);
+    assert.equal(response.sha256, targetHashes.current[target], `new target body matches current source: ${target}`);
+  }
+  if (newlyIntroduced.length) report.checks.push(`fetched ${newlyIntroduced.length} newly introduced targets at current revision`);
 
   const nav = await page.evaluate(() => {
     const n = document.querySelector('.app-tabs');
@@ -285,12 +346,13 @@ try {
   for (const row of fetchedCurrent) {
     assert.equal(row.status, 200);
     assert.equal(row.sha256, targetHashes.current[row.target], `new response matches current source: ${row.target}`);
-    assert.match(row.url, new RegExp(`\\?rev=${revision}$`));
+    assert.equal(new URL(row.url, 'http://local.invalid').searchParams.get('rev'), expectedRevision(row.target));
   }
   report.fetchedCurrent = fetchedCurrent;
   const warmedOldAgain = await page.evaluate(async urls => {
     const out = [];
     for (const [target, candidates] of Object.entries(urls)) {
+      if (!candidates.length) continue;
       const url = candidates[0]; const response = await fetch(url, { cache: 'force-cache' });
       const bytes = new Uint8Array(await response.arrayBuffer());
       const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -305,16 +367,34 @@ try {
   report.recheckedOldRefs = warmedOldAgain;
   const oldRequestsAfterSwitch = requests.filter(r => r.phase === 'after' && oldRefs[targets.find(t => r.url.startsWith(`/${t}?`))]?.includes(r.url));
   assert.equal(oldRequestsAfterSwitch.length, 0, 'cached old URLs should not be re-fetched from the new source');
-  const oldCacheEvents = report.cache.servedFromCache.filter(url => url && Object.values(oldRefs).flat().some(ref => url.endsWith(ref)));
+  const isCacheHit = url => report.cache.servedFromCache.some(cachedUrl => cachedUrl?.endsWith(url))
+    || report.cache.requests.some(event => {
+      if (event.fromDiskCache !== true || event.fromServiceWorker === true) return false;
+      const cached = new URL(event.url);
+      return `${cached.pathname}${cached.search}` === url;
+    });
+  const oldRefsSet = new Set(Object.values(oldRefs).flat());
+  const oldCacheEvents = [
+    ...report.cache.servedFromCache.filter(url => url && [...oldRefsSet].some(ref => url.endsWith(ref))),
+    ...report.cache.requests.filter(event => event.fromDiskCache === true && event.fromServiceWorker !== true
+      && oldRefsSet.has(`${new URL(event.url).pathname}${new URL(event.url).search}`))
+  ];
   assert.ok(oldCacheEvents.length > 0, 'Chromium reports cache-hit events for warmed old URLs');
-  for (const target of targets) assert.ok(requests.some(r => r.phase === 'after' && r.url === currentRefs[target][0]), `new URL requested in current phase: ${target}`);
-  report.checks.push('each new revision URL returns current source; prior revision URLs remain cache-served and unchanged');
+  for (const target of cameraPlacementTargets) {
+    assert.ok(requests.some(r => r.phase === 'after' && r.url === currentRefs[target][0]), `camera-placement URL requested in current phase: ${target}`);
+  }
+  for (const target of targets.filter(path => !cameraPlacementTargets.has(path))) {
+    assert.equal(targetHashes.current[target], targetHashes.old[target], `unchanged operation-bar target retains baseline bytes: ${target}`);
+    assert.ok(oldRefs[target].includes(currentRefs[target][0]), `unchanged target retains its baseline URL: ${target}`);
+    assert.ok(isCacheHit(currentRefs[target][0]), `unchanged target reuses its warmed HTTP cache entry: ${target}`);
+  }
+  report.checks.push('camera-placement URLs load fresh current bytes; unchanged operation-bar URLs remain byte-identical and cache-served');
 
   // mode-scope is intentionally not in the changed target set, so its same
   // URL should be reused from cache across the HTML reload.
   const modeScopeUrl = `${base}/js/creation/mode-scope.mjs?rev=20261001-independent-editors-1`;
   assert.ok(requests.some(r => r.phase === 'before' && r.url === new URL(modeScopeUrl).pathname + new URL(modeScopeUrl).search));
-  assert.ok(report.cache.servedFromCache.includes(modeScopeUrl), 'unchanged mode-scope module reused from HTTP cache');
+  assert.ok(isCacheHit(new URL(modeScopeUrl).pathname + new URL(modeScopeUrl).search), 'unchanged mode-scope module reused from HTTP cache');
   report.checks.push('unchanged mode-scope module remains reused from real HTTP cache');
 
   // The core contract check asserts both the versioned façade identity and
@@ -336,13 +416,7 @@ try {
   // Save from the editor after the hot swap, reload the same URL, and confirm
   // the project identity, saved revision and pixels remain stable.
   await switchMode('draw');
-  await page.locator('#creation-file-open').click();
-  await page.locator('#pxd-panel').waitFor({ state:'visible' });
-  await page.locator('#project-tab-current').click();
-  await page.locator('#project-current-pane .project-more > summary').click();
-  await page.locator('#pxd-save').click();
-  await page.waitForFunction(() => document.querySelector('.project-bar__open')?.dataset.state==='saved', null, { timeout: 15000 });
-  await page.locator('#project-close').click();await page.locator('#pxd-panel').waitFor({state:'hidden'});
+  await saveEditedProject();
   report.savedCurrent = await page.evaluate(async pointer => {
     const current = JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || 'null');
     const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs?rev=20261001-free-tools-1');

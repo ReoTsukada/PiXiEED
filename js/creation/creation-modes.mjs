@@ -15,7 +15,7 @@ export async function mountCreationModes({ draw, scope }) {
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261012-operation-bar-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261013-camera-placement-1';
   const styled = new Promise((resolve, reject) => { css.addEventListener('load', resolve, { once:true }); css.addEventListener('error', () => reject(new Error('共通の制作画面の表示を読み込めません。')), { once:true }); });
   document.head.append(css); await styled;
   const owned = new Map([['shared', new Set()], ['editor', new Set()], ['draw', new Set()], ['audio', new Set()], ['camera', new Set()]]);
@@ -300,7 +300,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261012-operation-bar-1&attempt=${version}`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261013-camera-placement-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

@@ -25,7 +25,7 @@ import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=202610
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
 import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?v=20261005-miniature-1';
 
-export async function mountPixelLensMode({ autoStart = true, isActive = () => true, mountWorkspace = mountPxdTools, onUseImage = null, draw = null, integratedShared = false, onProjectSettings = null, initialProjectSettings = null } = {}) {
+export async function mountPixelLensMode({ autoStart = true, isActive = () => true, mountWorkspace = mountPxdTools, onUseImage = null, draw = null, integratedShared = false, onProjectSettings = null, initialProjectSettings = null, onPreviewFrame = null, onPreviewError = null } = {}) {
   const lifecycle = new AbortController();
   const listenGlobal = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...(typeof options === 'boolean' ? { capture:options } : options), signal:lifecycle.signal });
 const $ = (selector) => document.querySelector(selector);
@@ -66,7 +66,7 @@ const video = $('#video');
 const stage = $('#stage');
 const view = $('#view');
 const captureFrame = $('#captureFrame');
-const viewContext = view.getContext('2d', { alpha: false });
+const viewContext = view.getContext('2d', { alpha: integratedShared });
 const mergeSelectionOverlay = $('#mergeSelectionOverlay');
 const mergeSelectionContext = mergeSelectionOverlay.getContext('2d');
 const stageMessage = $('#stageMsg');
@@ -440,6 +440,27 @@ function fitPreview(frame) {
   captureFrame.style.height = `${fit.height}px`;
 }
 
+function paintPreviewFrame(frame) {
+  if (!frame?.width || !frame?.height || frame.data?.length !== frame.width * frame.height * 4) return false;
+  let display = frame;
+  try {
+    const processed = onPreviewFrame?.(frame);
+    if (processed) {
+      const data = processed instanceof Uint8ClampedArray ? processed : processed.data;
+      if (!data || data.length !== frame.width * frame.height * 4 || processed.width && processed.width !== frame.width || processed.height && processed.height !== frame.height) {
+        throw new TypeError('配置プレビューの画素サイズが一致しません。');
+      }
+      display = { width:frame.width, height:frame.height, data };
+    }
+    onPreviewError?.(null);
+  } catch (error) {
+    onPreviewError?.(error instanceof Error ? error : new Error('配置プレビューを更新できません。'));
+  }
+  if (view.width !== frame.width || view.height !== frame.height) { view.width = frame.width; view.height = frame.height; }
+  viewContext.putImageData(new ImageData(display.data, display.width, display.height), 0, 0);
+  return true;
+}
+
 function invalidatePreview() {
   loop?.stop();
   renderSequence++;
@@ -482,11 +503,7 @@ function restartPreview({ preserveCompleted = false } = {}) {
 
 function drawCompleted(result) {
   if (!result?.width || !result?.height || result.data?.length !== result.width * result.height * 4) return false;
-  if (view.width !== result.width || view.height !== result.height) {
-    view.width = result.width;
-    view.height = result.height;
-  }
-  viewContext.putImageData(new ImageData(result.data, result.width, result.height), 0, 0);
+  paintPreviewFrame(result);
   fitPreview(result);
   state.result = result;
   updatePalettePreview(result);
@@ -913,11 +930,7 @@ function updateLiveRegionMerge(rawResult, { force = false } = {}) {
 function displayCurrentRegionMergeResult(result) {
   if (!result) return;
   state.result = result;
-  if (view.width !== result.width || view.height !== result.height) {
-    view.width = result.width;
-    view.height = result.height;
-  }
-  viewContext.putImageData(new ImageData(result.data, result.width, result.height), 0, 0);
+  paintPreviewFrame(result);
   fitPreview(result);
   root.dataset.ready = 'true';
   updateSizeSummary();
@@ -2357,8 +2370,14 @@ function finishGif() {
 }
 function playGif(frames) {
   stopGifPlayback();
+  // The integrated editor applies one captured cel. Keep its visible placement
+  // preview on that same final raw frame; the downloadable GIF remains animated.
+  if (integratedShared && state.mode === 'captured') {
+    if (state.result) paintPreviewFrame(state.result);
+    return;
+  }
   let index = 0;
-  const show = () => { const f = frames[index]; index = (index + 1) % frames.length; viewContext.putImageData(new ImageData(f.data, f.width, f.height), 0, 0); };
+  const show = () => { const f = frames[index]; index = (index + 1) % frames.length; paintPreviewFrame(f); };
   if (view.width !== frames[0].width || view.height !== frames[0].height) { view.width = frames[0].width; view.height = frames[0].height; }
   show();
   gif.playTimer = window.setInterval(show, 1000 / (frames.fps || GIF_FPS));
@@ -2386,7 +2405,7 @@ async function prepareGifDownload(frames) {
     sayToast(`GIFを撮影しました（${(frames.length / fps).toFixed(1)}秒）`);
     stopGifPlayback();
     if (isActive()) {
-      if (!audioCameraRequest) resultView.show({ title: 'GIFを撮影しました', detail: `${(frames.length / fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: downloadUrl });
+      if (!audioCameraRequest) resultView.show({ title: 'GIFを撮影しました', detail: `${(frames.length / fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), ...(integratedShared ? {} : { mediaUrl:downloadUrl }) });
       focusVisible('#savePng');
     }
   } catch (error) {
@@ -2708,7 +2727,7 @@ async function restoreReturnedCameraOutput() {
       root.dataset.gifFrames = String(plan.frames.length);
       playGif(plan.frames);
       $('#saveLabel').textContent = '動画を保存（GIF）';
-      resultView.show({ title: 'GIFを撮影しました', detail: `${(plan.frames.length / gif.fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), mediaUrl: url });
+      resultView.show({ title: 'GIFを撮影しました', detail: `${(plan.frames.length / gif.fps).toFixed(1)}秒`, preview: view, controls: $('#resultControls'), ...(integratedShared ? {} : { mediaUrl:url }) });
       say('撮影したGIFを復元しました。再生を確認して編集を続けられます。', { visible: true });
     } else {
       $('#saveLabel').textContent = '画像を保存（PNG）';
@@ -2783,6 +2802,7 @@ if (audioCameraInvalid) {
   }
   function resume({ start = false } = {}) {
     if (!isActive() || document.hidden) return false;
+    if (state.result) paintPreviewFrame(state.result);
     fitPreview();
     if (state.mode === 'captured') {
       if (gif.pending) {
@@ -2808,6 +2828,7 @@ if (audioCameraInvalid) {
     } : null;
   }
   function closeResult() { resultView.close({ focus: false, notify: false }); }
+  function repaintPreview() { if (!state.result) return false; const painted = paintPreviewFrame(state.result); if (painted) fitPreview(state.result); return painted; }
   function dispose() {
     suspend(); lifecycle.abort(); resizeObserver.disconnect(); resultView.dispose?.(); cameraPxd.dispose?.();
     resumeOnVisible = false;
@@ -2817,6 +2838,6 @@ if (audioCameraInvalid) {
     invalidateCaptureDownload();
     clearImportedSource();
   }
-  return { suspend, resume, getImage, closeResult, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
+  return { suspend, resume, getImage, repaintPreview, closeResult, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
     syncProjectSettings(settings) { syncSharedProjectSettings(settings); } };
 }

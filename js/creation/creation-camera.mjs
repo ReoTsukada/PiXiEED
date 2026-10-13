@@ -1,6 +1,6 @@
-import { centerCrop } from '../pixel-studio/framing.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261012-animation-core-contract-1';
+import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261013-camera-placement-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
 function scopedRules(rules) {
@@ -73,6 +73,131 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   controlStateObserver = new MutationObserver(() => { mirrorControlState(); syncCaptureProjectState(); }); controlStateObserver.observe(surface, { attributes: true });
   mirrorControlState();
   nav.insertBefore(shutter, nav.children[2]);
+  const cameraStage = surface.querySelector('#stage');
+  const placementOverlay = document.createElement('canvas'); placementOverlay.id = 'cameraPlacementOverlay';
+  placementOverlay.setAttribute('aria-hidden', 'true'); placementOverlay.hidden = true;
+  surface.querySelector('#captureFrame').append(placementOverlay);
+  let resultPreviewObserver = null, resultPreviewBox = null, resultPreviewCanvas = null, resultPlacementOverlay = null, originalPreviewPosition = '';
+  const placementStatus = document.createElement('p'); placementStatus.id = 'creation-camera-placement';
+  placementStatus.className = 'creation-camera-placement'; placementStatus.setAttribute('role', 'status'); placementStatus.setAttribute('aria-live', 'polite');
+  placementStatus.textContent = '作品への配置先を確認しています。'; cameraStage.append(placementStatus);
+  let placementSnapshot = null, placementMapping = null, placementRenderer = null;
+  let placementErrorMessage = '';
+  const discardResultPreview = () => {
+    resultPlacementOverlay?.remove(); resultPlacementOverlay = null;
+    if (resultPreviewBox) resultPreviewBox.style.position = originalPreviewPosition;
+    resultPreviewBox = resultPreviewCanvas = null; originalPreviewPosition = '';
+  };
+  const mirrorResultBoundary = () => {
+    if (!resultPlacementOverlay) return;
+    const visible = Boolean(placementMapping?.mask && !placementOverlay.hidden);
+    if (!visible) { resultPlacementOverlay.hidden = true; return; }
+    if (resultPlacementOverlay.width !== placementOverlay.width || resultPlacementOverlay.height !== placementOverlay.height) {
+      resultPlacementOverlay.width = placementOverlay.width; resultPlacementOverlay.height = placementOverlay.height;
+    }
+    const context = resultPlacementOverlay.getContext('2d');
+    context.clearRect(0, 0, resultPlacementOverlay.width, resultPlacementOverlay.height);
+    context.drawImage(placementOverlay, 0, 0);
+    resultPlacementOverlay.hidden = false;
+  };
+  const mirrorResultFrame = (frame, pixels = frame.data) => {
+    if (!resultPreviewCanvas?.isConnected || !frame?.width || !frame?.height || !pixels) return;
+    if (resultPreviewCanvas.width !== frame.width || resultPreviewCanvas.height !== frame.height) {
+      resultPreviewCanvas.width = frame.width; resultPreviewCanvas.height = frame.height;
+    }
+    const context = resultPreviewCanvas.getContext('2d');
+    context.putImageData(new ImageData(pixels, frame.width, frame.height), 0, 0);
+  };
+  const syncResultPreview = () => {
+    if (scope?.disposed || document.body.dataset.toolResultOpen !== 'camera-result') { discardResultPreview(); return; }
+    const section = document.querySelector('section[data-tool-result-view="camera-result"]');
+    const canvas = section?.querySelector('canvas.px-tool-result__preview');
+    const box = canvas?.closest('.px-tool-result__picture');
+    if (!canvas || !box) { discardResultPreview(); return; }
+    if (box !== resultPreviewBox) {
+      discardResultPreview(); resultPreviewBox = box; resultPreviewCanvas = canvas;
+      const actionGroup = section.querySelector('.px-tool-result__action-group');
+      if (actionGroup) actionGroup.scrollTop = 0;
+      originalPreviewPosition = box.style.position;
+      box.style.position = 'relative';
+      resultPlacementOverlay = document.createElement('canvas');
+      resultPlacementOverlay.id = 'cameraPlacementResultOverlay';
+      resultPlacementOverlay.setAttribute('aria-hidden', 'true');
+      resultPlacementOverlay.hidden = true;
+      box.append(resultPlacementOverlay);
+    }
+    instance?.repaintPreview?.();
+    mirrorResultBoundary();
+  };
+  const clearPlacement = (message) => {
+    placementSnapshot = placementMapping = placementRenderer = null;
+    placementOverlay.width = placementOverlay.height = 1; placementOverlay.hidden = true;
+    mirrorResultBoundary();
+    if (placementStatus.textContent !== message) placementStatus.textContent = message;
+  };
+  const updatePlacement = ({ repaint = true, sourceWidth = null, sourceHeight = null } = {}) => {
+    if (scope?.disposed) return;
+    try {
+      placementErrorMessage = '';
+      const snapshot = draw.cameraPlacementTarget();
+      if (snapshot.supported === false || snapshot.width > 256 || snapshot.height > 256) {
+        placementSnapshot = snapshot; placementMapping = placementRenderer = null;
+        placementOverlay.width = placementOverlay.height = 1; placementOverlay.hidden = true;
+        mirrorResultBoundary();
+        const message = `作品への配置プレビュー：${snapshot.description}。このサイズでは配置プレビューを表示できません。`;
+        if (placementStatus.textContent !== message) placementStatus.textContent = message;
+        return;
+      }
+      const mapping = createCameraPlacementMapping({ sourceWidth:sourceWidth || snapshot.width, sourceHeight:sourceHeight || snapshot.height, width:snapshot.width, height:snapshot.height,
+        bounds:snapshot.bounds, cells:snapshot.cells, mask:snapshot.mask });
+      const renderer = createCameraPlacementRenderer(snapshot, mapping);
+      placementSnapshot = snapshot; placementMapping = mapping; placementRenderer = renderer;
+      if (placementOverlay.width !== snapshot.width * 4 || placementOverlay.height !== snapshot.height * 4) {
+        placementOverlay.width = snapshot.width * 4; placementOverlay.height = snapshot.height * 4;
+      }
+      drawCameraPlacementBoundary(placementOverlay.getContext('2d'), mapping);
+      placementOverlay.hidden = !mapping.mask;
+      const lockNote = snapshot.activeLocked ? '選択レイヤーはロック中のため、作品画像を表示しています。'
+        : snapshot.musicOnly && !snapshot.layerVisible ? '音楽レイヤーは非表示ですが、現在の音楽編集表示に合わせてプレビューしています。'
+          : snapshot.layerVisible ? '' : '選択レイヤーは非表示のため、作品画像を表示しています。';
+      const message = `作品への配置プレビュー：${snapshot.description}。${lockNote}`;
+      if (placementStatus.textContent !== message) placementStatus.textContent = message;
+      mirrorResultBoundary();
+      if (repaint) instance?.repaintPreview?.();
+    } catch (error) {
+      clearPlacement(`作品への配置プレビューを更新できません。${error instanceof Error ? error.message : ''}`);
+      instance?.repaintPreview?.();
+    }
+  };
+  const renderPlacementFrame = frame => {
+    if (!placementRenderer || !placementMapping) { mirrorResultFrame(frame); return frame.data; }
+    if (placementMapping.sourceWidth !== frame.width || placementMapping.sourceHeight !== frame.height) updatePlacement({ repaint:false, sourceWidth:frame.width, sourceHeight:frame.height });
+    if (!placementRenderer || !placementMapping) { mirrorResultFrame(frame); return frame.data; }
+    try {
+      const pixels = placementRenderer.render(frame, { paletteFixed:frame.paletteFixed === true });
+      mirrorResultFrame(frame, pixels);
+      return pixels;
+    } catch (error) {
+      mirrorResultFrame(frame);
+      throw new Error(`作品への配置プレビューを更新できません。${error instanceof Error ? error.message : ''}`);
+    }
+  };
+  const reportPlacementError = error => {
+    if (!error) return;
+    const detail = error instanceof Error ? error.message : '配置プレビューを更新できません。';
+    const message = `配置プレビューを表示できません。撮影画像は作品へ適用されていません。${detail}`;
+    placementErrorMessage = message;
+    if (placementStatus.textContent !== message) placementStatus.textContent = message;
+  };
+  const clearPlacementError = error => {
+    if (error || !placementErrorMessage || !placementSnapshot) return;
+    placementErrorMessage = '';
+    const lockNote = placementSnapshot.activeLocked ? '選択レイヤーはロック中のため、作品画像を表示しています。'
+      : placementSnapshot.musicOnly && !placementSnapshot.layerVisible ? '音楽レイヤーは非表示ですが、現在の音楽編集表示に合わせてプレビューしています。'
+        : placementSnapshot.layerVisible ? '' : '選択レイヤーは非表示のため、作品画像を表示しています。';
+    const message = placementSnapshot.description ? `作品への配置プレビュー：${placementSnapshot.description}。${lockNote}` : '作品への配置プレビューを表示しています。';
+    if (placementStatus.textContent !== message) placementStatus.textContent = message;
+  };
   let destination = 'draw';
   const applyButton = controls.querySelector('#useCameraImage');
   const targetSummary = document.createElement('p'); targetSummary.id = 'creation-camera-target';
@@ -184,10 +309,15 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     return { width: image.width, height: image.height, palette: [...timeline.palette] };
   };
   let unsubscribeDraw = null;
+  resultPreviewObserver = new MutationObserver(syncResultPreview);
+  resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
+  syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261012-operation-bar-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261013-camera-placement-1');
   assertCurrent();
+  updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,
+    onPreviewFrame:renderPlacementFrame, onPreviewError:error => error ? reportPlacementError(error) : clearPlacementError(error),
     initialProjectSettings: readProjectSettings(),
     mountWorkspace: options => {
       workspace = mountProjectWorkspace({ ...options, root: surface, idPrefix: 'camera-', routePointer: false, initialPointer, isActive, onNavigate });
@@ -205,18 +335,9 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
       if (image.width !== currentImage.width || image.height !== currentImage.height) {
         throw new Error('描画設定が変わりました。カメラを撮り直してください。');
       }
-      const source = document.createElement('canvas'); source.width = image.width; source.height = image.height;
-      source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(image.data), image.width, image.height), 0, 0);
-      const sampled = document.createElement('canvas'); sampled.width = size.width; sampled.height = size.height;
-      const context = sampled.getContext('2d'); context.imageSmoothingEnabled = false;
-      const crop = centerCrop(image.width, image.height, size.width / size.height);
-      context.drawImage(source, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, size.width, size.height);
-      const local = context.getImageData(0, 0, size.width, size.height).data;
-      const selected = new Uint8ClampedArray(target.cells.length * 4);
-      target.cells.forEach((cell, index) => {
-        const offset = ((Math.floor(cell / target.width) - size.y) * size.width + cell % target.width - size.x) * 4;
-        selected.set(local.subarray(offset, offset + 4), index * 4);
-      });
+      const mapping = createCameraPlacementMapping({ sourceWidth:image.width, sourceHeight:image.height, width:target.width, height:target.height,
+        bounds:size, cells:target.cells, mask:target.mask });
+      const selected = sampleCameraFrameToPlacement(image, mapping);
       await draw.applyCameraRgba(snapshot, selected, { paletteFixed: image.paletteFixed === true });
       applied = true;
       // Shared palette updates may retire the camera preview during the commit.
@@ -240,6 +361,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   unsubscribeDraw = draw.subscribe(() => {
     try { instance.syncProjectSettings(readProjectSettings()); } catch {}
     renderProjectStatus();
+    if (isActive()) updatePlacement();
     if (isActive()) void updateTarget();
   });
   mountToolHeaderControls(document, { selectors: ['#cameraChooseImage', '#flipCamera'] });
@@ -265,7 +387,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   if (scope?.disposed || !isCurrent()) throw new Error('カメラモードが終了しました。');
   instance.closeResult(); instance.suspend(); setInteractive(false);
   scope.listen(window, 'resize', fit);
-  scope.add(() => { enterEpoch++; setInteractive(false); unsubscribeDraw?.(); observer?.disconnect(); controlStateObserver?.disconnect(); controlHost.remove(); instance?.dispose(); style?.remove(); });
+  scope.add(() => { enterEpoch++; setInteractive(false); unsubscribeDraw?.(); observer?.disconnect(); controlStateObserver?.disconnect(); resultPreviewObserver?.disconnect(); discardResultPreview(); controlHost.remove(); instance?.dispose(); style?.remove(); });
   return {
     surface, controls, controlHost, shutter, headerControls, extraNodes, workspace: instance.workspace,
     async enter(from = 'draw') {
@@ -273,6 +395,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
       destination = from;
       await updateTarget();
       if (epoch !== enterEpoch || !isCurrent()) return;
+      updatePlacement();
       applyButton.textContent = from === 'draw' ? '描画へ適用' : '音楽へ適用';
     },
     suspend() { enterEpoch++; setInteractive(false); instance.closeResult(); instance.suspend(); },
@@ -284,6 +407,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     try { instance?.dispose?.(); } catch {}
     try { observer?.disconnect(); } catch {}
     try { controlStateObserver?.disconnect(); } catch {}
+    try { resultPreviewObserver?.disconnect(); discardResultPreview(); } catch {}
     try { style?.remove(); } catch {}
     try { workspace?.dispose?.(); } catch {}
     const added = [...document.querySelectorAll('*')].filter(node => !existingNodes.has(node));

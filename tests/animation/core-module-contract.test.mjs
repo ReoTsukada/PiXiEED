@@ -9,7 +9,7 @@ import * as secondFacade from '../../js/creation/animation-core.mjs?identity-tes
 const root = new URL('../../', import.meta.url);
 const REV = '20261012-animation-core-contract-1';
 const CORE = 'js/creation/animation-core.mjs';
-// Operation-bar modules use a new URL while their animation-core dependencies keep REV.
+// Cache-busted operation-bar/camera modules keep the canonical core dependency URL.
 const operationBarTargets = new Set([
   'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs',
   'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs',
@@ -17,7 +17,13 @@ const operationBarTargets = new Set([
   'js/creation/jigsaw-page.mjs', 'js/creation/pixfind-play.mjs',
   'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-result-view.mjs'
 ]);
-const expectedRevision = target => operationBarTargets.has(target) ? '20261012-operation-bar-1' : REV;
+const cameraPlacementCoreTargets = new Set([
+  'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs',
+  'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs',
+  'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs'
+]);
+const expectedRevision = target => cameraPlacementCoreTargets.has(target) ? '20261013-camera-placement-1'
+  : operationBarTargets.has(target) ? '20261012-operation-bar-1' : REV;
 const specifiers = source => [...source.matchAll(/['"]([^'"\s]+\.mjs(?:\?[^'"\s]*)?)['"]/g)].map(match => match[1]);
 const targetFor = (owner, value) => {
   const path = value.split('?')[0];
