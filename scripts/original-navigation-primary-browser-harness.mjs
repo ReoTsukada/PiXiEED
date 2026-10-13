@@ -24,8 +24,8 @@ try{
  await page.locator('#draw-animation-play').click();await page.waitForFunction(()=>document.querySelector('#draw-animation-play').getAttribute('aria-pressed')==='true');
  await page.locator('#draw-animation-play').click();await page.waitForFunction(()=>document.querySelector('#draw-animation-play').getAttribute('aria-pressed')==='false');
  report.checks.push('historical central animation action starts and stops two-frame playback');
- await mode('audio');await page.locator('#draw-music-settings > summary').click();await page.locator('#draw-music-instrument').selectOption('square');
- await page.locator('#draw-music-settings > summary').click();
+ await mode('audio');await page.locator('#creation-settings-open').click();await page.locator('#creation-mode-settings-open').click();await page.locator('#draw-music-instrument').selectOption('square');
+ await page.keyboard.press('Escape');
  const box=await page.locator('#draw-canvas').boundingBox();await page.mouse.click(box.x+box.width*.35,box.y+box.height*.45);
  await page.locator('#draw-music-play').click();await page.waitForFunction(()=>document.querySelector('#draw-music-play').dataset.state==='playing');
  await page.locator('#draw-music-play').click();await page.waitForFunction(()=>document.querySelector('#draw-music-play').dataset.state==='idle');

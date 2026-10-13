@@ -9,6 +9,6 @@ if (sharedEntry) {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
   await import('./draw-camera-page.mjs?rev=20261012-animation-core-contract-1');
 } else {
-  await import('./app.mjs?rev=20261012-animation-core-contract-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
+  await import('./app.mjs?rev=20261012-operation-bar-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
 }
 }

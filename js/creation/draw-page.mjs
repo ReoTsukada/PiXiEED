@@ -23,7 +23,7 @@ import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20260928-pixel-roundtrip-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261011-integrated-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
@@ -45,7 +45,7 @@ import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=202610
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261011-tool-size-1';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261012-operation-bar-1';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261010-selection-handles-1';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261011-selection-body-1';
@@ -109,7 +109,7 @@ let musicReadOnlyReason = '';
 let outputPreferences = { ...DEFAULT_MUSIC_OUTPUT_PREFERENCES };
 // Every creation mode edits this one immutable timeline and history.
 const editorListeners = new Set(), projectHooks = new Set();
-let currentOpenedProject = null, projectSettingsRequest = null, musicSettingsPlanner = null;
+let currentOpenedProject = null, projectSettingsRequest = null, creationNavigationRequest = null, musicSettingsPlanner = null;
 let notifiedAnimation = null;
 function notifyEditorChange() {
   if (!editorListeners.size || notifiedAnimation === animationSession.animation) return;
@@ -2087,9 +2087,11 @@ const commandFocus = selector => {
   const node = $(selector); if (!node || node.disabled) return false;
   node.focus({ preventScroll: true }); node.scrollIntoView({ block: 'nearest', inline: 'nearest' }); return true;
 };
-function commandOpen(detailsSelector, focusSelector) {
+function commandOpen(detailsSelector, focusSelector, creationAction = null) {
   selectionPanel?.hide();
   cancelDrawingInput(); closeColorEditor(); animationControls?.close?.(); editorUi.closePanels();
+  const creationHandler = creationAction && creationNavigationRequest?.[creationAction];
+  if (typeof creationHandler === 'function') return creationHandler();
   const details = $(detailsSelector); if (!details) return false;
   details.open = true;
   if (details.id === 'draw-tool-picker') placeToolMenu();
@@ -2143,9 +2145,9 @@ const commandHandlers = {
   'focus.leftControls': () => { toast('色・道具をEnterで左に割り当てます。'); return commandHandlers['focus.palette'](); },
   'focus.rightControls': () => { toast('色・道具をShift＋Enterで右に割り当てます。'); return commandHandlers['focus.palette'](); },
   'focus.tools': () => commandOpen('#draw-tool-picker', '.draw-tool-menu [data-draw-tool]'),
-  'focus.settings': () => commandOpen('#draw-settings-picker', '#draw-mirror'),
-  'focus.fileMenu': () => commandOpen('#draw-output', '#draw-export'),
-  'open.canvasSettings': () => commandOpen('.draw-import', '#draw-canvas-width'),
+  'focus.settings': () => commandOpen('#draw-settings-picker', '#draw-mirror', 'settings'),
+  'focus.fileMenu': () => commandOpen('#draw-output', '#draw-export', 'fileMenu'),
+  'open.canvasSettings': () => commandOpen('.draw-import', '#draw-canvas-width', 'canvasSettings'),
   'open.colorEditor': () => { cancelDrawingInput(); editorUi.closePanels(); openColorEditor(Math.max(0, selectedColor)); requestAnimationFrame(() => commandFocus('#dce-h')); return true; },
   'focus.mirrorOriginX': () => commandFocus('#draw-mirror-x'), 'focus.mirrorOriginY': () => commandFocus('#draw-mirror-y'),
   'controls.left': () => setControlsSide('left'),
@@ -2291,6 +2293,13 @@ return {
   get workspace() { return pxdBridge; }, dispose: disposeDrawMode,
   get bank() { return 'shared'; },
   getTimeline() { return animationSession.animation; }, getImageRole() { return musicLayer ? 'main' : pxdImageRole; },
+  getTimelineHistoryPosition(timeline) {
+    const history = animationSession.snapshot().timeline;
+    if (history.current === timeline) return 'current';
+    if (history.past.includes(timeline)) return 'past';
+    if (history.future.includes(timeline)) return 'future';
+    return 'missing';
+  },
   getEditorState: getDrawEditorState,
   subscribe(listener) { editorListeners.add(listener); return () => editorListeners.delete(listener); },
   async attachProjectHooks(hooks) {
@@ -2301,6 +2310,11 @@ return {
     projectHooks.add(hooks); return () => projectHooks.delete(hooks);
   },
   setProjectSettingsRequest(callback) { projectSettingsRequest = callback; },
+  setCreationNavigation(callback) {
+    if (callback != null && (typeof callback !== 'object' || Object.values(callback).some(value => typeof value !== 'function'))) throw new TypeError('制作ナビゲーションの処理が不正です。');
+    creationNavigationRequest = callback;
+    return () => { if (creationNavigationRequest === callback) creationNavigationRequest = null; };
+  },
   setSharedSettingsDismissal(settings) { return scope.add(panelDismissals.registerSharedSettings(settings)); },
   cancelInput() { cancelDrawingInput(); },
   setMusicSettingsPlanner(callback) {

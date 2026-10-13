@@ -20,7 +20,7 @@ import { addAnimationFrame, composeAnimationFrame, createAnimationFromDraw, getA
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261009-fps-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
 import { AUDIO_ANIMATION_LINK_VERSION, audioAnimationFrameTicks, audioAnimationCellTiming, audioAnimationSequenceColumn, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261011-integrated-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountColorPanel } from './color-panel.mjs?rev=20261006-panel-close-1';

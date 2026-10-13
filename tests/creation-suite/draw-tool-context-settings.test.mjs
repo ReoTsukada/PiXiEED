@@ -7,9 +7,19 @@ test('selection transactions override shape and fill settings, including an empt
  for (const binding of [{tool:'rectangle'}, {tool:'fill',contiguous:false}]) {
   assert.deepEqual(keys(drawSelectionActionSlots({pending:true,hasClipboard:true},'paste',binding)), ['confirm','cancel']);
   assert.deepEqual(keys(drawSelectionActionSlots({bounds:{width:2},canCopy:false,canCut:false},'select',binding)), ['copy','cut']);
-  assert.deepEqual(keys(drawSelectionActionSlots({selectTool:true},'select',binding)), ['copy','cut']);
+  assert.deepEqual(keys(drawSelectionActionSlots({selectTool:true},'select',binding)), [binding.tool==='fill'?'contiguous':'filled','empty']);
   assert.deepEqual(keys(drawSelectionActionSlots({bounds:{width:2},hasClipboard:true,canPaste:true},'paste',binding)), ['paste','back']);
  }
+});
+test('copy and cut require selected bounds, while an existing clipboard remains reachable from the select tool', () => {
+ assert.deepEqual(keys(drawSelectionActionSlots({selectTool:true,hasClipboard:false},'select',{tool:'select'})), ['empty','empty']);
+ assert.deepEqual(keys(drawSelectionActionSlots({selectTool:true,hasClipboard:true,canPaste:true},'select',{tool:'select'})), ['paste','back']);
+ assert.deepEqual(keys(drawSelectionActionSlots({bounds:{width:1,height:1},selectTool:true,canCopy:false,canCut:false},'select',{tool:'select'})), ['copy','cut']);
+ assert.deepEqual(drawSelectionActionSlots({bounds:{width:1,height:1},selectTool:true,canCopy:false,canCut:false},'select',{tool:'select'}).map(slot=>slot.enabled), [false,false]);
+});
+test('paste mode keeps its paste-to-range transition while unrelated tool settings remain contextual', () => {
+ assert.deepEqual(keys(drawSelectionActionSlots({hasClipboard:true,canPaste:true},'paste',{tool:'rectangle'})), ['paste','back']);
+ assert.deepEqual(keys(drawSelectionActionSlots({hasClipboard:true,selectTool:false,canPaste:true},'tool',{tool:'fill',contiguous:false})), ['contiguous','empty']);
 });
 test('shape aliases expose exactly one independent filled toggle and an empty second slot', () => {
  for (const base of ['rectangle','ellipse']) for (const filled of [false,true]) {

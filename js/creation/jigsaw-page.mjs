@@ -18,7 +18,7 @@ import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261006-result-list-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
 import { createLevelTracker } from '../site-analytics.mjs';

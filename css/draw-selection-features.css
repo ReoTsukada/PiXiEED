@@ -35,6 +35,8 @@ body[data-page="draw"] .draw-feature-actions > .draw-selection-controls__deselec
   background: #ffd35a !important;
   color: #17232d !important;
 }
+body[data-page="draw"] .draw-feature-actions > [hidden] { display: none !important; }
+body[data-page="draw"] .draw-feature-actions:has(> .draw-selection-controls__deselect[hidden]) > .draw-brush-size-open { grid-column: 3 / span 2; }
 body[data-page="draw"] .draw-feature-actions > button:focus-visible {
   outline: 3px solid #8ecdf0;
   outline-offset: 2px;

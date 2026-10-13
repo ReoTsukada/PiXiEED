@@ -17,7 +17,7 @@ import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '..
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261001-free-tools-1';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261001-free-tools-1';
 import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261012-animation-core-contract-1';
-import { createToolResultView } from '../tool-result-view.mjs?rev=20261011-integrated-1';
+import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261009-output-12';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-3';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';

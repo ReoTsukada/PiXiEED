@@ -36,7 +36,7 @@ function scopedRules(rules) {
 }
 
 /** Full camera engine and controls occupy the Draw shell's stage, dock, header and shutter slot. */
-export async function mountCreationCamera({ scope, board, dock, nav, draw, getAudio, onReturn, onNavigate, onProjectSettings, isActive, isCurrent = isActive, initialPointer = null }) {
+export async function mountCreationCamera({ scope, board, dock, nav, draw, getAudio, onReturn, onNavigate, onProjectSettings, onProjectStatus, isActive, isCurrent = isActive, initialPointer = null }) {
   const existingNodes = new Set(document.querySelectorAll('*'));
   const bodyClasses = new Set(document.body.classList);
   const transferReady = document.body.getAttribute('data-tool-transfer-ready');
@@ -70,7 +70,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     for (const key of Object.keys(controlHost.dataset)) if (!Object.hasOwn(surface.dataset, key)) delete controlHost.dataset[key];
     Object.assign(controlHost.dataset, surface.dataset);
   };
-  controlStateObserver = new MutationObserver(mirrorControlState); controlStateObserver.observe(surface, { attributes: true });
+  controlStateObserver = new MutationObserver(() => { mirrorControlState(); syncCaptureProjectState(); }); controlStateObserver.observe(surface, { attributes: true });
   mirrorControlState();
   nav.insertBefore(shutter, nav.children[2]);
   let destination = 'draw';
@@ -78,6 +78,44 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const targetSummary = document.createElement('p'); targetSummary.id = 'creation-camera-target';
   targetSummary.setAttribute('role', 'status'); targetSummary.style.cssText = 'margin:0;font-size:12px;line-height:1.5;text-align:center;max-width:100%;';
   controls.querySelector('#resultControls').append(targetSummary);
+  const projectStatus = document.createElement('p'); projectStatus.id = 'creation-camera-project-status';
+  projectStatus.className = 'creation-camera-project-status'; projectStatus.setAttribute('role', 'status'); projectStatus.setAttribute('aria-live', 'polite');
+  controls.querySelector('#resultControls').append(projectStatus);
+  let cameraProjectState = 'none', appliedTimeline = null, lastCameraMode = surface.dataset.mode, captureEpoch = 0;
+  let restoredCaptureExpected = new URLSearchParams(location.search).has('outputId');
+  const cameraProjectCopy = {
+    none: '',
+    pending: '撮影画像は作品に未反映です。作品の保存には含まれず、出力は撮影画像単体です。',
+    applied: '撮影画像を作品へ反映済みです。保存するのは現在の作品です。撮影画像単体の出力もできます。',
+    undone: '撮影画像の反映は作品のUndoで取り消されています。作品は未反映の状態で保存され、出力は撮影画像単体です。',
+    unknown: '現在の作品では撮影画像の反映状態が変わっています。保存対象は現在の作品です。撮影画像単体の出力もできます。'
+  };
+  const renderProjectStatus = () => {
+    if (appliedTimeline) {
+      let position = 'missing';
+      try { position = draw.getTimelineHistoryPosition?.(appliedTimeline) || 'missing'; } catch {}
+      cameraProjectState = position === 'current' || position === 'past' ? 'applied' : position === 'future' ? 'undone' : 'unknown';
+    }
+    const message = cameraProjectCopy[cameraProjectState] || cameraProjectCopy.unknown;
+    if (projectStatus.textContent !== message) projectStatus.textContent = message;
+    projectStatus.hidden = cameraProjectState === 'none';
+    onProjectStatus?.({ type:cameraProjectState, timeline:appliedTimeline });
+  };
+  const syncCaptureProjectState = () => {
+    const nextMode = surface.dataset.mode;
+    if (nextMode === 'captured' && lastCameraMode !== 'captured') {
+      captureEpoch++;
+      cameraProjectState = restoredCaptureExpected ? 'unknown' : 'pending'; appliedTimeline = null;
+      restoredCaptureExpected = false;
+      onProjectStatus?.({ type:cameraProjectState === 'pending' ? 'captured' : 'unknown' }); renderProjectStatus();
+    } else if (lastCameraMode === 'captured' && nextMode !== 'captured') {
+      captureEpoch++; cameraProjectState = 'none'; appliedTimeline = null;
+      onProjectStatus?.({ type:'idle' }); renderProjectStatus();
+    }
+    lastCameraMode = nextMode;
+  };
+  if (lastCameraMode === 'captured') { captureEpoch++; cameraProjectState = restoredCaptureExpected ? 'unknown' : 'pending'; restoredCaptureExpected = false; onProjectStatus?.({ type:cameraProjectState === 'pending' ? 'captured' : 'unknown' }); }
+  renderProjectStatus();
   const recoveryActions = document.createElement('div');
   recoveryActions.className = 'creation-camera-recovery';
   recoveryActions.hidden = true;
@@ -147,7 +185,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   };
   let unsubscribeDraw = null;
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261012-animation-core-contract-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261012-operation-bar-1');
   assertCurrent();
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,
     initialProjectSettings: readProjectSettings(),
@@ -157,6 +195,8 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     },
     onUseImage: async image => {
       if (!isActive() || !image) return;
+      const attemptEpoch = captureEpoch;
+      let applied = false;
       try {
       // Resolve the active frame, layer, selection, and palette at apply time for every entry path.
       const snapshot = await draw.cameraTarget();
@@ -178,10 +218,16 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
         selected.set(local.subarray(offset, offset + 4), index * 4);
       });
       await draw.applyCameraRgba(snapshot, selected, { paletteFixed: image.paletteFixed === true });
+      applied = true;
+      // Shared palette updates may retire the camera preview during the commit.
+      // Keep the successful artwork application visible without attributing it
+      // to a newer captured image.
+      if (attemptEpoch === captureEpoch || cameraProjectState === 'none') { appliedTimeline = draw.getTimeline(); cameraProjectState = 'applied'; renderProjectStatus(); }
       instance.closeResult(); await onReturn(destination);
       } catch (error) {
         // The camera's stage notice sits behind its completed-image view.
         // Keep an apply failure readable alongside the preserved result controls.
+        if (!applied && attemptEpoch === captureEpoch) { cameraProjectState = 'pending'; onProjectStatus?.({ type:'apply-failed' }); renderProjectStatus(); }
         targetSummary.textContent = error.message;
         showApplyRecovery(error);
         throw error;
@@ -189,9 +235,11 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     }
   });
   assertCurrent();
+  restoredCaptureExpected = false;
   surface.querySelector('.lc-back')?.remove();
   unsubscribeDraw = draw.subscribe(() => {
     try { instance.syncProjectSettings(readProjectSettings()); } catch {}
+    renderProjectStatus();
     if (isActive()) void updateTarget();
   });
   mountToolHeaderControls(document, { selectors: ['#cameraChooseImage', '#flipCamera'] });

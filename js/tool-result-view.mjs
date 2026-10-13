@@ -104,7 +104,12 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
     if (event.type === 'click') returnFromResult();
   }
   function prepareNav() {
-    navButton = [...doc.querySelectorAll('.app-tabs > button')].find(button => !button.inert && !button.hidden && button.getClientRects().length);
+    const buttons = [...doc.querySelectorAll('.app-tabs > button')];
+    const isVisible = button => !button.inert && !button.hidden && button.getClientRects().length;
+    const creationPrimary = doc.body.classList.contains('creation-suite')
+      ? [...doc.querySelectorAll('.app-tabs > button[data-nav-primary]')].find(isVisible)
+      : null;
+    navButton = creationPrimary || buttons.find(isVisible);
     if (!navButton) return;
     navState = { label: navButton.getAttribute('aria-label'), title: navButton.getAttribute('title'), disabled: navButton.disabled, children: [...navButton.childNodes] };
     navButton.dataset.toolResultReturn = ''; navButton.disabled = false;

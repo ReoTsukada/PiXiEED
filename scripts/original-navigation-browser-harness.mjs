@@ -1,4 +1,4 @@
-/** Local acceptance of the historical five slots, including real mode actions. */
+/** Local acceptance of public navigation and the approved creation operation bar. */
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
@@ -34,7 +34,7 @@ try{
      for(let i=1;i<5;i++)assert.ok(nav.controls[i-1].rect.right<=nav.controls[i].rect.x+.5,'no adjacent target overlap');
     }
     if(creation){
-     const nav=row.rows[0];assert.deepEqual(nav.controls.map(n=>n.key||n.id),['map','creation-mode-menu',{draw:'draw-animation-play',camera:'capture',audio:'draw-music-play'}[mode],'tools','profile']);
+     const nav=row.rows[0];assert.deepEqual(nav.controls.map(n=>n.key||n.id),['creation-file-open','creation-mode-menu',{draw:'draw-animation-play',camera:'capture',audio:'draw-music-play'}[mode],'creation-settings-open','creation-output-open']);
      assert.equal(await page.locator('.app-tabs > button[data-creation-mode]').count(),0,'no rejected direct mode row');
      assert.equal(await page.locator('#creation-mode-menu [aria-pressed="true"]').count(),1);
      await page.locator('#creation-mode-menu > summary').focus();await page.keyboard.press('Enter');assert.equal(await page.locator('#creation-mode-menu').evaluate(n=>n.open),true);
@@ -50,5 +50,5 @@ try{
   }
   await ctx.close();console.log('complete',viewport.width,viewport.height);
  }
- assert.deepEqual(report.failures,[]);console.log('PASS: original five roles, centered existing play/capture/save, 44px targets, keyboard menu, all viewports');
+ assert.deepEqual(report.failures,[]);console.log('PASS: public destinations and creation operations, centered existing primary actions, 44px targets, keyboard menu, all viewports');
 }finally{await writeFile(output+'/report.json',JSON.stringify(report,null,2));await browser.close();}

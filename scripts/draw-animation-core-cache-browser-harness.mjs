@@ -81,7 +81,7 @@ try {
     row.checks.push('old cached PXD restores dimensions, exact pixels and two frames');
     const rgba=()=>page.locator('#draw-canvas').evaluate(c=>Array.from(c.getContext('2d').getImageData(0,0,c.width,c.height).data));
     const original=await rgba(),box=await page.locator('#draw-canvas').boundingBox();await page.mouse.click(box.x+box.width*.64,box.y+box.height*.61);const edited=await rgba();assert.notDeepEqual(edited,original);
-    for(const mode of ['audio','camera','draw']) {await page.locator(`button[data-creation-mode="${mode}"]`).click();await page.waitForFunction(m=>document.body.dataset.creationMode===m&&!document.body.hasAttribute('data-creation-transition'),mode);}
+    for(const mode of ['audio','camera','draw']) {if(!await page.locator('#creation-mode-menu').evaluate(n=>n.open))await page.locator('#creation-mode-menu > summary').click();await page.locator(`button[data-creation-mode="${mode}"]`).click();await page.waitForFunction(m=>document.body.dataset.creationMode===m&&!document.body.hasAttribute('data-creation-transition'),mode);}
     assert.deepEqual(await rgba(),edited);row.checks.push('draw and shared-mode round trip preserve pixels across the contract');
     await page.locator('#draw-undo').click();assert.deepEqual(await rgba(),original);await page.locator('#draw-redo').click();assert.deepEqual(await rgba(),edited);row.checks.push('Undo/Redo survive mode round trip');
     await page.locator('#pxd-save').evaluate(n=>n.click());await page.waitForFunction(()=>document.querySelector('.project-bar__open')?.dataset.state==='saved');

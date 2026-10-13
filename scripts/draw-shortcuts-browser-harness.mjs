@@ -45,7 +45,10 @@ try {
     };
     const openSettings = async () => {
       const details = page.locator('#draw-settings-picker');
-      if (!(await details.evaluate(node => node.open))) await page.locator('#draw-settings-summary').click();
+      if (!(await details.evaluate(node => node.open))) {
+        if (await page.locator('#creation-mode-settings-open').count()) { await page.locator('#creation-settings-open').click(); await page.locator('#creation-mode-settings-open').click(); }
+        else await page.locator('#draw-settings-summary').click();
+      }
     };
     const closeSettings = async () => { if (await page.locator('#draw-settings-picker').evaluate(node => node.open)) await page.keyboard.press('Escape'); };
     const openDialog = async () => { await openSettings(); await page.locator('#draw-shortcuts-open').click(); await page.locator('#draw-shortcuts-dialog').waitFor({ state: 'visible' }); };
@@ -176,8 +179,9 @@ try {
         await runListed('toggle.grid'); assert.equal(await page.locator('#draw-grid-toggle').getAttribute('aria-pressed'), 'false', 'grid command toggles the view setting');
         await runListed('open.colorEditor'); assert.equal(await page.locator('#draw-color-editor').isVisible(), true, 'color editor command opens the editor');
         await page.keyboard.press('Escape'); assert.equal(await page.locator('#draw-color-editor').isVisible(), false, 'color editor closes with Escape');
-        await runListed('open.canvasSettings'); assert.equal(await page.locator('.draw-import').evaluate(node => node.open), true, 'canvas settings command opens its panel');
-        await page.locator('#draw-import-summary').evaluate(node => node.click());
+        await runListed('open.canvasSettings');
+        if (await page.locator('#creation-project-settings-panel').count()) { assert.equal(await page.locator('#creation-project-settings-panel').isVisible(), true, 'canvas settings command opens shared settings'); await page.keyboard.press('Escape'); }
+        else { assert.equal(await page.locator('.draw-import').evaluate(node => node.open), true, 'canvas settings command opens its panel'); await page.locator('#draw-import-summary').evaluate(node => node.click()); }
         await runListed('animation.workspace');
         await runListed('animation.addBlankFrame');
         assert.match(await page.locator('#draw-animation-controls [data-action="toggle-frames"]').getAttribute('aria-label'), /コマ 2/, 'blank-frame command creates and selects the second frame');
