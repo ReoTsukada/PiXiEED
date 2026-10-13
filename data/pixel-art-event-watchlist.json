@@ -5,9 +5,12 @@
       "id": "region-170f8cfbca8977ea",
       "label": "ブラジル",
       "eventIds": [
+        "carioca-matsuri-pixel-art-workshop-2026",
         "scratch-day-pioneiro-pixel-art-2026"
       ],
-      "areas": []
+      "areas": [
+        "リオデジャネイロ・Barra Olímpica"
+      ]
     },
     {
       "id": "region-187d4b5e8c981da2",
@@ -171,6 +174,16 @@
       ]
     },
     {
+      "id": "region-c6f27629d041725b",
+      "label": "CAN",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-club-2026-10-22"
+      ],
+      "areas": [
+        "Montréal・Saint-Laurent, Québec"
+      ]
+    },
+    {
       "id": "region-c8af5159309d6a67",
       "label": "フランス",
       "eventIds": [
@@ -178,6 +191,7 @@
         "herofestival-marseille-dendrob-pixel-art-2026",
         "ingwiller-maison-famille-pixel-art-2026-11-04",
         "la-bourboule-pixel-art-serigraphie-2026-11-07",
+        "lyon-pixel-art-de-bibliotheque-2026-11-14",
         "lyon-pixel-art-graffiti-la-duchere-2026-11-25",
         "lyon-pixel-art-graffiti-part-dieu-2026-11-07",
         "lyon-pixel-art-graffiti-saint-rambert-2026-10-21",
@@ -191,7 +205,18 @@
         "Lyon / Part-Dieu",
         "Lyon / Saint-Rambert",
         "Marseille",
-        "Riedisheim"
+        "Riedisheim",
+        "リヨン・6区"
+      ]
+    },
+    {
+      "id": "region-c9c0448bea7fa3ad",
+      "label": "MEX",
+      "eventIds": [
+        "gcmx-del-arte-a-pixel-art-2026"
+      ],
+      "areas": [
+        "グアダラハラ・ハリスコ州"
       ]
     },
     {
@@ -597,6 +622,18 @@
       ]
     },
     {
+      "id": "venue-3b71c62c191569c5",
+      "label": "Mixlab de la Bibliothèque du Boisé, 2727 boulevard Thimens, Montréal (Québec) H4R 1T4",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-club-2026-10-22"
+      ],
+      "region": "CAN",
+      "area": "Montréal・Saint-Laurent, Québec",
+      "sourceUrls": [
+        "https://montreal.ca/evenements/mixlab-club-dart-du-pixel-119687"
+      ]
+    },
+    {
       "id": "venue-51aaaf888031b96d",
       "label": "札幌コンベンションセンター 大ホール",
       "eventIds": [
@@ -828,6 +865,30 @@
       ]
     },
     {
+      "id": "venue-77ca3965aa0b4ae3",
+      "label": "Salón Fiesta Guadalajara, Av. Adolfo López Mateos Sur 610, Guadalajara, Jal.",
+      "eventIds": [
+        "gcmx-del-arte-a-pixel-art-2026"
+      ],
+      "region": "MEX",
+      "area": "グアダラハラ・ハリスコ州",
+      "sourceUrls": [
+        "https://www.gameconferencemx.com/2026-agenda"
+      ]
+    },
+    {
+      "id": "venue-7a3031e798818111",
+      "label": "Riocentro Pavilhão 02（Pavilhão das Artesから入場）, Av. Salvador Allende 6555, Rio de Janeiro–RJ 22783-127",
+      "eventIds": [
+        "carioca-matsuri-pixel-art-workshop-2026"
+      ],
+      "region": "ブラジル",
+      "area": "リオデジャネイロ・Barra Olímpica",
+      "sourceUrls": [
+        "https://cariocamatsuri.com.br/evento"
+      ]
+    },
+    {
       "id": "venue-7ab43aa29a2327c9",
       "label": "渋谷ヒカリエ 8/ CUBE ほか",
       "eventIds": [
@@ -1044,6 +1105,18 @@
       "area": "渋谷",
       "sourceUrls": [
         "https://pixel-art.jp/reboot/"
+      ]
+    },
+    {
+      "id": "venue-e45aa72094ede443",
+      "label": "Bibliothèque du 6e（Salle d’animation, rez-de-chaussée）, 35 rue Bossuet, 69006 Lyon",
+      "eventIds": [
+        "lyon-pixel-art-de-bibliotheque-2026-11-14"
+      ],
+      "region": "フランス",
+      "area": "リヨン・6区",
+      "sourceUrls": [
+        "https://www.bm-lyon.fr/agenda/ateliers-numeriques-pixel-art-de-bibliotheque"
       ]
     },
     {
@@ -1609,6 +1682,27 @@
       }
     },
     {
+      "id": "source-22cc874733428bdd",
+      "label": "The Liquidy Jam!",
+      "eventIds": [
+        "liquidy-jam-2026"
+      ],
+      "url": "https://itch.io/jam/the-liquidy-jam",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（itch.io）"
+      ],
+      "lastKnownEventDate": "2026-11-03",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-12T23:58:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-2386c04f39b4b8de",
       "label": "Homeschool maker time: Pixel art（公式タイトル10–15歳、本文12–16歳）",
       "eventIds": [
@@ -1771,6 +1865,31 @@
       }
     },
     {
+      "id": "source-346f3e854b118367",
+      "label": "Mixlab : Club d'art du pixel",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-club-2026-10-22"
+      ],
+      "url": "https://montreal.ca/evenements/mixlab-club-dart-du-pixel-119687",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "CAN"
+      ],
+      "areas": [
+        "Montréal・Saint-Laurent, Québec"
+      ],
+      "venues": [
+        "Mixlab de la Bibliothèque du Boisé, 2727 boulevard Thimens, Montréal (Québec) H4R 1T4"
+      ],
+      "lastKnownEventDate": "2026-10-22",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-34e7fa0571b6bea4",
       "label": "ピクセルアートの学校",
       "eventIds": [
@@ -1795,6 +1914,31 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
         "notes": "開催情報に日時・会場・講義内容"
+      }
+    },
+    {
+      "id": "source-3aec34be132bfecc",
+      "label": "GCMX 2026 —「Del arte a mano al Pixel Art」トーク",
+      "eventIds": [
+        "gcmx-del-arte-a-pixel-art-2026"
+      ],
+      "url": "https://www.gameconferencemx.com/2026-agenda",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "MEX"
+      ],
+      "areas": [
+        "グアダラハラ・ハリスコ州"
+      ],
+      "venues": [
+        "Salón Fiesta Guadalajara, Av. Adolfo López Mateos Sur 610, Guadalajara, Jal."
+      ],
+      "lastKnownEventDate": "2026-11-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -2826,7 +2970,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "lastCheckedAt": "2026-10-13T00:05:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3296,6 +3440,54 @@
       }
     },
     {
+      "id": "source-9c365599b3eda5e4",
+      "label": "Carioca Matsuri 2026 — Pixel Artワークショップ",
+      "eventIds": [
+        "carioca-matsuri-pixel-art-workshop-2026"
+      ],
+      "url": "https://cariocamatsuri.com.br/evento",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ブラジル"
+      ],
+      "areas": [
+        "リオデジャネイロ・Barra Olímpica"
+      ],
+      "venues": [
+        "Riocentro Pavilhão 02（Pavilhão das Artesから入場）, Av. Salvador Allende 6555, Rio de Janeiro–RJ 22783-127"
+      ],
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-9c8c3e5956171163",
+      "label": "Mixlab : Club d'art du pixel",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-club-2026-10-22"
+      ],
+      "url": "https://montreal.ca/en/events/copie-de-mixlab-pixel-art-club-119687",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "CAN"
+      ],
+      "areas": [
+        "Montréal・Saint-Laurent, Québec"
+      ],
+      "venues": [
+        "Mixlab de la Bibliothèque du Boisé, 2727 boulevard Thimens, Montréal (Québec) H4R 1T4"
+      ],
+      "lastKnownEventDate": "2026-10-22",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-9e5a329f69719a21",
       "label": "新潟コミティア63 — ジュウニ（ドット絵本・出展予定）",
       "eventIds": [
@@ -3404,6 +3596,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-a1f8cf28cd955125",
+      "label": "Ateliers numériques : Pixel art de bibliothèque",
+      "eventIds": [
+        "lyon-pixel-art-de-bibliotheque-2026-11-14"
+      ],
+      "url": "https://www.bm-lyon.fr/agenda/ateliers-numeriques-pixel-art-de-bibliotheque",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "リヨン・6区"
+      ],
+      "venues": [
+        "Bibliothèque du 6e（Salle d’animation, rez-de-chaussée）, 35 rue Bossuet, 69006 Lyon"
+      ],
+      "lastKnownEventDate": "2026-11-14",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-13T00:01:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4161,7 +4378,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "lastCheckedAt": "2026-10-13T00:05:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4772,7 +4989,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-10-13T00:01:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4804,5 +5021,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-12T00:07:04+00:00"
+  "updatedAt": "2026-10-13T00:13:30+00:00"
 }
