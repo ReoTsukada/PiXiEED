@@ -6,9 +6,11 @@
       "label": "ブラジル",
       "eventIds": [
         "carioca-matsuri-pixel-art-workshop-2026",
-        "scratch-day-pioneiro-pixel-art-2026"
+        "scratch-day-pioneiro-pixel-art-2026",
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20"
       ],
       "areas": [
+        "Fortaleza, Centro",
         "リオデジャネイロ・Barra Olímpica"
       ]
     },
@@ -127,6 +129,16 @@
       ]
     },
     {
+      "id": "region-72446fce7237cd50",
+      "label": "オランダ",
+      "eventIds": [
+        "maakmiddag-pixelart-hardenberg-2026-10-28"
+      ],
+      "areas": [
+        "Hardenberg"
+      ]
+    },
+    {
       "id": "region-7ab4225df7fc4c9d",
       "label": "新潟県",
       "eventIds": [
@@ -188,24 +200,36 @@
       "label": "フランス",
       "eventIds": [
         "chateaubourg-pixel-art-workshop-2026-10-07",
+        "fontenay-vendee-serigne-pixel-art-lego-2026-11-18",
         "herofestival-marseille-dendrob-pixel-art-2026",
         "ingwiller-maison-famille-pixel-art-2026-11-04",
+        "jeumont-fete-bd-pixel-art-workshop-2026-10-17",
         "la-bourboule-pixel-art-serigraphie-2026-11-07",
+        "les-garennes-sur-loire-atelier-pixel-art-waldo-2026-10-21",
+        "lucinges-bibliotheque-michel-butor-pixel-art-2026-12-16",
         "lyon-pixel-art-de-bibliotheque-2026-11-14",
         "lyon-pixel-art-graffiti-la-duchere-2026-11-25",
         "lyon-pixel-art-graffiti-part-dieu-2026-11-07",
         "lyon-pixel-art-graffiti-saint-rambert-2026-10-21",
+        "moulins-association-artichaut-pixel-art-2026-10-17",
+        "pont-de-beauvoisin-pixel-art-geant-2026-11-25",
         "riedisheim-en-pixel-closing-2026"
       ],
       "areas": [
         "Châteaubourg",
         "Ingwiller",
+        "Jeumont",
         "La Bourboule",
+        "Les Garennes-sur-Loire",
+        "Lucinges",
         "Lyon",
         "Lyon / Part-Dieu",
         "Lyon / Saint-Rambert",
         "Marseille",
+        "Moulins",
+        "Pont-de-Beauvoisin",
         "Riedisheim",
+        "Sérigné",
         "リヨン・6区"
       ]
     },
@@ -445,6 +469,18 @@
       ]
     },
     {
+      "id": "venue-1866815214f7c3ad",
+      "label": "Bibliotheek Hardenberg（Educatieruimte）",
+      "eventIds": [
+        "maakmiddag-pixelart-hardenberg-2026-10-28"
+      ],
+      "region": "オランダ",
+      "area": "Hardenberg",
+      "sourceUrls": [
+        "https://cultuurkoepel.bibliotheekhardenberg.nl/8-tm-14/1773-maakmiddag-pixelart"
+      ]
+    },
+    {
       "id": "venue-187f08825e881838",
       "label": "Bibliothèque du 9e la Duchère（4 place Gisèle Halimi, 69009 Lyon）",
       "eventIds": [
@@ -538,6 +574,18 @@
       ]
     },
     {
+      "id": "venue-257aa92e818ebba7",
+      "label": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-10-17"
+      ],
+      "region": "フランス",
+      "area": "Moulins",
+      "sourceUrls": [
+        "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/"
+      ]
+    },
+    {
       "id": "venue-27cc5369fc3ce2d7",
       "label": "1289BUNKER（ソウル特別市龍山区梨泰院路174 地下1階）",
       "eventIds": [
@@ -547,6 +595,18 @@
       "area": "ソウル特別市・龍山区・梨泰院",
       "sourceUrls": [
         "https://www.jumpzip.net/"
+      ]
+    },
+    {
+      "id": "venue-2b4524dd3a0f5f29",
+      "label": "Médiathèque（7 rue de Chambretault, 49610 Les Garennes-sur-Loire）",
+      "eventIds": [
+        "les-garennes-sur-loire-atelier-pixel-art-waldo-2026-10-21"
+      ],
+      "region": "フランス",
+      "area": "Les Garennes-sur-Loire",
+      "sourceUrls": [
+        "https://www.les-garennes-sur-loire.fr/vie-quotidienne/infos-pratiques/agenda/atelier-pixel-art-avec-waldo/"
       ]
     },
     {
@@ -631,6 +691,18 @@
       "area": "Montréal・Saint-Laurent, Québec",
       "sourceUrls": [
         "https://montreal.ca/evenements/mixlab-club-dart-du-pixel-119687"
+      ]
+    },
+    {
+      "id": "venue-412a2ea7802d0997",
+      "label": "Médiathèque La Traversée（14 place du Professeur Trillat, 38480 Pont-de-Beauvoisin）",
+      "eventIds": [
+        "pont-de-beauvoisin-pixel-art-geant-2026-11-25"
+      ],
+      "region": "フランス",
+      "area": "Pont-de-Beauvoisin",
+      "sourceUrls": [
+        "https://tourisme-valsdudauphine.fr/agenda/7997420_atelier-pixel-art-geant/"
       ]
     },
     {
@@ -901,6 +973,18 @@
       ]
     },
     {
+      "id": "venue-837df2546049c88c",
+      "label": "Médiathèque de Jeumont",
+      "eventIds": [
+        "jeumont-fete-bd-pixel-art-workshop-2026-10-17"
+      ],
+      "region": "フランス",
+      "area": "Jeumont",
+      "sourceUrls": [
+        "https://www.lamediatheque-jeumont.fr/"
+      ]
+    },
+    {
       "id": "venue-85964b328e78f62c",
       "label": "Artist Cafe Fukuoka ギャラリースペース",
       "eventIds": [
@@ -1035,6 +1119,18 @@
       ]
     },
     {
+      "id": "venue-bd42fd8bca7753b2",
+      "label": "Bibliothèque municipale Michel Butor（188 place de l’Église, 74380 Lucinges）",
+      "eventIds": [
+        "lucinges-bibliotheque-michel-butor-pixel-art-2026-12-16"
+      ],
+      "region": "フランス",
+      "area": "Lucinges",
+      "sourceUrls": [
+        "https://www.montsdugenevois.com/a-voir-a-faire/agenda/tout-lagenda/atelier-pixel-art-lucinges-fr-6787126/"
+      ]
+    },
+    {
       "id": "venue-be324f237b95902d",
       "label": "非公開。事前登録後に開催地を案内（主催者はprivate house partyと説明）",
       "eventIds": [
@@ -1069,6 +1165,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://www.sapporo-game-odyssey.jp/"
+      ]
+    },
+    {
+      "id": "venue-cd0475de0bcfbbb1",
+      "label": "Bibliothèque municipale de Sérigné",
+      "eventIds": [
+        "fontenay-vendee-serigne-pixel-art-lego-2026-11-18"
+      ],
+      "region": "フランス",
+      "area": "Sérigné",
+      "sourceUrls": [
+        "https://biblios.fontenayvendee.fr/agenda/atelier-manuel/atelier-pixel-art-lego-r-2"
       ]
     },
     {
@@ -1129,6 +1237,18 @@
       "area": "横浜・みなとみらい",
       "sourceUrls": [
         "https://pixelartpark.com/en/events/pap9/"
+      ]
+    },
+    {
+      "id": "venue-e5be8cfea6aac90f",
+      "label": "Biblioteca da Vila das Artes（Rua 24 de Maio, 1221, Centro）",
+      "eventIds": [
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20"
+      ],
+      "region": "ブラジル",
+      "area": "Fortaleza, Centro",
+      "sourceUrls": [
+        "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/"
       ]
     },
     {
@@ -1326,6 +1446,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-087f15a99e98599a",
+      "label": "Atelier Pixel Art",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-10-17"
+      ],
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Moulins"
+      ],
+      "venues": [
+        "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）"
+      ],
+      "lastKnownEventDate": "2026-10-17",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:02:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1723,7 +1868,7 @@
       "lastKnownEventDate": "2026-10-20",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:02:00+00:00",
+        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2161,6 +2306,31 @@
       }
     },
     {
+      "id": "source-45b382016d35b424",
+      "label": "Atelier Pixel Art",
+      "eventIds": [
+        "lucinges-bibliotheque-michel-butor-pixel-art-2026-12-16"
+      ],
+      "url": "https://www.montsdugenevois.com/a-voir-a-faire/agenda/tout-lagenda/atelier-pixel-art-lucinges-fr-6787126/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Lucinges"
+      ],
+      "venues": [
+        "Bibliothèque municipale Michel Butor（188 place de l’Église, 74380 Lucinges）"
+      ],
+      "lastKnownEventDate": "2026-12-16",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-46021dc9cc2a513d",
       "label": "小光とあそばnight! SPECIAL WEEKEND（ドット絵作家参加展示）",
       "eventIds": [
@@ -2342,6 +2512,31 @@
       }
     },
     {
+      "id": "source-4c3d55a27cb8ce18",
+      "label": "Maak-Middag Pixel-art",
+      "eventIds": [
+        "maakmiddag-pixelart-hardenberg-2026-10-28"
+      ],
+      "url": "https://cultuurkoepel.bibliotheekhardenberg.nl/8-tm-14/1773-maakmiddag-pixelart",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "オランダ"
+      ],
+      "areas": [
+        "Hardenberg"
+      ],
+      "venues": [
+        "Bibliotheek Hardenberg（Educatieruimte）"
+      ],
+      "lastKnownEventDate": "2026-10-28",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-4c891ccad1295e97",
       "label": "是誰的遊戲間 — KAI PIXEL ART（新光三越高雄左營店11F）",
       "eventIds": [
@@ -2455,6 +2650,31 @@
         "result": "unavailable",
         "attemptedAt": "2026-10-06T00:08:38+00:00",
         "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
+      }
+    },
+    {
+      "id": "source-579b832803fa688f",
+      "label": "Fête de la BD — Pixel Artワークショップ",
+      "eventIds": [
+        "jeumont-fete-bd-pixel-art-workshop-2026-10-17"
+      ],
+      "url": "https://www.lamediatheque-jeumont.fr/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Jeumont"
+      ],
+      "venues": [
+        "Médiathèque de Jeumont"
+      ],
+      "lastKnownEventDate": "2026-10-17",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:03:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -2756,6 +2976,30 @@
       }
     },
     {
+      "id": "source-6388209ca71b7ae9",
+      "label": "Fête de la BD — Pixel Artワークショップ",
+      "eventIds": [
+        "jeumont-fete-bd-pixel-art-workshop-2026-10-17"
+      ],
+      "url": "https://www.bd-jeumont.fr/animations/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Jeumont"
+      ],
+      "venues": [
+        "Médiathèque de Jeumont"
+      ],
+      "lastKnownEventDate": "2026-10-17",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-64f5f0b5728626cc",
       "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
       "eventIds": [
@@ -2970,7 +3214,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-13T00:05:00+00:00",
+        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3072,7 +3316,7 @@
       "lastKnownEventDate": "2026-10-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:01:00+00:00",
+        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3098,6 +3342,31 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-7bcb332b6be7ec52",
+      "label": "Atelier — Pixel art géant",
+      "eventIds": [
+        "pont-de-beauvoisin-pixel-art-geant-2026-11-25"
+      ],
+      "url": "https://tourisme-valsdudauphine.fr/agenda/7997420_atelier-pixel-art-geant/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Pont-de-Beauvoisin"
+      ],
+      "venues": [
+        "Médiathèque La Traversée（14 place du Professeur Trillat, 38480 Pont-de-Beauvoisin）"
+      ],
+      "lastKnownEventDate": "2026-11-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:03:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -3213,6 +3482,30 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-878705bfc9a53e23",
+      "label": "Atelier Pixel Art",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-10-17"
+      ],
+      "url": "https://www.moulins-tourisme.com/en/fete-manifestation/atelier-pixel-art-2/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Moulins"
+      ],
+      "venues": [
+        "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）"
+      ],
+      "lastKnownEventDate": "2026-10-17",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -3488,6 +3781,31 @@
       }
     },
     {
+      "id": "source-9dd710da5e8aa327",
+      "label": "Atelier Pixel Art Lego®",
+      "eventIds": [
+        "fontenay-vendee-serigne-pixel-art-lego-2026-11-18"
+      ],
+      "url": "https://biblios.fontenayvendee.fr/agenda/atelier-manuel/atelier-pixel-art-lego-r-2",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Sérigné"
+      ],
+      "venues": [
+        "Bibliothèque municipale de Sérigné"
+      ],
+      "lastKnownEventDate": "2026-11-18",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-9e5a329f69719a21",
       "label": "新潟コミティア63 — ジュウニ（ドット絵本・出展予定）",
       "eventIds": [
@@ -3696,7 +4014,7 @@
       "lastKnownEventDate": "2026-11-15",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "lastCheckedAt": "2026-10-14T00:02:36+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4208,6 +4526,31 @@
       }
     },
     {
+      "id": "source-cfe7da4fbe1880a3",
+      "label": "Atelier Pixel Art avec Waldo",
+      "eventIds": [
+        "les-garennes-sur-loire-atelier-pixel-art-waldo-2026-10-21"
+      ],
+      "url": "https://www.les-garennes-sur-loire.fr/vie-quotidienne/infos-pratiques/agenda/atelier-pixel-art-avec-waldo/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Les Garennes-sur-Loire"
+      ],
+      "venues": [
+        "Médiathèque（7 rue de Chambretault, 49610 Les Garennes-sur-Loire）"
+      ],
+      "lastKnownEventDate": "2026-10-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-d0a3f6c1459bb6da",
       "label": "Riedisheim en Pixel — Conseil des Jeunes展示・締めくくり企画",
       "eventIds": [
@@ -4378,7 +4721,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-13T00:05:00+00:00",
+        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4969,6 +5312,31 @@
       }
     },
     {
+      "id": "source-fa9d07cc44fc88c3",
+      "label": "Vila Geek — Oficina de Pixel Art",
+      "eventIds": [
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20"
+      ],
+      "url": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ブラジル"
+      ],
+      "areas": [
+        "Fortaleza, Centro"
+      ],
+      "venues": [
+        "Biblioteca da Vila das Artes（Rua 24 de Maio, 1221, Centro）"
+      ],
+      "lastKnownEventDate": "2026-10-20",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-fda20b8e84534f3c",
       "label": "NRG Awards 2026 — Pixel Art部門",
       "eventIds": [
@@ -4989,7 +5357,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-13T00:01:00+00:00",
+        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5021,5 +5389,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-13T00:13:30+00:00"
+  "updatedAt": "2026-10-14T00:07:26+00:00"
 }
