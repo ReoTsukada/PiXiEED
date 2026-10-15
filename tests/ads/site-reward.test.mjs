@@ -1,15 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSiteRewardService } from '../../js/ads/site-reward.mjs';
-import { REWARD_DURATION_MS, SITE_REWARD_STORAGE_KEY } from '../../js/ads/site-reward-config.mjs';
+import { productionEnabled, REWARD_DURATION_MS, SITE_REWARD_STORAGE_KEY } from '../../js/ads/site-reward-config.mjs';
+import { rewardedAdsEnabled, featureRestrictionsEnabled } from '../../js/ads/site-reward-rollout-v20261016.mjs';
+import { requireSharedCanvasAccess } from '../../js/creation/shared-canvas-access.mjs';
+import { createPxdProject } from '../../js/creation/pxd-codec.mjs';
+import { putPxdSharedImage } from '../../js/creation/pxd-project.mjs';
 
-function harness({ enabled = true, nowValue = 1_000_000, storage = memoryStorage(), locks = { request: async (_name, _options, callback) => callback() }, scenario = 'ready', showAccepted = true } = {}) {
+function harness({ enabled = true, restrictionsEnabled = true, nowValue = 1_000_000, storage = memoryStorage(), locks = { request: async (_name, _options, callback) => callback() }, scenario = 'ready', showAccepted = true } = {}) {
   let now = nowValue;
   const adapters = [];
   const eventTarget = new EventTarget();
   const documentRef = mockDocument();
   const service = createSiteRewardService({
-    storage, eventTarget, documentRef, now: () => now, enabled, locks, schedule: () => 1, cancelSchedule() {},
+    storage, eventTarget, documentRef, now: () => now, enabled, restrictionsEnabled, locks, schedule: () => 1, cancelSchedule() {},
     timeoutSchedule: () => 1, cancelTimeoutSchedule() {},
     createAdapter: ({ emit }) => {
       const adapter = {
@@ -48,6 +52,12 @@ function mockDocument() {
   return { body: new Element(), createElement: () => new Element() };
 }
 
+function rgbaImage(colorCount) {
+  const rgba = new Uint8Array(colorCount * 4);
+  for (let index = 0; index < colorCount; index += 1) rgba.set([index, (index * 3) & 255, (index * 7) & 255, 255], index * 4);
+  return { width: colorCount, height: 1, rgba };
+}
+
 async function optIn(h, feature = 'draw') {
   assert.equal(h.service.requestSiteReward(feature), true);
   const root = h.documentRef.body.children.get('root');
@@ -62,6 +72,75 @@ test('disabled production policy bypasses locks and starts without storage grant
   assert.equal(h.service.hasSiteReward(), true);
   assert.equal(h.service.requireSiteReward('output'), true);
   assert.equal(h.service.getSiteRewardState().active, false);
+  h.service.dispose();
+});
+
+test('ads-only rollout keeps restrictions off while retaining voluntary no-fill and unsupported states', async () => {
+  assert.equal(rewardedAdsEnabled, true);
+  assert.equal(featureRestrictionsEnabled, false);
+  assert.equal(productionEnabled, false, 'legacy production config stays off for cached runtime safety');
+
+  for (const scenario of ['no-fill', 'unsupported']) {
+    const h = harness({ restrictionsEnabled: false, scenario });
+    assert.equal(h.service.isSiteRewardPolicyEnabled(), false);
+    assert.equal(h.service.getSiteRewardState().policyEnabled, false);
+    assert.equal(h.service.hasSiteReward(), false, 'access permission is not a granted receipt');
+    assert.equal(h.service.requireSiteReward('draw'), true, 'canvas access bypasses policy while restrictions are off');
+    const adapter = await optIn(h);
+    assert.ok(adapter, 'voluntary ad attempt can start');
+    await Promise.resolve();
+    assert.equal(h.service.getSiteRewardState().active, false);
+    assert.equal(h.service.getSiteRewardState().expiresAt, null);
+    assert.equal(h.service.getSiteRewardState().receiptCount, 0);
+    assert.equal(h.service.hasSiteReward(), false, 'ad failure never manufactures a reward receipt');
+    assert.equal(h.service.requireSiteReward('save'), true, 'ad failure never blocks saving');
+    h.service.dispose();
+  }
+});
+
+test('ads-only launcher stays visible without starting an ad and hides restriction benefit claims', () => {
+  const h = harness({ restrictionsEnabled: false });
+  const root = h.service.mountSiteRewardUI();
+  assert.ok(root);
+  assert.equal(root.children.get('[data-renew]').hidden, false, 'voluntary launcher remains visible');
+  assert.equal(root.children.get('[data-metrics]').hidden, true);
+  assert.equal(root.children.get('[data-details]').hidden, true);
+  assert.equal(root.children.get('[data-retention]').hidden, true);
+  assert.equal(h.adapters.length, 0, 'mounting the UI does not request an ad');
+  h.service.dispose();
+});
+
+test('video completion and close alone never grant an ads-only reward', async () => {
+  const h = harness({ restrictionsEnabled: false });
+  const adapter = await optIn(h);
+  adapter.emit({ type: 'videoCompleted' });
+  adapter.emit({ type: 'closed' });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(h.service.getSiteRewardState().expiresAt, null);
+  assert.equal(h.service.getSiteRewardState().active, false);
+  assert.equal(h.service.getSiteRewardState().receiptCount, 0);
+  assert.equal(h.service.hasSiteReward(), false);
+  assert.equal(h.service.requireSiteReward('output'), true, 'saving and output stay available after an ungranted ad');
+  const sharedCanvas = await putPxdSharedImage(createPxdProject(), rgbaImage(40));
+  assert.equal(requireSharedCanvasAccess(sharedCanvas, () => assert.fail('ads-only access must not prompt'), '', {
+    operation: 'color-edit', requestReward: h.service.requireSiteReward
+  }), true, 'direct shared-canvas access gate bypasses restrictions while the ledger stays empty');
+  assert.equal(h.service.getSiteRewardState().receiptCount, 0);
+  h.service.dispose();
+});
+
+test('accepted show plus granted receipt stays truthful while ads-only tools remain unlocked', async () => {
+  const h = harness({ restrictionsEnabled: false });
+  const adapter = await optIn(h);
+  adapter.emit({ type: 'videoCompleted' });
+  assert.equal(h.service.getSiteRewardState().expiresAt, null, 'video completion is not a receipt');
+  adapter.emit({ type: 'granted' });
+  adapter.emit({ type: 'closed' });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(h.service.getSiteRewardState().expiresAt, h.now + REWARD_DURATION_MS);
+  assert.equal(h.service.getSiteRewardState().receiptCount, 1);
+  assert.equal(h.service.hasSiteReward(), true, 'accepted show and granted receipt update actual entitlement');
+  assert.equal(h.service.requireSiteReward('share'), true, 'sharing stays available independent of the receipt');
   h.service.dispose();
 });
 

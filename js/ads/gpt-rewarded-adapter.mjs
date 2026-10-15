@@ -32,7 +32,10 @@ function loadSdk(win, doc, timeoutMs, schedule, cancelSchedule) {
     }
     script.src = GPT_SCRIPT_URL; script.async = true; script.crossOrigin = 'anonymous';
     script.dataset.pixieedRewarded = 'true';
-    script.onload = () => win.googletag?.apiReady ? finish() : finish(new Error('GPT APIを利用できません。'));
+    // gpt.js can finish before its asynchronous pubads implementation is ready.
+    // GPT's documented command queue, rather than the script load event, is
+    // the readiness boundary. The existing deadline still fails closed.
+    win.googletag.cmd.push(() => finish());
     script.onerror = () => finish(new Error('GPTを読み込めませんでした。'));
     doc.head.append(script);
   });
