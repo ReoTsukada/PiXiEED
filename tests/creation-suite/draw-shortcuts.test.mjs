@@ -114,6 +114,16 @@ test('held cursor commands require canvas focus; repeat is limited to movement c
   assert.equal(isDrawShortcutCommandEligible(click, { target: button, repeat: false }), false);
 });
 
+test('focused layout separators own their keys without invoking editor shortcuts', () => {
+  const doc = { querySelector: () => null };
+  const separatorChild = { closest: selector => selector === '[role="separator"]' ? {} : null };
+  for (const code of ['ArrowRight', 'Home', 'End', 'KeyB', 'KeyQ']) {
+    assert.equal(shouldDispatchDrawShortcut({ target: separatorChild, code }, doc), false, code);
+  }
+  const canvas = { closest: () => null };
+  assert.equal(shouldDispatchDrawShortcut({ target: canvas, code: 'KeyB' }, doc), true);
+});
+
  test('disabled shortcuts survive persistence and aliases cannot be reassigned', () => {
  const storage = memoryStorage(); const settings = readDrawShortcutSettings(storage);
  settings.bindings.mac['tool.left.pen'] = null;

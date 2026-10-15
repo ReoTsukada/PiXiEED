@@ -1,6 +1,6 @@
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261011-unified-project-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261013-camera-placement-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261015-draw-desktop-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261012-animation-core-contract-1';
 
 const scope = createModeScope();

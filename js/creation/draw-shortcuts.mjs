@@ -165,7 +165,8 @@ export const isDrawShortcutEditableTarget = target => Boolean(target?.isContentE
 const popupOpen = doc => Boolean(doc.querySelector('dialog[open], details[open], .draw-color-editor:not([hidden]), .animation-controls__workspace-panel:not([hidden]), body[data-tool-result-open], #pxd-panel[open], #pxd-panel:not(dialog):not([hidden])'));
 export function shouldDispatchDrawShortcut(event, doc) {
   return !event?.defaultPrevented && !event?.isComposing && event?.keyCode !== 229
-    && !isDrawShortcutEditableTarget(event?.target) && !popupOpen(doc);
+    && !isDrawShortcutEditableTarget(event?.target)
+    && !event?.target?.closest?.('[role="separator"]') && !popupOpen(doc);
 }
 export function isDrawShortcutCommandEligible(item, event) {
   return Boolean(item && event && (!event.repeat || item.repeat)

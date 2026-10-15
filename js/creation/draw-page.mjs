@@ -11,7 +11,7 @@ import { addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimati
 import { composeOutputFrame } from './creation-output-core.mjs?rev=20261012-animation-core-contract-1';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261011-shared-music-2';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261015-draw-desktop-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
@@ -31,6 +31,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261012-animation-core-contract-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261015-draw-desktop-1';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
@@ -43,7 +44,7 @@ import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
-import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261006-draw-startup-1';
+import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261015-draw-desktop-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261006-selection-fix-1';
 import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261012-operation-bar-1';
@@ -1499,12 +1500,17 @@ function syncInputControls() {
 function applyControlsPlacement() {
   document.body.dataset.drawControlsSide = inputSettings.controlsSide;
   const viewport = $('.draw-viewport'), dock = $('.draw-control-dock');
+  // Desktop draw UI owns the viewport's position while active. The resize
+  // handler still runs on the breakpoint transition; wait for its placeholder
+  // restoration, then reapply the compact editor's normal DOM order.
+  if (document.body.classList.contains('draw-desktop-active')) return;
   const horizontal = matchMedia('(min-width: 900px), (orientation: landscape) and (min-width: 560px)').matches;
   // Keep DOM/tab order aligned with visible placement. Portrait stays canvas then controls.
   if (horizontal && inputSettings.controlsSide === 'left') viewport.before(dock);
   else dock.before(viewport);
   requestAnimationFrame(() => { placeOverlays(); placeToolMenu(); placeSettingsPanel(); });
 }
+scope.listen(window, 'draw-desktop-layout-restored', applyControlsPlacement);
 function setControlsSide(side) {
   cancelDrawingInput(); inputSettings.controlsSide = side; syncInputControls(); applyControlsPlacement(); return true;
 }
@@ -2252,6 +2258,7 @@ function disposeDrawMode() {
 }
 function clearToastTimer() { clearTimeout(toastTimer); }
 scope.add(disposeDrawMode);
+mountDrawDesktopUi({ scope, root: $('#main'), drawShortcuts, animationControls, assignDrawInput, cancelInput: cancelDrawingInput, onLayout: updateCanvasView });
 await pxdBridge.ready;
 if (returnedCamera) {
   cameraOpening = true; freezeCameraEditor();

@@ -23,6 +23,7 @@ class FakeElement {
     };
   }
   append(...nodes) { for (const node of nodes) { if (node.parentElement) node.parentElement.children = node.parentElement.children.filter((child) => child !== node); node.parentElement = this; this.children.push(node); } }
+  insertBefore(node, before) { if (node === before) return node; if (node.parentElement) node.parentElement.children = node.parentElement.children.filter((child) => child !== node); const index = before ? this.children.indexOf(before) : -1; node.parentElement = this; this.children.splice(index < 0 ? this.children.length : index, 0, node); return node; }
   prepend(node) { node.parentElement = this; this.children.unshift(node); }
   removeChild(node) { this.children = this.children.filter((child) => child !== node); node.parentElement = null; return node; }
   replaceChildren(...nodes) { for (const child of this.children) child.parentElement = null; this.children = []; this.append(...nodes); }
@@ -136,6 +137,7 @@ test('animation controls emit typed actions, preserve one-frame collapse, and di
   const frame2 = frames.querySelectorAll('[data-action="select-frame"]')[1];
   frame2.fire('click'); assert.deepEqual(actions.at(-1), { type: 'select-frame', frameId: 'f2' });
 
+  root.querySelector('[data-action="toggle-layers"]').fire('click');
   const visibility = doc.body.querySelectorAll('[data-action="visibility"]').find((button) => button.dataset.layerId === 'l2'); visibility.fire('click');
   assert.deepEqual(actions.at(-1), { type: 'visibility', layerId: 'l2', visible: true });
   const lock = doc.body.querySelectorAll('[data-action="lock"]').find((button) => button.dataset.layerId === 'l2'); lock.fire('click');
@@ -372,6 +374,7 @@ test('Audio frame-only strip previews distant frames and preserves horizontal sc
   const state = { frames: frameData, layers: Object.freeze([]), frameId: 'f1', layerId: null, audioMode: true, readOnly: false, playing: false, onion: false };
   const ui = mountAnimationControls({ host, scope, frameOnly: true, getState: () => state, onAction: action => actions.push(action),
     getFramePreview(frameId) { const preview = doc.createElement('canvas'); preview.nodeType = 1; previewCalls.push(frameId); return preview; } });
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
   const strip = doc.body.querySelector('[data-frame-strip]');
   const assertEveryFrameHasPreview = () => {
     const items = strip.querySelectorAll('[data-action="select-frame"]');
@@ -381,15 +384,265 @@ test('Audio frame-only strip previews distant frames and preserves horizontal sc
 
   assertEveryFrameHasPreview();
   assert.equal(previewCalls.length, frameData.length);
+  ui.refresh(); assert.equal(previewCalls.length, frameData.length, 'stable immutable preview data is reused');
   for (const selectedIndex of [4, 8, 0]) {
     strip.scrollLeft = 72 + selectedIndex;
     state.frameId = frameData[selectedIndex].id;
     ui.refresh();
     assertEveryFrameHasPreview();
+    assert.equal(previewCalls.length, frameData.length * (selectedIndex === 4 ? 2 : selectedIndex === 8 ? 3 : 4), 'selection changes refresh same-ID previews');
     assert.equal(strip.scrollLeft, 72 + selectedIndex);
   }
   assert.equal(state.frames, frameData, 'refresh preserves the frame collection');
   assert.deepEqual(frameData.map((frame) => frame.id), ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9']);
   assert.deepEqual(actions, [], 'preview refreshes do not change project data');
+  ui.dispose();
+});
+
+test('hidden cel workspace defers its grid, restores latest state on open, and reconciles keyed cells', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 200 }],
+    layers: [{ id: 'l1', name: 'Ink', visible: true }, { id: 'l2', name: 'Tone', visible: true }],
+    frameId: 'f1', layerId: 'l2', playing: false, readOnly: false, audioMode: false };
+  let contentCalls = 0; let filled = false;
+  const ui = mountAnimationControls({ host, scope, getState: () => state,
+    getCelHasContent(frameId, layerId) { contentCalls += 1; return filled && frameId === 'f2' && layerId === 'l2'; }, onAction() {} });
+  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
+  const grid = panel.children[2];
+  assert.equal(grid.children.length, 0, 'the cel matrix is not built while its workspace is hidden');
+  ui.refresh(); ui.refresh(); assert.equal(contentCalls, 0);
+  filled = true; state.frameId = 'f2';
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
+  assert.equal(contentCalls, 4, 'opening builds only the latest 2 by 2 matrix');
+  for (const item of grid.querySelectorAll('[data-action="select-frame"], [data-action="select-cel"]')) {
+    item.children.find = undefined; item.children.some = undefined;
+  }
+  ui.refresh();
+  const cell = grid.querySelectorAll('[data-action="select-cel"]').find(item => item.dataset.frameId === 'f2' && item.dataset.layerId === 'l2');
+  assert.equal(cell.dataset.hasContent, 'true'); assert.equal(cell.getAttribute('aria-selected'), 'true');
+  const selectedFrameNode = grid.querySelectorAll('[data-action="select-frame"]').find(item => item.dataset.frameId === 'f2');
+  const originalCellCount = grid.querySelectorAll('[data-action="select-cel"]').length;
+  filled = false; ui.refresh(); assert.equal(cell.dataset.hasContent, 'false', 'mutable state refreshes do not reuse a stale cel-content cache');
+  filled = true; ui.refresh(); assert.equal(cell.dataset.hasContent, 'true');
+  state.frames.reverse(); state.layers.reverse(); state.layerId = 'l2'; ui.refresh();
+  assert.equal(grid.querySelectorAll('[data-action="select-frame"]').find(item => item.dataset.frameId === 'f2'), selectedFrameNode, 'reorder retains keyed header nodes');
+  assert.equal(grid.querySelectorAll('[data-action="select-cel"]').find(item => item.dataset.frameId === 'f2' && item.dataset.layerId === 'l2'), cell, 'selection refresh retains keyed cell nodes');
+  assert.equal(cell.getAttribute('aria-selected'), 'true');
+  state.frames.push({ id: 'f3', durationMs: 100 }); ui.refresh();
+  assert.equal(grid.querySelectorAll('[data-action="select-cel"]').length, originalCellCount + 2, 'adding a frame adds one cell per layer');
+  state.layers.splice(state.layers.findIndex(layer => layer.id === 'l1'), 1); ui.refresh();
+  assert.equal(grid.querySelectorAll('[data-action="select-layer"]').length, 1);
+  assert.equal(grid.querySelectorAll('[data-action="select-cel"]').length, 3, 'deleting a layer removes only its cells');
+  for (let index = 0; index < 7; index += 1) state.layers.push({ id: `l${index + 3}`, name: `Layer ${index + 3}` });
+  ui.refresh();
+  assert.equal(grid.querySelector('[data-action="add-layer"]').disabled, true, 'the eight-layer limit disables the grid add control');
+  ui.dispose();
+});
+
+test('frozen cel selection updates only its old and new headers and cells', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const frames = Object.freeze([{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }].map(Object.freeze));
+  const layers = Object.freeze([{ id: 'l1', name: 'Ink' }, { id: 'l2', name: 'Tone' }].map(Object.freeze));
+  const state = { frames, layers, frameId: 'f1', layerId: 'l1', playing: false, readOnly: false, audioMode: false };
+  let contentCalls = 0;
+  const ui = mountAnimationControls({ host, scope, getState: () => state,
+    getCelHasContent() { contentCalls += 1; return false; }, onAction() {} });
+  const launcher = host.querySelector('[data-action="toggle-frames"]');
+  launcher.fire('click');
+  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
+  const grid = panel.children.find(child => child.classList.contains('animation-controls__frames'));
+  assert.equal(contentCalls, 4);
+  const untouched = grid.querySelectorAll('[data-action="select-cel"]').find(cell => cell.dataset.frameId === 'f1' && cell.dataset.layerId === 'l2');
+  untouched.setAttribute('data-probe', 'preserved');
+  const originalLabel = untouched.getAttribute('aria-label');
+  const originalClass = untouched.className;
+
+  state.frameId = 'f2'; state.layerId = 'l2'; ui.refresh();
+
+  assert.equal(contentCalls, 4, 'selection-only refresh does not revisit sparse cel content');
+  assert.equal(untouched.getAttribute('data-probe'), 'preserved');
+  assert.equal(untouched.getAttribute('aria-label'), originalLabel);
+  assert.equal(untouched.className, originalClass);
+  assert.equal(untouched.getAttribute('aria-selected'), 'false');
+  assert.equal(grid.querySelectorAll('[data-action="select-frame"]').find(item => item.dataset.frameId === 'f1').getAttribute('aria-selected'), 'false');
+  assert.equal(grid.querySelectorAll('[data-action="select-frame"]').find(item => item.dataset.frameId === 'f2').getAttribute('aria-selected'), 'true');
+  assert.equal(grid.querySelectorAll('[data-action="select-layer"]').find(item => item.dataset.layerId === 'l1').getAttribute('aria-pressed'), 'false');
+  assert.equal(grid.querySelectorAll('[data-action="select-layer"]').find(item => item.dataset.layerId === 'l2').getAttribute('aria-pressed'), 'true');
+  assert.equal(grid.querySelectorAll('[data-action="select-cel"]').find(item => item.dataset.frameId === 'f2' && item.dataset.layerId === 'l2').getAttribute('aria-selected'), 'true');
+  assert.equal(launcher.getAttribute('aria-label'), 'レイヤーとフレームを開く。レイヤー 2、コマ 2');
+  assert.equal(launcher.title, 'レイヤー 2、コマ 2');
+  ui.dispose();
+});
+
+test('closed frame-only launcher refreshes its accessible count after an undo-sized shrink', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const state = { frames: Object.freeze([{ id: 'f1' }, { id: 'f2' }].map(Object.freeze)), layers: Object.freeze([]),
+    frameId: 'f2', layerId: null, audioMode: true, readOnly: false, playing: false };
+  const ui = mountAnimationControls({ host, scope, frameOnly: true, getState: () => state, onAction() {} });
+  const launcher = host.querySelector('[data-action="toggle-frames"]');
+  launcher.fire('click'); launcher.fire('click');
+  state.frames = Object.freeze([{ id: 'f1' }].map(Object.freeze)); state.frameId = 'f1'; ui.refresh();
+  assert.equal(launcher.getAttribute('aria-label'), 'フレームを開く（1 / 1）');
+  assert.equal(launcher.title, 'フレーム 1 / 1');
+  assert.equal(launcher.children.at(-1).textContent, 'F1');
+  ui.dispose();
+});
+
+test('refresh bursts coalesce heavy rendering while pending actions disable controls immediately', async () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }],
+    layers: [{ id: 'l1', name: 'Ink', visible: true }], frameId: 'f1', layerId: 'l1', playing: false, readOnly: false, audioMode: false };
+  let finish; let nextFrame = 1; const rafs = new Map();
+  doc.defaultView.requestAnimationFrame = callback => { const id = nextFrame++; rafs.set(id, callback); return id; };
+  doc.defaultView.cancelAnimationFrame = id => rafs.delete(id);
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction(action) { if (action.type === 'play') return new Promise(resolve => { finish = resolve; }); } });
+  const root = host.children[0]; root.querySelector('[data-action="play"]').fire('click');
+  ui.refresh(); ui.refresh(); ui.refresh();
+  assert.equal(rafs.size, 1, 'one browser frame contains the whole refresh burst');
+  assert.equal(root.querySelector('[data-action="play"]').disabled, true, 'pending state is applied synchronously');
+  state.readOnly = true;
+  const callback = rafs.values().next().value; rafs.clear(); callback();
+  assert.equal(root.querySelector('[data-action="play"]').disabled, true);
+  assert.equal(root.querySelector('[data-action="next-frame"]').disabled, true);
+  ui.dispose(); finish(); await Promise.resolve();
+  assert.equal(rafs.size, 0);
+});
+
+test('playback updates only the previous and current keyed columns and hidden playback restores on open', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }, { id: 'f3', durationMs: 100 }],
+    layers: [{ id: 'l1', name: 'Ink' }], frameId: 'f1', layerId: 'l1', playing: true, playbackFrameId: 'f1', readOnly: false };
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction() {}, getCelHasContent: () => false });
+  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog'); const grid = panel.children[2];
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
+  const cells = grid.querySelectorAll('[data-action="select-cel"]');
+  assert.ok(cells.filter(cell => cell.dataset.frameId === 'f1').every(cell => cell.classList.contains('is-playing')));
+  assert.ok(cells.filter(cell => cell.dataset.frameId !== 'f1').every(cell => !cell.classList.contains('is-playing')));
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
+  state.playbackFrameId = 'f3'; ui.refresh();
+  assert.ok(cells.filter(cell => cell.dataset.frameId === 'f1').every(cell => cell.classList.contains('is-playing')), 'hidden workspace is left untouched');
+  assert.ok(cells.filter(cell => cell.dataset.frameId === 'f3').every(cell => !cell.classList.contains('is-playing')));
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
+  assert.ok(grid.querySelectorAll('[data-action="select-cel"]').filter(cell => cell.dataset.frameId === 'f3').every(cell => cell.classList.contains('is-playing')));
+  ui.dispose();
+});
+
+test('refresh preserves locked, boundary, and music-layer inspector restrictions', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [
+    { id: 'music', role: 'music', name: 'Music', visible: true, locked: false },
+    { id: 'locked', name: 'Locked', visible: true, locked: true },
+    { id: 'top', name: 'Top', visible: true, locked: false }
+  ], frameId: 'f1', layerId: 'top', playing: false, readOnly: false, audioMode: false };
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction() {} });
+  host.querySelector('[data-action="toggle-layers"]').fire('click'); ui.refresh();
+  assert.equal(ui.hasOpenPanels, true, 'the mobile layer inspector remains a dismissible open panel');
+  const byLayer = (action, id) => doc.body.querySelectorAll(`[data-action="${action}"]`).find(control => control.dataset.layerId === id);
+  const rename = id => doc.body.querySelectorAll('[data-rename-layer]').find(input => input.dataset.renameLayer === id);
+  assert.equal(rename('locked').disabled, true); assert.equal(byLayer('visibility', 'locked').disabled, false);
+  assert.equal(byLayer('lock', 'locked').disabled, false); assert.equal(byLayer('move-layer-up', 'locked').disabled, true);
+  assert.equal(byLayer('move-layer-down', 'locked').disabled, true); assert.equal(byLayer('delete-layer', 'locked').disabled, true);
+  assert.equal(byLayer('move-layer-up', 'top').disabled, true, 'the top layer cannot move higher');
+  assert.equal(byLayer('move-layer-down', 'top').disabled, false);
+  assert.equal(rename('music').disabled, true); assert.equal(byLayer('move-layer-up', 'music').disabled, true);
+  assert.equal(byLayer('move-layer-down', 'music').disabled, true); assert.equal(byLayer('delete-layer', 'music').disabled, true);
+  ui.dispose();
+});
+
+test('desktop layout attaches the shared inspector and lazy keyed frame strip, then restores it', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls';
+  const layerHost = doc.createElement('aside'), frameHost = doc.createElement('footer'), scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 250 }], layers: [
+    { id: 'l1', name: 'Ink', visible: true, locked: false }, { id: 'l2', name: 'Tone', visible: false, locked: true }
+  ], frameId: 'f1', layerId: 'l1', playing: true, playbackFrameId: 'f1', readOnly: false, audioMode: false };
+  const actions = []; let previewCalls = 0; let contentCalls = 0;
+  const ui = mountAnimationControls({ host, scope, getState: () => state,
+    getFramePreview() { previewCalls += 1; return doc.createElement('canvas'); },
+    getCelHasContent(frameId, layerId) { contentCalls += 1; return frameId === 'f2' && layerId === 'l1'; },
+    onAction(action) {
+      actions.push(action);
+      if (action.type === 'select-frame') state.frameId = action.frameId;
+      if (action.type === 'visibility') state.layers.find(layer => layer.id === action.layerId).visible = action.visible;
+      if (action.type === 'lock') state.layers.find(layer => layer.id === action.layerId).locked = action.locked;
+    }
+  });
+  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
+  const grid = panel.children[2];
+  const layerList = doc.body.querySelector('[data-layer-list]').parentElement;
+  assert.equal(grid.children.length, 0, 'the matrix remains lazy while its original launcher is closed');
+
+  ui.setDesktopLayout({ active: true, layerHost, frameHost });
+  assert.equal(layerList.parentElement, layerHost, 'the existing inspector node moves into the desktop host');
+  assert.equal(layerList.hidden, false, 'global layer visibility controls stay docked');
+  assert.equal(ui.hasOpenPanels, false, 'the persistent desktop inspector is not a floating dismissal panel');
+  assert.equal(frameHost.children.length, 1);
+  assert.equal(previewCalls, 0, 'desktop frame buttons never request bitmap previews');
+  assert.equal(grid.children.length, 0, 'desktop setup does not open or duplicate the matrix');
+  const framePane = frameHost.children[0], strip = framePane.querySelector('[data-desktop-frame-strip]');
+  const frameButtons = strip.querySelectorAll('[data-action="select-frame"]');
+  assert.equal(frameButtons.length, 2);
+  assert.equal(frameButtons[1].children.find(child => child.classList.contains('animation-controls__frame-duration')).textContent, '250ms');
+  assert.ok(frameButtons[1].children.some(child => child.classList.contains('animation-controls__frame-content')), 'sparse cel content is shown as a small indicator');
+  assert.ok(frameButtons[0].classList.contains('is-playing'));
+  assert.equal(framePane.querySelector('[data-action="desktop-move-frame-left"]').disabled, true);
+  assert.equal(framePane.querySelector('[data-action="desktop-move-frame-right"]').disabled, false);
+
+  const originalButton = frameButtons[0];
+  frameButtons[0].fire('keydown', { key: 'ArrowRight' });
+  assert.deepEqual(actions.at(-1), { type: 'select-frame', frameId: 'f2' });
+  assert.equal(frameButtons[1].focused, true, 'keyboard selection moves focus to the next desktop frame');
+  assert.equal(framePane.querySelector('[data-action="desktop-move-frame-left"]').disabled, false);
+  assert.equal(framePane.querySelector('[data-action="desktop-move-frame-right"]').disabled, true);
+  assert.equal(strip.querySelectorAll('[data-action="select-frame"]')[0], originalButton, 'frame buttons retain keyed identity');
+  state.playbackFrameId = 'f2'; ui.refresh();
+  assert.equal(frameButtons[0].classList.contains('is-playing'), false);
+  assert.equal(frameButtons[1].classList.contains('is-playing'), true, 'playback moves between keyed frame buttons');
+  const visibility = layerList.querySelectorAll('[data-action="visibility"]').find(button => button.dataset.layerId === 'l2');
+  visibility.fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'visibility', layerId: 'l2', visible: true });
+  const lock = layerList.querySelectorAll('[data-action="lock"]').find(button => button.dataset.layerId === 'l2');
+  lock.fire('click'); ui.refresh();
+  assert.deepEqual(actions.at(-1), { type: 'lock', layerId: 'l2', locked: false });
+  const rename = layerList.querySelector('[data-rename-layer="l2"]');
+  assert.equal(rename.disabled, false, 'unlocking the global layer enables its rename control');
+  state.readOnly = true; ui.refresh();
+  assert.equal(layerList.querySelectorAll('[data-action="visibility"]').find(button => button.dataset.layerId === 'l2').disabled, true);
+  assert.equal(framePane.querySelector('[data-action="desktop-add-frame"]').disabled, true);
+  assert.equal(framePane.querySelector('[data-action="desktop-delete-frame"]').disabled, true);
+  assert.equal(framePane.querySelector('[data-action="desktop-move-frame-left"]').disabled, true);
+  assert.equal(framePane.querySelector('[data-action="desktop-move-frame-right"]').disabled, true);
+
+  state.readOnly = false;
+  framePane.querySelector('[data-action="desktop-blank-frame"]').fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'add-frame', frameId: 'f2', copy: false });
+  frameButtons[1].fire('contextmenu', { preventDefault() {} });
+  const menu = doc.body.querySelector('[data-frame-menu]');
+  assert.ok(menu.querySelector('[data-frame-menu-action="delete"]'));
+  assert.ok(menu.querySelector('[data-frame-menu-action="left"]'));
+  assert.ok(menu.querySelector('[data-frame-menu-action="right"]'));
+
+  ui.setDesktopFramesFolded(true);
+  assert.equal(strip.hidden, true);
+  state.playbackFrameId = 'f3';
+  const callsBeforeFoldedUpdate = contentCalls;
+  state.frames.push({ id: 'f3', durationMs: 80 }); ui.refresh();
+  assert.equal(contentCalls, callsBeforeFoldedUpdate, 'folded frame panes skip list and content rendering');
+  assert.equal(frameButtons[1].classList.contains('is-playing'), true, 'folded panes keep their existing playback nodes untouched');
+  assert.equal(strip.querySelectorAll('[data-action="select-frame"]').length, 2);
+  ui.setDesktopFramesFolded(false);
+  assert.equal(strip.querySelectorAll('[data-action="select-frame"]').length, 3, 'expanding renders the latest shared state');
+  assert.equal(strip.querySelectorAll('[data-action="select-frame"]')[2].classList.contains('is-playing'), true, 'expanding restores the latest playback frame');
+
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
+  assert.ok(grid.children.length > 0, 'the original cel matrix opens only through its original launcher');
+  assert.equal(ui.hasOpenPanels, true, 'opening the original matrix still exposes a dismissible panel');
+  host.querySelector('[data-action="toggle-frames"]').fire('click');
+  assert.equal(ui.hasOpenPanels, false, 'closing the matrix clears the open-panel state while layers remain docked');
+  ui.setDesktopLayout({ active: false });
+  assert.equal(layerList.parentElement, doc.body, 'the inspector returns to its original body portal parent');
+  assert.equal(layerList.hidden, true);
+  assert.equal(layerHost.dataset.desktopLayout, undefined);
+  assert.equal(frameHost.dataset.desktopLayout, undefined);
+  assert.equal(frameHost.children.length, 0);
   ui.dispose();
 });

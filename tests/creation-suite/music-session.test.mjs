@@ -71,6 +71,7 @@ test('Music uses its own grid instead of compositing visible drawing layers; reg
 class FakeElement {
   constructor(tag, ownerDocument) { this.tagName = tag.toUpperCase(); this.ownerDocument = ownerDocument; this.children = []; this.parentElement = null; this.dataset = {}; this.attributes = new Map(); this.listeners = new Map(); this.style = { setProperty() {} }; this.classNames = new Set(); this.className = ''; this.classList = { toggle: (name, force) => { const on = force ?? !this.classNames.has(name); on ? this.classNames.add(name) : this.classNames.delete(name); return on; }, add: (name) => this.classNames.add(name), contains: (name) => this.classNames.has(name) || this.className.split(/\s+/).includes(name) }; }
   append(...items) { for (const item of items) { item.parentElement = this; this.children.push(item); } }
+  insertBefore(item, before) { if (item === before) return item; if (item.parentElement) item.parentElement.children = item.parentElement.children.filter((child) => child !== item); const index = before ? this.children.indexOf(before) : -1; item.parentElement = this; this.children.splice(index < 0 ? this.children.length : index, 0, item); return item; }
   prepend(item) { item.parentElement = this; this.children.unshift(item); }
   removeChild(item) { this.children = this.children.filter((child) => child !== item); item.parentElement = null; return item; }
   replaceChildren(...items) { this.children = []; this.append(...items); }
@@ -100,9 +101,10 @@ test('layer controls label Music and prevent reordering or deleting it and addin
   let animation = createDrawAnimationSession(blank(), { musicLayer: true }).animation;
   for (let index = 1; index < 8; index += 1) animation = addAnimationLayer(animation);
   const music = animation.layers[0]; const doc = new FakeDocument(); const host = doc.createElement('div'); const life = scope();
-  const ui = mountAnimationControls({ host, scope: life, getState: () => ({ ...animation, frameId: animation.frames[0].id, layerId: music.id, audioMode: false, readOnly: false }), getCelHasContent: () => false, onAction() {} });
+  const ui = mountAnimationControls({ host, scope: life, getState: () => ({ ...animation, frameId: animation.frames[0].id, layerId: music.id, audioMode: false, readOnly: false }), onAction() {} });
+  host.querySelector('[data-action="toggle-layers"]').fire('click');
   const musicSelect = doc.body.querySelectorAll('[data-action="select-layer"]').find((button) => button.dataset.layerId === music.id);
-  assert.equal(musicSelect.textContent, '音楽');
+  assert.equal(musicSelect.textContent, '音楽（全コマ共通）');
   const rows = doc.body.querySelectorAll('.animation-controls__layer');
   const musicRow = rows.find((row) => row.querySelector('[data-action="select-layer"]')?.dataset.layerId === music.id);
   assert.equal(musicRow.querySelector('[data-action="move-layer-up"]').disabled, true);
