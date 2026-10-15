@@ -501,6 +501,27 @@ test('output handoff stays on the editor and reports save failure so the caller 
   assert.equal(outputLocation.assigned, '');
 });
 
+test('validated tool embeds flush editor saves then leave native file saving to the caller', async () => {
+  const calls = [];
+  const locationRef = { origin: 'https://example.test', assigned: '', assign(url) { this.assigned = url; } };
+  const windowRef = {
+    location: { origin: locationRef.origin },
+    parent: { location: { origin: locationRef.origin } },
+    __PIXIEED_TOOL_EMBED__: { role: 'draw', channel: validId }
+  };
+  const result = await sendToolOutputAfterSaving({
+    blob: new Blob(['pixels'], { type: 'image/png' }), filename: 'art.png', returnUrl: '/draw/'
+  }, {
+    dirty: true,
+    async assertCanSave() { calls.push('authorize'); },
+    async save() { calls.push('save'); this.dirty = false; }
+  }, () => true, { locationRef, windowRef });
+  assert.deepEqual(calls, ['authorize', 'save']);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'embedded_native_save');
+  assert.equal(locationRef.assigned, '');
+});
+
 test('nearest-neighbor exact resizing retains source alpha and does not mutate the source', () => {
   const frame = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 255, 0, 0]) };
   const resized = resizeRgbaNearest(frame, 4, 2);

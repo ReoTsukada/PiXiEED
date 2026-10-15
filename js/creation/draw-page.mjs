@@ -29,7 +29,7 @@ import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261011-tool-size-1';
 import { createToolStartTracker } from '../site-analytics.mjs';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261009-output-12';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261015-embed-native-save-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261012-animation-core-contract-1';
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261015-draw-desktop-1';
 

@@ -313,7 +313,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
   syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261013-camera-placement-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261015-embed-native-save-1');
   assertCurrent();
   updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,

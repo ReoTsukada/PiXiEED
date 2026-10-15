@@ -12,7 +12,8 @@ const evidenceRoot = '/tmp/pixieed-approved-release-20261015/evidence';
 await mkdir(evidenceRoot, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+const page = await context.newPage();
 await page.addInitScript(() => {
   window.__embedMediaCallCount = 0;
   const media = navigator.mediaDevices;
@@ -107,34 +108,84 @@ if (!cameraFrame) throw new Error('The camera tool iframe was not created.');
 await cameraFrame.waitForSelector('#pixelStudio');
 await cameraFrame.waitForFunction(() => document.documentElement.dataset.creationModesReady === 'true');
 if (await cameraFrame.evaluate(() => window.__embedMediaCallCount) !== 0) throw new Error('Camera iframe requested media before the explicit camera action.');
+await cameraFrame.locator('#cameraImageInput').setInputFiles(resolve(siteRoot, 'assets/pixel-studio/samples/coffee.png'));
+await cameraFrame.waitForFunction(() => document.querySelector('#cameraStatus')?.textContent === 'プレビュー');
+await cameraFrame.locator('#toolbarHome [data-tool="look"]').click();
+if (await cameraFrame.locator('#looks [data-look="c8"]').isHidden()) await cameraFrame.locator('#toolbarContextMore').click();
+await cameraFrame.locator('#looks [data-look="c8"]').click();
+await cameraFrame.locator('#toolbarContextBack').click();
+await cameraFrame.locator('#capture').click();
+await cameraFrame.waitForFunction(() => document.querySelector('#pixelStudio')?.dataset.mode === 'captured' && document.querySelector('#savePng')?.href.startsWith('blob:'));
+await cameraFrame.evaluate(() => { window.__cameraEmbedPersistenceProof = crypto.randomUUID(); });
+const cameraStateBeforeExport = await cameraFrame.evaluate(() => {
+  const view = document.querySelector('#view');
+  const pixels = view.getContext('2d').getImageData(0, 0, view.width, view.height).data;
+  let hash = 2166136261;
+  for (const byte of pixels) hash = Math.imul(hash ^ byte, 16777619);
+  return { width: view.width, height: view.height, hash: hash >>> 0, mode: document.querySelector('#pixelStudio').dataset.mode };
+});
+await cameraFrame.locator('#creation-output-open').click();
+await cameraFrame.locator('#cameraSaveDialog').waitFor({ state: 'visible' });
+const cameraDownloadWait = page.waitForEvent('download');
+await cameraFrame.locator('#cameraDownloadFile').click();
+const cameraDownload = await cameraDownloadWait;
+const cameraPngPath = `${evidenceRoot}/camera-embed-output.png`;
+await cameraDownload.saveAs(cameraPngPath);
+const cameraPng = await readFile(cameraPngPath);
+const cameraPngEvidence = { path: cameraPngPath, bytes: cameraPng.length, width: cameraPng.readUInt32BE(16), height: cameraPng.readUInt32BE(20), signature: cameraPng.subarray(0, 8).toString('hex') };
+if (cameraPngEvidence.signature !== '89504e470d0a1a0a') throw new Error('The embedded camera native save did not produce a PNG.');
+await cameraFrame.locator('#cameraSaveDialog form button[type="submit"]').click();
+if (new URL(cameraFrame.url()).pathname !== '/draw/') throw new Error('Camera PNG export navigated away from the editor iframe.');
+const cameraStateAfterExport = await cameraFrame.evaluate(() => {
+  const view = document.querySelector('#view');
+  const pixels = view.getContext('2d').getImageData(0, 0, view.width, view.height).data;
+  let hash = 2166136261;
+  for (const byte of pixels) hash = Math.imul(hash ^ byte, 16777619);
+  return { width: view.width, height: view.height, hash: hash >>> 0, mode: document.querySelector('#pixelStudio').dataset.mode };
+});
+if (JSON.stringify(cameraStateAfterExport) !== JSON.stringify(cameraStateBeforeExport)) throw new Error('Camera PNG export changed the captured camera image.');
 await page.getByRole('button', { name: '拡大' }).last().click();
 await cameraFrame.evaluate(() => { window.__cameraEmbedPersistenceProof = crypto.randomUUID(); });
 await page.screenshot({ path: `${evidenceRoot}/camera-embed-390.png`, fullPage: true, animations: 'disabled' });
 const cameraProof = await cameraFrame.evaluate(() => window.__cameraEmbedPersistenceProof);
 await page.getByRole('button', { name: '閉じる' }).last().click();
+await page.locator('[data-tool-mode="camera"] [data-embed-start]').click();
+await page.waitForFunction(() => document.querySelector('[data-tool-mode="camera"] [data-embed-status]')?.textContent.includes('編集を保持'));
+if (await cameraFrame.evaluate(() => window.__cameraEmbedPersistenceProof) !== cameraProof) throw new Error('Camera resume replaced its iframe browsing context.');
+const cameraStateAfterResume = await cameraFrame.evaluate(() => {
+  const view = document.querySelector('#view');
+  const pixels = view.getContext('2d').getImageData(0, 0, view.width, view.height).data;
+  let hash = 2166136261;
+  for (const byte of pixels) hash = Math.imul(hash ^ byte, 16777619);
+  return { width: view.width, height: view.height, hash: hash >>> 0, mode: document.querySelector('#pixelStudio').dataset.mode };
+});
+if (JSON.stringify(cameraStateAfterResume) !== JSON.stringify(cameraStateBeforeExport)) throw new Error('Camera close/resume after native PNG save changed the captured image.');
+await page.locator('[data-tool-mode="camera"] [data-embed-close]').click();
 await page.locator('[data-tool-mode="draw"] [data-embed-start]').click();
 await page.waitForFunction(() => document.querySelector('[data-tool-mode="draw"] [data-embed-status]')?.textContent.includes('編集を保持'));
-if (await cameraFrame.evaluate(() => window.__cameraEmbedPersistenceProof) !== cameraProof) throw new Error('Camera resume replaced its iframe browsing context.');
+const drawStateBeforeExport = await frame.evaluate(() => window.__PIXIEED_TOOL_EMBED_BRIDGE__.getState());
+const drawDownloadWait = page.waitForEvent('download');
 await frame.locator('#creation-output-open').click();
-await page.waitForFunction(() => [...document.querySelectorAll('iframe')].some(item => item.contentWindow?.location?.pathname?.startsWith('/output/work/'))).catch(async () => {
-  await page.waitForTimeout(1500);
-});
-await frame.waitForFunction(() => {
-  const download = document.querySelector('#output-download');
-  return download && download.getAttribute('href') && download.getAttribute('href') !== '#';
-}, null, { timeout: 30000 });
-const downloadWait = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
-await frame.locator('#output-download').click();
-const download = await downloadWait;
-let pngEvidence = null;
-if (download) {
-  const pngPath = `${evidenceRoot}/draw-embed-output.png`;
-  await download.saveAs(pngPath);
-  const bytes = await readFile(pngPath);
-  const signature = bytes.subarray(0, 8).toString('hex');
-  if (signature !== '89504e470d0a1a0a') throw new Error('The embedded drawing output is not a PNG.');
-  pngEvidence = { path: pngPath, bytes: bytes.length, width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20), signature };
-} else throw new Error('The embedded drawing export did not start a PNG download.');
+const drawDownload = await drawDownloadWait;
+const drawPngPath = `${evidenceRoot}/draw-embed-output.png`;
+await drawDownload.saveAs(drawPngPath);
+const drawPng = await readFile(drawPngPath);
+const pngEvidence = { path: drawPngPath, bytes: drawPng.length, width: drawPng.readUInt32BE(16), height: drawPng.readUInt32BE(20), signature: drawPng.subarray(0, 8).toString('hex') };
+if (pngEvidence.signature !== '89504e470d0a1a0a') throw new Error('The embedded Draw native save did not produce a PNG.');
+await frame.locator('[data-tool-result-return]').click();
+if (new URL(frame.url()).pathname !== '/draw/') throw new Error('Draw PNG export navigated away from the editor iframe.');
+const drawStateAfterExport = await frame.evaluate(() => window.__PIXIEED_TOOL_EMBED_BRIDGE__.getState());
+if (drawStateAfterExport.image.hash !== drawStateBeforeExport.image.hash || drawStateAfterExport.timeline.hash !== drawStateBeforeExport.timeline.hash) throw new Error('Draw PNG export changed current pixels or history.');
+await page.locator('[data-tool-mode="draw"] [data-embed-close]').click();
+await page.locator('[data-tool-mode="draw"] [data-embed-start]').click();
+await page.waitForFunction(() => document.querySelector('[data-tool-mode="draw"] [data-embed-status]')?.textContent.includes('編集を保持'));
+if (await frame.evaluate(() => window.__embedPersistenceProof) !== persistentContext) throw new Error('Draw PNG export then close/resume replaced the editor browsing context.');
+const drawStateAfterResume = await frame.evaluate(() => window.__PIXIEED_TOOL_EMBED_BRIDGE__.getState());
+if (drawStateAfterResume.image.hash !== drawStateBeforeExport.image.hash || drawStateAfterResume.timeline.hash !== drawStateBeforeExport.timeline.hash) throw new Error('Draw PNG export then close/resume lost the project.');
+await frame.locator('#draw-undo').click();
+await frame.waitForFunction(hash => window.__PIXIEED_TOOL_EMBED_BRIDGE__.getState().then(state => state.image.hash === hash), initial.image.hash);
+await frame.locator('#draw-redo').click();
+await frame.waitForFunction(hash => window.__PIXIEED_TOOL_EMBED_BRIDGE__.getState().then(state => state.image.hash === hash), painted.image.hash);
 const report = {
   viewport: '390×844',
   pixels: { changed: painted.image.hash !== initial.image.hash, undoRestored: undone.image.hash === initial.image.hash, redoRestored: redone.image.hash === painted.image.hash },
@@ -147,9 +198,16 @@ const report = {
       && JSON.stringify(resumed.timeline.layers) === JSON.stringify(suspendedHistory.timeline.layers)
   },
   closeResume: { sameBrowsingContext: Boolean(persistentContext), redoAvailable: !resumed.controls.redoDisabled, redoRestored: afterResumeRedo.image.hash === painted.image.hash },
+  nativeSave: {
+    undoRedoAfterExportAndResume: true,
+    draw: { png: pngEvidence, editorRouteRetained: new URL(frame.url()).pathname === '/draw/', sameBrowsingContextAfterCloseResume: await frame.evaluate(() => window.__embedPersistenceProof) === persistentContext, projectRetainedAfterCloseResume: drawStateAfterResume.image.hash === drawStateBeforeExport.image.hash && drawStateAfterResume.timeline.hash === drawStateBeforeExport.timeline.hash },
+    camera: { png: cameraPngEvidence, editorRouteRetained: new URL(cameraFrame.url()).pathname === '/draw/', imageRetainedOnExport: JSON.stringify(cameraStateAfterExport) === JSON.stringify(cameraStateBeforeExport), sameBrowsingContextAfterCloseResume: await cameraFrame.evaluate(() => window.__cameraEmbedPersistenceProof) === cameraProof, imageRetainedAfterCloseResume: JSON.stringify(cameraStateAfterResume) === JSON.stringify(cameraStateBeforeExport) }
+  },
   camera: { noPermissionBeforeExplicitAction: noPermissionBeforeStart === 0, importedSample: cameraImport.sourceLabel === 'プレビュー', reducedPalette: cameraImport.reducedPalette === 'true', mediaRequests: cameraImport.mediaCalls },
-  dedicatedCameraIframe: { mediaRequestsBeforeExplicitAction: await cameraFrame.evaluate(() => window.__embedMediaCallCount), sameBrowsingContextOnResume: await cameraFrame.evaluate(() => window.__cameraEmbedPersistenceProof) === cameraProof },
+  dedicatedCameraIframe: { mediaRequestsBeforeExplicitAction: await cameraFrame.evaluate(() => window.__embedMediaCallCount), sameBrowsingContextOnResume: await cameraFrame.evaluate(() => window.__cameraEmbedPersistenceProof) === cameraProof, imageRetainedOnExport: JSON.stringify(cameraStateAfterExport) === JSON.stringify(cameraStateBeforeExport) },
   pngOutput: pngEvidence,
+  cameraPngOutput: cameraPngEvidence,
+  cameraImage: { before: cameraStateBeforeExport, after: cameraStateAfterExport, retainedOnExport: JSON.stringify(cameraStateAfterExport) === JSON.stringify(cameraStateBeforeExport) },
   screenshots: [`${evidenceRoot}/draw-embed-390.png`, `${evidenceRoot}/camera-embed-390.png`],
   iframeCounts: { draw: await page.locator('[data-tool-mode="draw"] iframe').count(), camera: await page.locator('[data-tool-mode="camera"] iframe').count() },
   errors
@@ -160,6 +218,10 @@ if (!report.pixels.changed || !report.pixels.undoRestored || !report.pixels.redo
     || !report.camera.noPermissionBeforeExplicitAction || !report.camera.importedSample || !report.camera.reducedPalette
     || report.camera.mediaRequests !== 0 || report.dedicatedCameraIframe.mediaRequestsBeforeExplicitAction !== 0
     || !report.dedicatedCameraIframe.sameBrowsingContextOnResume || !report.pngOutput || report.iframeCounts.draw !== 1
+    || !report.cameraPngOutput || !report.cameraImage.retainedOnExport || !report.nativeSave.draw.editorRouteRetained
+    || !report.nativeSave.draw.sameBrowsingContextAfterCloseResume || !report.nativeSave.draw.projectRetainedAfterCloseResume
+    || !report.nativeSave.camera.editorRouteRetained || !report.nativeSave.camera.imageRetainedOnExport
+    || !report.nativeSave.camera.sameBrowsingContextAfterCloseResume || !report.nativeSave.camera.imageRetainedAfterCloseResume
     || report.iframeCounts.camera !== 1 || errors.length) throw new Error(`Embed acceptance report failed: ${JSON.stringify(report)}`);
 console.log(JSON.stringify(report, null, 2));
 await browser.close();

@@ -20,6 +20,16 @@ const RETURN_PATHS = new Set([
 const ID_PATTERN = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 const inFlightHandoffs = new WeakMap();
 
+function isValidatedToolEmbed(windowRef, locationRef) {
+  if (!windowRef || windowRef.parent === windowRef) return false;
+  const boot = windowRef.__PIXIEED_TOOL_EMBED__;
+  if (!boot || !['draw', 'camera'].includes(boot.role) || !ID_PATTERN.test(String(boot.channel || ''))) return false;
+  try {
+    return windowRef.location?.origin === locationRef?.origin
+      && windowRef.parent.location?.origin === locationRef?.origin;
+  } catch { return false; }
+}
+
 function mimeOf(blob) { return String(blob?.type || '').split(';', 1)[0].trim().toLowerCase(); }
 function extensionOf(filename) { return String(filename || '').split('.').pop().toLowerCase(); }
 
@@ -469,6 +479,8 @@ async function performToolOutput(options, dependencies) {
 /** Coalesce overlapping save gestures in one page so they stage and navigate only once. */
 export function sendToolOutput(options, dependencies) {
   const locationRef = dependencies?.locationRef || globalThis.location;
+  const windowRef = dependencies?.windowRef || globalThis.window;
+  if (isValidatedToolEmbed(windowRef, locationRef)) return Promise.resolve({ ok: false, reason: 'embedded_native_save' });
   if (!locationRef || (typeof locationRef !== 'object' && typeof locationRef !== 'function')) {
     return performToolOutput(options, dependencies);
   }
