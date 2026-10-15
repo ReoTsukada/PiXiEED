@@ -4,7 +4,7 @@ import { mountDrawMode } from './draw-page.mjs?rev=20261015-draw-desktop-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261012-animation-core-contract-1';
 
 const scope = createModeScope();
-let modes = null, starting = true;
+let modes = null, starting = true, drawForEmbed = null;
 const startupMain = document.querySelector('#main');
 if (startupMain) startupMain.inert = true;
 // Retained modes gate global drawing shortcuts while keeping Draw's undo timeline alive.
@@ -27,13 +27,17 @@ try {
       if (pointer?.projectId && pointer?.revisionId) retainedDrawPointer = pointer;
     } catch { /* Existing standalone works remain available through explicit imports. */ }
   }
-  const draw = await mountDrawMode({ scope: drawScope, musicLayer: true, isActive: () => !modes || modes.mode !== 'camera',
+  const draw = drawForEmbed = await mountDrawMode({ scope: drawScope, musicLayer: true, isActive: () => !modes || modes.mode !== 'camera',
     mountWorkspace: options => mountProjectWorkspace({ ...options, initialPointer: retainedDrawPointer, isActive: () => true,
       onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
   try {
-    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261013-camera-placement-1');
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261015-tool-embed-1');
     if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
+    if (!scope.disposed && window.__PIXIEED_TOOL_EMBED__ && drawForEmbed && modes) {
+      const { installToolEmbedBridge } = await import('./tool-embed-bridge.mjs');
+      installToolEmbedBridge({ draw: drawForEmbed, modes });
+    }
   } catch (error) {
     delete document.documentElement.dataset.creationStartup;
     document.documentElement.dataset.creationModesReady = 'true';

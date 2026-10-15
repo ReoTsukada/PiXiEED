@@ -379,7 +379,10 @@ export async function mountCreationModes({ draw, scope }) {
   });
   scope.listen(document, 'pointerdown', event => { if (!menu.contains(event.target)) menu.open = false; });
   scope.listen(document, 'keydown', event => { if (event.key === 'Escape' && menu.open) menu.open = false; });
-  const api = { get mode() { return mode; }, get switching() { return switching; }, switchMode: next => switchMode(next).catch(say), navigate };
+  const api = { get mode() { return mode; }, get switching() { return switching; }, switchMode: next => switchMode(next).catch(say), navigate,
+    suspendForEmbed() { stopCurrent(); },
+    resumeForEmbed() { resumeCurrent(); }
+  };
   let focusReturnTarget = null;
   function focusFirst(container, fallback) {
     const selector = 'button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])';
