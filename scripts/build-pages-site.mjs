@@ -24,6 +24,19 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
   const destination = resolve(output);
   if (destination === root || root.startsWith(destination + '/')) throw new Error('Output must not replace the repository');
   const names = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  const booksAssets = new Set(publishableBooksAssets);
+  const booksManifest = await readFile(join(root, 'assets/books/room-products.json'), 'utf8').catch(error => {
+    if (error.code === 'ENOENT') return '[]';
+    throw error;
+  });
+  for (const product of JSON.parse(booksManifest)) {
+    if (!product || product.enabled === false || product.visible === false || product.sample === true) continue;
+    const thumbnail = product.shopThumbnail;
+    if (thumbnail && [32, 96].includes(thumbnail.width) && thumbnail.height === thumbnail.width
+        && /^\/assets\/books\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|webp)$/i.test(thumbnail.src || '')) {
+      booksAssets.add(thumbnail.src.slice(1));
+    }
+  }
   const files = names.filter(name => {
     const parts = name.split('/');
     // Event output is regenerated from the catalog below; stale tracked pages
@@ -34,7 +47,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     // Publish only the public catalog route and the exact data/runtime it needs.
     // The room preview and prototype-only book assets stay local.
     if (parts[0] === 'books' && !publishableBooksPages.has(name)) return false;
-    if (name.startsWith('assets/books/') && !publishableBooksAssets.has(name)) return false;
+    if (name.startsWith('assets/books/') && !booksAssets.has(name)) return false;
     if (/^css\/books(?:-[a-z-]+)?\.css$/.test(name) && !publishableBooksStyles.has(name)) return false;
     if (/^js\/books(?:-[a-z-]+)?\.mjs$/.test(name) && !publishableBooksScripts.has(name)) return false;
     if (/^(?:package(?:-lock)?|deno(?:\.lock)?)\.(?:json|jsonc)$/.test(parts.at(-1))) return false;

@@ -14,7 +14,8 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
     'index.html': '<h1>site</h1>', 'assets/test.bin': 'asset', 'js/site.mjs': 'export const ready = true;', 'data/site-config.js': 'export const publicConfig = true;',
     'supabase/private.sql': 'private', 'tests/fixture.html': 'fixture', 'docs/notes.html': 'notes',
     'books/index.html': '<h1>catalog</h1>', 'books/room-preview.html': '<meta name="robots" content="noindex,follow">',
-    'assets/books/room-products.json': '[]', 'assets/books/room-commerce.json': '{"associateName":"PiXiEED","enrollmentConfirmed":true}',
+    'assets/books/room-products.json': '[{"id":"drawn-thumbnail","shopThumbnail":{"src":"/assets/books/thumb.png","width":32,"height":32}}]', 'assets/books/room-commerce.json': '{"associateName":"PiXiEED","enrollmentConfirmed":true}',
+    'assets/books/thumb.png': 'registered thumbnail', 'assets/books/unregistered.png': 'private draft',
     'assets/books/room-scene.json': '{}', 'css/books.css': '.catalog{}', 'css/books-room.css': 'canvas{}',
     'js/books-catalog.mjs': 'export {};', 'js/books-commerce.mjs': 'export {};', 'js/books-room-catalog.mjs': 'export {};', 'js/books-room.mjs': 'export {};',
     'shops/index.html': '<h1>retired route</h1>', 'stores/cafe-hoshi.html': '<h1>legacy store</h1>'
@@ -33,10 +34,12 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
   await writeFile(join(root, legacyPage, 'index.html'), '<meta property="og:image">');
   await writeFile(join(root, legacyPage, 'ogp-fedcba0987654321.png'), 'PNG');
   const result = await buildPagesSite({ root, output: join(scratch, 'site') });
-  assert.equal(result.puzzlePages, 2); assert.equal(result.files, 17);
+  assert.equal(result.puzzlePages, 2); assert.equal(result.files, 18);
   assert.equal(await readFile(join(result.output, 'index.html'), 'utf8'), '<h1>site</h1>');
   assert.equal(await readFile(join(result.output, 'books/index.html'), 'utf8'), '<h1>catalog</h1>');
-  assert.equal(await readFile(join(result.output, 'assets/books/room-products.json'), 'utf8'), '[]');
+  assert.equal(await readFile(join(result.output, 'assets/books/room-products.json'), 'utf8'), entries['assets/books/room-products.json']);
+  assert.equal(await readFile(join(result.output, 'assets/books/thumb.png'), 'utf8'), 'registered thumbnail');
+  await assert.rejects(readFile(join(result.output, 'assets/books/unregistered.png')), { code: 'ENOENT' });
   assert.equal(await readFile(join(result.output, 'assets/books/room-commerce.json'), 'utf8'), '{"associateName":"PiXiEED","enrollmentConfirmed":true}');
   for (const path of ['css/books.css', 'js/books-catalog.mjs', 'js/books-commerce.mjs', 'js/books-room-catalog.mjs']) assert.ok(await readFile(join(result.output, path), 'utf8'));
   assert.equal(await readFile(join(result.output, 'stores/cafe-hoshi.html'), 'utf8'), '<h1>legacy store</h1>');

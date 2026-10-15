@@ -14,6 +14,7 @@ const isLocalImagePath = value => typeof value === 'string'
   && value.split('/').slice(3).every(segment => /^[A-Za-z0-9._-]+$/.test(segment))
   && /\.(?:png|jpe?g|webp)$/i.test(value);
 const products = manifest.filter(p => p && p.enabled !== false && p.visible !== false && p.sample !== true);
+const associateDisclosure = 'Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています。価格・販売条件は販売先のAmazonでご確認ください。';
 const categoryOrder = ['books', 'toys', 'tools', 'gadgets'];
 const categoryCounts = Object.fromEntries(categoryOrder.map(category => [category, products.filter(product => (product.category || 'books') === category).length]));
 const listedProducts = [];
@@ -44,18 +45,27 @@ for (const product of products) {
     throw new Error(`Product image requires a local image, alt text, creator, rights, and source: ${product.id}`);
   }
   if (product.image && (!Number.isSafeInteger(product.image.width) || product.image.width < 1 || !Number.isSafeInteger(product.image.height) || product.image.height < 1)) throw new Error(`Product image dimensions must be positive integers: ${product.id}`);
+  if (product.shopThumbnail && (!isLocalImagePath(product.shopThumbnail.src)
+      || ![32, 96].includes(product.shopThumbnail.width)
+      || product.shopThumbnail.height !== product.shopThumbnail.width)) {
+    throw new Error(`Shop thumbnail must be a local 32x32 or 96x96 image: ${product.id}`);
+  }
 }
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const categoryLabel = { books: '本', toys: 'おもちゃ', tools: '制作道具', gadgets: 'ガジェット' };
-function card(p, index) {
+function card(p) {
   const author = p.author ? `<p class="product-card__byline">${esc(p.author)}${p.publisher ? ` · ${esc(p.publisher)}` : ''}</p>` : (p.publisher ? `<p class="product-card__byline">${esc(p.publisher)}</p>` : '');
   const authorMarkup = author ? `${author}\n            ` : '';
   const metadataMarkup = p.metadataNote ? `<p class="product-card__byline product-card__metadata-note">${esc(p.metadataNote)}</p>\n            ` : '';
   const source = p.sourceUrl && p.sourceLabel ? `<a class="product-card__source" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(p.sourceLabel)} <span aria-hidden="true">↗</span><span class="sr-only">（新しいタブ）</span></a>` : '<span class="product-card__source product-card__source--missing">出典情報未登録</span>';
-  const image = p.image ? `<img src="${esc(p.image.src)}" alt="${esc(p.image.alt || p.title)}" width="${Number(p.image.width) || 640}" height="${Number(p.image.height) || 480}" loading="lazy">` : `<div class="product-card__placeholder" aria-hidden="true"><span class="product-card__placeholder-mark">${String(index + 1).padStart(2, '0')}</span><span class="product-card__placeholder-title">${esc(p.title)}</span><small>商品画像未掲載</small></div>`;
-  return `        <article class="product-card" id="${esc(p.id)}" data-product-id="${esc(p.id)}" data-books-product-id="${esc(p.id)}" data-asin="${esc(p.asin)}" data-category="${esc(p.category || 'books')}" data-format="${esc(p.format || '')}" data-title="${esc(p.title)}" data-description="${esc(p.description || '')}" data-author="${esc(p.author || '')}" data-publisher="${esc(p.publisher || '')}" data-source-label="${esc(p.sourceLabel || '')}" data-source-url="${esc(p.sourceUrl || '')}" data-image-src="${esc(p.image?.src || '')}" data-work-id="${esc(p.workId || '')}" data-metadata-note="${esc(p.metadataNote || '')}">
-          <div class="product-card__image${p.image ? '' : ' product-card__image--empty'}">${image}</div>
+  const image = p.image
+    ? `<div class="product-card__image"><img src="${esc(p.image.src)}" alt="${esc(p.image.alt || p.title)}" width="${Number(p.image.width) || 640}" height="${Number(p.image.height) || 480}" loading="lazy"></div>`
+    : p.shopThumbnail
+      ? `<div class="product-card__image product-card__thumbnail" data-size="${p.shopThumbnail.width}"><img src="${esc(p.shopThumbnail.src)}" alt="" width="${p.shopThumbnail.width}" height="${p.shopThumbnail.height}" loading="lazy"></div>`
+      : '';
+  return `        <article class="product-card" id="${esc(p.id)}" data-product-id="${esc(p.id)}" data-books-product-id="${esc(p.id)}" data-asin="${esc(p.asin)}" data-category="${esc(p.category || 'books')}" data-format="${esc(p.format || '')}" data-title="${esc(p.title)}" data-description="${esc(p.description || '')}" data-author="${esc(p.author || '')}" data-publisher="${esc(p.publisher || '')}" data-source-label="${esc(p.sourceLabel || '')}" data-source-url="${esc(p.sourceUrl || '')}" data-image-src="${esc(p.image?.src || p.shopThumbnail?.src || '')}" data-work-id="${esc(p.workId || '')}" data-metadata-note="${esc(p.metadataNote || '')}">
+          ${image}
           <div class="product-card__body">
             <div class="product-card__meta"><span>${esc(categoryLabel[p.category] || '本')}</span><span>${esc(p.format || '形式未登録')}</span></div>
             <h3>${esc(p.title)}</h3>
@@ -99,7 +109,7 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261011-catalog-refine-2">
+  <link rel="stylesheet" href="/css/books.css?rev=20261015-approved-shop-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
@@ -111,7 +121,9 @@ function render(route) {
       <p class="catalog-eyebrow">BOOKS · TOYS · TOOLS · GADGETS</p>
       <h1 id="page-title">ドット絵の本と道具</h1>
       <p class="catalog-lead">描く、眺める、手を動かす。気になる一冊や道具を探せます。</p>
-      <p class="catalog-disclosure" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています。価格・販売条件は販売先のAmazonでご確認ください。</p>
+      ${preview
+    ? `<p class="catalog-disclosure" id="associate-status" aria-live="polite">${associateDisclosure}</p>`
+    : '<p class="catalog-disclosure">広告：Amazonアソシエイトリンクを含み、適格販売により収入を得ています。</p>'}
     </div></section>
     <section class="catalog-section catalog-wrap" aria-labelledby="catalog-title">
       <div class="catalog-heading"><div><p class="catalog-eyebrow">THE SHELF</p><h2 id="catalog-title">商品一覧</h2></div><p class="catalog-count" data-product-count aria-live="polite">${products.length}件</p></div>
@@ -139,7 +151,7 @@ ${listedProducts.map(card).join('\n')}
     </section>
     <section class="catalog-extra catalog-wrap" aria-labelledby="catalog-extra-title" hidden><div class="catalog-extra__copy"><p class="catalog-eyebrow">COMING LATER</p><h2 id="catalog-extra-title">PiXiEEDのグッズ</h2><p>準備ができたら、PiXiEEDのオリジナルグッズをこちらで紹介します。</p></div><div class="catalog-ad-slot" aria-label="広告掲載予定"><span>広告掲載予定</span></div></section>
   </main>
-${preview ? '' : `  <footer class="catalog-footer"><div class="catalog-wrap"><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>`}
+${preview ? '' : `  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure}</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>`}
   <dialog class="product-detail" id="product-detail" aria-labelledby="product-detail-title">
     <div class="product-detail__header"><span>商品詳細</span><button type="button" data-detail-close aria-label="詳細を閉じて一覧に戻る">一覧に戻る <span aria-hidden="true">×</span></button></div>
     <div class="product-detail__content" data-detail-body></div>

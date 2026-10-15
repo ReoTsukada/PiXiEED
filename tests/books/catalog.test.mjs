@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, copyFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import path from 'node:path';
 import { normalizeProduct, validAmazonUrl } from '../../js/books-room-catalog.mjs';
 
 const asin = 'B07H7DK5KH';
@@ -141,7 +143,7 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
     assert.equal((html.match(/data-books-product-id=/g) || []).length, 25);
     assert.ok(html.includes('B0GQYVXZJD'));
     assert.ok(!html.includes('商品名未確認'));
-    assert.match(html, /商品画像未掲載/);
+    assert.doesNotMatch(html, /product-card__placeholder|product-card__image--empty/);
     assert.match(html, /catalog-filters[^>]* hidden/);
     assert.match(html, /class="catalog-category-filter"/);
     assert.match(html, /class="catalog-more-filters" id="catalog-more-filters"/);
@@ -158,9 +160,40 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
   }
   assert.doesNotMatch(after[0], /name="robots"[^>]*noindex/);
   assert.match(after[1], /noindex,follow/);
+  assert.match(after[0], /class="catalog-disclosure">広告：Amazonアソシエイトリンクを含み、適格販売により収入を得ています。<\/p>/);
+  assert.match(after[0], /<footer class="catalog-footer">[\s\S]*?<p class="catalog-footer__notice" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています/);
+  assert.ok(after[0].indexOf('id="associate-status"') > after[0].indexOf('</main>'));
+  assert.match(after[1], /<p class="catalog-disclosure" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売/);
   const commerce = JSON.parse(await readFile(new URL('../../assets/books/room-commerce.json', import.meta.url), 'utf8'));
   assert.equal(commerce.enrollmentConfirmed, true);
   assert.equal(commerce.associateName, 'PiXiEED');
+});
+
+test('shop thumbnails accept only local 32px and 96px squares and render registered thumbnails', async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'pixieed-shop-thumbnail-'));
+  try {
+    const repo = path.join(temp, 'site');
+    await mkdir(path.join(repo, 'scripts'), { recursive: true });
+    await mkdir(path.join(repo, 'js'), { recursive: true });
+    await mkdir(path.join(repo, 'assets/books'), { recursive: true });
+    await mkdir(path.join(repo, 'books'), { recursive: true });
+    await copyFile(new URL('../../scripts/generate-books-catalog.mjs', import.meta.url), path.join(repo, 'scripts/generate-books-catalog.mjs'));
+    await copyFile(new URL('../../js/books-room-catalog.mjs', import.meta.url), path.join(repo, 'js/books-room-catalog.mjs'));
+    const source = JSON.parse(await readFile(new URL('../../assets/books/room-products.json', import.meta.url), 'utf8'))[0];
+    for (const size of [32, 96]) {
+      await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src: `/assets/books/thumb-${size}.png`, width: size, height: size } }]));
+      execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo });
+      const html = await readFile(path.join(repo, 'books/index.html'), 'utf8');
+      assert.match(html, new RegExp(`<div class="product-card__image product-card__thumbnail" data-size="${size}"><img src="/assets/books/thumb-${size}\\.png" alt="" width="${size}" height="${size}"`));
+      assert.match(html, new RegExp(`data-image-src="/assets/books/thumb-${size}\\.png"`));
+    }
+    await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src: '/assets/books/thumb.png', width: 32, height: 96 } }]));
+    assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo }), /Shop thumbnail must be a local 32x32 or 96x96 image/);
+    await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src: 'https://example.com/thumb.png', width: 32, height: 32 } }]));
+    assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo }), /Shop thumbnail must be a local 32x32 or 96x96 image/);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
 });
 
 test('six supplied listings retain exact ASINs, affiliate parameters and format distinctions without private chat metadata', async () => {
