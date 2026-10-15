@@ -159,7 +159,7 @@ ${preview ? '' : `  <footer class="catalog-footer"><div class="catalog-wrap"><p 
     <p class="product-detail__gate">商品リンクを確認できないため、購入リンクは利用できません。</p>
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261011-catalog-refine-2"></script>
-  <script type="module" src="/js/books-commerce.mjs?rev=20261011-catalog-refine-2"></script>
+  <script type="module" src="/js/books-commerce.mjs?rev=20261015-shop-thumbnails-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
 </body>
 </html>

@@ -34,7 +34,7 @@ try {
       && (record.sourceUrl || '') === card.dataset.sourceUrl
       && (record.workId || '') === card.dataset.workId
       && (record.metadataNote || '') === card.dataset.metadataNote
-      && (record.image?.src || '') === card.dataset.imageSrc;
+      && (record.image?.src || record.shopThumbnail?.src || '') === card.dataset.imageSrc;
     if (!product || product.sample || !matchesStatic || product.asin !== card.dataset.asin) {
       card.hidden = true;
       card.dataset.catalogDisabled = 'true';
