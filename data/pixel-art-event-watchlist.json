@@ -2,12 +2,21 @@
   "version": 1,
   "regions": [
     {
+      "id": "region-07f62b021771d3cf",
+      "label": "Brazil",
+      "eventIds": [
+        "mis-ce-fortaleza-pixel-art-workshop-2026-10-17"
+      ],
+      "areas": []
+    },
+    {
       "id": "region-170f8cfbca8977ea",
       "label": "ブラジル",
       "eventIds": [
         "carioca-matsuri-pixel-art-workshop-2026",
         "scratch-day-pioneiro-pixel-art-2026",
-        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20"
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20",
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-22"
       ],
       "areas": [
         "Fortaleza, Centro",
@@ -186,6 +195,14 @@
       ]
     },
     {
+      "id": "region-be55ef3f4c4e6c2d",
+      "label": "Canada",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+      ],
+      "areas": []
+    },
+    {
       "id": "region-c6f27629d041725b",
       "label": "CAN",
       "eventIds": [
@@ -212,6 +229,12 @@
         "lyon-pixel-art-graffiti-part-dieu-2026-11-07",
         "lyon-pixel-art-graffiti-saint-rambert-2026-10-21",
         "moulins-association-artichaut-pixel-art-2026-10-17",
+        "moulins-association-artichaut-pixel-art-2026-11-14",
+        "moulins-association-artichaut-pixel-art-2026-11-21",
+        "moulins-association-artichaut-pixel-art-2026-11-28",
+        "moulins-association-artichaut-pixel-art-2026-12-05",
+        "moulins-association-artichaut-pixel-art-2026-12-12",
+        "moulins-association-artichaut-pixel-art-2026-12-19",
         "pont-de-beauvoisin-pixel-art-geant-2026-11-25",
         "riedisheim-en-pixel-closing-2026"
       ],
@@ -577,7 +600,13 @@
       "id": "venue-257aa92e818ebba7",
       "label": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
       "eventIds": [
-        "moulins-association-artichaut-pixel-art-2026-10-17"
+        "moulins-association-artichaut-pixel-art-2026-10-17",
+        "moulins-association-artichaut-pixel-art-2026-11-14",
+        "moulins-association-artichaut-pixel-art-2026-11-21",
+        "moulins-association-artichaut-pixel-art-2026-11-28",
+        "moulins-association-artichaut-pixel-art-2026-12-05",
+        "moulins-association-artichaut-pixel-art-2026-12-12",
+        "moulins-association-artichaut-pixel-art-2026-12-19"
       ],
       "region": "フランス",
       "area": "Moulins",
@@ -703,6 +732,18 @@
       "area": "Pont-de-Beauvoisin",
       "sourceUrls": [
         "https://tourisme-valsdudauphine.fr/agenda/7997420_atelier-pixel-art-geant/"
+      ]
+    },
+    {
+      "id": "venue-4cc7f95e9595aa11",
+      "label": "Praça do MIS (Museu da Imagem e do Som do Ceará)",
+      "eventIds": [
+        "mis-ce-fortaleza-pixel-art-workshop-2026-10-17"
+      ],
+      "region": "Brazil",
+      "area": "",
+      "sourceUrls": [
+        "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/"
       ]
     },
     {
@@ -1021,6 +1062,18 @@
       ]
     },
     {
+      "id": "venue-8f5f4e735cf60f70",
+      "label": "Bibliothèque du Boisé, Saint-Laurent",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+      ],
+      "region": "Canada",
+      "area": "",
+      "sourceUrls": [
+        "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736"
+      ]
+    },
+    {
       "id": "venue-92826c47f229249a",
       "label": "登別市観光交流センターヌプㇽ",
       "eventIds": [
@@ -1243,7 +1296,8 @@
       "id": "venue-e5be8cfea6aac90f",
       "label": "Biblioteca da Vila das Artes（Rua 24 de Maio, 1221, Centro）",
       "eventIds": [
-        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20"
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20",
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-22"
       ],
       "region": "ブラジル",
       "area": "Fortaleza, Centro",
@@ -1424,7 +1478,7 @@
       "lastKnownEventDate": "2026-12-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1453,7 +1507,13 @@
       "id": "source-087f15a99e98599a",
       "label": "Atelier Pixel Art",
       "eventIds": [
-        "moulins-association-artichaut-pixel-art-2026-10-17"
+        "moulins-association-artichaut-pixel-art-2026-10-17",
+        "moulins-association-artichaut-pixel-art-2026-11-14",
+        "moulins-association-artichaut-pixel-art-2026-11-21",
+        "moulins-association-artichaut-pixel-art-2026-11-28",
+        "moulins-association-artichaut-pixel-art-2026-12-05",
+        "moulins-association-artichaut-pixel-art-2026-12-12",
+        "moulins-association-artichaut-pixel-art-2026-12-19"
       ],
       "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
       "kind": "website",
@@ -1467,10 +1527,10 @@
       "venues": [
         "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）"
       ],
-      "lastKnownEventDate": "2026-10-17",
+      "lastKnownEventDate": "2026-12-19",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:02:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1983,6 +2043,29 @@
       }
     },
     {
+      "id": "source-3075719fd08b3960",
+      "label": "Mixlab : dessiner un personnage et le faire vivre dans un jeu vidéo",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+      ],
+      "url": "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "Canada"
+      ],
+      "areas": [],
+      "venues": [
+        "Bibliothèque du Boisé, Saint-Laurent"
+      ],
+      "lastKnownEventDate": "2026-11-05",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-32728cdd83e36e6c",
       "label": "香月恵介個展「Afterglow(s)」",
       "eventIds": [
@@ -2059,6 +2142,33 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
         "notes": "開催情報に日時・会場・講義内容"
+      }
+    },
+    {
+      "id": "source-38f336d8bcb4ab50",
+      "label": "北海道COMITIA24 — ジュウニ（ドット絵本・委託参加予定）",
+      "eventIds": [
+        "hokkaido-comitia-24-juni-pixel-art-2026"
+      ],
+      "url": "https://elysian.dojin.com/h-comitia/index.html",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "札幌市"
+      ],
+      "venues": [
+        "札幌コンベンションセンター 大ホール"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "notes": "主催者公式本文で2026年11月1日11:00–15:00、札幌コンベンションセンター大ホールを確認。サークル本人の告知は委託参加予定。"
       }
     },
     {
@@ -2568,7 +2678,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "lastCheckedAt": "2026-10-14T23:58:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2673,7 +2783,7 @@
       "lastKnownEventDate": "2026-10-17",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:03:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3214,7 +3324,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3316,7 +3426,7 @@
       "lastKnownEventDate": "2026-10-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4327,6 +4437,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "unavailable",
+        "lastCheckedAt": "2026-10-14T23:58:00+00:00",
         "attemptedAt": "2026-10-06T00:08:38+00:00",
         "notes": "公式親ページから個別申込ページへ進んだがCache miss。展示会期は親ページで確認済み。個別活動日時は未確認。"
       }
@@ -4721,7 +4832,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5018,6 +5129,29 @@
       }
     },
     {
+      "id": "source-e158f2ca4db4f181",
+      "label": "Oficina de Pixel Art — MIS Ceará",
+      "eventIds": [
+        "mis-ce-fortaleza-pixel-art-workshop-2026-10-17"
+      ],
+      "url": "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "Brazil"
+      ],
+      "areas": [],
+      "venues": [
+        "Praça do MIS (Museu da Imagem e do Som do Ceará)"
+      ],
+      "lastKnownEventDate": "2026-10-17",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-e242e06d1750e9ed",
       "label": "Pixel Art Park 3",
       "eventIds": [
@@ -5285,6 +5419,27 @@
       }
     },
     {
+      "id": "source-f796eb1da3a0a3e3",
+      "label": "MED1 GameJam 2026 — 8-bit / Pixel Art",
+      "eventIds": [
+        "med1-gamejam-pixel-art-2026-10-12"
+      ],
+      "url": "https://itch.io/jam/med1-gamejam-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（itch.io）／Room 5.145a（所在地は公式ページに記載なし）"
+      ],
+      "lastKnownEventDate": "2026-10-16",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-fa6b90dd16d33463",
       "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
       "eventIds": [
@@ -5315,7 +5470,8 @@
       "id": "source-fa9d07cc44fc88c3",
       "label": "Vila Geek — Oficina de Pixel Art",
       "eventIds": [
-        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20"
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-20",
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-22"
       ],
       "url": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
       "kind": "website",
@@ -5329,11 +5485,36 @@
       "venues": [
         "Biblioteca da Vila das Artes（Rua 24 de Maio, 1221, Centro）"
       ],
-      "lastKnownEventDate": "2026-10-20",
+      "lastKnownEventDate": "2026-10-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-fd765a1a0cc83401",
+      "label": "Pixxelpoint 2026 — Pixel-artワークショップ（Marko Drpić / tipoRenesansa）",
+      "eventIds": [
+        "pixxelpoint-pixel-art-workshop-2026-10-21"
+      ],
+      "url": "https://www.pixxelpoint.org/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スロベニア"
+      ],
+      "areas": [
+        "Nova Gorica"
+      ],
+      "venues": [
+        "Akademija umetnosti Univerze v Novi Gorici（Nova Gorica School of Arts）"
+      ],
+      "lastKnownEventDate": "2026-10-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "notes": "公式日程で10月21日17時のPixel-artワークショップ、Akademija umetnosti Univerze v Novi Goriciを確認。"
       }
     },
     {
@@ -5357,7 +5538,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5389,5 +5570,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-14T00:07:26+00:00"
+  "updatedAt": "2026-10-15T00:02:30+00:00"
 }

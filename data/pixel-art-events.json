@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-14T00:04:00+00:00",
+  "updatedAt": "2026-10-15T00:00:00+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -116,7 +116,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "checkedAt": "2026-10-14T00:04:00+00:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -147,7 +147,7 @@
       "status": "active",
       "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
-      "checkedAt": "2026-10-14T00:04:00+00:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -193,7 +193,7 @@
       "status": "upcoming",
       "sourceUrl": "https://nrgevent.eu/compo/",
       "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
-      "checkedAt": "2026-10-14T00:04:00+00:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -278,9 +278,12 @@
       "status": "upcoming",
       "sourceUrl": "https://tryme12.2-d.jp/12/",
       "description": "ドット絵の本やグッズを制作するサークル「ジュウニ」が委託参加を告知。主催者の申込受付一覧にも掲載。催事全体は創作同人誌の即売会で、ドット絵作家の出展予定として掲載。作品の委託頒布であり、作家本人の来場予定ではない。",
-      "checkedAt": "2026-10-05T15:00:59+09:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "作家サークルと主催者の公式情報"
+      "sourceLabel": "作家サークルと主催者の公式情報",
+      "additionalUrls": [
+        "https://elysian.dojin.com/h-comitia/index.html"
+      ]
     },
     {
       "id": "noboribetsu-barrier-free-toy-expo-dot-art-2026",
@@ -1349,7 +1352,7 @@
         "https://www.instagram.com/skm_whoartyou/"
       ],
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
-      "checkedAt": "2026-10-12T00:03:34+00:00",
+      "checkedAt": "2026-10-14T23:58:00+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "mapAreaLocation": {
@@ -1933,9 +1936,12 @@
       "status": "upcoming",
       "sourceUrl": "https://www.pixxelpoint.org/artists.html",
       "description": "Marko DrpićとtipoRenesansaによるPixel Artワークショップ。デジタルのPixel Art表現を、基本形のLEGOブロックを用いたアナログ印刷表現へ翻訳する。定員10名、無料、学生向け、要申込。Pixxelpointの公式日程にも掲載。",
-      "checkedAt": "2026-10-14T00:04:00+00:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
-      "sourceLabel": "Pixxelpoint公式参加者・企画案内"
+      "sourceLabel": "Pixxelpoint公式参加者・企画案内",
+      "additionalUrls": [
+        "https://www.pixxelpoint.org/"
+      ]
     },
     {
       "id": "lyon-pixel-art-graffiti-saint-rambert-2026-10-21",
@@ -2087,20 +2093,20 @@
     },
     {
       "id": "moulins-association-artichaut-pixel-art-2026-10-17",
-      "name": "Atelier Pixel Art",
+      "name": "Atelier pixel art en perles (17 octobre)",
       "country": "フランス",
       "area": "Moulins",
       "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
       "startDate": "2026-10-17",
       "endDate": "2026-10-17",
-      "dateLabel": "2026年10月17日。公式ページの時刻表記は「14 a.m.」で判然としないため時刻は未確定。",
+      "dateLabel": "2026年10月17日 14:00–16:00。10歳以上。",
       "status": "upcoming",
       "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
       "additionalUrls": [
         "https://www.moulins-tourisme.com/en/fete-manifestation/atelier-pixel-art-2/"
       ],
-      "description": "Association Artichaut 03で開催するPixel Art体験。公式説明はビーズを使ったゲームキャラクター制作を案内。会場住所はイベント掲載の場所。",
-      "checkedAt": "2026-10-14T00:02:00+00:00",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。公式ページは10月17日、11月14・21・28日、12月5・12・19日の各回を同じ会場・時間で案内。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Moulins観光局公式イベント情報",
       "socialUrls": []
@@ -2120,7 +2126,7 @@
         "https://www.bd-jeumont.fr/animations/"
       ],
       "description": "Fête de la BD内のPixel Artワークショップ。図書館と催事主催者の公式告知で企画・時間を確認。制作物の説明は告知間に差がある。",
-      "checkedAt": "2026-10-14T00:03:00+00:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
       "sourceLabel": "図書館・催事主催者の公式情報",
       "socialUrls": []
@@ -2137,7 +2143,7 @@
       "status": "upcoming",
       "sourceUrl": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
       "description": "Vila Geek催事内で実施する無料Pixel Artワークショップ。市立Vila das Artes公式告知で開催日・内容・会場を確認。",
-      "checkedAt": "2026-10-14T00:01:00+00:00",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Vila das Artes公式情報",
       "socialUrls": []
@@ -2226,6 +2232,176 @@
       "kind": "pixel-art",
       "sourceLabel": "Monts du Genevois公式観光情報",
       "socialUrls": []
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-11-14",
+      "name": "Atelier pixel art en perles (14 novembre)",
+      "country": "フランス",
+      "area": "Moulins",
+      "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "startDate": "2026-11-14",
+      "endDate": "2026-11-14",
+      "dateLabel": "2026年11月14日 14:00–16:00。10歳以上。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Moulins観光局公式イベント情報",
+      "socialUrls": []
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-11-21",
+      "name": "Atelier pixel art en perles (21 novembre)",
+      "country": "フランス",
+      "area": "Moulins",
+      "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "startDate": "2026-11-21",
+      "endDate": "2026-11-21",
+      "dateLabel": "2026年11月21日 14:00–16:00。10歳以上。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Moulins観光局公式イベント情報",
+      "socialUrls": []
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-11-28",
+      "name": "Atelier pixel art en perles (28 novembre)",
+      "country": "フランス",
+      "area": "Moulins",
+      "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "startDate": "2026-11-28",
+      "endDate": "2026-11-28",
+      "dateLabel": "2026年11月28日 14:00–16:00。10歳以上。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Moulins観光局公式イベント情報",
+      "socialUrls": []
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-12-05",
+      "name": "Atelier pixel art en perles (5 décembre)",
+      "country": "フランス",
+      "area": "Moulins",
+      "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "startDate": "2026-12-05",
+      "endDate": "2026-12-05",
+      "dateLabel": "2026年12月5日 14:00–16:00。10歳以上。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Moulins観光局公式イベント情報",
+      "socialUrls": []
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-12-12",
+      "name": "Atelier pixel art en perles (12 décembre)",
+      "country": "フランス",
+      "area": "Moulins",
+      "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "startDate": "2026-12-12",
+      "endDate": "2026-12-12",
+      "dateLabel": "2026年12月12日 14:00–16:00。10歳以上。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Moulins観光局公式イベント情報",
+      "socialUrls": []
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-12-19",
+      "name": "Atelier pixel art en perles (19 décembre)",
+      "country": "フランス",
+      "area": "Moulins",
+      "venue": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
+      "startDate": "2026-12-19",
+      "endDate": "2026-12-19",
+      "dateLabel": "2026年12月19日 14:00–16:00。10歳以上。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Moulins観光局公式イベント情報",
+      "socialUrls": []
+    },
+    {
+      "id": "vila-geek-pixel-art-workshop-fortaleza-2026-10-22",
+      "name": "Vila Geek — Oficina de Pixel Art (22 October)",
+      "country": "ブラジル",
+      "area": "Fortaleza, Centro",
+      "venue": "Biblioteca da Vila das Artes（Rua 24 de Maio, 1221, Centro）",
+      "startDate": "2026-10-22",
+      "endDate": "2026-10-22",
+      "dateLabel": "2026年10月22日 15:00。",
+      "status": "upcoming",
+      "sourceUrl": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
+      "description": "Vila Geek催事内の無料Pixel Artワークショップ。10月20日回とは別日程の回として登録。Vila das Artes公式案内で日程・会場を確認。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Vila das Artes公式情報",
+      "socialUrls": []
+    },
+    {
+      "id": "med1-gamejam-pixel-art-2026-10-12",
+      "name": "MED1 GameJam 2026 — 8-bit / Pixel Art",
+      "online": true,
+      "venue": "オンライン（itch.io）／Room 5.145a（所在地は公式ページに記載なし）",
+      "startDate": "2026-10-12",
+      "endDate": "2026-10-16",
+      "dateLabel": "itch.io表示の募集期間は10月12日06:15〜10月16日10:00（タイムゾーン未記載）。説明では金曜12:00締切、発表12:30、15:00終了と記載（時刻の基準タイムゾーンは不明）。",
+      "status": "active",
+      "sourceUrl": "https://itch.io/jam/med1-gamejam-2026",
+      "description": "物語を題材にした学生チーム向けゲームジャム。公式ルールで8-bit／Pixel Artのビジュアル様式を必須とし、テキストなし等の条件がある。物理会場としてRoom 5.145aの記載もあるが所在地は特定できないためオンライン扱い。",
+      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者のitch.io公式ページ"
+    },
+    {
+      "id": "mis-ce-fortaleza-pixel-art-workshop-2026-10-17",
+      "name": "Oficina de Pixel Art — MIS Ceará",
+      "online": false,
+      "country": "Brazil",
+      "region": "Ceará",
+      "city": "Fortaleza",
+      "venue": "Praça do MIS (Museu da Imagem e do Som do Ceará)",
+      "startDate": "2026-10-17",
+      "endDate": "2026-10-17",
+      "dateLabel": "10月17日。MISの公式プログラム全体は15:00〜19:30。個別のPixel Art講座時間は未記載。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
+      "description": "MIS Cearáの公式プログラムに掲載されたPixel Artワークショップ。会場はプログラムに記載されたPraça do MIS。施設住所は開催会場の確証がないため会場として転記していない。",
+      "checkedAt": "2026-10-15T00:00:00+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Ceará州文化局公式記事"
+    },
+    {
+      "id": "montreal-mixlab-pixel-art-character-workshop-2026-11-05",
+      "name": "Mixlab : dessiner un personnage et le faire vivre dans un jeu vidéo",
+      "online": false,
+      "country": "Canada",
+      "region": "Québec",
+      "city": "Montréal",
+      "venue": "Bibliothèque du Boisé, Saint-Laurent",
+      "startDate": "2026-11-05",
+      "endDate": "2026-11-05",
+      "dateLabel": "16:30〜18:00（現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736",
+      "description": "8〜12歳向け、無料のキャラクター制作ワークショップ。公式説明にピクセルアートでキャラクターを描き、GDevelopで動かす内容と記載。",
+      "checkedAt": "2026-10-15T00:00:00+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Montréal市公式イベントページ"
     }
   ],
   "sources": [
@@ -2331,7 +2507,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
       "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
       "socialChecks": [
@@ -2357,7 +2533,7 @@
       "url": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
       "notes": "公式本文で開催期間・企画内容を再確認。 2026-10-08確認: 主催者公式告知で週次pixel art課題、最終締切10月18日、額縁付き提出要件を再確認。"
     },
@@ -2380,7 +2556,7 @@
       "url": "https://nrgevent.eu/compo/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
       "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。 2026年10月7日に公式本文を再確認。",
       "additionalUrls": [
@@ -2421,7 +2597,7 @@
         "https://elysian.dojin.com/h-comitia/",
         "https://elysian.dojin.com/h-comitia/uketsuke.html"
       ],
-      "lastCheckedAt": "2026-10-05T15:00:59+09:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
       "notes": "作家公式サイトの委託参加予定とドット絵作品、主催者公式サイトの開催日時・会場、申込受付一覧のジュウニを本文で確認。配置・頒布物の最終案内は未確認。公式数値座標は未確認のため北海道の代表セルで表示。"
     },
@@ -3172,7 +3348,7 @@
         "https://www.instagram.com/kai_pixelart/",
         "https://www.instagram.com/skm_whoartyou/"
       ],
-      "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+      "lastCheckedAt": "2026-10-14T23:58:00+00:00",
       "result": "official-confirmed",
       "notes": "2026年巡回展の高雄左營会期と、終了済み4会期を公式本文で確認。各店の個別体験は別イベントとして水増ししない。",
       "eventIds": [
@@ -3294,7 +3470,8 @@
       "url": "https://event.skm.com.tw/course_list.php?MM_SEARCH=search&activityStatus=&area=3&attr=&edate=2026-10-25&group=21&keyword=&sdate=2026-10-02",
       "result": "unavailable",
       "attemptedAt": "2026-10-06T00:08:38+00:00",
-      "notes": "公式親ページから個別申込ページへ進んだがCache miss。展示会期は親ページで確認済み。個別活動日時は未確認。"
+      "notes": "公式親ページから個別申込ページへ進んだがCache miss。展示会期は親ページで確認済み。個別活動日時は未確認。",
+      "lastCheckedAt": "2026-10-14T23:58:00+00:00"
     },
     {
       "id": "all-in-pixel-jam-2-2026",
@@ -3657,9 +3834,9 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T00:02:00+00:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページ本文で開催日とPixel Artとの関係、開催地を確認。"
+      "notes": "観光局公式本文で10/17、11/14、11/21、11/28、12/5、12/12、12/19の各14:00–16:00回、Pixel Artビーズ制作、会場住所、10歳以上を確認。"
     },
     {
       "id": "jeumont-fete-bd-pixel-art-workshop-2026-10-17",
@@ -3672,7 +3849,7 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T00:03:00+00:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
       "notes": "公式ページ本文で開催日とPixel Artとの関係、開催地を確認。"
     },
@@ -3685,9 +3862,9 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T00:01:00+00:00",
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページ本文で開催日とPixel Artとの関係、開催地を確認。"
+      "notes": "市の公式ページでVila Geekの10/20と10/22のPixel Art講座各15時、開催場所を確認。"
     },
     {
       "id": "les-garennes-sur-loire-atelier-pixel-art-waldo-2026-10-21",
@@ -3753,11 +3930,155 @@
       "lastCheckedAt": "2026-10-14T00:01:00+00:00",
       "result": "official-confirmed",
       "notes": "公式ページ本文で開催日とPixel Artとの関係、開催地を確認。"
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-11-14",
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-11-14"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-11-21",
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-11-21"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-11-28",
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-11-28"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-12-05",
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-12-05"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-12-12",
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-12-12"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "moulins-association-artichaut-pixel-art-2026-12-19",
+      "url": "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-12-19"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "vila-geek-pixel-art-workshop-fortaleza-2026-10-22",
+      "url": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
+      "eventIds": [
+        "vila-geek-pixel-art-workshop-fortaleza-2026-10-22"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "med1-gamejam-pixel-art-2026-10-12",
+      "url": "https://itch.io/jam/med1-gamejam-2026",
+      "eventIds": [
+        "med1-gamejam-pixel-art-2026-10-12"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+    },
+    {
+      "id": "hokkaido-comitia-24-juni-pixel-art-2026-venue-source",
+      "url": "https://elysian.dojin.com/h-comitia/index.html",
+      "eventIds": [
+        "hokkaido-comitia-24-juni-pixel-art-2026"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式本文で2026年11月1日11:00–15:00、札幌コンベンションセンター大ホールを確認。サークル本人の告知は委託参加予定。"
+    },
+    {
+      "id": "pixxelpoint-pixel-art-workshop-2026-10-21-venue-source",
+      "url": "https://www.pixxelpoint.org/",
+      "eventIds": [
+        "pixxelpoint-pixel-art-workshop-2026-10-21"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "result": "official-confirmed",
+      "notes": "公式日程で10月21日17時のPixel-artワークショップ、Akademija umetnosti Univerze v Novi Goriciを確認。"
+    },
+    {
+      "id": "mis-ce-fortaleza-pixel-art-workshop-2026-10-17-official-source",
+      "url": "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
+      "eventIds": [
+        "mis-ce-fortaleza-pixel-art-workshop-2026-10-17"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で日程、会場、ピクセルアートとの関係を確認。"
+    },
+    {
+      "id": "montreal-mixlab-pixel-art-character-workshop-2026-11-05-official-source",
+      "url": "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で日程、会場、ピクセルアートとの関係を確認。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-14T00:04:00+00:00",
-    "notes": "2026-10-14の定期調査を反映。今後のフランス・ブラジル・オランダの公式Pixel Art催事を追加し、主要な締切と開催直前イベントを再確認。",
+    "checkedAt": "2026-10-15T00:00:00+00:00",
+    "notes": "2026-10-15定期調査。締切間近のPixelween・NRG、開催直前のMoulins/Jeumontと会期中の催事を公式本文で再確認。新規開催回も公式本文で日付・Pixel Art要件を確認。",
     "searchExamples": [
       "ドット絵 イベント 2026",
       "ピクセルアート 展示 ワークショップ 2026",
@@ -3801,7 +4122,9 @@
       "pt",
       "id",
       "ar",
-      "nl"
+      "nl",
+      "sl",
+      "pl"
     ],
     "scopeRegions": [
       "日本",
@@ -3894,7 +4217,10 @@
       "https://cultuurkoepel.bibliotheekhardenberg.nl/8-tm-14/1773-maakmiddag-pixelart",
       "https://biblios.fontenayvendee.fr/agenda/atelier-manuel/atelier-pixel-art-lego-r-2",
       "https://tourisme-valsdudauphine.fr/agenda/7997420_atelier-pixel-art-geant/",
-      "https://www.montsdugenevois.com/a-voir-a-faire/agenda/tout-lagenda/atelier-pixel-art-lucinges-fr-6787126/"
+      "https://www.montsdugenevois.com/a-voir-a-faire/agenda/tout-lagenda/atelier-pixel-art-lucinges-fr-6787126/",
+      "https://itch.io/jam/med1-gamejam-2026",
+      "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
+      "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736"
     ],
     "regionalChecks": [
       {
@@ -4746,6 +5072,84 @@
           }
         ],
         "notes": "開催中・近い締切を優先し、公式本文で日時・ドット絵との関係・開催場所を確認した催しのみ追加。東アジア・南アジア・インドネシア・アフリカ・オセアニアの今回検索では追加に足る別の公式イベントを確認できず。"
+      },
+      {
+        "checkedAt": "2026-10-15T00:00:00+00:00",
+        "regions": [
+          "日本（沖縄・鹿児島・山口・徳島・北海道）",
+          "フランス（Moulins、Jeumont、Côte Landes Nature）",
+          "ブラジル・Fortaleza",
+          "スロベニア・Nova Gorica",
+          "ポーランド・Poznań",
+          "韓国・台湾・中国・香港",
+          "インドネシア",
+          "オンライン",
+          "カナダ・Montréal / ブラジル・Fortaleza"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "fr",
+          "pt",
+          "sl",
+          "pl",
+          "ko",
+          "zh",
+          "id"
+        ],
+        "queries": [
+          "沖縄県 鹿児島県 山口県 徳島県 ドット絵 ピクセルアート 2026 10月 11月",
+          "Pixel Art event Japan October November 2026 official",
+          "Atelier pixel art Moulins octobre novembre décembre 2026",
+          "Fête de la BD Jeumont atelier Pixel Art 2026 17 octobre",
+          "oficina de pixel art Fortaleza Vila Geek 20 22 outubro 2026",
+          "pixel art workshop Nova Gorica 21 October 2026 official",
+          "pixel art jam submission deadline October 2026 official",
+          "픽셀 아트 전시 공모전 10월 11월 2026 공식",
+          "像素藝術 展覽 工作坊 10月 11月 2026 台灣 香港",
+          "oficina pixel art MIS Ceará Fortaleza 17 outubro 2026",
+          "atelier pixel art Montréal Mixlab 5 novembre 2026"
+        ],
+        "addedIds": [
+          "moulins-association-artichaut-pixel-art-2026-11-14",
+          "moulins-association-artichaut-pixel-art-2026-11-21",
+          "moulins-association-artichaut-pixel-art-2026-11-28",
+          "moulins-association-artichaut-pixel-art-2026-12-05",
+          "moulins-association-artichaut-pixel-art-2026-12-12",
+          "moulins-association-artichaut-pixel-art-2026-12-19",
+          "vila-geek-pixel-art-workshop-fortaleza-2026-10-22",
+          "med1-gamejam-pixel-art-2026-10-12",
+          "mis-ce-fortaleza-pixel-art-workshop-2026-10-17",
+          "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+        ],
+        "recheckedIds": [
+          "segment-pixel-jam-2026",
+          "pixelween-2026",
+          "nrg-pixel-art-awards-2026",
+          "jeumont-fete-bd-pixel-art-workshop-2026-10-17",
+          "vila-geek-pixel-art-workshop-fortaleza-2026-10-20",
+          "pixxelpoint-pixel-art-workshop-2026-10-21",
+          "hokkaido-comitia-24-juni-pixel-art-2026",
+          "kai-whos-game-room-kaohsiung-2026"
+        ],
+        "unconfirmed": [
+          {
+            "name": "Ateliers numériques sans écran（Côte Landes Nature、11〜12月）",
+            "sourceUrl": "https://www.cc-cln.fr/communaute-de-communes/actualites/les-actus-du-territoire/ateliers-numeriques-sans-ecran",
+            "reason": "公式本文で11/4 Léon、11/18 Vielle-Saint-Girons、11/25 Linxe、12/2 Saint-Julien-en-Born、12/9 Léon、12/16 Vielle-Saint-Gironsと各会場、年齢別2枠の時間を確認。共通テーマ候補にPixel Artはあるが、各回への割当が明記されずイベント登録は保留。"
+          },
+          {
+            "name": "Retro Pixel Jam（オンライン、10/24〜31）",
+            "sourceUrl": "https://itch.io/jam/retro-pixel-jam",
+            "reason": "公式本文を確認。Pixel Artは推奨にとどまり、ルール上必須なのはレトロゲーム風の雰囲気であるため、ドット絵必須ジャムとしては登録しない。"
+          },
+          {
+            "name": "Pixelverse Jam 2026（オンライン、開催中〜2027/1）",
+            "sourceUrl": "https://itch.io/jam/pixelverse-jam-2026",
+            "reason": "公式ページは自由度の高いゲームジャムと説明し、ピクセルアート必須条件は明記していないため保留。"
+          }
+        ],
+        "notes": "Moulins公式日程に基づき別開催日の反復ワークショップ6回を追加。Vila Geekは10/20と10/22の別回を確認。MED1 GameJamは公式本文でピクセル様式必須を確認し追加。Pixel Artを強制しないRetro Pixel JamとPixelverse Jamは保留。Côte Landesの各回は開催日と会場は確認できたが、Pixel Artが個別日の活動か特定できず保留。韓国・中華圏に新規確認なし。インドネシアPOSKO VISUALはポスター/デザイン展でPixel Art要件なし。 Ceará州文化局のMISプログラムとMontréal市公式ページで新規2件を確認。"
       }
     ],
     "historyCollection": {
