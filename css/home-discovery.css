@@ -1,0 +1,62 @@
+/* Home discovery area, kept separate from the interactive hero styles. */
+.home-discovery { padding-block: clamp(2.25rem, 6vw, 5rem); }
+.home-discovery__heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.home-discovery__eyebrow { margin: 0 0 .4rem; color: #527367; font-size: .68rem; font-weight: 900; letter-spacing: .16em; }
+.home-discovery__heading h2 { margin: 0; color: #19222a; font-size: clamp(1.45rem, 3.4vw, 2.15rem); line-height: 1.25; letter-spacing: -.025em; }
+.home-discovery__all { min-height: 44px; display: inline-flex; align-items: center; gap: .35rem; color: #26352f; font-size: .82rem; font-weight: 800; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.home-discovery__layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(15rem, .85fr); gap: 1rem; align-items: stretch; }
+.home-gallery { min-width: 0; padding: clamp(.85rem, 2.6vw, 1.35rem); border: 1px solid #e0e4df; border-radius: 1.25rem; background: #fff; box-shadow: 0 12px 34px rgba(27,32,37,.045); }
+.home-gallery__heading { display: flex; align-items: end; justify-content: space-between; gap: .8rem; margin-bottom: 1rem; }
+.home-gallery__heading h3 { margin: 0 0 .25rem; color: #1b2025; font-size: 1.08rem; font-weight: 900; }
+.home-gallery__heading p { margin: 0; color: #65716e; font-size: .78rem; line-height: 1.5; }
+.home-gallery__heading > a { flex: none; min-height: 44px; display: inline-flex; align-items: center; gap: .3rem; color: #28624c; font-size: .8rem; font-weight: 850; text-decoration: none; }
+.home-gallery__heading > a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.home-gallery__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; }
+.home-gallery__status { grid-column: 1 / -1; box-sizing: border-box; display: grid; align-content: center; min-height: 10.5rem; margin: 0; padding: 1rem; border: 1px dashed #cbd4cf; border-radius: .9rem; background: #f7f9f6; color: #53635d; font-size: .84rem; line-height: 1.6; text-align: center; }
+.home-gallery__status a { color: #235f48; font-weight: 850; }
+.home-work { min-width: 0; overflow: hidden; border: 1px solid #e6e9e5; border-radius: .9rem; background: #f5f6f2; color: #1b2025; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; }
+.home-work:hover { transform: translateY(-2px); box-shadow: 0 9px 20px rgba(27,32,37,.11); }
+.home-work:focus-visible, .home-start:focus-visible, .home-discovery__all:focus-visible, .home-gallery__heading > a:focus-visible { outline: 3px solid #b04b39; outline-offset: 3px; }
+.home-work__image { display: grid; place-items: center; width: 100%; aspect-ratio: 1; overflow: hidden; background: #e7eae5; }
+.home-work__image img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.home-work__title { display: block; overflow: hidden; padding: .55rem .6rem .65rem; font-size: .76rem; font-weight: 850; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.home-starts { display: grid; grid-template-rows: repeat(3, minmax(0,1fr)); gap: .65rem; }
+.home-start { box-sizing: border-box; display: grid; grid-template-columns: 2rem minmax(0,1fr) 1.5rem; align-items: center; gap: .65rem; min-width: 0; min-height: 5rem; padding: .8rem; border: 1px solid #e1e4df; border-radius: 1rem; background: #fff; color: #1b2025; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; }
+.home-start:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(27,32,37,.09); }
+.home-start--draw { border-color: #ead49b; background: linear-gradient(110deg, #fff8e4, #fff 68%); }
+.home-start--camera { border-color: #d1dce1; background: linear-gradient(110deg, #eaf1f4, #fff 68%); }
+.home-start--about { background: linear-gradient(110deg, #eef3e9, #fff 68%); }
+.home-start__number { color: #6b756f; font: 800 .65rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.home-start__copy { display: grid; gap: .25rem; min-width: 0; }
+.home-start__copy strong { font-size: .94rem; line-height: 1.35; }
+.home-start__copy small { color: #63706b; font-size: .73rem; line-height: 1.4; }
+.home-start__arrow { justify-self: end; color: #3f6756; font-size: 1.05rem; font-weight: 900; }
+@media (max-width: 760px) {
+  .home-discovery { padding-block: 2.1rem; }
+  .home-discovery__layout { grid-template-columns: minmax(0,1fr); }
+  .home-gallery__grid { gap: .5rem; }
+  .home-starts { grid-template-columns: repeat(3, minmax(0,1fr)); grid-template-rows: auto; gap: .5rem; }
+  .home-start { grid-template-columns: 1.4rem minmax(0,1fr); grid-template-rows: auto 1fr; align-items: start; gap: .5rem; min-height: 7.2rem; padding: .65rem; }
+  .home-start__number { grid-column: 1; grid-row: 1; }
+  .home-start__copy { grid-column: 1 / -1; grid-row: 2; align-self: start; gap: .3rem; }
+  .home-start__copy strong { font-size: .84rem; }
+  .home-start__copy small { font-size: .68rem; }
+  .home-start__arrow { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 420px) {
+  .home-discovery__heading { align-items: start; }
+  .home-discovery__all { max-width: 7.2rem; justify-content: end; font-size: .72rem; text-align: right; }
+  .home-gallery__heading { align-items: start; }
+  .home-gallery__heading p { max-width: 27ch; }
+  .home-gallery__grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .home-work:nth-of-type(n+3) { display: none; }
+  .home-starts { grid-template-columns: minmax(0,1fr); }
+  .home-start { grid-template-columns: 2rem minmax(0,1fr) 1.5rem; grid-template-rows: auto; align-items: center; min-height: 4.35rem; padding: .6rem .7rem; }
+  .home-start__number { grid-column: 1; grid-row: 1; }
+  .home-start__copy { grid-column: 2; grid-row: 1; }
+  .home-start__copy strong { font-size: .9rem; }
+  .home-start__copy small { font-size: .7rem; }
+  .home-start__arrow { grid-column: 3; grid-row: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .home-work, .home-start { transition: none; } .home-work:hover, .home-start:hover { transform: none; } }
+html[data-pixieed-motion="reduced"] .home-work, html[data-pixieed-motion="reduced"] .home-start { transition: none; }

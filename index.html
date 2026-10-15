@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/home.css?rev=20261013-hero-autoplay-2">
+  <link rel="stylesheet" href="/css/home-discovery.css?rev=20261015-approved-home-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
@@ -64,8 +65,26 @@
       </div>
       <output id="hpAudioState" class="hp-audio-state" aria-live="polite">最初のタップで音が出ます</output>
       <output id="hpStatus" class="visually-hidden" aria-live="polite"></output>
-      <div class="hp-hero-foot"><a class="hp-discovery-link" href="#hpToysTitle">この先で、作品をつくる <span aria-hidden="true">↓</span></a></div>
+      <div class="hp-hero-foot"><a class="hp-discovery-link" href="/draw/">この先で、作品をつくる（PiXiEEDraw） <span aria-hidden="true">→</span></a><a class="hp-discovery-link hp-discovery-secondary" href="#hpToysTitle">ほかの遊びを見る <span aria-hidden="true">↓</span></a></div>
       <dialog class="hp-clear-dialog" id="hpClearDialog" aria-labelledby="hpClearTitle"><h2 id="hpClearTitle">あそび場を消しますか？</h2><p>描いたドットが消えます。消した後も「ひとつ戻す」で取り消せます。</p><div><button id="hpClearCancel" type="button" autofocus>残して戻る</button><button id="hpClearConfirm" type="button">消す</button></div></dialog>
+    </section>
+
+    <section class="home-discovery container" aria-labelledby="homeDiscoveryTitle">
+      <div class="home-discovery__heading">
+        <div><p class="home-discovery__eyebrow">SEE · PLAY · MAKE</p><h2 id="homeDiscoveryTitle">見つける。遊ぶ。つくる。</h2></div>
+        <a class="home-discovery__all" href="/about/">PiXiEEDについて <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="home-discovery__layout">
+        <section class="home-gallery" aria-labelledby="homeGalleryTitle">
+          <div class="home-gallery__heading"><div><h3 id="homeGalleryTitle">公開作品</h3><p>公式に公開された作品を、地図の場所とあわせて。</p></div><a href="/globe/">地図の投稿を見る <span aria-hidden="true">↗</span></a></div>
+          <div class="home-gallery__grid" data-home-gallery aria-live="polite" aria-busy="true"><p class="home-gallery__status">公開作品を読み込んでいます…</p></div>
+        </section>
+        <nav class="home-starts" aria-label="PiXiEEDでできること">
+          <a class="home-start home-start--draw" href="/draw/"><span class="home-start__number" aria-hidden="true">01</span><span class="home-start__copy"><strong>ドット絵を描く</strong><small>PiXiEEDrawをひらく</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
+          <a class="home-start home-start--camera" href="/camera/"><span class="home-start__number" aria-hidden="true">02</span><span class="home-start__copy"><strong>カメラで遊ぶ</strong><small>Pixel Camera Studio</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
+          <a class="home-start home-start--about" href="/draw/about/"><span class="home-start__number" aria-hidden="true">03</span><span class="home-start__copy"><strong>PiXiEEDrawを知る</strong><small>機能と使い方を見る</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
+        </nav>
+      </div>
     </section>
 
     <section class="hp-section" aria-labelledby="hpToysTitle">
@@ -76,7 +95,7 @@
           <h3 class="hp-group-title" id="hpCreateTitle">つくる</h3>
           <nav class="hp-card-grid hp-create-grid" aria-label="制作ツール">
             <a class="hp-toy hp-link-card" data-toy="editor" href="/draw/" style="--tone:#f1eee6"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">PiXiEEDraw</h3><span class="hp-toy-line">一粒ずつ描いて、アニメーションも制作。</span><span class="hp-card-link">ドット絵を描く <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="camera" href="/draw/?mode=camera" style="--tone:#1f2b36"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">写真ドット変換</h3><span class="hp-toy-line">写真や画像をドット絵にして、PNG保存。</span><span class="hp-card-link">写真を変換 <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="camera" href="/camera/" style="--tone:#1f2b36"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">写真ドット変換</h3><span class="hp-toy-line">写真や画像をドット絵にして、PNG保存。</span><span class="hp-card-link">写真を変換 <span aria-hidden="true">→</span></span></div></a>
             <a class="hp-toy hp-link-card" data-toy="sound" href="/audio/" style="--tone:#231a33"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">ドットで音楽</h3><span class="hp-toy-line">マス目に音を描いて、ループ曲を作曲。</span><span class="hp-card-link">音楽をつくる <span aria-hidden="true">→</span></span></div></a>
             <a class="hp-link-card hp-output-card" href="/output/"><span class="hp-output-visual" aria-hidden="true"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>♫</span></span><div class="hp-card-copy hp-output-copy"><h3 class="hp-toy-name">画像・音楽の合成変換</h3><span class="hp-toy-line">画像や動画に音楽を重ねて書き出し。</span><span class="hp-card-link">合成・変換する <span aria-hidden="true">→</span></span></div></a>
           </nav>
@@ -107,6 +126,7 @@
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
   <script type="module" src="/js/home-startup.mjs?rev=20261013-hero-autoplay-2"></script>
+  <script type="module" src="/js/home-gallery.mjs?rev=20261015-approved-home-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
   <script type="module" src="/js/display-ads.mjs?rev=20261007-lazy-ads-1"></script>
 </body>
