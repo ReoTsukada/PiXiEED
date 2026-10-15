@@ -7,8 +7,8 @@ if (sharedEntry) {
   location.replace(sharedEntry);
 } else {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
-  await import('./draw-camera-page.mjs?rev=20261012-animation-core-contract-1');
+  await import('./draw-camera-page.mjs?rev=20261016-color-capability-1');
 } else {
-  await import('./app.mjs?rev=20261013-camera-placement-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
+  await import('./app.mjs?rev=20261016-color-capability-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
 }
 }

@@ -76,9 +76,11 @@ body.draw-desktop-active .draw-desktop-tools {
   flex-direction: column;
   gap: 8px;
   padding: 8px;
-  overflow: auto;
+  overflow: hidden;
   scrollbar-width: thin;
 }
+body.draw-desktop-active .draw-desktop-tool-scroll { display: flex; flex: 1 1 auto; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; }
+body.draw-desktop-active .draw-desktop-tool-scroll > .draw-desktop-group { flex: 0 0 auto; }
 body.draw-desktop-active .draw-desktop-group { min-width: 0; padding: 0 0 8px; border-bottom: 1px solid #ffffff18; }
 body.draw-desktop-active .draw-desktop-group h2,
 body.draw-desktop-active .draw-desktop-palette-panel > h2,
@@ -138,8 +140,12 @@ body.draw-desktop-active .draw-desktop-context:empty,
 body.draw-desktop-active .draw-desktop-features:empty { display: none; }
 body.draw-desktop-active .draw-desktop-context,
 body.draw-desktop-active .draw-desktop-features { display: grid; gap: 4px; margin-top: 5px; }
+/* Keep the selection action slot reserved so showing copy/cut/clear never
+   pushes shared feature controls or undo/redo down the scroll rail. */
+body.draw-desktop-active .draw-desktop-context { box-sizing: border-box; min-height: 36px; }
 body.draw-desktop-active .draw-desktop-features .draw-feature-actions { display: grid; grid-template-columns: repeat(auto-fill, 100px); grid-auto-rows: 36px; justify-content: start; align-content: start; gap: 5px; min-width: 0; flex: none; }
 body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button { box-sizing: border-box; display: grid; place-items: center; grid-column: auto !important; flex: 0 0 100px; width: 100px; min-width: 100px; max-width: 100px; height: 36px; min-height: 36px; max-height: 36px; padding: 3px 5px; overflow-wrap: anywhere; border: 1px solid #ffffff20; border-radius: 7px; background: #202b33; color: #e9efeb; font: inherit; font-size: 11px; line-height: 1.1; }
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions:has(> .draw-selection-controls__deselect[hidden]) > .draw-brush-size-open { grid-column: 1 / -1 !important; width: 100%; max-width: none; }
 body.draw-desktop-active .draw-desktop-features .draw-feature-actions > .draw-selection-controls__deselect { background: #403b2b !important; color: #fff4c6 !important; }
 body.draw-desktop-active .draw-desktop-features > :is(button, details, .draw-selection-controls) { min-width: 0; }
 body.draw-desktop-active .draw-desktop-history { display: grid; grid-template-columns: repeat(auto-fill, 36px); grid-auto-rows: 36px; justify-content: start; gap: 5px; margin-bottom: 7px; }
@@ -259,9 +265,10 @@ body.draw-desktop-active .draw-desktop-layer-host .animation-controls__layer-row
 body.draw-desktop-active .draw-desktop-layer-host [data-layer-row] { min-width: 0; }
 body.draw-desktop-active .draw-desktop-layer-host :is(button, input) { min-width: 0; }
 
-@media (max-height: 720px) {
+@media (max-height: 800px) {
   body.draw-desktop-active .draw-desktop-shell { gap: 0; }
   body.draw-desktop-active .draw-desktop-tools { gap: 5px; padding: 6px; }
+  body.draw-desktop-active .draw-desktop-tool-scroll { gap: 5px; }
   body.draw-desktop-active .draw-desktop-group { padding-bottom: 5px; }
   body.draw-desktop-active .draw-desktop-button { padding: 3px 4px; }
   body.draw-desktop-active .draw-desktop-dock { padding: 6px; }

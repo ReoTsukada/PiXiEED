@@ -1,4 +1,4 @@
-import { getAnimationCelDocument, setAnimationPalette } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { getAnimationCelDocument, setAnimationPalette } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 /** Safe indexed Draw color adjustments with detached pixel or shared-palette results. */
 export const DRAW_COLOR_DEFAULTS = Object.freeze({ brightness: 0, contrast: 0, saturation: 100, curve: Object.freeze([0, 64, 128, 192, 255]), paletteMode: 'exact' });

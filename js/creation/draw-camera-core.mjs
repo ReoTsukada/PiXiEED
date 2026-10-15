@@ -1,22 +1,30 @@
-import { ANIMATION_MAX_COLORS } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { ANIMATION_MAX_PALETTE_ENTRIES } from './animation-core.mjs?rev=20261016-color-capability-1';
 
-/** Keep the whole artwork within 32 used colours, including remaining transparency. */
-export function chooseCameraPalette(doc, mask, otherUsedIndices = []) {
+import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
+
+function assertCameraTargetPalette(doc) {
+  if (!Array.isArray(doc?.palette) || doc.palette.some(color => typeof color !== 'string' || !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color))) throw new TypeError('カメラの適用先パレットを確認できません。作品と撮影画像は保持しています。');
+}
+const rgbaKey = hex => hex.length === 7 ? `${hex.toLowerCase()}ff` : hex.toLowerCase();
+/** Choose existing palette slots; transparent pixels never consume the visible-color budget. */
+export function chooseCameraPalette(doc, mask, otherUsedIndices = [], { maxColors = REWARD_LIMITS.draw.rewardColors } = {}) {
+  assertCameraTargetPalette(doc);
   const required = new Set(otherUsedIndices);
   doc.pixels.forEach((value, index) => { if (mask && !mask[index]) required.add(value); });
-  const capacity = required.has(-1) ? 31 : 32;
+  const capacity = maxColors;
   const indices = [], colors = new Set();
   for (const value of [...required, ...new Set(doc.pixels), ...doc.palette.keys()]) {
     const color = doc.palette[value]?.toLowerCase();
-    if (!color || !/^#[a-f\d]{6}(?:ff)?$/i.test(color) || colors.has(color.slice(0, 7))) continue;
+    if (!color || !/^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color) || rgbaKey(color).endsWith('00') || colors.has(rgbaKey(color))) continue;
     if (indices.length >= capacity) break;
-    colors.add(color.slice(0, 7)); indices.push(value);
+    colors.add(rgbaKey(color)); indices.push(value);
   }
   return indices;
 }
 
 /** Snapshot the selected cells so a camera session cannot drift with later selection changes. */
 export function prepareCameraTarget(doc, mask, allowedIndices) {
+  assertCameraTargetPalette(doc);
   const { width, height } = doc;
   if (!Number.isInteger(width) || !Number.isInteger(height) || !Array.isArray(doc.pixels) || doc.pixels.length !== width * height) throw new TypeError('Invalid drawing');
   if (mask != null && (!(mask instanceof Uint8Array) || mask.length !== width * height)) throw new TypeError('Invalid selection mask');
@@ -32,11 +40,11 @@ export function prepareCameraTarget(doc, mask, allowedIndices) {
   return Object.freeze({ document, width, height, bounds: Object.freeze(bounds), cells: Uint32Array.from(cells), palette: Object.freeze([...doc.palette]), allowedIndices: Object.freeze(permitted), mask: mask ? new Uint8Array(mask) : null });
 }
 
-const rgb = (hex) => [1, 3, 5].map((n) => Number.parseInt(hex.slice(n, n + 2), 16));
+const rgb = (hex) => [1, 3, 5, 7].map((n) => Number.parseInt(rgbaKey(hex).slice(n, n + 2), 16));
 /** Convert RGBA samples to signed palette slots, choosing only among allowed existing slots. */
 export function cameraPixels(rgba, palette, allowedIndices, saturation = 1) {
   if (!rgba || rgba.length % 4 || !Array.isArray(palette) || !allowedIndices?.length) throw new TypeError('Invalid camera pixels');
-  const choices = allowedIndices.map((i) => { if (!Number.isInteger(i) || i < 0 || i >= palette.length) throw new RangeError('Invalid palette slot'); const color = palette[i]; if (typeof color !== 'string' || !/^#[a-f\d]{6}(?:ff)?$/i.test(color)) throw new TypeError('Camera replacements require opaque palette colors'); return [i, rgb(color)]; });
+  const choices = allowedIndices.map((i) => { if (!Number.isInteger(i) || i < 0 || i >= palette.length) throw new RangeError('Invalid palette slot'); const color = palette[i]; if (typeof color !== 'string' || !/^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color)) throw new TypeError('Camera replacements require RGBA palette colors'); return [i, rgb(color)]; });
   const out = new Int16Array(rgba.length / 4); const sat = Math.max(0, Math.min(2, Number(saturation) || 0));
   for (let p = 0; p < out.length; p += 1) {
     const o = p * 4;
@@ -45,8 +53,8 @@ export function cameraPixels(rgba, palette, allowedIndices, saturation = 1) {
     const r = Math.max(0, Math.min(255, gray + (rgba[o] - gray) * sat));
     const g = Math.max(0, Math.min(255, gray + (rgba[o + 1] - gray) * sat));
     const b = Math.max(0, Math.min(255, gray + (rgba[o + 2] - gray) * sat));
-    for (const [i, candidate] of choices) { const d = (r - candidate[0]) ** 2 + (g - candidate[1]) ** 2 + (b - candidate[2]) ** 2; if (d < distance) { best = i; distance = d; } }
-    out[p] = best; // Every selected cell is replaced by an opaque existing palette color.
+    for (const [i, candidate] of choices) { const d = (r - candidate[0]) ** 2 + (g - candidate[1]) ** 2 + (b - candidate[2]) ** 2 + (rgba[o + 3] - candidate[3]) ** 2; if (d < distance) { best = i; distance = d; } }
+    out[p] = best; // Every selected cell is replaced by an existing RGBA palette color.
   }
   return out;
 }
@@ -58,16 +66,18 @@ export function replaceCameraPixels(doc, target, indices) {
   const pixels = [...doc.pixels];
   for (let n = 0; n < target.cells.length; n += 1) {
     const value = indices[n];
-    if (!Number.isInteger(value) || !target.allowedIndices.includes(value) || !/^#[a-f\d]{6}(?:ff)?$/i.test(doc.palette[value] ?? '')) throw new RangeError('Invalid replacement color');
+    if (!Number.isInteger(value) || !target.allowedIndices.includes(value) || !/^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(doc.palette[value] ?? '')) throw new RangeError('Invalid replacement color');
     pixels[target.cells[n]] = value;
   }
   return { ...doc, palette: [...doc.palette], pixels };
 }
 /** Stage the selected output pixels and appended colors without mutating the
  * project. A failed plan leaves the captured image available for another choice. */
-export function planCameraReplacement(target, rgba, { paletteFixed = false } = {}) {
+export function planCameraReplacement(target, rgba, { paletteFixed = false, maxColors = REWARD_LIMITS.draw.rewardColors, otherUsedIndices = [] } = {}) {
+  assertCameraTargetPalette(target?.document);
+  if (Array.isArray(target?.palette)) assertCameraTargetPalette({ ...target.document, palette: target.palette });
   if (!rgba || rgba.length !== target.cells.length * 4) throw new TypeError('撮影画像の画素数が一致しません。');
-  const palette = [...target.palette], normalize = hex => hex.slice(0, 7).toLowerCase();
+  const palette = [...target.palette], normalize = rgbaKey;
   const slots = new Map();
   palette.forEach((hex, index) => { if (!slots.has(normalize(hex))) slots.set(normalize(hex), index); });
   const pixels = [...target.document.pixels], additions = [];
@@ -75,19 +85,15 @@ export function planCameraReplacement(target, rgba, { paletteFixed = false } = {
   for (let n = 0; n < target.cells.length; n++) {
     const offset = n * 4, alpha = rgba[offset + 3];
     if (alpha === 0) { pixels[target.cells[n]] = -1; continue; }
-    if (alpha !== 255) {
-      const error = new TypeError('半透明の画素は共通作品に適用できません。撮影画像と作品は保持しています。不透明な画像、または完全な透明画素だけの画像を選び直してください。');
-      error.code = 'camera-partial-alpha';
-      throw error;
-    }
     if (paletteFixed) { pixels[target.cells[n]] = fixedPixels[n]; continue; }
-    const hex = '#' + Array.from(rgba.slice(offset, offset + 3), value => value.toString(16).padStart(2, '0')).join('');
-    let index = slots.get(hex);
-    if (index === undefined) { index = palette.length; slots.set(hex, index); palette.push(hex); additions.push(hex); }
+    const hex = '#' + Array.from(rgba.slice(offset, offset + (alpha === 255 ? 3 : 4)), value => value.toString(16).padStart(2, '0')).join('');
+    let index = slots.get(normalize(hex));
+    if (index === undefined) { index = palette.length; slots.set(normalize(hex), index); palette.push(hex); additions.push(hex); }
     pixels[target.cells[n]] = index;
   }
-  if (palette.length > ANIMATION_MAX_COLORS) {
-    const error = new RangeError(`使用色を追加すると${palette.length}色になります。共通作品の上限は${ANIMATION_MAX_COLORS}色です。色数の少ない撮影モードか「パレット固定」を選んで撮り直してください。画像と作品は変更していません。`);
+  const usedColors = new Set([...pixels, ...otherUsedIndices].filter(value => value >= 0).map(value => normalize(palette[value])).filter(key => !key.endsWith('00')));
+  if (usedColors.size > maxColors || palette.length > ANIMATION_MAX_PALETTE_ENTRIES) {
+    const error = new RangeError(`使用色を追加すると${usedColors.size}色になります。現在の使用色上限は${maxColors}色、登録パレット上限は${ANIMATION_MAX_PALETTE_ENTRIES}色です。色数の少ない撮影モードか「パレット固定」を選んで撮り直してください。画像と作品は変更していません。`);
     error.code = 'camera-palette-overflow'; throw error;
   }
   return { document: { ...target.document, palette, pixels }, additions };

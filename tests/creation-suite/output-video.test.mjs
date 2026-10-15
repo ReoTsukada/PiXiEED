@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderOutputVideo } from '../../js/creation/output-video.mjs';
 
-function createMediaHarness({ audio = false, duration = 0.04, deterministicAudioClock = false } = {}) {
+function createMediaHarness({ audio = false, duration = 0.04, deterministicAudioClock = false, startRequiresAudio = false, encoderStartDelayMs = 0, containerBytes = [0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01] } = {}) {
   const tracks = []; const recorders = []; const audioNodes = []; const paintedPixels = [];
   let audioClock = 0;
   class Track {
@@ -18,12 +18,12 @@ function createMediaHarness({ audio = false, duration = 0.04, deterministicAudio
   class Recorder {
     constructor(stream, options) { this.stream = stream; this.mimeType = options.mimeType; this.state = 'inactive'; this.listeners = new Map(); recorders.push(this); }
     addEventListener(type, listener) { const set = this.listeners.get(type) || new Set(); set.add(listener); this.listeners.set(type, set); }
-    emit(type, event = {}) { for (const listener of this.listeners.get(type) || []) listener(event); }
-    start() { this.startedTracks = this.stream.getTracks().map((track) => ({ kind: track.kind, readyState: track.readyState, enabled: track.enabled })); this.state = 'recording'; queueMicrotask(() => this.emit('start')); }
+    emit(type, event = {}) { if (type === 'start') this.paintedBeforeStart = [...paintedPixels]; for (const listener of this.listeners.get(type) || []) listener(event); }
+    start() { this.startedTracks = this.stream.getTracks().map((track) => ({ kind: track.kind, readyState: track.readyState, enabled: track.enabled })); this.state = 'recording'; if (!startRequiresAudio) queueMicrotask(() => this.emit('start')); }
     stop() {
       if (this.state !== 'recording') return;
       this.state = 'inactive';
-      queueMicrotask(() => { this.emit('dataavailable', { data: new Blob([Uint8Array.of(0x1a, 0x45, 0xdf, 0xa3)], { type: this.mimeType }) }); this.emit('stop'); });
+      queueMicrotask(() => { this.emit('dataavailable', { data: new Blob([Uint8Array.from(containerBytes)], { type: this.mimeType }) }); this.emit('stop'); });
     }
   }
   class AudioContext {
@@ -33,7 +33,7 @@ function createMediaHarness({ audio = false, duration = 0.04, deterministicAudio
     createBuffer(channelCount, length, sampleRate) { return { channelCount, length, sampleRate, copyToChannel() {} }; }
     createMediaStreamDestination() { return { stream: new Stream([new Track('audio')]) }; }
     createBufferSource() {
-      const node = { playbackRate: { value: 1 }, loop: false, connect() {}, disconnect() {}, start: (when) => { node.startTime = when; if (!node.loop) node.timer = setTimeout(() => node.onended?.(), duration / node.playbackRate.value * 1000); }, stop: (when) => { if (Number.isFinite(when)) { node.stopTime = when; clearTimeout(node.timer); node.timer = setTimeout(() => node.onended?.(), Math.max(0, (when - node.startTime) * 1000)); } else clearTimeout(node.timer); } };
+      const node = { playbackRate: { value: 1 }, loop: false, connect() {}, disconnect() {}, start: (when) => { node.startTime = when; if (startRequiresAudio) { if (encoderStartDelayMs) setTimeout(() => recorders.at(-1)?.emit('start'), encoderStartDelayMs); else queueMicrotask(() => recorders.at(-1)?.emit('start')); } if (!node.loop) node.timer = setTimeout(() => node.onended?.(), duration / node.playbackRate.value * 1000); }, stop: (when) => { if (Number.isFinite(when)) { node.stopTime = when; clearTimeout(node.timer); node.timer = setTimeout(() => node.onended?.(), Math.max(0, (when - node.startTime) * 1000)); } else clearTimeout(node.timer); } };
       audioNodes.push(node);
       return node;
     }
@@ -204,4 +204,65 @@ test('video cancellation rejects without returning partial chunks and releases t
   try { await assert.rejects(rendering, { name: 'AbortError' }); }
   finally { harness.restore(); }
   assert.ok(harness.tracks.every((track) => track.stopped));
+});
+
+// Real WebM files have payload after the four-byte EBML signature.
+test('output video rejects an invalid WebM signature even when payload is present', async () => {
+  const harness = createMediaHarness({ containerBytes: [0x1a, 0x45, 0xdf, 0x00, 0x9f, 0x42, 0x86, 0x81] });
+  try {
+    await assert.rejects(renderOutputVideo([frame()], {
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: callback => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    }), /識別情報が不正/);
+    assert.ok(harness.tracks.every(track => track.stopped));
+  } finally { harness.restore(); }
+});
+
+test('audio input starts even when the encoder waits for a first audio packet before start', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 0.06, startRequiresAudio: true });
+  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 500);
+  try {
+    const result = await renderOutputVideo([frame(100)], {
+      audioSource: harness.audioSource, signal: controller.signal,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: callback => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    });
+    assert.equal(result.hasAudio, true);
+    assert.ok(harness.tracks.every(track => track.stopped));
+  } finally { clearTimeout(timeout); harness.restore(); }
+});
+
+test('video frames keep advancing before a delayed encoder start notification', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 0.14, startRequiresAudio: true, encoderStartDelayMs: 60 });
+  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 500);
+  try {
+    await renderOutputVideo([frame(25), { ...frame(25), data: new Uint8Array([20, 20, 20, 255]) }], {
+      audioSource: harness.audioSource, signal: controller.signal,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: callback => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    });
+    assert.ok(harness.recorders[0].paintedBeforeStart.includes(20), 'later frame reaches the recorder before its delayed start event');
+    assert.ok(harness.tracks.every(track => track.stopped));
+  } finally { clearTimeout(timeout); harness.restore(); }
+});
+
+test('replacement audio waits until an imported video can actually play', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 0.06, startRequiresAudio: true });
+  const videoSource = { videoWidth: 16, videoHeight: 16, duration: 0.1, currentTime: 0,
+    async play() {
+      assert.equal(harness.audioNodes[0].startTime, undefined, 'audio must not advance while video playback is pending');
+      await new Promise(resolve => setTimeout(resolve, 30)); this.ready = true;
+    }, pause() {} };
+  try {
+    const result = await renderOutputVideo([], { videoSource, audioSource: harness.audioSource,
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: callback => setTimeout(() => callback(performance.now()), 12), cancelFrame: clearTimeout
+    });
+    assert.equal(videoSource.ready, true); assert.equal(result.hasAudio, true);
+    assert.ok(harness.tracks.every(track => track.stopped));
+  } finally { harness.restore(); }
 });

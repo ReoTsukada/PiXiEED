@@ -1,4 +1,4 @@
-import { evaluateSharedCanvasPolicy, SHARED_CANVAS_FREE_MAX_COLORS, SHARED_CANVAS_FREE_MAX_DIMENSION, SHARED_CANVAS_PREMIUM_MAX_COLORS, SHARED_CANVAS_PREMIUM_MAX_DIMENSION } from './shared-canvas-policy.mjs?rev=20261001-free-tools-1';
+import { evaluateSharedCanvasPolicy, SHARED_CANVAS_FREE_MAX_COLORS, SHARED_CANVAS_FREE_MAX_DIMENSION, SHARED_CANVAS_PREMIUM_MAX_COLORS, SHARED_CANVAS_PREMIUM_MAX_DIMENSION } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 
 const MAX_PIXELS = 2 * 1024 * 1024;
 
@@ -15,36 +15,25 @@ function colorKey(rgba, offset) {
 }
 function unpackColor(key) { return [key & 255, (key >>> 8) & 255, (key >>> 16) & 255, (key >>> 24) & 255]; }
 
-/** Count exact RGBA tuples, including alpha. With stopAfter, return stopAfter + 1 once exceeded. */
-export function countSharedImageColors(image, stopAfter) {
+/** Count used RGBA colors. Transparent pixels are excluded; storage can request legacy exact tuple counts. */
+export function countSharedImageColors(image, stopAfter, { includeTransparent = false } = {}) {
   validateImage(image);
   if (stopAfter !== undefined && (!Number.isSafeInteger(stopAfter) || stopAfter < 0)) throw new RangeError('stopAfterは0以上の整数にしてください。');
-  // Use a capped Set for the small palette checks used by editors and cameras.
-  // Large exact counts use a packed array and in-place numeric sort, avoiding a
-  // JS object per distinct pixel when reading full-colour legacy canvases.
-  if (stopAfter !== undefined && stopAfter <= 128) {
-    const colors = new Set(); const bytes = image.rgba;
-    for (let offset = 0; offset < bytes.length; offset += 4) {
-      colors.add(colorKey(bytes, offset));
-      if (colors.size > stopAfter) return stopAfter + 1;
-    }
-    return colors.size;
-  }
-  if (image.width * image.height > 8192) {
-    const keys = new Uint32Array(image.width * image.height); const bytes = image.rgba;
-    for (let index = 0, offset = 0; index < keys.length; index += 1, offset += 4) keys[index] = colorKey(bytes, offset);
-    keys.sort();
-    let count = 0; let previous = -1;
-    for (const key of keys) {
-      if (count === 0 || key !== previous) {
-        count += 1; previous = key;
-        if (stopAfter !== undefined && count > stopAfter) return stopAfter + 1;
-      }
+  const bytes = image.rgba;
+  if (image.width * image.height > 8192 && (stopAfter === undefined || stopAfter > 128)) {
+    const keys = new Uint32Array(image.width * image.height); let length = 0;
+    for (let offset = 0; offset < bytes.length; offset += 4) if (includeTransparent || bytes[offset + 3] !== 0) keys[length++] = colorKey(bytes, offset);
+    const used = keys.subarray(0, length); used.sort();
+    let count = 0, previous = -1;
+    for (const key of used) if (!count || key !== previous) {
+      count++; previous = key;
+      if (stopAfter !== undefined && count > stopAfter) return stopAfter + 1;
     }
     return count;
   }
-  const colors = new Set(); const bytes = image.rgba;
+  const colors = new Set();
   for (let offset = 0; offset < bytes.length; offset += 4) {
+    if (!includeTransparent && bytes[offset + 3] === 0) continue;
     colors.add(colorKey(bytes, offset));
     if (stopAfter !== undefined && colors.size > stopAfter) return stopAfter + 1;
   }
@@ -122,10 +111,10 @@ function splitPalette(colors, limit) {
 }
 
 function quantize(rgba, maxColors) {
-  const colors = histogram(rgba); if (colors.length <= maxColors) return rgba;
+  const colors = histogram(rgba); if (colors.filter(item => item.color[3] !== 0).length <= maxColors) return rgba;
   const hasTransparent = colors.some((item) => item.color[3] === 0);
   const opaque = colors.filter((item) => item.color[3] !== 0);
-  const opaqueBudget = maxColors - (hasTransparent ? 1 : 0);
+  const opaqueBudget = maxColors;
   if (opaque.length && opaqueBudget < 1) throw new RangeError('透明部分を保つには色数を2色以上にしてください。');
   const palette = opaque.length ? splitPalette(opaque, opaqueBudget) : [];
   const assignments = new Map();
@@ -147,7 +136,7 @@ function quantize(rgba, maxColors) {
 }
 
 /** Prepare a newly captured/imported image once; mode changes must use the stored image directly. */
-export function prepareSharedCanvasImage(image, { passActive = false, width, height, maxColors, fit } = {}) {
+export function prepareSharedCanvasImage(image, { passActive = false, width, height, maxColors, fit, allowConversion = false } = {}) {
   validateImage(image);
   const maxDimension = passActive ? SHARED_CANVAS_PREMIUM_MAX_DIMENSION : SHARED_CANVAS_FREE_MAX_DIMENSION;
   const policyColors = passActive ? SHARED_CANVAS_PREMIUM_MAX_COLORS : SHARED_CANVAS_FREE_MAX_COLORS;
@@ -164,6 +153,10 @@ export function prepareSharedCanvasImage(image, { passActive = false, width, hei
   const outWidth = explicitSize ? width : Math.max(1, Math.round(image.width * scale)); const outHeight = explicitSize ? height : Math.max(1, Math.round(image.height * scale));
   let rgba = explicitSize && fit === 'contain' ? containedBytes(image, outWidth, outHeight) : resizedBytes(image, outWidth, outHeight);
   const beforeColors = countSharedImageColors({ width: outWidth, height: outHeight, rgba }, colorLimit);
+  if ((outWidth !== image.width || outHeight !== image.height || beforeColors > colorLimit) && !allowConversion) {
+    const error = new RangeError(`原本を保持しています。変換先の${outWidth}×${outHeight}px・${colorLimit}色への変更内容を確認してから適用してください。`);
+    error.code = 'shared-image-conversion-required'; throw error;
+  }
   if (beforeColors > colorLimit) rgba = quantize(rgba, colorLimit);
   const colorCount = countSharedImageColors({ width: outWidth, height: outHeight, rgba });
   const policy = evaluateSharedCanvasPolicy({ width: outWidth, height: outHeight, colorCount }, { passActive });

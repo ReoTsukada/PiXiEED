@@ -1,12 +1,17 @@
-import { composeAnimationFrame, getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import {
   AUDIO_PPQ, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_TICKS, AUDIO_SHARED_IMAGE_MAX_DIMENSION,
   createAudioRowPitchMap, extendAudioLoopForImage, validateAudioSong
-} from './audio-core.mjs?rev=20261011-legacy-frames-1';
+} from './audio-core.mjs?rev=20261016-color-capability-1';
 
 export const AUDIO_ANIMATION_LINK_VERSION = 'shared-animation-v1';
 export const AUDIO_ANIMATION_MAX_NOTES = 100_000;
-export const AUDIO_ANIMATION_MAX_COLORS = 32;
+export const AUDIO_ANIMATION_FREE_COLORS = REWARD_LIMITS.draw.colors;
+export const AUDIO_ANIMATION_REWARD_COLORS = REWARD_LIMITS.draw.rewardColors;
+// This is a storage/decoder ceiling, not the current free editing allowance.
+// Expiry checks compare the exact used bonus-color content in the caller.
+export const AUDIO_ANIMATION_MAX_COLORS = AUDIO_ANIMATION_REWARD_COLORS;
 
 const rgbaId = (color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}`;
 
@@ -29,6 +34,32 @@ export function audioAnimationSequenceColumn(link, tick, width = link?.width) {
   const frameIndex = Math.floor(tick / frameTicks), localTick = tick % frameTicks;
   // Invert the rounded column boundaries (31 columns may alternate 61/62 ticks).
   return frameIndex * width + Math.min(width - 1, Math.ceil((localTick + 1) * width / frameTicks) - 1);
+}
+
+/** Count distinct, used RGBA swatches across every cel; transparent/unused slots are free. */
+export function getAudioAnimationUsedColorIds(animation) {
+  validateAnimation(animation);
+  const usedIndices = new Set();
+  for (const frame of animation.frames) for (const layer of animation.layers) {
+    const document = getAnimationCelDocument(animation, frame.id, layer.id);
+    for (const index of document.pixels) {
+      if (index < 0) continue;
+      const color = animation.palette[index];
+      if (!color) continue;
+      if (!rgbaId(color).endsWith('00')) usedIndices.add(index);
+    }
+  }
+  // The palette index order is also the shared Draw free/bonus partition.
+  // Normalize to RGBA IDs and deduplicate without treating unused slots as colors.
+  const ids = new Set();
+  for (let index = 0; index < animation.palette.length; index += 1) {
+    if (usedIndices.has(index)) ids.add(rgbaId(animation.palette[index]));
+  }
+  return ids;
+}
+
+export function getAudioAnimationColorCount(animation) {
+  return getAudioAnimationUsedColorIds(animation).size;
 }
 
 function validatePitchMap(rowPitchMap, height) {
@@ -121,7 +152,7 @@ function validateSequenceLink(song, animation, { rowPitchMap, frameRowPitchMaps 
   if (!colorToSlot || typeof colorToSlot !== 'object' || Array.isArray(colorToSlot)) throw new TypeError('アニメーションの色と音色の対応が不正です。');
   const slotIds = new Set((song.pixelPalette || AUDIO_PIXEL_PALETTE).map(({ slotId }) => slotId));
   for (const [colorId, slotId] of Object.entries(colorToSlot)) {
-    if (!/^rgba-[\da-f]{8}$/i.test(colorId) || colorId.endsWith('00') || (slotId !== null && !slotIds.has(slotId))) {
+    if (!/^rgba-[\da-f]{8}$/i.test(colorId) || (colorId.endsWith('00') && slotId !== null) || (slotId !== null && !slotIds.has(slotId))) {
       throw new TypeError('アニメーションの色と音色の対応が不正です。');
     }
   }
@@ -130,7 +161,7 @@ function validateSequenceLink(song, animation, { rowPitchMap, frameRowPitchMaps 
 export function createAudioAnimationLink(song, animation, { rowPitchMap = null, frameRowPitchMaps = null, frameCellPitchMaps = null, colorToSlot = null, projectionReady = false, timing = null } = {}) {
   validateAudioSong(song); validateAnimation(animation);
   if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('音楽に使えるアニメーションは256pxまでです。');
-  if (animation.palette.length > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える色は32色までです。');
+  if (getAudioAnimationColorCount(animation) > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える色は64色までです。');
   const pitches = rowPitchMap || createAudioRowPitchMap(animation.height);
   const framePitches = normalizeFrameRowPitchMaps(animation, frameRowPitchMaps, { pruneStale: true });
   const cellPitches = normalizeFrameCellPitchMaps(animation, frameCellPitchMaps, { pruneStale: true });
@@ -181,18 +212,43 @@ function fillClipGaps(song) {
 }
 
 /** Explicitly project every visible animation frame into one sequential audio timeline. */
+export function composeAudioProjectionFrame(animation, frameId) {
+  validateAnimation(animation);
+  if (!animation.frames.some((frame) => frame.id === frameId)) throw new TypeError('指定したフレームがありません。');
+  const pixels = new Array(animation.width * animation.height).fill(-1);
+  const layers = animation.layers.filter((layer) => layer.role !== 'music' && layer.visible && layer.opacity !== 0);
+  const cels = layers.map((layer) => ({ layer, document: getAnimationCelDocument(animation, frameId, layer.id) })).reverse();
+  for (let index = 0; index < pixels.length; index += 1) {
+    for (const { layer, document } of cels) {
+      const colorIndex = document.pixels[index];
+      if (colorIndex < 0) continue;
+      const color = animation.palette[colorIndex];
+      const alpha = color.length === 9 ? Number.parseInt(color.slice(7), 16) : 255;
+      if (alpha === 0) continue;
+      if (alpha !== 255 || layer.opacity !== undefined && layer.opacity !== 1) {
+        const error = new TypeError('半透明の合成色は音楽の色IDへ投影できません。元の音符・作品を保持しました。');
+        error.code = 'audio-animation-alpha-unsupported';
+        throw error;
+      }
+      pixels[index] = colorIndex;
+      break;
+    }
+  }
+  return { schemaVersion: 1, width: animation.width, height: animation.height, palette: [...animation.palette], pixels };
+}
+
 export function prepareAudioAnimationImport(song, animation, {
   rowPitchMap = null,
   frameRowPitchMaps = null,
   frameCellPitchMaps = null,
   colorToSlot = null,
-  composeFrame = composeAnimationFrame,
+  composeFrame = composeAudioProjectionFrame,
   maxNotes = AUDIO_ANIMATION_MAX_NOTES,
   timing = null
 } = {}) {
   validateAudioSong(song); validateAnimation(animation);
   if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION) throw new RangeError('音楽に使えるアニメーションは256pxまでです。');
-  if (animation.palette.length > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える色は32色までです。');
+  if (getAudioAnimationColorCount(animation) > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える色は64色までです。');
   if (typeof composeFrame !== 'function') throw new TypeError('アニメーションのフレーム合成関数が必要です。');
   if (!Number.isSafeInteger(maxNotes) || maxNotes < 1 || maxNotes > AUDIO_ANIMATION_MAX_NOTES) throw new RangeError('音符数の上限が不正です。');
 
@@ -288,7 +344,7 @@ export function prepareAudioAnimationImport(song, animation, {
 
 export function validateAudioAnimationBinding(song, animation, link) {
   validateAudioSong(song); validateAnimation(animation);
-  if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.palette.length > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える絵は256px、32色までです。');
+  if (animation.width > AUDIO_SHARED_IMAGE_MAX_DIMENSION || animation.height > AUDIO_SHARED_IMAGE_MAX_DIMENSION || getAudioAnimationColorCount(animation) > AUDIO_ANIMATION_MAX_COLORS) throw new RangeError('音楽に使える絵は256px、64色までです。');
   const frameTicks = audioAnimationFrameTicks(link, animation.width);
   if (link?.timing && JSON.stringify(link.timing.frameOffsets) !== JSON.stringify(animation.frames.map((_, index) => index * frameTicks))) throw new TypeError('保存したコマの時間オフセットが一致しません。');
   if (link?.rulesVersion !== AUDIO_ANIMATION_LINK_VERSION || link.imageRole !== 'audio'

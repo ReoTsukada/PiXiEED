@@ -4,6 +4,8 @@ const pending = new Map();
 const instances = new Map();
 const sectionGeneration = new WeakMap();
 const originalLabels = new WeakMap();
+const expandedSnapshots = new WeakMap();
+const startingSections = new WeakMap();
 let activeSection = null;
 
 function request(instance, command) {
@@ -33,6 +35,34 @@ function makeFrame(section, mode) {
 
 function getInstance(section) { return instances.get(section) || makeFrame(section, section.dataset.toolMode); }
 
+function startSection(button) {
+  const target = button.dataset.embedTarget;
+  if (!target) return button.closest('[data-tool-embed]');
+  const host = document.getElementById(target);
+  return host?.matches('[data-tool-embed]') ? host : host?.querySelector('[data-tool-embed]');
+}
+
+function startButtons(section) {
+  return [...document.querySelectorAll('[data-embed-start]')].filter(button => startSection(button) === section);
+}
+
+function updateStartButtons(section, state) {
+  for (const button of startButtons(section)) {
+    if (!originalLabels.has(button)) originalLabels.set(button, button.textContent.trim());
+    // Older embed hosts can keep a local launch button. Dedicated pages use
+    // one external primary action that also brings an active editor into view.
+    button.hidden = section.contains(button) && state !== 'closed';
+    button.setAttribute('aria-expanded', String(state !== 'closed'));
+    button.setAttribute('aria-busy', String(state === 'loading'));
+    if (!section.contains(button)) button.textContent = state === 'loading' ? 'ツールを準備中…' : state === 'active' ? '編集画面に戻る' : '続きから再開';
+  }
+}
+
+function showEditor(section) {
+  if (section.classList.contains('tool-embed--expanded')) return;
+  section.scrollIntoView({ block: 'start', behavior: 'instant' });
+}
+
 function setStatus(section, message) {
   const status = section.querySelector('[data-embed-status]');
   if (status) status.textContent = message;
@@ -44,45 +74,64 @@ function controls(section) {
   bar = document.createElement('div'); bar.className = 'tool-embed__controls';
   const title = document.createElement('span'); title.className = 'tool-embed__title'; title.textContent = section.dataset.toolMode === 'camera' ? 'PiXiEED カメラ' : 'PiXiEEDraw';
   title.id = `tool-embed-dialog-title-${crypto.randomUUID()}`;
-  const expand = document.createElement('button'); expand.type = 'button'; expand.dataset.embedExpand = ''; expand.textContent = '拡大'; expand.setAttribute('aria-expanded', 'false');
-  const close = document.createElement('button'); close.type = 'button'; close.dataset.embedClose = ''; close.textContent = '閉じる';
-  bar.append(title, expand, close); section.querySelector('[data-embed-stage]').prepend(bar); return bar;
+  const expand = document.createElement('button'); expand.type = 'button'; expand.dataset.embedExpand = ''; expand.textContent = '大きく使う'; expand.setAttribute('aria-label', 'エディターを大きく表示する'); expand.setAttribute('aria-expanded', 'false');
+  const close = document.createElement('button'); close.type = 'button'; close.dataset.embedClose = ''; close.textContent = '閉じる'; close.setAttribute('aria-label', 'ページ内エディターを閉じる');
+  bar.append(title, expand, close);
+  const help = document.createElement('p'); help.className = 'tool-embed__help';
+  help.textContent = section.dataset.toolMode === 'camera' ? '画像読込：下部の［ファイル］→［画像を読み込む］。閉じても続きから再開できます。' : '大きく使っても、閉じても、このページでは続きから再開できます。';
+  section.querySelector('[data-embed-stage]').prepend(bar, help); return bar;
 }
 
 async function activate(section) {
+  if (startingSections.has(section) || (activeSection === section && section.classList.contains('tool-embed--active'))) { showEditor(section); return; }
   const generation = (sectionGeneration.get(section) || 0) + 1;
   sectionGeneration.set(section, generation);
+  startingSections.set(section, generation);
   const instance = getInstance(section);
   if (activeSection && activeSection !== section) await close(activeSection, { restoreFocus: false });
   activeSection = section;
   section.classList.add('tool-embed--active');
   section.querySelector('[data-embed-stage]').hidden = false;
-  section.querySelector('[data-embed-start]').hidden = true;
+  updateStartButtons(section, 'loading');
   controls(section);
   setStatus(section, 'ツールを準備しています…');
+  showEditor(section);
   try {
     if (!instance.ready) await Promise.race([instance.readyPromise, new Promise((_, reject) => setTimeout(() => reject(new Error('ツールを起動できませんでした。')), 15000))]);
-    if (sectionGeneration.get(section) !== generation) { if (instance.ready) await request(instance, 'suspend').catch(() => {}); return; }
+    if (sectionGeneration.get(section) !== generation) return;
     await request(instance, 'activate');
     if (sectionGeneration.get(section) !== generation) return;
+    updateStartButtons(section, 'active');
     setStatus(section, '編集を保持しています。閉じても続きから再開できます。');
-  } catch (error) { setStatus(section, error.message); }
+    instance.frame.focus({ preventScroll: true });
+  } catch (error) {
+    if (sectionGeneration.get(section) !== generation) return;
+    await close(section);
+    setStatus(section, `${error.message} もう一度開始ボタンを押してください。`);
+  } finally { if (startingSections.get(section) === generation) startingSections.delete(section); }
 }
 
 async function close(section, { restoreFocus = true } = {}) {
   sectionGeneration.set(section, (sectionGeneration.get(section) || 0) + 1);
+  startingSections.delete(section);
   const instance = instances.get(section);
   if (instance?.ready) { try { await request(instance, 'suspend'); } catch {} }
   section.classList.remove('tool-embed--active', 'tool-embed--expanded');
+  unlockExpandedViewport(section);
   section.removeAttribute('role'); section.removeAttribute('aria-modal');
   restoreLabel(section);
   section.querySelector('[data-embed-stage]').hidden = true;
-  section.querySelector('[data-embed-start]').hidden = false;
+  updateStartButtons(section, 'closed');
   const expandButton = section.querySelector('[data-embed-expand]');
-  if (expandButton) { expandButton.textContent = '拡大'; expandButton.setAttribute('aria-expanded', 'false'); }
+  if (expandButton) { expandButton.textContent = '大きく使う'; expandButton.setAttribute('aria-label', 'エディターを大きく表示する'); expandButton.setAttribute('aria-expanded', 'false'); }
   if (activeSection === section) activeSection = null;
   releaseInert(section);
-  if (restoreFocus) section.querySelector('[data-embed-start]').focus({ preventScroll: true });
+  if (restoreFocus) {
+    const start = startButtons(section).find(button => !button.hidden);
+    start?.focus({ preventScroll: true });
+    const rect = start?.getBoundingClientRect();
+    if (rect && (rect.top < 0 || rect.bottom > innerHeight)) start.scrollIntoView({ block: 'center', behavior: 'instant' });
+  }
   setStatus(section, '編集を保持しています。続きから再開できます。');
   section.querySelector('[data-embed-expand]')?.setAttribute('aria-expanded', 'false');
 }
@@ -109,14 +158,88 @@ function restoreLabel(section) {
   else section.setAttribute('aria-labelledby', label);
 }
 
+function styleSnapshot(element, properties) {
+  return Object.fromEntries(properties.map(property => [property, {
+    value: element.style.getPropertyValue(property),
+    priority: element.style.getPropertyPriority(property),
+  }]));
+}
+
+function restoreStyle(element, snapshot) {
+  for (const [property, saved] of Object.entries(snapshot || {})) {
+    if (saved.value) element.style.setProperty(property, saved.value, saved.priority);
+    else element.style.removeProperty(property);
+  }
+}
+
+function lockExpandedViewport(section) {
+  if (expandedSnapshots.has(section)) return;
+  const root = document.documentElement;
+  const body = document.body;
+  const visualViewport = window.visualViewport;
+  const snapshot = {
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    rootStyle: styleSnapshot(root, ['overflow', 'scroll-behavior']),
+    bodyStyle: styleSnapshot(body, ['overflow', 'position', 'top', 'left', 'right', 'width', 'scroll-behavior']),
+  };
+  const updateViewport = () => {
+    const viewport = window.visualViewport;
+    section.style.setProperty('--tool-embed-viewport-top', `${Math.max(0, viewport?.offsetTop ?? 0)}px`);
+    section.style.setProperty('--tool-embed-viewport-left', `${Math.max(0, viewport?.offsetLeft ?? 0)}px`);
+    section.style.setProperty('--tool-embed-viewport-width', `${Math.max(1, viewport?.width ?? window.innerWidth)}px`);
+    section.style.setProperty('--tool-embed-viewport-height', `${Math.max(1, viewport?.height ?? window.innerHeight)}px`);
+  };
+  snapshot.updateViewport = updateViewport;
+  expandedSnapshots.set(section, snapshot);
+  updateViewport();
+  root.style.setProperty('overflow', 'hidden');
+  body.style.setProperty('overflow', 'hidden');
+  body.style.setProperty('position', 'fixed');
+  body.style.setProperty('top', `${-snapshot.scrollY}px`);
+  body.style.setProperty('left', '0');
+  body.style.setProperty('right', '0');
+  body.style.setProperty('width', '100%');
+  window.addEventListener('resize', updateViewport, { passive: true });
+  visualViewport?.addEventListener('resize', updateViewport, { passive: true });
+  visualViewport?.addEventListener('scroll', updateViewport, { passive: true });
+}
+
+function unlockExpandedViewport(section) {
+  const snapshot = expandedSnapshots.get(section);
+  if (!snapshot) return;
+  window.removeEventListener('resize', snapshot.updateViewport);
+  window.visualViewport?.removeEventListener('resize', snapshot.updateViewport);
+  window.visualViewport?.removeEventListener('scroll', snapshot.updateViewport);
+  restoreStyle(document.documentElement, snapshot.rootStyle);
+  restoreStyle(document.body, snapshot.bodyStyle);
+  for (const property of ['--tool-embed-viewport-top', '--tool-embed-viewport-left', '--tool-embed-viewport-width', '--tool-embed-viewport-height']) section.style.removeProperty(property);
+  expandedSnapshots.delete(section);
+  // The site uses smooth scrolling globally. Restore the saved position as an
+  // immediate operation, then put each element's original inline style back.
+  const root = document.documentElement;
+  const body = document.body;
+  root.style.setProperty('scroll-behavior', 'auto', 'important');
+  body.style.setProperty('scroll-behavior', 'auto', 'important');
+  try {
+    window.scrollTo({ left: snapshot.scrollX, top: snapshot.scrollY, behavior: 'instant' });
+  } catch {
+    window.scrollTo(snapshot.scrollX, snapshot.scrollY);
+  }
+  restoreStyle(root, { 'scroll-behavior': snapshot.rootStyle['scroll-behavior'] });
+  restoreStyle(body, { 'scroll-behavior': snapshot.bodyStyle['scroll-behavior'] });
+}
+
 function expand(section) {
   const expanded = !section.classList.contains('tool-embed--expanded');
-  if (!expanded) { section.classList.remove('tool-embed--expanded'); section.removeAttribute('role'); section.removeAttribute('aria-modal'); restoreLabel(section); releaseInert(section); section.querySelector('[data-embed-expand]').textContent = '拡大'; section.querySelector('[data-embed-expand]').setAttribute('aria-expanded', 'false'); section.querySelector('[data-embed-expand]').focus({ preventScroll: true }); return; }
+  if (!expanded) { section.classList.remove('tool-embed--expanded'); unlockExpandedViewport(section); section.removeAttribute('role'); section.removeAttribute('aria-modal'); restoreLabel(section); releaseInert(section); const button = section.querySelector('[data-embed-expand]'); button.textContent = '大きく使う'; button.setAttribute('aria-label', 'エディターを大きく表示する'); button.setAttribute('aria-expanded', 'false'); button.focus({ preventScroll: true }); return; }
+  lockExpandedViewport(section);
   section.classList.add('tool-embed--expanded'); section.setAttribute('role', 'dialog'); section.setAttribute('aria-modal', 'true');
   if (!originalLabels.has(section)) originalLabels.set(section, section.getAttribute('aria-labelledby'));
   section.setAttribute('aria-labelledby', section.querySelector('.tool-embed__title').id);
   acquireInert(section);
-  section.querySelector('[data-embed-expand]').textContent = '縮小';
+  section.querySelector('[data-embed-expand]').textContent = 'ページ内に戻る';
+  section.querySelector('[data-embed-expand]').setAttribute('aria-label', 'ページ内表示に戻る');
   section.querySelector('[data-embed-expand]').setAttribute('aria-expanded', 'true');
   section.querySelector('[data-embed-close]').focus({ preventScroll: true });
 }
@@ -146,7 +269,7 @@ window.addEventListener('message', event => {
 
 document.addEventListener('click', event => {
   const start = event.target.closest('[data-embed-start]');
-  if (start) { void activate(start.closest('[data-tool-embed]')); return; }
+  if (start) { const section = startSection(start); if (section) { event.preventDefault(); void activate(section); } return; }
   const section = event.target.closest('[data-tool-embed]');
   if (!section) return;
   if (event.target.closest('[data-embed-expand]')) expand(section);

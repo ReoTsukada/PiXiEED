@@ -1,6 +1,6 @@
 import { decodePxd } from './pxd-codec.mjs';
-import { createPxdStore, PxdStoreError } from './pxd-store.mjs?rev=20261001-free-tools-1';
-import { forkProject } from './project-catalog.mjs?rev=20261001-free-tools-1';
+import { createPxdStore, PxdStoreError } from './pxd-store.mjs?rev=20261016-color-capability-1';
+import { forkProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
 
 const TOOLS = new Set(['draw', 'audio', 'camera', 'jigsaw', 'spot_difference', 'hidden_object']);
 const ownStamp = (tool) => ({ tool, schemaVersion: 1 });

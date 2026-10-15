@@ -13,11 +13,12 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261012-animation-core-contract-1';
-import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261016-color-capability-1';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
-import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
+import { createPuzzleHintController, jigsawPuzzleHintKey } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
@@ -69,11 +70,19 @@ function scheduleJigsawResult() {
 }
 const reduceJigsawHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 const jigsawHintButton = $('#jigsaw-hint');
-const jigsawHintController = createPuzzleHintController({ onState: ({ pending }) => {
+const jigsawHintNotice = document.createElement('span');
+jigsawHintNotice.className = 'jigsaw-hint-notice'; jigsawHintNotice.setAttribute('role', 'status'); jigsawHintNotice.setAttribute('aria-live', 'polite');
+jigsawHintNotice.style.cssText = 'font-size:.68rem;line-height:1.2;max-width:12em;';
+jigsawHintButton?.after(jigsawHintNotice);
+const jigsawHintController = createPuzzleHintController({
+  feature: 'puzzle.hint', requireReward: requireSiteReward, hasReward: hasSiteReward, isRewardPolicyEnabled: isSiteRewardPolicyEnabled, subscribeReward: subscribeSiteReward,
+  onState: ({ pending, usedCount, freeLimit, freeRemaining, rewardActive, policyEnabled }) => {
   if (!jigsawHintButton) return;
   jigsawHintButton.disabled = pending || !game || isJigsawWorkspaceComplete(game);
-  jigsawHintButton.setAttribute('aria-label', 'ヒント：未配置ピースの合う場所を一時表示');
-  jigsawHintButton.title = '未配置ピースの合う場所を一時表示';
+  const allowance = !policyEnabled ? 'ヒント無制限' : freeRemaining ? `無料ヒント ${freeRemaining}回${freeLimit > 1 ? `（${usedCount}/${freeLimit}）` : ''}` : rewardActive ? `特典中：追加ヒント可${freeLimit > 1 ? `（無料${freeLimit}回使用済み）` : ''}` : `無料ヒント済み${freeLimit > 1 ? `（${freeLimit}回）` : ''}`;
+  jigsawHintNotice.textContent = allowance;
+  jigsawHintButton.setAttribute('aria-label', `ヒント：未配置ピースの合う場所を一時表示。${allowance}`);
+  jigsawHintButton.title = `未配置ピースの合う場所を一時表示（${allowance}）`;
 } });
 const PUBLIC_BUCKETS = new Set(['post-public', 'social-posts']);
 const safePublicUrl = (bucket, path) => {
@@ -579,7 +588,7 @@ function updateViewport() {
 function showGame() {
   $('#jigsaw-current').hidden = true;
   setupSection.hidden = true; playSection.hidden = false; document.body.dataset.jigsawPlaying = 'true';
-  const problemKey = game?.gameId ? `jigsaw:${game.gameId}` : '';
+  const problemKey = jigsawPuzzleHintKey(game);
   if (jigsawHintController.getState().problemKey !== problemKey) { window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0; jigsawHint = null; }
   jigsawHintController.setProblem(problemKey); renderGame();
 }

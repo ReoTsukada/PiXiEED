@@ -14,49 +14,49 @@ function image(width, height, colorCount = 1) {
   return { width, height, rgba };
 }
 
-test('all supported canvases are free while legacy overage retains its safety limit', () => {
+test('32 free / 64 reward canvases retain originals and distinguish entitlement from support', () => {
   assert.deepEqual(evaluateSharedCanvasPolicy({ width: 128, height: 128, colorCount: 16 }), {
     supported: true, premiumContent: false, locked: false, reason: null, maxDimension: 256, maxColors: 32
   });
   const premium = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 });
   assert.equal(premium.supported, true); assert.equal(premium.premiumContent, false); assert.equal(premium.locked, false); assert.equal(premium.reason, null);
-  const unlocked = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 }, { passActive: true });
-  assert.equal(unlocked.supported, true); assert.equal(unlocked.locked, false); assert.equal(unlocked.maxColors, 32);
-  const legacy = evaluateSharedCanvasPolicy({ width: 512, height: 512, colorCount: 128 }, { passActive: true });
+  const unlocked = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 }, { passActive: true, allowConversion: true });
+  assert.equal(unlocked.supported, true); assert.equal(unlocked.locked, false); assert.equal(unlocked.maxColors, 64);
+  const legacy = evaluateSharedCanvasPolicy({ width: 512, height: 512, colorCount: 128 }, { passActive: true, allowConversion: true });
   assert.equal(legacy.supported, false); assert.equal(legacy.premiumContent, false); assert.equal(legacy.locked, false); assert.equal(legacy.reason, 'canvas-over-256px');
-  assert.equal(evaluateSharedCanvasPolicy({ width: 128, height: 128, colorCount: 33 }, { passActive: true }).supported, false);
+  assert.equal(evaluateSharedCanvasPolicy({ width: 128, height: 128, colorCount: 65 }, { passActive: true }).supported, false);
 });
 
 test('RGBA color counting includes alpha and supports bounded threshold checks', () => {
   const sample = { width: 3, height: 1, rgba: new Uint8Array([1, 2, 3, 0, 1, 2, 3, 1, 1, 2, 3, 0]) };
-  assert.equal(countSharedImageColors(sample), 2); assert.equal(countSharedImageColors(sample, 1), 2);
+  assert.equal(countSharedImageColors(sample), 1); assert.equal(countSharedImageColors(sample, 1), 1);
   assert.throws(() => countSharedImageColors({ width: 1, height: 1, rgba: new Uint8Array(3) }), /寸法またはRGBA/);
 });
 
 test('photo preparation preserves aspect ratio, quantizes only the requested copy, and is deterministic', () => {
   const source = image(144, 256, 40); const before = new Uint8Array(source.rgba);
-  const regular = prepareSharedCanvasImage(source);
+  const regular = prepareSharedCanvasImage(source, { allowConversion: true });
   assert.equal(regular.image.width, 144); assert.equal(regular.image.height, 256); assert.equal(regular.colorCount, 32); assert.equal(regular.changed, true);
   assert.equal(regular.image.width / regular.image.height, source.width / source.height);
-  const extended = prepareSharedCanvasImage(source, { passActive: true });
-  assert.equal(extended.image.width, 144); assert.equal(extended.image.height, 256); assert.equal(extended.colorCount, 32);
-  assert.deepEqual(prepareSharedCanvasImage(source, { passActive: true }).image.rgba, extended.image.rgba);
-  const exactCanvas = prepareSharedCanvasImage(image(32, 20, 8), { passActive: true, width: 48, height: 40 });
+  const extended = prepareSharedCanvasImage(source, { passActive: true, allowConversion: true });
+  assert.equal(extended.image.width, 144); assert.equal(extended.image.height, 256); assert.equal(extended.colorCount, 40);
+  assert.deepEqual(prepareSharedCanvasImage(source, { passActive: true, allowConversion: true }).image.rgba, extended.image.rgba);
+  const exactCanvas = prepareSharedCanvasImage(image(32, 20, 8), { passActive: true, width: 48, height: 40, allowConversion: true });
   assert.equal(exactCanvas.image.width, 48); assert.equal(exactCanvas.image.height, 40);
-  assert.equal(prepareSharedCanvasImage(image(32, 20, 8), { width: 48, height: 40 }).image.width, 48);
+  assert.equal(prepareSharedCanvasImage(image(32, 20, 8), { width: 48, height: 40, allowConversion: true }).image.width, 48);
   assert.throws(() => prepareSharedCanvasImage(source, { width: 257, height: 128 }), /各辺256pxまで/);
   const rectangle = { width: 2, height: 1, rgba: new Uint8Array([220, 20, 30, 255, 20, 40, 220, 255]) };
-  const contained = prepareSharedCanvasImage(rectangle, { passActive: true, width: 4, height: 4, fit: 'contain' }).image;
+  const contained = prepareSharedCanvasImage(rectangle, { passActive: true, width: 4, height: 4, fit: 'contain', allowConversion: true }).image;
   assert.equal(contained.width, 4); assert.equal(contained.height, 4);
   assert.deepEqual([...contained.rgba.slice(0, 16)], Array(16).fill(0));
   assert.deepEqual([...contained.rgba.slice(48, 64)], Array(16).fill(0));
   assert.deepEqual([...contained.rgba.slice(16, 32)], [220, 20, 30, 255, 220, 20, 30, 255, 20, 40, 220, 255, 20, 40, 220, 255]);
   assert.deepEqual([...contained.rgba.slice(32, 48)], [...contained.rgba.slice(16, 32)]);
   assert.equal(contained.rgba.filter((value, index) => index % 4 === 3 && value > 0).length, 8);
-  assert.equal(countSharedImageColors(contained), 3, 'transparent margins count toward the RGBA budget');
+  assert.equal(countSharedImageColors(contained), 2, 'transparent margins do not consume visible colors');
   const many = { width: 20, height: 1, rgba: new Uint8Array(20 * 4) };
   for (let x = 0; x < 20; x += 1) many.rgba.set([x * 10, 50, 100, 255], x * 4);
-  const constrained = prepareSharedCanvasImage(many, { passActive: true, width: 20, height: 10, maxColors: 16, fit: 'contain' }).image;
+  const constrained = prepareSharedCanvasImage(many, { passActive: true, width: 20, height: 10, maxColors: 16, fit: 'contain', allowConversion: true }).image;
   assert.ok(countSharedImageColors(constrained) <= 16);
   for (let y = 0; y < 10; y += 1) if (y !== 4) {
     for (let x = 0; x < 20; x += 1) {
@@ -148,4 +148,33 @@ test('legacy puzzle image roles retain indexed payloads and either spot side inv
 test('PXD tool routing includes the camera entry', () => {
   const project = createPxdProject({ projectId: 'camera-project', revisionId: 'camera-r1' });
   assert.equal(pxdToolUrl('camera', project), '/pixel-camera.html?pxd=camera-project&pxdRevision=camera-r1');
+});
+
+
+test('33/64/65 visible colors require explicit conversion and transparent/alpha rules stay exact', () => {
+  for (const count of [33, 64, 65]) {
+    const source = image(count, 1, count), original = new Uint8Array(source.rgba);
+    assert.throws(() => prepareSharedCanvasImage(source), { code: 'shared-image-conversion-required' });
+    if (count <= 64) {
+      const active = prepareSharedCanvasImage(source, { passActive: true });
+      assert.equal(active.colorCount, count); assert.equal(active.changed, false);
+    } else assert.throws(() => prepareSharedCanvasImage(source, { passActive: true }), { code: 'shared-image-conversion-required' });
+    const converted = prepareSharedCanvasImage(source, { allowConversion: true });
+    assert.ok(converted.colorCount <= 32); assert.deepEqual(source.rgba, original);
+  }
+  const rgba = Uint8Array.of(1,2,3,0, 9,8,7,0, 1,2,3,128, 1,2,3,129);
+  const sample = { width:4, height:1, rgba };
+  assert.equal(countSharedImageColors(sample), 2);
+  assert.equal(countSharedImageColors(sample, undefined, { includeTransparent: true }), 4);
+  assert.equal(evaluateSharedCanvasPolicy({ width: 1, height: 1, colorCount: 0 }).supported, true);
+  assert.equal(evaluateSharedCanvasPolicy({ width: 64, height: 1, colorCount: 64 }).locked, true);
+  assert.equal(evaluateSharedCanvasPolicy({ width: 64, height: 1, colorCount: 64 }, { passActive: true }).locked, false);
+});
+
+test('legacy transparent tuple counts read exactly while policy receives usedColorCount', async () => {
+  const rgba = Uint8Array.of(1,2,3,0, 9,8,7,0, 1,2,3,128, 1,2,3,129);
+  const project = await putPxdSharedImage(createPxdProject(), { width:4, height:1, rgba });
+  assert.equal(getPxdJson(project, 'images/main/meta.json').colorCount, 4);
+  const loaded = await readPxdImage(await decodePxd(await encodePxd(project)));
+  assert.equal(loaded.colorCount, 4); assert.equal(loaded.usedColorCount, 2); assert.deepEqual(loaded.rgba, rgba);
 });

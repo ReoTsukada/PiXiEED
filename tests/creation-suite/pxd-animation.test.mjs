@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnimation, createAnimationFromDraw, getAnimationCelDocument, setAnimationFrameDuration, setLayerProperties, writeAnimationCel } from '../../js/creation/animation-core.mjs';
+import { ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, createAnimation, createAnimationFromDraw, getAnimationCelDocument, setAnimationFrameDuration, setLayerProperties, writeAnimationCel } from '../../js/creation/animation-core.mjs';
 import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdBytes, setPxdJson } from '../../js/creation/pxd-codec.mjs';
 import { readPxdAnimation, writePxdAnimation } from '../../js/creation/pxd-animation.mjs';
 
@@ -27,6 +27,41 @@ test('legacy Draw conversion serializes exact poster pixels while keeping PXD im
   assert.equal(project.entries.some(({ path }) => path === 'draw/state.json'), false);
   const restored = await readPxdAnimation(project);
   assert.deepEqual(getAnimationCelDocument(restored, restored.frames[0].id, restored.layers[0].id).pixels, [-1, 0]);
+});
+
+test('33 and 64 used RGBA colors roundtrip with an explicit expanded-color capability; schema 1/2 stay capped at 32', async () => {
+  const colors = Array.from({ length: 64 }, (_, index) => `#${index.toString(16).padStart(6, '0')}`);
+  colors[63] = '#00000080'; // Same RGB as index zero, different alpha, therefore a distinct RGBA color.
+  assert.throws(() => createAnimation({ width: 129, height: 1, palette: Array.from({ length: 129 }, (_, index) => `#${(index + 1).toString(16).padStart(6, '0')}`) }), /128色/);
+  for (const count of [33, 64]) {
+    const palette = colors.slice(0, count);
+    const blank = createAnimation({ width: count, height: 1, palette });
+    const animation = writeAnimationCel(blank, blank.frames[0].id, blank.layers[0].id,
+      { width: count, height: 1, pixels: Array.from({ length: count }, (_, index) => index + 1) });
+    assert.equal(animation.schemaVersion, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION);
+    const project = await writePxdAnimation(createPxdProject(), animation);
+    const state = getPxdJson(project, 'animations/main/state.json');
+    assert.equal(state.schemaVersion, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION);
+    assert.equal(state.colorCapacity, 128);
+    assert.equal(state.palette.length, count);
+    const restored = await readPxdAnimation(project);
+    assert.deepEqual(restored.palette, palette);
+    assert.deepEqual(getAnimationCelDocument(restored, restored.frames[0].id, restored.layers[0].id).pixels,
+      Array.from({ length: count }, (_, index) => index));
+    const { colorCapacity, ...schemaTwoState } = state;
+    const oldContract = setPxdJson(project, 'animations/main/state.json', { ...schemaTwoState, schemaVersion: 2 });
+    await assert.rejects(() => readPxdAnimation(oldContract), error => error.code === 'PXD_ANIMATION_VERSION');
+  }
+});
+
+test('65 registered slots with only one used RGBA color roundtrip; unused palette options do not consume the used-color cap', async () => {
+  const palette = Array.from({ length: 65 }, (_, index) => `#${(index + 1).toString(16).padStart(6, '0')}`);
+  const blank = createAnimation({ width: 1, height: 1, palette });
+  const animation = writeAnimationCel(blank, blank.frames[0].id, blank.layers[0].id, { width: 1, height: 1, pixels: [1] });
+  const project = await writePxdAnimation(createPxdProject(), animation);
+  const restored = await readPxdAnimation(project);
+  assert.equal(restored.palette.length, 65);
+  assert.deepEqual(getAnimationCelDocument(restored, restored.frames[0].id, restored.layers[0].id).pixels, [0]);
 });
 
 test('fractional frame delays for exact FPS values survive PXD save and reload', async () => {

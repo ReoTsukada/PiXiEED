@@ -23,15 +23,14 @@ test('camera appends only used opaque colors, deduplicates normalized hex, and p
   assert.deepEqual(repeat.additions, []); assert.deepEqual(repeat.document.palette, plan.document.palette);
 });
 
-test('camera transparency occupies no palette slot and partial alpha rejects the entire detached plan', () => {
+test('camera transparency occupies no palette slot and partial alpha stays exact in detached plans', () => {
   const doc = document(), snapshot = target(doc), before = structuredClone(doc);
   const result = planCameraReplacement(snapshot, samples([1, 2, 3, 0], [12, 34, 56, 255], [9, 8, 7, 0]));
   assert.deepEqual(result.additions, ['#0c2238']);
   assert.deepEqual([0, 2, 17].map(i => result.document.pixels[i]), [-1, 2, -1]);
-  for (const paletteFixed of [true, false]) {
-    assert.throws(() => planCameraReplacement(snapshot, samples([12, 34, 56, 255], [1, 2, 3, 128], [9, 8, 7, 255]), { paletteFixed }), error => error.code === 'camera-partial-alpha' && /半透明/.test(error.message) && /選び直してください/.test(error.message));
-    assert.deepEqual(doc, before); assert.deepEqual(snapshot.document, before);
-  }
+  const alpha = planCameraReplacement(snapshot, samples([12, 34, 56, 255], [1, 2, 3, 128], [9, 8, 7, 255]));
+  assert.ok(alpha.document.palette.includes('#01020380'));
+  assert.deepEqual(doc, before); assert.deepEqual(snapshot.document, before);
 });
 
 test('fixed palette selects only allowed existing entries and keeps transparent pixels', () => {
@@ -41,11 +40,11 @@ test('fixed palette selects only allowed existing entries and keeps transparent 
   assert.deepEqual([0, 2, 17].map(i => plan.document.pixels[i]), [0, 2, -1]);
 });
 
-test('32 opaque entries plus transparency remain valid, while overflow is explicit and makes no project change', () => {
-  const palette = Array.from({ length: 32 }, (_, i) => `#${i.toString(16).padStart(2, '0')}0000`);
+test('unused registered entries do not consume the visible camera color allowance', () => {
+  const palette = Array.from({ length: 64 }, (_, i) => `#${i.toString(16).padStart(2, '0')}0000`);
   const doc = document(palette), snapshot = target(doc), before = structuredClone(doc);
-  assert.equal(planCameraReplacement(snapshot, samples([31, 0, 0, 255], [0, 0, 0, 0], [0, 0, 0, 255])).document.palette.length, 32);
-  assert.throws(() => planCameraReplacement(snapshot, samples([31, 0, 0, 255], [12, 34, 56, 255], [0, 0, 0, 0])), error => error.code === 'camera-palette-overflow' && /33色.*32色/.test(error.message));
+  assert.equal(planCameraReplacement(snapshot, samples([31, 0, 0, 255], [0, 0, 0, 0], [0, 0, 0, 255])).document.palette.length, 64);
+  assert.equal(planCameraReplacement(snapshot, samples([31, 0, 0, 255], [12, 34, 56, 255], [0, 0, 0, 0]), {maxColors:32}).document.palette.length, 65);
   assert.deepEqual(snapshot.document, before); assert.deepEqual(doc, before);
 });
 
@@ -73,4 +72,17 @@ test('incorrect sample length is rejected before any palette append', () => {
   const snapshot = target(document());
   assert.throws(() => planCameraReplacement(snapshot, samples([12, 34, 56, 255])), /画素数/);
   assert.equal(snapshot.palette.length, 2);
+});
+
+
+test('camera free32/reward64 counts used RGBA across other cels and never mutates on 33/65 overflow', () => {
+ const palette=Array.from({length:64},(_,i)=>`#${i.toString(16).padStart(2,'0')}2233`);
+ const doc=document(palette); for(let i=0;i<64;i++)doc.pixels[i]=i;
+ const snapshot=target(doc,[100]), before=structuredClone(doc);
+ assert.throws(()=>planCameraReplacement(snapshot,samples([1,34,51,255]),{maxColors:32}),{code:'camera-palette-overflow'});
+ assert.equal(planCameraReplacement(snapshot,samples([1,34,51,255]),{maxColors:64}).document.palette.length,64);
+ assert.throws(()=>planCameraReplacement(snapshot,samples([200,100,50,255]),{maxColors:64}),{code:'camera-palette-overflow'});
+ assert.deepEqual(doc,before);
+ const free=document(palette);free.pixels[0]=0;
+ assert.doesNotThrow(()=>planCameraReplacement(target(free,[1]),samples([1,34,51,255]),{maxColors:32}));
 });

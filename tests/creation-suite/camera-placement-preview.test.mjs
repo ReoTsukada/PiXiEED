@@ -6,6 +6,7 @@ import {
   sampleCameraFrameToPlacement
 } from '../../js/creation/camera-placement-preview.mjs';
 import { cameraPixels, planCameraReplacement } from '../../js/creation/draw-camera-core.mjs?rev=20261012-animation-core-contract-1';
+import { addAnimationLayer, composeAnimationFrameRgba, createAnimation, setLayerProperties, writeAnimationCel } from '../../js/creation/animation-core.mjs?rev=20261016-color-capability-1';
 
 function rgba(width, height, colors) {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -104,4 +105,49 @@ test('render and sampling buffers are reused across frames', () => {
   const second = renderer.render(rgba(2,1,[[7,8,9,255],[10,11,12,255]]));
   assert.equal(second, first);
   assert.equal(mapping.sampled, sampleBuffer);
+});
+
+test('RGBA placement matches Draw composition for partial colors, opacity, and clearing the active cel', () => {
+  let animation = createAnimation({ width:2, height:1, palette:['#ff000080', '#00ff0080', '#0000ff80', '#00ffff80'] });
+  animation = addAnimationLayer(animation, { name:'Camera target' });
+  animation = addAnimationLayer(animation, { name:'Above' });
+  animation = setLayerProperties(animation, animation.layers[0].id, { opacity:0.5 });
+  animation = setLayerProperties(animation, animation.layers[1].id, { opacity:0.75 });
+  animation = setLayerProperties(animation, animation.layers[2].id, { opacity:0.25 });
+  animation = writeAnimationCel(animation, animation.frames[0].id, animation.layers[0].id,
+    { width:2, height:1, palette:[...animation.palette], pixels:[1,1] });
+  animation = writeAnimationCel(animation, animation.frames[0].id, animation.layers[1].id,
+    { width:2, height:1, palette:[...animation.palette], pixels:[2,2] });
+  animation = writeAnimationCel(animation, animation.frames[0].id, animation.layers[2].id,
+    { width:2, height:1, palette:[...animation.palette], pixels:[3,3] });
+  const frameId = animation.frames[0].id, activeLayerId = animation.layers[1].id;
+  const rgbaLayers = animation.layers.map((layer, layerIndex) => {
+    const color = animation.palette[layerIndex];
+    const value = color.slice(1).match(/../g).map(byte => Number.parseInt(byte, 16));
+    return { id:layer.id, rgba:Uint8Array.from([...value, ...value]), visible:layer.visible, opacity:layer.opacity ?? 1 };
+  });
+  const baseRgba = new Uint8ClampedArray(composeAnimationFrameRgba(animation, frameId).rgba);
+  const mapping = map({ sourceWidth:2, width:2, height:1, cells:[0,1] });
+  const renderer = createCameraPlacementRenderer({ width:2, height:1, palette:[...animation.palette],
+    rgbaLayers, activeLayerId, baseRgba, allowedIndices:[0,1,2,3] }, mapping);
+  const source = rgba(2,1,[[0,255,255,128],[20,30,40,0]]);
+  const preview = renderer.render(source);
+
+  animation = writeAnimationCel(animation, frameId, activeLayerId,
+    { width:2, height:1, palette:[...animation.palette], pixels:[4,0] });
+  assert.deepEqual([...preview], [...composeAnimationFrameRgba(animation, frameId).rgba]);
+});
+
+test('RGBA placement fixed-palette preview chooses the same partially transparent slot as camera apply', () => {
+  const palette = ['#ff000040', '#00ff00c0', '#0000ff80'];
+  const mapping = map({ width:1, height:1, cells:[0] });
+  const source = rgba(1,1,[[10,245,20,190]]);
+  const frame = { width:1, height:1, data:source.data };
+  const renderer = createCameraPlacementRenderer({ width:1, height:1, palette, allowedIndices:[0,1,2],
+    activeLayerId:'active', activeVisible:true, activeLocked:false, previewAllowed:true, musicOnly:false,
+    rgbaLayers:[{ id:'active', rgba:new Uint8Array(4), visible:true, opacity:1 }], baseRgba:new Uint8ClampedArray(4) }, mapping);
+  const preview = renderer.render(frame, { paletteFixed:true });
+  const index = cameraPixels(source.data, palette, [0,1,2])[0];
+  const expected = palette[index].slice(1).match(/../g).map(byte => Number.parseInt(byte,16));
+  assert.deepEqual([...preview], expected);
 });

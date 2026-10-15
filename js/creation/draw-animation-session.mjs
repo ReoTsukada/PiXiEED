@@ -1,5 +1,5 @@
-import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
-import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261012-animation-core-contract-1';
+import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261016-color-capability-1';
 import { validateDrawDocument } from './draw-core.mjs';
 
 /** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */
@@ -7,10 +7,17 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
   let animation = createAnimationFromDraw(document);
   if (musicMode) animation = ensureAnimationMusicLayer(animation);
   let frameId = animation.frames[0].id, layerId = musicMode ? animation.layers.find((layer) => layer.role === 'music').id : animation.layers[0].id;
-  let history = createDrawAnimationHistory(animation), below, above, composed;
+  let history = createDrawAnimationHistory(animation), below, above, composed, rgba, cacheRgba = null;
   let selectionPast = [], selectionFuture = [];
   let currentSelection = { frameId, layerId };
+  // Keep the selection attached to the current history entry separate from
+  // the user's temporary frame/layer selection. Redo must restore the layer
+  // that was active when its timeline snapshot was committed.
+  let historySelection = { ...currentSelection };
   function rebuild() {
+    cacheRgba = animationNeedsRgba(animation);
+    if (cacheRgba) { below = above = composed = null; rgba = new Uint8ClampedArray(animation.width * animation.height * 4); return; }
+    rgba = null;
     const index = animation.layers.findIndex((layer) => layer.id === layerId);
     below = Int16Array.from(composeAnimationFrame(animation, frameId, { layerIds: animation.layers.slice(0, index).map((layer) => layer.id) }).pixels);
     above = Int16Array.from(composeAnimationFrame(animation, frameId, { layerIds: animation.layers.slice(index + 1).map((layer) => layer.id) }).pixels);
@@ -23,8 +30,11 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
   }
   function commitHistory(next, selection = currentSelection) {
     if (!history.commit(next)) return false;
+    // A mode/layer selection immediately before an edit belongs to the state
+    // being left. Once committed, the new entry's selection is frozen here;
+    // later view-only selection changes must not rewrite its redo destination.
     selectionPast.push({ ...currentSelection }); selectionFuture = [];
-    trimSelectionPast(); currentSelection = { ...selection }; return true;
+    trimSelectionPast(); currentSelection = { ...selection }; historySelection = { ...selection }; return true;
   }
   function assertSelection(item, value) {
     if (!value || typeof value.frameId !== 'string' || typeof value.layerId !== 'string' ||
@@ -40,10 +50,12 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
     if (doc.palette.some((color, index) => color !== next.palette[index]) || doc.palette.length !== next.palette.length) next = setAnimationPalette(next, doc.palette);
     next = writeAnimationCel(next, frameId, layerId, { width: doc.width, height: doc.height, pixels: Uint8Array.from(doc.pixels, value => value + 1) });
     // Palette, indices and tile budgets have passed without changing either history.
-    return () => {
+    const commit = () => {
       if (animation !== original || frameId !== originalFrame || layerId !== originalLayer) throw new TypeError('選択の対象が変わりました。');
       commitHistory(next); animation = next; remember();
     };
+    Object.defineProperty(commit, 'animation', { value: next });
+    return commit;
   }
   function prepareTimeline(next, selection = currentSelection, preferMusic = false) {
     if (!musicMode) return { next, selection };
@@ -74,6 +86,7 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
       return Object.freeze({ timeline, selections: Object.freeze({
         past: Object.freeze(selectionPast.map((item) => Object.freeze({ ...item }))),
         current: Object.freeze({ ...currentSelection }),
+        historyCurrent: Object.freeze({ ...historySelection }),
         future: Object.freeze(selectionFuture.map((item) => Object.freeze({ ...item })))
       }) });
     },
@@ -87,11 +100,14 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
       const nextPast = [...timeline.past], nextFuture = [...timeline.future], nextCurrent = timeline.current;
       nextPast.forEach((item, index) => assertSelection(item, states.past[index]));
       assertSelection(nextCurrent, states.current);
+      const nextHistoryCurrent = states.historyCurrent ?? states.current;
+      assertSelection(nextCurrent, nextHistoryCurrent);
       nextFuture.forEach((item, index) => assertSelection(item, states.future[index]));
       // history.restore validates the animation snapshots and byte/entry limits before mutating.
       history.restore({ current: nextCurrent, past: nextPast, future: nextFuture });
       selectionPast = states.past.map((item) => ({ ...item }));
       currentSelection = { ...states.current };
+      historySelection = { ...nextHistoryCurrent };
       selectionFuture = states.future.map((item) => ({ ...item }));
       animation = nextCurrent; frameId = currentSelection.frameId; layerId = currentSelection.layerId;
       rebuild();
@@ -105,6 +121,7 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
       const chosen = musicMode ? prepared.selection : { frameId: selection?.frameId ?? next.frames[0].id, layerId: selection?.layerId ?? next.layers.at(-1).id };
       assertSelection(next, chosen);
       history = createDrawAnimationHistory(next); selectionPast = []; selectionFuture = [];
+      historySelection = { ...chosen };
       return restore(next, chosen);
     },
     prepareDocument,
@@ -119,12 +136,14 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
     },
     undo() {
       if (!history.undo()) return null;
-      selectionFuture.push({ ...currentSelection }); currentSelection = selectionPast.pop() ?? { frameId: history.current.frames[0].id, layerId: musicMode ? history.current.layers.find((layer) => layer.role === 'music').id : history.current.layers.at(-1).id };
+      selectionFuture.push({ ...historySelection }); currentSelection = selectionPast.pop() ?? { frameId: history.current.frames[0].id, layerId: musicMode ? history.current.layers.find((layer) => layer.role === 'music').id : history.current.layers.at(-1).id };
+      historySelection = { ...currentSelection };
       return restore(history.current, currentSelection);
     },
     redo() {
       if (!history.redo()) return null;
-      selectionPast.push({ ...currentSelection }); trimSelectionPast(); currentSelection = selectionFuture.pop() ?? { frameId: history.current.frames[0].id, layerId: musicMode ? history.current.layers.find((layer) => layer.role === 'music').id : history.current.layers.at(-1).id };
+      selectionPast.push({ ...historySelection }); trimSelectionPast(); currentSelection = selectionFuture.pop() ?? { frameId: history.current.frames[0].id, layerId: musicMode ? history.current.layers.find((layer) => layer.role === 'music').id : history.current.layers.at(-1).id };
+      historySelection = { ...currentSelection };
       return restore(history.current, currentSelection);
     },
     replaceMusicDocument(doc, { record = true } = {}) {
@@ -138,11 +157,16 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
       next = writeAnimationCel(next, frameId, musicId, { width: doc.width, height: doc.height, pixels: Uint8Array.from(doc.pixels, (value) => value + 1) });
       if (animation !== original || frameId !== originalFrame || layerId !== originalLayer) throw new TypeError('選択の対象が変わりました。');
       if (record) commitHistory(next, currentSelection);
-      else { history.reset(next); selectionPast = []; selectionFuture = []; }
+      else { history.reset(next); selectionPast = []; selectionFuture = []; historySelection = { ...currentSelection }; }
       animation = next; remember(); rebuild();
       return getAnimationCelDocument(animation, frameId, musicId);
     },
     composite(doc, changed = null) {
+      if (cacheRgba !== animationNeedsRgba(animation)) { rebuild(); changed = null; }
+      if (animationNeedsRgba(animation) || doc.palette.some(color => color.length === 9 && color.slice(7).toLowerCase() !== 'ff')) {
+        if (!rgba || rgba.length !== doc.width * doc.height * 4) { rgba = new Uint8ClampedArray(doc.width * doc.height * 4); changed = null; }
+        return composeAnimationFrameRgba(animation, frameId, { override: { layerId, document: doc }, target: rgba, ...(changed ? { changed } : {}) });
+      }
       if (musicMode && animation.layers.find((layer) => layer.id === layerId)?.role === 'music') return { ...doc, pixels: new Int16Array(doc.pixels) };
       const visible = animation.layers.find((layer) => layer.id === layerId)?.visible;
       const put = (index) => { composed[index] = above[index] >= 0 ? above[index] : visible && doc.pixels[index] >= 0 ? doc.pixels[index] : below[index]; };

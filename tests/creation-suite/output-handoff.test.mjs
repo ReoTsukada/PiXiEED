@@ -158,6 +158,20 @@ test('explicit original pixel-size choice survives output-item persistence and r
   assert.equal(sanitized.outputs[0].metadata.pixelOriginChoice, undefined, 'only the explicit original choice is accepted');
 });
 
+test('user filename provenance survives output-item persistence and reload', async () => {
+  const deps = dependencies();
+  await stageToolOutput(file(), deps);
+  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const custom = {
+    ...loaded.outputs[0], filename: 'pixieed-drawing-16x16@32x32.png',
+    metadata: { width: 16, height: 16, outputWidth: 32, outputHeight: 32, userFilename: true }
+  };
+  await saveToolOutputItems(validId, [custom], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const reloaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.equal(reloaded.outputs[0].filename, custom.filename);
+  assert.equal(reloaded.outputs[0].metadata.userFilename, true);
+});
+
 test('imported image frames, audio PCM and timeline settings survive reload without exposing payload in the URL', async () => {
   const deps = dependencies();
   const frames = [
@@ -248,13 +262,13 @@ test('PXD project backups download directly from the editor and never navigate t
   assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
   for (const [path, pattern] of [
-    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261012-animation-core-contract-1/],
-    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261012-animation-core-contract-1/],
-    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261012-animation-core-contract-1/],
-    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261012-animation-core-contract-1/],
-    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261012-animation-core-contract-1/],
-    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261012-animation-core-contract-1/],
-    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261012-animation-core-contract-1/]
+    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261016-color-capability-1/],
+    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261016-color-capability-1/],
+    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261016-color-capability-1/],
+    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261016-color-capability-1/],
+    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261016-color-capability-1/],
+    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261016-color-capability-1/],
+    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261016-color-capability-1/]
   ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), pattern, `${path} loads the direct-save PXD module revision`);
   const { OUTPUT_MIME_EXTENSIONS } = await import('../../js/creation/output-handoff.mjs');
   assert.equal(OUTPUT_MIME_EXTENSIONS['application/octet-stream'], undefined, 'PXD is not a generic shared output type');

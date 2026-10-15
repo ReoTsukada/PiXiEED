@@ -2,7 +2,8 @@ import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs';
-import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261001-free-tools-1';
+import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
@@ -385,15 +386,29 @@ function mount() {
   let hintFrame = 0; let hintTimer = 0;
   const reduceHintMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
   const stopHintMotion = () => { if (hintFrame) cancelAnimationFrame(hintFrame); hintFrame = 0; window.clearTimeout(hintTimer); hintTimer = 0; };
-  const hintController = createPuzzleHintController({ storage: null, onState: ({ pending, freeUsed }) => {
+  const hintNotice = document.createElement('span');
+  hintNotice.className = 'pixfind-hint-notice'; hintNotice.setAttribute('role', 'status'); hintNotice.setAttribute('aria-live', 'polite');
+  hintNotice.hidden = true;
+  hintNotice.style.cssText = 'display:none;margin-left:.4em;font-size:.72rem;line-height:1.2;';
+  hintButton?.after(hintNotice);
+  const hintController = createPuzzleHintController({
+    feature: 'puzzle.hint', requireReward: requireSiteReward, hasReward: hasSiteReward, isRewardPolicyEnabled: isSiteRewardPolicyEnabled, subscribeReward: subscribeSiteReward,
+    onState: ({ pending, usedCount, freeLimit, freeRemaining, rewardActive, policyEnabled }) => {
     if (!hintButton) return;
     hintButton.disabled = pending;
-    hintButton.setAttribute('aria-label', 'ヒント：未発見の場所を一時表示');
+    const allowance = !policyEnabled ? 'ヒント無制限' : freeRemaining ? `無料ヒント ${freeRemaining}回${freeLimit > 1 ? `（${usedCount}/${freeLimit}）` : ''}` : rewardActive ? `特典中：追加ヒント可${freeLimit > 1 ? `（無料${freeLimit}回使用済み）` : ''}` : `無料ヒント済み${freeLimit > 1 ? `（${freeLimit}回）` : ''}`;
+    hintNotice.textContent = allowance;
+    hintButton.setAttribute('aria-label', `ヒント：未発見の場所を一時表示。${allowance}`);
     hintButton.setAttribute('aria-busy', String(pending));
-    hintButton.dataset.used = String(freeUsed);
-    hintButton.title = '未発見の場所を一時表示（正解には数えません）';
+    hintButton.dataset.freeRemaining = String(freeRemaining);
+    hintButton.title = `未発見の場所を一時表示（正解には数えません。${allowance}）`;
   } });
-  const syncHint = () => { if (hintButton) hintButton.hidden = readOnly || !regions.length || found.size >= regions.length; };
+  const syncHint = () => {
+    const unavailable = readOnly || !regions.length || found.size >= regions.length;
+    if (hintButton) hintButton.hidden = unavailable;
+    hintNotice.hidden = unavailable;
+    hintNotice.style.display = unavailable ? 'none' : 'inline-block';
+  };
   const animateHint = () => {
     hintFrame = 0; paint();
     if (hint && performance.now() >= hint.until) { hint = null; window.clearTimeout(hintTimer); hintTimer = 0; paint(); }
@@ -461,7 +476,7 @@ function mount() {
     const hintIdentity = puzzle.localOnly || puzzle.localHiddenOnly
       ? `local:${puzzle.mode || 'puzzle'}:${String(puzzle.id || 'draft')}:${String(puzzle.hintRevision || 'revision-unknown')}`
       : `public:${puzzle.mode || 'puzzle'}:${String(puzzle.id || puzzle.slug || 'puzzle')}`;
-    hintController.setProblem(`pixfind:${hintIdentity}:run:${loadRun}`);
+    hintController.setProblem(`pixfind:${hintIdentity}`);
     selected = puzzle; found = new Set(); regions = []; cursorX = NaN; cursorY = NaN; viewport = { zoom: 1, x: 0, y: 0 }; activePointers.clear(); readOnly = false; authoritativeAnswers = false; answerInstruction = ''; primary.disabled = false; statusGame.dataset.visible = 'true'; statusGame.textContent = '絵を準備しています。';
     originalNode.hidden = false; changedNode.hidden = puzzle.mode === 'hidden-object';
     if (changedFigure) changedFigure.hidden = puzzle.mode !== 'spot-difference';

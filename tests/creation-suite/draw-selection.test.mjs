@@ -40,15 +40,15 @@ test('move, paste, and cut skip transparent holes with safe overlapping source a
 });
 test('palette capacity overflow rejects atomically, even after some colors could be added', () => {
   const source = doc([0, 1], ['#f00001', '#f00002']), clip = captureDrawSelection(source, bounds);
-  const target = doc([-1, -1], Array.from({ length: 31 }, (_, i) => `#${(i + 1).toString(16).padStart(6, '0')}`)), before = structuredClone(target);
+  const target = doc([-1, -1], Array.from({ length: 127 }, (_, i) => `#${(i + 1).toString(16).padStart(6, '0')}`)), before = structuredClone(target);
   assert.throws(() => projectDrawSelection(target, clip, { x: 0, y: 0, width: 2, height: 1 }), /パレット/);
   assert.deepEqual(target, before);
 });
-test('actual usage across other frames/layers includes transparency and cannot exceed 32 colors', () => {
+test('actual usage across other frames/layers includes transparency and cannot exceed 64 colors', () => {
   const clip = captureDrawSelection(doc([0], ['#f00001']), { x: 0, y: 0, width: 1, height: 1 });
   const target = doc([-1, -1], ['#000000']), before = structuredClone(target);
-  const otherColors = Array.from({ length: 31 }, (_, i) => `#${(i + 1).toString(16).padStart(6, '0')}`);
-  assert.throws(() => projectDrawSelection(target, clip, { x: 0, y: 0, width: 1, height: 1 }, { otherColors }), /使用色/);
+  const otherColors = Array.from({ length: 64 }, (_, i) => `#${(i + 1).toString(16).padStart(6, '0')}`);
+  assert.throws(() => projectDrawSelection(target, clip, { x: 0, y: 0, width: 1, height: 1 }, { otherColors }), /64色/);
   assert.deepEqual(target, before);
 });
 test('clipping budgets only in-bounds sampled colors; wholly outside confirm cannot delete the source', () => {
@@ -80,11 +80,11 @@ test('a 90-degree rotation has the expected exact orientation', () => {
   const source = { ...doc([0, 1, 2, -1, 1, 0]), width: 3, height: 2 }, clip = captureDrawSelection(source, { x: 0, y: 0, width: 3, height: 2 });
   assert.deepEqual([...sampleDrawSelection(clip, { width: 2, height: 3, turns: 1 })], [0, 1, 2, 2, 1, 3]);
 });
-test('clipboard validation rejects unknown versions, bad bounds, buffers, indices, masks, and alpha', () => {
+test('clipboard validation rejects unknown versions and malformed data, preserving RGBA colors', () => {
   const good = captureDrawSelection(doc(), bounds);
-  for (const changed of [{ version: 2 }, { format: 'unknown' }, { width: 257 }, { width: NaN }, { indices: new Uint8Array([2, 0]) }, { indices: [-1, 0] }, { indices: new Uint8Array(1) }, { palette: ['#ff000080'] }, { palette: ['#ff000000'] }, { palette: ['#zzz'] }, { mask: new Uint8Array([1]) }, { mask: new Uint8Array([1, 2]) }, { origin: { x: .5, y: 0 } }]) assert.throws(() => cloneDrawSelection({ ...good, ...changed }));
-  assert.throws(() => captureDrawSelection(doc([0], ['#12345680']), { x: 0, y: 0, width: 1, height: 1 }), /半透明/);
-  assert.equal(captureDrawSelection(doc([0], ['#12345600']), { x: 0, y: 0, width: 1, height: 1 }), null);
+  for (const changed of [{ version: 99 }, { format: 'unknown' }, { width: 257 }, { width: NaN }, { indices: new Uint8Array([2, 0]) }, { indices: [-1, 0] }, { indices: new Uint8Array(1) }, { palette: ['#zzz'] }, { mask: new Uint8Array([1]) }, { mask: new Uint8Array([1, 2]) }, { origin: { x: .5, y: 0 } }]) assert.throws(() => cloneDrawSelection({ ...good, ...changed }));
+  assert.deepEqual(captureDrawSelection(doc([0], ['#12345680']), { x: 0, y: 0, width: 1, height: 1 }).palette, ['#12345680']);
+  assert.deepEqual(captureDrawSelection(doc([0], ['#12345600']), { x: 0, y: 0, width: 1, height: 1 }).palette, ['#12345600']);
 });
 test('reserved zero supports 255 opaque clipboard entries without wrapping and rejects 256', () => {
   const good = captureDrawSelection(doc(), bounds), palette = Array.from({ length: 255 }, (_, i) => `#${i.toString(16).padStart(6, '0')}`);

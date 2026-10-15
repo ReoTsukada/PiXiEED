@@ -1,16 +1,17 @@
-import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport } from './audio-animation.mjs?rev=20261016-color-capability-1';
 import {
   AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, createAudioRowPitchMap, createAudioSong,
   setAudioColorInstrument, setAudioTempo, validateAudioSong
-} from './audio-core.mjs?rev=20261011-legacy-frames-1';
-import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1';
+} from './audio-core.mjs?rev=20261016-color-capability-1';
+import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { documentRgba } from './draw-core.mjs';
 import { getPxdJson, setPxdJson } from './pxd-codec.mjs';
-import { readPxdImage, readPxdSharedImage } from './pxd-project.mjs';
-import { addAnimationFrame, composeAnimationFrame, createAnimation, createAnimationFromSerialized,
-  getAnimationCelDocument, moveAnimationFrame, removeAnimationFrame, serializeAnimationPool,
-  resizeAnimation, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
+import { readPxdImage, readPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
+import { ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION,
+  ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_ENCODING, addAnimationFrame, animationNeedsRgba, composeAnimationFrame, composeAnimationFrameRgba, createAnimation, createAnimationFromSerialized,
+  getAnimationCelDocument, getAnimationDrawRewardBonusColors, moveAnimationFrame, removeAnimationFrame, serializeAnimationPool, setAnimationDrawRewardBonusColors,
+  resizeAnimation, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 
 const colorId = (color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}`;
 const clone = (value) => structuredClone(value);
@@ -19,6 +20,27 @@ export const DRAW_MUSIC_TRACK_SCHEMA_VERSION = 1;
 export function usesLegacyMusicTiming(link, song) {
   return Boolean(link?.timing?.rulesVersion === 'loop-ratio-v1') || link?.rulesVersion === 'shared-canvas-v1'
     && (link.legacyEditorRole === LEGACY_MUSIC_EDITOR_ROLE || link.ticksPerCell !== AUDIO_PIXEL_TICKS || song.loopTicks < link.width * AUDIO_PIXEL_TICKS);
+}
+
+/**
+ * Project an animation frame into the indexed image shape consumed by the
+ * audio-note projector. RGBA composition is accepted only when every visible
+ * result is exactly one existing palette color; blended colors fail closed.
+ */
+export function composeMusicProjectionFrame(animation, frameId) {
+  if (!animationNeedsRgba(animation)) return composeAnimationFrame(animation, frameId);
+  const composed = composeAnimationFrameRgba(animation, frameId);
+  const paletteIndex = new Map(animation.palette.map((color, index) => [colorId(color), index]));
+  const pixels = new Array(animation.width * animation.height).fill(-1);
+  for (let pixel = 0; pixel < pixels.length; pixel += 1) {
+    const offset = pixel * 4; const alpha = composed.rgba[offset + 3];
+    if (alpha === 0) continue;
+    const key = `rgba-${[0, 1, 2, 3].map(channel => composed.rgba[offset + channel].toString(16).padStart(2, '0')).join('')}`;
+    const index = paletteIndex.get(key);
+    if (index === undefined) failMusicTrack('DRAW_MUSIC_RGBA_PROJECTION_UNSUPPORTED', '半透明レイヤーの合成色を音楽へ損失なく投影できません。曲とPXDは変更していません。レイヤーを分けたままお使いください。');
+    pixels[pixel] = index;
+  }
+  return { schemaVersion: 1, width: animation.width, height: animation.height, palette: [...animation.palette], pixels };
 }
 
 function pitchName(midi) {
@@ -106,7 +128,19 @@ function syncMusicCanvas(state, art) {
   if (!resized && !paletteChanged) return { animation: source, resized: false, paletteChanged: false, changedColors: false };
 
   const layer = source.layers[0];
-  let animation = createAnimationFromSerialized({ schemaVersion: 1, width: art.width, height: art.height,
+  // The music page shares Draw's palette and must inherit its schema
+  // capability. A schema-1 shell made harmless edits to 33–64-color artwork
+  // look like lossy legacy conversions to the shared-audio reward guard.
+  const paletteSchema = art.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION
+    ? { schemaVersion: ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, colorCapacity: art.colorCapacity,
+      pixelEncoding: art.pixelEncoding, paletteEncoding: art.paletteEncoding, compositing: art.compositing }
+    : art.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION
+      ? { schemaVersion: ANIMATION_ALPHA_SCHEMA_VERSION, pixelEncoding: ANIMATION_PIXEL_ENCODING,
+        paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING }
+      : { schemaVersion: 1 };
+  let animation = createAnimationFromSerialized({ ...paletteSchema,
+    ...(art.drawRewardBonusColors ? { drawRewardBonusColors: art.drawRewardBonusColors } : {}),
+    width: art.width, height: art.height,
     palette: [...art.palette], frames: source.frames.map(({ id, durationMs }) => ({ id, durationMs })),
     layers: source.layers.map(item => ({ ...item })) }, []);
   for (const frame of source.frames) for (const sourceLayer of source.layers) {
@@ -140,6 +174,19 @@ function makeMusicAnimationFromImage(image, art) {
 function flattenMusicPages(source, art) {
   requireMusicCanvasMatch(art, source);
   if (source.layers.length === 1 && source.layers[0].role !== 'music') return source;
+  if (source.layers.length === 1 && source.layers[0].role === 'music') {
+    const { role: _role, ...musicPageLayer } = source.layers[0];
+    const meta = { ...source, layers: [{ ...musicPageLayer, name: 'Music page' }] };
+    let normalized = createAnimationFromSerialized(meta, []);
+    for (const frame of source.frames) {
+      const cel = getAnimationCelDocument(source, frame.id, source.layers[0].id);
+      normalized = writeAnimationCel(normalized, frame.id, normalized.layers[0].id, {
+        ...cel, palette: [...source.palette], pixels: Uint8Array.from(cel.pixels, value => value + 1)
+      });
+    }
+    return normalized;
+  }
+  if (animationNeedsRgba(source)) failMusicTrack('DRAW_MUSIC_RGBA_FLATTEN_UNSUPPORTED', '透明度を含む複数レイヤーの楽曲ページは1枚に統合できません。原本のページと曲は保持しています。');
   const ids = new Set(source.layers.map(({ id }) => id));
   let layerId = 'music-page-layer'; let suffix = 1;
   while (ids.has(layerId)) layerId = `music-page-layer-${suffix++}`;
@@ -290,7 +337,7 @@ function projectTimeline(state, animation, { link: overrideLink = null, song: ov
   song = retainActiveColorOverrides(inherited.song, animation, inherited.transferred);
   const filledMapping = paletteMapping(song, animation, inherited.mapping);
   if (state.link?.rulesVersion === 'shared-canvas-v1' && usesLegacyMusicTiming(state.link, state.song) && animation.frames.length === 1) {
-    const doc = composeAnimationFrame(animation, animation.frames[0].id);
+    const doc = composeMusicProjectionFrame(animation, animation.frames[0].id);
     const image = { width: doc.width, height: doc.height,
       rgba: new Uint8Array(documentRgba({ ...doc, pixels: Array.from(doc.pixels) })) };
     const link = { ...state.link, imageRole: 'audio', width: animation.width, height: animation.height,
@@ -308,7 +355,7 @@ function projectTimeline(state, animation, { link: overrideLink = null, song: ov
     frameRowPitchMaps: priorLink.frameRowPitchMaps,
     frameCellPitchMaps: priorLink.frameCellPitchMaps,
     colorToSlot: priorLink.colorToSlot,
-    composeFrame: composeAnimationFrame, timing
+    composeFrame: composeMusicProjectionFrame, timing
   });
   return { ...state, song: projection.song, link: projection.link, animation,
     timelineSignature: timelineSignature(animation), projected: true };
@@ -365,6 +412,13 @@ export async function createDrawMusicTrackState(project, artAnimation) {
   musicAnimation ||= createAnimation({ width: artAnimation.width, height: artAnimation.height, palette: [...artAnimation.palette] });
   requireMusicCanvasMatch(artAnimation, musicAnimation);
   if (musicAnimation.layers.length !== 1 || musicAnimation.layers[0].role === 'music') musicAnimation = flattenMusicPages(musicAnimation, artAnimation);
+  // Music pages and Draw use the same RGBA ownership partition. Seed legacy
+  // page snapshots from the shared timeline/link once so an expired free
+  // palette edit is not mistaken for a ledger change in the music projection.
+  const drawBonusColors = getAnimationDrawRewardBonusColors(artAnimation) ?? originalLink?.drawRewardBonusColors;
+  if (drawBonusColors && getAnimationDrawRewardBonusColors(musicAnimation) === null) {
+    setAnimationDrawRewardBonusColors(musicAnimation, drawBonusColors);
+  }
 
   if (originalLink?.musicTrack) {
     if (originalLink.musicTrack.schemaVersion !== DRAW_MUSIC_TRACK_SCHEMA_VERSION
@@ -428,7 +482,20 @@ export function projectDrawMusic(state, animation) {
   validateAnimation(animation);
   if (state?.musicTrackMode) {
     const roleLayer = musicLayer(animation);
-    if (!roleLayer || roleLayer.id !== state.musicLayerId) failMusicTrack('DRAW_MUSIC_TRACK_BINDING_INVALID', 'Draw音楽レイヤーが変更されました。PXDは変更していません。');
+    if (!roleLayer) failMusicTrack('DRAW_MUSIC_TRACK_BINDING_INVALID', 'Draw音楽レイヤーが変更されました。PXDは変更していません。');
+    if (roleLayer.id !== state.musicLayerId) {
+      // Image import creates a fresh timeline, including a fresh reserved
+      // music layer. Rebind an empty music canvas instead of leaving the old
+      // layer ID in a permanently read-only model. A nonempty music page must
+      // keep its original binding/data until it can be migrated losslessly.
+      const replacesTimeline = !animation.frames.some(frame => state.animation.frames.some(old => old.id === frame.id))
+        && !animation.layers.some(layer => state.animation.layers.some(old => old.id === layer.id));
+      const emptyPages = state.musicAnimation?.frames.every(frame => state.musicAnimation.layers.every(layer =>
+        getAnimationCelDocument(state.musicAnimation, frame.id, layer.id).pixels.every(index => index < 0)));
+      if (!replacesTimeline || !emptyPages) failMusicTrack('DRAW_MUSIC_TRACK_BINDING_INVALID', 'Draw音楽レイヤーが変更されました。PXDは変更していません。');
+      state = { ...state, musicLayerId: roleLayer.id,
+        link: bindMusicTrack(state.link, roleLayer.id, state.musicPageId) };
+    }
     const synchronized = syncMusicCanvas(state, animation);
     let musicAnimation = synchronized.animation;
     const colorToSlot = { ...(state.link?.colorToSlot || {}) };

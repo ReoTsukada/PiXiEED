@@ -1,11 +1,22 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261012-animation-core-contract-1';
+import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261016-color-capability-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261012-animation-core-contract-1';
+import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-color-capability-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';
+import { animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 
 /** One shell, project, palette and history. Mode changes never copy artwork. */
+export function assertCreationModeCompatible(next, animation) {
+  if (next !== 'audio' || !animationNeedsRgba(animation)) return true;
+  const hasVisibleArt = animation.frames.some((frame) => animation.layers.some((layer) =>
+    layer.role !== 'music' && layer.visible && layer.opacity !== 0 && hasAnimationCelContent(animation, frame.id, layer.id)));
+  if (!hasVisibleArt) return true;
+  const error = new TypeError('半透明色またはレイヤー不透明度を含む絵は、音楽への投影に対応していません。モードを切り替えず、絵・音楽・編集履歴は保持しました。');
+  error.code = 'audio-animation-alpha-unsupported';
+  throw error;
+}
+
 export async function mountCreationModes({ draw, scope }) {
   const body = document.body, main = document.querySelector('#main'), board = main.querySelector('.draw-board'), dock = main.querySelector('.draw-control-dock'), nav = document.querySelector('.app-tabs');
   const startupMode = document.documentElement.dataset.creationStartup === 'camera' ? 'camera' : null;
@@ -300,7 +311,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261015-embed-native-save-1&attempt=${version}`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261016-color-capability-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }
@@ -330,6 +341,9 @@ export async function mountCreationModes({ draw, scope }) {
     try {
       while (!scope.disposed && requestedMode !== mode) {
         const version = requestVersion, next = requestedMode, previous = mode;
+        // Check the receiver before suspending a capture session or saving a
+        // project, so an unsupported projection leaves the current mode intact.
+        assertCreationModeCompatible(next, draw.getTimeline());
         stopCurrent();
         switching = true; main.inert = true; body.dataset.creationTransition = 'true';
         menu.setAttribute('aria-busy', 'true'); errorNode.textContent = ''; settings.close();

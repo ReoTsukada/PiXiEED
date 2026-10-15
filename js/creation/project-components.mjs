@@ -1,8 +1,8 @@
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
-import { imageToDrawDocument, putPxdDrawDocument, putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { imageToDrawDocument, putPxdDrawDocument, putPxdImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
-import { cloneAnimation, composeAnimationFrame } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
+import { animationNeedsRgba, cloneAnimation, composeAnimationFrame, composeAnimationFrameRgba } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 export const COMPONENTS = Object.freeze([
   { tool: 'draw', label: '絵', role: 'main' },
@@ -38,11 +38,11 @@ export async function freezeProjectComponents(project, { resolveSourceImage } = 
   });
   let next = project;
   if (COMPONENTS.some(part => part.tool !== 'audio' && part.path && has(next, part.path))) {
-    const { freezePxdPuzzleImages } = await import('./pxd-puzzles.mjs?rev=20261001-free-tools-1');
+    const { freezePxdPuzzleImages } = await import('./pxd-puzzles.mjs?rev=20261016-color-capability-1');
     next = await freezePxdPuzzleImages(next, { resolveSourceImage: resolve });
   }
   if (!has(next, 'audio/state.json')) { readPxdAudioLink(next); return next; }
-  const { detachPxdAudioImage } = await import('./pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1');
+  const { detachPxdAudioImage } = await import('./pxd-draw-audio.mjs?rev=20261016-color-capability-1');
   return detachPxdAudioImage(next);
 }
 
@@ -51,17 +51,25 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   if (!hasProjectComponent(project, tool) || tool === 'draw') throw new Error('先に曲やパズルを作ってください。');
   let next = await freezeProjectComponents(project);
   if (tool === 'audio') {
-    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1'), import('./audio-animation.mjs?rev=20261012-animation-core-contract-1')]);
+    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }, { composeMusicProjectionFrame }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261016-color-capability-1'), import('./audio-animation.mjs?rev=20261016-color-capability-1'), import('./draw-music-core.mjs?rev=20261016-color-capability-1')]);
     const song = readPxdAudioState(next); const link = readPxdAudioLink(next);
     const animation = await readPxdAnimation(next, componentImageRole(next, 'draw'));
     if (animation) {
       const copy = cloneAnimation(animation);
       const plan = prepareAudioAnimationImport(song, copy, { colorToSlot: link?.colorToSlot || null,
         rowPitchMap: link?.rowPitchMap?.length === copy.height ? link.rowPitchMap : null,
+        composeFrame: composeMusicProjectionFrame,
         timing: link?.timing || null });
+      const alphaPoster = animationNeedsRgba(copy)
+        ? composeAnimationFrameRgba(copy, copy.frames[0].id)
+        : null;
       next = await writePxdAudioState(next, plan.song, { image, link: plan.link, animation: copy });
       next = await writePxdAnimation(next, copy, { role: 'audio', posterFrameId: copy.frames[0].id });
-      return putPxdDrawDocument(next, composeAnimationFrame(copy, copy.frames[0].id), 'audio');
+      if (!alphaPoster) return putPxdDrawDocument(next, composeAnimationFrame(copy, copy.frames[0].id), 'audio');
+      // The audio animation is authoritative; its poster is a derived RGBA image.
+      // Remove its stale indexed Draw sidecar before writing the exact composite.
+      next = { ...next, entries: next.entries.filter(entry => entry.path !== 'images/audio/draw.json') };
+      return putPxdImage(next, { width: alphaPoster.width, height: alphaPoster.height, rgba: new Uint8Array(alphaPoster.rgba) }, 'audio');
     }
     const options = { colorToSlot: link?.colorToSlot || null };
     if (link?.rowPitchMap?.length === image.height) options.rowPitchMap = link.rowPitchMap;
@@ -71,7 +79,7 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   // Build against a temporary source; the drawing itself is never replaced here.
   const temporary = await putPxdSharedImage(next, image);
   const draftStore = store || createLocalDraftStore(createIndexedDbDraftAdapter());
-  const { createPxdPuzzleFromMain, writePxdPuzzle } = await import('./pxd-puzzles.mjs?rev=20261001-free-tools-1');
+  const { createPxdPuzzleFromMain, writePxdPuzzle } = await import('./pxd-puzzles.mjs?rev=20261016-color-capability-1');
   const imported = await createPxdPuzzleFromMain(temporary, { tool, store: draftStore, preferredRole: 'main' });
   const sources = tool === 'spot_difference'
     ? { 'spot-before': imported.bindings.before.drawDocument, 'spot-after': imported.bindings.after.drawDocument }

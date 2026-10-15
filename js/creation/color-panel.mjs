@@ -1,12 +1,19 @@
 import { hexToHsl, hslToHex } from './color-utils.mjs?rev=20261004-symmetry-color-panel-1';
 
 const QUICK_COLORS = ['#17232d', '#ffffff', '#ff4d4d', '#ff9f1c', '#ffe14d', '#7ed957', '#2ec4b6', '#3a86ff', '#8338ec', '#ff6fb5', '#a0522d', '#ffd8b1'];
-const COLOR = /^#[\da-f]{6}$/i;
+const COLOR_RGB = /^#[\da-f]{6}$/i;
+const COLOR_RGBA = /^#[\da-f]{8}$/i;
 
-function validColor(value) {
+function validColor(value, allowAlpha = false) {
   const normalized = String(value ?? '').trim().toLowerCase();
-  return COLOR.test(normalized) ? normalized : null;
+  if (COLOR_RGB.test(normalized)) return allowAlpha ? `${normalized}ff` : normalized;
+  if (allowAlpha && COLOR_RGBA.test(normalized)) return normalized;
+  return null;
 }
+
+const rgbOf = color => color.slice(0, 7);
+const alphaOf = color => Number.parseInt(color.slice(7, 9), 16);
+const withAlpha = (rgb, alpha, allowAlpha) => allowAlpha ? `${rgbOf(rgb)}${Math.max(0, Math.min(255, Math.round(alpha))).toString(16).padStart(2, '0')}` : rgbOf(rgb);
 
 function asElement(anchor) {
   if (anchor instanceof Element) return anchor;
@@ -19,7 +26,7 @@ function anchorRect(anchor) {
   return null;
 }
 
-export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'draw-color-editor', inputIds = { h: 'dce-h', s: 'dce-s', l: 'dce-l' }, viewTabs = null } = {}) {
+export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'draw-color-editor', inputIds = { h: 'dce-h', s: 'dce-s', l: 'dce-l' }, viewTabs = null, allowAlpha = false } = {}) {
   if (!scope?.listen || !scope?.add || typeof scope.disposed !== 'boolean') throw new TypeError('Color panel requires a lifecycle scope');
   if (typeof getAnchor !== 'function' || typeof onChange !== 'function') throw new TypeError('Color panel requires getAnchor and onChange callbacks');
   const controller = new AbortController();
@@ -27,7 +34,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     if (!target || disposed) return;
     target.addEventListener(type, callback, { ...options, signal: controller.signal });
   };
-  let open = false; let disposed = false; let color = '#ffffff'; let resetColor = null; let hsl = { h: 0, s: 0, l: 100 };
+  let open = false; let disposed = false; let color = allowAlpha ? '#ffffffff' : '#ffffff'; let resetColor = null; let hsl = { h: 0, s: 0, l: 100 };
   const element = document.createElement('section');
   element.id = id; element.className = 'draw-color-editor creation-color-panel';
   element.setAttribute('role', 'dialog'); element.setAttribute('aria-modal', 'false'); element.setAttribute('aria-label', '色を調整');
@@ -43,6 +50,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
       <label class="dce-slider dce-hue" for="${inputIds.h}"><span class="dce-slider-label">色み <output data-dce-value="h">0°</output></span><input id="${inputIds.h}" data-dce-axis="h" type="range" min="0" max="359" step="1" value="0"></label>
       <label class="dce-slider dce-sat" for="${inputIds.s}"><span class="dce-slider-label">あざやか <output data-dce-value="s">0%</output></span><input id="${inputIds.s}" data-dce-axis="s" type="range" min="0" max="100" step="1" value="0"></label>
       <label class="dce-slider dce-light" for="${inputIds.l}"><span class="dce-slider-label">明るさ <output data-dce-value="l">100%</output></span><input id="${inputIds.l}" data-dce-axis="l" type="range" min="0" max="100" step="1" value="100"></label>
+      ${allowAlpha ? '<label class="dce-slider dce-alpha" for="dce-a"><span class="dce-slider-label">不透明度 <output data-dce-value="a">255</output></span><input id="dce-a" data-dce-axis="a" type="range" min="0" max="255" step="1" value="255"></label>' : ''}
     </div>
     <footer class="dce-actions"><button id="dce-reset" class="dce-reset" type="button">元に戻す</button><button id="dce-done" class="dce-done" type="button">完了</button></footer>`;
   let activeView = typeof viewTabs?.active === 'string' ? viewTabs.active : viewTabs?.items?.[0]?.id;
@@ -83,11 +91,16 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     valueOutput('h').value = valueOutput('h').textContent = `${hsl.h}°`;
     valueOutput('s').value = valueOutput('s').textContent = `${hsl.s}%`;
     valueOutput('l').value = valueOutput('l').textContent = `${hsl.l}%`;
+    if (allowAlpha) {
+      input('a').value = String(alphaOf(color));
+      valueOutput('a').value = valueOutput('a').textContent = String(alphaOf(color));
+    }
     element.style.setProperty('--h', String(hsl.h)); element.style.setProperty('--s', `${hsl.s}%`); element.style.setProperty('--l', `${hsl.l}%`);
+    if (allowAlpha) element.style.setProperty('--alpha-preview', rgbOf(color));
     before.style.backgroundColor = element.dataset.beforeColor || color;
     after.style.backgroundColor = color;
     after.setAttribute('aria-label', `変更後の色 ${color}`);
-    for (const button of quickHost.children) button.setAttribute('aria-pressed', String(button.dataset.color === color));
+    for (const button of quickHost.children) button.setAttribute('aria-pressed', String(button.dataset.color === rgbOf(color)));
   }
 
   function position() {
@@ -121,11 +134,12 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
   }
 
   function applyColor(nextColor, fallbackHue = hsl.h, requestedHsl = null) {
-    const requested = validColor(nextColor); if (!requested) return false;
+    if (allowAlpha && COLOR_RGB.test(String(nextColor ?? '').trim())) nextColor = `${String(nextColor).trim().toLowerCase()}${alphaOf(color).toString(16).padStart(2, '0')}`;
+    const requested = validColor(nextColor, allowAlpha); if (!requested) return false;
     let accepted;
     try { accepted = onChange(requested); } catch { accepted = false; }
     if (accepted === false) { sync(); return false; }
-    const resolved = validColor(typeof accepted === 'string' ? accepted : requested);
+    const resolved = validColor(typeof accepted === 'string' ? accepted : requested, allowAlpha);
     if (!resolved) { sync(); return false; }
     color = resolved;
     hsl = requestedHsl && resolved === requested
@@ -143,9 +157,9 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
 
   function openPanel({ color: initialColor, resetColor: initialResetColor = null } = {}) {
     if (disposed) return;
-    const normalized = validColor(initialColor); if (!normalized) throw new TypeError('Color panel needs a #RRGGBB color');
-    color = normalized; resetColor = validColor(initialResetColor);
-    hsl = hexToHsl(color, hsl.h); element.dataset.beforeColor = color;
+    const normalized = validColor(initialColor, allowAlpha); if (!normalized) throw new TypeError(`Color panel needs a ${allowAlpha ? '#RRGGBB or #RRGGBBAA' : '#RRGGBB'} color`);
+    color = normalized; resetColor = validColor(initialResetColor, allowAlpha);
+    hsl = hexToHsl(rgbOf(color), hsl.h); element.dataset.beforeColor = color;
     if (viewTabsHost) {
       activeView = typeof viewTabs?.active === 'string' ? viewTabs.active : viewTabs?.items?.[0]?.id;
       for (const tab of viewTabsHost.querySelectorAll('button[data-dce-view]')) tab.setAttribute('aria-pressed', String(tab.dataset.dceView === activeView));
@@ -156,8 +170,9 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
   }
 
   function setColor(hex) {
-    const normalized = validColor(hex); if (!normalized) return false;
-    color = normalized; hsl = hexToHsl(color, hsl.h); sync(); position();
+    if (allowAlpha && COLOR_RGB.test(String(hex ?? '').trim())) hex = `${String(hex).trim().toLowerCase()}${alphaOf(color).toString(16).padStart(2, '0')}`;
+    const normalized = validColor(hex, allowAlpha); if (!normalized) return false;
+    color = normalized; hsl = hexToHsl(rgbOf(color), hsl.h); sync(); position();
     return color;
   }
 
@@ -169,10 +184,11 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
   for (const axis of ['h', 's', 'l']) {
     listen(input(axis), 'input', () => {
       const requestedH = Number(input('h').value); const requestedS = Number(input('s').value); const requestedL = Number(input('l').value);
-      const next = hslToHex(requestedH, requestedS, requestedL);
+      const next = withAlpha(hslToHex(requestedH, requestedS, requestedL), allowAlpha ? alphaOf(color) : 255, allowAlpha);
       applyColor(next, requestedH, { h: requestedH, s: requestedS, l: requestedL });
     });
   }
+  if (allowAlpha) listen(input('a'), 'input', () => applyColor(withAlpha(color, Number(input('a').value), true)));
   listen(quickHost, 'click', (event) => {
     const button = event.target.closest('button[data-color]'); if (button) applyColor(button.dataset.color);
   });

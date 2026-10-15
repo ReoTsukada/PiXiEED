@@ -13,7 +13,14 @@ const cameraPlacementTargets = new Set([
  'js/creation/draw-entry.mjs','js/creation/draw-page.mjs',
  'js/pixel-lens/app.mjs','js/pixel-lens/entry.mjs'
 ]);
-const expectedRevision = target => cameraPlacementTargets.has(target) ? cameraPlacementRevision : operationBarRevision;
+const currentRgbaTargets = new Set([
+ 'js/creation/creation-modes.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs',
+ 'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs', 'js/creation/jigsaw-page.mjs',
+ 'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs',
+ 'js/creation/creation-camera.mjs', 'js/creation/camera-placement-preview.mjs', 'js/creation/pixfind-play.mjs'
+]);
+const expectedRevision = target => currentRgbaTargets.has(target) ? '20261016-color-capability-1'
+ : cameraPlacementTargets.has(target) ? cameraPlacementRevision : operationBarRevision;
 const leaves = [
  'js/creation/creation-modes.mjs','css/creation-modes.css','js/tool-result-view.mjs',
  'js/creation/draw-selection-panel.mjs','css/draw-selection-features.css','css/draw-compact-controls.css',
@@ -55,9 +62,13 @@ test('operation bar revisions propagate through runtime parents and every public
  assert.ok(matchedEntries>=6,'public preload/entry references are present');
 });
 
-test('operation bar release preserves the canonical animation implementation',async()=>{
+test('legacy animation implementation stays frozen while current facades share the reward-capable RGBA core',async()=>{
  const facade=await readFile(new URL('js/creation/animation-core.mjs',root),'utf8');
- assert.equal(facade.trim(),"export * from './animation-core-v20261012.mjs';");
+ assert.equal(facade.trim(),"export * from './animation-core-v20261016-color64.mjs';");
+ const current = await import('../../js/creation/animation-core.mjs');
+ const alpha = await import('../../js/creation/animation-core-v20261015-alpha.mjs');
+ assert.equal(typeof current.createAnimation, 'function');
+ assert.equal(current.createAnimation, alpha.createAnimation, 'all facades share the same current implementation');
  const bytes=await readFile(new URL('js/creation/animation-core-v20261012.mjs',root));
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'2a1e6158233a0ab2539dc8de132d5112e179e84aba4fc18eb21a8bf6484d14d3');
 });

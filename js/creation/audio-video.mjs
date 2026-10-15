@@ -1,4 +1,4 @@
-import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261005-audio-noise-1';
+import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { getAudioInstrument } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { createMusicVideoTimingPlan, sampleMusicVideoFrame } from './music-video-timing.mjs';
 

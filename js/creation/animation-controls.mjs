@@ -537,18 +537,31 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         const lock = button('', '', 'lock'); lock.dataset.layerId = id;
         const up = button('レイヤーを上へ', '↑', 'move-layer-up'); up.dataset.layerId = id;
         const down = button('レイヤーを下へ', '↓', 'move-layer-down'); down.dataset.layerId = id;
+        const opacityLabel = node('label', 'animation-controls__layer-opacity'); opacityLabel.dataset.layerOpacityFor = id;
+        const opacityText = node('span', '', '不透明度（全コマ共通）');
+        const opacityValue = node('output', 'animation-controls__layer-opacity-value', '100%');
+        const opacity = node('input', 'animation-controls__layer-opacity-input'); opacity.type = 'range'; opacity.min = '0'; opacity.max = '1'; opacity.step = '0.01'; opacity.dataset.layerOpacity = id;
+        opacity.setAttribute('aria-label', `${layerLabel}の不透明度（全コマ共通）`);
+        opacityLabel.append(opacityText, opacity, opacityValue);
         const remove = button('レイヤーを削除', '×', 'delete-layer'); remove.dataset.layerId = id;
-        row.append(select, rename, eye, lock, up, down, remove);
+        row.append(select, rename, opacityLabel, eye, lock, up, down, remove);
       } else old.delete(id);
-      const [select, rename, eye, lock, up, down, remove] = row.children;
+      const [select, rename, opacityLabel, eye, lock, up, down, remove] = row.children;
+      const opacity = opacityLabel.querySelector('[data-layer-opacity]');
       setClass(row, 'is-selected', layer.id === state.layerId);
       setText(select, layerLabel); setAttr(select, 'aria-label', layerLabel); setAttr(select, 'aria-pressed', layer.id === state.layerId); setData(select, 'layerId', id);
       const name = String(layer.name || ''); if (rename.value !== name && document.activeElement !== rename) rename.value = name;
       setAttr(rename, 'aria-label', `${layerLabel}の名前`); setData(rename, 'renameLayer', id);
+      setText(opacityLabel.children[0], '不透明度（全コマ共通）');
+      setAttr(opacity, 'aria-label', `${layerLabel}の不透明度（全コマ共通）`);
+      const layerOpacity = Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1;
+      if (document.activeElement !== opacity) opacity.value = String(layerOpacity);
+      setText(opacityLabel.children[2], `${Math.round(layerOpacity * 100)}%`);
       const eyeLabel = layer.visible === false ? 'レイヤーを表示' : 'レイヤーを隠す'; setAttr(eye, 'aria-label', eyeLabel); setText(eye, layer.visible === false ? '○' : '◉'); setAttr(eye, 'aria-pressed', layer.visible !== false);
       const lockLabel = layer.locked ? 'レイヤーのロックを解除' : 'レイヤーをロック'; setAttr(lock, 'aria-label', lockLabel); const lockIcon = layer.locked ? 'locked' : 'unlocked'; if (lock.dataset.iconName !== lockIcon) { replaceButtonIcon(lock, lockIcon); lock.dataset.iconName = lockIcon; } setAttr(lock, 'aria-pressed', Boolean(layer.locked));
       const disabled = Boolean(state.readOnly) || pending > 0;
       setBoolean(rename, 'disabled', disabled || musicLayer || Boolean(layer.locked));
+      setBoolean(opacity, 'disabled', disabled || musicLayer || Boolean(layer.locked));
       setBoolean(eye, 'disabled', disabled); setBoolean(lock, 'disabled', disabled);
       setBoolean(up, 'disabled', disabled || Boolean(layer.locked) || modelIndex === state.layers.length - 1 || musicLayer);
       setBoolean(down, 'disabled', disabled || Boolean(layer.locked) || modelIndex === (hasMusicLayer ? 1 : 0) || musicLayer);
@@ -782,6 +795,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const lock = add(layer.locked ? 'ロック解除' : 'ロック', '', 'lock', state.readOnly || pending > 0);
       replaceButtonIcon(lock, layer.locked ? 'unlocked' : 'locked');
       lock.append(node('span', 'animation-controls__context-label', layer.locked ? 'ロック解除' : 'ロック'));
+      const opacityLabel = node('label', 'animation-controls__context-opacity');
+      const opacityHeading = node('span', 'animation-controls__context-opacity-heading', '不透明度（全コマ共通）');
+      const opacityValue = node('output', 'animation-controls__layer-opacity-value', `${Math.round((Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1) * 100)}%`);
+      const opacity = node('input', 'animation-controls__layer-opacity-input'); opacity.type = 'range'; opacity.min = '0'; opacity.max = '1'; opacity.step = '0.01'; opacity.value = String(Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1);
+      opacity.dataset.layerOpacity = String(layer.id); opacity.setAttribute('aria-label', `${layer.name || 'レイヤー'}の不透明度（全コマ共通）`);
+      opacity.disabled = musicLayer || state.readOnly || pending > 0 || Boolean(layer.locked);
+      opacityLabel.append(opacityHeading, opacityValue, opacity); frameMenu.append(opacityLabel);
       const rename = node('input', 'animation-controls__context-rename'); rename.type = 'text'; rename.value = String(layer.name || ''); rename.maxLength = 80;
       rename.dataset.contextRename = String(layer.id); rename.setAttribute('aria-label', 'レイヤー名'); rename.disabled = musicLayer || state.readOnly || pending > 0 || Boolean(layer.locked); rename.placeholder = 'レイヤー名'; frameMenu.append(rename);
       add('名前を適用', '✓', 'rename', rename.disabled);
@@ -890,6 +910,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
 
   function onChange(event) {
     const target = event.target;
+    if (target.matches('[data-layer-opacity]')) {
+      const layerId = target.dataset.layerOpacity;
+      const state = stateNow(); const layer = state.layers.find(item => String(item.id) === String(layerId));
+      if (!layer || layer.role === 'music' || layer.locked || state.readOnly || pending > 0) { refresh(); return; }
+      const value = Number(target.value);
+      if (Number.isFinite(value)) dispatch({ type: 'layer-opacity', layerId: layer.id, opacity: Math.max(0, Math.min(1, value)) });
+      else refresh();
+      return;
+    }
     if (target.matches('[data-fps-preset]')) {
       const fps = Number(target.value);
       target.value = '';
@@ -897,6 +926,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       return;
     }
     if (target.matches('[data-duration-input]')) applyFrameFps(target, Number(target.value));
+  }
+
+  function onInput(event) {
+    const target = event.target;
+    if (!target.matches('[data-layer-opacity]')) return;
+    const output = target.closest('label')?.querySelector('output');
+    if (output) output.textContent = `${Math.round(Math.max(0, Math.min(1, Number(target.value) || 0)) * 100)}%`;
   }
 
   function onBlur(event) {
@@ -1030,11 +1066,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   createDom();
   listen(root, 'click', onClick);
   listen(root, 'change', onChange);
+  listen(root, 'input', onInput);
   listen(root, 'focusout', onBlur);
   listen(root, 'keydown', onKeydown);
   if (workspacePanel) {
     listen(workspacePanel, 'click', onClick);
     listen(workspacePanel, 'change', onChange);
+    listen(workspacePanel, 'input', onInput);
     listen(workspacePanel, 'focusout', onBlur);
     listen(workspacePanel, 'keydown', onKeydown);
     listen(workspacePanel, 'contextmenu', onContextMenu);
@@ -1061,7 +1099,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   }
   for (const portal of [frameMenu, layers, timing]) listen(portal, 'click', onClick);
   for (const portal of [frameMenu, layers, timing]) listen(portal, 'keydown', onKeydown);
+  listen(frameMenu, 'change', onChange);
+  listen(frameMenu, 'input', onInput);
   listen(layers, 'focusout', onBlur);
+  listen(layers, 'change', onChange);
   listen(timing, 'change', onChange);
   const api = {
     refresh,

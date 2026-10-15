@@ -19,7 +19,7 @@ const paths = [
   '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/', '/output/', '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 ];
 const manualPages = ['/', '/tools/', '/about/', '/guide/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
-const offerwallPage = '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const autoAdsPage = '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const sourcePrefix = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
 let checks = 0;
 try {
@@ -46,19 +46,19 @@ try {
     requests = []; rewardedRequests = [];
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(150);
-    const isOfferwallPage = path === offerwallPage;
-    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), isOfferwallPage ? 1 : 0, `${path}: only the output workspace loads the existing AdSense entrypoint`);
-    if (!manualPages.includes(path) && !isOfferwallPage) {
+    const isAutoAdsPage = path === autoAdsPage;
+    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), isAutoAdsPage ? 1 : 0, `${path}: only the output workspace loads the existing AdSense entrypoint`);
+    if (!manualPages.includes(path) && !isAutoAdsPage) {
       assert.equal(await page.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: no loader without a result or manual placement`);
       assert.equal(requests.length, 0, `${path}: no provider request without a placement`);
     }
-    if (isOfferwallPage) {
+    if (isAutoAdsPage) {
       assert.equal(requests.length, 1, 'the private output workspace uses the existing provider script once');
       assert.deepEqual(await page.evaluate(() => {
         let args;
         window.googlefc?.controlledMessagingFunction?.({ proceed: (...values) => { args = values; } });
         return args;
-      }), [true], 'the exact output workspace pathname permits Offerwall policy');
+      }), [false, [3]], 'the output workspace suppresses only Offerwall and preserves other messaging');
     } else if (path !== '/output/' && await page.evaluate(() => typeof window.googlefc?.controlledMessagingFunction === 'function')) {
       assert.deepEqual(await page.evaluate(() => {
         let args;

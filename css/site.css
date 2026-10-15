@@ -235,6 +235,9 @@ body.app-page--tool-globe .map-hero--field .map-hero__inner {
 body.app-page--tool-globe .map-hero--field .map-hero__inner { padding: 0; contain: paint; isolation: isolate; }
 body.app-page--tool-globe .site-footer { display: none; }
 .stores-globe { height: min(70svh, 46rem); min-height: 28rem; background: #02050a; }
+.stores-directory-intro { padding: .8rem 0 .6rem; }
+.stores-directory-intro h1 { margin: 0 0 .25rem; font-size: clamp(1.4rem, 3.5vw, 2rem); line-height: 1.2; }
+.stores-directory-intro p { margin: 0; color: var(--ink-soft); font-size: .85rem; line-height: 1.5; }
 .map-explorer--field { min-height: calc(100svh - var(--header-h)); }
 .map-explorer--field .map-surface { min-height: calc(100svh - var(--header-h)); border-radius: 0; box-shadow: none; }
 /* ホームは地図を主役にし、固定ナビの下に凡例が隠れないようにする。 */
@@ -593,6 +596,7 @@ body.home-play .hp-chip.is-open { color: #b53e33; }
 .store-location__copy h2 { margin-bottom: .7rem; font-size: clamp(2rem, 4vw, 3.2rem); }
 .store-location__copy p { color: var(--ink-soft); line-height: 1.8; }
 .store-location__copy .text-link { align-self: start; margin-top: .8rem; }
+.store-pending-note { margin: 1rem 0 0; padding: .8rem 1rem; border-left: 2px solid var(--yellow); color: var(--ink-soft); font-size: .9rem; line-height: 1.6; }
 
 /* Collection */
 .collection-head { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 2rem; margin-bottom: 2rem; }

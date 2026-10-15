@@ -13,6 +13,9 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
   const entries = {
     'index.html': '<h1>site</h1>', 'assets/test.bin': 'asset', 'js/site.mjs': 'export const ready = true;', 'data/site-config.js': 'export const publicConfig = true;',
     'supabase/private.sql': 'private', 'tests/fixture.html': 'fixture', 'docs/notes.html': 'notes',
+    'admanager-rewarded-test/index.html': '<h1>LOCAL MOCK ONLY</h1>',
+    'admanager-rewarded-test/mock-adapter.mjs': 'export const mockGrant = true;',
+    'admanager-rewarded-test/page.mjs': 'export const localTestPage = true;',
     'books/index.html': '<h1>catalog</h1>', 'books/room-preview.html': '<meta name="robots" content="noindex,follow">',
     'assets/books/room-products.json': '[{"id":"drawn-thumbnail","shopThumbnail":{"src":"/assets/books/thumb.png","width":32,"height":32}}]', 'assets/books/room-commerce.json': '{"associateName":"PiXiEED","enrollmentConfirmed":true}',
     'assets/books/thumb.png': 'registered thumbnail', 'assets/books/unregistered.png': 'private draft',
@@ -45,7 +48,7 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
   assert.equal(await readFile(join(result.output, 'stores/cafe-hoshi.html'), 'utf8'), '<h1>legacy store</h1>');
   assert.equal(await readFile(join(result.output, page, 'index.html'), 'utf8'), '<meta property="og:image">');
   assert.equal(await readFile(join(result.output, legacyPage, 'index.html'), 'utf8'), '<meta property="og:image">');
-  for (const path of ['supabase/private.sql', 'tests/fixture.html', 'docs/notes.html', 'experiment.html', 'books/room-preview.html', 'assets/books/room-scene.json', 'css/books-room.css', 'js/books-room.mjs', 'shops/index.html']) await assert.rejects(readFile(join(result.output, path)), { code: 'ENOENT' });
+  for (const path of ['admanager-rewarded-test/index.html', 'admanager-rewarded-test/mock-adapter.mjs', 'admanager-rewarded-test/page.mjs', 'supabase/private.sql', 'tests/fixture.html', 'docs/notes.html', 'experiment.html', 'books/room-preview.html', 'assets/books/room-scene.json', 'css/books-room.css', 'js/books-room.mjs', 'shops/index.html']) await assert.rejects(readFile(join(result.output, path)), { code: 'ENOENT' });
   await writeFile(join(root, page, 'answers.json'), 'must not leak');
   await assert.rejects(buildPagesSite({ root, output: join(scratch, 'bad-site') }), /Unexpected generated puzzle file/);
   await rm(join(root, page, 'answers.json'));

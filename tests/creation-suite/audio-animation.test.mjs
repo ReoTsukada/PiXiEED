@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addAnimationFrame, addAnimationLayer, composeAnimationFrame, createAnimation, createAnimationFromSerialized, moveAnimationFrame, removeAnimationFrame, writeAnimationCel } from '../../js/creation/animation-core.mjs';
-import { AUDIO_BAR_TICKS, AUDIO_MAX_LOOP_TICKS, AUDIO_PIXEL_TICKS, collectAudioEvents, createAudioSong, extendAudioLoopForImage, setAudioPixel } from '../../js/creation/audio-core.mjs';
-import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from '../../js/creation/audio-animation.mjs';
+import { addAnimationFrame, addAnimationLayer, composeAnimationFrame, createAnimation, createAnimationFromSerialized, getAnimationCelDocument, getAnimationDrawRewardBonusColors, moveAnimationFrame, removeAnimationFrame, setAnimationPalette, writeAnimationCel } from '../../js/creation/animation-core.mjs';
+import { AUDIO_BAR_TICKS, AUDIO_MAX_COLOR_INSTRUMENT_OVERRIDES, AUDIO_MAX_LOOP_TICKS, AUDIO_PIXEL_TICKS, collectAudioEvents, createAudioSong, extendAudioLoopForImage, setAudioColorInstrument, setAudioPixel } from '../../js/creation/audio-core.mjs';
+import { AUDIO_ANIMATION_LINK_VERSION, AUDIO_ANIMATION_MAX_COLORS, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationColorCount, getAudioAnimationRowPitchMap, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from '../../js/creation/audio-animation.mjs';
+import { AUDIO_FREE_COLORS, AUDIO_REWARD_COLORS, getAudioRewardColorCount, getAudioRewardImageColorCount, initializeAudioRewardColorOwnership, preservesAudioRewardImageContent, preservesAudioRewardPaletteContent } from '../../js/creation/audio-reward-policy.mjs';
+import { createPxdProject } from '../../js/creation/pxd-codec.mjs';
+import { readPxdAnimation, writePxdAnimation } from '../../js/creation/pxd-animation.mjs?rev=20261015-alpha-opacity-1';
 
 const RED = '#ff0000';
 const BLUE = '#0000ff';
@@ -42,6 +45,154 @@ test('explicit import places ordered frames on an independent PPQ timeline and k
     [15 * AUDIO_PIXEL_TICKS, 2 * AUDIO_PIXEL_TICKS]
   ]);
   assert.equal(validateAudioAnimationBinding(result.song, animation, result.link), result.song);
+});
+
+function animationWithPalettePixels(palette, indices) {
+  const animation = createAnimation({ width: indices.length, height: 1, palette });
+  const frame = animation.frames[0], layer = animation.layers[0];
+  return writeAnimationCel(animation, frame.id, layer.id, {
+    schemaVersion: 1, width: indices.length, height: 1, palette: [...palette],
+    pixels: Uint8Array.from(indices, index => index + 1)
+  });
+}
+
+test('shared audio palette counts 64 used RGBA colors, excludes transparent and unused entries, and retains bonus mappings', () => {
+  assert.equal(AUDIO_FREE_COLORS, 32);
+  assert.equal(AUDIO_REWARD_COLORS, 64);
+  assert.equal(AUDIO_ANIMATION_MAX_COLORS, 64);
+  const used = Array.from({ length: 64 }, (_, index) => `#${index.toString(16).padStart(6, '0')}`);
+  const animation = animationWithPalettePixels(used, Array.from({ length: 64 }, (_, index) => index));
+  assert.equal(getAudioAnimationColorCount(animation), 64,
+    'all 64 used bonus-capable colors remain valid');
+  const song = createAudioSong();
+  const link = createAudioAnimationLink(song, animation);
+  const imported = prepareAudioAnimationImport(song, animation, { colorToSlot: link.colorToSlot });
+  assert.equal(validateAudioAnimationBinding(imported.song, animation, imported.link), imported.song);
+  assert.equal(preservesAudioRewardPaletteContent(animation, link, animation, link), true);
+
+  const freeOnlyEdit = getAnimationCelDocument(animation, animation.frames[0].id, animation.layers[0].id);
+  freeOnlyEdit.pixels[0] = 1; // free color index 0 -> free color index 1
+  const freeOnlyAfter = writeAnimationCel(animation, animation.frames[0].id, animation.layers[0].id, {
+    ...freeOnlyEdit, pixels: Uint8Array.from(freeOnlyEdit.pixels, value => value + 1)
+  });
+  assert.equal(preservesAudioRewardPaletteContent(animation, link, freeOnlyAfter, link), true,
+    'editing cells in the first 32 used color identities stays free');
+
+  const bonusColorId = `rgba-${used[40].slice(1).padEnd(8, 'f')}`;
+  const remappedLink = { ...link, colorToSlot: { ...link.colorToSlot, [bonusColorId]: 'square' } };
+  assert.equal(preservesAudioRewardPaletteContent(animation, link, animation, remappedLink), false,
+    'an expired edit cannot change the mapping of a used bonus color');
+
+  const frame = animation.frames[0], layer = animation.layers[0];
+  const changed = getAnimationCelDocument(animation, frame.id, layer.id);
+  changed.pixels[40] = 0;
+  const after = writeAnimationCel(animation, frame.id, layer.id, {
+    ...changed, pixels: Uint8Array.from(changed.pixels, value => value + 1)
+  });
+  assert.equal(preservesAudioRewardPaletteContent(animation, link, after, link), false,
+    'an expired edit cannot replace a used bonus-color cell with a free color');
+});
+
+test('audio palette rejects a 65th used color but accepts wider registered palettes and RGBA variants', () => {
+  const sixtyFive = Array.from({ length: 65 }, (_, index) => `#${(index + 0x100000).toString(16).padStart(6, '0')}`);
+  const sixtyFiveUsed = animationWithPalettePixels(sixtyFive, Array.from({ length: 65 }, (_, index) => index));
+  assert.equal(getAudioAnimationColorCount(sixtyFiveUsed), 65);
+  assert.throws(() => createAudioAnimationLink(createAudioSong(), sixtyFiveUsed), /64色/,
+    'audio rejects 65 actual used colors while the shared Draw decoder can register them');
+
+  const palette = ['#112233ff', '#11223380', '#ffffff00', ...Array.from({ length: 61 }, (_, index) => `#${(index + 0x200000).toString(16).padStart(6, '0')}`)];
+  const variants = animationWithPalettePixels(palette, [0, 1, 2]);
+  assert.equal(getAudioAnimationColorCount(variants), 2,
+    'the same RGB with different alpha is two used colors, alpha zero is excluded, and unused entries are free');
+  assert.doesNotThrow(() => createAudioAnimationLink(createAudioSong(), variants));
+});
+
+test('65 registered but unused audio swatches roundtrip with their single used RGBA color', async () => {
+  const palette = Array.from({ length: 65 }, (_, index) => `#${(index + 0x100000).toString(16).padStart(6, '0')}`);
+  const animation = animationWithPalettePixels(palette, [0]);
+  assert.equal(getAudioAnimationColorCount(animation), 1);
+  const song = createAudioSong();
+  const link = createAudioAnimationLink(song, animation);
+  const imported = prepareAudioAnimationImport(song, animation, { colorToSlot: link.colorToSlot });
+  assert.equal(validateAudioAnimationBinding(imported.song, animation, imported.link), imported.song);
+  const project = await writePxdAnimation(createPxdProject(), animation, {
+    role: 'audio', posterFrameId: animation.frames[0].id
+  });
+  const restored = await readPxdAnimation(project, 'audio');
+  assert.equal(restored.palette.length, 65);
+  assert.equal(getAudioAnimationColorCount(restored), 1);
+});
+
+test('static shared audio palette counts actual RGBA pixels and protects bonus colors across image edits', () => {
+  const pixels = [];
+  for (let index = 0; index < 33; index += 1) pixels.push(index, 0, 0, 255);
+  pixels.push(0, 0, 0, 0); // transparent does not consume a color
+  const image = { width: 34, height: 1, rgba: Uint8Array.from(pixels) };
+  assert.equal(getAudioRewardImageColorCount(image), 33);
+  assert.equal(getAudioRewardColorCount(animationWithPalettePixels(
+    [...Array.from({ length: 32 }, (_, index) => `#${index.toString(16).padStart(6, '0')}`), '#ff0000'],
+    [...Array.from({ length: 32 }, (_, index) => index), 32])), 33,
+  'the 33rd visible color is measured as a bonus color in indexed animation too');
+  const link = { colorToSlot: { 'rgba-200000ff': 'square' } };
+  const unchanged = { ...image, rgba: new Uint8Array(image.rgba) };
+  assert.equal(preservesAudioRewardImageContent(image, link, unchanged, link), true);
+  const changed = { ...image, rgba: new Uint8Array(image.rgba) };
+  changed.rgba.set([9, 9, 9, 255], 32 * 4);
+  assert.equal(preservesAudioRewardImageContent(image, link, changed, link), false,
+    'editing the 33rd color pixel or its source assignment is locked after expiry');
+});
+
+test('expired free edits retain persisted bonus-color identities across palette order and color removal', () => {
+  const palette = Array.from({ length: 33 }, (_, index) => `#${(index + 0x100000).toString(16).padStart(6, '0')}`);
+  const animation = animationWithPalettePixels(palette, Array.from({ length: 33 }, (_, index) => index));
+  const link = createAudioAnimationLink(createAudioSong(), animation);
+  const owned = initializeAudioRewardColorOwnership({ animation, link });
+  assert.deepEqual(getAnimationDrawRewardBonusColors(owned.animation), [palette[32] + 'ff']);
+
+  const recoloredFreePalette = setAnimationPalette(owned.animation, [`#abcdef`, ...palette.slice(1)]);
+  const recoloredLink = { ...owned.link, colorToSlot: { ...owned.link.colorToSlot,
+    'rgba-abcdefff': null } };
+  assert.deepEqual(getAnimationDrawRewardBonusColors(recoloredFreePalette), [palette[32] + 'ff'],
+    'palette mutations carry the stable ownership ledger');
+  assert.equal(preservesAudioRewardPaletteContent(owned.animation, owned.link, recoloredFreePalette, recoloredLink), true,
+    'replacing free color 0 cannot reclassify or unlock color 33');
+
+  const image = { width: 33, height: 1, rgba: Uint8Array.from(palette.flatMap((color) => [
+    Number.parseInt(color.slice(1, 3), 16), Number.parseInt(color.slice(3, 5), 16), Number.parseInt(color.slice(5, 7), 16), 255
+  ])) };
+  const imageOwned = initializeAudioRewardColorOwnership({ image, link: { colorToSlot: {} } });
+  const removedFree = { ...image, rgba: new Uint8Array(image.rgba) };
+  removedFree.rgba.set([0, 0, 0, 0], 0);
+  assert.equal(preservesAudioRewardImageContent(image, imageOwned.link, removedFree, imageOwned.link), true,
+    'removing a free-only image color does not relabel the persisted bonus identity');
+});
+
+test('alpha palette entries roundtrip unchanged in audio mode even when audio projection must reject blending', async () => {
+  const animation = animationWithPalettePixels(['#123456ff', '#12345680', '#abcdef00'], [0, 1, 2]);
+  const song = createAudioSong();
+  const link = createAudioAnimationLink(song, animation);
+  assert.equal(link.colorToSlot['rgba-abcdef00'], null, 'transparent RGBA remains visible as unassigned metadata');
+  assert.equal(getAudioAnimationColorCount(animation), 2);
+  assert.equal(validateAudioAnimationBinding(song, animation, link), song,
+    'a nonprojected imported animation remains valid and intact');
+  assert.throws(() => prepareAudioAnimationImport(song, animation, { colorToSlot: link.colorToSlot }), /半透明/,
+    'unsupported blended colors cannot be converted into music notes');
+  const project = await writePxdAnimation(createPxdProject(), animation, {
+    role: 'audio', posterFrameId: animation.frames[0].id
+  });
+  const restored = await readPxdAnimation(project, 'audio');
+  assert.deepEqual(restored.palette, animation.palette);
+  assert.deepEqual(restored.frames, animation.frames);
+  assert.equal(getAudioAnimationColorCount(restored), 2);
+});
+
+test('audio color-instrument mapping storage supports 64 overrides and rejects 65', () => {
+  assert.equal(AUDIO_MAX_COLOR_INSTRUMENT_OVERRIDES, 64);
+  const ids = Array.from({ length: 65 }, (_, index) => `rgba-${index.toString(16).padStart(6, '0')}ff`);
+  let song = createAudioSong();
+  for (const colorId of ids.slice(0, 64)) song = setAudioColorInstrument(song, { colorId, instrument: 'square' });
+  assert.equal(Object.keys(song.colorInstruments).length, 64);
+  assert.throws(() => setAudioColorInstrument(song, { colorId: ids[64], instrument: 'square' }), /不正/);
 });
 
 test('frame-local pitch maps let the same canvas row sound different notes per frame', () => {

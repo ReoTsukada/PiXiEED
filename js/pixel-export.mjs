@@ -10,18 +10,20 @@
  */
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { trackSiteEvent } from './site-analytics.mjs';
-export const EXPORT_LONG_EDGE = 2048;
+import { resolveStaticImageLongEdge, STATIC_IMAGE_FREE_LONG_EDGE } from './creation/static-output-policy.mjs?rev=20261016-color-capability-1';
+export const EXPORT_LONG_EDGE = STATIC_IMAGE_FREE_LONG_EDGE;
 export const EXPORT_MAX_EDGE = 4096;
+export const EXPORT_MAX_PIXELS = 16 * 1024 * 1024;
 
 /** The integer enlargement that brings the long edge to about `longEdge` (never below 1×). */
-export function exportScale(width, height, longEdge = EXPORT_LONG_EDGE) {
+export function exportScale(width, height, longEdge = resolveStaticImageLongEdge()) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) throw new RangeError('invalid image size');
   return Math.max(1, Math.floor(longEdge / Math.max(width, height)));
 }
 
 /** RGBA pixels → an enlarged canvas (nearest-neighbour). */
 export function enlargedCanvas({ width, height, data }, { scale = exportScale(width, height), background = null, documentRef = globalThis.document } = {}) {
-  if (![width, height, scale].every(Number.isSafeInteger) || width < 1 || height < 1 || scale < 1 || width * scale > EXPORT_MAX_EDGE || height * scale > EXPORT_MAX_EDGE || !data || data.length !== width * height * 4) throw new RangeError('invalid image size or scale');
+  if (![width, height, scale].every(Number.isSafeInteger) || width < 1 || height < 1 || scale < 1 || width * scale > EXPORT_MAX_EDGE || height * scale > EXPORT_MAX_EDGE || width * height * scale * scale > EXPORT_MAX_PIXELS || !data || data.length !== width * height * 4) throw new RangeError('invalid image size or scale');
   const small = documentRef.createElement('canvas'); small.width = width; small.height = height;
   small.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
   const big = documentRef.createElement('canvas'); big.width = width * scale; big.height = height * scale;

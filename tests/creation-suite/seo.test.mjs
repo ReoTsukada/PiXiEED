@@ -6,7 +6,8 @@ import { resolve } from 'node:path';
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const pages = [
   ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'globe'], ['tools/index.html', '/tools/', 'tools'], ['output/index.html', '/output/', 'output'],
-  ['draw/index.html', '/draw/', 'draw'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
+  ['draw/index.html', '/draw/', 'draw'],
+  ['draw/about/index.html', '/draw/about/', 'draw'], ['camera/index.html', '/camera/', 'camera'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
   ['play/spot-difference/index.html', '/play/spot-difference/', 'spot-game'], ['play/hidden-object/index.html', '/play/hidden-object/', 'find-game'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],
   ['telescope/index.html', '/telescope/', 'telescope'], ['about/index.html', '/about/', 'site'], ['guide/index.html', '/guide/', 'site'],
@@ -72,7 +73,11 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.equal(values(head, 'property', 'og:image:type')[0], 'image/png');
     assert.equal(values(head, 'property', 'og:image:width')[0], '1200');
     assert.equal(values(head, 'property', 'og:image:height')[0], '630');
-    const expectedAlt = toolArtworkAlts[imageName] || `PiXiEEDのロゴと「${artworkLabels[imageName]}」${imageName === 'site' ? '' : 'のアイコン'}`;
+    const introArtworkAlts = {
+      'draw/about/index.html': 'PiXiEEDrawのドット絵アイコン',
+      'camera/index.html': 'PiXiEEDのカメラと写真変換のアイコン',
+    };
+    const expectedAlt = introArtworkAlts[file] || toolArtworkAlts[imageName] || `PiXiEEDのロゴと「${artworkLabels[imageName]}」${imageName === 'site' ? '' : 'のアイコン'}`;
     assert.equal(values(head, 'property', 'og:image:alt')[0], expectedAlt);
     assert.deepEqual(values(head, 'name', 'twitter:card'), ['summary_large_image']);
     for (const name of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image', 'twitter:image:alt']) {

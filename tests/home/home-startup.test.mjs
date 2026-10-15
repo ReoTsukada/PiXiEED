@@ -77,3 +77,13 @@ test('home index keeps motion preference available before the eagerly loaded her
   assert.match(html, /src="\/js\/home-startup\.mjs\?rev=[\w-]+/);
   assert.doesNotMatch(html, /src="\/js\/app\.js\?rev=/);
 });
+
+test('home mounts startup and gallery once across cache revisions', () => {
+  const home = read('index.html');
+  assert.doesNotMatch(home, /^(?:<{7}|={7}|>{7})/m, 'home contains no unresolved merge markers');
+  const scripts = [...home.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)]
+    .map(([, source]) => new URL(source, 'https://pixieed.jp').pathname);
+  for (const path of ['/js/home-startup.mjs', '/js/home-gallery.mjs']) {
+    assert.equal(scripts.filter(source => source === path).length, 1, `${path} loads exactly once`);
+  }
+});

@@ -1,4 +1,4 @@
-import { composeAnimationFrame, setLayerProperties } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { composeAnimationFrame, composeAnimationFrameRgba, setLayerProperties } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 /** Compose an export image without changing the saved layer visibility. */
 export function composeOutputFrame(animation, frameId, { includeMusic = false } = {}) {
@@ -8,4 +8,12 @@ export function composeOutputFrame(animation, frameId, { includeMusic = false } 
   const musicLayer = animation.layers.find(layer => layer.role === 'music');
   if (!musicLayer || musicLayer.visible) return composeAnimationFrame(animation, frameId);
   return composeAnimationFrame(setLayerProperties(animation, musicLayer.id, { visible: true }), frameId);
+}
+
+/** Render without forcing derived source-over colors back into the editing palette. */
+export function composeOutputFrameRgba(animation, frameId, { includeMusic = false, target } = {}) {
+  if (typeof includeMusic !== 'boolean') throw new TypeError('includeMusic must be a boolean');
+  const music = animation.layers.find(layer => layer.role === 'music');
+  const visible = includeMusic && music && !music.visible ? setLayerProperties(animation, music.id, { visible: true }) : animation;
+  return composeAnimationFrameRgba(visible, frameId, { excludeMusic: !includeMusic, target });
 }

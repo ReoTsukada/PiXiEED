@@ -94,9 +94,14 @@ test('APNG rejects incompatible frame PNG headers and does not invent a conversi
 });
 
 test('GIF converts normalized total plays into Netscape repeats and omits the loop extension for one play', async () => {
+  const gifFrames = [checkerA, checkerB].map((source) => {
+    const data = new Uint8ClampedArray(source.data);
+    for (let offset = 3; offset < data.length; offset += 4) data[offset] = data[offset] < 128 ? 0 : 255;
+    return { ...source, data };
+  });
   for (const [totalPlays, encodedRepeats] of [[0, 0], [1, null], [2, 1], [4, 3]]) {
     const progress = [];
-    const blob = await encodeOutput({ format: 'gif', frames: [checkerA, checkerB], totalPlays }, { onProgress: (value) => progress.push(value) }); const bytes = new Uint8Array(await blob.arrayBuffer());
+    const blob = await encodeOutput({ format: 'gif', frames: gifFrames, totalPlays }, { onProgress: (value) => progress.push(value) }); const bytes = new Uint8Array(await blob.arrayBuffer());
     assert.deepEqual(progress, [0.45, 0.9, 0.95, 1]);
     assert.equal(blob.type, 'image/gif'); assert.equal(String.fromCharCode(...bytes.subarray(0, 6)), 'GIF89a');
     const app = [...bytes].findIndex((byte, index) => byte === 0x21 && bytes[index + 1] === 0xff && bytes[index + 2] === 0x0b);

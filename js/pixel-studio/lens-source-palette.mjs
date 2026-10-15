@@ -187,7 +187,7 @@ export function createLensSourcePalette() {
   function render(sampled, settings = {}) {
     validate(sampled);
     const requestedSize = settings.colorDepth === 'full' ? 'full' :
-      [2, 4, 8, 16, 24].includes(Number(settings.colorDepth)) ? Number(settings.colorDepth) : PALETTE_SIZE;
+      [2, 4, 8, 16, 24, 32, 64].includes(Number(settings.colorDepth)) ? Number(settings.colorDepth) : PALETTE_SIZE;
     if (requestedSize !== paletteSize) { paletteSize = requestedSize; reset(); }
     const { width, height, data: original } = sampled, cells = width * height;
     const data = settings.legacyTone ? new Uint8ClampedArray(original) : original;

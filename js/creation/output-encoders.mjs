@@ -1,4 +1,4 @@
-import { encodeAnimatedGif } from '../animated-export.mjs?rev=20261008-output-progress-1';
+import { encodeAnimatedGif } from '../animated-export.mjs?rev=20261015-alpha-opacity-1';
 import { assertTotalPlays, totalPlaysToGifRepeats } from './output-loop-count.mjs?rev=20261008-loop-count-1';
 
 export const OUTPUT_FORMATS = Object.freeze(['png', 'jpeg', 'svg', 'gif', 'apng']);
@@ -64,13 +64,13 @@ function makeBlob(bytes, format) {
   return new Blob([bytes], { type: MIME[format] });
 }
 
-function parseHexColor(value) {
-  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) throw new TypeError('JPEGの背景色は#RRGGBBで指定してください。');
+function parseHexColor(value, format = 'JPEG') {
+  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) throw new TypeError(`${format}の背景色は#RRGGBBで指定してください。`);
   return [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16));
 }
 
-function flattenFrame(frame, background) {
-  const color = parseHexColor(background);
+function flattenFrame(frame, background, format = 'JPEG') {
+  const color = parseHexColor(background, format);
   const data = new Uint8ClampedArray(frame.data.length);
   for (let index = 0; index < data.length; index += 4) {
     const alpha = frame.data[index + 3] / 255;
@@ -222,7 +222,7 @@ async function encodeRaster(frame, format, encoder, signal, quality = 0.9) {
 }
 
 /** Encode one output item from original RGBA frame data. `encodeRaster(frame, mime)` supplies browser canvas encoding. */
-export async function encodeOutput({ format, frames, background = '#ffffff', quality = 0.9, totalPlays, loopCount, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
+export async function encodeOutput({ format, frames, background = '#ffffff', pngBackground = 'transparent', quality = 0.9, totalPlays, loopCount, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
   const progress = (value) => { try { onProgress(Math.max(0, Math.min(1, value))); } catch { /* progress cannot affect encoding */ } };
   if (!OUTPUT_FORMATS.includes(format)) throw new TypeError('選択できない画像形式です。');
   if (totalPlays === undefined) totalPlays = Number.isSafeInteger(loopCount) ? loopCount : 0; // compatibility with older callers
@@ -235,7 +235,10 @@ export async function encodeOutput({ format, frames, background = '#ffffff', qua
   checkFrames(outputFrames, animated);
   const framesWithTiming = outputFrames.map((frame) => ({ ...frame, delayMs: frame.delayMs ?? 100 }));
   if (format === 'svg') { const blob = makeBlob(new TextEncoder().encode(svgText(outputFrames[0])), format); progress(1); return blob; }
-  if (format === 'png') { progress(0.25); const blob = makeBlob(await encodeRaster(outputFrames[0], format, rasterEncoder, signal), format); progress(1); return blob; }
+  if (format === 'png') {
+    const pngFrame = pngBackground === 'transparent' ? outputFrames[0] : flattenFrame(outputFrames[0], pngBackground, 'PNG');
+    progress(0.25); const blob = makeBlob(await encodeRaster(pngFrame, format, rasterEncoder, signal), format); progress(1); return blob;
+  }
   if (format === 'jpeg') { progress(0.25); const blob = makeBlob(await encodeRaster(flattenFrame(outputFrames[0], background), format, rasterEncoder, signal, quality), format); progress(1); return blob; }
   if (format === 'apng') {
     const pngs = [];

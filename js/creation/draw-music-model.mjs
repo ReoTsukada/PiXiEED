@@ -3,9 +3,11 @@ import {
   describeDrawMusicProjection,
   getDrawMusicPageDocument, moveDrawMusicPage, projectDrawMusic, removeDrawMusicPage,
   selectDrawMusicPage, writeDrawMusicProject
-} from './draw-music-core.mjs?rev=20261012-animation-core-contract-1';
-import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261012-animation-core-contract-1';
+} from './draw-music-core.mjs?rev=20261016-color-capability-1';
+import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261016-color-capability-1';
 import { setPxdJson } from './pxd-codec.mjs';
+import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { preservesAudioRewardContent, preservesAudioRewardPaletteContent } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
 function json(value) {
@@ -26,12 +28,23 @@ function onlyTempoChanged(before, after) {
     && json({ ...before, song: undefined }) === json({ ...after, song: undefined });
 }
 
+function preservesAudioRewardState(before, after) {
+  if (!before || !after) return true;
+  if (!preservesAudioRewardContent(before.song, after.song)) return false;
+  if (!preservesAudioRewardPaletteContent(before.animation, before.link, after.animation, after.link)) return false;
+  if (before.musicAnimation || after.musicAnimation) {
+    return preservesAudioRewardPaletteContent(before.musicAnimation || before.animation, before.link,
+      after.musicAnimation || after.animation, after.link);
+  }
+  return true;
+}
+
 /**
  * Keep audio data synchronized with Draw history without creating a player or UI.
  * Call this before mounting the lazy music editor so the initial page snapshot is
  * part of the clean project baseline rather than an Undoable user edit.
  */
-export async function mountDrawMusicModel({ draw, scope } = {}) {
+export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } = {}) {
   if (!draw?.getTimeline || !draw?.subscribe || !draw?.attachProjectHooks || !scope?.add) {
     throw new TypeError('Draw music model requires a Draw API and lifecycle scope');
   }
@@ -43,8 +56,14 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
   let lastTimeline = null;
   let lastAudioSignature = '';
   let snapshots = new WeakMap();
+  let leasedTimelines = new WeakSet();
   let openSequence = 0;
+  let lastAcceptedTimelineSnapshot = null;
+  let restoringDeniedTimeline = false;
   const listeners = new Set();
+  const rewardEnabled = () => rewardPolicy?.isEnabled?.() ?? isSiteRewardPolicyEnabled();
+  const rewardEntitled = () => rewardPolicy?.hasReward?.() ?? hasSiteReward();
+  const requestAudioReward = () => rewardPolicy?.require ? rewardPolicy.require('audio') : requireSiteReward('audio');
 
   function setReadOnly(reason = '') {
     readOnlyReason = String(reason || '');
@@ -84,6 +103,33 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
     }
   }
 
+  function validateMusicTimeline({ before, after, rewardActive: operationLease } = {}) {
+    if (!after || !state) return true;
+    const lease = typeof operationLease === 'boolean' ? operationLease : rewardEntitled();
+    if (!rewardEnabled()) return true;
+    let candidate = snapshots.get(after);
+    try { candidate ||= projectDrawMusic(state, after); }
+    catch {
+      if (lease) { leasedTimelines.add(after); return true; }
+      requestAudioReward();
+      draw.setMusicRewardStatus?.('この描画変更は音楽ページへ安全に反映できないため、追加機能の更新後に適用できます。');
+      return false;
+    }
+    if (lease) {
+      snapshots.set(after, candidate);
+      leasedTimelines.add(after);
+      return true;
+    }
+    if (!preservesAudioRewardState(state, candidate)) {
+      requestAudioReward();
+      draw.setMusicRewardStatus?.('期限切れの追加音色・追加列は変更できません。リワードを更新してください。');
+      return false;
+    }
+    // Cache only the exact candidate the Draw API is about to commit.
+    snapshots.set(after, candidate);
+    return true;
+  }
+
   function install(next, timeline = draw.getTimeline(), { emit = true } = {}) {
     if (!next || !timeline) return state;
     const previousSignature = lastAudioSignature || audioSignature(state);
@@ -91,29 +137,49 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
     snapshots.set(timeline, state);
     lastTimeline = timeline;
     lastAudioSignature = audioSignature(state);
+    lastAcceptedTimelineSnapshot = draw.snapshotTimeline?.() ?? null;
     if (emit) notify(previousSignature !== lastAudioSignature);
     return state;
   }
 
   function resolveTimeline(timeline) {
-    if (!state || !timeline || timeline === lastTimeline) return state;
+    if (!state || !timeline || restoringDeniedTimeline) return state;
+    if (timeline === lastTimeline) { leasedTimelines.delete(timeline); return state; }
     const beforeSignature = lastAudioSignature || audioSignature(state);
+    let candidate;
     if (snapshots.has(timeline)) {
-      state = snapshots.get(timeline);
+      candidate = snapshots.get(timeline);
     } else if (!readOnlyReason) {
-      try { state = projectDrawMusic(state, timeline); }
+      try { candidate = projectDrawMusic(state, timeline); }
       catch (error) {
         setReadOnly(error?.message || 'この作品の音楽を安全に同期できません。');
-        state = { ...state, animation: timeline };
+        candidate = { ...state, animation: timeline };
       }
-      snapshots.set(timeline, state);
     } else {
       // A failed legacy-page migration never reprojects the song from artwork.
-      state = { ...state, animation: timeline };
-      snapshots.set(timeline, state);
+      candidate = { ...state, animation: timeline };
     }
+    const operationLease = leasedTimelines.has(timeline);
+    leasedTimelines.delete(timeline);
+    if (rewardEnabled() && !operationLease && !rewardEntitled()
+        && !preservesAudioRewardState(state, candidate)) {
+      requestAudioReward();
+      // Draw applies pointer edits before notifying subscribers. Restore the
+      // exact accepted session snapshot so denied music-layer edits cannot
+      // leave image/history state diverged from the unchanged song.
+      if (lastAcceptedTimelineSnapshot && draw.restoreTimelineSnapshot) {
+        restoringDeniedTimeline = true;
+        try { draw.restoreTimelineSnapshot(lastAcceptedTimelineSnapshot); }
+        finally { restoringDeniedTimeline = false; }
+      }
+      draw.setMusicRewardStatus?.('期限切れの追加音色・追加列は変更できません。リワードを更新してください。');
+      return state;
+    }
+    state = candidate;
+    snapshots.set(timeline, state);
     lastTimeline = timeline;
     lastAudioSignature = audioSignature(state);
+    lastAcceptedTimelineSnapshot = draw.snapshotTimeline?.() ?? null;
     notify(beforeSignature !== lastAudioSignature);
     return state;
   }
@@ -122,7 +188,7 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
     if (disposed || !timeline) return;
     const sequence = ++openSequence;
     const hadLoadedState = Boolean(state);
-    state = null; lastTimeline = null; lastAudioSignature = ''; snapshots = new WeakMap();
+    state = null; lastTimeline = null; lastAudioSignature = ''; snapshots = new WeakMap(); leasedTimelines = new WeakSet(); lastAcceptedTimelineSnapshot = null;
     setReadOnly('');
     // A new project replaces the current playback source immediately. Views
     // can stop the old player while the new baseline is being prepared.
@@ -172,12 +238,14 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
 
   const hooks = { onOpen, onSave };
   draw.setMusicSettingsPlanner?.(planMusicSettings);
+  const clearTimelineValidator = draw.setMusicTimelineValidator?.(validateMusicTimeline);
   const unsubscribeDraw = draw.subscribe(() => resolveTimeline(draw.getTimeline()));
   scope.add(() => {
     disposed = true;
     unsubscribeDraw?.();
     projectUnsubscribe?.();
     draw.setMusicSettingsPlanner?.(null);
+    clearTimelineValidator?.();
     listeners.clear();
   });
 
@@ -196,6 +264,11 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
     if (readOnlyReason && (!current.hasStoredAudio || !onlyTempoChanged(current, next))) {
       throw new Error(`${readOnlyReason} 音楽ページや色の割り当ては変更できません。`);
     }
+    if (rewardEnabled() && !rewardEntitled()
+        && !preservesAudioRewardState(current, next)) {
+      requestAudioReward();
+      throw new Error('期限切れの追加音色・追加列は変更できません。リワードを更新してください。');
+    }
     if (json(next.song) === json(current.song) && json(next.link) === json(current.link)) return current;
     if (typeof draw.commitMetadata !== 'function') throw new TypeError('Undo対応の音楽変更がありません。');
     const beforeSignature = lastAudioSignature || audioSignature(current);
@@ -211,6 +284,12 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
 
   async function applyPage(next) {
     if (readOnlyReason) throw new Error(`${readOnlyReason} 音楽ページは変更できません。`);
+    const current = resolveTimeline(draw.getTimeline());
+    if (rewardEnabled() && !rewardEntitled()
+        && !preservesAudioRewardState(current, next)) {
+      requestAudioReward();
+      throw new Error('期限切れの追加音色・追加列は変更できません。リワードを更新してください。');
+    }
     if (typeof draw.applyMusicPage !== 'function') throw new TypeError('音楽ページを描画へ適用できません。');
     const pageDocument = getDrawMusicPageDocument(next, next.musicPageId);
     const beforeSignature = lastAudioSignature || audioSignature(state);
@@ -279,6 +358,6 @@ export async function mountDrawMusicModel({ draw, scope } = {}) {
     removePage,
     selectMusicLayer,
     refresh,
-    dispose() { disposed = true; unsubscribeDraw?.(); projectUnsubscribe?.(); draw.setMusicSettingsPlanner?.(null); listeners.clear(); }
+    dispose() { disposed = true; unsubscribeDraw?.(); projectUnsubscribe?.(); draw.setMusicSettingsPlanner?.(null); clearTimelineValidator?.(); listeners.clear(); }
   };
 }

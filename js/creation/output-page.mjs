@@ -1,13 +1,17 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261009-preview-only-1';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261016-user-filename-provenance-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeOutput } from './output-encoders.mjs?rev=20261008-output-7';
-import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261008-output-3';
-import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261009-music-plays-1';
-import { renderOutputVideo } from './output-video.mjs?rev=20261009-output-video-1';
+import { encodeOutput } from './output-encoders.mjs?rev=20261015-alpha-opacity-1';
+import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261016-color-capability-1';
+import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261016-color-capability-1';
+import { renderOutputVideo } from './output-video.mjs?rev=20261016-color-capability-1';
 import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261009-preview-only-2';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
 import { createOutputPreviewFit } from './output-preview-fit.mjs?rev=20261009-display-fit-5';
+import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSiteReward, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatchDownload, OUTPUT_FREE_BATCH_LIMIT, OUTPUT_REWARD_BATCH_LIMIT } from './output-reward-policy.mjs?rev=20261016-color-capability-1';
+import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261016-color-capability-1';
+import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -50,6 +54,9 @@ const musicSourceSelect = $('#output-music-source');
 const musicTotalPlaysHelp = $('#output-music-total-plays-help');
 const musicTotalPlaysField = $('#output-music-total-plays-field');
 const outputItemsList = $('#output-items');
+const batchSave = $('#output-batch-save');
+const rewardNote = $('#output-reward-note');
+const startRewardNote = $('#output-start-reward-note');
 const addOutputItem = $('#output-add-item');
 const copyOutputItem = $('#output-copy-item');
 const deleteOutputItem = $('#output-delete-item');
@@ -59,6 +66,9 @@ const formatButton = $('#output-extension');
 const formatPicker = $('#output-format-picker');
 const formatSelect = $('#output-format-select');
 const jpegSetting = $('#output-jpeg-setting');
+const pngBackgroundSetting = $('#output-png-background-setting');
+const pngBackgroundMode = $('#output-png-background-mode');
+const pngBackgroundColor = $('#output-png-background');
 const jpegQualitySetting = $('#output-jpeg-quality-setting');
 const jpegQuality = $('#output-jpeg-quality');
 const jpegQualityValue = $('#output-jpeg-quality-value');
@@ -105,6 +115,7 @@ const originRestore = $('#output-origin-restore');
 
 let record = null;
 let outputItems = [];
+const selectedOutputIds = new Set();
 let activeItem = null;
 let mediaSources = [];
 let activeSource = null;
@@ -138,6 +149,31 @@ let rasterSettingsController = null;
 let rasterProfile = null;
 let originRestoreItemId = '';
 let originResizeActiveItemId = '';
+
+mountSiteRewardUI();
+const outputRewardEnabled = () => isSiteRewardPolicyEnabled();
+const canUseOutputReward = (feature) => !outputRewardEnabled() || requireSiteReward(feature);
+const outputScaleRewardLabel = `${STATIC_IMAGE_FREE_LONG_EDGE + 1}〜${STATIC_IMAGE_REWARD_LONG_EDGE}pxの静止画出力`;
+function renderRewardNotice() {
+  const enabled = outputRewardEnabled();
+  if (rewardNote) rewardNote.hidden = !enabled;
+  if (startRewardNote) startRewardNote.hidden = !enabled;
+  if (enabled) {
+    const notice = `PNG・JPEG・GIF・WAVと通常の単独保存は無料です。静止画は長辺${STATIC_IMAGE_FREE_LONG_EDGE}pxまで通常出力でき、${STATIC_IMAGE_FREE_LONG_EDGE + 1}〜${STATIC_IMAGE_REWARD_LONG_EDGE}pxの新しい拡大出力、SVG・APNG・対応動画の新規作成、${OUTPUT_FREE_BATCH_LIMIT + 1}〜${OUTPUT_REWARD_BATCH_LIMIT}項目の一括保存には60分パスが必要です。既存の大きな画像は縮小せず保存できます。複数保存ではブラウザーがダウンロードの許可を尋ねる場合があります。`;
+    if (rewardNote) rewardNote.textContent = notice;
+    if (startRewardNote) startRewardNote.textContent = notice;
+  }
+  renderBatchSaveState();
+}
+function renderBatchSaveState() {
+  if (!batchSave) return;
+  const count = selectedOutputIds.size;
+  batchSave.textContent = `選択した項目をまとめて保存（${count}）`;
+  batchSave.disabled = count < 1 || count > OUTPUT_REWARD_BATCH_LIMIT || itemWritePending || mediaWritePending || Boolean(generationController);
+  if (count > OUTPUT_REWARD_BATCH_LIMIT) batchSave.title = `一度に保存できるのは${OUTPUT_REWARD_BATCH_LIMIT}項目です。`;
+  else batchSave.removeAttribute('title');
+}
+subscribeSiteReward(() => { renderRewardNotice(); refreshScaleLimitsForEntitlement(); });
 
 function trackPending(promise) {
   const tracked = Promise.resolve(promise);
@@ -210,6 +246,13 @@ function updateSettingsSummaries() {
   }
   if (animationSettingsSummary) animationSettingsSummary.textContent = animationDetails.textContent || 'FPS・再生回数';
   if (audioSettingsSummary) audioSettingsSummary.textContent = audioDetails.textContent || '音声の設定';
+}
+
+function updateFormatSettings() {
+  jpegSetting.hidden = formatSelect.value !== 'jpeg';
+  jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
+  pngBackgroundSetting.hidden = formatSelect.value !== 'png';
+  pngBackgroundColor.hidden = pngBackgroundMode.value !== 'color';
 }
 
 function createItemId() {
@@ -436,6 +479,7 @@ function setActiveItem(item) {
 
 function renderOutputItems() {
   outputItemsList.replaceChildren();
+  for (const id of selectedOutputIds) if (!outputItems.some((item) => item.id === id)) selectedOutputIds.delete(id);
   for (const item of outputItems) {
     let url = generatedDownloadUrls.get(item.id);
     if (!url || item.__urlBlob !== item.blob) {
@@ -448,13 +492,22 @@ function renderOutputItems() {
     const type = document.createElement('strong'); type.textContent = item.extension.toUpperCase();
     const name = document.createElement('span'); name.textContent = item.filename;
     select.append(type, name); select.addEventListener('click', () => activateItem(item.id));
+    const includeLabel = document.createElement('label'); includeLabel.className = 'output-item__include';
+    const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedOutputIds.has(item.id);
+    include.setAttribute('aria-label', `まとめて保存に含める: ${item.filename}`);
+    include.addEventListener('change', () => {
+      if (include.checked) selectedOutputIds.add(item.id); else selectedOutputIds.delete(item.id);
+      renderBatchSaveState();
+    });
+    includeLabel.append(include, document.createTextNode('一括'));
     const save = document.createElement('a'); save.className = 'output-item__download'; save.href = url; save.download = item.filename; save.textContent = '保存'; save.setAttribute('aria-label', `${item.filename}をダウンロード`);
     save.addEventListener('click', () => { status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。'; trackSave('download'); });
-    row.append(select, save); outputItemsList.append(row);
+    row.append(select, includeLabel, save); outputItemsList.append(row);
   }
   deleteOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length <= 1;
   copyOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length >= 12;
   addOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length >= 12;
+  renderBatchSaveState();
   updateSettingsSummaries();
 }
 
@@ -469,7 +522,7 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   const formats = sourceFormats(activeSource);
   formatSelect.replaceChildren();
   for (const [value, label] of formats) {
-    const option = document.createElement('option'); option.value = value; option.textContent = `${label}（.${value}）`; formatSelect.append(option);
+    const option = document.createElement('option'); option.value = value; option.textContent = `${label}（.${value}）${isRewardedOutputFormat(value) && outputRewardEnabled() ? ' · 60分パス' : ''}`; formatSelect.append(option);
   }
   formatSelect.value = formats.some(([value]) => value === preferredFormat) ? preferredFormat : formats[0]?.[0] || '';
   formatButton.textContent = `.${formatSelect.value || activeItem?.extension || ''} ⌄`;
@@ -479,8 +532,7 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   addOutputItem.hidden = formats.length === 0;
   copyOutputItem.hidden = formats.length === 0;
   deleteOutputItem.hidden = formats.length === 0;
-  jpegSetting.hidden = formatSelect.value !== 'jpeg';
-  jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
+  updateFormatSettings();
   formatPicker.hidden = true;
   formatButton.setAttribute('aria-expanded', 'false');
   updateMusicPlayControl();
@@ -859,6 +911,8 @@ function setBusy(busy, canCancel = false) {
   if (busy) generationProgress.value = 0;
   scaleSettings.setAttribute('aria-busy', String(busy));
   jpegQuality.disabled = busy;
+  pngBackgroundMode.disabled = busy;
+  pngBackgroundColor.disabled = busy;
   renderAssets();
 }
 
@@ -900,7 +954,10 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     const frames = originalFrames.map((frame, index) => ({ ...frame, delayMs: timing.frameDelaysMs[index] }));
     if (!Array.isArray(frames) || !frames.length) throw new Error('画像の元データを確認できません。');
     const totalPlays = mediaSettings.totalPlays ?? source.mediaSource.totalPlays ?? source.mediaSource.loopCount ?? 0;
-    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null, background: $('#output-jpeg-background')?.value || '#ffffff', quality: Number(jpegQuality.value) / 100, totalPlays }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
+    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null,
+      background: $('#output-jpeg-background')?.value || '#ffffff',
+      pngBackground: pngBackgroundMode.value === 'color' ? pngBackgroundColor.value : 'transparent',
+      quality: Number(jpegQuality.value) / 100, totalPlays }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
     const result = await renderAudioWav(source.song);
@@ -966,8 +1023,34 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
   throw new Error('この素材では選択した形式を書き出せません。');
 }
 
-async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false } = {}) {
+function isStaticOutputFormat(formatValue) { return ['png', 'jpeg', 'svg'].includes(String(formatValue || '').toLowerCase()); }
+function isAnimatedOutputFormat(formatValue) { return ['gif', 'apng'].includes(String(formatValue || '').toLowerCase()); }
+
+function outputSourceOriginalSize(sourceId, frames) {
+  if (rasterProfile?.sourceId === sourceId && rasterProfile.width > 0 && rasterProfile.height > 0) {
+    return { width: rasterProfile.width, height: rasterProfile.height };
+  }
+  if (activeItem && (activeItem.sourceId === sourceId || rasterProfile?.sourceId === sourceId)) {
+    const current = rasterOutputDimensions(activeItem);
+    if (current.width > 0 && current.height > 0) return current;
+  }
+  return frames[0] || { width: 0, height: 0 };
+}
+
+function rewardedStaticSize(width, height, sourceId = activeSource?.id) {
+  if (!isStaticOutputFormat(formatSelect.value)) return false;
+  const original = outputSourceOriginalSize(sourceId, sourceFrames());
+  return isRewardedStaticImageSize(width, height, {
+    policyEnabled: outputRewardEnabled(), sourceWidth: original.width, sourceHeight: original.height
+  });
+}
+
+async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false, staticEntitledAtStart = null } = {}) {
   if (!record || !activeItem || generationController || mediaWritePending || itemWritePending) return false;
+  if (isRewardedOutputFormat(formatValue) && !canUseOutputReward('output.advanced-format')) {
+    status.textContent = 'この形式は60分パスが必要です。元の出力項目と素材は保持されています。';
+    return false;
+  }
   if (record.metadata?.previewOnly || activeItem.metadata?.previewOnly) {
     status.textContent = 'この画像はプレビュー専用です。編集・変換はできません。原本ファイルを保存できます。';
     return false;
@@ -982,9 +1065,26 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     if ((source.id === activeItem.sourceId || rasterProfile?.sourceId === source.id) && Number(widthInput.value) > 0 && Number(heightInput.value) > 0) {
       outputDimensions = { width: Number(widthInput.value), height: Number(heightInput.value) };
     } else {
-      const scale = Math.max(1, Math.min(16, Math.round(Number(record.metadata?.defaultScale) || 1)));
+      const pixelLimit = isAnimatedOutputFormat(extensionValue) ? MAX_GIF_INPUT_PIXELS : MAX_IMAGE_PIXELS;
+      const maxScale = Math.max(1, Math.min(Math.floor(MAX_IMAGE_EDGE / Math.max(framesForSource[0].width, framesForSource[0].height)),
+        Math.floor(Math.sqrt(pixelLimit / (framesForSource[0].width * framesForSource[0].height * (isAnimatedOutputFormat(extensionValue) ? framesForSource.length : 1))))));
+      const scale = Math.max(1, Math.min(maxScale, Math.round(Number(record.metadata?.defaultScale) || 1)));
       outputDimensions = { width: framesForSource[0].width * scale, height: framesForSource[0].height * scale };
     }
+  }
+  const originalStaticSize = outputSourceOriginalSize(sourceId, framesForSource);
+  if (isStaticOutputFormat(extensionValue) && outputDimensions
+      && !isIntegerStaticImageEnlargement(outputDimensions.width, outputDimensions.height, originalStaticSize.width, originalStaticSize.height)) {
+    status.textContent = 'ドット絵の拡大は、縦横とも同じ整数倍にしてください。現在の出力と元の素材は保持されています。';
+    return false;
+  }
+  const needsStaticReward = isStaticOutputFormat(extensionValue) && outputDimensions
+    && isRewardedStaticImageSize(outputDimensions.width, outputDimensions.height, {
+      policyEnabled: outputRewardEnabled(), sourceWidth: originalStaticSize.width, sourceHeight: originalStaticSize.height
+    });
+  if (needsStaticReward && staticEntitledAtStart !== true && !canUseOutputReward('output.static-image-upscale')) {
+    status.textContent = `${outputScaleRewardLabel}には60分パスが必要です。現在の出力と元の素材は保持されています。`;
+    return false;
   }
   const previousItem = activeItem;
   if (preservePrevious && outputItems.length >= 12) { status.textContent = '出力項目が上限のため、新しいサイズは作成できません。元のファイルはそのままです。'; return false; }
@@ -997,14 +1097,23 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     const generatedOutput = await createOutputBlob(source, extensionValue, outputDimensions, controller);
     const blob = generatedOutput.blob;
     if (controller.signal.aborted || pageDisposed || epoch !== generationEpoch) return;
-    const baseName = filename.value || outputBaseName(previousItem.filename, previousItem.extension);
-    const nextFilename = sanitizeOutputFilename(autoPixelOrigin ? `${baseName}-pixel` : baseName, extensionValue);
     const frames = sourceFrames(source);
+    const outputWidth = generatedOutput.metadata.outputWidth || outputDimensions?.width || frames[0]?.width;
+    const outputHeight = generatedOutput.metadata.outputHeight || outputDimensions?.height || frames[0]?.height;
+    const baseName = filename.value || outputBaseName(previousItem.filename, previousItem.extension);
+    const autoDrawingName = source.id === previousItem.sourceId && isAutoDrawingFilename({
+      source: record.source, filename: previousItem.filename, metadata: previousItem.metadata, extension: previousItem.extension
+    });
+    const nextFilename = sanitizeOutputFilename(resolveOutputFilename({
+      autoName: autoDrawingName, metadata: previousItem.metadata, width: outputWidth, height: outputHeight,
+      extension: extensionValue, baseName, autoPixelOrigin
+    }), extensionValue);
     const animatedOutput = ['gif', 'apng'].includes(extensionValue);
     const metadataValue = {
       ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
       ...(previousItem.metadata?.pixelOriginChoice ? { pixelOriginChoice: previousItem.metadata.pixelOriginChoice } : {}),
+      ...(previousItem.metadata?.userFilename === true ? { userFilename: true } : {}),
       ...(extensionValue === 'jpeg' ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
       ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: getOutputTiming(frames, { format: extensionValue, playbackRate: 1 }).durationMs / 1000, totalPlays: mediaSettings.totalPlays ?? source.mediaSource?.totalPlays ?? source.mediaSource?.loopCount ?? 0 } : {}),
       ...generatedOutput.metadata
@@ -1020,8 +1129,6 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     record.mime = activeItem.mime; record.extension = activeItem.extension; record.filename = activeItem.filename; record.blob = activeItem.blob;
     record.currentMetadata = activeItem.metadata; record.mediaSource = source.mediaSource || null;
     currentScale = outputDimensions?.width && frames[0] && outputDimensions.width % frames[0].width === 0 ? outputDimensions.width / frames[0].width : 1;
-    const outputWidth = generatedOutput.metadata.outputWidth || outputDimensions?.width || frames[0]?.width;
-    const outputHeight = generatedOutput.metadata.outputHeight || outputDimensions?.height || frames[0]?.height;
     setCurrentBlob(activeItem.blob, { width: outputWidth, height: outputHeight, animated: frames.length > 1 && ['gif', 'apng'].includes(extensionValue) });
     setMedia(record);
     updateMusicPlayControl();
@@ -1092,12 +1199,21 @@ async function prepareGifPoster(blob) {
 function setupScaleInput({ width, height, startScale, startWidth, startHeight, kind, frameCount = 1 }) {
   const totalPixels = width * height * frameCount;
   const pixelLimit = kind === 'gif' ? MAX_GIF_INPUT_PIXELS : MAX_IMAGE_PIXELS;
-  maxScale = Math.max(1, Math.min(Math.floor(MAX_IMAGE_EDGE / Math.max(width, height)), Math.floor(Math.sqrt(pixelLimit / totalPixels))));
+  const physicalScale = Math.max(1, Math.min(Math.floor(MAX_IMAGE_EDGE / Math.max(width, height)), Math.floor(Math.sqrt(pixelLimit / totalPixels))));
+  if (kind === 'gif') maxScale = physicalScale;
+  else {
+    const policyScale = resolveStaticImageMaxScale(width, height, {
+      policyEnabled: outputRewardEnabled(), entitled: hasSiteReward(), sourceWidth: width, sourceHeight: height,
+      maxEdge: MAX_IMAGE_EDGE, maxPixels: pixelLimit
+    });
+    // Keep a pre-existing larger rendition visible and selectable after expiry.
+    maxScale = Math.min(physicalScale, Math.max(policyScale, Math.round(startScale || 1)));
+  }
   currentScale = Math.max(1, Math.min(maxScale, Math.round(startScale || 1)));
   scaleInput.min = '1'; scaleInput.max = String(maxScale); scaleInput.value = String(currentScale);
-  widthInput.min = heightInput.min = '1'; widthInput.max = heightInput.max = String(MAX_IMAGE_EDGE);
-  widthInput.value = String(Math.max(1, Math.min(MAX_IMAGE_EDGE, Math.round(startWidth || width * currentScale))));
-  heightInput.value = String(Math.max(1, Math.min(MAX_IMAGE_EDGE, Math.round(startHeight || height * currentScale))));
+  widthInput.min = heightInput.min = '1'; widthInput.max = heightInput.max = String(Math.max(MAX_IMAGE_EDGE, Math.round(startWidth || 0), Math.round(startHeight || 0)));
+  widthInput.value = String(Math.max(1, Math.round(startWidth || width * currentScale)));
+  heightInput.value = String(Math.max(1, Math.round(startHeight || height * currentScale)));
   scaleSettings.hidden = false;
   aspectLock.checked = record?.currentMetadata?.aspectLocked !== false;
   scaleNote.textContent = kind === 'png'
@@ -1109,9 +1225,21 @@ function setupScaleInput({ width, height, startScale, startWidth, startHeight, k
   updateScaleSummary(width, height, kind, frameCount);
 }
 
+function refreshScaleLimitsForEntitlement() {
+  if (!record || scaleSettings.hidden || !pngBaseSize) return;
+  const frames = sourceFrames();
+  if (!frames.length) return;
+  const width = pngBaseSize.width; const height = pngBaseSize.height;
+  const startWidth = Number(widthInput.value) || width;
+  const startHeight = Number(heightInput.value) || height;
+  const animated = isAnimatedOutputFormat(formatSelect.value) && frames.length > 1;
+  setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight,
+    kind: animated ? 'gif' : 'png', frameCount: animated ? frames.length : 1 });
+}
+
 function buildScalePresets(width, height, kind, frameCount = 1) {
   presets.replaceChildren();
-  const candidates = [1, 2, 4, currentScale].filter((value, index, values) => values.indexOf(value) === index && value >= 1 && value <= maxScale);
+  const candidates = [1, 2, 4, currentScale, maxScale].filter((value, index, values) => values.indexOf(value) === index && value >= 1 && value <= maxScale);
   if (maxScale < 4 && !candidates.includes(maxScale)) candidates.push(maxScale);
   for (const scale of candidates) {
     const button = document.createElement('button');
@@ -1122,6 +1250,10 @@ function buildScalePresets(width, height, kind, frameCount = 1) {
     button.append(heading, dimensions);
     button.addEventListener('click', () => {
       if (applySettings.disabled) return;
+      if (rewardedStaticSize(width * scale, height * scale) && !canUseOutputReward('output.static-image-upscale')) {
+        status.textContent = `${outputScaleRewardLabel}には60分パスが必要です。表示中の出力は変更していません。`;
+        return;
+      }
       scaleInput.value = String(scale);
       widthInput.value = String(width * scale); heightInput.value = String(height * scale);
       updateScaleSummary(width, height, kind, frameCount);
@@ -1267,7 +1399,9 @@ async function prepareRasterSettings(entry, frames, { autoResize = true } = {}) 
   const startHeight = savedHeight || (canUseOrigin ? height : height * declaredScale);
   rasterProfile = { sourceId, width, height, status: detection.status, preferredScale: declaredScale, canUseOrigin };
   pngBaseSize = { width, height };
-  setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight, kind: frames.length > 1 ? 'gif' : 'png', frameCount: frames.length });
+  const selectedOutputIsAnimated = isAnimatedOutputFormat(formatSelect.value) && frames.length > 1;
+  setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight,
+    kind: selectedOutputIsAnimated ? 'gif' : 'png', frameCount: selectedOutputIsAnimated ? frames.length : 1 });
   scaleNote.textContent = canUseOrigin
     ? '原寸候補を基準に設定しました。表示倍率とは別に出力サイズを変更できます。'
     : '元フレームを保持したまま、出力サイズだけを変更できます。';
@@ -1316,8 +1450,14 @@ function targetDimensions() {
       || width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
     throw new RangeError('出力サイズが上限を超えています。幅と高さを小さくしてください。');
   }
-  if (['gif', 'apng'].includes(activeItem?.extension) && record?.mediaSource?.frames?.length > 1 && width * height * record.mediaSource.frames.length > MAX_GIF_INPUT_PIXELS) {
+  if (isAnimatedOutputFormat(formatSelect.value) && sourceFrames().length > 1 && width * height * sourceFrames().length > MAX_GIF_INPUT_PIXELS) {
     throw new RangeError('GIFの全フレーム合計が800万画素を超えています。幅と高さを小さくしてください。');
+  }
+  if (isStaticOutputFormat(formatSelect.value)) {
+    const original = outputSourceOriginalSize(activeSource?.id, sourceFrames());
+    if (!isIntegerStaticImageEnlargement(width, height, original.width, original.height)) {
+      throw new RangeError('ドット絵の拡大は、縦横とも同じ整数倍にしてください。');
+    }
   }
   return { width, height };
 }
@@ -1327,7 +1467,12 @@ async function applySelectedSize() {
   let dimensions;
   try { dimensions = targetDimensions(); }
   catch (error) { status.textContent = error?.message || '出力サイズを確認してください。'; return; }
-  await generateOutputItem({ dimensions });
+  const hasRewardUpscale = rewardedStaticSize(dimensions.width, dimensions.height);
+  if (hasRewardUpscale && !canUseOutputReward('output.static-image-upscale')) {
+    status.textContent = `${outputScaleRewardLabel}の新規作成には60分パスが必要です。現在の出力と元の素材は保持されています。`;
+    return;
+  }
+  await generateOutputItem({ dimensions, staticEntitledAtStart: outputRewardEnabled() && hasSiteReward() });
 }
 
 function displayFormat(entry) {
@@ -1507,6 +1652,22 @@ musicSourceSelect?.addEventListener('change', () => {
   void persistMediaSources(mediaSources, { ...mediaSettings, musicSourceId: source.id });
 });
 createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
+batchSave.addEventListener('click', () => {
+  const policyEnabled = outputRewardEnabled();
+  const entitledAtStart = selectedOutputIds.size > 1 ? (!policyEnabled || requireSiteReward('output.batch')) : !policyEnabled;
+  const batch = resolveOutputBatchSelection(outputItems, selectedOutputIds, { policyEnabled, entitled: entitledAtStart });
+  if (!batch.allowed) {
+    status.textContent = batch.selected.length > OUTPUT_REWARD_BATCH_LIMIT
+      ? `一度に保存できるのは${OUTPUT_REWARD_BATCH_LIMIT}項目です。選択を減らしてください。`
+      : '複数項目の一括保存には60分パスが必要です。選択した作品と出力は保持されています。';
+    return;
+  }
+  const started = triggerOutputBatchDownload(batch.selected, { urlForItem: (item) => generatedDownloadUrls.get(item.id) });
+  status.textContent = started > 1
+    ? `${started}項目のダウンロードを開始しました。ブラウザーが許可を尋ねた場合は、複数ファイルの保存を許可してください。`
+    : 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。';
+  for (const item of batch.selected) trackSave('download');
+});
 returnLink.addEventListener('click', async (event) => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !pendingWrites.size) return;
   event.preventDefault();
@@ -1520,11 +1681,17 @@ window.addEventListener('beforeunload', (event) => {
   event.returnValue = '';
 });
 
-filename.addEventListener('input', syncFilename);
+filename.addEventListener('input', () => {
+  if (activeItem) {
+    activeItem.metadata = { ...activeItem.metadata, userFilename: true };
+    record.currentMetadata = activeItem.metadata;
+  }
+  syncFilename();
+});
 filename.addEventListener('change', async () => {
   if (!record) return;
   try {
-    const updated = { ...activeItem, filename: currentFilename() };
+    const updated = { ...activeItem, filename: currentFilename(), metadata: { ...activeItem.metadata, userFilename: true } };
     await persistOutputItems(outputItems.map((item) => item.id === activeItem.id ? updated : item));
     record.filename = activeItem.filename; renderOutputItems();
   } catch { status.textContent = 'ファイル名を保持できませんでした。画面を閉じる前にもう一度入力してください。'; }
@@ -1552,8 +1719,16 @@ sourceSelect.addEventListener('change', () => {
   })();
 });
 formatSelect.addEventListener('change', () => {
-  jpegSetting.hidden = formatSelect.value !== 'jpeg';
-  jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
+  if (isRewardedOutputFormat(formatSelect.value) && !canUseOutputReward('output.advanced-format')) {
+    formatSelect.value = activeItem?.extension || 'png';
+    updateFormatSettings();
+    createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
+    updateMusicPlayControl();
+    updateSequenceControls();
+    status.textContent = 'この形式は60分パスが必要です。現在の出力はそのままです。';
+    return;
+  }
+  updateFormatSettings();
   createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
   updateMusicPlayControl();
   updateSequenceControls();
@@ -1562,6 +1737,13 @@ formatSelect.addEventListener('change', () => {
 });
 jpegSetting.addEventListener('change', () => {
   if (formatSelect.value === 'jpeg') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+});
+pngBackgroundMode.addEventListener('change', () => {
+  updateFormatSettings();
+  if (formatSelect.value === 'png') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+});
+pngBackgroundColor.addEventListener('change', () => {
+  if (formatSelect.value === 'png' && pngBackgroundMode.value === 'color') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
 jpegQuality.addEventListener('input', () => { jpegQualityValue.value = `${jpegQuality.value}%`; jpegQualityValue.textContent = `${jpegQuality.value}%`; });
 jpegQuality.addEventListener('change', () => {
@@ -1601,9 +1783,16 @@ originRestore.addEventListener('click', async () => {
 });
 scaleInput.addEventListener('input', () => {
   if (!record) return;
-  const frame = sourceFrames()[0]; const width = pngBaseSize?.width || frame?.width; const height = pngBaseSize?.height || frame?.height;
-  if (!width || !height) return;
+  const frame = sourceFrames()[0]; const base = pngBaseSize || frame;
   const scale = Math.max(1, Math.min(maxScale, Math.round(Number(scaleInput.value) || 1)));
+  if (base?.width && base?.height && rewardedStaticSize(base.width * scale, base.height * scale)
+      && !canUseOutputReward('output.static-image-upscale')) {
+    restoreScaleFieldDimensions(); scaleInput.value = String(currentScale);
+    status.textContent = `${outputScaleRewardLabel}には60分パスが必要です。元のサイズと表示中の出力は保持されています。`;
+    return;
+  }
+  const width = pngBaseSize?.width || frame?.width; const height = pngBaseSize?.height || frame?.height;
+  if (!width || !height) return;
   widthInput.value = String(width * scale); heightInput.value = String(height * scale);
   updateScaleSummary(width, height, sourceFrames().length > 1 ? 'gif' : 'png', sourceFrames().length || 1);
 });
@@ -1619,6 +1808,26 @@ function onDimensionInput(axis) {
 }
 widthInput.addEventListener('input', () => onDimensionInput('width'));
 heightInput.addEventListener('input', () => onDimensionInput('height'));
+function restoreScaleFieldDimensions() {
+  const frame = sourceFrames()[0];
+  const baseWidth = pngBaseSize?.width || frame?.width || 0;
+  const baseHeight = pngBaseSize?.height || frame?.height || 0;
+  if (!baseWidth || !baseHeight) return;
+  const current = rasterOutputDimensions(activeItem);
+  widthInput.value = String(current.width || baseWidth);
+  heightInput.value = String(current.height || baseHeight);
+  updateScaleSummary(baseWidth, baseHeight, sourceFrames().length > 1 ? 'gif' : 'png', sourceFrames().length || 1);
+}
+function gateManualScaleChange() {
+  if (!record) return;
+  if (rewardedStaticSize(Number(widthInput.value), Number(heightInput.value))
+      && !canUseOutputReward('output.static-image-upscale')) {
+    restoreScaleFieldDimensions();
+    status.textContent = `${outputScaleRewardLabel}の設定には60分パスが必要です。保存済みのサイズは変更していません。`;
+  }
+}
+widthInput.addEventListener('change', gateManualScaleChange);
+heightInput.addEventListener('change', gateManualScaleChange);
 aspectLock.addEventListener('change', () => { if (aspectLock.checked) onDimensionInput('width'); });
 applySettings.addEventListener('click', () => { void applySelectedSize(); });
 cancelSettings.addEventListener('click', () => { generationController?.abort(); });
@@ -1641,4 +1850,5 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) previewFit.reconnect();
 });
 
+renderRewardNotice();
 void mount();

@@ -1,4 +1,4 @@
-import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261007-color-selection-1';
+import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261016-color-capability-1';
 
 // Capture modifiers at down so changing keys during a drag cannot reinterpret it.
 export function selectionInputOperation(event) {

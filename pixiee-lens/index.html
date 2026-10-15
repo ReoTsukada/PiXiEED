@@ -2278,6 +2278,7 @@
 <body>
 <a class="lens-back" href="/tools/" aria-label="ツール一覧へ戻る">← ツール</a>
 <main>
+<h1 class="visually-hidden">PiXiEEDrawのPiXiEELENS 写真・カメラ変換</h1>
 <video autoplay="" id="cameraFeed" muted="" playsinline=""></video>
 <canvas class="dot-canvas" hidden="" id="dotCanvas"></canvas>
 <div class="aspect-overlay" hidden="" id="aspectOverlay">
@@ -2525,6 +2526,7 @@
 </select>
 </label>
 </div>
+<div class="dot-settings-panel__row"><p id="lens-reward-note" class="lc-image-note" hidden></p></div>
 <div class="dot-settings-panel__row">
 <button aria-label="グラデーション方法を切り替え" aria-pressed="true" class="option-button gradient-toggle is-active" id="gradientToggleBtn" type="button">グラデーション: ディザリング</button>
 </div>
@@ -2937,9 +2939,28 @@
         openCaptureInDraw();
       });
     }
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && capturePreviewOverlay && !capturePreviewOverlay.hidden) {
+    const escapeStartedInsideModal = new WeakSet();
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if ([...document.querySelectorAll('dialog[open], [role="dialog"][aria-modal="true"]')]
+          .some(dialog => !dialog.hidden && dialog.getAttribute('aria-hidden') !== 'true' && dialog.getClientRects().length > 0)) {
+        escapeStartedInsideModal.add(event);
+      }
+    }, true);
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (escapeStartedInsideModal.has(event)) { event.stopPropagation(); return; }
+      const modalOpen = [...document.querySelectorAll('dialog[open], [role="dialog"][aria-modal="true"]')]
+        .some(dialog => !dialog.hidden && dialog.getAttribute('aria-hidden') !== 'true' && dialog.getClientRects().length > 0);
+      if (modalOpen) { event.stopPropagation(); return; }
+      if (capturePreviewOverlay && !capturePreviewOverlay.hidden) {
+        event.preventDefault(); event.stopPropagation();
         closeCapturePreview();
+        return;
+      }
+      if (openMenuKey) {
+        event.preventDefault(); event.stopPropagation();
+        closeMenu(openMenuKey);
       }
     });
     const dotCanvas = document.getElementById('dotCanvas');
@@ -8930,7 +8951,18 @@
           const displayHeight = overlay.baseHeight * overlay.scale;
           const offsetStep = Math.min(overlays.length - 1, 5) * 32;
           overlay.offsetX = Math.round((window.innerWidth - displayWidth) / 2 + offsetStep);
-          overlay.offsetY = Math.round((window.innerHeight - displayHeight) / 2 + offsetStep);
+          const topInset = Math.max(16, (hudTop?.getBoundingClientRect().bottom ?? 0) + 16);
+          const shutterRect = captureBtn?.getBoundingClientRect();
+          const overlapsShutterX = shutterRect && overlay.offsetX < shutterRect.right && overlay.offsetX + displayWidth > shutterRect.left;
+          const shutterTop = overlapsShutterX ? shutterRect.top : window.innerHeight;
+          const bottomLimit = Number.isFinite(shutterTop) && shutterTop > 0
+            ? shutterTop - 16
+            : window.innerHeight - 16;
+          const preferredY = Math.round((window.innerHeight - displayHeight) / 2 + offsetStep);
+          const latestSafeY = bottomLimit - displayHeight;
+          overlay.offsetY = latestSafeY >= topInset
+            ? Math.max(topInset, Math.min(latestSafeY, preferredY))
+            : Math.min(topInset, latestSafeY);
           if (!Number.isFinite(overlay.offsetX)) {
             overlay.offsetX = 24;
           }
@@ -11260,6 +11292,12 @@
         setStatus('カメラの準備が完了してからGIF撮影してください');
         return false;
       }
+      const captureFps = getGifCaptureFps();
+      if (captureFps > (Number(window.__pixieedLensFreeGifFps) || 10) && typeof window.__pixieedLensRewardGate === 'function'
+          && !window.__pixieedLensRewardGate('lens.gif-fps')) {
+        setStatus('20・30FPSでGIFを撮影するには60分パスが必要です。10FPS以下へ変更するか、設定をそのままにして後で再試行できます。');
+        return false;
+      }
       const depth = state.colorDepth || '4';
       if (depthUsesPalette(depth)) {
         const hasPalette =
@@ -11292,9 +11330,10 @@
       const now = performance.now();
       const session = {
         active: true,
+        captureFps,
         startedAt: now,
         lastFrameAt: now,
-        frameDelayMs: getGifCaptureFrameIntervalMs(),
+        frameDelayMs: getGifCaptureFrameIntervalMs(captureFps),
         width: frameSize.width,
         height: frameSize.height,
         palette: gifPalette,
@@ -11310,7 +11349,6 @@
       updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
       setCaptureButtonRecording(true);
       const maxSeconds = (GIF_CAPTURE_MAX_DURATION_MS / 1000).toFixed(1);
-      const captureFps = getGifCaptureFps();
       setStatus(`GIF撮影中… ボタンを離すと保存（最大${maxSeconds}秒 / ${captureFps}FPS）`);
 
       const tick = (timestamp) => {
@@ -12106,6 +12144,7 @@
 
 
 
+<script type="module" src="/js/pixel-lens/legacy-reward.mjs?rev=20261016-color-capability-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
 </body>
 </html>

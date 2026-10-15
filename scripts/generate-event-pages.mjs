@@ -136,10 +136,28 @@ function relatedSeries(event, allEvents) {
     && (event.id.startsWith(`${candidate.id.replace(/-watch$/, '')}-`) || String(candidate.name || '').normalize('NFKC').trim().toLocaleLowerCase() === normalizedName));
 }
 
+function metaDescription(event, summary) {
+  const date = event.startDate
+    ? `${event.startDate}${event.endDate && event.endDate !== event.startDate ? `〜${event.endDate}` : ''}`
+    : (event.dateLabel || '');
+  const location = event.venue || event.area || event.prefecture || '';
+  const datePart = date ? `開催日: ${date}` : '';
+  const locationLabel = location ? `会場: ${location}` : '';
+  const fullSuffix = `（${datePart}${datePart && locationLabel ? '・' : ''}${locationLabel}）`;
+  const maxLocationLength = Math.max(0, 95 - Array.from(fullSuffix).length + Array.from(locationLabel).length);
+  const fittedLocation = locationLabel ? Array.from(locationLabel).slice(0, maxLocationLength).join('') : '';
+  const suffix = [datePart, fittedLocation].filter(Boolean).length
+    ? `（${[datePart, fittedLocation].filter(Boolean).join('・')}）`
+    : '';
+  const summaryBudget = Math.max(0, 155 - Array.from(suffix).length);
+  return `${Array.from(summary).slice(0, summaryBudget).join('')}${suffix}`;
+}
+
 function eventPage(event, allEvents, indexableIds = new Set(allEvents.map((item) => item.id))) {
   const canonical = `${origin}/events/${event.id}/`;
   const pageTitle = `${event.name}｜ドット絵イベント情報｜PiXiEED`;
   const summary = PUBLIC_SUMMARY_OVERRIDES[event.id] || event.description?.trim() || `${event.name}の開催履歴と次回開催情報を掲載しています。次回の日程など未発表の項目は未確認として表示しています。`;
+  const description = metaDescription(event, summary);
   const official = safeUrl(event.sourceUrl);
   const rows = eventFacts(event).map(([label, value]) => `<div class="event-fact"><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('\n');
   const related = relatedSeries(event, allEvents);
@@ -152,10 +170,10 @@ function eventPage(event, allEvents, indexableIds = new Set(allEvents.map((item)
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(pageTitle)}</title>
-<meta name="description" content="${esc(summary.slice(0, 155))}">
+<meta name="description" content="${esc(description)}">
 <link rel="canonical" href="${esc(canonical)}">
-<meta property="og:type" content="article"><meta property="og:site_name" content="PiXiEED"><meta property="og:title" content="${esc(pageTitle)}"><meta property="og:description" content="${esc(summary.slice(0, 155))}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:image" content="${origin}/assets/og/events.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(pageTitle)}"><meta name="twitter:description" content="${esc(summary.slice(0, 155))}"><meta name="twitter:image" content="${origin}/assets/og/events.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
+<meta property="og:type" content="article"><meta property="og:site_name" content="PiXiEED"><meta property="og:title" content="${esc(pageTitle)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:image" content="${origin}/assets/og/events.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(pageTitle)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${origin}/assets/og/events.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
 <link rel="stylesheet" href="/css/event-pages.css?rev=20261012-nav-polish-1">
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>

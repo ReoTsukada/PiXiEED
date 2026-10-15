@@ -1,6 +1,6 @@
 import { hashCanonical, validateAsset } from './asset-contract.mjs';
 import { validateDrawDocument } from './draw-core.mjs';
-import { validateAudioSong } from './audio-core.mjs';
+import { validateAudioSong } from './audio-core.mjs?rev=20261016-color-capability-1';
 
 export const WALK_GAME_SCHEMA_VERSION = 1;
 export const WALK_TEMPLATE_ID = 'walk-collect-v1';

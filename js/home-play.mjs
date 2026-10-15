@@ -6,7 +6,7 @@
  * while on screen. Reduced motion caps shared animation updates at 30 FPS; the hero keeps its own playback.
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
-import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20260929-shared-toys-2';
+import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20261015-real-screens-1';
 import { createHomeMotion } from './home-motion.mjs?rev=20261013-home-motion-1';
 import { stepGravitySand } from './home-sand.mjs?rev=20261002-gyro-360-1';
 import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, finishHomePlayIntro, HOME_PLAY_STORAGE_KEY } from './home-play-state.mjs?rev=20261010-home-stop-removal-1';
@@ -793,7 +793,7 @@ for (const canvas of document.querySelectorAll('[data-toy] canvas')) {
 // Initialize each preview shortly before its card comes into view.
 const initializedToys = new WeakSet();
 function initializeToy(el) {
-  if (initializedToys.has(el)) return;
+  if (initializedToys.has(el) || !el.querySelector('canvas')) return;
   initializedToys.add(el);
   try { homeToys[el.dataset.toy]?.(el); } catch (error) { console.warn('toy', el.dataset.toy, error); }
 }

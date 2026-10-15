@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDrawAnimationSession } from '../../js/creation/draw-animation-session.mjs';
-import { addAnimationFrame, addAnimationLayer, setLayerProperties, composeAnimationFrame } from '../../js/creation/animation-core.mjs';
+import { addAnimationFrame, addAnimationLayer, getAnimationCelDocument, setLayerProperties, composeAnimationFrame } from '../../js/creation/animation-core.mjs';
 const blank = () => ({ schemaVersion: 1, width: 16, height: 16, palette: ['#101010', '#ff7777'], pixels: Array(256).fill(-1) });
 test('frame copies edit independently and undo restores frame identity and pixels', () => {
   const s = createDrawAnimationSession(blank()); let doc = s.document(); doc.pixels[3] = 1; s.commitDocument(doc);
@@ -35,4 +35,44 @@ test('prepared selection commit is detached and validates before byte conversion
   s.undo(); assert.equal(s.animation, before);
   for (const value of [-2, 255, 256]) { const bad = s.document(); bad.pixels[0] = value; assert.throws(() => s.prepareDocument(bad)); assert.equal(s.animation, before); }
   const pending = s.prepareDocument(s.document()); s.apply(addAnimationFrame(s.animation)); assert.throws(pending, /対象/);
+});
+
+test('redo restores the layer attached to its timeline snapshot after a mode-only selection change', () => {
+  const s = createDrawAnimationSession(blank(), { musicLayer: true });
+  const frameId = s.frameId;
+  const artLayerId = s.animation.layers.find((layer) => layer.role !== 'music').id;
+  const musicLayerId = s.musicLayerId;
+
+  s.select(frameId, artLayerId);
+  const art = s.document(); art.pixels[0] = 1; s.commitDocument(art);
+  const appliedTimeline = s.animation;
+  const appliedPalette = [...s.animation.palette];
+  s.select(frameId, musicLayerId);
+  assert.ok(s.document().pixels.every((pixel) => pixel === -1), 'Music starts with an independent blank cel');
+
+  s.undo();
+  assert.equal(s.layerId, artLayerId, 'Undo restores the art cel for the preceding Draw snapshot');
+  assert.ok(s.document().pixels.every((pixel) => pixel === -1));
+  s.redo();
+  assert.equal(s.animation, appliedTimeline, 'Redo restores the exact applied timeline');
+  assert.equal(s.frameId, frameId);
+  assert.equal(s.layerId, artLayerId, 'Redo restores the art cel selected when the edit was committed');
+  assert.deepEqual([...s.document().pixels], [1, ...Array(255).fill(-1)]);
+  assert.deepEqual(s.animation.palette, appliedPalette);
+  assert.ok(getAnimationCelDocument(s.animation, frameId, musicLayerId).pixels.every((pixel) => pixel === -1),
+    'the independent Music cel remains blank');
+
+  const handoff = s.snapshot();
+  const restored = createDrawAnimationSession(blank(), { musicLayer: true });
+  restored.restore(handoff);
+  assert.equal(restored.layerId, artLayerId);
+  assert.equal(restored.animation, appliedTimeline);
+  restored.select(frameId, musicLayerId);
+  const musicSelectionHandoff = restored.snapshot();
+  const resumed = createDrawAnimationSession(blank(), { musicLayer: true });
+  resumed.restore(musicSelectionHandoff);
+  assert.equal(resumed.layerId, musicLayerId, 'handoff preserves the live selection separately from history selection');
+  resumed.undo(); resumed.redo();
+  assert.equal(resumed.layerId, artLayerId, 'Redo still restores the committed selection after handoff');
+  assert.deepEqual([...resumed.document().pixels], [...s.document().pixels]);
 });

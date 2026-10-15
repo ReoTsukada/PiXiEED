@@ -16,9 +16,10 @@ test('legacy draw converts without changing pixels and cel reads return isolated
   assert.deepEqual(getAnimationCelDocument(animation, animation.frames[0].id, animation.layers[0].id), source);
 });
 
-test('legacy half-transparent palette is refused instead of silently dropping alpha', () => {
+test('legacy half-transparent palette migrates while preserving alpha and its source', () => {
   const legacy = { schemaVersion: 1, width: 1, height: 1, palette: ['#12345680'], pixels: [0] };
-  assert.throws(() => createAnimationFromDraw(legacy), (error) => error instanceof RangeError && /半透明/.test(error.message));
+  const timeline = createAnimationFromDraw(legacy);
+  assert.deepEqual(getAnimationCelDocument(timeline, timeline.frames[0].id, timeline.layers[0].id), legacy);
   assert.deepEqual(legacy.palette, ['#12345680']);
   assert.deepEqual(legacy.pixels, [0]);
 });

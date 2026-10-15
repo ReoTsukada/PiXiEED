@@ -12,19 +12,20 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>try { if (localStorage.getItem('PiXiEED:motion-preference:v1') === 'reduced') document.documentElement.dataset.pixieedMotion = 'reduced'; } catch { /* storage may be blocked */ }</script>
-  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261013-hero-autoplay-2">
-  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261013-hero-autoplay-2">
+  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261015-real-screens-1">
+  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261015-real-screens-1">
   <link rel="modulepreload" href="/js/home-animation.mjs?rev=20261001-hero-rates-2">
-  <link rel="modulepreload" href="/js/tool-toys.mjs?rev=20260929-shared-toys-2">
+  <link rel="modulepreload" href="/js/tool-toys.mjs?rev=20261015-real-screens-1">
   <link rel="modulepreload" href="/js/home-motion.mjs?rev=20261013-home-motion-1">
   <link rel="modulepreload" href="/js/home-sand.mjs?rev=20261002-gyro-360-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/home.css?rev=20261013-hero-autoplay-2">
-  <link rel="stylesheet" href="/css/home-discovery.css?rev=20261015-approved-home-1">
+  <link rel="stylesheet" href="/css/home.css?rev=20261015-visual-polish-1">
+  <link rel="stylesheet" href="/css/home-discovery.css?rev=20261015-visual-polish-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
+  <link rel="stylesheet" href="/css/real-tool-screens.css?rev=20261015-icons-1">
 </head>
 <body data-page="home" class="app-page home-play">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -65,38 +66,38 @@
       </div>
       <output id="hpAudioState" class="hp-audio-state" aria-live="polite">最初のタップで音が出ます</output>
       <output id="hpStatus" class="visually-hidden" aria-live="polite"></output>
-      <div class="hp-hero-foot"><a class="hp-discovery-link" href="/draw/">この先で、作品をつくる（PiXiEEDraw） <span aria-hidden="true">→</span></a><a class="hp-discovery-link hp-discovery-secondary" href="#hpToysTitle">ほかの遊びを見る <span aria-hidden="true">↓</span></a></div>
+      <div class="hp-hero-foot"><a class="hp-discovery-link" href="/draw/" aria-label="PiXiEEDrawでドット絵を描く" data-draw-cta data-draw-context="general">ドット絵を描く <span aria-hidden="true">→</span></a><a class="hp-discovery-link hp-discovery-secondary" href="#hpToysTitle">ほかの遊びを見る <span aria-hidden="true">↓</span></a></div>
       <dialog class="hp-clear-dialog" id="hpClearDialog" aria-labelledby="hpClearTitle"><h2 id="hpClearTitle">あそび場を消しますか？</h2><p>描いたドットが消えます。消した後も「ひとつ戻す」で取り消せます。</p><div><button id="hpClearCancel" type="button" autofocus>残して戻る</button><button id="hpClearConfirm" type="button">消す</button></div></dialog>
     </section>
 
     <section class="home-discovery container" aria-labelledby="homeDiscoveryTitle">
       <div class="home-discovery__heading">
-        <div><p class="home-discovery__eyebrow">SEE · PLAY · MAKE</p><h2 id="homeDiscoveryTitle">見つける。遊ぶ。つくる。</h2></div>
+        <div><p class="home-discovery__eyebrow">つくる · あそぶ · 見つける</p><h2 id="homeDiscoveryTitle">次にできること</h2></div>
         <a class="home-discovery__all" href="/about/">PiXiEEDについて <span aria-hidden="true">→</span></a>
       </div>
       <div class="home-discovery__layout">
-        <section class="home-gallery" aria-labelledby="homeGalleryTitle">
-          <div class="home-gallery__heading"><div><h3 id="homeGalleryTitle">公開作品</h3><p>公式に公開された作品を、地図の場所とあわせて。</p></div><a href="/globe/">地図の投稿を見る <span aria-hidden="true">↗</span></a></div>
-          <div class="home-gallery__grid" data-home-gallery aria-live="polite" aria-busy="true"><p class="home-gallery__status">公開作品を読み込んでいます…</p></div>
-        </section>
         <nav class="home-starts" aria-label="PiXiEEDでできること">
           <a class="home-start home-start--draw" href="/draw/"><span class="home-start__number" aria-hidden="true">01</span><span class="home-start__copy"><strong>ドット絵を描く</strong><small>PiXiEEDrawをひらく</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
-          <a class="home-start home-start--camera" href="/camera/"><span class="home-start__number" aria-hidden="true">02</span><span class="home-start__copy"><strong>カメラで遊ぶ</strong><small>Pixel Camera Studio</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
+          <a class="home-start home-start--camera" href="/camera/"><span class="home-start__number" aria-hidden="true">02</span><span class="home-start__copy"><strong>カメラで遊ぶ</strong><small>PiXiEEDrawのPiXiEELENS</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
           <a class="home-start home-start--about" href="/draw/about/"><span class="home-start__number" aria-hidden="true">03</span><span class="home-start__copy"><strong>PiXiEEDrawを知る</strong><small>機能と使い方を見る</small></span><span class="home-start__arrow" aria-hidden="true">↗</span></a>
         </nav>
+        <section class="home-gallery" aria-labelledby="homeGalleryTitle">
+          <div class="home-gallery__heading"><div><h3 id="homeGalleryTitle">公開作品</h3><p>公式に公開された作品を、地図の場所とあわせて。</p></div><a href="/globe/">地図の投稿を見る <span aria-hidden="true">↗</span></a></div>
+          <div class="home-gallery__grid" data-home-gallery data-state="loading" tabindex="-1" aria-live="polite" aria-busy="true"><p class="home-gallery__status">公開作品を確認しています…</p></div>
+        </section>
       </div>
     </section>
 
     <section class="hp-section" aria-labelledby="hpToysTitle">
       <div class="container">
         <h2 class="hp-heading" id="hpToysTitle">つくる・あそぶ・出会う</h2>
-        <p class="hp-section-lede">気になるカードから、すぐにはじめられます。</p>
+        <p class="hp-section-lede">気になるカードから、すぐにはじめられます。 <span>実ツール画面：魔王様</span></p>
         <div class="hp-card-group" aria-labelledby="hpCreateTitle">
           <h3 class="hp-group-title" id="hpCreateTitle">つくる</h3>
           <nav class="hp-card-grid hp-create-grid" aria-label="制作ツール">
-            <a class="hp-toy hp-link-card" data-toy="editor" href="/draw/" style="--tone:#f1eee6"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">PiXiEEDraw</h3><span class="hp-toy-line">一粒ずつ描いて、アニメーションも制作。</span><span class="hp-card-link">ドット絵を描く <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="camera" href="/camera/" style="--tone:#1f2b36"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">写真ドット変換</h3><span class="hp-toy-line">写真や画像をドット絵にして、PNG保存。</span><span class="hp-card-link">写真を変換 <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="sound" href="/audio/" style="--tone:#231a33"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">ドットで音楽</h3><span class="hp-toy-line">マス目に音を描いて、ループ曲を作曲。</span><span class="hp-card-link">音楽をつくる <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="editor" href="/draw/" style="--tone:#f1eee6" data-static-tool="editor"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/artwork.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">PiXiEEDraw</h3><span class="hp-toy-line">一粒ずつ描いて、アニメーションも制作。</span><span class="hp-card-link">ドット絵を描く <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="camera" href="/camera/" style="--tone:#1f2b36" data-static-tool="camera"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/camera.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">PiXiEELENSで写真変換</h3><span class="hp-toy-line">写真や画像をドット絵にして、PNG保存。</span><span class="hp-card-link">写真を変換 <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="sound" href="/audio/" style="--tone:#231a33" data-static-tool="sound"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/music.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">PiXiEEaudioで音楽</h3><span class="hp-toy-line">マス目に音を描いて、ループ曲を作曲。</span><span class="hp-card-link">音楽をつくる <span aria-hidden="true">→</span></span></div></a>
             <a class="hp-link-card hp-output-card" href="/output/"><span class="hp-output-visual" aria-hidden="true"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>♫</span></span><div class="hp-card-copy hp-output-copy"><h3 class="hp-toy-name">画像・音楽の合成変換</h3><span class="hp-toy-line">画像や動画に音楽を重ねて書き出し。</span><span class="hp-card-link">合成・変換する <span aria-hidden="true">→</span></span></div></a>
           </nav>
         </div>
@@ -106,9 +107,9 @@
         <div class="hp-card-group" aria-labelledby="hpPlayTitle">
           <h3 class="hp-group-title" id="hpPlayTitle">あそぶ</h3>
           <nav class="hp-card-grid hp-puzzle-grid" aria-label="パズル">
-            <a class="hp-toy hp-link-card" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">ジグソーパズル</h3><span class="hp-toy-line">写真や画像から作って遊ぼう。</span><span class="hp-card-link">パズルを組む <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="diff" href="/play/spot-difference/" style="--tone:#e6edf3"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">間違い探し</h3><span class="hp-toy-line">2枚の絵から違いを見つけよう。</span><span class="hp-card-link">違いを探す <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="find" href="/play/hidden-object/" style="--tone:#dcebd2"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">もの探し</h3><span class="hp-toy-line">絵の中から、お題のアイテムを探そう。</span><span class="hp-card-link">ものを探す <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6" data-static-tool="jigsaw"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/jigsaw.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">ジグソーパズル</h3><span class="hp-toy-line">写真や画像から作って遊ぼう。</span><span class="hp-card-link">パズルを組む <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="diff" href="/play/spot-difference/" style="--tone:#e6edf3" data-static-tool="diff"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/spot-difference.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">間違い探し</h3><span class="hp-toy-line">2枚の絵から違いを見つけよう。</span><span class="hp-card-link">違いを探す <span aria-hidden="true">→</span></span></div></a>
+            <a class="hp-toy hp-link-card" data-toy="find" href="/play/hidden-object/" style="--tone:#dcebd2" data-static-tool="find"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/hidden-object.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">もの探し</h3><span class="hp-toy-line">絵の中から、お題のアイテムを探そう。</span><span class="hp-card-link">ものを探す <span aria-hidden="true">→</span></span></div></a>
           </nav>
         </div>
         <div class="hp-card-group" aria-labelledby="hpDiscoverTitle">
@@ -122,11 +123,26 @@
         </div>
       </div>
     </section>
+    <section class="container real-tool-screens" aria-labelledby="homeRealToolScreensTitle">
+      <div class="real-tool-screens__head"><h2 id="homeRealToolScreensTitle">魔王様で見る、実際のツール画面</h2><p>PiXiEEDrawとカメラで作品を開いた画面です。PC版とスマートフォン版を紹介します。</p></div>
+      <div class="real-tool-screens__grid">
+        <article class="real-tool-screens__item">
+          <h3>PiXiEEDraw</h3>
+          <div class="tool-real-pair"><span><img src="/assets/screenshots/draw-pc-maou.png" width="2880" height="1920" alt="魔王様を扱ったPiXiEEDrawの編集画面、PC版" loading="lazy"><small>PC版</small></span><span><img src="/assets/screenshots/draw-mobile-maou.png" width="780" height="1688" alt="魔王様を扱ったPiXiEEDrawの編集画面、スマートフォン版" loading="lazy"><small>スマートフォン版</small></span></div>
+          <a class="real-tool-screens__link" href="/draw/about/">PiXiEEDrawの機能と使い方を見る <span aria-hidden="true">→</span></a>
+        </article>
+        <article class="real-tool-screens__item">
+          <h3>写真をドット絵に変換</h3>
+          <div class="tool-real-pair"><span><img src="/assets/screenshots/camera-pc-maou.png" width="1366" height="900" alt="魔王様を扱ったカメラ・画像ツールの変換結果画面、PC版" loading="lazy"><small>PC版</small></span><span><img src="/assets/screenshots/camera-mobile-maou.png" width="390" height="844" alt="魔王様を扱ったカメラ・画像ツールの変換結果画面、スマートフォン版" loading="lazy"><small>スマートフォン版</small></span></div>
+          <a class="real-tool-screens__link" href="/camera/">カメラツールをひらく <span aria-hidden="true">→</span></a>
+        </article>
+      </div>
+    </section>
     <aside class="container px-display-ad" data-display-ad="home" data-ad-reserve aria-label="広告"><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
-  <script type="module" src="/js/home-startup.mjs?rev=20261013-hero-autoplay-2"></script>
-  <script type="module" src="/js/home-gallery.mjs?rev=20261015-approved-home-1"></script>
+  <script type="module" src="/js/home-startup.mjs?rev=20261015-real-screens-1"></script>
+  <script type="module" src="/js/home-gallery.mjs?rev=20261015-home-gallery-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
   <script type="module" src="/js/display-ads.mjs?rev=20261007-lazy-ads-1"></script>
 </body>

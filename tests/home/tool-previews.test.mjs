@@ -64,7 +64,8 @@ test('shared tool toys paint recognizable opaque scenes on a 24 by 24 integer gr
   const html = readFileSync(new URL('../../tools/index.html', import.meta.url), 'utf8');
   const markupScenes = [...html.matchAll(/class="hp-toy(?: [^"]*)?"[^>]*data-tool-preview="([a-z]+)"/g)].map((match) => match[1]);
   assert.equal(markupScenes.length, new Set(markupScenes).size, 'each tool scene has one card');
-  assert.ok(markupScenes.length >= 7);
+  // Intro cards now use real screenshots; only retained functional previews
+  // need canvas renderers. Do not require decorative sample scenes in markup.
   for (const scene of markupScenes) assert.ok(TOOL_TOY_NAMES.includes(scene), `missing ${scene} scene`);
 
   for (const scene of TOOL_TOY_NAMES) {

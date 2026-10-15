@@ -65,6 +65,17 @@ function hasTransparentPixels(frames) {
   return false;
 }
 
+function rejectPartialAlpha(frames) {
+  for (const frame of frames) for (let index = 3; index < frame.data.length; index += 4) {
+    const alpha = frame.data[index];
+    if (alpha > 0 && alpha < 255) {
+      const error = new TypeError('GIFは半透明を保存できません。PNGで書き出すか、GIF用の背景色を合成してから出力してください。');
+      error.code = 'gif-partial-alpha-unsupported';
+      throw error;
+    }
+  }
+}
+
 function validDelay(value) {
   if (!Number.isFinite(value) || value < 20 || value > 655350) throw new RangeError('GIFのコマ時間は20〜655350msで指定してください。');
   return Math.max(2, Math.min(65535, Math.round(value / 10)));
@@ -146,6 +157,7 @@ export function lzwEncode(indices, minCodeSize, out) {
  */
 export function encodeGif(frames, { delayMs = 1000 / GIF_FPS, scale = 1, palette = buildPalette(frames), onProgress = () => {} } = {}) {
   if (!frames.length) throw new RangeError('no frames');
+  rejectPartialAlpha(frames);
   const { width, height } = frames[0];
   const W = width * scale; const H = height * scale;
   const transparent = hasTransparentPixels(frames);

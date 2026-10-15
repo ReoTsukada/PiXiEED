@@ -1,8 +1,8 @@
-import { composeAnimationFrame } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 const PRESETS = [16, 32, 64, 128, 256];
 const ASPECTS = [['free', '自由'], ['1:1', '1:1'], ['3:4', '3:4'], ['9:16', '9:16'], ['4:3', '4:3'], ['16:9', '16:9']];
-const COLOR_COUNTS = [1, 2, 4, 8, 16, 32];
+const COLOR_COUNTS = [1, 2, 4, 8, 16, 32, 64, 128];
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -55,12 +55,12 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   const palettePreset = el('select', { id: 'creation-project-palette-preset', 'aria-label': 'パレットを選ぶ' });
   const palettePresets = new Map([['current', null], ['mono', ['#000000','#ffffff']], ['gray', ['#222222','#666666','#aaaaaa','#eeeeee']], ['gb', ['#e0f8d0','#a8c070','#587830','#203810']]]);
   for (const [value,label] of [['current','プリセット'],['mono','白黒'],['gray','グレー4色'],['gb','GB4色']]) palettePreset.append(el('option',{value},label));
-  try { for (const saved of JSON.parse(localStorage.getItem('pixieed:camera-palettes:v1') || '[]')) { if (!Array.isArray(saved?.colors) || saved.colors.length < 1 || saved.colors.length > 32 || saved.colors.some(rgb=>!Array.isArray(rgb)||rgb.length<3||rgb.some(c=>!Number.isInteger(c)||c<0||c>255))) continue; const id = `saved-${palettePresets.size}`; palettePresets.set(id,saved.colors.map(rgb=>'#'+rgb.slice(0,3).map(c=>c.toString(16).padStart(2,'0')).join(''))); palettePreset.append(el('option',{value:id},saved.name || '保存したパレット')); } } catch {}
+  try { for (const saved of JSON.parse(localStorage.getItem('pixieed:camera-palettes:v1') || '[]')) { if (!Array.isArray(saved?.colors) || saved.colors.length < 1 || saved.colors.length > 128 || saved.colors.some(rgb=>!Array.isArray(rgb)||rgb.length<3||rgb.some(c=>!Number.isInteger(c)||c<0||c>255))) continue; const id = `saved-${palettePresets.size}`; palettePresets.set(id,saved.colors.map(rgb=>'#'+rgb.slice(0,3).map(c=>c.toString(16).padStart(2,'0')).join(''))); palettePreset.append(el('option',{value:id},saved.name || '保存したパレット')); } } catch {}
   const swatches = el('div', { class: 'creation-project-settings__swatches', 'aria-label': 'パレットの各色' });
-  const colorCount = el('select', { id: 'creation-project-color-count', 'aria-label': 'パレット色数' });
-  for (const count of COLOR_COUNTS) colorCount.append(el('option', { value: count }, `${count}色まで`));
-  const colorCountLabel = el('label', { class: 'creation-project-settings__field' }, '色数'); colorCountLabel.append(colorCount);
-  const paletteHelp = el('small', { id: 'creation-project-palette-help' }, 'HEXカラーを改行またはカンマで区切ります。変更したパレットに合わせて全コマ・全レイヤーの色を量子化します。音の色割り当てにも影響します。');
+  const colorCount = el('select', { id: 'creation-project-color-count', 'aria-label': 'パレットの登録候補数' });
+  for (const count of COLOR_COUNTS) colorCount.append(el('option', { value: count }, count === 128 ? '128候補（使用色は最大64色）' : `${count}候補`));
+  const colorCountLabel = el('label', { class: 'creation-project-settings__field' }, '登録候補'); colorCountLabel.append(colorCount);
+  const paletteHelp = el('small', { id: 'creation-project-palette-help' }, 'HEXカラーを改行またはカンマで区切ります。使用色は無料32色・60分特典64色（透明・未使用色を除く）。未使用を含む登録候補は128色まで保持できます。変更したパレットに合わせて全コマ・全レイヤーの色を量子化します。音の色割り当てにも影響します。');
   const previewCanvas = el('canvas', { class: 'creation-project-settings__thumbnail', width: '1', height: '1', 'aria-label': '設定後の作品プレビュー' });
   const preview = el('div', { class: 'creation-project-settings__preview', role: 'status', 'aria-live': 'polite' });
   const actions = el('div', { class: 'creation-project-settings__actions' });
@@ -77,7 +77,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   let applying = false;
   const timeline = () => draw.getTimeline();
   const ratioOf = value => value === 'free' ? null : value.split(':').map(Number).reduce((a, b) => a / b);
-  const selectedPalette = () => palette.value.split(/[\s,]+/).filter(Boolean).slice(0, Number(colorCount.value) || 32);
+  const selectedPalette = () => { const colors = palette.value.split(/[\s,]+/).filter(Boolean); return colors.length > 128 ? colors : colors.slice(0, Number(colorCount.value) || 128); };
   const currentSettings = () => {
     const animation = timeline();
     return { width: Number(width.value), height: Number(height.value), palette: selectedPalette(), aspectLocked: ratio.checked, aspectRatio: aspect.value,
@@ -91,7 +91,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     if (force || root.dataset.signature !== signature) {
       width.value = String(animation.width); height.value = String(animation.height);
       palette.value = animation.palette.join('\n'); palettePreset.value = 'current'; renderSwatches();
-      colorCount.value = String(COLOR_COUNTS.find(count => count >= animation.palette.length) || 32);
+      colorCount.value = String(COLOR_COUNTS.find(count => count >= animation.palette.length) || 128);
       aspect.value = 'free';
       root.dataset.signature = signature;
       invalidatePreview(preserveStatus ? '' : '作品が変わったため、プレビューを更新してください。');
@@ -101,10 +101,10 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   }
   function renderSwatches() {
     swatches.replaceChildren();
-    palette.value.split(/[\s,]+/).filter(Boolean).slice(0,32).forEach((color,index)=>{
-      if (!/^#[\da-f]{6}(?:ff)?$/i.test(color)) return;
+    palette.value.split(/[\s,]+/).filter(Boolean).slice(0,128).forEach((color,index)=>{
+      if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) return;
       const input = el('input',{type:'color',value:color.slice(0,7),'aria-label':`色 ${index+1}`});
-      input.addEventListener('input',()=>{const colors=palette.value.split(/[\s,]+/).filter(Boolean);colors[index]=input.value;palette.value=colors.join('\n');palettePreset.value='current';invalidatePreview();}); swatches.append(input);
+      input.addEventListener('input',()=>{const colors=palette.value.split(/[\s,]+/).filter(Boolean);colors[index]=input.value+(colors[index]?.length===9?colors[index].slice(7):'');palette.value=colors.join('\n');palettePreset.value='current';invalidatePreview();}); swatches.append(input);
     });
   }
   function invalidatePreview(message = '設定に未適用の変更があります。適用前にもう一度プレビューしてください。') {
@@ -115,17 +115,10 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     if (!animation?.frames?.length) { previewCanvas.hidden = true; return; }
     const preferredFrame = draw.getEditorState?.().frameId;
     const frameId = animation.frames.some(frame => frame.id === preferredFrame) ? preferredFrame : animation.frames[0].id;
-    const cel = composeAnimationFrame(animation, frameId);
-    previewCanvas.width = cel.width; previewCanvas.height = cel.height;
+    const image = composeAnimationFrameRgba(animation, frameId);
+    previewCanvas.width = image.width; previewCanvas.height = image.height;
     const context = previewCanvas.getContext('2d'); if (!context) { previewCanvas.hidden = true; return; }
-    const pixels = cel.pixels;
-    for (let y = 0; y < cel.height; y++) for (let x = 0; x < cel.width; x++) {
-      const index = pixels[y * cel.width + x];
-      if (index < 0) continue;
-      const hex = cel.palette[index] || '#000000';
-      context.fillStyle = hex.length === 9 ? `#${hex.slice(1, 7)}${hex.slice(7, 9)}` : hex;
-      context.fillRect(x, y, 1, 1);
-    }
+    context.putImageData(new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0);
     previewCanvas.hidden = false;
   }
   async function makePreview() {
@@ -133,8 +126,8 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     if (!Number.isInteger(settings.width) || !Number.isInteger(settings.height) || settings.width < 1 || settings.height < 1 || settings.width > 256 || settings.height > 256) {
       invalidatePreview(); preview.textContent = '幅と高さは1〜256の整数で入力してください。'; return;
     }
-    if (!settings.palette.length || settings.palette.length > 32 || settings.palette.some(color => !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color))) {
-      invalidatePreview(); preview.textContent = 'パレットは有効なHEXカラーを1〜32色入力してください。'; return;
+    if (!settings.palette.length || settings.palette.length > 128 || settings.palette.some(color => !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color))) {
+      invalidatePreview(); preview.textContent = 'パレットは有効なHEXカラーを1〜128候補入力してください。'; return;
     }
     if (typeof draw.previewProjectSettings !== 'function') {
       invalidatePreview(); preview.textContent = '設定プレビューAPIを読み込めません。'; return;
@@ -182,7 +175,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   scope.listen(palette, 'input', renderSwatches);
   scope.listen(palettePreset, 'change', () => { const colors = palettePresets.get(palettePreset.value); if (!colors) return; palette.value=colors.join('\n');colorCount.value=String(COLOR_COUNTS.find(count=>count>=colors.length)||32);renderSwatches();invalidatePreview(); });
   scope.listen(colorCount, 'change', () => invalidatePreview());
-  scope.listen(palette, 'input', () => { const count = palette.value.split(/[\s,]+/).filter(Boolean).length; if (count <= 32) colorCount.value = String(COLOR_COUNTS.find(size => size >= count) || 32); invalidatePreview(); });
+  scope.listen(palette, 'input', () => { const count = palette.value.split(/[\s,]+/).filter(Boolean).length; if (count <= 128) colorCount.value = String(COLOR_COUNTS.find(size => size >= count) || 128); invalidatePreview(); });
   scope.listen(previewButton, 'click', () => void makePreview());
   scope.listen(presetRow, 'click', event => {
     const button = event.target.closest('[data-long-side]'); if (!button) return;

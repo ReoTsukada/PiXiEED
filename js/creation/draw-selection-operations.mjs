@@ -12,7 +12,9 @@ export function selectDrawColorMask(doc, point) {
   const x = Math.floor(point?.x), y = Math.floor(point?.y);
   if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= doc.width || y >= doc.height) return null;
   const targetIndex = y * doc.width + x, targetValue = doc.pixels[targetIndex];
-  const transparent = value => value < 0 || selectionColor(doc.palette[value]).endsWith('00');
+  // An erased hole and an indexed alpha-zero swatch are distinct: the latter
+  // remains addressable so copy/paste and color selection preserve its slot.
+  const transparent = value => value < 0;
   const isTransparent = transparent(targetValue);
   const targetColor = isTransparent ? null : selectionColor(doc.palette[targetValue]);
   const equivalents = new Set();
@@ -43,21 +45,19 @@ export function captureDrawSelection(doc, bounds, { mask = null } = {}) {
     const value = doc.pixels[offset];
     if (value < 0) continue;
     const color = selectionColor(doc.palette[value]);
-    if (color.endsWith('00')) continue;
-    if (!color.endsWith('ff')) fail('半透明の原本は変更できません。');
     if (!colors.has(color)) {
       if (palette.length >= 255) fail('選択の色数が255色を超えています。');
-      palette.push(color.slice(0, 7)); colors.set(color, palette.length);
+      palette.push(String(doc.palette[value]).toLowerCase()); colors.set(color, palette.length);
     }
     indices[y * bounds.width + x] = colors.get(color);
   }
-  return palette.length ? { format: DRAW_SELECTION_FORMAT, version: 1, width: bounds.width, height: bounds.height, origin: { x: bounds.x, y: bounds.y }, indices, palette, ...(localMask ? { mask: localMask } : {}) } : null;
+  return palette.length ? { format: DRAW_SELECTION_FORMAT, version: 3, width: bounds.width, height: bounds.height, origin: { x: bounds.x, y: bounds.y }, indices, palette, ...(localMask ? { mask: localMask } : {}) } : null;
 }
 
 function validateClipboard(clip) {
-  if (clip?.format !== DRAW_SELECTION_FORMAT || clip.version !== 1 || !dimension(clip.width) || !dimension(clip.height) || !(clip.indices instanceof Uint8Array)
+  if (clip?.format !== DRAW_SELECTION_FORMAT || clip.version !== 3 || !dimension(clip.width) || !dimension(clip.height) || !(clip.indices instanceof Uint8Array)
     || clip.indices.length !== clip.width * clip.height || !Array.isArray(clip.palette) || !clip.palette.length || clip.palette.length > 255) fail('コピーした選択データが不正です。');
-  for (const color of clip.palette) if (!selectionColor(color).endsWith('ff')) fail('半透明の原本は変更できません。');
+  for (const color of clip.palette) selectionColor(color);
   for (const byte of clip.indices) if (byte > clip.palette.length) fail('コピーした色番号が不正です。');
   if (!clip.origin || !Number.isSafeInteger(clip.origin.x) || !Number.isSafeInteger(clip.origin.y)) fail('コピーした範囲の位置が不正です。');
   // Optional future non-rectangular selection mask: 0 unselected, 1 selected.
@@ -80,7 +80,7 @@ export function createDrawSelectionClipboard() {
   };
 }
 
-/** Shared clipped opaque walk for signed editing pixels and zero-based clipboard bytes. */
+/** Shared clipped walk for signed editing pixels and zero-based clipboard bytes. */
 export function visitOpaqueDrawSelection(source, width, height, origin, canvasWidth, canvasHeight, visit, { mask = null, transparent = 0 } = {}) {
   for (let y = Math.max(0, -origin.y); y < Math.min(height, canvasHeight - origin.y); y++) for (let x = Math.max(0, -origin.x); x < Math.min(width, canvasWidth - origin.x); x++) {
     const index = y * width + x;
@@ -90,7 +90,7 @@ export function visitOpaqueDrawSelection(source, width, height, origin, canvasWi
   }
 }
 
-/** Clear only the captured opaque footprint, never the holes in its rectangle. */
+/** Clear only captured indexed cells, never holes in its rectangle. */
 export function clearDrawSelection(doc, clip, sourceBounds) {
   validateClipboard(clip);
   const pixels = [...doc.pixels];
@@ -120,7 +120,7 @@ export function sampleDrawSelection(clip, { width, height, turns = 0, flipX = fa
 }
 
 /** A staging document only. The caller commits pixels + palette once after validation. */
-export function projectDrawSelection(base, clip, transform, { sourceBounds = null, otherColors = [], enforceLimits = true, maxPalette = 32, maxUsedColors = 32 } = {}) {
+export function projectDrawSelection(base, clip, transform, { sourceBounds = null, otherColors = [], enforceLimits = true, maxPalette = 128, maxUsedColors = 64 } = {}) {
   validateDrawDocument(base);
   const raster = transform.angle === undefined ? { ...transform, indices: sampleDrawSelection(clip, transform) } : rasterDrawSelection(clip, transform);
   const { x, y, width, height, indices: samples } = raster;
@@ -138,16 +138,20 @@ export function projectDrawSelection(base, clip, transform, { sourceBounds = nul
   for (const byte of usedBytes) {
     const color = selectionColor(clip.palette[byte - 1]);
     if (!targetColors.has(color)) {
-      if (enforceLimits && next.palette.length >= maxPalette) fail('パレットは32色までです。貼り付けは確定していません。');
-      targetColors.set(color, next.palette.length); next.palette.push(color.slice(0, 7));
+      if (enforceLimits && next.palette.length >= maxPalette) fail(`パレットは${maxPalette}色までです。貼り付けは確定していません。`);
+      targetColors.set(color, next.palette.length); next.palette.push(clip.palette[byte - 1]);
     }
     remap.set(byte, targetColors.get(color));
   }
   visitOpaqueDrawSelection(samples, width, height, raster, base.width, base.height, (index, byte) => { next.pixels[index] = remap.get(byte); });
   if (enforceLimits) {
-    const used = new Set(otherColors.map(selectionColor));
-    for (const value of next.pixels) used.add(value < 0 ? '#00000000' : selectionColor(next.palette[value]));
-    if (used.size > maxUsedColors) fail('透明を含む使用色は作品全体で32色までです。貼り付けは確定していません。');
+    const visibleColor = color => { const rgba = selectionColor(color); return rgba.endsWith('00') ? null : rgba; };
+    const used = new Set(otherColors.map(visibleColor).filter(Boolean));
+    for (const value of next.pixels) {
+      const rgba = value < 0 ? null : visibleColor(next.palette[value]);
+      if (rgba) used.add(rgba);
+    }
+    if (used.size > maxUsedColors) fail(`使用中の色は${maxUsedColors}色までです。貼り付けは確定していません。`);
   }
   return { document: next, visiblePixels };
 }

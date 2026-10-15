@@ -33,7 +33,8 @@ await writeFile(fixturePath, await encodePxd(await writePxdAnimation(createPxdPr
 
 const defaultViewports = [
   { width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 },
-  { width: 568, height: 320 }, { width: 1280, height: 800 }
+  { width: 568, height: 320 }, { width: 1280, height: 800 }, { width: 1366, height: 768 },
+  { width: 1366, height: 720 }, { width: 1920, height: 1080 }
 ];
 const viewports = process.env.PIXIEED_SELECTION_CONTROLS_VIEWPORTS ? JSON.parse(process.env.PIXIEED_SELECTION_CONTROLS_VIEWPORTS) : defaultViewports;
 const browser = await chromium.launch({ headless: true });
@@ -245,6 +246,11 @@ async function runViewport(viewport) {
       assert.deepEqual(row.layout.bounds[name], row.layout.none[name], `${name} geometry stable with selection`);
       assert.deepEqual(row.layout.pending[name], row.layout.none[name], `${name} geometry stable while pending`);
     }
+    for (const state of ['none', 'bounds', 'pending']) for (const name of ['#draw-undo', '#draw-redo']) {
+      const rect = row.layout[state][name];
+      assert.ok(rect.y >= 0 && rect.y + rect.height <= viewport.height,
+        `${name} remains fully visible in the viewport (${state}, ${viewport.width}x${viewport.height})`);
+    }
     const featurePositions = await page.evaluate(() => Object.fromEntries(['.draw-color-adjustment-open', '.draw-text-opener', '#draw-brush-size-open'].map(selector => {
       const node = document.querySelector(selector), r = node.getBoundingClientRect(); return [selector, { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width) }];
     })));
@@ -254,6 +260,29 @@ async function runViewport(viewport) {
     assert.equal(featurePositions['#draw-brush-size-open'].x, row.layout.featuresNone['#draw-brush-size-open'].x, 'brush feature left edge stays fixed');
     assert.ok(featurePositions['#draw-brush-size-open'].width < row.layout.featuresNone['#draw-brush-size-open'].width, 'visible clear action reclaims a brush column');
     row.checks.push('editor/palette/undo/redo geometry stays fixed in all selection states');
+
+    if (viewport.width >= 1000) {
+      const beforeResizePixels = await snapPixels();
+      const beforeResizeTool = await page.locator('.draw-tool-menu [data-draw-tool][aria-pressed="true"]').first().getAttribute('data-draw-tool');
+      const beforeResizeSelection = await page.locator('.draw-selection').evaluate(node => ({
+        x: node.dataset.x, y: node.dataset.y, width: node.dataset.width, height: node.dataset.height
+      }));
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.waitForFunction(() => !document.body.classList.contains('draw-desktop-active'), null, { timeout: 10000 });
+      assert.equal(await page.locator('#draw-canvas').isVisible(), true, 'canvas is restored in compact layout');
+      assert.deepEqual(await snapPixels(), beforeResizePixels, 'leaving desktop layout preserves exact pixels');
+      assert.equal(await page.locator('.draw-tool-menu [data-draw-tool][aria-pressed="true"]').first().getAttribute('data-draw-tool'), beforeResizeTool);
+      assert.equal(await page.locator('.draw-selection').isVisible(), true, 'selection bounds stay visible in compact layout');
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.waitForFunction(() => document.body.classList.contains('draw-desktop-active'), null, { timeout: 10000 });
+      assert.deepEqual(await snapPixels(), beforeResizePixels, 'returning to desktop layout preserves exact pixels');
+      assert.equal(await page.locator('.draw-tool-menu [data-draw-tool][aria-pressed="true"]').first().getAttribute('data-draw-tool'), beforeResizeTool);
+      const afterResizeSelection = await page.locator('.draw-selection').evaluate(node => ({
+        x: node.dataset.x, y: node.dataset.y, width: node.dataset.width, height: node.dataset.height
+      }));
+      assert.deepEqual(afterResizeSelection, beforeResizeSelection, 'selection bounds survive desktop/compact restoration');
+      row.checks.push('desktop/compact resize restores tool, canvas, selection, and exact pixels');
+    }
 
     // Hidden context actions must not remain keyboard targets. The visible
     // deselect disappears after clearing and leaves focus away from hidden UI.

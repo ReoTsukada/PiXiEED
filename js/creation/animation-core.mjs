@@ -1,1 +1,1 @@
-export * from './animation-core-v20261012.mjs';
+export * from './animation-core-v20261016-color64.mjs';

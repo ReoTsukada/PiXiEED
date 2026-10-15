@@ -1,4 +1,4 @@
-import { encodeGif } from './pixel-lens/gif.mjs?v=20261008-output-progress-1';
+import { encodeGif } from './pixel-lens/gif.mjs?rev=20261015-alpha-opacity-1';
 
 self.onmessage = ({ data: { frames, delayMs, scale } }) => {
   try {

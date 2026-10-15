@@ -26,6 +26,57 @@ test('palette reorder remaps indices and retains exact picture for every frame/l
 test('center pad/crop roundtrip preserves logical cells and validates before mutation',()=>{
  const a=fixture(),pad=planSharedProjectSettings(a,{width:7,height:9}).animation,back=planSharedProjectSettings(pad,{width:4,height:4}).animation;
  for(const f of a.frames) for(const l of a.layers)assert.deepEqual(getAnimationCelDocument(back,f.id,l.id),getAnimationCelDocument(a,f.id,l.id));
- for(const settings of [{width:0},{height:257},{palette:[]},{palette:[red,red]},{palette:['#ffffff80']}])assert.throws(()=>planSharedProjectSettings(a,settings));
+ for(const settings of [{width:0},{height:257},{palette:[]},{palette:[red,red]}])assert.throws(()=>planSharedProjectSettings(a,settings));
  assert.equal(planSharedProjectSettings(a,{}).animation,a);
+});
+
+function rgbaFixture() {
+ let a = createAnimation({width:4,height:4,palette:['#ff3366f3','#12345600']});
+ a = addAnimationFrame(a); a = addAnimationLayer(a,{visible:false,locked:true});
+ for(const f of a.frames) for(const l of a.layers) {
+  const d={width:4,height:4,pixels:new Uint8Array(16)};
+  d.pixels[0]=1; d.pixels[5]=2;
+  a=writeAnimationCel(a,f.id,l.id,d);
+ }
+ return a;
+}
+
+test('resize with omitted palette preserves RGBA entries and every cel index without mutating source',()=>{
+ const a=rgbaFixture(), paletteRef=a.palette, paletteBefore=[...a.palette], poolBefore=serializeAnimationPool(a);
+ const plan=planSharedProjectSettings(a,{width:5,height:4});
+ assert.equal(plan.changed,true); assert.equal(plan.summary.remappedColors,0);
+ assert.equal(a.palette,paletteRef); assert.deepEqual(plan.animation.palette,paletteBefore); assert.deepEqual(a.palette,paletteBefore);
+ for(const f of a.frames) for(const l of a.layers) {
+  const old=getAnimationCelDocument(a,f.id,l.id), resized=getAnimationCelDocument(plan.animation,f.id,l.id);
+  assert.equal(resized.pixels[0],old.pixels[0]);
+  assert.equal(resized.pixels[6],old.pixels[5]);
+  assert.equal(resized.pixels[18],old.pixels[15]);
+ }
+ assert.deepEqual(serializeAnimationPool(a),poolBefore);
+});
+
+test('case-normalized identical RGBA palette preserves original spelling and reports no remaps',()=>{
+ const a=rgbaFixture(), paletteRef=a.palette, paletteBefore=[...a.palette], poolBefore=serializeAnimationPool(a);
+ const plan=planSharedProjectSettings(a,{width:5,height:4,palette:a.palette.map(color=>color.toUpperCase())});
+ assert.equal(plan.summary.remappedColors,0);
+ assert.equal(a.palette,paletteRef); assert.deepEqual(plan.animation.palette,paletteBefore);
+ for(const f of a.frames) for(const l of a.layers) {
+  const old=getAnimationCelDocument(a,f.id,l.id), resized=getAnimationCelDocument(plan.animation,f.id,l.id);
+  assert.deepEqual([resized.pixels[0],resized.pixels[6],resized.pixels[18]],[old.pixels[0],old.pixels[5],old.pixels[15]]);
+ }
+ assert.deepEqual(serializeAnimationPool(a),poolBefore);
+ assert.equal(planSharedProjectSettings(a,{}).animation,a);
+ assert.deepEqual(planSharedProjectSettings(a,{palette:['#ff336680','#12345600']}).animation.palette,['#ff336680','#12345600']);
+});
+
+
+test('explicit palette edits retain semitransparent RGBA and fully transparent pixels across every cel', () => {
+ const a=rgbaFixture();
+ const next=planSharedProjectSettings(a,{palette:['#ff336680','#12345600']}).animation;
+ for(const f of a.frames) for(const l of a.layers) {
+   const doc=getAnimationCelDocument(next,f.id,l.id);
+   assert.equal(next.palette[doc.pixels[0]], '#ff336680');
+   assert.equal(doc.pixels[5], -1);
+ }
+ assert.deepEqual(a.palette,['#ff3366f3','#12345600']);
 });

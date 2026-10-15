@@ -25,7 +25,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261015-draw-desktop-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261016-selection-rail-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
@@ -57,8 +57,8 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   };
   const shell = doc.createElement('section'); shell.className = 'draw-desktop-shell'; shell.setAttribute('aria-label', '描画ワークスペース');
   shell.innerHTML = `<div class="draw-desktop-tools" id="draw-desktop-tools" data-desktop-lane="tools">
-    <section class="draw-desktop-group" data-desktop-group="drawing" aria-label="描く"><h2>描く</h2><div class="draw-desktop-group__buttons" data-desktop-drawing></div><div class="draw-desktop-secondary" data-desktop-paint-secondary></div></section>
-    <section class="draw-desktop-group" data-desktop-group="shapes" aria-label="図形"><h2>図形</h2><div class="draw-desktop-group__buttons" data-desktop-shapes></div><div class="draw-desktop-secondary" data-desktop-shape-secondary></div></section>
+    <div class="draw-desktop-tool-scroll" data-desktop-tool-scroll><section class="draw-desktop-group" data-desktop-group="drawing" aria-label="描く"><h2>描く</h2><div class="draw-desktop-group__buttons" data-desktop-drawing></div><div class="draw-desktop-secondary" data-desktop-paint-secondary></div></section>
+    <section class="draw-desktop-group" data-desktop-group="shapes" aria-label="図形"><h2>図形</h2><div class="draw-desktop-group__buttons" data-desktop-shapes></div><div class="draw-desktop-secondary" data-desktop-shape-secondary></div></section></div>
     <section class="draw-desktop-group" data-desktop-group="selection" aria-label="選択と変形"><h2>選択と変形</h2><div class="draw-desktop-group__buttons" data-desktop-selection></div><div class="draw-desktop-context" data-desktop-selection-context></div><div class="draw-desktop-features" data-desktop-features></div></section>
     <section class="draw-desktop-group" data-desktop-group="view" aria-label="表示と補助"><h2>表示・補助</h2><div class="draw-desktop-group__buttons" data-desktop-view></div><div class="draw-desktop-history" data-desktop-history></div><button type="button" class="draw-desktop-button draw-desktop-cell-launcher" data-desktop-cell-launcher aria-label="セル表を開く">▦ <span>セル表</span></button></section>
   </div>

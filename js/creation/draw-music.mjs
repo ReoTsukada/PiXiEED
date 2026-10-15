@@ -1,15 +1,17 @@
-import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261011-legacy-frames-1';
+import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs';
-import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261012-animation-core-contract-1';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261012-animation-core-contract-1';
-import { composeAnimationFrame } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
-import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
+import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261016-color-capability-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
+import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261016-color-capability-1';
 import { documentRgba } from './draw-core.mjs';
-import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1';
-import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs';
+import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
+import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { setPxdJson } from './pxd-codec.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261011-shared-music-2';
+import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
+import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
 
 const preparedLegacyProjects = new WeakSet();
 
@@ -28,8 +30,8 @@ export async function prepareSharedMusicProject(project) {
     const animation = await readPxdAnimation(project, LEGACY_MUSIC_EDITOR_ROLE);
     const image = await readPxdImage(project, link.imageRole);
     if (animation?.frames.length === 1 && image) {
-      const doc = composeAnimationFrame(animation, animation.frames[0].id);
-      const rgba = documentRgba({ ...doc, pixels: Array.from(doc.pixels) });
+      const doc = composeAnimationFrameRgba(animation, animation.frames[0].id);
+      const rgba = doc.rgba;
       // Keep the retained layers when they still compose to the legacy image.
       if (doc.width === image.width && doc.height === image.height && rgba.every((byte, index) => byte === image.rgba[index])) {
         const existingAudioAnimation = await readPxdAnimation(project, 'audio');
@@ -51,6 +53,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     <label>曲のページ <select id="draw-music-page"></select></label>
     <div class="draw-music-pages"><button type="button" id="draw-music-page-add">追加</button><button type="button" id="draw-music-page-copy">複製</button><button type="button" id="draw-music-page-before" aria-label="音楽ページを前へ">←</button><button type="button" id="draw-music-page-after" aria-label="音楽ページを後へ">→</button><button type="button" id="draw-music-page-delete">削除</button></div>
     <label>BPM（音楽テンポ） <input id="draw-music-tempo" type="number" min="60" max="180" value="120"></label>
+    <p id="draw-music-reward-limits" aria-live="polite"></p>
     <label>描く色の音 <select id="draw-music-instrument"><option value="">無音（未割当）</option></select></label>
     <button type="button" id="draw-music-preview">この音を試聴</button>
     <label>保存時の再生回数 <select id="draw-music-loops"><option>1</option><option>2</option><option>4</option><option>8</option></select></label>
@@ -69,7 +72,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   const instrument = settings.querySelector('#draw-music-instrument'), tempo = settings.querySelector('#draw-music-tempo'), status = settings.querySelector('#draw-music-status');
   for (const { name, instruments } of AUDIO_INSTRUMENT_GROUPS) {
     const group = document.createElement('optgroup'); group.label = name;
-    for (const voice of instruments) { const option = document.createElement('option'); option.value = voice.id; option.textContent = voice.name; group.append(option); }
+    for (const voice of instruments) { const option = document.createElement('option'); option.value = voice.id; option.textContent = `${voice.name}${isSiteRewardPolicyEnabled() && !AUDIO_BASIC_INSTRUMENT_IDS.includes(voice.id) ? '（リワード）' : ''}`; group.append(option); }
     instrument.append(group);
   }
   const play = document.createElement('button'); play.type = 'button'; play.id = 'draw-music-play'; play.className = 'draw-playback-control';
@@ -114,6 +117,9 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   function refresh() {
     if (!state || !isActive()) return;
     tempo.value = state.song.tempo;
+    settings.querySelector('#draw-music-reward-limits').textContent = isSiteRewardPolicyEnabled()
+      ? `無料：共有画像${AUDIO_FREE_COLORS}色・${AUDIO_FREE_COLUMNS}列・基本4音色（矩形波、三角波、のこぎり波、ノイズ）。リワード有効中：共有画像${AUDIO_REWARD_COLORS}色・最大${AUDIO_REWARD_COLUMNS}列・追加音色。透明色と未使用色は色数に含みません。期限後も追加内容は保持され、再生・WAV・保存・バックアップは利用できます。`
+      : `音楽：最大${AUDIO_REWARD_COLUMNS}列。矩形波、三角波、のこぎり波、ノイズなどの音色を選べます。`;
     settings.querySelector('#draw-music-timing').textContent = `${describeDrawMusicProjection(state)}。音楽レイヤーだけを演奏します。画像のコマ切替では曲は変わりません。透明は無音。`;
     const pages = settings.querySelector('#draw-music-page'), frames = state.musicAnimation?.frames || [];
     pages.replaceChildren(...frames.map((frame,index) => { const option = document.createElement('option'); option.value=frame.id; option.textContent=`ページ ${index+1}`; return option; })); pages.value=state.musicPageId || '';
@@ -175,7 +181,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     const preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
     const doc=draw.getOutputFrame(timeline.frames[0].id, { includeMusic: preferences.includeMusic }),context=preview.getContext('2d');
     preview.width=doc.width;preview.height=doc.height;
-    context.putImageData(new ImageData(new Uint8ClampedArray(documentRgba({...doc,pixels:Array.from(doc.pixels)})),doc.width,doc.height),0,0);
+    context.putImageData(new ImageData(new Uint8ClampedArray((doc.rgba || documentRgba({...doc,pixels:Array.from(doc.pixels)}))),doc.width,doc.height),0,0);
     const loopSeconds = Number(state?.song?.loopTicks || 0) * 60 / Math.max(1, Number(state?.song?.tempo || 120)) / 480;
     settings.querySelector('#draw-music-export-summary').textContent = `動画の出力：音楽レイヤー${preferences.includeMusic ? 'あり' : 'なし'}・音声${preferences.includeAudio ? 'あり' : 'なし'}・${preferences.loops}回再生（約${(loopSeconds * preferences.loops).toFixed(1)}秒）。絵は設定したコマ時間で繰り返します。`;
   }
@@ -220,10 +226,10 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
       const workspace = draw.workspace;
       await workspace.assertCanSave(); if (!unchanged()) return;
       let result, filename;
-      if (kind === 'wav') { const { renderAudioWav } = await import('./audio-export.mjs'); if (!unchanged()) return; result = await renderAudioWav(source.song, { loops }); filename = `pixieed-dot-music-${Math.round(result.seconds)}s.wav`; }
+      if (kind === 'wav') { const { renderAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1'); if (!unchanged()) return; result = await renderAudioWav(source.song, { loops }); filename = `pixieed-dot-music-${Math.round(result.seconds)}s.wav`; }
       else {
-        const { renderAudioVideo } = await import('./audio-video.mjs'); if (!unchanged()) return; videoController = new AbortController();
-        const frames = timeline.frames.map(frame => { const doc = draw.getOutputFrame(frame.id, { includeMusic }); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba({ ...doc, pixels: Array.from(doc.pixels) })) }; });
+        const { renderAudioVideo } = await import('./audio-video.mjs?rev=20261016-color-capability-1'); if (!unchanged()) return; videoController = new AbortController();
+        const frames = timeline.frames.map(frame => { const doc = draw.getOutputFrame(frame.id, { includeMusic }); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray((doc.rgba || documentRgba({ ...doc, pixels: Array.from(doc.pixels) }))) }; });
         result = await renderAudioVideo(source.song, frames[0], { totalPlays: loops, frameImages: frames, frameDurationsMs: timeline.frames.map(frame=>frame.durationMs), includeAudio, signal: videoController.signal });
         filename = `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`;
       }

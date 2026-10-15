@@ -1,29 +1,121 @@
 [data-tool-embed] { position: relative; }
 [data-tool-embed] [data-embed-stage][hidden] { display: none; }
 [data-tool-embed] [data-embed-stage] { grid-column: 1 / -1; min-width: 0; width: 100%; }
-.tool-embed__controls { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem .75rem; background: #f4f2ec; border-bottom: 1px solid #d9d5ca; }
-.tool-embed__title { margin-right: auto; font-weight: 700; }
-.tool-embed__controls button { min-height: 2.5rem; padding: .4rem .8rem; border: 1px solid #c6c0b3; border-radius: .5rem; background: white; color: #27251f; font: inherit; cursor: pointer; }
-.tool-embed__frame { display: block; width: 100%; height: min(78vh, 900px); min-height: 520px; border: 0; background: #f4f2ec; }
-.tool-embed--expanded { position: fixed !important; inset: 0; z-index: 10000; display: flex; width: auto; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; flex-direction: column; overflow: auto; background: #f4f2ec; }
+
+.tool-embed__controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: .65rem;
+  min-height: 3.7rem;
+  padding: .55rem .75rem;
+  color: #27251f;
+  background: #f4f2ec;
+  border-bottom: 1px solid #d9d5ca;
+}
+.tool-embed__title { margin-right: auto; font-weight: 750; }
+.tool-embed__controls button {
+  min-height: 2.65rem;
+  padding: .55rem .95rem;
+  border: 1px solid #c6c0b3;
+  border-radius: .65rem;
+  color: #27251f;
+  background: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tool-embed__controls button:hover { background: #f8f7f3; }
+.tool-embed__controls button:focus-visible { outline: 3px solid #315fd0; outline-offset: 2px; }
+.tool-embed__controls [data-embed-expand] { color: white; border-color: var(--intro-accent-dark, #b83f34); background: var(--intro-accent-dark, #b83f34); }
+.tool-embed__controls [data-embed-expand]:hover { background: var(--intro-accent, #e75445); }
+
+.tool-embed__frame {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  height: min(80vh, 900px);
+  height: min(80dvh, 900px);
+  min-height: min(560px, 68vh);
+  border: 0;
+  background: #f4f2ec;
+}
+
+.tool-embed--active {
+  display: flex !important;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgba(27, 32, 37, .12);
+  border-radius: .85rem;
+  background: #f4f2ec;
+  box-shadow: 0 14px 38px rgba(27, 32, 37, .1);
+}
+.tool-embed--active > :not([data-embed-stage]) { display: none !important; }
+.tool-embed--active [data-embed-stage] { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; }
+.tool-embed--active .tool-embed__frame { width: 100%; min-width: 0; }
+
+.tool-embed--expanded {
+  position: fixed !important;
+  z-index: 10000;
+  inset-inline: auto;
+  inset-block: auto;
+  top: var(--tool-embed-viewport-top, 0px);
+  left: var(--tool-embed-viewport-left, 0px);
+  display: flex;
+  width: var(--tool-embed-viewport-width, 100vw);
+  max-width: none;
+  height: var(--tool-embed-viewport-height, 100vh);
+  height: var(--tool-embed-viewport-height, 100dvh);
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
+  flex-direction: column;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #f4f2ec;
+}
 .tool-embed--expanded > :not([data-embed-stage]) { display: none !important; }
-.tool-embed--expanded [data-embed-stage] { display: flex; flex: 1; min-height: 0; flex-direction: column; }
-.tool-embed--expanded .tool-embed__frame { flex: 1; width: 100%; height: 100%; min-height: 0; }
-@media (max-width: 640px) { .tool-embed__frame { height: 78vh; min-height: 460px; } }
+.tool-embed--expanded [data-embed-stage] { display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; flex-direction: column; }
+.tool-embed--expanded .tool-embed__controls { padding-block: .55rem; }
+.tool-embed--expanded .tool-embed__frame { flex: 1 1 0; width: 100%; height: 100%; max-height: none; min-height: 0; }
+
 @media (max-width: 640px) {
+  .tool-embed__frame { height: min(80vh, 800px); height: min(80dvh, 800px); min-height: min(460px, 68vh); }
   .tool-embed--active {
-    display: flex;
     width: 100vw;
-    min-width: 0;
+    max-width: none;
     margin-inline: calc(50% - 50vw);
-    padding: 0;
-    flex-direction: column;
-    align-items: stretch;
     border: 0;
     border-radius: 0;
     box-shadow: none;
   }
-  .tool-embed--active > :not([data-embed-stage]) { display: none !important; }
-  .tool-embed--active [data-embed-stage] { display: flex; min-width: 0; flex-direction: column; }
-  .tool-embed--active .tool-embed__frame { width: 100%; min-width: 0; }
+  .tool-embed--active .tool-embed__controls { padding-inline: max(.75rem, env(safe-area-inset-left, 0px)) max(.75rem, env(safe-area-inset-right, 0px)); }
+  .tool-embed--active .tool-embed__frame { min-height: min(460px, 68vh); }
+  .tool-embed--expanded .tool-embed__controls { gap: .45rem; padding-inline: max(.5rem, env(safe-area-inset-left, 0px)) max(.5rem, env(safe-area-inset-right, 0px)); }
+  .tool-embed--expanded .tool-embed__controls button { min-height: 2.85rem; padding-inline: .75rem; }
+  .tool-embed--expanded .tool-embed__title { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media (max-width: 360px) {
+  .tool-embed__controls { gap: .35rem; padding-inline: .45rem; }
+  .tool-embed__controls button { padding-inline: .65rem; font-size: .88rem; }
+  .tool-embed__title { font-size: .88rem; }
+}
+
+/* Keep the image entry and session hint visible beside the real tool. */
+.tool-embed__help { flex: 0 0 auto; margin: 0; padding: .35rem .75rem; border-bottom: 1px solid #dfdcd3; color: #5f6871; background: #faf9f5; font-size: .72rem; line-height: 1.45; }
+.tool-embed--active .tool-intro__embed-status { display: block !important; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 640px) {
+  .tool-embed--active .tool-embed__frame { height: min(80dvh, calc(100dvh - 12rem)); min-height: min(400px, 55dvh); }
+  .tool-embed--expanded .tool-embed__frame { height: 100%; min-height: 0; }
 }

@@ -1,6 +1,9 @@
 import { createPxdProject, getPxdJson, setPxdJson, setPxdBytes } from './pxd-codec.mjs';
 import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
-import { countSharedImageColors } from './shared-image.mjs?rev=20261001-free-tools-1';
+import { countSharedImageColors as countUsedImageColors } from './shared-image.mjs?rev=20261016-color-capability-1';
+
+// Existing image schema-2 metadata counts transparent tuples; preserve that wire contract.
+const countSharedImageColors = (image, stopAfter) => countUsedImageColors(image, stopAfter, { includeTransparent: true });
 
 const MAX_PIXELS = 2 * 1024 * 1024;
 const MAX_RETURNED_COLOR_IDS = 32;
@@ -86,6 +89,7 @@ export async function readPxdImage(project, role = 'main') {
     image.colorCount = colorCount;
     image.colorIds = colorsOfLimited(image.rgba, MAX_RETURNED_COLOR_IDS);
   }
+  image.usedColorCount = countUsedImageColors(image);
   return image;
 }
 

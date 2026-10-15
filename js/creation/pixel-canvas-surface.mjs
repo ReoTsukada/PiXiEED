@@ -34,7 +34,19 @@ export function createPixelCanvasSurface(canvas, { alpha = true, emptyColor = nu
     if (maxX >= minX) context.putImageData(image, 0, 0, minX, minY, maxX - minX + 1, maxY - minY + 1);
   }
 
-  return { resize, paint };
+  function paintRgba(rgba, changed = null) {
+    if (!(rgba instanceof Uint8Array || rgba instanceof Uint8ClampedArray) || rgba.length !== image.data.length) throw new TypeError('RGBA pixel count does not match canvas size');
+    let minX = image.width, minY = image.height, maxX = -1, maxY = -1;
+    if (changed === null) { image.data.set(rgba); context.putImageData(image, 0, 0); return; }
+    for (const index of changed) {
+      if (!Number.isInteger(index) || index < 0 || index >= image.width * image.height) continue;
+      const offset = index * 4; image.data.set(rgba.subarray(offset, offset + 4), offset);
+      const x = index % image.width, y = Math.floor(index / image.width);
+      minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+    }
+    if (maxX >= minX) context.putImageData(image, 0, 0, minX, minY, maxX - minX + 1, maxY - minY + 1);
+  }
+  return { resize, paint, paintRgba };
 }
 
 function readColor(color) {

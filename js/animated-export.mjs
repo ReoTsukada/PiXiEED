@@ -1,4 +1,4 @@
-import { encodeGif, GIF_LONG_EDGE } from './pixel-lens/gif.mjs?v=20261008-output-progress-1';
+import { encodeGif, GIF_LONG_EDGE } from './pixel-lens/gif.mjs?rev=20261015-alpha-opacity-1';
 
 export const ANIMATED_MAX_INPUT_PIXELS = 8e6;
 export const ANIMATED_MAX_FALLBACK_OUTPUT_PIXELS = 8e6;
@@ -80,7 +80,7 @@ export async function encodeAnimatedGif(frames, {
   }
   let worker;
   try {
-    worker = workerFactory ? workerFactory() : typeof Worker === 'function' ? new Worker(new URL('./gif-export-worker.mjs?v=20261008-output-progress-1', import.meta.url), { type: 'module' }) : null;
+    worker = workerFactory ? workerFactory() : typeof Worker === 'function' ? new Worker(new URL('./gif-export-worker.mjs?rev=20261015-alpha-opacity-1', import.meta.url), { type: 'module' }) : null;
   } catch { /* A small bounded export is still available when workers are blocked. */ }
   if (!worker) {
     const small = animatedGeometry(width, height, frames.length, {

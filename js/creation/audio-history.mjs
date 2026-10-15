@@ -6,6 +6,8 @@ export function createAudioHistory(limit = 40) {
   return Object.freeze({
     get canUndo() { return undoStack.length > 0; },
     get canRedo() { return redoStack.length > 0; },
+    peekUndo() { return undoStack.at(-1) || null; },
+    peekRedo() { return redoStack.at(-1) || null; },
     commit(previousState) {
       undoStack.push(previousState);
       if (undoStack.length > limit) undoStack.splice(0, undoStack.length - limit);

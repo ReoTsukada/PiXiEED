@@ -1,6 +1,6 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261012-animation-core-contract-1';
-import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261013-camera-placement-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-color-capability-1';
+import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
 function scopedRules(rules) {
@@ -313,7 +313,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
   syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261015-embed-native-save-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261016-color-capability-1');
   assertCurrent();
   updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,

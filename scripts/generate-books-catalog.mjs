@@ -109,7 +109,8 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261015-approved-shop-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261015-visual-polish-1">
+  <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
@@ -118,47 +119,45 @@ function render(route) {
   <header class="catalog-header"><div class="catalog-header__inner"><a href="/" class="catalog-brand" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span> PiXiEED</a><p>PIXEL PLAY · CATALOG</p></div></header>
   <main id="catalog">
     <section class="catalog-intro" aria-labelledby="page-title"><div class="catalog-wrap catalog-intro__inner">
-      <p class="catalog-eyebrow">BOOKS · TOYS · TOOLS · GADGETS</p>
       <h1 id="page-title">ドット絵の本と道具</h1>
-      <p class="catalog-lead">描く、眺める、手を動かす。気になる一冊や道具を探せます。</p>
-      ${preview
-    ? `<p class="catalog-disclosure" id="associate-status" aria-live="polite">${associateDisclosure}</p>`
-    : '<p class="catalog-disclosure">広告：Amazonアソシエイトリンクを含み、適格販売により収入を得ています。</p>'}
+      <p class="catalog-disclosure"><span>広告</span> Amazonアソシエイトリンクを含みます</p>
     </div></section>
-    <section class="catalog-section catalog-wrap" aria-labelledby="catalog-title">
-      <div class="catalog-heading"><div><p class="catalog-eyebrow">THE SHELF</p><h2 id="catalog-title">商品一覧</h2></div><p class="catalog-count" data-product-count aria-live="polite">${products.length}件</p></div>
+    <section class="catalog-section catalog-wrap" aria-labelledby="page-title">
       <noscript><p class="catalog-noscript">商品一覧と商品情報は以下でご覧いただけます。絞り込み操作にはJavaScriptが必要です。</p></noscript>
       <form class="catalog-filters" id="catalog-filters" role="search" hidden>
-        <label class="catalog-search-label" for="catalog-query">商品名・説明・著者・出版社で検索</label>
-        <div class="catalog-search"><input id="catalog-query" name="q" type="search" autocomplete="off" placeholder="例：背景、Kindle、著者名"><button type="button" data-clear-search aria-label="検索文字をクリア">クリア</button></div>
-        <fieldset class="catalog-category-filter"><legend>カテゴリ</legend><div class="catalog-chips" role="group" aria-label="カテゴリ。横にスクロールできます">
-          <button type="button" data-category-filter="all" data-category-label="すべて" aria-label="すべて ${products.length}件" aria-pressed="true"><span>すべて</span><span class="catalog-chip-count" data-category-count>${products.length}</span></button><button type="button" data-category-filter="books" data-category-label="本" aria-label="本 ${categoryCounts.books}件" aria-pressed="false"><span>本</span><span class="catalog-chip-count" data-category-count>${categoryCounts.books}</span></button><button type="button" data-category-filter="toys" data-category-label="おもちゃ" aria-label="おもちゃ ${categoryCounts.toys}件" aria-pressed="false"><span>おもちゃ</span><span class="catalog-chip-count" data-category-count>${categoryCounts.toys}</span></button><button type="button" data-category-filter="tools" data-category-label="制作道具" aria-label="制作道具 ${categoryCounts.tools}件" aria-pressed="false"><span>制作道具</span><span class="catalog-chip-count" data-category-count>${categoryCounts.tools}</span></button><button type="button" data-category-filter="gadgets" data-category-label="ガジェット" aria-label="ガジェット ${categoryCounts.gadgets}件" aria-pressed="false"><span>ガジェット</span><span class="catalog-chip-count" data-category-count>${categoryCounts.gadgets}</span></button>
-        </div></fieldset>
+        <label class="catalog-search-label sr-only" for="catalog-query">商品名・説明・著者・出版社で検索</label>
+        <div class="catalog-search"><input id="catalog-query" name="q" type="search" autocomplete="off" placeholder="本・道具を検索" aria-label="商品名・説明・著者・出版社で検索"><button type="button" data-clear-search aria-label="検索文字をクリア">クリア</button></div>
         <details class="catalog-more-filters" id="catalog-more-filters">
-          <summary><span>種別・並び替え</span><span class="catalog-more-filters__selection" data-extra-filter-summary>指定なし</span></summary>
+          <summary aria-label="カテゴリ・種別・並び替えを選ぶ"><span>絞り込み</span><span class="catalog-more-filters__selection" data-extra-filter-summary>指定なし</span></summary>
+          <div class="catalog-more-filters__panel">
+          <fieldset class="catalog-category-filter"><legend>カテゴリ</legend><div class="catalog-chips" role="group" aria-label="カテゴリ">
+            <button type="button" data-category-filter="all" data-category-label="すべて" aria-label="すべて ${products.length}件" aria-pressed="true"><span>すべて</span><span class="catalog-chip-count" data-category-count>${products.length}</span></button><button type="button" data-category-filter="books" data-category-label="本" aria-label="本 ${categoryCounts.books}件" aria-pressed="false"><span>本</span><span class="catalog-chip-count" data-category-count>${categoryCounts.books}</span></button><button type="button" data-category-filter="toys" data-category-label="おもちゃ" aria-label="おもちゃ ${categoryCounts.toys}件" aria-pressed="false"><span>おもちゃ</span><span class="catalog-chip-count" data-category-count>${categoryCounts.toys}</span></button><button type="button" data-category-filter="tools" data-category-label="制作道具" aria-label="制作道具 ${categoryCounts.tools}件" aria-pressed="false"><span>制作道具</span><span class="catalog-chip-count" data-category-count>${categoryCounts.tools}</span></button><button type="button" data-category-filter="gadgets" data-category-label="ガジェット" aria-label="ガジェット ${categoryCounts.gadgets}件" aria-pressed="false"><span>ガジェット</span><span class="catalog-chip-count" data-category-count>${categoryCounts.gadgets}</span></button>
+          </div></fieldset>
           <div class="catalog-filter-row">
             <label for="catalog-format">種別・仕様<select id="catalog-format" name="format"><option value="all">すべて</option></select></label>
             <label for="catalog-sort">並び順<select id="catalog-sort" name="sort"><option value="listed">掲載順</option><option value="name">名前順</option></select></label>
           </div>
+          </div>
         </details>
+        <p class="catalog-count" data-product-count aria-live="polite">${products.length}件</p>
+        <div class="catalog-filter-status" hidden><p data-filter-summary aria-live="polite"></p><button type="button" data-reset-filters hidden>条件を解除</button></div>
       </form>
-      <p class="catalog-image-note">商品画像は使用許諾未確認のため未掲載です。確認待ち情報は各商品の詳細をご覧ください。</p>
-      <div class="catalog-filter-status" hidden><p data-filter-summary aria-live="polite"></p><button type="button" data-reset-filters hidden>条件を解除</button></div>
       <div class="product-grid" data-product-grid>
 ${listedProducts.map(card).join('\n')}
       </div>
       <div class="catalog-empty" data-empty-state hidden><p>条件に合う商品はありません。</p></div>
+      <aside class="books-editor-invite" aria-label="ドット絵をつくる"><a href="/draw/" data-draw-cta data-draw-context="books">本で見つけたドット絵を、エディターで試してみる →</a></aside>
     </section>
     <section class="catalog-extra catalog-wrap" aria-labelledby="catalog-extra-title" hidden><div class="catalog-extra__copy"><p class="catalog-eyebrow">COMING LATER</p><h2 id="catalog-extra-title">PiXiEEDのグッズ</h2><p>準備ができたら、PiXiEEDのオリジナルグッズをこちらで紹介します。</p></div><div class="catalog-ad-slot" aria-label="広告掲載予定"><span>広告掲載予定</span></div></section>
   </main>
-${preview ? '' : `  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure}</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>`}
+  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure}</p><p class="catalog-image-note">商品画像は使用許諾未確認のため未掲載です。確認待ち情報は各商品の詳細をご覧ください。</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>
   <dialog class="product-detail" id="product-detail" aria-labelledby="product-detail-title">
     <div class="product-detail__header"><span>商品詳細</span><button type="button" data-detail-close aria-label="詳細を閉じて一覧に戻る">一覧に戻る <span aria-hidden="true">×</span></button></div>
     <div class="product-detail__content" data-detail-body></div>
     <p class="product-detail__notice">購入手続きは外部販売先のAmazonで行います。販売先のリンクは新しいタブで開きます。</p>
     <p class="product-detail__gate">商品リンクを確認できないため、購入リンクは利用できません。</p>
   </dialog>
-  <script type="module" src="/js/books-catalog.mjs?rev=20261011-catalog-refine-2"></script>
+  <script type="module" src="/js/books-catalog.mjs?rev=20261015-shop-compact-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261015-shop-thumbnails-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
 </body>

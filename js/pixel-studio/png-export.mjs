@@ -1,6 +1,5 @@
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-
-const TARGET_LONG_EDGE = 2048;
+import { resolveStaticImageLongEdge, staticImageOutputGeometry } from '../creation/static-output-policy.mjs?rev=20261016-color-capability-1';
 const MAX_SOURCE_EDGE = 8192;
 const MAX_SOURCE_PIXELS = 16 * 1024 * 1024;
 const PNG_ERROR = 'PNGを準備できませんでした。';
@@ -15,11 +14,13 @@ function validateDimensions(width, height) {
 }
 
 /** Return an integer-scale export size without changing the frame aspect ratio. */
-export function pngExportGeometry(width, height) {
+export function pngExportGeometry(width, height, options = {}) {
   validateDimensions(width, height);
-  const longEdge = Math.max(width, height);
-  const scale = Math.max(1, Math.floor(TARGET_LONG_EDGE / longEdge));
-  return { width: width * scale, height: height * scale, scale };
+  return staticImageOutputGeometry(width, height, {
+    longEdge: options.longEdge ?? resolveStaticImageLongEdge(),
+    maxEdge: options.maxEdge ?? 4096,
+    maxPixels: options.maxPixels ?? 16 * 1024 * 1024
+  });
 }
 
 /** Encode an opaque RGBA camera frame as an integer-scaled PNG. */

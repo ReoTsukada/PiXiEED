@@ -145,14 +145,19 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
     assert.ok(!html.includes('商品名未確認'));
     assert.doesNotMatch(html, /product-card__placeholder|product-card__image--empty/);
     assert.match(html, /catalog-filters[^>]* hidden/);
-    assert.match(html, /class="catalog-category-filter"/);
     assert.match(html, /class="catalog-more-filters" id="catalog-more-filters"/);
+    assert.match(html, /class="catalog-more-filters__panel"[\s\S]*?class="catalog-category-filter"/);
+    assert.match(html, /class="catalog-search"[\s\S]*?id="catalog-more-filters"/);
     assert.match(html, /class="catalog-filter-status" hidden/);
+    assert.match(html, /data-product-count aria-live="polite">\d+件<\/p>\s*<div class="catalog-filter-status" hidden>[\s\S]*?<\/form>\s*<div class="product-grid"/);
     assert.match(html, /aria-label="おもちゃ 6件"/);
     assert.match(html, /data-category-count/);
     assert.match(html, /class="catalog-image-note">商品画像は使用許諾未確認のため未掲載/);
+    assert.ok(html.indexOf('class="catalog-image-note"') > html.indexOf('</main>'), 'image permissions note stays in the footer');
     assert.match(html, /canonical" href="https:\/\/pixieed\.jp\/books\//);
-    assert.doesNotMatch(html, /product-card__ad-label|product-card__sales|>広告</);
+    assert.match(html, /class="catalog-disclosure"><span>広告<\/span> Amazonアソシエイトリンクを含みます<\/p>/);
+    const cards = [...html.matchAll(/<article class="product-card"[\s\S]*?<\/article>/g)].map(([card]) => card);
+    assert.ok(cards.every(card => !/product-card__ad-label|product-card__sales|>広告</.test(card)), 'no per-product ad labels');
     assert.match(html, /Amazonで価格を確認/);
     assert.match(html, /Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています/);
     assert.match(html, /og:image:type" content="image\/png"/);
@@ -160,10 +165,9 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
   }
   assert.doesNotMatch(after[0], /name="robots"[^>]*noindex/);
   assert.match(after[1], /noindex,follow/);
-  assert.match(after[0], /class="catalog-disclosure">広告：Amazonアソシエイトリンクを含み、適格販売により収入を得ています。<\/p>/);
   assert.match(after[0], /<footer class="catalog-footer">[\s\S]*?<p class="catalog-footer__notice" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています/);
   assert.ok(after[0].indexOf('id="associate-status"') > after[0].indexOf('</main>'));
-  assert.match(after[1], /<p class="catalog-disclosure" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売/);
+  assert.match(after[1], /<footer class="catalog-footer">[\s\S]*?<p class="catalog-footer__notice" id="associate-status" aria-live="polite">Amazon のアソシエイトとして、PiXiEED は適格販売により収入を得ています/);
   const commerce = JSON.parse(await readFile(new URL('../../assets/books/room-commerce.json', import.meta.url), 'utf8'));
   assert.equal(commerce.enrollmentConfirmed, true);
   assert.equal(commerce.associateName, 'PiXiEED');

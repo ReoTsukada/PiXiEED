@@ -1,6 +1,6 @@
 import { createBoundarySampler } from './boundary-sampler.mjs';
 import { createFourTonePalette } from './four-tone-palette.mjs';
-import { createLensSourcePalette } from './lens-source-palette.mjs';
+import { createLensSourcePalette } from './lens-source-palette.mjs?rev=20261016-color-capability-1';
 import { sampleLensFrame } from './lens-direct-sampler.mjs';
 import { flattenRecognizedBackground } from './background-flatten.mjs';
 import { smoothRecognizedBackground } from './background-smooth.mjs';

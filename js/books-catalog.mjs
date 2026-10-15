@@ -52,7 +52,7 @@ if (form && grid) {
     updateFormats(false);
     const requestedFormat = params.get('format');
     if ([...format.options].some(option => option.value === requestedFormat)) format.value = requestedFormat;
-    if (moreFilters) moreFilters.open = format.value !== 'all' || sort.value !== 'listed';
+    if (moreFilters) moreFilters.open = false;
     syncingLocation = false;
   }
 
@@ -93,8 +93,10 @@ if (form && grid) {
     const summary = document.querySelector('[data-filter-summary]');
     const reset = document.querySelector('[data-reset-filters]');
     const extraParts = [];
+    if (selectedCategory !== 'all') extraParts.push(categoryButtons.find(button => button.dataset.categoryFilter === selectedCategory)?.dataset.categoryLabel || selectedCategory);
     if (format.value !== 'all') extraParts.push(format.value);
     if (sort.value !== 'listed') extraParts.push('名前順');
+    if (!extraParts.length && query.value.trim()) extraParts.push('検索中');
     if (extraFilterSummary) extraFilterSummary.textContent = extraParts.join(' · ') || '指定なし';
     if (filterStatus) filterStatus.hidden = !active;
     if (summary) {
@@ -260,6 +262,18 @@ if (form && grid) {
     if (activeDetailId && detailCards.get(activeDetailId)?.dataset.catalogDisabled === 'true') closeDetailNow();
     else syncDetailFromLocation();
   });
+  moreFilters?.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !moreFilters.open) return;
+    event.preventDefault();
+    moreFilters.open = false;
+    moreFilters.querySelector('summary')?.focus({ preventScroll: true });
+  });
+  moreFilters?.addEventListener('focusout', event => {
+    if (moreFilters.open && !moreFilters.contains(event.relatedTarget)) moreFilters.open = false;
+  });
+  document.addEventListener('pointerdown', event => {
+    if (moreFilters?.open && !moreFilters.contains(event.target)) moreFilters.open = false;
+  });
   categoryButtons.forEach(button => button.addEventListener('click', () => {
     selectedCategory = button.dataset.categoryFilter;
     categoryButtons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
@@ -278,6 +292,7 @@ if (form && grid) {
     updateFormats(false);
     sort.value = 'listed';
     applyFilters();
+    if (moreFilters) moreFilters.open = false;
     query.focus();
   }));
   updateCategoryCounts();

@@ -7,13 +7,13 @@ import { addAnimationFrame, addAnimationLayer, getAnimationCelDocument } from '.
 
 const doc = { schemaVersion: 1, width: 4, height: 3, palette: ['#000000', '#ffffff', '#ff0000'], pixels: [0, 0, 0, 0, 0, -1, 2, 0, 0, 0, 0, 0] };
 
-test('32-colour palette reserves remaining transparency and prioritizes colours in other cels', () => {
+test('32-colour palette excludes remaining transparency and prioritizes colours in other cels', () => {
   const large = { ...doc, palette: Array.from({ length: 32 }, (_, i) => '#' + (i * 500003).toString(16).padStart(6, '0')) };
   const mask = new Uint8Array(12); mask[0] = 1;
   const limited = chooseCameraPalette(large, mask, [-1, 31, 30]);
-  assert.equal(limited.length, 31); assert.deepEqual(limited.slice(0, 2), [31, 30]);
+  assert.equal(limited.length, 32); assert.deepEqual(limited.slice(0, 2), [31, 30]);
   assert.equal(chooseCameraPalette(large, null, []).length, 32);
-  assert.equal(chooseCameraPalette(large, null, [-1]).length, 31);
+  assert.equal(chooseCameraPalette(large, null, [-1]).length, 32);
 });
 
 test('camera target snapshots only selected cells and tight bounds without retaining the mask', () => {
@@ -30,7 +30,7 @@ test('camera target snapshots only selected cells and tight bounds without retai
 test('camera quantization stays in allowed existing opaque slots, including for transparent source input', () => {
   const result = cameraPixels(Uint8Array.from([255, 0, 0, 255, 240, 240, 240, 255, 10, 10, 10, 0]), doc.palette, [0, 2]);
   assert.deepEqual([...result], [2, 2, 0]);
-  assert.throws(() => cameraPixels(new Uint8Array(4), ['#00000000'], [0]));
+  assert.deepEqual([...cameraPixels(new Uint8Array(4), ['#00000000'], [0])], [0]);
 });
 
 test('replacement clones document and changes selected transparent cells while preserving mask holes', () => {

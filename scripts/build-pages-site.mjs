@@ -5,9 +5,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
 import { generateEventPages } from './generate-event-pages.mjs';
+import { addSiteDrawCta } from './site-draw-cta.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const excluded = new Set(['docs', 'tests', 'scripts', 'supabase', 'node_modules']);
+const excluded = new Set(['docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
 const retiredPublicPages = new Set(['shops/index.html']);
 const publishableBooksPages = new Set(['books/index.html']);
 const publishableBooksAssets = new Set(['assets/books/room-products.json', 'assets/books/room-commerce.json']);
@@ -63,7 +64,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     files.push(...generated.files);
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
+    for (const name of ['js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
       'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
       'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
       'js/books-catalog.mjs',
@@ -105,7 +106,13 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
   await mkdir(destination, { recursive: false });
   for (const name of unique) {
     await mkdir(dirname(join(destination, name)), { recursive: true });
-    await copyFile(join(root, name), join(destination, name));
+    const sourcePath = join(root, name);
+    const outputPath = join(destination, name);
+    if (/\.html?$/i.test(name)) {
+      const sourceHtml = await readFile(sourcePath, 'utf8');
+      const transformed = addSiteDrawCta(sourceHtml, name);
+      await writeFile(outputPath, transformed.html);
+    } else await copyFile(sourcePath, outputPath);
   }
   await writeFile(join(destination, '.nojekyll'), '');
   return { files: unique.length + 1, puzzlePages, eventPages, output: destination };

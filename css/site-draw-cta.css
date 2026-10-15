@@ -1,0 +1,116 @@
+/* A small, source-visible entrance that follows the page header. */
+.site-draw-cta {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  border-bottom: 1px solid #1b202510;
+  background: #f7f8f6;
+}
+
+.site-draw-cta__description {
+  color: #4b5660;
+  font: 550 12px/1.35 system-ui, -apple-system, "Hiragino Sans", sans-serif;
+}
+
+.site-draw-cta__link {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 7px 14px;
+  border: 1px solid #1b20251a;
+  border-radius: 999px;
+  background: #fff;
+  color: #1b2025;
+  font: 650 13px/1.25 system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  text-decoration: none;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
+.site-draw-cta__brand { color: #5e6870; font-size: .72em; font-weight: 650; }
+
+.books-editor-invite {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 24px;
+}
+
+.books-editor-invite a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px 14px;
+  border: 1px solid #1b20251a;
+  border-radius: 999px;
+  background: #fff;
+  color: #1b2025;
+  font: 650 14px/1.35 system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  text-align: center;
+  text-decoration: none;
+}
+
+.books-editor-invite a:hover,
+.books-editor-invite a:focus-visible { border-color: #2588bb; color: #155d7d; text-decoration: underline; }
+
+.output-guide-page .tool-card a.output-draw-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .15rem .35rem;
+  min-width: 0;
+  white-space: normal;
+}
+
+.site-draw-cta__link:hover,
+.site-draw-cta__link:focus-visible {
+  border-color: #2588bb;
+  color: #155d7d;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.site-draw-cta__link:focus-visible {
+  outline: 3px solid #2588bb;
+  outline-offset: 2px;
+}
+
+/* PiXiEELENS uses an existing canvas toolbar, not a page-level promo strip. */
+.site-draw-cta--lens {
+  max-width: 160px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-color: rgba(123, 207, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(5, 9, 18, 0.78);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-size: 11px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.site-draw-cta--lens:hover,
+.site-draw-cta--lens:focus-visible {
+  border-color: rgba(123, 207, 255, 0.75);
+  background: rgba(5, 9, 18, 0.94);
+  color: #fff;
+}
+
+html[data-embed-mode="true"] .site-draw-cta--lens { display: none !important; }
+
+@media (max-width: 600px) {
+  .site-draw-cta { flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding-top: 6px; padding-bottom: 6px; }
+  .site-draw-cta__link { gap: 6px; padding: 6px 10px; font-size: 12px; }
+}

@@ -1,7 +1,7 @@
-import { getAudioColorInstrument } from './audio-core.mjs?rev=20261005-audio-color-instruments-1';
-import { setAnimationPalette } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
-import { validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261012-animation-core-contract-1';
-import { validatePxdAudioBinding } from './pxd-draw-audio.mjs?rev=20261012-animation-core-contract-1';
+import { getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
+import { setAnimationPalette } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261016-color-capability-1';
+import { validatePxdAudioBinding } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { hexToHsl, hslToHex } from './color-utils.mjs?rev=20261004-symmetry-color-panel-1';
 
 const rgbaPattern = /^rgba-([\da-f]{8})$/i;
@@ -30,6 +30,11 @@ export function replaceAudioSourceColor({ image = null, animation = null, link, 
   } else throw new TypeError('編集する画像がありません。');
   const oldId = `rgba-${match[1].toLowerCase()}`; const oldBytes = match[1].match(/../g).map((part) => Number.parseInt(part, 16));
   if (oldBytes[3] === 0 || !Object.hasOwn(link.colorToSlot, oldId)) throw new TypeError('元の画像色が見つかりません。');
+  if (animation && oldBytes[3] !== 255) {
+    const error = new TypeError('半透明のアニメーション色変更は音楽IDへ安全に対応できません。色・音符・リンクは変更していません。');
+    error.code = 'audio-animation-alpha-color-unsupported';
+    throw error;
+  }
   const newRgb = requested[1].toLowerCase(); const nextId = `rgba-${newRgb}${match[1].slice(6, 8).toLowerCase()}`;
   if (oldId === nextId) return { image, animation, link, song, colorId: oldId, changed: false };
   if (Object.hasOwn(link.colorToSlot, nextId) && (link.colorToSlot[nextId] !== link.colorToSlot[oldId]
@@ -39,7 +44,7 @@ export function replaceAudioSourceColor({ image = null, animation = null, link, 
 
   let nextImage = image; let nextAnimation = animation; const changedCells = new Set();
   if (animation) {
-    if (oldBytes[3] !== 255 || !Array.isArray(animation.palette)) throw new TypeError('このアニメーション色は変更できません。');
+    if (!Array.isArray(animation.palette)) throw new TypeError('このアニメーション色は変更できません。');
     const oldHex = `#${match[1].slice(0, 6).toLowerCase()}`;
     if (!animation.palette.some((entry) => entry.toLowerCase() === oldHex)) throw new TypeError('アニメーションの元色が見つかりません。');
     const nextHex = `#${newRgb}`;

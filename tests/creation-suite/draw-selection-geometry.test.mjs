@@ -91,6 +91,6 @@ test('arbitrary rotation skips transparent destination holes and clipping cannot
  assert.throws(()=>original.project(),/キャンバス内/);assert.deepEqual(original.project({enforceLimits:false}).document,d);assert.deepEqual(d,before);
  const partial={...s.state,x:-3,y:2,pivot:selectionDefaultPivot({...s.state,x:-3,y:2})};
  assert.ok(projectDrawSelection(base,clip,partial).visiblePixels>0);
- const full={...base,palette:Array.from({length:32},(_,i)=>`#${(i+1).toString(16).padStart(6,'0')}`)},fullBefore=structuredClone(full);
+ const full={...base,palette:Array.from({length:128},(_,i)=>`#${(i+1).toString(16).padStart(6,'0')}`)},fullBefore=structuredClone(full);
  assert.throws(()=>projectDrawSelection(full,clip,s.state),/パレット/);assert.deepEqual(full,fullBefore);
 });

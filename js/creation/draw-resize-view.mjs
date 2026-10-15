@@ -1,5 +1,5 @@
-import { canvasResizeOffset } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
-import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs';
+import { canvasResizeOffset } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261016-color-capability-1';
 
 /** Resize transient editor coordinates using the same sampling as the pixel operation.
  * Membership is independent of transparency; never replace a sparse selection by its box.

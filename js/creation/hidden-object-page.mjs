@@ -4,19 +4,20 @@ import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integr
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
-import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261001-free-tools-1';
-import { imageToDrawDocument } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
+import { imageToDrawDocument } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261012-animation-core-contract-1';
-import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261001-free-tools-1';
-import { putPxdSharedImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261001-free-tools-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261016-color-capability-1';
+import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261016-color-capability-1';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261016-color-capability-1';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -225,7 +226,26 @@ async function importImageFile(file) {
   try {
     const decoded = await decodeDrawImageFile(file);
     if (epoch !== editorEpoch) return;
-    const prepared = prepareSharedCanvasImage({ width: decoded.width, height: decoded.height, rgba: decoded.data }, { passActive: false });
+    const originalImage = { width: decoded.width, height: decoded.height, rgba: decoded.data };
+    let prepared;
+    try {
+      prepared = prepareSharedCanvasImage(originalImage, { passActive: false });
+    } catch (error) {
+      if (error?.code !== 'shared-image-conversion-required') throw error;
+      // Build only an in-memory preview. The source file and current draft stay untouched
+      // until the creator confirms the normalized working copy.
+      prepared = prepareSharedCanvasImage(originalImage, { passActive: false, allowConversion: true });
+      if (!prepared.image.rgba.some((value, index) => index % 4 === 3 && value > 0)) throw new RangeError('透明以外の画素がある画像を選んでください。');
+      const previewDocument = imageToDrawDocument(prepared.image);
+      const accepted = await confirmPxdConversion({
+        image: originalImage,
+        document: previewDocument,
+        title: 'もの探し用の画像を確認',
+        applyLabel: 'この作業用コピーを使う',
+        message: `${decoded.width}×${decoded.height}pxの原本は変更しません。もの探し用コピーを${prepared.image.width}×${prepared.image.height}px・${prepared.colorCount}色に整えます。`
+      });
+      if (!accepted || epoch !== editorEpoch) return;
+    }
     if (!prepared.image.rgba.some((value, index) => index % 4 === 3 && value > 0)) throw new RangeError('透明以外の画素がある画像を選んでください。');
     const document = imageToDrawDocument(prepared.image);
     const own = await savePicture('hidden-object', document, {

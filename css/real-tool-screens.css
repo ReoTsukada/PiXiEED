@@ -1,0 +1,32 @@
+.tool-intro--camera .tool-intro__hero-grid { display: block; }
+.tool-intro--camera .tool-intro__copy { max-width: 48rem; }
+.real-tool-screens { padding-block: .5rem 3rem; }
+.real-tool-screens__head { margin-bottom: 1.25rem; }
+.real-tool-screens__head h2 { margin: 0 0 .6rem; font-size: clamp(1.4rem, 3vw, 2rem); }
+.real-tool-screens__head p { margin: 0; color: #65717a; line-height: 1.7; }
+.real-tool-screens__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.real-tool-screens__item { min-width: 0; padding: 1rem; border: 1px solid #dce1df; border-radius: .75rem; background: #fff; }
+.real-tool-screens__item h3 { margin: 0 0 .75rem; font-size: 1rem; }
+.real-tool-screens__link { display: inline-block; margin-top: .65rem; color: #285c47; font-weight: 700; text-decoration: underline; text-underline-offset: .15em; }
+.real-tool-screens__pair { display: grid; grid-template-columns: minmax(0, 3.2fr) minmax(10rem, .9fr); align-items: center; gap: clamp(1rem, 3vw, 2rem); }
+.real-tool-screens figure { min-width: 0; margin: 0; }
+.real-tool-screens img { display: block; width: 100%; height: auto; border: 1px solid #dce1df; border-radius: .6rem; background: #f7f8f6; }
+.real-tool-screens figcaption { margin-top: .6rem; text-align: center; color: #65717a; font-size: .8rem; }
+.real-tool-screens__mobile { max-width: 18rem; justify-self: center; }
+.tool-real-pair { display: grid; grid-template-columns: minmax(0, 3.2fr) minmax(0, .9fr); align-items: center; gap: .65rem; min-width: 0; margin-bottom: .65rem; }
+.tool-real-pair > span { min-width: 0; }
+.tool-real-pair img { display: block; width: 100%; height: auto; border: 1px solid #dce1df; border-radius: .35rem; }
+.tool-real-pair small { display: block; margin-top: .4rem; color: #65717a; font-size: .7rem; text-align: center; }
+.hp-toy[data-static-tool] { opacity: 1; transform: none; }
+.output-tool-card { opacity: 1; transform: none; }
+.output-tool-card .tool-card__preview { aspect-ratio: auto; min-height: 4.5rem; }
+.hp-tool-icon { display: grid; place-items: center; min-height: 4.5rem; }
+.hp-tool-icon img { display: block; width: 2.5rem; height: 2.5rem; }
+body[data-page="home"] .hp-link-card .hp-tool-icon { background: #f1f3ef; }
+.tool-card--soon[data-static-tool] { align-content: center; }
+@media (max-width: 720px) {
+  .real-tool-screens__pair { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .real-tool-screens__mobile { width: min(100%, 15rem); }
+  .real-tool-screens__grid { grid-template-columns: minmax(0, 1fr); }
+  .tool-real-pair { grid-template-columns: minmax(0, 3fr) minmax(5rem, .9fr); }
+}

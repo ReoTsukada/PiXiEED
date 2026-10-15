@@ -1,5 +1,5 @@
-import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261012-animation-core-contract-1';
-import { readPxdImage } from './pxd-project.mjs?rev=20261001-free-tools-1';
+import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261016-color-capability-1';
+import { readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 
 const shapes = {
   draw: '<path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/>',

@@ -32,6 +32,7 @@
 .creation-color-panel .dce-hue input { --track: linear-gradient(90deg, hsl(0 var(--s) var(--l)), hsl(60 var(--s) var(--l)), hsl(120 var(--s) var(--l)), hsl(180 var(--s) var(--l)), hsl(240 var(--s) var(--l)), hsl(300 var(--s) var(--l)), hsl(359 var(--s) var(--l))); }
 .creation-color-panel .dce-sat input { --track: linear-gradient(90deg, hsl(var(--h) 0% var(--l)), hsl(var(--h) 100% var(--l))); }
 .creation-color-panel .dce-light input { --track: linear-gradient(90deg, #000, hsl(var(--h) var(--s) 50%), #fff); }
+.creation-color-panel .dce-alpha input { --track: linear-gradient(90deg, #ffffff00, var(--alpha-preview, #ffffff)); }
 .creation-color-panel .dce-actions { grid-row: 4; align-self: end; display: flex; justify-content: flex-end; gap: 8px; padding: 0; background: #15202b; }
 .creation-color-panel .dce-actions button { box-sizing: border-box; min-width: 88px; min-height: 44px; padding: 8px 14px; border: 1px solid #ffffff35; border-radius: 12px; background: #263642; color: #fff; font: 800 .9rem/1.2 system-ui, -apple-system, sans-serif; cursor: pointer; }
 .creation-color-panel .dce-actions .dce-done { background: #ffd35a; border-color: #ffd35a; color: #17232d; }

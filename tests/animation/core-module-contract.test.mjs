@@ -3,27 +3,14 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { posix } from 'node:path';
 import * as bare from '../../js/creation/animation-core.mjs';
-import * as versioned from '../../js/creation/animation-core.mjs?rev=20261012-animation-core-contract-1';
+import * as versioned from '../../js/creation/animation-core.mjs?rev=20261016-color-capability-1';
 import * as secondFacade from '../../js/creation/animation-core.mjs?identity-test=another-facade';
 
 const root = new URL('../../', import.meta.url);
-const REV = '20261012-animation-core-contract-1';
+const REV = '20261016-color-capability-1';
 const CORE = 'js/creation/animation-core.mjs';
-// Cache-busted operation-bar/camera modules keep the canonical core dependency URL.
-const operationBarTargets = new Set([
-  'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs',
-  'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs',
-  'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs',
-  'js/creation/jigsaw-page.mjs', 'js/creation/pixfind-play.mjs',
-  'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-result-view.mjs'
-]);
-const cameraPlacementCoreTargets = new Set([
-  'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs',
-  'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs',
-  'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs'
-]);
-const expectedRevision = target => cameraPlacementCoreTargets.has(target) ? '20261013-camera-placement-1'
-  : operationBarTargets.has(target) ? '20261012-operation-bar-1' : REV;
+// Every transitive consumer moves together to the alpha-aware canonical core.
+const expectedRevision = () => REV;
 const specifiers = source => [...source.matchAll(/['"]([^'"\s]+\.mjs(?:\?[^'"\s]*)?)['"]/g)].map(match => match[1]);
 const targetFor = (owner, value) => {
   const path = value.split('?')[0];

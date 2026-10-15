@@ -1,4 +1,4 @@
-import { serializeAnimationPool } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { serializeAnimationPool } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 const PROTOCOL = 'pixieed-tool-embed';
 const VERSION = 1;
@@ -44,7 +44,7 @@ export function installToolEmbedBridge({ draw, modes, windowRef = window, docume
       schemaVersion: timeline?.schemaVersion || null, width: timeline?.width || 0, height: timeline?.height || 0,
       palette: timeline?.palette || [],
       frames: (timeline?.frames || []).map(frame => ({ id: frame.id, durationMs: frame.durationMs })),
-      layers: (timeline?.layers || []).map(layer => ({ id: layer.id, visible: layer.visible, locked: layer.locked, role: layer.role || null })),
+      layers: (timeline?.layers || []).map(layer => ({ id: layer.id, visible: layer.visible, locked: layer.locked, opacity: layer.opacity ?? 1, role: layer.role || null })),
       cels: celRows
     };
     const timelineHash = await sha256(new TextEncoder().encode(JSON.stringify(canonical)));
@@ -77,6 +77,13 @@ export function installToolEmbedBridge({ draw, modes, windowRef = window, docume
     } else if (command === 'suspend') modes.suspendForEmbed?.();
     return snapshot();
   };
+  const hasVisibleEscapeLayer = () => [...documentRef.querySelectorAll('dialog[open],details[open],[role="dialog"][aria-modal="true"]')]
+    .some(node => {
+      if (node.hidden || node.getAttribute('aria-hidden') === 'true' || !node.getClientRects().length) return false;
+      const style = windowRef.getComputedStyle(node);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+  const escapeStartedInsideLayer = new WeakSet();
   const onMessage = event => {
     const message = event.data;
     if (event.origin !== windowRef.location.origin || event.source !== windowRef.parent || !message
@@ -92,8 +99,15 @@ export function installToolEmbedBridge({ draw, modes, windowRef = window, docume
     });
   };
   windowRef.addEventListener('message', onMessage);
+  // Snapshot the visible layer before a dialog's own Escape handler can hide it.
   documentRef.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !event.defaultPrevented && !documentRef.querySelector('dialog[open],details[open], [role="dialog"][aria-modal="true"]')) {
+    if (event.key === 'Escape' && !event.defaultPrevented && hasVisibleEscapeLayer()) {
+      escapeStartedInsideLayer.add(event);
+    }
+  }, true);
+  documentRef.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !event.defaultPrevented
+        && !escapeStartedInsideLayer.has(event) && !hasVisibleEscapeLayer()) {
       windowRef.parent.postMessage({ kind: PROTOCOL, version: VERSION, channel, type: 'close-request' }, windowRef.location.origin);
     }
     if (event.key !== 'Tab' || event.defaultPrevented) return;

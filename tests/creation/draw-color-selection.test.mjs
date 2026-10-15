@@ -12,9 +12,10 @@ test('same-color mask spans disconnected equivalent palette entries and snapshot
   assert.deepEqual([...selected.mask], [1, 0, 1, 0, 1, 0, 1, 0, 1, 0], 'later cel edits do not recompute selection');
 });
 
-test('clicking transparency selects every empty cell and palette slot zero remains opaque', () => {
+test('erased holes and indexed alpha-zero swatches stay independently selectable', () => {
   const doc = { schemaVersion: 1, width: 3, height: 2, palette: ['#ffffff', '#00000000'], pixels: [-1, 0, 1, 0, -1, 0] };
-  assert.deepEqual([...selectDrawColorMask(doc, { x: 0, y: 0 }).mask], [1, 0, 1, 0, 1, 0]);
+  assert.deepEqual([...selectDrawColorMask(doc, { x: 0, y: 0 }).mask], [1, 0, 0, 0, 1, 0]);
+  assert.deepEqual([...selectDrawColorMask(doc, { x: 2, y: 0 }).mask], [0, 0, 1, 0, 0, 0]);
   assert.deepEqual([...selectDrawColorMask(doc, { x: 1, y: 0 }).mask], [0, 1, 0, 1, 0, 1]);
   const empty = { ...doc, pixels: Array(6).fill(-1) };
   assert.deepEqual([...selectDrawColorMask(empty, { x: 2, y: 1 }).mask], Array(6).fill(1));

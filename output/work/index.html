@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="description" content="素材をプレビューし、対応する形式と設定を選んで端末に保存します。">
   <title>作品のプレビュー・保存｜PiXiEED</title>
-  <script src="/js/adsense-offerwall-policy.js?rev=20261009-output-offerwall-1"></script>
+  <script src="/js/adsense-offerwall-policy.js?rev=20261016-no-offerwall-1"></script>
   <script src="/js/adsense-auto.js?rev=20261009-output-offerwall-1"></script>
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
@@ -27,7 +27,7 @@
       <p id="output-copy" class="output-copy">プレビューを確認して、必要ならサイズや名前を整えて保存できます。</p>
     </div>
     <section id="output-start" class="output-start" aria-labelledby="output-start-title" hidden>
-        <div class="output-start__copy"><p class="output-eyebrow">端末の中で変換</p><h2 id="output-start-title">画像・動画・音声を選ぶ</h2><p>選んだファイルはこの端末内で読み込みます。PNG、JPEG、GIF、APNG、WebP画像、MP4/WebM動画と、ブラウザーがデコードできる音声を読み込めます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p></div>
+        <div class="output-start__copy"><p class="output-eyebrow">端末の中で変換</p><h2 id="output-start-title">画像・動画・音声を選ぶ</h2><p>選んだファイルはこの端末内で読み込みます。PNG、JPEG、GIF、APNG、WebP画像、MP4/WebM動画と、ブラウザーがデコードできる音声を読み込めます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p><p id="output-start-reward-note" class="output-help" hidden></p></div>
       <div id="output-drop" class="output-drop" aria-label="画像・動画または音声ファイルをここにドロップ">
         <span class="output-drop__mark" aria-hidden="true">＋</span><strong>ファイルを選ぶ</strong><span>複数の画像を並べてGIF・APNG・対応動画にできます</span>
         <button id="output-start-choose" class="output-button output-button--primary" type="button">端末からファイルを選ぶ</button>
@@ -73,6 +73,10 @@
         <details id="output-file-settings" class="output-setting-group" open>
           <summary><span>ファイル</span><span id="output-file-summary" class="output-setting-summary">出力を準備しています</span></summary>
           <div id="output-items" class="output-items" role="list" aria-label="出力項目"></div>
+          <p id="output-reward-note" class="output-help" hidden></p>
+          <div class="output-item-actions">
+            <button id="output-batch-save" class="output-button output-button--secondary" type="button" disabled>選択した項目をまとめて保存（0）</button>
+          </div>
           <button id="output-add-item" class="output-button output-button--secondary output-add-item" type="button">＋ 出力項目を追加</button>
           <div class="output-item-actions">
             <button id="output-copy-item" class="output-text-button" type="button">この項目を複製</button>
@@ -89,6 +93,13 @@
             <label class="output-field-label" for="output-format-select">対応形式</label>
             <select id="output-format-select" class="output-select" aria-label="出力形式"></select>
             <label id="output-jpeg-setting" class="output-jpeg-setting" hidden for="output-jpeg-background">JPEGの背景色 <input id="output-jpeg-background" type="color" value="#ffffff"></label>
+            <label id="output-png-background-setting" class="output-jpeg-setting" hidden for="output-png-background-mode">PNGの背景
+              <select id="output-png-background-mode" class="output-select" style="width:auto;min-width:0;min-height:38px;flex:1;margin:0;padding:4px 8px" aria-label="PNGの背景">
+                <option value="transparent">透過背景</option>
+                <option value="color">背景色を合成</option>
+              </select>
+              <input id="output-png-background" type="color" value="#ffffff" aria-label="PNGに合成する背景色" hidden>
+            </label>
             <label id="output-jpeg-quality-setting" class="output-jpeg-quality-setting" hidden for="output-jpeg-quality"><span>JPEG画質 <output id="output-jpeg-quality-value" for="output-jpeg-quality">90%</output></span><input id="output-jpeg-quality" type="range" min="50" max="100" step="5" value="90"></label>
           </div>
           <p id="output-filename-help" class="output-help">形式を変えると拡張子が合わせて切り替わります。</p>
@@ -163,7 +174,7 @@
     <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
     <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261009-display-fit-5"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261016-color-capability-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
 </body>
 </html>

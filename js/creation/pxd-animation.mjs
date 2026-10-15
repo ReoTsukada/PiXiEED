@@ -1,5 +1,5 @@
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson, PXD_MAX_BYTES } from './pxd-codec.mjs';
-import { ANIMATION_METADATA_BUDGET, ANIMATION_PIXEL_BUDGET, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261012-animation-core-contract-1';
+import { ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_COLORS_V1, ANIMATION_METADATA_BUDGET, ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_BUDGET, ANIMATION_PIXEL_ENCODING, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, getAnimationDrawRewardBonusColors, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 const encoder = new TextEncoder();
 const rolePattern = /^[a-z][a-z0-9-]{0,47}$/;
@@ -21,6 +21,18 @@ function measureExisting(project, replacingRole = null) {
     if (!state || !pool) fail('PXD_ANIMATION_CORRUPT', 'アニメーションの保存部品が揃っていません。原本は保持しています。');
     metadata += state.bytes.byteLength; pixels += pool.bytes.byteLength;
   }
+  const backups = new Map();
+  for (const entry of project?.entries ?? []) {
+    const match = /^animations\/legacy\/alpha-upgrade-([a-z][a-z0-9-]{0,47})-v1\/(state\.json|cels\.bin)$/.exec(entry.path);
+    if (!match) continue;
+    const backup = backups.get(match[1]) ?? {};
+    backup[match[2] === 'state.json' ? 'state' : 'pool'] = entry;
+    backups.set(match[1], backup);
+  }
+  for (const backup of backups.values()) {
+    if (!backup.state || !backup.pool) fail('PXD_ANIMATION_BACKUP', '旧アニメーションの退避データが不完全です。原本は保持しています。');
+    metadata += backup.state.bytes.byteLength; pixels += backup.pool.bytes.byteLength;
+  }
   return { pixels, metadata };
 }
 async function sha256(bytes) {
@@ -30,8 +42,18 @@ async function sha256(bytes) {
 }
 function sameBytes(a, b) { return a.length === b.length && a.every((value, index) => value === b[index]); }
 
-function makeState(animation, descriptors) {
-  return { ...animation, schemaVersion: ANIMATION_SCHEMA_VERSION, cels: descriptors };
+function makeState(animation, descriptors, promoteToSchema2 = false) {
+  const drawRewardBonusColors = getAnimationDrawRewardBonusColors(animation);
+  const state = { ...animation, cels: descriptors };
+  if (promoteToSchema2) Object.assign(state, {
+    schemaVersion: ANIMATION_ALPHA_SCHEMA_VERSION,
+    pixelEncoding: ANIMATION_PIXEL_ENCODING,
+    paletteEncoding: ANIMATION_PALETTE_ENCODING,
+    compositing: ANIMATION_COMPOSITING
+  });
+  if (drawRewardBonusColors) state.drawRewardBonusColors = drawRewardBonusColors;
+  else delete state.drawRewardBonusColors;
+  return state;
 }
 
 /** Add or replace one role's timeline while preserving every unrelated PXD entry and field. */
@@ -39,7 +61,18 @@ export async function writePxdAnimation(project, animation, { role = 'main', pos
   assertRole(role); validateAnimation(animation);
   if (posterFrameId !== undefined && !animation.frames.some(({ id }) => id === posterFrameId)) throw new TypeError('表紙にするコマがありません。');
   project ||= createPxdProject();
-  const other = measureExisting(project, role);
+  const priorAnimation = await readPxdAnimation(project, role);
+  const promoteToSchema2 = priorAnimation?.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && animation.schemaVersion === ANIMATION_SCHEMA_VERSION;
+  let other = measureExisting(project, role);
+  const priorStateForBudget = project.entries.find((entry) => entry.path === statePath(role));
+  const priorPoolForBudget = project.entries.find((entry) => entry.path === poolPath(role));
+  if (animation.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && priorStateForBudget && priorPoolForBudget) {
+    const backupPrefix = `animations/legacy/alpha-upgrade-${role}-v1`;
+    const hasBackup = project.entries.some((entry) => entry.path === `${backupPrefix}/state.json` || entry.path === `${backupPrefix}/cels.bin`);
+    if (priorAnimation?.schemaVersion === ANIMATION_SCHEMA_VERSION && !hasBackup) {
+      other = { pixels: other.pixels + priorPoolForBudget.bytes.byteLength, metadata: other.metadata + priorStateForBudget.bytes.byteLength };
+    }
+  }
   const poolParts = []; const descriptors = []; const slotsByTileId = new Map(); const dedup = new Map(); let poolLength = 0;
   for (const tile of serializeAnimationPool(animation)) {
     let slot = slotsByTileId.get(tile.tileId);
@@ -54,14 +87,29 @@ export async function writePxdAnimation(project, animation, { role = 'main', pos
     cel.tiles.push({ x: tile.x, y: tile.y, width: tile.width, height: tile.height, offset: slot.offset, length: slot.length, sha256: slot.digest });
   }
   if (other.pixels + poolLength > ANIMATION_PIXEL_BUDGET) throw new RangeError('絵と音楽の画素プール合計が32MiBを超えます。');
-  const state = makeState(animation, descriptors);
+  const state = makeState(animation, descriptors, promoteToSchema2);
   if (posterFrameId !== undefined) state.posterFrameId = posterFrameId;
   const stateBytes = encoder.encode(JSON.stringify(state));
   if (other.metadata + stateBytes.byteLength > ANIMATION_METADATA_BUDGET) throw new RangeError('絵と音楽のアニメーション情報合計が1MiBを超えます。');
   if (stateBytes.byteLength + poolLength > PXD_MAX_BYTES) throw new RangeError('アニメーションがPXD全体の容量上限を超えます。');
   const pool = new Uint8Array(poolLength); let cursor = 0; for (const bytes of poolParts) { pool.set(bytes, cursor); cursor += bytes.length; }
   // setPxdJson/setPxdBytes are immutable; if either validation fails the input project is untouched.
-  let next = setPxdJson(project, statePath(role), state);
+  const priorState = project.entries.find((entry) => entry.path === statePath(role));
+  const priorPool = project.entries.find((entry) => entry.path === poolPath(role));
+  let next = project;
+  if (animation.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && priorState && priorPool) {
+    const backupPrefix = `animations/legacy/alpha-upgrade-${role}-v1`;
+    if (priorAnimation?.schemaVersion === ANIMATION_SCHEMA_VERSION) {
+      const hasStateBackup = project.entries.some((entry) => entry.path === `${backupPrefix}/state.json`);
+      const hasPoolBackup = project.entries.some((entry) => entry.path === `${backupPrefix}/cels.bin`);
+      if (hasStateBackup !== hasPoolBackup) fail('PXD_ANIMATION_BACKUP', '旧アニメーションの退避データが不完全なため更新できません。原本は保持しています。');
+      if (!hasStateBackup) {
+        next = setPxdBytes(next, `${backupPrefix}/state.json`, priorState.bytes);
+        next = setPxdBytes(next, `${backupPrefix}/cels.bin`, priorPool.bytes);
+      }
+    }
+  }
+  next = setPxdJson(next, statePath(role), state);
   next = setPxdBytes(next, poolPath(role), pool);
   return next;
 }
@@ -76,11 +124,16 @@ export async function readPxdAnimation(project, role = 'main') {
   const totals = measureExisting(project);
   if (totals.pixels > ANIMATION_PIXEL_BUDGET || totals.metadata > ANIMATION_METADATA_BUDGET) throw new RangeError('アニメーションの保存容量が上限を超えています。');
   const state = getPxdJson(project, statePath(role));
-  if (state?.schemaVersion !== ANIMATION_SCHEMA_VERSION) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています。');
+  if (![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION].includes(state?.schemaVersion)) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています。');
+  if (state.schemaVersion === ANIMATION_SCHEMA_VERSION && (state.palette?.some((color) => typeof color === 'string' && color.length === 9 && color.slice(7).toLowerCase() !== 'ff') || state.layers?.some((layer) => layer.opacity !== undefined && layer.opacity !== 1))) fail('PXD_ANIMATION_VERSION', '透明度を含むアニメーション保存版1には対応していません。原本は保持しています。');
+  if (state.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && (state.pixelEncoding !== ANIMATION_PIXEL_ENCODING || state.paletteEncoding !== ANIMATION_PALETTE_ENCODING || state.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', 'アニメーションの画素形式または合成方式に対応していません。原本は保持しています。');
+  if (state.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION
+      && (state.colorCapacity !== ANIMATION_MAX_PALETTE_ENTRIES || state.pixelEncoding !== ANIMATION_PIXEL_ENCODING || state.paletteEncoding !== ANIMATION_PALETTE_ENCODING || state.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', '拡張パレット対応を明示したアニメーション保存版ではありません。原本は保持しています。');
+  if (state.schemaVersion !== ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION && state.palette?.length > ANIMATION_MAX_COLORS_V1) fail('PXD_ANIMATION_VERSION', 'この保存版で使用できる色数は32色までです。原本は保持しています。');
   const pool = poolEntry.bytes; const seen = new Set(); const tileRows = [];
   // Validate JSON metadata and every offset/length before allocating per-tile copies.
   if (!Number.isInteger(state.width) || !Number.isInteger(state.height) || state.width < 1 || state.height < 1 || state.width > 256 || state.height > 256
-    || !Array.isArray(state.palette) || state.palette.length < 1 || state.palette.length > 32 || state.palette.some((color) => typeof color !== 'string' || !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color) || color.length === 9 && color.slice(7).toLowerCase() !== 'ff')
+    || !Array.isArray(state.palette) || state.palette.length < 1 || state.palette.length > (state.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION ? ANIMATION_MAX_PALETTE_ENTRIES : ANIMATION_MAX_COLORS_V1) || state.palette.some((color) => typeof color !== 'string' || !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color))
     || !Array.isArray(state.frames) || state.frames.length < 1 || state.frames.length > 128
     || !Array.isArray(state.layers) || state.layers.length < 1 || state.layers.length > 9
     || !Array.isArray(state.cels)) throw new TypeError('アニメーションのコマ一覧が壊れています。');
@@ -88,7 +141,7 @@ export async function readPxdAnimation(project, role = 'main') {
     if (!frame || typeof frame.id !== 'string' || frameIds.has(frame.id) || !Number.isFinite(frame.durationMs) || frame.durationMs < 1 || frame.durationMs > 60000) throw new TypeError('フレーム情報が壊れています。'); frameIds.add(frame.id);
   }
   const layerIds = new Set(); for (const layer of state.layers) {
-    if (!layer || typeof layer.id !== 'string' || layerIds.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean' || Object.hasOwn(layer, 'role') && typeof layer.role !== 'string') throw new TypeError('レイヤー情報が壊れています。'); layerIds.add(layer.id);
+    if (!layer || typeof layer.id !== 'string' || layerIds.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean' || layer.opacity !== undefined && (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1) || Object.hasOwn(layer, 'role') && typeof layer.role !== 'string') throw new TypeError('レイヤー情報が壊れています。'); layerIds.add(layer.id);
   }
   const musicLayers = state.layers.map((layer, index) => layer.role === 'music' ? index : -1).filter((index) => index >= 0);
   if (musicLayers.length > 1 || musicLayers.length === 1 && musicLayers[0] !== 0 || state.layers.length > 8 + Number(musicLayers.length === 1)) throw new TypeError('音楽レイヤーの位置またはレイヤー数が不正です。');

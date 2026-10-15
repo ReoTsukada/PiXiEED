@@ -71,7 +71,7 @@ test('invalid color override maps are rejected and an explicit empty map is acce
     [], new Map(), Object.assign(Object.create({ inherited: 'piano' }), { [RED]: 'piano' }),
     { 'RGBA-ff0000ff': 'piano' }, { 'rgba-ff000000': 'piano' }, { [RED]: 'missing-sound' }
   ]) assert.throws(() => validateAudioSong({ ...song, colorInstruments }), /音色設定/);
-  const tooMany = Object.fromEntries(Array.from({ length: 33 }, (_, index) => [`rgba-${index.toString(16).padStart(6, '0')}ff`, 'piano']));
+  const tooMany = Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`rgba-${index.toString(16).padStart(6, '0')}ff`, 'piano']));
   assert.throws(() => validateAudioSong({ ...song, colorInstruments: tooMany }), /音色設定/);
   assert.throws(() => setAudioColorInstrument(song, { colorId: RED, instrument: 'unknown' }), /音色設定/);
 });

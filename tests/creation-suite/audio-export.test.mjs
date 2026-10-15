@@ -48,6 +48,8 @@ test('PNG uses an integer enlargement while preserving rectangular music dimensi
   assert.deepEqual(audioImageExportSize(32, 16), { width: 2048, height: 1024, scale: 64 });
   assert.deepEqual(audioImageExportSize(64, 16), { width: 2048, height: 512, scale: 32 });
   assert.deepEqual(audioImageExportSize(48, 16), { width: 2016, height: 672, scale: 42 });
+  assert.deepEqual(audioImageExportSize(16, 16, 4096), { width: 4096, height: 4096, scale: 256 });
+  assert.deepEqual(audioImageExportSize(3000, 1500, 2048), { width: 3000, height: 1500, scale: 1 }, 'a smaller target never shrinks the original');
 });
 
 test('invalid or unbounded export dimensions fail before allocating a canvas', () => {

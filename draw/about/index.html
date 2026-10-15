@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f8f6">
   <title>ドット絵を描く｜PiXiEEDraw</title>
-  <meta name="description" content="ブラウザーでドット絵を描き、レイヤーやフレームを使って編集できます。PNG出力と、このブラウザーへの作品保存に対応したPiXiEEDrawの紹介です。">
+  <meta name="description" content="PiXiEEDrawでブラウザーからドット絵を描けます。レイヤーやフレームで編集し、PNGで出力できます。">
   <link rel="canonical" href="https://pixieed.jp/draw/about/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
   <meta property="og:locale" content="ja_JP">
   <meta property="og:title" content="ドット絵を描く｜PiXiEEDraw">
-  <meta property="og:description" content="ブラウザーでドット絵を描き、レイヤーやフレームを使って編集できます。PNG出力と、このブラウザーへの作品保存に対応しています。">
+  <meta property="og:description" content="PiXiEEDrawでブラウザーからドット絵を描けます。レイヤーやフレームで編集し、PNGで出力できます。">
   <meta property="og:url" content="https://pixieed.jp/draw/about/">
   <meta property="og:image" content="https://pixieed.jp/assets/og/draw.png">
   <meta property="og:image:type" content="image/png">
@@ -20,7 +20,7 @@
   <meta property="og:image:alt" content="PiXiEEDrawのドット絵アイコン">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="ドット絵を描く｜PiXiEEDraw">
-  <meta name="twitter:description" content="ブラウザーでドット絵を描き、レイヤーやフレームを使って編集できます。PNG出力と、このブラウザーへの作品保存に対応しています。">
+  <meta name="twitter:description" content="PiXiEEDrawでブラウザーからドット絵を描けます。レイヤーやフレームで編集し、PNGで出力できます。">
   <meta name="twitter:image" content="https://pixieed.jp/assets/og/draw.png">
   <meta name="twitter:image:alt" content="PiXiEEDrawのドット絵アイコン">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
@@ -30,8 +30,8 @@
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-approved-release-3">
-  <link rel="stylesheet" href="/css/tool-embed.css?rev=20261015-approved-release-2">
+  <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
+  <link rel="stylesheet" href="/css/tool-embed.css?rev=20261015-dedicated-start-2">
 </head>
 <body class="tool-intro tool-intro--draw">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -42,56 +42,67 @@
     </div>
   </header>
   <main id="main">
-    <section class="tool-intro__hero">
-      <div class="container tool-intro__hero-grid">
+    <section class="tool-intro__hero" aria-labelledby="draw-title">
+      <div class="container tool-intro__hero-grid tool-intro__hero-grid--single">
         <div class="tool-intro__copy">
-          <p class="tool-intro__eyebrow">DRAW · PIXEL EDITOR</p>
-          <h1><span>一粒から描く。</span><span>動きもつくる。</span></h1>
-          <p class="tool-intro__lead">PiXiEEDrawは、ブラウザーで使えるドット絵エディター。色や道具を選んで描き、レイヤーとフレームで仕上げられます。</p>
+          <p class="tool-intro__eyebrow">PIXiEEDRAW · PIXEL EDITOR</p>
+          <h1 id="draw-title">ブラウザでドット絵を描く <span>PiXiEEDraw</span></h1>
+          <p class="tool-intro__lead">色と道具を選んで、レイヤーやフレームで編集。作品はPNGで出力できます。</p>
           <div class="tool-intro__actions">
-            <a class="button button--primary" href="/draw/">エディターを開く <span aria-hidden="true">↗</span></a>
-            <a class="button button--quiet" href="/camera/">写真から作る</a>
+            <button class="button button--primary tool-intro__start" type="button" data-embed-start data-embed-target="draw-try" aria-controls="draw-try" aria-expanded="false">PiXiEEDrawを使う <span aria-hidden="true">↓</span></button>
+            <a class="tool-intro__route-link" href="/draw/">専用エディターを開く <span aria-hidden="true">↗</span></a>
           </div>
-          <p class="tool-intro__hint">編集画面は、このページ内でも開けます。起動はボタンを押したときだけです。</p>
+          <p class="tool-intro__hint">描画・PiXiEELENSカメラ・PiXiEEaudio音楽はPiXiEEDraw内の3モードです。読み込み後も、同じ編集画面を拡大・再開できます。</p>
+          <details class="tool-intro__screens">
+            <summary>実際の編集画面を見る</summary>
+            <div class="tool-intro__screen-pair">
+              <figure><a href="/assets/screenshots/draw-pc-maou.png" target="_blank" rel="noopener"><img src="/assets/screenshots/draw-pc-maou.png" width="2880" height="1920" alt="魔王のドット絵を読み込んだPiXiEEDrawのパソコン画面" loading="lazy"></a><figcaption>PC版</figcaption></figure>
+              <figure><a href="/assets/screenshots/draw-mobile-maou.png" target="_blank" rel="noopener"><img src="/assets/screenshots/draw-mobile-maou.png" width="780" height="1688" alt="魔王のドット絵を読み込んだPiXiEEDrawのスマートフォン画面" loading="lazy"></a><figcaption>スマートフォン版</figcaption></figure>
+            </div>
+          </details>
         </div>
-        <div class="tool-intro__art" role="img" aria-label="色とりどりの四角いピクセルが並ぶイラスト">
-          <span class="tool-intro__pixel tool-intro__pixel--a"></span><span class="tool-intro__pixel tool-intro__pixel--b"></span>
-          <span class="tool-intro__pixel tool-intro__pixel--c"></span><span class="tool-intro__pixel tool-intro__pixel--d"></span>
-          <span class="tool-intro__pixel tool-intro__pixel--e"></span><span class="tool-intro__pixel tool-intro__pixel--f"></span>
-          <span class="tool-intro__pixel tool-intro__pixel--g"></span><span class="tool-intro__pixel tool-intro__pixel--h"></span>
-          <span class="tool-intro__pixel tool-intro__pixel--i"></span><span class="tool-intro__pixel tool-intro__pixel--j"></span>
-          <span class="tool-intro__pixel tool-intro__pixel--k"></span><span class="tool-intro__pixel tool-intro__pixel--l"></span>
-          <span class="tool-intro__art-label">PIXEL BY PIXEL</span>
-        </div>
+        <figure class="tool-intro__sample">
+          <img src="/assets/samples/maou.png" width="64" height="64" alt="完成サンプルの魔王ドット絵" decoding="async">
+          <figcaption><span>作例</span><strong>魔王様</strong></figcaption>
+        </figure>
       </div>
     </section>
 
-    <section class="tool-intro__features container" aria-labelledby="draw-features-title">
-      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">MAKE IT YOURS</p><h2 id="draw-features-title">描いて、組み立てて、保存。</h2></div>
-      <div class="tool-intro__feature-grid">
-        <article class="tool-intro__feature"><span class="tool-intro__feature-mark" aria-hidden="true">01</span><h3>レイヤーで整理</h3><p>パーツごとに分けて描き、重なりを調整できます。</p></article>
-        <article class="tool-intro__feature"><span class="tool-intro__feature-mark" aria-hidden="true">02</span><h3>フレームで動かす</h3><p>コマを重ねて見ながら、小さなアニメーションを作れます。</p></article>
-        <article class="tool-intro__feature"><span class="tool-intro__feature-mark" aria-hidden="true">03</span><h3>PNGで出力</h3><p>できた絵はPNGとして書き出せます。作品をこのブラウザーに保存して、あとから続きを編集できます。</p></article>
-      </div>
-      <p class="tool-intro__note">作品の保存先は利用中のブラウザーです。別の端末やブラウザーへ自動で同期される機能ではありません。</p>
-    </section>
-
-    <section class="tool-intro__embed-wrap" aria-labelledby="draw-embed-title">
+    <section class="tool-intro__embed-wrap tool-intro__embed-wrap--primary" aria-label="PiXiEEDraw">
       <div class="container">
-        <section class="tool-intro__embed" data-tool-embed data-tool-mode="draw" aria-labelledby="draw-embed-title">
-          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">TRY IT HERE</p><h2 id="draw-embed-title">このページで描く</h2><p>ボタンを押すと、ページ内にエディターを読み込みます。</p></div>
-          <button class="button button--primary" type="button" data-embed-start>エディターを読み込む</button>
-          <div data-embed-stage></div>
-          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">起動すると、ページ内にドット絵エディターが表示されます。</p>
-          <p class="tool-intro__note">ページ内の表示を広げたり戻したりするときは、同じエディターを使い続けます。別のツールページを開いた場合、編集状態が引き継がれるとは限りません。</p>
-          <a class="tool-intro__text-link" href="/draw/">エディターを専用ページで開く <span aria-hidden="true">↗</span></a>
+        <section class="tool-intro__embed" id="draw-try" data-tool-embed data-tool-mode="draw" aria-labelledby="draw-embed-title">
+          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">DRAW HERE</p><h2 id="draw-embed-title">このページで描く</h2><p>エディターを読み込むと、ここに表示されます。</p></div>
+          <div data-embed-stage hidden></div>
+          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">ボタンを押すと、ページ内で編集を始められます。</p>
+          <p class="tool-intro__note">作品は利用中のブラウザーに保存されます。別の端末への自動同期はありません。</p>
         </section>
       </div>
     </section>
-    <nav class="tool-intro__related container" aria-label="関連ツール"><a href="/draw/">PiXiEEDrawを開く <span aria-hidden="true">→</span></a><a href="/camera/">写真をドット絵にする <span aria-hidden="true">→</span></a></nav>
+
+    <section class="tool-intro__how-to container" aria-labelledby="draw-how-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">HOW TO DRAW</p><h2 id="draw-how-title">色を選んで、少しずつ形に。</h2></div>
+      <ol class="tool-intro__steps">
+        <li><span>01</span><div><h3>色と道具を選ぶ</h3><p>パレットから色を選び、ペンや図形で描きます。</p></div></li>
+        <li><span>02</span><div><h3>レイヤーとフレームで編集</h3><p>絵を重ねて整え、フレームを加えて動きをつけます。</p></div></li>
+        <li><span>03</span><div><h3>保存して続きを描く</h3><p>作品を保存し、あとから続きを編集できます。</p></div></li>
+      </ol>
+    </section>
+
+    <section class="tool-intro__formats container" aria-labelledby="draw-formats-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">EXPORT & SAVE</p><h2 id="draw-formats-title">出力と保存</h2></div>
+      <p>完成した絵はPNGで出力できます。作品データは利用中のブラウザーに保存され、別の端末やブラウザーには自動同期されません。</p>
+      <a class="tool-intro__route-link" href="/draw/">PiXiEEDraw専用ページを開く <span aria-hidden="true">↗</span></a>
+    </section>
+
+    <section class="tool-intro__faq container" aria-labelledby="draw-faq-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FAQ</p><h2 id="draw-faq-title">よくある質問</h2></div>
+      <details><summary>作品はどこに保存されますか？</summary><p>保存操作をすると、利用中のブラウザーに保存されます。別の端末やブラウザーとの自動同期はありません。</p></details>
+      <details><summary>画面を広げても編集内容は続きますか？</summary><p>拡大表示とページ内表示は同じ編集画面です。ページを離れた後も続きを描く場合は、作品を保存してください。</p></details>
+    </section>
+    <nav class="tool-intro__related container" aria-label="関連ツール"><a href="/draw/">PiXiEEDraw専用ページ <span aria-hidden="true">→</span></a><a href="/camera/">写真をドット絵にする <span aria-hidden="true">→</span></a></nav>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/camera/">カメラ</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-embed.mjs?rev=20261015-approved-release-1"></script>
+  <script type="module" src="/js/tool-embed.mjs?rev=20261015-dedicated-start-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
 </body>
 </html>

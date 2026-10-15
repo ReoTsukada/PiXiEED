@@ -64,9 +64,100 @@ function paletteColor(palette, index, output, offset) {
   output[offset + 3] = 255;
 }
 
+function rgbaPaletteColor(palette, index) {
+  const color = palette?.[index];
+  if (typeof color !== 'string' || !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) return null;
+  return [1, 3, 5].map(offset => Number.parseInt(color.slice(offset, offset + 2), 16))
+    .concat(color.length === 9 ? Number.parseInt(color.slice(7, 9), 16) : 255);
+}
+
+function createRgbaCameraPlacementRenderer(snapshot, mapping) {
+  const { width, height, rgbaLayers, activeLayerId, baseRgba, activeVisible = true,
+    activeLocked = false, musicOnly = false, previewAllowed = true, palette = [], allowedIndices = [] } = snapshot;
+  const length = width * height;
+  if (!Array.isArray(rgbaLayers) || !rgbaLayers.length || !rgbaLayers.some(layer => layer.id === activeLayerId)) throw new TypeError('RGBA placement layers are incomplete');
+  if (!(baseRgba instanceof Uint8Array || baseRgba instanceof Uint8ClampedArray) || baseRgba.length !== length * 4) throw new TypeError('RGBA placement base does not match canvas');
+  const layers = rgbaLayers.map(layer => {
+    if (!layer || typeof layer.id !== 'string' || !layer.rgba || layer.rgba.length !== length * 4
+      || typeof layer.visible !== 'boolean' || !Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1) throw new TypeError('RGBA placement layer is invalid');
+    return layer;
+  });
+  const activeIndex = layers.findIndex(layer => layer.id === activeLayerId);
+  const canPreview = (musicOnly || activeVisible) && !activeLocked && previewAllowed !== false;
+  const fixedChoices = allowedIndices.map(index => ({ index, rgba:rgbaPaletteColor(palette, index) })).filter(choice => choice.rgba);
+  if (!fixedChoices.length) throw new TypeError('RGBA replacement palette is empty');
+  const fixedIndices = new Int16Array(mapping.targetIndices.length);
+  const sampled = mapping.sampled;
+  const output = new Uint8ClampedArray(length * 4);
+
+  function compositePixel(pixel, cameraPixel = -1, paletteFixed = false) {
+    let red = 0, green = 0, blue = 0, alpha = 0;
+    const first = musicOnly ? activeIndex : 0, last = musicOnly ? activeIndex + 1 : layers.length;
+    for (let layerIndex = first; layerIndex < last; layerIndex += 1) {
+      const layer = layers[layerIndex];
+      if (!musicOnly && !layer.visible) continue;
+      const offset = pixel * 4;
+      let sourceRed, sourceGreen, sourceBlue, sourceAlpha;
+      if (layerIndex === activeIndex && cameraPixel >= 0) {
+        const cameraOffset = cameraPixel * 4;
+        if (sampled[cameraOffset + 3] === 0) continue; // transparent capture clears this cel
+        if (paletteFixed) {
+          const color = fixedChoices[fixedIndices[cameraPixel]].rgba;
+          [sourceRed, sourceGreen, sourceBlue, sourceAlpha] = color;
+        } else {
+          sourceRed = sampled[cameraOffset]; sourceGreen = sampled[cameraOffset + 1];
+          sourceBlue = sampled[cameraOffset + 2]; sourceAlpha = sampled[cameraOffset + 3];
+        }
+      } else {
+        sourceRed = layer.rgba[offset]; sourceGreen = layer.rgba[offset + 1];
+        sourceBlue = layer.rgba[offset + 2]; sourceAlpha = layer.rgba[offset + 3];
+      }
+      sourceAlpha *= layer.opacity;
+      if (!sourceAlpha) continue;
+      if (sourceAlpha === 255) { red = sourceRed; green = sourceGreen; blue = sourceBlue; alpha = 255; continue; }
+      const sourceWeight = sourceAlpha / 255, backWeight = 1 - sourceWeight;
+      const backRed = red * alpha / 255, backGreen = green * alpha / 255, backBlue = blue * alpha / 255;
+      alpha = sourceAlpha + alpha * backWeight;
+      if (alpha > 0) {
+        red = (sourceRed * sourceWeight + backRed * backWeight) * 255 / alpha;
+        green = (sourceGreen * sourceWeight + backGreen * backWeight) * 255 / alpha;
+        blue = (sourceBlue * sourceWeight + backBlue * backWeight) * 255 / alpha;
+      }
+    }
+    const offset = pixel * 4;
+    output[offset] = Math.round(red); output[offset + 1] = Math.round(green);
+    output[offset + 2] = Math.round(blue); output[offset + 3] = Math.round(alpha);
+  }
+
+  return Object.freeze({
+    mapping,
+    render(frame, { paletteFixed = false } = {}) {
+      sampleCameraFrameToPlacement(frame, mapping, sampled);
+      output.set(baseRgba);
+      if (!canPreview) return output;
+      if (paletteFixed) {
+        for (let n = 0; n < mapping.targetIndices.length; n += 1) {
+          const source = n * 4; let best = 0, distance = Infinity;
+          const sample = [sampled[source], sampled[source + 1], sampled[source + 2], sampled[source + 3]];
+          for (let choiceIndex = 0; choiceIndex < fixedChoices.length; choiceIndex += 1) {
+            const color = fixedChoices[choiceIndex].rgba;
+            const candidate = (sample[0] - color[0]) ** 2 + (sample[1] - color[1]) ** 2
+              + (sample[2] - color[2]) ** 2 + (sample[3] - color[3]) ** 2;
+            if (candidate < distance) { best = choiceIndex; distance = candidate; }
+          }
+          fixedIndices[n] = best;
+        }
+      }
+      for (let n = 0; n < mapping.targetIndices.length; n += 1) compositePixel(mapping.targetIndices[n], n, paletteFixed);
+      return output;
+    }
+  });
+}
+
 /** Build a cached base composite and render camera pixels over the selected layer. */
 export function createCameraPlacementRenderer(snapshot, mapping) {
   if (!snapshot || !mapping || snapshot.width !== mapping.width || snapshot.height !== mapping.height) throw new TypeError('Placement snapshot does not match its mapping');
+  if (Array.isArray(snapshot.rgbaLayers)) return createRgbaCameraPlacementRenderer(snapshot, mapping);
   const { width, height, palette, below, active, above, activeVisible = true, activeLocked = false, musicOnly = false, allowedIndices = [] } = snapshot;
   const length = width * height;
   for (const pixels of [below, active, above]) if (!pixels || pixels.length !== length) throw new TypeError('Placement layer pixels do not match canvas');

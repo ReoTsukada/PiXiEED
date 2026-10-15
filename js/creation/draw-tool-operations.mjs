@@ -1,7 +1,7 @@
 import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261009-pointer-selection-1';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { symmetryPoints } from './drawing-symmetry.mjs';
-import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261006-draw-startup-1';
+import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261016-color-capability-1';
 import { boundedPixelLine } from './draw-pointer-geometry.mjs';
 
 const MAX_SIDE = 512;

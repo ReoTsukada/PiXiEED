@@ -22,6 +22,10 @@ const EVENTS = new Set([
 const GAME_TYPES = new Set(['spot_difference', 'hidden_object', 'jigsaw', 'walk']);
 const COMPLETION_KINDS = new Set(['solved', 'candidates_reviewed', 'goal']);
 const CONTENT_TYPES = new Set(['work', 'store', 'event', 'tool', 'game', 'project']);
+const DRAW_CTA_CONTENT_IDS = new Set(['draw_cta_event', 'draw_cta_creation', 'draw_cta_general', 'draw_cta_books']);
+const DRAW_CTA_CONTEXT_IDS = Object.freeze({
+  event: 'draw_cta_event', creation: 'draw_cta_creation', general: 'draw_cta_general', books: 'draw_cta_books'
+});
 const FILE_TYPES = new Set(['png', 'gif', 'jpg', 'jpeg', 'webp', 'svg', 'wav', 'mp3', 'mp4', 'webm', 'pxd', 'zip', 'other']);
 const METHODS = new Set(['downloaded', 'shared', 'native', 'clipboard', 'ad', 'free']);
 const LINK_KINDS = new Set(['official', 'ticket', 'related', 'social']);
@@ -107,7 +111,10 @@ function parametersFor(name, input = {}) {
       }
       break;
     }
-    case 'select_content': put('content_type', enumValue(input.content_type, CONTENT_TYPES)); break;
+    case 'select_content':
+      put('content_type', enumValue(input.content_type, CONTENT_TYPES));
+      put('content_id', enumValue(input.content_id, DRAW_CTA_CONTENT_IDS));
+      break;
     case 'event_outbound': put('link_kind', enumValue(input.link_kind, LINK_KINDS)); break;
     case 'share': put('method', enumValue(input.method, new Set(['native']))); break;
     case 'link_copy': put('method', enumValue(input.method, new Set(['clipboard']))); break;
@@ -213,6 +220,14 @@ export function startAnalytics() {
   pageView();
   watchPathChanges();
   document.addEventListener('click', (event) => {
+    const anchor = event.target?.closest?.('a[href="/draw/"]');
+    const marker = anchor?.closest?.('[data-draw-cta]');
+    const context = marker?.dataset?.drawContext;
+    const contentId = DRAW_CTA_CONTEXT_IDS[context];
+    if (anchor && contentId && event.isTrusted === true && event.defaultPrevented !== true && event.button === 0) {
+      emit('select_content', { content_type: 'tool', content_id: contentId });
+      return;
+    }
     const target = event.target?.closest?.('[data-analytics-event]');
     const name = target?.dataset?.analyticsEvent;
     if (['work_open', 'store_open', 'map_open'].includes(name)) emit(name, {});

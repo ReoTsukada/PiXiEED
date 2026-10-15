@@ -1,4 +1,4 @@
-import { audioVideoFrameSize, chooseAudioVideoMimeType, AUDIO_VIDEO_MAX_SECONDS } from './audio-video.mjs?rev=20261008-output-1';
+import { audioVideoFrameSize, chooseAudioVideoMimeType, AUDIO_VIDEO_MAX_SECONDS } from './audio-video.mjs?rev=20261016-color-capability-1';
 import { getOutputTiming } from './output-timing.mjs?rev=20261009-fps-1';
 
 function abortError() { try { return new DOMException('動画の作成を中止しました。', 'AbortError'); } catch { const error = new Error('動画の作成を中止しました。'); error.name = 'AbortError'; return error; } }
@@ -98,7 +98,7 @@ export async function renderOutputVideo(frames, {
       const signature = new Uint8Array(buffer);
       const valid = extension === 'mp4'
         ? signature.length === 8 && String.fromCharCode(...signature.subarray(4, 8)) === 'ftyp'
-        : signature.length === 4 && signature[0] === 0x1a && signature[1] === 0x45 && signature[2] === 0xdf && signature[3] === 0xa3;
+        : signature.length >= 4 && signature[0] === 0x1a && signature[1] === 0x45 && signature[2] === 0xdf && signature[3] === 0xa3;
       if (!valid) { rejectOnce(new Error('作成した動画ファイルの識別情報が不正です。元データはそのままです。')); return; }
       disposed = true;
       resolveResult({ blob, extension, mimeType: actualMime, seconds: durationSeconds, width: frameSize.width, height: frameSize.height, hasAudio: Boolean(audioSource) });
@@ -136,15 +136,15 @@ export async function renderOutputVideo(frames, {
     signal?.addEventListener('abort', abort, { once: true });
     documentRef.addEventListener?.('visibilitychange', onVisibility);
     recorder.start(500);
-    await Promise.race([started, resultPromise]);
-    if (disposed) return await resultPromise;
     startedAt = now();
-    if (audioNode) { audioStartAt = audioContext.currentTime; audioNode.start(audioStartAt); if (audioTotalPlays > 1) audioNode.stop(audioStartAt + durationSeconds); }
     if (hasVideoSource) {
       videoSource.currentTime = 0;
       const playResult = videoSource.play?.();
       if (playResult?.catch) await playResult.catch(() => { throw new Error('動画の再生を開始できませんでした。画像と音声の元データは保持されています。'); });
     }
+    // Encoders may wait for input before emitting start. Feed audio before
+    // awaiting that event, once any imported video is ready to play.
+    if (audioNode) { audioStartAt = audioContext.currentTime; audioNode.start(audioStartAt); if (audioTotalPlays > 1) audioNode.stop(audioStartAt + durationSeconds); }
     const step = (time) => {
       if (signal?.aborted || canceled || disposed) return;
       const elapsed = audioNode ? Math.max(0, audioContext.currentTime - audioStartAt) : Math.max(0, (time - startedAt) / 1000);
@@ -155,6 +155,8 @@ export async function renderOutputVideo(frames, {
     raf = requestFrame(step);
     watchdog = setTimeoutImpl(() => { rejectOnce(new Error('動画の作成が時間内に終わりませんでした。元データはそのままです。')); stopRecording(); }, (durationSeconds + 8) * 1000);
     if (!audioNode) stopTimer = setTimeoutImpl(stopRecording, Math.ceil(durationSeconds * 1000));
+    // Keep feeding video frames while an encoder waits to announce start.
+    await Promise.race([started, resultPromise]);
     const result = await resultPromise;
     return result;
   } catch (error) {

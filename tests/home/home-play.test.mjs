@@ -14,7 +14,9 @@ test('home: tool cards have working toys and creation links lead the page', () =
   assert.match(html, /class="hp-card-grid hp-create-grid"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
   assert.doesNotMatch(html, /data-toy="game"/);
   assert.match(html, /data-toy="editor" href="\/draw\/"[\s\S]*?PiXiEEDraw/);
-  assert.doesNotMatch(html, /PiXiEELENS|PXDraw/);
+  assert.doesNotMatch(html, /PXDraw/);
+  assert.match(html, /PiXiEEDrawのPiXiEELENS/);
+  assert.match(html, /data-toy="sound" href="\/audio\/"[\s\S]*?PiXiEEaudio/);
   assert.match(source, /prefers-reduced-motion/);
 });
 
@@ -55,11 +57,13 @@ test('home hero: the play leads somewhere — invitations matched to what the vi
 
 test('home: discovery follows the mini experience and links to published tools', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
-  assert.match(html, /<a class="hp-discovery-link" href="\/draw\/">この先で、作品をつくる（PiXiEEDraw）/);
+  assert.match(html, /<a class="hp-discovery-link" href="\/draw\/" aria-label="PiXiEEDrawでドット絵を描く" data-draw-cta data-draw-context="general">/);
   for (const path of ['/camera/', '/draw/about/', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
   assert.match(html, /hp-link-card" data-toy="camera"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card/);
   assert.match(html, /気になるカードから、すぐにはじめられます。/);
-  assert.ok(html.indexOf('class="hp-hero"') < html.indexOf('class="home-discovery container"'), 'public works and direct entry links follow the mini experience');
+  const heroIndex = html.indexOf('class="hp-hero container"');
+  const discoveryIndex = html.indexOf('class="home-discovery container"');
+  assert.ok(heroIndex >= 0 && discoveryIndex > heroIndex, 'public works and direct entry links follow the mini experience');
   assert.match(html, /data-home-gallery/);
   assert.match(source, /function groupToys\(/);
   assert.match(html, /class="hp-card-grid hp-discover-grid"/);

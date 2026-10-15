@@ -1,4 +1,7 @@
+import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
+
 export const AUDIO_SCHEMA_VERSION = 1;
+export const AUDIO_MAX_COLOR_INSTRUMENT_OVERRIDES = REWARD_LIMITS.draw.rewardColors;
 export const AUDIO_PPQ = 480;
 export const AUDIO_STEP_TICKS = AUDIO_PPQ / 2;
 export const AUDIO_PIXEL_TICKS = AUDIO_PPQ / 4;
@@ -165,7 +168,7 @@ export function validateAudioSong(song) {
     const overrides = song.colorInstruments;
     if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)
         || ![Object.prototype, null].includes(Object.getPrototypeOf(overrides))
-        || Object.keys(overrides).length > 32
+        || Object.keys(overrides).length > AUDIO_MAX_COLOR_INSTRUMENT_OVERRIDES
         || Object.entries(overrides).some(([colorId, instrument]) => !/^rgba-[\da-f]{8}$/.test(colorId) || colorId.endsWith('00') || !INSTRUMENT_IDS.has(instrument))) {
       throw new TypeError('色ごとの音色設定が不正です');
     }

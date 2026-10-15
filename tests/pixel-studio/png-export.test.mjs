@@ -22,6 +22,12 @@ test('uses floor integer scaling near the 2048 target and never shrinks a frame'
   assert.deepEqual(pngExportGeometry(8192, 2048), { width: 8192, height: 2048, scale: 1 });
 });
 
+test('an active reward can raise the direct PNG target to 4096 while preserving the same grid', () => {
+  assert.deepEqual(pngExportGeometry(16, 16, { longEdge: 4096 }), { width: 4096, height: 4096, scale: 256 });
+  assert.deepEqual(pngExportGeometry(2000, 1000, { longEdge: 4096 }), { width: 4000, height: 2000, scale: 2 });
+  assert.deepEqual(pngExportGeometry(3000, 1000, { longEdge: 2048 }), { width: 3000, height: 1000, scale: 1 });
+});
+
 test('rejects invalid or excessively large geometry', () => {
   for (const [width, height] of [[0, 10], [-1, 10], [10, 0], [1.5, 10], [NaN, 10], [Infinity, 10], ['64', 64]]) {
     assert.throws(() => pngExportGeometry(width, height), RangeError);

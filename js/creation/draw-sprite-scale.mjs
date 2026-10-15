@@ -1,8 +1,8 @@
 import {
   ANIMATION_MAX_DIMENSION, ANIMATION_METADATA_BUDGET, ANIMATION_PIXEL_BUDGET, estimateRetainedAnimationBytes,
   resizeAnimation, validateAnimation,
-} from './animation-core.mjs?rev=20261012-animation-core-contract-1';
-import { DRAW_ANIMATION_HISTORY_MAX_BYTES } from './draw-animation-history.mjs?rev=20261012-animation-core-contract-1';
+} from './animation-core.mjs?rev=20261016-color-capability-1';
+import { DRAW_ANIMATION_HISTORY_MAX_BYTES } from './draw-animation-history.mjs?rev=20261016-color-capability-1';
 
 export const DRAW_SPRITE_SCALE_MEMORY_MAX_BYTES = 64 * 1024 * 1024;
 const TILE_BYTES = 32 * 32;
