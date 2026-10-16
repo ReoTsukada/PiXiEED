@@ -18,17 +18,27 @@ function loadSdk(win, doc, timeoutMs, schedule, cancelSchedule) {
   }
   const bootstrap = { servicesEnabled: false, promise: null };
   bootstraps.set(win, bootstrap);
-  win.googletag = { cmd: [] };
+  const ownedTag = { cmd: [] };
+  win.googletag = ownedTag;
   bootstrap.promise = new Promise((resolve, reject) => {
     let done = false;
     const script = doc.createElement('script');
     const timer = schedule(() => finish(new Error('GPTの読み込みがタイムアウトしました。')) , timeoutMs);
-    function finish(error) {
+    function finish(error, transportFailed = false) {
       if (done) return;
       done = true;
       try { cancelSchedule(timer); } catch {}
       script.onload = script.onerror = null;
-      if (error) reject(error); else resolve(bootstrap);
+      if (error) {
+        // A transport error has finished this script. A later explicit attempt
+        // may replace only our own failed loader; never remove another GPT.
+        if (transportFailed && win.googletag === ownedTag && !ownedTag.apiReady && bootstraps.get(win) === bootstrap) {
+          script.remove?.();
+          delete win.googletag;
+          bootstraps.delete(win);
+        }
+        reject(error);
+      } else resolve(bootstrap);
     }
     script.src = GPT_SCRIPT_URL; script.async = true; script.crossOrigin = 'anonymous';
     script.dataset.pixieedRewarded = 'true';
@@ -36,7 +46,7 @@ function loadSdk(win, doc, timeoutMs, schedule, cancelSchedule) {
     // GPT's documented command queue, rather than the script load event, is
     // the readiness boundary. The existing deadline still fails closed.
     win.googletag.cmd.push(() => finish());
-    script.onerror = () => finish(new Error('GPTを読み込めませんでした。'));
+    script.onerror = () => finish(new Error('GPTを読み込めませんでした。'), true);
     doc.head.append(script);
   });
   return bootstrap.promise;

@@ -11,8 +11,8 @@ const idSet = new Set(events.map((event) => event.id));
 const allIds = new Set(catalog.events.map((event) => event.id));
 
 test('indexable events have a checked source and unique, substantive dated edition', () => {
-  assert.equal(catalog.events.length, 131);
-  assert.equal(events.length, 114);
+  assert.equal(catalog.events.length, 134);
+  assert.equal(events.length, 117);
   for (const event of events) {
     assert.ok(event.sourceUrl.startsWith('https://'));
     assert.ok(event.checkedAt);
@@ -29,6 +29,9 @@ test('indexable events have a checked source and unique, substantive dated editi
   assert.ok(!idSet.has('motocross-saito-ultra-dope-2026'));
   assert.ok([...idSet].every((id) => allIds.has(id)));
   for (const id of [
+    'howard-county-library-pixel-perfect-art-2026-10-17',
+    'villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17',
+    'west-vancouver-library-scary-simbrix-pixel-art-2026-10-21',
     'sydney-haymarket-pixel-art-workshop-2026-10-20',
     'pixxelpoint-pixel-art-workshop-2026-10-21',
     'lyon-pixel-art-graffiti-saint-rambert-2026-10-21',
@@ -116,8 +119,8 @@ test('indexable leaf metadata is unique and adds only sourced date and venue con
     assert.ok(html.includes(`<p class="event-summary">${visibleSummary.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</p>`));
     return { event, title, description };
   });
-  assert.equal(new Set(pages.map((page) => page.title)).size, 114);
-  assert.equal(new Set(pages.map((page) => page.description)).size, 114);
+  assert.equal(new Set(pages.map((page) => page.title)).size, 117);
+  assert.equal(new Set(pages.map((page) => page.description)).size, 117);
 
   for (const ids of [
     ['pixel-art-park-5', 'pixel-art-park-6'],
@@ -141,7 +144,7 @@ test('indexable leaf metadata is unique and adds only sourced date and venue con
 
 test('hub has one anchor per source record and accurate record, edition, watch, and page counts', () => {
   const hub = indexPage(events, catalog.events);
-  assert.match(hub, /131レコード（開催日付き125記録・重複1件を除く124開催回・次回未定6件）。個別紹介ページ114件。/);
+  assert.match(hub, /134レコード（開催日付き128記録・重複1件を除く127開催回・次回未定6件）。個別紹介ページ117件。/);
   assert.match(hub, /PiXiEEDが独自に調査・編集した一覧です/);
   for (const event of catalog.events) assert.ok(hub.includes(`id="${event.id}"`));
 });
@@ -153,7 +156,7 @@ test('generated canonical pages and sitemap contain only unique leaf URLs and ar
     await writeFile(join(root, 'data/pixel-art-events.json'), JSON.stringify(catalog));
     await writeFile(join(root, 'sitemap.xml'), '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://pixieed.jp/</loc></url><url><loc>https://pixieed.jp/events/old/</loc></url></urlset>');
     const first = await generateEventPages({ root });
-    assert.equal(first.eventPages, 114);
+    assert.equal(first.eventPages, 117);
     const sitemapPath = join(root, 'sitemap.xml');
     const sitemap = await readFile(sitemapPath, 'utf8');
     const sitemapUrls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) => url);

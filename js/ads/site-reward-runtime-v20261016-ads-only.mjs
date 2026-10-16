@@ -17,6 +17,17 @@ const FEATURE_BENEFITS = Object.freeze({
   camera: ['カメラ（PiXiEELENS）の追加枠', 'GIFは3秒・10fpsから最大10秒・20fpsに。使用色は最大64色です。'],
   puzzle: ['パズルの追加枠', '無料の1回を使った後も追加ヒントを利用できます。']
 });
+export function getSiteRewardPresentation({ policyEnabled = false } = {}) {
+  return policyEnabled
+    ? Object.freeze({ openPeriod: false })
+    : Object.freeze({
+        openPeriod: true,
+        title: '期間限定・全機能開放中',
+        message: '機能制限なし・広告視聴不要',
+        intro: '特典対象の機能を広告視聴なしで利用できます。広告が配信されない場合も、通常どおり利用できます。安全な最大値など各機能の技術上の上限は引き続き適用されます。',
+        primaryAction: '制作を続ける'
+      });
+}
 function browserStorage() { try { return globalThis.localStorage; } catch { return null; } }
 
 function parseRecord(storage, key) {
@@ -115,15 +126,21 @@ export function createSiteRewardService({
   function render() {
     if (!ui || disposed) return;
     const state = snapshot();
+    const presentation = getSiteRewardPresentation(state);
     const remaining = state.remainingMs;
     const mm = Math.floor(remaining / 60_000);
     const ss = Math.floor((remaining % 60_000) / 1000);
-    ui.status.textContent = state.active ? `リワード有効 ${mm}:${String(ss).padStart(2, '0')}` : 'リワードなし';
-    ui.mobileStatus.textContent = state.active ? `${mm}:${String(ss).padStart(2, '0')}` : '特典';
-    ui.renew.setAttribute('aria-label', `${state.active ? `リワード有効、残り約${Math.ceil(remaining / 60_000)}分` : 'リワードなし'}。詳細と延長`);
+    ui.status.textContent = presentation.openPeriod ? '期間限定・全機能開放中' : state.active ? `リワード有効 ${mm}:${String(ss).padStart(2, '0')}` : 'リワードなし';
+    ui.mobileStatus.textContent = presentation.openPeriod ? '開放中' : state.active ? `${mm}:${String(ss).padStart(2, '0')}` : '特典';
+    ui.desktopStatus.textContent = presentation.openPeriod ? '開放中' : '特典を確認';
+    ui.renew.setAttribute('aria-label', presentation.openPeriod
+      ? '期間限定・全機能開放中。機能制限なし・広告視聴不要。詳細を確認'
+      : `${state.active ? `リワード有効、残り約${Math.ceil(remaining / 60_000)}分` : 'リワードなし'}。詳細と延長`);
     ui.renew.hidden = !enabled;
     ui.renew.disabled = modalReleasedForAd;
-    ui.message.textContent = restrictionsEnabled
+    ui.message.textContent = presentation.openPeriod
+      ? presentation.message
+      : restrictionsEnabled
       ? state.active
         ? `このサイト全体のリワードが有効です。残り ${mm}分${String(ss).padStart(2, '0')}秒。`
         : 'リワードは有効ではありません。通常の機能はそのまま利用できます。'
@@ -132,16 +149,28 @@ export function createSiteRewardService({
       ? `残り ${mm}分${String(ss).padStart(2, '0')}秒`
       : state.expiresAt ? '期限切れ' : '未有効';
     ui.remaining.setAttribute('data-active', String(state.active));
-    ui.intro.textContent = restrictionsEnabled
+    ui.remaining.hidden = presentation.openPeriod;
+    ui.intro.textContent = presentation.openPeriod
+      ? presentation.intro
+      : restrictionsEnabled
       ? 'PiXiEEDrawをはじめ、対応する制作ツールで共通のリワードが60分間有効です。'
       : '広告視聴は任意です。リワードは60分間記録されますが、現在は機能制限を適用していません。描画・作成・保存・共有は広告を見なくても利用できます。広告が配信されない場合も、通常どおり利用できます。';
     ui.metrics.hidden = !restrictionsEnabled;
     ui.details.hidden = !restrictionsEnabled;
     ui.retention.hidden = !restrictionsEnabled;
-    ui.title.textContent = restrictionsEnabled ? '広告1回で、サイト全体を60分拡張' : '広告を見て、60分のリワード';
+    ui.title.textContent = presentation.openPeriod ? presentation.title : '広告1回で、サイト全体を60分拡張';
+    ui.root.setAttribute('data-open-period', String(presentation.openPeriod));
+    ui.dialog.setAttribute('aria-describedby', presentation.openPeriod ? 'site-reward-intro' : 'site-reward-intro site-reward-retention');
     ui.dialog.hidden = !ui.open;
+    const descriptionIds = presentation.openPeriod ? 'site-reward-intro' : 'site-reward-intro site-reward-retention';
+    ui.dialog.setAttribute('aria-describedby', descriptionIds);
+    ui.card.setAttribute('aria-describedby', descriptionIds);
     ui.accept.textContent = state.active ? '同意して広告を見て60分延長' : '同意して広告を見る';
-    if (state.active && remaining <= REWARD_WARNING_MS && warnedForExpiry !== state.expiresAt) {
+    ui.accept.hidden = presentation.openPeriod;
+    ui.cancel.textContent = presentation.openPeriod ? presentation.primaryAction : '通常の制作を続ける';
+    if (presentation.openPeriod) {
+      ui.notice.hidden = true;
+    } else if (state.active && remaining <= REWARD_WARNING_MS && warnedForExpiry !== state.expiresAt) {
       warnedForExpiry = state.expiresAt;
       ui.notice.textContent = 'リワードの有効期限が2分以内です。';
       ui.notice.hidden = false;
@@ -150,9 +179,10 @@ export function createSiteRewardService({
       ui.notice.textContent = 'リワードの有効期限が切れました。通常の保存データはそのままです。';
       ui.notice.hidden = false;
     } else if (state.active && remaining > REWARD_WARNING_MS) ui.notice.hidden = true;
-    ui.accept.disabled = controller.state.phase === 'loading' || controller.state.phase === 'showing';
+    ui.accept.disabled = presentation.openPeriod || controller.state.phase === 'loading' || controller.state.phase === 'showing';
     let feedback = '';
-    if (controller.state.phase === 'no-fill') feedback = '広告がありませんでした。少し後で再度お試しください。';
+    if (presentation.openPeriod) feedback = '';
+    else if (controller.state.phase === 'no-fill') feedback = '広告がありませんでした。少し後で再度お試しください。';
     else if (controller.state.phase === 'unsupported') feedback = 'この環境ではリワード広告を表示できません。';
     else if (controller.state.phase === 'error') feedback = '広告を準備できませんでした。リワードは付与されていません。';
     else if (controller.state.phase === 'granted') feedback = restrictionsEnabled ? 'リワードを受け取りました。サイト全体で60分間有効です。' : 'リワードを受け取りました。制作ツールは広告なしでも引き続き利用できます。';
@@ -167,6 +197,7 @@ export function createSiteRewardService({
     if (!ui || disposed || !modalReleasedForAd) return;
     modalReleasedForAd = false;
     ui.open = true;
+    documentRef?.dispatchEvent?.(new CustomEvent('pixieed:site-reward-open'));
     ui.setBackgroundInert?.(true);
     render();
     setTimeout(() => { if (ui?.open) ui.title?.focus?.({ preventScroll: true }); }, 0);
@@ -179,8 +210,10 @@ export function createSiteRewardService({
     root.innerHTML = `<style>
       .pixieed-site-reward{--reward-ink:#202b3c;--reward-muted:#596779;--reward-line:#dfe5eb;--reward-paper:#fff;--reward-tint:#f4f7fa;--reward-accent:#276c65;position:fixed;right:16px;bottom:16px;z-index:2147483000;color:var(--reward-ink);font:14px/1.5 system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif}
       .pixieed-site-reward *{box-sizing:border-box}
+      .pixieed-site-reward [hidden]{display:none!important}
       .pixieed-site-reward [data-metrics][hidden],.pixieed-site-reward [data-details][hidden],.pixieed-site-reward [data-retention][hidden]{display:none}
       .pixieed-site-reward:has([data-dialog]:not([hidden])){z-index:2147483000}
+      [data-header-entry-active] .pixieed-site-reward-status,[data-embedded-frame] .pixieed-site-reward-status{display:none}
       .pixieed-site-reward button{font:inherit;cursor:pointer;border:1px solid #aebac6;border-radius:10px;background:var(--reward-paper);color:inherit;padding:9px 13px}
       .pixieed-site-reward button:focus-visible{outline:3px solid #68a79e;outline-offset:3px}
       .pixieed-site-reward-status{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--reward-line);border-radius:12px;padding:8px 10px;box-shadow:0 3px 16px #18283b20}
@@ -258,10 +291,10 @@ export function createSiteRewardService({
         .pixieed-site-reward-actions [data-accept]{padding-inline:8px}
       }
     </style><div class="pixieed-site-reward">
-      <div class="pixieed-site-reward-status"><span data-status aria-live="off"></span><button type="button" data-renew aria-haspopup="dialog"><span class="pixieed-site-reward-desktop">特典を確認</span><span class="pixieed-site-reward-mobile" data-mobile-status aria-hidden="true">特典</span></button></div>
+      <div class="pixieed-site-reward-status"><span data-status aria-live="off"></span><button type="button" data-renew aria-haspopup="dialog"><span class="pixieed-site-reward-desktop" data-desktop-status>特典を確認</span><span class="pixieed-site-reward-mobile" data-mobile-status aria-hidden="true">特典</span></button></div>
       <div class="pixieed-site-reward-notice" data-notice role="status" hidden></div>
-      <div class="pixieed-site-reward-dialog" data-dialog role="dialog" aria-modal="true" aria-labelledby="site-reward-title" hidden>
-        <section class="pixieed-site-reward-card" aria-describedby="site-reward-intro site-reward-retention">
+      <div class="pixieed-site-reward-dialog" id="site-reward-dialog" data-dialog role="dialog" aria-modal="true" aria-labelledby="site-reward-title" hidden>
+        <section class="pixieed-site-reward-card" data-card aria-describedby="site-reward-intro site-reward-retention">
           <div class="pixieed-site-reward-kicker-row"><p class="pixieed-site-reward-kicker" data-requested></p><span class="pixieed-site-reward-clock" data-remaining data-active="false" role="status" aria-live="off">未有効</span></div>
           <div class="pixieed-site-reward-heading"><h2 id="site-reward-title" tabindex="-1">広告を見て、60分のリワード</h2></div>
           <p class="pixieed-site-reward-intro" id="site-reward-intro">広告視聴は任意です。リワードは60分間記録されますが、現在は機能制限を適用していません。描画・作成・保存・共有は広告を見なくても利用できます。広告が配信されない場合も、通常どおり利用できます。</p>
@@ -289,10 +322,11 @@ export function createSiteRewardService({
       </div>
     </div>`;
     documentRef.body.append(root);
+    try { if (windowRef?.top !== windowRef?.self) root.setAttribute('data-embedded-frame', ''); } catch { root.setAttribute('data-embedded-frame', ''); }
     const query = selector => root.querySelector(selector);
-    ui = { root, status: query('[data-status]'), mobileStatus: query('[data-mobile-status]'), renew: query('[data-renew]'), notice: query('[data-notice]'),
+    ui = { root, status: query('[data-status]'), desktopStatus: query('[data-desktop-status]'), mobileStatus: query('[data-mobile-status]'), renew: query('[data-renew]'), notice: query('[data-notice]'),
       dialog: query('[data-dialog]'), requested: query('[data-requested]'), context: query('[data-context]'), contextTitle: query('[data-context-title]'), contextCopy: query('[data-context-copy]'), message: query('[data-message]'),
-      remaining: query('[data-remaining]'), title: query('#site-reward-title'), intro: query('#site-reward-intro'), metrics: query('[data-metrics]'), details: query('[data-details]'), retention: query('[data-retention]'), benefits: query('[data-benefits]'), feedback: query('[data-feedback]'), accept: query('[data-accept]'), open: false, returnFocus: null, inertSiblings: new Map(), backgroundObserver: null };
+      remaining: query('[data-remaining]'), title: query('#site-reward-title'), card: query('[data-card]'), intro: query('#site-reward-intro'), metrics: query('[data-metrics]'), details: query('[data-details]'), retention: query('[data-retention]'), benefits: query('[data-benefits]'), feedback: query('[data-feedback]'), accept: query('[data-accept]'), cancel: query('[data-cancel]'), open: false, returnFocus: null, inertSiblings: new Map(), backgroundObserver: null };
     const setBackgroundInert = inert => {
       if (!documentRef.body?.children) return;
       if (inert) {
@@ -321,6 +355,7 @@ export function createSiteRewardService({
       ui.open = false;
       if (['loading', 'ready'].includes(controller.state.phase)) controller.cancel();
       setBackgroundInert(false); render();
+      documentRef?.dispatchEvent?.(new CustomEvent('pixieed:site-reward-close'));
       if (ui.returnFocus?.isConnected) ui.returnFocus.focus();
     };
     ui.renew.addEventListener('click', () => openConsent(requestedFeature || 'site'));
@@ -330,13 +365,23 @@ export function createSiteRewardService({
       if (event.key === 'Escape') { event.preventDefault(); close(); return; }
       if (event.key !== 'Tab') return;
       const focusable = [...ui.dialog.querySelectorAll('summary,button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])')]
-        .filter(element => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
+        .filter(element => {
+          if (element.getAttribute('aria-hidden') === 'true') return false;
+          for (let node = element; node && node !== ui.dialog; node = node.parentElement) {
+            if (node.hidden || node.getAttribute('aria-hidden') === 'true') return false;
+          }
+          return typeof element.getClientRects !== 'function' || element.getClientRects().length > 0;
+        });
       if (!focusable.length) { event.preventDefault(); return; }
       const first = focusable[0], last = focusable.at(-1);
       if (event.shiftKey && documentRef.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && documentRef.activeElement === last) { event.preventDefault(); first.focus(); }
     });
     ui.accept.addEventListener('click', async () => {
+      if (!restrictionsEnabled) {
+        render();
+        return;
+      }
       if (enabled && !locks?.request) {
         render();
         ui.feedback.textContent = 'この環境ではリワードを安全に同期できないため、広告を開始できません。通常の機能は利用できます。';
@@ -351,6 +396,7 @@ export function createSiteRewardService({
           // isolation before calling show so that surface remains interactive.
           modalReleasedForAd = true;
           ui.open = false; ui.setBackgroundInert(false); render();
+          documentRef?.dispatchEvent?.(new CustomEvent('pixieed:site-reward-close'));
           if (!show()) {
             restoreConsentAfterAd();
             ui.feedback.textContent = '広告を開始できませんでした。リワードは付与されていません。';
@@ -385,7 +431,9 @@ export function createSiteRewardService({
       items.sort((a, b) => rank(a) - rank(b));
       for (const item of items) ui.benefits.append(item);
     }
-    ui.open = true; setTimeout(() => { if (ui?.open) ui.title?.focus?.({ preventScroll: true }); }, 0);
+    ui.open = true;
+    documentRef?.dispatchEvent?.(new CustomEvent('pixieed:site-reward-open'));
+    setTimeout(() => { if (ui?.open) ui.title?.focus?.({ preventScroll: true }); }, 0);
     ui.setBackgroundInert(true); render();
     return true;
   }

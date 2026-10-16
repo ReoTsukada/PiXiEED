@@ -83,5 +83,8 @@ test('ads.txt seller and privacy disclosure agree with the installed publisher',
   const privacy = await html('privacy/index.html');
   assert.match(privacy, /Google AdSense/);
   assert.match(privacy, /無料/);
+  assert.match(privacy, /期間限定で特典対象の全機能を広告視聴なしで利用できます/);
+  assert.match(privacy, /開放期間中は、報酬型広告の視聴を求める案内や開始ボタンを表示しません/);
+  assert.doesNotMatch(privacy, /広告視聴で60分間のリワード記録を受け取れます/);
   assert.doesNotMatch(privacy, /広告を.*1時間追加|残り時間の上限は2時間/);
 });

@@ -251,11 +251,35 @@ body .app-tabs--work > :is(a,button){width:auto!important;min-width:44px!importa
 body .px-site-header .site-nav,body .event-site-header.px-site-header > nav{display:none}
 @media(max-width:600px){body .catalog-header .px-header-inner > p,body .output-header.px-site-header .output-header__label{display:none}}
 
+/* The site-wide reward is an optional entry and reports only an actual receipt. */
+.px-site-header .px-header-reward{display:grid;place-items:center;flex:0 0 auto;min-width:44px;min-height:44px;height:44px;margin-left:auto;padding:0 8px;border:1px solid #b8d1cb;border-radius:12px;background:#f2f8f6;color:#185e56;font:700 12px/1 system-ui,-apple-system,"Hiragino Sans",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+.px-site-header .px-header-reward:hover,.px-site-header .px-header-reward:focus-visible{background:#fff;box-shadow:0 2px 9px #17233312}
+.px-site-header .px-header-reward:focus-visible{outline:3px solid #68a79e;outline-offset:2px}
+.px-site-header .px-header-reward[data-active=true]{border-color:#c9a45a;background:#fffaf0;color:#5b4417}
+.px-site-header .px-header-reward + .menu-toggle{margin-left:0!important}
+body .px-site-header .px-header-reward{min-width:44px}
+@media(max-width:380px){.px-site-header .px-header-reward{padding-inline:5px;font-size:11px}}
+body [data-header-entry-active] .pixieed-site-reward-status,body[data-header-reward-embedded] .pixieed-site-reward-status{display:none!important}
+/* Full-screen editors were designed to fill the viewport without the shared header. */
+.px-header-ready body.app-page--tool-draw .site-header.px-site-header,.px-header-ready body.app-page--tool-creation-game .site-header.px-site-header{display:block}
+.px-header-ready body.app-page--tool-draw #main,.px-header-ready body.app-page--tool-creation-game #main{height:calc(100dvh - var(--px-header-height,64px))}
+
 /* Legacy Lens keeps its existing HUD row and full camera viewport. */
 body .hud-top__bar.px-site-header.px-header-inner{min-height:44px;padding:0;gap:6px}
 body .hud-top__bar.px-site-header .hud-top__actions{min-width:44px;flex:0 1 auto;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
 body .hud-top__bar.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;background:#111923d9}
 
 body .hud-top__bar.px-site-header .menu-toggle{pointer-events:auto}
+body .hud-top__bar.px-site-header .px-header-reward{pointer-events:auto}
 body .pc-header.px-site-header.px-header-inner{width:auto;min-height:44px;padding:0;gap:6px}
 body .pc-header.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;background:#111923d9}
+@media(max-width:380px){
+  body .hud-top__bar.px-site-header.px-header-inner{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:4px;width:100%;overflow:visible}
+  body .hud-top__bar.px-site-header .hud-top__actions{display:flex;flex-wrap:nowrap;gap:4px;min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+  body .hud-top__bar.px-site-header .hud-top__actions--right{margin-left:0;justify-content:flex-start;flex:0 0 auto;overflow:visible}
+  body .hud-top__bar.px-site-header .px-header-reward{margin-left:0;padding-inline:4px}
+  body .hud-top__bar.px-site-header .menu-toggle{margin-left:0!important}
+  body .hud-top__bar.px-site-header .menu-toggle{width:44px!important;min-width:44px;padding-inline:0!important}
+  body .hud-top__bar.px-site-header .menu-toggle__label{display:none}
+  body .hud-top__bar.px-site-header .site-draw-cta--lens{flex:0 0 80px;max-width:80px;min-height:44px;padding:3px;font-size:10px;line-height:1.1}
+}

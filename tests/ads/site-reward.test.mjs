@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSiteRewardService } from '../../js/ads/site-reward.mjs';
+import { getSiteRewardPresentation } from '../../js/ads/site-reward-runtime-v20261016-ads-only.mjs';
 import { productionEnabled, REWARD_DURATION_MS, SITE_REWARD_STORAGE_KEY } from '../../js/ads/site-reward-config.mjs';
 import { rewardedAdsEnabled, featureRestrictionsEnabled } from '../../js/ads/site-reward-rollout-v20261016.mjs';
 import { requireSharedCanvasAccess } from '../../js/creation/shared-canvas-access.mjs';
@@ -75,43 +76,56 @@ test('disabled production policy bypasses locks and starts without storage grant
   h.service.dispose();
 });
 
-test('ads-only rollout keeps restrictions off while retaining voluntary no-fill and unsupported states', async () => {
+test('open-period presentation is accurate and limited to reward-target features', () => {
   assert.equal(rewardedAdsEnabled, true);
   assert.equal(featureRestrictionsEnabled, false);
   assert.equal(productionEnabled, false, 'legacy production config stays off for cached runtime safety');
-
-  for (const scenario of ['no-fill', 'unsupported']) {
-    const h = harness({ restrictionsEnabled: false, scenario });
-    assert.equal(h.service.isSiteRewardPolicyEnabled(), false);
-    assert.equal(h.service.getSiteRewardState().policyEnabled, false);
-    assert.equal(h.service.hasSiteReward(), false, 'access permission is not a granted receipt');
-    assert.equal(h.service.requireSiteReward('draw'), true, 'canvas access bypasses policy while restrictions are off');
-    const adapter = await optIn(h);
-    assert.ok(adapter, 'voluntary ad attempt can start');
-    await Promise.resolve();
-    assert.equal(h.service.getSiteRewardState().active, false);
-    assert.equal(h.service.getSiteRewardState().expiresAt, null);
-    assert.equal(h.service.getSiteRewardState().receiptCount, 0);
-    assert.equal(h.service.hasSiteReward(), false, 'ad failure never manufactures a reward receipt');
-    assert.equal(h.service.requireSiteReward('save'), true, 'ad failure never blocks saving');
-    h.service.dispose();
-  }
+  const presentation = getSiteRewardPresentation({ policyEnabled: false });
+  assert.equal(presentation.title, '期間限定・全機能開放中');
+  assert.equal(presentation.message, '機能制限なし・広告視聴不要');
+  assert.match(presentation.intro, /特典対象の機能を広告視聴なしで利用できます/);
+  assert.match(presentation.intro, /安全上限|安全な最大値/);
+  assert.doesNotMatch(presentation.intro, /4096|期限|残り/);
+  assert.equal(presentation.primaryAction, '制作を続ける');
+  assert.equal(getSiteRewardPresentation({ policyEnabled: true }).openPeriod, false, 'restricted-mode view remains distinct');
 });
 
-test('ads-only launcher stays visible without starting an ad and hides restriction benefit claims', () => {
+test('open-period panel is informational, hides receipt clocks and guards programmatic ad acceptance', async () => {
   const h = harness({ restrictionsEnabled: false });
   const root = h.service.mountSiteRewardUI();
   assert.ok(root);
   assert.equal(root.children.get('[data-renew]').hidden, false, 'voluntary launcher remains visible');
+  assert.equal(h.service.requestSiteReward('site'), true);
+  assert.equal(root.querySelector('[data-dialog]').hidden, false);
+  assert.equal(root.querySelector('[data-dialog]').attributes['aria-describedby'], 'site-reward-intro');
+  assert.equal(root.querySelector('[data-card]').attributes['aria-describedby'], 'site-reward-intro');
+  assert.equal(root.querySelector('[data-mobile-status]').textContent, '開放中');
+  assert.match(root.querySelector('[data-renew]').attributes['aria-label'], /期間限定・全機能開放中/);
+  assert.doesNotMatch(root.querySelector('[data-renew]').attributes['aria-label'], /残り|延長/);
+  assert.equal(root.querySelector('#site-reward-title').textContent, '期間限定・全機能開放中');
+  assert.equal(root.querySelector('[data-message]').textContent, '機能制限なし・広告視聴不要');
+  assert.match(root.querySelector('#site-reward-intro').textContent, /特典対象の機能を広告視聴なしで利用できます/);
+  assert.equal(root.querySelector('[data-remaining]').hidden, true);
+  assert.equal(root.querySelector('[data-accept]').hidden, true);
+  assert.equal(root.querySelector('[data-cancel]').textContent, '制作を続ける');
   assert.equal(root.children.get('[data-metrics]').hidden, true);
   assert.equal(root.children.get('[data-details]').hidden, true);
   assert.equal(root.children.get('[data-retention]').hidden, true);
   assert.equal(h.adapters.length, 0, 'mounting the UI does not request an ad');
+  root.querySelector('[data-accept]').click();
+  await Promise.resolve();
+  assert.equal(h.adapters.length, 0, 'programmatic accept cannot start an ad during the open period');
+  assert.equal(h.service.getSiteRewardState().receiptCount, 0);
+  const sharedCanvas = await putPxdSharedImage(createPxdProject(), rgbaImage(40));
+  assert.equal(requireSharedCanvasAccess(sharedCanvas, () => assert.fail('open-period access must not prompt'), '', {
+    operation: 'color-edit', requestReward: h.service.requireSiteReward
+  }), true, 'direct shared-canvas access follows the open period without creating a receipt');
+  assert.equal(h.service.getSiteRewardState().receiptCount, 0);
   h.service.dispose();
 });
 
-test('video completion and close alone never grant an ads-only reward', async () => {
-  const h = harness({ restrictionsEnabled: false });
+test('video completion and close alone never grant a reward receipt', async () => {
+  const h = harness();
   const adapter = await optIn(h);
   adapter.emit({ type: 'videoCompleted' });
   adapter.emit({ type: 'closed' });
@@ -120,17 +134,12 @@ test('video completion and close alone never grant an ads-only reward', async ()
   assert.equal(h.service.getSiteRewardState().active, false);
   assert.equal(h.service.getSiteRewardState().receiptCount, 0);
   assert.equal(h.service.hasSiteReward(), false);
-  assert.equal(h.service.requireSiteReward('output'), true, 'saving and output stay available after an ungranted ad');
-  const sharedCanvas = await putPxdSharedImage(createPxdProject(), rgbaImage(40));
-  assert.equal(requireSharedCanvasAccess(sharedCanvas, () => assert.fail('ads-only access must not prompt'), '', {
-    operation: 'color-edit', requestReward: h.service.requireSiteReward
-  }), true, 'direct shared-canvas access gate bypasses restrictions while the ledger stays empty');
-  assert.equal(h.service.getSiteRewardState().receiptCount, 0);
+  assert.equal(h.service.requireSiteReward('output'), false, 'ungranted receipt keeps a restricted feature gated');
   h.service.dispose();
 });
 
-test('accepted show plus granted receipt stays truthful while ads-only tools remain unlocked', async () => {
-  const h = harness({ restrictionsEnabled: false });
+test('accepted show plus granted receipt stays truthful without enabling restrictions', async () => {
+  const h = harness();
   const adapter = await optIn(h);
   adapter.emit({ type: 'videoCompleted' });
   assert.equal(h.service.getSiteRewardState().expiresAt, null, 'video completion is not a receipt');
@@ -140,7 +149,7 @@ test('accepted show plus granted receipt stays truthful while ads-only tools rem
   assert.equal(h.service.getSiteRewardState().expiresAt, h.now + REWARD_DURATION_MS);
   assert.equal(h.service.getSiteRewardState().receiptCount, 1);
   assert.equal(h.service.hasSiteReward(), true, 'accepted show and granted receipt update actual entitlement');
-  assert.equal(h.service.requireSiteReward('share'), true, 'sharing stays available independent of the receipt');
+  assert.equal(h.service.requireSiteReward('share'), true, 'the accepted receipt unlocks restricted features');
   h.service.dispose();
 });
 

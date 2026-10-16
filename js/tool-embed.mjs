@@ -126,6 +126,7 @@ async function close(section, { restoreFocus = true } = {}) {
   if (expandButton) { expandButton.textContent = '大きく使う'; expandButton.setAttribute('aria-label', 'エディターを大きく表示する'); expandButton.setAttribute('aria-expanded', 'false'); }
   if (activeSection === section) activeSection = null;
   releaseInert(section);
+  document.dispatchEvent(new CustomEvent('pixieed:tool-embed-expanded', { detail: { section, expanded: false } }));
   if (restoreFocus) {
     const start = startButtons(section).find(button => !button.hidden);
     start?.focus({ preventScroll: true });
@@ -232,7 +233,7 @@ function unlockExpandedViewport(section) {
 
 function expand(section) {
   const expanded = !section.classList.contains('tool-embed--expanded');
-  if (!expanded) { section.classList.remove('tool-embed--expanded'); unlockExpandedViewport(section); section.removeAttribute('role'); section.removeAttribute('aria-modal'); restoreLabel(section); releaseInert(section); const button = section.querySelector('[data-embed-expand]'); button.textContent = '大きく使う'; button.setAttribute('aria-label', 'エディターを大きく表示する'); button.setAttribute('aria-expanded', 'false'); button.focus({ preventScroll: true }); return; }
+  if (!expanded) { section.classList.remove('tool-embed--expanded'); unlockExpandedViewport(section); section.removeAttribute('role'); section.removeAttribute('aria-modal'); restoreLabel(section); releaseInert(section); document.dispatchEvent(new CustomEvent('pixieed:tool-embed-expanded', { detail: { section, expanded: false } })); const button = section.querySelector('[data-embed-expand]'); button.textContent = '大きく使う'; button.setAttribute('aria-label', 'エディターを大きく表示する'); button.setAttribute('aria-expanded', 'false'); button.focus({ preventScroll: true }); return; }
   lockExpandedViewport(section);
   section.classList.add('tool-embed--expanded'); section.setAttribute('role', 'dialog'); section.setAttribute('aria-modal', 'true');
   if (!originalLabels.has(section)) originalLabels.set(section, section.getAttribute('aria-labelledby'));
@@ -242,7 +243,15 @@ function expand(section) {
   section.querySelector('[data-embed-expand]').setAttribute('aria-label', 'ページ内表示に戻る');
   section.querySelector('[data-embed-expand]').setAttribute('aria-expanded', 'true');
   section.querySelector('[data-embed-close]').focus({ preventScroll: true });
+  document.dispatchEvent(new CustomEvent('pixieed:tool-embed-expanded', { detail: { section, expanded: true } }));
 }
+
+document.addEventListener('pixieed:tool-embed-reward-modal', event => {
+  const active = document.querySelector('.tool-embed--expanded');
+  if (!active) return;
+  if (event.detail?.expanded === true) releaseInert(active);
+  else acquireInert(active);
+});
 
 window.addEventListener('message', event => {
   if (event.origin !== location.origin) return;
@@ -276,6 +285,8 @@ document.addEventListener('click', event => {
   else if (event.target.closest('[data-embed-close]')) void close(section);
 });
 document.addEventListener('keydown', event => {
+  if (event.defaultPrevented) return;
+  if (document.querySelector('[data-dialog]:not([hidden])')) return;
   if (event.key === 'Escape' && activeSection?.classList.contains('tool-embed--expanded')) { event.preventDefault(); void close(activeSection); }
   if (event.key !== 'Tab' || !activeSection?.classList.contains('tool-embed--expanded')) return;
   const focusable = [...activeSection.querySelectorAll('button:not([disabled]),iframe')].filter(node => node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[inert]'));

@@ -8,10 +8,10 @@ function environment() {
   const win = {};
   const doc = {
     querySelector: () => null,
-    createElement: () => ({ dataset: {} }),
+    createElement: () => ({ dataset: {}, remove() { this.removed = true; } }),
     head: { append: script => scripts.push(script) }
   };
-  const adapter = createGptRewardedAdapter({
+  const newAdapter = () => createGptRewardedAdapter({
     enabled: true, windowRef: win, documentRef: doc,
     emit: event => events.push(event),
     schedule: callback => { const id = ++next; timers.set(id, callback); return id; },
@@ -36,7 +36,7 @@ function environment() {
     win.googletag.cmd = { push: callback => callback() };
     queued.forEach(callback => callback());
   }
-  return { adapter, win, scripts, events, calls, timers, ready, slot, listeners };
+  return { adapter: newAdapter(), newAdapter, win, scripts, events, calls, timers, ready, slot, listeners };
 }
 
 test('production GPT bootstrap waits for the API command queue after gpt.js has loaded', async () => {
@@ -80,6 +80,52 @@ test('a script transport error still rejects without showing or granting', async
   assert.equal(h.timers.size, 0);
   assert.equal(h.adapter.show(), false);
   assert.deepEqual(h.events, []);
+  h.adapter.destroy();
+});
+
+test('an explicit retry after a transport failure loads a fresh SDK and can prepare a slot', async () => {
+  const h = environment();
+  const failed = h.adapter.prepare();
+  const rejected = assert.rejects(failed, /読み込めません/);
+  h.scripts[0].onerror();
+  await rejected;
+  assert.equal(h.scripts[0].removed, true);
+  assert.equal(h.win.googletag, undefined);
+  assert.equal(h.scripts.length, 1, 'failure does not retry automatically');
+  h.adapter.destroy();
+  const retry = h.newAdapter();
+  const pending = retry.prepare();
+  assert.equal(h.scripts.length, 2);
+  h.ready(); await pending;
+  assert.deepEqual(h.calls, ['define', 'enable', 'display']);
+  assert.deepEqual(h.events, []);
+  retry.destroy();
+});
+
+test('a timed-out SDK cannot create a competing loader on a manual retry', async () => {
+  const h = environment();
+  const failed = h.adapter.prepare();
+  const rejected = assert.rejects(failed, /タイムアウト/);
+  [...h.timers.values()][0](); await rejected;
+  const ownedTag = h.win.googletag;
+  h.adapter.destroy();
+  const retry = h.newAdapter();
+  await assert.rejects(retry.prepare(), /タイムアウト/);
+  assert.equal(h.win.googletag, ownedTag);
+  assert.equal(h.scripts.length, 1, 'a timed-out script might still execute late');
+  assert.deepEqual(h.calls, []);
+  retry.destroy();
+});
+
+test('transport failure never removes a foreign GPT global', async () => {
+  const h = environment();
+  const failed = h.adapter.prepare();
+  const rejected = assert.rejects(failed, /読み込めません/);
+  const foreignTag = { cmd: [] };
+  h.win.googletag = foreignTag;
+  h.scripts[0].onerror(); await rejected;
+  assert.equal(h.win.googletag, foreignTag);
+  assert.equal(h.scripts[0].removed, undefined);
   h.adapter.destroy();
 });
 

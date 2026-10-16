@@ -65,7 +65,12 @@ export function createRewardedController({
     return true;
   }
   function show() { return showFor(generation); }
-  function cancelFor(token) { return finish('cancelled', token); }
+  function cancelFor(token) {
+    // Once a valid receipt starts persistence, cancellation cannot undo it.
+    // Keep the attempt pending until that persistence succeeds or fails.
+    if (rewarded) return false;
+    return finish('cancelled', token);
+  }
   function cancel() { return cancelFor(generation); }
 
   function receive(event, token) {
@@ -126,7 +131,7 @@ export function createRewardedController({
       resolver = resolve; phase = 'loading'; publish('loading');
       if (abortSignal?.aborted) { finish('cancelled', token); return; }
       signal = abortSignal || null;
-      if (signal) { abortHandler = () => finish('cancelled', token); signal.addEventListener('abort', abortHandler, { once: true }); }
+      if (signal) { abortHandler = () => cancelFor(token); signal.addEventListener('abort', abortHandler, { once: true }); }
       try {
         adapter = createAdapter({ emit: event => { if (token === generation) receive(event, token); }, attempt });
         if (!adapter || typeof adapter.prepare !== 'function' || typeof adapter.show !== 'function' || typeof adapter.destroy !== 'function') {

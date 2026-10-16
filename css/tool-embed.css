@@ -30,6 +30,12 @@
 }
 .tool-embed__controls button:hover { background: #f8f7f3; }
 .tool-embed__controls button:focus-visible { outline: 3px solid #315fd0; outline-offset: 2px; }
+.tool-embed__controls [data-header-reward]{flex:0 0 auto;min-width:44px;min-height:44px;padding:6px 9px;border-color:#b8d1cb;background:#f2f8f6;color:#185e56;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tool-embed__controls [data-header-reward][data-active=true]{border-color:#c9a45a;background:#fffaf0;color:#5b4417}
+.tool-embed--expanded .tool-embed__controls{gap:clamp(4px,2vw,10px);min-width:0}
+.tool-embed--expanded .tool-embed__title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tool-embed--expanded .tool-embed__controls button{flex:0 0 auto;white-space:nowrap}
+@media(max-width:360px){.tool-embed--expanded .tool-embed__controls button{padding-inline:8px;font-size:.82rem}}
 .tool-embed__controls [data-embed-expand] { color: white; border-color: var(--intro-accent-dark, #b83f34); background: var(--intro-accent-dark, #b83f34); }
 .tool-embed__controls [data-embed-expand]:hover { background: var(--intro-accent, #e75445); }
 
