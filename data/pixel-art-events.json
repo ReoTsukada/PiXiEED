@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-15T00:00:00+00:00",
+  "updatedAt": "2026-10-16T00:08:33+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -116,7 +116,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-16T00:08:33+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -147,7 +147,7 @@
       "status": "active",
       "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-16T00:08:33+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -193,7 +193,7 @@
       "status": "upcoming",
       "sourceUrl": "https://nrgevent.eu/compo/",
       "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-16T00:08:33+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -2106,7 +2106,7 @@
         "https://www.moulins-tourisme.com/en/fete-manifestation/atelier-pixel-art-2/"
       ],
       "description": "Steevの指導で、アイロンビーズを使ってゲームキャラクターや模様をPixel Artとして制作するワークショップ。公式ページは10月17日、11月14・21・28日、12月5・12・19日の各回を同じ会場・時間で案内。",
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-16T00:07:54+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Moulins観光局公式イベント情報",
       "socialUrls": []
@@ -2126,7 +2126,7 @@
         "https://www.bd-jeumont.fr/animations/"
       ],
       "description": "Fête de la BD内のPixel Artワークショップ。図書館と催事主催者の公式告知で企画・時間を確認。制作物の説明は告知間に差がある。",
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-16T00:07:54+00:00",
       "kind": "pixel-art",
       "sourceLabel": "図書館・催事主催者の公式情報",
       "socialUrls": []
@@ -2381,7 +2381,7 @@
       "status": "upcoming",
       "sourceUrl": "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
       "description": "MIS Cearáの公式プログラムに掲載されたPixel Artワークショップ。会場はプログラムに記載されたPraça do MIS。施設住所は開催会場の確証がないため会場として転記していない。",
-      "checkedAt": "2026-10-15T00:00:00+00:00",
+      "checkedAt": "2026-10-16T00:07:54+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Ceará州文化局公式記事"
     },
@@ -2402,6 +2402,60 @@
       "checkedAt": "2026-10-15T00:00:00+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Montréal市公式イベントページ"
+    },
+    {
+      "id": "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17",
+      "name": "Pixel Art LEGO®",
+      "country": "フランス",
+      "area": "Villeneuve-d’Ascq, Hauts-de-France",
+      "venue": "Forum des Sciences",
+      "startDate": "2026-10-17",
+      "endDate": "2026-10-18",
+      "dateLabel": "10月17日・18日 各日14:00〜17:30（公式現地時刻）",
+      "status": "upcoming",
+      "sourceUrl": "https://forumdepartementaldessciences.fr/evenements/pixel-art-lego/",
+      "additionalUrls": [
+        "https://forumdepartementaldessciences.fr/agenda/"
+      ],
+      "description": "7歳以上向けの無料制作企画。LEGOブロックでピクセルアートの人物・物・模様を作ると公式説明に明記。",
+      "checkedAt": "2026-10-16T00:07:01+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Forum des Sciences公式イベント案内"
+    },
+    {
+      "id": "howard-county-library-pixel-perfect-art-2026-10-17",
+      "name": "Pixel Perfect Art（11〜13歳向け）",
+      "country": "USA",
+      "area": "Howard County, Maryland",
+      "venue": "Central Branch, Maxine White Warfield Room",
+      "startDate": "2026-10-17",
+      "endDate": "2026-10-17",
+      "dateLabel": "15:00〜16:00（現地時間）。要登録",
+      "status": "upcoming",
+      "sourceUrl": "https://howardcounty.librarycalendar.com/events/day/2026/10/17",
+      "description": "メリーランド州Howard County Library System公式カレンダーに掲載。2Dグラフィックをピクセルのみで構成し、Pixel Art作品を制作する。要登録。",
+      "checkedAt": "2026-10-16T00:07:54+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "施設公式イベント情報"
+    },
+    {
+      "id": "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21",
+      "name": "Scary Simbrix: Halloween Pixel Art（3〜5年生）",
+      "country": "Canada",
+      "area": "West Vancouver, British Columbia",
+      "venue": "West Vancouver Memorial Library, The Lab",
+      "startDate": "2026-10-21",
+      "endDate": "2026-10-21",
+      "dateLabel": "16:00〜17:00（現地時間）。無料・満席",
+      "status": "upcoming",
+      "sourceUrl": "https://westvanlibrary.ca/series/featured-youth-tech-programs/",
+      "description": "West Vancouver Memorial Libraryの公式シリーズページに掲載。Simbrixでピクセルアート作品を作るハロウィーン企画。無料だが満席。",
+      "checkedAt": "2026-10-16T00:07:54+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "施設公式イベント情報",
+      "additionalUrls": [
+        "https://westvanlibrary.ca/event/scary-simbrix-halloween-pixel-art-grades-3-5/"
+      ]
     }
   ],
   "sources": [
@@ -2507,7 +2561,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "lastCheckedAt": "2026-10-16T00:08:33+00:00",
       "result": "official-confirmed",
       "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
       "socialChecks": [
@@ -2533,7 +2587,7 @@
       "url": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "lastCheckedAt": "2026-10-16T00:08:33+00:00",
       "result": "official-confirmed",
       "notes": "公式本文で開催期間・企画内容を再確認。 2026-10-08確認: 主催者公式告知で週次pixel art課題、最終締切10月18日、額縁付き提出要件を再確認。"
     },
@@ -2556,7 +2610,7 @@
       "url": "https://nrgevent.eu/compo/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "lastCheckedAt": "2026-10-16T00:08:33+00:00",
       "result": "official-confirmed",
       "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。 2026年10月7日に公式本文を再確認。",
       "additionalUrls": [
@@ -3834,7 +3888,7 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "lastCheckedAt": "2026-10-16T00:07:54+00:00",
       "result": "official-confirmed",
       "notes": "観光局公式本文で10/17、11/14、11/21、11/28、12/5、12/12、12/19の各14:00–16:00回、Pixel Artビーズ制作、会場住所、10歳以上を確認。"
     },
@@ -3849,7 +3903,7 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "lastCheckedAt": "2026-10-16T00:07:54+00:00",
       "result": "official-confirmed",
       "notes": "公式ページ本文で開催日とPixel Artとの関係、開催地を確認。"
     },
@@ -4059,7 +4113,7 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+      "lastCheckedAt": "2026-10-16T00:07:54+00:00",
       "result": "official-confirmed",
       "notes": "公式本文で日程、会場、ピクセルアートとの関係を確認。"
     },
@@ -4074,10 +4128,53 @@
       "lastCheckedAt": "2026-10-15T00:00:00+00:00",
       "result": "official-confirmed",
       "notes": "公式本文で日程、会場、ピクセルアートとの関係を確認。"
+    },
+    {
+      "id": "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17-official-source",
+      "url": "https://forumdepartementaldessciences.fr/evenements/pixel-art-lego/",
+      "additionalUrls": [
+        "https://forumdepartementaldessciences.fr/agenda/"
+      ],
+      "eventIds": [
+        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-16T00:07:01+00:00",
+      "result": "official-confirmed",
+      "notes": "公式本文で10月17・18日各14:00〜17:30、Forum des Sciences、LEGOブロックを使ったPixel Art制作、無料・7歳以上を確認。"
+    },
+    {
+      "id": "howard-county-library-pixel-perfect-art-2026-10-17-official-source",
+      "url": "https://howardcounty.librarycalendar.com/events/day/2026/10/17",
+      "additionalUrls": [],
+      "eventIds": [
+        "howard-county-library-pixel-perfect-art-2026-10-17"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-16T00:07:54+00:00",
+      "result": "official-confirmed",
+      "notes": "公式イベント本文で10月17日15:00〜16:00、Central BranchのMaxine White Warfield Room、11〜13歳向け、Pixel Art制作を確認。"
+    },
+    {
+      "id": "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21-official-source",
+      "url": "https://westvanlibrary.ca/series/featured-youth-tech-programs/",
+      "additionalUrls": [
+        "https://westvanlibrary.ca/event/scary-simbrix-halloween-pixel-art-grades-3-5/"
+      ],
+      "eventIds": [
+        "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-16T00:07:54+00:00",
+      "result": "official-confirmed",
+      "notes": "図書館公式シリーズ本文で10月21日16:00〜17:00、The Lab、1950 Marine Drive、Simbrixを使うPixel Art制作、無料・満席を確認。個別イベントURLは403。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-15T00:00:00+00:00",
+    "checkedAt": "2026-10-16T00:08:33+00:00",
     "notes": "2026-10-15定期調査。締切間近のPixelween・NRG、開催直前のMoulins/Jeumontと会期中の催事を公式本文で再確認。新規開催回も公式本文で日付・Pixel Art要件を確認。",
     "searchExamples": [
       "ドット絵 イベント 2026",
@@ -4220,7 +4317,11 @@
       "https://www.montsdugenevois.com/a-voir-a-faire/agenda/tout-lagenda/atelier-pixel-art-lucinges-fr-6787126/",
       "https://itch.io/jam/med1-gamejam-2026",
       "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
-      "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736"
+      "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736",
+      "https://forumdepartementaldessciences.fr/evenements/pixel-art-lego/",
+      "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/",
+      "https://howardcounty.librarycalendar.com/events/day/2026/10/17",
+      "https://westvanlibrary.ca/series/featured-youth-tech-programs/"
     ],
     "regionalChecks": [
       {
@@ -5150,6 +5251,113 @@
           }
         ],
         "notes": "Moulins公式日程に基づき別開催日の反復ワークショップ6回を追加。Vila Geekは10/20と10/22の別回を確認。MED1 GameJamは公式本文でピクセル様式必須を確認し追加。Pixel Artを強制しないRetro Pixel JamとPixelverse Jamは保留。Côte Landesの各回は開催日と会場は確認できたが、Pixel Artが個別日の活動か特定できず保留。韓国・中華圏に新規確認なし。インドネシアPOSKO VISUALはポスター/デザイン展でPixel Art要件なし。 Ceará州文化局のMISプログラムとMontréal市公式ページで新規2件を確認。"
+      },
+      {
+        "checkedAt": "2026-10-16T00:07:01+00:00",
+        "regions": [
+          "フランス・Villeneuve-d’Ascq",
+          "日本（複数県）",
+          "韓国・香港・中国・東南アジア",
+          "オンライン"
+        ],
+        "languages": [
+          "fr",
+          "ja",
+          "ko",
+          "zh",
+          "en"
+        ],
+        "queries": [
+          "Pixel Art LEGO Villeneuve-d’Ascq octobre 2026 site:forumdepartementaldessciences.fr",
+          "pixel art atelier exposition octobre novembre 2026 officiel France",
+          "2026年10月17日 ドット絵 イベント 日本 展示 ワークショップ",
+          "2026年10月 ドット絵 個展 11月 ドット絵 ワークショップ",
+          "像素藝術 展覽 工作坊 比賽 10月 香港 M+",
+          "픽셀아트 공모전 전시 10월 11월 2026 공식",
+          "pixel art jam contest deadline October 2026 official"
+        ],
+        "addedIds": [
+          "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
+        ],
+        "recheckedIds": [],
+        "unconfirmed": [
+          {
+            "name": "INITIATION AU PIXEL ART ET À L’ANIMATION 2D（Mitry-Mory、10月17日）",
+            "sourceUrl": "https://mediatheques.roissypaysdefrance.fr/evenements-et-actualites/agenda/3252-initiation-au-pixel-art-et-a-l-animation-2d-",
+            "reason": "検索結果表示では16:00〜17:30のPixel Art制作と記載を確認できたが、公式詳細ページはHTTP 403で本文を直接読めず、本文確認要件を満たさないため未登録。"
+          },
+          {
+            "name": "Drop-in Activity: Pixel Monster（香港M+、11月7・8日）",
+            "sourceUrl": "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/",
+            "reason": "公式本文で日付と紙工作は確認したが、Pixel Art制作なのか、ゲーム由来のpixel monsterを立体紙工作で作る企画か判別できず保留。"
+          }
+        ],
+        "notes": "Forum des Sciences公式本文でPixel Art LEGOを新規確認。日本の調査ではPixel × Pixel 2026は3DCG/モーション/VFX、shigemi個展はドット絵との関係を確認できず対象外。韓国・中華圏・東南アジアでは新規確定なし。Roissy公式ページは403で未読、香港M+のPixel MonsterはPixel Art該当性が曖昧で保留。"
+      },
+      {
+        "checkedAt": "2026-10-16T00:08:33+00:00",
+        "regions": [
+          "米国・Maryland州Howard County",
+          "カナダ・British Columbia州West Vancouver",
+          "フランス・Villeneuve-d’Ascq",
+          "日本（複数県）",
+          "韓国・香港・中国・東南アジア",
+          "オンライン"
+        ],
+        "languages": [
+          "en",
+          "fr",
+          "ja",
+          "ko",
+          "zh"
+        ],
+        "queries": [
+          "Howard County Library Pixel Perfect Art October 17 2026 official",
+          "West Vancouver Memorial Library Scary Simbrix Halloween Pixel Art October 21 2026",
+          "Pixel Art LEGO Villeneuve-d’Ascq octobre 2026 site:forumdepartementaldessciences.fr",
+          "Pixel Art atelier exposition octobre novembre 2026 officiel France",
+          "2026年10月17日 ドット絵 イベント 日本 展示 ワークショップ",
+          "2026年10月 ドット絵 個展 11月 ドット絵 ワークショップ",
+          "像素藝術 展覽 工作坊 比賽 10月 香港 M+",
+          "픽셀아트 공모전 전시 10월 11월 2026 공식",
+          "pixel art jam contest deadline October 2026 official"
+        ],
+        "addedIds": [
+          "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17",
+          "howard-county-library-pixel-perfect-art-2026-10-17",
+          "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21"
+        ],
+        "recheckedIds": [
+          "segment-pixel-jam-2026",
+          "pixelween-2026",
+          "nrg-pixel-art-awards-2026",
+          "moulins-association-artichaut-pixel-art-2026-10-17",
+          "jeumont-fete-bd-pixel-art-workshop-2026-10-17",
+          "mis-ce-fortaleza-pixel-art-workshop-2026-10-17"
+        ],
+        "unconfirmed": [
+          {
+            "name": "INITIATION AU PIXEL ART ET À L’ANIMATION 2D（Mitry-Mory、10月17日）",
+            "sourceUrl": "https://mediatheques.roissypaysdefrance.fr/evenements-et-actualites/agenda/3252-initiation-au-pixel-art-et-a-l-animation-2d-",
+            "reason": "公式ページの検索表示では10月17日16:00〜17:30のPixel Art制作を確認したが、公式詳細ページはHTTP 403で本文未読のため保留。"
+          },
+          {
+            "name": "Drop-in Activity: Pixel Monster（香港M+、11月7・8日）",
+            "sourceUrl": "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/",
+            "reason": "公式本文で日付と紙工作は確認したが、Pixel Art制作か立体紙工作か判別できず保留。"
+          },
+          {
+            "name": "Jeux vidéo et pixel art（Froges、10月23日）",
+            "sourceUrl": "https://www.gresivaudan-actu.org/",
+            "reason": "地域アジェンダに開催日・会場・ゲームとPixel Artを扱う催しの記載を発見したが、主催施設の公式本文を確認できず未登録。"
+          },
+          {
+            "name": "Pixel Art Challenge（Howard County Library、10月16日）",
+            "sourceUrl": "https://howardcounty.librarycalendar.com/events/upcoming?branches%5B97%5D=97&page=1",
+            "reason": "公式一覧にCancelledと表示。開催予定として登録しない。"
+          }
+        ],
+        "notes": "Forum des SciencesのPixel Art LEGOに加え、Howard County LibraryのPixel Perfect ArtとWest Vancouver Memorial LibraryのScary Simbrixを公式情報で確認し追加。日本の調査ではPIXEL × PIXEL 2026は3DCG/モーション/VFX、shigemi個展はドット絵との関係が確認できず対象外。韓国・中華圏・東南アジアに新規確定なし。Roissy公式詳細は403、香港M+ Pixel Monsterはピクセルアートか物理紙工作か曖昧で保留。 Pixelween 10/18締切、NRG 10/21締切、Segment Pixel Jam 10/24締切とPixel Art必須条件を再確認。Moulins・Jeumont 10/17とMIS Ceará 10/17の開催詳細を再確認。"
       }
     ],
     "historyCollection": {

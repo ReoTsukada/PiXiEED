@@ -184,6 +184,16 @@
       ]
     },
     {
+      "id": "region-aa5ab35a9174c206",
+      "label": "USA",
+      "eventIds": [
+        "howard-county-library-pixel-perfect-art-2026-10-17"
+      ],
+      "areas": [
+        "Howard County, Maryland"
+      ]
+    },
+    {
       "id": "region-b289b2720987c665",
       "label": "シンガポール",
       "eventIds": [
@@ -198,9 +208,12 @@
       "id": "region-be55ef3f4c4e6c2d",
       "label": "Canada",
       "eventIds": [
-        "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+        "montreal-mixlab-pixel-art-character-workshop-2026-11-05",
+        "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21"
       ],
-      "areas": []
+      "areas": [
+        "West Vancouver, British Columbia"
+      ]
     },
     {
       "id": "region-c6f27629d041725b",
@@ -236,7 +249,8 @@
         "moulins-association-artichaut-pixel-art-2026-12-12",
         "moulins-association-artichaut-pixel-art-2026-12-19",
         "pont-de-beauvoisin-pixel-art-geant-2026-11-25",
-        "riedisheim-en-pixel-closing-2026"
+        "riedisheim-en-pixel-closing-2026",
+        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
       ],
       "areas": [
         "Châteaubourg",
@@ -253,6 +267,7 @@
         "Pont-de-Beauvoisin",
         "Riedisheim",
         "Sérigné",
+        "Villeneuve-d’Ascq, Hauts-de-France",
         "リヨン・6区"
       ]
     },
@@ -429,6 +444,18 @@
       "area": "高雄市",
       "sourceUrls": [
         "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
+      ]
+    },
+    {
+      "id": "venue-0b0bb09e0817e83b",
+      "label": "West Vancouver Memorial Library, The Lab",
+      "eventIds": [
+        "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21"
+      ],
+      "region": "Canada",
+      "area": "West Vancouver, British Columbia",
+      "sourceUrls": [
+        "https://westvanlibrary.ca/series/featured-youth-tech-programs/"
       ]
     },
     {
@@ -747,6 +774,18 @@
       ]
     },
     {
+      "id": "venue-4fa70862fd0a0cbf",
+      "label": "Central Branch, Maxine White Warfield Room",
+      "eventIds": [
+        "howard-county-library-pixel-perfect-art-2026-10-17"
+      ],
+      "region": "USA",
+      "area": "Howard County, Maryland",
+      "sourceUrls": [
+        "https://howardcounty.librarycalendar.com/events/day/2026/10/17"
+      ]
+    },
+    {
       "id": "venue-51aaaf888031b96d",
       "label": "札幌コンベンションセンター 大ホール",
       "eventIds": [
@@ -756,6 +795,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://tryme12.2-d.jp/12/"
+      ]
+    },
+    {
+      "id": "venue-545b411ef0082380",
+      "label": "Forum des Sciences",
+      "eventIds": [
+        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
+      ],
+      "region": "フランス",
+      "area": "Villeneuve-d’Ascq, Hauts-de-France",
+      "sourceUrls": [
+        "https://forumdepartementaldessciences.fr/evenements/pixel-art-lego/"
       ]
     },
     {
@@ -1530,7 +1581,7 @@
       "lastKnownEventDate": "2026-12-19",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-10-16T00:07:54+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1986,6 +2037,31 @@
         "result": "unavailable",
         "attemptedAt": "2026-10-07T06:30:42+00:00",
         "notes": "Xプロフィール本文は取得できず。検索結果スニペットを本文確認済みとして扱わない。"
+      }
+    },
+    {
+      "id": "source-27fdad765a351c07",
+      "label": "Scary Simbrix: Halloween Pixel Art（3〜5年生）",
+      "eventIds": [
+        "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21"
+      ],
+      "url": "https://westvanlibrary.ca/series/featured-youth-tech-programs/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "Canada"
+      ],
+      "areas": [
+        "West Vancouver, British Columbia"
+      ],
+      "venues": [
+        "West Vancouver Memorial Library, The Lab"
+      ],
+      "lastKnownEventDate": "2026-10-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-16T00:07:54+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -2683,6 +2759,31 @@
       }
     },
     {
+      "id": "source-4d99f3bfe5b7eda3",
+      "label": "Pixel Art LEGO®",
+      "eventIds": [
+        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
+      ],
+      "url": "https://forumdepartementaldessciences.fr/evenements/pixel-art-lego/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Villeneuve-d’Ascq, Hauts-de-France"
+      ],
+      "venues": [
+        "Forum des Sciences"
+      ],
+      "lastKnownEventDate": "2026-10-18",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-16T00:07:01+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-4e220705e4189e54",
       "label": "モトクロス斉藤 個展「ウルトラドープ」",
       "eventIds": [
@@ -2783,7 +2884,7 @@
       "lastKnownEventDate": "2026-10-17",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-10-16T00:07:54+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3324,7 +3425,7 @@
       "lastKnownEventDate": "2026-10-18",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-10-16T00:08:33+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3619,6 +3720,30 @@
       }
     },
     {
+      "id": "source-8b9ebb8130afaf77",
+      "label": "Scary Simbrix: Halloween Pixel Art（3〜5年生）",
+      "eventIds": [
+        "west-vancouver-library-scary-simbrix-pixel-art-2026-10-21"
+      ],
+      "url": "https://westvanlibrary.ca/event/scary-simbrix-halloween-pixel-art-grades-3-5/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "Canada"
+      ],
+      "areas": [
+        "West Vancouver, British Columbia"
+      ],
+      "venues": [
+        "West Vancouver Memorial Library, The Lab"
+      ],
+      "lastKnownEventDate": "2026-10-21",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-8daa093c024d4996",
       "label": "モトクロス斉藤 個展「ウルトラドープ」",
       "eventIds": [
@@ -3672,6 +3797,30 @@
         "result": "unavailable",
         "attemptedAt": "2026-10-07T06:30:42+00:00",
         "notes": "Xプロフィール本文は取得できず。検索結果スニペットを本文確認済みとして扱わない。"
+      }
+    },
+    {
+      "id": "source-9122d09068ac1e26",
+      "label": "Pixel Art LEGO®",
+      "eventIds": [
+        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
+      ],
+      "url": "https://forumdepartementaldessciences.fr/agenda/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Villeneuve-d’Ascq, Hauts-de-France"
+      ],
+      "venues": [
+        "Forum des Sciences"
+      ],
+      "lastKnownEventDate": "2026-10-18",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -4485,6 +4634,31 @@
       }
     },
     {
+      "id": "source-c94b8510dbf57812",
+      "label": "Pixel Perfect Art（11〜13歳向け）",
+      "eventIds": [
+        "howard-county-library-pixel-perfect-art-2026-10-17"
+      ],
+      "url": "https://howardcounty.librarycalendar.com/events/day/2026/10/17",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "USA"
+      ],
+      "areas": [
+        "Howard County, Maryland"
+      ],
+      "venues": [
+        "Central Branch, Maxine White Warfield Room"
+      ],
+      "lastKnownEventDate": "2026-10-17",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-16T00:07:54+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-c9b81cc18151cd85",
       "label": "ヘルミッペ × m7kenji 二人展「Doom Loophole」",
       "eventIds": [
@@ -4832,7 +5006,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-10-16T00:08:33+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5147,7 +5321,7 @@
       "lastKnownEventDate": "2026-10-17",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+        "lastCheckedAt": "2026-10-16T00:07:54+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5538,7 +5712,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-10-16T00:08:33+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5570,5 +5744,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-15T00:02:30+00:00"
+  "updatedAt": "2026-10-16T00:09:33+00:00"
 }
