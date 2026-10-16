@@ -11,12 +11,12 @@ test('home: tool cards have working toys and creation links lead the page', () =
   assert.ok(toys.length >= 7);
   for (const toy of toys) assert.match(toysSource, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
   assert.match(source, /createToolToys\(\{ note, animate, interactive: false \}\)/, 'linked cards use non-interactive previews');
-  assert.match(html, /class="hp-card-grid hp-create-grid"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
+  assert.match(html, /class="hp-card-grid hp-create-grid"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/draw\/\?mode=audio"/);
   assert.doesNotMatch(html, /data-toy="game"/);
   assert.match(html, /data-toy="editor" href="\/draw\/"[\s\S]*?PiXiEEDraw/);
   assert.doesNotMatch(html, /PXDraw/);
-  assert.match(html, /PiXiEEDrawのPiXiEELENS/);
-  assert.match(html, /data-toy="sound" href="\/audio\/"[\s\S]*?PiXiEEaudio/);
+  assert.match(html, /PiXiEELENSで写真変換/);
+  assert.match(html, /data-toy="sound" href="\/draw\/\?mode=audio"[\s\S]*?PiXiEEaudio/);
   assert.match(source, /prefers-reduced-motion/);
 });
 
@@ -58,7 +58,7 @@ test('home hero: the play leads somewhere — invitations matched to what the vi
 test('home: discovery follows the mini experience and links to published tools', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /<a class="hp-discovery-link" href="\/draw\/" aria-label="PiXiEEDrawでドット絵を描く" data-draw-cta data-draw-context="general">/);
-  for (const path of ['/camera/', '/draw/about/', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
+  for (const path of ['/draw/?mode=camera', '/draw/about/', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
   assert.match(html, /hp-link-card" data-toy="camera"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card/);
   assert.match(html, /気になるカードから、すぐにはじめられます。/);
   const heroIndex = html.indexOf('class="hp-hero container"');

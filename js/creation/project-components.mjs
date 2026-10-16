@@ -51,7 +51,7 @@ export async function replaceProjectComponentImage(project, tool, image, { store
   if (!hasProjectComponent(project, tool) || tool === 'draw') throw new Error('先に曲やパズルを作ってください。');
   let next = await freezeProjectComponents(project);
   if (tool === 'audio') {
-    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }, { composeMusicProjectionFrame }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261016-color-capability-1'), import('./audio-animation.mjs?rev=20261016-color-capability-1'), import('./draw-music-core.mjs?rev=20261016-color-capability-1')]);
+    const [{ readPxdAudioState, readPxdAudioLink, prepareSharedAudioImageImport, writePxdAudioState }, { prepareAudioAnimationImport }, { composeMusicProjectionFrame }] = await Promise.all([import('./pxd-draw-audio.mjs?rev=20261016-color-capability-1'), import('./audio-animation.mjs?rev=20261016-color-capability-1'), import('./draw-music-core.mjs?rev=20261016-tool-shell-1')]);
     const song = readPxdAudioState(next); const link = readPxdAudioLink(next);
     const animation = await readPxdAnimation(next, componentImageRole(next, 'draw'));
     if (animation) {

@@ -17,19 +17,19 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=2026101
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261016-color-capability-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261016-tool-shell-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
-import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261016-color-capability-1';
+import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261016-tool-shell-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261016-color-capability-1';
-import { createToolStartTracker } from '../site-analytics.mjs';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261015-embed-native-save-1';
+import { createToolStartTracker } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261016-tool-shell-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261016-selection-rail-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
@@ -41,7 +41,8 @@ import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261009-sprit
 import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=20261009-sprite-scale-1';
 import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261016-color-capability-1';
 import { resizeDrawView } from './draw-resize-view.mjs?rev=20261016-color-capability-1';
-import { mountColorPanel } from './color-panel.mjs?rev=20261015-alpha-opacity-1';
+import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
+import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
@@ -478,7 +479,7 @@ async function restoreCameraReturn(record) {
   handoffApi.consumeDrawCameraRequest(record);
   const current = pxdBridge.currentProject;
   const query = current && pxdBridge.persisted ? `?${new URLSearchParams({ pxd: current.projectId, pxdRevision: current.revisionId })}` : '';
-  window.history.replaceState(null, '', `/draw/${query}`);
+  window.history.replaceState(null, '', `/draw/${query}${location.hash}`);
   toast(record.indices ? '撮影を反映しました。1回戻すと撮影前に戻ります。' : '撮影を取消し、元の作品を戻しました。');
 }
 scope.listen(document, 'keydown', event => {
@@ -670,7 +671,11 @@ function renderPalette() {
 }
 // ---- changing a colour: hue / vividness / lightness sliders and a few quick colours; one undo step per edit ----
 let colorEdit = null;
-const colorPanel = mountColorPanel({ scope, getAnchor: () => $('.draw-control-row'), onChange: setEditColor, onClose: closeColorEditor, allowAlpha: true });
+let drawAudioTimbrePanel = null, audioTimbreApi = null;
+const colorPanel = mountColorPanel({ scope, getAnchor: () => $('.draw-control-row'), onChange: setEditColor, onClose: closeColorEditor, allowAlpha: true,
+  viewTabs: { compactHeader: true, active: 'color', label: '色と音色', items: [{ id: 'color', label: '色' }, { id: 'sound', label: '音色' }],
+    onSelect: view => drawAudioTimbrePanel?.onView(view), onEscape: event => drawAudioTimbrePanel?.onEscape(event) === true,
+    onHide: () => drawAudioTimbrePanel?.onHide(), onShow: view => drawAudioTimbrePanel?.onShow(view) } });
 function linkedToSong() {
   try { const link = readPxdAudioLink(pxdBridge?.currentProject || pxdBridge?.heldProject); return Boolean(link && link.imageRole === pxdImageRole); } catch { return false; }
 }
@@ -696,9 +701,9 @@ function setEditColor(hex) {
   document.querySelector(`.draw-color[data-color-index="${colorEdit.index}"]`)?.style.setProperty('--draw-color', hex);
   saved = false; showCurrentColor(); paint(); pxdBridge?.markDirty(); return hex;
 }
-function closeColorEditor() {
-  const returnFocus = colorPanel.element.contains(document.activeElement) ? colorEditorReturnFocus : null;
-  colorEditorReturnFocus = null; colorPanel.close();
+function finishColorEdit({ closePanel = true } = {}) {
+  const returnFocus = closePanel && colorPanel.element.contains(document.activeElement) ? colorEditorReturnFocus : null;
+  if (closePanel) { colorEditorReturnFocus = null; colorPanel.close(); }
   if (!colorEdit) return;
   const after = documentData.palette, lease = colorEdit.lease; documentData.palette = colorEdit.base; colorEdit = null;
   const previousLease = drawOperationLease; drawOperationLease = lease;
@@ -707,6 +712,21 @@ function closeColorEditor() {
   renderPalette(); showCurrentColor(); paint();
   if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
 }
+function closeColorEditor() { finishColorEdit({ closePanel: true }); }
+function beginColorEditForPanel(index = selectedColor) {
+  if (colorEdit || index < 0 || index >= documentData.palette.length || !canEdit()) return false;
+  colorEdit = { index, base: [...documentData.palette], lease: drawRewardPolicy.capture('draw'), maxColors: ANIMATION_MAX_PALETTE_ENTRIES };
+  colorPanel.setColor(colorEdit.base[index], { resetColor: index < DRAW_PALETTE.length ? DRAW_PALETTE[index] : null, beforeColor: colorEdit.base[index] });
+  return true;
+}
+drawAudioTimbrePanel = mountDrawAudioTimbrePanel({ scope, colorPanel, getPalette: () => [...documentData.palette], getSelectedColor: () => selectedColor,
+  selectColor: index => {
+    if (colorEdit) finishColorEdit({ closePanel: false });
+    selectedColor = index; chooseColor(index, document.querySelector(`.draw-color[data-color-index="${index}"]`));
+    if (colorPanel.activeView === 'color') beginColorEditForPanel(index);
+  },
+  onEnterSound: () => finishColorEdit({ closePanel: false }), onEnterColor: () => beginColorEditForPanel(),
+  getAudioApi: () => audioTimbreApi });
 const editorUi = mountCreationEditorUi($('#main'), { beforePanelOpen: () => { cancelDrawingInput(); closeColorEditor(); animationControls?.close?.(); } });
 // touching the picture closes the sheet and draws straight away with the new colour
 canvas.addEventListener('pointerdown', () => { if (colorEdit) closeColorEditor(); }, true);
@@ -2016,7 +2036,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261016-color-capability-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261016-tool-shell-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2345,7 +2365,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261016-color-capability-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261016-tool-shell-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -2644,6 +2664,8 @@ return {
     return 'missing';
   },
   getEditorState: getDrawEditorState,
+  setAudioTimbreApi(api) { audioTimbreApi = api || null; drawAudioTimbrePanel?.setEnabled(Boolean(audioTimbreApi)); drawAudioTimbrePanel?.setAudioApi(audioTimbreApi); },
+  refreshAudioTimbrePanel() { drawAudioTimbrePanel?.refresh(); },
   subscribe(listener) { editorListeners.add(listener); return () => editorListeners.delete(listener); },
   async attachProjectHooks(hooks) {
     await pxdBridge.ready;
@@ -2768,6 +2790,7 @@ return {
     animationSession.apply(next); saved = false; paint(); pxdBridge?.markDirty();
   },
   suspend() {
+    if (drawAudioTimbrePanel && colorPanel.isOpen) colorPanel.dismiss();
     if (featureSession || selectionTransform || spriteScaling || drawingInputBusy() || colorEdit) throw new Error('現在の編集を確定または取り消してから切り替えてください。');
     activeTimelapseJob?.controller.abort(); animationExportController?.abort();
     stopAnimation(); virtualCursor?.release(true); cancelDrawingInput(); hideCursors();

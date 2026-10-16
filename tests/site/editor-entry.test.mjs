@@ -26,7 +26,7 @@ test('compatibility HTML stays out of the index and discloses legacy data limits
     const html = await readFile(new URL(`../../${name}/index.html`, import.meta.url), 'utf8');
     assert.match(html, /content="noindex,follow"/);
     assert.match(html, /canonical" href="https:\/\/pixieed.jp\/draw\/"/);
-    assert.match(html, /data-current-editor href="\/draw\/"/);
+    assert.match(html, /data-legacy-draw-link href="\/draw\/"/);
     if (name !== 'PiXiEEDraw') assert.match(html, /旧/);
   }
 });

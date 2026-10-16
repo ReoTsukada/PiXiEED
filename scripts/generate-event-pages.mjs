@@ -77,9 +77,11 @@ function displayPeople(value) {
   if (Array.isArray(value)) return value.map((person) => typeof person === 'string' ? person : person?.name).filter(Boolean).join('・') || '未確認';
   return display(value);
 }
-function eventStatus(event, today = tokyoDate()) {
+function eventStatus(event, today = tokyoDate(), now = Date.now()) {
   if (event.status === 'ended') return 'ended';
-  const period = classifyEvent(event, today);
+  // A registration cutoff can precede the event itself. Keep the event's
+  // public state tied to its actual dates and expose the cutoff separately.
+  const period = classifyEvent({ ...event, deadlineAt: undefined }, today, now);
   if (period === 'past') return 'ended';
   if (period === 'active') return 'active';
   if (period === 'upcoming') return 'upcoming';
@@ -87,6 +89,14 @@ function eventStatus(event, today = tokyoDate()) {
   return event.status || 'unknown';
 }
 function statusLabel(event) { return statusLabels[eventStatus(event)] || statusLabels.unknown; }
+function registrationDeadline(event) {
+  const timestamp = Date.parse(event?.deadlineAt || '');
+  if (!Number.isFinite(timestamp)) return '';
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(timestamp);
+}
 function historyForWatch(watch, records) {
   const key = String(watch.name || '').normalize('NFKC').trim().toLocaleLowerCase();
   const prefix = watch.id.replace(/-watch$/, '');
@@ -121,6 +131,7 @@ function eventFacts(event) {
     ['通称', display(event.nickname)],
     ['開催回', display(event.edition)],
     ['開催日時', date],
+    ...(registrationDeadline(event) ? [['申込・応募締切', registrationDeadline(event)]] : []),
     ['会場', location],
     ['参加方法', display(event.participation)],
     ['主催', displayPeople(event.organizer)],
@@ -134,6 +145,23 @@ function relatedSeries(event, allEvents) {
   const normalizedName = String(event.name || '').normalize('NFKC').trim().toLocaleLowerCase();
   return allEvents.filter((candidate) => candidate.status === 'watch'
     && (event.id.startsWith(`${candidate.id.replace(/-watch$/, '')}-`) || String(candidate.name || '').normalize('NFKC').trim().toLocaleLowerCase() === normalizedName));
+}
+
+function eventYear(event) {
+  const date = event.startDate || event.endDate || event.lastHeldDate || event.dateLabel || '';
+  return String(date).match(/(?:19|20)\d{2}/)?.[0] || '';
+}
+
+function eventRegion(event) {
+  return [event.country, event.prefecture, event.region, event.area]
+    .find((value) => typeof value === 'string' && value.trim())?.trim()
+    || (event.online === true ? 'オンライン' : '地域未確認');
+}
+
+function eventFormat(event) {
+  if (event.online === true) return 'online';
+  if (event.online === false) return 'in-person';
+  return 'unknown';
 }
 
 function metaDescription(event, summary) {
@@ -174,7 +202,7 @@ function eventPage(event, allEvents, indexableIds = new Set(allEvents.map((item)
 <link rel="canonical" href="${esc(canonical)}">
 <meta property="og:type" content="article"><meta property="og:site_name" content="PiXiEED"><meta property="og:title" content="${esc(pageTitle)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:image" content="${origin}/assets/og/events.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(pageTitle)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${origin}/assets/og/events.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
-<link rel="stylesheet" href="/css/event-pages.css?rev=20261012-nav-polish-1">
+<link rel="stylesheet" href="/css/event-pages.css?rev=20261016-event-history-1">
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body>
@@ -194,8 +222,8 @@ ${relatedHtml}
 </article>
 </main>
 <footer><a href="/events/">イベント一覧へ戻る</a> · <a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
-<script type="module" src="/js/event-page-analytics.mjs"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
+<script type="module" src="/js/event-page-analytics.mjs?rev=20261016-tool-shell-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261016-tool-shell-1"></script>
 </body>
 </html>
 `;
@@ -207,9 +235,26 @@ function indexPage(events, allRecords = events) {
   const sorted = [...allRecords].sort((a, b) => (statusOrder[eventStatus(a)] ?? 6) - (statusOrder[eventStatus(b)] ?? 6)
     || String(a.startDate || a.lastHeldDate || '').localeCompare(String(b.startDate || b.lastHeldDate || ''))
     || a.name.localeCompare(b.name, 'ja'));
-  const cards = sorted.map((event) => {
+  const yearGroups = new Map();
+  for (const event of sorted) {
+    const year = eventYear(event);
+    if (!yearGroups.has(year)) yearGroups.set(year, []);
+    yearGroups.get(year).push(event);
+  }
+  const years = [...yearGroups.keys()].sort((a, b) => {
+    if (!a) return 1;
+    if (!b) return -1;
+    return b.localeCompare(a);
+  });
+  const yearLinks = years.map((year) => `<a href="#event-year-${year || 'unknown'}">${year ? `${year}年` : '年未確認'} <span>(<span data-year-count>${yearGroups.get(year).length}</span>)</span></a>`).join('');
+  const regionOptions = [...new Set(allRecords.map(eventRegion))].sort((a, b) => a.localeCompare(b, 'ja'));
+  const regionFilterOptions = regionOptions.map((region) => `<option value="${esc(region)}">${esc(region)}</option>`).join('');
+  const cardsForYear = (year) => yearGroups.get(year).map((event) => {
     const date = event.status === 'watch' ? (event.dateLabel || '次回開催情報待ち') : (event.dateLabel || `${display(event.startDate)} 〜 ${display(event.endDate)}`);
-    const location = [event.prefecture, event.area, event.venue].filter((value) => typeof value === 'string' && value.trim()).join('・') || (event.online ? 'オンライン' : '未確認');
+    const location = [event.country, event.prefecture, event.area, event.venue].filter((value) => typeof value === 'string' && value.trim()).join('・') || (event.online ? 'オンライン' : '未確認');
+    const status = eventStatus(event);
+    const format = eventFormat(event);
+    const region = eventRegion(event);
     const isIndexable = indexable.has(event.id);
     const hubOnly = HUB_ONLY_REASONS[event.id];
     const summary = !isIndexable ? (HUB_ONLY_SUMMARIES[event.id] || '開催情報の詳細は公式案内をご確認ください。') : '';
@@ -224,9 +269,11 @@ function indexPage(events, allRecords = events) {
     }
     const hubFacts = !isIndexable ? `<span class="event-card-summary">${esc(summary)}</span>${hubOnly?.kind === 'duplicate' ? '<span>同じ開催回の重複レコード</span>' : ''}${links.map((link) => `<span class="event-card-related">${link}</span>`).join('')}` : '';
     const footer = `<span class="event-card-source"><a href="${esc(source)}" target="_blank" rel="noopener noreferrer">情報源：${esc(event.sourceLabel || '公式情報')} ↗</a> · 確認日：${esc(display(event.checkedAt))}</span>`;
-    const facts = `<span class="event-card-status">${esc(statusLabel(event))}</span><strong>${esc(event.name)}</strong><span>${esc(date)}</span><span>${esc(location)}</span>`;
-    return `<li class="event-card" id="${esc(event.id)}">${isIndexable ? `<a data-event-introduction href="/events/${esc(event.id)}/">${facts}</a>${footer}` : `<div class="event-card--hub-only">${facts}${hubFacts}${footer}</div>`}</li>`;
+    const deadline = registrationDeadline(event);
+    const facts = `<span class="event-card-status">${esc(statusLabel(event))}</span><strong>${esc(event.name)}</strong><span>${esc(date)}</span>${deadline ? `<span class="event-card-deadline">申込・応募締切：${esc(deadline)}（日本時間）</span>` : ''}<span>${esc(location)}</span>`;
+    return `<li class="event-card" id="${esc(event.id)}" data-event-card data-year="${esc(year || 'unknown')}" data-status="${esc(status)}" data-format="${format}" data-region="${esc(region)}">${isIndexable ? `<a data-event-introduction href="/events/${esc(event.id)}/">${facts}</a>${footer}` : `<div class="event-card--hub-only">${facts}${hubFacts}${footer}</div>`}</li>`;
   }).join('\n');
+  const yearSections = years.map((year) => `<section class="event-year-section" id="event-year-${year || 'unknown'}" data-event-year-section="${year || 'unknown'}" aria-labelledby="event-year-heading-${year || 'unknown'}"><h2 id="event-year-heading-${year || 'unknown'}">${year ? `${year}年` : '年未確認'}</h2><ul class="event-list">${cardsForYear(year)}</ul></section>`).join('\n');
   const title = 'ドット絵・ピクセルアートのイベント一覧｜PiXiEED';
   const datedRecordCount = allRecords.filter((event) => event.startDate || event.endDate).length;
   const watchCount = allRecords.filter((event) => event.status === 'watch').length;
@@ -239,7 +286,7 @@ function indexPage(events, allRecords = events) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title><meta name="description" content="${esc(description)}">
 <link rel="canonical" href="${esc(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:image" content="${origin}/assets/og/events.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${origin}/assets/og/events.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
-<link rel="stylesheet" href="/css/event-pages.css?rev=20261012-nav-polish-1">
+<link rel="stylesheet" href="/css/event-pages.css?rev=20261016-event-history-1">
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body>
@@ -248,11 +295,21 @@ function indexPage(events, allRecords = events) {
 <h1>ドット絵・ピクセルアートのイベント</h1>
 <p class="event-summary">国内外の展示、即売会、ワークショップ、コンテストなどを、確認できた公式情報源とあわせて紹介します。PiXiEEDが独自に調査・編集した一覧です。掲載情報は各主催者の公式ページでご確認ください。</p>
 <p class="event-index-count">${esc(description)}</p>
-<ul class="event-list">${cards}</ul>
+<nav class="event-year-nav" aria-label="イベントを年から探す">${yearLinks}</nav>
+<form class="event-index-filters" data-event-filters hidden role="search">
+<label>キーワード<input type="search" name="q" data-event-query placeholder="イベント名・会場・日付"></label>
+<label>開催状態<select name="status" data-event-status-filter><option value="all">すべて</option><option value="near">開催中・開催予定</option><option value="watch">次回情報待ち</option><option value="ended">開催終了</option><option value="other">その他</option></select></label>
+<label>開催形式<select name="format" data-event-format-filter><option value="all">すべて</option><option value="online">オンライン開催（明記）</option><option value="in-person">現地開催（明記）</option><option value="unknown">形式未確認</option></select></label>
+<label>地域<select name="region" data-event-region-filter><option value="all">すべて</option>${regionFilterOptions}</select></label>
+<button type="reset">条件をクリア</button>
+</form>
+<p class="event-filter-result" data-event-result role="status" aria-live="polite" hidden></p>
+${yearSections}
 <p class="event-globe-link"><a href="/globe/">世界地図でイベントの地域を見る</a></p>
 </main><footer><a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
-<script type="module" src="/js/event-page-analytics.mjs"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
+<script type="module" src="/js/event-page-analytics.mjs?rev=20261016-tool-shell-1"></script>
+<script type="module" src="/js/event-history.mjs?rev=20261016-tool-shell-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261016-tool-shell-1"></script>
 </body>
 </html>
 `;
@@ -341,4 +398,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   } else { console.error('Usage: node scripts/generate-event-pages.mjs --generate'); process.exitCode = 2; }
 }
 
-export { eligibleEvents, eventFacts, eventPage, generateEventPages, indexPage, HUB_ONLY_REASONS, PUBLIC_SUMMARY_OVERRIDES };
+export { eligibleEvents, eventFacts, eventPage, eventStatus, generateEventPages, indexPage, registrationDeadline, HUB_ONLY_REASONS, PUBLIC_SUMMARY_OVERRIDES };

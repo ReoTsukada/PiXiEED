@@ -535,8 +535,11 @@ test('every selectable timbre can schedule a short canvas note without invalid a
 
 test('audio page exposes labeled editing, project save and central playback controls without legacy entry points', async () => {
   const { readFile } = await import('node:fs/promises');
-  const page = await readFile(new URL('../../audio/index.html', import.meta.url), 'utf8');
+  const shell = await readFile(new URL('../../audio/index.html', import.meta.url), 'utf8');
+  const page = await readFile(new URL('../../audio/editor.html', import.meta.url), 'utf8');
   const script = await readFile(new URL('../../js/creation/audio-page.mjs', import.meta.url), 'utf8');
+  assert.match(shell, /data-tool-shell[\s\S]*data-tool-mode="audio"[\s\S]*data-embed-auto/);
+  assert.match(shell, /tool-shell\.mjs/);
   assert.match(page, /id="audio-play-toggle"/);
   assert.match(page, /aria-label="アプリナビゲーション"/);
   assert.match(page, /id="audio-save"/);

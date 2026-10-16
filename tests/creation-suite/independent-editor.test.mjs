@@ -6,8 +6,10 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('Draw and Audio pages mount their own factories without shared mode switching', () => {
   for (const mode of ['draw', 'audio']) {
-    const html = read(`../../${mode}/index.html`);
+    const shell = read(`../../${mode}/index.html`);
+    const html = read(`../../${mode === 'draw' ? 'draw/editor.html' : 'audio/editor.html'}`);
     const entry = read(`../../js/creation/${mode}-entry.mjs`);
+    assert.match(shell, /tool-shell\.mjs/);
     assert.match(html, new RegExp(`/js/creation/${mode}-entry\\.mjs\\?rev=`));
     assert.doesNotMatch(html, /creation-app\.mjs/);
     assert.match(entry, new RegExp(`mount${mode === 'draw' ? 'Draw' : 'Audio'}Mode`));
@@ -17,7 +19,7 @@ test('Draw and Audio pages mount their own factories without shared mode switchi
 });
 
 test('Audio animation controls sit with music controls and have no push-to-music sync action', () => {
-  const html = read('../../audio/index.html');
+  const html = read('../../audio/editor.html');
   const palette = html.indexOf('id="audio-tracks"');
   const animationControls = html.indexOf('id="audio-animation-controls"');
   const workspace = html.indexOf('class="audio-workspace"');

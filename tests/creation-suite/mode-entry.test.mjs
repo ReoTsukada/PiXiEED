@@ -29,6 +29,35 @@ test('camera mode can switch from an earlier mode namespace without inheriting i
   assert.equal(params.get('projectTab'), '3');
 });
 
+test('re-entering the selected mode preserves its existing saved-project pointer', () => {
+  const url = creationModeEntryUrl('audio', '?modeProjectTool=audio&modePxd=p&modePxdRevision=r&modePxdImage=audio&keep=yes');
+  const params = query(url);
+  assert.equal(params.get('modeProjectTool'), 'audio');
+  assert.deepEqual(readCreationModePointer('audio', url.slice(url.indexOf('?'))), {
+    projectId: 'p', revisionId: 'r', imageRole: 'audio'
+  });
+  assert.equal(params.get('keep'), 'yes');
+});
+
+test('re-entering the selected mode promotes its raw saved pointer when no mode pointer exists', () => {
+  const url = creationModeEntryUrl('audio', '?modeProjectTool=audio&pxd=latest&pxdRevision=rev-9&pxdImage=audio');
+  assert.deepEqual(readCreationModePointer('audio', url.slice(url.indexOf('?'))), {
+    projectId: 'latest', revisionId: 'rev-9', imageRole: 'audio'
+  });
+});
+
+test('the latest raw save pointer wins over an older namespaced entry pointer', () => {
+  const url = creationModeEntryUrl('audio', '?modeProjectTool=audio&modePxd=old&modePxdRevision=rev-1&pxd=new&pxdRevision=rev-2');
+  assert.deepEqual(readCreationModePointer('audio', url.slice(url.indexOf('?'))), {
+    projectId: 'new', revisionId: 'rev-2'
+  });
+});
+
+test('a partial raw save pointer is not hidden by a complete older mode pointer', () => {
+  const url = creationModeEntryUrl('audio', '?modeProjectTool=audio&modePxd=old&modePxdRevision=rev-1&pxd=new');
+  assert.throws(() => readCreationModePointer('audio', url.slice(url.indexOf('?'))), /制作モードの作品保存版/);
+});
+
 test('ambiguous pointer values fail closed instead of silently dropping duplicates', () => {
   assert.throws(() => creationModeEntryUrl('audio', '?pxd=a&pxd=b&pxdRevision=r'), /複数のpxd値/);
   assert.throws(() => creationModeEntryUrl('camera', '?pxd=a&pxdRevision=r&pxdImage=main&pxdImage=audio'), /複数のpxdImage値/);

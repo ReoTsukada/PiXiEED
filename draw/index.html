@@ -2,163 +2,106 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-<title>ドット絵エディター・アニメーション制作｜PiXiEEDraw</title>
-<meta name="description" content="レイヤーとフレームでドット絵アニメーションを制作。選択範囲の移動や色・図形の編集、PNG・GIF出力に対応したブラウザーツールです。">
-<link rel="canonical" href="https://pixieed.jp/draw/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="ドット絵エディター・アニメーション制作｜PiXiEEDraw"><meta property="og:description" content="レイヤーとフレームでドット絵アニメーションを制作。選択範囲の移動や色・図形の編集、PNG・GIF出力に対応したブラウザーツールです。"><meta property="og:url" content="https://pixieed.jp/draw/"><meta property="og:image" content="https://pixieed.jp/assets/og/draw.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵を描く」のアイコン">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドット絵エディター・アニメーション制作｜PiXiEEDraw"><meta name="twitter:description" content="レイヤーとフレームでドット絵アニメーションを制作。選択範囲の移動や色・図形の編集、PNG・GIF出力に対応したブラウザーツールです。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/draw.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵を描く」のアイコン">
-<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <script src="/js/creation/startup-mode.js?rev=20261011-camera-first-paint-1"></script>
   <script>
     (() => {
       const params = new URLSearchParams(location.search);
-      const role = params.get('embedRole');
-      if (params.get('embed') !== '1' || !['draw', 'camera'].includes(role) || !params.get('channel')) return;
-      document.documentElement.dataset.toolEmbed = role;
-      const style = document.createElement('link'); style.rel = 'stylesheet'; style.href = '/css/tool-embed-child.css'; document.head.append(style);
-      window.__PIXIEED_TOOL_EMBED__ = Object.freeze({ role, channel: params.get('channel') });
+      const validBridge = value => value.get('embed') === '1' && ['draw', 'camera', 'audio'].includes(value.get('embedRole')) && value.get('channel');
+      // A tool's own return link can reach its public URL inside the retained
+      // iframe. Recover only this same-origin controller's transport channel.
+      try {
+        const frame = window.frameElement;
+        const original = frame && new URL(frame.src, location.href);
+        const audioLegacy = /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
+        if (!validBridge(params) && !audioLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
+          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : 'draw';
+          params.set('embed', '1'); params.set('embedRole', mode); params.set('channel', original.searchParams.get('channel'));
+        }
+      } catch { /* Foreign frames do not inherit an editor channel. */ }
+      if (validBridge(params)) {
+        location.replace(`/draw/editor.html?${params}${location.hash}`);
+      }
     })();
   </script>
-  <link rel="stylesheet" href="/css/creation-startup.css?rev=20261011-camera-first-paint-1">
+  <title>ドット絵を描く｜PiXiEEDraw</title>
+  <meta name="description" content="ブラウザーでドット絵を描き、写真を変換し、音楽を作れます。作品は端末内に保存できます。">
+  <link rel="canonical" href="https://pixieed.jp/draw/">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="ドット絵を描く｜PiXiEEDraw"><meta property="og:description" content="ブラウザーでドット絵を描き、写真を変換し、音楽を作れます。作品は端末内に保存できます。"><meta property="og:url" content="https://pixieed.jp/draw/"><meta property="og:image" content="https://pixieed.jp/assets/og/draw.png">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="ドット絵を描く｜PiXiEEDraw"><meta name="twitter:description" content="ブラウザーでドット絵を描き、写真を変換し、音楽を作れます。作品は端末内に保存できます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/draw.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵を描く」のアイコン">
+  <meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵を描く」のアイコン">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/creation-draw.css?rev=20260929-tool-ui-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/interaction-effects.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/arcade.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/arcade-tools.css?rev=20260929-claude-integration-1">
-  <link rel="stylesheet" href="/css/draw-ui.css?rev=20261004-symmetry-color-panel-1">
-  <link rel="stylesheet" href="/css/creation-editor.css?rev=20261002-palette-layout-1">
-  <link rel="stylesheet" href="/css/creation-animation.css?rev=20261015-alpha-opacity-1">
-  <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
-  <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
-  <link rel="stylesheet" href="/css/color-panel.css?rev=20261015-alpha-opacity-1">
-  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261007-color-selection-1">
-  <link rel="stylesheet" href="/css/draw-canvas-panel.css?rev=20261009-sprite-scale-1">
-  <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261011-tool-size-1">
-  <link rel="stylesheet" href="/css/draw-compact-controls.css?rev=20261012-operation-bar-1">
-  <link rel="stylesheet" href="/css/draw-color-adjustment-panel.css?rev=20261010-features-1">
-  <link rel="stylesheet" href="/css/draw-text-panel.css?rev=20261010-features-1">
-  <link rel="stylesheet" href="/css/draw-selection-features.css?rev=20261012-operation-bar-1">
-  <!-- Start the editor dependency graph together with its styles. -->
-  <link rel="modulepreload" href="/js/creation/draw-page.mjs?rev=20261016-color-capability-1">
-  <link rel="modulepreload" href="/js/creation/project-workspace.mjs?rev=20261016-color-capability-1">
-  <link rel="modulepreload" href="/js/creation/draw-core.mjs?rev=20261011-tool-size-1">
-  <link rel="modulepreload" href="/js/creation/animation-core.mjs?rev=20261016-color-capability-1">
-  <link rel="modulepreload" href="/js/creation/pxd-project.mjs?rev=20261016-color-capability-1">
-  <link rel="modulepreload" href="/js/creation/pxd-codec.mjs">
-  <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
-  <link rel="stylesheet" href="/css/draw-brush-settings.css?rev=20261011-tool-size-1">
+  <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
+  <link rel="stylesheet" href="/css/tool-embed.css?rev=20261016-tool-shell-1">
+  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261016-unified-shell-1">
 </head>
-<body data-page="draw" data-tool-name="PiXiEEDraw" data-tool-short="ドット" class="app-page app-page--tool-draw creation-editor">
-  <div id="creation-startup" class="creation-startup-placeholder" role="status" aria-live="polite">
-    <span class="creation-startup-placeholder__mark" aria-hidden="true"></span>
-    <span>カメラモードを準備しています…</span>
-  </div>
+<body class="tool-intro tool-shell tool-shell--draw" data-tool-shell>
   <a class="skip-link" href="#main">本文へ移動</a>
-  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a></div></header>
-  <main id="main" class="draw-page">
-    <h1 class="draw-title">PiXiEEDraw</h1><p class="visually-hidden">ブラウザーでドット絵を描き、レイヤー、フレームアニメーション、範囲選択の移動・変形で編集できます。PNG・GIF出力と、端末内の作品保存・PXDファイル保存に対応しています。</p><label class="draw-size">サイズ<select id="draw-size" aria-label="キャンバスのサイズ"></select></label>
-    <div class="draw-meta"><p id="draw-size-label" class="draw-size-label" aria-live="polite">16×16px</p><p id="draw-status" class="draw-status" role="status" aria-live="polite">新しい絵を準備しています。</p><span id="draw-zoom-label" aria-live="polite">100%</span></div>
-      <div class="draw-viewport">
-      <div id="draw-mirror-rail" class="draw-mirror-rail is-disabled" role="group" aria-disabled="true" aria-label="対称の中心を移動。すべてのミラー軸がこの中心を通ります。">
-        <span class="draw-mirror-rail__label">対称の中心</span>
-        <label><span id="draw-mirror-x-label">X 8</span><input id="draw-mirror-x" type="range" min="0" max="16" step="0.5" value="8" aria-label="ミラーの中心X"></label>
-        <label><span id="draw-mirror-y-label">Y 8</span><input id="draw-mirror-y" type="range" min="0" max="16" step="0.5" value="8" aria-label="ミラーの中心Y"></label>
-        <button id="draw-mirror-center" type="button" aria-label="ミラーの中心を中央に戻す" title="中央に戻す">⌖</button>
-      </div>
-      <div class="draw-board creation-editor__stage" aria-label="描画エリア。2本指で拡大・移動できます。"><canvas id="draw-canvas" width="16" height="16" role="img" aria-label="16×16の透明なキャンバス。色を選んで描きます。ドラッグで描画、2本指で拡大・移動できます。" tabindex="0"></canvas><div class="draw-grid" aria-hidden="true"></div><div class="draw-cursor" aria-hidden="true" hidden></div><div class="draw-cursor draw-cursor-twin" aria-hidden="true" hidden></div><span id="draw-playback-position" class="draw-playback-position" hidden aria-hidden="true"></span></div>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
+      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a></nav>
     </div>
-    <div class="draw-control-dock">
-      <div id="draw-virtual-controls" class="draw-virtual-controls draw-floating-mouse is-disabled" hidden role="group" aria-label="仮想マウスの左右ボタン" aria-disabled="true">
-        <span class="draw-floating-mouse__hint" aria-live="polite">ボタンをドラッグで配置</span>
-        <button type="button" data-virtual-left aria-pressed="false" disabled aria-label="仮想カーソルの左ボタン。押しながら描画面で動かすと描けます。" title="左ボタン"><span class="draw-button-tool-icon" data-button-tool-icon="left" aria-hidden="true"></span><span data-button-label="left">左</span><span class="draw-button-swatch" data-button-swatch="left" aria-hidden="true"></span></button>
-        <button type="button" data-virtual-right aria-pressed="false" disabled aria-label="仮想カーソルの右ボタン" title="右ボタン"><span class="draw-button-tool-icon" data-button-tool-icon="right" aria-hidden="true"></span><span data-button-label="right">右</span><span class="draw-button-swatch" data-button-swatch="right" aria-hidden="true"></span></button>
-      </div>
-      <div class="draw-feature-actions" role="group" aria-label="編集ツール"></div>
-    <section class="draw-controls creation-editor__controls" aria-label="描画の操作">
-      <input id="draw-import-file" class="draw-file-input" type="file" accept="image/png,image/webp" tabindex="-1" aria-label="複製する画像ファイル">
-      <div class="draw-control-row creation-editor__palette"><div id="draw-palette" class="draw-palette" role="group" aria-label="色を選ぶ"></div></div>
-      <div class="draw-toolbar creation-editor__tools-row">
-        <div class="draw-tools" role="group" aria-label="描画の道具">
-          <details id="draw-tool-picker" class="draw-tool-picker">
-            <summary id="draw-tool-summary" data-drawing-icon="fill" data-active="false" aria-label="道具を選ぶ" title="道具を選ぶ"><span data-draw-tool-name>道具</span><span class="draw-tool-picker__chevron" aria-hidden="true">⌄</span></summary>
-            <div class="draw-tool-menu" aria-label="道具を選ぶ">
-              <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-paint">
-                <h2 id="draw-tool-group-paint" class="draw-tool-group__heading">塗る</h2>
-                <button type="button" data-draw-tool="pen" data-drawing-icon="pen" aria-pressed="true" aria-label="ペン" title="ペン"><span data-tool-label>ペン</span><small data-tool-description>点や線を描く</small></button>
-                <button type="button" data-draw-tool="eraser" data-drawing-icon="eraser" aria-pressed="false" aria-label="消しゴム" title="消しゴム"><span data-tool-label>消しゴム</span><small data-tool-description>透明に戻す</small></button>
-                <button type="button" data-draw-tool="fill" data-drawing-icon="fill" aria-pressed="false" aria-label="塗りつぶし" title="塗りつぶし：囲まれた場所を塗る"><span data-tool-label>塗りつぶし</span><small data-tool-description>囲まれた場所を塗る</small></button>
-                <button type="button" data-draw-tool="spray" data-drawing-icon="spray" aria-pressed="false" aria-label="スプレー" title="スプレー：点を散らして描く"><span data-tool-label>スプレー</span><small data-tool-description>点を散らして描く</small></button>
-              </section>
-              <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-shapes">
-                <h2 id="draw-tool-group-shapes" class="draw-tool-group__heading">図形</h2>
-                <button type="button" data-draw-tool="line" data-drawing-icon="line" aria-pressed="false" aria-label="直線" title="直線：2点を結ぶ"><span data-tool-label>直線</span><small data-tool-description>2点を結ぶ</small></button>
-                <button type="button" data-draw-tool="rectangle" data-drawing-icon="rectangle" aria-pressed="false" aria-label="四角形" title="四角形：輪郭を描く"><span data-tool-label>四角形</span><small data-tool-description>輪郭を描く</small></button>
-                <button type="button" data-draw-tool="rectangle-fill" data-drawing-icon="rectangle-fill" aria-pressed="false" aria-label="塗り四角形" title="塗り四角形：中まで塗る"><span data-tool-label>塗り四角形</span><small data-tool-description>中まで塗る</small></button>
-                <button type="button" data-draw-tool="ellipse" data-drawing-icon="ellipse" aria-pressed="false" aria-label="楕円" title="楕円：輪郭を描く"><span data-tool-label>楕円</span><small data-tool-description>輪郭を描く</small></button>
-                <button type="button" data-draw-tool="ellipse-fill" data-drawing-icon="ellipse-fill" aria-pressed="false" aria-label="塗り楕円" title="塗り楕円：中まで塗る"><span data-tool-label>塗り楕円</span><small data-tool-description>中まで塗る</small></button>
-              </section>
-              <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-select">
-                <h2 id="draw-tool-group-select" class="draw-tool-group__heading">選ぶ</h2>
-                <div class="draw-select-tool-modes" role="group" aria-label="範囲選択の方式">
-                  <button type="button" data-draw-tool="select" data-selection-mode="rectangle" data-drawing-icon="select" aria-pressed="false" aria-label="四角形選択" title="四角形選択：ドラッグで範囲を選ぶ"><span data-tool-label>範囲選択</span><small data-tool-description>四角形をドラッグ</small></button>
-                  <button type="button" data-draw-tool="select" data-selection-mode="lasso" data-drawing-icon="select" aria-pressed="false" aria-label="投げ縄選択" title="投げ縄選択：ドラッグで囲んだ形を選ぶ"><span data-tool-label>投げ縄</span><small data-tool-description>自由な形で囲む</small></button>
-                  <button type="button" data-draw-tool="select" data-selection-mode="color" data-drawing-icon="select" aria-pressed="false" aria-label="同じ色を選択" title="同じ色を選択：クリックした色をすべて選ぶ"><span data-tool-label>同じ色</span><small data-tool-description>色をクリック</small></button>
-                </div>
-                <button type="button" data-draw-tool="picker" data-drawing-icon="picker" aria-pressed="false" aria-label="スポイト" title="スポイト：絵から色をとる"><span data-tool-label>スポイト</span><small data-tool-description>絵から色をとる</small></button>
-              </section>
-            </div>
-          </details>
-        </div>
-        <div class="draw-toggles">
-
-        <details id="draw-settings-picker" class="draw-settings-picker">
-          <summary id="draw-settings-summary" data-drawing-icon="settings" aria-label="描き方・表示の設定" title="描き方・表示の設定"></summary>
-          <div class="draw-settings-panel" role="group" aria-label="描き方・表示の設定">
-            <button id="draw-mirror" type="button" data-drawing-icon="mirror" data-symmetry="horizontal" aria-pressed="false" aria-label="左右対称に描く" title="左右対称に描く"></button>
-            <button id="draw-mirror-vertical" type="button" data-drawing-icon="mirror-vertical" data-symmetry="vertical" aria-pressed="false" aria-label="上下対称に描く" title="上下対称に描く"></button>
-            <button id="draw-mirror-diagonal-down" type="button" data-drawing-icon="mirror-diagonal-down" data-symmetry="diagonalDown" aria-pressed="false" aria-label="右下がりの対角線で対称に描く" title="右下がりの対角線で対称に描く"></button>
-            <button id="draw-mirror-diagonal-up" type="button" data-drawing-icon="mirror-diagonal-up" data-symmetry="diagonalUp" aria-pressed="false" aria-label="右上がりの対角線で対称に描く" title="右上がりの対角線で対称に描く"></button>
-            <button id="draw-grid-toggle" type="button" data-drawing-icon="grid" aria-pressed="true" aria-label="マス目を表示" title="マス目を表示"></button>
-            <button id="draw-onion-toggle" type="button" data-drawing-icon="onion" aria-pressed="false" aria-label="前後のコマを重ねて表示" title="前後のコマを重ねて表示"></button>
-            <button id="draw-virtual-toggle" type="button" aria-pressed="false" aria-label="仮想カーソル。描画面をなぞってカーソルを動かす" title="仮想カーソル"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v16l5-5 4 7 3-2-4-6h8Z"/></svg></button>
-            <button id="draw-controls-side-toggle" type="button" aria-pressed="false" aria-label="操作欄は右。左に移動" title="操作欄は右。左に移動"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><rect data-controls-side-highlight x="16" y="6" width="3" height="12" rx="1"/></svg></button>
-            <section class="draw-input-settings" aria-label="操作設定">
-              <p class="draw-input-help">色・道具はタップ／左クリックで左に設定。長押し／右クリックで右に設定。キーボードは対象を選んで Shift＋Enter。選択中の色をもう一度押すと編集。透明は編集しません。</p>
-              <button id="draw-shortcuts-open" type="button" aria-label="ショートカット一覧と設定を開く">ショートカット</button>
-              <button id="draw-mouse-position-reset" type="button">仮想マウスの位置を戻す</button>
-              <button id="draw-input-reset" type="button">操作設定を初期値に戻す</button>
-            </section>
-          </div>
-        </details>
+  </header>
+  <main id="main">
+    <section class="tool-intro__hero" aria-labelledby="tool-title">
+      <div class="container tool-intro__hero-grid tool-intro__hero-grid--single">
+        <div class="tool-intro__copy">
+          <p class="tool-intro__eyebrow" data-shell-eyebrow>PIXIEEDRAW</p>
+          <h1 id="tool-title" data-shell-title>ドット絵を描く</h1>
+          <p class="tool-intro__lead" data-shell-lead>レイヤーやコマを使って、ドット絵とアニメーションを作れます。</p>
+          <p class="tool-intro__hint">通常の制作は［大きく使う］で作業領域を広げて行えます。現在は期間限定で全機能を開放中です。</p>
         </div>
       </div>
-      <div class="draw-actions creation-editor__actions" role="group" aria-label="編集と保存"><div id="draw-animation-controls"></div><button id="draw-undo" type="button" disabled aria-label="ひとつ戻す" title="戻す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 4 9l5 5M4 9h9a6 6 0 0 1 0 12h-2"/></svg></button><button id="draw-redo" type="button" disabled aria-label="やり直す" title="やり直す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5-5 5M20 9h-9a6 6 0 0 0 0 12h2"/></svg></button><button id="draw-clear" type="button" aria-label="ぜんぶ消す" title="ぜんぶ消す"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/></svg></button><details id="draw-output" class="creation-output"><summary aria-label="出力と保存" title="出力"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg></summary><div class="creation-output__panel"><h2>出力</h2><p>画像やアニメーションの形式・名前を選べます。</p><button id="draw-save" type="button" class="creation-output__card" aria-label="プロジェクトをこのブラウザーに保存"><strong>作品を保存</strong><small>このブラウザーに保存して続ける</small></button><button id="draw-export" type="button" class="creation-output__card"><strong>出力を開く</strong><small>画像・アニメーションの形式やサイズを選択</small></button><div class="creation-output__divider"></div><button id="draw-import-local" type="button" class="creation-output__card"><strong>画像ファイル</strong><small>PNG・WebPを複製して開く</small></button><button id="draw-copy-last" type="button" class="creation-output__card" hidden><strong>前回の絵を複製</strong><small>元の絵を残して続ける</small></button><button id="draw-resume" type="button" class="creation-output__card" hidden><strong>前回の絵をひらく</strong><small>前回の続きから編集</small></button><div id="draw-shelf" hidden></div><div class="creation-output__divider"></div><button type="button" class="creation-output__card" data-output-project><strong>作品を管理</strong><small>名前・保存・読み込み</small></button></div></details><button id="draw-to-globe" type="button" aria-label="世界地図へ投稿" title="世界地図へ"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.4 2.2 3.6 4.9 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-4.9-3.6-8S9.6 6.2 12 4z"/></svg></button><details class="draw-import"><summary id="draw-import-summary" aria-label="キャンバス設定" title="キャンバス設定" aria-controls="draw-canvas-options"><span id="draw-size-chip" class="draw-size-chip">16</span></summary><div id="draw-canvas-options" class="draw-import__options draw-canvas-panel"><header><h2>キャンバス設定</h2><p id="draw-canvas-dimensions" aria-live="polite">16 × 16 px</p></header><h3 id="draw-canvas-resize-title" class="draw-canvas-panel__section-title">キャンバス領域変更</h3><p id="draw-canvas-resize-help" class="draw-canvas-resize-help">絵の1pxを保ち、中央を基準に余白を変更します。小さくすると外側が切れます。「戻す」で復元できます。</p><div class="draw-size-seg" role="radiogroup" aria-label="長辺のサイズ"><button type="button" role="radio" data-draw-size="16" aria-label="長辺16px">16</button><button type="button" role="radio" data-draw-size="32" aria-label="長辺32px">32</button><button type="button" role="radio" data-draw-size="64" aria-label="長辺64px">64</button><button type="button" role="radio" data-draw-size="128" aria-label="長辺128px">128</button><button type="button" role="radio" data-draw-size="256" aria-label="長辺256px">256</button></div><form id="draw-canvas-form" aria-describedby="draw-canvas-resize-help"><div class="draw-canvas-panel__dimensions"><label for="draw-canvas-width">幅<input id="draw-canvas-width" type="number" min="1" max="256" step="1" value="16" inputmode="numeric"></label><label for="draw-canvas-height">高さ<input id="draw-canvas-height" type="number" min="1" max="256" step="1" value="16" inputmode="numeric"></label></div><label class="draw-canvas-panel__ratio"><input id="draw-canvas-ratio" type="checkbox" checked>縦横比を固定</label><button id="draw-canvas-apply" type="submit">サイズを適用</button></form>
-<section class="draw-sprite-scale" aria-labelledby="draw-sprite-scale-title">
-  <h3 id="draw-sprite-scale-title">スプライト倍率変更</h3>
-  <p id="draw-sprite-scale-help" class="draw-canvas-panel__note">全コマ・全レイヤーを、透明部分を保って最近傍補間で拡大・縮小します。幅・高さは同じ倍率で計算し、四捨五入（最小1px）します。表示ズームとは別の変更です。</p>
-  <div class="draw-sprite-scale__presets" role="group" aria-label="スプライト倍率のプリセット">
-    <button type="button" data-draw-sprite-scale="25" aria-pressed="false">25%</button><button type="button" data-draw-sprite-scale="50" aria-pressed="false">50%</button><button type="button" data-draw-sprite-scale="100" aria-pressed="true">100%</button><button type="button" data-draw-sprite-scale="200" aria-pressed="false">200%</button><button type="button" data-draw-sprite-scale="300" aria-pressed="false">300%</button><button type="button" data-draw-sprite-scale="1000" aria-pressed="false">1000%</button>
-  </div>
-  <form id="draw-sprite-scale-form" aria-describedby="draw-sprite-scale-help draw-sprite-scale-note">
-    <label class="draw-sprite-scale__field" for="draw-sprite-scale-percent">倍率 (%)<input id="draw-sprite-scale-percent" name="percent" type="number" min="0" step="any" value="100" aria-describedby="draw-sprite-scale-help draw-sprite-scale-preview draw-sprite-scale-reason" inputmode="decimal"></label>
-    <p id="draw-sprite-scale-preview" class="draw-sprite-scale__preview" aria-live="polite">現在 16 × 16 px → 16 × 16 px</p>
-    <p id="draw-sprite-scale-reason" class="draw-sprite-scale__reason" role="status" aria-live="polite"></p>
-    <button id="draw-sprite-scale-apply" type="submit" disabled>倍率を適用</button>
-  </form>
-  <p id="draw-sprite-scale-note" class="draw-canvas-panel__note">縮小や小数倍率では、寸法の丸めで一部の画素が失われることがあります。</p>
-</section></div></details></div>
-      
     </section>
-    </div>
+
+    <section class="tool-intro__embed-wrap tool-shell__workspace" aria-label="PiXiEEDraw 制作ツール">
+      <div class="container">
+        <section class="tool-intro__embed tool-shell__embed" data-tool-embed data-tool-shell data-tool-mode="draw" data-embed-auto aria-labelledby="tool-embed-title">
+          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CREATE HERE</p><h2 id="tool-embed-title">このページで制作する</h2><p data-shell-workspace-copy>描画・カメラ・音楽を同じ作品で切り替えて使えます。</p></div>
+          <div data-embed-stage hidden></div>
+          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">ツールを準備しています…</p>
+        </section>
+      </div>
+    </section>
+
+    <section class="tool-intro__how-to container" aria-labelledby="tool-how-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">HOW TO USE</p><h2 id="tool-how-title">使い方</h2></div>
+      <ol class="tool-intro__steps">
+        <li><span>01</span><div><h3>モードを選ぶ</h3><p>描画・カメラ・音楽を、ツール下部のモードから切り替えます。</p></div></li>
+        <li><span>02</span><div><h3>描いて編集する</h3><p>色や道具を選び、キャンバスを編集します。カメラでは画像の読込や撮影ができます。</p></div></li>
+        <li><span>03</span><div><h3>保存・出力する</h3><p>作品を端末に保存したり、画像・アニメーション・音声を書き出したりできます。</p></div></li>
+      </ol>
+    </section>
+
+    <section class="tool-intro__formats container" aria-labelledby="tool-features-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FEATURES</p><h2 id="tool-features-title">ひとつの作品で、描く・変換する・音を作る</h2></div>
+      <p>レイヤーとフレームを使ったドット絵やアニメーション、写真からの変換、色を音に割り当てる音楽づくりに対応しています。カメラは撮影操作を選んだときに起動します。</p>
+    </section>
+
+    <section class="tool-intro__formats tool-shell__save container" aria-labelledby="tool-save-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">SAVE & EXPORT</p><h2 id="tool-save-title">保存・出力</h2></div>
+      <p>作品はこのブラウザーの端末内に保存されます。編集を続けるPXDバックアップは［ファイル］→［今の作品］→［その他］でダウンロードできます。PNG・GIF・WAVなどの完成画像・アニメーション・音声は［出力］からダウンロードします。保存やダウンロードだけで作品が公開されることはありません。</p>
+    </section>
+
+    <section class="tool-intro__faq container" aria-labelledby="tool-faq-title">
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FAQ</p><h2 id="tool-faq-title">よくある質問</h2></div>
+      <details><summary>作った作品はどこに保存されますか？</summary><p>作品を保存すると、このブラウザーの端末内に保存されます。出力メニューからファイルとして書き出すこともできます。</p></details>
+      <details><summary>作品を保存すると公開されますか？</summary><p>保存と公開は別の操作です。端末内への保存やファイルのダウンロードでは公開されません。公開作品を探すときは<a href="/globe/">世界地図</a>を開けます。</p></details>
+      <details><summary>カメラはページを開くと起動しますか？</summary><p>自動では起動しません。撮影操作を選んだときにブラウザーがカメラの利用許可を確認します。画像ファイルからも始められます。</p></details>
+      <details><summary>描画・カメラ・音楽の作品は共有されますか？</summary><p>3つのモードは同じ作品とキャンバスを使います。音楽は専用レイヤーで編集します。</p></details>
+    </section>
   </main>
-  <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
-  <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/draw/?mode=camera" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-animation-play" type="button" aria-pressed="false" aria-label="アニメーションを再生" title="再生"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="draw-play-icon" d="m8 5 11 7-11 7Z"/><path class="draw-stop-icon" d="M8 5v14M16 5v14"/></svg></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261016-color-capability-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
-  <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261016-tool-shell-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261016-tool-shell-1"></script>
 </body>
 </html>

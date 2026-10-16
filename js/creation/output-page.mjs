@@ -1,4 +1,4 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261016-user-filename-provenance-1';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261016-tool-shell-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261015-alpha-opacity-1';
 import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261016-color-capability-1';
@@ -884,7 +884,7 @@ function syncFilename() {
 }
 
 function trackSave(method) {
-  void import('../site-analytics.mjs').then(({ trackSiteEvent }) => {
+  void import('../site-analytics.mjs?rev=20261016-tool-shell-1').then(({ trackSiteEvent }) => {
     trackSiteEvent('file_export', { file_type: record.extension, method, export_status: 'download_started' });
   }).catch(() => { /* Analytics never blocks a local preview or download. */ });
 }

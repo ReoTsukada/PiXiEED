@@ -1,7 +1,7 @@
-import { readCreationModePointer } from './mode-entry.mjs?rev=20261011-unified-project-1';
+import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261016-color-capability-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-color-capability-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261016-tool-shell-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-tool-shell-1';
 
 const scope = createModeScope();
 let modes = null, starting = true, drawForEmbed = null;
@@ -32,10 +32,10 @@ try {
       onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
   try {
-    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261016-color-capability-1');
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261016-tool-shell-1');
     if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
     if (!scope.disposed && window.__PIXIEED_TOOL_EMBED__ && drawForEmbed && modes) {
-      const { installToolEmbedBridge } = await import('./tool-embed-bridge.mjs?rev=20261016-color-capability-1');
+      const { installToolEmbedBridge } = await import('./tool-embed-bridge.mjs?rev=20261016-tool-shell-1');
       installToolEmbedBridge({ draw: drawForEmbed, modes });
     }
   } catch (error) {

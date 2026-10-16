@@ -10,7 +10,8 @@ const root = new URL('../../', import.meta.url);
 const REV = '20261016-color-capability-1';
 const CORE = 'js/creation/animation-core.mjs';
 // Every transitive consumer moves together to the alpha-aware canonical core.
-const expectedRevision = () => REV;
+const cacheRevisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
+const expectedRevision = target => cacheRevisions[target] || REV;
 const specifiers = source => [...source.matchAll(/['"]([^'"\s]+\.mjs(?:\?[^'"\s]*)?)['"]/g)].map(match => match[1]);
 const targetFor = (owner, value) => {
   const path = value.split('?')[0];
@@ -51,7 +52,7 @@ test('every browser dependency leading to the animation contract uses its exact 
   for (const [name,targets] of edges) for (const {value,target} of targets) if (affected.has(target)) {
     assert.equal(new URL(value,'https://test.invalid/'+name).searchParams.get('rev'),expectedRevision(target),`${name} must fetch the cache-busted ${target}`);
   }
-  for (const name of ['draw/index.html','audio/index.html','jigsaw/index.html','hidden-object/index.html','spot-difference/index.html','pixel-camera.html']) {
+  for (const name of ['draw/index.html','audio/index.html','draw/editor.html','audio/editor.html','jigsaw/index.html','hidden-object/index.html','spot-difference/index.html','pixel-camera.html']) {
     for (const value of specifiers(await readFile(new URL(name,root),'utf8'))) if(affected.has(targetFor(name,value))) {
       assert.equal(new URL(value,'https://test.invalid/'+name).searchParams.get('rev'),expectedRevision(targetFor(name,value)),`${name} preload/entry must match its transitive contract`);
     }

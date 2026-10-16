@@ -191,7 +191,7 @@ test('image import dimension preflight rejects malformed headers and detects PNG
 
 test('draw page exposes local copies (no camera copy: camera shots are not edited here) and no publish call', async () => {
   const { readFile } = await import('node:fs/promises');
-  const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../draw/editor.html', import.meta.url), 'utf8');
   assert.match(html, /id="draw-size"/); assert.match(html, /id="draw-import-local"/); assert.doesNotMatch(html, /id="draw-import-camera"/); assert.match(html, /id="draw-copy-last"/);
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /drawAdapter = createIndexedDbDraftAdapter\(\); store = createLocalDraftStore\(drawAdapter\)/); assert.match(page, /store\.save\(/); assert.match(page, /store\.load\(/);
@@ -201,7 +201,7 @@ test('draw page exposes local copies (no camera copy: camera shots are not edite
 
 test('draw workspace prioritizes the canvas and supports touch zoom gestures accessibly', async () => {
   const { readFile } = await import('node:fs/promises');
-  const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../draw/editor.html', import.meta.url), 'utf8');
   const css = await readFile(new URL('../../css/creation-draw.css', import.meta.url), 'utf8');
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   assert.match(html, /class="draw-board\b[^"]*" aria-label="描画エリア。2本指で拡大・移動できます。"/);
@@ -248,7 +248,7 @@ test('かんたんドット: a colour change is one undo step and undo reports o
   assert.equal(history.undo(), true); assert.equal(history.undo(), true);
   assert.equal(history.lastStep.paletteChanged, false); assert.deepEqual([...history.lastStep.indices], [0]); assert.equal(document.pixels[0], -1);
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
-  const html = await readFile(new URL('../../draw/index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../draw/editor.html', import.meta.url), 'utf8');
   assert.match(page, /mountColorPanel/); assert.match(html, /color-panel\.css/);
   assert.doesNotMatch(html, /id="draw-color-editor"/);
   assert.match(page, /function zoomAt\(/); assert.match(page, /fingers >= 3\) redo\(\); else undo\(\)/);

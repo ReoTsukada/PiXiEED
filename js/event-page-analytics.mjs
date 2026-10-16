@@ -1,4 +1,4 @@
-import { trackSiteEvent } from './site-analytics.mjs';
+import { trackSiteEvent } from './site-analytics.mjs?rev=20261016-tool-shell-1';
 
 // Reuse the existing consent boundary and event vocabulary. No event IDs,
 // external URLs, new consent settings, or new key events are sent.

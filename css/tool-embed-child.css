@@ -1,13 +1,28 @@
 html[data-tool-embed] { height: 100%; background: #f4f2ec; }
 html[data-tool-embed] body { min-height: 100%; margin: 0; padding-bottom: 0; background: #f4f2ec; }
-html[data-tool-embed] .site-header, html[data-tool-embed] .skip-link, html[data-tool-embed] .bottom-nav,
+html[data-tool-embed] .skip-link,
 html[data-tool-embed] .display-ad, html[data-tool-embed] [data-ad], html[data-tool-embed] .adsbygoogle { display: none !important; }
+html[data-tool-embed] .site-header { display: block !important; }
 html[data-tool-embed] #main { width: min(100%, 1100px); max-width: none; margin: 0 auto; padding: .75rem; }
 html[data-tool-embed] .draw-title { margin-top: 0; }
 html[data-tool-embed] [data-tool-help], html[data-tool-embed] #tool-help { display: none !important; }
 html[data-tool-embed='camera'] #main > .draw-title, html[data-tool-embed='camera'] #main > .draw-size,
 html[data-tool-embed='camera'] #main > .draw-meta { display: none !important; }
 html[data-tool-embed='camera'] #main { padding-top: 0; }
+html[data-tool-embed] .site-header .brand,
+html[data-tool-embed] .site-header [data-menu-toggle],
+html[data-tool-embed] .site-header .site-nav,
+html[data-tool-embed-expanded] .bottom-nav,
+html[data-tool-embed-expanded] [data-site-menu],
+html[data-tool-embed-expanded] [data-menu-backdrop] { display: none !important; }
+html[data-tool-embed-expanded] .site-header { min-height: 0; }
+html[data-tool-embed-expanded] #main { padding-top: .35rem; }
+/* Camera history labels need their natural width within the retained tool header. */
+html[data-tool-embed] body.creation-suite[data-creation-mode='camera'] :is(#creation-project-undo, #creation-project-redo) {
+  width: max-content !important; max-width: none !important;
+  min-width: 44px !important; min-height: 44px !important; height: 44px !important;
+  padding-inline: 10px !important; white-space: nowrap !important; line-height: 1;
+}
 @media (max-width: 700px) {
   html[data-tool-embed] #main { padding: .5rem; }
   html[data-tool-embed] .draw-board { touch-action: none; }

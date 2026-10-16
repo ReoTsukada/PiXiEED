@@ -3,7 +3,7 @@ import {
   describeDrawMusicProjection,
   getDrawMusicPageDocument, moveDrawMusicPage, projectDrawMusic, removeDrawMusicPage,
   selectDrawMusicPage, writeDrawMusicProject
-} from './draw-music-core.mjs?rev=20261016-color-capability-1';
+} from './draw-music-core.mjs?rev=20261016-tool-shell-1';
 import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261016-color-capability-1';
 import { setPxdJson } from './pxd-codec.mjs';
 import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { eligibleEvents, eventPage, eventFacts, generateEventPages, indexPage, HUB_ONLY_REASONS, PUBLIC_SUMMARY_OVERRIDES } from '../../scripts/generate-event-pages.mjs';
+import { eligibleEvents, eventPage, eventFacts, eventStatus, generateEventPages, indexPage, registrationDeadline, HUB_ONLY_REASONS, PUBLIC_SUMMARY_OVERRIDES } from '../../scripts/generate-event-pages.mjs';
 
 const catalog = JSON.parse(await readFile(new URL('../../data/pixel-art-events.json', import.meta.url), 'utf8'));
 const events = eligibleEvents(catalog);
@@ -57,6 +57,25 @@ test('event page discloses unknown fields, source provenance, and introduction s
   assert.match(html, /PiXiEEDによるイベント紹介です/);
   assert.match(html, /情報確認日/);
   assert.doesNotMatch(html, /application\/ld\+json/);
+});
+
+test('event state follows inclusive event dates while registration cutoff is shown separately', () => {
+  const event = {
+    id: 'registration-closes-before-event', name: 'Pixel Jam', status: 'upcoming',
+    startDate: '2026-10-18', endDate: '2026-10-20', deadlineAt: '2026-10-16T17:00:00Z',
+    sourceUrl: 'https://example.test/event', checkedAt: '2026-10-16', description: '開催内容',
+  };
+  const deadline = Date.parse(event.deadlineAt);
+  assert.equal(eventStatus(event, '2026-10-17', deadline + 1), 'upcoming', 'a closed registration period does not end a future event');
+  assert.equal(eventStatus(event, '2026-10-18', deadline + 1), 'active', 'the event is active on its first date');
+  assert.equal(eventStatus(event, '2026-10-20', deadline + 1), 'active', 'the event remains active through its final date');
+  assert.equal(eventStatus(event, '2026-10-21', deadline + 1), 'ended', 'the event ends after its final date');
+  assert.equal(registrationDeadline(event), '2026年10月17日 02:00');
+  assert.equal(eventFacts(event).find(([label]) => label === '申込・応募締切')[1], '2026年10月17日 02:00');
+  const hub = indexPage([event], [event]);
+  assert.match(hub, /data-status="upcoming"/);
+  assert.match(hub, /申込・応募締切：2026年10月17日 02:00（日本時間）/);
+  assert.doesNotMatch(hub, /締切まであと|締切が近い|deadline soon/i);
 });
 
 test('watch records are hub-only with previous-date facts and links to available history', () => {
@@ -147,6 +166,29 @@ test('hub has one anchor per source record and accurate record, edition, watch, 
   assert.match(hub, /134レコード（開催日付き128記録・重複1件を除く127開催回・次回未定6件）。個別紹介ページ117件。/);
   assert.match(hub, /PiXiEEDが独自に調査・編集した一覧です/);
   for (const event of catalog.events) assert.ok(hub.includes(`id="${event.id}"`));
+});
+
+test('event history stays fully available without JavaScript and is grouped with factual year and filter facets', () => {
+  const hub = indexPage(events, catalog.events);
+  const cardIds = [...hub.matchAll(/<li class="event-card" id="([^"]+)" data-event-card/g)].map(([, id]) => id);
+  assert.deepEqual(new Set(cardIds), allIds);
+  assert.equal(cardIds.length, catalog.events.length, 'each source record appears once in the full archive');
+  assert.match(hub, /<form class="event-index-filters" data-event-filters hidden role="search">/);
+  assert.match(hub, /name="status" data-event-status-filter/);
+  assert.match(hub, /name="format" data-event-format-filter/);
+  assert.match(hub, /name="region" data-event-region-filter/);
+  assert.match(hub, /value="near">開催中・開催予定/);
+  assert.match(hub, /value="ended">開催終了/);
+  assert.match(hub, /value="online">オンライン開催（明記）/);
+  assert.match(hub, /value="in-person">現地開催（明記）/);
+  assert.match(hub, /href="#event-year-2026"/);
+  assert.match(hub, /id="event-year-2026" data-event-year-section="2026"/);
+  assert.match(hub, /src="\/js\/event-history\.mjs\?rev=20261016-tool-shell-1"/);
+  assert.doesNotMatch(hub, /<meta name="robots"/);
+  const locationWithCountry = catalog.events.find((event) => event.country);
+  assert.ok(hub.includes(`data-region="${locationWithCountry.country}"`));
+  assert.ok(hub.includes(`>${locationWithCountry.country}・`), 'country is visible on the event card');
+  for (const id of allIds) assert.match(hub, new RegExp(`id="${id}" data-event-card data-year="(?:19|20)\\d{2}|unknown"`));
 });
 
 test('generated canonical pages and sitemap contain only unique leaf URLs and are repeatable', async () => {

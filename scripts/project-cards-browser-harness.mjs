@@ -13,7 +13,7 @@ async function projectImage(page, id) {
   return page.evaluate(async id => {
     const project = await (await import('/js/creation/pxd-store.mjs')).createPxdStore().load(id);
     if (!project) return null;
-    const { componentImageRole } = await import('/js/creation/project-components.mjs');
+    const { componentImageRole } = await import('/js/creation/project-components.mjs?rev=20261016-tool-shell-1');
     const image = await (await import('/js/creation/pxd-project.mjs')).readPxdImage(project, componentImageRole(project, project.manifest.toolProject.tool));
     return { id: project.projectId, width: image.width, height: image.height, rgba: Array.from(image.rgba) };
   }, id);
@@ -81,7 +81,7 @@ try {
       const fixture = await page.evaluate(async tool => {
         const { createPxdProject } = await import('/js/creation/pxd-codec.mjs');
         const { putPxdSharedImage } = await import('/js/creation/pxd-project.mjs');
-        const { importToolProject } = await import('/js/creation/tool-project-import.mjs');
+        const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261016-tool-shell-1');
         const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs');
         const result = {};
         for (const label of ['A', 'B']) {

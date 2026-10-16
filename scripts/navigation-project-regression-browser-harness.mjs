@@ -101,7 +101,7 @@ try {
         const outputId=new URL(page.url()).searchParams.get('id');
         await page.locator('#output-return').waitFor({state:'visible'});
         const record=await page.evaluate(async id=>{
-          const {readToolOutput}=await import('/js/creation/output-handoff.mjs');
+          const {readToolOutput}=await import('/js/creation/output-handoff.mjs?rev=20261016-tool-shell-1');
           const r=await readToolOutput(id);
           return {id:r.id,returnUrl:r.returnUrl,source:r.source,title:r.title,filename:r.filename,metadata:r.metadata,mediaSourceCount:r.mediaSources?.length||0};
         },outputId);

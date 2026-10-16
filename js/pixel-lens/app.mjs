@@ -1,5 +1,5 @@
 import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
-import { createToolStartTracker, trackSiteEvent } from '../site-analytics.mjs';
+import { createToolStartTracker, trackSiteEvent } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20261016-color-capability-1';
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
@@ -7,7 +7,7 @@ import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette,
 import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261004-camera-tap-focus-1';
 import { GIF_FPS } from './gif.mjs?rev=20261015-alpha-opacity-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?rev=20261015-alpha-opacity-1';
-import { createCameraFileSave } from './file-save.mjs?rev=20261006-camera-save-1';
+import { createCameraFileSave } from './file-save.mjs?rev=20261016-tool-shell-1';
 import { decodeCameraImageFile } from './image-source.mjs?rev=20261006-camera-upload-1';
 import { cameraPostDataUrl } from './camera-post.mjs?rev=20261004-post-size-256-1';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20261016-color-capability-1';
@@ -16,9 +16,9 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261016-color-capability-1';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261016-color-capability-1';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261016-color-capability-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261016-tool-shell-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
-import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261015-embed-native-save-1';
+import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261016-tool-shell-1';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-3';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';

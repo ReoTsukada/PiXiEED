@@ -4,34 +4,34 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
-<title>登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換</title>
-<meta content="PiXiEELENSは登録不要・無料で写真やカメラ映像をドット絵にするブラウザツールです。画像の読み込み、減色、GIF撮影に対応します。" name="description"/>
+<title>旧版PiXiEELENS｜独立カメラで写真変換・GIF撮影｜PiXiEED</title>
+<meta content="旧版PiXiEELENSは、独立した画面で画像の読み込み・写真の減色・GIF撮影を行うカメラです。現在の写真変換はPiXiEEDraw内のカメラモードから利用できます。" name="description"/>
 <link rel="canonical" href="https://pixieed.jp/pixiee-lens/"/>
 <link rel="stylesheet" href="/css/navigation.css?rev=20261012-nav-polish-1"/>
 <meta content="#0b1224" name="theme-color"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
-<meta content="登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換" property="og:title"/>
-<meta content="登録不要・無料で写真やカメラ映像をドット化・ピクセル化できるブラウザツールです。" property="og:description"/>
+<meta content="旧版PiXiEELENS｜独立カメラで写真変換・GIF撮影｜PiXiEED" property="og:title"/>
+<meta content="旧版PiXiEELENSの独立カメラ。写真のドット絵変換・減色・GIF撮影に対応。現在の写真変換はPiXiEEDraw内のカメラモードで利用できます。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
 <meta content="https://pixieed.jp/pixiee-lens/" property="og:url"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/pixiee-lens/" name="twitter:url"/>
-<meta content="登録不要・無料でドット絵にするサイト PiXiEELENS | 写真をオンライン変換" name="twitter:title"/>
-<meta content="登録不要・無料で写真やカメラ映像をドット化・ピクセル化できるブラウザツールです。" name="twitter:description"/>
+<meta content="旧版PiXiEELENS｜独立カメラで写真変換・GIF撮影｜PiXiEED" name="twitter:title"/>
+<meta content="旧版PiXiEELENSの独立カメラ。写真のドット絵変換・減色・GIF撮影に対応。現在の写真変換はPiXiEEDraw内のカメラモードで利用できます。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  "name": "PiXiEELENS",
+  "name": "旧版PiXiEELENS",
   "applicationCategory": "MultimediaApplication",
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/pixiee-lens/",
   "image": "https://pixieed.jp/pixiee-lens/ogp.png",
-  "description": "登録不要・無料で写真やカメラ映像をドット化・ピクセル化できるブラウザツールです。",
+  "description": "旧版PiXiEELENSの独立カメラ。写真のドット絵変換・減色・GIF撮影に対応。現在の写真変換はPiXiEEDraw内のカメラモードで利用できます。",
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -70,7 +70,7 @@
   })();
 </script>
 <script type="module">
-  import { trackSiteEvent } from '../js/site-analytics.mjs';
+  import { trackSiteEvent } from '../js/site-analytics.mjs?rev=20261016-tool-shell-1';
   trackSiteEvent('project_open', {
     project_slug: 'pixiee-lens',
     project_type: 'tool',
@@ -2157,6 +2157,11 @@
     text-decoration: none;
     white-space: nowrap;
   }
+  .lens-edition{align-self:flex-start;max-width:100%;margin:0;padding:0 10px;border:1px solid #ffffff35;border-radius:8px;background:#111923ed;color:#fff;font:14px/1.5 system-ui,sans-serif;pointer-events:auto;text-shadow:none}
+  .lens-edition summary{display:flex;min-height:44px;align-items:center;gap:6px;cursor:pointer;list-style:none}
+  .lens-edition summary::before{content:"▸"}.lens-edition[open] summary::before{content:"▾"}
+  .lens-edition p{max-width:54ch;margin:0 0 8px}.lens-edition a{display:flex;min-height:44px;align-items:center;color:#c6dcff;text-underline-offset:3px}
+  html[data-embed-mode="true"] .lens-edition{display:none}
   .lens-back:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 </style>
 
@@ -2278,7 +2283,7 @@
 <body>
 <a class="lens-back" href="/tools/" aria-label="ツール一覧へ戻る">← ツール</a>
 <main>
-<h1 class="visually-hidden">PiXiEEDrawのPiXiEELENS 写真・カメラ変換</h1>
+<h1 class="visually-hidden">旧版PiXiEELENS 写真・カメラ変換とGIF撮影</h1>
 <video autoplay="" id="cameraFeed" muted="" playsinline=""></video>
 <canvas class="dot-canvas" hidden="" id="dotCanvas"></canvas>
 <div class="aspect-overlay" hidden="" id="aspectOverlay">
@@ -2292,6 +2297,7 @@
 </div>
 <div class="hud">
 <div class="hud-top">
+<details class="lens-edition"><summary>旧版PiXiEELENS・独立カメラ</summary><p>写真変換・減色・GIF撮影を独立した画面で使う旧版です。<a href="/camera/">現在の写真変換・PiXiEEDrawのカメラモードへ →</a></p></details>
 <div class="hud-top__bar">
 <div aria-label="ドット絵コントロール" class="hud-top__actions" role="group">
 <button aria-label="画像を読み込む" class="icon-button icon-button--labeled" id="pixelArtBtn" type="button">
@@ -2877,7 +2883,7 @@
         if (!(capturePreviewBlob instanceof Blob) || !capturePreviewFilename || capturePreviewOutputBtn.disabled) return;
         capturePreviewOutputBtn.disabled = true;
         try {
-          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261009-output-12');
+          const { sendToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261016-tool-shell-1');
           const staged = await sendToolOutput({
             blob: capturePreviewBlob,
             filename: capturePreviewFilename,
@@ -5618,7 +5624,7 @@
     async function restoreOutputCapture() {
       const ids = new URLSearchParams(location.search).getAll('outputId');
       if (ids.length !== 1) throw new Error('撮影データの戻り先を確認できません。もう一度撮影してください。');
-      const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261009-output-12');
+      const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261016-tool-shell-1');
       const entry = await readToolOutput(ids[0]);
       if (entry.source !== 'PiXiEELENS' || !['image/png', 'image/gif'].includes(entry.mime)) {
         throw new Error('この撮影データをPiXiEELENSで開けません。もう一度撮影してください。');
@@ -12145,6 +12151,6 @@
 
 
 <script type="module" src="/js/pixel-lens/legacy-reward.mjs?rev=20261016-color-capability-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261012-original-nav-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261016-tool-shell-1"></script>
 </body>
 </html>

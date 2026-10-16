@@ -1,0 +1,40 @@
+/* Shared PiXiEED color, type, size, radius, and layout tokens. */
+:root {
+  --pixieed-bg: #f7f8f6;
+  --pixieed-surface: #ffffff;
+  --pixieed-surface-muted: #eef1ef;
+  --pixieed-ink: #1b2025;
+  --pixieed-muted: #5f6871;
+  --pixieed-line: rgba(27, 32, 37, .11);
+  --pixieed-accent: #e75445;
+  --pixieed-accent-strong: #b83f34;
+  --pixieed-focus: #145d91;
+  --pixieed-link: #315fd0;
+  --pixieed-dark: #17232d;
+  --pixieed-header-height: 64px;
+  --pixieed-radius-sm: 8px;
+  --pixieed-radius-md: 16px;
+  --pixieed-radius-lg: 22px;
+  --pixieed-content-max: 1200px;
+  --pixieed-ease: cubic-bezier(.2, .8, .2, 1);
+  --pixieed-font-sans: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+
+  /* Compatibility aliases for the legacy site and tool styles. */
+  --paper: var(--pixieed-bg);
+  --paper-deep: var(--pixieed-surface-muted);
+  --white: var(--pixieed-surface);
+  --ink: var(--pixieed-ink);
+  --ink-soft: var(--pixieed-muted);
+  --line: var(--pixieed-line);
+  --blue: var(--pixieed-link);
+  --blue-deep: var(--pixieed-dark);
+  --coral: var(--pixieed-accent);
+  --yellow: #e9bd55;
+  --green: #637c60;
+  --shadow: 0 18px 48px rgba(27, 32, 37, .08);
+  --radius-sm: var(--pixieed-radius-sm);
+  --radius-md: var(--pixieed-radius-md);
+  --radius-lg: var(--pixieed-radius-lg);
+  --max: var(--pixieed-content-max);
+  --header-h: var(--pixieed-header-height);
+}

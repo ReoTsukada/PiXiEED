@@ -373,3 +373,44 @@ html[data-pixieed-motion="reduced"] .books-page .product-card:hover { transform:
   .catalog-image-note { margin-top: 6px; }
   .product-grid { margin-top: 9px; }
 }
+
+/* Keep the catalog on the shared 1200px grid and use the common page gutters. */
+.books-page .catalog-wrap,
+.books-page .catalog-header__inner {
+  width: min(var(--pixieed-content-max, 1200px), calc(100% - 3rem));
+}
+.books-page .catalog-intro__inner { max-width: var(--pixieed-content-max, 1200px); }
+.books-page .catalog-filters input[type="search"],
+.books-page .catalog-search button,
+.books-page .catalog-more-filters > summary {
+  border-radius: var(--pixieed-radius-sm, 8px);
+}
+.books-page .product-card__description,
+.books-page .catalog-extra__copy p:last-child,
+.books-page .product-detail__content .product-card__description {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.books-page .product-detail__notice,
+.books-page .product-detail__gate {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 599px) {
+  .books-page .catalog-wrap,
+  .books-page .catalog-header__inner {
+    width: calc(100% - 24px);
+  }
+  .books-page .product-grid .product-card__details { min-height: 44px; }
+}
+
+@media (max-width: 479px) {
+  .books-page .product-grid { grid-template-columns: minmax(0, 1fr); }
+  .books-page .product-grid .product-card__description,
+  .books-page .product-grid .product-card__byline { display: block; }
+  .books-page .product-grid .product-card__body { min-height: 0; padding: 12px; }
+  .books-page .product-grid .product-card h3 { font-size: 1rem; }
+  .books-page .product-grid .product-card__description { font-size: .9rem; line-height: 1.6; }
+  .books-page .product-grid .product-card__byline { font-size: .78rem; }
+}

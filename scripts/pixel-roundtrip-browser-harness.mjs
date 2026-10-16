@@ -46,7 +46,7 @@ try {
   const results = await page.evaluate(async () => {
     const metadata = await import('/js/pixel-png-metadata.mjs?pixel-roundtrip=1');
     const { normalizePixelFile } = await import('/js/pixel-scale.mjs?pixel-roundtrip=1');
-    const { enlargedPng } = await import('/js/pixel-export.mjs?pixel-roundtrip=1');
+    const { enlargedPng } = await import('/js/pixel-export.mjs?pixel-roundtrip=1&rev=20261016-tool-shell-1');
     const { decodeDrawImageFile } = await import('/js/creation/draw-import.mjs?pixel-roundtrip=1');
     const { inspectPixelImage } = await import('/js/globe/post-image.mjs?pixel-roundtrip=1');
     const { encodeCameraPng } = await import('/js/pixel-studio/png-export.mjs?pixel-roundtrip=1');

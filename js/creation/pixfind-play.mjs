@@ -10,10 +10,10 @@ import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, vali
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
 import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
-import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261004-legacy-puzzle-share-1';
+import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261016-tool-shell-1';
 import { isLegacyPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
-import { createLevelTracker, trackSiteEvent } from '../site-analytics.mjs';
+import { createLevelTracker, trackSiteEvent } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);
 const HEADERS = { apikey: supabaseConfig.publishableKey };

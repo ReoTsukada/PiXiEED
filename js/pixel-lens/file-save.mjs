@@ -1,4 +1,4 @@
-import { trackSiteEvent } from '../site-analytics.mjs';
+import { trackSiteEvent } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 
 function isCurrentSnapshot(snapshot) {
   if (!snapshot || typeof snapshot.isCurrent !== 'function') return false;

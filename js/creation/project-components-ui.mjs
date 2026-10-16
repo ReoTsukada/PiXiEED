@@ -1,4 +1,4 @@
-import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261016-color-capability-1';
+import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261016-tool-shell-1';
 import { readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 
 const shapes = {

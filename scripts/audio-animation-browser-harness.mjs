@@ -61,7 +61,7 @@ async function makeDrawAnimationProject(page) {
 async function importDrawIntoAudio(page, source) {
   return page.evaluate(async ({ id, revisionId }) => {
     const storeApi = await import('/js/creation/tool-project-store.mjs');
-    const importer = await import('/js/creation/tool-project-import.mjs');
+    const importer = await import('/js/creation/tool-project-import.mjs?rev=20261016-tool-shell-1');
     const { readPxdAnimation, writePxdAnimation } = await import('/js/creation/pxd-animation.mjs');
     const { readPxdAudioState, readPxdAudioLink, writePxdAudioState } = await import('/js/creation/pxd-draw-audio.mjs');
     const { setAudioPixel } = await import('/js/creation/audio-core.mjs');

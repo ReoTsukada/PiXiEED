@@ -21,7 +21,7 @@ async function seed(page) {
   return page.evaluate(async () => {
     const { createPxdProject } = await import('/js/creation/pxd-codec.mjs');
     const { putPxdSharedImage } = await import('/js/creation/pxd-project.mjs');
-    const { importToolProject } = await import('/js/creation/tool-project-import.mjs');
+    const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261016-tool-shell-1');
     const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs');
     const rgba = new Uint8Array(16 * 16 * 4);
     for (let y=0; y<16; y++) for (let x=0; x<16; x++) rgba.set([x<8?230:70,y<8?80:170,90,255],(y*16+x)*4);
@@ -33,7 +33,7 @@ async function seed(page) {
 async function snapshot(page, id) {
   return page.evaluate(async projectId => {
     const project = await (await import('/js/creation/pxd-store.mjs')).createPxdStore().load(projectId);
-    const { componentImageRole } = await import('/js/creation/project-components.mjs');
+    const { componentImageRole } = await import('/js/creation/project-components.mjs?rev=20261016-tool-shell-1');
     const { readPxdImage } = await import('/js/creation/pxd-project.mjs');
     const { readPxdAudioState, readPxdAudioLink } = await import('/js/creation/pxd-draw-audio.mjs');
     const image = await readPxdImage(project,componentImageRole(project,project.manifest.toolProject.tool));
@@ -71,7 +71,7 @@ try {
       const project = await (await import('/js/creation/pxd-store.mjs')).createPxdStore().load(new URLSearchParams(location.search).get('pxd'));
       const { readPxdImage } = await import('/js/creation/pxd-project.mjs');
       const { readPxdAudioState } = await import('/js/creation/pxd-draw-audio.mjs');
-      const { componentImageRole } = await import('/js/creation/project-components.mjs');
+      const { componentImageRole } = await import('/js/creation/project-components.mjs?rev=20261016-tool-shell-1');
       const image=await readPxdImage(project,componentImageRole(project,project.manifest.toolProject.tool));
       const out=await exportAudioImage(readPxdAudioState(project),{image});
       const bitmap=await createImageBitmap(out.blob);const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;

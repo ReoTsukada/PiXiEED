@@ -131,7 +131,7 @@ test('PiXiEELENS gets a static creation link in its native toolbar and hides it 
   assert.ok(result.html.indexOf('hud-top__actions" role="group">') < result.html.indexOf('data-draw-cta'));
   const ctaCss = await readFile(new URL('../../css/site-draw-cta.css', import.meta.url), 'utf8');
   const lensSource = await readFile(new URL('../../pixiee-lens/index.html', import.meta.url), 'utf8');
-  assert.match(lensSource, /<main>\s*<h1 class="visually-hidden">PiXiEEDrawのPiXiEELENS 写真・カメラ変換<\/h1>/);
+  assert.match(lensSource, /<main>\s*<h1 class="visually-hidden">旧版PiXiEELENS 写真・カメラ変換とGIF撮影<\/h1>/);
   assert.match(ctaCss, /html\[data-embed-mode="true"\] \.site-draw-cta--lens\s*\{\s*display:\s*none/);
   assert.match(ctaCss, /@media \(max-width: 600px\)\s*\{\s*\.site-draw-cta\s*\{[^}]*flex-direction:\s*column/);
   assert.equal(addSiteDrawCta(result.html, 'pixiee-lens/index.html').added, false, 'the transform remains idempotent');

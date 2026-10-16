@@ -1,4 +1,4 @@
-import { trackSiteEvent } from '../site-analytics.mjs';
+import { trackSiteEvent } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 import { analyticsConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 
 const MESSAGE_TYPE = 'pixieed:globe-analytics';

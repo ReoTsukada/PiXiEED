@@ -1,5 +1,5 @@
 import { isPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
-import { trackSiteEvent } from '../site-analytics.mjs';
+import { trackSiteEvent } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 const GAMES = Object.freeze({ 'spot-difference': 'spot-difference', hidden_object: 'hidden-object', 'hidden-object': 'hidden-object', spot_difference: 'spot-difference' });
 
 export class PuzzleShareError extends Error {

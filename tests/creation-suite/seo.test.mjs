@@ -20,6 +20,7 @@ const sitemapPages = pages
 sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/pixel-camera.html') + 1, 0,
   ['pixiee-lens/index.html', '/pixiee-lens/']);
 const eventIds = JSON.parse(readFileSync(resolve(root, 'events/catalog.json'), 'utf8')).ids;
+sitemapPages.push(['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'], ['projects/pixfind/index.html', '/projects/pixfind/']);
 sitemapPages.push(['events/index.html', '/events/'], ...eventIds.map(id => [`events/${id}/index.html`, `/events/${id}/`]));
 const artworkLabels = {
   site: 'つくる・あそぶ・つながる', tools: '制作ツール', draw: 'ドット絵を描く', audio: '音をつくる',

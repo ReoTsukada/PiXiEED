@@ -21,11 +21,24 @@ export function creationModeEntryUrl(mode, search = '') {
       || LEGACY_HANDOFF_KEYS.some((key) => params.has(key))) return null;
 
   assertUnambiguous(params, [...POINTER_KEYS, 'modeProjectTool']);
+  const selectedTool = params.get('modeProjectTool');
+  const legacyKeys = ['pxd', 'pxdRevision', 'pxdImage'];
+  const selectedKeys = ['modePxd', 'modePxdRevision', 'modePxdImage'];
+  const legacyPointer = legacyKeys.map((key) => params.get(key));
+  const selectedPointer = selectedKeys.map((key) => params.get(key));
+  const hasLegacyPointer = legacyKeys.some((key) => params.has(key));
+  const hasSelectedPointer = selectedKeys.some((key) => params.has(key));
+  // Workspace saves update the raw PXD pointer. When both namespaces are
+  // present, that newest saved revision takes precedence over the entry hint.
+  const pointerToKeep = selectedTool === mode && hasLegacyPointer
+    ? legacyPointer
+    : selectedTool === mode && hasSelectedPointer ? selectedPointer
+      : selectedTool !== mode && hasLegacyPointer ? legacyPointer : null;
   for (const key of POINTER_KEYS) params.delete(key);
-  params.delete('modeProjectTool');
-  for (const [from, to] of [['pxd', 'modePxd'], ['pxdRevision', 'modePxdRevision'], ['pxdImage', 'modePxdImage']]) {
-    const value = paramsFrom(search).get(from);
-    if (value !== null) params.set(to, value);
+  if (pointerToKeep) {
+    for (const [key, value] of selectedKeys.map((key, index) => [key, pointerToKeep[index]])) {
+      if (value !== null) params.set(key, value);
+    }
   }
   params.set('modeProjectTool', mode);
   params.set('mode', mode);

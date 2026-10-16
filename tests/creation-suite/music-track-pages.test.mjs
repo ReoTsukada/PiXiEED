@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addAnimationFrame, createAnimation, ensureAnimationMusicLayer, getAnimationCelDocument,
-  moveAnimationFrame, removeAnimationFrame, setAnimationFrameDuration, writeAnimationCel } from '../../js/creation/animation-core.mjs';
+  moveAnimationFrame, removeAnimationFrame, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel } from '../../js/creation/animation-core.mjs';
 import { planSharedProjectSettings } from '../../js/creation/shared-project-core.mjs';
-import { collectAudioEvents, createAudioSong } from '../../js/creation/audio-core.mjs';
+import { AUDIO_PIXEL_TICKS, collectAudioEvents, createAudioSong, getAudioColorInstrument } from '../../js/creation/audio-core.mjs';
 import { addDrawMusicPage, createDrawMusicTrackState, getDrawMusicPageDocument,
   changeDrawMusicColor, moveDrawMusicPage, projectDrawMusic, removeDrawMusicPage,
   selectDrawMusicPage, writeDrawMusicProject } from '../../js/creation/draw-music-core.mjs';
@@ -179,6 +179,78 @@ test('shared palette reorder, new colors and center resize synchronize every mus
     state.musicAnimation.frames.map(({ id, durationMs }) => [id, durationMs]), 'resize preserves music-page identity and timing');
   assert.equal(getDrawMusicPageDocument(resized, page1).pixels[1 * 18 + 3], 1, 'all pages use the same center offset');
   assert.deepEqual(getDrawMusicPageDocument(resized, page0).pixels, new Array(18 * 3).fill(-1));
+});
+
+test('shared unique recolors inherit the assigned voice, undo reprojects it, and ambiguous or new colors stay silent', async () => {
+  const editedColor = '#6b7d56';
+  const editedId = 'rgba-6b7d56ff';
+  const blueId = 'rgba-0000ffff';
+  let art = artWithMusicLayer();
+  let state = await createDrawMusicTrackState(null, art);
+  const roleLayer = state.animation.layers.find(layer => layer.role === 'music');
+  art = paint(state.animation, state.animation.frames[0].id, roleLayer.id, [[0, 0]]);
+  state = projectDrawMusic(state, art);
+  state = changeDrawMusicColor(state, { colorId: GREEN_ID, slotId: 'square', instrument: 'triangle' });
+  assert.equal(collectAudioEvents(state.song)[0]?.instrument, 'triangle');
+
+  const previousSnapshot = { song: structuredClone(state.song), link: structuredClone(state.link), musicAnimation: state.musicAnimation };
+  const recoloredPlan = planSharedProjectSettings(state.animation, { palette: [editedColor] });
+  const recolored = projectDrawMusic(state, recoloredPlan.animation);
+  assert.deepEqual(state.song, previousSnapshot.song, 'projection does not mutate the previous song snapshot');
+  assert.deepEqual(state.link, previousSnapshot.link, 'projection does not mutate the previous mapping snapshot');
+  assert.equal(state.musicAnimation, previousSnapshot.musicAnimation, 'projection does not mutate the previous music timeline');
+  assert.equal(recolored.link.colorToSlot[editedId], 'square', 'a unique same-index recolor carries its mapped slot');
+  assert.equal(getAudioColorInstrument(recolored.song, editedId, recolored.link.colorToSlot[editedId]), 'triangle',
+    'the color-specific instrument override follows a unique recolor');
+  assert.equal(collectAudioEvents(recolored.song)[0]?.instrument, 'triangle');
+
+  const undone = projectDrawMusic(recolored, state.animation);
+  assert.equal(undone.link.colorToSlot[GREEN_ID], 'square');
+  assert.equal(getAudioColorInstrument(undone.song, GREEN_ID, undone.link.colorToSlot[GREEN_ID]), 'triangle',
+    'undoing the palette edit restores the prior color mapping and voice');
+  assert.equal(collectAudioEvents(undone.song)[0]?.instrument, 'triangle');
+
+  const expandedPlan = planSharedProjectSettings(recolored.animation, { palette: [editedColor, '#0000ff'] });
+  const expanded = projectDrawMusic(recolored, expandedPlan.animation);
+  assert.equal(expanded.link.colorToSlot[blueId], null, 'a newly added color stays silent until explicitly assigned');
+  assert.equal(collectAudioEvents(expanded.song)[0]?.instrument, 'triangle');
+
+  let duplicate = await createDrawMusicTrackState(null,
+    ensureAnimationMusicLayer(createAnimation({ width: 16, height: 1, palette: [GREEN, GREEN] })));
+  const duplicateRole = duplicate.animation.layers.find(layer => layer.role === 'music');
+  duplicate = projectDrawMusic(duplicate, paint(duplicate.animation, duplicate.animation.frames[0].id, duplicateRole.id, [[0, 0]]));
+  duplicate = changeDrawMusicColor(duplicate, { colorId: GREEN_ID, slotId: 'square', instrument: 'triangle' });
+  const ambiguousPlan = planSharedProjectSettings(duplicate.animation, { palette: [editedColor, GREEN] });
+  const ambiguous = projectDrawMusic(duplicate, ambiguousPlan.animation);
+  assert.equal(ambiguous.link.colorToSlot[editedId], null, 'a duplicate source color is ambiguous and does not transfer its slot');
+  assert.equal(ambiguous.link.colorToSlot[GREEN_ID], 'square');
+  assert.equal(collectAudioEvents(ambiguous.song)[0]?.instrument, 'triangle');
+  const transparentAnimation = setAnimationPalette(ambiguous.animation, ['#6b7d5600', GREEN]);
+  const transparent = projectDrawMusic(ambiguous, transparentAnimation);
+  assert.equal(transparent.link.colorToSlot['rgba-6b7d5600'], null, 'transparent colors do not inherit an audible slot');
+  const transparentRole = transparent.animation.layers.find(layer => layer.role === 'music');
+  const artWithTransparentMusicPixel = paint(transparent.animation, transparent.animation.frames[0].id, transparentRole.id, [[1, 0, 0]]);
+  const transparentPixel = projectDrawMusic(transparent, artWithTransparentMusicPixel);
+  assert.equal(collectAudioEvents(transparentPixel.song).some(event => event.startTick === AUDIO_PIXEL_TICKS), false,
+    'a fully transparent music pixel does not produce a note');
+});
+
+test('a direct unique palette edit keeps the same color index and voice on inactive music pages', async () => {
+  const art = ensureAnimationMusicLayer(createAnimation({ width: 16, height: 1, palette: [GREEN, '#4a653d'] }));
+  let state = await createDrawMusicTrackState(null, art);
+  state = projectDrawMusic(state, paint(state.animation, state.animation.frames[0].id, state.musicLayerId, [[0, 0]]));
+  state = changeDrawMusicColor(state, { colorId: GREEN_ID, slotId: 'square', instrument: 'electric-piano' });
+  state = addDrawMusicPage(state);
+  assert.equal(collectAudioEvents(state.song).length, 2);
+  const previous = structuredClone(state);
+  const recolored = projectDrawMusic(state, setAnimationPalette(state.animation, ['#ff0000', '#4a653d']));
+  assert.deepEqual(state, previous, 'recolor preserves the previous history snapshot');
+  for (const page of recolored.musicAnimation.frames) {
+    assert.equal(getDrawMusicPageDocument(recolored, page.id).pixels[0], 0, 'every page retains its edited palette entry');
+  }
+  assert.deepEqual(collectAudioEvents(recolored.song).map(event => event.instrument), ['electric-piano', 'electric-piano']);
+  assert.deepEqual(collectAudioEvents(recolored.song).map(event => [event.startTick, event.pitch]),
+    collectAudioEvents(state.song).map(event => [event.startTick, event.pitch]));
 });
 
 test('a second save updates the managed music pages while preserving the one-time source archive', async () => {

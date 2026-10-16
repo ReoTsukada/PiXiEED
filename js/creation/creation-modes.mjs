@@ -1,7 +1,7 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
 import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261016-color-capability-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-color-capability-1';
+import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-tool-shell-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';
 import { animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261016-color-capability-1';
 
@@ -273,7 +273,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261011-polish-1&attempt=${audioLoadAttempt++}`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?attempt=${audioLoadAttempt++}&rev=20261016-tool-shell-1`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -311,7 +311,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261016-color-capability-1&attempt=${version}`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?attempt=${version}&rev=20261016-tool-shell-1`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

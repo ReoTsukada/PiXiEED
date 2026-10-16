@@ -1,6 +1,6 @@
 import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs';
-import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261016-color-capability-1';
+import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261016-tool-shell-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261016-color-capability-1';
 import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261016-color-capability-1';
@@ -9,7 +9,8 @@ import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, ass
 import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { setPxdJson } from './pxd-codec.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261011-shared-music-2';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261016-tool-shell-1';
+import { saveFile } from '../pixel-export.mjs?rev=20261016-tool-shell-1';
 import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
 import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
 
@@ -110,6 +111,46 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     if (!playing) { position.hidden = true; cancelAnimationFrame(positionFrame); positionFrame = 0; }
   }
   const player = createAudioPlayer({ onStateChange: updateTransport }); updateTransport(false, false);
+  let timbrePreviewPending = false, timbrePreviewActive = false, timbrePreviewTimer = 0, timbrePreviewToken = 0;
+  function stopTimbrePreview() {
+    timbrePreviewToken += 1; clearTimeout(timbrePreviewTimer); timbrePreviewTimer = 0;
+    if (timbrePreviewPending || timbrePreviewActive) player.stop();
+    timbrePreviewPending = false; timbrePreviewActive = false;
+  }
+  async function previewTimbre(instrumentId) {
+    const voice = AUDIO_INSTRUMENTS.find(item => item.id === instrumentId); if (!voice) return false;
+    stopTimbrePreview(); const token = ++timbrePreviewToken; timbrePreviewPending = true;
+    player.stop();
+    try {
+      const started = await player.preview({ instrument: instrumentId, pitch: 60, velocity: 82, duration: 0.12 });
+      if (token !== timbrePreviewToken || !started) return false;
+      timbrePreviewPending = false; timbrePreviewActive = true;
+      const duration = Math.max(0.12 + Number(voice.release || 0.12), Number(voice.drum?.duration || 0)) + 0.16;
+      timbrePreviewTimer = window.setTimeout(() => { if (token === timbrePreviewToken) { timbrePreviewActive = false; timbrePreviewTimer = 0; } }, Math.ceil(duration * 1000));
+      return true;
+    } catch (error) { if (token === timbrePreviewToken) { timbrePreviewPending = false; timbrePreviewActive = false; } throw error; }
+  }
+  function timbreColorId(index, color = draw.getTimeline()?.palette?.[index]) {
+    const value = typeof color === 'string' ? color.toLowerCase() : '';
+    const fullyTransparent = value.length === 9 && value.endsWith('00');
+    return Number.isInteger(index) && index >= 0 && value.startsWith('#') && !fullyTransparent
+      ? `rgba-${value.slice(1).padEnd(8, 'f')}` : null;
+  }
+  const timbreApi = Object.freeze({
+    getAssignment(index, color) {
+      const current = musicModel.getState(), colorId = timbreColorId(index, color);
+      const slotId = colorId ? current?.link?.colorToSlot?.[colorId] : null;
+      return slotId && current?.song ? getAudioColorInstrument(current.song, colorId, slotId) || null : null;
+    },
+    isReadOnly(index) { const color = draw.getTimeline()?.palette?.[index]; return musicModel.readOnly || !timbreColorId(index, color); },
+    preview: previewTimbre, stopPreview: stopTimbrePreview,
+    apply(index, color, instrumentId) {
+      const colorId = timbreColorId(index, color); if (!colorId || musicModel.readOnly) throw new Error('この色の音色は現在変更できません。');
+      const current = musicModel.getState(), slotId = instrumentId ? current?.link?.colorToSlot?.[colorId] || 'square' : null;
+      state = musicModel.change(value => changeDrawMusicColor(value, { colorId, slotId, instrument: instrumentId || null }));
+      refresh();
+    }
+  });
   function selectedColorId() {
     const timeline = draw.getTimeline(), index = draw.getEditorState().selectedColor, color = timeline.palette[index];
     return color ? `rgba-${color.slice(1).toLowerCase().padEnd(8, 'f')}` : null;
@@ -147,6 +188,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
       swatch.dataset.musicAssigned = String(Boolean(slotId)); swatch.title = label; swatch.setAttribute('aria-label', label);
     }
     for (const id of ['#draw-music-wav', '#draw-music-video']) settings.querySelector(id).disabled = exporting;
+    draw.refreshAudioTimbrePanel?.();
   }
   function projected() {
     const next = musicModel.getState();
@@ -193,7 +235,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   scope.listen(window, 'click', () => { if (isActive()) requestAnimationFrame(() => { if (!scope.disposed) refresh(); }); }, { capture: true });
   scope.listen(document, 'pointerdown', event => { if (!settings.contains(event.target)) settings.open = false; });
   scope.listen(settings.querySelector('#draw-music-preview'), 'click', async () => {
-    try { if (instrument.value) await player.preview({ instrument: instrument.value, pitch: 60 }); } catch { say('音を試聴できませんでした。'); }
+    try { if (instrument.value) await previewTimbre(instrument.value); } catch { say('音を試聴できませんでした。'); }
   });
   function paintPosition() {
     if (!isActive() || !player.isPlaying) return;
@@ -206,6 +248,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   }
   scope.listen(play, 'click', async () => {
     feedbackDismissed = false;
+    stopTimbrePreview();
     try {
       if (player.isPlaying || player.isStarting) { player.stop(); return; }
       state = projected(); const token = epoch;
@@ -236,16 +279,27 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
       if (!unchanged()) return;
       if (kind === 'video') say(`動画を準備しました：音楽レイヤー${includeMusic ? 'あり' : 'なし'}・音声${includeAudio ? 'あり' : 'なし'}・${loops}回再生。`);
       const staged = await sendToolOutputAfterSaving({ blob: result.blob, filename, returnUrl: () => `${location.pathname}${location.search}`, title: kind === 'wav' ? '音を確認' : '動画を確認', source: 'ドットで音楽', metadata: { durationSeconds: result.seconds, loops, ...(kind==='video'? {includeMusicLayer:includeMusic,includeAudio:result.hasAudio,visualFrameDurationsMs:timeline.frames.map(frame=>frame.durationMs)}:{}) } }, workspace, unchanged);
+      if (!staged.ok && staged.reason === 'embedded_native_save') {
+        const saved = await saveFile(result.blob, filename);
+        const label = kind === 'wav' ? 'WAV' : '動画';
+        say(saved === 'cancelled' ? `${label}の保存をキャンセルしました。`
+          : saved === 'shared' ? `${label}を共有画面に渡しました。`
+            : `${label}のダウンロードを開始しました。`);
+        return;
+      }
       if (!staged.ok && staged.reason !== 'source_changed') say(staged.error?.message || '出力画面を開けませんでした。作品は保持しています。');
     } finally { exporting = false; videoController = null; refresh(); }
   }
   for (const kind of ['wav', 'video']) scope.listen(settings.querySelector(`#draw-music-${kind}`), 'click', () => void output(kind).catch(error => { if (error.name !== 'AbortError') say(error.message); }));
-  function suspend() { epoch++; settings.open = false; videoController?.abort(); player.stop(); void player.dispose(); position.hidden = true; }
-  scope.listen(document, 'visibilitychange', () => { if (document.hidden) suspend(); });
+  function suspend() { draw.setAudioTimbreApi?.(null); epoch++; settings.open = false; videoController?.abort(); stopTimbrePreview(); player.stop(); void player.dispose(); position.hidden = true; }
+  scope.listen(document, 'visibilitychange', () => {
+    if (document.hidden) suspend();
+    else if (isActive()) { draw.setAudioTimbreApi?.(timbreApi); refresh(); }
+  });
   scope.listen(window, 'pagehide', suspend);
   scope.add(suspend);
-  return { get workspace() { return draw.workspace; }, nodes: [settings.closest('.px-tool-header-slot') || settings, play, position, feedback], suspend,
-    resume() { musicModel.selectMusicLayer(); changed(); refresh(); },
+  return { get workspace() { return draw.workspace; }, nodes: [settings.closest('.px-tool-header-slot') || settings, play, position, feedback], suspend, timbreApi,
+    resume() { draw.setAudioTimbreApi?.(timbreApi); musicModel.selectMusicLayer(); changed(); refresh(); },
     importImage(image) { draw.importImage(image); changed(); },
     getImage: () => draw.getImage()
   };

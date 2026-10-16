@@ -1,0 +1,53 @@
+.tool-shell {
+  --intro-accent: #e75445;
+  --intro-accent-dark: #b83f34;
+}
+.tool-shell .site-header .header-inner { min-height: 4rem; }
+.tool-shell .site-nav { display: flex; align-items: center; gap: 1rem; }
+.tool-shell .site-nav a { color: #4d5962; font-size: .84rem; font-weight: 700; text-underline-offset: .2em; }
+.tool-shell .tool-intro__hero { padding-block: clamp(1.15rem, 2.1vw, 1.8rem); }
+.tool-shell .tool-intro__copy h1 { margin-bottom: .4rem; font-size: clamp(1.8rem, 3.1vw, 2.65rem); }
+.tool-shell .tool-intro__lead { font-size: .96rem; }
+.tool-shell .tool-intro__hint { margin-top: .35rem; }
+.tool-shell__workspace { padding-block: 1rem; }
+.tool-shell__embed { gap: .45rem; padding: clamp(.8rem, 1.7vw, 1.25rem); }
+.tool-shell__embed.tool-embed--expanded { gap: 0; margin: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+.tool-shell__embed.tool-embed--expanded [data-embed-stage] { min-width: 0; min-height: 0; width: 100%; }
+.tool-shell__embed .tool-intro__embed-copy h2 { font-size: 1.25rem; }
+.tool-shell__embed .tool-intro__embed-copy p:last-child { margin-top: .2rem; }
+.tool-shell .tool-intro__how-to,
+.tool-shell .tool-intro__formats,
+.tool-shell .tool-intro__faq { padding-block: clamp(1.4rem, 2.6vw, 2.2rem); }
+.tool-shell .tool-intro__section-head { margin-bottom: .75rem; }
+.tool-shell .tool-intro__section-head h2 { font-size: clamp(1.25rem, 2.2vw, 1.7rem); }
+.tool-shell .tool-intro__steps { gap: .55rem; }
+.tool-shell .tool-intro__steps li { padding: .8rem; }
+.tool-shell .tool-intro__steps h3 { font-size: .88rem; }
+.tool-shell .tool-intro__steps p,
+.tool-shell .tool-intro__formats > p { font-size: .8rem; }
+.tool-shell .tool-intro__faq summary { padding-block: .7rem; font-size: .86rem; }
+.tool-shell .tool-intro__faq details p { font-size: .82rem; }
+.tool-shell--camera { --intro-accent: #315fd0; --intro-accent-dark: #2447a2; }
+.tool-shell--camera .tool-intro__hero { background: linear-gradient(115deg, #e9effa 0%, #f7f8f6 58%, #f6f0e8 100%); }
+.tool-shell--audio { --intro-accent: #7450a8; --intro-accent-dark: #53347f; }
+.tool-shell--audio .tool-intro__hero { background: linear-gradient(115deg, #f0eafa 0%, #f7f8f6 58%, #f6f0e8 100%); }
+.tool-shell .site-footer { margin-top: 0; }
+
+@media (max-width: 720px) {
+  .tool-shell .site-header .header-inner { min-height: 3.7rem; }
+  .tool-shell .site-nav { gap: .7rem; }
+  .tool-shell .site-nav a { font-size: .75rem; }
+  .tool-shell .tool-intro__hero { padding-block: 1rem 1.1rem; }
+  .tool-shell .tool-intro__copy h1 { font-size: clamp(1.65rem, 7vw, 2.25rem); }
+  .tool-shell .tool-intro__lead { font-size: .89rem; }
+  .tool-shell__workspace { padding-block: .75rem; }
+  .tool-shell__embed { padding: .75rem; border-radius: .75rem; }
+  .tool-shell .tool-intro__steps { grid-template-columns: minmax(0, 1fr); }
+  .tool-shell .tool-intro__steps li { grid-template-columns: 1.8rem minmax(0, 1fr); gap: .55rem; }
+  .tool-shell .tool-intro__steps li > span { width: 1.8rem; height: 1.8rem; }
+}
+
+@media (max-width: 380px) {
+  .tool-shell .site-nav { gap: .45rem; }
+  .tool-shell .site-nav a { font-size: .7rem; }
+}

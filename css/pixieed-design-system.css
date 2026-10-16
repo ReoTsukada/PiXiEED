@@ -1,3 +1,4 @@
+@import url('./design-tokens.css?rev=20261016-site-polish-1');
 @import url('./navigation.css?rev=20261012-nav-polish-1');
 /*
  * PiXiEED Design System
@@ -7,40 +8,8 @@
  * supplies the common app-like tone, tokens, surfaces, controls, and motion.
  */
 :root {
-  --pixieed-bg: #f7f8f6;
-  --pixieed-surface: #ffffff;
-  --pixieed-surface-muted: #eef1ef;
-  --pixieed-ink: #1b2025;
-  --pixieed-muted: #5f6871;
-  --pixieed-line: rgba(27, 32, 37, .11);
-  --pixieed-accent: #e75445;
-  --pixieed-accent-strong: #b83f34;
-  --pixieed-link: #315fd0;
-  --pixieed-dark: #17232d;
-  --pixieed-header-height: 64px;
-  --pixieed-radius-sm: 8px;
-  --pixieed-radius-md: 16px;
-  --pixieed-radius-lg: 22px;
-  --pixieed-content-max: 1200px;
-  --pixieed-ease: cubic-bezier(.2, .8, .2, 1);
-
-  --paper: var(--pixieed-bg);
-  --paper-deep: var(--pixieed-surface-muted);
-  --white: var(--pixieed-surface);
-  --ink: var(--pixieed-ink);
-  --ink-soft: var(--pixieed-muted);
-  --line: var(--pixieed-line);
-  --blue: var(--pixieed-link);
-  --blue-deep: var(--pixieed-dark);
-  --coral: var(--pixieed-accent);
-  --shadow: 0 18px 48px rgba(27, 32, 37, .08);
-  --radius-sm: var(--pixieed-radius-sm);
-  --radius-md: var(--pixieed-radius-md);
-  --radius-lg: var(--pixieed-radius-lg);
-  --max: var(--pixieed-content-max);
-  --header-h: var(--pixieed-header-height);
   color-scheme: light;
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  font-family: var(--pixieed-font-sans);
 }
 
 html {
@@ -182,7 +151,7 @@ h2 { font-size: clamp(1.9rem, 4.5vw, 3.4rem); }
   min-height: 2.75rem;
   padding: .68rem .95rem;
   border: 0;
-  border-radius: .65rem;
+  border-radius: var(--pixieed-radius-sm);
   box-shadow: none;
   transition: transform .18s var(--pixieed-ease), color .18s var(--pixieed-ease), background .18s var(--pixieed-ease);
 }
@@ -201,7 +170,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 3px solid rgba(49, 95, 208, .35);
+  outline: 3px solid var(--pixieed-focus);
   outline-offset: 3px;
 }
 
@@ -218,7 +187,7 @@ summary:focus-visible {
 
 input, select, textarea {
   border: 0 !important;
-  border-radius: .65rem !important;
+  border-radius: var(--pixieed-radius-sm) !important;
   background: var(--pixieed-surface-muted) !important;
 }
 

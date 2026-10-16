@@ -1,4 +1,4 @@
-import { initMapEvents } from './map-events.mjs?v=20261008-event-filter-1';
+import { initMapEvents } from './map-events.mjs?v=20261008-event-filter-1&rev=20261016-tool-shell-1';
 import { createEventCalendarSection } from './event-calendar-ui.mjs?rev=20261008-calendar-direct-2';
 
 // Public event fields only: artwork, accounts and project state never cross this bridge.

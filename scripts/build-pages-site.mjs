@@ -28,8 +28,8 @@ export function addSiteHeaderBenefits(html, name = '') {
   if (html.includes('/js/site-header-benefits.mjs')) return { html, added: false, skipped: false };
   const versioned = html
     .replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-header-benefits-2$2')
-    .replace(/(href="\/css\/tool-embed\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-header-benefits-2$2')
-    .replace(/(src="\/js\/tool-embed\.mjs)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-header-benefits-2$2');
+    .replace(/(href="\/css\/tool-embed\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-tool-shell-1$2')
+    .replace(/(src="\/js\/tool-embed\.mjs)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-tool-shell-1$2');
   const output = /<\/body\s*>/i.test(versioned)
     ? versioned.replace(/<\/body\s*>/i, `${HEADER_REWARD_SCRIPT}</body>`)
     : `${versioned}\n${HEADER_REWARD_SCRIPT}`;
@@ -82,7 +82,12 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     files.push(...generated.files);
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
+    for (const name of ['css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+      'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'css/tool-shell.css',
+      'js/legacy-project-entry.mjs', 'css/legacy-project-entry.css', 'css/legacy-reference.css',
+      'help/index.html', 'glossary/index.html', 'projects/pixfind/index.html', 'projects/pixiedraw/index.html',
+      'css/design-tokens.css', 'js/event-history.mjs',
+      'js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
       'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
       'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
       'js/books-catalog.mjs',

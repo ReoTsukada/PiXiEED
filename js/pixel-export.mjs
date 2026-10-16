@@ -9,7 +9,7 @@
  * On phones the file goes to the share sheet (so it can be saved to Photos); elsewhere it downloads.
  */
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { trackSiteEvent } from './site-analytics.mjs';
+import { trackSiteEvent } from './site-analytics.mjs?rev=20261016-tool-shell-1';
 import { resolveStaticImageLongEdge, STATIC_IMAGE_FREE_LONG_EDGE } from './creation/static-output-policy.mjs?rev=20261016-color-capability-1';
 export const EXPORT_LONG_EDGE = STATIC_IMAGE_FREE_LONG_EDGE;
 export const EXPORT_MAX_EDGE = 4096;

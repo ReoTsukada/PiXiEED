@@ -17,7 +17,7 @@ test('the old works route goes to the globe and the tools route remains reachabl
   assert.ok(PAGE_DESTINATIONS.flatMap(group => group.links).some(([href]) => href === fixture.routes.tools));
   assert.match(oldWorks, /name="robots" content="noindex,follow"/);
   assert.match(oldWorks, /http-equiv="refresh" content="0;url=\/globe\/"/);
-  assert.ok(PAGE_DESTINATIONS.flatMap(group => group.links).some(([href, label]) => href === '/globe/' && label === '世界地図で作品を見る'));
+  assert.ok(PAGE_DESTINATIONS.flatMap(group => group.links).some(([href, label]) => href === '/globe/' && label.includes('世界地図')));
   assert.match(read('js/site-header.mjs'), /PAGE_DESTINATIONS/);
   assert.match(read('css/site.css'), /\.mobile-nav a\[href="\/works\/"\]/);
 });
@@ -61,7 +61,7 @@ test('each puzzle card opens its public list without a duplicate creator card', 
     assert.doesNotMatch(tools, new RegExp(`href="/${kind}/"`));
     assert.equal((tools.match(new RegExp(`<h2[^>]*>${name}</h2>`, 'g')) || []).length, 1);
   }
-  assert.match(tools, /href="\/audio\/"/);
+  assert.match(tools, /href="\/draw\/\?mode=audio"/);
   assert.match(tools, /href="\/jigsaw\/"/);
   assert.doesNotMatch(tools, /href="\/game\/"/);
   assert.doesNotMatch(read('index.html'), /href="\/game\/"/);

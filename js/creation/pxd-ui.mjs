@@ -3,7 +3,7 @@ import { createPxdStore } from './pxd-store.mjs?rev=20261016-color-capability-1'
 import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { documentRgba } from './draw-core.mjs?rev=20261006-draw-startup-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-color-capability-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-tool-shell-1';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {
@@ -74,8 +74,8 @@ export function mountPxdTools(options) {
   const input = document.createElement('input'); input.type = 'file'; input.accept = '.pxd,application/octet-stream'; input.id = 'pxd-file-input'; input.hidden = true;
   const actions = document.createElement('div'); actions.className = 'pxd-actions';
   const openButton = button('バックアップを開く（PXD）', 'pxd-open', () => input.click());
-  const saveButton = button('プロジェクトを保存', 'pxd-save', () => run(async () => { say('作品を保存しています…'); await save(); say('作品をこの端末に保存しました。'); }));
-  const exportButton = button('バックアップを保存（PXD）', 'pxd-export', () => run(async () => { const project = await save(); const staged = await sendPxdBackup(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`); if (!staged) say('PXDバックアップのダウンロードを開始しました。'); }));
+  const saveButton = button('プロジェクトを保存', 'pxd-save', () => run(async () => { say('作品をこの端末に保存しています…'); await save(); say('作品をこの端末に保存しました。'); }));
+  const exportButton = button('バックアップをダウンロード（PXD）', 'pxd-export', () => run(async () => { const project = await save(); const staged = await sendPxdBackup(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`); if (!staged) say('PXDバックアップのダウンロードを開始しました。'); }));
   actions.append(openButton, saveButton, exportButton);
   const linksHeading = document.createElement('h3'); linksHeading.className = 'pxd-links-heading'; linksHeading.textContent = '同じ作品をほかのツールで使う';
   const links = document.createElement('div'); links.className = 'pxd-links'; links.setAttribute('aria-label', '同じ作品をほかのツールで使う');

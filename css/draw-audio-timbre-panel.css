@@ -1,0 +1,124 @@
+/* The integrated Draw color/audio sheet is opt-in; standalone color and Audio panels keep their own layouts. */
+.draw-audio-timbre-panel.has-audio-timbre {
+  display: grid; grid-template-rows: 44px 44px 44px minmax(0, 1fr) 52px; gap: 6px;
+  width: min(380px, calc(100vw - 16px)); height: min(560px, calc(100dvh - 139px));
+  max-height: calc(100dvh - 139px); padding: 8px; overflow: hidden; overscroll-behavior: contain;
+  border-radius: 16px 0 0 16px; background: #15202b; color: #f3f6f6;
+}
+.draw-audio-timbre-panel.has-audio-timbre[data-active-view="color"] { grid-template-rows: 44px minmax(0, 1fr) 52px; }
+.draw-audio-timbre-panel.has-audio-timbre[hidden] { display: none !important; }
+.draw-audio-timbre-panel.has-audio-timbre .dce-header {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; gap: 7px; min-height: 44px;
+}
+.draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs { grid-row: auto; }
+.draw-audio-timbre-panel.has-audio-timbre #dce-done[hidden] { display: none !important; }
+body[data-page="draw"] .draw-audio-timbre-panel.has-audio-timbre .dce-header {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto 44px; align-items: center; justify-content: initial;
+  gap: 7px; min-height: 44px; padding: 0; position: relative; z-index: auto;
+}
+.draw-audio-timbre-panel.has-audio-timbre .dce-header h2 { overflow: hidden; margin: 0; font-size: 13px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+.draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs { display: flex; align-items: center; gap: 3px; }
+.draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs button {
+  min-width: 44px; min-height: 44px; padding: 0 9px; border: 1px solid #ffffff24; border-radius: 10px;
+  background: transparent; color: #c1cbd0; font: 750 12px/1 system-ui, sans-serif; cursor: pointer;
+}
+.draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs button[aria-pressed="true"] { border-color: #d6d8d0; background: #e3e5df; color: #26343c; }
+.draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs button[hidden] { display: none !important; }
+.draw-audio-timbre-panel.has-audio-timbre .dce-close,
+.draw-audio-timbre-panel.has-audio-timbre .datp-icon-button {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid #ffffff24;
+  border-radius: 10px; background: #202e39; color: #e7ebec; cursor: pointer;
+}
+.draw-audio-timbre-panel.has-audio-timbre .dce-close { font: 300 24px/1 system-ui, sans-serif; }
+.draw-audio-timbre-panel .datp-target-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px 44px; align-items: center; gap: 6px; min-width: 0; }
+.draw-audio-timbre-panel .datp-target-chip { width: 44px; height: 44px; border: 1px solid #ffffff65; border-radius: 10px; background: var(--datp-target); box-shadow: inset 0 0 0 3px #15202b; }
+.draw-audio-timbre-panel .datp-assignment { display: flex; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; padding-left: 2px; }
+.draw-audio-timbre-panel .datp-micro-label { color: #aab8bf; font-size: 9px; font-weight: 750; letter-spacing: .03em; }
+.draw-audio-timbre-panel .datp-current-instrument { display: flex; align-items: center; gap: 6px; min-width: 0; color: #f4f5f2; font-size: 11px; font-weight: 730; }
+.draw-audio-timbre-panel .datp-current-instrument > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.draw-audio-timbre-panel .datp-no-voice { color: #a9b6bb; font-style: italic; }
+.draw-audio-timbre-panel .datp-voice-icon { width: 22px; height: 22px; flex: none; object-fit: contain; filter: brightness(0) invert(.9); }
+.draw-audio-timbre-panel .datp-target-row .datp-icon-button { font: 400 25px/1 system-ui, sans-serif; }
+.draw-audio-timbre-panel .datp-category-row { position: relative; min-width: 0; height: 44px; }
+.draw-audio-timbre-panel .datp-category-trigger { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr auto 18px; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 0 11px; border: 1px solid #ffffff27; border-radius: 10px; background: #202e39; color: #edf0ef; text-align: left; cursor: pointer; }
+.draw-audio-timbre-panel .datp-category-trigger > span:first-child { color: #aebbc0; font-size: 10px; font-weight: 650; }
+.draw-audio-timbre-panel .datp-category-trigger strong { font-size: 11px; font-weight: 760; }
+.draw-audio-timbre-panel .datp-category-trigger[aria-expanded="true"] { border-color: #bfa66f; }
+.draw-audio-timbre-panel .datp-category-back-row { position: absolute; inset: 0; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; height: 44px; }
+.draw-audio-timbre-panel .datp-category-back-row[hidden] { display: none !important; }
+.draw-audio-timbre-panel .datp-category-back-row > strong { color: #dfe4e5; font-size: 12px; }
+.draw-audio-timbre-panel .datp-back { display: flex; align-items: center; gap: 5px; min-width: 96px; min-height: 44px; padding: 0 9px; border: 1px solid #ffffff1e; border-radius: 8px; background: #202e38; color: #d7dfdf; font-size: 11px; font-weight: 700; cursor: pointer; }
+.draw-audio-timbre-panel .datp-back span { font-size: 19px; line-height: 1; }
+.draw-audio-timbre-panel .datp-scroll { position: relative; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #73838b transparent; scroll-padding: 8px 0 14px; border-radius: 9px; background: #111a22; box-shadow: inset 0 1px 0 #ffffff0c; }
+.draw-audio-timbre-panel .datp-scroll.has-overflow { box-shadow: inset 0 -12px 13px -14px #05090d, inset 0 1px 0 #ffffff0c; }
+.draw-audio-timbre-panel .datp-scroll.at-bottom { box-shadow: inset 0 1px 0 #ffffff0c; }
+.draw-audio-timbre-panel .datp-scroll.has-overflow .datp-color-view,
+.draw-audio-timbre-panel .datp-scroll.has-overflow .datp-sound-view { padding-bottom: 34px; }
+.draw-audio-timbre-panel .datp-scroll-cue { position: absolute; z-index: 1; left: 50%; bottom: 73px; transform: translateX(-50%); padding: 4px 9px; border: 1px solid #ffffff24; border-radius: 999px; background: #263640ed; color: #e3e9e8; font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px #0005; }
+.draw-audio-timbre-panel .datp-scroll-cue[hidden] { display: none !important; }
+.draw-audio-timbre-panel .datp-color-view, .draw-audio-timbre-panel .datp-sound-view { min-height: 100%; padding: 8px; overflow: visible; }
+.draw-audio-timbre-panel .datp-color-view[hidden], .draw-audio-timbre-panel .datp-sound-view[hidden], .draw-audio-timbre-panel .datp-candidate-list[hidden], .draw-audio-timbre-panel .datp-category-list[hidden] { display: none !important; }
+.draw-audio-timbre-panel .datp-color-view .dce-content { display: grid; align-content: start; gap: 12px; min-height: 100%; padding: 0; overflow: visible; }
+.draw-audio-timbre-panel .datp-color-view .dce-preview { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.draw-audio-timbre-panel .datp-color-view .dce-preview-swatch { width: 76px; height: 42px; }
+.draw-audio-timbre-panel .datp-color-view .dce-quick { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.draw-audio-timbre-panel .datp-color-view .dce-quick-color { min-width: 0; min-height: 44px; padding: 4px; }
+.draw-audio-timbre-panel .datp-color-view .dce-sliders { gap: 5px; }
+.draw-audio-timbre-panel .datp-color-view .dce-slider { grid-template-columns: minmax(84px, 1fr) minmax(90px, 1.5fr); gap: 6px; font-size: 11px; }
+.draw-audio-timbre-panel .datp-color-view .dce-slider input { min-height: 44px; }
+.draw-audio-timbre-panel .datp-candidate-list { display: block; }
+.draw-audio-timbre-panel .datp-voice-grid, .draw-audio-timbre-panel .datp-category-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.draw-audio-timbre-panel .datp-voice { display: grid; grid-template-columns: 25px minmax(0, 1fr); align-content: center; align-items: center; column-gap: 7px; min-width: 0; min-height: 56px; padding: 6px 7px; border: 1px solid #ffffff1b; border-radius: 10px; background: #1c2a34; color: #edf1f1; text-align: left; cursor: pointer; }
+.draw-audio-timbre-panel .datp-voice.is-candidate { border-color: #c3a568; background: #26323a; box-shadow: inset 0 0 0 1px #c3a56842; }
+.draw-audio-timbre-panel .datp-voice-name { min-width: 0; font-size: 13px; font-weight: 680; line-height: 1.2; overflow-wrap: anywhere; }
+.draw-audio-timbre-panel .datp-name-chunk { display: inline-block; white-space: nowrap; }
+.draw-audio-timbre-panel .datp-badge { grid-column: 2; justify-self: start; margin-top: 2px; color: #c8b27d; font-size: 9px; font-weight: 750; line-height: 1.15; }
+.draw-audio-timbre-panel .datp-badge[hidden] { display: none !important; }
+.draw-audio-timbre-panel .datp-voice.is-applied .datp-badge { color: #b5c2c6; }
+.draw-audio-timbre-panel .datp-voice.is-candidate.is-applied .datp-badge { color: #d4c08f; }
+.draw-audio-timbre-panel .datp-category-list { gap: 7px; }
+.draw-audio-timbre-panel .datp-category { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; min-height: 46px; padding: 6px 9px; border: 1px solid #ffffff20; border-radius: 9px; background: #1c2a34; color: #e7ebeb; text-align: left; cursor: pointer; }
+.draw-audio-timbre-panel .datp-category[aria-selected="true"] { border-color: #bca56e; background: #28333a; }
+.draw-audio-timbre-panel .datp-category > span { font-size: 12px; font-weight: 710; line-height: 1.2; }
+.draw-audio-timbre-panel .datp-category small { flex: none; color: #98a7ad; font-size: 9px; font-variant-numeric: tabular-nums; }
+.draw-audio-timbre-panel .datp-footer { min-width: 0; min-height: 44px; }
+.draw-audio-timbre-panel .datp-footer .dce-actions { display: flex; justify-content: flex-start; align-items: center; min-height: 44px; padding: 0; background: transparent; }
+.draw-audio-timbre-panel .datp-footer .dce-actions #dce-reset { min-width: 88px; min-height: 44px; padding: 6px 12px; font-size: 12px; }
+.draw-audio-timbre-panel .datp-sound-actions { display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1.06fr); align-items: center; gap: 5px; min-height: 44px; }
+.draw-audio-timbre-panel .datp-sound-actions button { min-width: 0; min-height: 44px; border: 1px solid #ffffff28; border-radius: 10px; color: #edf0ee; font: 700 11px/1.18 system-ui, sans-serif; cursor: pointer; }
+.draw-audio-timbre-panel .datp-sound-actions button:disabled { opacity: .46; cursor: not-allowed; }
+.draw-audio-timbre-panel .datp-audition { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 2px; background: #26343e; font-size: 13px !important; line-height: 1 !important; }
+.draw-audio-timbre-panel .datp-audition span { font-size: 9px; }
+.draw-audio-timbre-panel .datp-mute { padding: 3px 5px; background: #202d36; }
+.draw-audio-timbre-panel .datp-apply { padding: 3px 6px; border-color: #b9a36d !important; background: #454333; color: #f4f0e5 !important; }
+.draw-audio-timbre-panel .datp-status { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.draw-audio-timbre-panel :is(button, input):focus-visible { outline: 3px solid #81b6d2; outline-offset: 2px; }
+@media (max-width: 380px) {
+  .draw-audio-timbre-panel.has-audio-timbre { right: 8px; width: calc(100vw - 16px); border-right: 1px solid #ffffff22; border-radius: 16px; padding: 7px; gap: 5px; }
+  .draw-audio-timbre-panel.has-audio-timbre .dce-header { gap: 5px; }
+  .draw-audio-timbre-panel.has-audio-timbre .dce-header h2 { font-size: 12px; }
+  .draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs { gap: 2px; }
+  .draw-audio-timbre-panel.has-audio-timbre .dce-view-tabs button { padding: 0 7px; font-size: 11px; }
+.draw-audio-timbre-panel .datp-target-row { grid-template-columns: 44px minmax(0, 1fr) 44px 44px; gap: 4px; }
+.draw-audio-timbre-panel .datp-current-instrument { font-size: 10px; }
+.draw-audio-timbre-panel .datp-color-view .dce-quick { grid-template-columns: repeat(4, minmax(44px, 1fr)); }
+.draw-audio-timbre-panel .datp-color-view .dce-quick-color { min-width: 44px; }
+.draw-audio-timbre-panel .datp-voice { column-gap: 5px; padding: 5px; }
+.draw-audio-timbre-panel .datp-voice-name { font-size: 12px; }
+.draw-audio-timbre-panel .datp-footer .dce-actions #dce-reset { font-size: 11px; }
+.draw-audio-timbre-panel .datp-sound-actions button { font-size: 11px; }
+.draw-audio-timbre-panel .datp-mute, .draw-audio-timbre-panel .datp-apply { padding: 2px 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .draw-audio-timbre-panel { transition: none; } }
+/* When no music-mode controller is attached, retain the original standalone color-editor layout. */
+.draw-audio-timbre-panel:not(.has-audio-timbre) { grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; }
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-target-row[hidden],
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-category-row[hidden],
+.draw-audio-timbre-panel:not(.has-audio-timbre) .dce-view-tabs[hidden],
+.draw-audio-timbre-panel:not(.has-audio-timbre) .dce-close[hidden] { display: none !important; }
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-scroll { position: relative; min-height: 0; overflow-x: hidden; overflow-y: auto; border-radius: 0; background: transparent; box-shadow: none; }
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-color-view { min-height: 0; padding: 0; }
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-sound-view { display: none !important; }
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-footer .dce-actions { grid-row: auto; }
+.draw-audio-timbre-panel:not(.has-audio-timbre) .datp-footer .dce-actions #dce-done[hidden] { display: none !important; }
+.draw-audio-timbre-panel [hidden] { display: none !important; }

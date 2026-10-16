@@ -35,6 +35,9 @@
 .tool-embed--expanded .tool-embed__controls{gap:clamp(4px,2vw,10px);min-width:0}
 .tool-embed--expanded .tool-embed__title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tool-embed--expanded .tool-embed__controls button{flex:0 0 auto;white-space:nowrap}
+.tool-embed--expanded .tool-embed__controls button{min-height:44px}
+.tool-embed--expanded [data-embed-close],.tool-embed--expanded .tool-embed__help{display:none!important}
+[data-tool-shell] .tool-embed__controls [data-embed-close]{display:none!important}
 @media(max-width:360px){.tool-embed--expanded .tool-embed__controls button{padding-inline:8px;font-size:.82rem}}
 .tool-embed__controls [data-embed-expand] { color: white; border-color: var(--intro-accent-dark, #b83f34); background: var(--intro-accent-dark, #b83f34); }
 .tool-embed__controls [data-embed-expand]:hover { background: var(--intro-accent, #e75445); }
@@ -125,3 +128,7 @@
   .tool-embed--active .tool-embed__frame { height: min(80dvh, calc(100dvh - 12rem)); min-height: min(400px, 55dvh); }
   .tool-embed--expanded .tool-embed__frame { height: 100%; min-height: 0; }
 }
+
+/* Failed startup keeps its recovery action and explanation reachable. */
+.tool-embed--failed .tool-embed__frame { display: none; }
+.tool-embed--failed .tool-intro__embed-status { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; padding: .75rem; }

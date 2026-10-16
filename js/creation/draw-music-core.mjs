@@ -124,6 +124,19 @@ function syncMusicCanvas(state, art) {
   const paletteChanged = source.palette.length !== art.palette.length
     || source.palette.some((color, index) => color.toLowerCase() !== art.palette[index]?.toLowerCase());
   const sourceToTarget = source.palette.map(color => nearestPaletteIndex(color, art.palette));
+  // Color sliders edit a palette entry in place. Keep that entry on inactive
+  // music pages too, rather than snapping their pixels to a nearby other color.
+  // Reorders, additions, removals and ambiguous duplicates retain exact/nearest
+  // matching, as in the shared canvas settings.
+  if (source.palette.length === art.palette.length) {
+    const oldIds = source.palette.map(colorId), nextIds = art.palette.map(colorId);
+    for (let index = 0; index < oldIds.length; index += 1) {
+      if (oldIds[index] === nextIds[index] || nextIds.includes(oldIds[index])
+          || oldIds.filter(id => id === oldIds[index]).length !== 1
+          || nextIds.filter(id => id === nextIds[index]).length !== 1) continue;
+      sourceToTarget[index] = index;
+    }
+  }
   const changedColors = source.palette.some((color, index) => color.toLowerCase() !== art.palette[sourceToTarget[index]]?.toLowerCase());
   if (!resized && !paletteChanged) return { animation: source, resized: false, paletteChanged: false, changedColors: false };
 
@@ -251,10 +264,11 @@ function inheritEditedPalette(state, animation, mapping, song) {
   const transferred = {};
   for (let index = 0; index < Math.min(oldIds.length, newIds.length); index += 1) {
     const oldId = oldIds[index]; const nextId = newIds[index];
-    if (oldId === nextId || oldCounts.get(oldId) !== 1 || newCounts.get(nextId) !== 1
-        || newIds.includes(oldId) || Object.hasOwn(mapping, nextId) || claimed.has(nextId)
+    if (oldId === nextId || oldId.endsWith('00') || nextId.endsWith('00') || oldCounts.get(oldId) !== 1 || newCounts.get(nextId) !== 1
+        || newIds.includes(oldId) || claimed.has(nextId)
         || !Object.hasOwn(state.link?.colorToSlot || {}, oldId)) continue;
-    mapping[nextId] = state.link.colorToSlot[oldId]; claimed.add(nextId);
+    if (!Object.hasOwn(mapping, nextId)) mapping[nextId] = state.link.colorToSlot[oldId];
+    claimed.add(nextId);
     if (Object.hasOwn(song.colorInstruments || {}, oldId) && !Object.hasOwn(song.colorInstruments || {}, nextId)) {
       transferred[nextId] = song.colorInstruments[oldId];
     }
@@ -496,13 +510,15 @@ export function projectDrawMusic(state, animation) {
       state = { ...state, musicLayerId: roleLayer.id,
         link: bindMusicTrack(state.link, roleLayer.id, state.musicPageId) };
     }
+    const inherited = inheritEditedPalette(state, animation, { ...(state.link?.colorToSlot || {}) }, state.song);
     const synchronized = syncMusicCanvas(state, animation);
     let musicAnimation = synchronized.animation;
-    const colorToSlot = { ...(state.link?.colorToSlot || {}) };
+    const colorToSlot = { ...inherited.mapping };
     // A newly introduced shared color is intentionally silent until the user
     // assigns it to a voice in music settings.
     for (const color of animation.palette) if (!Object.hasOwn(colorToSlot, colorId(color))) colorToSlot[colorId(color)] = null;
-    let nextState = { ...state, musicAnimation,
+    const song = retainActiveColorOverrides(inherited.song, musicAnimation, inherited.transferred);
+    const nextState = { ...state, song, musicAnimation,
       link: bindMusicTrack({ ...state.link, colorToSlot }, state.musicLayerId, state.musicPageId) };
     const mirrored = remapMusicDocumentPalette(getAnimationCelDocument(animation, animation.frames[0].id, roleLayer.id),
       animation.palette, musicAnimation.palette);

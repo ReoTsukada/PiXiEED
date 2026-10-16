@@ -1,11 +1,11 @@
-import { createPxdProject, decodePxd } from './pxd-codec.mjs';
+import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261016-color-capability-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261016-tool-shell-1';
 import { createProjectSession } from './project-session.mjs?rev=20261016-color-capability-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261016-color-capability-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
-import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261016-color-capability-1';
+import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261016-tool-shell-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
@@ -81,7 +81,18 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     // Apply validates the editable components before this copy becomes active.
     await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別の作品として複製しました。');
   }));
-  const saveButton = button('保存し直す', 'pxd-save', () => void transact(async () => { await save(); say('この作品を保存し直しました。'); await refreshList(); }, { close: false }));
+  const saveButton = button('保存し直す', 'pxd-save', () => void transact(async () => {
+    await save();
+    say(session.dirty
+      ? '保存した版をこの端末に保存しました。保存中に加えた編集はまだ保存されていません。'
+      : 'この作品をこの端末に保存しました。');
+    await refreshList();
+  }, { close: false }));
+  const exportButton = button('作品全体をダウンロード（PXD）', 'pxd-export', () => void transact(async () => {
+    const project = await save();
+    const staged = await sendPxdBackup(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`);
+    if (!staged) say('保存した作品全体のPXDバックアップのダウンロードを開始しました。');
+  }, { close: false }));
   const original = button('読み込んだファイルを保存', 'pxd-export-original', () => void transact(async () => {
     const backup = findPxdOriginalBackup(session.currentProject, { copyBytes: true });
     if (!backup) throw new Error('保存できるPXD原本が見つかりません。現在の作品は保持しています。');
@@ -89,7 +100,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const staged = await sendPxdBackup(backup.bytes, backup.filename);
     if (!staged) say(`${backup.label}：ダウンロードを開始しました。現在の作品は変更していません。`);
   }, { close: false }));
-  actions.append(duplicate, saveButton, original);
+  actions.append(duplicate, saveButton, exportButton, original);
   const moreActions = node('details', 'project-files project-more');
   moreActions.append(node('summary', '', 'その他')); moreActions.append(actions);
   const transferSection = node('section', 'project-transfer');
@@ -247,14 +258,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (initialPointer) {
         const params = new URLSearchParams(location.search);
         params.set('modeProjectTool', tool); params.set('modePxd', project.projectId); params.set('modePxdRevision', project.revisionId);
-        history.replaceState(history.state, '', `${location.pathname}?${params}`);
+        history.replaceState(history.state, '', `${location.pathname}?${params}${location.hash}`);
       }
       return;
     }
     const params = new URLSearchParams(location.search); params.set('pxd', project.projectId); params.set('pxdRevision', project.revisionId);
-    history.replaceState({ ...history.state, projectWorkspaceSelection: true }, '', `${location.pathname}?${params}`);
+    history.replaceState({ ...history.state, projectWorkspaceSelection: true }, '', `${location.pathname}?${params}${location.hash}`);
   }
-  function resetPointer() { if (!routePointer) return; const params = new URLSearchParams(location.search); for (const key of ['pxd', 'pxdRevision', 'pxdImage']) params.delete(key); const state = { ...history.state }; delete state.projectWorkspaceSelection; history.replaceState(state, '', `${location.pathname}${params.size ? `?${params}` : ''}`); }
+  function resetPointer() { if (!routePointer) return; const params = new URLSearchParams(location.search); for (const key of ['pxd', 'pxdRevision', 'pxdImage']) params.delete(key); const state = { ...history.state }; delete state.projectWorkspaceSelection; history.replaceState(state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`); }
   async function transact(work, { close: closeSheet = true } = {}) {
     if (locked) return;
     locked = true; clearTimeout(timer); main.inert = true; main.setAttribute('aria-busy', 'true'); update();

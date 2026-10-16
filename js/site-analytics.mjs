@@ -3,7 +3,9 @@ import { analyticsConfig } from '../data/site-config.js?rev=20261007-safe-analyt
 
 const CONSENT_KEY = 'PiXiEED:analytics-consent:v1';
 const DEBUG_KEY = 'pixieed:ga-debug';
+export const EMBED_TOOL_START_EVENT = 'pixieed:embed-tool-start';
 const ALLOWED_HOSTS = new Set(['pixieed.jp', 'www.pixieed.jp']);
+const EMBED_TOOL_STARTS = new Set(['draw', 'audio', 'pixel-camera']);
 const TOOLS = new Set([
   'home', 'about', 'guide', 'privacy', 'globe', 'shops', 'stores', 'works', 'collection',
   'profile', 'pass', 'tools', 'draw', 'animation', 'audio', 'game', 'jigsaw', 'hidden-object',
@@ -247,6 +249,13 @@ export function createToolStartTracker(tool) {
   return () => {
     if (sent) return false;
     sent = true;
+    if (inBrowser() && window.top !== window.self) {
+      const boot = window.__PIXIEED_TOOL_EMBED__;
+      if (!boot || typeof boot.channel !== 'string' || !boot.channel
+          || !['draw', 'camera', 'audio'].includes(boot.role) || !EMBED_TOOL_STARTS.has(tool)) return false;
+      document.dispatchEvent(new CustomEvent(EMBED_TOOL_START_EVENT, { detail: { tool } }));
+      return false;
+    }
     return emit('tool_start', { tool });
   };
 }

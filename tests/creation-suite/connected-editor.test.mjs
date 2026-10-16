@@ -40,7 +40,12 @@ test('drawing and music strokes visit identical connected cells in every directi
 
 test('entrances share the Draw shell and retain a lazy standalone Audio implementation', () => {
   for (const mode of ['draw', 'audio']) {
-    const html = readFileSync(new URL(`../../${mode}/index.html`, import.meta.url), 'utf8');
+    const shell = readFileSync(new URL(`../../${mode}/index.html`, import.meta.url), 'utf8');
+    const runtime = readFileSync(new URL(`../../${mode === 'draw' ? 'draw/editor.html' : 'audio/editor.html'}`, import.meta.url), 'utf8');
+    assert.match(shell, /tool-shell\.mjs/);
+    if (mode === 'draw') assert.match(shell, /data-tool-mode="draw"/);
+    else assert.match(shell, /data-tool-mode="audio"/);
+    const html = runtime;
     assert.match(html, new RegExp(`src="/js/creation/${mode}-entry\\.mjs\\?rev=`));
     assert.doesNotMatch(html, /src="\/js\/creation\/creation-app\.mjs/);
     const source = readFileSync(new URL(`../../js/creation/${mode}-page.mjs`, import.meta.url), 'utf8');

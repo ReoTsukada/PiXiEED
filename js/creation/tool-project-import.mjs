@@ -1,13 +1,13 @@
 import { encodePxd, setPxdBytes } from './pxd-codec.mjs';
 import { cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
-import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261016-color-capability-1';
+import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261016-tool-shell-1';
 import { putPxdSharedImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 
 /** Copy into a fresh tool-owned project; never save or mutate the source. */
 export async function importToolProject(source, tool) {
   const original = source;
-  if (tool === 'draw' && source.entries.some(entry => entry.path === 'audio/state.json')) { const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261016-color-capability-1'); source = await prepareSharedMusicProject(source); }
+  if (tool === 'draw' && source.entries.some(entry => entry.path === 'audio/state.json')) { const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261016-tool-shell-1'); source = await prepareSharedMusicProject(source); }
   let project = cloneAsToolProject(source, tool);
   if (tool === 'draw') project = setPxdBytes(project, 'legacy/import-source.pxd', await encodePxd(original), 'application/octet-stream');
   const sourceTool = source.manifest?.toolProject?.tool || source.manifest?.lastMode;

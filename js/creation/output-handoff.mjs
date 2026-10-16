@@ -23,7 +23,7 @@ const inFlightHandoffs = new WeakMap();
 function isValidatedToolEmbed(windowRef, locationRef) {
   if (!windowRef || windowRef.parent === windowRef) return false;
   const boot = windowRef.__PIXIEED_TOOL_EMBED__;
-  if (!boot || !['draw', 'camera'].includes(boot.role) || !ID_PATTERN.test(String(boot.channel || ''))) return false;
+  if (!boot || !['draw', 'camera', 'audio'].includes(boot.role) || !ID_PATTERN.test(String(boot.channel || ''))) return false;
   try {
     return windowRef.location?.origin === locationRef?.origin
       && windowRef.parent.location?.origin === locationRef?.origin;
@@ -55,7 +55,13 @@ function assertBlobAndName(blob, filename) {
 function safeReturnUrl(value, origin = globalThis.location?.origin) {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || !origin) throw new TypeError('編集画面への戻り先を確認できません。');
   const url = new URL(value, origin);
-  if (url.origin !== origin || !RETURN_PATHS.has(url.pathname)) throw new TypeError('編集画面への戻り先を確認できません。');
+  if (url.origin !== origin) throw new TypeError('編集画面への戻り先を確認できません。');
+  const runtimeRoutes = { '/draw/editor.html': '/draw/', '/audio/editor.html': '/audio/' };
+  if (runtimeRoutes[url.pathname]) {
+    url.pathname = runtimeRoutes[url.pathname];
+    for (const key of ['embed', 'embedRole', 'channel']) url.searchParams.delete(key);
+  }
+  if (!RETURN_PATHS.has(url.pathname)) throw new TypeError('編集画面への戻り先を確認できません。');
   return `${url.pathname}${url.search}${url.hash}`;
 }
 

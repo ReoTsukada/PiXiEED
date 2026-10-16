@@ -8,13 +8,14 @@ export const MANUAL_PAGES = [
   'stores/index.html', 'stores/ecowashcafe-nakanoshima.html'
 ];
 export const RESULT_PAGES = [
-  'pixel-camera.html', 'draw/index.html', 'audio/index.html', 'jigsaw/index.html',
+  'pixel-camera.html', 'draw/index.html', 'audio/index.html', 'draw/editor.html', 'audio/editor.html', 'jigsaw/index.html',
   'play/spot-difference/index.html', 'play/hidden-object/index.html'
 ];
 export const WORKSPACE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pixiee-lens/index.html', 'globe/index.html'];
 const OFFERWALL_PAGE = 'output/work/index.html';
 const COMPATIBILITY_PAGES = ['PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html'];
 // This isolated mock page never participates in the site's AdSense loading.
+const REFERENCE_NO_AD_PAGES = ['help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html'];
 const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 const eventCatalog = JSON.parse(await readFile(new URL('events/catalog.json', root), 'utf8'));
 const EVENT_NO_AD_PAGES = ['events/index.html', ...eventCatalog.ids.map(id => `events/${id}/index.html`)];
@@ -65,11 +66,11 @@ test('every non-fixture HTML entry has an explicit ad-loading decision', async (
     return found;
   }
   const established = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES, OFFERWALL_PAGE])];
-  const expected = [...new Set([...established, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
+  const expected = [...new Set([...established, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 41);
-  assert.equal(expected.length, 41 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
-  for (const path of [...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...ISOLATED_TEST_PAGES]) {
+  assert.equal(established.length, 43);
+  assert.equal(expected.length, 43 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  for (const path of [...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES]) {
     assert.doesNotMatch(await html(path), /adsbygoogle|adsense-auto|display-ads|data-display-ad|adsense-offerwall/, `${path}: compatibility and factual event pages have no ad loader`);
   }
   for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);

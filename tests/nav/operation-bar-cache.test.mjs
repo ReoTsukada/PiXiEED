@@ -19,8 +19,9 @@ const currentRgbaTargets = new Set([
  'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs',
  'js/creation/creation-camera.mjs', 'js/creation/camera-placement-preview.mjs', 'js/creation/pixfind-play.mjs'
 ]);
-const expectedRevision = target => currentRgbaTargets.has(target) ? '20261016-color-capability-1'
- : cameraPlacementTargets.has(target) ? cameraPlacementRevision : operationBarRevision;
+const cacheRevisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
+const expectedRevision = target => cacheRevisions[target] || (currentRgbaTargets.has(target) ? '20261016-color-capability-1'
+ : cameraPlacementTargets.has(target) ? cameraPlacementRevision : operationBarRevision);
 const leaves = [
  'js/creation/creation-modes.mjs','css/creation-modes.css','js/tool-result-view.mjs',
  'js/creation/draw-selection-panel.mjs','css/draw-selection-features.css','css/draw-compact-controls.css',

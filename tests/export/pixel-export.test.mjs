@@ -37,10 +37,10 @@ test('normal exports and creative tools stay available without perk gates', asyn
   assert.doesNotMatch(camera, /fetch\(snapshot\.url\)/, 'the camera shares its prepared file without an asynchronous refetch');
   assert.match(pixfind, /createPuzzleHintController\(\{[^}]*\bonState:/);
   assert.doesNotMatch(pixfind, /requestPass|px-perk/);
-  assert.match(await read('draw/index.html'), /id="draw-export"/);
-  assert.doesNotMatch(await read('draw/index.html'), /id="draw-timelapse-detail"/);
-  assert.match(await read('audio/index.html'), /id="audio-export-image"/);
-  assert.doesNotMatch(await read('audio/index.html'), /id="audio-export-sound"/);
+  assert.match(await read('draw/editor.html'), /id="draw-export"/);
+  assert.doesNotMatch(await read('draw/editor.html'), /id="draw-timelapse-detail"/);
+  assert.match(await read('audio/editor.html'), /id="audio-export-image"/);
+  assert.doesNotMatch(await read('audio/editor.html'), /id="audio-export-sound"/);
   for (const game of ['spot-difference', 'hidden-object']) {
     const html = await read(`play/${game}/index.html`);
     assert.match(html, /id="pixfind-hint"/);

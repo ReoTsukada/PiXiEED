@@ -15,7 +15,7 @@ async function snapshot(page, id) {
   return page.evaluate(async id => {
     const { createPxdStore } = await import('/js/creation/pxd-store.mjs');
     const { readPxdImage } = await import('/js/creation/pxd-project.mjs');
-    const { componentImageRole } = await import('/js/creation/project-components.mjs');
+    const { componentImageRole } = await import('/js/creation/project-components.mjs?rev=20261016-tool-shell-1');
     const { readPxdAudioState } = await import('/js/creation/pxd-draw-audio.mjs');
     const project = await createPxdStore().load(id || new URLSearchParams(location.search).get('pxd'));
     const image = await readPxdImage(project, componentImageRole(project, project.manifest.toolProject.tool));

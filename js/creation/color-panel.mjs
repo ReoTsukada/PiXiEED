@@ -57,17 +57,27 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
   const viewTabsHost = viewTabs?.items?.length ? document.createElement('div') : null;
   if (viewTabsHost) {
     viewTabsHost.className = 'dce-view-tabs';
-    viewTabsHost.setAttribute('role', 'group');
+    viewTabsHost.setAttribute('role', viewTabs.compactHeader ? 'tablist' : 'group');
     viewTabsHost.setAttribute('aria-label', viewTabs.label || '色と音色の切り替え');
     for (const item of viewTabs.items) {
       if (!item || typeof item.id !== 'string' || typeof item.label !== 'string') continue;
       const button = document.createElement('button'); button.type = 'button';
       button.dataset.dceView = item.id; button.textContent = item.label;
+      if (viewTabs.compactHeader) button.setAttribute('role', 'tab');
       button.setAttribute('aria-pressed', String(item.id === activeView));
+      if (viewTabs.compactHeader) button.setAttribute('aria-selected', String(item.id === activeView));
       button.setAttribute('aria-label', `${item.label}を表示`);
       viewTabsHost.append(button);
     }
-    element.querySelector('.dce-header')?.after(viewTabsHost);
+    if (viewTabs.compactHeader) {
+      const header = element.querySelector('.dce-header');
+      header?.classList.add('dce-header--views');
+      header?.append(viewTabsHost);
+      const closeButton = document.createElement('button'); closeButton.type = 'button'; closeButton.id = 'dce-close';
+      closeButton.className = 'dce-close'; closeButton.setAttribute('aria-label', '色と音色のパネルを閉じる'); closeButton.textContent = '×';
+      header?.append(closeButton);
+      listen(closeButton, 'click', closeAndNotify);
+    } else element.querySelector('.dce-header')?.after(viewTabsHost);
   }
   const contentHost = document.createElement('div'); contentHost.className = 'dce-content';
   for (const selector of ['.dce-preview', '.dce-quick', '.dce-sliders']) {
@@ -155,6 +165,18 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     try { onClose?.(); } catch { /* Keep close state even when the owner callback fails. */ }
   }
 
+  function setView(nextView, { notify = true } = {}) {
+    if (!viewTabsHost || !viewTabs.items?.some(item => item.id === nextView) || nextView === activeView) return false;
+    activeView = nextView;
+    for (const tab of viewTabsHost.querySelectorAll('button[data-dce-view]')) {
+      const selected = String(tab.dataset.dceView === activeView);
+      tab.setAttribute('aria-pressed', selected);
+      if (viewTabs.compactHeader) tab.setAttribute('aria-selected', selected);
+    }
+    if (notify) try { viewTabs.onSelect?.(nextView); } catch { /* Keep tab state even when its owner callback fails. */ }
+    return true;
+  }
+
   function openPanel({ color: initialColor, resetColor: initialResetColor = null } = {}) {
     if (disposed) return;
     const normalized = validColor(initialColor, allowAlpha); if (!normalized) throw new TypeError(`Color panel needs a ${allowAlpha ? '#RRGGBB or #RRGGBBAA' : '#RRGGBB'} color`);
@@ -167,18 +189,24 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     resetButton.hidden = !resetColor; sync();
     open = true; element.hidden = false; element.classList.add('is-open');
     position(); requestAnimationFrame(position);
+    try { viewTabs?.onShow?.(activeView); } catch { /* Opening remains successful if an external view hook fails. */ }
   }
 
-  function setColor(hex) {
+  function setColor(hex, options = {}) {
     if (allowAlpha && COLOR_RGB.test(String(hex ?? '').trim())) hex = `${String(hex).trim().toLowerCase()}${alphaOf(color).toString(16).padStart(2, '0')}`;
     const normalized = validColor(hex, allowAlpha); if (!normalized) return false;
-    color = normalized; hsl = hexToHsl(rgbOf(color), hsl.h); sync(); position();
+    color = normalized;
+    if (Object.hasOwn(options, 'resetColor')) resetColor = validColor(options.resetColor, allowAlpha);
+    if (Object.hasOwn(options, 'beforeColor')) element.dataset.beforeColor = validColor(options.beforeColor, allowAlpha) || color;
+    resetButton.hidden = !resetColor; hsl = hexToHsl(rgbOf(color), hsl.h); sync(); position();
     return color;
   }
 
   function close() {
     if (!open) return;
-    open = false; element.classList.remove('is-open'); element.hidden = true; delete element.dataset.anchorId;
+    open = false;
+    try { viewTabs?.onHide?.(); } catch { /* Keep close state even when a view owner fails. */ }
+    element.classList.remove('is-open'); element.hidden = true; delete element.dataset.anchorId;
   }
 
   for (const axis of ['h', 's', 'l']) {
@@ -196,12 +224,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
   listen(doneButton, 'click', closeAndNotify);
   listen(viewTabsHost, 'click', (event) => {
     const button = event.target.closest('button[data-dce-view]');
-    if (!button || !viewTabsHost.contains(button)) return;
-    const nextView = button.dataset.dceView;
-    if (nextView === activeView) return;
-    activeView = nextView;
-    for (const tab of viewTabsHost.querySelectorAll('button[data-dce-view]')) tab.setAttribute('aria-pressed', String(tab.dataset.dceView === activeView));
-    try { viewTabs.onSelect?.(nextView); } catch { /* Keep the selected view button state if the owner callback fails. */ }
+    if (button && viewTabsHost.contains(button)) setView(button.dataset.dceView);
   });
   listen(document, 'pointerdown', (event) => {
     if (!open || element.contains(event.target)) return;
@@ -210,7 +233,10 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     closeAndNotify();
   }, { capture: true });
   listen(document, 'keydown', (event) => {
-    if (open && event.key === 'Escape') { event.preventDefault(); closeAndNotify(); }
+    if (open && event.key === 'Escape') {
+      try { if (viewTabs?.onEscape?.(event) === true) { event.preventDefault(); event.stopImmediatePropagation(); return; } } catch { /* Fall through to the panel close. */ }
+      event.preventDefault(); closeAndNotify();
+    }
   }, { capture: true });
   listen(window, 'resize', position, { passive: true });
   listen(window, 'scroll', position, { passive: true });
@@ -220,5 +246,5 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
     close(); disposed = true; controller.abort(); element.remove();
   }
   scope.add(dispose);
-  return { open: openPanel, setColor, close, element, get isOpen() { return open; }, dispose };
+  return { open: openPanel, setColor, setView, dismiss: closeAndNotify, close, element, get isOpen() { return open; }, get activeView() { return activeView; }, dispose };
 }

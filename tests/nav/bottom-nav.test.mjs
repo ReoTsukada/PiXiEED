@@ -43,13 +43,13 @@ test('camera and creation-editor operator controls remain authored in their orig
     assert.match(nav, /aria-label="撮影" aria-current="page"/, file);
     assert.match(nav, /aria-label="撮影"[^>]*>[^]*?data-action="capture"[^]*?aria-label="ツール"/, file);
   }
-  const drawNav = read('draw/index.html').match(/<nav class="app-tabs"[^>]*>([\s\S]*?)<\/nav>/)[1];
-  const audioNav = read('audio/index.html').match(/<nav class="app-tabs"[^>]*>([\s\S]*?)<\/nav>/)[1];
+  const drawNav = read('draw/editor.html').match(/<nav class="app-tabs"[^>]*>([\s\S]*?)<\/nav>/)[1];
+  const audioNav = read('audio/editor.html').match(/<nav class="app-tabs"[^>]*>([\s\S]*?)<\/nav>/)[1];
   assert.match(drawNav, /id="draw-animation-play"[^>]*aria-label="アニメーションを再生"/);
   assert.match(audioNav, /id="audio-play-toggle"[^>]*aria-label="曲を再生"/);
   assert.doesNotMatch(drawNav + audioNav, /app-tab-label/);
-  assert.match(read('draw/index.html'), /id="draw-animation-play"/);
-  assert.match(read('audio/index.html'), /id="audio-play-toggle"/);
+  assert.match(read('draw/editor.html'), /id="draw-animation-play"/);
+  assert.match(read('audio/editor.html'), /id="audio-play-toggle"/);
 });
 
 test('all static store detail map CTAs describe the world map destination', () => {

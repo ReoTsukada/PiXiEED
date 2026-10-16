@@ -10,12 +10,14 @@ import { stores as storeData } from '../data/site-data.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const eventCatalog = JSON.parse(await readFile(resolve(root, 'events/catalog.json'), 'utf8'));
 const eventRoutes = ['/events/', ...eventCatalog.ids.map(id => `/events/${id}/`)];
-const pages = ['/', '/output/', '/globe/', '/tools/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/'];
+const pages = ['/', '/output/', '/globe/', '/tools/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/', '/help/', '/glossary/', '/projects/pixfind/'];
+const legacyRoutes = ['/pixiedraw/', '/pixiedraw2/', '/PiXiEEDraw/', '/studio/', '/projects/pixiedraw/'];
 const indexableRoutes = ['/', '/globe/', '/tools/', '/output/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/pixiee-lens/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
-indexableRoutes.push(...eventRoutes);
+indexableRoutes.push('/help/', '/glossary/', '/projects/pixfind/', ...eventRoutes);
 const images = ['site', 'tools', 'draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object', 'spot-game', 'find-game', 'game', 'camera', 'telescope', 'output', 'globe', 'events', 'stores'];
 const icons = new Map([['/favicon-96.png', 96], ['/apple-touch-icon.png', 180], ['/assets/brand/app-icon-192.png', 192], ['/assets/brand/app-icon-512.png', 512]]);
 const paths = new Map(pages.map((url) => [url, url.endsWith('/') ? `${url}index.html` : url]));
+for (const path of legacyRoutes) paths.set(path, `${path}index.html`);
 for (const path of eventRoutes) paths.set(path, `${path}index.html`);
 for (const name of images) paths.set(`/assets/og/${name}.png`, `/assets/og/${name}.png`);
 paths.set('/pixiee-lens/ogp.png', '/pixiee-lens/ogp.png');
@@ -103,6 +105,17 @@ try {
     assert.doesNotMatch(html, /name="robots"[^>]*noindex/);
     assert.match(html, /href="\/globe\/"/);
     checks++;
+  }
+  for (const path of legacyRoutes) {
+    for (const query of ['', '?pxd=old&pxd=duplicate']) {
+      const response = await fetch(`${base}${path}${query}`, { redirect: 'error', signal: AbortSignal.timeout(5000) });
+      assert.equal(response.status, 200, `${path}${query}`);
+      const html = await response.text();
+      assert.match(html, /rel="canonical" href="https:\/\/pixieed\.jp\/(?:draw\/)?"/);
+      assert.match(html, /\/js\/legacy-project-entry\.mjs/);
+      assert.doesNotMatch(html, /http-equiv=["']refresh/i);
+      checks++;
+    }
   }
   for (const [path, width, height] of [...images.map((name) => [`/assets/og/${name}.png`, 1200, 630]), ...[...icons].map(([path, size]) => [path, size, size])]) {
     const response = await get(path); assert.equal(response.headers.get('content-type'), 'image/png');
