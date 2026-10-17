@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-17T00:10:51+00:00",
+  "updatedAt": "2026-10-17T00:23:10+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -2334,6 +2334,68 @@
       "additionalUrls": [
         "https://westvanlibrary.ca/event/scary-simbrix-halloween-pixel-art-grades-3-5/"
       ]
+    },
+    {
+      "id": "connecting-dots-256-pacman-ip-art-exhibition-bna-2026",
+      "name": "Connecting Dots:256 — IP-ART EXHIBITION：PAC-MAN",
+      "prefecture": "京都府",
+      "area": "京都市下京区",
+      "venue": "BnA Alter Museum",
+      "startDate": "2026-10-17",
+      "endDate": "2026-12-13",
+      "dateLabel": "2026年10月17日〜12月13日。入場無料、11:00〜24:00（バー営業18:00〜24:00）。初日10月17日は19:00〜22:00。",
+      "status": "upcoming",
+      "sourceUrl": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
+      "description": "PAC-MANのゲームIPをテーマに、7組の作家が作品を展示・販売する企画。ピクセルアート作品だけの展覧会とは公式に明記されていないが、ドット絵ゲームに関する展示として掲載。",
+      "checkedAt": "2026-10-17T00:23:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "BnA Alter Museum公式イベント情報"
+    },
+    {
+      "id": "connecting-dots-256-pacman-pixel-dot-field-kyoto-station-2026",
+      "name": "Connecting Dots:256 — PIXEL DOT FIELD／ドットのひろば（PAC-MAN）",
+      "prefecture": "京都府",
+      "area": "京都市・京都駅",
+      "venue": "京都駅ビル4F 室町小路広場",
+      "startDate": "2026-10-17",
+      "endDate": "2026-11-03",
+      "dateLabel": "2026年10月17日〜11月3日。京都駅ビル芸術祭の開催時間は13:00〜20:00だが、この設置作品の個別開場時間は公式本文に記載なし。",
+      "status": "upcoming",
+      "sourceUrl": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
+      "description": "PAC-MANがゲーム内で食べるドットをモチーフにしたアクリル立体作品と、巨大ドットのインスタレーション。ドット絵ゲームに明確に関係する会場内企画の範囲で掲載。",
+      "checkedAt": "2026-10-17T00:23:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "BnA Alter Museum公式イベント情報"
+    },
+    {
+      "id": "hk-museum-festival-carnival-pixel-public-art-2026",
+      "name": "香港博物館節2026 — 繽FUN博物館嘉年華（巨型像素蛋撻・公共藝術）",
+      "country": "香港",
+      "area": "九龍・尖沙咀",
+      "venue": "香港文化中心露天廣場",
+      "startDate": "2026-10-31",
+      "endDate": "2026-11-01",
+      "dateLabel": "2026年10月31日〜11月1日。イベント内の当該作品の個別時間は公式案内に記載なし。台風警報・大雨警報等による中止条件あり。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.museums.gov.hk/tc/web/portal/mf2026-fun-at-museum-carnival.html",
+      "description": "博物館フェスティバル内のピクセル表現を使う参加型公共藝術企画に限定して掲載。公式案内は「像素化視覺語言」と、来場者が像素貼紙を貼って完成させる1×1.5mの「巨型像素蛋撻」を記載。ドット絵制作ワークショップとは区別する。",
+      "checkedAt": "2026-10-17T00:23:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "香港康文署博物館公式情報"
+    },
+    {
+      "id": "retro-pixel-jam-2026",
+      "name": "Retro Pixel Jam 2026（レトロ／ドット絵ゲーム制作ジャム）",
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-31",
+      "dateLabel": "itch.ioヘッダー: 10月24日22:00〜10月31日22:20。本文: 開始10月24日19:00、締切10月31日19:20（同ページはitch.ioの現地時刻と説明）。両表示の時刻差は未解決のため併記。Pixel Artは推奨だが必須ではない。",
+      "status": "upcoming",
+      "online": true,
+      "sourceUrl": "https://itch.io/jam/retro-pixel-jam",
+      "description": "8/16-bit時代のゲーム様式をテーマにしたオンラインゲームジャム。主催本文はPixel Art、小さなスプライト、限られた色数などを強く推奨し、参加者はそのレトロ表現のゲームを制作する。ユーザー指定に沿い、ドット絵ゲームに関係する企画として掲載するが、ドット絵必須ではないことを明記。",
+      "checkedAt": "2026-10-17T00:23:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者のitch.io公式募集ページ"
     }
   ],
   "sources": [
@@ -4049,22 +4111,46 @@
       "lastCheckedAt": "2026-10-16T00:07:54+00:00",
       "result": "official-confirmed",
       "notes": "図書館公式シリーズ本文で10月21日16:00〜17:00、The Lab、1950 Marine Drive、Simbrixを使うPixel Art制作、無料・満席を確認。個別イベントURLは403。"
+    },
+    {
+      "id": "bna-connecting-dots-pacman-2026",
+      "url": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+      "result": "official-confirmed",
+      "notes": "BnA Alter Museumの公式ページでPAC-MANのIPアート展と京都駅の別会場企画を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "hk-museum-festival-pixel-installation-2026",
+      "url": "https://www.museums.gov.hk/tc/web/portal/mf2026-fun-at-museum-carnival.html",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+      "result": "official-confirmed",
+      "notes": "康文署公式で会期、香港文化中心露天廣場、像素表現を使う参加型公共藝術を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "retro-pixel-jam-2026",
+      "url": "https://itch.io/jam/retro-pixel-jam",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+      "result": "official-confirmed",
+      "notes": "itch.io主催ページで開催期間、ゲームジャム内容、Pixel Artは推奨で必須でないこと、時刻差を確認。",
+      "socialChecks": []
     }
   ],
   "research": {
-    "checkedAt": "2026-10-17T00:10:51+00:00",
-    "notes": "2026-10-17定期調査。Moulins観光局の公式本文で同企画はアイロンビーズ制作のみと確認し、対象外として2026年10月17日・11月14日・21日・28日・12月5日・12日・19日の7レコードを削除。開催当日のHoward County Library講座、MIS Ceará内Pixel Art講座、Pixel Art LEGO Villeneuve-d’Ascqの公式内容を確認し、既存登録の日時変更なし。NRG Awards（10/21）・Segment Pixel Jam（10/24）の締切を再確認。Retro Pixel JamはPixel Artが推奨で必須ではないため追加せず。京都駅PIXEL DOT FIELDはPAC-MANのドットを題材にした立体インスタレーションで、ドット絵作品展示とは公式に明記されず保留。香港博物館祭も像素化視覚言語の大型参加型作品はあるが、ドット絵企画と確定できず保留。Jeumont図書館の10/17 Pixel Artワークショップは今回公式本文で確認できず、開催結果・変更を断定しない。韓国・中華圏・日本・欧州・米州を確認し、新規登録可能な確定イベントは見つからず。",
+    "checkedAt": "2026-10-17T00:23:10+00:00",
+    "notes": "2026-10-17追調査。ユーザーの指示を受け、ドット絵ゲームに関わる公式展示・企画も対象として再確認。BnA Alter Museum公式案内でPAC-MANのIPアート展（10/17〜12/13）と、京都駅ビル4F室町小路広場のPIXEL DOT FIELD（10/17〜11/3）を別会場・別企画として確認し追加。香港康文署公式の博物館節（10/31〜11/1）は、ピクセル表現の巨型蛋撻参加型公共藝術部分に限定して追加。Retro Pixel Jamはレトロゲーム制作ジャムでPixel Artは推奨だが必須ではないため、ドット絵ゲーム関連として条件を明記して追加。公式ページ内の時刻差も未解決としてdateLabelに併記。Moulinsのアイロンビーズ工作7件は対象外のまま。京都駅・香港・Retroの各企画は該当コンテンツに限定。",
     "searchExamples": [
-      "2026 pixel art event October 17 workshop exhibition official",
-      "2026 pixel art jam deadline October 2026 official itch.io",
-      "2026년 10월 픽셀 아트 전시 공모전 워크숍 한국",
-      "2026 台湾 香港 像素藝術 工作坊 展覽 10月 官方",
-      "pixel art atelier Moulins octobre 2026 perles",
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
+      "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
       "繽FUN博物館嘉年華 像素化視覺語言 2026",
-      "Retro Pixel Jam October 2026 pixel art required",
-      "site:howardcounty.librarycalendar.com pixel perfect art October 17 2026",
-      "MIS Ceará GaMIS oficina pixel art 17 outubro 2026"
+      "Retro Pixel Jam October 2026 pixel art encouraged official"
     ],
     "scopeLanguages": [
       "ja",
@@ -4103,7 +4189,9 @@
       "ブラジル・リオデジャネイロ",
       "メキシコ・グアダラハラ",
       "フランス・リヨン",
-      "東アジア"
+      "東アジア",
+      "京都府・京都市",
+      "香港・九龍"
     ],
     "verifiedSourceLanguages": [
       "es",

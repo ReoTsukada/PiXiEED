@@ -184,6 +184,18 @@
       ]
     },
     {
+      "id": "region-a29f6cf0520d2a43",
+      "label": "京都府",
+      "eventIds": [
+        "connecting-dots-256-pacman-ip-art-exhibition-bna-2026",
+        "connecting-dots-256-pacman-pixel-dot-field-kyoto-station-2026"
+      ],
+      "areas": [
+        "京都市・京都駅",
+        "京都市下京区"
+      ]
+    },
+    {
       "id": "region-aa5ab35a9174c206",
       "label": "USA",
       "eventIds": [
@@ -337,6 +349,16 @@
         "港区・南青山",
         "港区・赤坂",
         "足立区・北千住"
+      ]
+    },
+    {
+      "id": "region-d448d143c4e04eb6",
+      "label": "香港",
+      "eventIds": [
+        "hk-museum-festival-carnival-pixel-public-art-2026"
+      ],
+      "areas": [
+        "九龍・尖沙咀"
       ]
     },
     {
@@ -786,6 +808,18 @@
       ]
     },
     {
+      "id": "venue-510fed60fd2b4312",
+      "label": "香港文化中心露天廣場",
+      "eventIds": [
+        "hk-museum-festival-carnival-pixel-public-art-2026"
+      ],
+      "region": "香港",
+      "area": "九龍・尖沙咀",
+      "sourceUrls": [
+        "https://www.museums.gov.hk/tc/web/portal/mf2026-fun-at-museum-carnival.html"
+      ]
+    },
+    {
       "id": "venue-51aaaf888031b96d",
       "label": "札幌コンベンションセンター 大ホール",
       "eventIds": [
@@ -1101,6 +1135,18 @@
       ]
     },
     {
+      "id": "venue-889f6d9b13d690ef",
+      "label": "京都駅ビル4F 室町小路広場",
+      "eventIds": [
+        "connecting-dots-256-pacman-pixel-dot-field-kyoto-station-2026"
+      ],
+      "region": "京都府",
+      "area": "京都市・京都駅",
+      "sourceUrls": [
+        "https://bnaaltermuseum.com/event/ip-art_pac-man/"
+      ]
+    },
+    {
       "id": "venue-8c3a160383224b40",
       "label": "新潟市産業振興センター",
       "eventIds": [
@@ -1160,6 +1206,18 @@
       "area": "新宿区",
       "sourceUrls": [
         "https://honkbooks.com/asobanight-20/"
+      ]
+    },
+    {
+      "id": "venue-9f1684bf438e426a",
+      "label": "BnA Alter Museum",
+      "eventIds": [
+        "connecting-dots-256-pacman-ip-art-exhibition-bna-2026"
+      ],
+      "region": "京都府",
+      "area": "京都市下京区",
+      "sourceUrls": [
+        "https://bnaaltermuseum.com/event/ip-art_pac-man/"
       ]
     },
     {
@@ -4332,6 +4390,31 @@
       }
     },
     {
+      "id": "source-afb4c903eed92a51",
+      "label": "香港博物館節2026 — 繽FUN博物館嘉年華（巨型像素蛋撻・公共藝術）",
+      "eventIds": [
+        "hk-museum-festival-carnival-pixel-public-art-2026"
+      ],
+      "url": "https://www.museums.gov.hk/tc/web/portal/mf2026-fun-at-museum-carnival.html",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "香港"
+      ],
+      "areas": [
+        "九龍・尖沙咀"
+      ],
+      "venues": [
+        "香港文化中心露天廣場"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-b021bad77e561c60",
       "label": "冬休みドット大作戦",
       "eventIds": [
@@ -4407,6 +4490,25 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-b5eb0b411ac19d48",
+      "label": "Retro Pixel Jam 2026（レトロ／ドット絵ゲーム制作ジャム）",
+      "eventIds": [
+        "retro-pixel-jam-2026"
+      ],
+      "url": "https://itch.io/jam/retro-pixel-jam",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [],
+      "lastKnownEventDate": "2026-10-31",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-17T00:23:10+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5563,6 +5665,36 @@
       }
     },
     {
+      "id": "source-f5159f1b71bfa23b",
+      "label": "Connecting Dots:256 — IP-ART EXHIBITION：PAC-MAN",
+      "eventIds": [
+        "connecting-dots-256-pacman-ip-art-exhibition-bna-2026",
+        "connecting-dots-256-pacman-pixel-dot-field-kyoto-station-2026"
+      ],
+      "url": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
+      "kind": "website",
+      "prefectures": [
+        "京都府"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "京都市・京都駅",
+        "京都市下京区"
+      ],
+      "venues": [
+        "BnA Alter Museum",
+        "京都駅ビル4F 室町小路広場"
+      ],
+      "lastKnownEventDate": "2026-12-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-f52ee73c60128e7b",
       "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
       "eventIds": [
@@ -5744,5 +5876,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-16T00:09:33+00:00"
+  "updatedAt": "2026-10-17T00:24:06+00:00"
 }
