@@ -12,6 +12,7 @@ test('all public menu destinations exist and include the prior direct feature en
     assert.ok(existsSync(new URL(`../../${path.slice(1)}${path.endsWith('/') ? 'index.html' : ''}`, import.meta.url)), `${label}: ${path}`);
   }
   for (const href of ['/', '/draw/', '/draw/?mode=camera', '/draw/?mode=audio', '/output/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/globe/', '/globe/?post=1', '/events/', '/stores/', '/books/', '/profile/', '/collection/', '/privacy/']) assert.ok(hrefs.includes(href), href);
+  assert.ok(!hrefs.includes('/pixiee-lens/'), 'retired PiXiEELENS is a compatibility entry, not a promoted destination');
   assert.ok(!hrefs.includes('/shops/'), 'retired shop invitation is not a public destination');
 });
 

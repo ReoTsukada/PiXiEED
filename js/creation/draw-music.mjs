@@ -97,8 +97,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   };
   scope.listen(dismissFeedback, 'click', () => { feedbackDismissed = true; feedback.hidden = true; });
   scope.listen(voiceCta, 'click', () => {
-    settings.open = true;
-    requestAnimationFrame(() => { if (!scope.disposed && !instrument.disabled) instrument.focus(); });
+    if (draw.openAudioTimbre?.(undefined, play)) say('');
   });
   scope.listen(recoveryCta, 'click', () => {
     say('');
@@ -184,8 +183,8 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
       const key = color ? `rgba-${color.slice(1).toLowerCase().padEnd(8, 'f')}` : null;
       const slotId = key ? state.link?.colorToSlot?.[key] : null;
       const voice = slotId ? AUDIO_INSTRUMENTS.find(item => item.id === getAudioColorInstrument(state.song, key, slotId)) : null;
-      const label = index < 0 ? '透明・無音' : `色 ${index + 1}・${voice?.name || '未割当。音楽設定で音を選べます'}`;
-      swatch.dataset.musicAssigned = String(Boolean(slotId)); swatch.title = label; swatch.setAttribute('aria-label', label);
+      const label = index < 0 ? '透明・無音' : `色 ${index + 1}・${voice?.name || '未割当。音色タブで設定できます'}`;
+      swatch.dataset.musicAssigned = String(Boolean(voice)); swatch.title = label; swatch.setAttribute('aria-label', label);
     }
     for (const id of ['#draw-music-wav', '#draw-music-video']) settings.querySelector(id).disabled = exporting;
     draw.refreshAudioTimbrePanel?.();

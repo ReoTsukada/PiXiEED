@@ -31,7 +31,7 @@ try {
     await context.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.origin !== new URL(base).origin) return route.abort();
-      if (url.pathname.endsWith('/js/creation/draw-page.mjs')) {
+      if (url.pathname.endsWith('/js/creation/draw-page.mjs?rev=20261017-editor-improvements-1')) {
         const response = await route.fetch();
         const source = await response.text();
         const marker = 'return {\n  get workspace() { return pxdBridge; }, dispose: disposeDrawMode,';
@@ -118,10 +118,21 @@ try {
     await page.locator('#draw-music-play').click();
     await page.waitForFunction(() => !document.querySelector('#draw-music-feedback').hidden);
     record('dismiss-and-explicit-play-reopens-reason', viewport);
+    await page.evaluate(() => { window.__soundTimelineBefore = __polishDraw.getTimeline(); });
     await page.locator('#draw-music-voice-cta').click();
-    assert.equal(await page.locator('#draw-music-settings').evaluate(node => node.open), true);
-    await page.waitForFunction(() => document.activeElement.id === 'draw-music-instrument');
-    record('empty-play-visible-voice-action-focus', viewport);
+    await page.waitForFunction(() => !document.querySelector('#draw-color-editor')?.hidden && document.querySelector('#draw-color-editor')?.dataset.activeView === 'sound');
+    assert.equal(await page.locator('#draw-music-settings').evaluate(node => node.open), false);
+    assert.equal(await page.locator('#draw-music-feedback').isVisible(), false);
+    assert.equal(await page.locator('#draw-color-editor').evaluate(node => node.dataset.activeView), 'sound');
+    await page.waitForFunction(() => document.activeElement.matches('#datp-candidate-list [data-instrument]'));
+    assert.equal(await page.locator('#datp-candidate-list [data-instrument]').evaluate(node => node === document.activeElement), true);
+    const unchangedWhileOpening = await page.evaluate(() => ({ sameTimeline: __polishDraw.getTimeline() === window.__soundTimelineBefore, selectedColor: __polishDraw.getEditorState().selectedColor }));
+    assert.equal(unchangedWhileOpening.sameTimeline, true);
+    record('empty-play-voice-action-opens-sound-tab-without-mutation', viewport, unchangedWhileOpening);
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#draw-color-editor').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'draw-music-play');
+    record('sound-tab-escape-restores-warning-trigger', viewport);
     await page.locator('#draw-music-output-layer').check();
     await page.locator('#draw-music-output-audio').uncheck();
     await page.locator('#draw-music-loops').selectOption('2');

@@ -1,0 +1,11 @@
+/* Sound icons decorate assigned Draw palette swatches without changing the swatch controls. */
+body[data-page="draw"] #draw-palette .draw-color .draw-audio-instrument-icon {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}

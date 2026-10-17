@@ -1,5 +1,5 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261016-color-capability-1';
+import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261017-editor-improvements-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-tool-shell-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';
@@ -26,7 +26,7 @@ export async function mountCreationModes({ draw, scope }) {
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261016-tool-operations-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261017-editor-improvements-1';
   const styled = new Promise((resolve, reject) => { css.addEventListener('load', resolve, { once:true }); css.addEventListener('error', () => reject(new Error('共通の制作画面の表示を読み込めません。')), { once:true }); });
   document.head.append(css); await styled;
   const owned = new Map([['shared', new Set()], ['editor', new Set()], ['draw', new Set()], ['audio', new Set()], ['camera', new Set()]]);
@@ -191,7 +191,8 @@ export async function mountCreationModes({ draw, scope }) {
   settings.close = options => closeSharedSettings({ ...options, restoreFocus:false });
   const sharedSettingsFocusObserver = new MutationObserver(() => {
     if (!settings.panel.hidden || scope.disposed || switching) return;
-    const trigger = focusReturnTarget?.panel === settings.panel ? focusReturnTarget.trigger : settingsButton;
+    const trigger = focusReturnTarget?.panel === settings.panel ? focusReturnTarget.trigger
+      : settings.launcher?.getClientRects().length ? settings.launcher : settingsButton;
     focusReturnTarget = null;
     if (trigger?.isConnected && !trigger.disabled) trigger.focus({ preventScroll:true });
   });
@@ -314,7 +315,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?attempt=${audioLoadAttempt++}&rev=20261016-tool-shell-1`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?attempt=${audioLoadAttempt++}&rev=20261017-editor-improvements-1`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -352,7 +353,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?attempt=${version}&rev=20261016-tool-shell-1`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?attempt=${version}&rev=20261017-editor-improvements-1`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

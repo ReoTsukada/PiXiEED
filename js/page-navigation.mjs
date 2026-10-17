@@ -1,7 +1,7 @@
 /** Public destinations only; editor actions and project modes have their own UI. */
 export const PAGE_DESTINATIONS = Object.freeze([
   { label: 'はじめる', links: [['/', 'ホーム'], ['/tools/', 'ツール一覧']] },
-  { label: 'つくる', links: [['/draw/', 'ドット絵を描く'], ['/draw/?mode=camera', 'カメラ・写真をドット絵に変換'], ['/draw/?mode=audio', '絵を描いて音楽を作る'], ['/output/', '変換・書き出し'], ['/pixiee-lens/', '旧版PiXiEELENS（GIF撮影）']] },
+  { label: 'つくる', links: [['/draw/', 'ドット絵を描く'], ['/draw/?mode=camera', 'カメラ・写真をドット絵に変換'], ['/draw/?mode=audio', '絵を描いて音楽を作る'], ['/output/', '変換・書き出し']] },
   { label: 'あそぶ', links: [['/jigsaw/', 'ジグソーパズル'], ['/play/spot-difference/', 'ドット絵間違い探し'], ['/play/hidden-object/', 'ドット絵もの探し']] },
   { label: '問題をつくる', links: [['/spot-difference/', '間違い探しをつくる'], ['/hidden-object/', 'もの探しをつくる']] },
   { label: '見つける・参加する', links: [['/globe/', '世界地図で公開作品を見る'], ['/globe/?post=1', 'ドット絵を投稿する'], ['/events/', 'ドット絵イベントを探す'], ['/stores/', '絵に会えるお店'], ['/books/', 'ドット絵の本・グッズ']] },

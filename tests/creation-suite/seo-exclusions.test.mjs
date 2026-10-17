@@ -31,7 +31,7 @@ test('internal, private and retired sample pages request search exclusion', () =
   }
 });
 
-test('internal pages and the retained PiXiEELENS entry use the same PiXiEED favicon', () => {
+test('internal pages and the legacy PiXiEELENS bridge use the same PiXiEED favicon', () => {
   for (const file of [...excluded, 'pixiee-lens/index.html']) {
     const html = headOf(read(file));
     const icons = [...html.matchAll(/<link\b(?=[^>]*\brel=["']icon["'])[^>]*>/gi)].map(([tag]) => tag);
@@ -40,5 +40,6 @@ test('internal pages and the retained PiXiEELENS entry use the same PiXiEED favi
     assert.ok(icons.some((tag) => tag.includes('href="/favicon.ico"')), file);
     assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png" sizes="180x180"/);
   }
-  assert.doesNotMatch(read('pixiee-lens/index.html'), /<meta\b(?=[^>]*\bname=["']robots["'])[^>]*\bnoindex\b/i);
+  assert.match(read('pixiee-lens/index.html'), /<meta\s+name="robots"\s+content="noindex,follow"/i);
+  assert.match(read('pixiee-lens/index.html'), /legacy-lens-entry\.mjs/);
 });

@@ -20,6 +20,9 @@ const beforeJson = resolve(process.env.PIXIEED_NAV_BEFORE_JSON || '/tmp/pixieed-
 const beforeRows = phase === 'after' ? JSON.parse(await readFile(beforeJson, 'utf8').catch(() => '[]')) : [];
 const viewports = [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1280, height: 800 }];
 const ordinaryRoutes = ['/', '/books/', '/stores/', '/globe/', '/jigsaw/', '/output/', '/play/hidden-object/', '/pixel-camera.html', '/events/', '/events/pixelween-2026/', '/output/work/', '/pixiee-lens/', '/pixel-camera-studio.html'];
+const routeFilter = process.env.PIXIEED_NAV_ROUTES?.split(',').map(value => value.trim()).filter(Boolean);
+const selectedRoutes = [...ordinaryRoutes, '/draw/'].filter(path => !routeFilter || routeFilter.includes(path));
+assert.ok(selectedRoutes.length, 'At least one known local navigation route must be selected');
 const results = [], failures = [];
 const startedAt = new Date().toISOString();
 const browser = await chromium.launch({ headless: true });
@@ -51,13 +54,28 @@ try {
     page.setDefaultTimeout(8000);
     let activeRow = null;
     page.on('pageerror', e => { activeRow?.pageErrors.push(e.message); });
-    for (const path of [...ordinaryRoutes, '/draw/']) {
+    for (const path of selectedRoutes) {
       const row = { phase, path, viewport, checks: [], status: 'PENDING', pageErrors: [] };
       activeRow = row;
       results.push(row);
       try {
         await page.goto(base + path, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(450);
+        if (phase === 'after' && path === '/pixiee-lens/') {
+          await page.waitForURL(url => url.pathname === '/draw/' && url.searchParams.get('mode') === 'camera');
+          await page.waitForFunction(() => document.querySelector('[data-embed-status]')?.textContent.includes('編集を保持'));
+          const frame = page.frames().find(frame => new URL(frame.url()).pathname === '/draw/editor.html');
+          assert.ok(frame, 'retired LENS opens the retained current editor iframe');
+          await frame.waitForFunction(() => document.body.dataset.creationMode === 'camera' && !document.body.hasAttribute('data-creation-transition'));
+          row.actualPath = new URL(page.url()).pathname;
+          row.compatibilityMode = await frame.locator('body').getAttribute('data-creation-mode');
+          assert.equal(row.compatibilityMode, 'camera');
+          assert.equal(await frame.locator('#pixelStudio').count(), 1);
+          assert.equal(await page.locator('a[href="/pixiee-lens/"]').count(), 0);
+          row.checks.push('retired LENS reaches current camera in the retained iframe without old app promotion');
+          row.status = 'PASS';
+          continue;
+        }
         if (phase === 'after' && path === '/draw/') {
           await page.waitForFunction(() => document.documentElement.dataset.creationModesReady === 'true' && !document.body.hasAttribute('data-creation-transition'), null, { timeout:25000 });
         } else if (phase === 'after' && path === '/pixel-camera.html') {
@@ -245,7 +263,7 @@ try {
             row.checks.push('page menu label, scroller/close, links, combined settings, focus wrap/Escape, storage preservation');
           }
         }
-        if (phase === 'after' && path !== '/draw/') {
+        if (phase === 'after' && path !== '/draw/' && path !== '/pixiee-lens/') {
           if (path === '/globe/') {
             assert.equal(row.creationControls.length, 0, 'map route has no creation mode bar');
             assert.ok(row.workNavigation.some(n=>n.label==='この画面の操作'&&n.actions.some(a=>a.action==='view'&&/見る/.test(a.text))&&n.actions.some(a=>a.action==='post'&&/投稿する/.test(a.text))), 'map exposes its view/post work actions');

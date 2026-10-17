@@ -122,19 +122,14 @@ test('standalone pages without a header still place the CTA before their main co
   assert.ok(result.html.indexOf('data-draw-cta') < result.html.indexOf('<main'));
 });
 
-test('PiXiEELENS gets a static creation link in its native toolbar and hides it in embed mode', async () => {
-  const lens = '<html><head></head><body><div class="hud-top__bar"><div aria-label="ドット絵コントロール" class="hud-top__actions" role="group"><button>画像</button></div></div></body></html>';
+test('retired PiXiEELENS compatibility bridge is not promoted as a creation page', async () => {
+  const lens = await readFile(new URL('../../pixiee-lens/index.html', import.meta.url), 'utf8');
   const result = addSiteDrawCta(lens, 'pixiee-lens/index.html');
-  assert.equal(result.added, true);
-  assert.equal(result.placement, 'toolbar');
-  assert.match(result.html, /class="site-draw-cta__link site-draw-cta--lens" aria-label="ブラウザで使えるドット絵エディターを開く" data-draw-cta data-draw-context="creation" href="\/draw\/">ドット絵エディターで描く<\/a>/);
-  assert.ok(result.html.indexOf('hud-top__actions" role="group">') < result.html.indexOf('data-draw-cta'));
-  const ctaCss = await readFile(new URL('../../css/site-draw-cta.css', import.meta.url), 'utf8');
-  const lensSource = await readFile(new URL('../../pixiee-lens/index.html', import.meta.url), 'utf8');
-  assert.match(lensSource, /<main>\s*<h1 class="visually-hidden">旧版PiXiEELENS 写真・カメラ変換とGIF撮影<\/h1>/);
-  assert.match(ctaCss, /html\[data-embed-mode="true"\] \.site-draw-cta--lens\s*\{\s*display:\s*none/);
-  assert.match(ctaCss, /@media \(max-width: 600px\)\s*\{\s*\.site-draw-cta\s*\{[^}]*flex-direction:\s*column/);
-  assert.equal(addSiteDrawCta(result.html, 'pixiee-lens/index.html').added, false, 'the transform remains idempotent');
+  assert.equal(result.added, false);
+  assert.match(lens, /legacy-lens-entry\.mjs/);
+  assert.match(lens, /新しいカメラモード/);
+  assert.doesNotMatch(lens, /<canvas\b|hud-top__actions|GIF撮影/);
+  assert.equal(addSiteDrawCta(result.html, 'pixiee-lens/index.html').added, false, 'the compatibility bridge stays unpromoted');
 });
 
 test('fresh build output contains static CTAs while route exclusions and existing links remain intact', async () => {
@@ -147,6 +142,12 @@ test('fresh build output contains static CTAs while route exclusions and existin
       'scripts/generate-event-pages.mjs': await readFile(new URL('../../scripts/generate-event-pages.mjs', import.meta.url), 'utf8'),
       'js/creation/puzzle-share-identity.mjs': await readFile(new URL('../../js/creation/puzzle-share-identity.mjs', import.meta.url), 'utf8'),
       'js/globe/event-density.mjs': await readFile(new URL('../../js/globe/event-density.mjs', import.meta.url), 'utf8'),
+      'js/creation/legacy-lens-entry.mjs': await readFile(new URL('../../js/creation/legacy-lens-entry.mjs', import.meta.url), 'utf8'),
+      'js/creation/mode-entry.mjs': await readFile(new URL('../../js/creation/mode-entry.mjs', import.meta.url), 'utf8'),
+      'js/creation/shared-project-settings.mjs': await readFile(new URL('../../js/creation/shared-project-settings.mjs', import.meta.url), 'utf8'),
+      'js/creation/shared-project-settings-core.mjs': await readFile(new URL('../../js/creation/shared-project-settings-core.mjs', import.meta.url), 'utf8'),
+      'css/creation-camera-idle.css': await readFile(new URL('../../css/creation-camera-idle.css', import.meta.url), 'utf8'),
+      'css/draw-palette-instruments.css': await readFile(new URL('../../css/draw-palette-instruments.css', import.meta.url), 'utf8'),
       'css/site-draw-cta.css': await readFile(new URL('../../css/site-draw-cta.css', import.meta.url), 'utf8'),
       'data/pixel-art-events.json': JSON.stringify({ version: 1, events: [{
         id: 'fixture-event', name: 'Fixture Pixel Event', status: 'upcoming', startDate: '2099-01-01', endDate: '2099-01-01',
@@ -159,7 +160,7 @@ test('fresh build output contains static CTAs while route exclusions and existin
       'privacy/index.html': page('privacy'),
       'draw/index.html': page('editor'),
       'globe/index.html': page('<iframe src="/globe-prototype.html" title="map"></iframe>'),
-      'pixiee-lens/index.html': '<html><head></head><body><div class="hud-top__bar"><div aria-label="ドット絵コントロール" class="hud-top__actions" role="group"><button>画像</button></div></div></body></html>',
+      'pixiee-lens/index.html': '<html><head></head><body><main><h1>PiXiEELENS compatibility bridge</h1><a href="/draw/?mode=camera">camera</a></main></body></html>',
       'admin/index.html': page('admin')
     };
     for (const [name, contents] of Object.entries(files)) {
@@ -169,6 +170,7 @@ test('fresh build output contains static CTAs while route exclusions and existin
     }
     execFileSync('git', ['init', '-q'], { cwd: root });
     execFileSync('git', ['add', '-A'], { cwd: root });
+    execFileSync('git', ['rm', '--cached', '-q', '--', 'js/creation/legacy-lens-entry.mjs', 'js/creation/shared-project-settings-core.mjs', 'css/creation-camera-idle.css', 'css/draw-palette-instruments.css'], { cwd: root });
 
     const built = await buildPagesSite({ root, output });
     assert.equal(built.eventPages, 1);
@@ -183,6 +185,9 @@ test('fresh build output contains static CTAs while route exclusions and existin
     const globe = await builtHtml('globe/index.html');
     const lens = await builtHtml('pixiee-lens/index.html');
     const admin = await builtHtml('admin/index.html');
+    for (const asset of ['js/creation/legacy-lens-entry.mjs', 'js/creation/shared-project-settings-core.mjs', 'css/creation-camera-idle.css', 'css/draw-palette-instruments.css']) {
+      assert.equal(await builtHtml(asset), files[asset], `${asset}: untracked runtime source is copied for clean local builds`);
+    }
 
     assert.equal((home.match(/data-draw-cta/g) || []).length, 1, 'home keeps its authored primary action');
     assert.equal((await builtHtml('tools/index.html')).match(/data-draw-cta/g)?.length, 1, 'tools keeps its authored primary action');
@@ -194,7 +199,7 @@ test('fresh build output contains static CTAs while route exclusions and existin
     assert.match(outputGuide, /ブラウザで使えるドット絵エディター[\s\S]*?ドット絵を描いてみる/);
     for (const html of [privacy, editor, admin]) assert.doesNotMatch(html, /data-draw-cta/);
     assert.match(globe, /data-draw-context="creation"[\s\S]*?href="\/draw\/"/, 'the normal globe page remains eligible despite its embedded map');
-    assert.match(lens, /class="site-draw-cta__link site-draw-cta--lens"[^>]*href="\/draw\/">ドット絵エディターで描く/);
+    assert.doesNotMatch(lens, /data-draw-cta/, 'the retired route does not receive a promoted CTA');
     assert.match(await builtHtml('css/site-draw-cta.css'), /\.site-draw-cta__link/);
     const beforeSecondBuild = await Promise.all(['index.html', 'events/index.html', 'events/fixture-event/index.html', 'pixiee-lens/index.html'].map(builtHtml));
     const secondOutput = join(root, 'published-again');

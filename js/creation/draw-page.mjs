@@ -17,7 +17,7 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=2026101
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261016-tool-shell-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-editor-improvements-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
@@ -43,6 +43,7 @@ import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?r
 import { resizeDrawView } from './draw-resize-view.mjs?rev=20261016-color-capability-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261016-tool-shell-1';
+import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261017-layer-minimum-1';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
@@ -660,6 +661,7 @@ function renderPalette() {
   const order = usesDefaultPalette ? DRAW_PALETTE_ORDER : documentData.palette.map((_, index) => index);
   order.forEach((index) => { const color = documentData.palette[index];
     const button = document.createElement('button'); button.dataset.colorIndex = String(index); button.type = 'button'; button.className = 'draw-color'; button.style.setProperty('--draw-color', color); button.setAttribute('aria-label', `色 ${index + 1}`); button.title = `色 ${index + 1}`; button.setAttribute('aria-pressed', String(index === selectedColor));
+    renderAudioPaletteIcon(button, index, color);
     palette.append(button);
   });
   if (documentData.palette.length < ANIMATION_MAX_PALETTE_ENTRIES) {
@@ -672,6 +674,35 @@ function renderPalette() {
       selectedColor = palette.length - 1; renderPalette(); showCurrentColor(); openColorEditor(selectedColor);
     }); palette.append(add);
   }
+}
+function renderAudioPaletteIcon(button, index, color) {
+  if (index < 0) {
+    button.classList.remove('draw-color--audio-assigned'); button.dataset.musicAssigned = 'false';
+    button.querySelector('.draw-audio-instrument-icon')?.remove();
+    button.setAttribute('aria-label', '透明色'); button.title = '透明色'; return;
+  }
+  const instrumentId = audioTimbreApi?.getAssignment?.(index, color) || null;
+  button.classList.toggle('draw-color--audio-assigned', Boolean(instrumentId));
+  button.dataset.musicAssigned = String(Boolean(instrumentId));
+  const existing = button.querySelector('.draw-audio-instrument-icon');
+  if (!instrumentId) {
+    existing?.remove();
+    if (audioTimbreApi) {
+      const label = `色 ${index + 1}・未割当。音色タブで設定できます`;
+      button.setAttribute('aria-label', label); button.title = label;
+    } else {
+      button.setAttribute('aria-label', `色 ${index + 1}`); button.title = `色 ${index + 1}`;
+    }
+    return;
+  }
+  const icon = getAudioInstrumentIcon(instrumentId);
+  const image = existing || document.createElement('img');
+  image.className = 'draw-audio-instrument-icon'; image.src = icon.url; image.alt = ''; image.setAttribute('aria-hidden', 'true');
+  image.dataset.instrument = instrumentId;
+  image.style.filter = audioInstrumentIconFilter(String(color || '').slice(0, 7));
+  const label = `色 ${index + 1}・${icon.name}`;
+  button.setAttribute('aria-label', label); button.title = label;
+  if (!existing) button.append(image);
 }
 // ---- changing a colour: hue / vividness / lightness sliders and a few quick colours; one undo step per edit ----
 let colorEdit = null;
@@ -708,7 +739,7 @@ function setEditColor(hex) {
 function finishColorEdit({ closePanel = true } = {}) {
   const returnFocus = closePanel && colorPanel.element.contains(document.activeElement) ? colorEditorReturnFocus : null;
   if (closePanel) { colorEditorReturnFocus = null; colorPanel.close(); }
-  if (!colorEdit) return;
+  if (!colorEdit) { if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); return; }
   const after = documentData.palette, lease = colorEdit.lease; documentData.palette = colorEdit.base; colorEdit = null;
   const previousLease = drawOperationLease; drawOperationLease = lease;
   try { if (history.commit({ ...documentData, pixels: [...documentData.pixels], palette: after })) saved = false; }
@@ -1705,7 +1736,8 @@ async function scaleSpriteCanvas(percent) {
     // Use the ordinary immutable PXD writer to check combined image/music and
     // poster capacity before replacing the live document or creating an Undo entry.
     if (project) {
-      let candidate = await putPxdDrawDocument(project, composeOutputFrame(next, next.frames[0].id, { includeMusic: false }), role);
+      const poster = composeOutputFrame(next, next.frames[0].id, { includeMusic: false });
+      let candidate = role === 'main' ? await putPxdSharedImage(project, poster) : await putPxdImage(project, poster, role);
       candidate = await writePxdAnimation(candidate, next, { role, posterFrameId: next.frames[0].id });
     }
     if (scope.disposed || animationSession.animation !== before || documentData !== originalDocument
@@ -2082,7 +2114,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261016-tool-shell-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261017-editor-improvements-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2411,7 +2443,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261016-tool-shell-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261017-editor-improvements-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -2698,6 +2730,48 @@ function settingsPlan(settings) {
   const cropped = Number(extra.summary.croppedPixels || 0);
   return { ...plan, summary: { ...plan.summary, ...extra.summary, croppedPixels: plan.summary.croppedPixels + (Number.isFinite(cropped) ? cropped : 0) } };
 }
+function openAudioTimbre(index = selectedColor, sourceTrigger = null) {
+  if (!audioTimbreApi || !drawAudioTimbrePanel?.isEnabled) return false;
+  if (selectionTransform) { toast('✓で確定、×で取消してから音色を設定できます。'); return false; }
+  if (colorEdit) { toast('色の調整を終えてから音色を設定できます。'); return false; }
+  const playableColor = colorIndex => {
+    const color = documentData.palette[colorIndex];
+    return Number.isInteger(colorIndex) && colorIndex >= 0 && Boolean(color)
+      && !(String(color).length === 9 && String(color).endsWith('00'));
+  };
+  let target = playableColor(index) ? index : null;
+  if (target === null) {
+    // The shared palette drives both artwork and the reserved music cels.
+    // Include all cels so the fallback can target an actual active music color.
+    const used = getAnimationUsedColorIndices(animationSession.animation);
+    target = [...used].filter(playableColor).sort((a, b) => a - b)
+      .find(colorIndex => !audioTimbreApi.getAssignment?.(colorIndex, documentData.palette[colorIndex])
+        && !audioTimbreApi.isReadOnly?.(colorIndex)) ?? null;
+  }
+  if (target === null) { toast('音色を設定できる使用中の色がありません。'); return false; }
+  if (audioTimbreApi.isReadOnly?.(target) && !playableColor(index)) {
+    toast('この作品の音色は表示専用です。'); return false;
+  }
+
+  const isVisible = node => Boolean(node?.isConnected && !node.hidden && node.getClientRects().length);
+  const focusReturn = isVisible(sourceTrigger) ? sourceTrigger
+    : isVisible(document.activeElement) ? document.activeElement : document.querySelector('#draw-music-play');
+  colorEditorReturnFocus = focusReturn?.isConnected ? focusReturn : null;
+  selectionPanel?.hide(); editorUi.closePanels();
+  if (colorPanel.isOpen) colorPanel.close();
+  if (target !== selectedColor) {
+    selectedColor = target;
+    chooseColor(target, document.querySelector(`.draw-color[data-color-index="${target}"]`));
+  }
+  const color = documentData.palette[target];
+  colorPanel.open({ color, resetColor: target < DRAW_PALETTE.length ? DRAW_PALETTE[target] : null });
+  colorPanel.setView('sound');
+  requestAnimationFrame(() => {
+    if (!scope.disposed && colorPanel.isOpen && colorPanel.activeView === 'sound')
+      colorPanel.element.querySelector('#datp-candidate-list [data-instrument]')?.focus({ preventScroll: true });
+  });
+  return true;
+}
 return {
   get workspace() { return pxdBridge; }, dispose: disposeDrawMode,
   get bank() { return 'shared'; },
@@ -2710,8 +2784,9 @@ return {
     return 'missing';
   },
   getEditorState: getDrawEditorState,
-  setAudioTimbreApi(api) { audioTimbreApi = api || null; drawAudioTimbrePanel?.setEnabled(Boolean(audioTimbreApi)); drawAudioTimbrePanel?.setAudioApi(audioTimbreApi); },
-  refreshAudioTimbrePanel() { drawAudioTimbrePanel?.refresh(); },
+  setAudioTimbreApi(api) { audioTimbreApi = api || null; drawAudioTimbrePanel?.setEnabled(Boolean(audioTimbreApi)); drawAudioTimbrePanel?.setAudioApi(audioTimbreApi); for (const swatch of document.querySelectorAll('#draw-palette [data-color-index]')) renderAudioPaletteIcon(swatch, Number(swatch.dataset.colorIndex), documentData.palette[Number(swatch.dataset.colorIndex)]); },
+  refreshAudioTimbrePanel() { for (const swatch of document.querySelectorAll('#draw-palette [data-color-index]')) renderAudioPaletteIcon(swatch, Number(swatch.dataset.colorIndex), documentData.palette[Number(swatch.dataset.colorIndex)]); drawAudioTimbrePanel?.refresh(); },
+  openAudioTimbre,
   subscribe(listener) { editorListeners.add(listener); return () => editorListeners.delete(listener); },
   async attachProjectHooks(hooks) {
     await pxdBridge.ready;
@@ -2751,6 +2826,37 @@ return {
   previewProjectSettings(settings) {
     const plan = settingsPlan(settings), doc = composeAnimationFrameRgba(plan.animation, animationSession.frameId);
     return { ...plan, image: { width: doc.width, height: doc.height, rgba: documentRgba(doc.rgba ? doc : { ...doc, pixels: Array.from(doc.pixels) }) } };
+  },
+  previewSpriteScaleSettings(percent) {
+    const blocked = spriteScaleBlockedReason();
+    if (blocked) throw new Error(blocked);
+    const owner = animationSession.animation;
+    const plan = planSpriteScale(owner, percent);
+    if (!plan.allowed) {
+      const error = new RangeError(plan.reason);
+      error.code = plan.reasonCode;
+      error.plan = plan;
+      throw error;
+    }
+    const scaled = scaleSpriteAnimation(owner, percent);
+    const doc = composeAnimationFrameRgba(scaled, animationSession.frameId);
+    return {
+      owner,
+      changed: plan.changed,
+      plan,
+      image: { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(doc.rgba || documentRgba(doc)) },
+      summary: {
+        croppedPixels: 0,
+        remappedColors: 0,
+        musicImpact: '全コマ・全レイヤーを同じ倍率で拡縮します。音がある場合は音の配置も拡縮されます。'
+      }
+    };
+  },
+  async setSpriteScaleSettings(percent, { expectedOwner = null } = {}) {
+    if (expectedOwner && expectedOwner !== animationSession.animation) throw new Error('プレビュー後に作品が変わりました。もう一度確認してください。');
+    const blocked = spriteScaleBlockedReason();
+    if (blocked) throw new Error(blocked);
+    return await scaleSpriteCanvas(percent);
   },
   setProjectSettings(settings, { expectedOwner = null } = {}) {
     if (expectedOwner && expectedOwner !== animationSession.animation) throw new Error('プレビュー後に作品が変わりました。もう一度確認してください。');

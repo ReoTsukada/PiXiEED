@@ -80,6 +80,10 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
   await mkdir(join(root,'assets/fonts/DotGothic16'), { recursive: true });
   await mkdir(join(root,'assets/fonts/PressStart2P'), { recursive: true });
   const drawFeatureFiles = {
+    'js/creation/legacy-lens-entry.mjs': 'export const legacyLensEntry = true;',
+    'js/creation/shared-project-settings-core.mjs': 'export const sharedSettingsCore = true;',
+    'css/creation-camera-idle.css': '.creation-camera-idle{}',
+    'css/draw-palette-instruments.css': '.draw-audio-instrument-icon{}',
     'js/page-navigation.mjs': 'export const pageNavigation = true;',
     'js/creation/creation-modes.mjs': 'export const creationModes = true;',
     'js/creation/creation-camera.mjs': 'export const creationCamera = true;',

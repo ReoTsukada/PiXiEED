@@ -1,7 +1,7 @@
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261017-layer-minimum-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-tool-shell-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261017-editor-improvements-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261017-editor-improvements-1';
 
 if (new URLSearchParams(location.search).get('gameEditor') === 'spot') {
   document.documentElement.dataset.gameDrawRuntime = 'true';
@@ -49,7 +49,7 @@ try {
       onNavigate: request => modes ? modes.navigate(request) : location.assign(request.url) }) });
   if (!scope.disposed) document.documentElement.dataset.drawReady = 'true';
   try {
-    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261016-tool-operations-1');
+    const { mountCreationModes } = await import('./creation-modes.mjs?rev=20261017-editor-improvements-1');
     if (!scope.disposed) modes = await mountCreationModes({ draw, scope });
     if (!scope.disposed && window.__PIXIEED_TOOL_EMBED__ && drawForEmbed && modes) {
       const { installToolEmbedBridge } = await import('./tool-embed-bridge.mjs?rev=20261016-tool-shell-1');

@@ -12,7 +12,7 @@ const eventCatalog = JSON.parse(await readFile(resolve(root, 'events/catalog.jso
 const eventRoutes = ['/events/', ...eventCatalog.ids.map(id => `/events/${id}/`)];
 const pages = ['/', '/output/', '/globe/', '/tools/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/', '/help/', '/glossary/', '/projects/pixfind/'];
 const legacyRoutes = ['/pixiedraw/', '/pixiedraw2/', '/PiXiEEDraw/', '/studio/', '/projects/pixiedraw/'];
-const indexableRoutes = ['/', '/globe/', '/tools/', '/output/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/pixiee-lens/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+const indexableRoutes = ['/', '/globe/', '/tools/', '/output/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/pixel-camera.html', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
 indexableRoutes.push('/help/', '/glossary/', '/projects/pixfind/', ...eventRoutes);
 const images = ['site', 'tools', 'draw', 'audio', 'jigsaw', 'spot-difference', 'hidden-object', 'spot-game', 'find-game', 'game', 'camera', 'telescope', 'output', 'globe', 'events', 'stores'];
 const icons = new Map([['/favicon-96.png', 96], ['/apple-touch-icon.png', 180], ['/assets/brand/app-icon-192.png', 192], ['/assets/brand/app-icon-512.png', 512]]);
@@ -58,7 +58,14 @@ try {
       }
       const canonical = tags.filter((tag) => tag.rel === 'canonical');
       assert.equal(canonical.length, 1);
-      assert.equal(canonical[0].href, `https://pixieed.jp${path}`);
+      assert.equal(canonical[0].href, path === '/pixiee-lens/' ? 'https://pixieed.jp/draw/?mode=camera' : `https://pixieed.jp${path}`);
+      if (path === '/pixiee-lens/') {
+        assert.match(html, /legacy-lens-entry\.mjs/);
+        assert.match(html, /name="robots" content="noindex,follow"/);
+        assert.doesNotMatch(html, /<canvas\b|PiXiEELENS.*GIF撮影/);
+        checks++;
+        continue;
+      }
       if (indexableRoutes.includes(path)) {
         const robots = tags.find((tag) => tag.name === 'robots');
         assert.ok(!/noindex/i.test(robots?.content || ''), `${path}: indexable sitemap route is not noindex`);
@@ -66,22 +73,6 @@ try {
       assert.equal(meta('og:url'), canonical[0].href);
       assert.equal(meta('og:site_name'), 'PiXiEED');
       assert.equal(meta('og:locale'), 'ja_JP');
-      if (path === '/pixiee-lens/') {
-        // The established lens page uses a compact legacy head; validate its
-        // canonical and factual JSON-LD without imposing the newer OG bundle.
-        assert.ok(meta('description'));
-        assert.ok(meta('og:title'));
-        assert.ok(meta('og:description'));
-        assert.equal(meta('og:image'), 'https://pixieed.jp/pixiee-lens/ogp.png');
-        const image = new URL(meta('og:image'));
-        assert.equal(image.origin, 'https://pixieed.jp');
-        assert.ok(paths.has(image.pathname));
-        const structured = [...html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
-          .map(([, json]) => JSON.parse(json));
-        assert.ok(structured.length > 0, 'lens structured data remains valid JSON');
-        checks++;
-        continue;
-      }
       assert.equal(meta('og:type'), 'website');
       assert.equal(meta('og:image:width'), '1200'); assert.equal(meta('og:image:height'), '630');
       assert.equal(meta('og:image:type'), 'image/png');

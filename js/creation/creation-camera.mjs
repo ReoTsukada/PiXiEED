@@ -1,5 +1,5 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-tool-shell-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261017-editor-improvements-1';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
@@ -51,6 +51,19 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const template = new DOMParser().parseFromString(markup, 'text/html');
   const surface = template.querySelector('#pixelStudio'), controls = surface?.querySelector('.lc-bottom'), shutter = template.querySelector('#capture');
   if (!surface || !controls || !shutter) throw new Error('撮影の操作が不足しています。');
+  // The retained camera lives inside an already bounded stage. Keep the start
+  // instruction separate from optional device help, rather than inheriting a
+  // whole-page error card and reserving the outer header/navigation twice.
+  const welcomeCopy = surface.querySelector('.lc-fallback-copy');
+  const welcomeTitle = welcomeCopy.querySelector('h2');
+  welcomeTitle.textContent = 'カメラを開始';
+  const deviceHelp = document.createElement('details'); deviceHelp.className = 'creation-camera-device-help';
+  const deviceHelpSummary = document.createElement('summary'); deviceHelpSummary.textContent = 'カメラを使えないとき';
+  deviceHelp.append(deviceHelpSummary);
+  for (const paragraph of [...welcomeCopy.querySelectorAll('p:not(#cameraUnavailableReason)')]) deviceHelp.append(paragraph);
+  const fileHint = document.createElement('p'); fileHint.className = 'creation-camera-file-hint';
+  fileHint.textContent = '画像は下の「ファイル」から読み込めます。';
+  welcomeCopy.append(fileHint, deviceHelp);
   const cssResponse = await fetch('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', { signal:scope.signal });
   assertCurrent();
   if (!cssResponse.ok) throw new Error('撮影の表示を読み込めません。');
@@ -69,6 +82,8 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const mirrorControlState = () => {
     for (const key of Object.keys(controlHost.dataset)) if (!Object.hasOwn(surface.dataset, key)) delete controlHost.dataset[key];
     Object.assign(controlHost.dataset, surface.dataset);
+    const title = surface.dataset.error === 'true' ? 'カメラを開始できません' : 'カメラを開始';
+    if (welcomeTitle.textContent !== title) welcomeTitle.textContent = title;
   };
   controlStateObserver = new MutationObserver(() => { mirrorControlState(); syncCaptureProjectState(); }); controlStateObserver.observe(surface, { attributes: true });
   mirrorControlState();
@@ -313,7 +328,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
   syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261016-tool-shell-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261017-editor-improvements-1');
   assertCurrent();
   updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,

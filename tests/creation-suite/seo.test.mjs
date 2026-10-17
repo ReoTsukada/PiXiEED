@@ -17,8 +17,6 @@ const pages = [
 const sitemapExcludedPaths = new Set(['/game/', '/telescope/', '/collection/']);
 const sitemapPages = pages
   .filter(([, path]) => !sitemapExcludedPaths.has(path));
-sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/pixel-camera.html') + 1, 0,
-  ['pixiee-lens/index.html', '/pixiee-lens/']);
 const eventIds = JSON.parse(readFileSync(resolve(root, 'events/catalog.json'), 'utf8')).ids;
 sitemapPages.push(['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'], ['projects/pixfind/index.html', '/projects/pixfind/']);
 sitemapPages.push(['events/index.html', '/events/'], ...eventIds.map(id => [`events/${id}/index.html`, `/events/${id}/`]));
@@ -137,6 +135,7 @@ test('sitemap lists the clean public page URLs without retired and private route
   const expected = sitemapPages.map(([, path]) => `https://pixieed.jp${path}`);
   assert.deepEqual(actual, expected);
   assert.equal(new Set(actual).size, actual.length, 'no duplicate URLs');
+  assert.doesNotMatch(sitemap, /https:\/\/pixieed\.jp\/pixiee-lens\//);
   assert.doesNotMatch(sitemap, /\/(?:profile|admin|sale|localdrafts|works|gallery|game|collection|telescope)\//i);
 });
 
