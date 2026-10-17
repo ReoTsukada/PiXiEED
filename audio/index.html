@@ -13,13 +13,14 @@
       try {
         const frame = window.frameElement;
         const original = frame && new URL(frame.src, location.href);
-        const audioLegacy = /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
-        if (!validBridge(params) && !audioLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
-          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : 'draw';
+        const independentLegacy = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
+        if (!validBridge(params) && !independentLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
+          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : /\/camera(?:\/index\.html)?\/?$/.test(location.pathname) ? 'camera' : 'draw';
           params.set('embed', '1'); params.set('embedRole', mode); params.set('channel', original.searchParams.get('channel'));
         }
       } catch { /* Foreign frames do not inherit an editor channel. */ }
       if (validBridge(params)) {
+        if (!params.has('mode')) params.set('mode', params.get('embedRole'));
         location.replace(`/draw/editor.html?${params}${location.hash}`);
       }
     })();
@@ -41,14 +42,14 @@
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
   <link rel="stylesheet" href="/css/tool-embed.css?rev=20261016-tool-shell-1">
-  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261016-unified-shell-1">
+  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261017-entry-integration-1">
 </head>
 <body class="tool-intro tool-shell tool-shell--audio" data-tool-shell>
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
-      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a></nav>
+      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="/draw/#draw-how-to">ドット絵を描く</a></nav>
     </div>
   </header>
   <main id="main">
@@ -100,8 +101,8 @@
       <details><summary>描画・カメラ・音楽の作品は共有されますか？</summary><p>3つのモードは同じ作品とキャンバスを使います。音楽は専用レイヤーで編集します。</p></details>
     </section>
   </main>
-  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-shell.mjs?rev=20261016-tool-shell-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/#draw-how-to">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261017-entry-integration-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
 </body>
 </html>

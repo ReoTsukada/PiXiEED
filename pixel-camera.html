@@ -5,9 +5,10 @@
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
 <title>写真をドット絵に変換｜画像・カメラから作成｜PiXiEED</title>
 <meta name="description" content="写真や画像をドット絵に変換し、色やドットの見た目を調整してPNGで保存できます。カメラ撮影にも対応し、画像は端末内で処理します。">
-<link rel="canonical" href="https://pixieed.jp/pixel-camera.html">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="写真をドット絵に変換｜画像・カメラから作成｜PiXiEED"><meta property="og:description" content="写真や画像をドット絵に変換し、色やドットの見た目を調整してPNGで保存できます。カメラ撮影にも対応し、画像は端末内で処理します。"><meta property="og:url" content="https://pixieed.jp/pixel-camera.html"><meta property="og:image" content="https://pixieed.jp/assets/og/camera.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「写真をドット絵に変換」のアイコン">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="写真をドット絵に変換｜画像・カメラから作成｜PiXiEED"><meta name="twitter:description" content="写真や画像をドット絵に変換し、色やドットの見た目を調整してPNGで保存できます。カメラ撮影にも対応し、画像は端末内で処理します。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/camera.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「写真をドット絵に変換」のアイコン">
+<meta name="robots" content="noindex,follow">
+<link rel="canonical" href="https://pixieed.jp/camera/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="写真をドット絵に変換｜画像・カメラから作成｜PiXiEED"><meta property="og:description" content="写真や画像をドット絵に変換し、色やドットの見た目を調整してPNGで保存できます。カメラ撮影にも対応し、画像は端末内で処理します。"><meta property="og:url" content="https://pixieed.jp/camera/"><meta property="og:image" content="https://pixieed.jp/assets/og/camera.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDrawのカメラモードのアイコン">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="写真をドット絵に変換｜画像・カメラから作成｜PiXiEED"><meta name="twitter:description" content="写真や画像をドット絵に変換し、色やドットの見た目を調整してPNGで保存できます。カメラ撮影にも対応し、画像は端末内で処理します。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/camera.png"><meta name="twitter:image:alt" content="PiXiEEDrawのカメラモードのアイコン">
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0d1114">
@@ -16,7 +17,7 @@
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
   <link rel="stylesheet" href="/css/tool-result-view.css?rev=20261002-ux-polish-1">
-  <link rel="modulepreload" href="/js/pixel-lens/entry.mjs?rev=20261017-editor-improvements-1">
+  <link rel="modulepreload" href="/js/pixel-lens/entry.mjs?rev=20261017-entry-integration-1">
 </head>
 <body data-tool-name="写真をドット絵に変換" data-tool-short="カメラ">
   <a class="pc-skip" href="#stage">カメラへ移動</a>
@@ -176,7 +177,7 @@
   </dialog>
   <nav class="app-tabs pc-nav" aria-label="アプリナビゲーション" data-nav="five">
     <a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
-    <a data-nav="camera" href="/draw/?mode=camera" aria-label="撮影" aria-current="page"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
+    <a data-nav="camera" href="/camera/" aria-label="撮影" aria-current="page"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
     <button id="capture" class="pc-nav-action" data-action="capture" type="button" aria-label="表示中の画像を撮影（長押しでGIF）" title="タップで撮影・長押しでGIF" disabled>
       <span class="pc-nav-shutter" aria-hidden="true"></span>
       <img class="pc-nav-resume" src="/assets/icons/pixieed/camera.svg" alt="">
@@ -185,8 +186,8 @@
     <a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="/js/pixel-lens/entry.mjs?rev=20261017-editor-improvements-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+  <script type="module" src="/js/pixel-lens/entry.mjs?rev=20261017-entry-integration-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-merge-selection-1"></script>
 </body>
 </html>

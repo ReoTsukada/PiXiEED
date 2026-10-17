@@ -223,7 +223,7 @@ ${relatedHtml}
 </main>
 <footer><a href="/events/">イベント一覧へ戻る</a> · <a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261016-tool-shell-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
 </body>
 </html>
 `;
@@ -309,7 +309,7 @@ ${yearSections}
 </main><footer><a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261016-tool-shell-1"></script>
 <script type="module" src="/js/event-history.mjs?rev=20261016-tool-shell-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
 </body>
 </html>
 `;

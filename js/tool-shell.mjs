@@ -8,7 +8,8 @@ const params = new URLSearchParams(location.search);
 const knownModes = new Set(['draw', 'camera', 'audio']);
 const requestedMode = params.get('mode');
 const isAudioRoute = location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '') === '/audio';
-const mode = isAudioRoute ? 'audio' : knownModes.has(requestedMode) ? requestedMode : 'draw';
+const isCameraRoute = location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '') === '/camera';
+const mode = isAudioRoute ? 'audio' : isCameraRoute ? 'camera' : knownModes.has(requestedMode) ? requestedMode : 'draw';
 section.dataset.toolMode = mode;
 shell.classList.remove('tool-shell--draw', 'tool-shell--camera', 'tool-shell--audio');
 shell.classList.add(`tool-shell--${mode}`);
@@ -21,7 +22,7 @@ const copy = {
     workspaceTitle: 'このページで制作する',
   },
   camera: {
-    eyebrow: 'PIXIEE LENS', title: '写真・画像をドット絵に変換',
+    eyebrow: 'PiXiEEDraw · PiXiEELENS', title: '写真・画像をドット絵に変換',
     lead: '写真を撮影するか画像を読み込み、ドット絵に変換して色数を調整できます。',
     workspace: '画像の読込や撮影から始め、変換結果を作品に反映できます。',
     workspaceTitle: 'このページで画像を変換する',
@@ -43,14 +44,15 @@ document.title = mode === 'audio'
   : `${copy.title}｜PiXiEEDraw`;
 
 function queryWithAdapter() {
-  if (!isAudioRoute) return new URLSearchParams(location.search);
+  if (!isAudioRoute && !isCameraRoute) return new URLSearchParams(location.search);
   if (params.getAll('mode').length > 1) {
     throw new TypeError('モードが複数指定されています。URLの mode 値をひとつにして開き直してください。');
   }
-  const adapted = creationModeEntryUrl('audio', location.search);
+  const adapted = creationModeEntryUrl(mode, location.search);
   if (!adapted) {
-    // Legacy standalone and handoff URLs retain the former independent audio runtime.
-    location.replace(`/audio/editor.html${location.search}${location.hash}`);
+    // Legacy standalone and handoff URLs retain their independent runtime.
+    const legacyRuntime = isCameraRoute ? '/pixel-camera.html' : '/audio/editor.html';
+    location.replace(`${legacyRuntime}${location.search}${location.hash}`);
     return null;
   }
   return new URL(adapted, location.href).searchParams;
@@ -64,8 +66,9 @@ try {
   if (status) status.textContent = error.message || '制作ツールを準備できませんでした。';
   throw error;
 }
-if (!forwarded) throw new Error('旧形式の音楽編集画面へ移動しています。');
-if (isAudioRoute && !forwarded.has('mode')) forwarded.append('mode', 'audio');
+// A legacy dispatch is an expected navigation, not an application error.
+if (forwarded) {
+if ((isAudioRoute || isCameraRoute) && !forwarded.has('mode')) forwarded.append('mode', mode);
 
 // The parent controller owns the bridge channel. Replacing these reserved
 // transport fields is safe; every application and unknown query value remains
@@ -81,4 +84,5 @@ runtime.hash = location.hash;
 section.dataset.embedUrl = runtime.href;
 
 // The controller consumes data-embed-url and data-embed-auto on import.
-await import('/js/tool-embed.mjs?rev=20261016-tool-shell-1');
+await import('/js/tool-embed.mjs?rev=20261017-entry-integration-1');
+}

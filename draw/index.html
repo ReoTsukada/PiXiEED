@@ -13,13 +13,14 @@
       try {
         const frame = window.frameElement;
         const original = frame && new URL(frame.src, location.href);
-        const audioLegacy = /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
-        if (!validBridge(params) && !audioLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
-          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : 'draw';
+        const independentLegacy = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
+        if (!validBridge(params) && !independentLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
+          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : /\/camera(?:\/index\.html)?\/?$/.test(location.pathname) ? 'camera' : 'draw';
           params.set('embed', '1'); params.set('embedRole', mode); params.set('channel', original.searchParams.get('channel'));
         }
       } catch { /* Foreign frames do not inherit an editor channel. */ }
       if (validBridge(params)) {
+        if (!params.has('mode')) params.set('mode', params.get('embedRole'));
         location.replace(`/draw/editor.html?${params}${location.hash}`);
       }
     })();
@@ -41,14 +42,14 @@
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
   <link rel="stylesheet" href="/css/tool-embed.css?rev=20261016-tool-shell-1">
-  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261016-unified-shell-1">
+  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261017-entry-integration-1">
 </head>
 <body class="tool-intro tool-shell tool-shell--draw" data-tool-shell>
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
-      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a></nav>
+      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="/draw/#draw-how-to">使い方</a></nav>
     </div>
   </header>
   <main id="main">
@@ -63,7 +64,9 @@
       </div>
     </section>
 
-    <section class="tool-intro__embed-wrap tool-shell__workspace" aria-label="PiXiEEDraw 制作ツール">
+    <nav class="tool-intro__related container" aria-label="このページ内の案内"><a href="#draw-tool">制作ツール <span aria-hidden="true">↓</span></a><a href="#draw-how-to">使い方 <span aria-hidden="true">↓</span></a><a href="#draw-save">保存・出力 <span aria-hidden="true">↓</span></a><a href="#draw-faq">よくある質問 <span aria-hidden="true">↓</span></a></nav>
+
+    <section class="tool-intro__embed-wrap tool-shell__workspace" id="draw-tool" aria-label="PiXiEEDraw 制作ツール">
       <div class="container">
         <section class="tool-intro__embed tool-shell__embed" data-tool-embed data-tool-shell data-tool-mode="draw" data-embed-auto aria-labelledby="tool-embed-title">
           <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CREATE HERE</p><h2 id="tool-embed-title">このページで制作する</h2><p data-shell-workspace-copy>描画・カメラ・音楽を同じ作品で切り替えて使えます。</p></div>
@@ -73,13 +76,20 @@
       </div>
     </section>
 
-    <section class="tool-intro__how-to container" aria-labelledby="tool-how-title">
+    <section class="tool-intro__how-to container" id="draw-how-to" aria-labelledby="tool-how-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">HOW TO USE</p><h2 id="tool-how-title">使い方</h2></div>
       <ol class="tool-intro__steps">
-        <li><span>01</span><div><h3>モードを選ぶ</h3><p>描画・カメラ・音楽を、ツール下部のモードから切り替えます。</p></div></li>
-        <li><span>02</span><div><h3>描いて編集する</h3><p>色や道具を選び、キャンバスを編集します。カメラでは画像の読込や撮影ができます。</p></div></li>
-        <li><span>03</span><div><h3>保存・出力する</h3><p>作品を端末に保存したり、画像・アニメーション・音声を書き出したりできます。</p></div></li>
+        <li><span>01</span><div><h3>色と道具を選ぶ</h3><p>パレットから色を選び、ペンや消しゴム、直線・図形などでキャンバスに描きます。</p></div></li>
+        <li><span>02</span><div><h3>レイヤーとフレームで編集</h3><p>レイヤーを重ねて絵を整え、フレームを加えてアニメーションを作れます。</p></div></li>
+        <li><span>03</span><div><h3>保存して出力する</h3><p>作品をこのブラウザーに保存して続きを編集したり、［出力］から完成画像やアニメーションを書き出したりできます。</p></div></li>
       </ol>
+      <details class="tool-intro__screens">
+        <summary>実際の編集画面を見る</summary>
+        <div class="tool-intro__screen-pair">
+          <figure><a href="/assets/screenshots/draw-pc-maou.png" target="_blank" rel="noopener"><picture><source type="image/webp" srcset="/assets/screenshots/previews/draw-pc-maou-480.webp 480w, /assets/screenshots/previews/draw-pc-maou-960.webp 960w" sizes="(min-width: 900px) 560px, 90vw"><img src="/assets/screenshots/draw-pc-maou.png" width="2880" height="1920" alt="魔王のドット絵を読み込んだPiXiEEDrawのパソコン画面" loading="lazy"></picture></a><figcaption>PC版</figcaption></figure>
+          <figure><a href="/assets/screenshots/draw-mobile-maou.png" target="_blank" rel="noopener"><picture><source type="image/webp" srcset="/assets/screenshots/previews/draw-mobile-maou-780.webp 780w" sizes="(min-width: 900px) 560px, 90vw"><img src="/assets/screenshots/draw-mobile-maou.png" width="780" height="1688" alt="魔王のドット絵を読み込んだPiXiEEDrawのスマートフォン画面" loading="lazy"></picture></a><figcaption>スマートフォン版</figcaption></figure>
+        </div>
+      </details>
     </section>
 
     <section class="tool-intro__formats container" aria-labelledby="tool-features-title">
@@ -87,21 +97,22 @@
       <p>レイヤーとフレームを使ったドット絵やアニメーション、写真からの変換、色を音に割り当てる音楽づくりに対応しています。カメラは撮影操作を選んだときに起動します。</p>
     </section>
 
-    <section class="tool-intro__formats tool-shell__save container" aria-labelledby="tool-save-title">
+    <section class="tool-intro__formats tool-shell__save container" id="draw-save" aria-labelledby="tool-save-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">SAVE & EXPORT</p><h2 id="tool-save-title">保存・出力</h2></div>
-      <p>作品はこのブラウザーの端末内に保存されます。編集を続けるPXDバックアップは［ファイル］→［今の作品］→［その他］でダウンロードできます。PNG・GIF・WAVなどの完成画像・アニメーション・音声は［出力］からダウンロードします。保存やダウンロードだけで作品が公開されることはありません。</p>
+      <p>［作品を保存］を選ぶと、作品データを利用中のブラウザーに保存できます。別の端末やブラウザーへの自動同期はありません。完成画像はPNGなどで、アニメーションは［出力］に表示される形式やサイズを選んで書き出せます。保存やダウンロードだけで作品が公開されることはありません。</p>
     </section>
 
-    <section class="tool-intro__faq container" aria-labelledby="tool-faq-title">
+    <section class="tool-intro__faq container" id="draw-faq" aria-labelledby="tool-faq-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FAQ</p><h2 id="tool-faq-title">よくある質問</h2></div>
-      <details><summary>作った作品はどこに保存されますか？</summary><p>作品を保存すると、このブラウザーの端末内に保存されます。出力メニューからファイルとして書き出すこともできます。</p></details>
+      <details><summary>作品はどこに保存されますか？別の端末でも続けられますか？</summary><p>［作品を保存］で利用中のブラウザーに保存されます。別の端末やブラウザーとの自動同期はありません。別の場所で使う場合は、必要な画像を［出力］からファイルに書き出してください。</p></details>
+      <details><summary>ページ内表示と「大きく使う」は別の編集画面ですか？</summary><p>同じエディターを使います。大きく表示した後にページ内表示へ戻っても、編集内容を続けて使えます。ページを離れる前には作品を保存してください。</p></details>
       <details><summary>作品を保存すると公開されますか？</summary><p>保存と公開は別の操作です。端末内への保存やファイルのダウンロードでは公開されません。公開作品を探すときは<a href="/globe/">世界地図</a>を開けます。</p></details>
       <details><summary>カメラはページを開くと起動しますか？</summary><p>自動では起動しません。撮影操作を選んだときにブラウザーがカメラの利用許可を確認します。画像ファイルからも始められます。</p></details>
       <details><summary>描画・カメラ・音楽の作品は共有されますか？</summary><p>3つのモードは同じ作品とキャンバスを使います。音楽は専用レイヤーで編集します。</p></details>
     </section>
   </main>
-  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-shell.mjs?rev=20261016-tool-shell-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261017-entry-integration-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
 </body>
 </html>

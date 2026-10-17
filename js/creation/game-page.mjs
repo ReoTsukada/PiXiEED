@@ -1,5 +1,5 @@
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { createAudioPlayer } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { createLevelTracker } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 import { createWalkCollectGame, directionForGameKey, moveWalkGame, resolveLocalGameArt, resolveLocalGameSong, resolveWalkGameAssets, restoreWalkGame, setWalkGamePaused, validateWalkGame } from './game-core.mjs?rev=20261016-color-capability-1';

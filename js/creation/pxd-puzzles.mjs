@@ -1,6 +1,6 @@
 import { createPxdProject, getPxdJson, setPxdJson } from './pxd-codec.mjs';
 import { mergePxdJson, primaryPxdImageRole, putPxdDrawDocument, putPxdImage, readPxdDrawDocument, readPxdImage, readPxdSharedImage, imageToDrawDocument } from './pxd-project.mjs?rev=20261016-color-capability-1';
-import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { detectDifferenceCandidates, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { createHiddenObjectDraft, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { createJigsawLayout, createJigsawWorkspace, validateJigsawWorkspace } from './jigsaw-workspace.mjs?rev=20261001-free-tools-1';

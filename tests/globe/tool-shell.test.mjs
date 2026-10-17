@@ -16,7 +16,7 @@ test('globe top is a single viewport tool surface', () => {
 
 test('camera link from the embedded posting panel leaves the iframe', () => {
   const source = read('js/globe/post-ui.mjs');
-  assert.match(source, /href="\/pixel-camera\.html\?from=globe"/);
+  assert.match(source, /href="\/camera\/\?from=globe"/);
   assert.match(source, /target="_top"/);
 });
 

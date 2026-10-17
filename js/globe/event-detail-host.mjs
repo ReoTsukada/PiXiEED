@@ -148,6 +148,7 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
   }
 
   function sendHostReady() {
+    iframe.inert = !host.hidden && Boolean(win.matchMedia?.('(max-width: 900px)').matches);
     if (!disposed && iframe.contentWindow) {
       try { iframe.contentWindow.postMessage({ type: 'pixieed:map-event-detail-host-ready', layout: win.matchMedia?.('(min-width: 901px)').matches ? 'wide' : 'compact' }, win.location.origin); } catch { /* frame may be navigating */ }
     }
@@ -157,6 +158,7 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
     const hadDetailFocus = host.contains?.(doc.activeElement);
     currentEventId = '';
     host.hidden = true;
+    iframe.inert = false;
     detail.hidden = true;
     detail.replaceChildren();
     ad.hidden = true;
@@ -201,6 +203,7 @@ export function createMapEventDetailHost({ doc = globalThis.document, win = glob
     if (!currentEventId) returnScroll = { main: main?.scrollTop || 0, page: doc.scrollingElement?.scrollTop || 0 };
     currentEventId = safeEvent.id;
     host.hidden = false;
+    iframe.inert = Boolean(win.matchMedia?.('(max-width: 900px)').matches);
     detail.hidden = false;
     try {
       const calendarSlot = renderEventDetail(doc, detail, safeEvent, backToList);

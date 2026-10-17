@@ -1,6 +1,6 @@
 import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261016-color-capability-1';
 import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261016-color-capability-1';
-import { validateDrawDocument } from './draw-core.mjs';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 /** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */
 export function createDrawAnimationSession(document, { musicLayer: musicMode = false } = {}) {

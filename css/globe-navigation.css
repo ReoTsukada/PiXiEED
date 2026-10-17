@@ -1,0 +1,105 @@
+/* Page navigation and map purpose, scoped to the globe route and iframe. */
+body.app-page--tool-globe { --px-header-height: 72px; --header-h: 72px; }
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) {
+  height: auto;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  padding-bottom: calc(5.3rem + env(safe-area-inset-bottom));
+}
+
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) #main {
+  display: block;
+  height: auto;
+  min-height: calc(100dvh - var(--px-header-height) - 44px);
+}
+
+.map-page-directory-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  color: #d3e2e8;
+  background: #071520;
+  font-size: .78rem;
+}
+.map-page-directory-link a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 3px; }
+.map-page-directory-link a:focus-visible { outline: 2px solid #9bcfff; outline-offset: 2px; }
+
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) .map-hero--field {
+  height: auto;
+  min-height: 0;
+}
+
+body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) .map-hero--field .map-hero__inner {
+  height: calc(100dvh - var(--map-page-chrome-height, calc(var(--px-header-height) + 44px)));
+  min-height: 0;
+}
+
+.is-embedded:not(.is-tool-telescope) #globeStage:not(.has-sheet):not(.is-composing) .map-layers:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(300px, calc(100% - 20px));
+}
+.is-embedded:not(.is-tool-telescope) #globeStage.has-map-events .map-layers:not([hidden]) { display: grid; }
+.map-layers button { justify-content: center; min-width: 0; }
+
+.is-embedded:not(.is-tool-telescope) .map-events-panel[data-view="list"] {
+  top: 78px;
+  bottom: calc(5.3rem + env(safe-area-inset-bottom));
+  max-height: none;
+  height: auto;
+  overflow: hidden;
+}
+
+@media (max-width: 680px) {
+  .is-embedded:not(.is-tool-telescope) .map-layers {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 14px;
+  }
+  .is-embedded:not(.is-tool-telescope) .map-layers button {
+    width: 100%;
+    padding-inline: 6px;
+    font-size: .75rem;
+  }
+}
+
+@media (max-height: 520px) and (max-width: 680px) {
+  .is-embedded:not(.is-tool-telescope) #globeStage.has-selection .map-layers { display: none; }
+}
+
+/* Keep map layer controls above a list, while only the list body scrolls. */
+.is-embedded .map-events-panel__close { min-width: 88px; padding-inline: 12px; }
+.map-event-directory { scroll-margin-top: 84px; }
+@media (max-height: 400px) and (min-width: 681px) {
+  .is-embedded:not(.is-tool-telescope) #globeStage .map-layers { left: 10px; right: auto; width: 300px; }
+  .is-embedded:not(.is-tool-telescope) .map-events-dock { top: 10px; bottom: auto; left: auto; right: 10px; width: min(350px, 43%); max-width: none; transform: none; }
+  .is-embedded:not(.is-tool-telescope) .map-events-panel[data-view="list"] { top: 10px; }
+}
+/* The published page's CTA leaves a short iframe in landscape. Keep the date
+   filter and return action on one row, followed by a heading and scroll body. */
+@media (max-height: 300px) and (min-width: 681px) {
+  .is-embedded:not(.is-tool-telescope) .map-events-panel[data-view="list"]:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 44px auto minmax(0, 1fr); gap: 4px; }
+  .is-embedded .map-events-panel[data-view="list"] .map-events-panel__head { display: contents; }
+  .is-embedded .map-events-panel[data-view="list"] .map-events-panel__head h2 { grid-column: 1 / -1; grid-row: 2; margin: 0; padding: 0; font-size: .75rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .is-embedded .map-events-panel[data-view="list"] .map-events-panel__head-controls { grid-column: 2; grid-row: 1; }
+  .is-embedded .map-events-panel[data-view="list"] .map-events-panel__controls { grid-column: 1; grid-row: 1; min-width: 0; }
+  .is-embedded .map-events-panel[data-view="list"] .map-events-panel__body { grid-column: 1 / -1; grid-row: 3; }
+}
+/* Detail keeps its own scroll surface, without the directory shortcut taking a grid column. */
+body.app-page--tool-globe:has(.map-event-detail-host:not([hidden])) .map-page-directory-link { display: none; }
+@media (max-width: 680px) {
+  .is-embedded:not(.is-tool-telescope) .map-events-panel[data-view="list"] {
+    top: auto;
+    max-height: min(65%, calc(100% - 162px - env(safe-area-inset-bottom)));
+  }
+}

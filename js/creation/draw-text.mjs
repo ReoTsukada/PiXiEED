@@ -1,4 +1,4 @@
-import { validateDrawDocument } from './draw-core.mjs';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 export const DRAW_TEXT_FONTS = Object.freeze([
   { id: 'sans', label: 'ゴシック', css: 'sans-serif' },

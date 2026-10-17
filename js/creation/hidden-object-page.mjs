@@ -3,7 +3,7 @@ import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=2026100
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { decodeDrawImageFile } from './draw-import.mjs?rev=20260928-pixel-roundtrip-1';
 import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
 import { imageToDrawDocument } from './pxd-project.mjs?rev=20261016-color-capability-1';
@@ -16,7 +16,7 @@ import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capabili
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
-import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
+import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
 import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261017-editor-improvements-1';
 

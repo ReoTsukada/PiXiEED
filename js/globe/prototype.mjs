@@ -1,17 +1,26 @@
-import { initPostUi } from './post-ui.mjs?v=20261007-map-lazy-1';
-import { initEnhancedMapEvents as initMapEvents } from './map-event-enhancements.mjs?rev=20261016-tool-shell-1';
+import { initPostUi } from './post-ui.mjs?v=20261017-entry-integration-1';
+import { initEnhancedMapEvents as initMapEvents } from './map-event-enhancements.mjs?rev=20261017-map-navigation-1';
 import { createMapGeometryLoader } from './map-geometry-loader.mjs?v=20261007-map-lazy-1';
 import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261007-map-lazy-1';
 import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
 
+import { readMapNavigationState, writeMapNavigationState } from './map-navigation-state.mjs?rev=20261017-map-navigation-1';
+
 const telescopeTool = new URLSearchParams(location.search).get('tool') === 'telescope';
 // Astronomy belongs to the stand-alone telescope; a map never starts its timers or catalogue.
 const astronomy = telescopeTool ? await Promise.all([import('./astro-ui.mjs?v=20261005-admin-boundary-1'), import('./real-sky.mjs?v=20260927-sky-events-v1')]) : null;
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
+// Explicit artwork/post arrivals take precedence over a previous browsing position.
+let navigationState = null, navigationRestorationCancelled = false;
+try {
+  const arrival = new URL(embedMode ? parent.location.href : location.href).searchParams;
+  if (!telescopeTool && !['art', 'post', 'from', 'compose'].some(key => arrival.has(key))) navigationState = readMapNavigationState(sessionStorage);
+} catch { /* Unavailable storage must not prevent startup. */ }
 
 const canvas = document.querySelector('#globeCanvas');
 const globeStage = document.querySelector('#globeStage');
+for (const kind of ['pointerdown', 'keydown', 'wheel']) globeStage?.addEventListener(kind, event => { if (event.isTrusted) navigationRestorationCancelled = true; }, { capture: true, passive: true });
 const loadStatus = document.querySelector('#loadStatus');
 const selectionPanel = document.querySelector('#selectionPanel');
 const selectedOwner = document.querySelector('#selectedOwner');
@@ -156,7 +165,12 @@ function createPrototypeRenderer(options = {}) {
     eventUi = initMapEvents({ renderer, stage: globeStage, onChange: updateMapContent, onOpen: () => { postUi?.close(); showCellHover(null); } });
     globalThis.__PIXIEED_MAP_EVENTS__ = eventUi;
     updateMapContent();
-    setMapContentLayer('posts');
+    if (navigationState?.view) renderer.setView(navigationState.view);
+    setMapContentLayer(navigationState?.layer || 'posts');
+    if (navigationState?.events) {
+      const saved = navigationState.events;
+      void eventUi.ready.then(() => { if (!navigationRestorationCancelled) eventUi.restoreNavigationState(saved); });
+    }
   }
   syncObservationViews();
   return renderer;
@@ -241,6 +255,15 @@ primaryAction?.addEventListener('click', () => {
 });
 globeStage?.addEventListener('pixieed:astro-viewchange', syncPrimaryAction);
 globeStage?.addEventListener('pixieed:astro-viewchange', syncObservationViews);
+
+function rememberNavigation() {
+  if (telescopeTool || !renderer) return;
+  try {
+    writeMapNavigationState(sessionStorage, { layer: mapContentLayer, view: renderer.getSnapshot().view, events: eventUi?.getNavigationState() });
+  } catch { /* Storage is optional. */ }
+}
+window.addEventListener('pagehide', rememberNavigation);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') rememberNavigation(); });
 
 // /telescope/ opens the shared sky simulation as a stand-alone tool.
 function openToolFromUrl() {

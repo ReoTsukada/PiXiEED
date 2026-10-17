@@ -83,6 +83,7 @@ function render(route) {
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <script>document.documentElement.classList.add('books-catalog-js');</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   ${robots}
   <meta name="description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
@@ -109,7 +110,7 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261015-visual-polish-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261017-startup-layout-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
@@ -159,7 +160,7 @@ ${listedProducts.map(card).join('\n')}
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261015-shop-compact-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261015-shop-thumbnails-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
 </body>
 </html>
 `;

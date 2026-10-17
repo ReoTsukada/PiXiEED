@@ -7,7 +7,7 @@ import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-c
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261016-tool-shell-1';
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
 
 const icons = {
@@ -41,7 +41,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
   let transientNavigation = false;
-  const css = node('link'); css.rel = 'stylesheet'; css.href = '/css/project-workspace.css?rev=20261006-header-controls-1'; document.head.append(css);
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261006-header-controls-1';
+  let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
+  const ownsCss = !css;
+  if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
   document.body.classList.add('project-workspace-ready');
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
@@ -571,7 +574,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     return switching;
   }
   return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, activate: update,
-    dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); for (const cleanup of cardContextCleanups) cleanup(); dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); css.remove(); },
+    dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); for (const cleanup of cardContextCleanups) cleanup(); dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
     async importProject(project) { await ready; await transact(() => importCopy(project)); },
     async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
     async pauseForNavigation() {

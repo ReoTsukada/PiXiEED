@@ -99,7 +99,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
           <span>クリックで選ぶ ・ 貼り付け（Ctrl/⌘+V）も使えます</span>
           <small>PNG / WebP ・ 長辺${PIXEL_LIMITS.maxSize}pxまで ・ ${PIXEL_LIMITS.maxColors}色まで ・ 横長・縦長も可 ・ 拡大保存も等倍に戻します</small>
         </div>
-        <a class="camera-link" data-camera-link href="/pixel-camera.html?from=globe" target="_top" rel="noopener">ドット絵カメラで撮って作る</a>
+        <a class="camera-link" data-camera-link href="/camera/?from=globe" target="_top" rel="noopener">ドット絵カメラで撮って作る</a>
         <input type="file" accept="image/png,image/webp" data-file hidden>
         <div class="art" data-art hidden>
           <div class="art__stage"><img data-art-image alt="選んだドット絵のプレビュー"></div>

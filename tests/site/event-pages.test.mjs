@@ -59,7 +59,8 @@ test('event page discloses unknown fields, source provenance, and introduction s
   assert.doesNotMatch(html, /application\/ld\+json/);
 });
 
-test('event state follows inclusive event dates while registration cutoff is shown separately', () => {
+test('event state follows inclusive event dates while registration cutoff is shown separately', (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-17T00:00:00Z') });
   const event = {
     id: 'registration-closes-before-event', name: 'Pixel Jam', status: 'upcoming',
     startDate: '2026-10-18', endDate: '2026-10-20', deadlineAt: '2026-10-16T17:00:00Z',

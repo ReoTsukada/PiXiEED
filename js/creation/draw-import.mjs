@@ -1,4 +1,4 @@
-import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20260927-draw-step08-3';
+import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { downscalePixels, normalizePixelFile, readPixelImageDimensions, reductionScale } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;

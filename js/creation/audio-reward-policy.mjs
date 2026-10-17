@@ -1,6 +1,6 @@
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import { AUDIO_PIXEL_TICKS, collectAudioEvents, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
-import { AUDIO_INSTRUMENTS } from './audio-timbres.mjs';
+import { AUDIO_INSTRUMENTS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { getAnimationCelDocument, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261016-color-capability-1';
 import { getAudioAnimationUsedColorIds } from './audio-animation.mjs?rev=20261016-color-capability-1';
 

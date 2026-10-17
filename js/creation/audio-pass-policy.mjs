@@ -1,5 +1,5 @@
 import { AUDIO_PIXEL_TICKS, collectAudioEvents } from './audio-core.mjs?rev=20261016-color-capability-1';
-import { AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20260930-four-voices-1';
+import { AUDIO_EXTRA_INSTRUMENT_IDS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 
 /** Compatibility metadata; instruments and supported canvas sizes are available without a pass. */

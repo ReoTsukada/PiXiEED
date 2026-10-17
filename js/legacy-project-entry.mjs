@@ -1,5 +1,5 @@
 const DRAW_PATH = '/draw/';
-const DRAW_HELP_PATH = '/draw/about/';
+const DRAW_HELP_PATH = '/draw/#draw-how-to';
 const PIXFIND_GAMES = Object.freeze({
   'hidden-object': '/play/hidden-object/',
   'spot-difference': '/play/spot-difference/',
@@ -116,10 +116,11 @@ export function legacyDrawRecoveryLinks({ search = '', hash = '' } = {}) {
   const drawQuery = params.has('pxd')
     ? query
     : `${query}${query ? '&' : ''}pxd=legacy-state-unavailable`;
-  const originalSuffix = suffix(search, hash);
+  const helpPath = DRAW_HELP_PATH.slice(0, DRAW_HELP_PATH.indexOf('#'));
+  const helpFragment = DRAW_HELP_PATH.slice(DRAW_HELP_PATH.indexOf('#'));
   return {
     draw: `${DRAW_PATH}${drawQuery ? `?${drawQuery}` : ''}${hash || ''}`,
-    guide: `${DRAW_HELP_PATH}${originalSuffix}`,
+    guide: `${helpPath}${query ? `?${query}` : ''}${helpFragment}`,
   };
 }
 

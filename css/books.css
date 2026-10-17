@@ -12,6 +12,14 @@
   background: var(--catalog-paper);
 }
 .books-page *, .books-page *::before, .books-page *::after { box-sizing: border-box; }
+/* Match the mounted header before its module arrives; the blank flex item reserves the menu slot. */
+@media (min-width: 601px) {
+  body.books-page .catalog-header:not(.px-site-header) { min-height: 65px; }
+  body.books-page .catalog-header:not(.px-site-header) .catalog-header__inner { width: 100%; min-height: 64px; margin: 0; padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); justify-content: flex-start; gap: 8px; }
+  body.books-page .catalog-header:not(.px-site-header) .catalog-brand { display: flex; flex: none; gap: 9px; min-height: 44px; padding: 0; font: 750 1rem/1 system-ui, -apple-system, sans-serif; letter-spacing: 0; }
+  body.books-page .catalog-header:not(.px-site-header) .catalog-header__inner::after { content: ''; flex: 0 0 88px; height: 44px; margin-left: auto; }
+  .books-catalog-js body.books-page #catalog-filters[hidden] { display: grid !important; visibility: hidden; pointer-events: none; }
+}
 .books-page [hidden] { display: none !important; }
 .books-page :is(a, button, input, select):focus-visible { outline: 3px solid #17232d; outline-offset: 3px; }
 .catalog-wrap { width: min(1160px, calc(100% - 40px)); margin-inline: auto; }

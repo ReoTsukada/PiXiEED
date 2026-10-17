@@ -31,7 +31,7 @@ export async function freezeProjectComponents(project, { resolveSourceImage } = 
   let adapter;
   const resolve = resolveSourceImage || (async (ref) => {
     adapter ||= createIndexedDbDraftAdapter();
-    const [{ resolveLocalDrawRevision }, { documentRgba }] = await Promise.all([import('./spot-difference-core.mjs'), import('./draw-core.mjs?rev=20261006-draw-startup-1')]);
+    const [{ resolveLocalDrawRevision }, { documentRgba }] = await Promise.all([import('./spot-difference-core.mjs'), import('./draw-core.mjs?rev=20261011-tool-size-1')]);
     const fixed = await resolveLocalDrawRevision(adapter, ref.draftId, ref.revisionId);
     if (fixed.documentHash !== ref.contentHash || fixed.asset.assetId !== ref.assetId) throw new Error('パズルに使った絵の保存版を確認できません。');
     return { width: fixed.document.width, height: fixed.document.height, rgba: documentRgba(fixed.document) };

@@ -147,7 +147,7 @@ test('legacy puzzle image roles retain indexed payloads and either spot side inv
 
 test('PXD tool routing includes the camera entry', () => {
   const project = createPxdProject({ projectId: 'camera-project', revisionId: 'camera-r1' });
-  assert.equal(pxdToolUrl('camera', project), '/pixel-camera.html?pxd=camera-project&pxdRevision=camera-r1');
+  assert.equal(pxdToolUrl('camera', project), '/camera/?pxd=camera-project&pxdRevision=camera-r1');
 });
 
 

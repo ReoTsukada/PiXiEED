@@ -224,6 +224,7 @@ const guideById = new Map(TOOL_GUIDES.map((guide) => [guide.id, guide]));
 const guideByPath = new Map([
   ['/draw/', 'draw'],
   ['/pixel-camera.html', 'camera'],
+  ['/camera/', 'camera'],
   ['/telescope/', 'telescope'],
   ['/audio/', 'audio'],
   ['/jigsaw/', 'jigsaw'],

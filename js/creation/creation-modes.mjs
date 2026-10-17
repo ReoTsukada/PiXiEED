@@ -1,4 +1,4 @@
-import { mountToolHeaderControls } from '../tool-header-controls.mjs';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261017-editor-improvements-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-tool-shell-1';

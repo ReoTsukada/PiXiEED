@@ -367,8 +367,10 @@ window.addEventListener('message', event => {
       if (inner.origin !== location.origin) return;
       inner.searchParams.delete('embed'); inner.searchParams.delete('embedRole'); inner.searchParams.delete('channel');
       const publicPath = location.pathname;
-      const audioEntry = publicPath.replace(/index\.html$/, '').replace(/\/+$/, '') === '/audio';
-      const outer = new URL(audioEntry && inner.searchParams.get('mode') !== 'audio' ? '/draw/' : publicPath, location.origin);
+      const dedicatedEntry = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(publicPath);
+      const selectedMode = inner.searchParams.get('mode');
+      const selectedPath = selectedMode === 'camera' ? '/camera/' : selectedMode === 'audio' ? '/audio/' : '/draw/';
+      const outer = new URL(dedicatedEntry ? selectedPath : publicPath, location.origin);
       outer.search = inner.searchParams.toString();
       outer.hash = inner.hash;
       history.replaceState(history.state, '', `${outer.pathname}${outer.search}${outer.hash}`);

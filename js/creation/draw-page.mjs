@@ -1,6 +1,6 @@
 import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261016-color-capability-1';
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
@@ -17,7 +17,7 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=2026101
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-editor-improvements-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-project-workspace-css-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';

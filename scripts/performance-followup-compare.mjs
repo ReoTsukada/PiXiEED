@@ -1,0 +1,20 @@
+/** Targeted follow-up; the original twenty-page measurements remain immutable. */
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const dir='docs/performance-20261017',out=dir+'/followup';
+const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
+const before=read(dir+'/after-browser.json');
+const batches=['final-pc','final-mobile','final-shared-editor','final-map'].map(p=>read(out+'/'+p+'/after-browser.json'));
+const key=c=>c.route+'@'+c.viewport.width+'x'+c.viewport.height;
+const byCase=new Map();for(const b of batches)for(const c of b.cases)byCase.set(key(c)+'#'+c.run,{...c,measuredArtifactRoot:b.artifactRoot});const after=[...byCase.values()];
+const stats=xs=>{const s=xs.filter(Number.isFinite).sort((a,b)=>a-b);return {n:s.length,median:s.length?s[Math.floor(s.length/2)]:null,min:s[0]??null,max:s.at(-1)??null};};
+const metrics={bytes:c=>c.navigationRequestSummary.encodedDataLengthBytes,requests:c=>c.navigationRequestSummary.count,lcpMs:c=>c.metrics.lcp.finalValueMs,readyMs:c=>c.readiness.elapsedMs,cls:c=>c.metrics.cls.value,longTaskMs:c=>c.metrics.longTasks.sumMs,firstActionMs:c=>c.firstAction?.durationMs};
+const groups=[...new Set(after.map(key))].sort().map(k=>{const a=after.filter(c=>key(c)===k),b=before.cases.filter(c=>key(c)===k);assert.equal(a.length,3);assert.equal(b.length,3);return {key:k,metrics:Object.fromEntries(Object.entries(metrics).map(([m,f])=>{const bs=stats(b.map(f)),as=stats(a.map(f));return[m,{before:bs,after:as,deltaMedian:as.median-bs.median}];})),ready:a.every(c=>c.readiness.ready),errors:a.flatMap(c=>c.errors),firstActions:a.map(c=>c.firstAction)};});
+assert.equal(after.length,54);assert.ok(groups.every(g=>g.ready&&!g.errors.length));assert.ok(after.every(c=>!c.firstAction?.attempted||c.firstAction.success));assert.ok(after.every(c=>c.metrics.getUserMediaAttempts===0));
+const report={checkedAt:new Date().toISOString(),beforeArtifact:before.artifactRoot,afterArtifact:batches.at(-1).artifactRoot,measuredBatches:batches.map(b=>({root:b.artifactRoot,cases:b.cases.length})),versionEquivalence:read(out+'/trial-to-final-diff.json'),conditions:batches[0].network,scope:'18 affected route/viewport groups, three accepted samples each (54 cases). Shared-editor PC groups use the later 9-case remeasurement and both map routes use the final 18-case remeasurement. Unchanged route groups reuse the earlier follow-up batches, with per-case artifact roots and the explicit artifact diff retained. Superseded trial cases remain in their raw batches. Before is the original final-after version, not performance-start. Same sampler conditions, additional CLS DOM attribution only. Other routes retain original results; no new production or field measurement.',cases:after.length,groups};
+fs.writeFileSync(out+'/accepted-browser.json',JSON.stringify({...report,rawCases:after},null,2)+'\n');
+fs.writeFileSync(out+'/comparison.json',JSON.stringify(report,null,2)+'\n');
+const fmt=(s,d=0)=>`${s.median?.toFixed(d)} [${s.min?.toFixed(d)}–${s.max?.toFixed(d)}]`;
+const cell=(g,m,d=0)=>fmt(g.metrics[m].before,d)+' → '+fmt(g.metrics[m].after,d);
+const md=['# 対象版だけの追加比較','',report.scope,'','CPU ×2、20 Mbps down / 10 Mbps up、遅延20 ms、cache無効・毎回新規context。値は中央値 [min–max]、各 n=3。CLSは直近入力を除く観測合計（CWV session-window定義ではない）。','', '| route / viewport | bytes | LCP ms | ready ms | CLS | main long task ms | requests |','|---|---:|---:|---:|---:|---:|---:|',...groups.map(g=>`| ${g.key} | ${cell(g,'bytes')} | ${cell(g,'lcpMs')} | ${cell(g,'readyMs')} | ${cell(g,'cls',5)} | ${cell(g,'longTaskMs',1)} | ${cell(g,'requests')} |`),'','全54ケース ready、pageerrorなし、初回ナビ操作成功、カメラ要求0。一般ページ ready はDOM/navigation代理指標。LCPはmain frameのみで、iframeのlong taskは原データに別保存。初回ナビ操作はINPではない。',''];
+fs.writeFileSync(out+'/comparison.md',md.join('\n'));console.log(JSON.stringify({groups:groups.length,cases:after.length,rows:groups.map(g=>({key:g.key,bytes:g.metrics.bytes.after.median,cls:g.metrics.cls.after.median,readyDelta:g.metrics.readyMs.deltaMedian,lcpDelta:g.metrics.lcpMs.deltaMedian}))},null,2));

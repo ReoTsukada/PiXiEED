@@ -161,7 +161,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
 
   const dock = doc.createElement('div');
   dock.className = 'map-events-dock'; dock.hidden = true;
-  const allButton = doc.createElement('button'); allButton.type = 'button'; allButton.className = 'map-events-dock__all'; allButton.textContent = 'イベント一覧';
+  const allButton = doc.createElement('button'); allButton.type = 'button'; allButton.className = 'map-events-dock__all'; allButton.textContent = '一覧で探す';
   const dockPeriodToggle = createPeriodToggle('map-events-dock__period-toggle');
   const dockLegend = createLegend('map-events-dock__legend');
   const dockTop = doc.createElement('div'); dockTop.className = 'map-events-dock__top'; dockTop.append(dockPeriodToggle, allButton);
@@ -172,7 +172,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
   const heading = doc.createElement('h2'); heading.className = 'map-events-panel__heading'; heading.textContent = 'イベント一覧';
   const headControls = doc.createElement('div'); headControls.className = 'map-events-panel__head-controls';
   const backButton = doc.createElement('button'); backButton.type = 'button'; backButton.className = 'map-events-panel__back'; backButton.textContent = '一覧に戻る'; backButton.hidden = true;
-  const closeButton = doc.createElement('button'); closeButton.type = 'button'; closeButton.className = 'map-events-panel__close'; closeButton.textContent = '閉じる'; closeButton.setAttribute('aria-label', 'イベント一覧を閉じる');
+  const closeButton = doc.createElement('button'); closeButton.type = 'button'; closeButton.className = 'map-events-panel__close'; closeButton.textContent = '地図に戻る'; closeButton.setAttribute('aria-label', 'イベント一覧を閉じて地図に戻る');
   headControls.append(backButton, closeButton);
   head.append(heading, headControls);
   const compactControls = doc.createElement('div'); compactControls.className = 'map-events-panel__controls';
@@ -580,6 +580,18 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     return catalogPending;
   }
   const ready = Promise.all([publicReady, refreshCatalog(true)]).then(() => events);
+  function getNavigationState() {
+    return { period: periodFilter, open: !panel.hidden, scope, limit: listLimit, scroll: view === 'detail' ? detailReturnScroll : body.scrollTop };
+  }
+  function restoreNavigationState(state) {
+    if (!state || destroyed) return;
+    setPeriodFilter(state.period);
+    if (!state.open || !active) return;
+    scope = state.scope || null; listLimit = state.limit || 20;
+    panel.hidden = false; panel.classList.add('is-open'); stage.classList.add('has-map-events');
+    onOpen(scope); setView('list', { restoreScroll: state.scroll || 0 });
+    returnFocus = allButton;
+  }
   const catalogTimer = setInterval(() => { void refreshCatalog(); }, CATALOG_REFRESH_MS);
   let midnightTimer = null;
   function scheduleMidnight() {
@@ -595,6 +607,7 @@ export function initMapEvents({ renderer, stage, onChange = () => {}, onOpen = (
     getCellSummary: selection => summarize(selection),
     getDensityEvents: () => events.filter(event => !event.locationPending && (event.mapPeriod === 'upcoming' || event.mapPeriod === 'active' || event.mapPeriod === 'past')),
     getPeriodFilter: () => periodFilter,
+    getNavigationState, restoreNavigationState,
     openCellEvents, openAll, selectRegion, updateSelection, refresh, setActive(value) { active = Boolean(value); if (!active) close(); refresh(); }, close,
     ready, refreshLocations, refreshData: () => refreshCatalog(true),
     destroy() { destroyed = true; clearInterval(catalogTimer); clearTimeout(midnightTimer); clearPendingCanvasTouch(); stage.removeEventListener('pointerdown', rememberCanvasTouch, true); stage.removeEventListener('click', preventCanvasTouchRetarget, true); doc.removeEventListener('visibilitychange', onVisibilityChange); close(); doc.removeEventListener('keydown', onKeydown); dock.remove(); panel.remove(); }

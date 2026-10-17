@@ -1,5 +1,5 @@
 import { createPxdProject, getPxdJson, setPxdJson, setPxdBytes } from './pxd-codec.mjs';
-import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { countSharedImageColors as countUsedImageColors } from './shared-image.mjs?rev=20261016-color-capability-1';
 
 // Existing image schema-2 metadata counts transparent tuples; preserve that wire contract.
@@ -168,7 +168,7 @@ export function primaryPxdImageRole(project, preferred) {
   return ['main', 'draw', 'audio', 'jigsaw-main', 'hidden', 'spot-after', 'spot-before'].find((role) => roles.includes(role)) || null;
 }
 export function pxdToolUrl(tool, project, imageRole) {
-  const routes = { draw: '/draw/', audio: '/audio/', camera: '/pixel-camera.html', jigsaw: '/jigsaw/', spot_difference: '/spot-difference/', hidden_object: '/hidden-object/' };
+  const routes = { draw: '/draw/', audio: '/audio/', camera: '/camera/', jigsaw: '/jigsaw/', spot_difference: '/spot-difference/', hidden_object: '/hidden-object/' };
   if (!routes[tool] || !project?.projectId || !project?.revisionId) throw new TypeError('保存した作品の行き先を確認できません。');
   const query = new URLSearchParams({ pxd: project.projectId, pxdRevision: project.revisionId });
   if (imageRole) { imagePaths(imageRole); query.set('pxdImage', imageRole); }

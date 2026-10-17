@@ -1,5 +1,5 @@
 import './site-analytics.mjs?rev=20261016-tool-shell-1';
-import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261017-editor-improvements-1';
+import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261017-dedicated-routes-1';
 import { installGlobeAnalyticsBridge } from './globe/analytics-bridge.mjs?rev=20261016-tool-shell-1';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';

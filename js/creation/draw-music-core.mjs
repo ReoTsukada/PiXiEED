@@ -4,7 +4,7 @@ import {
   setAudioColorInstrument, setAudioTempo, validateAudioSong
 } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
-import { documentRgba } from './draw-core.mjs';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { getPxdJson, setPxdJson } from './pxd-codec.mjs';
 import { readPxdImage, readPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION,

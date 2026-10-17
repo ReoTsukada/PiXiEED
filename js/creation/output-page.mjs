@@ -1,9 +1,7 @@
 import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261016-tool-shell-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261015-alpha-opacity-1';
-import { encodeImportedAudioWav, renderAudioWav } from './audio-export.mjs?rev=20261016-color-capability-1';
-import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261016-color-capability-1';
-import { renderOutputVideo } from './output-video.mjs?rev=20261016-color-capability-1';
+import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
 import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261009-preview-only-2';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
@@ -429,6 +427,8 @@ function outputMime(formatValue) {
 
 async function renderSongAudioSource(source, totalPlays, signal) {
   if (!source?.song) throw new TypeError('音楽素材を読み込めません。');
+  const { renderAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+  if (signal?.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
   const rendered = await renderAudioWav(source.song, { loops: totalPlays });
   if (signal?.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
   const AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -826,6 +826,8 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         initialFilename = 'pixieed-video-preview.png';
         metadataValue = { width: imported.video.width, height: imported.video.height, durationSeconds: imported.video.durationSeconds, description: '動画の最初の映像コマをプレビューしています。' };
       } else {
+        const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+        if (controller.signal.aborted) throw new DOMException('素材の読み込みを中止しました。', 'AbortError');
         initialBlob = await encodeImportedAudioWav(newSources.find((source) => source.kind === 'audio-buffer'), {
           signal: controller.signal,
           onProgress: (progress) => { const value = 70 + Math.round(progress * 30); importProgress.value = value; targetStatus.textContent = `WAVを書き出しています（${value - 70}%）…`; }
@@ -960,10 +962,14 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
       quality: Number(jpegQuality.value) / 100, totalPlays }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
+    const { renderAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+    if (controller.signal.aborted) throw new DOMException('出力の作成を中止しました。', 'AbortError');
     const result = await renderAudioWav(source.song);
     return { blob: result.blob, metadata: { durationSeconds: result.seconds, sampleRate: 44100, loops: result.loops } };
   }
   if (source?.kind === 'audio-buffer' && formatValue === 'wav') {
+    const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+    if (controller.signal.aborted) throw new DOMException('出力の作成を中止しました。', 'AbortError');
     const blob = await encodeImportedAudioWav(source, { signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
     return { blob, metadata: { durationSeconds: source.durationSeconds, sampleRate: source.sampleRate } };
   }
@@ -989,6 +995,8 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     }
     let result;
     try {
+      const { renderOutputVideo } = await import('./output-video.mjs?rev=20261016-color-capability-1');
+      if (controller.signal.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
       if (!audioSource && selectedMusic?.song) {
         const renderedMusic = await renderSongAudioSource(selectedMusic, totalMusicPlays, controller.signal);
         result = await renderOutputVideo(frames, { audioSource: renderedMusic, videoSource, playbackRate: rate, mimeChoice, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
@@ -1006,10 +1014,14 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     const musicTotalPlays = Math.max(1, Math.min(8, Number(mediaSettings.musicTotalPlays) || 1));
     let result;
     if (selectedMusic?.song) {
+      const { renderAudioVideo } = await import('./audio-video.mjs?rev=20261016-color-capability-1');
+      if (controller.signal.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
       result = await renderAudioVideo(selectedMusic.song, { width: frame.width, height: frame.height, rgba: frame.data }, { totalPlays: musicTotalPlays, signal: controller.signal });
     } else if (selectedMusic?.kind === 'audio-buffer') {
       const mimeChoice = chooseAudioVideoMimeType();
       if (!mimeChoice || mimeChoice.extension !== formatValue) throw new Error('このブラウザーが実際に作成できる動画形式と選択内容が一致しません。画像と音楽の元データは保持されています。');
+      const { renderOutputVideo } = await import('./output-video.mjs?rev=20261016-color-capability-1');
+      if (controller.signal.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
       result = await renderOutputVideo([{ width: frame.width, height: frame.height, data: frame.data, delayMs: 100 }], {
         audioSource: selectedMusic, audioTotalPlays: musicTotalPlays, mimeChoice,
         signal: controller.signal,

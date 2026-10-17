@@ -1,4 +1,4 @@
-import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261009-pointer-selection-1';
+import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { symmetryPoints } from './drawing-symmetry.mjs';
 import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261016-color-capability-1';

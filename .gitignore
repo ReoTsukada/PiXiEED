@@ -14,3 +14,12 @@ Claude outputs/
 /docs/nav-camera-review-20261012/reverification/
 /docs/navigation-roles-review-20261012/evidence/
 /docs/gam-rewarded-test-20261012/evidence/
+
+# Local-only synthetic browser/performance captures and release audit records.
+# Keep raw JSON, screenshots, local machine paths, Library IDs and PXD backups out of Git.
+/docs/entry-integration-20261017/
+/docs/home-grid-20261017/
+/docs/home-map-20261017/
+/docs/performance-20261017/
+/docs/performance/
+/docs/release-prep-local-20261017/

@@ -1,7 +1,7 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
 import { decodeSpotImagePair, decodeSpotSingleImage } from './spot-image-import.mjs?rev=20261002-inline-draw-1';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';

@@ -1,5 +1,5 @@
 import { hashCanonical, validateAsset } from './asset-contract.mjs';
-import { documentRgba, validateDrawDocument } from './draw-core.mjs';
+import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 export const SPOT_DIFFERENCE_SCHEMA_VERSION = 1;
 export const SPOT_DIFFERENCE_MAX_PIXELS = 2 * 1024 * 1024;

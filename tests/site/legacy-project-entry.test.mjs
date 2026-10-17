@@ -34,11 +34,11 @@ test('Draw translates supported tool pointers and refuses unsupported or incompl
   assert.equal(resolveLegacyDrawEntry({ search: '?mode=DRAW&mode=AUDIO' }).action, 'stay');
 });
 
-test('Draw recovery link blocks current editor last-project fallback and retains original guide suffix', () => {
+test('Draw recovery link blocks current editor last-project fallback and points to its how-to section', () => {
   const links = legacyDrawRecoveryLinks({ search: '?project=old-123&x=one&x=two', hash: '#legacy' });
   assert.match(links.draw, /^\/draw\/\?/);
   assert.match(links.draw, /pxd=legacy-state-unavailable/);
-  assert.equal(links.guide, '/draw/about/?project=old-123&x=one&x=two#legacy');
+  assert.equal(links.guide, '/draw/?project=old-123&x=one&x=two#draw-how-to');
 });
 
 test('PiXFiND routes recognized local drafts and historical typed IDs to their matching game', () => {

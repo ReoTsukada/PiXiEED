@@ -8,8 +8,8 @@
  *  - a celebration with time, best time and "もういちど / むずかしくする"
  */
 import { createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs';
-import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260928-pixel-roundtrip-1';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
+import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { ICON, pixelIcon, sfx, createTimer, formatTime, assembleTitle, winOverlay, floatText } from '../arcade.mjs?rev=20260928-arcade-1';
 
 const $ = (s) => document.querySelector(s);

@@ -19,6 +19,12 @@ body[data-page="output"] {
 .output-brand { display: inline-flex; align-items: center; gap: 10px; color: #223a30; font-size: 1rem; font-weight: 850; text-decoration: none; letter-spacing: -.02em; }
 .output-brand > span { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 11px; background: #276e54; color: #fff; font-size: 1rem; }
 .output-header__label { color: #6e7a73; font-size: .84rem; font-weight: 700; }
+/* Reserve the eventual common-header geometry without making an unbound menu interactive. */
+@media (min-width: 601px) {
+  body .output-header:not(.px-site-header) { width: 100%; min-height: 65px; margin: 0; padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left)); justify-content: flex-start; gap: 8px; }
+  body .output-header:not(.px-site-header) .output-brand { display: flex; flex: none; gap: 9px; min-height: 44px; padding: 0; font: 750 1rem/1 system-ui, -apple-system, sans-serif; letter-spacing: 0; }
+  body .output-header:not(.px-site-header)::after { content: ''; flex: 0 0 88px; height: 44px; margin-left: auto; }
+}
 .output-main { width: min(1280px, 100%); margin: 0 auto; padding: clamp(24px, 5vw, 54px) clamp(14px, 4vw, 42px) 64px; }
 .output-intro { margin: 0 0 25px; }
 .output-eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--out-green); font-size: .78rem; font-weight: 800; letter-spacing: .04em; }

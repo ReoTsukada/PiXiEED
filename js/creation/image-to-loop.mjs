@@ -1,5 +1,5 @@
 import { hashCanonical, validateAsset } from './asset-contract.mjs';
-import { validateDrawDocument } from './draw-core.mjs';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 export const IMAGE_TO_LOOP_RULES_VERSION = 'image-to-loop-v2';
 export const IMAGE_TO_LOOP_PPQ = 480;

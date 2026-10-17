@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="/css/globe-event-detail.css?rev=20261009-seo-1">
   <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
     <link rel="stylesheet" href="/css/globe-event-ui.css?rev=20261008-event-filter-1">
+    <link rel="stylesheet" href="/css/globe-navigation.css?rev=20261017-map-page-chrome-1">
 </head>
 <body data-page="map" class="app-page app-page--field app-page--tool-globe">
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -27,7 +28,8 @@
   <main id="main">
     <h1 class="visually-hidden">ドット絵のイベント・作品を世界地図で探す</h1>
     <p class="visually-hidden">世界地図を動かして、公開中の作品やイベントを地域ごとに探せます。</p>
-    <section class="map-hero map-hero--field" aria-label="PiXiEED 地図"><div class="map-hero__inner"><iframe id="globeFrame" class="map-hero__globe-frame" src="/globe-prototype.html?embed=1&amp;rev=20261008-calendar-direct-2" title="みんなの投稿・イベントを探せるPiXiEED地図" allow="geolocation" loading="eager"></iframe></div></section>
+    <p class="map-page-directory-link"><span>地域から探す</span><a href="#map-event-directory-title">イベント紹介一覧へ ↓</a></p>
+    <section class="map-hero map-hero--field" aria-label="PiXiEED 地図"><div class="map-hero__inner"><iframe id="globeFrame" class="map-hero__globe-frame" src="/globe-prototype.html?embed=1&amp;rev=20261017-map-navigation-1" title="みんなの投稿・イベントを探せるPiXiEED地図" allow="geolocation" loading="eager"></iframe></div></section>
     <aside id="mapEventDetailHost" class="map-event-detail-host" aria-label="選択したイベント" hidden>
       <article id="mapEventDetail" class="globe-event-detail" hidden></article>
       <aside id="mapDetailAd" class="px-display-ad map-event-detail-host__ad" aria-label="広告" hidden>
@@ -37,7 +39,8 @@
       <section class="map-event-directory container" aria-labelledby="map-event-directory-title"><h2 id="map-event-directory-title">ドット絵イベントの日程・会場を探す</h2><p>開催予定、過去の開催、次回情報待ちを分けて紹介しています。参加前に主催者の公式情報をご確認ください。</p><a class="button button--primary" href="/events/">イベント紹介一覧を見る</a></section>
   </main>
     <script type="module" src="/js/app.js?rev=20261017-editor-improvements-1"></script>
-    <script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
-    <script type="module" src="/js/globe/event-detail-host.mjs?rev=20261009-seo-1"></script>
+    <script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
+    <script type="module" src="/js/globe/event-detail-host.mjs?rev=20261017-map-navigation-1"></script>
+    <script type="module" src="/js/globe/map-page-layout.mjs?rev=20261017-map-page-chrome-1"></script>
 </body>
 </html>

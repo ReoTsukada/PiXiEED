@@ -11,12 +11,12 @@ test('home: tool cards have working toys and creation links lead the page', () =
   assert.ok(toys.length >= 7);
   for (const toy of toys) assert.match(toysSource, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
   assert.match(source, /createToolToys\(\{ note, animate, interactive: false \}\)/, 'linked cards use non-interactive previews');
-  assert.match(html, /class="hp-card-grid hp-create-grid"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/draw\/\?mode=audio"/);
+  assert.match(html, /class="hp-card-grid hp-create-grid"[\s\S]*?data-toy="editor" href="\/draw\/"[\s\S]*?data-toy="sound" href="\/audio\/"/);
   assert.doesNotMatch(html, /data-toy="game"/);
   assert.match(html, /data-toy="editor" href="\/draw\/"[\s\S]*?PiXiEEDraw/);
   assert.doesNotMatch(html, /PXDraw/);
-  assert.match(html, /PiXiEELENSで写真変換/);
-  assert.match(html, /data-toy="sound" href="\/draw\/\?mode=audio"[\s\S]*?PiXiEEaudio/);
+  assert.match(html, /<h3 class="hp-tool-title">写真をドット絵に<\/h3><span class="hp-toy-line">画像をPNG保存/);
+  assert.match(html, /data-toy="sound" href="\/audio\/"[\s\S]*?PiXiEEaudio/);
   assert.match(source, /prefers-reduced-motion/);
 });
 
@@ -55,18 +55,34 @@ test('home hero: the play leads somewhere — invitations matched to what the vi
   assert.match(source, /canvas\.tabIndex = 0/); assert.match(source, /ArrowLeft/);
 });
 
-test('home: discovery follows the mini experience and links to published tools', () => {
+test('home: real creation tools lead the mini experience and gallery follows play', () => {
   const html = read('index.html'); const source = read('js/home-play.mjs');
-  assert.match(html, /<a class="hp-discovery-link" href="\/draw\/" aria-label="PiXiEEDrawでドット絵を描く" data-draw-cta data-draw-context="general">/);
-  for (const path of ['/draw/?mode=camera', '/draw/about/', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
-  assert.match(html, /hp-link-card" data-toy="camera"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card/);
-  assert.match(html, /気になるカードから、すぐにはじめられます。/);
-  const heroIndex = html.indexOf('class="hp-hero container"');
+  for (const path of ['/camera/', '/draw/#draw-how-to', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
+  assert.match(html, /hp-link-card hp-visual-tool-card" data-toy="camera" href="\/camera\/"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card hp-visual-tool-card" href="\/output\/"/);
+  assert.match(html, /id="homePrimaryToolsTitle">制作ツール/);
+  assert.match(html, /data-toy="editor" href="\/draw\/"[^>]*data-draw-cta data-draw-context="general"/);
+  assert.match(html, /src="\/assets\/icons\/pixieed\/artwork\.svg"/);
+  assert.match(html, /src="\/assets\/icons\/pixieed\/camera\.svg"/);
+  assert.match(html, /src="\/assets\/icons\/pixieed\/music\.svg"/);
+  for (const shot of ['draw-pc-maou.png', 'camera-pc-maou.png', 'audio-pc-maou.png', 'output-pc-maou.png']) assert.match(html, new RegExp(`src="/assets/screenshots/${shot}"`), shot);
+  const toolCards = html.slice(html.indexOf('<nav class="hp-card-grid hp-create-grid"'), html.indexOf('</nav>', html.indexOf('<nav class="hp-card-grid hp-create-grid"')));
+  for (const href of ['/draw/', '/camera/', '/audio/', '/output/']) assert.ok(toolCards.includes(`href="${href}"`), href);
+  assert.match(html, /hp-tools-about" href="\/draw\/#draw-how-to"/);
+  assert.doesNotMatch(html, /class="container real-tool-screens"/);
+  assert.match(toolCards, /class="hp-toy hp-link-card hp-visual-tool-card"[^>]*>[\s\S]*?hp-tool-screen[\s\S]*?<h3 class="hp-tool-title">[\s\S]*?hp-toy-line[\s\S]*?hp-tool-brandline[\s\S]*?hp-card-link/);
+  assert.match(toolCards, /href="\/output\/"[\s\S]*?合成ツールの紹介へ/);
+  assert.doesNotMatch(html, /目的からはじめる/);
+  const toolsIndex = html.indexOf('home-primary-tools');
+  const playIndex = html.indexOf('class="hp-home-play"');
   const discoveryIndex = html.indexOf('class="home-discovery container"');
-  assert.ok(heroIndex >= 0 && discoveryIndex > heroIndex, 'public works and direct entry links follow the mini experience');
+  assert.ok(toolsIndex >= 0 && playIndex > toolsIndex && discoveryIndex > playIndex, 'real tools lead, then the mini experience, then public works');
   assert.match(html, /data-home-gallery/);
   assert.match(source, /function groupToys\(/);
   assert.match(html, /class="hp-card-grid hp-discover-grid"/);
+  const homeCss = read('css/home.css');
+  assert.match(homeCss, /home-primary-tools \.hp-card-grid \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(homeCss, /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 8\.5rem\), 1fr\)\)/);
+  assert.match(homeCss, /object-fit: cover/);
 });
 
 test('home hero: each colour is its own instrument — drawing, landing and cleared rows all play it', () => {

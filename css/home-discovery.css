@@ -1,22 +1,8 @@
-/* Compact routes first; the public gallery may load slowly or be empty. */
-.home-discovery { padding-block: 1.25rem 1.7rem; }
-.home-discovery__heading { display: flex; align-items: end; justify-content: space-between; gap: .8rem; margin-bottom: .65rem; }
-.home-discovery__eyebrow { margin: 0 0 .2rem; color: #5f6871; font-size: .62rem; font-weight: 800; letter-spacing: .14em; }
-.home-discovery__heading h2 { margin: 0; color: #19222a; font-size: clamp(1.2rem, 2.2vw, 1.55rem); line-height: 1.2; text-wrap: balance; }
-.home-discovery__all { min-height: 44px; display: inline-flex; align-items: center; gap: .3rem; color: #26352f; font-size: .76rem; font-weight: 800; text-decoration-thickness: 1px; text-underline-offset: 4px; }
-.home-discovery__layout { display: grid; grid-template-columns: minmax(15rem, .85fr) minmax(0, 1.5fr); gap: .8rem; align-items: start; }
-.home-starts { display: grid; gap: .45rem; }
-.home-start { box-sizing: border-box; display: grid; grid-template-columns: 1.6rem minmax(0,1fr) 1.25rem; align-items: center; gap: .55rem; min-width: 0; min-height: 4rem; padding: .55rem .7rem; border: 1px solid #dfe2e3; border-radius: .85rem; background: #fff; color: #1b2025; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease; }
-.home-start:hover { transform: translateY(-1px); box-shadow: 0 7px 18px rgba(27,32,37,.08); }
-.home-start--draw, .home-start--camera, .home-start--about { border-color: #dfe2e3; background: #fff; }
-.home-start__number { color: #6b756f; font: 800 .62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.home-start__copy { display: grid; gap: .12rem; min-width: 0; }
-.home-start__copy strong { font-size: .88rem; line-height: 1.3; }
-.home-start__copy small { color: #63706b; font-size: .69rem; line-height: 1.35; }
-.home-start__arrow { justify-self: end; color: #46515a; font-size: 1rem; font-weight: 900; }
+/* The first screen leads with real tools; public works follow the mini experience. */
+.home-discovery { padding-block: .75rem 1.7rem; }
 .home-gallery { min-width: 0; padding: .75rem; border: 1px solid #e0e4df; border-radius: 1rem; background: #fff; }
 .home-gallery__heading { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .55rem; }
-.home-gallery__heading h3 { margin: 0 0 .15rem; color: #1b2025; font-size: .96rem; font-weight: 900; }
+.home-gallery__heading h2 { margin: 0 0 .15rem; color: #1b2025; font-size: .96rem; font-weight: 900; }
 .home-gallery__heading p { margin: 0; color: #65716e; font-size: .72rem; line-height: 1.4; }
 .home-gallery__heading > a { flex: none; min-height: 44px; display: inline-flex; align-items: center; gap: .25rem; color: #1b2025; font-size: .74rem; font-weight: 850; text-decoration: none; }
 .home-gallery__heading > a:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -32,38 +18,14 @@
 .home-work__image { display: grid; place-items: center; width: 100%; aspect-ratio: 1; overflow: hidden; background: #e7eae5; }
 .home-work__image img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 .home-work__title { display: block; overflow: hidden; padding: .45rem .5rem; font-size: .72rem; font-weight: 850; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-.home-work:focus-visible, .home-start:focus-visible, .home-discovery__all:focus-visible, .home-gallery__heading > a:focus-visible, .home-gallery__retry:focus-visible { outline: 3px solid #1b2025; outline-offset: 2px; }
-@media (max-width: 760px) {
-  .home-discovery { padding-block: 1rem 1.25rem; }
-  .home-discovery__layout { grid-template-columns: minmax(0,1fr); gap: .65rem; }
-  .home-starts { grid-template-columns: repeat(3, minmax(0,1fr)); gap: .45rem; }
-  .home-start { grid-template-columns: 1.2rem minmax(0,1fr); grid-template-rows: auto 1fr; align-items: start; gap: .35rem; min-height: 5rem; padding: .55rem; }
-  .home-start__number { grid-column: 1; grid-row: 1; }
-  .home-start__copy { grid-column: 1 / -1; grid-row: 2; align-self: start; gap: .2rem; }
-  .home-start__copy strong { font-size: .79rem; }
-  .home-start__copy small { font-size: .64rem; }
-  .home-start__arrow { grid-column: 2; grid-row: 1; }
-}
+.home-work:focus-visible, .home-gallery__heading > a:focus-visible, .home-gallery__retry:focus-visible { outline: 3px solid #1b2025; outline-offset: 2px; }
 @media (max-width: 420px) {
-  .home-discovery__heading { align-items: center; }
-  .home-discovery__all { max-width: 7.2rem; justify-content: end; font-size: .69rem; text-align: right; }
-  .home-starts { grid-template-columns: repeat(2, minmax(0,1fr)); gap: .4rem; }
-  .home-start { grid-template-columns: 1.2rem minmax(0,1fr) 1rem; grid-template-rows: auto 1fr; align-items: start; gap: .3rem; min-height: 5rem; padding: .5rem; }
-  .home-start__number { grid-column: 1; grid-row: 1; }
-  .home-start__copy { grid-column: 1 / -1; grid-row: 2; align-self: center; }
-  .home-start__copy strong { font-size: .85rem; }
-  .home-start__copy small { font-size: .67rem; }
-  .home-start__arrow { grid-column: 3; grid-row: 1; }
-  .home-start--about { grid-column: 1 / -1; grid-template-columns: 0 minmax(0,1fr) 1rem; grid-template-rows: 1fr; align-items: center; min-height: 2.75rem; padding: .35rem .6rem; }
-  .home-start--about .home-start__number, .home-start--about .home-start__copy small { display: none; }
-  .home-start--about .home-start__copy { grid-column: 2; grid-row: 1; }
-  .home-start--about .home-start__copy strong { font-size: .75rem; }
-  .home-start--about .home-start__arrow { grid-column: 3; grid-row: 1; }
+  .home-discovery { padding-block: .65rem 1.25rem; }
   .home-gallery { padding: .65rem; }
   .home-gallery__heading { align-items: start; }
   .home-gallery__heading p { max-width: 26ch; }
   .home-gallery__grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .home-work:nth-of-type(n+3) { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .home-work, .home-start { transition: none; } .home-work:hover, .home-start:hover { transform: none; } }
-html[data-pixieed-motion="reduced"] .home-work, html[data-pixieed-motion="reduced"] .home-start { transition: none; }
+@media (prefers-reduced-motion: reduce) { .home-work { transition: none; } .home-work:hover { transform: none; } }
+html[data-pixieed-motion="reduced"] .home-work { transition: none; }

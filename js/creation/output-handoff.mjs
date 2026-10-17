@@ -14,7 +14,7 @@ const MIME_EXTENSIONS = Object.freeze({
   'video/webm': 'webm'
 });
 const RETURN_PATHS = new Set([
-  '/draw/', '/audio/', '/pixel-camera.html', '/pixel-camera-studio.html', '/pixiee-lens/',
+  '/draw/', '/camera/', '/audio/', '/pixel-camera.html', '/pixel-camera-studio.html', '/pixiee-lens/',
   '/jigsaw/', '/spot-difference/', '/hidden-object/', '/output/'
 ]);
 const ID_PATTERN = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;

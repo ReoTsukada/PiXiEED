@@ -1,4 +1,4 @@
-import { createDrawingToolIcon, DRAWING_TOOL_ICON_NAMES } from './drawing-tool-icons.mjs';
+import { createDrawingToolIcon, DRAWING_TOOL_ICON_NAMES } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { DRAW_SHORTCUT_COMMANDS } from './draw-shortcuts.mjs?rev=20261015-draw-desktop-1';
 import {
   DRAW_DESKTOP_LAYOUT_DEFAULTS,

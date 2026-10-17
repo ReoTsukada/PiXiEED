@@ -1,7 +1,7 @@
 import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
 import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';

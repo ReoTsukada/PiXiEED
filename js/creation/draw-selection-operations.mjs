@@ -1,4 +1,4 @@
-import { validateDrawDocument } from './draw-core.mjs?rev=20261006-draw-startup-1';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 
 export const selectionColor = color => {

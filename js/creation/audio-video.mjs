@@ -1,6 +1,9 @@
 import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { getAudioInstrument } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { createMusicVideoTimingPlan, sampleMusicVideoFrame } from './music-video-timing.mjs';
+import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
+
+export { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
 
 const VIDEO_FRAME_LONG_EDGE = 1024;
 const VIDEO_FRAME_MAX_EDGE = 1024;
@@ -11,29 +14,6 @@ export function audioVideoFrameSize(width, height, { longEdge = VIDEO_FRAME_LONG
   const longest = Math.max(width, height);
   const scale = Math.max(1, Math.min(Math.floor(maxEdge / longest), Math.ceil(longEdge / longest)));
   return { width: width * scale, height: height * scale, scale };
-}
-
-export function chooseAudioVideoMimeType(MediaRecorderImpl = globalThis.MediaRecorder, { includeAudio = true } = {}) {
-  if (typeof MediaRecorderImpl !== 'function') return null;
-  if (typeof MediaRecorderImpl.isTypeSupported !== 'function') return null;
-  const choices = includeAudio ? [
-    ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'mp4'],
-    ['video/mp4', 'mp4'],
-    ['video/webm;codecs=vp9,opus', 'webm'],
-    ['video/webm;codecs=vp8,opus', 'webm'],
-    ['video/webm', 'webm']
-  ] : [
-    ['video/mp4;codecs=avc1.42E01E', 'mp4'],
-    ['video/mp4', 'mp4'],
-    ['video/webm;codecs=vp9', 'webm'],
-    ['video/webm;codecs=vp8', 'webm'],
-    ['video/webm', 'webm']
-  ];
-  return choices.find(([mimeType]) => MediaRecorderImpl.isTypeSupported(mimeType))?.reduce((result, value, index) => {
-    if (index === 0) result.mimeType = value;
-    if (index === 1) result.extension = value;
-    return result;
-  }, {}) || null;
 }
 
 function makeVideoCanvas(documentRef, image, frameSize, frameImages = [image], frameTicks = 0, loopTicks = 1) {

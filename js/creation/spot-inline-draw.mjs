@@ -1,6 +1,6 @@
-import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-drawing-tools-4';
+import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 
-import { beginDrawStroke, cancelDrawStroke, commitDrawStroke, createDrawHistory, documentRgba, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261001-animation-1';
+import { beginDrawStroke, cancelDrawStroke, commitDrawStroke, createDrawHistory, documentRgba, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 /** A small independent dot editor. The supplied original is display-only. */
 export function mountSpotInlineDraw(options) {

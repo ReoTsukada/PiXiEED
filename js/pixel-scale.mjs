@@ -1,4 +1,4 @@
-import { inspectPixelPng, withPixelPngMetadata } from './pixel-png-metadata.mjs';
+import { inspectPixelPng, withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 
 export const MIN_DOTS = 8;
 export const MAX_PIXEL_FILE_BYTES = 10 * 1024 * 1024;

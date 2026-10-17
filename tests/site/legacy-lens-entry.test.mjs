@@ -7,16 +7,16 @@ const outputId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 test('clean legacy LENS URLs enter the current camera mode and keep safe tracking and hash', () => {
   assert.deepEqual(resolveLegacyLensEntry({ search: '?utm_source=archive&ref=mail', hash: '#capture' }), {
     action: 'redirect', reason: 'compatible-camera-entry',
-    url: '/draw/?utm_source=archive&ref=mail&modeProjectTool=camera&mode=camera#capture'
+    url: '/camera/?utm_source=archive&ref=mail&modeProjectTool=camera&mode=camera#capture'
   });
-  assert.equal(resolveLegacyLensEntry({ search: '', hash: '#legacy-anchor' }).url, '/draw/?modeProjectTool=camera&mode=camera#legacy-anchor');
+  assert.equal(resolveLegacyLensEntry({ search: '', hash: '#legacy-anchor' }).url, '/camera/?modeProjectTool=camera&mode=camera#legacy-anchor');
 });
 
 test('current PXD pointers move into the camera-scoped namespace without dropping the fragment', () => {
   const result = resolveLegacyLensEntry({ search: '?pxd=project-7&pxdRevision=rev-2&pxdImage=camera&utm_campaign=old', hash: '#preview' });
   assert.deepEqual(result, {
     action: 'redirect', reason: 'compatible-camera-entry',
-    url: '/draw/?utm_campaign=old&modePxd=project-7&modePxdRevision=rev-2&modePxdImage=camera&modeProjectTool=camera&mode=camera#preview'
+    url: '/camera/?utm_campaign=old&modePxd=project-7&modePxdRevision=rev-2&modePxdImage=camera&modeProjectTool=camera&mode=camera#preview'
   });
 });
 
@@ -73,7 +73,7 @@ test('pending localStorage or window.name transfer is detected but never consume
   const result = initLegacyLensEntry({ locationLike: location, documentLike: { querySelector: (selector) => nodes.get(selector) }, storage, windowName });
   assert.equal(result.reason, 'pending-transfer');
   assert.equal(transferNote.hidden, false);
-  assert.equal(nodes.get('[data-legacy-camera-link]').href, '/draw/?mode=camera');
+  assert.equal(nodes.get('[data-legacy-camera-link]').href, '/camera/');
   assert.match(status.textContent, /消費・変更せずに保持/);
   assert.equal(transferDownload.download, 'old-capture.png');
   assert.equal(transferDownload.hidden, false);
@@ -108,7 +108,7 @@ test('storage-denied environments still route safely and leave window.name untou
       windowName: '{"host":"must stay untouched"}'
     });
     assert.equal(result.action, 'redirect');
-    assert.equal(destination, '/draw/?modeProjectTool=camera&mode=camera');
+    assert.equal(destination, '/camera/?modeProjectTool=camera&mode=camera');
   } finally {
     if (original) Object.defineProperty(globalThis, 'localStorage', original);
     else delete globalThis.localStorage;

@@ -9,6 +9,9 @@
 .tool-shell .tool-intro__copy h1 { margin-bottom: .4rem; font-size: clamp(1.8rem, 3.1vw, 2.65rem); }
 .tool-shell .tool-intro__lead { font-size: .96rem; }
 .tool-shell .tool-intro__hint { margin-top: .35rem; }
+.tool-shell .tool-intro__related { padding-block: .4rem; gap: .25rem .9rem; }
+.tool-shell .tool-intro__related a { min-height: 44px; display: inline-flex; align-items: center; }
+.tool-shell [id] { scroll-margin-top: 5.5rem; }
 .tool-shell__workspace { padding-block: 1rem; }
 .tool-shell__embed { gap: .45rem; padding: clamp(.8rem, 1.7vw, 1.25rem); }
 .tool-shell__embed.tool-embed--expanded { gap: 0; margin: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }

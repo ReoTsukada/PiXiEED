@@ -4,7 +4,10 @@ const params = new URLSearchParams(location.search);
 const sharedEntry = creationModeEntryUrl('camera', location.search);
 if (sharedEntry) {
   document.querySelector('#pixelStudio')?.setAttribute('inert', '');
-  location.replace(sharedEntry);
+  const destination = new URL(sharedEntry, location.href);
+  destination.pathname = '/camera/';
+  destination.hash = location.hash;
+  location.replace(`${destination.pathname}${destination.search}${destination.hash}`);
 } else {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
   await import('./draw-camera-page.mjs?rev=20261016-color-capability-1');

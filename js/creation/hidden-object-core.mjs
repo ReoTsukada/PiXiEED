@@ -1,5 +1,5 @@
 import { hashCanonical, validateAsset } from './asset-contract.mjs';
-import { validateDrawDocument } from './draw-core.mjs';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 export const HIDDEN_OBJECT_SCHEMA_VERSION = 1;
 export const HIDDEN_OBJECT_MAX_TARGETS = 128;

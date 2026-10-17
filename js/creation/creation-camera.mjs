@@ -1,5 +1,5 @@
-import { mountToolHeaderControls } from '../tool-header-controls.mjs';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261017-editor-improvements-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261017-project-workspace-css-1';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.

@@ -1,14 +1,14 @@
 import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
-import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs';
+import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261016-tool-shell-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261016-color-capability-1';
 import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261016-color-capability-1';
-import { documentRgba } from './draw-core.mjs';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { setPxdJson } from './pxd-codec.mjs';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261016-tool-shell-1';
 import { saveFile } from '../pixel-export.mjs?rev=20261016-tool-shell-1';
 import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';

@@ -2,7 +2,7 @@ import { readDrawCameraRequest, completeDrawCamera, drawCameraCancelUrl } from '
 import { prepareCameraTarget, cameraPixels, replaceCameraPixels } from '../creation/draw-camera-core.mjs?rev=20261016-color-capability-1';
 import { createDrawAnimationSession } from '../creation/draw-animation-session.mjs?rev=20261016-color-capability-1';
 import { getAnimationCelDocument } from '../creation/animation-core.mjs?rev=20261016-color-capability-1';
-import { documentRgba } from '../creation/draw-core.mjs';
+import { documentRgba } from '../creation/draw-core.mjs?rev=20261011-tool-size-1';
 import { centerCrop } from '../pixel-studio/framing.mjs';
 import { cameraStartErrorMessage } from '../pixel-studio/camera-ui-state.mjs';
 

@@ -34,7 +34,7 @@ for (const engineName of ['chromium', 'webkit']) {
       });
       const page = await ctx.newPage();
       const errors = []; page.on('pageerror', error => { if (!error.message.includes('optional ad unavailable')) errors.push(error.message); });
-      async function openList() {
+      async function openList(expectedCount = 20) {
         const frame = page.frames().find(f => f !== page.mainFrame());
         await frame.waitForFunction(() => globalThis.__PIXIEED_MAP_EVENTS__);
         await frame.evaluate(() => __PIXIEED_MAP_EVENTS__.ready);
@@ -42,7 +42,7 @@ for (const engineName of ['chromium', 'webkit']) {
         await frame.evaluate(() => __PIXIEED_MAP_EVENTS__.selectRegion({ prefectureId: '13', prefectureLabel: '東京都', mapRegionId: 'prefecture:13', mapRegionKind: 'prefecture', mapRegionLabel: '東京都', countryId: 'JPN' }));
         assert.equal(await frame.locator('.map-events-panel').getAttribute('data-view'), 'list');
         assert.equal(await frame.locator('.map-events-panel__expand').count(), 0);
-        assert.equal(await frame.locator('.map-event-card').count(), 20);
+        assert.equal(await frame.locator('.map-event-card').count(), expectedCount);
         return frame;
       }
       await page.goto(base + '/globe/', { waitUntil: 'domcontentloaded' });
@@ -128,10 +128,11 @@ for (const engineName of ['chromium', 'webkit']) {
         assert.equal(await frame.locator('.map-event-card').count(), 1);
         assert.equal(await frame.evaluate(() => document.activeElement.dataset.periodOption), 'past');
       }
-      await page.reload({ waitUntil: 'domcontentloaded' }); frame = await openList();
+      const restoredCount = viewport.width > 900 ? 1 : 26;
+      await page.reload({ waitUntil: 'domcontentloaded' }); frame = await openList(restoredCount);
       await page.goto(base + '/tools/', { waitUntil: 'domcontentloaded' });
       await page.goBack({ waitUntil: 'domcontentloaded' });
-      frame = await openList();
+      frame = await openList(restoredCount);
       assert.deepEqual(errors, []);
       checks.push({ engine: engineName, ...viewport, expanded: true, keyboard: true, scrollFocus: true, reloadAndBack: true, ics: true, controls: metrics.controls.length, periodFilters: true });
       await ctx.close();

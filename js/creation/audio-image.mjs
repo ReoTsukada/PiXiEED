@@ -1,5 +1,5 @@
 import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PIXEL_PALETTE, audioPixelColumns, resizeAudioCanvas, validateAudioSong } from './audio-core.mjs?rev=20261016-color-capability-1';
-import { DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs';
+import { DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
 
 const colorDefaults = AUDIO_PIXEL_PALETTE.map(({ color }) => color);
 export const AUDIO_IMAGE_RULES_VERSION = 'image-to-audio-pixels-v1';

@@ -14,7 +14,12 @@ const pages = [
   ['privacy/index.html', '/privacy/', 'site'], ['books/index.html', '/books/', 'site'], ['stores/index.html', '/stores/', 'stores'],
   ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html', 'site'], ['collection/index.html', '/collection/', 'site'],
 ];
-const sitemapExcludedPaths = new Set(['/game/', '/telescope/', '/collection/']);
+const sitemapExcludedPaths = new Set(['/draw/about/', '/pixel-camera.html', '/game/', '/telescope/', '/collection/']);
+const nonIndexableLegacyRoutes = new Set(['/draw/about/', '/pixel-camera.html']);
+const canonicalPathOverrides = new Map([
+  ['/draw/about/', '/draw/'],
+  ['/pixel-camera.html', '/camera/'],
+]);
 const sitemapPages = pages
   .filter(([, path]) => !sitemapExcludedPaths.has(path));
 const eventIds = JSON.parse(readFileSync(resolve(root, 'events/catalog.json'), 'utf8')).ids;
@@ -57,7 +62,10 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.ok(title && title.length > 3, `${file} has a useful title`);
     assert.equal(description.length, 1, `${file} has exactly one description`);
     assert.ok(description[0].length >= 20, `${file} has a specific description`);
-    assert.match(head, new RegExp(`<link\\b(?=[^>]*rel=["']canonical["'])[^>]*href=["']https://pixieed\\.jp${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`));
+    const canonicalPath = canonicalPathOverrides.get(path) || path;
+    const canonicalTags = [...head.matchAll(/<link\b(?=[^>]*rel=["']canonical["'])[^>]*href=["']([^"']+)["'][^>]*>/gi)];
+    assert.equal(canonicalTags.length, 1, `${file} has one canonical`);
+    assert.equal(canonicalTags[0][1], `https://pixieed.jp${canonicalPath}`);
     assert.equal(values(head, 'property', 'og:type')[0], 'website');
     for (const name of ['og:type', 'og:site_name', 'og:locale', 'og:title', 'og:description', 'og:url', 'og:image', 'og:image:type', 'og:image:width', 'og:image:height', 'og:image:alt']) {
       assert.equal(values(head, 'property', name).length, 1, `${file} has one ${name}`);
@@ -66,7 +74,7 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.equal(values(head, 'property', 'og:locale')[0], 'ja_JP');
     assert.equal(values(head, 'property', 'og:title')[0], title);
     assert.equal(values(head, 'property', 'og:description')[0], description[0]);
-    assert.equal(values(head, 'property', 'og:url')[0], `https://pixieed.jp${path}`);
+    assert.equal(values(head, 'property', 'og:url')[0], `https://pixieed.jp${canonicalPath}`);
     const imageUrl = `https://pixieed.jp/assets/og/${imageName}.png`;
     assert.equal(values(head, 'property', 'og:image')[0], imageUrl);
     assert.equal(values(head, 'property', 'og:image:type')[0], 'image/png');
@@ -74,7 +82,8 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.equal(values(head, 'property', 'og:image:height')[0], '630');
     const introArtworkAlts = {
       'draw/about/index.html': 'PiXiEEDrawのドット絵アイコン',
-      'camera/index.html': 'PiXiEEDのカメラと写真変換のアイコン',
+      'camera/index.html': 'PiXiEEDrawのカメラモードのアイコン',
+      'pixel-camera.html': 'PiXiEEDrawのカメラモードのアイコン',
     };
     const expectedAlt = introArtworkAlts[file] || toolArtworkAlts[imageName] || `PiXiEEDのロゴと「${artworkLabels[imageName]}」${imageName === 'site' ? '' : 'のアイコン'}`;
     assert.equal(values(head, 'property', 'og:image:alt')[0], expectedAlt);
@@ -89,6 +98,9 @@ test('pages carry one canonical, branded OGP and Twitter preview with the assign
     assert.deepEqual(pngDimensions(`assets/og/${imageName}.png`), [1200, 630]);
     assert.equal((head.match(/rel=["']canonical["']/gi) || []).length, 1);
     assert.doesNotMatch(head, /assets\/brand\/pixieed-logo.*(?:og:image|twitter:image)/i);
+    if (nonIndexableLegacyRoutes.has(path)) {
+      assert.match(head, /<meta\s+name=["']robots["']\s+content=["']noindex,follow["']/i, `${file}: legacy route must not be indexed`);
+    }
   }
 });
 
@@ -136,6 +148,9 @@ test('sitemap lists the clean public page URLs without retired and private route
   assert.deepEqual(actual, expected);
   assert.equal(new Set(actual).size, actual.length, 'no duplicate URLs');
   assert.doesNotMatch(sitemap, /https:\/\/pixieed\.jp\/pixiee-lens\//);
+  for (const path of nonIndexableLegacyRoutes) {
+    assert.ok(!actual.includes(`https://pixieed.jp${path}`), `${path}: legacy route is excluded from sitemap`);
+  }
   assert.doesNotMatch(sitemap, /\/(?:profile|admin|sale|localdrafts|works|gallery|game|collection|telescope)\//i);
 });
 

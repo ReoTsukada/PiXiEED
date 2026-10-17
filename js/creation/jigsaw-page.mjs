@@ -4,7 +4,7 @@ import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-draf
 import {
   chunkJigsawPuzzleIds, collectPagedRows, fingerprintBytes, firstPublishedPixfindReferences, isSafeJigsawPixfindOriginalUrl, resolveLocalDrawRevision, validateJigsawSource, JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS
 } from './jigsaw-core.mjs?rev=20261001-free-tools-1';
-import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
+import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import {
   createJigsawLayout, createJigsawWorkspace, migrateLegacyJigsawGame,
   moveJigsawGroup, rotateJigsawGroup, snapJigsawGroup, worldGroupBounds,

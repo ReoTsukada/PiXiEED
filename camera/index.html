@@ -3,106 +3,112 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f8f6">
-  <title>写真・画像をドット絵に変換｜PiXiEELENS</title>
-  <meta name="description" content="PiXiEEDrawのカメラモードPiXiEELENS。写真を撮影するか、画像を読み込んでドット絵に変換し、色数を減らして仕上げられます。">
+  <meta name="theme-color" content="#f4f2ec">
+  <script>
+    (() => {
+      const params = new URLSearchParams(location.search);
+      const validBridge = value => value.get('embed') === '1' && ['draw', 'camera', 'audio'].includes(value.get('embedRole')) && value.get('channel');
+      // A tool's own return link can reach its public URL inside the retained
+      // iframe. Recover only this same-origin controller's transport channel.
+      try {
+        const frame = window.frameElement;
+        const original = frame && new URL(frame.src, location.href);
+        const independentLegacy = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
+        if (!validBridge(params) && !independentLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
+          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : /\/camera(?:\/index\.html)?\/?$/.test(location.pathname) ? 'camera' : 'draw';
+          params.set('embed', '1'); params.set('embedRole', mode); params.set('channel', original.searchParams.get('channel'));
+        }
+      } catch { /* Foreign frames do not inherit an editor channel. */ }
+      if (validBridge(params)) {
+        if (!params.has('mode')) params.set('mode', params.get('embedRole'));
+        location.replace(`/draw/editor.html?${params}${location.hash}`);
+      }
+    })();
+  </script>
+  <title>写真・画像をドット絵に変換｜PiXiEEDraw カメラモード</title>
+  <meta name="description" content="PiXiEEDrawのカメラモードPiXiEELENS。撮影や画像読込からドット絵に変換し、色数を調整して保存できます。">
   <link rel="canonical" href="https://pixieed.jp/camera/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="PiXiEED">
-  <meta property="og:locale" content="ja_JP">
-  <meta property="og:title" content="写真・画像をドット絵に変換｜PiXiEELENS">
-  <meta property="og:description" content="PiXiEEDrawのカメラモードPiXiEELENS。写真を撮影するか、画像を読み込んでドット絵に変換し、色数を減らして仕上げられます。">
-  <meta property="og:url" content="https://pixieed.jp/camera/">
-  <meta property="og:image" content="https://pixieed.jp/assets/og/camera.png">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="写真・画像をドット絵に変換｜PiXiEEDraw カメラモード"><meta property="og:description" content="PiXiEEDrawのカメラモードPiXiEELENS。撮影や画像読込からドット絵に変換し、色数を調整して保存できます。"><meta property="og:url" content="https://pixieed.jp/camera/"><meta property="og:image" content="https://pixieed.jp/assets/og/camera.png">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="写真・画像をドット絵に変換｜PiXiEEDraw カメラモード"><meta name="twitter:description" content="PiXiEEDrawのカメラモードPiXiEELENS。撮影や画像読込からドット絵に変換し、色数を調整して保存できます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/camera.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="PiXiEEDのカメラと写真変換のアイコン">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="写真・画像をドット絵に変換｜PiXiEELENS">
-  <meta name="twitter:description" content="PiXiEEDrawのカメラモードPiXiEELENS。写真を撮影するか、画像を読み込んでドット絵に変換し、色数を減らして仕上げられます。">
-  <meta name="twitter:image" content="https://pixieed.jp/assets/og/camera.png">
-  <meta name="twitter:image:alt" content="PiXiEEDのカメラと写真変換のアイコン">
-  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
+  <meta property="og:image:alt" content="PiXiEEDrawのカメラモードのアイコン">
+  <meta name="twitter:image:alt" content="PiXiEEDrawのカメラモードのアイコン">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
   <link rel="stylesheet" href="/css/tool-embed.css?rev=20261016-tool-shell-1">
+  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261017-entry-integration-1">
 </head>
-<body class="tool-intro tool-intro--camera">
+<body class="tool-intro tool-shell tool-shell--camera" data-tool-shell>
   <a class="skip-link" href="#main">本文へ移動</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
-      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a></nav>
+      <nav class="site-nav" aria-label="メインナビゲーション"><a href="/tools/">ツール</a><a href="#camera-how-to">使い方</a></nav>
     </div>
   </header>
   <main id="main">
-    <section class="tool-intro__hero" aria-labelledby="camera-title">
+    <section class="tool-intro__hero" aria-labelledby="tool-title">
       <div class="container tool-intro__hero-grid tool-intro__hero-grid--single">
         <div class="tool-intro__copy">
-          <p class="tool-intro__eyebrow">PiXiEEDraw · PiXiEELENS</p>
-          <h1 id="camera-title"><span>写真・画像を</span><span>ドット絵に変換</span></h1>
-          <p class="tool-intro__lead">PiXiEEDrawのカメラモードです。撮影か画像読込から始め、色数を減らして仕上げられます。</p>
-          <div class="tool-intro__actions">
-            <button class="button button--primary tool-intro__start" type="button" data-embed-start data-embed-target="camera-try" aria-controls="camera-try" aria-expanded="false">画像・カメラツールを使う <span aria-hidden="true">↓</span></button>
-            <a class="tool-intro__route-link" href="/draw/?mode=camera">専用ページを開く <span aria-hidden="true">↗</span></a>
-          </div>
-          <p class="tool-intro__hint">起動後、ツール下部の［ファイル］→［画像を読み込む］から画像を選べます。撮影はページ読み込み時に始まりません。</p>
-          <details class="tool-intro__screens">
-            <summary>実際の変換画面を見る</summary>
-            <div class="tool-intro__screen-pair">
-              <figure><a href="/assets/screenshots/camera-pc-maou.png" target="_blank" rel="noopener"><img src="/assets/screenshots/camera-pc-maou.png" width="1366" height="900" alt="魔王様を変換したカメラ・画像ツールのパソコン画面" loading="lazy"></a><figcaption>PC版</figcaption></figure>
-              <figure><a href="/assets/screenshots/camera-mobile-maou.png" target="_blank" rel="noopener"><img src="/assets/screenshots/camera-mobile-maou.png" width="390" height="844" alt="魔王様を変換したカメラ・画像ツールのスマートフォン画面" loading="lazy"></a><figcaption>スマートフォン版</figcaption></figure>
-            </div>
-          </details>
+          <p class="tool-intro__eyebrow" data-shell-eyebrow>PiXiEEDraw · PiXiEELENS</p>
+          <h1 id="tool-title" data-shell-title>写真・画像をドット絵に変換</h1>
+          <p class="tool-intro__lead" data-shell-lead>PiXiEEDrawのカメラモードです。撮影か画像読込から始め、色数を減らして仕上げられます。</p>
+          <p class="tool-intro__hint">画像は［ファイル］から読み込めます。撮影はツール内の［カメラを開始］を選んだときに始まります。</p>
         </div>
-        <figure class="tool-intro__sample">
-          <img src="/assets/samples/maou.png" width="64" height="64" alt="魔王様のドット絵作例" decoding="async">
-          <figcaption><span>作例</span><strong>魔王様</strong></figcaption>
-        </figure>
       </div>
     </section>
 
-    <section class="tool-intro__embed-wrap tool-intro__embed-wrap--primary" aria-label="写真・画像をドット絵に変換">
+    <nav class="tool-intro__related container" aria-label="このページ内の案内"><a href="#camera-tool">制作ツール <span aria-hidden="true">↓</span></a><a href="#camera-how-to">使い方 <span aria-hidden="true">↓</span></a><a href="#camera-save">保存・出力 <span aria-hidden="true">↓</span></a><a href="#camera-faq">よくある質問 <span aria-hidden="true">↓</span></a></nav>
+
+    <section class="tool-intro__embed-wrap tool-shell__workspace" id="camera-tool" aria-label="PiXiEEDraw 制作ツール">
       <div class="container">
-        <section class="tool-intro__embed" id="camera-try" data-tool-embed data-tool-mode="camera" aria-labelledby="camera-embed-title">
-          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CONVERT HERE</p><h2 id="camera-embed-title">このページで変換する</h2><p>画像ファイルを読み込むか、ツール内の撮影操作を使えます。</p></div>
+        <section class="tool-intro__embed tool-shell__embed" data-tool-embed data-tool-shell data-tool-mode="camera" data-embed-auto aria-labelledby="tool-embed-title">
+          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CREATE HERE</p><h2 id="tool-embed-title">このページで画像を変換する</h2><p data-shell-workspace-copy>［大きく使う］で作業領域を広げられます。描画・音楽も同じ作品で切り替えられます。</p></div>
           <div data-embed-stage hidden></div>
-          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">ページを開いただけではカメラを起動しません。</p>
-          <p class="tool-intro__note">カメラの利用許可は、ツール内で撮影を選んだときに確認されます。</p>
+          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">ツールを準備しています…</p>
         </section>
       </div>
     </section>
 
-    <section class="tool-intro__how-to container" aria-labelledby="camera-how-title">
+    <section class="tool-intro__how-to container" id="camera-how-to" aria-labelledby="camera-how-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FROM PHOTO TO PIXELS</p><h2 id="camera-how-title">画像からでも、カメラからでも。</h2></div>
       <ol class="tool-intro__steps">
         <li><span>01</span><div><h3>画像読込、または撮影</h3><p>下部の［ファイル］→［画像を読み込む］へ。撮影する場合はカメラを選びます。</p></div></li>
         <li><span>02</span><div><h3>ピクセルに変換</h3><p>ピクセルの細かさを調整し、プレビューで仕上がりを確認します。</p></div></li>
-        <li><span>03</span><div><h3>減色してPNGで保存</h3><p>色数や見た目を選び、変換結果を確定してPNGで保存します。</p></div></li>
+        <li><span>03</span><div><h3>減色してPNGで保存</h3><p>色数や見た目を選び、変換結果を確定し、［出力］からPNGで保存します。</p></div></li>
       </ol>
+<details class="tool-intro__screens">
+            <summary>実際の変換画面を見る</summary>
+            <div class="tool-intro__screen-pair">
+              <figure><a href="/assets/screenshots/camera-pc-maou.png" target="_blank" rel="noopener"><picture><source type="image/webp" srcset="/assets/screenshots/previews/camera-pc-maou-480.webp 480w, /assets/screenshots/previews/camera-pc-maou-1366.webp 1366w" sizes="(min-width: 900px) 560px, 90vw"><img src="/assets/screenshots/camera-pc-maou.png" width="1366" height="900" alt="魔王様を変換したカメラ・画像ツールのパソコン画面" loading="lazy"></picture></a><figcaption>PC版</figcaption></figure>
+              <figure><a href="/assets/screenshots/camera-mobile-maou.png" target="_blank" rel="noopener"><picture><source type="image/webp" srcset="/assets/screenshots/previews/camera-mobile-maou-390.webp 390w" sizes="(min-width: 900px) 560px, 90vw"><img src="/assets/screenshots/camera-mobile-maou.png" width="390" height="844" alt="魔王様を変換したカメラ・画像ツールのスマートフォン画面" loading="lazy"></picture></a><figcaption>スマートフォン版</figcaption></figure>
+            </div>
+          </details>
     </section>
 
-    <section class="tool-intro__formats container" aria-labelledby="camera-formats-title">
+    <section class="tool-intro__formats container" id="camera-save" aria-labelledby="camera-formats-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FILES & PRIVACY</p><h2 id="camera-formats-title">対応画像と保存</h2></div>
       <p>PNG・JPEG・WebP画像を読み込み、変換した画像はPNGで保存できます。画像は端末内で処理します。</p>
-      <a class="tool-intro__route-link" href="/draw/?mode=camera">カメラ・画像ツール専用ページを開く <span aria-hidden="true">↗</span></a>
+      <p>元の作品に変換結果を反映して描き足せます。［作品を保存］は利用中のブラウザー内の保存です。別の端末への自動同期はありません。PNGなどのファイルは［出力］から保存してください。保存だけで作品は公開されません。</p>
     </section>
 
-    <section class="tool-intro__faq container" aria-labelledby="camera-faq-title">
+    <section class="tool-intro__faq container" id="camera-faq" aria-labelledby="camera-faq-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FAQ</p><h2 id="camera-faq-title">よくある質問</h2></div>
       <details><summary>ページを開くとカメラが起動しますか？</summary><p>起動しません。ページ内ツールを読み込んだ後、撮影操作を選ぶとブラウザーが利用許可を確認します。</p></details>
-      <details><summary>カメラを使わずに変換できますか？</summary><p>PNG・JPEG・WebP画像を選んで変換できます。</p></details>
+      <details><summary>カメラを使わずに変換できますか？</summary><p>PNG・JPEG・WebP画像を選んで変換できます。10MB以内、長辺4096px以内の画像に対応しています。</p></details>
+      <details><summary>PiXiEELENSは別のアプリですか？</summary><p>PiXiEEDrawのカメラモードの名前です。描画・カメラ・音楽を同じ作品で切り替えられます。</p></details>
+      <details><summary>大きく表示すると編集内容は消えますか？</summary><p>同じ編集画面を広げるため、ページ内表示へ戻っても作業を続けられます。ページを離れる前には作品を保存してください。</p></details>
+      <details><summary>写真以外にどんな調整ができますか？</summary><p>色やパレット、ディザ、ピクセルの細かさ、縦横比、トーン、倍率を調整できます。撮影時は前後カメラの切替や、シャッター長押しによるGIF撮影にも対応しています。端末やブラウザーによって撮影機能の対応が異なります。</p></details>
     </section>
-    <nav class="tool-intro__related container" aria-label="関連ツール"><a href="/draw/?mode=camera">カメラ・画像ツール専用ページ <span aria-hidden="true">→</span></a><a href="/draw/about/">ドット絵を描く <span aria-hidden="true">→</span></a></nav>
   </main>
-  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/about/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-embed.mjs?rev=20261016-tool-shell-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261017-editor-improvements-1"></script>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261017-entry-integration-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
 </body>
 </html>

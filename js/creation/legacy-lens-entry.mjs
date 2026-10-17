@@ -69,7 +69,7 @@ export function resolveLegacyLensEntry({ search = '', hash = '', hasPendingTrans
     return { action: 'stay', reason: 'ambiguous-project-pointer' };
   }
   if (!url) return { action: 'stay', reason: 'unsupported-project-pointer' };
-  return { action: 'redirect', reason: 'compatible-camera-entry', url: `${url}${cleanHash(hash)}` };
+  return { action: 'redirect', reason: 'compatible-camera-entry', url: `${url.replace(/^\/draw\//, '/camera/')}${cleanHash(hash)}` };
 }
 
 function safeBrowserStorage() {
@@ -131,7 +131,7 @@ export function initLegacyLensEntry({ locationLike = globalThis.location, docume
     return result;
   }
 
-  if (cameraLink) cameraLink.href = '/draw/?mode=camera';
+  if (cameraLink) cameraLink.href = '/camera/';
   if (result.outputUrl && outputLink) {
     outputLink.href = result.outputUrl;
     outputLink.hidden = false;
