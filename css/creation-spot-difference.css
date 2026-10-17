@@ -108,3 +108,23 @@ body.px-tool-header .px-site-header [data-editor-header-control]:focus-visible {
 @media (orientation:landscape) and (max-height:500px) {
   body.spot-editing:has(.spot-publish-actions > button:not([hidden])) .spot-preview { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
 }
+/* Reuse Draw's viewport inside the game's retained editing surface. */
+body.spot-inline-open #spot-inline-draw .game-draw-host__frame {
+  grid-column:1; grid-row:1; align-self:stretch;
+  width:100%!important; height:100%!important; max-height:100%!important;
+  aspect-ratio:auto!important; border-radius:8px;
+}
+
+body.spot-inline-open #spot-inline-draw:has([data-game-draw-backend="legacy-shared-core"]) {
+  grid-template-rows:minmax(0,1fr) auto auto;
+}
+.game-draw-legacy-tools { display:flex; align-items:center; gap:6px; grid-row:2; min-width:0; }
+.game-draw-legacy-tools button { width:44px; height:44px; flex:0 0 44px; padding:8px; border:1px solid #c5cbbd; border-radius:10px; background:#fff; }
+.game-draw-legacy-tools button[aria-pressed="true"] { background:#ffd35a; }
+.game-draw-legacy-tools svg { width:24px; height:24px; }
+.game-draw-legacy-tools span { min-width:0; font-size:11px; line-height:1.35; color:#485044; }
+body.spot-inline-open #spot-inline-draw:has([data-game-draw-backend="legacy-shared-core"]) .spot-inline-color-row { grid-row:3; }
+body.spot-inline-open #spot-inline-draw canvas[data-game-draw-backend="legacy-shared-core"] {
+  width:100%!important; height:100%!important; max-height:100%!important;
+  min-height:0; align-self:stretch; object-fit:contain;
+}

@@ -153,7 +153,7 @@ body.draw-desktop-active .draw-desktop-history > button { box-sizing: border-box
 body.draw-desktop-active .draw-desktop-history svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 body.draw-desktop-active .draw-desktop-cell-launcher { margin-top: 5px; justify-content: center; min-height: 34px; color: #dfe7e4; }
 body.draw-desktop-active .draw-desktop-cell-launcher > span { flex: 0 1 auto; }
-body.draw-desktop-active .draw-desktop-stage { grid-area: stage; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 5px; padding: 7px; overflow: hidden; background: #151e25; }
+body.draw-desktop-active .draw-desktop-stage { position: relative; grid-area: stage; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 5px; padding: 7px; overflow: hidden; background: #151e25; }
 body.draw-desktop-active .draw-desktop-canvas-meta { min-width: 0; min-height: 0; }
 body.draw-desktop-active .draw-desktop-canvas-meta .draw-meta { position: static; display: flex; align-items: center; gap: 9px; min-width: 0; margin: 0; color: #c5d0d4; font-size: 11px; }
 body.draw-desktop-active .draw-desktop-canvas-meta .draw-status { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -264,6 +264,14 @@ body.draw-desktop-active.draw-desktop-embedded .draw-desktop-shell { grid-templa
 body.draw-desktop-active .draw-desktop-layer-host .animation-controls__layer-row,
 body.draw-desktop-active .draw-desktop-layer-host [data-layer-row] { min-width: 0; }
 body.draw-desktop-active .draw-desktop-layer-host :is(button, input) { min-width: 0; }
+/* Put the shared opacity caption above a usable slider/value row. The compact
+   dock replaces this row before the slider would fall below 100px. */
+body.draw-desktop-active .draw-desktop-layer-host .animation-controls__layer-opacity {
+  grid-template-columns: minmax(100px, 1fr) 40px;
+}
+body.draw-desktop-active .draw-desktop-layer-host .animation-controls__layer-opacity > span { grid-column: 1 / -1; }
+body.draw-desktop-active .draw-desktop-layer-host .animation-controls__layer-opacity-input { grid-column: 1; }
+body.draw-desktop-active .draw-desktop-layer-host .animation-controls__layer-opacity-value { grid-column: 2; }
 
 @media (max-height: 800px) {
   body.draw-desktop-active .draw-desktop-shell { gap: 0; }
@@ -272,4 +280,165 @@ body.draw-desktop-active .draw-desktop-layer-host :is(button, input) { min-width
   body.draw-desktop-active .draw-desktop-group { padding-bottom: 5px; }
   body.draw-desktop-active .draw-desktop-button { padding: 3px 4px; }
   body.draw-desktop-active .draw-desktop-dock { padding: 6px; }
+}
+
+/* Rail actions stay thumb-sized square icon controls at every saved width.
+   Auto-fill increases the number of columns as a rail grows. */
+body.draw-desktop-active .draw-desktop-tools { overflow-x: hidden; overflow-y: auto; }
+body.draw-desktop-active .draw-desktop-tool-scroll { flex: 0 0 auto; overflow: visible; }
+body.draw-desktop-active .draw-desktop-tool-scroll > .draw-desktop-group,
+body.draw-desktop-active .draw-desktop-tools > .draw-desktop-group { flex: 0 0 auto; }
+body.draw-desktop-active .draw-desktop-group__buttons,
+body.draw-desktop-active .draw-desktop-secondary,
+body.draw-desktop-active .draw-desktop-history,
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions,
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row {
+  grid-template-columns: repeat(auto-fill, 44px) !important;
+  grid-auto-rows: 44px;
+  justify-content: start;
+  gap: 4px;
+}
+body.draw-desktop-active .draw-desktop-button,
+body.draw-desktop-active .draw-desktop-history > button,
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button,
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > button,
+body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary,
+body.draw-desktop-active .draw-desktop-cell-launcher {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  margin: 0;
+  padding: 2px;
+  overflow: hidden;
+  border: 1px solid #ffffff20;
+  border-radius: 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+body.draw-desktop-active .draw-desktop-button { gap: 0; }
+body.draw-desktop-active .draw-desktop-button__icon,
+body.draw-desktop-active .draw-desktop-history svg { width: 24px; height: 24px; }
+body.draw-desktop-active .draw-desktop-button__icon { flex-basis: 24px; }
+body.draw-desktop-active .draw-desktop-button__icon svg { width: 24px; height: 24px; }
+body.draw-desktop-active .draw-desktop-button__label,
+body.draw-desktop-active .draw-desktop-button__key,
+body.draw-desktop-active .draw-desktop-cell-launcher > span { display: none !important; }
+body.draw-desktop-active .draw-desktop-history { grid-auto-rows: 44px; margin-bottom: 7px; }
+body.draw-desktop-active .draw-desktop-history > button { padding: 0; }
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button,
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > button,
+body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary {
+  appearance: none;
+  font-size: 0 !important;
+  line-height: 0;
+  cursor: pointer;
+}
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button::before,
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > button::before,
+body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::before {
+  display: grid;
+  place-items: center;
+  font: 700 17px/1 system-ui, sans-serif;
+}
+body.draw-desktop-active .draw-desktop-features .draw-text-opener::before { content: "文"; }
+body.draw-desktop-active .draw-desktop-features .draw-color-adjustment-open::before { content: "色"; }
+body.draw-desktop-active .draw-desktop-features .draw-brush-size-open::before { content: "筆"; }
+body.draw-desktop-active .draw-desktop-features .draw-selection-controls__deselect::before { content: "×"; }
+body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::before { content: "数"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="confirm"]::before { content: "✓"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="cancel"]::before { content: "×"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="copy"]::before { content: "複"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="cut"]::before { content: "切"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="paste"]::before { content: "貼"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="back"]::before { content: "範"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="filled"]::before { content: "塗"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="contiguous"]::before { content: "隣"; }
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="empty"]::before { content: "—"; }
+body.draw-desktop-active .draw-desktop-features .draw-brush-size-open { font-size: 0 !important; }
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions:has(> .draw-selection-controls__deselect[hidden]) > .draw-brush-size-open { grid-column: auto !important; width: 44px; max-width: 44px; }
+body.draw-desktop-active .draw-desktop-cell-launcher { font-size: 20px; }
+body.draw-desktop-active .draw-desktop-history > button:disabled,
+body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button:disabled,
+body.draw-desktop-active .draw-desktop-shell #draw-selection-controls button:disabled { opacity: .4; cursor: default; }
+
+/* Width descriptions move to native tooltips and accessible names. A narrow
+   rail scrolls as one column so the selection and view groups remain reachable. */
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] { gap: 4px; padding: 6px; }
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] .draw-desktop-group h2 { display: none; }
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] { scrollbar-width: none; }
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"]::-webkit-scrollbar,
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-palette-host::-webkit-scrollbar,
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host::-webkit-scrollbar { display: none; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] :is(.draw-desktop-palette-host, .draw-desktop-layer-host) { scrollbar-width: none; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-palette-host,
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host { overflow-x: hidden; overflow-y: auto; }
+
+/* Compact right dock stacks each layer action as a 44px square and swaps its
+   inline range for the compact value trigger that opens the full slider. */
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] > :is(.draw-desktop-palette-panel, .draw-desktop-layers-panel) > h2 { display: none; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer {
+  grid-template-columns: 44px;
+  grid-auto-rows: 44px;
+  justify-content: center;
+  justify-items: center;
+  gap: 3px;
+  width: 44px;
+  max-width: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer-name { grid-column: 1; grid-row: auto; display: grid; place-items: center; width: 44px !important; min-width: 44px !important; max-width: 44px; height: 44px; padding: 0; overflow: hidden; font-size: 0; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer-name::before { content: "L" attr(data-layer-number); font: 700 14px/1 system-ui, sans-serif; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer > [data-action="visibility"],
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer > [data-action="lock"],
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer > [data-action="move-layer-up"],
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer > [data-action="move-layer-down"],
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer > [data-action="delete-layer"] { grid-column: 1; grid-row: auto; width: 44px !important; min-width: 44px !important; max-width: 44px; height: 44px !important; min-height: 44px !important; max-height: 44px; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer > .animation-controls__wide-button { justify-self: center; width: 44px !important; min-width: 44px !important; max-width: 44px !important; height: 44px !important; min-height: 44px !important; max-height: 44px !important; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__rename { box-sizing: border-box; grid-column: 1; width: 44px; min-width: 0; max-width: 44px; height: 44px; min-height: 44px; padding: 2px; font-size: 10px; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer-opacity { display: grid; grid-column: 1; grid-template-columns: 44px; justify-items: center; width: 44px; min-width: 44px; padding: 0; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__layer-opacity > :not(.animation-controls__opacity-compact-trigger) { display: none !important; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host .animation-controls__opacity-compact-trigger { display: grid; place-items: center; box-sizing: border-box; width: 44px; min-width: 44px; max-width: 44px; height: 44px; min-height: 44px; max-height: 44px; padding: 2px; font-size: 11px; }
+
+/* The short-height override above also preserves the 44px single-column lane. */
+@media (max-height: 800px) {
+  body.draw-desktop-active .draw-desktop-tools[data-compact="true"] { padding: 6px; }
+}
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] .draw-desktop-context { min-height: 0; }
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] #draw-selection-controls { padding: 0; border: 0; background: transparent; }
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] #draw-selection-controls > p { display: none; }
+body.draw-desktop-active .draw-desktop-tools[data-compact="true"] #draw-selection-controls .draw-selection-controls__row { gap: 3px; }
+
+/* Keep every desktop rail action square even after a wide rail adds columns. */
+body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset] {
+  box-sizing: border-box; display: grid; place-items: center; flex: 0 0 24px; width: 24px; min-width: 24px; max-width: 24px;
+  height: 24px; min-height: 24px; max-height: 24px; padding: 2px; overflow: hidden; font-size: 0;
+}
+body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset]::before { content: "↺"; font: 700 18px/1 system-ui, sans-serif; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frames { grid-template-rows: 44px minmax(0, 1fr); }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions { flex-wrap: wrap; overflow: auto; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions button {
+  box-sizing: border-box; display: grid; place-items: center; flex: 0 0 44px !important; width: 44px !important; min-width: 44px !important;
+  max-width: 44px; height: 44px !important; min-height: 44px !important; max-height: 44px; padding: 2px; overflow: hidden; font-size: 0;
+}
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-blank-frame"]::before { content: "空"; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-add-frame"]::before { content: "+"; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-delete-frame"]::before { content: "×"; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-move-frame-left"]::before { content: "←"; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-move-frame-right"]::before { content: "→"; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions button::before { font: 700 17px/1 system-ui, sans-serif; }
+
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .animation-controls__layer-list { justify-items: center; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .animation-controls__layer { box-sizing: border-box; }
+body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button {
+  justify-self: center; width: 44px !important; min-width: 44px !important; max-width: 44px !important;
+  height: 44px !important; min-height: 44px !important; max-height: 44px !important;
 }

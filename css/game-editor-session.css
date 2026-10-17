@@ -1,0 +1,12 @@
+.game-editor-session { display:flex; align-items:center; gap:4px; flex:0 0 auto; }
+.game-editor-session[hidden] { display:none!important; }
+.game-editor-session button { min-height:44px; padding:6px 9px; border:1px solid #bec8bc; border-radius:10px; background:#fff; color:#26312a; font:700 12px/1.2 sans-serif; cursor:pointer; }
+body[data-game-editor-active] .project-transfer { display:none!important; }
+body[data-game-editor-active] .puzzle-list-back,body[data-game-editor-active] .puzzle-editor-play { display:none!important; }
+body.game-editor-expanded { overflow:hidden; }
+body.game-editor-expanded .site-header { position:fixed; inset:0 0 auto; z-index:60; }
+body.game-editor-expanded :is(.spot-page,.hidden-page) { position:fixed; inset:var(--px-header-height,64px) 0 0; width:100%; margin:0; overflow:hidden; }
+body[data-game-editor-active] .px-site-header .header-inner { flex-wrap:nowrap; }
+body[data-game-editor-active] .px-site-header .brand { display:none!important; }
+body[data-game-editor-active] .px-tool-header-controls:empty { display:none; }
+@media(max-width:390px) { .game-editor-session button { padding-inline:6px; font-size:11px; } body[data-game-editor-active] .project-bar { flex:1 1 40px; min-width:40px; } }

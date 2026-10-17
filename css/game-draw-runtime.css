@@ -1,0 +1,99 @@
+html[data-game-draw-runtime="true"],
+html[data-game-draw-runtime="true"] body {
+  width: 100%; height: 100%; min-height: 0; overflow: hidden;
+}
+html[data-game-draw-runtime="true"] body { height: 100dvh; }
+html[data-game-draw-runtime="true"] .site-header,
+html[data-game-draw-runtime="true"] .site-footer,
+html[data-game-draw-runtime="true"] .app-tabs,
+html[data-game-draw-runtime="true"] .skip-link,
+html[data-game-draw-runtime="true"] #creation-startup,
+html[data-game-draw-runtime="true"] .draw-title,
+html[data-game-draw-runtime="true"] .draw-size,
+html[data-game-draw-runtime="true"] .draw-meta,
+html[data-game-draw-runtime="true"] .draw-reward-notice,
+html[data-game-draw-runtime="true"] [data-draw-reward-notice],
+html[data-game-draw-runtime="true"] .pixieed-site-reward,
+html[data-game-draw-runtime="true"] #draw-mirror-rail,
+html[data-game-draw-runtime="true"] #draw-animation-controls,
+html[data-game-draw-runtime="true"] .draw-toggles,
+html[data-game-draw-runtime="true"] .draw-feature-actions,
+html[data-game-draw-runtime="true"] #draw-clear,
+html[data-game-draw-runtime="true"] #draw-output,
+html[data-game-draw-runtime="true"] #draw-to-globe,
+html[data-game-draw-runtime="true"] .draw-import,
+html[data-game-draw-runtime="true"] #draw-undo,
+html[data-game-draw-runtime="true"] #draw-redo,
+html[data-game-draw-runtime="true"] #draw-virtual-controls { display: none !important; }
+html[data-game-draw-runtime="true"] #main,
+html[data-game-draw-runtime="true"] .draw-page {
+  box-sizing: border-box; width: 100%; height: 100%; min-height: 0; max-width: none;
+  margin: 0; padding: 5px; overflow: hidden;
+}
+html[data-game-draw-runtime="true"] .draw-page {
+  display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 5px;
+}
+html[data-game-draw-runtime="true"] .draw-viewport,
+html[data-game-draw-runtime="true"] .draw-board { min-width: 0; min-height: 0; }
+html[data-game-draw-runtime="true"] .draw-viewport { display: contents; }
+html[data-game-draw-runtime="true"] .draw-board {
+  position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 8px;
+}
+html[data-game-draw-runtime="true"] #draw-canvas { max-width: 100%; max-height: 100%; }
+html[data-game-draw-runtime="true"] .draw-controls {
+  grid-row: 2; grid-template-columns: minmax(0, 1fr); gap: 3px; margin: 0; padding: 4px;
+  border-radius: 8px;
+}
+html[data-game-draw-runtime="true"] .draw-control-row { min-width: 0; }
+html[data-game-draw-runtime="true"] .draw-palette { max-height: 70px; }
+html[data-game-draw-runtime="true"] #draw-palette .draw-color:not([data-color-index]) { display: none !important; }
+html[data-game-draw-runtime="true"] .draw-toolbar { display: flex; justify-content: center; }
+html[data-game-draw-runtime="true"] .draw-tools { justify-content: center; }
+html[data-game-draw-runtime="true"] .draw-board .game-draw-original {
+  position: absolute; z-index: 2; object-fit: fill; image-rendering: pixelated;
+  transform-origin: center center; pointer-events: none;
+}
+html[data-game-draw-runtime="true"] .draw-board .draw-grid { z-index: 3; }
+html[data-game-draw-runtime="true"] .draw-board .draw-cursor { z-index: 4; }
+/* The puzzle owns its header and five operations outside this iframe. */
+html[data-game-draw-runtime="true"] body.creation-editor {
+  --creation-editor-header:0px; --creation-editor-bottom:0px;
+}
+html[data-game-draw-runtime="true"] body.creation-editor #main.draw-page {
+  position:fixed!important; inset:0!important; height:100%!important;
+  display:grid!important; grid-template-areas:"stage" "controls"!important;
+  grid-template-columns:minmax(0,1fr)!important; grid-template-rows:minmax(0,1fr) 104px!important;
+  gap:4px!important; padding:4px!important;
+}
+html[data-game-draw-runtime="true"] body.creation-editor .draw-viewport {
+  grid-area:stage!important; display:flex!important; position:relative!important;
+  width:100%!important; height:100%!important; min-height:0!important; overflow:hidden!important;
+}
+html[data-game-draw-runtime="true"] body.creation-editor .draw-board {
+  position:relative!important; width:100%!important; height:100%!important; min-height:0!important;
+}
+html[data-game-draw-runtime="true"] body.creation-editor .draw-control-dock {
+  grid-area:controls!important; display:block!important; height:100%!important; min-height:0!important;
+}
+html[data-game-draw-runtime="true"] body.creation-editor[data-page="draw"] .draw-controls {
+  display:grid!important; grid-template-columns:44px minmax(0,1fr) 44px!important;
+  grid-template-rows:96px!important; min-height:0!important; height:100%!important;
+  flex:initial!important; margin:0!important; padding:2px!important; gap:3px!important;
+}
+html[data-game-draw-runtime="true"] body[data-page="draw"] .draw-controls>.draw-control-row {
+  grid-column:2!important; grid-row:1!important; height:96px!important; min-height:0!important;
+}
+html[data-game-draw-runtime="true"] body[data-page="draw"] :is(.draw-fixed-left,.draw-fixed-right) {
+  height:96px!important; min-height:0!important; grid-template-rows:44px 44px!important;
+}
+html[data-game-draw-runtime="true"] body.creation-editor #draw-palette {
+  display:grid!important; grid-auto-flow:column!important; grid-template-rows:repeat(2,40px)!important;
+  grid-template-columns:none!important; grid-auto-columns:40px!important;
+  height:88px!important; max-height:88px!important; min-height:0!important; overflow:auto!important;
+}
+html[data-game-draw-runtime="true"] body.creation-editor #draw-palette .draw-color { width:36px!important; height:36px!important; }
+html[data-game-draw-runtime="true"] body.creation-editor .draw-heading { display:none!important; }
+html[data-game-draw-runtime="true"] body.creation-editor .draw-control-dock,
+html[data-game-draw-runtime="true"] body.creation-editor[data-page="draw"] .draw-controls {
+  height:104px!important; max-height:none!important;
+}

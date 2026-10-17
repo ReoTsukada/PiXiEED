@@ -8,8 +8,10 @@ export const DRAW_DESKTOP_LAYOUT_DEFAULTS = Object.freeze({
 });
 
 export const DRAW_DESKTOP_LAYOUT_LIMITS = Object.freeze({
-  leftWidth: Object.freeze({ min: 196, max: 440 }),
-  rightWidth: Object.freeze({ min: 216, max: 520 }),
+  // 62px leaves a 44px square tool button after the panel border and padding.
+  leftWidth: Object.freeze({ min: 62, max: 440 }),
+  // 68px leaves room for one 44px swatch plus palette/dock padding.
+  rightWidth: Object.freeze({ min: 68, max: 520 }),
   paletteHeight: Object.freeze({ min: 96, max: 720 }),
   frameHeight: Object.freeze({ min: 108, max: 480 })
 });

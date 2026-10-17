@@ -368,8 +368,8 @@ test('間違い探し and もの探し are separate games; PiXFiND links forward
   assert.equal(playPathForLegacyLink(at('?localHidden=1')), '/play/hidden-object/');
   for (const search of ['?localSpot=1', '?postPuzzle=1', '?puzzle=abc']) assert.equal(playPathForLegacyLink(at(search)), '/play/spot-difference/', search);
   assert.equal(playPathForLegacyLink(at('', '#puzzle=abc')), '/play/spot-difference/');
-  assert.equal(exitDestination(at('?localSpot=1'), 'spot-difference'), '/spot-difference/');
-  assert.equal(exitDestination(at('?localHidden=1'), 'hidden-object'), '/hidden-object/');
+  assert.equal(exitDestination(at('?localSpot=1'), 'spot-difference'), '/spot-difference/?resumeLocal=1');
+  assert.equal(exitDestination(at('?localHidden=1'), 'hidden-object'), '/hidden-object/?resumeLocal=1');
   assert.equal(exitDestination(at('?postPuzzle=1'), 'hidden-object'), '/play/hidden-object/');
   const forwarder = readFileSync(new URL('../../pixfind/index.html', import.meta.url), 'utf8');
   assert.match(forwarder, /noindex/);

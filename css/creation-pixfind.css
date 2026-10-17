@@ -127,3 +127,11 @@ body[data-puzzle-mode="hidden-object"].pixfind-is-playing .pixfind-found-list li
 .pixfind-card__body{position:absolute;right:0;bottom:0;left:0;padding:24px 14px 10px;background:linear-gradient(transparent,rgba(18,25,18,.88));color:#fff}
 .pixfind-card h2{overflow:hidden;color:inherit;text-overflow:ellipsis;white-space:nowrap}
 .pixfind-card p{overflow:hidden;color:rgba(255,255,255,.86);text-overflow:ellipsis;white-space:nowrap}
+
+/* The hidden-object editor reuses the puzzle workbench's compact field style. */
+.hidden-target-rename{display:grid;gap:4px;font-size:.75rem;font-weight:700}
+.hidden-target-rename>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.hidden-target-rename input{box-sizing:border-box;min-width:0;min-height:40px;padding:7px 10px;border:1px solid #c5cbbd;border-radius:10px;font:inherit;font-weight:400}
+.hidden-target-rename button,#hidden-edit-targets{min-height:40px;padding:7px 12px;border:1px solid #c5cbbd;border-radius:12px;background:#fff;color:inherit;font:inherit;font-size:.82rem;cursor:pointer}
+.hidden-target-rename button:disabled,#hidden-edit-targets:disabled{opacity:.45;cursor:default}
+body.hidden-object-editing #hidden-editor[data-confirmed="true"] #hidden-target-settings[open] .hidden-workbench{display:grid}

@@ -64,7 +64,9 @@ export function mountToolHeaderControls(doc = document, { selectors = [], projec
   }
   for (const selector of selectors) {
     const node = typeof selector === 'string' ? doc.querySelector(selector) : selector;
-    if (!node || movedControls.has(node)) continue;
+    // Tool operation bars own these controls and may move them before the
+    // shared header mounts. Do not wrap them in a header slot or reparent them.
+    if (!node || node.hasAttribute('data-tool-operation') || movedControls.has(node)) continue;
     // Keep controls belonging to a hidden setup/edit/result section hidden too.
     const ancestors = [];
     for (let parent = node.parentElement; parent && parent !== doc.body; parent = parent.parentElement) ancestors.push(parent);

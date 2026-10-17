@@ -8,7 +8,7 @@ import {
   resizeDrawDesktopPreference,
   setDrawDesktopPreference,
   writeDrawDesktopPreferences
-} from './draw-desktop-layout.mjs';
+} from './draw-desktop-layout.mjs?rev=20261017-draw-rails-1';
 
 const TOOL_COMMANDS = {
   pen: 'tool.left.pen', eraser: 'tool.left.eraser', fill: 'tool.left.fill', picker: 'tool.left.picker', spray: 'tool.left.spray',
@@ -20,12 +20,37 @@ const TOOL_LABELS = {
   rectangle: '四角形', 'rectangle-fill': '塗り四角形', ellipse: '楕円', 'ellipse-fill': '塗り楕円',
   select: '範囲選択'
 };
+const TOGGLE_SOURCE_SELECTORS = Object.freeze({ 'toggle.grid': '#draw-grid-toggle', 'toggle.onion': '#draw-onion-toggle' });
+
+export function findDesktopToggleSource(doc, command) {
+  const selector = TOGGLE_SOURCE_SELECTORS[command];
+  return selector ? doc?.querySelector?.(selector) || null : null;
+}
+
+export function dispatchDesktopToggle(doc, command) {
+  const source = findDesktopToggleSource(doc, command);
+  if (!source || source.disabled) return false;
+  source.click();
+  return true;
+}
+
+export function syncDesktopToggleProxy(proxy, source, { label, shortcut = '' } = {}) {
+  if (!proxy || !source) return false;
+  const pressed = source.getAttribute('aria-pressed') === 'true' ? 'true' : 'false';
+  const accessibleName = source.getAttribute('aria-label') || label || '';
+  if (proxy.getAttribute('aria-pressed') !== pressed) proxy.setAttribute('aria-pressed', pressed);
+  if (proxy.disabled !== Boolean(source.disabled)) proxy.disabled = Boolean(source.disabled);
+  if (accessibleName && proxy.getAttribute('aria-label') !== accessibleName) proxy.setAttribute('aria-label', accessibleName);
+  const title = keyTip(source.title || accessibleName, shortcut);
+  if (proxy.title !== title) proxy.title = title;
+  return true;
+}
 
 export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationControls, assignDrawInput, cancelInput = () => {}, onLayout = () => {} } = {}) {
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261016-selection-rail-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261017-draw-rails-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
@@ -60,7 +85,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     <div class="draw-desktop-tool-scroll" data-desktop-tool-scroll><section class="draw-desktop-group" data-desktop-group="drawing" aria-label="描く"><h2>描く</h2><div class="draw-desktop-group__buttons" data-desktop-drawing></div><div class="draw-desktop-secondary" data-desktop-paint-secondary></div></section>
     <section class="draw-desktop-group" data-desktop-group="shapes" aria-label="図形"><h2>図形</h2><div class="draw-desktop-group__buttons" data-desktop-shapes></div><div class="draw-desktop-secondary" data-desktop-shape-secondary></div></section></div>
     <section class="draw-desktop-group" data-desktop-group="selection" aria-label="選択と変形"><h2>選択と変形</h2><div class="draw-desktop-group__buttons" data-desktop-selection></div><div class="draw-desktop-context" data-desktop-selection-context></div><div class="draw-desktop-features" data-desktop-features></div></section>
-    <section class="draw-desktop-group" data-desktop-group="view" aria-label="表示と補助"><h2>表示・補助</h2><div class="draw-desktop-group__buttons" data-desktop-view></div><div class="draw-desktop-history" data-desktop-history></div><button type="button" class="draw-desktop-button draw-desktop-cell-launcher" data-desktop-cell-launcher aria-label="セル表を開く">▦ <span>セル表</span></button></section>
+    <section class="draw-desktop-group" data-desktop-group="view" aria-label="表示と補助"><h2>表示・補助</h2><div class="draw-desktop-group__buttons" data-desktop-view></div><div class="draw-desktop-history" data-desktop-history></div><button type="button" class="draw-desktop-button draw-desktop-cell-launcher" data-desktop-cell-launcher aria-label="セル表を開く" title="セル表を開く">▦ <span>セル表</span></button></section>
   </div>
   <div class="draw-desktop-resizer" data-layout-separator="leftWidth" role="separator" tabindex="0" aria-label="ツール欄の幅を変更" aria-orientation="vertical" aria-controls="draw-desktop-tools"></div>
   <div class="draw-desktop-stage" data-desktop-lane="stage"><div class="draw-desktop-canvas-meta"></div><div class="draw-desktop-canvas-host"></div><div class="draw-desktop-toolbar-context" data-desktop-toolbar-context></div></div>
@@ -144,6 +169,8 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     shell.style.setProperty('--draw-desktop-right', `${resolvedLayout.rightWidth}px`);
     shell.style.setProperty('--draw-desktop-palette', `${resolvedLayout.paletteHeight}px`);
     shell.style.setProperty('--draw-desktop-frame', `${resolvedLayout.frameHeight}px`);
+    $('.draw-desktop-tools').dataset.compact = String(resolvedLayout.leftWidth < 112);
+    $('.draw-desktop-dock').dataset.compact = String(resolvedLayout.rightWidth < 200);
     for (const separator of shell.querySelectorAll('[data-layout-separator]')) {
       const key = separator.dataset.layoutSeparator;
       const bounds = resolvedLayout.limits[key];
@@ -253,7 +280,9 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
       const tool = node.dataset.desktopTool;
       let mode = node.dataset.desktopSelectionMode || '';
       const actual = actualButtons.get(`${tool}:${mode}`) || actualButtons.get(`${tool}:`);
-      node.setAttribute('aria-pressed', String(actual?.getAttribute('aria-pressed') === 'true'));
+      const pressed = String(actual?.getAttribute('aria-pressed') === 'true');
+      if (node.getAttribute('aria-pressed') !== pressed) node.setAttribute('aria-pressed', pressed);
+      if (node.disabled !== Boolean(actual?.disabled)) node.disabled = Boolean(actual?.disabled);
       const commandId = node.dataset.desktopCommand;
       const key = bindingKey(commandId);
       const kbd = node.querySelector('kbd'); if (kbd && kbd.textContent !== key) kbd.textContent = key;
@@ -264,9 +293,16 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
       }
       node.title = keyTip(node.getAttribute('aria-label'), key);
     }
-    for (const [command, selector] of [['toggle.grid', '#draw-grid-toggle'], ['toggle.onion', '#draw-onion-toggle']]) {
-      const target = shell.querySelector(`[data-desktop-command="${command}"]`), source = root.querySelector(selector);
-      if (target && source) target.setAttribute('aria-pressed', source.getAttribute('aria-pressed') === 'true' ? 'true' : 'false');
+    for (const command of Object.keys(TOGGLE_SOURCE_SELECTORS)) {
+      const target = shell.querySelector(`[data-desktop-command="${command}"]`), source = findDesktopToggleSource(doc, command);
+      if (target && source) syncDesktopToggleProxy(target, source, { label: target.getAttribute('aria-label'), shortcut: bindingKey(command) });
+    }
+    for (const control of shell.querySelectorAll('button[aria-label], summary')) {
+      const description = control.getAttribute('aria-label') || control.textContent?.trim();
+      if (description && (!control.title || control.dataset.drawDesktopTitleSync === 'true')) {
+        control.title = description;
+        control.dataset.drawDesktopTitleSync = 'true';
+      }
     }
   }
   const onRootClick = event => {
@@ -279,8 +315,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
       if (actual) assignDrawInput({ side: 'left', kind: 'tool', value: actual.dataset.drawTool, target: actual, event });
     } else if (control.dataset.desktopCommand) {
       const id = control.dataset.desktopCommand;
-      if (id === 'toggle.grid') root.querySelector('#draw-grid-toggle')?.click();
-      else if (id === 'toggle.onion') root.querySelector('#draw-onion-toggle')?.click();
+      if (id === 'toggle.grid' || id === 'toggle.onion') dispatchDesktopToggle(doc, id);
       else drawShortcuts.run(id);
     }
     win.requestAnimationFrame(updatePressed);
@@ -291,6 +326,13 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   scope.listen(shell, 'pointerover', updatePressed);
   scope.listen(shell, 'focusin', updatePressed);
   scope.listen(doc, 'close', updatePressed, { capture: true });
+  const sourceObserver = new win.MutationObserver(() => win.requestAnimationFrame(updatePressed));
+  const sources = new Set([...actualButtons.values(), ...Object.keys(TOGGLE_SOURCE_SELECTORS).map(command => findDesktopToggleSource(doc, command)).filter(Boolean)]);
+  for (const source of sources) sourceObserver.observe(source, { attributes: true, attributeFilter: ['aria-pressed', 'aria-label', 'disabled', 'title'] });
+  scope.add(() => sourceObserver.disconnect());
+  const shellObserver = new win.MutationObserver(() => updatePressed());
+  shellObserver.observe(shell, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'disabled'] });
+  scope.add(() => shellObserver.disconnect());
   scope.listen($('[data-desktop-cell-launcher]'), 'click', () => originalLauncher?.click());
   const isEmbedded = () => { try { return win.self !== win.top; } catch { return true; } };
   function updateActive() {

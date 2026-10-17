@@ -11,7 +11,7 @@ import { ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame,
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261016-color-capability-1';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261015-alpha-opacity-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261017-draw-rails-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
@@ -31,7 +31,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261016-tool-shell-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261016-selection-rail-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261017-draw-rails-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
@@ -43,7 +43,7 @@ import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?r
 import { resizeDrawView } from './draw-resize-view.mjs?rev=20261016-color-capability-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261016-tool-shell-1';
-import { mountDrawViewportOverlays } from './draw-viewport-overlays.mjs';
+import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261017-draw-rails-1';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
@@ -516,7 +516,7 @@ function composeDisplayFrame(animation, frameId) {
   return animationNeedsRgba(animation) ? composeAnimationFrameRgba(animation, frameId) : composeAnimationFrame(animation, frameId);
 }
 function paint(changed = null) {
-  if (readOnlyImage) { setCanvasDimensions(); canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(readOnlyImage.rgba), readOnlyImage.width, readOnlyImage.height), 0, 0); updateControls(); return; }
+  if (readOnlyImage) { setCanvasDimensions(); canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(readOnlyImage.rgba), readOnlyImage.width, readOnlyImage.height), 0, 0); paintOnion(readOnlyImage); updateControls(); return; }
   if (!canvasPrepared || canvas.width !== documentData.width || canvas.height !== documentData.height) setCanvasDimensions();
   if (selectionTransform) changed = null;
   const display = playing ? composeDisplayFrame(animationSession.animation, playbackFrame || animationSession.frameId)
@@ -547,15 +547,19 @@ function installAnimationDocument(doc, { preserveTimelapse = false } = {}) {
   drawOperationLease = null; setDrawRewardNotice();
 }
 function stopAnimation() {
+  const wasPlaying = playing;
   playing = false; playbackFrame = null; cancelAnimationFrame(playbackRequest); playbackRequest = 0;
   animationControls?.refresh();
   syncPlaybackControl();
   syncMirrorRail();
+  // Visibility changes and mode suspension also stop playback. Restore the
+  // selected cel and its onion guides instead of leaving the last played cel.
+  if (wasPlaying) paint();
 }
 function toggleAnimation() {
   if (selectionTransform) { toast('✓で確定、×で取消してから再生できます。'); return; }
   cancelSelectionTransform(); selectionPanel?.hide();
-  if (playing) { stopAnimation(); paint(); return; }
+  if (playing) { stopAnimation(); return; }
   if (readOnlyImage || animationSession.animation.frames.length < 2) { toast('2コマ以上あるとアニメーションを再生できます。'); return; }
   virtualCursor?.release();
   endStroke(); closeColorEditor();
@@ -575,7 +579,7 @@ function toggleAnimation() {
 }
 let onionKey = '', onionGuide = null;
 function paintOnion(display) {
-  onionCanvas.hidden = !onion || playing || readOnlyImage;
+  onionCanvas.hidden = !shouldShowDrawOnion({ enabled: onion, playing, readOnly: Boolean(readOnlyImage) });
   if (onionCanvas.hidden) return;
   const animation = animationSession.animation, key = `${animationSession.frameId}:${animation.frames.map((frame) => frame.id).join(',')}`;
   if (onionKey !== key || onionGuide?.animation !== animation) {
@@ -1208,7 +1212,7 @@ function syncDrawingSettings() {
     symmetryAxes[index].hidden = !available || !symmetry[key];
   });
   setAttributeIfChanged(gridButton, 'aria-pressed', showGrid); setAttributeIfChanged(onionButton, 'aria-pressed', onion);
-  if (onionButton) { onionButton.disabled = frames < 2 && !onion; onionButton.title = onionButton.disabled ? '2コマ以上あると前後のコマを表示できます' : onionButton.getAttribute('aria-label'); }
+  if (onionButton) { onionButton.disabled = Boolean(readOnlyImage) || frames < 2 && !onion; onionButton.title = readOnlyImage ? '原本の表示中はオニオンスキンを使えません' : onionButton.disabled ? '2コマ以上あると前後のコマを表示できます' : onionButton.getAttribute('aria-label'); }
   $('.draw-board')?.classList.toggle('has-symmetry', available && Object.values(symmetry).some(Boolean));
   $('.draw-board')?.classList.toggle('has-grid', showGrid);
   syncMirrorRail();
@@ -1913,7 +1917,49 @@ $('.draw-board').addEventListener('wheel', (event) => {
 // the zoom chip puts the whole picture back
 $('#draw-zoom-label').addEventListener('click', resetView); $('#draw-zoom-label').title = '全体を表示';
 canvas.addEventListener('dblclick', (event) => { if (tool === 'picker' || tool === 'fill') return; event.preventDefault(); });
-$('#draw-clear').addEventListener('click', () => commitChange((next) => { next.pixels.fill(-1); return null; }));
+const drawClearButton = $('#draw-clear');
+drawClearButton.setAttribute('aria-haspopup', 'dialog');
+let drawClearDialog = null;
+function openDrawClearConfirmation() {
+  if (drawClearDialog?.open) return;
+  if (!drawClearDialog) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'project-delete-dialog';
+    dialog.setAttribute('aria-labelledby', 'draw-clear-confirmation-title');
+    dialog.setAttribute('aria-describedby', 'draw-clear-confirmation-copy');
+    const title = document.createElement('h2');
+    title.id = 'draw-clear-confirmation-title';
+    title.textContent = 'このレイヤーを消去しますか？';
+    const copy = document.createElement('p');
+    copy.id = 'draw-clear-confirmation-copy';
+    copy.textContent = '現在のコマで選択中のレイヤーを消去します。他のコマやレイヤーは変わりません。消去後は「元に戻す」で戻せます。';
+    const actions = document.createElement('div');
+    actions.className = 'project-sheet__actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'キャンセル';
+    cancel.autofocus = true;
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.id = 'draw-clear-confirm';
+    confirm.textContent = '消去する';
+    actions.append(cancel, confirm);
+    dialog.append(title, copy, actions);
+    document.body.append(dialog);
+    cancel.addEventListener('click', () => dialog.close());
+    confirm.addEventListener('click', () => {
+      dialog.close();
+      commitChange((next) => { next.pixels.fill(-1); return null; });
+    });
+    dialog.addEventListener('close', () => {
+      if (!scope.disposed && drawClearButton.isConnected) drawClearButton.focus({ preventScroll: true });
+    });
+    drawClearDialog = dialog;
+    scope.add(() => { if (dialog.open) dialog.close(); dialog.remove(); drawClearDialog = null; });
+  }
+  drawClearDialog.showModal();
+}
+drawClearButton.addEventListener('click', openDrawClearConfirmation);
 async function saveRevision() {
   if (featureSession) { toast('プレビューを適用またはキャンセルしてから保存できます。'); return null; }
   if (scope.disposed) return null;
@@ -2799,6 +2845,45 @@ return {
   },
   resume() { setCanvasDimensions(); paint(); updateCanvasView(); updateControls(); },
   getImage() { if (readOnlyImage) return { width: readOnlyImage.width, height: readOnlyImage.height, rgba: new Uint8ClampedArray(readOnlyImage.rgba) }; const doc = animationSession.composite(documentData); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba(doc.rgba ? doc : { ...doc, pixels: Array.from(doc.pixels) })) }; },
+  /** Narrow bridge used by the spot editor's isolated, memory-only Draw iframe. */
+  getDocument() {
+    const doc = animationSession.document();
+    return { schemaVersion: 1, width: doc.width, height: doc.height, palette: [...doc.palette], pixels: Array.from(doc.pixels) };
+  },
+  initializeDrawDocument(nextDocument) {
+    validateDrawDocument(nextDocument);
+    const next = createDrawAnimationSession(structuredClone(nextDocument)).animation;
+    if (!guardDrawTransition(next, { lease: captureDrawOperation(), mutation: 'import' })) throw new Error('この画像は現在読み込めません。');
+    replaceDocument(structuredClone(nextDocument), { type: 'hand_drawn', assetId: null, revisionId: null });
+    const doc = animationSession.load(animationSession.animation);
+    installAnimationDocument(doc);
+    return this.getDocument();
+  },
+  establishHistoryBaseline() {
+    const doc = animationSession.load(animationSession.animation);
+    installAnimationDocument(doc);
+    return this.getDocument();
+  },
+  setDrawingTool(name) {
+    if (name !== 'pen' && name !== 'eraser') throw new TypeError('スポット編集で使える道具ではありません。');
+    return setTool(name);
+  },
+  addPaletteColor(value) {
+    const color = String(value || '').toLowerCase();
+    if (!/^#[\da-f]{6}$/.test(color)) throw new TypeError('色の形式が不正です。');
+    let index = documentData.palette.findIndex(candidate => candidate.slice(0, 7).toLowerCase() === color);
+    if (index < 0) {
+      if (documentData.palette.length >= 32) throw new RangeError('スポット画像は32色までです。');
+      const palette = [...documentData.palette, color];
+      const next = setAnimationPalette(animationSession.animation, palette);
+      if (!guardDrawTransition(next, { lease: captureDrawOperation(), mutation: 'edit' })) throw new Error('この色は現在追加できません。');
+      installAnimationDocument(animationSession.apply(next));
+      index = palette.length - 1;
+    }
+    selectedColor = index; inputSettings.bindings.left.color = index; setTool('pen');
+    renderPalette(); showCurrentColor(); syncInputControls();
+    return index;
+  },
   async cameraTarget() {
     const lease = captureDrawOperation();
     const { prepareCameraTarget } = await import('./draw-camera-core.mjs?rev=20261016-color-capability-1');

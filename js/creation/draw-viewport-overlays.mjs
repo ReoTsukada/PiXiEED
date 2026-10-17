@@ -1,4 +1,8 @@
 /** Paint pixel boundaries in viewport coordinates, without repeated fractional CSS tiles. */
+export function shouldShowDrawOnion({ enabled = false, playing = false, readOnly = false } = {}) {
+  return Boolean(enabled && !playing && !readOnly);
+}
+
 export function mountDrawViewportOverlays({ board, canvas, scope }) {
   const background = document.createElement('canvas'), lines = document.createElement('canvas');
   background.className = 'draw-pixel-background'; lines.className = 'draw-pixel-lines';

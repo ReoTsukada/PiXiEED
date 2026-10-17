@@ -1,4 +1,5 @@
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { mountGameEditorSession } from './game-editor-session.mjs?rev=20261017-game-editor-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
@@ -34,6 +35,7 @@ let importingImage = false;
 let editorEpoch = 0;
 let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 const touchPoints = new Map(); let touchStrokeSnapshot = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0;
+const undoStack = []; const redoStack = []; let historyApplying = false; let activeMaskSnapshot = null; let historyPixelCount = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
 function writeStorage(key, value) { try { localStorage.setItem(key, value); return true; } catch { return false; } }
@@ -56,6 +58,60 @@ async function verifyCurrentSource() {
 }
 function revisionText(revision, index) { return `保存版 ${index + 1}・${revision.document.width}×${revision.document.height}px`; }
 function currentTarget() { return draft?.targets.find((target) => target.id === selectedTargetId) || null; }
+function updateHistoryControls() {
+  const undo = $('#hidden-undo'); const redo = $('#hidden-redo');
+  if (!undo || !redo) return;
+  undo.disabled = draft?.confirmed || !undoStack.length;
+  redo.disabled = draft?.confirmed || !redoStack.length;
+  undo.hidden = !draft || draft.confirmed;
+  redo.hidden = !draft || draft.confirmed;
+}
+function recordHistory(entry) {
+  if (historyApplying) return;
+  while (redoStack.length) { const discarded = redoStack.pop(); historyPixelCount -= historyEntryPixels(discarded); }
+  if (entry.kind === 'mask') entry.changes = Uint32Array.from(entry.changes, ({ pixel, before }) => pixel * 2 + Number(before));
+  if (entry.kind === 'target') { entry.target = { ...entry.target, pixels: [] }; if (entry.action === 'remove') entry.pixels = Uint32Array.from(entry.pixels); }
+  historyPixelCount += historyEntryPixels(entry);
+  undoStack.push(entry);
+  while (undoStack.length > 100 || historyPixelCount > 262144) historyPixelCount -= historyEntryPixels(undoStack.shift());
+  updateHistoryControls();
+}
+function historyEntryPixels(entry) { return entry.kind === 'mask' ? entry.changes.length : entry.kind === 'target' && entry.action === 'remove' ? entry.pixels.length : 0; }
+function applyHistoryEntry(entry, direction) {
+  historyApplying = true;
+  try {
+    if (entry.kind === 'mask') {
+      const set = maskSets.get(entry.targetId);
+      if (set) for (const encoded of entry.changes) {
+        const pixel = encoded >>> 1; const before = Boolean(encoded & 1);
+        const present = direction === 'undo' ? before : !before;
+        const had = set.has(pixel);
+        if (present && !had) { set.add(pixel); totalMaskPixels += 1; }
+        else if (!present && had) { set.delete(pixel); totalMaskPixels -= 1; }
+      }
+    } else if (entry.kind === 'target') {
+      const shouldExist = (entry.action === 'add') === (direction === 'redo');
+      const index = draft.targets.findIndex((target) => target.id === entry.target.id);
+      if (shouldExist && index < 0) {
+        draft.targets.splice(Math.min(entry.index, draft.targets.length), 0, { ...entry.target, pixels: [] });
+        maskSets.set(entry.target.id, new Set(entry.pixels));
+        totalMaskPixels += entry.pixels.length;
+      } else if (!shouldExist && index >= 0) {
+        totalMaskPixels -= maskSets.get(entry.target.id)?.size || 0;
+        draft.targets.splice(index, 1); maskSets.delete(entry.target.id);
+      }
+      if (entry.action === 'add') selectedTargetId = direction === 'undo' ? entry.selectedBefore : entry.target.id;
+      else selectedTargetId = direction === 'undo' ? entry.target.id : (draft.targets[0]?.id || null);
+    } else if (entry.kind === 'rename') {
+      const target = draft.targets.find(({ id }) => id === entry.targetId);
+      if (target) target.name = direction === 'undo' ? entry.before : entry.after;
+    }
+  } finally { historyApplying = false; }
+  renderTargets(); requestDraw(); pxdBridge?.markDirty();
+  setStatus(direction === 'undo' ? '直前の編集を元に戻しました。' : '編集をやり直しました。');
+}
+function undo() { if (draft?.confirmed || !undoStack.length) return; const entry = undoStack.pop(); applyHistoryEntry(entry, 'undo'); redoStack.push(entry); updateHistoryControls(); }
+function redo() { if (draft?.confirmed || !redoStack.length) return; const entry = redoStack.pop(); applyHistoryEntry(entry, 'redo'); undoStack.push(entry); updateHistoryControls(); }
 function updateLocalPlayButton() {
   const ready = Boolean(draft?.confirmed && draftId && savedConfirmedDraftId === draftId);
   playLocalButton.hidden = !ready; playLocalButton.disabled = !ready;
@@ -124,12 +180,18 @@ function renderTargets() {
   $('#hidden-remove').disabled = draft.confirmed || !currentTarget();
   $('#hidden-confirm').disabled = draft.confirmed || !draft.targets.length || draft.targets.some((target) => !(maskSets.get(target.id)?.size));
   $('#hidden-add').disabled = draft.confirmed; $('#hidden-name').disabled = draft.confirmed;
+  const rename = $('#hidden-rename'); const renameApply = $('#hidden-rename-apply');
+  if (rename && document.activeElement !== rename) rename.value = currentTarget()?.name || '';
+  if (rename) rename.disabled = draft.confirmed || !currentTarget();
+  if (renameApply) renameApply.disabled = draft.confirmed || !currentTarget();
   $('#hidden-new').hidden = !draft.confirmed;
-  $('#hidden-target-settings').hidden = draft.confirmed;
+  $('#hidden-edit-targets').hidden = !draft.confirmed;
+  $('#hidden-target-settings').hidden = false;
   for (const id of ['hidden-remove', 'hidden-confirm', 'hidden-image-replace']) document.getElementById(id).hidden = draft.confirmed;
   document.querySelectorAll('[data-hidden-mode]').forEach(button => { button.disabled = draft.confirmed || !currentTarget(); });
   saveButton.disabled = !draft;
   updateLocalPlayButton();
+  updateHistoryControls();
   updateSummary();
 }
 
@@ -167,6 +229,7 @@ function displayEditor() {
   resetCanvasView(); renderTargets(); requestDraw(); fitCanvas();
 }
 function installRevision(revision, fixedDraftId, targetModel = null) {
+  undoStack.length = 0; redoStack.length = 0; historyPixelCount = 0; activeMaskSnapshot = null;
   sourceDraftId = fixedDraftId; sourceRevision = revision;
   savedConfirmedDraftId = null;
   cursorPixel = 0;
@@ -185,6 +248,7 @@ function installRevision(revision, fixedDraftId, targetModel = null) {
   $('#hidden-source-label').textContent = `元の絵の固定版 ${revision.revisionId.slice(0, 8)}・${draft.width}×${draft.height}px`;
   $('#hidden-confirmed').hidden = !draft.confirmed; displayEditor(); saveButton.disabled = false;
   $('#hidden-new').hidden = !draft.confirmed;
+  updateHistoryControls();
 }
 
 async function loadSources() {
@@ -302,7 +366,7 @@ async function save() {
 
 async function resume() {
   if (importingImage) return;
-  const id = readStorage(LAST_KEY); if (!id || !store || !adapter) return;
+  const id = new URLSearchParams(location.search).get('resumeLocal') || readStorage(LAST_KEY); if (!id || !store || !adapter) return;
   const epoch = ++editorEpoch;
   resumeButton.disabled = true; setStatus('前回の下書きと固定版を確認しています…');
   try {
@@ -361,18 +425,25 @@ function addTarget() {
   if (draft.targets.some((target) => target.name.trim().toLocaleLowerCase('ja') === name.toLocaleLowerCase('ja'))) { setStatus('対象の名前は重複できません。'); return; }
   if (draft.targets.length >= 128) { setStatus('対象は128個までです。'); return; }
   let suffix = draft.targets.length + 1; let id = `target-${String(suffix).padStart(3, '0')}`; const ids = new Set(draft.targets.map((target) => target.id)); while (ids.has(id)) id = `target-${String(++suffix).padStart(3, '0')}`;
-  draft.targets.push({ id, name, pixels: [] }); maskSets.set(id, new Set()); selectedTargetId = id; editMode = 'paint'; document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.hiddenMode === 'paint'))); $('#hidden-name').value = ''; renderTargets(); requestDraw(); $('#hidden-target-settings').open = false; canvas.focus({ preventScroll: true }); pxdBridge?.markDirty(); setStatus(`${name}を追加しました。絵の上をなぞってマスクを作ってください。`);
+  const selectedBefore = selectedTargetId; const index = draft.targets.length; const target = { id, name, pixels: [] };
+  draft.targets.push(target); maskSets.set(id, new Set()); selectedTargetId = id; editMode = 'paint';
+  recordHistory({ kind: 'target', action: 'add', target: { ...target }, pixels: [], index, selectedBefore });
+  document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.hiddenMode === 'paint'))); $('#hidden-name').value = ''; renderTargets(); requestDraw(); $('#hidden-target-settings').open = false; canvas.focus({ preventScroll: true }); pxdBridge?.markDirty(); setStatus(`${name}を追加しました。絵の上をなぞってマスクを作ってください。`);
 }
 
 function removeTarget() {
   if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
   if (!currentTarget() || draft.confirmed) return;
-  const name = currentTarget().name; totalMaskPixels -= maskSets.get(selectedTargetId)?.size || 0; draft.targets = draft.targets.filter((target) => target.id !== selectedTargetId); maskSets.delete(selectedTargetId); selectedTargetId = draft.targets[0]?.id || null; renderTargets(); requestDraw(); pxdBridge?.markDirty(); setStatus(`${name}を削除しました。`);
+  const target = currentTarget(); const index = draft.targets.indexOf(target); const pixels = [...(maskSets.get(target.id) || [])].sort((a, b) => a - b); const selectedBefore = selectedTargetId;
+  totalMaskPixels -= pixels.length; draft.targets = draft.targets.filter((item) => item.id !== target.id); maskSets.delete(target.id); selectedTargetId = draft.targets[0]?.id || null;
+  recordHistory({ kind: 'target', action: 'remove', target: { ...target }, pixels, index, selectedBefore });
+  renderTargets(); requestDraw(); pxdBridge?.markDirty(); setStatus(`${target.name}を削除しました。`);
 }
 
-function setPixel(pixel, { refresh = true } = {}) {
+function setPixel(pixel, { refresh = true, record = true } = {}) {
   if (pixel === null || !currentTarget() || draft.confirmed) return;
   const set = maskSets.get(selectedTargetId); const mode = editMode;
+  const wasPresent = set.has(pixel);
   if (mode === 'paint') {
     if (set.has(pixel)) return false;
     if ([...maskSets.entries()].some(([id, other]) => id !== selectedTargetId && other.has(pixel))) { setStatus('別の対象の色が付いた場所です。先にそちらを消してください。'); return false; }
@@ -380,7 +451,17 @@ function setPixel(pixel, { refresh = true } = {}) {
     set.add(pixel); totalMaskPixels += 1;
   } else { if (!set.delete(pixel)) return false; totalMaskPixels -= 1; }
   if (refresh) { renderTargets(); requestDraw(); }
+  if (record) recordHistory({ kind: 'mask', targetId: selectedTargetId, changes: [{ pixel, before: wasPresent }] });
   return true;
+}
+
+function commitMaskStroke() {
+  if (!activeMaskSnapshot) return;
+  const { targetId, pixels: before } = activeMaskSnapshot; const after = maskSets.get(targetId) || new Set();
+  const changed = new Set([...before].filter((pixel) => !after.has(pixel)));
+  for (const pixel of after) if (!before.has(pixel)) changed.add(pixel);
+  activeMaskSnapshot = null;
+  if (changed.size) recordHistory({ kind: 'mask', targetId, changes: [...changed].map((pixel) => ({ pixel, before: before.has(pixel) })) });
 }
 
 function linePixels(from, to, callback) {
@@ -395,6 +476,7 @@ function cancelTouchStroke() {
   maskSets.set(touchStrokeSnapshot.targetId, touchStrokeSnapshot.pixels);
   totalMaskPixels = touchStrokeSnapshot.totalMaskPixels;
   touchStrokeSnapshot = null;
+  activeMaskSnapshot = null;
   renderTargets(); requestDraw();
 }
 canvas.addEventListener('pointerdown', (event) => {
@@ -415,7 +497,7 @@ canvas.addEventListener('pointerdown', (event) => {
   if (!requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
   if (event.pointerType === 'touch') touchStrokeSnapshot = { targetId: selectedTargetId, pixels: new Set(maskSets.get(selectedTargetId)), totalMaskPixels };
   const pixel = canvasPoint(event); if (pixel === null) return;
-  event.preventDefault(); activePointer = event.pointerId; previousPoint = pixel; canvas.setPointerCapture(event.pointerId); setPixel(pixel);
+  event.preventDefault(); activePointer = event.pointerId; previousPoint = pixel; activeMaskSnapshot = { targetId: selectedTargetId, pixels: new Set(maskSets.get(selectedTargetId)) }; canvas.setPointerCapture(event.pointerId); setPixel(pixel, { record: false });
 });
 canvas.addEventListener('pointermove', (event) => {
   if (touchPoints.has(event.pointerId)) {
@@ -437,8 +519,8 @@ canvas.addEventListener('pointermove', (event) => {
   const pixel = canvasPoint(event);
   if (pixel === null) { previousPoint = null; return; }
   let changed = false;
-  if (previousPoint === null) changed = setPixel(pixel, { refresh: false });
-  else if (pixel !== previousPoint) linePixels(previousPoint, pixel, (at) => { changed = setPixel(at, { refresh: false }) || changed; });
+  if (previousPoint === null) changed = setPixel(pixel, { refresh: false, record: false });
+  else if (pixel !== previousPoint) linePixels(previousPoint, pixel, (at) => { changed = setPixel(at, { refresh: false, record: false }) || changed; });
   if (changed) { updateSummary(); requestDraw(); }
   previousPoint = pixel;
 });
@@ -455,9 +537,12 @@ canvas.addEventListener('wheel', (event) => {
 }, { passive: false });
 function finishPointer(event) {
   const wasTouch = touchPoints.delete(event.pointerId);
-  if (wasTouch && event.type === 'pointercancel') cancelTouchStroke();
+  if (event.type === 'pointercancel' && activePointer === event.pointerId) {
+    if (activeMaskSnapshot) { maskSets.set(activeMaskSnapshot.targetId, activeMaskSnapshot.pixels); totalMaskPixels = [...maskSets.values()].reduce((sum, set) => sum + set.size, 0); activeMaskSnapshot = null; }
+    if (touchStrokeSnapshot) cancelTouchStroke();
+  }
   if (touchPoints.size < 2) pinchStart = null;
-  if (activePointer === event.pointerId) { activePointer = null; previousPoint = null; renderTargets(); requestDraw(); pxdBridge?.markDirty(); }
+  if (activePointer === event.pointerId) { if (event.type !== 'pointercancel') commitMaskStroke(); activePointer = null; previousPoint = null; renderTargets(); requestDraw(); pxdBridge?.markDirty(); }
   if (wasTouch && touchPoints.size === 0) { touchStrokeSnapshot = null; renderTargets(); requestDraw(); }
 }
 canvas.addEventListener('pointerup', finishPointer); canvas.addEventListener('pointercancel', finishPointer);
@@ -493,6 +578,18 @@ $('#hidden-share-prompt-text').addEventListener('input', (event) => {
   updateLocalPlayButton();
 });
 $('#hidden-add').addEventListener('click', addTarget); $('#hidden-name').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addTarget(); } }); $('#hidden-remove').addEventListener('click', removeTarget);
+function renameTarget() {
+  if (!draft || draft.confirmed || !currentTarget() || !requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
+  const target = currentTarget(); const before = target.name; const after = $('#hidden-rename').value.trim();
+  if (!after) { setStatus('対象の名前を入力してください。'); $('#hidden-rename').focus(); return; }
+  if (after === before) return;
+  if (draft.targets.some((item) => item.id !== target.id && item.name.trim().toLocaleLowerCase('ja') === after.toLocaleLowerCase('ja'))) { setStatus('対象の名前は重複できません。'); return; }
+  target.name = after; recordHistory({ kind: 'rename', targetId: target.id, before, after });
+  renderTargets(); pxdBridge?.markDirty(); setStatus(`「${before}」を「${after}」に変更しました。`);
+}
+$('#hidden-rename-apply').addEventListener('click', renameTarget);
+$('#hidden-rename').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); renameTarget(); } });
+$('#hidden-undo').addEventListener('click', undo); $('#hidden-redo').addEventListener('click', redo);
 applyDrawingToolIcons(document.querySelector('.hidden-tools'));
 document.querySelectorAll('[data-hidden-mode]').forEach((button) => button.addEventListener('click', () => { editMode = button.dataset.hiddenMode; document.querySelectorAll('[data-hidden-mode]').forEach((option) => option.setAttribute('aria-pressed', String(option === button))); }));
 $('#hidden-confirm').addEventListener('click', async () => {
@@ -501,7 +598,15 @@ $('#hidden-confirm').addEventListener('click', async () => {
   try { await verifyCurrentSource(); if (epoch !== editorEpoch) return; draft = confirmHiddenObjectTargets(modelWithMasks()); editor.dataset.confirmed = 'true'; $('#hidden-confirmed').hidden = false; renderTargets(); requestDraw(); setStatus(`番号付きの枠が、遊ぶ人に見つけてもらう範囲です。`); await save(); }
   catch (error) { if (epoch === editorEpoch) setStatus(`確定できませんでした：${error.message}`); }
 });
-$('#hidden-new').addEventListener('click', () => { editorEpoch += 1; importingImage = false; imageSlot.clear(); imageSlot.setBusy(false); updateStartButton(); pxdBridge?.reset(); $('#hidden-share-prompt-text').value = ''; draft = null; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = null; pxdPreservedPayload = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); setStatus('新しいもの探しの元画像を選んでください。'); });
+$('#hidden-edit-targets').addEventListener('click', async () => {
+  if (!draft?.confirmed || !requireSharedCanvasAccess(pxdBridge?.currentProject, setStatus, 'hidden_object')) return;
+  draft = { ...draft, confirmed: false, hitBoxes: null, hitTestLayout: null };
+  savedConfirmedDraftId = null; editor.dataset.confirmed = 'false'; $('#hidden-confirmed').hidden = true;
+  $('#hidden-target-settings').open = false; renderTargets(); requestDraw(); pxdBridge?.markDirty();
+  setStatus('正解の編集に戻りました。マスクや対象を変更したら、もう一度正解を確認してください。');
+  await save();
+});
+$('#hidden-new').addEventListener('click', () => { editorEpoch += 1; importingImage = false; imageSlot.clear(); imageSlot.setBusy(false); updateStartButton(); pxdBridge?.reset(); $('#hidden-share-prompt-text').value = ''; draft = null; draftId = null; savedConfirmedDraftId = null; pxdOriginalRefs = null; pxdPreservedPayload = null; sourceRevision = null; selectedTargetId = null; maskSets.clear(); totalMaskPixels = 0; undoStack.length = 0; redoStack.length = 0; historyPixelCount = 0; activeMaskSnapshot = null; editor.hidden = true; setup.hidden = false; document.body.classList.remove('hidden-object-editing'); resetCanvasView(); saveButton.disabled = true; updateLocalPlayButton(); updateHistoryControls(); setStatus('新しいもの探しの元画像を選んでください。'); });
 
 try { adapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(adapter); } catch { setStatus('このブラウザーでは端末内保存を利用できません。'); }
 window.addEventListener('resize', fitCanvas);
@@ -511,6 +616,8 @@ pxdBridge = mountPxdHidden();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSources();
 
-// Capture the editor's visibility before moving the target settings panel.
-for (const id of ['hidden-remove', 'hidden-confirm', 'hidden-image-replace']) editor.append(document.getElementById(id));
-mountToolHeaderControls(document, { selectors: ['#hidden-target-settings', '[data-hidden-mode="paint"]', '[data-hidden-mode="erase"]', '#hidden-remove', '#hidden-confirm', '#hidden-image-replace', '#hidden-new', '#hidden-play-local', '#hidden-publish'] });
+// Target controls stay in the dedicated settings sheet.
+mountToolHeaderControls(document, { selectors: [] });
+
+mountGameEditorSession({ kind: 'hidden-object', isActive: () => Boolean(draft), isDirty: () => Boolean(pxdBridge?.dirty), workspace: () => pxdBridge });
+if (new URLSearchParams(location.search).has('resumeLocal')) await resume();

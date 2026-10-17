@@ -7,6 +7,14 @@ import { PAGE_DESTINATIONS } from '../../js/page-navigation.mjs';
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
 const fixture = JSON.parse(readFileSync(new URL('./baseline.fixture.json', import.meta.url), 'utf8'));
+const attributes = (tag) => Object.fromEntries(
+  [...tag.matchAll(/([\w-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)]
+    .map(([, name, doubleQuoted, singleQuoted, unquoted]) => [name, doubleQuoted ?? singleQuoted ?? unquoted ?? '']),
+);
+const elements = (html, tagName) => [...html.matchAll(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}\\s*>`, 'gi'))]
+  .map(([whole, content]) => ({ attributes: attributes(whole.match(new RegExp(`^<${tagName}\\b[^>]*>`, 'i'))[0]), content }));
+const hasClass = (element, className) => (element.attributes.class || '').split(/\s+/).includes(className);
+const visibleText = (html) => html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 
 test('the old works route goes to the globe and the tools route remains reachable', () => {
   const home = read('globe/index.html');
@@ -72,10 +80,17 @@ test('public puzzle lists open by default with one create action', () => {
   for (const kind of ['spot-difference', 'hidden-object']) {
     const play = read(`play/${kind}/index.html`);
     const create = read(`${kind}/index.html`);
-    assert.match(play, /id="pixfind-list"/);
-    assert.match(play, new RegExp(`class="puzzle-create-link" href="/${kind}/">＋ 作る</a>`));
+    const list = elements(play, 'section').find((element) => element.attributes.id === 'pixfind-list');
+    assert.ok(list, `${kind} public list exists`);
+    assert.equal(list.attributes.hidden, undefined, `${kind} public list is visible by default`);
+    const createLinks = elements(play, 'a').filter((element) => hasClass(element, 'puzzle-create-link'));
+    assert.equal(createLinks.length, 1, `${kind} list has exactly one create link`);
+    assert.equal(createLinks[0].attributes.href, `/${kind}/`);
+    assert.equal(visibleText(createLinks[0].content), '＋ 作る');
     assert.doesNotMatch(play, /puzzle-mode-switch/);
-    assert.match(create, new RegExp(`class="puzzle-list-back" href="/play/${kind}/"`));
-    assert.match(create, new RegExp(`class="puzzle-editor-play" href="/play/${kind}/"`));
+    const backLinks = elements(create, 'a').filter((element) => hasClass(element, 'puzzle-list-back'));
+    const editorPlayLinks = elements(create, 'a').filter((element) => hasClass(element, 'puzzle-editor-play'));
+    assert.ok(backLinks.some((element) => element.attributes.href === `/play/${kind}/`), `${kind} creator back link returns to its public list`);
+    assert.ok(editorPlayLinks.some((element) => element.attributes.href === `/play/${kind}/`), `${kind} creator play link opens its public list`);
   }
 });

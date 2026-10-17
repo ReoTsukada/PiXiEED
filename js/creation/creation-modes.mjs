@@ -26,7 +26,7 @@ export async function mountCreationModes({ draw, scope }) {
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261013-camera-placement-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261016-tool-operations-1';
   const styled = new Promise((resolve, reject) => { css.addEventListener('load', resolve, { once:true }); css.addEventListener('error', () => reject(new Error('共通の制作画面の表示を読み込めません。')), { once:true }); });
   document.head.append(css); await styled;
   const owned = new Map([['shared', new Set()], ['editor', new Set()], ['draw', new Set()], ['audio', new Set()], ['camera', new Set()]]);
@@ -41,12 +41,27 @@ export async function mountCreationModes({ draw, scope }) {
   own(document.querySelector('#draw-animation-play'), 'draw');
   const launcher = nav.querySelector('[data-nav="camera"]');
   const menu = document.createElement('details'); menu.id = 'creation-mode-menu';
-  menu.dataset.navSlot = '2';
   menu.innerHTML = `<summary aria-label="制作モードを切り替え" title="制作モード"><img src="/assets/icons/pixieed/shoot.svg" alt=""><span class="app-tab-label">モード</span><span class="visually-hidden">制作モード</span></summary><div class="creation-mode-menu__panel" role="group" aria-label="制作モード"><button type="button" data-creation-mode="draw" aria-pressed="true">描画</button><button type="button" data-creation-mode="camera" aria-pressed="false">カメラ</button><button type="button" data-creation-mode="audio" aria-pressed="false">音楽</button><p>同じ作品・キャンバス・パレットを使います。音楽は全コマ共通の専用レイヤーで編集します。</p><p>以前の独立作品は「作品を管理 → 取り込む」で選べます。元の作品を残したコピーとして開きます。</p><p class="creation-mode-error" role="status" aria-live="polite"></p></div>`;
   launcher.replaceWith(menu);
   const modeButtons = [...menu.querySelectorAll('[data-creation-mode]')];
   const errorNode = menu.querySelector('.creation-mode-error');
-  nav.classList.add('px-five-nav', 'app-tabs--labeled'); nav.setAttribute('aria-label', '制作モードと操作');
+  // The header scrolls horizontally; keep its popup in the viewport layer.
+  const modePanel = menu.querySelector('.creation-mode-menu__panel');
+  modePanel.id = 'creation-mode-panel'; modePanel.hidden = true;
+  menu.querySelector('summary').setAttribute('aria-controls', modePanel.id);
+  document.body.append(modePanel); own(modePanel, 'shared');
+  function setModeMenu(open) {
+    if (menu.open !== open) menu.open = open;
+    modePanel.hidden = !open;
+    menu.querySelector('summary').setAttribute('aria-expanded', String(open));
+  }
+  setModeMenu(false);
+  scope.listen(menu, 'toggle', () => setModeMenu(menu.open));
+  const modeMenuObserver = new MutationObserver(() => setModeMenu(menu.open));
+  modeMenuObserver.observe(menu, { attributes:true, attributeFilter:['open'] });
+  scope.add(() => modeMenuObserver.disconnect());
+  scope.add(() => modePanel.remove());
+  nav.classList.add('px-five-nav', 'app-tabs--tool-operations'); nav.classList.remove('app-tabs--labeled'); nav.setAttribute('aria-label', '制作の操作');
   const makeActionButton = ({ id, slot, label, icon, ariaLabel }) => {
     const button = document.createElement('button'); button.type = 'button'; button.id = id;
     button.className = 'creation-nav-action'; button.dataset.navSlot = slot;
@@ -102,16 +117,41 @@ export async function mountCreationModes({ draw, scope }) {
   };
   const drawAction = nav.querySelector('#draw-animation-play');
   drawAction.dataset.navSlot = '3'; drawAction.dataset.navPrimary = '';
+  let historyPlaced = false;
   const markPrimaryActions = () => {
+    // The retained desktop layout restores its original controls on mode and
+    // viewport changes. The operation bar owns history after initial placement.
+    if (historyPlaced && !scope.disposed) for (const button of historyActions) if (button.parentElement !== nav) nav.append(button);
     for (const action of nav.querySelectorAll('#draw-animation-play,#capture,#draw-music-play')) {
       action.dataset.navSlot = '3'; action.dataset.navPrimary = '';
     }
+    // Match keyboard order to the five visual slots, including lazy modes.
+    const ordered = [...nav.children].sort((a, b) => Number(a.dataset.navSlot || 99) - Number(b.dataset.navSlot || 99));
+    ordered.forEach((node, index) => { if (nav.children[index] !== node) nav.insertBefore(node, nav.children[index] || null); });
   };
   markPrimaryActions();
   const primaryActionObserver = new MutationObserver(markPrimaryActions);
   primaryActionObserver.observe(nav, { childList:true, subtree:true });
   scope.add(() => primaryActionObserver.disconnect());
   drawAction.after(settingsButton, settingsStatus, outputButton, outputStatus);
+  // Move the actual history controls, keeping their existing handlers and state.
+  const historyActions = [document.querySelector('#draw-undo'), document.querySelector('#draw-redo')];
+  for (const [index, button] of historyActions.entries()) {
+    const marker = document.createComment('creation-history-position'); button.before(marker);
+    const label = document.createElement('span'); label.className = 'app-tab-label'; label.textContent = index ? 'やり直す' : '戻す';
+    button.append(label); button.dataset.navSlot = index ? '4' : '2'; button.dataset.toolOperation = '';
+    button.classList.add('creation-nav-action'); own(button, 'editor'); nav.append(button);
+    scope.add(() => { label.remove(); marker.replaceWith(button); delete button.dataset.navSlot; delete button.dataset.toolOperation; });
+  }
+  historyPlaced = true;
+  const headerSettingsSlot = document.createElement('div'); headerSettingsSlot.className = 'px-tool-header-slot creation-navigation-settings';
+  const productionHeader = mountToolHeaderControls(document, { selectors:[menu] });
+  productionHeader.append(headerSettingsSlot); headerSettingsSlot.append(settingsButton); own(headerSettingsSlot, 'shared');
+  for (const slot of productionHeader.querySelectorAll('.px-tool-header-slot:has(#creation-mode-menu)')) own(slot, 'shared');
+  const placeSettings = owner => {
+    if (owner === 'camera') nav.append(settingsButton);
+    else headerSettingsSlot.append(settingsButton);
+  };
   const projectDialog = document.querySelector('#pxd-panel');
   let restoreFileFocus = false;
   const currentProjectPane = projectDialog?.querySelector('#project-current-pane');
@@ -143,7 +183,7 @@ export async function mountCreationModes({ draw, scope }) {
     if (mode === 'camera') document.querySelector('#cameraChooseImage')?.click();
     else document.querySelector('#draw-import-local')?.click();
   });
-  const say = error => { errorNode.textContent = error?.message || String(error); menu.open = true; };
+  const say = error => { errorNode.textContent = error?.message || String(error); setModeMenu(true); };
   const settings = mountSharedProjectSettings({ draw, scope });
   draw.setSharedSettingsDismissal(settings);
   for (const node of settings.nodes) { if (!node.isConnected) document.body.append(node); own(node, 'shared'); }
@@ -250,7 +290,7 @@ export async function mountCreationModes({ draw, scope }) {
   };
   // Mode buttons stay usable so a rapid new request can replace an old one.
   const guardInput = event => {
-    if (!switching || menu.contains(event.target)) return;
+    if (!switching || menu.contains(event.target) || modePanel.contains(event.target)) return;
     if (event.target.closest?.('#main,.px-tool-header-slot,.app-tabs button') || event.type === 'keydown') {
       event.preventDefault(); event.stopImmediatePropagation();
     }
@@ -266,6 +306,7 @@ export async function mountCreationModes({ draw, scope }) {
     modeSettingsChoice.textContent = `${label}の設定`;
     menu.querySelector('summary').setAttribute('aria-label', `${label}モード。制作モードを切り替え`);
     menu.querySelector('summary img').src = `/assets/icons/pixieed/${owner === 'audio' ? 'music' : 'shoot'}.svg`;
+    placeSettings(owner);
     updateCameraActionState();
   }
   async function ensureAudio(version) {
@@ -317,6 +358,16 @@ export async function mountCreationModes({ draw, scope }) {
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }
     accepted = true; camera = candidate; scope.add(() => candidateScope.dispose());
     for (const node of [camera.surface, camera.controls, camera.controlHost, camera.shutter, ...camera.headerControls]) { own(node, 'camera'); node.hidden = false; }
+    const flip = document.querySelector('#flipCamera');
+    if (flip) {
+      flip.dataset.navSlot = '2'; flip.dataset.toolOperation = ''; flip.classList.add('creation-nav-action');
+      const label = document.createElement('span'); label.className = 'app-tab-label'; flip.append(label);
+      const syncLabel = () => { label.textContent = flip.getAttribute('aria-label') === 'カメラを開く' ? 'カメラ' : '切替'; };
+      syncLabel();
+      const observer = new MutationObserver(syncLabel); observer.observe(flip, { attributes:true, attributeFilter:['aria-label'] });
+      candidateScope.add(() => observer.disconnect());
+      nav.append(flip); own(flip, 'camera');
+    }
     for (const node of camera.extraNodes) own(node, 'camera');
     observeCameraActionNodes();
     return camera;
@@ -358,7 +409,7 @@ export async function mountCreationModes({ draw, scope }) {
           if (next === 'camera') { await ensureCamera(version); await camera.enter(previous === 'audio' ? 'audio' : 'draw'); }
           await leaving;
           if (!currentRequest(version)) continue;
-          mode = next; show(mode); menu.open = false;
+          mode = next; show(mode); setModeMenu(false);
           const params = new URLSearchParams(location.search); if (mode === 'draw') params.delete('mode'); else params.set('mode', mode);
           history.replaceState(history.state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
           // Keep editors stopped until the reveal finishes; no media start is simulated.
@@ -385,14 +436,16 @@ export async function mountCreationModes({ draw, scope }) {
     await switchMode(tool);
     if (project && project.projectId !== draw.workspace.currentProject?.projectId) await draw.workspace.importProject(project);
   }
-  scope.listen(menu, 'click', event => {
+  scope.listen(modePanel, 'click', event => {
     const button = event.target.closest('button[data-creation-mode]');
     if (!button) return;
     focusModeAfterSwitch = menu.querySelector('summary');
     void switchMode(button.dataset.creationMode).catch(say);
   });
-  scope.listen(document, 'pointerdown', event => { if (!menu.contains(event.target)) menu.open = false; });
-  scope.listen(document, 'keydown', event => { if (event.key === 'Escape' && menu.open) menu.open = false; });
+  scope.listen(document, 'pointerdown', event => { if (!menu.contains(event.target) && !modePanel.contains(event.target)) setModeMenu(false); });
+  scope.listen(document, 'keydown', event => {
+    if (event.key === 'Escape' && menu.open) { setModeMenu(false); menu.querySelector('summary').focus({ preventScroll:true }); event.preventDefault(); }
+  });
   const api = { get mode() { return mode; }, get switching() { return switching; }, switchMode: next => switchMode(next).catch(say), navigate,
     suspendForEmbed() { stopCurrent(); },
     resumeForEmbed() { resumeCurrent(); }
@@ -537,7 +590,7 @@ export async function mountCreationModes({ draw, scope }) {
     event.preventDefault();
     const target = modeButtons.find(button => button.dataset.creationMode === requested);
     if (target && requested === mode && !running) {
-      menu.open = true; target.focus({ preventScroll:true }); return;
+      setModeMenu(true); target.focus({ preventScroll:true }); return;
     }
     focusModeAfterSwitch = menu.querySelector('summary');
     void api.switchMode(requested);

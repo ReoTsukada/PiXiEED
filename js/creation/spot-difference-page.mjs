@@ -1,11 +1,13 @@
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
 import { decodeSpotImagePair, decodeSpotSingleImage } from './spot-image-import.mjs?rev=20261002-inline-draw-1';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
-import { mountSpotInlineDraw } from './spot-inline-draw.mjs?rev=20261004-drawing-tools-4';
+import { mountGameDraw as mountSpotInlineDraw } from './game-draw-host.mjs?rev=20261017-game-compat-1';
+import { mountGameEditorSession } from './game-editor-session.mjs?rev=20261017-game-editor-1';
+import { createGameEditorHistory, retainDifferenceCandidates } from './game-editor-history.mjs?rev=20261017-game-editor-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
@@ -28,6 +30,9 @@ const touchPoints = new Map(); let touchEditSnapshot = null;
 let adapter; let store; let draftId = null; let draft = null; let beforeRevision = null; let afterRevision = null; let sourceDraftId = null; let afterDraftId = null; let savedConfirmedDraftId = null;
 let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 let inlineDraw = null; let inlineBeforeRevision = null; let inlineWorkingRevision = null; let inlineBeforeSourceId = null; let inlineSourceId = null; let inlinePreservePxd = false; let inlineDraftGameId = null;
+const candidateHistory = createGameEditorHistory();
+let gameSession = null;
+let candidateHistoryBusy = false;
 let sessionEpoch = 0; let inlineSessionEpoch = null;
 let splitMode = false; let activePointer = null; let previousPixel = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0; let cursorPixel = 0;
 
@@ -81,7 +86,7 @@ function renderCandidates() {
     checkbox.addEventListener('change', () => { checkbox.checked ? selectedIds.add(candidate.id) : selectedIds.delete(candidate.id); splitPixels.clear(); updateActions(); drawPreview(); });
     label.append(checkbox, document.createTextNode(`候補 ${index + 1}・${candidate.pixels.length}画素`)); item.append(label); list.append(item);
   });
-  updateActions(); drawPreview(); pxdBridge?.markDirty();
+  updateActions(); drawPreview();
 }
 function updateActions() {
   const ids = [...selectedIds].filter((id) => draft?.candidates.some((candidate) => candidate.id === id));
@@ -93,6 +98,8 @@ function updateActions() {
   $('#spot-exclude').disabled = ids.length !== 1 || Boolean(draft?.confirmed);
   $('#spot-confirm').disabled = !draft || !draft.candidates.length || Boolean(draft.confirmed);
   saveButton.disabled = !draft || !draft.candidates.length;
+  $('#spot-candidate-undo').disabled = candidateHistoryBusy || !candidateHistory.canUndo; $('#spot-candidate-redo').disabled = candidateHistoryBusy || !candidateHistory.canRedo;
+  $('#spot-edit-again').hidden = !draft?.confirmed;
   const canPlayLocal = Boolean(draft?.confirmed && savedConfirmedDraftId === draft.gameId);
   playLocalButton.hidden = !canPlayLocal;
   playLocalButton.disabled = !canPlayLocal;
@@ -103,11 +110,11 @@ function updateActions() {
   publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
 }
 function showEditor() {
-  inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open');
-  $('#spot-redraw').hidden = !draft?.before || draft.before.draftId !== draft.after?.draftId;
+  $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open');
+  $('#spot-redraw').hidden = !draft?.before;
   setup.hidden = true; editor.hidden = false; document.body.classList.add('spot-editing');
   $('#spot-edit-hint').textContent = '色のついた場所をタップして選択 · ピンチで拡大';
-  renderCandidates(); fitCanvas(); resetCanvasView();
+  renderCandidates(); fitCanvas(); resetCanvasView(); gameSession?.refresh();
 }
 
 function applyCanvasView() {
@@ -212,6 +219,8 @@ async function saveImportedPair(pair) {
 async function showCandidatePair(beforeSourceId, before, afterSourceId, after, { label = '固定版', preservePxd = false, gameId = null } = {}) {
   if (before.revisionId === after.revisionId) throw new Error('別々の画像を選んでください。');
   const result = detectDifferenceCandidates(before.document, after.document);
+  const previousDraft = preservePxd && draft?.gameId === gameId ? structuredClone(draft) : null;
+  const previousAfter = afterRevision;
   if (!result.candidates.length) throw new Error('2枚に差がありません。画像を確認してください。');
   if (!preservePxd) {
     pxdBridge?.reset(); pxdOriginalRefs = null; pxdPreservedPayload = null;
@@ -220,14 +229,23 @@ async function showCandidatePair(beforeSourceId, before, afterSourceId, after, {
   draftId = null; savedConfirmedDraftId = null; selectedIds.clear(); splitPixels.clear();
   sourceDraftId = beforeSourceId; beforeRevision = before; afterRevision = after;
   draft = { schemaVersion: 1, gameId: gameId || crypto.randomUUID(), width: result.width, height: result.height, before: reference(beforeSourceId, before), after: reference(afterSourceId, after), candidates: result.candidates, confirmed: false, publication: 'draft', published: false };
+  if (previousDraft && previousAfter) {
+    const previousDetected = detectDifferenceCandidates(before.document, previousAfter.document).candidates;
+    draft.candidates = retainDifferenceCandidates(previousDraft.candidates, previousDetected, result.candidates);
+    draft.confirmed = previousDraft.confirmed && JSON.stringify(previousAfter.document) === JSON.stringify(after.document);
+    candidateHistory.record(previousDraft);
+  } else candidateHistory.reset();
   validateSpotDifferenceDraft(draft);
+  pxdBridge?.markDirty();
   $('#spot-source-label').textContent = `元 ${before.revisionId.slice(0, 8)} → 変更後 ${after.revisionId.slice(0, 8)}・${label}`;
-  $('#spot-confirmed').hidden = true; $('#spot-redraw').hidden = false; showEditor();
+  $('#spot-confirmed').hidden = !draft.confirmed; $('#spot-redraw').hidden = false; showEditor();
   message(`${result.candidates.length}個の差分候補を作りました。すべての変更画素を候補に含めています。`);
 }
 
 async function finishInlineDrawing(edited) {
   const requestedEpoch = sessionEpoch;
+  await inlineDraw?.ready;
+  // Freeze the working copy through the existing PXD save path.
   await pxdBridge?.save();
   if (requestedEpoch !== sessionEpoch || !inlineDraw) return;
   const epoch = sessionEpoch; const sourceId = inlineSourceId; const before = inlineBeforeRevision; const working = inlineWorkingRevision; const beforeSourceId = inlineBeforeSourceId; const preservePxd = inlinePreservePxd; const gameId = inlineDraftGameId;
@@ -241,18 +259,19 @@ async function finishInlineDrawing(edited) {
 }
 
 function openInlineDrawing(beforeSourceId, before, sourceId, working, { preservePxd = false, gameId = null } = {}) {
-  inlineDraw?.dispose(); inlineBeforeSourceId = beforeSourceId; inlineSourceId = sourceId; inlineBeforeRevision = before; inlineWorkingRevision = working; inlinePreservePxd = preservePxd; inlineDraftGameId = gameId;
+  const retained = inlineDraw && inlineBeforeRevision?.revisionId === before.revisionId && inlineWorkingRevision?.revisionId === working.revisionId;
+  if (!retained) inlineDraw?.dispose(); inlineBeforeSourceId = beforeSourceId; inlineSourceId = sourceId; inlineBeforeRevision = before; inlineWorkingRevision = working; inlinePreservePxd = preservePxd; inlineDraftGameId = gameId;
   inlineSessionEpoch = sessionEpoch;
-  if (!preservePxd) { pxdBridge?.reset(); pxdOriginalRefs = null; pxdPreservedPayload = null; if (!gameId) { draft = null; draftId = null; savedConfirmedDraftId = null; } }
-  saveButton.disabled = true;
+  if (!preservePxd) { candidateHistory.reset(); pxdBridge?.reset(); pxdOriginalRefs = null; pxdPreservedPayload = null; if (!gameId) { draft = null; draftId = null; savedConfirmedDraftId = null; } }
+  saveButton.disabled = false;
   setup.hidden = true; editor.hidden = true; $('#spot-inline-draw').hidden = false; document.body.classList.remove('spot-editing'); document.body.classList.add('spot-inline-open');
-  inlineDraw = mountSpotInlineDraw({
+  if (!retained) inlineDraw = mountSpotInlineDraw({
     canvas: $('#spot-inline-canvas'), paletteHost: $('#spot-inline-palette'), penButton: $('#spot-inline-pen'), eraserButton: $('#spot-inline-eraser'),
     undoButton: $('#spot-inline-undo'), redoButton: $('#spot-inline-redo'), originalButton: $('#spot-inline-original'), addColorInput: $('#spot-inline-add-color'),
     finishButton: $('#spot-inline-finish'), status: $('#spot-inline-status'), original: before.document, working: working.document,
     onFinish: finishInlineDrawing, onChange: () => pxdBridge?.markDirty()
   });
-  $('#spot-inline-cancel').focus();
+  $('#spot-inline-cancel').focus(); gameSession?.refresh();
 }
 
 async function importSelectedImages() {
@@ -285,7 +304,7 @@ async function importSelectedImages() {
 
 async function redrawImage() {
   if (!beforeRevision || !afterRevision || beforeRevision.document.width !== afterRevision.document.width || beforeRevision.document.height !== afterRevision.document.height) return;
-  openInlineDrawing(draft?.before.draftId || sourceDraftId, beforeRevision, draft?.after.draftId || sourceDraftId, afterRevision, { preservePxd: Boolean(pxdOriginalRefs), gameId: draft?.gameId || null });
+  openInlineDrawing(draft?.before.draftId || sourceDraftId, beforeRevision, draft?.after.draftId || sourceDraftId, afterRevision, { preservePxd: true, gameId: draft?.gameId || null });
 }
 
 /** Freeze unfinished dots before the project workspace exports or switches projects. */
@@ -298,12 +317,14 @@ async function persistInlineDrawing() {
     saved = await store.save({ draftId: workingId, kind: 'pixel_art', ownerId: 'local-owner', document: edited, source: { type: 'local_image_copy', assetId: before.asset.assetId, revisionId: before.revisionId }, expectedRevisionId: working.revisionId });
   }
   if (epoch !== sessionEpoch || inlineDraw === null || inlineWorkingRevision?.revisionId !== working.revisionId) return null;
+  const previousAfterDocument = afterRevision?.document;
   inlineWorkingRevision = saved; beforeRevision = before; afterRevision = saved; sourceDraftId = beforeId; afterDraftId = workingId;
   const result = detectDifferenceCandidates(before.document, edited);
+  const previousDetected = draft && previousAfterDocument ? detectDifferenceCandidates(before.document, previousAfterDocument).candidates : null;
   const nextDraft = draft ? structuredClone(draft) : { schemaVersion: 1, gameId: inlineDraftGameId || crypto.randomUUID(), publication: 'draft', published: false };
   Object.assign(nextDraft, {
     schemaVersion: 1, gameId: inlineDraftGameId || nextDraft.gameId || crypto.randomUUID(), width: edited.width, height: edited.height,
-    before: reference(beforeId, before), after: reference(workingId, saved), candidates: result.candidates, confirmed: false, publication: 'draft', published: false
+    before: reference(beforeId, before), after: reference(workingId, saved), candidates: previousDetected ? retainDifferenceCandidates(draft.candidates, previousDetected, result.candidates) : result.candidates, confirmed: Boolean(draft?.confirmed && JSON.stringify(working.document) === JSON.stringify(edited)), publication: 'draft', published: false
   });
   draft = validateSpotDifferenceDraft(nextDraft); draftId = null; savedConfirmedDraftId = null;
   inlineDraftGameId = draft.gameId; inlinePreservePxd = true;
@@ -312,6 +333,11 @@ async function persistInlineDrawing() {
 }
 
 async function save() {
+  if (document.body.classList.contains('spot-inline-open')) {
+    await inlineDraw?.ready;
+    try { await pxdBridge?.save(); message('元画像と編集中の絵を端末に保存しました。'); } catch (error) { message(`保存できませんでした：${error.message}`); }
+    return;
+  }
   if (!store || !draft || !draft.candidates.length) { message('先に画像の差分候補を作ってください。'); return; }
   savedConfirmedDraftId = null; updateActions();
   saveButton.disabled = true; message('端末に保存しています…');
@@ -331,7 +357,7 @@ async function save() {
 
 async function resume() {
   const epoch = sessionEpoch;
-  const id = readStorage(LAST_KEY); if (!id || !store || !adapter) return;
+  const id = new URLSearchParams(location.search).get('resumeLocal') || readStorage(LAST_KEY); if (!id || !store || !adapter) return;
   resumeButton.disabled = true; message('前回の下書きと画像版を確認しています…');
   try {
     const revision = await store.load(id);
@@ -345,7 +371,7 @@ async function resume() {
     if (JSON.stringify(reference(restored.before.draftId, beforeRevision)) !== JSON.stringify(restored.before) || JSON.stringify(reference(restored.after.draftId, afterRevision)) !== JSON.stringify(restored.after)) throw new Error('元画像の固定版が一致しません');
     if (beforeRevision.document.width !== restored.width || beforeRevision.document.height !== restored.height || afterRevision.document.width !== restored.width || afterRevision.document.height !== restored.height) throw new Error('比較画像の寸法が保存した候補と一致しません');
     pxdBridge?.reset();
-    draft = restored; draftId = id; sourceDraftId = restored.before.draftId; savedConfirmedDraftId = restored.confirmed ? id : null; selectedIds.clear(); splitPixels.clear();
+    candidateHistory.reset(); draft = restored; draftId = id; sourceDraftId = restored.before.draftId; savedConfirmedDraftId = restored.confirmed ? id : null; selectedIds.clear(); splitPixels.clear();
     $('#spot-source-label').textContent = `元 ${beforeRevision.revisionId.slice(0, 8)} → 変更後 ${afterRevision.revisionId.slice(0, 8)}・固定版`;
     $('#spot-confirmed').hidden = !draft.confirmed; showEditor(); editor.scrollIntoView({ block: 'start' }); message('同じ画像の固定版で前回の作成を再開しました。');
   } catch (error) { message(`再開できませんでした：${error.message}`); }
@@ -354,6 +380,7 @@ async function resume() {
 
 async function openPxdSpot(project) {
   const epoch = ++sessionEpoch;
+  candidateHistory.reset();
   delete importButton.dataset.busy;
   beforeImageSlot.clear(); afterImageSlot.clear(); beforeImageSlot.setBusy(false); afterImageSlot.setBusy(false);
   refreshImportAction();
@@ -387,7 +414,7 @@ function mountPxdSpot() {
   return mountPxdTools({
     tool: 'spot_difference', projectWorkspace: true, setStatus: message, hasContent: () => Boolean(draft || inlineDraw), openProject: openPxdSpot,
     getProject: async (project) => {
-      if (inlineDraw) await persistInlineDrawing();
+      if (inlineDraw && document.body.classList.contains('spot-inline-open')) { await inlineDraw.ready; await persistInlineDrawing(); }
       if (!draft || !beforeRevision || !afterRevision) return project;
       return writePxdPuzzle(project.manifest.sharedCanvas ? project : await putPxdSharedImage(project, { width: afterRevision.document.width, height: afterRevision.document.height, rgba: documentRgba(afterRevision.document) }), {
         tool: 'spot_difference', document: draft,
@@ -400,7 +427,11 @@ function mountPxdSpot() {
 
 $('#spot-start').addEventListener('click', start); saveButton.addEventListener('click', save); resumeButton.addEventListener('click', resume);
 importButton.addEventListener('click', importSelectedImages);
-$('#spot-inline-cancel').addEventListener('click', () => { inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing'); setup.hidden = false; });
+$('#spot-inline-cancel').addEventListener('click', async () => {
+  if (draft?.candidates.length) { await finishInlineDrawing(inlineDraw.getDocument()); return; }
+  if (gameSession?.dirty && !confirm('未保存の変更があります。画像選択に戻りますか？')) return;
+  inlineDraw?.dispose(); inlineDraw = null; $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open', 'spot-editing'); setup.hidden = false; gameSession?.refresh();
+});
 $('#spot-redraw').addEventListener('click', redrawImage);
 playLocalButton.addEventListener('click', () => {
   if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId) return;
@@ -416,10 +447,27 @@ $('#spot-split-mode').addEventListener('click', (event) => {
   splitMode = !splitMode; event.currentTarget.setAttribute('aria-pressed', String(splitMode));
   $('#spot-edit-hint').textContent = splitMode ? '選んだ候補の中をなぞって分割範囲を指定' : '色のついた場所をタップして選択 · ピンチで拡大';
 });
-$('#spot-merge').addEventListener('click', () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message, 'spot_difference')) return; try { draft.candidates = mergeDifferenceCandidates(draft.candidates, [...selectedIds], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補をまとめました。'); } catch (error) { message(error.message); } });
-$('#spot-split').addEventListener('click', () => { try { const id = [...selectedIds][0]; draft.candidates = splitDifferenceCandidate(draft.candidates, id, [...splitPixels], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ画素を別の候補に分けました。'); } catch (error) { message(error.message); } });
-$('#spot-exclude').addEventListener('click', () => { try { const id = [...selectedIds][0]; draft.candidates = excludeDifferenceCandidate(draft.candidates, id, draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); message('選んだ候補を正解候補から除外しました。'); } catch (error) { message(error.message); } });
-$('#spot-confirm').addEventListener('click', async () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message, 'spot_difference')) return; try { draft = confirmDifferenceCandidates(draft); $('#spot-confirmed').hidden = false; updateActions(); await save(); } catch (error) { message(error.message); } });
+$('#spot-merge').addEventListener('click', () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message, 'spot_difference')) return; try { candidateHistory.record(draft); draft.candidates = mergeDifferenceCandidates(draft.candidates, [...selectedIds], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); pxdBridge?.markDirty(); message('選んだ候補をまとめました。'); } catch (error) { message(error.message); } });
+$('#spot-split').addEventListener('click', () => { try { candidateHistory.record(draft); const id = [...selectedIds][0]; draft.candidates = splitDifferenceCandidate(draft.candidates, id, [...splitPixels], draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); pxdBridge?.markDirty(); message('選んだ画素を別の候補に分けました。'); } catch (error) { message(error.message); } });
+$('#spot-exclude').addEventListener('click', () => { try { candidateHistory.record(draft); const id = [...selectedIds][0]; draft.candidates = excludeDifferenceCandidate(draft.candidates, id, draft.width, draft.height); selectedIds.clear(); splitPixels.clear(); renderCandidates(); pxdBridge?.markDirty(); message('選んだ候補を正解候補から除外しました。'); } catch (error) { message(error.message); } });
+$('#spot-confirm').addEventListener('click', async () => { if (!requireSharedCanvasAccess(pxdBridge?.currentProject, message, 'spot_difference')) return; try { candidateHistory.record(draft); draft = confirmDifferenceCandidates(draft); pxdBridge?.markDirty(); $('#spot-confirmed').hidden = false; updateActions(); await save(); } catch (error) { message(error.message); } });
+async function restoreCandidateHistory(direction) {
+  if (candidateHistoryBusy || !draft) return;
+  const restored = candidateHistory[direction](draft); if (!restored) return;
+  candidateHistoryBusy = true; updateActions(); const epoch = sessionEpoch;
+  try {
+    const before = await resolveLocalDrawRevision(adapter, restored.before.draftId, restored.before.revisionId);
+    const after = await resolveLocalDrawRevision(adapter, restored.after.draftId, restored.after.revisionId);
+    if (epoch !== sessionEpoch) return;
+    beforeRevision = before; afterRevision = after; draft = restored;
+    savedConfirmedDraftId = null; selectedIds.clear(); splitPixels.clear();
+    $('#spot-confirmed').hidden = !draft.confirmed; renderCandidates(); pxdBridge?.markDirty();
+  } catch (error) { message(`編集履歴を戻せませんでした：${error.message}`); }
+  finally { candidateHistoryBusy = false; updateActions(); }
+}
+$('#spot-candidate-undo').addEventListener('click', () => restoreCandidateHistory('undo'));
+$('#spot-candidate-redo').addEventListener('click', () => restoreCandidateHistory('redo'));
+$('#spot-edit-again').addEventListener('click', () => { candidateHistory.record(draft); draft = { ...draft, confirmed: false }; savedConfirmedDraftId = null; $('#spot-confirmed').hidden = true; updateActions(); pxdBridge?.markDirty(); });
 function cancelTouchEdit() {
   if (!touchEditSnapshot) return;
   selectedIds.clear(); for (const id of touchEditSnapshot.selectedIds) selectedIds.add(id);
@@ -513,6 +561,10 @@ pxdBridge = mountPxdSpot();
 const pxdImported = pxdBridge ? await pxdBridge.ready : false;
 if (!pxdImported) await loadSourceOptions();
 
-// Keep the editor as the visibility owner even when its candidate panel moved first.
-for (const id of ['spot-split-mode', 'spot-merge', 'spot-split', 'spot-exclude', 'spot-confirm', 'spot-redraw', 'spot-play-local', 'spot-publish']) editor.append(document.getElementById(id));
-mountToolHeaderControls(document, { selectors: ['.spot-settings', '#spot-split-mode', '#spot-merge', '#spot-split', '#spot-exclude', '#spot-confirm', '#spot-redraw', '#spot-play-local', '#spot-publish', '#spot-inline-pen', '#spot-inline-eraser', '#spot-inline-undo', '#spot-inline-redo', '#spot-inline-original', '#spot-inline-finish', '#spot-inline-cancel'] });
+// Candidate edits stay together in the game-specific sheet.
+$('#spot-inline-finish').setAttribute('data-tool-operation', '');
+$('#spot-play-local').removeAttribute('data-tool-operation');
+mountToolHeaderControls(document, { selectors: ['#spot-play-local'] });
+
+gameSession = mountGameEditorSession({ kind: 'spot-difference', isActive: () => Boolean(draft || inlineDraw), isDirty: () => Boolean(pxdBridge?.dirty), workspace: () => pxdBridge });
+if (new URLSearchParams(location.search).has('resumeLocal')) await resume();

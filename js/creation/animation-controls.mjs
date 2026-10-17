@@ -11,6 +11,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   let menuFrameId = null;
   let menuLayerId = null;
   let menuReturnFocus = null;
+  let opacityPopover = null; let opacityPopoverTitle = null; let opacityPopoverValue = null; let opacityPopoverInput = null;
+  let opacityPopoverState = null;
   let draggedFrameId = null;
   let draggedLayerId = null;
   let pointerHold = null;
@@ -141,6 +143,22 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const timingUnit = node('span', 'animation-controls__unit', 'FPS');
     timingHeading.append(timingClose); timing.append(timingHeading, fpsPreset, durationInput, timingUnit, node('p', 'animation-controls__timing-note', 'GIFは20ms以上・10ms単位で書き出します。'));
 
+    opacityPopover = node('section', 'animation-controls__opacity-popover');
+    opacityPopover.dataset.opacityPopover = 'true'; opacityPopover.hidden = true;
+    opacityPopover.setAttribute('role', 'dialog'); opacityPopover.setAttribute('aria-modal', 'false');
+    const opacityPopoverHeading = node('div', 'animation-controls__opacity-popover-heading');
+    opacityPopoverTitle = node('strong', 'animation-controls__opacity-popover-title');
+    const opacityPopoverClose = button('不透明度を閉じる', '×', 'close-opacity-popover', 'animation-controls__opacity-popover-close');
+    opacityPopoverHeading.append(opacityPopoverTitle, opacityPopoverClose);
+    opacityPopoverValue = node('output', 'animation-controls__opacity-popover-value');
+    opacityPopoverValue.dataset.opacityPopoverValue = 'true';
+    opacityPopoverInput = node('input', 'animation-controls__layer-opacity-input animation-controls__opacity-popover-input');
+    opacityPopoverInput.type = 'range'; opacityPopoverInput.min = '0'; opacityPopoverInput.max = '1'; opacityPopoverInput.step = '0.01';
+    opacityPopoverInput.dataset.layerOpacity = ''; opacityPopoverInput.dataset.opacityPopoverInput = 'true';
+    const opacityPopoverLabel = node('label', 'animation-controls__opacity-popover-control');
+    opacityPopoverLabel.append(opacityPopoverInput, opacityPopoverValue);
+    opacityPopover.append(opacityPopoverHeading, opacityPopoverLabel);
+
     status = node('span', 'animation-controls__status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     if (hasWorkspace) {
       workspacePanel = node('section', 'animation-controls__workspace-panel');
@@ -160,7 +178,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       workspacePanel.append(heading, toolbar, frames, status);
     } else root.append(toolbar, frames, status);
     host.replaceChildren(root);
-    (document.body || host).append(...(workspacePanel ? [workspacePanel, frameMenu, ...(!frameOnly ? [layers, timing] : [])] : [frameMenu, layers, timing]));
+    (document.body || host).append(...(workspacePanel ? [workspacePanel, frameMenu, ...(!frameOnly ? [layers, timing] : []), opacityPopover] : [frameMenu, layers, timing, opacityPopover]));
   }
 
   function stateNow() {
@@ -180,6 +198,54 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   }
 
   function closePanels() { layers.hidden = true; timing.hidden = true; layerListDirty = true; setAttr(layerToggle, 'aria-expanded', 'false'); setAttr(timingToggle, 'aria-expanded', 'false'); }
+
+  function closeOpacityPopover({ returnFocus = false } = {}) {
+    if (!opacityPopoverState) return;
+    const { trigger } = opacityPopoverState;
+    opacityPopoverState = null;
+    opacityPopover.hidden = true;
+    if (trigger?.parentElement && trigger.isConnected !== false) {
+      setAttr(trigger, 'aria-expanded', 'false');
+      if (returnFocus && !trigger.disabled) trigger.focus({ preventScroll: true });
+    }
+  }
+
+  function positionOpacityPopover() {
+    if (!opacityPopoverState || opacityPopover.hidden) return;
+    const view = document.defaultView;
+    const viewportWidth = view?.innerWidth || 320; const viewportHeight = view?.innerHeight || 568;
+    const triggerRect = opacityPopoverState.trigger.getBoundingClientRect?.() || { left: 8, right: 52, top: 8, bottom: 52 };
+    const width = Math.min(260, Math.max(0, viewportWidth - 16));
+    opacityPopover.style.width = `${width}px`;
+    const left = Math.max(8, Math.min(viewportWidth - width - 8, triggerRect.right - width));
+    const height = opacityPopover.getBoundingClientRect?.().height || 156;
+    const top = triggerRect.bottom + height + 8 <= viewportHeight - 8
+      ? triggerRect.bottom + 8
+      : Math.max(8, Math.min(viewportHeight - height - 8, triggerRect.top - height - 8));
+    opacityPopover.style.left = `${left}px`; opacityPopover.style.top = `${top}px`;
+  }
+
+  function openOpacityPopover(trigger) {
+    const state = stateNow();
+    const layer = state.layers.find(item => String(item.id) === String(trigger.dataset.layerId));
+    if (!layer || layer.role === 'music' || layer.locked || state.readOnly || pending > 0 || state.audioMode) return;
+    if (opacityPopoverState?.layerId === String(layer.id)) { closeOpacityPopover({ returnFocus: true }); return; }
+    closeOpacityPopover();
+    opacityPopoverState = { layerId: String(layer.id), frameId: String(state.frameId), selectedLayerId: String(state.layerId), trigger };
+    const value = Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1;
+    const layerLabel = String(layer.name || 'レイヤー');
+    setText(opacityPopoverTitle, `${layerLabel}の不透明度（全コマ共通）`);
+    setAttr(opacityPopover, 'aria-label', `${layerLabel}の不透明度（全コマ共通）`);
+    setAttr(opacityPopoverInput, 'aria-label', `${layerLabel}の不透明度（全コマ共通）`);
+    setData(opacityPopoverInput, 'layerOpacity', layer.id);
+    opacityPopoverInput.value = String(value);
+    setText(opacityPopoverValue, `${Math.round(value * 100)}%`);
+    opacityPopoverInput.disabled = false;
+    opacityPopover.hidden = false;
+    setAttr(trigger, 'aria-expanded', 'true');
+    positionOpacityPopover();
+    opacityPopoverInput.focus({ preventScroll: true });
+  }
 
   function positionWorkspacePanel() {
     if (!workspacePanel || workspacePanel.hidden) return;
@@ -219,10 +285,16 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   }
 
   function onOutsidePointerDown(event) {
-    if (!workspaceOpen) return;
     const target = event.target;
+    if (opacityPopoverState && !opacityPopover.contains(target) && !opacityPopoverState.trigger?.contains(target)) closeOpacityPopover();
+    if (!workspaceOpen) return;
     if ([root, workspacePanel, frameMenu, layers, timing].some((container) => container?.contains(target))) return;
     setWorkspaceOpen(false);
+  }
+
+  function onOpacityKeydown(event) {
+    if (event.key !== 'Escape' || !opacityPopoverState) return;
+    event.preventDefault(); closeOpacityPopover({ returnFocus: true });
   }
 
   async function dispatch(action) {
@@ -387,6 +459,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   function setDesktopLayout({ active = false, layerHost = null, frameHost = null } = {}) {
     const nextActive = Boolean(active && !frameOnly && hasCelMatrix && layerHost?.append && frameHost?.append);
     if (nextActive && desktopActive && desktopLayerHost === layerHost && desktopFrameHost === frameHost) return;
+    if (opacityPopoverState && (!nextActive || !desktopActive || desktopLayerHost !== layerHost || desktopFrameHost !== frameHost)) closeOpacityPopover();
     if (desktopActive) {
       if (desktopFramePane?.parentElement === desktopFrameHost) desktopFrameHost.removeChild(desktopFramePane);
       if (layers.parentElement === desktopLayerHost) {
@@ -540,9 +613,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         const opacityLabel = node('label', 'animation-controls__layer-opacity'); opacityLabel.dataset.layerOpacityFor = id;
         const opacityText = node('span', '', '不透明度（全コマ共通）');
         const opacityValue = node('output', 'animation-controls__layer-opacity-value', '100%');
+        opacityValue.dataset.layerOpacityValue = id;
         const opacity = node('input', 'animation-controls__layer-opacity-input'); opacity.type = 'range'; opacity.min = '0'; opacity.max = '1'; opacity.step = '0.01'; opacity.dataset.layerOpacity = id;
         opacity.setAttribute('aria-label', `${layerLabel}の不透明度（全コマ共通）`);
-        opacityLabel.append(opacityText, opacity, opacityValue);
+        const opacityTrigger = button(`${layerLabel}の不透明度を調整`, '100%', 'opacity-popover', 'animation-controls__opacity-compact-trigger');
+        opacityTrigger.dataset.opacityPopoverTrigger = 'true'; opacityTrigger.dataset.layerId = id;
+        opacityTrigger.setAttribute('aria-haspopup', 'dialog'); opacityTrigger.setAttribute('aria-expanded', 'false');
+        opacityTrigger.setAttribute('aria-controls', `${host.id || 'animation-controls'}-opacity-popover`);
+        opacityPopover.id = `${host.id || 'animation-controls'}-opacity-popover`;
+        opacityLabel.append(opacityText, opacity, opacityValue, opacityTrigger);
         const remove = button('レイヤーを削除', '×', 'delete-layer'); remove.dataset.layerId = id;
         row.append(select, rename, opacityLabel, eye, lock, up, down, remove);
       } else old.delete(id);
@@ -550,16 +629,26 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const opacity = opacityLabel.querySelector('[data-layer-opacity]');
       setClass(row, 'is-selected', layer.id === state.layerId);
       setText(select, layerLabel); setAttr(select, 'aria-label', layerLabel); setAttr(select, 'aria-pressed', layer.id === state.layerId); setData(select, 'layerId', id);
+      setData(select, 'layerNumber', modelIndex + 1);
       const name = String(layer.name || ''); if (rename.value !== name && document.activeElement !== rename) rename.value = name;
       setAttr(rename, 'aria-label', `${layerLabel}の名前`); setData(rename, 'renameLayer', id);
       setText(opacityLabel.children[0], '不透明度（全コマ共通）');
       setAttr(opacity, 'aria-label', `${layerLabel}の不透明度（全コマ共通）`);
+      const disabled = Boolean(state.readOnly) || pending > 0;
       const layerOpacity = Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1;
       if (document.activeElement !== opacity) opacity.value = String(layerOpacity);
       setText(opacityLabel.children[2], `${Math.round(layerOpacity * 100)}%`);
+      const opacityTrigger = opacityLabel.querySelector('[data-opacity-popover-trigger]');
+      setText(opacityTrigger, `${Math.round(layerOpacity * 100)}%`);
+      setAttr(opacityTrigger, 'aria-label', `${layerLabel}の不透明度を調整（${Math.round(layerOpacity * 100)}%）`);
+      setAttr(opacityTrigger, 'title', `${layerLabel}の不透明度 ${Math.round(layerOpacity * 100)}%`);
+      setBoolean(opacityTrigger, 'disabled', disabled || musicLayer || Boolean(layer.locked));
+      if (opacityPopoverState?.layerId === id) {
+        opacityPopoverInput.value = String(layerOpacity);
+        setText(opacityPopoverValue, `${Math.round(layerOpacity * 100)}%`);
+      }
       const eyeLabel = layer.visible === false ? 'レイヤーを表示' : 'レイヤーを隠す'; setAttr(eye, 'aria-label', eyeLabel); setText(eye, layer.visible === false ? '○' : '◉'); setAttr(eye, 'aria-pressed', layer.visible !== false);
       const lockLabel = layer.locked ? 'レイヤーのロックを解除' : 'レイヤーをロック'; setAttr(lock, 'aria-label', lockLabel); const lockIcon = layer.locked ? 'locked' : 'unlocked'; if (lock.dataset.iconName !== lockIcon) { replaceButtonIcon(lock, lockIcon); lock.dataset.iconName = lockIcon; } setAttr(lock, 'aria-pressed', Boolean(layer.locked));
-      const disabled = Boolean(state.readOnly) || pending > 0;
       setBoolean(rename, 'disabled', disabled || musicLayer || Boolean(layer.locked));
       setBoolean(opacity, 'disabled', disabled || musicLayer || Boolean(layer.locked));
       setBoolean(eye, 'disabled', disabled); setBoolean(lock, 'disabled', disabled);
@@ -680,6 +769,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         if (!layer) disabled = true;
         else if (action === 'select-layer') disabled = pendingDisabled;
         else if (control.dataset.renameLayer) disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer;
+        else if (control.dataset.opacityPopoverTrigger) disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer;
         else if (action === 'visibility' || action === 'lock') disabled = Boolean(state.readOnly) || pendingDisabled;
         else if (action === 'move-layer-up') disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer || index === state.layers.length - 1;
         else if (action === 'move-layer-down') disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer || index === (state.layers.some(item => item.role === 'music') ? 1 : 0);
@@ -703,6 +793,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
 
   function renderRefresh(state) {
     if (disposed || scope.disposed) return;
+    if (opacityPopoverState) {
+      const popoverLayer = state.layers.find(layer => String(layer.id) === opacityPopoverState.layerId);
+      const selectionChanged = String(state.frameId) !== opacityPopoverState.frameId || String(state.layerId) !== opacityPopoverState.selectedLayerId;
+      const protectedState = !popoverLayer || popoverLayer.role === 'music' || popoverLayer.locked || state.readOnly || state.audioMode || pending > 0;
+      const canReturnFocus = Boolean(popoverLayer) && popoverLayer.role !== 'music' && !popoverLayer.locked && !state.readOnly && !state.audioMode;
+      if (protectedState || selectionChanged) closeOpacityPopover({ returnFocus: canReturnFocus });
+    }
     root.classList.toggle('is-audio', Boolean(state.audioMode));
     for (const portal of [workspacePanel, frameMenu, layers, timing]) portal?.classList.toggle('is-audio', Boolean(state.audioMode));
     for (const action of ['play', 'onion', 'toggle-duration']) { const control = actionElement(action); if (control) setBoolean(control, 'hidden', Boolean(state.audioMode)); }
@@ -849,9 +946,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
 
   function onClick(event) {
     const target = event.target.closest?.('button, input');
-    if (!target || ![root, workspacePanel, frameMenu, layers, timing, desktopFramePane].some((container) => container?.contains(target))) return;
+    if (!target || ![root, workspacePanel, frameMenu, layers, timing, desktopFramePane, opacityPopover].some((container) => container?.contains(target))) return;
     if (target.matches('input')) return;
     const state = stateNow(); const action = target.dataset.action;
+    if (action === 'opacity-popover') { event.preventDefault?.(); if (!target.disabled) openOpacityPopover(target); return; }
+    if (action === 'close-opacity-popover') { closeOpacityPopover({ returnFocus: true }); return; }
     if (action === 'close-frame-menu') { closeCellMenu({ returnFocus: true }); return; }
     if (action === 'frame-menu') { menuAction(target.dataset.frameMenuAction, target); return; }
     if (action === 'toggle-frames') {
@@ -915,7 +1014,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const state = stateNow(); const layer = state.layers.find(item => String(item.id) === String(layerId));
       if (!layer || layer.role === 'music' || layer.locked || state.readOnly || pending > 0) { refresh(); return; }
       const value = Number(target.value);
-      if (Number.isFinite(value)) dispatch({ type: 'layer-opacity', layerId: layer.id, opacity: Math.max(0, Math.min(1, value)) });
+      if (Number.isFinite(value)) {
+        if (opacityPopoverState) closeOpacityPopover({ returnFocus: true });
+        dispatch({ type: 'layer-opacity', layerId: layer.id, opacity: Math.max(0, Math.min(1, value)) });
+      }
       else refresh();
       return;
     }
@@ -931,8 +1033,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   function onInput(event) {
     const target = event.target;
     if (!target.matches('[data-layer-opacity]')) return;
-    const output = target.closest('label')?.querySelector('output');
-    if (output) output.textContent = `${Math.round(Math.max(0, Math.min(1, Number(target.value) || 0)) * 100)}%`;
+    const layerId = String(target.dataset.layerOpacity);
+    const text = `${Math.round(Math.max(0, Math.min(1, Number(target.value) || 0)) * 100)}%`;
+    const output = Array.from(target.closest('label')?.children || []).find(child => child.tagName === 'OUTPUT');
+    if (output) output.textContent = text;
+    const rowValue = layers.querySelector(`[data-layer-opacity-value="${layerId}"]`);
+    const compactTrigger = Array.from(layers.querySelectorAll('[data-opacity-popover-trigger]')).find(trigger => String(trigger.dataset.layerId) === layerId);
+    if (rowValue) setText(rowValue, text);
+    if (compactTrigger) setText(compactTrigger, text);
+    if (opacityPopoverState?.layerId === layerId) setText(opacityPopoverValue, text);
   }
 
   function onBlur(event) {
@@ -947,6 +1056,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (event.defaultPrevented || document.querySelector('dialog[open]')) return;
     if (event.key === 'Escape') {
       event.preventDefault();
+      if (opacityPopoverState) { closeOpacityPopover({ returnFocus: true }); return; }
       if (dismissibleMenus && !frameMenu.hidden) { closeCellMenu({ returnFocus: true }); return; }
       if (dismissibleMenus && !timing.hidden) { timing.hidden = true; (menuReturnFocus?.isConnected ? menuReturnFocus : timingToggle).focus({ preventScroll: true }); return; }
       if (workspacePanel && workspaceOpen) { setWorkspaceOpen(false, { returnFocus: true }); return; }
@@ -1069,6 +1179,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   listen(root, 'input', onInput);
   listen(root, 'focusout', onBlur);
   listen(root, 'keydown', onKeydown);
+  listen(document, 'pointerdown', onOutsidePointerDown);
+  listen(document, 'keydown', onOpacityKeydown);
+  if (document.defaultView?.addEventListener) listen(document.defaultView, 'resize', positionOpacityPopover);
+  listen(opacityPopover, 'click', onClick);
+  listen(opacityPopover, 'change', onChange);
+  listen(opacityPopover, 'input', onInput);
+  listen(opacityPopover, 'keydown', onOpacityKeydown);
   if (workspacePanel) {
     listen(workspacePanel, 'click', onClick);
     listen(workspacePanel, 'change', onChange);
@@ -1077,8 +1194,6 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     listen(workspacePanel, 'keydown', onKeydown);
     listen(workspacePanel, 'contextmenu', onContextMenu);
     listen(workspacePanel, 'dblclick', onDoubleClick);
-    listen(document, 'pointerdown', onOutsidePointerDown);
-    listen(document, 'keydown', onKeydown);
     listen(document, 'pointermove', onPointerMove);
     listen(document, 'pointerup', onPointerEnd);
     listen(document, 'pointercancel', onPointerCancel);
@@ -1109,10 +1224,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     showPlaybackFrame,
     setDesktopLayout,
     setDesktopFramesFolded,
-    get hasOpenPanels() { return workspaceOpen || !frameMenu.hidden || !timing.hidden || (!desktopActive && !layers.hidden); },
+    get hasOpenPanels() { return Boolean(opacityPopoverState) || workspaceOpen || !frameMenu.hidden || !timing.hidden || (!desktopActive && !layers.hidden); },
     close() {
       clearLongPress(); pointerHold = null; suppressClick = false;
       liftedHeader?.classList.toggle('is-lifted', false); liftedHeader = null;
+      closeOpacityPopover();
       frameMenu.hidden = true; menuFrameId = null; menuLayerId = null;
       closePanels();
       if (workspacePanel) setWorkspaceOpen(false);
@@ -1134,7 +1250,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       pointerHold = null; liftedHeader?.classList.toggle('is-lifted', false); liftedHeader = null;
       for (const remove of removeListeners.splice(0)) remove();
       host.replaceChildren();
-      for (const element of [workspacePanel, frameMenu, layers, timing, desktopFramePane]) element?.parentElement?.removeChild(element);
+      for (const element of [workspacePanel, frameMenu, layers, timing, opacityPopover, desktopFramePane]) element?.parentElement?.removeChild(element);
     }
   };
   scope.add(api.dispose);

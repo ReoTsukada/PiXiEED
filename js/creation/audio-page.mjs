@@ -18,7 +18,7 @@ import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, a
 import { documentRgba } from './draw-core.mjs?rev=20260930-shared-canvas-5';
 import { ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, animationNeedsRgba, composeAnimationFrameRgba, createAnimationFromDraw, getAnimationCelDocument, getAnimationDrawRewardBonusColors, moveAnimationFrame, removeAnimationFrame, removeAnimationLayer, setAnimationPalette, setAnimationDrawRewardBonusColors, setLayerProperties, writeAnimationCel } from './animation-core.mjs?rev=20261016-color-capability-1';
 import { composeMusicProjectionFrame } from './draw-music-core.mjs?rev=20261016-tool-shell-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261015-alpha-opacity-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261017-draw-rails-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 import { AUDIO_ANIMATION_LINK_VERSION, AUDIO_ANIMATION_MAX_COLORS, audioAnimationFrameTicks, audioAnimationCellTiming, audioAnimationSequenceColumn, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, getAudioAnimationColorCount, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261016-color-capability-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';

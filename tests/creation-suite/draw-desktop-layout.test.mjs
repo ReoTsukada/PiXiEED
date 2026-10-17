@@ -54,7 +54,7 @@ test('corrupt, wrong-version, non-finite and out-of-range saved values recover s
   const wrongVersion = readDrawDesktopPreferences(memoryStorage(JSON.stringify({ version: 2, preferences: {} })));
   assert.equal(wrongVersion.recovered, true);
   const normalized = normalizeDrawDesktopPreferences({ leftWidth: Infinity, rightWidth: -500, paletteHeight: 1e9, frameHeight: NaN });
-  assert.deepEqual(normalized, { leftWidth: 224, rightWidth: 216, paletteHeight: 720, frameHeight: 152 });
+  assert.deepEqual(normalized, { leftWidth: 224, rightWidth: 68, paletteHeight: 720, frameHeight: 152 });
 });
 
 test('resizing one boundary updates only its preferred dimension and clamps to hard bounds', () => {
@@ -65,6 +65,8 @@ test('resizing one boundary updates only its preferred dimension and clamps to h
   assert.equal(setDrawDesktopPreference(start, 'frameHeight', 90).frameHeight, 108);
   assert.equal(start.frameHeight, 152);
   assert.deepEqual(resizeDrawDesktopPreference(start, 'unknown', 10), start);
+  assert.equal(setDrawDesktopPreference(start, 'leftWidth', 1).leftWidth, 62);
+  assert.equal(setDrawDesktopPreference(start, 'rightWidth', 1).rightWidth, 68);
 });
 
 test('preference reads/writes tolerate storage access failures', () => {

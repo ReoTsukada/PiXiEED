@@ -220,6 +220,76 @@ test('frame timing is shown and edited as FPS without changing source timing on 
   ui.dispose();
 });
 
+test('compact opacity popover follows its target layer, reports input, and dismisses safely', async () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls'; const scope = fakeScope();
+  const state = {
+    frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }],
+    layers: [{ id: 'l1', name: 'Lineart', visible: true, locked: false, opacity: 1 }, { id: 'l2', name: 'Color', visible: true, locked: false, opacity: 0.35 }],
+    frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false
+  };
+  const actions = []; let finishOpacity;
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction(action) {
+    actions.push(action);
+    if (action.type === 'layer-opacity') return new Promise(resolve => { finishOpacity = () => { state.layers.find(layer => layer.id === action.layerId).opacity = action.opacity; resolve(); }; });
+    if (action.type === 'select-frame') state.frameId = action.frameId;
+  } });
+  host.querySelector('[data-action="toggle-layers"]').fire('click');
+  const trigger = doc.body.querySelectorAll('[data-opacity-popover-trigger]').find(item => item.dataset.layerId === 'l2');
+  const layerName = doc.body.querySelectorAll('[data-action="select-layer"]').find(item => item.dataset.layerId === 'l2');
+  assert.equal(layerName.dataset.layerNumber, '2', 'the compact row keeps a visible layer number and its full accessible name');
+  assert.equal(layerName.getAttribute('aria-label'), 'Color');
+  const popover = doc.body.querySelector('[data-opacity-popover]');
+  assert.equal(trigger.textContent, '35%');
+  assert.match(trigger.getAttribute('aria-label'), /35%/);
+  trigger.fire('click');
+  assert.equal(popover.hidden, false);
+  assert.equal(popover.getAttribute('role'), 'dialog');
+  assert.equal(popover.getAttribute('aria-label'), 'Colorの不透明度（全コマ共通）');
+  const inspector = doc.body.children.find(child => child.querySelector('[data-layer-list]'));
+  const queryAll = inspector.querySelectorAll.bind(inspector);
+  inspector.querySelectorAll = selector => {
+    const found = queryAll(selector);
+    return selector === '[data-opacity-popover-trigger]' ? { [Symbol.iterator]: () => found[Symbol.iterator]() } : found;
+  };
+  const slider = popover.querySelector('[data-opacity-popover-input]');
+  assert.ok(popover.querySelector('[data-action="close-opacity-popover"]'), 'the dialog has an explicit keyboard and pointer dismissal control');
+  assert.equal(slider.dataset.layerOpacity, 'l2', 'the compact slider is bound to its own layer, even when another layer is selected');
+  assert.equal(slider.value, '0.35');
+  slider.value = '0.62'; slider.fire('input');
+  assert.equal(popover.querySelector('[data-opacity-popover-value]').textContent, '62%');
+  doc.fire('keydown', { key: 'Escape' });
+  assert.equal(popover.hidden, true);
+  assert.equal(trigger.focused, true, 'Escape returns focus to the trigger');
+
+  trigger.fire('click'); doc.fire('pointerdown', { target: doc.body });
+  assert.equal(popover.hidden, true, 'a pointer outside both the trigger and popover dismisses it');
+
+  trigger.fire('click');
+  state.frameId = 'f2'; ui.refresh();
+  assert.equal(popover.hidden, true, 'a frame change closes the layer-scoped popover');
+  state.frameId = 'f1'; ui.refresh(); trigger.fire('click');
+  trigger.focused = false;
+  slider.value = '0.62'; slider.fire('change');
+  assert.deepEqual(actions.at(-1), { type: 'layer-opacity', layerId: 'l2', opacity: 0.62 });
+  assert.equal(popover.hidden, true, 'a pending opacity write closes the popover');
+  assert.equal(trigger.focused, true, 'closing for a pending write restores focus while the trigger remains mounted');
+  finishOpacity(); await Promise.resolve();
+
+  state.readOnly = true; ui.refresh();
+  trigger.fire('click');
+  assert.equal(popover.hidden, true, 'read-only state cannot leave the opacity popover open');
+  assert.equal(trigger.disabled, true, 'read-only state disables the compact opacity trigger');
+  state.readOnly = false; state.layers[1].locked = false; ui.refresh(); trigger.fire('click');
+  state.layers[1].locked = true; ui.refresh();
+  assert.equal(popover.hidden, true, 'locking the layer closes its opacity popover');
+  assert.equal(trigger.disabled, true, 'a locked layer disables the compact opacity trigger');
+  state.layers[1].locked = false; ui.refresh(); trigger.fire('click');
+  state.layers.splice(1, 1); ui.refresh();
+  assert.equal(popover.hidden, true, 'removing the target layer closes its opacity popover');
+  assert.equal(doc.body.querySelectorAll('[data-opacity-popover-trigger]').some(item => item.dataset.layerId === 'l2'), false, 'the inspector removes the deleted layer trigger');
+  ui.dispose();
+});
+
 test('playback frame highlight survives refresh without changing the editing selection', () => {
   const doc = new FakeDocument(), host = doc.createElement('div'), scope = fakeScope();
   const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }], layers: [{ id: 'l1', name: 'Layer', visible: true }], frameId: 'f1', layerId: 'l1', playing: true, playbackFrameId: 'f2' };
