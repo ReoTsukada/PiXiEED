@@ -24,7 +24,7 @@ test('Draw rail and shared animation changes invalidate every runtime parent and
         return (path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(owner), path))) === target;
       });
       assert.ok(urls.length, `${owner} references ${target}`);
-      assert.equal(revisions[target], '20261017-draw-rails-1', `${target} has a release revision`);
+      assert.equal(revisions[target], '20261017-layer-minimum-1', `${target} has a release revision`);
       for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), revisions[target], `${owner} invalidates ${target}`);
     }
   }

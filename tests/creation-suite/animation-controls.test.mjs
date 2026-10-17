@@ -237,7 +237,7 @@ test('compact opacity popover follows its target layer, reports input, and dismi
   const trigger = doc.body.querySelectorAll('[data-opacity-popover-trigger]').find(item => item.dataset.layerId === 'l2');
   const layerName = doc.body.querySelectorAll('[data-action="select-layer"]').find(item => item.dataset.layerId === 'l2');
   assert.equal(layerName.dataset.layerNumber, '2', 'the compact row keeps a visible layer number and its full accessible name');
-  assert.equal(layerName.getAttribute('aria-label'), 'Color');
+  assert.equal(layerName.getAttribute('aria-label'), 'Color、上から1番目、表示、ロックなし');
   const popover = doc.body.querySelector('[data-opacity-popover]');
   assert.equal(trigger.textContent, '35%');
   assert.match(trigger.getAttribute('aria-label'), /35%/);
@@ -287,6 +287,96 @@ test('compact opacity popover follows its target layer, reports input, and dismi
   state.layers.splice(1, 1); ui.refresh();
   assert.equal(popover.hidden, true, 'removing the target layer closes its opacity popover');
   assert.equal(doc.body.querySelectorAll('[data-opacity-popover-trigger]').some(item => item.dataset.layerId === 'l2'), false, 'the inspector removes the deleted layer trigger');
+  ui.dispose();
+});
+
+test('minimal desktop layer lane shows order and selection, then opens safe settings for the current selection', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); const layerHost = doc.createElement('aside'), frameHost = doc.createElement('footer'); const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [
+    { id: 'music', role: 'music', name: 'Music', visible: true, locked: false, opacity: 1 },
+    { id: 'hidden', name: 'Hidden', visible: false, locked: true, opacity: 0.5 },
+    { id: 'top', name: 'Top', visible: true, locked: false, opacity: 0.8 }
+  ], frameId: 'f1', layerId: 'top', playing: false, readOnly: false, audioMode: false };
+  const actions = [];
+  const ui = mountAnimationControls({ host, scope, dismissibleMenus: true, getState: () => state, getCelHasContent: () => false,
+    onAction(action) { actions.push(action); if (action.type === 'select-layer') state.layerId = action.layerId; } });
+  ui.setDesktopLayout({ active: true, layerHost, frameHost });
+  const settings = layerHost.querySelector('[data-action="selected-layer-settings"]');
+  const list = layerHost.querySelector('[data-layer-list]');
+  const select = id => list.querySelectorAll('[data-action="select-layer"]').find(button => button.dataset.layerId === id);
+  assert.equal(settings.hidden, true, 'the settings entry is hidden at ordinary widths');
+  ui.setDesktopMinimal(true);
+  assert.equal(settings.hidden, false);
+  assert.equal(settings.getAttribute('aria-label'), '設定：Top');
+  assert.equal(settings.getAttribute('aria-controls'), `${host.id || 'animation-controls'}-context-menu`);
+  assert.equal(settings.getAttribute('aria-expanded'), 'false');
+  assert.equal(select('top').getAttribute('aria-pressed'), 'true');
+  assert.match(select('top').getAttribute('aria-label'), /上から1番目、表示、ロックなし/);
+  assert.match(select('hidden').getAttribute('aria-label'), /上から2番目、非表示、ロック中/);
+  assert.equal(select('hidden').dataset.layerHidden, 'true', 'hidden state remains a separate passive indicator for the compact tile');
+  assert.match(select('music').getAttribute('aria-label'), /音楽（全コマ共通）.*上から3番目/);
+
+  settings.isConnected = true;
+  settings.getBoundingClientRect = () => ({ left: 320, right: 364, top: 90, bottom: 134, width: 44, height: 44 });
+  settings.fire('click');
+  let menu = doc.body.querySelector('[data-frame-menu]');
+  assert.equal(menu.hidden, false);
+  assert.equal(menu.getAttribute('role'), 'dialog');
+  assert.equal(menu.getAttribute('aria-modal'), 'false');
+  assert.equal(menu.getAttribute('aria-label'), 'Topの操作');
+  assert.equal(menu.children[0].children[0].textContent, 'Topの操作', 'the visible heading identifies the selected layer');
+  assert.equal(menu.style.left, '96px', 'the compact details panel opens left of the right-side layer tiles');
+  assert.equal(menu.classList.contains('is-minimal-layer-menu'), true);
+  const close = menu.querySelector('[data-action="close-frame-menu"]');
+  close.fire('click');
+  assert.equal(menu.hidden, true);
+  assert.equal(menu.getAttribute('role'), 'group', 'closing compact details restores the normal contextual group semantics');
+  assert.equal(menu.classList.contains('is-minimal-layer-menu'), false);
+  assert.equal(settings.getAttribute('aria-expanded'), 'false');
+  assert.equal(settings.focused, true, 'closing details returns focus to the single settings entry');
+
+  settings.focused = false;
+  settings.fire('click');
+  const opacity = menu.querySelector('[data-layer-opacity]');
+  opacity.value = '0.45'; opacity.fire('change');
+  assert.deepEqual(actions.at(-1), { type: 'layer-opacity', layerId: 'top', opacity: 0.45 });
+  assert.equal(menu.hidden, true, 'applying opacity from compact details closes the menu');
+  assert.equal(settings.getAttribute('aria-expanded'), 'false');
+  assert.equal(settings.focused, true, 'opacity apply returns focus to the settings entry');
+
+  settings.fire('click');
+  select('hidden').fire('click');
+  assert.equal(menu.hidden, true, 'changing selection closes the old layer details instead of retaining a stale target');
+  assert.deepEqual(actions.at(-1), { type: 'select-layer', layerId: 'hidden' });
+  assert.equal(settings.getAttribute('aria-label'), '設定：Hidden');
+  settings.fire('click');
+  menu = doc.body.querySelector('[data-frame-menu]');
+  assert.equal(menu.getAttribute('aria-label'), 'Hiddenの操作');
+  assert.equal(menu.querySelector('[data-context-rename]').disabled, true, 'locked layers retain existing rename restrictions');
+  assert.equal(menu.querySelector('[data-frame-menu-action="delete-layer"]').disabled, true, 'locked layers retain existing deletion restrictions');
+  assert.equal(menu.querySelector('[data-layer-opacity]').disabled, true, 'locked layers retain existing opacity restrictions');
+  ui.setDesktopMinimal(false);
+  assert.equal(menu.hidden, true, 'expanding the dock closes compact-only details');
+  assert.equal(settings.hidden, true, 'the compact settings entry disappears after width restoration');
+
+  ui.setDesktopMinimal(true); settings.fire('click');
+  menu = doc.body.querySelector('[data-frame-menu]');
+  state.readOnly = true; ui.refresh();
+  assert.equal(menu.hidden, true, 'a read-only transition closes already-open editing details');
+  assert.equal(settings.getAttribute('aria-expanded'), 'false');
+  settings.fire('click');
+  menu = doc.body.querySelector('[data-frame-menu]');
+  assert.equal(menu.querySelector('[data-frame-menu-action="visibility"]').disabled, true, 'read-only mode keeps visibility actions disabled');
+  assert.equal(menu.querySelector('[data-frame-menu-action="lock"]').disabled, true, 'read-only mode keeps lock actions disabled');
+  state.readOnly = false; ui.refresh();
+  state.layerId = 'music'; ui.refresh(); settings.fire('click');
+  menu = doc.body.querySelector('[data-frame-menu]');
+  assert.equal(menu.getAttribute('aria-label'), 'Musicの操作');
+  assert.equal(menu.querySelector('[data-layer-opacity]').disabled, true, 'music layer opacity remains unavailable');
+  assert.equal(menu.querySelector('[data-context-rename]').disabled, true, 'music layer rename remains unavailable');
+  assert.equal(menu.querySelector('[data-frame-menu-action="delete-layer"]').disabled, true, 'music layer deletion remains unavailable');
+  ui.setDesktopLayout({ active: false });
+  assert.equal(menu.hidden, true, 'leaving desktop mode closes compact layer details');
   ui.dispose();
 });
 

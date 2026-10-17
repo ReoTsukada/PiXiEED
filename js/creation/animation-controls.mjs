@@ -10,6 +10,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   let suppressClick = false;
   let menuFrameId = null;
   let menuLayerId = null;
+  let minimalLayerMenu = false;
   let menuReturnFocus = null;
   let opacityPopover = null; let opacityPopoverTitle = null; let opacityPopoverValue = null; let opacityPopoverInput = null;
   let opacityPopoverState = null;
@@ -27,6 +28,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   let celFrameHeaders = new Map(); let celLayerHeaders = new Map(); let celNodes = new Map();
   let lastGridSnapshot = null; let controlsDirty = true; let lastControlSignature = null; let lastControlFrames = null; let lastControlLayers = null;
   let desktopActive = false; let desktopLayerHost = null; let desktopFrameHost = null; let desktopLayersParent = null; let desktopLayersNextSibling = null;
+  let desktopMinimal = false;
   let desktopFramePane = null; let desktopFrames = null; let desktopFolded = false;
   let desktopFrameButtons = new Map();
   let desktopPlaybackNodes = new Map();
@@ -115,6 +117,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     frames = node('div', 'animation-controls__frames');
     frames.dataset.frameStrip = 'true'; frames.setAttribute('role', 'listbox'); frames.setAttribute('aria-label', 'コマ');
     frameMenu = node('div', 'animation-controls__frame-menu'); frameMenu.dataset.frameMenu = 'true'; frameMenu.hidden = true; frameMenu.setAttribute('role', 'group'); frameMenu.setAttribute('aria-label', 'コマの操作');
+    frameMenu.id = `${host.id || 'animation-controls'}-context-menu`;
     frameMenu.setAttribute('role', 'group'); frameMenu.setAttribute('aria-label', '選択セルの操作');
     if (!hasCelMatrix) {
       for (const [label, glyph, command] of [['複製', '＋', 'duplicate'], ['空白', '□', 'blank'], ['左へ', '←', 'left'], ['右へ', '→', 'right'], ['削除', '×', 'delete']]) {
@@ -125,9 +128,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     layers = node('div', 'animation-controls__layers'); layers.hidden = true; layers.setAttribute('role', 'group'); layers.setAttribute('aria-label', 'レイヤー操作');
     const layerHeading = node('div', 'animation-controls__panel-heading', 'レイヤー');
     layerHeading.append(button('レイヤーパネルを閉じる', '×', 'close-layers'));
+    const selectedLayerSettings = button('選択中レイヤーの設定', '⚙', 'selected-layer-settings', 'animation-controls__layer-settings');
+    selectedLayerSettings.setAttribute('aria-haspopup', 'dialog'); selectedLayerSettings.setAttribute('aria-expanded', 'false'); selectedLayerSettings.setAttribute('aria-controls', frameMenu.id);
     const layerList = node('div', 'animation-controls__layer-list'); layerList.dataset.layerList = 'true';
     const addLayer = button('レイヤーを追加', '+', 'add-layer', 'animation-controls__wide-button');
-    layers.append(layerHeading, layerList, addLayer);
+    layers.append(layerHeading, selectedLayerSettings, layerList, addLayer);
 
     timing = node('div', 'animation-controls__timing'); timing.hidden = true; timing.setAttribute('role', 'group'); timing.setAttribute('aria-label', 'コマのFPS');
     const timingHeading = node('div', 'animation-controls__panel-heading', '選択コマのFPS');
@@ -461,6 +466,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (nextActive && desktopActive && desktopLayerHost === layerHost && desktopFrameHost === frameHost) return;
     if (opacityPopoverState && (!nextActive || !desktopActive || desktopLayerHost !== layerHost || desktopFrameHost !== frameHost)) closeOpacityPopover();
     if (desktopActive) {
+      if (menuLayerId) closeCellMenu();
       if (desktopFramePane?.parentElement === desktopFrameHost) desktopFrameHost.removeChild(desktopFramePane);
       if (layers.parentElement === desktopLayerHost) {
         if (desktopLayersNextSibling?.parentElement === desktopLayersParent) desktopLayersParent.insertBefore(layers, desktopLayersNextSibling);
@@ -474,8 +480,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       if (desktopLayerHost?.dataset?.desktopLayout) delete desktopLayerHost.dataset.desktopLayout;
       if (desktopFrameHost?.dataset?.desktopLayout) delete desktopFrameHost.dataset.desktopLayout;
     }
-    desktopActive = false; desktopLayerHost = null; desktopFrameHost = null;
-    if (!nextActive) { layerListDirty = true; workspaceDirty = true; refresh(); return; }
+    desktopActive = false; desktopMinimal = false; desktopLayerHost = null; desktopFrameHost = null;
+    if (!nextActive) { renderLayers(stateNow()); layerListDirty = true; workspaceDirty = true; refresh(); return; }
     desktopLayerHost = layerHost; desktopFrameHost = frameHost; desktopActive = true;
     if (!desktopFramePane) createDesktopFramePane();
     if (layers.parentElement !== desktopLayerHost) {
@@ -491,6 +497,14 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (desktopFramePane.parentElement !== desktopFrameHost) desktopFrameHost.append(desktopFramePane);
     layerListDirty = true; workspaceDirty = true;
     const state = stateNow(); renderLayers(state); renderDesktopFramePane(state); showPlaybackFrame(state.playing ? state.playbackFrameId ?? null : null);
+  }
+
+  function setDesktopMinimal(minimal) {
+    const next = Boolean(minimal && desktopActive);
+    if (desktopMinimal === next) return;
+    desktopMinimal = next;
+    if (!desktopMinimal && minimalLayerMenu) closeCellMenu();
+    if (desktopActive) renderLayers(stateNow());
   }
 
   function renderCelGrid(state) {
@@ -595,9 +609,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const orderedLayers = state.layers.map((layer, modelIndex) => ({ layer, modelIndex })).reverse();
     const hasMusicLayer = state.layers.some((layer) => layer.role === 'music');
     const normalLayerCount = state.layers.filter((layer) => layer.role !== 'music').length;
-    const old = new Map([...list.children].map(row => [row.dataset.layerId, row]));
+    const old = new Map([...list.children].filter(row => row.dataset.layerId).map(row => [row.dataset.layerId, row]));
     const desired = [];
+    let displayPosition = 0;
     for (const { layer, modelIndex } of orderedLayers) {
+      displayPosition += 1;
       const id = String(layer.id), musicLayer = layer.role === 'music';
       const layerLabel = musicLayer ? '音楽（全コマ共通）' : layer.name || `レイヤー ${modelIndex + 1}`;
       let row = old.get(id);
@@ -628,8 +644,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const [select, rename, opacityLabel, eye, lock, up, down, remove] = row.children;
       const opacity = opacityLabel.querySelector('[data-layer-opacity]');
       setClass(row, 'is-selected', layer.id === state.layerId);
-      setText(select, layerLabel); setAttr(select, 'aria-label', layerLabel); setAttr(select, 'aria-pressed', layer.id === state.layerId); setData(select, 'layerId', id);
+      setText(select, layerLabel);
+      const visibilityDescription = layer.visible === false ? '非表示' : '表示';
+      const lockDescription = layer.locked ? 'ロック中' : 'ロックなし';
+      const orderDescription = `上から${displayPosition}番目`;
+      const selectLabel = `${layerLabel}、${orderDescription}、${visibilityDescription}、${lockDescription}`;
+      setAttr(select, 'aria-label', selectLabel); setAttr(select, 'title', selectLabel); setAttr(select, 'aria-pressed', layer.id === state.layerId); setData(select, 'layerId', id);
       setData(select, 'layerNumber', modelIndex + 1);
+      setData(select, 'stackPosition', displayPosition);
+      setData(select, 'layerHidden', layer.visible === false);
       const name = String(layer.name || ''); if (rename.value !== name && document.activeElement !== rename) rename.value = name;
       setAttr(rename, 'aria-label', `${layerLabel}の名前`); setData(rename, 'renameLayer', id);
       setText(opacityLabel.children[0], '不透明度（全コマ共通）');
@@ -660,6 +683,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     placeChildren(list, desired);
     for (const row of old.values()) if (row.parentElement === list) list.removeChild(row);
     const add = layers.querySelector('[data-action="add-layer"]'); setBoolean(add, 'disabled', Boolean(state.readOnly) || pending > 0 || normalLayerCount >= 8);
+    const selectedLayer = state.layers.find(layer => String(layer.id) === String(state.layerId));
+    const settings = layers.querySelector('[data-action="selected-layer-settings"]');
+    if (settings) {
+      setBoolean(settings, 'hidden', !desktopMinimal || !selectedLayer);
+      if (selectedLayer) {
+        const label = `設定：${selectedLayer.name || (selectedLayer.role === 'music' ? '音楽' : 'レイヤー')}`;
+        setAttr(settings, 'aria-label', label); setAttr(settings, 'title', label); setData(settings, 'layerId', selectedLayer.id);
+      } else if (settings.dataset.layerId) delete settings.dataset.layerId;
+    }
     layerListDirty = false;
   }
 
@@ -800,6 +832,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const canReturnFocus = Boolean(popoverLayer) && popoverLayer.role !== 'music' && !popoverLayer.locked && !state.readOnly && !state.audioMode;
       if (protectedState || selectionChanged) closeOpacityPopover({ returnFocus: canReturnFocus });
     }
+    if (minimalLayerMenu && menuLayerId) {
+      const menuLayer = state.layers.find(layer => String(layer.id) === String(menuLayerId));
+      if (!menuLayer || String(state.layerId) !== String(menuLayerId) || !desktopActive || !desktopMinimal || state.readOnly || pending > 0) closeCellMenu();
+    }
     root.classList.toggle('is-audio', Boolean(state.audioMode));
     for (const portal of [workspacePanel, frameMenu, layers, timing]) portal?.classList.toggle('is-audio', Boolean(state.audioMode));
     for (const action of ['play', 'onion', 'toggle-duration']) { const control = actionElement(action); if (control) setBoolean(control, 'hidden', Boolean(state.audioMode)); }
@@ -854,7 +890,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   function request(action) { void dispatch(action); }
   function closeCellMenu({ returnFocus = false } = {}) {
     clearLongPress(); pointerHold = null; suppressClick = false;
-    frameMenu.hidden = true; menuFrameId = null; menuLayerId = null;
+    frameMenu.hidden = true; menuFrameId = null; menuLayerId = null; minimalLayerMenu = false;
+    frameMenu.classList.toggle('is-minimal-layer-menu', false);
+    frameMenu.setAttribute('role', 'group'); frameMenu.removeAttribute?.('aria-modal');
+    if (menuReturnFocus?.dataset?.action === 'selected-layer-settings') setAttr(menuReturnFocus, 'aria-expanded', 'false');
     if (returnFocus && menuReturnFocus?.isConnected) menuReturnFocus.focus({ preventScroll: true });
     menuReturnFocus = null;
   }
@@ -862,9 +901,17 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (!hasWorkspace || !workspacePanel) return;
     const state = stateNow();
     menuFrameId = kind === 'frame' ? id : null; menuLayerId = kind === 'layer' ? id : null;
+    minimalLayerMenu = Boolean(kind === 'layer' && target?.dataset?.action === 'selected-layer-settings');
+    frameMenu.classList.toggle('is-minimal-layer-menu', minimalLayerMenu);
+    frameMenu.setAttribute('role', minimalLayerMenu ? 'dialog' : 'group');
+    if (minimalLayerMenu) setAttr(frameMenu, 'aria-modal', 'false');
+    else frameMenu.removeAttribute?.('aria-modal');
     frameMenu.replaceChildren(); menuReturnFocus = target;
     if (dismissibleMenus) {
-      const heading = node('div', 'draw-panel-header'); heading.append(node('strong', '', kind === 'frame' ? 'コマの操作' : 'レイヤーの操作'));
+      const menuLayer = kind === 'layer' ? state.layers.find(layer => String(layer.id) === String(id)) : null;
+      const layerName = menuLayer?.name || (menuLayer?.role === 'music' ? '音楽' : 'レイヤー');
+      const headingLabel = kind === 'frame' ? 'コマの操作' : minimalLayerMenu ? `${layerName}の操作` : 'レイヤーの操作';
+      const heading = node('div', 'draw-panel-header'); heading.append(node('strong', '', headingLabel));
       const close = button('操作メニューを閉じる', '×', 'close-frame-menu', 'draw-panel-close'); heading.append(close); frameMenu.append(heading);
     }
     const add = (label, glyph, command, disabled = false) => {
@@ -906,10 +953,12 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     frameMenu.classList.toggle('is-cel-menu', true); frameMenu.classList.toggle('is-layer-menu', kind === 'layer');
     frameMenu.hidden = false;
+    if (minimalLayerMenu) setAttr(target, 'aria-expanded', 'true');
     const rect = target.getBoundingClientRect(); const view = document.defaultView;
     const viewportWidth = view?.innerWidth || 320; const viewportHeight = view?.innerHeight || 568;
     const width = Math.min(kind === 'frame' ? 252 : 220, viewportWidth - 16);
-    frameMenu.style.left = `${Math.max(8, Math.min(viewportWidth - width - 8, rect.left))}px`;
+    const preferredLeft = minimalLayerMenu ? rect.left - width - 4 : rect.left;
+    frameMenu.style.left = `${Math.max(8, Math.min(viewportWidth - width - 8, preferredLeft))}px`;
     frameMenu.style.width = `${width}px`;
     const menuHeight = Math.min(frameMenu.getBoundingClientRect().height || (kind === 'frame' ? 100 : 170), viewportHeight - 16);
     frameMenu.style.top = `${Math.max(8, Math.min(viewportHeight - menuHeight - 8, rect.bottom + 4))}px`;
@@ -919,16 +968,19 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   function menuAction(command, target) {
     const state = stateNow();
     if (menuLayerId) {
-      const layerId = menuLayerId; const layer = state.layers.find((item) => item.id === layerId);
-      if (!layer) return;
+      const layerId = menuLayerId; const layer = state.layers.find((item) => String(item.id) === String(layerId));
+      if (!layer || (minimalLayerMenu && (String(state.layerId) !== String(layerId) || !desktopActive || !desktopMinimal))) { closeCellMenu(); return; }
+      if (minimalLayerMenu && (state.readOnly || pending > 0)) { closeCellMenu(); return; }
       if (command === 'visibility') request({ type: 'visibility', layerId, visible: layer.visible === false });
       else if (command === 'lock') request({ type: 'lock', layerId, locked: !layer.locked });
-      else if (command === 'delete-layer') request({ type: 'delete-layer', layerId });
+      else if (command === 'delete-layer' && layer.role !== 'music' && !layer.locked && !state.readOnly && state.layers.length > 1) request({ type: 'delete-layer', layerId });
       else if (command === 'rename') {
         const input = frameMenu.querySelector('[data-context-rename]'); const name = input?.value.trim();
-        if (name && name !== layer.name) request({ type: 'rename-layer', layerId, name });
+        if (layer.role !== 'music' && !layer.locked && !state.readOnly && name && name !== layer.name) request({ type: 'rename-layer', layerId, name });
       }
-      frameMenu.hidden = true; menuLayerId = null; return;
+      if (minimalLayerMenu) closeCellMenu({ returnFocus: true });
+      else { frameMenu.hidden = true; menuLayerId = null; }
+      return;
     }
     const index = state.frames.findIndex((frame) => frame.id === menuFrameId);
     suppressClick = false;
@@ -952,6 +1004,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (action === 'opacity-popover') { event.preventDefault?.(); if (!target.disabled) openOpacityPopover(target); return; }
     if (action === 'close-opacity-popover') { closeOpacityPopover({ returnFocus: true }); return; }
     if (action === 'close-frame-menu') { closeCellMenu({ returnFocus: true }); return; }
+    if (action === 'selected-layer-settings') {
+      const selectedLayer = state.layers.find(layer => String(layer.id) === String(state.layerId));
+      if (desktopActive && desktopMinimal && selectedLayer) openCellMenu('layer', selectedLayer.id, target);
+      return;
+    }
     if (action === 'frame-menu') { menuAction(target.dataset.frameMenuAction, target); return; }
     if (action === 'toggle-frames') {
       if (workspacePanel) { setWorkspaceOpen(!workspaceOpen); return; }
@@ -1015,7 +1072,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       if (!layer || layer.role === 'music' || layer.locked || state.readOnly || pending > 0) { refresh(); return; }
       const value = Number(target.value);
       if (Number.isFinite(value)) {
-        if (opacityPopoverState) closeOpacityPopover({ returnFocus: true });
+        if (minimalLayerMenu) closeCellMenu({ returnFocus: true });
+        else if (opacityPopoverState) closeOpacityPopover({ returnFocus: true });
         dispatch({ type: 'layer-opacity', layerId: layer.id, opacity: Math.max(0, Math.min(1, value)) });
       }
       else refresh();
@@ -1223,6 +1281,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     refresh,
     showPlaybackFrame,
     setDesktopLayout,
+    setDesktopMinimal,
     setDesktopFramesFolded,
     get hasOpenPanels() { return Boolean(opacityPopoverState) || workspaceOpen || !frameMenu.hidden || !timing.hidden || (!desktopActive && !layers.hidden); },
     close() {

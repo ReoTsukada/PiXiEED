@@ -442,3 +442,98 @@ body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-l
   justify-self: center; width: 44px !important; min-width: 44px !important; max-width: 44px !important;
   height: 44px !important; min-height: 44px !important; max-height: 44px !important;
 }
+
+/* The narrowest layer lane is an ordering and selection strip. Layer-specific
+   actions live in one focused settings menu for the currently selected layer. */
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  min-width: 0;
+  overflow: visible !important;
+}
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer-settings {
+  display: grid !important;
+  box-sizing: border-box;
+  place-items: center;
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  padding: 0;
+  border: 1px solid #ffffff24;
+  border-radius: 8px;
+  background: #202b33;
+  color: #f2eee0;
+  font-size: 18px;
+}
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer-settings[hidden] { display: none !important; }
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer-list {
+  grid-template-columns: 46px;
+  justify-content: center;
+  justify-items: center;
+  gap: 4px;
+  width: 46px;
+  max-width: 46px;
+  margin-inline: auto;
+  overflow: visible;
+}
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px;
+  grid-auto-rows: 44px;
+  justify-content: center;
+  justify-items: center;
+  gap: 0;
+  box-sizing: border-box;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid #3a4850;
+  border-radius: 9px;
+  background: #172129;
+}
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer.is-selected { border-color: #e6bd4a; background: #302f27; box-shadow: inset 0 0 0 1px #e6bd4a; }
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer > :not(.animation-controls__layer-name) { display: none !important; }
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer-name {
+  position: relative;
+  display: grid;
+  place-items: center;
+  grid-column: 1;
+  grid-row: 1;
+  box-sizing: border-box;
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  color: #f4f3e9;
+  font-size: 0;
+}
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer-name::before {
+  content: attr(data-stack-position);
+  font: 700 16px/1 system-ui, sans-serif;
+}
+body.draw-desktop-active .draw-desktop-dock[data-minimal="true"] .draw-desktop-layer-host .animation-controls__layer-name[data-layer-hidden="true"]::after {
+  content: "隠";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #8f4545;
+  color: #fff;
+  font: 700 9px/1 system-ui, sans-serif;
+}

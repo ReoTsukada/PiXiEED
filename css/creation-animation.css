@@ -244,6 +244,7 @@
 .animation-controls__context-opacity .animation-controls__layer-opacity-input { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; min-height: 44px; }
 .animation-controls__context-opacity .animation-controls__layer-opacity-value { grid-column: 2; grid-row: 2; }
 .animation-controls__context-rename { grid-column: 1 / -1; width: 100%; min-width: 0; height: 44px; padding: 6px 8px; border: 1px solid var(--creation-panel-edge, #52606a); border-radius: 8px; background: #141c22; color: inherit; font: inherit; }
+.animation-controls__frame-menu.is-minimal-layer-menu .animation-controls__context-rename { border-color: #77868c !important; background: #10181e !important; color: #f0f1ea !important; color-scheme: dark; }
 .animation-controls__layers,
 .animation-controls__timing {
   position: fixed;
@@ -296,6 +297,7 @@
 .animation-controls__opacity-popover-value { color: var(--creation-muted, #c5cbd0); font-variant-numeric: tabular-nums; text-align: right; }
 .animation-controls__layer.is-selected { border-color: var(--creation-yellow, #ffd35a); background: #ffffff0b; }
 .animation-controls__layer-name { display: block; overflow: hidden; min-width: 0; padding: 0 4px; border: 0; background: transparent; color: inherit; font-size: 11px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.animation-controls__layer-settings { display: none; }
 .animation-controls__rename { grid-column: 1 / -1; grid-row: 2; width: 100%; min-width: 0; height: 44px; min-height: 44px; padding: 4px 6px; border: 1px solid var(--creation-panel-edge, #52606a); border-radius: 8px; background: #141c22; color: inherit; font: inherit; font-size: 11px; }
 .animation-controls__layer .animation-controls__button { flex-basis: 44px; width: 44px; min-width: 44px; height: 44px; min-height: 44px; border-radius: 9px; font-size: 15px; }
 .animation-controls__wide-button { display: flex; width: 100%; min-height: 44px; margin-top: 6px; font-size: 12px; }

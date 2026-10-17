@@ -1,6 +1,6 @@
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261017-draw-rails-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261017-layer-minimum-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261016-tool-shell-1';
 
 if (new URLSearchParams(location.search).get('gameEditor') === 'spot') {

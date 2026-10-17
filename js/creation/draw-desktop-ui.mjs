@@ -8,7 +8,7 @@ import {
   resizeDrawDesktopPreference,
   setDrawDesktopPreference,
   writeDrawDesktopPreferences
-} from './draw-desktop-layout.mjs?rev=20261017-draw-rails-1';
+} from './draw-desktop-layout.mjs?rev=20261017-layer-minimum-1';
 
 const TOOL_COMMANDS = {
   pen: 'tool.left.pen', eraser: 'tool.left.eraser', fill: 'tool.left.fill', picker: 'tool.left.picker', spray: 'tool.left.spray',
@@ -50,7 +50,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261017-draw-rails-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261017-layer-minimum-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
@@ -171,6 +171,8 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     shell.style.setProperty('--draw-desktop-frame', `${resolvedLayout.frameHeight}px`);
     $('.draw-desktop-tools').dataset.compact = String(resolvedLayout.leftWidth < 112);
     $('.draw-desktop-dock').dataset.compact = String(resolvedLayout.rightWidth < 200);
+    $('.draw-desktop-dock').dataset.minimal = String(resolvedLayout.rightWidth < 120);
+    animationControls?.setDesktopMinimal?.(resolvedLayout.rightWidth < 120);
     for (const separator of shell.querySelectorAll('[data-layout-separator]')) {
       const key = separator.dataset.layoutSeparator;
       const bounds = resolvedLayout.limits[key];

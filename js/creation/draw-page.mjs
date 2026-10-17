@@ -11,7 +11,7 @@ import { ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame,
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261016-color-capability-1';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261017-draw-rails-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261017-layer-minimum-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
@@ -31,7 +31,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261016-tool-shell-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261017-draw-rails-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261017-layer-minimum-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
@@ -43,7 +43,7 @@ import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?r
 import { resizeDrawView } from './draw-resize-view.mjs?rev=20261016-color-capability-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261016-tool-shell-1';
-import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261017-draw-rails-1';
+import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261017-layer-minimum-1';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
