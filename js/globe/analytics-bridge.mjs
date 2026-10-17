@@ -1,9 +1,12 @@
-import { trackSiteEvent } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
+import { trackSiteEvent } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { analyticsConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 
 const MESSAGE_TYPE = 'pixieed:globe-analytics';
 const MESSAGE_VERSION = 1;
 const CONSENT_KEY = 'PiXiEED:analytics-consent:v1';
+// Keep this exact revision in sync with globe/index.html's trusted prototype
+// iframe. Tests derive the source revision from that canonical iframe URL.
+const MAP_IFRAME_REVISION = '20261017-map-navigation-1';
 const ALLOWED_HOSTS = new Set(['pixieed.jp', 'www.pixieed.jp']);
 const LINK_KINDS = new Set(['official', 'ticket', 'related', 'social']);
 const EVENT_PARAMS = Object.freeze({
@@ -69,7 +72,7 @@ function exactPrototypeFrame(frame, windowRef) {
     const allowedKeys = new Set(['embed', 'rev', 'layer']);
     if ([...url.searchParams.keys()].some(key => !allowedKeys.has(key))) return false;
     if (url.searchParams.getAll('embed').length !== 1 || url.searchParams.get('embed') !== '1') return false;
-    if (url.searchParams.getAll('rev').length !== 1 || !/^202\d{5}-map-panel-close-[a-z0-9-]+$/.test(url.searchParams.get('rev') || '')) return false;
+    if (url.searchParams.getAll('rev').length !== 1 || url.searchParams.get('rev') !== MAP_IFRAME_REVISION) return false;
     const layers = url.searchParams.getAll('layer');
     if (layers.length > 1 || (layers.length && !['posts', 'events', 'stores'].includes(layers[0]))) return false;
     return true;

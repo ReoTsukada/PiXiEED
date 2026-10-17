@@ -1,4 +1,4 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename } from './output-handoff.mjs?rev=20261016-tool-shell-1';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261017-analytics-integrity-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261015-alpha-opacity-1';
 import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
@@ -501,7 +501,7 @@ function renderOutputItems() {
     });
     includeLabel.append(include, document.createTextNode('一括'));
     const save = document.createElement('a'); save.className = 'output-item__download'; save.href = url; save.download = item.filename; save.textContent = '保存'; save.setAttribute('aria-label', `${item.filename}をダウンロード`);
-    save.addEventListener('click', () => { status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。'; trackSave('download'); });
+    save.addEventListener('click', () => { status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。'; trackSave(item); });
     row.append(select, includeLabel, save); outputItemsList.append(row);
   }
   deleteOutputItem.disabled = itemWritePending || mediaWritePending || Boolean(generationController) || outputItems.length <= 1;
@@ -885,9 +885,10 @@ function syncFilename() {
   download.download = safeName;
 }
 
-function trackSave(method) {
-  void import('../site-analytics.mjs?rev=20261016-tool-shell-1').then(({ trackSiteEvent }) => {
-    trackSiteEvent('file_export', { file_type: record.extension, method, export_status: 'download_started' });
+function trackSave(item) {
+  const params = outputExportEventParams(item);
+  void import('../site-analytics.mjs?rev=20261017-analytics-integrity-1').then(({ trackSiteEvent }) => {
+    trackSiteEvent('file_export', params);
   }).catch(() => { /* Analytics never blocks a local preview or download. */ });
 }
 
@@ -1678,7 +1679,7 @@ batchSave.addEventListener('click', () => {
   status.textContent = started > 1
     ? `${started}項目のダウンロードを開始しました。ブラウザーが許可を尋ねた場合は、複数ファイルの保存を許可してください。`
     : 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。';
-  for (const item of batch.selected) trackSave('download');
+  for (const item of batch.selected.slice(0, started)) trackSave(item);
 });
 returnLink.addEventListener('click', async (event) => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !pendingWrites.size) return;
@@ -1768,7 +1769,7 @@ download.addEventListener('click', (event) => {
   if (!record || !fileUrl || !currentBlob) { event.preventDefault(); return; }
   syncFilename();
   status.textContent = 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。';
-  trackSave('download');
+  trackSave(activeItem);
 });
 viewFitButton.addEventListener('click', () => setPreviewZoom(1));
 viewZoomOut.addEventListener('click', () => setPreviewZoom(previewZoom / 1.25));

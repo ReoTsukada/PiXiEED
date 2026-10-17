@@ -6,7 +6,7 @@ import { lookupCell } from './geometry.mjs?v=20261005-map-layers-1';
 import { readEventCatalog, mergeEventCatalog } from './event-catalog.mjs?v=20261005-event-research-1';
 import { classifyEvent, DEFAULT_EVENT_PERIOD_FILTER, eventPeriodCounts, matchesEventPeriod, nextTokyoMidnightDelay, sortEventsByDisplayPriority, tokyoDate, uniqueEventEditions } from './event-density.mjs';
 import { presentMapEvent } from './map-event-presentation.mjs?v=20261007-event-discovery-1';
-import { trackGlobeEvent } from './analytics-bridge.mjs?rev=20261016-tool-shell-1';
+import { trackGlobeEvent } from './analytics-bridge.mjs?rev=20261017-analytics-integrity-1';
 import { appendEventPageLink } from './event-page-links.mjs';
 
 const CATALOG_URL = new URL('../../data/pixel-art-events.json', import.meta.url);

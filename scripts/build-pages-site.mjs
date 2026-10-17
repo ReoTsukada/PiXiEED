@@ -29,7 +29,7 @@ export function addSiteHeaderBenefits(html, name = '') {
   const versioned = html
     .replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-header-benefits-2$2')
     .replace(/(href="\/css\/tool-embed\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-tool-shell-1$2')
-    .replace(/(src="\/js\/tool-embed\.mjs)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-tool-shell-1$2');
+    .replace(/(src="\/js\/tool-embed\.mjs)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261017-analytics-integrity-1$2');
   const output = /<\/body\s*>/i.test(versioned)
     ? versioned.replace(/<\/body\s*>/i, `${HEADER_REWARD_SCRIPT}</body>`)
     : `${versioned}\n${HEADER_REWARD_SCRIPT}`;

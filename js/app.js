@@ -1,5 +1,5 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261017-performance-1';
-import { trackSiteEvent } from './site-analytics.mjs?rev=20261016-tool-shell-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261017-analytics-integrity-1';
+import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
 import { mapConfig, supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';

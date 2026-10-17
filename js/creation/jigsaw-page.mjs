@@ -13,7 +13,7 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261017-editor-improvements-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261017-analytics-integrity-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
@@ -22,7 +22,7 @@ import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeS
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
-import { createLevelTracker } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
+import { createLevelTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);

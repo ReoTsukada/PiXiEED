@@ -4,6 +4,7 @@ import { analyticsConfig } from '../data/site-config.js?rev=20261007-safe-analyt
 const CONSENT_KEY = 'PiXiEED:analytics-consent:v1';
 const DEBUG_KEY = 'pixieed:ga-debug';
 export const EMBED_TOOL_START_EVENT = 'pixieed:embed-tool-start';
+export const EMBED_ANALYTICS_EVENT = 'pixieed:embed-analytics';
 const ALLOWED_HOSTS = new Set(['pixieed.jp', 'www.pixieed.jp']);
 const EMBED_TOOL_STARTS = new Set(['draw', 'audio', 'pixel-camera']);
 const TOOLS = new Set([
@@ -11,7 +12,7 @@ const TOOLS = new Set([
   'profile', 'pass', 'tools', 'draw', 'animation', 'audio', 'game', 'jigsaw', 'hidden-object',
   'spot-difference', 'pixfind', 'pixel-camera', 'pixel-camera-studio', 'pixiee-lens', 'telescope',
   'training', 'play', 'play-spot-difference', 'play-hidden-object', 'creation-suite', 'store', 'event',
-  'output', 'output-work',
+  'output', 'output-work', 'camera', 'books', 'events',
   'hidden-object', 'spot-difference'
 ]);
 const EVENTS = new Set([
@@ -139,7 +140,66 @@ function emit(name, params = {}) {
 }
 
 /** Send one allowlisted event. Unsafe names and parameters are discarded. */
-export function trackSiteEvent(name, params = {}) { return emit(name, params); }
+export function trackSiteEvent(name, params = {}) {
+  try {
+    if (inBrowser() && window.top !== window.self) return relayEmbeddedEvent(name, params);
+    return emit(name, params);
+  } catch { return false; }
+}
+
+/** Only these fixed, anonymous outcomes may cross the retained editor boundary. */
+export function isEmbeddedAnalyticsEvent(name, params) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) return false;
+  const keys = Object.keys(params).sort().join(',');
+  if (name === 'camera_capture') return keys === 'tool' && params.tool === 'pixel-camera';
+  if (name !== 'file_export' || keys !== 'export_status,file_type,method,tool') return false;
+  return EMBED_TOOL_STARTS.has(params.tool) && FILE_TYPES.has(params.file_type)
+    && ((params.method === 'downloaded' && params.export_status === 'download_started')
+      || (params.method === 'shared' && params.export_status === 'share_handoff'));
+}
+
+export function canRelayEmbeddedAnalytics(windowRef = globalThis.window) {
+  try {
+    return Boolean(analyticsConfig?.measurementId && windowRef && windowRef.top !== windowRef.self
+      && windowRef.location.protocol === 'https:' && ALLOWED_HOSTS.has(windowRef.location.hostname.toLowerCase())
+      && windowRef.localStorage.getItem(CONSENT_KEY) !== 'denied'
+      && windowRef.parent.location.origin === windowRef.location.origin);
+  } catch { return false; }
+}
+
+/** Per-frame replay guard. The normal sender still enforces the parent's consent. */
+export function createEmbeddedAnalyticsReceiver({ channel, source, origin, send = trackSiteEvent }) {
+  let sequence = 0;
+  return {
+    reset() { sequence = 0; },
+    receive(event) {
+      try {
+        if (event.origin !== origin || event.source !== source) return false;
+        const message = event.data;
+        if (!message || Object.keys(message).sort().join(',') !== 'channel,kind,name,params,sequence,type,version'
+          || message.kind !== 'pixieed-tool-embed' || message.version !== 1 || message.channel !== channel
+          || message.type !== 'analytics-event' || !Number.isSafeInteger(message.sequence)
+          || message.sequence <= sequence || !isEmbeddedAnalyticsEvent(message.name, message.params)) return false;
+        sequence = message.sequence; // No delayed replay after denial or a sender failure.
+        if (!canRelayEmbeddedAnalytics(source)) return false;
+        return send(message.name, { ...message.params }) === true;
+      } catch { return false; }
+    }
+  };
+}
+
+function relayEmbeddedEvent(name, input) {
+  if (!['file_export', 'camera_capture'].includes(name) || !canRelayEmbeddedAnalytics()) return false;
+  const boot = window.__PIXIEED_TOOL_EMBED__;
+  if (!boot || typeof boot.channel !== 'string' || !boot.channel || !['draw', 'camera', 'audio'].includes(boot.role)) return false;
+  // Never turn a regular or cross-origin iframe into an analytics source.
+  const mode = document.body?.dataset?.creationMode || boot.role;
+  const tool = name === 'camera_capture' || mode === 'camera' ? 'pixel-camera' : mode;
+  const params = parametersFor(name, { ...input, tool });
+  if (!isEmbeddedAnalyticsEvent(name, params)) return false;
+  document.dispatchEvent(new CustomEvent(EMBED_ANALYTICS_EVENT, { detail: { name, params } }));
+  return false; // The iframe never sends directly to GA.
+}
 
 function pushCommand(command, ...args) {
   window.dataLayer = window.dataLayer || [];

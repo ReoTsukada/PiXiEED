@@ -17,19 +17,19 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=2026101
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-project-workspace-css-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-analytics-integrity-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
-import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261016-tool-shell-1';
+import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261017-analytics-integrity-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261016-color-capability-1';
-import { createToolStartTracker } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261016-tool-shell-1';
+import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261017-analytics-integrity-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261017-layer-minimum-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
@@ -2114,7 +2114,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261017-editor-improvements-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261017-analytics-integrity-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2443,7 +2443,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261017-editor-improvements-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261017-analytics-integrity-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {

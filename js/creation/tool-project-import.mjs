@@ -7,7 +7,7 @@ import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=202
 /** Copy into a fresh tool-owned project; never save or mutate the source. */
 export async function importToolProject(source, tool) {
   const original = source;
-  if (tool === 'draw' && source.entries.some(entry => entry.path === 'audio/state.json')) { const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261017-editor-improvements-1'); source = await prepareSharedMusicProject(source); }
+  if (tool === 'draw' && source.entries.some(entry => entry.path === 'audio/state.json')) { const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261017-analytics-integrity-1'); source = await prepareSharedMusicProject(source); }
   let project = cloneAsToolProject(source, tool);
   if (tool === 'draw') project = setPxdBytes(project, 'legacy/import-source.pxd', await encodePxd(original), 'application/octet-stream');
   const sourceTool = source.manifest?.toolProject?.tool || source.manifest?.lastMode;

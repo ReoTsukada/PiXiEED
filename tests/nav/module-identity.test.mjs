@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
-  ['js/site-header.mjs', 'rev=20261017-performance-1'],
+  ['js/site-header.mjs', 'rev=20261017-analytics-integrity-1'],
   ['js/tool-header-controls.mjs', 'rev=20261006-header-controls-1&nav=20261016-tool-operations-1'],
   ['js/creation/draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['js/creation/drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],

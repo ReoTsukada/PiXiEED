@@ -160,7 +160,7 @@ ${listedProducts.map(card).join('\n')}
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261015-shop-compact-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261015-shop-thumbnails-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261017-performance-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261017-analytics-integrity-1"></script>
 </body>
 </html>
 `;

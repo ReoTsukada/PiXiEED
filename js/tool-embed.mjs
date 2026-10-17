@@ -1,4 +1,4 @@
-import { trackSiteEvent } from './site-analytics.mjs?rev=20261016-tool-shell-1';
+import { trackSiteEvent, createEmbeddedAnalyticsReceiver } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 
 const PROTOCOL = 'pixieed-tool-embed';
 const VERSION = 1;
@@ -40,6 +40,8 @@ function makeFrame(section, mode) {
   const instance = { section, mode, channel, frame, ready: false, readyPromise: null, readyResolve: null, toolStarts: new Set() };
   instance.readyPromise = new Promise(resolve => { instance.readyResolve = resolve; });
   section.querySelector('[data-embed-stage]').append(frame);
+  instance.analyticsReceiver = createEmbeddedAnalyticsReceiver({ channel, source: frame.contentWindow, origin: location.origin });
+  frame.addEventListener('load', () => instance.analyticsReceiver.reset());
   instances.set(section, instance);
   observeMode(section);
   return instance;
@@ -360,6 +362,10 @@ window.addEventListener('message', event => {
   if (!message || message.kind !== PROTOCOL || message.version !== VERSION) return;
   const instance = [...instances.values()].find(item => item.frame.contentWindow === event.source);
   if (!instance || message.channel !== instance.channel) return;
+  if (message.type === 'analytics-event') {
+    instance.analyticsReceiver.receive(event);
+    return;
+  }
   if (message.type === 'route-change' && instance.section.hasAttribute('data-tool-shell')
       && typeof message.pathname === 'string' && typeof message.search === 'string' && typeof message.hash === 'string') {
     try {

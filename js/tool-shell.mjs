@@ -84,5 +84,5 @@ runtime.hash = location.hash;
 section.dataset.embedUrl = runtime.href;
 
 // The controller consumes data-embed-url and data-embed-auto on import.
-await import('/js/tool-embed.mjs?rev=20261017-entry-integration-1');
+await import('/js/tool-embed.mjs?rev=20261017-analytics-integrity-1');
 }

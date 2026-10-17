@@ -11,7 +11,7 @@ import { createGameEditorHistory, retainDifferenceCandidates } from './game-edit
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261017-editor-improvements-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261017-analytics-integrity-1';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261016-color-capability-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';

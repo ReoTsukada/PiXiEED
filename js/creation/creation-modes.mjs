@@ -315,7 +315,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?attempt=${audioLoadAttempt++}&rev=20261017-editor-improvements-1`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261017-analytics-integrity-1&attempt=${audioLoadAttempt++}`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -353,7 +353,7 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?attempt=${version}&rev=20261017-editor-improvements-1`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261017-analytics-integrity-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

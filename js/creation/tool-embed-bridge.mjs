@@ -1,5 +1,5 @@
 import { serializeAnimationPool } from './animation-core.mjs?rev=20261016-color-capability-1';
-import { EMBED_TOOL_START_EVENT } from '../site-analytics.mjs?rev=20261016-tool-shell-1';
+import { EMBED_TOOL_START_EVENT, EMBED_ANALYTICS_EVENT, isEmbeddedAnalyticsEvent, canRelayEmbeddedAnalytics } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 
 const PROTOCOL = 'pixieed-tool-embed';
 const VERSION = 1;
@@ -21,6 +21,7 @@ export function installToolEmbedBridge({ draw, modes, windowRef = window, docume
   const { channel, role } = boot;
   let commandQueue = Promise.resolve();
   let activated = false;
+  let analyticsSequence = 0;
   async function sha256(bytes) {
     const digest = await windowRef.crypto.subtle.digest('SHA-256', bytes);
     return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -133,6 +134,14 @@ export function installToolEmbedBridge({ draw, modes, windowRef = window, docume
     windowRef.parent.postMessage({ kind: PROTOCOL, version: VERSION, channel, type: 'tool-start', tool }, windowRef.location.origin);
   };
   documentRef.addEventListener(EMBED_TOOL_START_EVENT, onToolStart);
+  const onAnalytics = event => {
+    try {
+      const { name, params } = event.detail || {};
+      if (!canRelayEmbeddedAnalytics(windowRef) || !isEmbeddedAnalyticsEvent(name, params)) return;
+      windowRef.parent.postMessage({ kind: PROTOCOL, version: VERSION, channel, type: 'analytics-event', sequence: ++analyticsSequence, name, params: { ...params } }, windowRef.location.origin);
+    } catch { /* Measurement must never interrupt a completed capture or file handoff. */ }
+  };
+  documentRef.addEventListener(EMBED_ANALYTICS_EVENT, onAnalytics);
   const announceMode = () => {
     const mode = modes.mode;
     if (['draw', 'camera', 'audio'].includes(mode)) {
@@ -178,6 +187,7 @@ export function installToolEmbedBridge({ draw, modes, windowRef = window, docume
     windowRef.removeEventListener('message', onMessage); windowRef.removeEventListener('message', onExpansionState);
     documentRef.removeEventListener('fullscreenchange', onFullscreenChange);
     documentRef.removeEventListener(EMBED_TOOL_START_EVENT, onToolStart);
+    documentRef.removeEventListener(EMBED_ANALYTICS_EVENT, onAnalytics);
     modeObserver?.disconnect();
     windowRef.removeEventListener('hashchange', announceRoute); windowRef.removeEventListener('popstate', announceRoute);
     if (historyRef.replaceState === wrappedReplaceState) {

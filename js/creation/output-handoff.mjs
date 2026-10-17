@@ -524,3 +524,12 @@ export async function sendToolOutputAfterSaving(options, workspace, isCurrent = 
 
 export const OUTPUT_RETURN_PATHS = RETURN_PATHS;
 export const OUTPUT_MIME_EXTENSIONS = MIME_EXTENSIONS;
+
+/** Build the allowlisted fields for an output item whose browser save was dispatched. */
+export function outputExportEventParams(item) {
+  return {
+    file_type: String(item?.extension || '').toLowerCase(),
+    method: 'downloaded',
+    export_status: 'download_started'
+  };
+}
