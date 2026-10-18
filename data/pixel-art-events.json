@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-17T00:23:10+00:00",
+  "updatedAt": "2026-10-18T00:04:17+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -2396,6 +2396,118 @@
       "checkedAt": "2026-10-17T00:23:10+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者のitch.io公式募集ページ"
+    },
+    {
+      "id": "cheltenham-spooky-pixel-art-gifs-2026-10-28",
+      "name": "Cheltenham Lab — Spooky Pixel Art GIFs",
+      "country": "イギリス",
+      "area": "Cheltenham, Gloucestershire",
+      "venue": "Cheltenham Library（Clarence St, Cheltenham GL50 3JT）",
+      "startDate": "2026-10-28",
+      "endDate": "2026-10-28",
+      "dateLabel": "2026年10月28日 10:00–11:00（英国現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://gloslibraries.uk/event/cheltenham-library-cheltenham-lab-spooky-pixel-art-gifs-28-10-2026",
+      "description": "7〜14歳向け。自分で不気味なピクセルアートをデザインし、アニメーションGIFにするワークショップ。14歳未満は大人同伴、要予約、参加費£2。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Gloucestershire Libraries公式イベント案内"
+    },
+    {
+      "id": "chipping-campden-spooky-pixel-art-gifs-2026-10-30",
+      "name": "Chipping Campden Lab — Spooky Pixel Art GIFs",
+      "country": "イギリス",
+      "area": "Chipping Campden, Gloucestershire",
+      "venue": "Chipping Campden Library（High Street, Chipping Campden GL55 6AT）",
+      "startDate": "2026-10-30",
+      "endDate": "2026-10-30",
+      "dateLabel": "2026年10月30日 10:00–11:00（英国現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://gloslibraries.uk/event/chipping-campden-library-chipping-campden-lab-spooky-pixel-art-gifs-30-10-2026",
+      "description": "7〜14歳向け。自分で不気味なピクセルアートをデザインし、アニメーションGIFにするワークショップ。14歳未満は大人同伴、要予約、参加費£2。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Gloucestershire Libraries公式イベント案内"
+    },
+    {
+      "id": "binomio-whimtale-pixel-art-game-workshop-2026-10-24",
+      "name": "Taller 26/27: Creación de juegos — Whimtaleでピクセルアートゲーム制作",
+      "country": "スペイン",
+      "area": "Deusto, Bilbao",
+      "venue": "Espacio Binomio（C/ Heliodoro de la Torre, 4, 48014）",
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-24",
+      "dateLabel": "2026年10月24日 09:30–13:30（スペイン現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://espaciobinomio.com/2026/08/26/taller-26-27-creacion-de-juegos/",
+      "description": "18歳以上向けのゲーム制作講座。Whimtaleを使い、キャラクター・物体・背景をピクセルアートで作り、ビジュアルスクリプティングで動かすゲームを制作する。4時間、参加費50€。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式プログラム"
+    },
+    {
+      "id": "binomio-bitsy3d-pixel-art-game-workshop-2027-03-20",
+      "name": "Taller 26/27: Creación de juegos — Bitsy 3DでモノクロPixel Artゲーム制作",
+      "country": "スペイン",
+      "area": "Deusto, Bilbao",
+      "venue": "Espacio Binomio（C/ Heliodoro de la Torre, 4, 48014）",
+      "startDate": "2027-03-20",
+      "endDate": "2027-03-20",
+      "dateLabel": "2027年3月20日 09:30–13:30（スペイン現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://espaciobinomio.com/2026/08/26/taller-26-27-creacion-de-juegos/",
+      "description": "18歳以上向けのゲーム制作講座。グリッドを使った物語・探索ゲームをBitsy 3Dで作り、モノクロのピクセルアートを用いる。4時間、参加費50€。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式プログラム"
+    },
+    {
+      "id": "binomio-txiki-bitsy3d-pixel-art-game-workshop-2027-03-06",
+      "name": "Taller txiki 26/27 — Bitsy 3DでモノクロPixel Artゲーム制作",
+      "country": "スペイン",
+      "area": "Deusto, Bilbao",
+      "venue": "Espacio Binomio（C/ Heliodoro de la Torre, 4, 48014）",
+      "startDate": "2027-03-06",
+      "endDate": "2027-03-06",
+      "dateLabel": "2027年3月6日 09:30–13:30（スペイン現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://espaciobinomio.com/2026/08/26/taller-txiki-videojuegos-26-27/",
+      "description": "8〜17歳向けのゲーム制作講座。グリッドを使った物語・探索ゲームをBitsy 3Dで作り、モノクロのピクセルアートを用いる。4時間、参加費50€。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式プログラム"
+    },
+    {
+      "id": "graphite-academy-heroverse-pixel-art-game-camp-2026-11-23",
+      "name": "Heroverse: Marvel-Inspired Coding — Pixel Art＆レトロゲームキャンプ",
+      "country": "シンガポール",
+      "area": "Singapore",
+      "venue": "Elias Mall（#02-306）またはCanberra Plaza（#03-10,11）のいずれか（公式ページで複数会場を選択可）",
+      "startDate": "2026-11-23",
+      "endDate": "2026-11-25",
+      "dateLabel": "2026年11月23〜25日 各日09:30–12:00（シンガポール現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://graphiteacademy.com/holiday-camps-november-holiday-camp/",
+      "description": "6〜13歳向けの3日間のキャンプ。スーパーヒーロー風ピクセルアートを作り、レトロゲームをプログラムし、3D体験も行う。定員8人。開催地は公式ページに複数拠点が示され、選択式のため座標は設定しない。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Graphite Academy公式プログラム"
+    },
+    {
+      "id": "graphite-academy-pokemon-pixel-art-game-camp-2026-11-30",
+      "name": "Pokémon-Inspired Coding Adventure — Pixel Artゲーム制作キャンプ",
+      "country": "シンガポール",
+      "area": "Singapore",
+      "venue": "Elias Mall（#02-306）またはCanberra Plaza（#03-10,11）のいずれか（公式ページで複数会場を選択可）",
+      "startDate": "2026-11-30",
+      "endDate": "2026-12-02",
+      "dateLabel": "2026年11月30日〜12月2日 各日09:30–12:00（シンガポール現地時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://graphiteacademy.com/holiday-camps-november-holiday-camp/",
+      "description": "6〜13歳向けの3日間のキャンプ。ピクセルアートをデザインし、Pokémon風ゲームを作ってMinecraft Educationで3D世界も構築する。定員8人。開催地は公式ページに複数拠点が示され、選択式のため座標は設定しない。",
+      "checkedAt": "2026-10-18T09:04:17+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Graphite Academy公式プログラム"
     }
   ],
   "sources": [
@@ -4144,8 +4256,8 @@
     }
   ],
   "research": {
-    "checkedAt": "2026-10-17T00:23:10+00:00",
-    "notes": "2026-10-17追調査。ユーザーの指示を受け、ドット絵ゲームに関わる公式展示・企画も対象として再確認。BnA Alter Museum公式案内でPAC-MANのIPアート展（10/17〜12/13）と、京都駅ビル4F室町小路広場のPIXEL DOT FIELD（10/17〜11/3）を別会場・別企画として確認し追加。香港康文署公式の博物館節（10/31〜11/1）は、ピクセル表現の巨型蛋撻参加型公共藝術部分に限定して追加。Retro Pixel Jamはレトロゲーム制作ジャムでPixel Artは推奨だが必須ではないため、ドット絵ゲーム関連として条件を明記して追加。公式ページ内の時刻差も未解決としてdateLabelに併記。Moulinsのアイロンビーズ工作7件は対象外のまま。京都駅・香港・Retroの各企画は該当コンテンツに限定。",
+    "checkedAt": "2026-10-18T00:04:17+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
@@ -5395,6 +5507,21 @@
         }
       ],
       "notes": "3エージェントとrootが公式本文で開催回を確認。2015年まで遡り、出展作家別の水増しはしない。過去の開催と次回情報待ちを別レコードとして保持。北海道の過去3件はresearch例から実績イベントへ追加。全件網羅を保証しない。"
-    }
+    },
+    "queries": [
+      "Chipping Campden and Cheltenham Lab Spooky Pixel Art GIFs Gloucestershire Libraries October 2026",
+      "pixel art video game workshop Whimtale Bitsy 3D Bilbao 2026 2027",
+      "Graphite Academy Singapore November holiday camp pixel art 2026",
+      "pixel art workshop October 18 2026 official pixel art competition deadline October 2026",
+      "픽셀 아트 행사 전시 공모전 2026",
+      "像素藝術 像素畫 工作坊 2026 新加坡"
+    ],
+    "languages": [
+      "en",
+      "es",
+      "ja",
+      "ko",
+      "zh"
+    ]
   }
 }

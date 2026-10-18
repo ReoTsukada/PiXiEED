@@ -81,10 +81,14 @@
       "id": "region-332d5e21f830bc60",
       "label": "スペイン",
       "eventIds": [
+        "binomio-bitsy3d-pixel-art-game-workshop-2027-03-20",
+        "binomio-txiki-bitsy3d-pixel-art-game-workshop-2027-03-06",
+        "binomio-whimtale-pixel-art-game-workshop-2026-10-24",
         "digital-jove-pixel-art-workshop-2026",
         "festival-fps-pixel-art-workshop-2026"
       ],
       "areas": [
+        "Deusto, Bilbao",
         "アルメンドラレホ（バダホス）",
         "バレンシア"
       ]
@@ -206,14 +210,29 @@
       ]
     },
     {
+      "id": "region-b1573b12262e9f61",
+      "label": "イギリス",
+      "eventIds": [
+        "cheltenham-spooky-pixel-art-gifs-2026-10-28",
+        "chipping-campden-spooky-pixel-art-gifs-2026-10-30"
+      ],
+      "areas": [
+        "Cheltenham, Gloucestershire",
+        "Chipping Campden, Gloucestershire"
+      ]
+    },
+    {
       "id": "region-b289b2720987c665",
       "label": "シンガポール",
       "eventIds": [
+        "graphite-academy-heroverse-pixel-art-game-camp-2026-11-23",
+        "graphite-academy-pokemon-pixel-art-game-camp-2026-11-30",
         "lccl-game-design-pixel-art-camp-2026-11-30",
         "lccl-game-design-pixel-art-camp-2026-12-08"
       ],
       "areas": [
-        "Orchard Road, Singapore"
+        "Orchard Road, Singapore",
+        "Singapore"
       ]
     },
     {
@@ -646,6 +665,18 @@
       ]
     },
     {
+      "id": "venue-250aaec1c9072bba",
+      "label": "Cheltenham Library（Clarence St, Cheltenham GL50 3JT）",
+      "eventIds": [
+        "cheltenham-spooky-pixel-art-gifs-2026-10-28"
+      ],
+      "region": "イギリス",
+      "area": "Cheltenham, Gloucestershire",
+      "sourceUrls": [
+        "https://gloslibraries.uk/event/cheltenham-library-cheltenham-lab-spooky-pixel-art-gifs-28-10-2026"
+      ]
+    },
+    {
       "id": "venue-257aa92e818ebba7",
       "label": "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）",
       "eventIds": [
@@ -673,6 +704,21 @@
       "area": "ソウル特別市・龍山区・梨泰院",
       "sourceUrls": [
         "https://www.jumpzip.net/"
+      ]
+    },
+    {
+      "id": "venue-28d752851be4d889",
+      "label": "Espacio Binomio（C/ Heliodoro de la Torre, 4, 48014）",
+      "eventIds": [
+        "binomio-bitsy3d-pixel-art-game-workshop-2027-03-20",
+        "binomio-txiki-bitsy3d-pixel-art-game-workshop-2027-03-06",
+        "binomio-whimtale-pixel-art-game-workshop-2026-10-24"
+      ],
+      "region": "スペイン",
+      "area": "Deusto, Bilbao",
+      "sourceUrls": [
+        "https://espaciobinomio.com/2026/08/26/taller-26-27-creacion-de-juegos/",
+        "https://espaciobinomio.com/2026/08/26/taller-txiki-videojuegos-26-27/"
       ]
     },
     {
@@ -1147,6 +1193,18 @@
       ]
     },
     {
+      "id": "venue-89787915c21e7fcb",
+      "label": "Chipping Campden Library（High Street, Chipping Campden GL55 6AT）",
+      "eventIds": [
+        "chipping-campden-spooky-pixel-art-gifs-2026-10-30"
+      ],
+      "region": "イギリス",
+      "area": "Chipping Campden, Gloucestershire",
+      "sourceUrls": [
+        "https://gloslibraries.uk/event/chipping-campden-library-chipping-campden-lab-spooky-pixel-art-gifs-30-10-2026"
+      ]
+    },
+    {
       "id": "venue-8c3a160383224b40",
       "label": "新潟市産業振興センター",
       "eventIds": [
@@ -1375,6 +1433,19 @@
       "area": "渋谷",
       "sourceUrls": [
         "https://pixel-art.jp/reboot/"
+      ]
+    },
+    {
+      "id": "venue-df4c324280cfa2a3",
+      "label": "Elias Mall（#02-306）またはCanberra Plaza（#03-10,11）のいずれか（公式ページで複数会場を選択可）",
+      "eventIds": [
+        "graphite-academy-heroverse-pixel-art-game-camp-2026-11-23",
+        "graphite-academy-pokemon-pixel-art-game-camp-2026-11-30"
+      ],
+      "region": "シンガポール",
+      "area": "Singapore",
+      "sourceUrls": [
+        "https://graphiteacademy.com/holiday-camps-november-holiday-camp/"
       ]
     },
     {
@@ -3350,6 +3421,31 @@
       }
     },
     {
+      "id": "source-65f60dd0cf4f86d4",
+      "label": "Taller txiki 26/27 — Bitsy 3DでモノクロPixel Artゲーム制作",
+      "eventIds": [
+        "binomio-txiki-bitsy3d-pixel-art-game-workshop-2027-03-06"
+      ],
+      "url": "https://espaciobinomio.com/2026/08/26/taller-txiki-videojuegos-26-27/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "Deusto, Bilbao"
+      ],
+      "venues": [
+        "Espacio Binomio（C/ Heliodoro de la Torre, 4, 48014）"
+      ],
+      "lastKnownEventDate": "2027-03-06",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-18T09:04:17+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-66184c8f4f8773ad",
       "label": "Newgrounds Pixel Day 2021",
       "eventIds": [
@@ -3390,6 +3486,32 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-06T00:08:38+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-68d12fefcddfe3e9",
+      "label": "Heroverse: Marvel-Inspired Coding — Pixel Art＆レトロゲームキャンプ",
+      "eventIds": [
+        "graphite-academy-heroverse-pixel-art-game-camp-2026-11-23",
+        "graphite-academy-pokemon-pixel-art-game-camp-2026-11-30"
+      ],
+      "url": "https://graphiteacademy.com/holiday-camps-november-holiday-camp/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "シンガポール"
+      ],
+      "areas": [
+        "Singapore"
+      ],
+      "venues": [
+        "Elias Mall（#02-306）またはCanberra Plaza（#03-10,11）のいずれか（公式ページで複数会場を選択可）"
+      ],
+      "lastKnownEventDate": "2026-12-02",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-18T09:04:17+09:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4199,6 +4321,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-a068de70b9b42f1d",
+      "label": "Chipping Campden Lab — Spooky Pixel Art GIFs",
+      "eventIds": [
+        "chipping-campden-spooky-pixel-art-gifs-2026-10-30"
+      ],
+      "url": "https://gloslibraries.uk/event/chipping-campden-library-chipping-campden-lab-spooky-pixel-art-gifs-30-10-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "イギリス"
+      ],
+      "areas": [
+        "Chipping Campden, Gloucestershire"
+      ],
+      "venues": [
+        "Chipping Campden Library（High Street, Chipping Campden GL55 6AT）"
+      ],
+      "lastKnownEventDate": "2026-10-30",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-18T09:04:17+09:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5325,6 +5472,31 @@
       }
     },
     {
+      "id": "source-dc4b535ecc1b2ab3",
+      "label": "Cheltenham Lab — Spooky Pixel Art GIFs",
+      "eventIds": [
+        "cheltenham-spooky-pixel-art-gifs-2026-10-28"
+      ],
+      "url": "https://gloslibraries.uk/event/cheltenham-library-cheltenham-lab-spooky-pixel-art-gifs-28-10-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "イギリス"
+      ],
+      "areas": [
+        "Cheltenham, Gloucestershire"
+      ],
+      "venues": [
+        "Cheltenham Library（Clarence St, Cheltenham GL50 3JT）"
+      ],
+      "lastKnownEventDate": "2026-10-28",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-18T09:04:17+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-dd2b5bb40b76ae00",
       "label": "名駅教室 — Excel関数でドット絵を作ろう！",
       "eventIds": [
@@ -5535,6 +5707,32 @@
         "result": "unavailable",
         "attemptedAt": "2026-10-06T00:08:38+00:00",
         "notes": "公開SNS本文の取得を再試行したが取得不能。Web本文の確認と区別。"
+      }
+    },
+    {
+      "id": "source-eb9eb0cf54847c7b",
+      "label": "Taller 26/27: Creación de juegos — Whimtaleでピクセルアートゲーム制作",
+      "eventIds": [
+        "binomio-bitsy3d-pixel-art-game-workshop-2027-03-20",
+        "binomio-whimtale-pixel-art-game-workshop-2026-10-24"
+      ],
+      "url": "https://espaciobinomio.com/2026/08/26/taller-26-27-creacion-de-juegos/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "Deusto, Bilbao"
+      ],
+      "venues": [
+        "Espacio Binomio（C/ Heliodoro de la Torre, 4, 48014）"
+      ],
+      "lastKnownEventDate": "2027-03-20",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-18T09:04:17+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -5876,5 +6074,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-17T00:24:06+00:00"
+  "updatedAt": "2026-10-18T00:05:13+00:00"
 }
