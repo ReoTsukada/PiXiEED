@@ -12,7 +12,7 @@ import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';
 import { verifyPuzzleSharePage } from './puzzle-share-client.mjs?rev=20261017-analytics-integrity-1';
 import { isLegacyPuzzleShareId } from './puzzle-share-identity.mjs?rev=20261004-legacy-puzzle-share-1';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { createLevelTracker, trackSiteEvent } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 
 const BUCKETS = new Set(['pixfind-puzzles', 'pixieed-contest']);

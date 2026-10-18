@@ -59,7 +59,7 @@ async function verify(page, label, { maximal = true, pixelated = false } = {}) {
 
 async function storedSnapshot(page, id) {
   return page.evaluate(async id => {
-    const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261016-tool-shell-1');
+    const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261018-direct-runtime-1');
     const r = await readToolOutput(id);
     const hash = async blob => [...new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))].map(n => n.toString(16).padStart(2, '0')).join('');
     return { source: await hash(r.sourceBlob), outputs: await Promise.all(r.outputs.map(async i => ({ id: i.id, hash: await hash(i.blob), metadata: i.metadata }))), metadata: r.metadata, settings: r.mediaSettings,
@@ -85,7 +85,7 @@ try {
   if (process.env.PIXIEED_PREVIEW_TRACE) page.on('console', m => console.log(m.text()));
   await page.goto(`${base}/output/work/`, { waitUntil: 'domcontentloaded' });
   const fixtures = await Promise.race([page.evaluate(async () => {
-    const { stageToolOutput, saveToolOutputItems } = await import('/js/creation/output-handoff.mjs?rev=20261016-tool-shell-1');
+    const { stageToolOutput, saveToolOutputItems } = await import('/js/creation/output-handoff.mjs?rev=20261018-direct-runtime-1');
     const { encodeOutput } = await import('/js/creation/output-encoders.mjs');
     const { encodeAnimatedGif } = await import('/js/animated-export.mjs');
     const encodeRaster = async (frame, mime, quality) => {
@@ -140,7 +140,7 @@ try {
     }
     const first = entries.find(e => e.label === 'png-16x16');
     const second = entries.find(e => e.label === 'png-16x64');
-    const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261016-tool-shell-1');
+    const { readToolOutput } = await import('/js/creation/output-handoff.mjs?rev=20261018-direct-runtime-1');
     const r1 = await readToolOutput(first.id), r2 = await readToolOutput(second.id);
     await saveToolOutputItems(first.id, [r1.outputs[0], { ...r2.outputs[0], id: 'portrait', sourceId: 'fixture', metadata: { width: 16, height: 64 } }]);
     return entries;

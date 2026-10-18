@@ -336,10 +336,10 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   shellObserver.observe(shell, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-label', 'disabled'] });
   scope.add(() => shellObserver.disconnect());
   scope.listen($('[data-desktop-cell-launcher]'), 'click', () => originalLauncher?.click());
-  const isEmbedded = () => { try { return win.self !== win.top; } catch { return true; } };
+  const isEmbedded = () => { try { return win.self !== win.top || doc.documentElement.hasAttribute('data-tool-direct'); } catch { return true; } };
   function updateActive() {
     const embedded = isEmbedded();
-    const allowed = win.innerWidth >= 1100 && win.innerHeight >= 620 && (root.dataset.creationMode || doc.body.dataset.creationMode || 'draw') === 'draw'
+    const allowed = !root.hidden && win.innerWidth >= 1100 && win.innerHeight >= 620 && (root.dataset.creationMode || doc.body.dataset.creationMode || 'draw') === 'draw'
       && !doc.body.hasAttribute('data-tool-result-open');
     const wasActive = active, nextActive = Boolean(allowed);
     if (wasActive && !nextActive) finishResize();

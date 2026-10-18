@@ -1,5 +1,5 @@
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261017-analytics-integrity-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
@@ -328,7 +328,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
   syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261017-analytics-integrity-1');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261018-direct-runtime-2');
   assertCurrent();
   updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,
@@ -379,7 +379,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     if (isActive()) updatePlacement();
     if (isActive()) void updateTarget();
   });
-  mountToolHeaderControls(document, { selectors: ['#cameraChooseImage', '#flipCamera'] });
+  mountToolHeaderControls(document, { scope, selectors: ['#cameraChooseImage', '#flipCamera'] });
   const headerControls = [...document.querySelectorAll('.px-tool-header-slot,.project-bar')].filter(node => !beforeHeader.has(node));
   const extraNodes = [document.querySelector('#cameraImageStatus'), document.querySelector('#cameraSaveDialog')].filter(Boolean);
   const setInteractive = (enabled) => {

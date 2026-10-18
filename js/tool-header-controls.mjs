@@ -44,7 +44,7 @@ function installHeaderDismissals(doc, controls) {
   mountedDismissals.add(controls);
 }
 
-export function mountToolHeaderControls(doc = document, { selectors = [], projectBar = null } = {}) {
+export function mountToolHeaderControls(doc = document, { selectors = [], projectBar = null, scope = null } = {}) {
   const header = doc.querySelector('.site-header, .audio-heading, .lc-top');
   if (!header || !doc.body.dataset.toolName) return null;
   const inner = header.querySelector('.header-inner') || header;
@@ -87,6 +87,7 @@ export function mountToolHeaderControls(doc = document, { selectors = [], projec
     observer?.observe(node, { attributes: true, attributeFilter: ['hidden', 'inert'] });
     for (const parent of ancestors) observer?.observe(parent, { attributes: true, attributeFilter: ['hidden', 'inert'] });
     movedControls.set(node, { slot, observer });
+    scope?.add(() => { observer?.disconnect(); movedControls.delete(node); });
     update();
   }
   return controls;

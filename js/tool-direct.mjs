@@ -1,0 +1,291 @@
+import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261017-workspace-entry-1';
+
+const DRAFT_KEY = 'pixieed:pxd:last:direct-workspace:v1';
+const attributes = node => [...node.attributes].map(a => [a.name, a.value]);
+// This existing global dialog can be mounted by the public header before the
+// editor. It belongs to both views, rather than the hidden introduction DOM.
+const isSharedRewardRoot = node => node.tagName === 'ASIDE' && Boolean(node.querySelector(':scope > .pixieed-site-reward'));
+function restoreAttributes(node, saved) {
+  for (const a of [...node.attributes]) node.removeAttribute(a.name);
+  for (const [name, value] of saved) node.setAttribute(name, value);
+}
+
+/** A single retained, real creation runtime in this document. No editor bootstrap is evaluated. */
+export function installDirectToolShell({ section, mode, search }) {
+  const body = document.body, html = document.documentElement;
+  let runtime = null, mounting = null, open = false, generation = 0, disposed = false, activated = false;
+  let description = null, shellAttributes = null, workAttributes = null, bodyObserver = null, headObserver = null;
+  let pendingActivation = null, scroll = null, teardown = null, reloadRequired = false, barFrame = 0;
+  const owned = new Map(), styles = new Map();
+  const barObserver = window.ResizeObserver ? new ResizeObserver(() => {
+    if (!barFrame) barFrame = requestAnimationFrame(() => { barFrame = 0; viewport(); });
+  }) : null;
+  const lifecycle = new AbortController();
+  const start = document.querySelector('[data-embed-start]');
+  const status = section.querySelector('[data-embed-status]');
+  const bar = document.createElement('div'); bar.className = 'tool-direct__bar'; bar.dataset.directChrome = '';
+  const label = document.createElement('strong'); label.textContent = 'PiXiEEDraw';
+  const message = document.createElement('span'); message.className = 'tool-direct__status'; message.setAttribute('role', 'status');
+  const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '再試行'; retry.hidden = true;
+  const recovery = document.createElement('button'); recovery.type = 'button'; recovery.textContent = '作品を選ぶ'; recovery.hidden = true;
+  const explanation = document.createElement('button'); explanation.type = 'button'; explanation.textContent = '説明を見る'; explanation.dataset.shellExplanation = '';
+  bar.append(label, message, retry, recovery, explanation);
+  barObserver?.observe(bar);
+  const publicApi = Object.freeze({ kind: 'direct', get active() { return open && !disposed; }, get runtime() { return runtime; }, getState: () => runtime?.getState(), show: () => show(true), hide: () => hide(true), dispose });
+  window.__PIXIEED_CREATION_HOST__ = publicApi;
+
+  function setIntent(value, replace = false) {
+    const entry = createWorkspaceHistoryEntry(location.href, history.state, value);
+    const unchanged = entry.url === `${location.pathname}${location.search}${location.hash}`;
+    history[replace || unchanged ? 'replaceState' : 'pushState'](entry.state, '', entry.url);
+  }
+  function syncRetainedRoute() {
+    if (!runtime || disposed) return;
+    const url = new URL(location.href), workspace = runtime.draw.workspace;
+    if (workspace.restoreError) return;
+    // Browser history toggles visibility. A retained editor keeps its own latest
+    // project/revision and mode; reloading the resumed URL must restore that state.
+    for (const key of ['pxd','pxdRevision','pxdImage','modePxd','modePxdRevision','modePxdImage','modeProjectTool']) url.searchParams.delete(key);
+    const project = workspace.persisted ? workspace.persistedProject : null;
+    if (project?.projectId && project?.revisionId) {
+      url.searchParams.set('pxd', project.projectId); url.searchParams.set('pxdRevision', project.revisionId);
+      const role = project.manifest?.creationProject?.imageRole || runtime.draw.getRestoreImageRole();
+      if (role && role !== 'main') url.searchParams.set('pxdImage', role);
+    }
+    url.searchParams.set('mode', runtime.modes.mode);
+    history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+  function showRestoreState() {
+    if (!runtime || disposed) return;
+    const error = runtime.draw.workspace.restoreError;
+    recovery.hidden = !error;
+    message.textContent = error ? `作品を開けませんでした。${error}` : '';
+    status.textContent = error ? message.textContent : '編集を保持しています。';
+    bar.classList.toggle('tool-direct__bar--recovery', Boolean(error));
+    const main = document.querySelector('#main');
+    if (open && main) main.inert = Boolean(error) || runtime.draw.workspace.busy;
+    viewport();
+  }
+  function own(node) {
+    if (node === description || node === bar || owned.has(node) || node.tagName === 'SCRIPT' || isSharedRewardRoot(node)) return;
+    owned.set(node, { hidden: node.hidden, inert: node.inert });
+    node.dataset.directOwned = '';
+    if (!open) { node.hidden = true; node.inert = true; }
+  }
+  function ownStyle(node) {
+    if (!node.matches?.('link[rel="stylesheet"],style') || styles.has(node) || node.hasAttribute('data-direct-shell-style')) return;
+    styles.set(node, node.disabled === true);
+    if (!open && runtime) node.disabled = true;
+  }
+  function viewport() {
+    if (!open) return;
+    const view = window.visualViewport;
+    let changed = false;
+    for (const [name, value] of Object.entries({ top:view?.offsetTop || 0, height:view?.height || innerHeight, width:view?.width || innerWidth })) {
+      const key = `--tool-direct-${name}`, next = `${value}px`;
+      if (html.style.getPropertyValue(key) !== next) { html.style.setProperty(key, next); changed = true; }
+    }
+    const height = `${bar.getBoundingClientRect().height || 60}px`;
+    changed ||= html.style.getPropertyValue('--tool-direct-bar') !== height;
+    html.style.setProperty('--tool-direct-bar', height);
+    if (changed) window.dispatchEvent(new Event('resize'));
+  }
+  function useWork() {
+    if (!description) return;
+    description.hidden = true; description.inert = true;
+    for (const header of description.querySelectorAll('.site-header')) { header.dataset.directShellHeader = ''; header.classList.remove('site-header'); }
+    restoreAttributes(body, workAttributes);
+    html.dataset.toolDirect = 'work';
+    for (const [node, state] of owned) { node.hidden = state.hidden; node.inert = state.inert; }
+    for (const [node, disabled] of styles) node.disabled = disabled;
+    bar.hidden = false; viewport();
+  }
+  function useDescription() {
+    if (!description) return;
+    for (const [node, state] of owned) { state.hidden = node.hidden; state.inert = node.inert; node.hidden = true; node.inert = true; }
+    for (const node of styles.keys()) node.disabled = true;
+    workAttributes = attributes(body);
+    restoreAttributes(body, shellAttributes);
+    html.dataset.toolDirect = 'explanation';
+    for (const key of ['--tool-direct-top','--tool-direct-height','--tool-direct-width','--tool-direct-bar']) html.style.removeProperty(key);
+    bar.hidden = true;
+    description.hidden = false; description.inert = false;
+    for (const header of description.querySelectorAll('[data-direct-shell-header]')) header.classList.add('site-header');
+    start.textContent = runtime ? '作業に戻る' : '作業を始める'; start.setAttribute('aria-expanded', 'false');
+    if (scroll) window.scrollTo({ top: scroll.y, left: scroll.x, behavior: 'instant' });
+    start.focus({ preventScroll: true });
+  }
+  function prepareHost(template) {
+    if (!description) {
+    shellAttributes = attributes(body); scroll = { x: scrollX, y: scrollY };
+    description = document.createElement('div'); description.dataset.directDescription = '';
+    const main = document.querySelector('#main');
+    if (main) { main.id = 'tool-shell-main'; }
+    const skip = document.querySelector('.skip-link[href="#main"]'); if (skip) skip.setAttribute('href', '#tool-shell-main');
+    const shared = [...body.children].filter(isSharedRewardRoot);
+    description.append(...[...body.childNodes].filter(node => !shared.includes(node))); body.append(description, bar, ...shared);
+    for (const header of description.querySelectorAll('.site-header')) { header.dataset.directShellHeader = ''; header.classList.remove('site-header'); }
+    headObserver = new MutationObserver(records => { for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1) ownStyle(node); });
+    headObserver.observe(document.head, { childList: true });
+    bodyObserver = new MutationObserver(records => {
+      for (const record of records) for (const node of record.addedNodes) if (node.nodeType === 1 && node.parentElement === body) own(node);
+      label.textContent = { draw:'PiXiEEDraw', camera:'PiXiEED カメラ', audio:'PiXiEED 音楽' }[body.dataset.creationMode] || 'PiXiEEDraw';
+    });
+    bodyObserver.observe(body, { childList: true, attributes: true, attributeFilter: ['data-creation-mode'] });
+    }
+    for (const attr of [...body.attributes]) if (!['class','data-page','data-tool-name','data-tool-short'].includes(attr.name)) body.removeAttribute(attr.name);
+    for (const name of ['class','data-page','data-tool-name','data-tool-short']) {
+      const value = template.body.getAttribute(name); if (value === null) body.removeAttribute(name); else body.setAttribute(name, value);
+    }
+    workAttributes = attributes(body);
+    for (const node of [...template.body.children]) {
+      if (node.matches('script,.skip-link,.site-footer')) continue;
+      if (node.matches('main')) node.querySelector('.draw-title')?.remove();
+      body.append(document.importNode(node, true)); own(body.lastElementChild);
+    }
+    const header = [...owned.keys()].find(n => n.matches('.site-header'));
+    header?.querySelector('.brand')?.remove();
+    useWork();
+  }
+  function checkAlive() { if (disposed) throw new DOMException('編集画面を閉じました。', 'AbortError'); }
+  function clearAttempt() {
+    for (const node of owned.keys()) node.remove(); owned.clear();
+    for (const node of styles.keys()) node.remove(); styles.clear();
+    workAttributes = null;
+  }
+  async function loadRuntime() {
+    if (runtime) return runtime;
+    if (mounting) return mounting;
+    mounting = (async () => {
+      const response = await fetch('/draw/editor.html', { credentials: 'same-origin', signal: lifecycle.signal });
+      if (!response.ok) throw new Error('編集画面を読み込めませんでした。');
+      const template = new DOMParser().parseFromString(await response.text(), 'text/html');
+      checkAlive();
+      // Only markup and styles are consumed. Head metadata, scripts and preloads are never copied.
+      prepareHost(template);
+      const cssLoads = [];
+      const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));
+      for (const source of template.head.querySelectorAll('link[rel="stylesheet"]')) {
+        const href = new URL(source.getAttribute('href'), location.origin).href;
+        if (existing.has(href)) continue;
+        const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = href;
+        cssLoads.push(new Promise((resolve, reject) => {
+          const abort = () => reject(new DOMException('編集画面を閉じました。', 'AbortError'));
+          const finish = error => { lifecycle.signal.removeEventListener('abort', abort); link.onload = link.onerror = null; error ? reject(error) : resolve(); };
+          lifecycle.signal.addEventListener('abort', abort, { once: true });
+          link.onload = () => finish(); link.onerror = () => finish(new Error('編集画面の表示を読み込めませんでした。'));
+        }));
+        document.head.append(link); ownStyle(link); existing.add(href);
+      }
+      await Promise.all(cssLoads);
+      checkAlive();
+      const adapted = new URL(location.href); adapted.search = search.toString(); if (open) adapted.searchParams.set('workspace', '1'); else adapted.searchParams.delete('workspace'); adapted.searchParams.set('runtime', 'direct');
+      history.replaceState(history.state, '', `${adapted.pathname}${adapted.search}${adapted.hash}`);
+      let initialPointer, initialRestoreError = '';
+      if (!adapted.searchParams.has('pxd') && !adapted.searchParams.has('modePxd')) {
+        try {
+          const direct = localStorage.getItem(DRAFT_KEY);
+          const last = JSON.parse(direct !== null ? direct : localStorage.getItem('pixieed:pxd:last:creation') || localStorage.getItem('pixieed:pxd:last:draw') || 'null');
+          if (last !== null && (typeof last?.projectId !== 'string' || !last.projectId || typeof last?.revisionId !== 'string' || !last.revisionId)) throw new Error('INVALID_DRAFT_POINTER');
+          if (last?.projectId && last?.revisionId) initialPointer = { ...last, fork: true };
+        } catch { initialRestoreError = '前回の作品の記録を確認できません。作品一覧から選び直してください。元の保存内容は保持しています。'; }
+      }
+      let mountCreationRuntime;
+      try { ({ mountCreationRuntime } = await import('./creation/creation-runtime.mjs?rev=20261018-direct-runtime-2')); }
+      catch (error) { reloadRequired = true; throw error; }
+      checkAlive();
+      runtime = await mountCreationRuntime({ signal: lifecycle.signal, isActive: () => open && !disposed, role: mode, requestedMode: mode, search: adapted.search, restoreLast: false, initialPointer, workspaceOptions: { rememberKey: DRAFT_KEY, rememberShared: false, allowImplicitImport: false, initialRestoreError }, deferInitialMode: true });
+      checkAlive();
+      return runtime;
+    })();
+    return mounting;
+  }
+  async function show(updateHistory = false) {
+    if (disposed) return;
+    const token = ++generation; open = true;
+    syncRetainedRoute();
+    if (updateHistory) setIntent(true);
+    start.setAttribute('aria-busy', 'true'); retry.hidden = true; html.dataset.directLoading = '';
+    if (description && workAttributes) useWork();
+    message.textContent = '準備中…';
+    try {
+      const editor = await loadRuntime();
+      if (generation !== token || !open || disposed) return;
+      syncRetainedRoute();
+      const activation = editor.activate(activated ? null : mode);
+      pendingActivation = activation;
+      await activation; if (pendingActivation === activation) pendingActivation = null; activated = true;
+      // A newer show owns this retained runtime. Hide/dispose own suspension.
+      if (generation !== token || !open || disposed) return;
+      workAttributes = attributes(body); label.textContent = { draw:'PiXiEEDraw', camera:'PiXiEED カメラ', audio:'PiXiEED 音楽' }[editor.state.mode];
+      start.setAttribute('aria-busy', 'false'); start.setAttribute('aria-expanded', 'true');
+      showRestoreState(); delete html.dataset.directLoading;
+      viewport(); window.dispatchEvent(new Event('resize'));
+      document.querySelector('#draw-canvas')?.focus({ preventScroll: true });
+    } catch (error) {
+      if (disposed || generation !== token) return;
+      delete html.dataset.directLoading; message.textContent = error.message || '起動できませんでした。'; retry.hidden = false;
+      retry.textContent = reloadRequired ? '再読み込みして再試行' : '再試行';
+      if (!description) { body.append(bar); bar.hidden = false; }
+      status.textContent = '起動できませんでした。再試行できます。';
+      start.setAttribute('aria-busy', 'false');
+    }
+  }
+  async function hide(updateHistory = false) {
+    if (!open || disposed) return;
+    ++generation; open = false;
+    syncRetainedRoute();
+    if (updateHistory) setIntent(false);
+    try {
+      if (runtime) runtime.suspend();
+      // Initialization owns document-wide selectors until it has finished.
+      if (mounting && !runtime) await mounting.catch(() => {});
+      if (runtime) runtime.suspend();
+      if (pendingActivation) await pendingActivation.catch(() => {});
+    } catch (error) {
+      // Pending transforms must remain available for explicit commit/cancel.
+      open = true; setIntent(true, true); message.textContent = error.message; return;
+    }
+    if (open || disposed) return;
+    for (const [node] of owned) { if (node.matches('dialog[open]')) node.close(); for (const dialog of node.querySelectorAll('dialog[open]')) dialog.close(); }
+    if (description) useDescription(); else bar.hidden = true;
+    delete html.dataset.directLoading;
+    status.textContent = runtime?.draw.workspace.restoreError || (runtime ? '編集を保持しています。' : '必要なときに起動できます。');
+  }
+  function dispose() {
+    if (disposed) return teardown; disposed = true; open = false; ++generation;
+    runtime?.dispose(); lifecycle.abort(); barObserver?.disconnect(); cancelAnimationFrame(barFrame);
+    // Keep ownership observers until an in-flight mount has released its partial scope.
+    teardown = Promise.allSettled([mounting, pendingActivation]).then(() => {
+    runtime?.dispose(); bodyObserver?.disconnect(); headObserver?.disconnect();
+    clearAttempt();
+    bar.remove();
+    if (description) {
+      restoreAttributes(body, shellAttributes);
+      for (const header of description.querySelectorAll('[data-direct-shell-header]')) { header.classList.add('site-header'); delete header.dataset.directShellHeader; }
+      const main = description.querySelector('#tool-shell-main'); if (main) main.id = 'main';
+      description.querySelector('.skip-link[href="#tool-shell-main"]')?.setAttribute('href', '#main');
+      description.replaceWith(...description.childNodes);
+    }
+    delete html.dataset.toolDirect; delete html.dataset.directLoading;
+    for (const key of ['--tool-direct-top','--tool-direct-height','--tool-direct-width','--tool-direct-bar']) html.style.removeProperty(key);
+    if (window.__PIXIEED_CREATION_HOST__ === publicApi) delete window.__PIXIEED_CREATION_HOST__;
+    });
+    return teardown;
+  }
+  start.addEventListener('click', () => void show(true), { signal: lifecycle.signal });
+  explanation.addEventListener('click', () => void hide(true), { signal: lifecycle.signal });
+  recovery.addEventListener('click', () => void runtime?.draw.workspace.showProjects({ pane: 'library' }), { signal: lifecycle.signal });
+  document.addEventListener('pixieed:project-restore-state', () => { showRestoreState(); syncRetainedRoute(); }, { signal: lifecycle.signal });
+  retry.addEventListener('click', () => { if (reloadRequired) { location.reload(); return; } if (!runtime) { mounting = null; clearAttempt(); } void show(false); }, { signal: lifecycle.signal });
+  window.addEventListener('popstate', () => { if (isWorkspaceRequested(location.href, history.state)) void show(false); else void hide(false); }, { signal: lifecycle.signal });
+  for (const target of [window, window.visualViewport].filter(Boolean)) target.addEventListener('resize', viewport, { signal: lifecycle.signal, passive: true });
+  window.visualViewport?.addEventListener('scroll', viewport, { signal: lifecycle.signal, passive: true });
+  document.addEventListener('keydown', event => {
+    if (!open || event.defaultPrevented || event.key !== 'Escape' || document.querySelector('dialog[open],details[open]')) return;
+    event.preventDefault(); void hide(true);
+  }, { signal: lifecycle.signal });
+  window.addEventListener('pagehide', event => { if (!event.persisted) dispose(); }, { signal: lifecycle.signal });
+  if (isWorkspaceRequested(location.href, history.state)) void show(false);
+  return publicApi;
+}

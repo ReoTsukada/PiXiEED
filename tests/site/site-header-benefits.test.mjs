@@ -11,8 +11,8 @@ test('header benefit build transform versions shared and embed CSS/modules and i
   assert.equal(result.added, true);
   assert.match(result.html, /site-header\.css\?rev=20261016-header-benefits-2/);
   assert.match(result.html, /site-header-benefits\.mjs\?rev=20261016-header-benefits-2/);
-  assert.match(result.html, /tool-embed\.css\?rev=20261016-tool-shell-1/);
-  assert.match(result.html, /tool-embed\.mjs\?rev=20261017-analytics-integrity-1/);
+  assert.match(result.html, /tool-embed\.css\?rev=20261017-workspace-entry-1/);
+  assert.match(result.html, /tool-embed\.mjs\?rev=20261017-workspace-entry-1/);
   assert.equal((result.html.match(/site-header-benefits\.mjs/g) || []).length, 1);
   const repeated = addSiteHeaderBenefits(result.html, 'draw/index.html');
   assert.equal(repeated.added, false);

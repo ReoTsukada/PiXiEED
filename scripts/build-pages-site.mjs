@@ -4,7 +4,7 @@ import { copyFile, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/pr
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
-import { generateEventPages } from './generate-event-pages.mjs';
+import { generateEventPages } from './generate-event-pages.mjs?rev=20261018-direct-runtime-1';
 import { addSiteDrawCta } from './site-draw-cta.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,8 +28,8 @@ export function addSiteHeaderBenefits(html, name = '') {
   if (html.includes('/js/site-header-benefits.mjs')) return { html, added: false, skipped: false };
   const versioned = html
     .replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-header-benefits-2$2')
-    .replace(/(href="\/css\/tool-embed\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261016-tool-shell-1$2')
-    .replace(/(src="\/js\/tool-embed\.mjs)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261017-analytics-integrity-1$2');
+    .replace(/(href="\/css\/tool-embed\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261017-workspace-entry-1$2')
+    .replace(/(src="\/js\/tool-embed\.mjs)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261017-workspace-entry-1$2');
   const output = /<\/body\s*>/i.test(versioned)
     ? versioned.replace(/<\/body\s*>/i, `${HEADER_REWARD_SCRIPT}</body>`)
     : `${versioned}\n${HEADER_REWARD_SCRIPT}`;
@@ -83,7 +83,8 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
     for (const name of ['css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
-      'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'css/tool-shell.css',
+      'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
+      'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs',
       'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
       'js/globe/map-page-layout.mjs',
       'assets/screenshots/audio-pc-maou.png', 'assets/screenshots/output-pc-maou.png',

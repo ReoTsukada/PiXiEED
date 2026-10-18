@@ -1,4 +1,4 @@
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261017-editor-improvements-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-tool-shell-1';
@@ -17,18 +17,27 @@ export function assertCreationModeCompatible(next, animation) {
   throw error;
 }
 
-export async function mountCreationModes({ draw, scope }) {
+export async function mountCreationModes({ draw, scope, isActive = () => true, requestedMode: initialRequestedMode = null, deferInitialMode = false }) {
   const body = document.body, main = document.querySelector('#main'), board = main.querySelector('.draw-board'), dock = main.querySelector('.draw-control-dock'), nav = document.querySelector('.app-tabs');
-  const startupMode = document.documentElement.dataset.creationStartup === 'camera' ? 'camera' : null;
+  const startupMode = !deferInitialMode && document.documentElement.dataset.creationStartup === 'camera' ? 'camera' : null;
   let mode = 'draw', requestedMode = 'draw', switching = false, audio = null, camera = null;
   let cameraProjectState = 'none', appliedCameraTimeline = null;
-  let requestVersion = 0, running = null, initializingScope = null, startupSwitchPending = Boolean(startupMode), focusModeAfterSwitch = null;
+  let requestVersion = 0, running = null, initializingScope = null, startupSwitchPending = Boolean(startupMode || (deferInitialMode && ['camera', 'audio'].includes(initialRequestedMode))), focusModeAfterSwitch = null;
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
   const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261017-editor-improvements-1';
-  const styled = new Promise((resolve, reject) => { css.addEventListener('load', resolve, { once:true }); css.addEventListener('error', () => reject(new Error('共通の制作画面の表示を読み込めません。')), { once:true }); });
-  document.head.append(css); await styled;
+  const styled = new Promise((resolve, reject) => {
+    const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
+    const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
+    scope.signal.addEventListener('abort', abort, { once:true });
+    css.addEventListener('load', () => finish(), { once:true });
+    css.addEventListener('error', () => finish(new Error('共通の制作画面の表示を読み込めません。')), { once:true });
+    if (scope.disposed) abort();
+  });
+  scope.add(() => css.remove());
+  if (!scope.disposed) document.head.append(css); await styled;
+  if (scope.disposed) throw new DOMException('制作画面が閉じられました。', 'AbortError');
   const owned = new Map([['shared', new Set()], ['editor', new Set()], ['draw', new Set()], ['audio', new Set()], ['camera', new Set()]]);
   function own(node, owner) { if (!node) return; node.dataset.modeOwner = owner; owned.get(owner).add(node); }
   for (const node of board.children) own(node, 'editor');
@@ -145,7 +154,7 @@ export async function mountCreationModes({ draw, scope }) {
   }
   historyPlaced = true;
   const headerSettingsSlot = document.createElement('div'); headerSettingsSlot.className = 'px-tool-header-slot creation-navigation-settings';
-  const productionHeader = mountToolHeaderControls(document, { selectors:[menu] });
+  const productionHeader = mountToolHeaderControls(document, { scope, selectors:[menu] });
   productionHeader.append(headerSettingsSlot); headerSettingsSlot.append(settingsButton); own(headerSettingsSlot, 'shared');
   for (const slot of productionHeader.querySelectorAll('.px-tool-header-slot:has(#creation-mode-menu)')) own(slot, 'shared');
   const placeSettings = owner => {
@@ -227,7 +236,7 @@ export async function mountCreationModes({ draw, scope }) {
   settings.root.append(undo, redo); undo.className = redo.className = 'creation-control-button';
   scope.listen(undo, 'click', () => draw.undo()); scope.listen(redo, 'click', () => draw.redo());
   const beforeSharedHeader = new Set(document.querySelectorAll('.px-tool-header-slot'));
-  mountToolHeaderControls(document, { selectors: ['#creation-project-settings-open', '#creation-project-undo', '#creation-project-redo'] });
+  mountToolHeaderControls(document, { scope, selectors: ['#creation-project-settings-open', '#creation-project-undo', '#creation-project-redo'] });
   const previousSettingsLauncher = { hidden:settings.launcher.hidden, tabIndex:settings.launcher.getAttribute('tabindex'), ariaHidden:settings.launcher.getAttribute('aria-hidden') };
   settings.launcher.hidden = true; settings.launcher.tabIndex = -1; settings.launcher.setAttribute('aria-hidden', 'true');
   scope.add(() => {
@@ -276,14 +285,19 @@ export async function mountCreationModes({ draw, scope }) {
   finally { main.inert = startupInert; }
   const motion = mountCreationModeMotion({ board, main, scope });
   const interrupted = () => new DOMException('制作モードの切替が更新されました。', 'AbortError');
-  const currentRequest = version => !scope.disposed && requestVersion === version;
+  const currentRequest = version => !scope.disposed && isActive() && requestVersion === version;
   const stopCurrent = () => {
-    if (mode !== 'camera') draw.suspend();
-    if (mode === 'audio') audio?.suspend();
-    if (mode === 'camera') camera?.suspend();
+    try {
+      if (mode !== 'camera') draw.suspend();
+    } finally {
+      // An unfinished Draw transform can reject suspension. Media must still
+      // stop before the retained editor is hidden behind its explanation.
+      if (mode === 'audio') audio?.suspend();
+      if (mode === 'camera') camera?.suspend();
+    }
   };
   const resumeCurrent = () => {
-    if (scope.disposed || document.hidden) return;
+    if (scope.disposed || !isActive() || document.hidden) return;
     if (mode !== 'camera') draw.resume();
     if (mode === 'audio') audio?.resume();
     if (mode === 'camera') camera?.resume();
@@ -315,9 +329,9 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261017-analytics-integrity-1&attempt=${audioLoadAttempt++}`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261018-direct-runtime-1&attempt=${audioLoadAttempt++}`);
       if (!currentRequest(version)) throw interrupted();
-      candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => mode === 'audio' && !switching });
+      candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => isActive() && mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
       const musicPanel = settingsNode?.querySelector('.draw-music-panel');
       if (musicPanel) musicPanel.dataset.creationAudioView = 'settings';
@@ -353,9 +367,9 @@ export async function mountCreationModes({ draw, scope }) {
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261017-analytics-integrity-1&attempt=${version}`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261018-direct-runtime-2&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
-    const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => mode === 'camera' });
+    const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }
     accepted = true; camera = candidate; scope.add(() => candidateScope.dispose());
     for (const node of [camera.surface, camera.controls, camera.controlHost, camera.shutter, ...camera.headerControls]) { own(node, 'camera'); node.hidden = false; }
@@ -391,7 +405,7 @@ export async function mountCreationModes({ draw, scope }) {
   async function runTransitions() {
     const wasInert = main.inert;
     try {
-      while (!scope.disposed && requestedMode !== mode) {
+      while (!scope.disposed && isActive() && requestedMode !== mode) {
         const version = requestVersion, next = requestedMode, previous = mode;
         // Check the receiver before suspending a capture session or saving a
         // project, so an unsupported projection leaves the current mode intact.
@@ -399,7 +413,7 @@ export async function mountCreationModes({ draw, scope }) {
         stopCurrent();
         switching = true; main.inert = true; body.dataset.creationTransition = 'true';
         menu.setAttribute('aria-busy', 'true'); errorNode.textContent = ''; settings.close();
-        const skipStartupTransition = startupSwitchPending && previous === 'draw' && next === 'camera';
+        const skipStartupTransition = startupSwitchPending && previous === 'draw' && next === (startupMode || initialRequestedMode);
         const leaving = skipStartupTransition ? Promise.resolve() : motion.leave(previous);
         try {
           // The retained project was already restored by Draw startup. It has
@@ -410,7 +424,7 @@ export async function mountCreationModes({ draw, scope }) {
           if (next === 'camera') { await ensureCamera(version); await camera.enter(previous === 'audio' ? 'audio' : 'draw'); }
           await leaving;
           if (!currentRequest(version)) continue;
-          mode = next; show(mode); setModeMenu(false);
+          mode = next; startupSwitchPending = false; show(mode); setModeMenu(false);
           const params = new URLSearchParams(location.search); if (mode === 'draw') params.delete('mode'); else params.set('mode', mode);
           history.replaceState(history.state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
           // Keep editors stopped until the reveal finishes; no media start is simulated.
@@ -425,7 +439,7 @@ export async function mountCreationModes({ draw, scope }) {
     finally {
       motion.cancel(); main.inert = wasInert; delete body.dataset.creationTransition;
       switching = false; menu.removeAttribute('aria-busy');
-      resumeCurrent(); if (!scope.disposed) draw.workspace.activate();
+      resumeCurrent(); if (!scope.disposed && isActive()) draw.workspace.activate();
       if (focusModeAfterSwitch?.isConnected) focusModeAfterSwitch.focus({ preventScroll:true });
       focusModeAfterSwitch = null;
     }
@@ -448,7 +462,11 @@ export async function mountCreationModes({ draw, scope }) {
     if (event.key === 'Escape' && menu.open) { setModeMenu(false); menu.querySelector('summary').focus({ preventScroll:true }); event.preventDefault(); }
   });
   const api = { get mode() { return mode; }, get switching() { return switching; }, switchMode: next => switchMode(next).catch(say), navigate,
-    suspendForEmbed() { stopCurrent(); },
+    suspendForEmbed() {
+      motion.cancel(); initializingScope?.dispose();
+      if (switching) { requestVersion++; requestedMode = mode; }
+      stopCurrent();
+    },
     resumeForEmbed() { resumeCurrent(); }
   };
   let focusReturnTarget = null;
@@ -603,9 +621,9 @@ export async function mountCreationModes({ draw, scope }) {
       startupSwitchPending = false;
       delete document.documentElement.dataset.creationStartup;
     }
-  } else {
+  } else if (!deferInitialMode) {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const requested = new URLSearchParams(location.search).get('mode');
+    const requested = initialRequestedMode || new URLSearchParams(location.search).get('mode');
     if (requested === 'audio' || requested === 'camera') scope.timeout(() => void api.switchMode(requested), 0);
   }
   document.documentElement.dataset.creationModesReady = 'true';

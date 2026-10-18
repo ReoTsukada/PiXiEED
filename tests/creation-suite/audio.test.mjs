@@ -538,7 +538,9 @@ test('audio page exposes labeled editing, project save and central playback cont
   const shell = await readFile(new URL('../../audio/index.html', import.meta.url), 'utf8');
   const page = await readFile(new URL('../../audio/editor.html', import.meta.url), 'utf8');
   const script = await readFile(new URL('../../js/creation/audio-page.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /data-tool-shell[\s\S]*data-tool-mode="audio"[\s\S]*data-embed-auto/);
+  assert.match(shell, /data-tool-shell[\s\S]*data-tool-mode="audio"/);
+  assert.match(shell, /data-embed-start data-embed-target="audio-tool"/);
+  assert.doesNotMatch(shell, /data-embed-auto/);
   assert.match(shell, /tool-shell\.mjs/);
   assert.match(page, /id="audio-play-toggle"/);
   assert.match(page, /aria-label="アプリナビゲーション"/);

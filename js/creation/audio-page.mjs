@@ -12,7 +12,7 @@ import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { audioHslToHex, replaceAudioSourceColor } from './audio-color-edit.mjs?rev=20261016-color-capability-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-analytics-integrity-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, pxdImageToAudioDocument, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
@@ -22,12 +22,12 @@ import { mountAnimationControls } from './animation-controls.mjs?rev=20261017-la
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 import { AUDIO_ANIMATION_LINK_VERSION, AUDIO_ANIMATION_MAX_COLORS, audioAnimationFrameTicks, audioAnimationCellTiming, audioAnimationSequenceColumn, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, getAudioAnimationColorCount, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261016-color-capability-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
-import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
+import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261016-color-capability-1';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261017-analytics-integrity-1';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward, mountSiteRewardUI } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
 import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS, getAudioRewardColorCount, getAudioRewardFeatures, getAudioRewardImageColorCount, initializeAudioRewardColorOwnership, preservesAudioRewardContent, preservesAudioRewardImageContent, preservesAudioRewardPaletteContent, writeAudioRewardColorOwnership } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
 import {

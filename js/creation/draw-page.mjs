@@ -1,6 +1,6 @@
 import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261016-color-capability-1';
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261006-header-controls-1&nav=20261016-tool-operations-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
@@ -17,21 +17,21 @@ import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=2026101
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261017-analytics-integrity-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261017-analytics-integrity-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
-import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261006-header-controls-1';
+import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261016-color-capability-1';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261017-analytics-integrity-1';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261017-layer-minimum-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261018-direct-runtime-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
@@ -98,7 +98,7 @@ const canvas = $('#draw-canvas'); const pixelSurface = createPixelCanvasSurface(
 const viewportOverlays = mountDrawViewportOverlays({ board: $('.draw-board'), canvas, scope });
 let virtualCursor = null;
 applyDrawingToolIcons($('#main'));
-mountToolHeaderControls(document, { selectors: ['.draw-import', '#draw-settings-picker', '#draw-output', '#draw-clear', '#draw-to-globe'] });
+mountToolHeaderControls(document, { scope, selectors: ['.draw-import', '#draw-settings-picker', '#draw-output', '#draw-clear', '#draw-to-globe'] });
 const fixedLeft = document.createElement('div'); fixedLeft.className = 'draw-fixed-left';
 fixedLeft.append($('#draw-tool-picker'), $('#draw-animation-controls'), $('#draw-undo'));
 $('.draw-controls').prepend(fixedLeft);
@@ -1195,7 +1195,15 @@ function toast(message) { status.textContent = message; }
 const QUIET = new Set(['編集中です。保存すると端末に残ります。', '新しい絵を準備しています。']);
 const statusObserver = new MutationObserver(() => { if (scope.disposed || QUIET.has(status.textContent.trim())) return; status.classList.add('is-show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => { if (!scope.disposed) status.classList.remove('is-show'); }, 2600); });
 scope.observe(statusObserver, status, { childList: true, characterData: true, subtree: true });
-const overlayObserver = new ResizeObserver(() => { if (!scope.disposed) placeOverlays(); });
+let overlayResizeFrame = 0;
+const overlayObserver = new ResizeObserver(() => {
+  if (scope.disposed || overlayResizeFrame) return;
+  overlayResizeFrame = requestAnimationFrame(() => {
+    overlayResizeFrame = 0;
+    if (!scope.disposed && !$('#main').hidden) placeOverlays();
+  });
+});
+scope.add(() => cancelAnimationFrame(overlayResizeFrame));
 scope.observe(overlayObserver, $('.draw-board'));
 function pointerPair() { return [...activePointers.values()].slice(0, 2); }
 function startPinch() {
@@ -2114,7 +2122,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261017-analytics-integrity-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261018-direct-runtime-2');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2443,7 +2451,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261017-analytics-integrity-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261018-direct-runtime-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -2716,6 +2724,8 @@ async function chooseProjectRole(project, roles) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = role => { if (settled) return; settled = true; dialog.close(); dialog.remove(); role ? resolve(role) : reject(new Error('画像の選択を取り消しました。作品は保持しています。')); };
+    scope.add(() => finish(null));
+    if (scope.disposed) return;
     for (const role of roles) { const button = document.createElement('button'); button.type = 'button'; button.textContent = ({ main: '共通画像', audio: '音楽の画像', draw: '描画の画像' })[role] || role; button.dataset.imageRole = role; button.addEventListener('click', () => finish(role)); dialog.append(button); }
     const cancel = document.createElement('button'); cancel.textContent = '取消'; cancel.addEventListener('click', () => finish(null)); dialog.append(cancel);
     dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); }); document.body.append(dialog); dialog.showModal();
@@ -2776,6 +2786,7 @@ return {
   get workspace() { return pxdBridge; }, dispose: disposeDrawMode,
   get bank() { return 'shared'; },
   getTimeline() { return animationSession.animation; }, getImageRole() { return musicLayer ? 'main' : pxdImageRole; },
+  getRestoreImageRole() { return pxdImageRole; },
   getTimelineHistoryPosition(timeline) {
     const history = animationSession.snapshot().timeline;
     if (history.current === timeline) return 'current';

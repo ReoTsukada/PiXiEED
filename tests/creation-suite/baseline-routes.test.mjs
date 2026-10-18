@@ -69,7 +69,8 @@ test('each puzzle card opens its public list without a duplicate creator card', 
     assert.doesNotMatch(tools, new RegExp(`href="/${kind}/"`));
     assert.equal((tools.match(new RegExp(`<h2[^>]*>${name}</h2>`, 'g')) || []).length, 1);
   }
-  assert.match(tools, /href="\/draw\/\?mode=audio"/);
+  assert.match(tools, /href="\/draw\/\?workspace=1"[^>]*data-static-tool="editor"/);
+  assert.match(tools, /href="\/audio\/\?workspace=1"[^>]*data-static-tool="sound"/);
   assert.match(tools, /href="\/jigsaw\/"/);
   assert.doesNotMatch(tools, /href="\/game\/"/);
   assert.doesNotMatch(read('index.html'), /href="\/game\/"/);

@@ -63,7 +63,7 @@ try {
   assert.equal(await p.locator('[data-draw-tool=eraser]').count(), 1); assert.equal(await p.locator('.app-tabs #draw-animation-play').count(), 1); assert.equal(await p.locator('#draw-selection-controls').count(), 1); assert.deepEqual(await rgba(), oldPixels); checks.push('fresh same-origin HTML loads current entry/page and restores old saved pixels without missing geometry exports');
   const after = await records(), latest = after.filter(r => r.phase === 'new'), revision = '20261006-header-controls-1';
   for (const name of ['draw-assignment-input','editor-ui','project-workspace']) assert.ok(latest.some(r => r.url === `/js/creation/${name}.mjs?rev=${revision}`), name + ' fetched with current revision');
-  assert.ok(latest.some(r => r.url === `/js/tool-header-controls.mjs?rev=${revision}`));
+  assert.ok(latest.some(r => r.url === `/js/tool-header-controls.mjs?rev=20261018-direct-runtime-1`));
   for (const name of ['draw-virtual-cursor','draw-panel-dismissals']) assert.ok(latest.some(r => r.url === `/js/creation/${name}.mjs?rev=20261006-floating-mouse-2`), name + ' current floating mouse revision');
   for (const name of ['draw-entry','draw-page','draw-selection-panel','draw-selection-session','draw-selection-operations','draw-selection-geometry','draw-selection-overlay']) assert.ok(latest.some(r => r.url === `/js/creation/${name}.mjs?rev=20261006-selection-fix-1`), name + ' current selection click revision');
   for (const name of ['draw-compact-controls','draw-tool-picker']) assert.ok(latest.some(r => r.url === `/css/${name}.css?rev=20261006-floating-mouse-2`));

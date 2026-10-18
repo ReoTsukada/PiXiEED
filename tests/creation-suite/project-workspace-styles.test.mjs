@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 const root = new URL('../../', import.meta.url);
 const stylesheet = '/css/project-workspace.css?rev=20261006-header-controls-1';
-const workspaceRevision = '20261017-analytics-integrity-1';
+const workspaceRevision = '20261018-direct-runtime-2';
+const runtimeRevision = '20261018-direct-runtime-2';
 const consumers = [
   'jigsaw/index.html',
   'spot-difference/index.html',
@@ -42,7 +43,10 @@ test('direct workspace imports and modulepreload match the runtime cache manifes
   assert.equal(manifest['js/creation/project-workspace.mjs'], workspaceRevision);
   for (const file of ['js/creation/creation-camera.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/creation/audio-page.mjs', 'js/creation/pxd-ui.mjs']) {
     const js = await source(file);
-    assert.match(js, new RegExp(`project-workspace\\.mjs\\?rev=${workspaceRevision}`), `${file} imports the bumped workspace module URL`);
+    if (file === 'js/creation/draw-entry.mjs') {
+      assert.match(js, new RegExp(`creation-runtime\\.mjs\\?rev=${runtimeRevision}`), `${file} boots the shared runtime`);
+      assert.match(await source('js/creation/creation-runtime.mjs'), new RegExp(`project-workspace\\.mjs\\?rev=${workspaceRevision}`), 'the shared runtime imports the bumped workspace module URL');
+    } else assert.match(js, new RegExp(`project-workspace\\.mjs\\?rev=${workspaceRevision}`), `${file} imports the bumped workspace module URL`);
   }
   assert.match(await source('draw/editor.html'), new RegExp(`project-workspace\\.mjs\\?rev=${workspaceRevision}`));
 });

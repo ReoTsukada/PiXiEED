@@ -21,6 +21,7 @@ const ID_PATTERN = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{
 const inFlightHandoffs = new WeakMap();
 
 function isValidatedToolEmbed(windowRef, locationRef) {
+  if (windowRef?.__PIXIEED_CREATION_HOST__?.kind === 'direct' && windowRef.__PIXIEED_CREATION_HOST__.active === true) return true;
   if (!windowRef || windowRef.parent === windowRef) return false;
   const boot = windowRef.__PIXIEED_TOOL_EMBED__;
   if (!boot || !['draw', 'camera', 'audio'].includes(boot.role) || !ID_PATTERN.test(String(boot.channel || ''))) return false;

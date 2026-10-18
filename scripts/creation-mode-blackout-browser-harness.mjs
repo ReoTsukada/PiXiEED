@@ -58,7 +58,7 @@ try {
   const {ctx,page,errors,original,hold}=await contextFor(viewport);const row={name:'normal-'+viewport.width,viewport,transitions:[]};report.results.push(row);
   try {
    for(const mode of ['audio','camera']) {
-    const held=hold(mode==='audio'?'/js/creation/draw-music.mjs':'/js/creation/creation-camera.mjs');
+    const held=hold(mode==='audio'?'/js/creation/draw-music.mjs?rev=20261018-direct-runtime-1':'/js/creation/creation-camera.mjs?rev=20261018-direct-runtime-1');
     await requestMode(page,mode);await held.seen;
     try{const frame=await blackFrame(page,row.name+'-'+mode,viewport);row.transitions.push({target:mode,...frame});}finally{held.release();}
     await ready(page,mode);assert.equal(await page.locator('#creation-mode-transition').isHidden(),true);assert.equal(await page.evaluate(()=>document.activeElement===document.querySelector('#creation-mode-menu > summary')),true);
@@ -72,7 +72,7 @@ try {
   const animationMode=variant==='missing-animation-api'?'missing':variant.includes('stalled')?'stalled':'normal';
   const {ctx,page,errors,original,hold}=await contextFor(viewport,reduced?'reduce':'no-preference',animationMode);const row={name:variant,viewport};report.results.push(row);
   try {
-   const held=hold('/js/creation/draw-music.mjs',variant==='failed-audio-retry');await requestMode(page,'audio');await held.seen;
+   const held=hold('/js/creation/draw-music.mjs?rev=20261018-direct-runtime-1',variant==='failed-audio-retry');await requestMode(page,'audio');await held.seen;
    try {
     if(reduced||variant==='missing-animation-api'||variant==='stalled-animation-finished'||variant==='failed-audio-retry')row.black=await blackFrame(page,variant,viewport);
     else if(variant==='rapid-latest-wins'){await page.waitForFunction(()=>document.body.hasAttribute('data-creation-transition'));await requestMode(page,'camera');await requestMode(page,'draw');}

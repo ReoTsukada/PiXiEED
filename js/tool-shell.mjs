@@ -7,9 +7,10 @@ if (!section || !shell) throw new Error('制作ツールのページを準備で
 const params = new URLSearchParams(location.search);
 const knownModes = new Set(['draw', 'camera', 'audio']);
 const requestedMode = params.get('mode');
+const directCandidate = params.get('runtime') !== 'iframe';
 const isAudioRoute = location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '') === '/audio';
 const isCameraRoute = location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '') === '/camera';
-const mode = isAudioRoute ? 'audio' : isCameraRoute ? 'camera' : knownModes.has(requestedMode) ? requestedMode : 'draw';
+const mode = directCandidate && knownModes.has(requestedMode) ? requestedMode : isAudioRoute ? 'audio' : isCameraRoute ? 'camera' : knownModes.has(requestedMode) ? requestedMode : 'draw';
 section.dataset.toolMode = mode;
 shell.classList.remove('tool-shell--draw', 'tool-shell--camera', 'tool-shell--audio');
 shell.classList.add(`tool-shell--${mode}`);
@@ -44,6 +45,7 @@ document.title = mode === 'audio'
   : `${copy.title}｜PiXiEEDraw`;
 
 function queryWithAdapter() {
+  if (directCandidate && mode === 'draw' && !['standalone','to','drawRequest','audioRequest','drawCamera','audioCamera'].some(key => params.has(key))) return new URLSearchParams(location.search);
   if (!isAudioRoute && !isCameraRoute) return new URLSearchParams(location.search);
   if (params.getAll('mode').length > 1) {
     throw new TypeError('モードが複数指定されています。URLの mode 値をひとつにして開き直してください。');
@@ -70,10 +72,15 @@ try {
 if (forwarded) {
 if ((isAudioRoute || isCameraRoute) && !forwarded.has('mode')) forwarded.append('mode', mode);
 
+if (directCandidate) {
+  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261018-workspace-polish-1');
+  installDirectToolShell({ section, mode, search: forwarded });
+} else {
+
 // The parent controller owns the bridge channel. Replacing these reserved
 // transport fields is safe; every application and unknown query value remains
 // in order, including duplicates, and the fragment is carried separately.
-for (const key of ['embed', 'embedRole', 'channel']) forwarded.delete(key);
+for (const key of ['embed', 'embedRole', 'channel', 'workspace']) forwarded.delete(key);
 const childRole = mode;
 forwarded.set('embed', '1');
 forwarded.set('embedRole', childRole);
@@ -84,5 +91,6 @@ runtime.hash = location.hash;
 section.dataset.embedUrl = runtime.href;
 
 // The controller consumes data-embed-url and data-embed-auto on import.
-await import('/js/tool-embed.mjs?rev=20261017-analytics-integrity-1');
+await import('/js/tool-embed.mjs?rev=20261017-workspace-entry-1');
+}
 }

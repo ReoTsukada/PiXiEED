@@ -32,7 +32,7 @@ function clickEvent({ trusted = true, prevented = false, button = 0, href = '/dr
   return {
     target: {
       closest(selector) {
-        if (selector === 'a[href="/draw/"]') return href === '/draw/' ? anchor : null;
+        if (selector === 'a[href="/draw/"],a[href="/draw/?workspace=1"]') return ['/draw/', '/draw/?workspace=1'].includes(href) ? anchor : null;
         return null;
       }
     },
@@ -51,6 +51,8 @@ test('draw CTA source clicks use the existing consent-gated event with a fixed c
 
   listener(clickEvent({ markerOnAnchor: true }));
   assert.equal(eventRows().at(-1)[2].content_id, 'draw_cta_creation', 'an authored anchor can be its own CTA marker');
+  listener(clickEvent({ href: '/draw/?workspace=1' }));
+  assert.equal(eventRows().at(-1)[2].content_id, 'draw_cta_event', 'focused launch keeps the same source event');
   const afterValid = eventRows().length;
 
   listener(clickEvent({ trusted: false }));

@@ -2,7 +2,7 @@
 import {execFileSync} from 'node:child_process';
 import {mkdtemp,mkdir,copyFile,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';import {dirname,join,resolve}from'node:path';
-import {createHash}from'node:crypto';import {buildPagesSite}from'./build-pages-site.mjs';
+import {createHash}from'node:crypto';import {buildPagesSite}from'./build-pages-site.mjs?rev=20261018-direct-runtime-1';
 const repo=process.cwd(),phase=process.env.PHASE||'after';if(!['before','after'].includes(phase))throw Error('PHASE must be before/after');
 const scratch=await mkdtemp(join(tmpdir(),`pixieed-performance-${phase}-`)),root=join(scratch,'source');await mkdir(root);
 const names=[...new Set(['ls-files','ls-files --others --exclude-standard'].flatMap(command=>execFileSync('git',command.split(' ').concat('-z'),{encoding:'utf8'}).split('\0')))].filter(n=>n&&!['.git','docs','node_modules','.aws','.codex','.agents'].includes(n.split('/')[0]));

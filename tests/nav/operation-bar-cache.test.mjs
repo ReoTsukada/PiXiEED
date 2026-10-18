@@ -52,7 +52,7 @@ test('operation bar revisions propagate through runtime parents and every public
  const affected=new Set(leaves);
  let growing=true;
  while(growing) {growing=false;for(const [path,refs] of edges)if(!affected.has(path)&&refs.some(ref=>affected.has(ref.target))){affected.add(path);growing=true;}}
- assert.equal(affected.size,16,'bounded runtime cache graph including camera-placement preview');
+ assert.equal(affected.size,19,'bounded runtime cache graph including camera-placement preview, editor lifecycle and shared direct runtime');
  const entries=await files('',path=>path.endsWith('.html')||/^scripts\/generate-.*\.mjs$/.test(path));
  let matchedEntries=0;
  for(const path of [...runtime,...entries])for(const value of references(await readFile(new URL(path,root),'utf8'))) {

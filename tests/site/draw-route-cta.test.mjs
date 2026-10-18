@@ -26,7 +26,7 @@ test('build-time CTA is a static anchor after the header with page-specific cont
     assert.equal(result.context, context, file);
     assert.match(result.html, new RegExp(`<nav class="site-draw-cta" data-draw-cta data-draw-context="${context}"`), file);
     assert.match(result.html, /class="site-draw-cta__description">ブラウザで使えるドット絵エディター<\/span>/, file);
-    assert.match(result.html, new RegExp(`<a class="site-draw-cta__link" href="/draw/">\\s*<span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw<\\/small>`), file);
+    assert.match(result.html, new RegExp(`<a class="site-draw-cta__link" href="/draw/\\?workspace=1">\\s*<span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw<\\/small>`), file);
     assert.ok(result.html.indexOf('</header>') < result.html.indexOf('data-draw-cta'), `${file}: CTA follows the header`);
     assert.match(result.html, /href="\/css\/site-draw-cta\.css\?rev=20261014-route-cta-1"/);
     assert.equal(original, page(), 'the transform does not mutate its source string');
@@ -41,7 +41,7 @@ test('CTA transform is idempotent and respects an authored books CTA', () => {
   assert.equal(twice.html, once.html);
   assert.match(twice.reason, /authored CTA/);
 
-  const books = page('<a data-draw-cta data-draw-context="books" href="/draw/">本で見つけたドット絵を試す</a>');
+  const books = page('<a data-draw-cta data-draw-context="books" href="/draw/?workspace=1">本で見つけたドット絵を試す</a>');
   const result = addSiteDrawCta(books, 'books/index.html');
   assert.equal(result.added, false);
   assert.equal(result.html, books);
@@ -54,7 +54,7 @@ test('home and tools reuse their authored primary Draw links without adding a st
     assert.equal(result.added, false, file);
     assert.equal(result.html, html);
     assert.equal((html.match(/data-draw-cta/g) || []).length, 1, file);
-    assert.match(html, /href="\/draw\/"[^>]*data-draw-cta[^>]*data-draw-context="(?:general|creation)"/);
+    assert.match(html, /href="\/draw\/\?workspace=1"[^>]*data-draw-cta[^>]*data-draw-context="(?:general|creation)"/);
   }
 });
 
@@ -71,7 +71,7 @@ test('books generator emits the authored static Draw CTA without changing produc
     const generated = await readFile(join(root, 'books/index.html'), 'utf8');
     assert.equal((generated.match(/data-draw-cta/g) || []).length, 1);
     assert.match(generated, /site-draw-cta\.css/);
-    assert.match(generated, /<aside class="books-editor-invite"[^>]*>[\s\S]*?href="\/draw\/" data-draw-cta data-draw-context="books"/);
+    assert.match(generated, /<aside class="books-editor-invite"[^>]*>[\s\S]*?href="\/draw\/\?workspace=1" data-draw-cta data-draw-context="books"/);
     assert.match(generated, /data-shop-thumbnail|data-image-src/);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -79,14 +79,14 @@ test('books generator emits the authored static Draw CTA without changing produc
 });
 
 test('conversion guide explains the editor and keeps its existing action link without a duplicate strip', async () => {
-  const output = page('<article><h3>ブラウザで使えるドット絵エディター</h3><p>絵やアニメーションを作って書き出せます。</p><a class="output-draw-cta" href="/draw/" data-draw-cta data-draw-context="creation"><span>ドット絵を描いてみる</span><small>PiXiEEDraw</small><span aria-hidden="true">→</span></a></article>');
+  const output = page('<article><h3>ブラウザで使えるドット絵エディター</h3><p>絵やアニメーションを作って書き出せます。</p><a class="output-draw-cta" href="/draw/?workspace=1" data-draw-cta data-draw-context="creation"><span>ドット絵を描いてみる</span><small>PiXiEEDraw</small><span aria-hidden="true">→</span></a></article>');
   const result = addSiteDrawCta(output, 'output/index.html');
   assert.equal(result.added, false);
   assert.match(result.reason, /existing conversion guide link/);
   assert.equal(result.html, output);
-  assert.match(output, /ブラウザで使えるドット絵エディター[\s\S]*?href="\/draw\/"[^>]*data-draw-cta[^>]*>[\s\S]*?ドット絵を描いてみる/);
+  assert.match(output, /ブラウザで使えるドット絵エディター[\s\S]*?href="\/draw\/\?workspace=1"[^>]*data-draw-cta[^>]*>[\s\S]*?ドット絵を描いてみる/);
   const sourceOutput = await readFile(new URL('../../output/index.html', import.meta.url), 'utf8');
-  assert.match(sourceOutput, /<a href="\/draw\/" data-draw-cta data-draw-context="creation">ドット絵を描いてみる/);
+  assert.match(sourceOutput, /<a href="\/draw\/\?workspace=1" data-draw-cta data-draw-context="creation">ドット絵を描いてみる/);
   assert.equal((sourceOutput.match(/data-draw-cta/g) || []).length, 1);
 });
 
@@ -153,10 +153,10 @@ test('fresh build output contains static CTAs while route exclusions and existin
         id: 'fixture-event', name: 'Fixture Pixel Event', status: 'upcoming', startDate: '2099-01-01', endDate: '2099-01-01',
         sourceUrl: 'https://example.test/event', sourceLabel: '公式案内', checkedAt: '2026-10-14', description: 'A fixture event for generated route coverage.'
       }] }),
-      'index.html': page('<a href="/draw/" data-draw-cta data-draw-context="general">PiXiEEDraw</a>'),
-      'tools/index.html': page('<a href="/draw/" data-draw-cta data-draw-context="general">PiXiEEDraw</a>'),
-      'books/index.html': page('<aside class="books-editor-invite"><a href="/draw/" data-draw-cta data-draw-context="books">本で見つけたドット絵を描く</a></aside>'),
-      'output/index.html': page('<article><h3>ブラウザで使えるドット絵エディター</h3><a class="output-draw-cta" href="/draw/" data-draw-cta data-draw-context="creation"><span>ドット絵を描いてみる</span><small>PiXiEEDraw</small><span aria-hidden="true">→</span></a></article>'),
+      'index.html': page('<a href="/draw/?workspace=1" data-draw-cta data-draw-context="general">PiXiEEDraw</a>'),
+      'tools/index.html': page('<a href="/draw/?workspace=1" data-draw-cta data-draw-context="general">PiXiEEDraw</a>'),
+      'books/index.html': page('<aside class="books-editor-invite"><a href="/draw/?workspace=1" data-draw-cta data-draw-context="books">本で見つけたドット絵を描く</a></aside>'),
+      'output/index.html': page('<article><h3>ブラウザで使えるドット絵エディター</h3><a class="output-draw-cta" href="/draw/?workspace=1" data-draw-cta data-draw-context="creation"><span>ドット絵を描いてみる</span><small>PiXiEEDraw</small><span aria-hidden="true">→</span></a></article>'),
       'privacy/index.html': page('privacy'),
       'draw/index.html': page('editor'),
       'globe/index.html': page('<iframe src="/globe-prototype.html" title="map"></iframe>'),
@@ -191,14 +191,14 @@ test('fresh build output contains static CTAs while route exclusions and existin
 
     assert.equal((home.match(/data-draw-cta/g) || []).length, 1, 'home keeps its authored primary action');
     assert.equal((await builtHtml('tools/index.html')).match(/data-draw-cta/g)?.length, 1, 'tools keeps its authored primary action');
-    assert.match(eventIndex, /data-draw-context="event"[\s\S]*?href="\/draw\/"/);
-    assert.match(eventLeaf, /data-draw-context="event"[\s\S]*?href="\/draw\/"/);
+    assert.match(eventIndex, /data-draw-context="event"[\s\S]*?href="\/draw\/\?workspace=1"/);
+    assert.match(eventLeaf, /data-draw-context="event"[\s\S]*?href="\/draw\/\?workspace=1"/);
     assert.equal((books.match(/data-draw-cta/g) || []).length, 1, 'books keeps its authored CTA without a duplicate strip');
     assert.match(books, /books-editor-invite[\s\S]*?data-draw-context="books"/);
-    assert.equal((outputGuide.match(/href="\/draw\/"/g) || []).length, 1, 'conversion guide keeps its existing link');
+    assert.equal((outputGuide.match(/href="\/draw\/\?workspace=1"/g) || []).length, 1, 'conversion guide keeps its existing link');
     assert.match(outputGuide, /ブラウザで使えるドット絵エディター[\s\S]*?ドット絵を描いてみる/);
     for (const html of [privacy, editor, admin]) assert.doesNotMatch(html, /data-draw-cta/);
-    assert.match(globe, /data-draw-context="creation"[\s\S]*?href="\/draw\/"/, 'the normal globe page remains eligible despite its embedded map');
+    assert.match(globe, /data-draw-context="creation"[\s\S]*?href="\/draw\/\?workspace=1"/, 'the normal globe page remains eligible despite its embedded map');
     assert.doesNotMatch(lens, /data-draw-cta/, 'the retired route does not receive a promoted CTA');
     assert.match(await builtHtml('css/site-draw-cta.css'), /\.site-draw-cta__link/);
     const beforeSecondBuild = await Promise.all(['index.html', 'events/index.html', 'events/fixture-event/index.html', 'pixiee-lens/index.html'].map(builtHtml));

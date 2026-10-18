@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { buildPagesSite } from './build-pages-site.mjs';
+import { buildPagesSite } from './build-pages-site.mjs?rev=20261018-direct-runtime-1';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const markerName = '.pixieed-generated-puzzle-share-pages';

@@ -106,7 +106,7 @@ try {
 
     // Exercise the native dialog's real CSS and cancel callback without touching project data.
     await page.evaluate(async () => {
-      const { confirmPxdConversion } = await import('/js/creation/pxd-ui.mjs?rev=20261016-tool-shell-1');
+      const { confirmPxdConversion } = await import('/js/creation/pxd-ui.mjs?rev=20261018-direct-runtime-1');
       const rgba = new Uint8Array(16 * 16 * 4); rgba.fill(255);
       window.__closeDialogResult = confirmPxdConversion({ image: { width: 16, height: 16, rgba }, document: { width: 16, height: 16, rgba } });
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));

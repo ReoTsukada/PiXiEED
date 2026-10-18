@@ -12,7 +12,7 @@
 <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>try { if (localStorage.getItem('PiXiEED:motion-preference:v1') === 'reduced') document.documentElement.dataset.pixieedMotion = 'reduced'; } catch { /* storage may be blocked */ }</script>
-  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261017-analytics-integrity-1">
+  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261018-direct-runtime-1">
   <link rel="modulepreload" href="/js/home-play.mjs?rev=20261015-real-screens-1">
   <link rel="modulepreload" href="/js/home-animation.mjs?rev=20261001-hero-rates-2">
   <link rel="modulepreload" href="/js/tool-toys.mjs?rev=20261015-real-screens-1">
@@ -43,15 +43,15 @@
       <div class="hp-card-group home-primary-tools" aria-labelledby="homePrimaryToolsTitle">
         <h2 class="hp-group-title" id="homePrimaryToolsTitle">制作ツール</h2>
         <nav class="hp-card-grid hp-create-grid" aria-label="制作ツール">
-          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="editor" href="/draw/" data-static-tool="editor" data-draw-cta data-draw-context="general">
+          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="editor" href="/draw/?workspace=1" data-static-tool="editor" data-draw-cta data-draw-context="general">
             <span class="hp-tool-screen hp-tool-screen--draw"><picture><source type="image/webp" srcset="/assets/screenshots/previews/draw-pc-maou-480.webp 480w, /assets/screenshots/previews/draw-pc-maou-960.webp 960w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/draw-pc-maou.png" width="2880" height="1920" alt="PiXiEEDrawで魔王様のドット絵を編集中" fetchpriority="high"></picture></span>
             <div class="hp-card-copy"><h3 class="hp-tool-title">ドット絵を描く</h3><span class="hp-toy-line">アニメ・レイヤー制作</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/artwork.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEEDraw</small></span><span class="hp-card-link">ツール画面へ <span aria-hidden="true">→</span></span></div>
           </a>
-          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="camera" href="/camera/" data-static-tool="camera">
+          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="camera" href="/camera/?workspace=1" data-static-tool="camera">
             <span class="hp-tool-screen hp-tool-screen--camera"><picture><source type="image/webp" srcset="/assets/screenshots/previews/camera-pc-maou-480.webp 480w, /assets/screenshots/previews/camera-pc-maou-1366.webp 1366w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/camera-pc-maou.png" width="1366" height="900" alt="PiXiEELENSで変換した魔王様のドット絵" loading="eager"></picture></span>
             <div class="hp-card-copy"><h3 class="hp-tool-title">写真をドット絵に</h3><span class="hp-toy-line">画像をPNG保存</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/camera.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEELENS</small></span><span class="hp-card-link">ツール画面へ <span aria-hidden="true">→</span></span></div>
           </a>
-          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="sound" href="/audio/" data-static-tool="sound">
+          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="sound" href="/audio/?workspace=1" data-static-tool="sound">
             <span class="hp-tool-screen hp-tool-screen--audio"><picture><source type="image/webp" srcset="/assets/screenshots/previews/audio-pc-maou-480.webp 480w, /assets/screenshots/previews/audio-pc-maou-1366.webp 1366w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/audio-pc-maou.png" width="1366" height="838" alt="魔王様を音楽レイヤーに読み込んだPiXiEEaudioの実画面" loading="eager"></picture></span>
             <div class="hp-card-copy"><h3 class="hp-tool-title">音楽をつくる</h3><span class="hp-toy-line">マス目で作曲</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/music.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEEaudio</small></span><span class="hp-card-link">ツール画面へ <span aria-hidden="true">→</span></span></div>
           </a>
@@ -129,9 +129,9 @@
     <aside class="container px-display-ad" data-display-ad="home" data-ad-reserve aria-label="広告"><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
-  <script type="module" src="/js/home-startup.mjs?rev=20261017-analytics-integrity-1"></script>
+  <script type="module" src="/js/home-startup.mjs?rev=20261018-direct-runtime-1"></script>
   <script type="module" src="/js/home-gallery.mjs?rev=20261015-home-gallery-2"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261017-analytics-integrity-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
   <script type="module" src="/js/display-ads.mjs?rev=20261007-lazy-ads-1"></script>
 </body>
 </html>

@@ -65,6 +65,9 @@ test('query and fragment updates used by expansion do not create another page vi
   const before = events().filter((entry) => entry[1] === 'page_view').length;
   history.replaceState(history.state, '', '/draw/?mode=draw&keep=one#expanded');
   history.replaceState(history.state, '', '/draw/?mode=draw&keep=one');
+  history.pushState(history.state, '', '/draw/?mode=draw&keep=one&workspace=1');
+  history.pushState(history.state, '', '/draw/?mode=draw&keep=one');
+  history.pushState(history.state, '', '/draw/?mode=audio&keep=one&workspace=1');
   const after = events().filter((entry) => entry[1] === 'page_view').length;
   assert.equal(after, before);
 });

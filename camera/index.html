@@ -4,27 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <script>
-    (() => {
-      const params = new URLSearchParams(location.search);
-      const validBridge = value => value.get('embed') === '1' && ['draw', 'camera', 'audio'].includes(value.get('embedRole')) && value.get('channel');
-      // A tool's own return link can reach its public URL inside the retained
-      // iframe. Recover only this same-origin controller's transport channel.
-      try {
-        const frame = window.frameElement;
-        const original = frame && new URL(frame.src, location.href);
-        const independentLegacy = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(location.pathname) && (params.get('standalone') === '1' || ['draw', 'audio'].includes(params.get('to')) || ['drawRequest', 'audioRequest', 'drawCamera', 'audioCamera'].some(key => params.has(key)));
-        if (!validBridge(params) && !independentLegacy && frame?.matches('.tool-embed__frame') && original.origin === location.origin && validBridge(original.searchParams)) {
-          const mode = ['draw', 'camera', 'audio'].includes(params.get('mode')) ? params.get('mode') : /\/audio(?:\/index\.html)?\/?$/.test(location.pathname) ? 'audio' : /\/camera(?:\/index\.html)?\/?$/.test(location.pathname) ? 'camera' : 'draw';
-          params.set('embed', '1'); params.set('embedRole', mode); params.set('channel', original.searchParams.get('channel'));
-        }
-      } catch { /* Foreign frames do not inherit an editor channel. */ }
-      if (validBridge(params)) {
-        if (!params.has('mode')) params.set('mode', params.get('embedRole'));
-        location.replace(`/draw/editor.html?${params}${location.hash}`);
-      }
-    })();
-  </script>
+  <script src="/js/tool-entry-compat.js?rev=20261018-workspace-polish-1"></script>
   <title>写真・画像をドット絵に変換｜PiXiEEDraw カメラモード</title>
   <meta name="description" content="PiXiEEDrawのカメラモードPiXiEELENS。撮影や画像読込からドット絵に変換し、色数を調整して保存できます。">
   <link rel="canonical" href="https://pixieed.jp/camera/">
@@ -41,8 +21,9 @@
   <link rel="stylesheet" href="/css/site.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
-  <link rel="stylesheet" href="/css/tool-embed.css?rev=20261016-tool-shell-1">
-  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261017-entry-integration-1">
+  <link rel="stylesheet" href="/css/tool-embed.css?rev=20261017-workspace-entry-1">
+  <link rel="stylesheet" data-direct-shell-style href="/css/tool-direct.css?rev=20261018-workspace-polish-1">
+  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261017-workspace-entry-1">
 </head>
 <body class="tool-intro tool-shell tool-shell--camera" data-tool-shell>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -60,6 +41,7 @@
           <h1 id="tool-title" data-shell-title>写真・画像をドット絵に変換</h1>
           <p class="tool-intro__lead" data-shell-lead>PiXiEEDrawのカメラモードです。撮影か画像読込から始め、色数を減らして仕上げられます。</p>
           <p class="tool-intro__hint">画像は［ファイル］から読み込めます。撮影はツール内の［カメラを開始］を選んだときに始まります。</p>
+          <button class="tool-shell__start" type="button" data-embed-start data-embed-target="camera-tool">作業を始める</button>
         </div>
       </div>
     </section>
@@ -68,10 +50,10 @@
 
     <section class="tool-intro__embed-wrap tool-shell__workspace" id="camera-tool" aria-label="PiXiEEDraw 制作ツール">
       <div class="container">
-        <section class="tool-intro__embed tool-shell__embed" data-tool-embed data-tool-shell data-tool-mode="camera" data-embed-auto aria-labelledby="tool-embed-title">
-          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CREATE HERE</p><h2 id="tool-embed-title">このページで画像を変換する</h2><p data-shell-workspace-copy>［大きく使う］で作業領域を広げられます。描画・音楽も同じ作品で切り替えられます。</p></div>
+        <section class="tool-intro__embed tool-shell__embed" data-tool-embed data-tool-shell data-tool-mode="camera" aria-labelledby="tool-embed-title">
+          <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CREATE HERE</p><h2 id="tool-embed-title">このページで画像を変換する</h2><p data-shell-workspace-copy>描画・音楽も同じ作品で切り替えられます。</p></div>
           <div data-embed-stage hidden></div>
-          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">ツールを準備しています…</p>
+          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">［作業を始める］を押すと制作画面を開きます。</p>
         </section>
       </div>
     </section>
@@ -108,7 +90,7 @@
     </section>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-shell.mjs?rev=20261017-analytics-integrity-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261017-analytics-integrity-1"></script>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261018-workspace-polish-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
 </body>
 </html>

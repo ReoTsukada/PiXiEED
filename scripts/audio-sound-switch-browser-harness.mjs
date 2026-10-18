@@ -34,7 +34,7 @@ async function seed(page, tool) {
   return page.evaluate(async toolName => {
     const { createPxdProject } = await import('/js/creation/pxd-codec.mjs');
     const { putPxdSharedImage } = await import('/js/creation/pxd-project.mjs');
-    const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261016-tool-shell-1');
+    const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261018-direct-runtime-1');
     const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs');
     const colors = [[230,80,70],[250,220,90],[60,170,110],[80,150,210]];
     const rgba = new Uint8Array(16 * 16 * 4);

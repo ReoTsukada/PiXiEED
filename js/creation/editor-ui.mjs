@@ -24,9 +24,9 @@ export function editorViewportInsets({ height, headerBottom = 64, navTop = heigh
 
 export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {}) {
   const doc = root.ownerDocument; const win = doc.defaultView;
-  let disposed = false;
+  let disposed = false, resizeFrame = 0;
   function updateInsets() {
-    if (disposed) return;
+    if (disposed || root.hidden || root.inert) return;
     const header = doc.querySelector('body > .site-header');
     const nav = doc.querySelector('.app-tabs');
     const insets = editorViewportInsets({ height: win.innerHeight,
@@ -38,6 +38,7 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
     }
   }
   function onToggle(event) {
+    if (root.hidden || root.inert) return;
     const panel = event.target;
     if (!panel.matches?.('details') || (!root.contains(panel) && !panel.closest('[data-editor-header-control]'))) return;
     panel.querySelector('summary')?.setAttribute('aria-expanded', String(panel.open));
@@ -49,6 +50,7 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
     }
   }
   function onPointerDown(event) {
+    if (root.hidden || root.inert) return;
     const panels = editorDetails(root).filter(panel => panel.open);
     // Interacting with a body-mounted sheet also keeps its ancestor menus open.
     if (panels.some((panel) => {
@@ -65,6 +67,7 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
     }
   }
   function onKey(event) {
+    if (root.hidden || root.inert) return;
     if (event.key !== 'Escape') return;
     const panel = editorDetails(root).filter(panel => panel.open).at(-1);
     if (!panel) return;
@@ -74,13 +77,17 @@ export function mountCreationEditorUi(root, { beforePanelOpen = () => {} } = {})
   doc.addEventListener('pointerdown', onPointerDown);
   doc.addEventListener('keydown', onKey);
   win.addEventListener('resize', updateInsets, { passive: true });
-  const observer = win.ResizeObserver ? new win.ResizeObserver(updateInsets) : null;
+  win.visualViewport?.addEventListener('resize', updateInsets, { passive: true });
+  const observer = win.ResizeObserver ? new win.ResizeObserver(() => {
+    if (!resizeFrame) resizeFrame = win.requestAnimationFrame(() => { resizeFrame = 0; updateInsets(); });
+  }) : null;
   for (const node of [doc.querySelector('body > .site-header'), doc.querySelector('.app-tabs')]) if (node) observer?.observe(node);
   updateInsets();
   return { closePanels: () => closeEditorPanels(root), dispose() {
-    disposed = true; observer?.disconnect();
+    disposed = true; observer?.disconnect(); win.cancelAnimationFrame(resizeFrame);
     doc.removeEventListener('toggle', onToggle, true);
     doc.removeEventListener('pointerdown', onPointerDown); doc.removeEventListener('keydown', onKey);
     win.removeEventListener('resize', updateInsets);
+    win.visualViewport?.removeEventListener('resize', updateInsets);
   } };
 }

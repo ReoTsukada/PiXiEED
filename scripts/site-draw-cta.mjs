@@ -65,7 +65,7 @@ function insertLensToolbarCta(html) {
   const actions = /(<(?:div|nav)\b[^>]*class\s*=\s*["'][^"']*\bhud-top__actions\b[^"']*["'][^>]*>)/i.exec(html);
   if (!actions) return html;
   const index = actions.index + actions[0].length;
-  const link = '<a class="site-draw-cta__link site-draw-cta--lens" aria-label="ブラウザで使えるドット絵エディターを開く" data-draw-cta data-draw-context="creation" href="/draw/">ドット絵エディターで描く</a>\n';
+  const link = '<a class="site-draw-cta__link site-draw-cta--lens" aria-label="ブラウザで使えるドット絵エディターを開く" data-draw-cta data-draw-context="creation" href="/draw/?workspace=1">ドット絵エディターで描く</a>\n';
   return `${html.slice(0, index)}\n${link}${html.slice(index)}`;
 }
 
@@ -73,7 +73,7 @@ function skipReason(route, html) {
   if (DRAW_CTA_EXCLUDED_ROUTES[route]) return DRAW_CTA_EXCLUDED_ROUTES[route];
   for (const [prefix, reason] of EXCLUDED_PREFIXES) if (route.startsWith(prefix)) return reason;
   if (route === '/' || route === '/tools/') return 'existing primary Draw action is authored in the page';
-  if (route === '/output/' && /<a\b[^>]*href\s*=\s*["']\/draw\/["']/i.test(html)) return 'existing conversion guide link';
+  if (route === '/output/' && /<a\b[^>]*href\s*=\s*["']\/draw\/(?:\?workspace=1)?["']/i.test(html)) return 'existing conversion guide link';
   if (route === '/books/') return 'catalog CTA is authored by the books generator';
   if (/<meta\b[^>]*name\s*=\s*["']robots["'][^>]*content\s*=\s*["'][^"']*\bnoindex\b/i.test(html)
     || /<meta\b[^>]*content\s*=\s*["'][^"']*\bnoindex\b[^"']*["'][^>]*name\s*=\s*["']robots["']/i.test(html)) return 'noindex utility page';
@@ -87,7 +87,7 @@ function skipReason(route, html) {
 
 function markup(context) {
   const label = LABELS[context] || LABELS.general;
-  return `\n<nav class="site-draw-cta" data-draw-cta data-draw-context="${context}" aria-label="ドット絵をつくる"><span class="site-draw-cta__description">ブラウザで使えるドット絵エディター</span><a class="site-draw-cta__link" href="/draw/"><span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw</small><span aria-hidden="true">→</span></a></nav>\n`;
+  return `\n<nav class="site-draw-cta" data-draw-cta data-draw-context="${context}" aria-label="ドット絵をつくる"><span class="site-draw-cta__description">ブラウザで使えるドット絵エディター</span><a class="site-draw-cta__link" href="/draw/?workspace=1"><span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw</small><span aria-hidden="true">→</span></a></nav>\n`;
 }
 
 function insertAfterHeader(html, block) {

@@ -38,6 +38,8 @@
 .tool-embed--expanded .tool-embed__controls button{min-height:44px}
 .tool-embed--expanded [data-embed-close],.tool-embed--expanded .tool-embed__help{display:none!important}
 [data-tool-shell] .tool-embed__controls [data-embed-close]{display:none!important}
+[data-tool-shell] .tool-embed__controls [data-embed-expand]:not([data-embed-retry]){display:none!important}
+[data-tool-shell] .tool-embed__controls [data-shell-explanation]{color:#27251f;border-color:#c6c0b3;background:#fff}
 @media(max-width:360px){.tool-embed--expanded .tool-embed__controls button{padding-inline:8px;font-size:.82rem}}
 .tool-embed__controls [data-embed-expand] { color: white; border-color: var(--intro-accent-dark, #b83f34); background: var(--intro-accent-dark, #b83f34); }
 .tool-embed__controls [data-embed-expand]:hover { background: var(--intro-accent, #e75445); }

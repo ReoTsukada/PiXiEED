@@ -10,7 +10,7 @@ document.querySelector('#main')?.setAttribute('inert', '');
 const scope = createModeScope();
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });
 try {
-  const { mountAudioMode } = await import('./audio-page.mjs?rev=20261017-analytics-integrity-1');
+  const { mountAudioMode } = await import('./audio-page.mjs?rev=20261018-direct-runtime-2');
   await mountAudioMode({ scope });
   document.documentElement.dataset.audioReady = 'true';
 } catch (error) {

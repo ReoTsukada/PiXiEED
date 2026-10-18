@@ -1,24 +1,2 @@
-import assert from 'node:assert/strict';import {writeFile} from 'node:fs/promises';import {chromium} from '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
-const base=process.env.PIXIEED_BROWSER_BASE_URL||'http://127.0.0.1:4197';assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));const out='/tmp/pixieed-tool-shell-evidence';const b=await chromium.launch({headless:true});const results=[];
-try{const c=await b.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});await c.route('**/*',r=>new URL(r.request().url()).origin===base&&['GET','HEAD'].includes(r.request().method())?r.continue():r.abort());const p=await c.newPage();p.setDefaultTimeout(12000);
- const routes=[
- ['/draw/?embed=1&embedRole=draw&channel=qa-channel&keep=one&keep=two#compat','/draw/editor.html','keep'],
- ['/audio/?standalone=1&keep=one&keep=two#compat','/audio/editor.html','keep'],
- ['/audio/?to=audio&audioRequest=qa-only#compat','/audio/editor.html','audioRequest'],
- ['/audio/?modeProjectTool=audio&modePxd=qa-project&modePxdRevision=qa-revision&keep=one#compat','/audio/','modePxd'],
- ...['/pixiedraw/','/pixiedraw2/','/PiXiEEDraw/','/studio/'].map(x=>[x+'?mode=camera&utm_source=qa#main','/draw/','mode']),
- ...['/pixiedraw/','/pixiedraw2/','/PiXiEEDraw/','/studio/','/projects/pixiedraw/'].map(x=>[x+'?pxd=one&pxd=two#unknown',x,'pxd']),
- ['/projects/pixfind/?id=untyped-old-uuid#keep','/projects/pixfind/','id']
- ];
- for(const [path,target,key]of routes){const row={path,target};results.push(row);try{await p.goto(base+path,{waitUntil:'load'});await p.waitForURL(u=>u.pathname===target);assert.equal(new URL(p.url()).pathname,target);let u=new URL(p.url());
- if(target==='/audio/'){await p.waitForSelector('iframe');u=new URL(await p.locator('iframe').getAttribute('src'));assert.equal(u.searchParams.get('modePxd'),'qa-project');assert.equal(u.hash,'#compat');}
- else if(key==='keep')assert.deepEqual(u.searchParams.getAll('keep'),['one','two']);else if(key==='pxd')assert.deepEqual(u.searchParams.getAll('pxd'),['one','two']);else assert.ok(u.searchParams.has(key));
- if(target===new URL(base+path).pathname&&key==='pxd'){assert.ok(await p.locator('[data-legacy-draw-link]').count());assert.equal(u.hash,'#unknown');}
- row.passed=true;
- }catch(e){row.error=e.message;console.error('FAIL',path,e.message);}}
- await p.goto(base+'/draw/');await p.waitForFunction(()=>document.querySelector('[data-embed-status]')?.textContent.includes('編集を保持'));const original=await p.locator('iframe').getAttribute('src');await p.evaluate(()=>window.postMessage({kind:'pixieed-tool-embed',version:1,channel:'wrong',type:'route-change',pathname:'/bad/',search:'?pxd=secret',hash:''},location.origin));assert.equal(await p.locator('iframe').getAttribute('src'),original);assert.equal(new URL(p.url()).pathname,'/draw/');results.push({path:'forged embed message',passed:true});
- await p.locator('[data-embed-expand]').click();const frame=p.frames().find(f=>f.url().includes('/draw/editor.html'));
- await frame.goto(base+'/draw/?mode=camera&keep=return#main');await frame.waitForFunction(()=>!!window.__PIXIEED_TOOL_EMBED_BRIDGE__&&document.documentElement.hasAttribute('data-tool-embed-expanded')).catch(async e=>{console.log('RETURN DEBUG',await frame.evaluate(()=>({url:location.href,frame:!!window.frameElement,src:window.frameElement?.src,bridge:!!window.__PIXIEED_TOOL_EMBED_BRIDGE__,expanded:document.documentElement.hasAttribute('data-tool-embed-expanded'),body:document.body.className})),await p.locator('[data-tool-embed]').getAttribute('class'),p.frames().map(f=>f.url()));await p.screenshot({path:'/tmp/pixieed-tool-shell-evidence/return-debug.png'});throw e;});
- assert.ok(frame.url().includes('/draw/editor.html'));assert.equal(new URL(frame.url()).searchParams.get('keep'),'return');assert.equal(p.frames().length,2);assert.equal(await p.locator('iframe').count(),1);results.push({path:'public tool URL return inside owned expanded iframe',passed:true});await c.close();
-}finally{await b.close();await writeFile(out+'/compat-results.json',JSON.stringify({results,externalRequestsSent:0},null,2));}
-console.log(JSON.stringify({cases:results.length,failures:results.filter(r=>!r.passed)}));if(results.some(r=>!r.passed))process.exitCode=1;
+// Preserve the historical CLI entrypoint while keeping compatibility coverage in one harness.
+import './tool-workspace-compat-browser-harness.mjs';

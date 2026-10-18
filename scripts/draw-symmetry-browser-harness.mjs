@@ -45,7 +45,7 @@ try {
   const fixture = await page.evaluate(async () => {
     const { createPxdProject } = await import('/js/creation/pxd-codec.mjs');
     const { putPxdSharedImage } = await import('/js/creation/pxd-project.mjs');
-    const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261016-tool-shell-1');
+    const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261018-direct-runtime-1');
     const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs');
     const rgba = new Uint8Array(16 * 8 * 4);
     for (let x = 0; x < 3; x++) rgba.set([[200,60,60,255],[70,180,70,255],[50,90,230,255]][x], (7 * 16 + x) * 4);

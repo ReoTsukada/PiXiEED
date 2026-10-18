@@ -282,7 +282,7 @@ export function startAnalytics() {
   pageView();
   watchPathChanges();
   document.addEventListener('click', (event) => {
-    const anchor = event.target?.closest?.('a[href="/draw/"]');
+    const anchor = event.target?.closest?.('a[href="/draw/"],a[href="/draw/?workspace=1"]');
     const marker = anchor?.closest?.('[data-draw-cta]');
     const context = marker?.dataset?.drawContext;
     const contentId = DRAW_CTA_CONTEXT_IDS[context];

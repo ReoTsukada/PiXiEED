@@ -18,14 +18,14 @@ async function newPage(viewport) {
   await context.route('**/*', async route => {
     const requestUrl = new URL(route.request().url());
     if (requestUrl.origin !== new URL(base).origin) return route.abort();
-    if (requestUrl.pathname.endsWith('/js/creation/draw-page.mjs')) {
+    if (requestUrl.pathname.endsWith('/js/creation/draw-page.mjs?rev=20261018-direct-runtime-1')) {
       const response = await route.fetch(); let source = await response.text();
       // Publish the mountDrawMode API object without modifying the repo source.
       const marker = 'return {\n  get workspace() { return pxdBridge; }, dispose: disposeDrawMode,';
       if (source.includes(marker)) source = source.replace(marker, 'window.__musicLayerQA ||= {};\nreturn window.__musicLayerQA.draw = {\n  get workspace() { return pxdBridge; }, dispose: disposeDrawMode,');
       return route.fulfill({ response, body: source });
     }
-    if (requestUrl.pathname.endsWith('/js/creation/creation-modes.mjs')) {
+    if (requestUrl.pathname.endsWith('/js/creation/creation-modes.mjs?rev=20261018-direct-runtime-1')) {
       const response = await route.fetch(); let source = await response.text();
       const marker = 'let musicModel;';
       if (source.includes(marker)) source = source.replace(marker, `${marker}\nwindow.__musicLayerQA ||= {};`)

@@ -1,4 +1,5 @@
 import { trackSiteEvent, createEmbeddedAnalyticsReceiver } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
+import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261017-workspace-entry-1';
 
 const PROTOCOL = 'pixieed-tool-embed';
 const VERSION = 1;
@@ -10,6 +11,7 @@ const originalLabels = new WeakMap();
 const expandedSnapshots = new WeakMap();
 const startingSections = new WeakMap();
 const modeObservers = new WeakMap();
+const shellViewGenerations = new WeakMap();
 let activeSection = null;
 
 function request(instance, command, detail = {}) {
@@ -68,7 +70,12 @@ function updateStartButtons(section, state) {
     button.hidden = section.contains(button) && state !== 'closed';
     button.setAttribute('aria-expanded', String(state !== 'closed'));
     button.setAttribute('aria-busy', String(state === 'loading'));
-    if (!section.contains(button)) button.textContent = state === 'loading' ? 'ツールを準備中…' : state === 'active' ? '編集画面に戻る' : '続きから再開';
+    if (!section.contains(button)) {
+      const retained = instances.get(section)?.ready;
+      button.textContent = section.hasAttribute('data-tool-shell')
+        ? state === 'loading' ? 'ツールを準備中…' : state === 'active' ? '編集画面に戻る' : retained ? '作業に戻る' : '作業を始める'
+        : state === 'loading' ? 'ツールを準備中…' : state === 'active' ? '編集画面に戻る' : '続きから再開';
+    }
   }
 }
 
@@ -90,14 +97,17 @@ function controls(section) {
   title.id = `tool-embed-dialog-title-${crypto.randomUUID()}`;
   const expand = document.createElement('button'); expand.type = 'button'; expand.dataset.embedExpand = ''; expand.textContent = '大きく使う'; expand.setAttribute('aria-label', 'エディターを大きく表示する'); expand.setAttribute('aria-expanded', 'false');
   const close = document.createElement('button'); close.type = 'button'; close.dataset.embedClose = ''; close.textContent = '閉じる'; close.setAttribute('aria-label', 'ページ内エディターを閉じる');
-  bar.append(title, expand, close);
+  if (section.hasAttribute('data-tool-shell')) {
+    const explanation = document.createElement('button'); explanation.type = 'button'; explanation.dataset.shellExplanation = ''; explanation.textContent = '説明を見る'; explanation.setAttribute('aria-label', '説明ページに戻る');
+    bar.append(title, expand, explanation, close);
+  } else bar.append(title, expand, close);
   const help = document.createElement('p'); help.className = 'tool-embed__help';
   help.textContent = section.dataset.toolMode === 'camera' ? '画像読込：下部の［ファイル］→［画像を読み込む］。閉じても続きから再開できます。' : '大きく使っても、閉じても、このページでは続きから再開できます。';
   section.querySelector('[data-embed-stage]').prepend(bar, help); return bar;
 }
 
 async function activate(section, { bringIntoView = true, focus = true } = {}) {
-  if (startingSections.has(section) || (activeSection === section && section.classList.contains('tool-embed--active'))) { if (bringIntoView) showEditor(section); return; }
+  if (!startingSections.has(section) && activeSection === section && section.classList.contains('tool-embed--active') && !section.classList.contains('tool-embed--failed')) { if (bringIntoView) showEditor(section); return; }
   section.classList.remove('tool-embed--failed');
   const generation = (sectionGeneration.get(section) || 0) + 1;
   sectionGeneration.set(section, generation);
@@ -122,16 +132,22 @@ async function activate(section, { bringIntoView = true, focus = true } = {}) {
     }
     await request(instance, 'activate');
     if (sectionGeneration.get(section) !== generation) return;
+    if (section.hasAttribute('data-tool-shell') && instance.lastRoute) syncShellRoute(instance.lastRoute);
     instance.frame.inert = false;
     updateStartButtons(section, 'active');
     setStatus(section, '編集を保持しています。閉じても続きから再開できます。');
+    if (section.hasAttribute('data-tool-shell') && document.body.classList.contains('tool-shell--workspace-open')
+        && !section.classList.contains('tool-embed--expanded')) expand(section);
     if (focus) instance.frame.focus({ preventScroll: true });
   } catch (error) {
     if (sectionGeneration.get(section) !== generation) return;
     await close(section);
-    const retryHint = section.hasAttribute('data-embed-auto') ? '再試行ボタンを押してください。' : 'もう一度開始ボタンを押してください。';
+    const retryHint = section.hasAttribute('data-embed-auto')
+      || (section.hasAttribute('data-tool-shell') && document.body.classList.contains('tool-shell--workspace-open'))
+      ? '再試行ボタンを押してください。' : 'もう一度開始ボタンを押してください。';
     setStatus(section, `${error.message} ${retryHint}`);
-    if (section.hasAttribute('data-embed-auto')) {
+    if (section.hasAttribute('data-embed-auto')
+        || (section.hasAttribute('data-tool-shell') && document.body.classList.contains('tool-shell--workspace-open'))) {
       section.classList.add('tool-embed--active', 'tool-embed--failed');
       section.querySelector('[data-embed-stage]').hidden = false;
       markAutoRetry(section);
@@ -196,10 +212,12 @@ function acceptShellMode(instance, mode) {
 }
 
 async function close(section, { restoreFocus = true } = {}) {
-  sectionGeneration.set(section, (sectionGeneration.get(section) || 0) + 1);
+  const closeGeneration = (sectionGeneration.get(section) || 0) + 1;
+  sectionGeneration.set(section, closeGeneration);
   startingSections.delete(section);
   const instance = instances.get(section);
   if (instance?.ready) { try { await request(instance, 'suspend'); } catch {} }
+  if (sectionGeneration.get(section) !== closeGeneration) return;
   section.classList.remove('tool-embed--active', 'tool-embed--expanded');
   unlockExpandedViewport(section);
   section.removeAttribute('role'); section.removeAttribute('aria-modal');
@@ -334,7 +352,7 @@ function expand(section) {
   section.querySelector('[data-embed-expand]').textContent = '拡大表示を終了';
   section.querySelector('[data-embed-expand]').setAttribute('aria-label', '拡大表示を終了');
   section.querySelector('[data-embed-expand]').setAttribute('aria-expanded', 'true');
-  section.querySelector('[data-embed-expand]').focus({ preventScroll: true });
+  (section.hasAttribute('data-tool-shell') ? section.querySelector('[data-shell-explanation]') : section.querySelector('[data-embed-expand]'))?.focus({ preventScroll: true });
   sendExpandedState(section, true);
   document.dispatchEvent(new CustomEvent('pixieed:tool-embed-expanded', { detail: { section, expanded: true } }));
 }
@@ -347,6 +365,51 @@ function sendExpandedState(section, expanded) {
 function exitExpanded(section) {
   if (!section?.classList.contains('tool-embed--expanded')) return;
   expand(section);
+}
+
+function syncShellRoute(route) {
+  try {
+    const inner = new URL(`${route.pathname}${route.search}${route.hash}`, location.origin);
+    if (inner.origin !== location.origin) return;
+    inner.searchParams.delete('embed'); inner.searchParams.delete('embedRole'); inner.searchParams.delete('channel');
+    inner.searchParams.delete('workspace');
+    const publicPath = location.pathname;
+    const dedicatedEntry = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(publicPath);
+    const selectedMode = inner.searchParams.get('mode');
+    const selectedPath = selectedMode === 'camera' ? '/camera/' : selectedMode === 'audio' ? '/audio/' : '/draw/';
+    const outer = new URL(dedicatedEntry ? selectedPath : publicPath, location.origin);
+    outer.search = inner.searchParams.toString();
+    if (new URL(location.href).searchParams.get('workspace') === '1') outer.searchParams.set('workspace', '1');
+    outer.hash = inner.hash;
+    history.replaceState(history.state, '', `${outer.pathname}${outer.search}${outer.hash}`);
+  } catch { /* Ignore malformed same-origin route announcements. */ }
+}
+
+function shellWorkspaceUrl(open) {
+  const entry = createWorkspaceHistoryEntry(location.href, history.state, open);
+  history.pushState(entry.state, '', entry.url);
+}
+
+async function showShellWorkspace(section, { updateHistory = false, focus = false } = {}) {
+  const viewGeneration = (shellViewGenerations.get(section) || 0) + 1;
+  shellViewGenerations.set(section, viewGeneration);
+  if (updateHistory) shellWorkspaceUrl(true);
+  document.body.classList.add('tool-shell--workspace-open');
+  const activation = activate(section, { bringIntoView: false, focus });
+  if (shellViewGenerations.get(section) === viewGeneration && section.classList.contains('tool-embed--active')
+      && !section.classList.contains('tool-embed--expanded')) expand(section);
+  await activation;
+  if (shellViewGenerations.get(section) === viewGeneration && section.classList.contains('tool-embed--active')
+      && !section.classList.contains('tool-embed--failed') && !section.classList.contains('tool-embed--expanded')) expand(section);
+}
+
+async function showShellExplanation(section, { updateHistory = false } = {}) {
+  const viewGeneration = (shellViewGenerations.get(section) || 0) + 1;
+  shellViewGenerations.set(section, viewGeneration);
+  if (updateHistory) shellWorkspaceUrl(false);
+  document.body.classList.remove('tool-shell--workspace-open');
+  if (section.classList.contains('tool-embed--active')) await close(section, { restoreFocus: false });
+  if (shellViewGenerations.get(section) === viewGeneration) startButtons(section).find(button => !button.hidden)?.focus({ preventScroll: true });
 }
 
 document.addEventListener('pixieed:tool-embed-reward-modal', event => {
@@ -368,23 +431,13 @@ window.addEventListener('message', event => {
   }
   if (message.type === 'route-change' && instance.section.hasAttribute('data-tool-shell')
       && typeof message.pathname === 'string' && typeof message.search === 'string' && typeof message.hash === 'string') {
-    try {
-      const inner = new URL(`${message.pathname}${message.search}${message.hash}`, location.origin);
-      if (inner.origin !== location.origin) return;
-      inner.searchParams.delete('embed'); inner.searchParams.delete('embedRole'); inner.searchParams.delete('channel');
-      const publicPath = location.pathname;
-      const dedicatedEntry = /\/(?:audio|camera)(?:\/index\.html)?\/?$/.test(publicPath);
-      const selectedMode = inner.searchParams.get('mode');
-      const selectedPath = selectedMode === 'camera' ? '/camera/' : selectedMode === 'audio' ? '/audio/' : '/draw/';
-      const outer = new URL(dedicatedEntry ? selectedPath : publicPath, location.origin);
-      outer.search = inner.searchParams.toString();
-      outer.hash = inner.hash;
-      history.replaceState(history.state, '', `${outer.pathname}${outer.search}${outer.hash}`);
-    } catch { /* Ignore malformed same-origin route announcements. */ }
+    instance.lastRoute = { pathname: message.pathname, search: message.search, hash: message.hash };
+    syncShellRoute(instance.lastRoute);
     return;
   }
   if (message.type === 'fullscreen-state' && message.active === false) {
-    if (instance.section.classList.contains('tool-embed--expanded')) exitExpanded(instance.section);
+    if (instance.section.hasAttribute('data-tool-shell')) void showShellExplanation(instance.section, { updateHistory: true });
+    else if (instance.section.classList.contains('tool-embed--expanded')) exitExpanded(instance.section);
     return;
   }
   if (message.type === 'mode-state') {
@@ -398,12 +451,14 @@ window.addEventListener('message', event => {
     return;
   }
   if (message.type === 'close-request') {
-    if (instance.section.classList.contains('tool-embed--expanded')) exitExpanded(instance.section);
+    if (instance.section.hasAttribute('data-tool-shell')) void showShellExplanation(instance.section, { updateHistory: true });
+    else if (instance.section.classList.contains('tool-embed--expanded')) exitExpanded(instance.section);
     else if (!instance.section.hasAttribute('data-embed-auto')) void close(instance.section);
     return;
   }
   if (message.type === 'escape-request') {
-    if (instance.section.classList.contains('tool-embed--expanded')) exitExpanded(instance.section);
+    if (instance.section.hasAttribute('data-tool-shell')) void showShellExplanation(instance.section, { updateHistory: true });
+    else if (instance.section.classList.contains('tool-embed--expanded')) exitExpanded(instance.section);
     else if (!instance.section.hasAttribute('data-embed-auto')) void close(instance.section);
     return;
   }
@@ -431,10 +486,13 @@ window.addEventListener('message', event => {
 
 document.addEventListener('click', event => {
   const start = event.target.closest('[data-embed-start]');
-  if (start) { const section = startSection(start); if (section) { event.preventDefault(); void activate(section); } return; }
+  if (start) { const section = startSection(start); if (section) { event.preventDefault(); if (section.hasAttribute('data-tool-shell')) void showShellWorkspace(section, { updateHistory: true }); else void activate(section); } return; }
   const section = event.target.closest('[data-tool-embed]');
   if (!section) return;
-  if (event.target.closest('[data-embed-retry]')) {
+  if (event.target.closest('[data-shell-explanation]')) {
+    event.preventDefault(); void showShellExplanation(section, { updateHistory: true });
+  }
+  else if (event.target.closest('[data-embed-retry]')) {
     event.preventDefault();
     const instance = instances.get(section);
     // Explicit retry may replace a runtime that never became usable. Expansion
@@ -448,7 +506,11 @@ document.addEventListener('click', event => {
 document.addEventListener('keydown', event => {
   if (event.defaultPrevented) return;
   if (document.querySelector('[data-dialog]:not([hidden])')) return;
-  if (event.key === 'Escape' && activeSection?.classList.contains('tool-embed--expanded')) { event.preventDefault(); exitExpanded(activeSection); }
+  if (event.key === 'Escape' && activeSection?.classList.contains('tool-embed--expanded')) {
+    event.preventDefault();
+    if (activeSection.hasAttribute('data-tool-shell')) void showShellExplanation(activeSection, { updateHistory: true });
+    else exitExpanded(activeSection);
+  }
   if (event.key !== 'Tab' || !activeSection?.classList.contains('tool-embed--expanded')) return;
   const focusable = [...activeSection.querySelectorAll('button:not([disabled]),iframe')].filter(node => node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[inert]'));
   const active = document.activeElement;
@@ -458,10 +520,26 @@ document.addEventListener('keydown', event => {
 });
 
 for (const section of document.querySelectorAll('[data-tool-embed][data-embed-auto]')) {
-  void activate(section, { bringIntoView: false, focus: false });
+  if (section.hasAttribute('data-tool-shell')) {
+    if (isWorkspaceRequested(location.href, history.state)) void showShellWorkspace(section, { focus: false });
+  } else void activate(section, { bringIntoView: false, focus: false });
 }
+
+for (const section of document.querySelectorAll('[data-tool-embed][data-tool-shell]')) {
+  if (isWorkspaceRequested(location.href, history.state)) void showShellWorkspace(section, { focus: false });
+}
+
+window.addEventListener('popstate', () => {
+  const section = document.querySelector('[data-tool-embed][data-tool-shell]');
+  if (!section) return;
+  if (isWorkspaceRequested(location.href, history.state)) void showShellWorkspace(section, { focus: false });
+  else void showShellExplanation(section);
+});
 
 document.addEventListener('fullscreenchange', () => {
   const expanded = document.querySelector('.tool-embed--expanded');
-  if (expanded && document.fullscreenElement === null) exitExpanded(expanded);
+  if (expanded && document.fullscreenElement === null) {
+    if (expanded.hasAttribute('data-tool-shell')) void showShellExplanation(expanded, { updateHistory: true });
+    else exitExpanded(expanded);
+  }
 });

@@ -13,6 +13,31 @@
 .tool-shell .tool-intro__related a { min-height: 44px; display: inline-flex; align-items: center; }
 .tool-shell [id] { scroll-margin-top: 5.5rem; }
 .tool-shell__workspace { padding-block: 1rem; }
+.tool-shell__start {
+  display: inline-flex;
+  min-height: 2.9rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: .7rem;
+  padding: .65rem 1.15rem;
+  border: 0;
+  border-radius: .7rem;
+  color: white;
+  background: var(--intro-accent-dark);
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.tool-shell__start:hover { background: var(--intro-accent); }
+.tool-shell__start:focus-visible { outline: 3px solid var(--intro-accent); outline-offset: 3px; }
+.tool-shell--workspace-open main > :not(.tool-shell__workspace) { display: none !important; }
+.tool-shell--workspace-open .site-header,
+.tool-shell--workspace-open .site-footer,
+.tool-shell--workspace-open .skip-link { display: none !important; }
+.tool-shell--workspace-open .tool-shell__workspace { min-height: calc(100vh - 4rem); }
+.tool-shell--workspace-open .tool-shell__embed:not(.tool-embed--active) { display: flex; min-height: 12rem; align-items: center; }
+.tool-shell--workspace-open .tool-shell__embed:not(.tool-embed--active) .tool-intro__embed-copy { display: none; }
+.tool-shell--workspace-open .tool-shell__embed:not(.tool-embed--active) .tool-intro__embed-status { display: block; }
 .tool-shell__embed { gap: .45rem; padding: clamp(.8rem, 1.7vw, 1.25rem); }
 .tool-shell__embed.tool-embed--expanded { gap: 0; margin: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 .tool-shell__embed.tool-embed--expanded [data-embed-stage] { min-width: 0; min-height: 0; width: 100%; }
@@ -44,6 +69,7 @@
   .tool-shell .tool-intro__copy h1 { font-size: clamp(1.65rem, 7vw, 2.25rem); }
   .tool-shell .tool-intro__lead { font-size: .89rem; }
   .tool-shell__workspace { padding-block: .75rem; }
+  .tool-shell__start { width: 100%; }
   .tool-shell__embed { padding: .75rem; border-radius: .75rem; }
   .tool-shell .tool-intro__steps { grid-template-columns: minmax(0, 1fr); }
   .tool-shell .tool-intro__steps li { grid-template-columns: 1.8rem minmax(0, 1fr); gap: .55rem; }

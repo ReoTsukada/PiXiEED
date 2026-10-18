@@ -38,7 +38,14 @@ test('drawing and music strokes visit identical connected cells in every directi
   }
 });
 
-test('entrances share the Draw shell and retain a lazy standalone Audio implementation', () => {
+test('direct entrances share a lifecycle-scoped runtime while retaining lazy mode bundles', () => {
+  const creationRuntime = readFileSync(new URL('../../js/creation/creation-runtime.mjs', import.meta.url), 'utf8');
+  const creationModes = readFileSync(new URL('../../js/creation/creation-modes.mjs', import.meta.url), 'utf8');
+  assert.match(creationRuntime, /scope\.listen\(window, 'pagehide'/);
+  assert.match(creationRuntime, /mountCreationModes\(/);
+  assert.doesNotMatch(creationRuntime, /import[^\n]*audio-page\.mjs/);
+  assert.match(creationModes, /async function ensureAudio\(/);
+  assert.match(creationModes, /await import\(`\.\/draw-music\.mjs/);
   for (const mode of ['draw', 'audio']) {
     const shell = readFileSync(new URL(`../../${mode}/index.html`, import.meta.url), 'utf8');
     const runtime = readFileSync(new URL(`../../${mode === 'draw' ? 'draw/editor.html' : 'audio/editor.html'}`, import.meta.url), 'utf8');
@@ -54,8 +61,8 @@ test('entrances share the Draw shell and retain a lazy standalone Audio implemen
     const entry = readFileSync(new URL(`../../js/creation/${mode}-entry.mjs`, import.meta.url), 'utf8');
     if (mode === 'draw') assert.match(entry, /import \{ mountDrawMode \} from '.\/draw-page\.mjs/);
     if (mode === 'draw') {
-      assert.match(entry, /await mountDrawMode\(\{ scope: drawScope/);
-      assert.ok(entry.indexOf('await mountDrawMode') < entry.indexOf("await import('./creation-modes.mjs"));
+      assert.match(entry, /await import\('\.\/creation-runtime\.mjs/);
+      assert.ok(entry.indexOf("await import('./creation-runtime.mjs") < entry.indexOf('runtime = await mountCreationRuntime'));
       assert.doesNotMatch(entry, /from ['"][^'"]*(?:audio-page|pixel-lens\/app)/);
     } else {
       assert.match(entry, /creationModeEntryUrl\('audio', location.search\)/);

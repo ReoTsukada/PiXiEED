@@ -81,7 +81,7 @@ try {
       const fixture = await page.evaluate(async tool => {
         const { createPxdProject } = await import('/js/creation/pxd-codec.mjs');
         const { putPxdSharedImage } = await import('/js/creation/pxd-project.mjs');
-        const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261016-tool-shell-1');
+        const { importToolProject } = await import('/js/creation/tool-project-import.mjs?rev=20261018-direct-runtime-1');
         const { createToolProjectStore } = await import('/js/creation/tool-project-store.mjs');
         const result = {};
         for (const label of ['A', 'B']) {

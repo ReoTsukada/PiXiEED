@@ -81,6 +81,7 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
   await mkdir(join(root,'assets/fonts/PressStart2P'), { recursive: true });
   const drawFeatureFiles = {
     'js/creation/legacy-lens-entry.mjs': 'export const legacyLensEntry = true;',
+    'js/tool-entry-compat.js': 'window.toolEntryCompatLoaded = true;',
     'js/creation/shared-project-settings-core.mjs': 'export const sharedSettingsCore = true;',
     'css/creation-camera-idle.css': '.creation-camera-idle{}',
     'css/draw-palette-instruments.css': '.draw-audio-instrument-icon{}',

@@ -14,8 +14,8 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // These are URL-only changes. Keep module bodies, revision semantics, and
 // runtime-specific query values out of this normalizer.
 const targets = new Map([
-  ['site-header.mjs', 'rev=20261017-analytics-integrity-1'],
-  ['tool-header-controls.mjs', 'rev=20261006-header-controls-1&nav=20261016-tool-operations-1'],
+  ['site-header.mjs', 'rev=20261018-direct-runtime-1'],
+  ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],
   ['pixel-png-metadata.mjs', 'rev=20260928-pixel-roundtrip-1'],
