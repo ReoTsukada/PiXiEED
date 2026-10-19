@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-18T00:04:17+00:00",
+  "updatedAt": "2026-10-19T00:00:00+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -144,7 +144,7 @@
       "startDate": "2026-09-14",
       "endDate": "2026-10-18",
       "dateLabel": "2026年9月14日〜10月18日。本戦最終締切10月18日、審査対象外のボーナス企画は10月19日〜25日。",
-      "status": "active",
+      "status": "ended",
       "sourceUrl": "https://pixeljoint.com/2026/09/13/7508/Pixelween_2026_announcement.htm",
       "description": "額縁と肖像画を制作するドット絵コンテスト。週ごとの課題と本戦の提出先は別。",
       "checkedAt": "2026-10-16T00:08:33+00:00",
@@ -1246,7 +1246,7 @@
       "startDate": "2026-10-18",
       "endDate": "2026-10-18",
       "dateLabel": "2026-10-18 10:00–15:00。無料・予約不要・定員10名／回。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.beppuartmonth.com/?programs=56_%E3%83%9E%E3%82%A4%E3%82%AF%E3%83%A9%E3%81%A7%E3%83%89%E3%83%83%E3%83%88%E7%B5%B5%E3%82%92%E8%87%AA%E5%8B%95%E3%81%A7%E3%81%A4%E3%81%8F%E3%82%8D%E3%81%86-2",
       "sourceLabel": "ベップ・アート・マンス2026公式プログラム",
       "description": "ブロックを組み合わせたプログラムでMinecraft内にドット絵を自動生成し、オリジナル作品を制作する体験。生徒作品の展示あり。10月と11月は別の実施日として登録し、その間を連続開催期間にしない。",
@@ -1802,7 +1802,7 @@
       "startDate": "2026-09-25",
       "endDate": "2026-10-18",
       "dateLabel": "2026年9月25日〜10月18日。月・火休廊。",
-      "status": "active",
+      "status": "ended",
       "sourceUrl": "https://eukaryote.jp/exhibition/keisuke_katasuki_soloex2026/",
       "additionalUrls": [
         "https://bijutsutecho.com/exhibitions/18841"
@@ -2100,7 +2100,7 @@
       "startDate": "2026-10-17",
       "endDate": "2026-10-17",
       "dateLabel": "2026年10月17日 10:30–12:00。図書館告知はPixel Artのトートバッグ制作、主催者プログラムはiPadでのPixel Art／Tシャツ制作と説明に差がある。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.lamediatheque-jeumont.fr/",
       "additionalUrls": [
         "https://www.bd-jeumont.fr/animations/"
@@ -2238,7 +2238,7 @@
       "startDate": "2026-10-12",
       "endDate": "2026-10-16",
       "dateLabel": "itch.io表示の募集期間は10月12日06:15〜10月16日10:00（タイムゾーン未記載）。説明では金曜12:00締切、発表12:30、15:00終了と記載（時刻の基準タイムゾーンは不明）。",
-      "status": "active",
+      "status": "ended",
       "sourceUrl": "https://itch.io/jam/med1-gamejam-2026",
       "description": "物語を題材にした学生チーム向けゲームジャム。公式ルールで8-bit／Pixel Artのビジュアル様式を必須とし、テキストなし等の条件がある。物理会場としてRoom 5.145aの記載もあるが所在地は特定できないためオンライン扱い。",
       "checkedAt": "2026-10-14T23:59:30+00:00",
@@ -2256,7 +2256,7 @@
       "startDate": "2026-10-17",
       "endDate": "2026-10-17",
       "dateLabel": "10月17日。MISの公式プログラム全体は15:00〜19:30。個別のPixel Art講座時間は未記載。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.ce.gov.br/secult/2026/10/14/mis-ce-lanca-obra-imersiva-com-personagens-e-cores-da-amazonia-contemporanea/",
       "description": "MIS Cearáの公式プログラムに掲載されたPixel Artワークショップ。会場はプログラムに記載されたPraça do MIS。施設住所は開催会場の確証がないため会場として転記していない。",
       "checkedAt": "2026-10-16T00:07:54+00:00",
@@ -2290,7 +2290,7 @@
       "startDate": "2026-10-17",
       "endDate": "2026-10-18",
       "dateLabel": "10月17日・18日 各日14:00〜17:30（公式現地時刻）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://forumdepartementaldessciences.fr/evenements/pixel-art-lego/",
       "additionalUrls": [
         "https://forumdepartementaldessciences.fr/agenda/"
@@ -2309,7 +2309,7 @@
       "startDate": "2026-10-17",
       "endDate": "2026-10-17",
       "dateLabel": "15:00〜16:00（現地時間）。要登録",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://howardcounty.librarycalendar.com/events/day/2026/10/17",
       "description": "メリーランド州Howard County Library System公式カレンダーに掲載。2Dグラフィックをピクセルのみで構成し、Pixel Art作品を制作する。要登録。",
       "checkedAt": "2026-10-16T00:07:54+00:00",
@@ -2508,6 +2508,37 @@
       "checkedAt": "2026-10-18T09:04:17+09:00",
       "kind": "pixel-art",
       "sourceLabel": "Graphite Academy公式プログラム"
+    },
+    {
+      "id": "pixelverse-jam-2026",
+      "name": "Pixelverse Jam 2026 — Pixel Art・レトロゲーム制作ジャム",
+      "online": true,
+      "venue": "オンライン",
+      "startDate": "2026-01-01",
+      "endDate": "2027-01-01",
+      "dateLabel": "応募受付：2026年1月1日 05:00 UTC〜2027年1月1日 05:00 UTC。Pixel Artとレトロゲームを主題とするオンラインゲームジャム。",
+      "status": "active",
+      "sourceUrl": "https://itch.io/jam/pixelverse-jam-2026",
+      "description": "Pixel Artとレトロゲームを主題に、8-bit/16-bit作品に着想を得たゲームを制作するグローバルゲームジャム。参加・提出はオンライン。募集期間の終端は公式表示のUTC時刻。",
+      "checkedAt": "2026-10-19T09:00:00+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "itch.io主催ページ"
+    },
+    {
+      "id": "altg-six-senses-dot-art-live-2026-10-09",
+      "name": "제2회 ALT+G SIX SENSES — ドット似顔絵ライブアート／ドット絵ゲーム展示",
+      "country": "韓国",
+      "area": "ソウル特別市・城東区・聖水",
+      "venue": "Platz2（서울 성동구 뚝섬로17길 35）",
+      "startDate": "2026-10-09",
+      "endDate": "2026-10-09",
+      "dateLabel": "2026年10月9日 12:00–20:00（韓国現地時間）",
+      "status": "ended",
+      "sourceUrl": "https://iggk.net/ko/altg/2026",
+      "description": "ゲーム展示イベント全体ではなく、現場プログラム「얼굴도트침공」（観客の顔をドットキャラクターとして描くライブアート）と、ドット表現のゲーム『Guidus One』の展示を対象範囲として記録。",
+      "checkedAt": "2026-10-19T09:00:00+09:00",
+      "kind": "pixel-art",
+      "sourceLabel": "IGG-K公式イベント案内"
     }
   ],
   "sources": [
@@ -4256,8 +4287,8 @@
     }
   ],
   "research": {
-    "checkedAt": "2026-10-18T00:04:17+00:00",
-    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。",
+    "checkedAt": "2026-10-19T00:00:00+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
@@ -5514,7 +5545,14 @@
       "Graphite Academy Singapore November holiday camp pixel art 2026",
       "pixel art workshop October 18 2026 official pixel art competition deadline October 2026",
       "픽셀 아트 행사 전시 공모전 2026",
-      "像素藝術 像素畫 工作坊 2026 新加坡"
+      "像素藝術 像素畫 工作坊 2026 新加坡",
+      "Pixelverse Jam 2026 itch.io pixel art retro gaming",
+      "ALT+G SIX SENSES 2026 Seoul 도트 캐리커처 Guidus One",
+      "PAC-MAN 京都 BIG SEAL BOOK pixel art event October 2026",
+      "pixel art workshop October 19 2026 official event deadline",
+      "픽셀 아트 도트 행사 서울 2026",
+      "像素艺术 活动 展览 工作坊 2026",
+      "arte pixel taller videojuego 2026"
     ],
     "languages": [
       "en",

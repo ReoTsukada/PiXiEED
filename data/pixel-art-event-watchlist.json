@@ -71,9 +71,11 @@
       "id": "region-306d5b1c48e24feb",
       "label": "韓国",
       "eventIds": [
+        "altg-six-senses-dot-art-live-2026-10-09",
         "jumpzip-pixel-art-market-seoul-2026"
       ],
       "areas": [
+        "ソウル特別市・城東区・聖水",
         "ソウル特別市・龍山区・梨泰院"
       ]
     },
@@ -1020,6 +1022,18 @@
       "area": "高雄市",
       "sourceUrls": [
         "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6"
+      ]
+    },
+    {
+      "id": "venue-6c7149aecaf86568",
+      "label": "Platz2（서울 성동구 뚝섬로17길 35）",
+      "eventIds": [
+        "altg-six-senses-dot-art-live-2026-10-09"
+      ],
+      "region": "韓国",
+      "area": "ソウル特別市・城東区・聖水",
+      "sourceUrls": [
+        "https://iggk.net/ko/altg/2026"
       ]
     },
     {
@@ -2067,6 +2081,31 @@
       }
     },
     {
+      "id": "source-22c0dc4de04ff667",
+      "label": "제2회 ALT+G SIX SENSES — ドット似顔絵ライブアート／ドット絵ゲーム展示",
+      "eventIds": [
+        "altg-six-senses-dot-art-live-2026-10-09"
+      ],
+      "url": "https://iggk.net/ko/altg/2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "韓国"
+      ],
+      "areas": [
+        "ソウル特別市・城東区・聖水"
+      ],
+      "venues": [
+        "Platz2（서울 성동구 뚝섬로17길 35）"
+      ],
+      "lastKnownEventDate": "2026-10-09",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-19T09:00:00+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-22cc874733428bdd",
       "label": "The Liquidy Jam!",
       "eventIds": [
@@ -3088,6 +3127,27 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-12T00:02:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5bc5307996a40be0",
+      "label": "Pixelverse Jam 2026 — Pixel Art・レトロゲーム制作ジャム",
+      "eventIds": [
+        "pixelverse-jam-2026"
+      ],
+      "url": "https://itch.io/jam/pixelverse-jam-2026",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン"
+      ],
+      "lastKnownEventDate": "2027-01-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-19T09:00:00+09:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6074,5 +6134,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-18T00:05:13+00:00"
+  "updatedAt": "2026-10-19T00:00:54+00:00"
 }
