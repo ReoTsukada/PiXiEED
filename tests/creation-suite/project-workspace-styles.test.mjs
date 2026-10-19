@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const root = new URL('../../', import.meta.url);
 const stylesheet = '/css/project-workspace.css?rev=20261006-header-controls-1';
 const workspaceRevision = '20261018-direct-runtime-2';
-const runtimeRevision = '20261018-direct-runtime-2';
+const runtimeRevision = '20261019-camera-original-color-1';
 const consumers = [
   'jigsaw/index.html',
   'spot-difference/index.html',

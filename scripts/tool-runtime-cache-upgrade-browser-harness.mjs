@@ -16,7 +16,7 @@ const oldLabel = process.env.PIXIEED_CACHE_OLD_LABEL || (oldRoot.includes('/stag
 const oldPhase = `old-${oldLabel}`;
 const out = process.env.PIXIEED_CACHE_UPGRADE_OUTPUT || '/tmp/pixieed-stage3/cache';
 const coreFreshUrls = [
-  '/js/creation/creation-runtime.mjs?rev=20261018-direct-runtime-2',
+  '/js/creation/creation-runtime.mjs?rev=20261019-camera-original-color-1',
   '/js/creation/draw-page.mjs?rev=20261018-direct-runtime-2',
   '/js/creation/project-workspace.mjs?rev=20261018-direct-runtime-2',
 ];
@@ -272,7 +272,10 @@ try {
   browser = await chromium.launch({ headless: true });
   report.engine = browser.version();
   browserContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block', acceptDownloads: true });
-  await browserContext.addInitScript(() => { window.__qaDocumentEntryUrl = location.href; });
+  await browserContext.addInitScript(() => {
+    window.__qaDocumentEntryUrl = location.href;
+    navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Isolated cache test: no hardware access', 'NotAllowedError'); };
+  });
   browserContext.on('request', request => {
     if (new URL(request.url()).origin !== base) report.externalRequests.push(request.url());
   });
@@ -339,7 +342,7 @@ try {
   const normalizedCacheHits = cacheHitUrls.map(value => { const parsed = new URL(value); return `${parsed.pathname}${parsed.search}`; });
   const oldCanonicalHit = normalizedCacheHits.includes(oldEntryUrl);
   const currentNewRuntime = logs.filter(row => row.phase === 'current'
-    && /^\/js\/creation\/(creation-runtime|draw-page|project-workspace)\.mjs\?rev=20261018-direct-runtime-2(?:&|$)/.test(row.url));
+    && coreFreshUrls.some(url => row.url === url || row.url.startsWith(`${url}&`)));
   assert.ok(oldCanonicalHit, `unchanged canonical module served from HTTP cache: ${oldEntryUrl}`);
   const freshAssetEvidence = [];
   for (const url of expectedFreshURLs) {

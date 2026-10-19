@@ -3,7 +3,7 @@ import { createToolStartTracker, trackSiteEvent } from '../site-analytics.mjs?re
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20261016-color-capability-1';
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?v=20261002-camera-palette-startup-2';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?rev=20261019-camera-original-color-1';
 import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261004-camera-tap-focus-1';
 import { GIF_FPS } from './gif.mjs?rev=20261015-alpha-opacity-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?rev=20261015-alpha-opacity-1';
@@ -57,6 +57,7 @@ if (returnToAudio && !audioCameraRequest) {
   } else audioCameraInvalid = true;
 } else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
+const savePngLink = $('#savePng');
 mountSiteRewardUI();
 const cameraRewardNotice = document.createElement('p');
 cameraRewardNotice.className = 'lc-image-note';
@@ -176,6 +177,7 @@ let sharedPaletteHex = [];
 let cameraPaletteFixed = false;
 let paletteBeforeSharedFixed = null;
 let paletteBeforeSharedFixedEdited = false;
+const isOriginalColorMode = () => state.colorDepth === 'full' && !cameraPaletteFixed;
 const colorHex = (color) => {
   if (typeof color === 'string' && /^#[\da-f]{6}(?:ff)?$/i.test(color)) return color.slice(0, 7).toLowerCase();
   if (Array.isArray(color) && color.length >= 3) return `#${color.slice(0, 3).map((v) => Math.max(0, Math.min(255, Number(v) || 0)).toString(16).padStart(2, '0')).join('')}`;
@@ -234,7 +236,7 @@ const zoomController = createCameraZoomController({ onChange: (snapshot) => {
 const autoSurface = (depth) => (depth === '8' || depth === '16' ? 55 : 0);
 // A little more punch than the raw camera by default; the tone sliders still read 0 at this standard look.
 const BASE_TONE = { contrast: 15, saturation: 20 };
-const withBaseTone = (camera) => { const out = { ...camera }; for (const [key, add] of Object.entries(BASE_TONE)) out[key] = Math.max(-100, Math.min(100, (out[key] ?? 0) + add)); return out; };
+const withBaseTone = (camera) => { const out = { ...camera }; if (isOriginalColorMode()) return { ...CAMERA_SETTING_DEFAULTS }; for (const [key, add] of Object.entries(BASE_TONE)) out[key] = Math.max(-100, Math.min(100, (out[key] ?? 0) + add)); return out; };
 function lensColorDepth() { return cameraPaletteFixed && sharedPaletteHex.length ? String(sharedPaletteHex.length) : state.colorDepth; }
 function syncLens() { const depth = lensColorDepth(); setLensSettings({ colorDepth: depth, paletteMode: cameraPaletteFixed ? 'source' : state.paletteMode, gradientMode: state.gradientMode, ditherPattern: state.ditherPattern, surfaceSimplify: autoSurface(depth), cameraSettings: withBaseTone(state.camera) }); }
 syncLens();
@@ -279,11 +281,10 @@ function invalidateCaptureDownload() {
   stopGifPlayback();
   if (downloadUrl) URL.revokeObjectURL(downloadUrl);
   downloadUrl = null;
-  const link = $('#savePng');
-  link.removeAttribute('href');
-  link.removeAttribute('download');
-  link.setAttribute('aria-disabled', 'true');
-  link.setAttribute('tabindex', '-1');
+  savePngLink.removeAttribute('href');
+  savePngLink.removeAttribute('download');
+  savePngLink.setAttribute('aria-disabled', 'true');
+  savePngLink.setAttribute('tabindex', '-1');
 }
 
 function updateSaveLinkState() {
@@ -292,6 +293,7 @@ function updateSaveLinkState() {
   $('#resultControls').hidden = !enabled;
   $('#postCamera').hidden = Boolean(gif.pending);
   $('#useCameraImage').hidden = Boolean(audioCameraRequest || gif.pending);
+  $('#useCameraImage').textContent = isOriginalColorMode() && typeof onUseImage !== 'function' ? '共有作品へ使う' : '他のツールへ';
   link.setAttribute('aria-disabled', String(!enabled));
   link.setAttribute('tabindex', enabled ? '0' : '-1');
   if (!enabled) link.removeAttribute('href');
@@ -1538,17 +1540,19 @@ async function capture() {
     finishAudioCamera({ ...state.result, width: target.width, height: target.height, data: rgba, palette: paletteFromRgba(rgba) });
     return;
   }
-  if (integratedShared) {
+  if (integratedShared || isOriginalColorMode()) {
     captureInFlight = true;
     try {
       const frame = state.result;
-      if (!frame || frame.width !== sharedImageTarget?.width || frame.height !== sharedImageTarget?.height) {
-        sayToast('共有キャンバスの設定が変わりました。プレビューを更新してください');
-        return;
-      }
-      if (frame.paletteFixed !== cameraPaletteFixed) {
-        sayToast('色設定に合わせてプレビューを更新しています。更新後に撮影してください');
-        return;
+      if (integratedShared) {
+        if (!frame || frame.width !== sharedImageTarget?.width || frame.height !== sharedImageTarget?.height) {
+          sayToast('共有キャンバスの設定が変わりました。プレビューを更新してください');
+          return;
+        }
+        if (frame.paletteFixed !== cameraPaletteFixed) {
+          sayToast('色設定に合わせてプレビューを更新しています。更新後に撮影してください');
+          return;
+        }
       }
       invalidateCaptureDownload();
       gif.pending = null;
@@ -1740,20 +1744,23 @@ const LOOKS = {
   c16: { colorDepth: '16', paletteMode: 'gameboy' },
   photo: { colorDepth: '16', paletteMode: 'source' },
   c32: { colorDepth: '32', paletteMode: 'source' },
-  c64: { colorDepth: '64', paletteMode: 'source' }
+  c64: { colorDepth: '64', paletteMode: 'source' },
+  full: { colorDepth: 'full', paletteMode: 'source', gradientMode: 'none', surfaceSimplify: 0 }
 };
-for (const [key, label] of [['c32', '32色'], ['c64', '64色']]) {
+for (const [key, label] of [['c32', '32色'], ['c64', '64色'], ['full', '元の色']]) {
   if ($('#looks [data-look="' + key + '"]')) continue;
   const button = document.createElement('button');
   button.type = 'button'; button.setAttribute('role', 'radio'); button.setAttribute('aria-checked', 'false');
   button.dataset.look = key; button.setAttribute('aria-label', label);
   const swatch = document.createElement('i'); swatch.className = 'lc-sw';
+  if (key === 'full') swatch.classList.add('lc-sw-photo');
   swatch.style.cssText = '--a:#f7c59f;--b:#ef6f6c;--c:#2a9d8f;--d:#264653';
   const text = document.createElement('span'); text.textContent = label;
   button.append(swatch, text); $('#looks').append(button);
 }
 function currentLook() {
   if (state.customLook) return `my-${state.customLook}`;
+  if (state.colorDepth === 'full') return 'full';
   if (state.colorDepth === '16') return state.paletteMode === 'source' ? 'photo' : 'c16';
   return Object.keys(LOOKS).find((key) => LOOKS[key].colorDepth === state.colorDepth) ?? 'gb';
 }
@@ -1812,7 +1819,7 @@ function selectLook(button) {
     && !requireSiteReward('camera.colors64')) return;
   const mine = myPalettes.find((p) => `my-${p.id}` === button.dataset.look);
   const targetDepth = mine ? mine.colors.length : Number(LOOKS[button.dataset.look]?.colorDepth);
-  if (!canEditCameraSettings({ allowColorDowngrade: Number.isFinite(targetDepth) && targetDepth < 64 })) return;
+  if (!canEditCameraSettings({ allowColorDowngrade: button.dataset.look === 'full' || (Number.isFinite(targetDepth) && targetDepth < 64) })) return;
   setPaletteEditing(-1);
   if (mine) {
     // a saved palette: exactly those colours, never re-picked from the view
@@ -1821,6 +1828,12 @@ function selectLook(button) {
     setLensPalette(mine.colors.map(([r, g, b]) => [r, g, b]));
   } else {
     Object.assign(state, LOOKS[button.dataset.look], { customLook: null });
+    if (button.dataset.look === 'full') {
+      state.gradientMode = 'none';
+      state.surfaceSimplify = 0;
+      state.miniature = false;
+      root.dataset.miniature = 'false';
+    }
     applyChange();
   }
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
@@ -2039,10 +2052,12 @@ function syncToolbar() {
   face('aspect').dataset.ratio = sharedImageTarget ? `${sharedImageTarget.width}:${sharedImageTarget.height}` : state.ratio;
   const toneChanged = TONES.some(([key]) => state.camera[key] !== CAMERA_SETTING_DEFAULTS[key]);
   const toneFace = face('tone');
-  toneFace.querySelector('b').textContent = toneChanged || state.miniature ? '設定中' : '調整';
-  toneFace.title = state.miniature ? (toneChanged ? '色味：調整中・ジオラマ ON' : '色味：ジオラマ ON') : toneChanged ? '色味：調整中' : '色味：調整';
-  toneFace.setAttribute('aria-label', `${toneFace.title}（タップで項目を選ぶ）`);
-  toneFace.dataset.changed = String(toneChanged || state.miniature);
+  const originalColor = state.colorDepth === 'full' && !cameraPaletteFixed;
+  toneFace.disabled = originalColor;
+  toneFace.querySelector('b').textContent = originalColor ? '補正なし' : toneChanged || state.miniature ? '設定中' : '調整';
+  toneFace.title = originalColor ? '元の色では色味補正・ジオラマを使いません' : state.miniature ? (toneChanged ? '色味：調整中・ジオラマ ON' : '色味：ジオラマ ON') : toneChanged ? '色味：調整中' : '色味：調整';
+  toneFace.setAttribute('aria-label', originalColor ? toneFace.title : `${toneFace.title}（タップで項目を選ぶ）`);
+  toneFace.dataset.changed = String(!originalColor && (toneChanged || state.miniature));
   syncZoomFace();
   // selected chips
   const mark = (panel, value) => { for (const b of panel.querySelectorAll('[data-value]')) b.setAttribute('aria-checked', String(b.dataset.value === value)); };
@@ -2056,7 +2071,10 @@ function syncToolbar() {
   toneSlider.setAttribute('aria-label', toneLabel);
   const v = Number(toneSlider.value); toneValue.textContent = v > 0 ? `+${v}` : String(v);
   toneSlider.style.setProperty('--fill', `${(v + 100) / 2}%`);
-  $('#toneReset').disabled = !toneChanged;
+  $('#toneReset').disabled = originalColor || !toneChanged;
+  toneSlider.disabled = originalColor;
+  for (const button of toneChips.querySelectorAll('[data-value]')) button.disabled = originalColor;
+  $('#miniatureToggle').disabled = originalColor;
 }
 function syncControls() {
   const look = currentLook();
@@ -2115,11 +2133,12 @@ aspectPanel.addEventListener('click', (event) => {
 });
 toneChips.addEventListener('click', (event) => {
   const button = event.target.closest('[data-value]'); if (!button) return;
+  if (state.colorDepth === 'full' && !cameraPaletteFixed) return;
   toneKey = button.dataset.value; navigator.vibrate?.(4); syncToolbar();
   button.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 });
 toneSlider.addEventListener('input', () => {
-  if (state.mode === 'captured' || toneKey === 'miniature') return;
+  if (state.mode === 'captured' || toneKey === 'miniature' || (state.colorDepth === 'full' && !cameraPaletteFixed)) return;
   if (!canEditCameraSettings()) return;
   const value = Number(toneSlider.value);
   // a light detent at 0 so the standard look is easy to find again
@@ -2129,7 +2148,7 @@ toneSlider.addEventListener('input', () => {
 });
 $('#toneReset').addEventListener('click', () => { if (!canEditCameraSettings()) return; for (const [key] of TONES) state.camera[key] = CAMERA_SETTING_DEFAULTS[key]; navigator.vibrate?.(8); applyChange(); sayToast('色調整を元に戻しました'); });
 $('#miniatureToggle').addEventListener('click', () => {
-  if (state.mode !== 'live' || gif.recording || captureInFlight || regionMergeSession) return;
+  if (state.mode !== 'live' || gif.recording || captureInFlight || regionMergeSession || (state.colorDepth === 'full' && !cameraPaletteFixed)) return;
   // Turning a saved bonus effect off is always free; only a new activation
   // needs an entitlement.
   if (!state.miniature && isSiteRewardPolicyEnabled() && !requireSiteReward('camera.diorama')) {
@@ -2711,6 +2730,20 @@ function suspendCamera() {
   resumeOnVisible = true;
 }
 
+function startCameraFromWorkspaceEntry() {
+  if (!isActive() || document.hidden || audioCameraInvalid || outputReturnPending) return false;
+  // A retained capture or imported image belongs to the user. Entering the
+  // shared camera mode must not replace it with a live preview.
+  if (state.mode === 'captured' || state.result || importedSource) return false;
+  if (state.mode === 'live' || state.mode === 'loading') return false;
+  if (pendingCameraRequest) {
+    say('カメラの許可確認が続いています。完了後に中央のボタンから再試行できます。', { visible:true });
+    return false;
+  }
+  void startCamera({ focus:false });
+  return true;
+}
+
 function resumeCameraIfVisible() {
   if (audioCameraInvalid || outputReturnPending || document.hidden || !resumeOnVisible || state.mode === 'captured' || !isActive()) return;
   resumeOnVisible = false;
@@ -2821,6 +2854,7 @@ function applyReturnedCameraSettings(settings) {
   if (Number.isFinite(settings.surfaceSimplify)) state.surfaceSimplify = settings.surfaceSimplify;
   if (Number.isFinite(settings.zoom)) state.zoom = settings.zoom;
   if (typeof settings.miniature === 'boolean') state.miniature = settings.miniature;
+  if (state.colorDepth === 'full') { state.gradientMode = 'none'; state.surfaceSimplify = 0; state.miniature = false; }
   if (settings.facing) { state.facing = settings.facing; lastFacing = settings.facing; }
   if (settings.camera) state.camera = { ...CAMERA_SETTING_DEFAULTS, ...settings.camera };
   state.customLook = settings.customLook && myPalettes.some((palette) => palette.id === settings.customLook) ? settings.customLook : null;
@@ -2903,6 +2937,10 @@ $('#useCameraImage').dataset.toolResultTransfer = '';
 $('#useCameraImage').textContent = '他のツールへ';
 $('#useCameraImage').addEventListener('click', async () => {
   if (state.mode !== 'captured' || !state.result || gif.pending) return;
+  if (isOriginalColorMode() && typeof onUseImage !== 'function') {
+    say('元の色の撮影結果はそのまま保持しています。共有作品に使うには、32色または64色以下のルックを選び直して撮り直してください。', { visible: true });
+    return;
+  }
   if (typeof onUseImage === 'function') {
     try { await onUseImage(getImage()); }
     catch (error) { say(error instanceof Error ? error.message : '撮影画像を渡せませんでした。', { visible: true }); }
@@ -2984,6 +3022,6 @@ if (audioCameraInvalid) {
     invalidateCaptureDownload();
     clearImportedSource();
   }
-  return { suspend, resume, getImage, repaintPreview, closeResult, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
+  return { suspend, resume, getImage, repaintPreview, closeResult, startCameraFromWorkspaceEntry, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
     syncProjectSettings(settings) { syncSharedProjectSettings(settings); } };
 }

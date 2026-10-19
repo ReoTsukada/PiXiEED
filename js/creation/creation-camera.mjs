@@ -328,7 +328,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
   syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261018-direct-runtime-2');
+  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261019-camera-original-color-1');
   assertCurrent();
   updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,
@@ -389,6 +389,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     if (!enabled && dialog?.open) dialog.close();
   };
   let enterEpoch = 0;
+  let startOnEntryResume = false;
   const stage = surface.querySelector('#stage');
   function fit() {
     if (!isActive()) return;
@@ -412,10 +413,21 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
       if (epoch !== enterEpoch || !isCurrent()) return;
       updatePlacement();
       applyButton.textContent = from === 'draw' ? '描画へ適用' : '音楽へ適用';
+      // The mode controller calls resume after the camera view is active. This
+      // keeps the permission request tied to one explicit WORK entry and out
+      // of ordinary visibility/embed resumes.
+      startOnEntryResume = true;
     },
-    suspend() { enterEpoch++; setInteractive(false); instance.closeResult(); instance.suspend(); },
+    suspend() { enterEpoch++; startOnEntryResume = false; setInteractive(false); instance.closeResult(); instance.suspend(); },
     closeResult: () => instance.closeResult(),
-    resume() { if (!isActive() || scope?.disposed) return; setInteractive(true); fit(); instance.resume(); },
+    resume() {
+      if (!isActive() || scope?.disposed) return;
+      setInteractive(true); fit(); instance.resume();
+      if (startOnEntryResume) {
+        startOnEntryResume = false;
+        instance.startCameraFromWorkspaceEntry?.();
+      }
+    },
     get destination() { return destination; }
   };
   } catch (error) {

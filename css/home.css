@@ -270,11 +270,7 @@ body[data-page="home"] .home-primary-tools .hp-card-grid { grid-template-columns
 body[data-page="home"] .home-primary-tools .hp-link-card { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: .4rem; min-height: 0; padding: .45rem; border-radius: .85rem; opacity: 1; transform: none; }
 body[data-page="home"] .home-primary-tools .hp-link-card:hover { transform: translateY(-2px); }
 body[data-page="home"] .home-primary-tools .hp-tool-screen { display: block; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: .55rem; background: #202b33; }
-body[data-page="home"] .home-primary-tools .hp-tool-screen img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-body[data-page="home"] .home-primary-tools .hp-tool-screen--draw img { object-position: center 49%; }
-body[data-page="home"] .home-primary-tools .hp-tool-screen--camera img { object-position: center 42%; }
-body[data-page="home"] .home-primary-tools .hp-tool-screen--audio img { object-position: center 50%; }
-body[data-page="home"] .home-primary-tools .hp-tool-screen--output img { object-position: center 50%; }
+body[data-page="home"] .home-primary-tools .hp-tool-screen img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 body[data-page="home"] .home-primary-tools .hp-card-copy { display: grid; align-content: start; gap: .16rem; min-width: 0; }
 body[data-page="home"] .home-primary-tools .hp-tool-title { min-width: 0; margin: 0; font-size: .88rem; font-weight: 900; line-height: 1.3; }
 body[data-page="home"] .home-primary-tools .hp-toy-line { padding: 0; color: var(--pixieed-muted, #5f6972); font-size: .7rem; line-height: 1.4; }
@@ -357,7 +353,4 @@ body[data-page="home"] .hp-puzzle-grid, body[data-page="home"] .hp-discover-grid
   body[data-page="home"] .hp-link-card { transition: none; }
 }
 
-/* Enlarge the recognizable work area while retaining the original real UI pixels. */
-body[data-page="home"] .home-primary-tools .hp-tool-screen--draw img { transform: scale(1.35); transform-origin: 50% 85%; }
-body[data-page="home"] .home-primary-tools .hp-tool-screen--camera img { transform: scale(2.1); transform-origin: 50% 30%; }
 body[data-page="home"] .home-gallery__heading { flex-wrap: wrap; }

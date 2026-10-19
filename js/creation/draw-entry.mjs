@@ -20,7 +20,7 @@ if (new URLSearchParams(location.search).get('gameEditor') === 'spot') {
 const startupMain = document.querySelector('#main');
 if (startupMain) startupMain.inert = true;
 try {
-  const { mountCreationRuntime } = await import('./creation-runtime.mjs?rev=20261018-direct-runtime-2');
+  const { mountCreationRuntime } = await import('./creation-runtime.mjs?rev=20261019-camera-original-color-1');
   const params = new URLSearchParams(location.search);
   const requestedMode = params.get('mode');
   const runtime = await mountCreationRuntime({ requestedMode, search: location.search, role: requestedMode || 'draw' });

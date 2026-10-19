@@ -38,6 +38,26 @@ async function context(row, { delayedCamera = false } = {}) {
   });
   await ctx.addInitScript(() => {
     window.__qaFailIdbWrite = false;
+    window.__qaMedia = { requests:0, constraints:[] };
+    if (navigator.mediaDevices) {
+      const syntheticMediaDevices = {
+        getSupportedConstraints: () => ({ zoom:true }),
+        getUserMedia: async constraints => {
+          window.__qaMedia.requests++;
+          window.__qaMedia.constraints.push(constraints);
+          throw new DOMException('Synthetic QA permission denial', 'NotAllowedError');
+        }
+      };
+      Object.defineProperty(navigator, 'mediaDevices', { configurable:true, enumerable:true, value:syntheticMediaDevices });
+      if (navigator.mediaDevices !== syntheticMediaDevices || navigator.mediaDevices.getUserMedia !== syntheticMediaDevices.getUserMedia) {
+        throw new Error('Deep QA fixture failed to replace navigator.mediaDevices; native media must remain unreachable');
+      }
+    }
+    const syntheticPermissions = { query:async () => ({ state:'denied' }) };
+    Object.defineProperty(navigator, 'permissions', { configurable:true, enumerable:true, value:syntheticPermissions });
+    if (navigator.permissions !== syntheticPermissions || navigator.permissions.query !== syntheticPermissions.query) {
+      throw new Error('Deep QA fixture failed to replace navigator.permissions; browser permission state must remain unreachable');
+    }
     const originalPut = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function (...args) {
       if (window.__qaFailIdbWrite) {
@@ -273,6 +293,7 @@ await run('input-undo-tab-trap-and-rapid-async-switch-hide', async ({ page, came
   assert.equal(await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.runtime.state.mode), 'draw');
   assert.equal(await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.active), false);
   assert.equal(await page.evaluate(() => document.querySelectorAll('#pixelStudio').length), 0, 'stale camera load must not append an active camera UI while hidden');
+  assert.equal(await page.evaluate(() => window.__qaMedia.requests), 0, 'stale camera mode initialization must not request hardware media');
   done(result, 'rapid mode requests followed by hide during delayed camera initialization cancel stale mode and UI');
 
   for (let i = 0; i < 16; i++) {

@@ -2,7 +2,7 @@ import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-edito
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
 import { mountDrawMode } from './draw-page.mjs?rev=20261018-direct-runtime-2';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
-import { mountCreationModes } from './creation-modes.mjs?rev=20261018-direct-runtime-2';
+import { mountCreationModes } from './creation-modes.mjs?rev=20261019-camera-original-color-1';
 import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261018-direct-runtime-1';
 
 function lastWorkspacePointer(search, requestedMode, restoreLast) {

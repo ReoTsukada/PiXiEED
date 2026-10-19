@@ -64,8 +64,16 @@ test('home: real creation tools lead the mini experience and gallery follows pla
   assert.match(html, /src="\/assets\/icons\/pixieed\/artwork\.svg"/);
   assert.match(html, /src="\/assets\/icons\/pixieed\/camera\.svg"/);
   assert.match(html, /src="\/assets\/icons\/pixieed\/music\.svg"/);
-  for (const shot of ['draw-pc-maou.png', 'camera-pc-maou.png', 'audio-pc-maou.png', 'output-pc-maou.png']) assert.match(html, new RegExp(`src="/assets/screenshots/${shot}"`), shot);
   const toolCards = html.slice(html.indexOf('<nav class="hp-card-grid hp-create-grid"'), html.indexOf('</nav>', html.indexOf('<nav class="hp-card-grid hp-create-grid"')));
+  for (const tool of ['draw', 'camera', 'audio', 'output']) {
+    assert.match(toolCards, new RegExp(`src="/assets/screenshots/home-${tool}-empty\\.png" width="960" height="540" alt="[^"]+"`), `${tool} has a 16:9 empty-tool fallback and descriptive alt`);
+    assert.match(toolCards, new RegExp(`/assets/screenshots/previews/home-${tool}-empty-480\\.webp 480w, /assets/screenshots/previews/home-${tool}-empty-960\\.webp 960w`), `${tool} has responsive empty-tool previews`);
+  }
+  assert.match(toolCards, /src="\/assets\/screenshots\/home-camera-empty\.png"[^>]*alt="写真調に生成した山と湖の風景をPiXiEELENSで元の色・ディザなしで128×72へドット変換したPC横画面全体"/, 'camera preview describes the generated original-color landscape conversion and full PC screen');
+  assert.doesNotMatch(toolCards, /maou/i, 'primary tool cards do not show the older sample artwork');
+  assert.match(toolCards, /fetchpriority="high"/, 'Draw keeps its high-priority image hint');
+  assert.equal((toolCards.match(/loading="eager"/g) || []).length, 3, 'Camera, audio and output keep eager loading');
+  assert.equal((toolCards.match(/sizes="\(min-width: 900px\) 360px, 240px"/g) || []).length, 4, 'all four cards retain their responsive image sizes');
   for (const href of ['/draw/?workspace=1', '/camera/?workspace=1', '/audio/?workspace=1', '/output/']) assert.ok(toolCards.includes(`href="${href}"`), href);
   assert.match(html, /hp-tools-about" href="\/draw\/#draw-how-to"/);
   assert.doesNotMatch(html, /class="container real-tool-screens"/);
@@ -82,7 +90,7 @@ test('home: real creation tools lead the mini experience and gallery follows pla
   const homeCss = read('css/home.css');
   assert.match(homeCss, /home-primary-tools \.hp-card-grid \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(homeCss, /grid-template-columns: repeat\(auto-fit, minmax\(min\(100%, 8\.5rem\), 1fr\)\)/);
-  assert.match(homeCss, /object-fit: cover/);
+  assert.match(homeCss, /home-primary-tools \.hp-tool-screen img \{[^}]*object-fit: contain/);
 });
 
 test('home hero: each colour is its own instrument — drawing, landing and cleared rows all play it', () => {

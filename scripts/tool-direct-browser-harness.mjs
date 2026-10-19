@@ -57,10 +57,30 @@ async function newContext(viewport, row) {
     // pointer migration, while preserving any real remembered direct pointer.
     if (localStorage.getItem('pixieed:pxd:last:direct-workspace:v1') === null) localStorage.setItem('pixieed:pxd:last:direct-workspace:v1', 'null');
     window.__directQa = { mediaRequests: 0, audioContexts: 0 };
-    if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => {
-      window.__directQa.mediaRequests++;
-      throw new DOMException('Synthetic QA permission denial', 'NotAllowedError');
-    };
+    window.__directQaPermissionQueries = 0;
+    window.__directQaAsyncErrors = [];
+    addEventListener('error', event => window.__directQaAsyncErrors.push(event.error?.stack || event.message || 'window error'));
+    addEventListener('unhandledrejection', event => window.__directQaAsyncErrors.push(event.reason?.stack || String(event.reason)));
+    window.__directQaMediaConstraints = [];
+    if (navigator.mediaDevices) {
+      const syntheticMediaDevices = {
+        getSupportedConstraints: () => ({ zoom: true }),
+        getUserMedia: async constraints => {
+        window.__directQa.mediaRequests++;
+        window.__directQaMediaConstraints.push(constraints);
+        throw new DOMException('Synthetic QA permission denial', 'NotAllowedError');
+        }
+      };
+      Object.defineProperty(navigator, 'mediaDevices', { configurable:true, enumerable:true, value:syntheticMediaDevices });
+      if (navigator.mediaDevices !== syntheticMediaDevices || navigator.mediaDevices.getUserMedia !== syntheticMediaDevices.getUserMedia) {
+        throw new Error('QA safety fixture failed to replace navigator.mediaDevices; no media request may run');
+      }
+    }
+    const syntheticPermissions = { query: async () => { window.__directQaPermissionQueries++; return { state:'denied' }; } };
+    Object.defineProperty(navigator, 'permissions', { configurable:true, enumerable:true, value:syntheticPermissions });
+    if (navigator.permissions !== syntheticPermissions || navigator.permissions.query !== syntheticPermissions.query) {
+      throw new Error('QA safety fixture failed to replace navigator.permissions; no permission query may reach browser state');
+    }
     const Audio = window.AudioContext || window.webkitAudioContext;
     if (Audio) window.AudioContext = class extends Audio {
       constructor(...args) { super(...args); window.__directQa.audioContexts++; }
@@ -117,7 +137,7 @@ async function runCase(mode, viewport) {
     assert.ok(startBox && startBox.y >= 0 && startBox.y + startBox.height <= viewport.height, 'start control must be reachable in the first viewport');
     const untouched = await page.evaluate(() => ({ ...window.__directQa }));
     assert.deepEqual(untouched, { mediaRequests: 0, audioContexts: 0 }, 'no media permission or AudioContext before explicit use');
-    check(row, 'description-first view, reachable CTA, no iframe/editor/media preload');
+    check(row, 'description-first view, reachable CTA, no iframe/editor/media preload; explanation is passive');
 
     await page.locator('[data-embed-start]').click();
     const runtimeHandle = await waitDirect(page, mode);
@@ -131,8 +151,16 @@ async function runCase(mode, viewport) {
     assert.equal(await page.evaluate(() => new URL(location.href).hash), '#acceptance');
     assert.equal(await page.evaluate(() => new URL(location.href).searchParams.get('workspace')), '1');
     assert.equal(await page.evaluate(() => document.querySelectorAll('#draw-canvas').length), 1);
-    assert.deepEqual(await page.evaluate(() => ({ ...window.__directQa })), untouched);
-    check(row, 'explicit start mounts requested real mode once without iframe or media startup');
+    const afterEntry = await page.evaluate(() => ({ ...window.__directQa }));
+    if (mode === 'camera') {
+      await page.waitForFunction(() => window.__directQa.mediaRequests === 1 && document.querySelector('#pixelStudio')?.dataset.mode === 'idle');
+      assert.deepEqual(await page.evaluate(() => ({ ...window.__directQa })), { mediaRequests:1, audioContexts:0 }, 'one automatic request per explicit camera WORK entry; synthetic denial is safe');
+      assert.ok(await page.locator('#cameraFallbackChoose').isEnabled(), 'denial preserves image import fallback');
+      assert.deepEqual(await page.evaluate(() => window.__directQaMediaConstraints.map(value => value.audio)), [false], 'camera request must never ask for microphone access');
+    } else assert.deepEqual(afterEntry, untouched);
+    check(row, mode === 'camera'
+      ? 'explicit start mounts camera once without iframe and attempts exactly one video-only request'
+      : 'explicit start mounts requested mode once without iframe or media startup');
 
     const runtime = runtimeHandle;
     const drawMode = await runtime.evaluate(rt => rt.modes.switchMode('draw'));
@@ -220,10 +248,20 @@ async function runCase(mode, viewport) {
       check(row, 'real PNG export returns valid bytes');
     }
     assert.deepEqual(row.errors, []);
+    row.asyncErrors = await page.evaluate(() => window.__directQaAsyncErrors ?? []);
+    assert.deepEqual(row.asyncErrors, [], 'no unhandled window errors or promise rejections');
     console.log('PASS', label, row.checks.length);
   } catch (error) {
     row.failure = error.stack || String(error); report.failures.push(label);
     console.error('FAIL', label, error.message);
+    row.diagnostics = await page.evaluate(() => ({
+      media: window.__directQa,
+      permissionQueries: window.__directQaPermissionQueries,
+      constraints: window.__directQaMediaConstraints,
+      asyncErrors: window.__directQaAsyncErrors,
+      mode: document.querySelector('#pixelStudio')?.dataset.mode ?? null,
+      fallbackText: document.querySelector('#cameraFallbackChoose')?.textContent ?? null
+    })).catch(() => null);
     await page.screenshot({ path: `${out}/${label}-failure.png`, fullPage: true }).catch(() => {});
   } finally {
     await context.close();
@@ -248,8 +286,17 @@ try {
       const runtime = await waitDirect(page,mode); const before = await state(runtime);
       await page.locator('[data-shell-explanation]').click(); await page.locator('[data-embed-start]').click();
       await waitDirect(page,mode); assert.deepEqual(await state(runtime),before);
-      assert.deepEqual(await page.evaluate(() => ({...window.__directQa})),{mediaRequests:0,audioContexts:0});
-      assert.deepEqual(row.errors,[]); check(row,'unchanged home CTA enters default direct mode once, no media start, same work after explanation');
+      if (mode === 'camera') {
+        await page.waitForFunction(() => window.__directQa.mediaRequests === 1 && document.querySelector('#pixelStudio')?.dataset.mode === 'idle');
+        assert.deepEqual(await page.evaluate(() => ({...window.__directQa})),{mediaRequests:1,audioContexts:0});
+        assert.deepEqual(await page.evaluate(() => window.__directQaMediaConstraints.map(value => value.audio)),[false]);
+      } else assert.deepEqual(await page.evaluate(() => ({...window.__directQa})),{mediaRequests:0,audioContexts:0});
+      assert.deepEqual(row.errors,[]);
+      row.asyncErrors = await page.evaluate(() => window.__directQaAsyncErrors ?? []);
+      assert.deepEqual(row.asyncErrors, [], 'no unhandled window errors or promise rejections');
+      check(row,mode==='camera'
+        ? 'home CTA enters camera WORK with one video-only request and explanation resume does not repeat it'
+        : 'home CTA enters default direct mode once with no media start, same work after explanation');
       console.log('PASS',row.label,row.checks.length);
     } catch(error) { row.failure=error.stack;report.failures.push(row.label);console.error('FAIL',row.label,error.message); }
     finally { await context.close(); }

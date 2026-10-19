@@ -747,15 +747,15 @@ function removeSmallRegions(imageData, edgeMap) {
 
 function applyColorDepth(imageData) {
   const depth = state.colorDepth || '4';
+  if (depth === 'full') {
+    clearPaletteState();
+    return;
+  }
   const edgeMap = createEdgeMap(imageData);
   applyPreAverage(imageData);
   boostSaturation(imageData);
   applyContrastToImageData(imageData);
   liftShadows(imageData);
-  if (depth === 'full') {
-    clearPaletteState();
-    return;
-  }
   if (depth === '256') {
     applyFixed8Bit(imageData, edgeMap);
     clearPaletteState();
@@ -1022,6 +1022,7 @@ export function ensureGrayTint() {
 
 /** CSS filter string PiXiEELENS draws the camera frame with (tone settings + the dot smoothing blur). */
 export function lensFrameFilter() {
+  if (state.colorDepth === 'full') return 'none';
   return `blur(${DOT_SMOOTHING_BLUR}px) ${computeCameraFilterComponents(state.cameraSettings).join(' ')}`;
 }
 
