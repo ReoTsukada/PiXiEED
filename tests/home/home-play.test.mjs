@@ -66,10 +66,11 @@ test('home: real creation tools lead the mini experience and gallery follows pla
   assert.match(html, /src="\/assets\/icons\/pixieed\/music\.svg"/);
   const toolCards = html.slice(html.indexOf('<nav class="hp-card-grid hp-create-grid"'), html.indexOf('</nav>', html.indexOf('<nav class="hp-card-grid hp-create-grid"')));
   for (const tool of ['draw', 'camera', 'audio', 'output']) {
-    assert.match(toolCards, new RegExp(`src="/assets/screenshots/home-${tool}-empty\\.png" width="960" height="540" alt="[^"]+"`), `${tool} has a 16:9 empty-tool fallback and descriptive alt`);
-    assert.match(toolCards, new RegExp(`/assets/screenshots/previews/home-${tool}-empty-480\\.webp 480w, /assets/screenshots/previews/home-${tool}-empty-960\\.webp 960w`), `${tool} has responsive empty-tool previews`);
+    const revision = tool === 'camera' ? '\\?rev=20261019-photo16-preview-1' : '';
+    assert.match(toolCards, new RegExp(`src="/assets/screenshots/home-${tool}-empty\\.png${revision}" width="960" height="540" alt="[^"]+"`), `${tool} has a 16:9 fallback and descriptive alt`);
+    assert.match(toolCards, new RegExp(`/assets/screenshots/previews/home-${tool}-empty-480\\.webp${revision} 480w, /assets/screenshots/previews/home-${tool}-empty-960\\.webp${revision} 960w`), `${tool} has responsive full-PC previews`);
   }
-  assert.match(toolCards, /src="\/assets\/screenshots\/home-camera-empty\.png"[^>]*alt="写真調に生成した山と湖の風景をPiXiEELENSで元の色・ディザなしで128×72へドット変換したPC横画面全体"/, 'camera preview describes the generated original-color landscape conversion and full PC screen');
+  assert.match(toolCards, /src="\/assets\/screenshots\/home-camera-empty\.png\?rev=20261019-photo16-preview-1"[^>]*alt="写真調に生成した山と湖の風景をPiXiEELENSで写真から選ぶ16色・ディザなしで128×72へドット変換したPC横画面全体"/, 'camera preview describes the generated source-palette 16-color landscape without dithering and the full PC screen');
   assert.doesNotMatch(toolCards, /maou/i, 'primary tool cards do not show the older sample artwork');
   assert.match(toolCards, /fetchpriority="high"/, 'Draw keeps its high-priority image hint');
   assert.equal((toolCards.match(/loading="eager"/g) || []).length, 3, 'Camera, audio and output keep eager loading');
