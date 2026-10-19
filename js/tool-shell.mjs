@@ -17,19 +17,22 @@ shell.classList.add(`tool-shell--${mode}`);
 
 const copy = {
   draw: {
-    eyebrow: 'PIXIEEDRAW', title: 'ドット絵を描く',
-    lead: 'レイヤーやコマを使って、ドット絵とアニメーションを作れます。',
+    eyebrow: 'PIXIEEDRAW', title: 'ドット絵・ピクセルアートを描く',
+    documentTitle: 'ドット絵・ピクセルアートを描く｜アニメーションGIF作成｜PiXiEEDraw',
+    lead: 'ピクセルアート（Pixel Art）のコマをつないで、動くアニメーションを作れます。',
     workspace: '描画・カメラ・音楽を同じ作品で切り替えて使えます.',
     workspaceTitle: 'このページで制作する',
   },
   camera: {
     eyebrow: 'PiXiEEDraw · PiXiEELENS', title: '写真・画像をドット絵に変換',
+    documentTitle: '写真・画像をドット絵に変換｜PiXiEEDraw',
     lead: '写真を撮影するか画像を読み込み、ドット絵に変換して色数を調整できます。',
     workspace: '画像の読込や撮影から始め、変換結果を作品に反映できます。',
     workspaceTitle: 'このページで画像を変換する',
   },
   audio: {
     eyebrow: 'PIXIEEDAUDIO', title: '音楽をつくる',
+    documentTitle: '音楽をつくる｜PiXiEEaudio｜PiXiEEDraw',
     lead: '色を音色に割り当て、マス目に音を描いてループ曲を作れます。',
     workspace: '色を音に割り当て、フレームとテンポを編集して曲にします。',
     workspaceTitle: 'このページで音楽を作る',
@@ -40,9 +43,7 @@ document.querySelector('[data-shell-title]').textContent = copy.title;
 document.querySelector('[data-shell-lead]').textContent = copy.lead;
 document.querySelector('[data-shell-workspace-copy]').textContent = copy.workspace.replace(/\.$/, '。');
 document.querySelector('#tool-embed-title').textContent = copy.workspaceTitle;
-document.title = mode === 'audio'
-  ? `${copy.title}｜PiXiEEaudio｜PiXiEEDraw`
-  : `${copy.title}｜PiXiEEDraw`;
+document.title = copy.documentTitle;
 
 function queryWithAdapter() {
   if (directCandidate && mode === 'draw' && !['standalone','to','drawRequest','audioRequest','drawCamera','audioCamera'].some(key => params.has(key))) return new URLSearchParams(location.search);
@@ -73,7 +74,7 @@ if (forwarded) {
 if ((isAudioRoute || isCameraRoute) && !forwarded.has('mode')) forwarded.append('mode', mode);
 
 if (directCandidate) {
-  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261019-camera-original-color-1');
+  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261019-draw-search-rail-1');
   installDirectToolShell({ section, mode, search: forwarded });
 } else {
 

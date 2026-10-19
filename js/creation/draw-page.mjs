@@ -11,7 +11,7 @@ import { ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame,
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261016-color-capability-1';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261017-layer-minimum-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-draw-search-rail-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
@@ -31,7 +31,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261018-direct-runtime-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261019-draw-search-rail-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
@@ -56,7 +56,7 @@ import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transform
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261010-selection-handles-1';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261016-color-capability-1';
 import { mountDrawColorAdjustmentPanel } from './draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1';
-import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261011-tool-size-1';
+import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261019-draw-search-rail-1';
 import { mountDrawTextPanel } from './draw-text-panel.mjs?rev=20261010-features-1';
 
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
@@ -552,7 +552,7 @@ function stopAnimation() {
   playing = false; playbackFrame = null; cancelAnimationFrame(playbackRequest); playbackRequest = 0;
   animationControls?.refresh();
   syncPlaybackControl();
-  syncMirrorRail();
+  syncDrawingSettings();
   // Visibility changes and mode suspension also stop playback. Restore the
   // selected cel and its onion guides instead of leaving the last played cel.
   if (wasPlaying) paint();
@@ -567,7 +567,7 @@ function toggleAnimation() {
   const frames = animationSession.animation.frames; playbackOffset = 0;
   for (const frame of frames) { if (frame.id === animationSession.frameId) break; playbackOffset += frame.durationMs; }
   playing = true; playbackStarted = performance.now();
-  syncMirrorRail();
+  syncDrawingSettings();
   const tick = (now) => {
     if (!playing || scope.disposed) return;
     const sequence = animationSession.animation.frames, total = sequence.reduce((sum, frame) => sum + frame.durationMs, 0);
@@ -580,7 +580,7 @@ function toggleAnimation() {
 }
 let onionKey = '', onionGuide = null;
 function paintOnion(display) {
-  onionCanvas.hidden = !shouldShowDrawOnion({ enabled: onion, playing, readOnly: Boolean(readOnlyImage) });
+  onionCanvas.hidden = !shouldShowDrawOnion({ enabled: onion && animationSession.animation.frames.length >= 2, playing, readOnly: Boolean(readOnlyImage) });
   if (onionCanvas.hidden) return;
   const animation = animationSession.animation, key = `${animationSession.frameId}:${animation.frames.map((frame) => frame.id).join(',')}`;
   if (onionKey !== key || onionGuide?.animation !== animation) {
@@ -1250,10 +1250,15 @@ function syncDrawingSettings() {
     if (!available) button.setAttribute('aria-description', button.title); else button.removeAttribute('aria-description');
     symmetryAxes[index].hidden = !available || !symmetry[key];
   });
-  setAttributeIfChanged(gridButton, 'aria-pressed', showGrid); setAttributeIfChanged(onionButton, 'aria-pressed', onion);
-  if (onionButton) { onionButton.disabled = Boolean(readOnlyImage) || frames < 2 && !onion; onionButton.title = readOnlyImage ? '原本の表示中はオニオンスキンを使えません' : onionButton.disabled ? '2コマ以上あると前後のコマを表示できます' : onionButton.getAttribute('aria-label'); }
+  const gridAvailable = !readOnlyImage, onionAvailable = gridAvailable && frames >= 2 && !playing;
+  // Retain the user's preferences, but show an active state only when the
+  // corresponding guide can actually appear on this canvas.
+  setAttributeIfChanged(gridButton, 'aria-pressed', showGrid && gridAvailable);
+  setAttributeIfChanged(onionButton, 'aria-pressed', onion && onionAvailable);
+  if (gridButton) { gridButton.disabled = !gridAvailable; gridButton.title = gridAvailable ? gridButton.getAttribute('aria-label') : '原本の表示中はマス目を使えません'; }
+  if (onionButton) { onionButton.disabled = !onionAvailable; onionButton.title = readOnlyImage ? '原本の表示中はオニオンスキンを使えません' : playing ? '再生を止めると前後のコマを表示できます' : frames < 2 ? '2コマ以上あると前後のコマを表示できます' : onionButton.getAttribute('aria-label'); }
   $('.draw-board')?.classList.toggle('has-symmetry', available && Object.values(symmetry).some(Boolean));
-  $('.draw-board')?.classList.toggle('has-grid', showGrid);
+  $('.draw-board')?.classList.toggle('has-grid', showGrid && gridAvailable);
   syncMirrorRail();
   placeOverlays();
 }

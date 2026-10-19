@@ -21,6 +21,11 @@ const TOOL_LABELS = {
   select: '範囲選択'
 };
 const TOGGLE_SOURCE_SELECTORS = Object.freeze({ 'toggle.grid': '#draw-grid-toggle', 'toggle.onion': '#draw-onion-toggle' });
+const SELECTION_MODE_ICONS = Object.freeze({ rectangle: 'rectangle', lasso: '∿', color: '◉' });
+
+export function desktopToolIcon(tool, mode = '') {
+  return tool === 'select' ? SELECTION_MODE_ICONS[mode] || 'select' : tool;
+}
 
 export function findDesktopToggleSource(doc, command) {
   const selector = TOGGLE_SOURCE_SELECTORS[command];
@@ -50,7 +55,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261017-layer-minimum-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261019-draw-search-rail-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
@@ -59,6 +64,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   const featureGroup = featureActions;
   const undo = root.querySelector('#draw-undo'), redo = root.querySelector('#draw-redo');
   const selection = root.querySelector('#draw-selection-controls');
+  const selectionNumbers = doc.querySelector('#draw-selection-numbers');
   const animationHost = root.querySelector('#draw-animation-controls');
   const originalLauncher = animationHost?.querySelector('[data-action="toggle-frames"]');
   const restore = [];
@@ -113,7 +119,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     const key = `${tool}:${mode}`;
     const actual = actualButtons.get(key) || actualButtons.get(`${tool}:`);
     if (!actual) return null;
-    const node = button(label, bindingKey(commandId), commandId, { icon: actual.dataset.drawingIcon || tool, pressed: actual.getAttribute('aria-pressed') === 'true' });
+    const node = button(label, bindingKey(commandId), commandId, { icon: desktopToolIcon(tool, mode) || actual.dataset.drawingIcon || tool, pressed: actual.getAttribute('aria-pressed') === 'true' });
     node.dataset.desktopTool = tool; if (mode) node.dataset.desktopSelectionMode = mode;
     node.title = keyTip(label, bindingKey(commandId)); host.append(node); return node;
   };
@@ -143,6 +149,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     move(viewport, $('.draw-desktop-canvas-host'));
     move(paletteRow, $('.draw-desktop-palette-host'));
     move(featureGroup, $('[data-desktop-features]'));
+    move(selectionNumbers, $('[data-desktop-features]'));
     move(selection, $('[data-desktop-selection-context]'));
     move(undo, $('[data-desktop-history]')); move(redo, $('[data-desktop-history]'));
     move(meta, $('.draw-desktop-canvas-meta'));

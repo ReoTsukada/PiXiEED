@@ -217,7 +217,7 @@ body.draw-desktop-active .draw-desktop-frame-panel { grid-area: frames; display:
 body.draw-desktop-active .draw-desktop-frame-heading { display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; min-height: 19px; }
 body.draw-desktop-active .draw-desktop-frame-heading h2 { margin: 0; color: var(--desktop-muted); font-size: 10px; }
 body.draw-desktop-active [data-layout-reset] { min-height: 24px; padding: 2px 8px; border: 1px solid #ffffff20; border-radius: 6px; background: #172129; color: #d8e0df; font: inherit; font-size: 10px; cursor: pointer; }
-body.draw-desktop-active .draw-desktop-frame-host { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: hidden; }
+body.draw-desktop-active .draw-desktop-frame-host { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; overflow: auto; scrollbar-width: thin; }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frames { display: grid; grid-template-rows: 28px minmax(0, 1fr); min-width: 0; min-height: 0; width: 100%; height: 100%; gap: 4px; }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-heading { display: none !important; }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions { display: flex; align-items: center; gap: 4px; min-height: 0; }
@@ -424,6 +424,9 @@ body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset] {
 }
 body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset]::before { content: "↺"; font: 700 18px/1 system-ui, sans-serif; }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frames { grid-template-rows: 44px minmax(0, 1fr); }
+/* A short PC workspace scrolls the frame actions and cards together. The cards
+   retain their full hit area instead of being clipped below the action row. */
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frames:not(.is-collapsed) { min-height: 100px; grid-template-rows: 44px minmax(52px, 1fr); }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions { flex-wrap: wrap; overflow: auto; }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions button {
   box-sizing: border-box; display: grid; place-items: center; flex: 0 0 44px !important; width: 44px !important; min-width: 44px !important;

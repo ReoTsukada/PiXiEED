@@ -6,6 +6,12 @@ import { posix } from 'node:path';
 test('Draw rail, editor UI, and direct runtime changes invalidate every parent and editor entry', async () => {
   const root = new URL('../../', import.meta.url);
   const revisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
+  const drawSearchRails = new Set([
+    'js/creation/animation-controls.mjs', 'js/creation/draw-desktop-ui.mjs', 'js/creation/draw-brush-settings.mjs', 'js/creation/draw-page.mjs',
+    'js/creation/draw-entry.mjs', 'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs',
+    'js/creation/creation-runtime.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs',
+    'css/draw-desktop-ui.css', 'css/draw-color-adjustment-panel.css'
+  ]);
   const previousRelease = new Set(['js/creation/draw-desktop-ui.mjs']);
   const cameraWorkEntry = new Set([
     'js/creation/creation-camera.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/engine.mjs', 'js/pixel-lens/entry.mjs',
@@ -20,7 +26,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
   ]);
   const graph = {
     'js/creation/draw-desktop-ui.mjs': ['js/creation/draw-desktop-layout.mjs', 'css/draw-desktop-ui.css'],
-    'js/creation/draw-page.mjs': ['js/creation/draw-desktop-ui.mjs', 'js/creation/draw-viewport-overlays.mjs', 'js/creation/animation-controls.mjs', 'js/creation/editor-ui.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs'],
+    'js/creation/draw-page.mjs': ['js/creation/draw-desktop-ui.mjs', 'js/creation/draw-brush-settings.mjs', 'js/creation/draw-viewport-overlays.mjs', 'js/creation/animation-controls.mjs', 'js/creation/editor-ui.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs'],
     'js/creation/creation-runtime.mjs': ['js/creation/draw-page.mjs', 'js/creation/project-workspace.mjs', 'js/creation/creation-modes.mjs'],
     'js/creation/draw-entry.mjs': ['js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs'],
     'js/creation/audio-page.mjs': ['js/creation/animation-controls.mjs', 'js/creation/editor-ui.mjs', 'js/creation/project-workspace.mjs'],
@@ -38,7 +44,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'draw/index.html': ['js/tool-shell.mjs'],
     'camera/index.html': ['js/tool-shell.mjs'],
     'audio/index.html': ['js/tool-shell.mjs'],
-    'draw/editor.html': ['js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/creation/project-workspace.mjs', 'css/creation-animation.css'],
+    'draw/editor.html': ['js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/creation/project-workspace.mjs', 'css/creation-animation.css', 'css/draw-color-adjustment-panel.css'],
     'audio/editor.html': ['js/creation/audio-entry.mjs', 'css/creation-animation.css'],
     'hidden-object/index.html': ['js/creation/hidden-object-page.mjs'],
     'jigsaw/index.html': ['js/creation/jigsaw-page.mjs'],
@@ -55,9 +61,10 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (cameraWorkEntry.has(target)) assert.equal(revisions[target], '20261019-camera-original-color-1', `${target} invalidates the explicit camera entry release`);
+      if (drawSearchRails.has(target)) assert.equal(revisions[target], '20261019-draw-search-rail-1', `${target} invalidates the Draw control and search guidance release`);
+      else if (cameraWorkEntry.has(target)) assert.equal(revisions[target], '20261019-camera-original-color-1', `${target} invalidates the explicit camera entry release`);
       else if (changed.has(target)) assert.equal(revisions[target], '20261018-direct-runtime-2', `${target} carries the direct runtime release revision`);
-      if (previousRelease.has(target)) assert.equal(revisions[target], '20261018-direct-runtime-1', `${target} keeps the previous release revision`);
+      if (previousRelease.has(target) && !drawSearchRails.has(target)) assert.equal(revisions[target], '20261018-direct-runtime-1', `${target} keeps the previous release revision`);
       for (const value of urls) assert.equal(new URL(value, `https://local.invalid/${owner}`).searchParams.get('rev'), revisions[target], `${owner} invalidates ${target}`);
     }
   }

@@ -24,7 +24,7 @@ body[data-admin-page] { background: #edf2f0; }
 .admin-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
 .admin-metric { display: grid; gap: .4rem; margin: 0; }
 .admin-metric span { color: var(--ink-soft); font-size: .78rem; }
-.admin-metric strong { font-family: Georgia, serif; font-size: 2.2rem; }
+.admin-metric strong { font-family: var(--pixieed-font-sans); font-size: 2.2rem; }
 .admin-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
 .admin-section-heading h2 { margin-bottom: 0; font-size: clamp(1.8rem, 4vw, 3rem); }
 .admin-section-heading p { max-width: 28rem; margin-bottom: 0; color: var(--ink-soft); line-height: 1.7; }

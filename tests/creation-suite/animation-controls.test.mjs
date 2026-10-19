@@ -427,6 +427,16 @@ test('Draw cel grid exposes add cells, contextual editing, and long-press header
   const panel = doc.body.children.find((child) => child.getAttribute('role') === 'dialog');
   const grid = panel.children[2];
   assert.equal(panel.children[1].hidden, true, 'Draw hides the row of permanent controls');
+  const gif = panel.children[0].querySelector('[data-action="export-gif"]');
+  assert.ok(gif, 'GIF export stays in the visible workspace heading');
+  assert.equal(panel.children[1].querySelector('[data-action="export-gif"]'), null, 'the hidden legacy toolbar cannot trap GIF export');
+  gif.fire('click');
+  assert.deepEqual(actions.at(-1), { type: 'export-gif' });
+  state.readOnly = true; ui.refresh();
+  assert.equal(gif.disabled, true, 'read-only originals cannot silently ignore GIF export');
+  assert.match(gif.title, /PNG/);
+  state.readOnly = false; ui.refresh();
+  assert.equal(gif.disabled, false);
   assert.ok(grid.querySelector('[data-action="add-frame"]'));
   assert.ok(grid.querySelector('[data-action="add-layer"]'));
   const addLayer = grid.querySelector('[data-action="add-layer"]');

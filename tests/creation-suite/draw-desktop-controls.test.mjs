@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dispatchDesktopToggle, findDesktopToggleSource, syncDesktopToggleProxy } from '../../js/creation/draw-desktop-ui.mjs';
+import { desktopToolIcon, dispatchDesktopToggle, findDesktopToggleSource, syncDesktopToggleProxy } from '../../js/creation/draw-desktop-ui.mjs';
+
+test('desktop selection modes have distinct rail glyphs', () => {
+  const icons = ['rectangle', 'lasso', 'color'].map(mode => desktopToolIcon('select', mode));
+  assert.deepEqual(icons, ['rectangle', '∿', '◉']);
+  assert.equal(new Set(icons).size, 3);
+});
 
 function fixture({ outsideRoot = false, disabled = false, pressed = 'true' } = {}) {
   const root = { containsSource: false };

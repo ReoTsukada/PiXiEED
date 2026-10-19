@@ -58,7 +58,7 @@
 .product-card__placeholder::after { right: -8%; bottom: 20%; background: repeating-linear-gradient(90deg, rgb(185 78 60 / 16%) 0 8px, transparent 8px 13px); }
 .product-card__placeholder-mark, .product-card__placeholder-title, .product-card__placeholder small { position: relative; z-index: 1; }
 .product-card__placeholder-mark { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgb(49 93 80 / 35%); color: var(--catalog-green); font: 700 .7rem ui-monospace, monospace; }
-.product-card__placeholder-title { display: -webkit-box; max-width: 100%; overflow: hidden; color: var(--catalog-ink); font-family: Georgia, "Yu Mincho", serif; font-size: clamp(.88rem, 2.1vw, 1.28rem); font-weight: 700; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.product-card__placeholder-title { display: -webkit-box; max-width: 100%; overflow: hidden; color: var(--catalog-ink); font-family: var(--pixieed-font-sans); font-size: clamp(.88rem, 2.1vw, 1.28rem); font-weight: 700; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .product-card__placeholder small { color: var(--catalog-muted); font-size: .67rem; letter-spacing: .08em; }
 .product-card__body { display: flex; min-height: 286px; flex-direction: column; padding: 12px; }
 .product-card__meta { display: flex; flex-wrap: wrap; gap: 5px; color: var(--catalog-green); font-size: .68rem; font-weight: 750; }

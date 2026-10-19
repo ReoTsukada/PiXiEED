@@ -112,7 +112,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     playButton = button('再生', '▶', 'play', 'animation-controls__play');
     toolbar.append(playButton);
     if (!onionControlExternal) toolbar.append(button('オニオンスキン', '◉', 'onion'));
-    toolbar.append(button('GIFを書き出す', 'GIF', 'export-gif', 'animation-controls__export'));
+    const exportGif = button('GIFを書き出す', 'GIF', 'export-gif', 'animation-controls__export');
+    toolbar.append(exportGif);
 
     frames = node('div', 'animation-controls__frames');
     frames.dataset.frameStrip = 'true'; frames.setAttribute('role', 'listbox'); frames.setAttribute('aria-label', 'コマ');
@@ -175,7 +176,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const heading = node('div', 'animation-controls__workspace-heading');
       heading.append(node('strong', '', frameOnly ? 'フレーム' : 'レイヤー・フレーム'));
       workspaceSelection = node('span', 'animation-controls__workspace-selection');
-      heading.append(playButton);
+      // The workspace hides its legacy toolbar. Keep the existing export action
+      // reachable alongside playback in both the desktop and compact layouts.
+      heading.append(playButton, exportGif);
       const closeWorkspace = button(frameOnly ? 'フレームを閉じる' : 'レイヤー・フレームを閉じる', '×', 'close-animation');
       heading.append(workspaceSelection, closeWorkspace);
       celToolbar = toolbar; celToolbar.hidden = !frameOnly;
@@ -819,6 +822,12 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const addFrame = actionElement('add-frame'); if (addFrame) setBoolean(addFrame, 'disabled', Boolean(state.readOnly) || pendingDisabled || state.frames.length >= 128);
     const play = actionElement('play'); if (play) setBoolean(play, 'disabled', pendingDisabled || (!state.playing && (state.readOnly || (!state.audioMode && state.frames.length < 2))));
     const onion = actionElement('onion'); if (onion) setBoolean(onion, 'disabled', pendingDisabled || state.frames.length < 2);
+    const gif = actionElement('export-gif');
+    if (gif) {
+      setBoolean(gif, 'disabled', pendingDisabled || Boolean(state.readOnly));
+      const label = state.readOnly ? '原本の表示中はGIFを書き出せません。PNGで保存できます。' : 'GIFを書き出す';
+      if (gif.title !== label) gif.title = label;
+    }
     const fps = timing.querySelector('[data-duration-input]'); if (fps) setBoolean(fps, 'disabled', Boolean(state.readOnly) || pendingDisabled || selectedIndex < 0);
     const preset = timing.querySelector('[data-fps-preset]'); if (preset) setBoolean(preset, 'disabled', Boolean(state.readOnly) || pendingDisabled || selectedIndex < 0);
   }

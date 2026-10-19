@@ -4,7 +4,17 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildPagesSite } from '../../scripts/build-pages-site.mjs';
+import { addSiteFontFallback, buildPagesSite } from '../../scripts/build-pages-site.mjs';
+
+test('standalone and old generated pages get local sans typography without changing content or artwork fonts', () => {
+  const source = '<!doctype html><html><head><meta charset="utf-8"><link rel="canonical" href="https://pixieed.jp/example/"></head><body><h1>合成案内</h1><code style="font-family:monospace">A1</code><canvas></canvas></body></html>';
+  const result = addSiteFontFallback(source);
+  assert.match(result, /<style data-site-font>:root\{font-family:[^}]*"Hiragino Sans"[^}]*sans-serif\}/);
+  assert.match(result, /button,input,select,textarea\{font-family:inherit\}/);
+  assert.equal(result.replace(/\n<style data-site-font>[\s\S]*?<\/style>/, ''), source);
+  assert.equal(addSiteFontFallback(result), result, 'an existing baseline is not duplicated');
+  assert.doesNotMatch(result, /@font-face|https:\/\/(?:fonts\.|fonts\/)/);
+});
 
 test('Pages artifact includes tracked site and generated OGP, excludes private and untracked work', async t => {
   const scratch = await mkdtemp(join(tmpdir(), 'pixieed-pages-test-')); t.after(() => rm(scratch, { recursive: true, force: true }));

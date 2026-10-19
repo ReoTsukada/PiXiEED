@@ -206,6 +206,7 @@ export function createPuzzleSharePage(payload, { postId, supabaseUrl, ogpImagePa
   return `<!doctype html>
 <html lang="ja">
 <head>
+<style data-site-font>:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Meiryo",system-ui,sans-serif}button,input,select,textarea{font-family:inherit}</style>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>${escapeHtml(title)}</title>

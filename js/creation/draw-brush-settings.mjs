@@ -23,7 +23,10 @@ export function mountDrawBrushSettings({ scope, host, getState, onChange, before
   const status = dialog.querySelector('[data-brush-status]');
   function sync() {
     const state = getState(), current = state.bindings[state.side || 'left'], setting = brushSettingForTool(current);
-    opener.textContent = `サイズ ${setting.supported ? `${setting.value}px` : '—'}`;
+    // Pointer-down cancellation also syncs these controls. Replacing the label
+    // during that gesture can cancel the browser's native button click.
+    const text = `サイズ ${setting.supported ? `${setting.value}px` : '—'}`;
+    if (opener.textContent !== text) opener.textContent = text;
     opener.setAttribute('aria-label', `サイズ設定。${state.side === 'right' ? '右' : '左'}ボタン${setting.supported ? ` ${setting.value}px` : 'の道具はサイズ対象外'}`);
     opener.disabled = Boolean(state.blockedReason);
     if (!dialog.open) return;

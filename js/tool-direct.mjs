@@ -191,7 +191,7 @@ export function installDirectToolShell({ section, mode, search }) {
         } catch { initialRestoreError = '前回の作品の記録を確認できません。作品一覧から選び直してください。元の保存内容は保持しています。'; }
       }
       let mountCreationRuntime;
-      try { ({ mountCreationRuntime } = await import('./creation/creation-runtime.mjs?rev=20261019-camera-original-color-1')); }
+      try { ({ mountCreationRuntime } = await import('./creation/creation-runtime.mjs?rev=20261019-draw-search-rail-1')); }
       catch (error) { reloadRequired = true; throw error; }
       checkAlive();
       runtime = await mountCreationRuntime({ signal: lifecycle.signal, isActive: () => open && !disposed, role: mode, requestedMode: mode, search: adapted.search, restoreLast: false, initialPointer, workspaceOptions: { rememberKey: DRAFT_KEY, rememberShared: false, allowImplicitImport: false, initialRestoreError }, deferInitialMode: true });
