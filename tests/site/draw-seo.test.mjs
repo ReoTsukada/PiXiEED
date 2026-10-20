@@ -39,7 +39,7 @@ test('visible draw guidance explains frame duplication, onion skin, playback, an
   const h1 = main.match(/<h1[^>]*data-shell-title[^>]*>([^<]+)<\/h1>/i)?.[1];
   const lead = main.match(/<p[^>]*data-shell-lead[^>]*>([^<]+)<\/p>/i)?.[1];
   assert.equal(h1, 'ドット絵・ピクセルアートを描く');
-  assert.equal(lead, 'ピクセルアート（Pixel Art）のコマをつないで、動くアニメーションを作れます。');
+  assert.equal(lead, 'ピクセルアート（Pixel Art）でゲーム素材などの小さな絵を描き、コマをつないでGIFも作れます。');
   const drawCopy = shellScript.match(/draw:\s*\{([\s\S]*?)\n\s*\},\n\s*camera:/i)?.[1] ?? '';
   assert.match(drawCopy, new RegExp(`title:\\s*'${h1}'`));
   assert.match(drawCopy, new RegExp(`documentTitle:\\s*'${title}'`));

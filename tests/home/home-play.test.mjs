@@ -15,7 +15,7 @@ test('home: tool cards have working toys and creation links lead the page', () =
   assert.doesNotMatch(html, /data-toy="game"/);
   assert.match(html, /data-toy="editor" href="\/draw\/\?workspace=1"[\s\S]*?PiXiEEDraw/);
   assert.doesNotMatch(html, /PXDraw/);
-  assert.match(html, /<h3 class="hp-tool-title">写真をドット絵に<\/h3><span class="hp-toy-line">画像をPNG保存/);
+  assert.match(html, /<h3 class="hp-tool-title">写真をドット絵に<\/h3><span class="hp-toy-line">描かずに加工・PNG保存/);
   assert.match(html, /data-toy="sound" href="\/audio\/\?workspace=1"[\s\S]*?PiXiEEaudio/);
   assert.match(source, /prefers-reduced-motion/);
 });

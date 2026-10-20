@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
   <script src="/js/tool-entry-compat.js?rev=20261018-workspace-polish-1"></script>
-<title>音楽をつくる｜PiXiEEaudio</title>
-  <meta name="description" content="色を音色に割り当て、マス目に音を描いてループ曲を作れます。テンポやフレームを編集し、WAVや画像を書き出せます。">
+<title>短いループ曲をつくる｜PiXiEEaudio</title>
+  <meta name="description" content="マス目に色を置いて短いループ曲づくりを試せます。音色・テンポ・フレームを編集し、再生して確認。完成した音声はWAVで保存できます。">
   <link rel="canonical" href="https://pixieed.jp/audio/">
   <meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP">
-  <meta property="og:title" content="音楽をつくる｜PiXiEEaudio"><meta property="og:description" content="色を音色に割り当て、マス目に音を描いてループ曲を作れます。テンポやフレームを編集し、WAVや画像を書き出せます。"><meta property="og:url" content="https://pixieed.jp/audio/"><meta property="og:image" content="https://pixieed.jp/assets/og/audio.png">
-  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="音楽をつくる｜PiXiEEaudio"><meta name="twitter:description" content="色を音色に割り当て、マス目に音を描いてループ曲を作れます。テンポやフレームを編集し、WAVや画像を書き出せます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/audio.png">
+  <meta property="og:title" content="短いループ曲をつくる｜PiXiEEaudio"><meta property="og:description" content="マス目に色を置いて短いループ曲づくりを試せます。音色・テンポ・フレームを編集し、再生して確認。完成した音声はWAVで保存できます。"><meta property="og:url" content="https://pixieed.jp/audio/"><meta property="og:image" content="https://pixieed.jp/assets/og/audio.png">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="短いループ曲をつくる｜PiXiEEaudio"><meta name="twitter:description" content="マス目に色を置いて短いループ曲づくりを試せます。音色・テンポ・フレームを編集し、再生して確認。完成した音声はWAVで保存できます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/audio.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -38,8 +38,8 @@
       <div class="container tool-intro__hero-grid tool-intro__hero-grid--single">
         <div class="tool-intro__copy">
           <p class="tool-intro__eyebrow" data-shell-eyebrow>PIXIEEDAUDIO</p>
-          <h1 id="tool-title" data-shell-title>音楽をつくる</h1>
-          <p class="tool-intro__lead" data-shell-lead>色を音色に割り当て、マス目に音を描いてループ曲を作れます。</p>
+          <h1 id="tool-title" data-shell-title>短いループ曲をつくる</h1>
+          <p class="tool-intro__lead" data-shell-lead>短いループ曲を、マス目に色を置いて試せます。音色とテンポを選び、再生して聴きながら整えます。</p>
           <p class="tool-intro__hint">［作業を始める］で、ブラウザー内いっぱいの制作画面を開きます。現在は期間限定で全機能を開放中です。</p>
           <button class="tool-shell__start" type="button" data-embed-start data-embed-target="audio-tool">作業を始める</button>
         </div>
@@ -59,20 +59,21 @@
     <section class="tool-intro__how-to container" aria-labelledby="tool-how-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">HOW TO USE</p><h2 id="tool-how-title">使い方</h2></div>
       <ol class="tool-intro__steps">
-        <li><span>01</span><div><h3>モードを選ぶ</h3><p>描画・カメラ・音楽を、ツール下部のモードから切り替えます。</p></div></li>
-        <li><span>02</span><div><h3>描いて編集する</h3><p>色や道具を選び、キャンバスを編集します。カメラでは画像の読込や撮影ができます。</p></div></li>
-        <li><span>03</span><div><h3>保存・出力する</h3><p>作品を端末に保存したり、画像・アニメーション・音声を書き出したりできます。</p></div></li>
+        <li><span>01</span><div><h3>音色を選ぶ</h3><p>音楽モードで始まります。パレットの色に音色を割り当てます。</p></div></li>
+        <li><span>02</span><div><h3>マス目に音を置く</h3><p>音楽レイヤーに色を置き、フレームとテンポで短いループを整えます。</p></div></li>
+        <li><span>03</span><div><h3>再生してWAVで保存する</h3><p>再生ボタンで聴き、［作品を保存］で編集内容を残します。完成した音声は［出力］からWAVで書き出せます。</p></div></li>
       </ol>
     </section>
 
     <section class="tool-intro__formats container" aria-labelledby="tool-features-title">
-      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FEATURES</p><h2 id="tool-features-title">ひとつの作品で、描く・変換する・音を作る</h2></div>
-      <p>レイヤーとフレームを使ったドット絵やアニメーション、写真からの変換、色を音に割り当てる音楽づくりに対応しています。カメラは撮影操作を選んだときに起動します。</p>
+      <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FEATURES</p><h2 id="tool-features-title">色を置いて、短い曲を試す</h2></div>
+      <p>色を音色に割り当て、マス目に音を置いてループ曲を作ります。フレームやテンポを変えながら、再生ボタンで確かめられます。描画・写真の作業も続ける場合は、同じ制作画面の［モード］で切り替えられます。</p>
     </section>
 
     <section class="tool-intro__formats tool-shell__save container" aria-labelledby="tool-save-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">SAVE & EXPORT</p><h2 id="tool-save-title">保存・出力</h2></div>
-      <p>作品はこのブラウザーの端末内に保存されます。編集を続けるPXDバックアップは［ファイル］→［今の作品］→［その他］でダウンロードできます。PNG・GIF・WAVなどの完成画像・アニメーション・音声は［出力］からダウンロードします。保存やダウンロードだけで作品が公開されることはありません。</p>
+      <p>作品はこのブラウザーの端末内に保存されます。編集を続けるPXDバックアップは［ファイル］→［今の作品］→［その他］でダウンロードできます。完成した音声は［出力］からWAVでダウンロードできます。保存やダウンロードだけで作品が公開されることはありません。</p>
+      <p>画像やGIFに作った音を合わせたいときは、音声ファイルを保存してから<a href="/output/">画像・音楽の合成ツール</a>を使えます。</p>
     </section>
 
     <section class="tool-intro__faq container" aria-labelledby="tool-faq-title">
@@ -84,7 +85,7 @@
     </section>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/#draw-how-to">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-shell.mjs?rev=20261019-draw-search-rail-1"></script>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261019-purpose-entry-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
 </body>
 </html>

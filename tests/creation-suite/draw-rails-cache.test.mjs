@@ -61,7 +61,8 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (drawSearchRails.has(target)) assert.equal(revisions[target], '20261019-draw-search-rail-1', `${target} invalidates the Draw control and search guidance release`);
+      if (target === 'js/tool-shell.mjs') assert.equal(revisions[target], '20261019-purpose-entry-1', 'entry copy changes invalidate the shell');
+      else if (drawSearchRails.has(target)) assert.equal(revisions[target], '20261019-draw-search-rail-1', `${target} invalidates the Draw control and search guidance release`);
       else if (cameraWorkEntry.has(target)) assert.equal(revisions[target], '20261019-camera-original-color-1', `${target} invalidates the explicit camera entry release`);
       else if (changed.has(target)) assert.equal(revisions[target], '20261018-direct-runtime-2', `${target} carries the direct runtime release revision`);
       if (previousRelease.has(target) && !drawSearchRails.has(target)) assert.equal(revisions[target], '20261018-direct-runtime-1', `${target} keeps the previous release revision`);
