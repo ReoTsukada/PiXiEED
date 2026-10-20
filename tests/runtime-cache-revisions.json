@@ -19,8 +19,8 @@
   "js/creation/jigsaw-page.mjs": "20261018-direct-runtime-2",
   "js/creation/jigsaw-file.mjs": "20260929-claude-integration-1",
   "js/creation/mode-entry.mjs": "20261016-tool-shell-1",
-  "js/creation/output-handoff.mjs": "20261018-direct-runtime-1",
-  "js/creation/output-page.mjs": "20261018-direct-runtime-1",
+  "js/creation/output-handoff.mjs": "20261020-format-conversion-1",
+  "js/creation/output-page.mjs": "20261020-format-conversion-1",
   "js/creation/pixfind-play.mjs": "20261018-direct-runtime-1",
   "js/creation/project-components-ui.mjs": "20261016-tool-shell-1",
   "js/creation/project-components.mjs": "20261016-tool-shell-1",
@@ -79,5 +79,9 @@
   "js/creation/editor-ui.mjs": "20261018-direct-runtime-2",
   "js/tool-entry-compat.js": "20261018-workspace-polish-1",
   "js/creation/draw-brush-settings.mjs": "20261019-draw-search-rail-1",
-  "css/draw-color-adjustment-panel.css": "20261019-draw-search-rail-1"
+  "css/draw-color-adjustment-panel.css": "20261019-draw-search-rail-1",
+  "js/creation/output-import.mjs": "20261020-format-conversion-1",
+  "js/creation/output-encoders.mjs": "20261020-format-conversion-1",
+  "js/creation/output-audio-capabilities.mjs": "20261020-format-conversion-1",
+  "js/creation/output-audio-encode.mjs": "20261020-format-conversion-1"
 }

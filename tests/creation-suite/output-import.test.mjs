@@ -325,9 +325,19 @@ test('decoded audio is stored as PCM channels and the decode context is released
 test('input limits and unsupported files fail before any media state is returned', async () => {
   const tooMany = Array.from({ length: 9 }, (_, index) => localFile(`${index}.png`, pngHeader()));
   await assert.rejects(importOutputFiles(tooMany), /8ファイル/);
-  await assert.rejects(importOutputFiles([localFile('active.svg', new TextEncoder().encode('<svg><script>bad()</script></svg>'))], {
-    AudioContextImpl: class { async decodeAudioData() { throw new Error('not audio'); } async close() {} }
-  }), /not audio/);
+  let contexts = 0;
+  for (const name of ['active.svg', 'photo.heic', 'image.avif']) await assert.rejects(importOutputFiles([localFile(name, new TextEncoder().encode('unsupported image bytes'))], {
+    AudioContextImpl: class { constructor() { contexts++; } }
+  }), /対応していない画像形式/);
+  assert.equal(contexts, 0, 'unsupported images must not initialize an audio decoder');
+});
+
+test('failed audio decoding reports an actionable format error and closes the context', async () => {
+  let closed = false;
+  await assert.rejects(importOutputFiles([localFile('broken.m4a', new Uint8Array([1, 2, 3]))], {
+    AudioContextImpl: class { decodeAudioData() { throw new Error('Unable to decode audio data'); } async close() { closed = true; } }
+  }), /broken\.m4a.*音声として読み込めません/);
+  assert.equal(closed, true);
 });
 
 test('oversized image is rejected before its complete bytes or a decoder are read', async () => {

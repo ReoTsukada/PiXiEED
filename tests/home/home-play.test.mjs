@@ -79,7 +79,7 @@ test('home: real creation tools lead the mini experience and gallery follows pla
   assert.match(html, /hp-tools-about" href="\/draw\/#draw-how-to"/);
   assert.doesNotMatch(html, /class="container real-tool-screens"/);
   assert.match(toolCards, /class="hp-toy hp-link-card hp-visual-tool-card"[^>]*>[\s\S]*?hp-tool-screen[\s\S]*?<h3 class="hp-tool-title">[\s\S]*?hp-toy-line[\s\S]*?hp-tool-brandline[\s\S]*?hp-card-link/);
-  assert.match(toolCards, /href="\/output\/"[\s\S]*?合成ツールの紹介へ/);
+  assert.match(toolCards, /href="\/output\/"[\s\S]*?変換・合成ツールへ/);
   assert.doesNotMatch(html, /目的からはじめる/);
   const toolsIndex = html.indexOf('home-primary-tools');
   const playIndex = html.indexOf('class="hp-home-play"');

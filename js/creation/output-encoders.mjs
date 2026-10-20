@@ -1,7 +1,7 @@
 import { encodeAnimatedGif } from '../animated-export.mjs?rev=20261015-alpha-opacity-1';
 import { assertTotalPlays, totalPlaysToGifRepeats } from './output-loop-count.mjs?rev=20261008-loop-count-1';
 
-export const OUTPUT_FORMATS = Object.freeze(['png', 'jpeg', 'svg', 'gif', 'apng']);
+export const OUTPUT_FORMATS = Object.freeze(['png', 'jpeg', 'webp', 'svg', 'gif', 'apng']);
 export const OUTPUT_MAX_EDGE = 4096;
 export const OUTPUT_MAX_PIXELS = 16_777_216;
 export const OUTPUT_MAX_ANIMATED_PIXELS = 8_000_000;
@@ -9,7 +9,7 @@ export const OUTPUT_MAX_FRAMES = 600;
 export const OUTPUT_MAX_SVG_BYTES = 32 * 1024 * 1024;
 
 const PNG_SIGNATURE = Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10);
-const MIME = Object.freeze({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng' });
+const MIME = Object.freeze({ png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng' });
 
 function checkFrame(frame) {
   if (!frame || !Number.isSafeInteger(frame.width) || !Number.isSafeInteger(frame.height)
@@ -54,6 +54,7 @@ function bytesOf(value) {
 function signatureMatches(format, bytes) {
   if (format === 'png' || format === 'apng') return bytes.length >= 8 && PNG_SIGNATURE.every((byte, i) => bytes[i] === byte);
   if (format === 'jpeg') return bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9;
+  if (format === 'webp') return bytes.length >= 20 && String.fromCharCode(...bytes.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.subarray(8, 12)) === 'WEBP';
   if (format === 'gif') return bytes.length >= 6 && String.fromCharCode(...bytes.subarray(0, 6)).startsWith('GIF8');
   if (format === 'svg') return bytes.length > 0 && new TextDecoder().decode(bytes).includes('<svg');
   return false;
@@ -79,7 +80,7 @@ function flattenFrame(frame, background, format = 'JPEG') {
     data[index + 2] = Math.round(frame.data[index + 2] * alpha + color[2] * (1 - alpha));
     data[index + 3] = 255;
   }
-  return { width: frame.width, height: frame.height, data };
+  return { ...frame, data };
 }
 
 function svgText(frame) {
@@ -222,14 +223,14 @@ async function encodeRaster(frame, format, encoder, signal, quality = 0.9) {
 }
 
 /** Encode one output item from original RGBA frame data. `encodeRaster(frame, mime)` supplies browser canvas encoding. */
-export async function encodeOutput({ format, frames, background = '#ffffff', pngBackground = 'transparent', quality = 0.9, totalPlays, loopCount, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
+export async function encodeOutput({ format, frames, background = '#ffffff', pngBackground = 'transparent', gifBackground = 'transparent', quality = 0.9, totalPlays, loopCount, scale = 1, width = null, height = null } = {}, { encodeRaster: rasterEncoder, signal, onProgress = () => {} } = {}) {
   const progress = (value) => { try { onProgress(Math.max(0, Math.min(1, value))); } catch { /* progress cannot affect encoding */ } };
   if (!OUTPUT_FORMATS.includes(format)) throw new TypeError('選択できない画像形式です。');
   if (totalPlays === undefined) totalPlays = Number.isSafeInteger(loopCount) ? loopCount : 0; // compatibility with older callers
   const animated = format === 'gif' || format === 'apng';
   checkFrames(frames, animated);
   if (!Number.isSafeInteger(scale) || scale < 1 || scale > 16) throw new RangeError('拡大率は1〜16の整数で指定してください。');
-  if (format === 'jpeg' && (!Number.isFinite(quality) || quality < 0.5 || quality > 1)) throw new RangeError('JPEG画質は50〜100%で指定してください。');
+  if (['jpeg', 'webp'].includes(format) && (!Number.isFinite(quality) || quality < 0.5 || quality > 1)) throw new RangeError('JPEG・WebP画質は50〜100%で指定してください。');
   if ((width === null) !== (height === null)) throw new RangeError('幅と高さを両方指定してください。');
   const outputFrames = frames.map((frame) => scaleFrame(frame, scale, width, height));
   checkFrames(outputFrames, animated);
@@ -240,6 +241,7 @@ export async function encodeOutput({ format, frames, background = '#ffffff', png
     progress(0.25); const blob = makeBlob(await encodeRaster(pngFrame, format, rasterEncoder, signal), format); progress(1); return blob;
   }
   if (format === 'jpeg') { progress(0.25); const blob = makeBlob(await encodeRaster(flattenFrame(outputFrames[0], background), format, rasterEncoder, signal, quality), format); progress(1); return blob; }
+  if (format === 'webp') { const blob = makeBlob(await encodeRaster(outputFrames[0], format, rasterEncoder, signal, quality), format); progress(1); return blob; }
   if (format === 'apng') {
     const pngs = [];
     for (let index = 0; index < framesWithTiming.length; index += 1) {
@@ -250,7 +252,10 @@ export async function encodeOutput({ format, frames, background = '#ffffff', png
     const blob = makeBlob(encodeApng(pngs, totalPlays), format); progress(1); return blob;
   }
   totalPlaysToGifRepeats(totalPlays);
-  const encoded = await encodeAnimatedGif(framesWithTiming, { delayMs: 100, maxInputPixels: OUTPUT_MAX_ANIMATED_PIXELS, maxPixels: OUTPUT_MAX_ANIMATED_PIXELS, longEdge: 4096, signal, onProgress: (value) => progress(value * 0.9) });
+  const gifFrames = gifBackground === 'transparent' ? framesWithTiming : framesWithTiming.map(frame => flattenFrame(frame, gifBackground, 'GIF'));
+  // Output conversion uses the requested dimensions; camera/drawing GIF helpers
+  // retain their separate integer-enlargement policy.
+  const encoded = await encodeAnimatedGif(gifFrames, { delayMs: 100, maxInputPixels: OUTPUT_MAX_ANIMATED_PIXELS, maxPixels: OUTPUT_MAX_ANIMATED_PIXELS, longEdge: Math.max(gifFrames[0].width, gifFrames[0].height), signal, onProgress: (value) => progress(value * 0.9) });
   progress(0.95);
   const blob = makeBlob(setGifLoop(encoded.bytes, totalPlays), format); progress(1); return blob;
 }

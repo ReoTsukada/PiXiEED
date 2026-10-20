@@ -1,8 +1,9 @@
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
+import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261020-format-conversion-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { encodeOutput } from './output-encoders.mjs?rev=20261015-alpha-opacity-1';
+import { encodeOutput } from './output-encoders.mjs?rev=20261020-format-conversion-1';
 import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
-import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261009-preview-only-2';
+import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261020-format-conversion-1';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
 import { createOutputPreviewFit } from './output-preview-fit.mjs?rev=20261009-display-fit-5';
@@ -71,6 +72,22 @@ const jpegQualitySetting = $('#output-jpeg-quality-setting');
 const jpegQuality = $('#output-jpeg-quality');
 const jpegQualityValue = $('#output-jpeg-quality-value');
 const formatHelp = $('#output-filename-help');
+const conversionNote = $('#output-conversion-note');
+const gifBackgroundSetting = $('#output-gif-background-setting');
+const gifBackgroundMode = $('#output-gif-background-mode');
+const gifBackgroundColor = $('#output-gif-background');
+const stillFrameSetting = $('#output-still-frame-setting');
+const stillFrameSelect = $('#output-still-frame');
+const createAudioButton = $('#output-create-audio');
+let webpEncodingSupported;
+function canEncodeWebp() {
+  if (webpEncodingSupported === undefined) {
+    try { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; webpEncodingSupported = canvas.toDataURL('image/webp').startsWith('data:image/webp;'); } catch { webpEncodingSupported = false; }
+  }
+  return webpEncodingSupported;
+}
+function isNativeAudioFormat(value = formatSelect.value) { return activeSource?.kind === 'audio-buffer' && value !== 'wav'; }
+function isVideoFormat(value = formatSelect.value) { return !isNativeAudioFormat(value) && ['mp4', 'webm'].includes(value); }
 const outputStart = $('#output-start');
 const outputLayout = $('#output-layout');
 const fileInput = $('#output-file-input');
@@ -248,7 +265,28 @@ function updateSettingsSummaries() {
 
 function updateFormatSettings() {
   jpegSetting.hidden = formatSelect.value !== 'jpeg';
-  jpegQualitySetting.hidden = formatSelect.value !== 'jpeg';
+  jpegQualitySetting.hidden = !['jpeg', 'webp'].includes(formatSelect.value);
+  jpegQualitySetting.querySelector('span').firstChild.textContent = formatSelect.value === 'webp' ? 'WebP画質 ' : 'JPEG画質 ';
+  gifBackgroundSetting.hidden = formatSelect.value !== 'gif';
+  gifBackgroundColor.hidden = gifBackgroundMode.value !== 'color';
+  const frames = sourceFrames();
+  stillFrameSetting.hidden = !isStaticOutputFormat(formatSelect.value) || frames.length < 2;
+  const frameOptionsChanged = stillFrameSelect.options.length !== frames.length || stillFrameSelect.dataset.source !== activeSource?.id;
+  if (frameOptionsChanged) {
+    stillFrameSelect.replaceChildren(...frames.map((_, i) => { const option = document.createElement('option'); option.value = String(i); option.textContent = `${i + 1}コマ目`; return option; }));
+    stillFrameSelect.dataset.source = activeSource?.id || '';
+  }
+  if (frameOptionsChanged || stillFrameSelect.dataset.item !== activeItem?.id) {
+    stillFrameSelect.value = String(Math.max(0, Math.min(frames.length - 1, Number(activeItem?.metadata?.staticFrameIndex) || 0)));
+    stillFrameSelect.dataset.item = activeItem?.id || '';
+  }
+  createAudioButton.hidden = !isNativeAudioFormat();
+  conversionNote.textContent = activeSource?.kind === 'audio-buffer'
+    ? 'WAVは16-bit PCMです。圧縮形式は作成ボタンで元音声の長さ程度かけて記録し、先頭40ms・末尾80msの無音を加えます。作成中はこの画面を開いたままにしてください。厳密な長さにはWAVを選んでください。'
+    : formatSelect.value === 'gif' ? 'GIFは最大256色に減色します。半透明は背景色を合成してください。指定した出力寸法を保ちます。'
+    : formatSelect.value === 'jpeg' ? 'JPEGは透過を背景色に合成し、非可逆圧縮します。'
+    : formatSelect.value === 'webp' ? 'WebPは透過を保存できます。画質設定による非可逆圧縮です。複数コマからは選択した1コマを保存します。'
+    : frames.length > 1 && isStaticOutputFormat(formatSelect.value) ? '選択した1コマを静止画として保存します。動きを保つ場合はGIF・APNGを選んでください。' : '';
   pngBackgroundSetting.hidden = formatSelect.value !== 'png';
   pngBackgroundColor.hidden = pngBackgroundMode.value !== 'color';
 }
@@ -268,9 +306,8 @@ function sourceFrames(source = activeSource) {
 function sourceFormats(source = activeSource) {
   if (source?.kind === 'rgba-frames') {
     const frames = source.mediaSource.frames;
-    const formats = frames.length > 1
-      ? [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']]
-      : [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
+    const formats = [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ...(canEncodeWebp() ? [['webp', 'WebP画像']] : []), ['svg', 'SVGベクター'], ['gif', frames.length > 1 ? 'GIFアニメーション' : 'GIF画像']];
+    if (frames.length > 1) formats.push(['apng', 'APNGアニメーション']);
     const video = chooseAudioVideoMimeType();
     if (video) formats.push([video.extension, `${video.extension.toUpperCase()}動画`]);
     return formats;
@@ -280,9 +317,9 @@ function sourceFormats(source = activeSource) {
     const supported = chooseAudioVideoMimeType();
     return supported ? [[supported.extension, supported.extension.toUpperCase() + '動画']] : [];
   }
-  if (source?.kind === 'legacy-image' && source.mediaSource?.frames?.length > 1) return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター'], ['gif', 'GIFアニメーション'], ['apng', 'APNGアニメーション']];
-  if (source?.kind === 'legacy-image') return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ['svg', 'SVGベクター']];
-  if (source?.kind === 'audio-buffer') return [['wav', 'WAV音声']];
+  if (source?.kind === 'legacy-image' && source.mediaSource?.frames?.length > 1) return sourceFormats({ kind: 'rgba-frames', mediaSource: source.mediaSource });
+  if (source?.kind === 'legacy-image') return [['png', 'PNG画像'], ['jpeg', 'JPEG画像'], ...(canEncodeWebp() ? [['webp', 'WebP画像']] : []), ['svg', 'SVGベクター'], ['gif', 'GIF画像']];
+  if (source?.kind === 'audio-buffer') return listAudioOutputFormats().filter(choice => choice.available).map(choice => [choice.value, choice.label]);
   if (source?.kind === 'video-source') {
     const supported = chooseAudioVideoMimeType();
     return supported ? [[supported.extension, `${supported.extension.toUpperCase()}動画`]] : [];
@@ -390,7 +427,7 @@ function updateMusicPlayControl() {
   const musicSources = availableMusicSources();
   const musicSource = selectedMusicSource();
   const hasMusic = Boolean(musicSource);
-  const hasVideoFormat = ['mp4', 'webm'].includes(formatSelect.value) && Boolean(chooseAudioVideoMimeType());
+  const hasVideoFormat = isVideoFormat() && Boolean(chooseAudioVideoMimeType());
   const songSeconds = musicDurationSeconds(musicSource);
   const musicViaWav = Boolean(musicSource?.song && activeSource?.kind !== 'audio-video');
   const maximumSeconds = musicViaWav ? 118.8 : 120;
@@ -422,7 +459,8 @@ function updateMusicPlayControl() {
 }
 
 function outputMime(formatValue) {
-  return ({ png: 'image/png', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', mp4: 'video/mp4', webm: 'video/webm' })[formatValue] || '';
+  if (isNativeAudioFormat(formatValue)) return listAudioOutputFormats().find(choice => choice.value === formatValue && choice.available)?.mimeType.split(';')[0] || '';
+  return ({ png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', gif: 'image/gif', apng: 'image/apng', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg', mp4: 'video/mp4', webm: 'video/webm' })[formatValue] || '';
 }
 
 async function renderSongAudioSource(source, totalPlays, signal) {
@@ -524,10 +562,15 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   for (const [value, label] of formats) {
     const option = document.createElement('option'); option.value = value; option.textContent = `${label}（.${value}）${isRewardedOutputFormat(value) && outputRewardEnabled() ? ' · 60分パス' : ''}`; formatSelect.append(option);
   }
+  if (activeSource?.kind === 'audio-buffer') {
+    for (const choice of listAudioOutputFormats().filter(choice => !choice.available)) {
+      const option = document.createElement('option'); option.value = choice.value; option.disabled = true; option.textContent = `${choice.label}（非対応）`; option.title = choice.reason; formatSelect.append(option);
+    }
+  }
   formatSelect.value = formats.some(([value]) => value === preferredFormat) ? preferredFormat : formats[0]?.[0] || '';
   formatButton.textContent = `.${formatSelect.value || activeItem?.extension || ''} ⌄`;
   formatButton.hidden = formats.length <= 1;
-  createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
+  createVideoButton.hidden = !isVideoFormat();
   formatHelp.hidden = formats.length <= 1;
   addOutputItem.hidden = formats.length === 0;
   copyOutputItem.hidden = formats.length === 0;
@@ -872,7 +915,7 @@ function displayMetadata(entry, blob = currentBlob, width = entry.metadata?.widt
   const itemMetadata = { ...entry.metadata, ...entry.currentMetadata };
   if (width && height) values.push(`${width} × ${height}px`);
   if (['image/gif', 'image/apng'].includes(entry.mime) && entry.mediaSource?.frames?.length > 1) values.push(`${entry.mediaSource.frames.length}フレーム`);
-  if (itemMetadata.durationSeconds) values.push(`${itemMetadata.durationSeconds}秒`);
+  if (itemMetadata.durationSeconds) values.push(`${itemMetadata.durationIsApproximate ? '約' : ''}${Number(Number(itemMetadata.durationSeconds).toFixed(3))}秒`);
   if (blob) values.push(`${(blob.size / (1024 * 1024)).toFixed(blob.size < 1024 * 1024 ? 2 : 1)} MB`);
   metadata.textContent = values.join(' · ');
 }
@@ -903,6 +946,10 @@ function setBusy(busy, canCancel = false) {
   sourceSelect.disabled = busy;
   formatSelect.disabled = busy || previewOnly;
   createVideoButton.disabled = busy;
+  createAudioButton.disabled = busy;
+  stillFrameSelect.disabled = busy;
+  gifBackgroundMode.disabled = busy;
+  gifBackgroundColor.disabled = busy;
   addOutputItem.disabled = busy || outputItems.length >= 12;
   copyOutputItem.disabled = busy || outputItems.length >= 12;
   deleteOutputItem.disabled = busy || outputItems.length <= 1;
@@ -931,7 +978,7 @@ function setCurrentBlob(blob, { width = null, height = null, animated = false } 
       animationToggle.setAttribute('aria-pressed', 'false');
       animationToggle.hidden = true;
     }
-  } else if (record.mime === 'audio/wav') audio.src = fileUrl;
+  } else if (record.mime.startsWith('audio/')) audio.src = fileUrl;
   else if (record.mime.startsWith('video/')) video.src = fileUrl;
   if (previous && previous !== sourceUrl) URL.revokeObjectURL(previous);
   displayMetadata(record, blob, width, height);
@@ -944,7 +991,7 @@ async function canvasRaster(frame, mime, quality = 0.9) {
     const context = canvas.getContext('2d', { alpha: true });
     if (!context) throw new Error('画像のプレビューを準備できません。');
     context.putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
-    return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('画像を書き出せませんでした。')), mime, mime === 'image/jpeg' ? quality : undefined));
+    return await new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('画像を書き出せませんでした。')), mime, ['image/jpeg', 'image/webp'].includes(mime) ? quality : undefined));
   } finally { canvas.width = canvas.height = 1; }
 }
 
@@ -957,9 +1004,11 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     const frames = originalFrames.map((frame, index) => ({ ...frame, delayMs: timing.frameDelaysMs[index] }));
     if (!Array.isArray(frames) || !frames.length) throw new Error('画像の元データを確認できません。');
     const totalPlays = mediaSettings.totalPlays ?? source.mediaSource.totalPlays ?? source.mediaSource.loopCount ?? 0;
-    return { blob: await encodeOutput({ format: formatValue, frames, width: dimensions?.width || null, height: dimensions?.height || null,
+    const selectedFrame = Math.max(0, Math.min(frames.length - 1, Number(stillFrameSelect.value) || 0));
+    return { blob: await encodeOutput({ format: formatValue, frames: isStaticOutputFormat(formatValue) ? [frames[selectedFrame]] : frames, width: dimensions?.width || null, height: dimensions?.height || null,
       background: $('#output-jpeg-background')?.value || '#ffffff',
       pngBackground: pngBackgroundMode.value === 'color' ? pngBackgroundColor.value : 'transparent',
+      gifBackground: gifBackgroundMode.value === 'color' ? gifBackgroundColor.value : 'transparent',
       quality: Number(jpegQuality.value) / 100, totalPlays }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
@@ -967,6 +1016,13 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
     if (controller.signal.aborted) throw new DOMException('出力の作成を中止しました。', 'AbortError');
     const result = await renderAudioWav(source.song);
     return { blob: result.blob, metadata: { durationSeconds: result.seconds, sampleRate: 44100, loops: result.loops } };
+  }
+  if (source?.kind === 'audio-buffer' && formatValue !== 'wav') {
+    const formatChoice = listAudioOutputFormats().find(choice => choice.value === formatValue && choice.available);
+    if (!formatChoice) throw new Error('このブラウザーでは選択した音声形式を生成できません。');
+    const { encodeNativeAudio } = await import('./output-audio-encode.mjs?rev=20261020-format-conversion-1');
+    const result = await encodeNativeAudio(source, { formatChoice, signal: controller.signal, onProgress: progress => { generationProgress.value = Math.round(progress * 100); } });
+    return { blob: result.blob, metadata: { durationSeconds: result.seconds, durationIsApproximate: true, sourceSeconds: result.sourceSeconds, paddingSeconds: result.paddingSeconds, sampleRate: source.sampleRate, description: '音の欠落を避けるため先頭40ms・末尾80msの無音を加えています。圧縮による余白や長さの差があるため、厳密な長さはWAVを選んでください。' } };
   }
   if (source?.kind === 'audio-buffer' && formatValue === 'wav') {
     const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
@@ -1036,7 +1092,7 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
   throw new Error('この素材では選択した形式を書き出せません。');
 }
 
-function isStaticOutputFormat(formatValue) { return ['png', 'jpeg', 'svg'].includes(String(formatValue || '').toLowerCase()); }
+function isStaticOutputFormat(formatValue) { return ['png', 'jpeg', 'webp', 'svg'].includes(String(formatValue || '').toLowerCase()); }
 function isAnimatedOutputFormat(formatValue) { return ['gif', 'apng'].includes(String(formatValue || '').toLowerCase()); }
 
 function outputSourceOriginalSize(sourceId, frames) {
@@ -1104,7 +1160,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
   const epoch = ++generationEpoch;
   const controller = new AbortController(); generationController = controller;
   setBusy(true, true); addOutputItem.disabled = true; copyOutputItem.disabled = true; deleteOutputItem.disabled = true;
-  status.textContent = ['mp4', 'webm'].includes(extensionValue) ? '動画を作成しています。画面を開いたままお待ちください…' : '出力を作成しています…';
+  status.textContent = isNativeAudioFormat(extensionValue) ? '音声を作成しています。音声の長さ程度の時間がかかります…' : isVideoFormat(extensionValue) ? '動画を作成しています。画面を開いたままお待ちください…' : '出力を作成しています…';
   let completed = false;
   try {
     const generatedOutput = await createOutputBlob(source, extensionValue, outputDimensions, controller);
@@ -1127,7 +1183,8 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
       ...(previousItem.metadata?.pixelOriginChoice ? { pixelOriginChoice: previousItem.metadata.pixelOriginChoice } : {}),
       ...(previousItem.metadata?.userFilename === true ? { userFilename: true } : {}),
-      ...(extensionValue === 'jpeg' ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
+      ...(isStaticOutputFormat(extensionValue) ? { staticFrameIndex: Number(stillFrameSelect.value) || 0 } : {}),
+      ...(['jpeg', 'webp'].includes(extensionValue) ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
       ...(animatedOutput && frames.length > 1 ? { frameCount: frames.length, durationSeconds: getOutputTiming(frames, { format: extensionValue, playbackRate: 1 }).durationMs / 1000, totalPlays: mediaSettings.totalPlays ?? source.mediaSource?.totalPlays ?? source.mediaSource?.loopCount ?? 0 } : {}),
       ...generatedOutput.metadata
     };
@@ -1154,7 +1211,11 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
   } catch (error) {
     if (error?.name === 'AbortError') status.textContent = '作成を中止しました。前の出力と素材はそのまま保存できます。';
     else status.textContent = error?.message || '出力を作成できませんでした。前の項目はそのまま保存できます。';
-    fillSourceAndFormatControls({ preferredFormat: previousItem.extension });
+    fillSourceAndFormatControls({ preferredFormat: extensionValue });
+    // Keep the failed settings editable while the previous file remains downloadable.
+    formatButton.textContent = `.${previousItem.extension} ⌄`;
+    formatPicker.hidden = false;
+    formatButton.setAttribute('aria-expanded', 'true');
   } finally {
     if (generationController === controller) generationController = null;
     if (!pageDisposed) setBusy(false);
@@ -1384,7 +1445,7 @@ async function prepareRasterSettings(entry, frames, { autoResize = true } = {}) 
   const itemId = activeItem?.id;
   if (controller.signal.aborted || epoch !== rasterSettingsEpoch || sourceId !== activeSource?.id || itemId !== activeItem?.id) return;
   const actualSize = rasterOutputDimensions(entry);
-  const detection = await resolveRasterOrigin(entry, frames, actualSize, controller.signal, (progress) => {
+  const detection = activeSource?.id.startsWith('local-images') ? { status: 'skip', reason: 'local-file-conversion' } : await resolveRasterOrigin(entry, frames, actualSize, controller.signal, (progress) => {
     if (!controller.signal.aborted && epoch === rasterSettingsEpoch) {
       status.textContent = `画素ブロックを確認中（コマ${progress.frameIndex + 1}/${progress.frameCount}、${progress.rowsDone}/${progress.rowsTotal}行）…`;
     }
@@ -1491,6 +1552,8 @@ async function applySelectedSize() {
 function displayFormat(entry) {
   if (entry.mime === 'image/png') return 'PNG画像';
   if (entry.mime === 'image/jpeg') return 'JPEG画像';
+  if (entry.mime === 'image/webp') return 'WebP画像';
+  if (entry.mime.startsWith('audio/') && entry.mime !== 'audio/wav') return `${entry.extension.toUpperCase()}音声`;
   if (entry.mime === 'image/svg+xml') return 'SVGベクター画像';
   if (entry.mime === 'image/gif') return 'GIFアニメーション';
   if (entry.mime === 'image/apng') return 'APNGアニメーション';
@@ -1517,7 +1580,7 @@ function setMedia(entry) {
   rasterSettingsController?.abort();
   if (type.startsWith('image/')) {
     const frames = sourceFrames(activeSource);
-    const useTimeline = activeSource?.id.startsWith('local-images') && frames.length > 1 && !['image/gif', 'image/apng'].includes(type);
+    const useTimeline = activeSource?.id.startsWith('local-images') && frames.length > 1 && !['image/gif', 'image/apng'].includes(type) && !Number.isInteger(activeItem?.metadata?.staticFrameIndex);
     const dimensions = rasterOutputDimensions(entry);
     const animated = frames.length > 1 && ['image/gif', 'image/apng'].includes(type);
     setPreviewSourceDimensions(image, dimensions.width, dimensions.height);
@@ -1554,7 +1617,7 @@ function setMedia(entry) {
       applySettings.disabled = true;
       image.alt = `${entry.title || entry.filename || '原本'}のプレビュー（編集・変換不可）`;
     }
-  } else if (type === 'audio/wav') {
+  } else if (type.startsWith('audio/')) {
     audio.hidden = false; audio.src = fileUrl;
     fileCard.hidden = true;
     const itemMetadata = { ...entry.metadata, ...entry.currentMetadata };
@@ -1562,7 +1625,7 @@ function setMedia(entry) {
       const rate = itemMetadata.sampleRate ? `${Number((itemMetadata.sampleRate / 1000).toFixed(2))}kHz` : '';
       const loops = itemMetadata.loops ? `${itemMetadata.loops}回ループ` : '';
       const channels = activeSource?.kind === 'audio-buffer' ? (activeSource.channels.length === 1 ? 'モノラル' : 'ステレオ') : 'ステレオ';
-      audioDetails.textContent = [`${channels} · 16-bit PCM`, rate, loops].filter(Boolean).join(' · ') || '曲をWAV音声に書き出しました。';
+      audioDetails.textContent = [`${channels} · ${type === 'audio/wav' ? '16-bit PCM' : '圧縮音声'}`, rate, loops].filter(Boolean).join(' · ') || '曲をWAV音声に書き出しました。';
       audioSettings.hidden = false;
     }
   } else if (type.startsWith('video/')) {
@@ -1664,6 +1727,7 @@ musicSourceSelect?.addEventListener('change', () => {
   if (!source) { updateMusicPlayControl(); return; }
   void persistMediaSources(mediaSources, { ...mediaSettings, musicSourceId: source.id });
 });
+createAudioButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
 createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
 batchSave.addEventListener('click', () => {
   const policyEnabled = outputRewardEnabled();
@@ -1723,7 +1787,8 @@ sourceSelect.addEventListener('change', () => {
   stopTimelinePreview();
   fillSourceAndFormatControls({ preferredFormat: activeItem?.extension });
   const nextFormat = formats.some(([value]) => value === activeItem?.extension) ? activeItem.extension : formats[0]?.[0];
-  if (['mp4', 'webm'].includes(nextFormat)) { createVideoButton.hidden = false; status.textContent = '動画を作成するには、作成ボタンを押してください。'; return; }
+  if (isNativeAudioFormat(nextFormat)) { createAudioButton.hidden = false; status.textContent = '音声作成ボタンを押すと変換を開始します。'; return; }
+  if (isVideoFormat(nextFormat)) { createVideoButton.hidden = false; status.textContent = '動画を作成するには、作成ボタンを押してください。'; return; }
   const frames = sourceFrames(source);
   void (async () => {
     if (frames.length) await prepareRasterSettings(record, frames, { autoResize: false });
@@ -1735,21 +1800,24 @@ formatSelect.addEventListener('change', () => {
   if (isRewardedOutputFormat(formatSelect.value) && !canUseOutputReward('output.advanced-format')) {
     formatSelect.value = activeItem?.extension || 'png';
     updateFormatSettings();
-    createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
+    createVideoButton.hidden = !isVideoFormat();
     updateMusicPlayControl();
     updateSequenceControls();
     status.textContent = 'この形式は60分パスが必要です。現在の出力はそのままです。';
     return;
   }
   updateFormatSettings();
-  createVideoButton.hidden = !['mp4', 'webm'].includes(formatSelect.value);
+  createVideoButton.hidden = !isVideoFormat();
   updateMusicPlayControl();
   updateSequenceControls();
-  if (['mp4', 'webm'].includes(formatSelect.value)) { status.textContent = '動画の作成には少し時間がかかります。「この設定で動画を作る」を押して開始してください。'; return; }
+  if (isNativeAudioFormat()) { status.textContent = '音声作成ボタンで変換を開始します。音声の長さ程度の時間がかかります。'; return; }
+  if (isVideoFormat()) { status.textContent = '動画の作成には少し時間がかかります。「この設定で動画を作る」を押して開始してください。'; return; }
   void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
+stillFrameSelect.addEventListener('change', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
+for (const control of [gifBackgroundMode, gifBackgroundColor]) control.addEventListener('change', () => { updateFormatSettings(); if (formatSelect.value === 'gif') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: 'gif' }); });
 jpegSetting.addEventListener('change', () => {
-  if (formatSelect.value === 'jpeg') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+  if (['jpeg', 'webp'].includes(formatSelect.value)) void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
 pngBackgroundMode.addEventListener('change', () => {
   updateFormatSettings();
@@ -1760,7 +1828,7 @@ pngBackgroundColor.addEventListener('change', () => {
 });
 jpegQuality.addEventListener('input', () => { jpegQualityValue.value = `${jpegQuality.value}%`; jpegQualityValue.textContent = `${jpegQuality.value}%`; });
 jpegQuality.addEventListener('change', () => {
-  if (formatSelect.value === 'jpeg') void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
+  if (['jpeg', 'webp'].includes(formatSelect.value)) void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value });
 });
 addOutputItem.addEventListener('click', () => { void addOutput(false); });
 copyOutputItem.addEventListener('click', () => { void addOutput(true); });
@@ -1851,7 +1919,12 @@ animationToggle.addEventListener('click', () => {
   animationToggle.textContent = animationStopped ? 'アニメーションを再生' : 'アニメーションを停止';
   animationToggle.setAttribute('aria-pressed', String(animationStopped));
 });
+function interruptNativeAudioGeneration() {
+  if (generationController && isNativeAudioFormat()) generationController.abort();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) interruptNativeAudioGeneration(); });
 window.addEventListener('pagehide', (event) => {
+  interruptNativeAudioGeneration();
   previewFit.suspend();
   if (event.persisted) return;
   pageDisposed = true;

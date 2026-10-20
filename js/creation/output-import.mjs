@@ -495,7 +495,8 @@ async function decodeAudioFile(file, audioContext, signal) {
   const encoded = new Uint8Array(bytes);
   const preflight = looksWav ? wavPreflight(encoded) : mp3Preflight(encoded);
   if (!preflight && file.size > MAX_UNKNOWN_AUDIO_BYTES) throw new RangeError('音声の長さを事前確認できないファイルは4MBまで読み込めます。');
-  const decoding = audioContext.decodeAudioData(bytes.slice(0));
+  checkAbort(signal);
+  const decoding = Promise.resolve().then(() => audioContext.decodeAudioData(bytes.slice(0)));
   decoding.catch(() => {});
   let audio; let abortListener = null;
   try {
@@ -504,6 +505,9 @@ async function decodeAudioFile(file, audioContext, signal) {
       abortListener = () => reject(abortError());
       signal.addEventListener('abort', abortListener, { once: true });
     })]);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new Error(`${file.name || '選択したファイル'}は、このブラウザーで音声として読み込めません。対応形式か、ファイルが壊れていないかを確認してください。`, { cause: error });
   } finally { if (abortListener) signal.removeEventListener('abort', abortListener); }
   checkAbort(signal);
   assertAudioBounds({ durationSeconds: audio.duration, channels: audio.numberOfChannels, sampleRate: audio.sampleRate });
@@ -544,6 +548,11 @@ async function decodeVideoFile(file, signal, { documentRef = globalThis.document
     });
     checkAbort(signal);
     const { videoWidth: width, videoHeight: height, duration: durationSeconds } = video;
+    if (!width && !height && Number.isFinite(durationSeconds) && durationSeconds > 0) {
+      const error = new Error('映像トラックのないファイルです。音声として読み込みます。');
+      error.code = 'output-audio-only-container';
+      throw error;
+    }
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width > MAX_EDGE || height > MAX_EDGE || width * height > MAX_VIDEO_PIXELS) throw new RangeError('動画の画像サイズは4096px以下・800万画素以下にしてください。');
     if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > MAX_VIDEO_SECONDS) throw new RangeError('動画は120秒以内のファイルを選んでください。');
     if (video.readyState < 2) {
@@ -601,9 +610,18 @@ export async function importOutputFiles(files, { signal, onProgress = () => {}, 
         if (output.frames.length + decoded.frames.length > MAX_FRAMES) throw new RangeError('画像の合計は600コマまでです。');
         if (!output.frames.length && decoded.frames.length > 1) output.totalPlays = decoded.totalPlays;
         output.frames.push(...decoded.frames);
-      } else if (videoCandidate(file)) {
+      } else if (String(file.type || '').startsWith('image/') || /\.(?:svg|heic|heif|avif|bmp|tiff?|ico|jxl)$/i.test(file.name || '')) {
+        throw new Error(`${file.name || '選択したファイル'}は対応していない画像形式です。PNG・JPEG・GIF・APNG・WebPを選んでください。`);
+      } else if (videoCandidate(file) && !String(file.type || '').startsWith('audio/')) {
         if (output.video) throw new Error('動画は1つずつ読み込んでください。');
-        output.video = await decodeVideoFile(file, signal, { documentRef, URLImpl });
+        try { output.video = await decodeVideoFile(file, signal, { documentRef, URLImpl }); }
+        catch (error) {
+          if (error?.code !== 'output-audio-only-container') throw error;
+          if (!AudioContextImpl) throw new Error('このブラウザーでは音声の読み込みに対応していません。');
+          if (output.audio) throw new Error('音声は1つずつ追加してください。');
+          audioContext ||= new AudioContextImpl();
+          output.audio = await decodeAudioFile(file, audioContext, signal);
+        }
       } else {
         if (String(file.type || '').startsWith('video/')) throw new Error(`${file.name || '選択したファイル'}は対応していない形式です。動画はMP4/WebMに対応しています。`);
         if (!AudioContextImpl) throw new Error('このブラウザーでは音声の読み込みに対応していません。');

@@ -1,0 +1,34 @@
+/* Local placement review only. No flow reservation, overlay, sticky rail or animation. */
+.output-main[data-side-ad-preview-host] { position: relative; }
+.output-side-ad-preview {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  color: #667079;
+  text-align: center;
+  pointer-events: none;
+}
+.output-side-ad-preview[hidden] { display: none !important; }
+.output-side-ad-preview__label {
+  display: block;
+  box-sizing: border-box;
+  height: 15px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.output-side-ad-preview__unit {
+  display: grid;
+  box-sizing: border-box;
+  height: var(--output-side-ad-unit-height, 600px);
+  align-content: center;
+  gap: 7px;
+  padding: 10px;
+  border: 1px dashed #b9c6be;
+  background: #f1f5f2;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.output-side-ad-preview__unit strong { color: #52675a; font-weight: 650; }

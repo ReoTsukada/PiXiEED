@@ -119,8 +119,10 @@ test('output landing describes supported capabilities and legacy work links to t
   assert.match(source, /<table class="capability-table">/);
   assert.match(source, /GIF・動画\＋音楽/);
   assert.match(source, /GIFの映像を音楽に合わせた長さで繰り返し/);
-  assert.match(source, /PNG・JPEG・SVG/);
-  assert.doesNotMatch(source, /WebPを(?:含む)?出力|WebPで出力/);
+  assert.match(source, /PNG・JPEG・WebP・GIF・SVG/);
+  assert.match(source, /WebP出力はブラウザー対応時/);
+  assert.match(source, /アニメWebPの出力には対応していません/);
+  assert.match(source, /JPEG・WebPは非可逆圧縮/);
   assert.match(source, /location\.replace\(`\/output\/work\/\?id=\$\{encodeURIComponent\(ids\[0\]\)\}`\)/);
   assert.doesNotMatch(source, /\$\{current\.search\}|current\.hash/);
   assert.doesNotMatch(source, /name=['"]robots['"][^>]+noindex/);

@@ -6,10 +6,14 @@ export const TOOL_OUTPUT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MIME_EXTENSIONS = Object.freeze({
   'image/png': 'png',
   'image/jpeg': 'jpeg',
+  'image/webp': 'webp',
   'image/svg+xml': 'svg',
   'image/gif': 'gif',
   'image/apng': 'apng',
   'audio/wav': 'wav',
+  'audio/mp4': 'm4a',
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
   'video/mp4': 'mp4',
   'video/webm': 'webm'
 });
@@ -165,7 +169,7 @@ export function clearToolOutputReturnId(locationRef = globalThis.location, histo
 }
 
 function safeMetadata(metadata = {}) {
-  const allowed = ['includeMusicLayer', 'includeAudio', 'visualFrameDurationsMs', 'width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'description', 'previewOnly', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'pixelOriginChoice', 'userFilename', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
+  const allowed = ['includeMusicLayer', 'includeAudio', 'visualFrameDurationsMs', 'width', 'height', 'outputWidth', 'outputHeight', 'durationSeconds', 'durationIsApproximate', 'sourceSeconds', 'paddingSeconds', 'staticFrameIndex', 'description', 'previewOnly', 'scale', 'defaultScale', 'frameCount', 'frameDelayMs', 'loopCount', 'totalPlays', 'sampleRate', 'loops', 'jpegQuality', 'aspectLocked', 'pixelOriginChoice', 'userFilename', 'cameraSize', 'cameraRatio', 'cameraColors', 'cameraFinish', 'cameraFacing', 'cameraEdges', 'cameraPaletteMode', 'cameraGradientMode', 'cameraDitherPattern', 'cameraSurfaceSimplify', 'cameraZoom', 'cameraMiniature', 'cameraCustomLook', 'cameraTone'];
   const result = {};
   for (const key of allowed) {
     const value = metadata?.[key];
@@ -173,6 +177,9 @@ function safeMetadata(metadata = {}) {
     else if (key === 'visualFrameDurationsMs' && Array.isArray(value) && value.length >= 1 && value.length <= 128 && value.every(ms=>Number.isFinite(ms)&&ms>=1&&ms<=60000)) result[key] = [...value];
     else if (key === 'description' && typeof value === 'string') result[key] = value.slice(0, 180);
     else if (key === 'previewOnly' && typeof value === 'boolean') result[key] = value;
+    else if (key === 'durationIsApproximate' && typeof value === 'boolean') result[key] = value;
+    else if (key === 'staticFrameIndex') { if (Number.isSafeInteger(value) && value >= 0 && value < 600) result[key] = value; }
+    else if (['sourceSeconds', 'paddingSeconds'].includes(key)) { if (Number.isFinite(value) && value >= 0 && value <= 121) result[key] = Math.round(value * 1000) / 1000; }
     else if (key === 'aspectLocked' && typeof value === 'boolean') result[key] = value;
     else if (key === 'pixelOriginChoice' && value === 'original') result[key] = value;
     else if (key === 'userFilename' && value === true) result[key] = true;

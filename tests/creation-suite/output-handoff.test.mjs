@@ -141,6 +141,20 @@ test('multiple output items and original RGBA sources persist independently with
   assert.equal(await reloaded.sourceBlob.text(), 'pixels');
 });
 
+test('converted frame choice and approximate audio timing survive reload with bounded metadata', async () => {
+  const deps = dependencies();
+  await stageToolOutput(file(), deps);
+  const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const metadata = { staticFrameIndex: 1, durationIsApproximate: true, sourceSeconds: 0.5, paddingSeconds: 0.12 };
+  await saveToolOutputItems(validId, [{ ...loaded.outputs[0], metadata }], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const reloaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.deepEqual(reloaded.outputs[0].metadata, metadata);
+  await saveToolOutputItems(validId, [{ ...loaded.outputs[0], metadata: { staticFrameIndex: 600, durationIsApproximate: 'yes', sourceSeconds: Infinity, paddingSeconds: -1 } }], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const sanitized = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.deepEqual(sanitized.outputs[0].metadata, {});
+  assert.equal(await sanitized.sourceBlob.text(), 'pixels');
+});
+
 test('explicit original pixel-size choice survives output-item persistence and reload', async () => {
   const deps = dependencies();
   await stageToolOutput(file(), deps);

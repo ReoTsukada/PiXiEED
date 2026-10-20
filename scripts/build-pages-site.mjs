@@ -90,7 +90,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     files.push(...generated.files);
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+    for (const name of ['js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
       'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
       'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs',
       'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',

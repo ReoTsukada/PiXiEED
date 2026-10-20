@@ -127,7 +127,7 @@ test('APNG total-play values encode one pass, repeated passes, and infinite play
 });
 
 test('format, pixel, frame, delay, and animation memory limits fail safely', async () => {
-  await assert.rejects(encodeOutput({ format: 'webp', frames: [checkerA] }), /形式/);
+  await assert.rejects(encodeOutput({ format: 'avif', frames: [checkerA] }), /形式/);
   await assert.rejects(encodeOutput({ format: 'png', frames: [{ width: 1, height: 1, data: new Uint8Array(3) }] }), /不正/);
   await assert.rejects(encodeOutput({ format: 'apng', frames: [{ ...checkerA, delayMs: 0 }] }, { encodeRaster: raster }), /表示時間/);
   await assert.rejects(encodeOutput({ format: 'apng', frames: Array.from({ length: 600 }, () => ({ width: 4096, height: 4096, data: new Uint8Array(0) })) }, { encodeRaster: raster }), /RGBAデータ|大きすぎ/);

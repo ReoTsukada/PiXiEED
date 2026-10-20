@@ -11,7 +11,8 @@
   <script src="/js/adsense-auto.js?rev=20261009-output-offerwall-1"></script>
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261017-startup-layout-1">
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261020-format-conversion-1">
+  <link rel="stylesheet" href="/css/output-side-ad.css?rev=20261020-side-ad-vertical-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body data-page="output">
@@ -101,6 +102,12 @@
               <input id="output-png-background" type="color" value="#ffffff" aria-label="PNGに合成する背景色" hidden>
             </label>
             <label id="output-jpeg-quality-setting" class="output-jpeg-quality-setting" hidden for="output-jpeg-quality"><span>JPEG画質 <output id="output-jpeg-quality-value" for="output-jpeg-quality">90%</output></span><input id="output-jpeg-quality" type="range" min="50" max="100" step="5" value="90"></label>
+            <label id="output-gif-background-setting" class="output-jpeg-setting" hidden for="output-gif-background-mode">GIFの背景
+              <select id="output-gif-background-mode" class="output-select" style="width:auto;min-width:0;flex:1;margin:0"><option value="transparent">透過を保つ（半透明不可）</option><option value="color">背景色を合成</option></select>
+              <input id="output-gif-background" type="color" value="#ffffff" aria-label="GIFに合成する背景色" hidden>
+            </label>
+            <label id="output-still-frame-setting" class="output-field-label" hidden for="output-still-frame">静止画にするコマ<select id="output-still-frame" class="output-select"></select></label>
+            <p id="output-conversion-note" class="output-help" aria-live="polite"></p>
           </div>
           <p id="output-filename-help" class="output-help">形式を変えると拡張子が合わせて切り替わります。</p>
         </details>
@@ -161,6 +168,7 @@
         </details>
         <div class="output-actions">
           <button id="output-create-video" class="output-button output-button--secondary" type="button" hidden>この設定で動画を作る</button>
+          <button id="output-create-audio" class="output-button output-button--secondary" type="button" hidden>この形式で音声を作る</button>
           <a id="output-download" class="output-button output-button--primary" href="#" download>ダウンロード</a>
           <progress id="output-generation-progress" class="output-progress" max="100" value="0" aria-label="出力作成の進行状況" hidden></progress>
           <button id="output-cancel-generation" class="output-button output-button--secondary" type="button" hidden>作成を中止</button>
@@ -174,7 +182,8 @@
     <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
     <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261018-direct-runtime-1"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261020-format-conversion-1"></script>
+  <script type="module" src="/js/ads/output-side-ad.mjs?rev=20261020-side-ad-vertical-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
 </body>
 </html>

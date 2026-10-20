@@ -70,14 +70,17 @@ test('a result that lacks safe space is skipped before creating or requesting an
 });
 for (const [path, key] of pages) test(`${path}: configured hidden flow-layout ads stay outside interactive content`, async () => {
   const source = await read(path);
-  const expectedCount = ['home', 'tools'].includes(key) ? 2 : 1;
+  const expectedCount = 1;
   const ads = [...source.matchAll(/<aside\b[^>]*data-display-ad="[^"]+"[^>]*>/g)];
   assert.equal(ads.length, expectedCount);
   const mainStart = source.indexOf('<main');
   const mainEnd = source.indexOf('</main>');
   for (const ad of ads) {
     assert.ok(ad[0].includes(`data-display-ad="${key}"`) && ad[0].includes('data-ad-reserve'));
-    assert.ok(ad.index > mainStart && ad.index < mainEnd);
+    assert.ok(ad.index > mainEnd, 'the optional tail unit cannot push any main operation down');
+    const footerEnd = source.lastIndexOf('</footer>');
+    if (footerEnd >= 0) assert.ok(ad.index > footerEnd, 'footer navigation stays above late or missing ads');
+    assert.ok(ad[0].includes('data-ad-tail') && ad[0].includes('container'), 'tail keeps the shared content width');
   }
   assert.ok(!source.includes('<ins'), 'AdSense units are created only after a valid ID is configured');
   assert.equal((source.match(/src="\/js\/display-ads\.mjs/g) || []).length, 1);
@@ -85,13 +88,12 @@ for (const [path, key] of pages) test(`${path}: configured hidden flow-layout ad
   if (key === 'home') {
     const creationEnd = source.indexOf('</nav>', source.indexOf('aria-label="制作ツール"'));
     const puzzlesStart = source.indexOf('aria-labelledby="hpPlayTitle"');
-    assert.ok(ads[0].index > creationEnd && ads[0].index < puzzlesStart, 'first home slot follows complete linked creation cards and precedes puzzles');
-    assert.ok(!ads[0][0].includes('px-display-ad--interactive-clearance'), 'the static destination cards buffer ads from the hero');
-    assert.ok(ads[1].index > source.indexOf('href="/stores/"') && ads[1].index < source.indexOf('</main>'));
+    assert.ok(puzzlesStart > creationEnd && ads[0].index > puzzlesStart, 'no ad separates the creation destinations from the games');
+    assert.ok(ads[0].index > source.indexOf('href="/stores/"') && ads[0].index > mainEnd, 'the only home unit follows the complete content');
   }
   if (key === 'tools') {
-    assert.ok(ads[0].index > source.indexOf('data-tool-preview="game"') && ads[0].index < source.indexOf('tool-shell__head--games'));
-    assert.ok(ads[1].index > source.indexOf('href="/play/hidden-object/"') && ads[1].index < source.indexOf('class="tool-note"'));
+    assert.ok(ads[0].index > source.indexOf('tool-shell__head--games'), 'no ad interrupts the tools-to-games flow');
+    assert.ok(ads[0].index > source.indexOf('href="/play/hidden-object/"') && ads[0].index > source.indexOf('class="tool-note"'));
   }
 });
 test('working and private HTML has no manual slot or renderer', async () => {
