@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-19T00:00:00+00:00",
+  "updatedAt": "2026-10-20T00:06:54+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -2539,6 +2539,24 @@
       "checkedAt": "2026-10-19T09:00:00+09:00",
       "kind": "pixel-art",
       "sourceLabel": "IGG-K公式イベント案内"
+    },
+    {
+      "id": "pixel-layered-hermippe-shibuya-2026",
+      "name": "PIXEL LAYERED 第三弾 hermippe「円環」",
+      "prefecture": "東京都",
+      "area": "渋谷区・神宮前",
+      "venue": "MIYASHITA PARK 全域58面のLEDビジョン（東京都渋谷区神宮前6-20-10）",
+      "startDate": "2026-10-21",
+      "endDate": "2026-11-20",
+      "dateLabel": "2026年10月21日（水）〜11月20日（金）。施設営業時間内、1時間に5回（1回約1分）上映予定。",
+      "status": "upcoming",
+      "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
+      "description": "ピクセルアーティストhermippeの映像作品「円環」をMIYASHITA PARKの58面のLEDビジョンで展示。ヨーヨーのパフォーマンスとピクセルアートのループアニメーションを重ねた作品。",
+      "checkedAt": "2026-10-20T00:06:54+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "主催者公式告知（株式会社thePIXEL）",
+      "socialUrls": [],
+      "officialName": "PIXEL LAYERED 第三弾 hermippe「円環」"
     }
   ],
   "sources": [
@@ -4284,11 +4302,20 @@
       "result": "official-confirmed",
       "notes": "itch.io主催ページで開催期間、ゲームジャム内容、Pixel Artは推奨で必須でないこと、時刻差を確認。",
       "socialChecks": []
+    },
+    {
+      "id": "pixel-layered-hermippe-shibuya-2026",
+      "url": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-20T00:06:54+00:00",
+      "result": "official-confirmed",
+      "notes": "株式会社thePIXELの公式告知本文で、開催期間・MIYASHITA PARK全域58面のLEDビジョン・住所・上映頻度・ピクセルアート作品を確認。公開SNS投稿本文は未確認。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-19T00:00:00+00:00",
-    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。",
+    "checkedAt": "2026-10-20T00:06:54+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
@@ -4416,7 +4443,8 @@
       "https://itch.io/jam/retro-pixel-jam",
       "https://nrgevent.eu/compo/",
       "https://itch.io/jam/segment-pixel-jam-2026",
-      "https://howardcounty.librarycalendar.com/events/list?age_groups%5B116%5D=116&age_groups%5B117%5D=117&age_groups%5B119%5D=119&age_groups%5B208%5D=208&page=0"
+      "https://howardcounty.librarycalendar.com/events/list?age_groups%5B116%5D=116&age_groups%5B117%5D=117&age_groups%5B119%5D=119&age_groups%5B208%5D=208&page=0",
+      "https://prtimes.jp/main/html/rd/p/000000019.000142243.html"
     ],
     "regionalChecks": [
       {
@@ -5453,6 +5481,62 @@
           }
         ],
         "notes": "Forum des SciencesのPixel Art LEGOに加え、Howard County LibraryのPixel Perfect ArtとWest Vancouver Memorial LibraryのScary Simbrixを公式情報で確認し追加。日本の調査ではPIXEL × PIXEL 2026は3DCG/モーション/VFX、shigemi個展はドット絵との関係が確認できず対象外。韓国・中華圏・東南アジアに新規確定なし。Roissy公式詳細は403、香港M+ Pixel Monsterはピクセルアートか物理紙工作か曖昧で保留。 Pixelween 10/18締切、NRG 10/21締切、Segment Pixel Jam 10/24締切とPixel Art必須条件を再確認。Moulins・Jeumont 10/17とMIS Ceará 10/17の開催詳細を再確認。"
+      },
+      {
+        "checkedAt": "2026-10-20T00:06:54+00:00",
+        "regions": [
+          "日本・東京都渋谷区",
+          "豪州・Sydney",
+          "ブラジル・Fortaleza",
+          "欧州・Slovenia",
+          "欧州・France",
+          "欧州・Poland",
+          "韓国",
+          "台湾・香港・中国",
+          "北米・中南米",
+          "オンライン"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "ko",
+          "zh",
+          "fr",
+          "pt",
+          "sl",
+          "pl"
+        ],
+        "queries": [
+          "MIYASHITA PARK hermippe PIXEL LAYERED 2026 10月21日 ピクセルアート",
+          "pixel art exhibition workshop deadline October 2026 official",
+          "픽셀 아트 행사 전시 공모전 2026",
+          "像素藝術 像素畫 工作坊 2026 新加坡",
+          "arte pixel taller videojuego 2026"
+        ],
+        "addedIds": [
+          "pixel-layered-hermippe-shibuya-2026"
+        ],
+        "recheckedIds": [
+          "sydney-haymarket-pixel-art-workshop-2026-10-20",
+          "vila-geek-pixel-art-workshop-fortaleza-2026-10-20",
+          "vila-geek-pixel-art-workshop-fortaleza-2026-10-22",
+          "pixxelpoint-pixel-art-workshop-2026-10-21",
+          "nrg-pixel-art-awards-2026",
+          "segment-pixel-jam-2026"
+        ],
+        "unconfirmed": [
+          {
+            "name": "JumpZip 次回（韓国、2026年10月告知）",
+            "sourceUrl": "https://www.jumpzip.net/",
+            "reason": "公式サイトにCOMING SOON表示はあるが具体的な開催日・会場が未発表。次回情報待ちとして既存記録を維持。"
+          },
+          {
+            "name": "M+ Drop-in Activity: Pixel Monster（香港、11月7・8日）",
+            "sourceUrl": "https://www.mplus.org.hk/sc/events/drop-in-activity-pixel-monster/",
+            "reason": "公式本文は紙工作のPixel Monster制作。ドット絵制作・ゲームとの関連が確認できず対象外。"
+          }
+        ],
+        "notes": "Pixel Artが必須でない一般ゲームジャム等は対象外。"
       }
     ],
     "historyCollection": {
@@ -5552,14 +5636,20 @@
       "pixel art workshop October 19 2026 official event deadline",
       "픽셀 아트 도트 행사 서울 2026",
       "像素艺术 活动 展览 工作坊 2026",
-      "arte pixel taller videojuego 2026"
+      "arte pixel taller videojuego 2026",
+      "MIYASHITA PARK hermippe PIXEL LAYERED 2026 10月21日 ピクセルアート",
+      "pixel art exhibition workshop deadline October 2026 official"
     ],
     "languages": [
       "en",
       "es",
       "ja",
       "ko",
-      "zh"
+      "zh",
+      "fr",
+      "pt",
+      "sl",
+      "pl"
     ]
   }
 }

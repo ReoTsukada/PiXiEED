@@ -336,6 +336,7 @@
         "pixel-art-park-4",
         "pixel-art-park-5",
         "pixel-art-park-6",
+        "pixel-layered-hermippe-shibuya-2026",
         "pixel-school-stage-2-2024",
         "pixelgirls-side-b-2025",
         "shibuya-pixel-art-2018",
@@ -949,6 +950,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://www.do-johodai.ac.jp/topics/9694350/"
+      ]
+    },
+    {
+      "id": "venue-65db0a06a4a4c709",
+      "label": "MIYASHITA PARK 全域58面のLEDビジョン（東京都渋谷区神宮前6-20-10）",
+      "eventIds": [
+        "pixel-layered-hermippe-shibuya-2026"
+      ],
+      "region": "東京都",
+      "area": "渋谷区・神宮前",
+      "sourceUrls": [
+        "https://prtimes.jp/main/html/rd/p/000000019.000142243.html"
       ]
     },
     {
@@ -4943,6 +4956,33 @@
       }
     },
     {
+      "id": "source-c8ac9e5c5e029782",
+      "label": "PIXEL LAYERED 第三弾 hermippe「円環」",
+      "eventIds": [
+        "pixel-layered-hermippe-shibuya-2026"
+      ],
+      "url": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "渋谷区・神宮前"
+      ],
+      "venues": [
+        "MIYASHITA PARK 全域58面のLEDビジョン（東京都渋谷区神宮前6-20-10）"
+      ],
+      "lastKnownEventDate": "2026-11-20",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-20T00:06:54+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-c94b8510dbf57812",
       "label": "Pixel Perfect Art（11〜13歳向け）",
       "eventIds": [
@@ -6134,5 +6174,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-19T00:00:54+00:00"
+  "updatedAt": "2026-10-20T00:07:51+00:00"
 }
