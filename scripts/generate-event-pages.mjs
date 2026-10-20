@@ -70,6 +70,12 @@ const PUBLIC_SUMMARY_OVERRIDES = Object.freeze({
   'syntax-demoparty-pixel-art-2026': 'ピクセルグラフィック／アニメーションのコンペとピクセルアート交流企画。',
   'e-topia-kagawa-dot-art-gif-workshop-2026-10-08': '点を並べてドット絵GIFアニメを作るデジタル講座。会場はe-とぴあ・かがわ。',
   'herofestival-marseille-dendrob-pixel-art-2026': 'Le Dendrob’Atelierによる手作りPixel Art作品・アクセサリーのブース出展。',
+  'all-in-pixel-jam-2-2026': 'Pixel-based gamesをテーマにしたオンラインゲームジャム。別企画向けに作ったゲームもPixel Art game themeに合えば提出できます。',
+  'retro-pixel-jam-2026': '8/16-bit時代のゲーム様式をテーマにしたオンラインゲームジャム。主催者はPixel Art、小さなスプライト、限られた色数などを推奨していますが、ドット絵は必須ではありません。',
+  'med1-gamejam-pixel-art-2026-10-12': '物語を題材にした学生チーム向けゲームジャム。公式ルールで8-bit／Pixel Artのビジュアル様式を必須とし、テキストなし等の条件があります。',
+  'lyon-pixel-art-graffiti-saint-rambert-2026-10-21': 'リヨン市立図書館のPixel ArtとGraffitiを組み合わせたワークショップ。',
+  'lyon-pixel-art-graffiti-part-dieu-2026-11-07': 'リヨン市立図書館のPixel ArtとGraffitiを組み合わせたワークショップ。',
+  'lyon-pixel-art-graffiti-la-duchere-2026-11-25': 'リヨン市立図書館のPixel ArtとGraffitiを組み合わせたワークショップ。',
 });
 
 function display(value) { return typeof value === 'string' && value.trim() ? value.trim() : '未確認'; }
@@ -171,19 +177,32 @@ function metaDescription(event, summary) {
   const location = event.venue || event.area || event.prefecture || '';
   const datePart = date ? `開催日: ${date}` : '';
   const locationLabel = location ? `会場: ${location}` : '';
-  const fullSuffix = `（${datePart}${datePart && locationLabel ? '・' : ''}${locationLabel}）`;
-  const maxLocationLength = Math.max(0, 95 - Array.from(fullSuffix).length + Array.from(locationLabel).length);
+  const state = eventStatus(event);
+  const stateLabel = ['ended', 'cancelled', 'postponed'].includes(state) ? `状態: ${statusLabels[state]}` : '';
+  const fixedSuffixLength = Array.from(datePart).length + Array.from(stateLabel).length + (datePart && stateLabel ? 1 : 0) + 2;
+  const maxLocationLength = Math.max(0, 95 - fixedSuffixLength - (locationLabel ? 1 : 0));
   const fittedLocation = locationLabel ? Array.from(locationLabel).slice(0, maxLocationLength).join('') : '';
-  const suffix = [datePart, fittedLocation].filter(Boolean).length
-    ? `（${[datePart, fittedLocation].filter(Boolean).join('・')}）`
+  const suffixParts = [datePart, fittedLocation, stateLabel].filter(Boolean);
+  const suffix = suffixParts.length
+    ? `（${suffixParts.join('・')}）`
     : '';
   const summaryBudget = Math.max(0, 155 - Array.from(suffix).length);
-  return `${Array.from(summary).slice(0, summaryBudget).join('')}${suffix}`;
+  return `${Array.from(summary).slice(0, summaryBudget).join('').trimEnd()}${suffix}`;
+}
+
+function detailPageTitle(event) {
+  const year = eventYear(event);
+  const yearContext = year && !new RegExp(`(?:^|\\D)${year}(?:\\D|$)`).test(event.name) ? `${year}年` : '';
+  const location = event.online === true
+    ? 'オンライン'
+    : (event.prefecture || event.area || event.region || event.country || '');
+  const context = [yearContext, location].filter(Boolean).join('・');
+  return `${event.name}${context ? `｜${context}` : ''}｜ドット絵イベント情報｜PiXiEED`;
 }
 
 function eventPage(event, allEvents, indexableIds = new Set(allEvents.map((item) => item.id))) {
   const canonical = `${origin}/events/${event.id}/`;
-  const pageTitle = `${event.name}｜ドット絵イベント情報｜PiXiEED`;
+  const pageTitle = detailPageTitle(event);
   const summary = PUBLIC_SUMMARY_OVERRIDES[event.id] || event.description?.trim() || `${event.name}の開催履歴と次回開催情報を掲載しています。次回の日程など未発表の項目は未確認として表示しています。`;
   const description = metaDescription(event, summary);
   const official = safeUrl(event.sourceUrl);
@@ -206,9 +225,9 @@ function eventPage(event, allEvents, indexableIds = new Set(allEvents.map((item)
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body>
-<header class="event-site-header"><a href="/">PiXiEED</a><nav aria-label="サイト内"><a href="/events/">イベント一覧</a><a href="/globe/">世界地図で見る</a></nav></header>
+<header class="event-site-header"><a href="/">PiXiEED</a><nav aria-label="サイト内"><a href="/events/">ドット絵イベント一覧</a><a href="/globe/">世界地図で見る</a></nav></header>
 <main class="event-page">
-<nav class="breadcrumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">›</span><a href="/events/">ドット絵イベント</a><span aria-hidden="true">›</span><span aria-current="page">${esc(event.name)}</span></nav>
+<nav class="breadcrumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">›</span><a href="/events/">ドット絵イベント一覧</a><span aria-hidden="true">›</span><span aria-current="page">${esc(event.name)}</span></nav>
 <article>
 <p class="event-status">${esc(statusLabel(event))}</p>
 <h1>${esc(event.name)}</h1>
@@ -221,7 +240,7 @@ ${relatedHtml}
 <p class="event-globe-link"><a href="/globe/">PiXiEEDの世界地図でイベントを見る</a></p>
 </article>
 </main>
-<footer><a href="/events/">イベント一覧へ戻る</a> · <a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
+<footer><a href="/events/">ドット絵イベント一覧へ戻る</a> · <a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
 </body>
@@ -274,12 +293,13 @@ function indexPage(events, allRecords = events) {
     return `<li class="event-card" id="${esc(event.id)}" data-event-card data-year="${esc(year || 'unknown')}" data-status="${esc(status)}" data-format="${format}" data-region="${esc(region)}">${isIndexable ? `<a data-event-introduction href="/events/${esc(event.id)}/">${facts}</a>${footer}` : `<div class="event-card--hub-only">${facts}${hubFacts}${footer}</div>`}</li>`;
   }).join('\n');
   const yearSections = years.map((year) => `<section class="event-year-section" id="event-year-${year || 'unknown'}" data-event-year-section="${year || 'unknown'}" aria-labelledby="event-year-heading-${year || 'unknown'}"><h2 id="event-year-heading-${year || 'unknown'}">${year ? `${year}年` : '年未確認'}</h2><ul class="event-list">${cardsForYear(year)}</ul></section>`).join('\n');
-  const title = 'ドット絵・ピクセルアートのイベント一覧｜PiXiEED';
+  const title = 'ドット絵イベント一覧｜展示・即売会・ワークショップ・ゲームジャム | PiXiEED';
   const datedRecordCount = allRecords.filter((event) => event.startDate || event.endDate).length;
   const watchCount = allRecords.filter((event) => event.status === 'watch').length;
   const duplicateCount = allRecords.filter((event) => HUB_ONLY_REASONS[event.id]?.kind === 'duplicate').length;
   const uniqueDateCount = datedRecordCount - duplicateCount;
-  const description = `${allRecords.length}レコード（開催日付き${datedRecordCount}記録・重複${duplicateCount}件を除く${uniqueDateCount}開催回・次回未定${watchCount}件）。個別紹介ページ${events.length}件。`;
+  const countDescription = `${allRecords.length}レコード（開催日付き${datedRecordCount}記録・重複${duplicateCount}件を除く${uniqueDateCount}開催回・次回未定${watchCount}件）。個別紹介ページ${events.length}件。`;
+  const description = '国内外のドット絵イベントを紹介。展示・即売会・ワークショップ・ゲームジャムなど、開催予定・開催中・過去の開催情報を日程・地域・公式情報源とあわせて確認できます。掲載情報は確認時点の内容です。';
   return `<!doctype html>
 <html lang="ja">
 <head>
@@ -292,9 +312,10 @@ function indexPage(events, allRecords = events) {
 <body>
 <header class="event-site-header"><a href="/">PiXiEED</a><nav aria-label="サイト内"><a href="/globe/">世界地図で見る</a></nav></header>
 <main class="event-page event-index"><nav class="breadcrumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">›</span><span aria-current="page">ドット絵イベント</span></nav>
-<h1>ドット絵・ピクセルアートのイベント</h1>
-<p class="event-summary">国内外の展示、即売会、ワークショップ、コンテストなどを、確認できた公式情報源とあわせて紹介します。PiXiEEDが独自に調査・編集した一覧です。掲載情報は各主催者の公式ページでご確認ください。</p>
-<p class="event-index-count">${esc(description)}</p>
+<h1>ドット絵イベント一覧</h1>
+<p class="event-summary">ドット絵を見て、つくって、つながる。国内外の展示・即売会・ワークショップ・ゲームジャムなど、ドット絵に関わるイベントを、開催予定から過去の記録まで紹介します。イベント全体ではなく、関連プログラムや作家の展示を含む場合があります。PiXiEEDが独自に調査・編集した一覧です。最新の開催・参加情報は各主催者の公式案内をご確認ください。</p>
+<h2 class="event-archive-heading">開催予定から過去のイベントまで探す</h2>
+<p class="event-index-count">${esc(countDescription)}</p>
 <nav class="event-year-nav" aria-label="イベントを年から探す">${yearLinks}</nav>
 <form class="event-index-filters" data-event-filters hidden role="search">
 <label>キーワード<input type="search" name="q" data-event-query placeholder="イベント名・会場・日付"></label>

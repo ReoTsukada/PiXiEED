@@ -101,7 +101,7 @@ test('retains all existing catalog records and adds one tools sample with no com
   assert.equal(normalizeProduct({ ...sample, enabled: true }).amazonUrl, '');
 
   const commerce = JSON.parse(await readFile(new URL('../../assets/books/room-commerce.json', import.meta.url), 'utf8'));
-  assert.deepEqual(commerce, { associateName: 'PiXiEED', enrollmentConfirmed: true });
+  assert.deepEqual(commerce, { associateName: 'PiXiEED', enrollmentConfirmed: true, yahooAffiliateLinksConfirmed: true });
 });
 
 test('catalog records carry only known credits and keep product art unclaimed', async () => {
@@ -155,7 +155,7 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
     assert.match(html, /class="catalog-image-note">商品画像は使用許諾未確認のため未掲載/);
     assert.ok(html.indexOf('class="catalog-image-note"') > html.indexOf('</main>'), 'image permissions note stays in the footer');
     assert.match(html, /canonical" href="https:\/\/pixieed\.jp\/books\//);
-    assert.match(html, /class="catalog-disclosure"><span>広告<\/span> Amazonアソシエイトリンクを含みます<\/p>/);
+    assert.match(html, /class="catalog-disclosure"><span>広告・PR<\/span> Amazon・Yahoo!の購入リンクを含みます<\/p>/);
     const cards = [...html.matchAll(/<article class="product-card"[\s\S]*?<\/article>/g)].map(([card]) => card);
     assert.ok(cards.every(card => !/product-card__ad-label|product-card__sales|>広告</.test(card)), 'no per-product ad labels');
     assert.match(html, /Amazonで価格を確認/);
@@ -171,6 +171,7 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
   const commerce = JSON.parse(await readFile(new URL('../../assets/books/room-commerce.json', import.meta.url), 'utf8'));
   assert.equal(commerce.enrollmentConfirmed, true);
   assert.equal(commerce.associateName, 'PiXiEED');
+  assert.equal(commerce.yahooAffiliateLinksConfirmed, true);
 });
 
 test('shop thumbnails accept only local 32px and 96px squares and render registered thumbnails', async () => {

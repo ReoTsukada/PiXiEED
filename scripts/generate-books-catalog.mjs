@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { normalizeProduct, validAmazonUrl } from '../js/books-room-catalog.mjs';
+import { normalizeProduct, normalizeYahooRelatedOffers, validAmazonUrl } from '../js/books-room-catalog.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifestPath = path.join(root, 'assets/books/room-products.json');
@@ -18,6 +18,7 @@ const associateDisclosure = 'Amazon のアソシエイトとして、PiXiEED は
 const categoryOrder = ['books', 'toys', 'tools', 'gadgets'];
 const categoryCounts = Object.fromEntries(categoryOrder.map(category => [category, products.filter(product => (product.category || 'books') === category).length]));
 const listedProducts = [];
+const relatedOffersByProductId = new Map();
 for (const category of categoryOrder) {
   const groups = new Map();
   products.forEach((product, index) => {
@@ -36,6 +37,9 @@ for (const product of products) {
     throw new Error(`Invalid or duplicate catalog product: ${product?.id || '(missing id)'}`);
   }
   ids.add(product.id);
+  const relatedOffers = normalizeYahooRelatedOffers(product.relatedOffers, product.id);
+  if (relatedOffers === false) throw new Error(`Invalid related Yahoo offer: ${product.id}`);
+  if (relatedOffers.length) relatedOffersByProductId.set(product.id, relatedOffers);
   if (product.sourceUrl) {
     let source;
     try { source = new URL(product.sourceUrl); } catch { throw new Error(`Invalid source URL: ${product.id}`); }
@@ -64,6 +68,8 @@ function card(p) {
     : p.shopThumbnail
       ? `<div class="product-card__image product-card__thumbnail" data-size="${p.shopThumbnail.width}"><img src="${esc(p.shopThumbnail.src)}" alt="" width="${p.shopThumbnail.width}" height="${p.shopThumbnail.height}" loading="lazy"></div>`
       : '';
+  const relatedOffers = relatedOffersByProductId.get(p.id) || [];
+  const related = relatedOffers.length ? `<section class="product-card__related-offers" data-related-offers data-section-label="${esc(relatedOffers[0].sectionLabel)}" hidden aria-label="Yahoo!ショッピングの販売先"><h4>${esc(relatedOffers[0].sectionLabel)}</h4>${relatedOffers.map(offer => `<a class="product-card__yahoo" data-yahoo-commerce-link data-offer-id="${esc(offer.offerId)}" data-offer-product-id="${esc(offer.productId)}" data-offer-href="${esc(offer.href)}" data-offer-title="${esc(offer.title)}" data-offer-merchant="${esc(offer.merchant)}" data-offer-label="${esc(offer.label)}" data-offer-note="${esc(offer.note)}" data-offer-source-url="${esc(offer.sourceUrl)}" data-offer-checked-date="${esc(offer.checkedDate)}" hidden href="#" target="_blank" rel="sponsored noopener noreferrer"><span data-offer-visible-label>${esc(offer.label)}</span> <span aria-hidden="true">↗</span><span class="sr-only">（外部販売先・新しいタブ）</span></a><p class="product-card__yahoo-note" data-offer-visible-note data-offer-note-id="${esc(offer.offerId)}" hidden>${esc(offer.note)}</p>`).join('')}</section>` : '';
   return `        <article class="product-card" id="${esc(p.id)}" data-product-id="${esc(p.id)}" data-books-product-id="${esc(p.id)}" data-asin="${esc(p.asin)}" data-category="${esc(p.category || 'books')}" data-format="${esc(p.format || '')}" data-title="${esc(p.title)}" data-description="${esc(p.description || '')}" data-author="${esc(p.author || '')}" data-publisher="${esc(p.publisher || '')}" data-source-label="${esc(p.sourceLabel || '')}" data-source-url="${esc(p.sourceUrl || '')}" data-image-src="${esc(p.image?.src || p.shopThumbnail?.src || '')}" data-work-id="${esc(p.workId || '')}" data-metadata-note="${esc(p.metadataNote || '')}">
           ${image}
           <div class="product-card__body">
@@ -71,7 +77,7 @@ function card(p) {
             <h3>${esc(p.title)}</h3>
             <p class="product-card__description">${esc(p.description || '')}</p>
             ${authorMarkup}${metadataMarkup}
-            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="${esc(p.id)}" aria-haspopup="dialog" aria-controls="product-detail" aria-label="${esc(p.title)}の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button>${source}<a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p></div>
+            <div class="product-card__actions"><button type="button" class="product-card__details" data-product-details="${esc(p.id)}" aria-haspopup="dialog" aria-controls="product-detail" aria-label="${esc(p.title)}の詳細を見る" hidden>詳細を見る <span aria-hidden="true">→</span></button>${source}<a class="product-card__amazon" data-commerce-link hidden href="#" target="_blank" rel="sponsored noopener noreferrer">Amazonで価格を確認 <span aria-hidden="true">↗</span><span class="sr-only">（外部サイト・新しいタブ）</span></a><p class="product-card__commerce-pending" data-commerce-pending hidden>商品リンクは準備中</p>${related}</div>
           </div>
         </article>`;
 }
@@ -110,7 +116,7 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261019-site-gothic-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261020-yahoo-related-offers-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
@@ -121,7 +127,7 @@ function render(route) {
   <main id="catalog">
     <section class="catalog-intro" aria-labelledby="page-title"><div class="catalog-wrap catalog-intro__inner">
       <h1 id="page-title">ドット絵の本と道具</h1>
-      <p class="catalog-disclosure"><span>広告</span> Amazonアソシエイトリンクを含みます</p>
+      <p class="catalog-disclosure"><span>広告・PR</span> Amazon・Yahoo!の購入リンクを含みます</p>
     </div></section>
     <section class="catalog-section catalog-wrap" aria-labelledby="page-title">
       <noscript><p class="catalog-noscript">商品一覧と商品情報は以下でご覧いただけます。絞り込み操作にはJavaScriptが必要です。</p></noscript>
@@ -151,15 +157,15 @@ ${listedProducts.map(card).join('\n')}
     </section>
     <section class="catalog-extra catalog-wrap" aria-labelledby="catalog-extra-title" hidden><div class="catalog-extra__copy"><p class="catalog-eyebrow">COMING LATER</p><h2 id="catalog-extra-title">PiXiEEDのグッズ</h2><p>準備ができたら、PiXiEEDのオリジナルグッズをこちらで紹介します。</p></div><div class="catalog-ad-slot" aria-label="広告掲載予定"><span>広告掲載予定</span></div></section>
   </main>
-  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure}</p><p class="catalog-image-note">商品画像は使用許諾未確認のため未掲載です。確認待ち情報は各商品の詳細をご覧ください。</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>
+  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure} Yahoo!ショッピングのアフィリエイトリンクを含みます。PiXiEEDは適格販売により収入を得る場合があります。価格・販売条件・版・仕様は販売先でご確認ください。</p><p class="catalog-image-note">商品画像は使用許諾未確認のため未掲載です。確認待ち情報は各商品の詳細をご覧ください。</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>
   <dialog class="product-detail" id="product-detail" aria-labelledby="product-detail-title">
     <div class="product-detail__header"><span>商品詳細</span><button type="button" data-detail-close aria-label="詳細を閉じて一覧に戻る">一覧に戻る <span aria-hidden="true">×</span></button></div>
     <div class="product-detail__content" data-detail-body></div>
-    <p class="product-detail__notice">購入手続きは外部販売先のAmazonで行います。販売先のリンクは新しいタブで開きます。</p>
+    <p class="product-detail__notice">購入手続きは外部販売先で行います。販売先のリンクは新しいタブで開きます。</p>
     <p class="product-detail__gate">商品リンクを確認できないため、購入リンクは利用できません。</p>
   </dialog>
-  <script type="module" src="/js/books-catalog.mjs?rev=20261015-shop-compact-1"></script>
-  <script type="module" src="/js/books-commerce.mjs?rev=20261015-shop-thumbnails-1"></script>
+  <script type="module" src="/js/books-catalog.mjs?rev=20261020-yahoo-related-offers-1"></script>
+  <script type="module" src="/js/books-commerce.mjs?rev=20261020-yahoo-related-offers-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
 </body>
 </html>

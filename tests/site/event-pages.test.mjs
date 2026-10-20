@@ -54,8 +54,31 @@ test('event page discloses unknown fields, source provenance, and introduction s
   assert.match(html, /<dt>通称<\/dt><dd>未確認<\/dd>/);
   assert.match(html, /<dt>参加方法<\/dt><dd>未確認<\/dd>/);
   assert.match(html, /PiXiEEDによるイベント紹介です/);
+  assert.match(html, /ドット絵イベント一覧/);
+  assert.match(html, /ドット絵イベント一覧へ戻る/);
   assert.match(html, /情報確認日/);
   assert.doesNotMatch(html, /application\/ld\+json/);
+});
+
+test('detail metadata adds sourced year/location and keeps ended, cancelled, and postponed states distinct', () => {
+  const park = events.find((event) => event.id === 'pixel-art-park-9');
+  const parkHtml = eventPage(park, catalog.events, idSet);
+  assert.match(parkHtml, /<title>Pixel Art Park 9｜2026年・神奈川県｜ドット絵イベント情報｜PiXiEED<\/title>/);
+
+  const retro = events.find((event) => event.id === 'retro-pixel-jam-2026');
+  const retroTitle = eventPage(retro, catalog.events, idSet).match(/<title>([^<]+)<\/title>/)?.[1];
+  assert.equal((retroTitle.match(/2026/g) || []).length, 1, 'a year already in the event name is not repeated');
+  assert.match(retroTitle, /オンライン/);
+
+  for (const [status, label] of [['ended', '開催終了'], ['cancelled', '中止'], ['postponed', '延期']]) {
+    const event = { id: `status-${status}`, name: `Status ${status}`, status, startDate: '2027-01-01', endDate: '2027-01-01', venue: 'Test Hall', sourceUrl: 'https://example.test/event', checkedAt: '2026-10-01', description: '確認済みの開催内容' };
+    const html = eventPage(event, [event]);
+    const description = html.match(/<meta name="description" content="([^"]*)">/)?.[1];
+    assert.ok(description.includes(`状態: ${label}`), `${status} appears distinctly in metadata`);
+    assert.ok(description.includes('開催日: 2027-01-01'));
+    assert.ok(description.includes('会場: Test Hall'));
+    assert.match(html, new RegExp(`<p class="event-status">${label}</p>`));
+  }
 });
 
 test('event state follows inclusive event dates while registration cutoff is shown separately', (t) => {
@@ -121,6 +144,16 @@ test('leaf pages use public-facing summaries where catalog descriptions contain 
     assert.ok(html.includes(summary.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')));
     assert.doesNotMatch(html, /別開催回として登録|今回確認時点|催事全体ではなく|重複計上しない|件数を増やさず/);
   }
+  const allIn = eventPage(events.find((event) => event.id === 'all-in-pixel-jam-2-2026'), catalog.events, idSet);
+  assert.doesNotMatch(allIn, /締切が近い/);
+  const retro = eventPage(events.find((event) => event.id === 'retro-pixel-jam-2026'), catalog.events, idSet);
+  assert.match(retro, /Pixel Art.*推奨.*必須ではありません/);
+  assert.doesNotMatch(retro, /ユーザー指定に沿い/);
+  const med1 = eventPage(events.find((event) => event.id === 'med1-gamejam-pixel-art-2026-10-12'), catalog.events, idSet);
+  assert.match(med1, /学生チーム向け.*8-bit／Pixel Art.*必須.*テキストなし/);
+  assert.doesNotMatch(med1, /所在地は特定できないためオンライン扱い/);
+  const lyon = eventPage(events.find((event) => event.id === 'lyon-pixel-art-graffiti-saint-rambert-2026-10-21'), catalog.events, idSet);
+  assert.doesNotMatch(lyon, /別開催回として記録/);
 });
 
 test('indexable leaf metadata is unique and adds only sourced date and venue context', () => {
@@ -160,6 +193,13 @@ test('hub has one anchor per source record and accurate record, edition, watch, 
   const watchRecords = catalog.events.filter((event) => event.status === 'watch').length;
   const expectedSummary = `${catalog.events.length}レコード（開催日付き${datedRecords}記録・重複${duplicateRecords}件を除く${datedRecords - duplicateRecords}開催回・次回未定${watchRecords}件）。個別紹介ページ${events.length}件。`;
   assert.ok(hub.includes(expectedSummary), 'summary counts track the current sourced catalog and eligible leaf pages');
+  assert.match(hub, /<title>ドット絵イベント一覧｜展示・即売会・ワークショップ・ゲームジャム \| PiXiEED<\/title>/);
+  assert.match(hub, /<h1>ドット絵イベント一覧<\/h1>/);
+  assert.match(hub, /ドット絵を見て、つくって、つながる/);
+  assert.match(hub, /関連プログラムや作家の展示/);
+  assert.match(hub, /<h2 class="event-archive-heading">開催予定から過去のイベントまで探す<\/h2>/);
+  assert.match(hub, /<meta name="description" content="国内外のドット絵イベントを紹介。展示・即売会・ワークショップ・ゲームジャムなど/);
+  assert.doesNotMatch(hub, /<meta name="description" content="141レコード/);
   assert.match(hub, /PiXiEEDが独自に調査・編集した一覧です/);
   for (const event of catalog.events) assert.ok(hub.includes(`id="${event.id}"`));
 });

@@ -1,0 +1,97 @@
+/* Desktop whitespace for explicitly opted-in public and tool-landing pages. */
+@media (min-width: 1440px) {
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) {
+    --page-gutters-edge: max(160px, calc((100vw - 1200px) / 2));
+  }
+
+  /* Percentage widths use the layout viewport's content box, preserving the
+     full 160px gutter when classic scrollbars reduce clientWidth below 100vw. */
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .container:not(.narrow) {
+    width: min(1200px, calc(100% - 320px));
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) :is(.px-site-header .px-header-inner, .px-site-header.px-header-inner, .header-inner, .footer-inner, .footer-meta) {
+    width: min(1200px, calc(100% - 320px));
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="glossary"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) > .page {
+    width: min(1080px, calc(100% - 320px));
+    max-width: 1080px;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="content"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .stores-globe {
+    width: min(1200px, calc(100% - 320px));
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="events"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .event-site-header:not(.px-site-header),
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="events"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) footer {
+    padding-inline: var(--page-gutters-edge);
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="legacy"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) :is(.legacy-reference-header, .legacy-reference-footer) {
+    padding-inline: var(--page-gutters-edge);
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="catalog"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .catalog-wrap,
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="catalog"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .catalog-header__inner {
+    width: min(1160px, calc(100% - 320px));
+    max-width: 1160px;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="events"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .event-page {
+    width: min(72rem, calc(100% - 320px));
+    max-width: 72rem;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="events"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .event-page:not(.event-index) {
+    width: min(52rem, calc(100% - 320px));
+    max-width: 52rem;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="legacy"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .legacy-reference-page {
+    width: min(68rem, calc(100% - 320px));
+    max-width: 68rem;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="content"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .pass-page {
+    width: min(1200px, calc(100% - 320px));
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters="tool-landing"]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .landing-main {
+    width: min(1180px, calc(100% - 320px));
+    max-width: 1180px;
+    margin-inline: auto;
+  }
+
+  /* Keep viewport-fixed affordances aligned with the centered content without
+     moving them into a transformed or clipped containing block. */
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .site-menu {
+    right: var(--page-gutters-edge);
+    width: min(22.5rem, calc(100vw - 2 * var(--page-gutters-edge)));
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) :is(.pixieed-site-reward, .toast, .skip-link) {
+    right: var(--page-gutters-edge);
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .site-draw-cta {
+    padding-inline: var(--page-gutters-edge);
+  }
+
+  html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) .skip-link {
+    right: auto;
+    left: var(--page-gutters-edge);
+  }
+}

@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
 import { generateEventPages } from './generate-event-pages.mjs?rev=20261018-direct-runtime-1';
 import { addSiteDrawCta } from './site-draw-cta.mjs';
+import { addPageGutters } from './page-gutters.mjs';
+import { addInformationAutoAds } from './information-auto-ads.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const excluded = new Set(['docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
@@ -81,6 +83,7 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     return parts[0] === 'assets' || publicExtension.test(name) || name === 'CNAME';
   });
   let eventPages = 0;
+  const generatedEventRoutes = new Set();
   if (await lstat(join(root, 'data/pixel-art-events.json')).catch(error => {
     if (error.code === 'ENOENT') return null;
     throw error;
@@ -88,9 +91,12 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
     const generated = await generateEventPages({ root });
     eventPages = generated.eventPages;
     files.push(...generated.files);
+    for (const name of generated.files) {
+      if (/^events\/[a-z0-9][a-z0-9-]*\/index\.html$/.test(name)) generatedEventRoutes.add(name);
+    }
     // Explicit new public sources are also reviewable in a clean local build
     // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+    for (const name of ['js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
       'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
       'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs',
       'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
@@ -170,7 +176,9 @@ export async function buildPagesSite({ root = sourceRoot, output } = {}) {
       const sourceHtml = await readFile(sourcePath, 'utf8');
       const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), name);
       const withBenefits = addSiteHeaderBenefits(transformed.html, name);
-      await writeFile(outputPath, withBenefits.html);
+      const withGutters = addPageGutters(withBenefits.html, name, { generatedEventRoutes });
+      const withInformationAutoAds = addInformationAutoAds(withGutters.html, name, { generatedEventRoutes });
+      await writeFile(outputPath, withInformationAutoAds.html);
     } else await copyFile(sourcePath, outputPath);
   }
   await writeFile(join(destination, '.nojekyll'), '');

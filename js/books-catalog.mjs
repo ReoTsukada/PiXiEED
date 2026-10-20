@@ -73,7 +73,7 @@ if (form && grid) {
     const terms = normalize(query.value.trim()).split(/\s+/u).filter(Boolean);
     const selectedFormat = format.value;
     const visible = cards.filter(card => {
-      const text = normalize([card.dataset.title, card.dataset.description, card.dataset.author, card.dataset.publisher, card.dataset.format].join(' '));
+      const text = normalize([card.dataset.title, card.dataset.description, card.dataset.author, card.dataset.publisher, card.dataset.format, card.dataset.relatedSearch].join(' '));
       return !card.dataset.catalogDisabled
         && (selectedCategory === 'all' || card.dataset.category === selectedCategory)
         && (selectedFormat === 'all' || card.dataset.format === selectedFormat)
@@ -142,6 +142,8 @@ if (form && grid) {
     });
     detailBody.replaceChildren(fragment);
     detailDialog.classList.toggle('product-detail--no-image', !card.dataset.imageSrc);
+    const relatedOffers = detailBody.querySelector('[data-related-offers]');
+    if (relatedOffers?.querySelector('[data-yahoo-commerce-link]:not([hidden])')) relatedOffers.hidden = false;
     const title = detailBody.querySelector('h3');
     if (title) {
       const heading = document.createElement('h2');
@@ -149,7 +151,7 @@ if (form && grid) {
       heading.textContent = title.textContent;
       title.replaceWith(heading);
     }
-    const readyLink = detailBody.querySelector('[data-commerce-link]:not([hidden])');
+    const readyLink = detailBody.querySelector('[data-commerce-link]:not([hidden]), [data-yahoo-commerce-link]:not([hidden])');
     const gate = detailDialog.querySelector('.product-detail__gate');
     const notice = detailDialog.querySelector('.product-detail__notice');
     if (gate) gate.hidden = Boolean(readyLink);

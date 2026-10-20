@@ -12,7 +12,21 @@
     "sourceLabel": "出版社の紹介",
     "sourceUrl": "https://books.mdn.co.jp/books/3218303007/",
     "image": null,
-    "sample": false
+    "sample": false,
+    "relatedOffers": [
+      {
+        "offerId": "VcagnL",
+        "productId": "product-dot-classroom",
+        "href": "https://yahoo.jp/VcagnL",
+        "title": "ドット絵教室 電子書籍版",
+        "merchant": "ebookjapan ヤフー店",
+        "label": "電子書籍版（ebookjapan ヤフー店）",
+        "note": "AmazonのKindle版とは別に、電子書籍版を確認",
+        "sectionLabel": "Yahoo!ショッピングの販売先",
+        "sourceUrl": "https://store.shopping.yahoo.co.jp/ebookjapan/b00162030316.html",
+        "checkedDate": "2026-10-20"
+      }
+    ]
   },
   {
     "id": "product-pochipochi",
@@ -27,7 +41,21 @@
     "sourceLabel": "出版社の紹介",
     "sourceUrl": "https://books.mdn.co.jp/books/3222303001/",
     "image": null,
-    "sample": false
+    "sample": false,
+    "relatedOffers": [
+      {
+        "offerId": "QGVY75",
+        "productId": "product-pochipochi",
+        "href": "https://yahoo.jp/QGVY75",
+        "title": "ぽちぽちドット絵 自由に描いて楽しもう！",
+        "merchant": "bookfanプレミアム",
+        "label": "bookfanプレミアムで確認",
+        "note": "版・仕様は販売先で確認",
+        "sectionLabel": "Yahoo!ショッピングの販売先",
+        "sourceUrl": "https://store.shopping.yahoo.co.jp/bookfan/bk-4295202517.html",
+        "checkedDate": "2026-10-20"
+      }
+    ]
   },
   {
     "id": "product-background",
@@ -90,6 +118,20 @@
     "sample": false,
     "previousAmazonUrls": [
       "https://www.amazon.co.jp/dp/B0FJW7GQ8X?tag=pixieed-22&linkCode=ll2"
+    ],
+    "relatedOffers": [
+      {
+        "offerId": "UZdRQ2",
+        "productId": "product-3d-dot",
+        "href": "https://yahoo.jp/UZdRQ2",
+        "title": "立体ドット絵メーカー RD-10",
+        "merchant": "アイリスプラザ Yahoo!店",
+        "label": "RD-10（アイリスプラザ Yahoo!店）",
+        "note": "くもん出版 RD-10",
+        "sectionLabel": "Yahoo!ショッピングの販売先",
+        "sourceUrl": "https://store.shopping.yahoo.co.jp/irisplaza/7296660.html",
+        "checkedDate": "2026-10-20"
+      }
     ]
   },
   {
@@ -229,7 +271,21 @@
     "author": "相馬章宏",
     "publisher": "ポプラ社",
     "sourceLabel": "ポプラ社の書籍紹介",
-    "sourceUrl": "https://www.poplar.co.jp/book/search/result/archive/8008573.html"
+    "sourceUrl": "https://www.poplar.co.jp/book/search/result/archive/8008573.html",
+    "relatedOffers": [
+      {
+        "offerId": "6bv5C3",
+        "productId": "product-dot-sticker-masterpieces",
+        "href": "https://yahoo.jp/6bv5C3",
+        "title": "ドット絵シールパズル 世界の名画",
+        "merchant": "タワーレコード Yahoo!店",
+        "label": "タワーレコード Yahoo!店で確認",
+        "note": "版・仕様・販売条件は販売先で確認",
+        "sectionLabel": "Yahoo!ショッピングの販売先",
+        "sourceUrl": "https://store.shopping.yahoo.co.jp/tower/8175200.html",
+        "checkedDate": "2026-10-20"
+      }
+    ]
   },
   {
     "id": "product-girls-collection-01",
@@ -267,7 +323,33 @@
     "image": null,
     "sample": false,
     "sourceLabel": "Divoomの製品紹介",
-    "sourceUrl": "https://divoom.com/products/divoom-pro"
+    "sourceUrl": "https://divoom.com/products/divoom-pro",
+    "relatedOffers": [
+      {
+        "offerId": "WSpxf2",
+        "productId": "product-divoom-ditoo-pro-white",
+        "href": "https://yahoo.jp/WSpxf2",
+        "title": "Divoom DITOO Mic",
+        "merchant": "ハートシステムグループ",
+        "label": "ハートシステムグループ",
+        "note": "色は販売先で選択",
+        "sectionLabel": "Yahoo!ショッピングの関連モデル（DITOO Mic・Ditoo-Proとは別モデル）",
+        "sourceUrl": "https://store.shopping.yahoo.co.jp/heartsystem/divoom.html",
+        "checkedDate": "2026-10-20"
+      },
+      {
+        "offerId": "76DmXL",
+        "productId": "product-divoom-ditoo-pro-white",
+        "href": "https://yahoo.jp/76DmXL",
+        "title": "Divoom DITOO Mic ピンク",
+        "merchant": "shopooo by GMO",
+        "label": "shopooo by GMO（ピンク）",
+        "note": "販売先の商品名にピンク表記あり",
+        "sectionLabel": "Yahoo!ショッピングの関連モデル（DITOO Mic・Ditoo-Proとは別モデル）",
+        "sourceUrl": "https://store.shopping.yahoo.co.jp/itempost/1-tokotokoneko-387.html",
+        "checkedDate": "2026-10-20"
+      }
+    ]
   },
   {
     "id": "product-divoom-timebox-evo-black",

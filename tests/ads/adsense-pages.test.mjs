@@ -17,6 +17,8 @@ const COMPATIBILITY_PAGES = ['PiXiEEDraw/index.html', 'pixiedraw/index.html', 'p
 // This isolated mock page never participates in the site's AdSense loading.
 const REFERENCE_NO_AD_PAGES = ['help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html'];
 const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
+// These are source templates. The Pages build injects the informational loader
+// only after checking its explicit route allowlist and generated-event set.
 const eventCatalog = JSON.parse(await readFile(new URL('events/catalog.json', root), 'utf8'));
 const EVENT_NO_AD_PAGES = ['events/index.html', ...eventCatalog.ids.map(id => `events/${id}/index.html`)];
 const EXCLUDED_PAGES = [
@@ -53,7 +55,7 @@ for (const path of EXCLUDED_PAGES) test(`${path}: no eager provider entrypoint`,
   assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
 });
 
-test('every non-fixture HTML entry has an explicit ad-loading decision', async () => {
+test('source HTML inventory has explicit loader decisions before route-scoped build injection', async () => {
   const ignored = new Set(['.git', 'node_modules', 'tests', 'assets', 'books', 'docs']);
   async function entries(directory = '') {
     const found = [];
