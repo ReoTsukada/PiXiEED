@@ -57,6 +57,7 @@ if (returnToAudio && !audioCameraRequest) {
   } else audioCameraInvalid = true;
 } else if (initialParams.has('audioRequest') && !audioCameraRequest) audioCameraInvalid = true;
 const root = $('#pixelStudio');
+root.dataset.startupPhase = 'idle';
 const savePngLink = $('#savePng');
 mountSiteRewardUI();
 const cameraRewardNotice = document.createElement('p');
@@ -604,7 +605,10 @@ function drawCompleted(result) {
   root.dataset.faceStatus = result.faceStatus ?? 'unavailable';
   root.dataset.faceCount = String(result.faceCount ?? 0);
   root.dataset.faceMs = String(Math.round(result.faceProcessingMs ?? 0));
-  if (previewCounter === 1) root.dataset.firstPreviewMs = root.dataset.previewElapsedMs;
+  if (previewCounter === 1) {
+    root.dataset.firstPreviewMs = root.dataset.previewElapsedMs;
+    root.dataset.startupPhase = 'ready';
+  }
   clearStartupWatchdog();
   state.error = '';
   if (stageMessage.textContent.startsWith('画像を処理できませんでした')) say('');
@@ -1294,6 +1298,7 @@ function stopTracks() {
 }
 
 function closeCamera({ idle = true, message = '', focus = false, visible = false } = {}) {
+  root.dataset.startupPhase = message ? 'error' : 'idle';
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
   clearStartupWatchdog();
   resumeOnVisible = false;
@@ -1332,9 +1337,11 @@ async function startCamera({ focus = true } = {}) {
   clearPreview();
   state.facing = lastFacing;
   setMode('loading');
+  root.dataset.startupPhase = 'request';
   say('カメラを準備しています…');
   if (focus) focusVisible('#capture');
   if (!navigator.mediaDevices?.getUserMedia) {
+    root.dataset.startupPhase = 'error';
     setMode('idle');
     say(cameraStartErrorMessage(null, { secureContext: window.isSecureContext !== false, supported: false }), { visible: true });
     focusVisible('#capture');
@@ -1358,6 +1365,7 @@ async function startCamera({ focus = true } = {}) {
     }
     if (token !== cameraSequence) { stream.getTracks().forEach((track) => track.stop()); return; }
     activeStream = stream;
+    root.dataset.startupPhase = 'video';
     startupWatchdog = window.setTimeout(() => {
       if (token !== cameraSequence || previewReady) return;
       startupWatchdog = null;
@@ -1378,6 +1386,7 @@ async function startCamera({ focus = true } = {}) {
     setMode('live');
     setInfoForMode('live');
     say('最初の画像を仕上げています…');
+    root.dataset.startupPhase = 'processing';
     loop.start();
   } catch (error) {
     if (token !== cameraSequence) return;

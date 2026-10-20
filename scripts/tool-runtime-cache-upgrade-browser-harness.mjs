@@ -16,8 +16,8 @@ const oldLabel = process.env.PIXIEED_CACHE_OLD_LABEL || (oldRoot.includes('/stag
 const oldPhase = `old-${oldLabel}`;
 const out = process.env.PIXIEED_CACHE_UPGRADE_OUTPUT || '/tmp/pixieed-stage3/cache';
 const coreFreshUrls = [
-  '/js/creation/creation-runtime.mjs?rev=20261019-camera-original-color-1',
-  '/js/creation/draw-page.mjs?rev=20261018-direct-runtime-2',
+  '/js/creation/creation-runtime.mjs?rev=20261020-staged-startup-1',
+  '/js/creation/draw-page.mjs?rev=20261020-staged-startup-1',
   '/js/creation/project-workspace.mjs?rev=20261018-direct-runtime-2',
 ];
 const freshUrlOverride = process.env.PIXIEED_CACHE_EXPECT_FRESH_URLS;

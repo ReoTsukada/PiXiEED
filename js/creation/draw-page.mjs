@@ -55,9 +55,8 @@ import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261012
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261010-selection-handles-1';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261016-color-capability-1';
-import { mountDrawColorAdjustmentPanel } from './draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261020-staged-startup-1';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261019-draw-search-rail-1';
-import { mountDrawTextPanel } from './draw-text-panel.mjs?rev=20261010-features-1';
 
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
 const DRAW_REWARD_LIMITS = Object.freeze({ ...REWARD_LIMITS.draw });
@@ -1133,10 +1132,11 @@ function applyDrawFeature(value) {
   } catch (error) { featureSession = session; updateControls(); throw error; }
 }
 let colorAdjustmentPanel = null, textPanel = null;
-colorAdjustmentPanel = mountDrawColorAdjustmentPanel({ scope, host: $('#main'), getState: featureGetState, onBegin: beginDrawFeature,
-  onPreview: previewDrawFeature, onApply: applyDrawFeature, onCancel: clearDrawFeature, onLayout: placeOverlays });
-textPanel = mountDrawTextPanel({ scope, host: $('#main'), getState: featureGetState, onBegin: beginDrawFeature,
-  onPreview: previewDrawFeature, onApply: applyDrawFeature, onCancel: clearDrawFeature });
+const lazyFeaturePanels = mountLazyDrawFeaturePanels({ scope, host: $('#main'), isActive,
+  callbacks: { getState: featureGetState, onBegin: beginDrawFeature, onPreview: previewDrawFeature,
+    onApply: applyDrawFeature, onCancel: clearDrawFeature, onLayout: placeOverlays } });
+colorAdjustmentPanel = lazyFeaturePanels.color;
+textPanel = lazyFeaturePanels.text;
 brushSettingsPanel = mountDrawBrushSettings({ scope, host: $('#main'),
   getState: () => ({ bindings: inputSettings.bindings, side: lastInputSide, toolNames: TOOL_NAMES,
     blockedReason: featureBlockedReason() || (featureSession ? '開いている編集を閉じてから使ってください。' : '') }),

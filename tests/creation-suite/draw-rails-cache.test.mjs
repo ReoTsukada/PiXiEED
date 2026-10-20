@@ -12,6 +12,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/creation/creation-runtime.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs',
     'css/draw-desktop-ui.css', 'css/draw-color-adjustment-panel.css'
   ]);
+  const stagedStartup = new Set(['js/creation/draw-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/creation-modes.mjs', 'js/creation/creation-camera.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
   const previousRelease = new Set(['js/creation/draw-desktop-ui.mjs']);
   const cameraWorkEntry = new Set([
     'js/creation/creation-camera.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/engine.mjs', 'js/pixel-lens/entry.mjs',
@@ -61,7 +62,8 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (target === 'js/tool-shell.mjs') assert.equal(revisions[target], '20261019-purpose-entry-1', 'entry copy changes invalidate the shell');
+      if (['js/tool-direct.mjs', 'js/tool-shell.mjs'].includes(target)) assert.equal(revisions[target], '20261020-first-paint-1', 'first-paint fixes invalidate host and caller URLs');
+      else if (stagedStartup.has(target)) assert.equal(revisions[target], '20261020-staged-startup-1', 'staged startup invalidates changed modules and their parent URLs');
       else if (drawSearchRails.has(target)) assert.equal(revisions[target], '20261019-draw-search-rail-1', `${target} invalidates the Draw control and search guidance release`);
       else if (cameraWorkEntry.has(target)) assert.equal(revisions[target], '20261019-camera-original-color-1', `${target} invalidates the explicit camera entry release`);
       else if (changed.has(target)) assert.equal(revisions[target], '20261018-direct-runtime-2', `${target} carries the direct runtime release revision`);

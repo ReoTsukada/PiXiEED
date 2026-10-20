@@ -44,10 +44,24 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   try {
   if (scope?.disposed || !isCurrent()) throw new Error('カメラモードが終了しました。');
   const assertCurrent = () => { if (scope?.disposed || !isCurrent()) throw new Error('カメラモードが終了しました。'); };
-  const response = await fetch('/pixel-camera.html', { signal:scope.signal });
-  assertCurrent();
-  if (!response.ok) throw new Error('撮影の操作を読み込めません。');
-  const markup = await response.text(); assertCurrent();
+  // All three assets are mandatory for the explicitly selected camera. Start
+  // their downloads together, while retaining scoped cancellation and errors.
+  const settle = promise => promise.then(value => ({ value }), error => ({ error }));
+  const readAsset = async (url, message) => {
+    const response = await fetch(url, { signal:scope.signal });
+    assertCurrent();
+    if (!response.ok) throw new Error(message);
+    const value = await response.text(); assertCurrent(); return value;
+  };
+  const prepared = async promise => {
+    const result = await promise; assertCurrent();
+    if (result.error) throw result.error;
+    return result.value;
+  };
+  const markupLoad = settle(readAsset('/pixel-camera.html', '撮影の操作を読み込めません。'));
+  const stylesheetLoad = settle(readAsset('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', '撮影の表示を読み込めません。'));
+  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261020-staged-startup-1'));
+  const markup = await prepared(markupLoad);
   const template = new DOMParser().parseFromString(markup, 'text/html');
   const surface = template.querySelector('#pixelStudio'), controls = surface?.querySelector('.lc-bottom'), shutter = template.querySelector('#capture');
   if (!surface || !controls || !shutter) throw new Error('撮影の操作が不足しています。');
@@ -64,10 +78,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const fileHint = document.createElement('p'); fileHint.className = 'creation-camera-file-hint';
   fileHint.textContent = '画像は下の「ファイル」から読み込めます。';
   welcomeCopy.append(fileHint, deviceHelp);
-  const cssResponse = await fetch('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', { signal:scope.signal });
-  assertCurrent();
-  if (!cssResponse.ok) throw new Error('撮影の表示を読み込めません。');
-  const stylesheet = await cssResponse.text(); assertCurrent();
+  const stylesheet = await prepared(stylesheetLoad);
   style = document.createElement('style'); style.media = 'not all'; style.textContent = stylesheet;
   document.head.append(style);
   const scoped = scopedRules(style.sheet.cssRules); style.textContent = scoped; style.media = 'all';
@@ -328,7 +339,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   resultPreviewObserver.observe(document.body, { attributes:true, attributeFilter:['data-tool-result-open'] });
   syncResultPreview();
   const beforeHeader = new Set(document.querySelectorAll('.px-tool-header-slot,.project-bar'));
-  const { mountPixelLensMode } = await import('../pixel-lens/app.mjs?rev=20261019-camera-original-color-1');
+  const { mountPixelLensMode } = await prepared(appLoad);
   assertCurrent();
   updatePlacement({ repaint:false });
   instance = await mountPixelLensMode({ autoStart: false, isActive, draw, integratedShared: true, onProjectSettings,

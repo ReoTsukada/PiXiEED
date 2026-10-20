@@ -1,0 +1,13 @@
+{
+  "name": "pixieed-site",
+  "version": "0.0.0",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node scripts/build-pages-site.mjs",
+    "test": "node scripts/test-site.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5"
+  }
+}

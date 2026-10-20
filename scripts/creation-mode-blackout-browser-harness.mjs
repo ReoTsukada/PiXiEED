@@ -58,7 +58,7 @@ try {
   const {ctx,page,errors,original,hold}=await contextFor(viewport);const row={name:'normal-'+viewport.width,viewport,transitions:[]};report.results.push(row);
   try {
    for(const mode of ['audio','camera']) {
-    const held=hold(mode==='audio'?'/js/creation/draw-music.mjs?rev=20261018-direct-runtime-1':'/js/creation/creation-camera.mjs?rev=20261018-direct-runtime-1');
+    const held=hold(mode==='audio'?'/js/creation/draw-music.mjs?rev=20261018-direct-runtime-1':'/js/creation/creation-camera.mjs?rev=20261020-staged-startup-1');
     await requestMode(page,mode);await held.seen;
     try{const frame=await blackFrame(page,row.name+'-'+mode,viewport);row.transitions.push({target:mode,...frame});}finally{held.release();}
     await ready(page,mode);assert.equal(await page.locator('#creation-mode-transition').isHidden(),true);assert.equal(await page.evaluate(()=>document.activeElement===document.querySelector('#creation-mode-menu > summary')),true);

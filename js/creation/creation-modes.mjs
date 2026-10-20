@@ -367,7 +367,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261019-camera-original-color-1&attempt=${version}`);
+    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261020-staged-startup-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

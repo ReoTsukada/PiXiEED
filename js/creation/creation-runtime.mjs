@@ -1,8 +1,8 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261019-draw-search-rail-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261020-staged-startup-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
-import { mountCreationModes } from './creation-modes.mjs?rev=20261019-camera-original-color-1';
+import { mountCreationModes } from './creation-modes.mjs?rev=20261020-staged-startup-1';
 import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261018-direct-runtime-1';
 
 function lastWorkspacePointer(search, requestedMode, restoreLast) {
@@ -30,6 +30,7 @@ export async function mountCreationRuntime({
   initialPointer,
   workspaceOptions = {},
   deferInitialMode = false,
+  onBootPhase = () => {},
   signal
 } = {}) {
   const scope = createModeScope();
@@ -62,20 +63,26 @@ export async function mountCreationRuntime({
   const retainedPointer = initialPointer === undefined
     ? lastWorkspacePointer(search, requestedMode || new URLSearchParams(search).get('mode'), restoreLast)
     : initialPointer;
+  const reportBootPhase = phase => { try { onBootPhase(phase); } catch { /* Progress reporting must never affect editor startup. */ } };
   try {
+  reportBootPhase('draw');
   draw = await mountDrawMode({
     scope: gatedScope,
     musicLayer: true,
     isActive: () => hostActive() && (!mountedModes || mountedModes.mode !== 'camera'),
-    mountWorkspace: options => mountProjectWorkspace({
+    mountWorkspace: options => {
+      reportBootPhase('workspace');
+      return mountProjectWorkspace({
       ...options,
       ...workspaceOptions,
       initialPointer: retainedPointer,
       isActive: () => hostActive(),
       onNavigate: request => mountedModes ? mountedModes.navigate(request) : location.assign(request.url)
-    })
+      });
+    }
   });
   if (disposed) throw new Error('制作画面が閉じられました。');
+  reportBootPhase('mode');
   mountedModes = await mountCreationModes({
     draw,
     scope: gatedScope,

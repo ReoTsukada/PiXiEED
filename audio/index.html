@@ -4,7 +4,48 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
-  <script src="/js/tool-entry-compat.js?rev=20261018-workspace-polish-1"></script>
+  <script src="/js/tool-entry-compat.js?rev=20261020-first-paint-1"></script>
+  <style data-direct-shell-style>
+    html[data-direct-bootstrap], html[data-direct-bootstrap] body { box-sizing:border-box; min-height:100%; margin:0; background:#151d24; color:#27251f; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+    html[data-direct-bootstrap] *, html[data-direct-bootstrap] *::before, html[data-direct-bootstrap] *::after { box-sizing:inherit; }
+    html[data-direct-bootstrap] body.tool-shell { min-height:100svh; overflow:hidden; }
+    html[data-direct-bootstrap] body.tool-shell::before { position:fixed; z-index:1; inset:0 0 auto; height:60px; display:flex; align-items:center; padding:0 8px; border-bottom:1px solid #d9d5ca; background:#f4f2ec; color:#27251f; font-size:16px; font-weight:700; content:"PiXiEEDraw"; }
+    html[data-direct-bootstrap] body.tool-shell--camera::before { content:"PiXiEED カメラ"; }
+    html[data-direct-bootstrap] body.tool-shell--audio::before { content:"PiXiEED 音楽"; }
+    html[data-direct-bootstrap] body.tool-shell > .skip-link, html[data-direct-bootstrap] body.tool-shell > .site-header, html[data-direct-bootstrap] body.tool-shell > .site-footer,
+    html[data-direct-bootstrap] body.tool-shell #main > :not(.tool-shell__workspace) { display:none!important; }
+    html[data-direct-bootstrap] body.tool-shell #main { min-height:100svh; }
+    html[data-direct-bootstrap] body.tool-shell .tool-shell__workspace { position:fixed; inset:60px 0 0; display:grid; place-items:center; min-height:0; padding:16px; background:#151d24; }
+    html[data-direct-bootstrap] body.tool-shell .tool-shell__workspace > .container { width:min(100%,560px); margin:0 auto; }
+    html[data-direct-bootstrap] body.tool-shell .tool-intro__embed-copy, html[data-direct-bootstrap] body.tool-shell .tool-shell__embed [data-embed-stage] { display:none!important; }
+    html[data-direct-bootstrap] body.tool-shell .tool-shell__embed { display:flex; flex-direction:column; align-items:stretch; gap:12px; width:100%; min-height:0; margin:0; padding:20px; border:1px solid #d9d5ca; border-radius:14px; background:#fff; color:#27251f; box-shadow:0 12px 40px #0003; }
+    html[data-direct-bootstrap] body.tool-shell .tool-intro__embed-status { display:flex; align-items:center; gap:12px; margin:0; font:700 14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    html[data-direct-bootstrap] body.tool-shell .tool-intro__embed-status::before { content:""; flex:0 0 16px; width:16px; height:16px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:tool-direct-first-spin .8s linear infinite; }
+    html[data-direct-bootstrap] body.tool-shell [data-direct-bootstrap-back], html[data-direct-bootstrap] body.tool-shell [data-direct-bootstrap-retry] { display:inline-flex; align-self:flex-start; min-height:44px; align-items:center; justify-content:center; padding:8px 12px; border:1px solid #c6c0b3; border-radius:10px; background:#fff; color:#27251f; font:700 14px system-ui,-apple-system,"Segoe UI",sans-serif; text-decoration:none; white-space:nowrap; }
+    html[data-direct-bootstrap] body.tool-shell [hidden] { display:none!important; }
+    html[data-direct-shell-styles-failed] body.tool-shell .tool-intro__embed-status::before { display:none; }
+    html[data-direct-bootstrap] .pixieed-site-reward { visibility:hidden; }
+    .tool-direct__bar { position:fixed; z-index:180; top:var(--tool-direct-top,0px); left:0; width:var(--tool-direct-width,100%); box-sizing:border-box; min-height:60px; display:flex; align-items:center; gap:8px; padding:8px; background:#f4f2ec; color:#27251f; border-bottom:1px solid #d9d5ca; font:16px system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .tool-direct__bar strong { margin-right:auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .tool-direct__bar button { flex-shrink:0; white-space:nowrap; min-height:44px; border:1px solid #c6c0b3; border-radius:10px; padding:8px 12px; font:700 14px system-ui; background:#fff; color:#27251f; }
+    .tool-direct__bar button:focus-visible { outline:3px solid #315fd0; outline-offset:2px; }
+    .tool-direct__bar[hidden] { display:none!important; }
+    .tool-direct__status { font:12px system-ui; }
+    html[data-direct-loading]:not([data-direct-error]) .tool-direct__status { display:none; }
+    .tool-direct__boot-cue { position:fixed; z-index:200; top:calc(var(--tool-direct-top,0px) + (var(--tool-direct-height,100dvh) + 60px)/2); left:50%; display:flex; flex-direction:column; align-items:stretch; gap:12px; box-sizing:border-box; width:min(560px,calc(100vw - 32px)); max-width:calc(100vw - 32px); margin:0; padding:20px; transform:translate(-50%,-50%); border:1px solid #d9d5ca; border-radius:14px; background:#fff; color:#27251f; box-shadow:0 12px 40px #0003; font:700 14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .tool-direct__boot-cue p { display:flex; align-items:center; gap:12px; margin:0; }
+    .tool-direct__boot-cue p::before { content:''; flex:0 0 auto; width:1rem; height:1rem; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:tool-direct-spin .8s linear infinite; }
+    .tool-direct__boot-cue button { align-self:flex-start; flex-shrink:0; white-space:nowrap; min-height:44px; padding:8px 12px; border:1px solid #c6c0b3; border-radius:10px; background:#fff; color:#27251f; font:700 14px system-ui; }
+    .tool-direct__boot-cue button:focus-visible { outline:3px solid #315fd0; outline-offset:2px; }
+    .tool-direct__boot-cue[hidden] { display:none!important; }
+
+    @keyframes tool-direct-spin { to { transform:rotate(1turn); } }
+    @media (prefers-reduced-motion:reduce) { .tool-direct__boot-cue p::before { animation:none; } }
+    html[data-direct-loading] [data-direct-owned]:not(dialog[open]) { visibility:hidden!important; }
+    html[data-direct-loading] dialog[open] { visibility:visible!important; }
+    @keyframes tool-direct-first-spin { to { transform:rotate(1turn); } }
+    @media (prefers-reduced-motion:reduce) { html[data-direct-bootstrap] body.tool-shell .tool-intro__embed-status::before { animation:none; } }
+  </style>
 <title>短いループ曲をつくる｜PiXiEEaudio</title>
   <meta name="description" content="マス目に色を置いて短いループ曲づくりを試せます。音色・テンポ・フレームを編集し、再生して確認。完成した音声はWAVで保存できます。">
   <link rel="canonical" href="https://pixieed.jp/audio/">
@@ -22,7 +63,7 @@
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
   <link rel="stylesheet" href="/css/tool-embed.css?rev=20261017-workspace-entry-1">
-  <link rel="stylesheet" data-direct-shell-style href="/css/tool-direct.css?rev=20261018-workspace-polish-1">
+  <link rel="stylesheet" data-direct-shell-style href="/css/tool-direct.css?rev=20261020-first-paint-1">
   <link rel="stylesheet" href="/css/tool-shell.css?rev=20261017-workspace-entry-1">
 </head>
 <body class="tool-intro tool-shell tool-shell--audio" data-tool-shell>
@@ -51,7 +92,9 @@
         <section class="tool-intro__embed tool-shell__embed" data-tool-embed data-tool-shell data-tool-mode="audio" aria-labelledby="tool-embed-title">
           <div class="tool-intro__embed-copy"><p class="tool-intro__eyebrow">CREATE HERE</p><h2 id="tool-embed-title">このページで音楽を作る</h2><p data-shell-workspace-copy>色を音に割り当て、フレームとテンポを編集して曲にします。</p></div>
           <div data-embed-stage hidden></div>
-          <p class="tool-intro__embed-status" data-embed-status aria-live="polite">［作業を始める］を押すと制作画面を開きます。</p>
+          <p class="tool-intro__embed-status" data-embed-status role="status" aria-live="polite">［作業を始める］を押すと制作画面を開きます。</p>
+          <a class="tool-direct__bootstrap-back" data-direct-bootstrap-back href="/audio/" hidden>説明へ戻る</a>
+          <button class="tool-direct__bootstrap-retry" data-direct-bootstrap-retry type="button" hidden>再読み込みして再試行</button>
         </section>
       </div>
     </section>
@@ -86,7 +129,7 @@
     </section>
   </main>
   <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/tools/">ツール</a><a href="/draw/#draw-how-to">ドット絵を描く</a><a href="/about/">PiXiEEDについて</a></nav></div></footer>
-  <script type="module" src="/js/tool-shell.mjs?rev=20261019-purpose-entry-1"></script>
+  <script type="module" src="/js/tool-shell.mjs?rev=20261020-first-paint-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
 </body>
 </html>

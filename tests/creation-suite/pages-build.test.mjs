@@ -137,6 +137,8 @@ test('Pages artifact regenerates event pages and removes stale event URLs while 
   const sitemap=await readFile(join(result.output,'sitemap.xml'),'utf8');
   assert.match(sitemap,/https:\/\/pixieed.jp\/events\/verified-edition\//);
   assert.doesNotMatch(sitemap,/events\/removed/);
+  assert.equal(await readFile(join(root,'events/removed/index.html'),'utf8'),'obsolete', 'normal build preserves tracked source event pages');
+  assert.match(await readFile(join(root,'sitemap.xml'),'utf8'),/events\/removed/,'normal build preserves the source sitemap');
   await assert.rejects(readFile(join(result.output,'events/removed/index.html')),{code:'ENOENT'});
   await assert.rejects(readFile(join(result.output,'unreviewed.html')),{code:'ENOENT'});
 });

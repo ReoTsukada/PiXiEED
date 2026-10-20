@@ -58,7 +58,7 @@ try{
  const point=(x,y)=>({x:rect.x+x*rect.width/size,y:rect.y+y*rect.height/size});
  for(const [x,y] of [[3.5,4.5],[4.5,5.5],[5.5,6.5]]){const q=point(x,y);await page.mouse.click(q.x,q.y);}
  await save();const oldPixels=await pixels('#draw-canvas');await page.waitForTimeout(250);
- const oldRecords=await records();assert.ok(oldRecords.some(item=>item.phase==='old'&&item.url.includes('/js/creation/draw-page.mjs?rev=20261018-direct-runtime-1')),'old Draw modules warmed the real HTTP cache');
+ const oldRecords=await records();assert.ok(oldRecords.some(item=>item.phase==='old'&&item.url.includes('/js/creation/draw-page.mjs?rev=20261020-staged-startup-1')),'old Draw modules warmed the real HTTP cache');
  await writeFile(marker,'new');const next=new URL(page.url());next.searchParams.set('cache-upgrade','new');await page.goto(next.href,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>document.documentElement.dataset.drawReady==='true'&&!!document.querySelector('#draw-camera')&&!document.querySelector('#main')?.inert);
  assert.equal(await page.locator('#draw-camera').count(),1);assert.deepEqual((await pixels('#draw-canvas')).rgba,oldPixels.rgba,'fresh HTML restores pixels saved by the cached baseline app');

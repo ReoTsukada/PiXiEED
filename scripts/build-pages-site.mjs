@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { copyFile, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
@@ -8,6 +9,7 @@ import { generateEventPages } from './generate-event-pages.mjs?rev=20261018-dire
 import { addSiteDrawCta } from './site-draw-cta.mjs';
 import { addPageGutters } from './page-gutters.mjs';
 import { addInformationAutoAds } from './information-auto-ads.mjs';
+import { optimizeToolRuntimeDelivery } from './tool-runtime-delivery.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const excluded = new Set(['docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
@@ -47,142 +49,166 @@ export function addSiteHeaderBenefits(html, name = '') {
 }
 
 /** Copy tracked public sources and only the generator's validated per-puzzle output. */
-export async function buildPagesSite({ root = sourceRoot, output } = {}) {
+export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } = {}) {
   root = resolve(root);
   if (typeof output !== 'string' || !output) throw new Error('An explicit output directory is required');
   const destination = resolve(output);
   if (destination === root || root.startsWith(destination + '/')) throw new Error('Output must not replace the repository');
-  const names = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
-  const booksAssets = new Set(publishableBooksAssets);
-  const booksManifest = await readFile(join(root, 'assets/books/room-products.json'), 'utf8').catch(error => {
-    if (error.code === 'ENOENT') return '[]';
-    throw error;
-  });
-  for (const product of JSON.parse(booksManifest)) {
-    if (!product || product.enabled === false || product.visible === false || product.sample === true) continue;
-    const thumbnail = product.shopThumbnail;
-    if (thumbnail && [32, 96].includes(thumbnail.width) && thumbnail.height === thumbnail.width
-        && /^\/assets\/books\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|webp)$/i.test(thumbnail.src || '')) {
-      booksAssets.add(thumbnail.src.slice(1));
-    }
-  }
-  const files = names.filter(name => {
-    const parts = name.split('/');
-    // Event output is regenerated from the catalog below; stale tracked pages
-    // must not survive a removed/merged catalog record.
-    if (parts[0] === 'events') return false;
-    if (parts.some(part => part === '..' || part.startsWith('.')) || excluded.has(parts[0])) return false;
-    if (retiredPublicPages.has(name)) return false;
-    // Publish only the public catalog route and the exact data/runtime it needs.
-    // The room preview and prototype-only book assets stay local.
-    if (parts[0] === 'books' && !publishableBooksPages.has(name)) return false;
-    if (name.startsWith('assets/books/') && !booksAssets.has(name)) return false;
-    if (/^css\/books(?:-[a-z-]+)?\.css$/.test(name) && !publishableBooksStyles.has(name)) return false;
-    if (/^js\/books(?:-[a-z-]+)?\.mjs$/.test(name) && !publishableBooksScripts.has(name)) return false;
-    if (/^(?:package(?:-lock)?|deno(?:\.lock)?)\.(?:json|jsonc)$/.test(parts.at(-1))) return false;
-    return parts[0] === 'assets' || publicExtension.test(name) || name === 'CNAME';
-  });
-  let eventPages = 0;
-  const generatedEventRoutes = new Set();
-  if (await lstat(join(root, 'data/pixel-art-events.json')).catch(error => {
-    if (error.code === 'ENOENT') return null;
-    throw error;
-  })) {
-    const generated = await generateEventPages({ root });
-    eventPages = generated.eventPages;
-    files.push(...generated.files);
-    for (const name of generated.files) {
-      if (/^events\/[a-z0-9][a-z0-9-]*\/index\.html$/.test(name)) generatedEventRoutes.add(name);
-    }
-    // Explicit new public sources are also reviewable in a clean local build
-    // before they are committed. Arbitrary untracked work stays excluded.
-    for (const name of ['js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
-      'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
-      'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs',
-      'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
-      'js/globe/map-page-layout.mjs',
-      'assets/screenshots/audio-pc-maou.png', 'assets/screenshots/output-pc-maou.png',
-      'assets/screenshots/previews/audio-pc-maou-1366.webp',
-      'assets/screenshots/previews/audio-pc-maou-480.webp',
-      'assets/screenshots/previews/camera-mobile-maou-390.webp',
-      'assets/screenshots/previews/camera-pc-maou-1366.webp',
-      'assets/screenshots/previews/camera-pc-maou-480.webp',
-      'assets/screenshots/previews/draw-mobile-maou-780.webp',
-      'assets/screenshots/previews/draw-pc-maou-480.webp',
-      'assets/screenshots/previews/draw-pc-maou-960.webp',
-      'assets/screenshots/previews/hidden-mobile-maou-390.webp',
-      'assets/screenshots/previews/hidden-pc-maou-1366.webp',
-      'assets/screenshots/previews/hidden-pc-maou-480.webp',
-      'assets/screenshots/previews/jigsaw-mobile-maou-390.webp',
-      'assets/screenshots/previews/jigsaw-pc-maou-1366.webp',
-      'assets/screenshots/previews/jigsaw-pc-maou-480.webp',
-      'assets/screenshots/previews/output-pc-maou-1366.webp',
-      'assets/screenshots/previews/output-pc-maou-480.webp',
-      'assets/screenshots/previews/spot-mobile-maou-390.webp',
-      'assets/screenshots/previews/spot-pc-maou-1366.webp',
-      'assets/screenshots/previews/spot-pc-maou-480.webp',
-      'js/legacy-project-entry.mjs', 'css/legacy-project-entry.css', 'css/legacy-reference.css',
-      'help/index.html', 'glossary/index.html', 'projects/pixfind/index.html', 'projects/pixiedraw/index.html',
-      'css/design-tokens.css', 'js/event-history.mjs',
-      'js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
-      'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
-      'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
-      'js/books-catalog.mjs',
-      'js/site-header-benefits.mjs', 'js/ads/site-reward-runtime-v20261016-ads-only.mjs', 'js/ads/site-reward-rollout-v20261016.mjs',
-      'js/creation/music-output-preferences.mjs', 'js/creation/pxd-original-backup.mjs',
-      'js/creation/legacy-lens-entry.mjs', 'js/creation/shared-project-settings-core.mjs',
-      'css/creation-camera-idle.css', 'css/draw-palette-instruments.css',
-      'js/creation/mode-entry.mjs', 'js/creation/shared-project-settings.mjs',
-      'js/creation/creation-modes.mjs', 'js/creation/creation-camera.mjs', 'js/creation/creation-mode-motion.mjs', 'js/creation/music-video-timing.mjs', 'js/creation/draw-music-model.mjs', 'js/creation/creation-output-core.mjs', 'js/creation/draw-music.mjs', 'js/creation/draw-music-core.mjs', 'js/creation/shared-project-core.mjs', 'css/creation-modes.css',
-      'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
-      'js/creation/draw-color-adjustment-panel.mjs', 'js/creation/draw-color-adjustments.mjs',
-      'js/creation/draw-text-panel.mjs', 'js/creation/draw-text.mjs', 'js/creation/draw-brush-settings.mjs', 'css/draw-brush-settings.css',
-      'css/draw-color-adjustment-panel.css', 'css/draw-selection-features.css', 'css/draw-text-panel.css',
-      'assets/fonts/DotGothic16/DotGothic16-Regular.ttf', 'assets/fonts/DotGothic16/OFL.txt',
-      'assets/fonts/PressStart2P/PressStart2P-Regular.ttf', 'assets/fonts/PressStart2P/OFL.txt',
-      'PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html']) {
-      if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
-    }
-  }
-  let puzzlePages = 0;
-  for (const game of ['spot-difference', 'hidden-object']) {
-    const relative = `play/${game}/puzzles`;
-    const directory = join(root, relative);
-    const state = await lstat(directory).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
-    if (!state) continue;
-    if (!state.isDirectory() || state.isSymbolicLink() || await readFile(join(directory, marker), 'utf8') !== markerContents) throw new Error('Unrecognized generated puzzle directory');
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
-      if (entry.name === marker) continue;
-      if (!entry.isDirectory() || !isPuzzleShareId(game, entry.name)) throw new Error('Unexpected generated puzzle entry');
-      const children = await readdir(join(directory, entry.name), { withFileTypes: true });
-      if (!children.some(child => child.name === 'index.html')) throw new Error('Puzzle page is missing');
-      for (const child of children) {
-        if (!child.isFile() || !/^(?:index\.html|ogp-[a-f0-9]{16}\.png)$/.test(child.name)) throw new Error('Unexpected generated puzzle file');
-        files.push(`${relative}/${entry.name}/${child.name}`);
+  let eventRoot = null, created = false;
+  const generatedSources = new Set();
+  const sourceFor = name => join(generatedSources.has(name) ? eventRoot : root, name);
+  try {
+    const names = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    const booksAssets = new Set(publishableBooksAssets);
+    const booksManifest = await readFile(join(root, 'assets/books/room-products.json'), 'utf8').catch(error => {
+      if (error.code === 'ENOENT') return '[]';
+      throw error;
+    });
+    for (const product of JSON.parse(booksManifest)) {
+      if (!product || product.enabled === false || product.visible === false || product.sample === true) continue;
+      const thumbnail = product.shopThumbnail;
+      if (thumbnail && [32, 96].includes(thumbnail.width) && thumbnail.height === thumbnail.width
+          && /^\/assets\/books\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|webp)$/i.test(thumbnail.src || '')) {
+        booksAssets.add(thumbnail.src.slice(1));
       }
-      puzzlePages++;
     }
+    const files = names.filter(name => {
+      const parts = name.split('/');
+      // Event output is regenerated from the catalog below; stale tracked pages
+      // must not survive a removed/merged catalog record.
+      if (parts[0] === 'events') return false;
+      if (parts.some(part => part === '..' || part.startsWith('.')) || excluded.has(parts[0])) return false;
+      if (retiredPublicPages.has(name)) return false;
+      // Publish only the public catalog route and the exact data/runtime it needs.
+      // The room preview and prototype-only book assets stay local.
+      if (parts[0] === 'books' && !publishableBooksPages.has(name)) return false;
+      if (name.startsWith('assets/books/') && !booksAssets.has(name)) return false;
+      if (/^css\/books(?:-[a-z-]+)?\.css$/.test(name) && !publishableBooksStyles.has(name)) return false;
+      if (/^js\/books(?:-[a-z-]+)?\.mjs$/.test(name) && !publishableBooksScripts.has(name)) return false;
+      if (/^(?:package(?:-lock)?|deno(?:\.lock)?)\.(?:json|jsonc)$/.test(parts.at(-1))) return false;
+      return parts[0] === 'assets' || publicExtension.test(name) || name === 'CNAME';
+    });
+    let eventPages = 0;
+    const generatedEventRoutes = new Set();
+    if (await lstat(join(root, 'data/pixel-art-events.json')).catch(error => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    })) {
+      // Generate against an owned temporary copy. Normal builds must not rewrite
+      // tracked event pages or the source sitemap while collecting public files.
+      eventRoot = await mkdtemp(join(tmpdir(), 'pixieed-pages-events-'));
+      await mkdir(join(eventRoot, 'data'));
+      await copyFile(join(root, 'data/pixel-art-events.json'), join(eventRoot, 'data/pixel-art-events.json'));
+      const sitemap = await lstat(join(root, 'sitemap.xml')).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+      if (sitemap) {
+        if (!sitemap.isFile() || sitemap.isSymbolicLink()) throw new Error('sitemap.xml must be a regular file.');
+        await copyFile(join(root, 'sitemap.xml'), join(eventRoot, 'sitemap.xml'));
+      }
+      const generated = await generateEventPages({ root: eventRoot });
+      for (const name of generated.files) generatedSources.add(name);
+      eventPages = generated.eventPages;
+      files.push(...generated.files);
+      for (const name of generated.files) {
+        if (/^events\/[a-z0-9][a-z0-9-]*\/index\.html$/.test(name)) generatedEventRoutes.add(name);
+      }
+      // Explicit new public sources are also reviewable in a clean local build
+      // before they are committed. Arbitrary untracked work stays excluded.
+      for (const name of ['js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+        'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
+        'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/draw-lazy-panels.mjs',
+        'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
+        'js/globe/map-page-layout.mjs',
+        'assets/screenshots/audio-pc-maou.png', 'assets/screenshots/output-pc-maou.png',
+        'assets/screenshots/previews/audio-pc-maou-1366.webp',
+        'assets/screenshots/previews/audio-pc-maou-480.webp',
+        'assets/screenshots/previews/camera-mobile-maou-390.webp',
+        'assets/screenshots/previews/camera-pc-maou-1366.webp',
+        'assets/screenshots/previews/camera-pc-maou-480.webp',
+        'assets/screenshots/previews/draw-mobile-maou-780.webp',
+        'assets/screenshots/previews/draw-pc-maou-480.webp',
+        'assets/screenshots/previews/draw-pc-maou-960.webp',
+        'assets/screenshots/previews/hidden-mobile-maou-390.webp',
+        'assets/screenshots/previews/hidden-pc-maou-1366.webp',
+        'assets/screenshots/previews/hidden-pc-maou-480.webp',
+        'assets/screenshots/previews/jigsaw-mobile-maou-390.webp',
+        'assets/screenshots/previews/jigsaw-pc-maou-1366.webp',
+        'assets/screenshots/previews/jigsaw-pc-maou-480.webp',
+        'assets/screenshots/previews/output-pc-maou-1366.webp',
+        'assets/screenshots/previews/output-pc-maou-480.webp',
+        'assets/screenshots/previews/spot-mobile-maou-390.webp',
+        'assets/screenshots/previews/spot-pc-maou-1366.webp',
+        'assets/screenshots/previews/spot-pc-maou-480.webp',
+        'js/legacy-project-entry.mjs', 'css/legacy-project-entry.css', 'css/legacy-reference.css',
+        'help/index.html', 'glossary/index.html', 'projects/pixfind/index.html', 'projects/pixiedraw/index.html',
+        'css/design-tokens.css', 'js/event-history.mjs',
+        'js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
+        'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
+        'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',
+        'js/books-catalog.mjs',
+        'js/site-header-benefits.mjs', 'js/ads/site-reward-runtime-v20261016-ads-only.mjs', 'js/ads/site-reward-rollout-v20261016.mjs',
+        'js/creation/music-output-preferences.mjs', 'js/creation/pxd-original-backup.mjs',
+        'js/creation/legacy-lens-entry.mjs', 'js/creation/shared-project-settings-core.mjs',
+        'css/creation-camera-idle.css', 'css/draw-palette-instruments.css',
+        'js/creation/mode-entry.mjs', 'js/creation/shared-project-settings.mjs',
+        'js/creation/creation-modes.mjs', 'js/creation/creation-camera.mjs', 'js/creation/creation-mode-motion.mjs', 'js/creation/music-video-timing.mjs', 'js/creation/draw-music-model.mjs', 'js/creation/creation-output-core.mjs', 'js/creation/draw-music.mjs', 'js/creation/draw-music-core.mjs', 'js/creation/shared-project-core.mjs', 'css/creation-modes.css',
+        'js/legacy-editor-entry.mjs', 'js/globe/event-page-links.mjs',
+        'js/creation/draw-color-adjustment-panel.mjs', 'js/creation/draw-color-adjustments.mjs',
+        'js/creation/draw-text-panel.mjs', 'js/creation/draw-text.mjs', 'js/creation/draw-brush-settings.mjs', 'css/draw-brush-settings.css',
+        'css/draw-color-adjustment-panel.css', 'css/draw-selection-features.css', 'css/draw-text-panel.css',
+        'assets/fonts/DotGothic16/DotGothic16-Regular.ttf', 'assets/fonts/DotGothic16/OFL.txt',
+        'assets/fonts/PressStart2P/PressStart2P-Regular.ttf', 'assets/fonts/PressStart2P/OFL.txt',
+        'PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html']) {
+        if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
+      }
+    }
+    let puzzlePages = 0;
+    for (const game of ['spot-difference', 'hidden-object']) {
+      const relative = `play/${game}/puzzles`;
+      const directory = join(root, relative);
+      const state = await lstat(directory).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+      if (!state) continue;
+      if (!state.isDirectory() || state.isSymbolicLink() || await readFile(join(directory, marker), 'utf8') !== markerContents) throw new Error('Unrecognized generated puzzle directory');
+      for (const entry of await readdir(directory, { withFileTypes: true })) {
+        if (entry.name === marker) continue;
+        if (!entry.isDirectory() || !isPuzzleShareId(game, entry.name)) throw new Error('Unexpected generated puzzle entry');
+        const children = await readdir(join(directory, entry.name), { withFileTypes: true });
+        if (!children.some(child => child.name === 'index.html')) throw new Error('Puzzle page is missing');
+        for (const child of children) {
+          if (!child.isFile() || !/^(?:index\.html|ogp-[a-f0-9]{16}\.png)$/.test(child.name)) throw new Error('Unexpected generated puzzle file');
+          files.push(`${relative}/${entry.name}/${child.name}`);
+        }
+        puzzlePages++;
+      }
+    }
+    const unique = [...new Set(files)].sort();
+    for (const name of unique) {
+      if (!(await lstat(sourceFor(name))).isFile()) throw new Error(`Public source is not a regular file: ${name}`);
+    }
+    await mkdir(destination, { recursive: false });
+    created = true;
+    for (const name of unique) {
+      await mkdir(dirname(join(destination, name)), { recursive: true });
+      const sourcePath = sourceFor(name);
+      const outputPath = join(destination, name);
+      if (/\.html?$/i.test(name)) {
+        const sourceHtml = await readFile(sourcePath, 'utf8');
+        const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), name);
+        const withBenefits = addSiteHeaderBenefits(transformed.html, name);
+        const withGutters = addPageGutters(withBenefits.html, name, { generatedEventRoutes });
+        const withInformationAutoAds = addInformationAutoAds(withGutters.html, name, { generatedEventRoutes });
+        await writeFile(outputPath, withInformationAutoAds.html);
+      } else await copyFile(sourcePath, outputPath);
+    }
+    await writeFile(join(destination, '.nojekyll'), '');
+    const runtimeDelivery = unique.includes('js/tool-direct.mjs')
+      ? await optimizeToolRuntimeDelivery({ root: destination, esbuildPath }) : null;
+    return { files: unique.length + 1 + (runtimeDelivery ? 1 : 0), puzzlePages, eventPages, output: destination, runtimeDelivery };
+  } catch (error) {
+    if (created) await rm(destination, { recursive: true, force: true });
+    throw error;
+  } finally {
+    if (eventRoot) await rm(eventRoot, { recursive: true, force: true });
   }
-  const unique = [...new Set(files)].sort();
-  for (const name of unique) {
-    if (!(await lstat(join(root, name))).isFile()) throw new Error(`Public source is not a regular file: ${name}`);
-  }
-  await mkdir(destination, { recursive: false });
-  for (const name of unique) {
-    await mkdir(dirname(join(destination, name)), { recursive: true });
-    const sourcePath = join(root, name);
-    const outputPath = join(destination, name);
-    if (/\.html?$/i.test(name)) {
-      const sourceHtml = await readFile(sourcePath, 'utf8');
-      const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), name);
-      const withBenefits = addSiteHeaderBenefits(transformed.html, name);
-      const withGutters = addPageGutters(withBenefits.html, name, { generatedEventRoutes });
-      const withInformationAutoAds = addInformationAutoAds(withGutters.html, name, { generatedEventRoutes });
-      await writeFile(outputPath, withInformationAutoAds.html);
-    } else await copyFile(sourcePath, outputPath);
-  }
-  await writeFile(join(destination, '.nojekyll'), '');
-  return { files: unique.length + 1, puzzlePages, eventPages, output: destination };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

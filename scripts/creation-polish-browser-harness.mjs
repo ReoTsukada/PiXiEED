@@ -31,7 +31,7 @@ try {
     await context.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.origin !== new URL(base).origin) return route.abort();
-      if (url.pathname.endsWith('/js/creation/draw-page.mjs?rev=20261018-direct-runtime-1')) {
+      if (url.pathname.endsWith('/js/creation/draw-page.mjs?rev=20261020-staged-startup-1')) {
         const response = await route.fetch();
         const source = await response.text();
         const marker = 'return {\n  get workspace() { return pxdBridge; }, dispose: disposeDrawMode,';

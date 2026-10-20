@@ -2,6 +2,7 @@
 # local / OS files
 .DS_Store
 .vscode/
+/node_modules/
 Claude outputs/
 
 # OGP pages are generated into the Pages deployment artifact.
