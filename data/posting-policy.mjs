@@ -1,15 +1,15 @@
-// Not an issued policy: publication stays blocked until both approved documents
-// and the public contact are confirmed. Never fill these from localStorage.
+// Approved text, still an UNISSUED candidate: activation also needs real
+// DB/Auth/Gateway/browser verification. Never fill these from localStorage.
 export const postingPolicy = Object.freeze({
-  state: 'draft', contactConfirmed: true,
-  terms: Object.freeze({ url: '', version: '', sha256: '' }),
-  privacy: Object.freeze({ url: 'https://pixieed.jp/privacy/', version: '', sha256: '' }),
+  state: 'draft', contactConfirmed: true, effectiveCandidateDate: '2026-10-21',
+  terms: Object.freeze({ url: 'https://pixieed.jp/terms/', version: 'terms-20261021-1', sha256: 'dd63e55e2895b8df65a281a90e92cd9300679f3134af2ac18de9c7080bc029c9' }),
+  privacy: Object.freeze({ url: 'https://pixieed.jp/privacy/', version: 'privacy-20261021-1', sha256: 'a590c64ec27bd7ac483d5c70e9ba89e352595d51db7f4fabdfa5c11ba63e8ad3' }),
 });
 
 export class PostingConsentError extends Error {
   constructor(code) {
     super(code === 'posting_policy_unavailable'
-      ? '投稿条件の文書を準備中です。公開送信はできません。自分用保存は利用できます。'
+      ? '公開投稿機能の準備・検証中です。公開送信はできません。自分用保存は利用できます。'
       : '現在の利用規約とプライバシーポリシーを確認し、同意してから投稿してください。');
     this.name = 'PostingConsentError'; this.code = code;
   }

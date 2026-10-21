@@ -30,6 +30,7 @@ export const DRAW_CTA_EXCLUDED_ROUTES = Object.freeze({
   '/play/spot-difference/': 'interactive game',
   '/profile/': 'personal account surface',
   '/privacy/': 'legal and privacy information',
+  '/terms/': 'legal terms information',
   '/pass/': 'access and reward flow',
   '/shops/': 'retired route',
   '/globe-prototype.html': 'prototype',

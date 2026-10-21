@@ -11,7 +11,7 @@ const pages = [
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
   ['play/spot-difference/index.html', '/play/spot-difference/', 'spot-game'], ['play/hidden-object/index.html', '/play/hidden-object/', 'find-game'], ['game/index.html', '/game/', 'game'], ['pixel-camera.html', '/pixel-camera.html', 'camera'],
   ['telescope/index.html', '/telescope/', 'telescope'], ['about/index.html', '/about/', 'site'], ['guide/index.html', '/guide/', 'site'],
-  ['privacy/index.html', '/privacy/', 'site'], ['books/index.html', '/books/', 'site'], ['stores/index.html', '/stores/', 'stores'],
+  ['privacy/index.html', '/privacy/', 'site'], ['terms/index.html', '/terms/', 'site'], ['books/index.html', '/books/', 'site'], ['stores/index.html', '/stores/', 'stores'],
   ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html', 'site'], ['collection/index.html', '/collection/', 'site'],
 ];
 const sitemapExcludedPaths = new Set(['/draw/about/', '/pixel-camera.html', '/game/', '/telescope/', '/collection/']);

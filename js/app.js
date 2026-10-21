@@ -1424,7 +1424,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20261021-posting-consent-1').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20261021-posting-consent-2').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;
@@ -4115,7 +4115,7 @@ function renderPublicShell() {
   }
 
   const footerLinks = document.querySelector('.footer-links');
-  if (footerLinks) footerLinks.innerHTML = '<a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a>';
+  if (footerLinks) footerLinks.innerHTML = '<a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/terms/">利用規約</a><a href="/privacy/">プライバシー</a>';
   if (!document.documentElement.dataset.appConsentHandler) {
     document.documentElement.dataset.appConsentHandler = 'true';
     document.addEventListener('pixieed:analytics-consent-change', () => {

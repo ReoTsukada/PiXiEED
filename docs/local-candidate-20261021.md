@@ -20,11 +20,11 @@
 
 通常のNode全体/関連試験、合成Auth/Storage/RPCを使うDeno、通常build2回の一致、依存/cache/画像除外を検証する。これらは実Supabase、実ブラウザー、実機、実広告の証拠ではない。既知browser/listen/MachPort/blocked-clientおよびinitdb shared-memory拒否を別経路で迂回しない。SQL専用試験のskipを成功扱いしない。
 
-`supabase/migrations/20261021121542_jigsaw_publication.sql` の承認mapは空のまま。4制約の正確な定義を独立レビューする前に `jigsaw_constraint_review_required` で停止する。guardを外して適用する候補ではない。
+`supabase/migrations/20261021121542_jigsaw_publication.sql` の承認mapは空のまま。保存済み4制約・4関数の独立静的レビューは完了したが、実DB検証と本番実行承認は未了。`jigsaw_constraint_review_required` で停止し、guardを外して適用する候補ではない。
 
 ## 本番公開の最小blocking項目
 
-1. **同意対象の正式文書が未確定。** 現行sourceで正式な利用規約URL/本文を確認できず、現行プライバシーの2026-10-02本文は旧画像/地図投稿を中心とする。投稿前同意UI・API/サーバー版検証とservice-only確認記録の移行案は追加実装したが、正式文書/版が未確定のため設定はdraftで公開送信を停止。存在しない規約や草案へ同意した扱いにしない。`posting-policy-review-20261021.md` に不足と草案を分離した。本番公開前の必須要件。
+1. **文書は確定候補、実基盤の発効条件は未了。** `/terms/` と `/privacy/` の本文、版（terms-20261021-1 / privacy-20261021-1）、SHA256、発効候補日2026-10-21を確定。作者権利維持・限定サイト内利用・将来ゲームへの適用・保護者同意・メール受付・完了対応記録の原則90日整理はユーザー承認済み。通常設定はstate=draftを維持し、未検証のまま公開送信を有効化しない。詳細は `posting-policy-review-20261021.md`。
 2. 許可された非本番DB/browserで実schema/RLS/Storage/Gateway、複数所有者、ゲスト→登録/既存所有者移管、公開/非公開/削除/通報、音源Range、実IndexedDB/keyboard/320/390/PCを確認する必要がある。既知拒否を回避する目的の別routeは使わない。新環境/契約/credentialsを勝手に作らない。
 3. project `kyyiuakrqomzlikfaire` の現在の匿名Auth/manual linking/メール確認・provider/Google redirect値は未確認。設定読取の専用ツールがなく、同条件で失敗済みの操作は繰り返していない。現在値を確認する権限・手段が必要。
 
@@ -48,7 +48,7 @@
 
 ## 投稿前同意の追加候補（2026-10-21）
 
-運営者表示はユーザー指定の「PiXiEED アルタ」。privacy/index.htmlは改定候補と適用日未確定を明示し、既存の広告/解析の2節は本文を変更しない。公開問い合わせ先はユーザー確認済みの pixieed.arta@gmail.com だけをmailtoで掲載する。data/posting-policy.mjsはstate=draft/contactConfirmed=true（メールのみ確認済み）、terms URL/2文書version/hashは空。正式文書がないまま同意した扱いにせず、公開送信はクライアントのAuth作成前、サーバーのAuth/DB/媒体副作用前に停止する。閲覧/削除/非公開編集、自分用保存/試遊は別経路。
+運営者「PiXiEED アルタ」と問い合わせ先 pixieed.arta@gmail.com は確認済み。privacyと新設termsの本文を承認方針へ整合し、本文articleの版/hash/候補日を通常buildで検証する。既存広告/解析の2節は本文を変えない。data/posting-policy.mjsはstate=draft/contactConfirmed=trueのまま、両URL/版/hashを実在候補へ設定。残る停止理由は文書の不足ではなく、本番Auth/RLS/Gateway/Storageの承認・実環境検証。
 
 正式な2文書/版/承認本文SHA256と公開窓口の確認後、同じ設定をクライアントとFunctionへ同時配布して初めて有効化できる構造。ゲスト/登録の双方に未チェックUI、再表示/公開範囲/本人切替でreset。下書きやguest claimへ同意を移さない。画像/パズルcreate-postとSNS文章/音源create/公開editは、欠落・false・旧版を拒否。確認記録が保存できない場合も媒体の保存/公開処理へ進まない。
 
@@ -56,4 +56,6 @@
 
 旧pixfind_puzzles等に直接INSERTできる既存の公開Data API権限は今回変更していない。新規Function経路の同意制御が、旧RLS経路全体を保護することを意味しない。本番の全投稿経路へ同意を強制する前に、旧書込経路のcatalog確認と必要な権限制限/互換移行の個別承認が必要。
 
-2026-10-21追記: 運営者名「PiXiEED アルタ」と公開問い合わせ先 pixieed.arta@gmail.com は確認済み。正式Terms URL/本文、2文書の適用版/日、権利許諾・年齢・保持・退会・通報運用は未確定。連絡先確認だけでpolicy.stateをpublishedにしない。元の草案の未確定リストは作成時点の記録であり、この追記で連絡先のみ更新する。
+2026-10-21方針確定追記: 正式候補文書と原則90日の対応記録整理方針を確定。専用台帳のdry-run/新規置換ファイル作成と手動メール整理の手順を追加したが、実メール/DBの削除・運用開始や自動定期実行は行っていない。同意・所有権/再試行安全記録を90日で一律消すものではない。
+
+ジグソー移行案は保存済みcatalogの4関数完全定義へ変更し、署名/MD5と4制約の正確な定義をDDL前に検査する。旧モード検証は逆変換fingerprintで保持を確認。幅/高さはjigsaw専用にJSON数値を要求。独立レビュー済みだが実SQL/DB未検証で、承認mapは空のまま。候補dfc8fbfcへの保存は本番適用ではない。

@@ -20,8 +20,8 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.runtimeGraph.edges.length, 196);
   assert.equal(plan.dynamicRoots.length, 23);
   assert.equal(plan.dynamicGraph.modules.size, 102);
-  assert(plan.dynamicGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-1'));
-  assert(!plan.runtimeGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-1'));
+  assert(plan.dynamicGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-2'));
+  assert(!plan.runtimeGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-2'));
   assert.equal(plan.externalUrls.size, 53);
   assert.equal(plan.internalizedUrls.length, 51);
   assert(plan.externalUrls.has('/js/social/tool-return.mjs?rev=20261021-jigsaw-public-1'));

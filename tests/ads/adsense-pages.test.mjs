@@ -15,7 +15,7 @@ export const WORKSPACE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pi
 const OFFERWALL_PAGE = 'output/work/index.html';
 const COMPATIBILITY_PAGES = ['PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html'];
 // This isolated mock page never participates in the site's AdSense loading.
-const REFERENCE_NO_AD_PAGES = ['help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html'];
+const REFERENCE_NO_AD_PAGES = ['terms/index.html', 'help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html'];
 const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 // These are source templates. The Pages build injects the informational loader
 // only after checking its explicit route allowlist and generated-event set.
