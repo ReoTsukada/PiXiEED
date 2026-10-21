@@ -11,7 +11,7 @@ function makeAdmin({
 }: {
   initialStatus?: string;
   publish?: "success" | "error_pending" | "error_published" | "throw_pending" | "error_rejected" | "error_hidden" | "error_hidden_committed" | "point_read_error";
-  puzzleMode?: "spot_difference" | "hidden_object" | null;
+  puzzleMode?: "spot_difference" | "hidden_object" | "jigsaw" | null;
   pointReadError?: boolean;
 } = {}) {
   let status = initialStatus;
@@ -205,4 +205,14 @@ Deno.test("moderation handler rejects requests without a bearer token before cre
     projectUrl: "https://example.supabase.co", publishableKey: "public", serviceKey: "secret" });
   assert.equal(response.status, 401);
   assert.equal(created, false);
+});
+
+Deno.test("Jigsaw approval uses one image and ambiguous committed results retain it", async () => {
+  for (const publish of ["success", "error_published"] as const) {
+    const fixture = makeAdmin({ puzzleMode: "jigsaw", publish });
+    const result = await moderatePost(fixture.admin, { postId: POST_ID, action: "approve" });
+    assert.equal(result.status, "published");
+    assert.equal(fixture.calls.filter(call => call.startsWith("upload:")).length, 1);
+    assert.ok(!fixture.calls.some(call => call.startsWith("remove-")));
+  }
 });

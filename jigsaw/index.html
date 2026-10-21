@@ -38,7 +38,7 @@
       <label class="jigsaw-field" hidden aria-hidden="true">ピースの大きさ<select id="jigsaw-grid-size" aria-label="ピースの大きさ"><option value="auto" selected>おまかせ</option><option value="3">約3px・細かい</option><option value="6">約6px</option><option value="12">約12px</option><option value="24">約24px</option><option value="48">約48px</option><option value="96">約96px・大きめ</option></select></label>
       <p id="jigsaw-piece-count" class="jigsaw-piece-count" aria-live="polite">画像を選ぶとピース数の目安が表示されます。</p>
       <div class="jigsaw-setup__actions"><button id="jigsaw-start" data-tool-operation type="button" disabled>パズルをはじめる</button><button id="jigsaw-resume" data-tool-operation type="button" hidden>前回のパズルを再開</button><button id="jigsaw-current" data-tool-operation type="button" hidden>直前のパズルを開く</button></div>
-      <p class="jigsaw-help">公開作品はこの端末で遊ぶためだけに読み込みます。選んだ画像の投稿やアップロードは行いません。3px未満のピースは作成できません。</p>
+      <p class="jigsaw-help">プレイと保存はこの端末内で行います。自分の保存版から作ったジグソーは「投稿する」から内容を準備できます。フィードで確認して最後に送信するまで公開されません。端末ファイルや公開作品、PXDから開いたジグソーは投稿できません。</p>
     </section>
     <section id="jigsaw-play" class="jigsaw-play" aria-label="ジグソーパズル" hidden>
       <p id="jigsaw-source-label" class="jigsaw-source-label"></p>
@@ -55,6 +55,7 @@
             <button id="jigsaw-tray-next" type="button" aria-label="次のページ" title="次のページ">›</button>
           </div>
           <button id="jigsaw-new" type="button" aria-label="別の絵でパズルを作る" title="現在のプレイを閉じて絵を選ぶ">別の絵を選ぶ</button>
+          <button id="jigsaw-publish" type="button" aria-label="投稿する" title="投稿内容の確認へ進む">投稿する</button>
         </div></details>
         <span id="jigsaw-selection" role="status" aria-live="polite">ピースを選択してください</span>
       </div>
@@ -80,7 +81,7 @@
     <div class="tool-operation-slot" data-operation-slot="3" role="group" aria-label="ツール操作"></div>
     <div class="tool-operation-slot" data-operation-slot="4" role="group" aria-label="ツール操作"></div>
   </nav>
-  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20261018-direct-runtime-2&nav=20261016-tool-operations-1"></script>
+  <script type="module" src="/js/creation/jigsaw-page.mjs?rev=20261021-jigsaw-public-1&nav=20261016-tool-operations-1"></script>
   <script type="module" src="/js/creation/jigsaw-arcade.mjs?rev=20261006-jigsaw-camera-difficulty-3"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261021-header-layout-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>

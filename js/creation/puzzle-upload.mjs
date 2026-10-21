@@ -42,6 +42,10 @@ async function imageClaim(document, encodeImage, inspectImage, width, height) {
 }
 
 export async function preparePuzzleUpload({ mode, draftId, store, adapter, encodeImage = encodeDrawPng, inspectImage = inspectPixelImage } = {}) {
+  if (mode === 'jigsaw') {
+    const { prepareJigsawUpload } = await import('./jigsaw-publication.mjs?rev=20261021-jigsaw-public-1');
+    return prepareJigsawUpload({mode,draftId,store,adapter,encodeImage,inspectImage});
+  }
   if (mode !== 'spot_difference' && mode !== 'hidden_object') throw new TypeError('未対応のパズル形式です');
   if (!store || typeof store.load !== 'function' || !adapter || typeof adapter.get !== 'function') throw new TypeError('ローカル下書きストアが必要です');
   const saved = await store.load(draftId);

@@ -22,3 +22,21 @@ test('review exclusion protects formal assets, arbitrary artwork and public rout
     'play/hidden-object/puzzles/pixfind-ho-a90bc7c5-e055-447c-b67f-d0b9fa61e3fa/ogp-abb89804d66dabb3.png',
   ]) assert.equal(isLocalReviewSource(name), false, name);
 });
+
+test('SNS feed uses the existing 48px logo master instead of CSS square marks', async () => {
+  for (const [htmlPath, cssPath, src] of [
+    ['feed/index.html', 'css/social-feed.css', '/assets/brand/pixieed-logo-48.png'],
+  ]) {
+    const html = await readFile(new URL(`../../${htmlPath}`, import.meta.url), 'utf8');
+    const css = await readFile(new URL(`../../${cssPath}`, import.meta.url), 'utf8');
+    const links = [...html.matchAll(/<a class="brand"[^>]*>[\s\S]*?<\/a>/g)].map(match => match[0]);
+    assert.equal(links.length, 2, htmlPath);
+    for (const link of links) {
+      assert(link.includes('aria-label="PiXiEED ホーム"'));
+      assert(link.includes(`src="${src}" width="24" height="24"`));
+      assert(!link.includes('brand-mark'));
+    }
+    assert.match(css, /\.brand-logo\s*\{[^}]*image-rendering:\s*pixelated/);
+    assert(!css.includes('.brand-mark'));
+  }
+});

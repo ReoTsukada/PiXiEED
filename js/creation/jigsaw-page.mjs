@@ -23,6 +23,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-opera
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
 import { createLevelTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
+import { preparePublicJigsaw } from './jigsaw-publication.mjs?rev=20261021-jigsaw-public-1';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -32,6 +33,7 @@ let levelGameId = null;
 const sourceKind = $('#jigsaw-source-kind'); const publicSelect = $('#jigsaw-public-version'); const fileInput = $('#jigsaw-file');
 const gridSelect = $('#jigsaw-grid-size'); const startButton = $('#jigsaw-start');
 const resumeButton = $('#jigsaw-resume'); const saveButton = $('#jigsaw-save');
+const publishButton = $('#jigsaw-publish');
 const setupSection = $('#jigsaw-setup'); const playSection = $('#jigsaw-play');
 const boardElement = $('#jigsaw-board'); const workspaceElement = $('#jigsaw-workspace'); const trayElement = $('#jigsaw-tray');
 const previewPanel = $('#jigsaw-preview'); const previewCanvas = $('#jigsaw-preview-canvas'); const previewToggle = $('#jigsaw-preview-toggle');
@@ -49,6 +51,7 @@ let jigsawHint = null;
 let jigsawHintTimer = 0;
 let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null; let pendingPxdSource = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
+let publishBusy = false;
 let resultRun = 0; let resultShownRun = -1; let resultTimer = 0;
 const MAX_TRAY_DOM = 80;
 const jigsawResult = createToolResultView({ key: 'jigsaw-result', main: $('#main'), returnLabel: '問題一覧に戻る', returnHref: '/jigsaw/',
@@ -683,7 +686,8 @@ async function startGame() {
     clearSelectionCache();
     pieces = sliceJigsawPieces(rgba, layoutData);
     setSourcePreview(rgba);
-    game = createJigsawWorkspace({ gameId, source, layout: layoutData, seed: gameId });
+    const createdGame = createJigsawWorkspace({ gameId, source, layout: layoutData, seed: gameId });
+    game = pendingSource ? { ...createdGame, sourceOrigin: 'pxd' } : createdGame;
     if (pendingSource) {
       pxdOriginalRefs = pendingSource.portableOriginalRefs;
       pxdPreservedPayload = pendingSource.preservedPayload || null;
@@ -700,12 +704,12 @@ async function startGame() {
 }
 
 async function saveGame() {
-  if (!draftStore || !game) return;
+  if (!draftStore || !game) return false;
   saveButton.disabled = true; updateStatus('途中の配置を端末に保存しています…');
   try {
     if (game.source.type !== 'public') await pxdBridge?.save();
     const rect = workspaceElement.getBoundingClientRect();
-    game = { ...game, viewport: { scale: Math.max(0.2, Math.min(12, view.scale)), x: Math.max(-4, Math.min(4, rect.width ? view.x / rect.width : 0)), y: Math.max(-4, Math.min(4, rect.height ? view.y / rect.height : 0)) } };
+    game = { ...game, ...((pxdOriginalRefs || pxdPreservedPayload || pendingPxdSource) ? { sourceOrigin: 'pxd' } : {}), viewport: { scale: Math.max(0.2, Math.min(12, view.scale)), x: Math.max(-4, Math.min(4, rect.width ? view.x / rect.width : 0)), y: Math.max(-4, Math.min(4, rect.height ? view.y / rect.height : 0)) } };
     validateJigsawWorkspace(game, layoutData);
     if (game.source.type === 'public' || game.source.type === 'file') {
       validateJigsawSource(game.source);
@@ -714,21 +718,23 @@ async function saveGame() {
     else { const fixedSource = await resolveLocalDrawRevision(adapter, game.source.draftId, game.source.revisionId); if (fixedSource.asset.assetId !== game.source.assetId || fixedSource.documentHash !== game.source.contentHash || fixedSource.hashScheme !== game.source.hashScheme) throw new Error('元の保存版が一致しません。パズルを新しく作り直してください'); }
     await draftStore.save({ draftId: gameDraftId, kind: 'jigsaw', ownerId: 'local-owner', document: game, source: { type: 'jigsaw_game', assetId: game.source.assetId || null, revisionId: game.source.revisionId || null } });
   } catch (error) {
-    saveButton.disabled = false; updateStatus(`保存できませんでした：${error.message || '端末の空き容量とブラウザーの保存設定を確認してください。'}`); return;
+    saveButton.disabled = false; updateStatus(`保存できませんでした：${error.message || '端末の空き容量とブラウザーの保存設定を確認してください。'}`); return false;
   }
   try {
     localStorage.setItem(JIGSAW_LAST_DRAFT_KEY, gameDraftId);
     saveButton.disabled = false; updateStatus(isJigsawWorkspaceComplete(game) ? '完成したパズルを端末に保存しました。' : '配置を端末に保存しました。');
+    return true;
   } catch {
     saveButton.disabled = false; updateStatus('パズル本体は保存されましたが、再開用の目印を保存できませんでした。');
+    return true;
   }
 }
 
-async function resumeGame() {
+async function resumeGame(requestedDraftId = null) {
   cancelJigsawResult(true); resultShownRun = -1;
   if (!draftStore || !adapter) return;
   setSourcePreview(null);
-  const draftId = localStorageValue(JIGSAW_LAST_DRAFT_KEY);
+  const draftId = requestedDraftId || localStorageValue(JIGSAW_LAST_DRAFT_KEY);
   if (!draftId) { resumeButton.hidden = true; updateStatus('前回のパズルはありません。'); return; }
   resumeButton.disabled = true; updateStatus('前回の配置と元の固定版を確認しています…');
   try {
@@ -739,6 +745,12 @@ async function resumeGame() {
     if (savedGame.gameId !== draftId) throw new Error('パズルIDが一致しません');
     let rgba; let width; let height;
     if (savedGame.source.type === 'public') {
+      if (savedGame.source.puzzleMode === 'jigsaw') {
+        const publicId = /^map:([a-f\d-]{36})$/i.exec(savedGame.source.postId)?.[1];
+        const current = publicId ? await readPublishedJigsaw(publicId) : null;
+        if (!current || current.url !== savedGame.source.url || current.width !== savedGame.layout.width || current.height !== savedGame.layout.height
+          || current.definition.pieceSize !== savedGame.layout.pieceSize || current.definition.seed !== savedGame.layout.seed) throw new Error('公開ジグソーの定義が保存時と一致しません。端末内の配置は保持しています');
+      }
       await assertListedPublicSource(savedGame.source.postId, savedGame.source.url, savedGame.source.puzzleId || null);
       const bytes = await fetchImageBytes(savedGame.source.url); if (await fingerprintBytes(bytes) !== savedGame.source.fingerprint) throw new Error('公開画像が保存時から変わっています。別の絵へ自動変更はしません');
       const blobUrl = URL.createObjectURL(new Blob([bytes])); try { rgba = boundedRgba(await decodeImage(blobUrl)); } finally { URL.revokeObjectURL(blobUrl); }
@@ -772,6 +784,63 @@ async function resumeGame() {
     }
     resumeButton.disabled = false; updateStatus(isLegacy ? '前回の配置を新しい作業スペースへ引き継ぎました。元の履歴は残っています。' : '前回の配置を、同じ元の固定版で再開しました。');
   } catch (error) { resumeButton.disabled = false; updateStatus(`再開できませんでした：${error.message}`); }
+}
+
+function resolveJigsawRouteId(name) {
+  const values = new URLSearchParams(location.search).getAll(name);
+  if (!values.length) return undefined;
+  return values.length === 1 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(values[0]) ? values[0] : null;
+}
+
+async function readPublishedJigsaw(postId) {
+    const endpoint = new URL('/functions/v1/public-post-puzzle', `${String(supabaseConfig.url).replace(/\/$/, '')}/`);
+    endpoint.searchParams.set('postId', postId);
+    const response = await fetch(endpoint.href, { method: 'GET', headers: { apikey: supabaseConfig.publishableKey, Accept: 'application/json' }, cache: 'no-store', credentials: 'omit' });
+    if (!response.ok || response.status !== 200) throw new Error('この公開ジグソーは現在利用できません');
+    return preparePublicJigsaw(await response.json(), postId, supabaseConfig.url);
+}
+async function openPublishedJigsaw(postId) {
+  if (!postId) { updateStatus('公開ジグソーのIDを確認できません。'); return; }
+  updateStatus('公開されたジグソーを確認しています…');
+  try {
+    const publicPuzzle = await readPublishedJigsaw(postId);
+    const imageBytes = await fetchImageBytes(publicPuzzle.url);
+    const fingerprint = await fingerprintBytes(imageBytes);
+    const blobUrl = URL.createObjectURL(new Blob([imageBytes])); let rgba;
+    try { rgba = boundedRgba(await decodeImage(blobUrl)); } finally { URL.revokeObjectURL(blobUrl); }
+    if (rgba.width !== publicPuzzle.width || rgba.height !== publicPuzzle.height) throw new Error('公開ジグソーの画像サイズが一致しません');
+    const source = { type: 'public', postId: `map:${postId}`, puzzleMode:'jigsaw', title: publicPuzzle.title, url: publicPuzzle.url, fingerprint, width: rgba.width, height: rgba.height };
+    const layoutDataNext = createJigsawLayout({ width: rgba.width, height: rgba.height, pieceSize: publicPuzzle.definition.pieceSize, seed: publicPuzzle.definition.seed });
+    if (layoutDataNext.columns * layoutDataNext.rows > 4096) throw new Error('公開ジグソーのピース数が上限を超えています');
+    const gameNext = createJigsawWorkspace({ gameId: globalThis.crypto.randomUUID(), source, layout: layoutDataNext, seed: publicPuzzle.definition.seed });
+    const piecesNext = sliceJigsawPieces(rgba, layoutDataNext);
+    cancelJigsawResult(true); resultShownRun = -1; clearSelectionCache(); pxdBridge?.reset();
+    game = gameNext; gameDraftId = gameNext.gameId; sourceRevision = null; sourceDraftId = null; layoutData = layoutDataNext;
+    pieces = piecesNext; setSourcePreview(rgba); sourceLabel.textContent = `${source.title} · 公開ジグソー`;
+    selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 }; pxdOriginalRefs = null; pxdPreservedPayload = null;
+    saveButton.disabled = false; showGame(); updateStatus('公開ジグソーを読み込みました。配置はこの端末に保存できます。');
+  } catch (error) { updateStatus(`公開ジグソーを開けませんでした：${error.message}`); }
+}
+
+function jigsawShareIdentity(value) {
+  return JSON.stringify({ gameId: value?.gameId, source: value?.source, layout: value?.layout, groups: value?.groups, pieceOrder: value?.pieceOrder });
+}
+
+async function prepareJigsawPost() {
+  if (publishBusy || !game) return;
+  if (game.sourceOrigin === 'pxd' || game.source?.type && game.source.type !== 'draw') { updateStatus('端末ファイル、公開作品、PXDから開いたジグソーは投稿できません。自分の保存版から作り直してください。'); return; }
+  if (pxdOriginalRefs || pxdPreservedPayload || pendingPxdSource) { updateStatus('PXDから開いたジグソーは投稿できません。自分の保存版から作り直してください。'); return; }
+  if (!draftStore || !adapter || !gameDraftId) { updateStatus('このジグソーを端末に保存できません。投稿内容を準備できません。'); return; }
+  publishBusy = true; publishButton.disabled = true;
+  const initialGameId = game.gameId; const initialIdentity = jigsawShareIdentity(game); const draftId = gameDraftId;
+  updateStatus('ジグソーを端末に保存して、投稿内容を準備しています…');
+  try {
+    if (!await saveGame()) return;
+    if (!game || game.gameId !== initialGameId || gameDraftId !== draftId || jigsawShareIdentity(game) !== initialIdentity) throw new Error('準備中に配置が変わりました。もう一度投稿するを選んでください');
+    const {openPuzzleHandoff} = await import('./puzzle-handoff.mjs?rev=20261021-jigsaw-public-1');
+    await openPuzzleHandoff({ mode: 'jigsaw', destination: 'feed', draftId, localDraftId: draftId, store: draftStore, adapter, isCurrent: () => !!game && game.gameId === initialGameId && gameDraftId === draftId && jigsawShareIdentity(game) === initialIdentity });
+  } catch (error) { updateStatus(`投稿内容を準備できませんでした：${error.message}`); }
+  finally { publishBusy = false; publishButton.disabled = false; }
 }
 
 async function encodePxdJigsawImage(image) {
@@ -859,7 +928,7 @@ async function openPxdJigsaw(project) {
   if (!sourcePixels || sourcePixels.width !== nextLayout.width || sourcePixels.height !== nextLayout.height) throw new Error('PXDの画像と盤面サイズが一致しません。');
   const nextPieces = sliceJigsawPieces(sourcePixels, nextLayout);
   setSourcePreview(sourcePixels);
-  game = nextGame; layoutData = nextLayout; pieces = nextPieces; gameDraftId = game.gameId;
+  game = { ...nextGame, sourceOrigin: 'pxd' }; layoutData = nextLayout; pieces = nextPieces; gameDraftId = game.gameId;
   clearSelectionCache(); clearDragState();
   pxdOriginalRefs = materialized.portableOriginalRefs; pxdPreservedPayload = materialized.preservedPayload || null;
   selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
@@ -980,6 +1049,7 @@ $('#jigsaw-new').addEventListener('click', () => {
   updateStatus('絵とむずかしさを選んでください。');
 });
 $('#jigsaw-current').addEventListener('click', () => { if (game) { showGame(); workspaceElement.focus({ preventScroll: true }); } });
+publishButton?.addEventListener('click', () => { void prepareJigsawPost(); });
 
 jigsawHintButton?.addEventListener('click', () => { void requestJigsawHint(); });
 
@@ -993,3 +1063,8 @@ if (pxdBridge) {
 } else {
   await loadSourceOptions(); await loadPublicOptions(); displaySourceFields();
 }
+const requestedLocalJigsaw = resolveJigsawRouteId('localJigsaw');
+const requestedPublicJigsaw = resolveJigsawRouteId('postPuzzle');
+if (requestedLocalJigsaw !== undefined && requestedLocalJigsaw !== null && requestedPublicJigsaw === undefined) await resumeGame(requestedLocalJigsaw);
+else if (requestedPublicJigsaw !== undefined && requestedLocalJigsaw === undefined) await openPublishedJigsaw(requestedPublicJigsaw);
+else if (requestedLocalJigsaw === null || requestedPublicJigsaw === null || requestedLocalJigsaw !== undefined && requestedPublicJigsaw !== undefined) updateStatus('ジグソーのリンクを確認できません。');

@@ -8,7 +8,7 @@ const USER_ID = "22222222-2222-4222-8222-222222222222";
 const REQUEST_KEY = "33333333-3333-4333-8333-333333333333";
 const PROJECT = "https://example.supabase.co";
 
-type PuzzleMode = "hidden_object" | "spot_difference";
+type PuzzleMode = "hidden_object" | "spot_difference" | "jigsaw";
 type FixtureOptions = {
   lookup?: { data?: unknown; error?: { message: string } | null } | Array<{ data?: unknown; error?: { message: string } | null }>;
   create?: { data?: unknown; error?: { message: string } | null };
@@ -37,7 +37,9 @@ async function body(requestKey?: string, puzzleMode?: PuzzleMode, postKind: "pix
     const puzzle: Record<string, unknown> = {
       mode: puzzleMode,
       source: { schemaVersion: 1, original: sourceRef, ...(puzzleMode === "spot_difference" ? { changed: { ...sourceRef, revisionId: "rev2", contentHash: "b".repeat(64) } } : {}) },
-      definition: puzzleMode === "hidden_object"
+      definition: puzzleMode === "jigsaw"
+        ? { schemaVersion: 1, width: 16, height: 16, confirmed: true, layoutVersion: 1, pieceSize: 6, seed: "public-seed" }
+        : puzzleMode === "hidden_object"
         ? { schemaVersion: 1, width: 16, height: 16, confirmed: true, targets: [{ id: "flower", name: "花", pixels }] }
         : { schemaVersion: 1, width: 16, height: 16, confirmed: true, candidates: [{ id: "spot1", pixels: [4] }] },
     };
@@ -82,7 +84,7 @@ function mockCreateClient(options: FixtureOptions) {
           if (options.puzzleMode) {
             const puzzle = args.p_puzzle as Record<string, unknown>;
             assert.equal(puzzle.mode, options.puzzleMode);
-            if (options.puzzleMode === "hidden_object") {
+            if (options.puzzleMode !== "spot_difference") {
               assert.equal(Object.hasOwn(puzzle, "changed_image_path"), false);
               assert.equal(Object.hasOwn(puzzle, "changed_image_claim"), false);
             } else {
@@ -184,7 +186,7 @@ Deno.test("a request-key digest mismatch remains a conflict and fails before sid
 });
 
 Deno.test("puzzle posts remain pending for moderation", async () => {
-  for (const puzzleMode of ["hidden_object", "spot_difference"] as const) {
+  for (const puzzleMode of ["hidden_object", "spot_difference", "jigsaw"] as const) {
     const fixture = mockCreateClient({ puzzleMode });
     const response = await createPostHandler(request(await body(undefined, puzzleMode)), deps(fixture.factory));
     assert.equal(response.status, 201);

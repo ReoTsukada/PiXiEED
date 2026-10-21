@@ -608,7 +608,10 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     event.preventDefault();
     if (c.submit.disabled || state.submitting || renderer.isMapLocationReady?.() === false) return;
     const user = currentUser();
-    if (!user) { needLogin(() => c.form.requestSubmit()); return; }
+    if (!user) {
+      needLogin(state.puzzle ? () => { syncComposer(); say('ログインを確認しました。パズルの内容を確認して、もう一度投稿ボタンを押してください。'); } : () => c.form.requestSubmit());
+      return;
+    }
     invalidateLocationRequest();
     state.submitting = true; syncComposer();
     try {

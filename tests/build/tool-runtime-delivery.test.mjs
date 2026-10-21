@@ -16,12 +16,19 @@ const esbuildPath = path.join(repositoryRoot, 'node_modules/.bin/esbuild');
 test('delivery plan preserves runtime identities and bounds minification to startup/mode files', async () => {
   const plan = await deriveToolRuntimeDeliveryPlan({ root: repositoryRoot });
 
-  assert.equal(plan.runtimeGraph.modules.size, 100);
-  assert.equal(plan.runtimeGraph.edges.length, 191);
+  assert.equal(plan.runtimeGraph.modules.size, 102);
+  assert.equal(plan.runtimeGraph.edges.length, 194);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 98);
-  assert.equal(plan.externalUrls.size, 50);
+  assert.equal(plan.dynamicGraph.modules.size, 100);
+  assert.equal(plan.externalUrls.size, 52);
   assert.equal(plan.internalizedUrls.length, 50);
+  // The two metadata-only save modules are shared external identities, never Auth imports.
+  for (const file of ['local-work-save-hook.mjs', 'local-work-ownership.mjs']) {
+    assert(plan.runtimeGraph.modules.has(`/js/creation/${file}`));
+    assert(plan.externalUrls.has(`/js/creation/${file}`));
+  }
+  assert(![...plan.runtimeGraph.modules.keys()].some(url => /guest-auth|guest-google|guest-account|local-login-transfer/.test(url)));
+
   assert(plan.externalUrls.has('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
   assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261016-color-capability-1'));
   assert([...plan.modeGraph.modules.keys()].some(url => url.startsWith('/js/pixel-lens/app.mjs?')));
@@ -84,7 +91,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 50);
+    assert.equal(report.externalCount, 52);
     assert.equal(report.internalizedCount, 50);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);

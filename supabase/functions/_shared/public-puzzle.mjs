@@ -1,5 +1,5 @@
 import { verifyStoredPixelPngClaim, PixelPngError } from './pixel-png.mjs';
-import { validateHiddenPuzzleDefinition, validateSpotPuzzleDefinition } from './puzzle-definition.mjs';
+import { validateHiddenPuzzleDefinition, validateSpotPuzzleDefinition, validateJigsawPuzzleDefinition } from './puzzle-definition.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROOT_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -85,7 +85,7 @@ export async function buildPublicPuzzleResponse(input, supabaseUrl) {
   if (parent.status !== 'published') reject('public_puzzle_parent_not_published');
   if (!validTimestamp(parent.publishedAt) || !validTimestamp(point.publishedAt)) reject('public_puzzle_publication_date_invalid');
   if (puzzle.reviewState !== 'approved') reject('public_puzzle_not_approved');
-  if (!['spot_difference', 'hidden_object'].includes(puzzle.mode)) reject('public_puzzle_mode_invalid');
+  if (!['spot_difference', 'hidden_object', 'jigsaw'].includes(puzzle.mode)) reject('public_puzzle_mode_invalid');
   if (puzzle.schemaVersion !== 1) reject('public_puzzle_version_unsupported');
   if (typeof parent.title !== 'string' || !parent.title.trim() || Array.from(parent.title.trim()).length > 60) reject('public_puzzle_title_invalid');
   if (parent.authorLabel !== undefined && (typeof parent.authorLabel !== 'string' || !parent.authorLabel.trim() || Array.from(parent.authorLabel.trim()).length > 80 || /[\u0000-\u001f\u007f]/.test(parent.authorLabel))) reject('public_puzzle_author_invalid');
@@ -106,7 +106,7 @@ export async function buildPublicPuzzleResponse(input, supabaseUrl) {
     changedImage = { url: changedUrl, width: changed.width, height: changed.height };
   } else {
     if (Object.hasOwn(puzzle, 'changedImage') || Object.hasOwn(input, 'changedBytes')) reject('public_puzzle_changed_image_unexpected');
-    try { definition = validateHiddenPuzzleDefinition(puzzle.definition, original); }
+    try { definition = puzzle.mode === 'jigsaw' ? validateJigsawPuzzleDefinition(puzzle.definition, original) : validateHiddenPuzzleDefinition(puzzle.definition, original); }
     catch { reject('public_puzzle_definition_invalid'); }
   }
 

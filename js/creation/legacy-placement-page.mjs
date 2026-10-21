@@ -8,13 +8,32 @@ const root = document.querySelector('#legacy-placement-root');
 if (root && new URLSearchParams(location.search).get('view') === 'posts') {
   root.hidden = false;
   const api = createLegacyPlacementApi();
+  let googleBridge = null;
+  async function loadGoogleBridge() {
+    if (googleBridge) return googleBridge;
+    const [{ createGuestAuthAdapter }, { createGuestAccountController }, { createGuestGoogleBridge }] = await Promise.all([
+      import('../social/guest-auth-adapter.mjs'), import('../social/guest-account.mjs'), import('../social/guest-google-bridge.mjs')
+    ]);
+    const auth = createGuestAuthAdapter();
+    const accountController = createGuestAccountController({ auth });
+    let local = null;
+    try {
+      const { createLocalLoginTransfer } = await import('../social/local-login-transfer.mjs');
+      local = createLocalLoginTransfer({ auth, storage: localStorage, indexedDBRef: indexedDB });
+    } catch { /* Keep callback intent cancellable; never claim or report local completion without this store. */ }
+    googleBridge = createGuestGoogleBridge({ api, auth, accountController, prepareLocal: local ? ({ requestNonce, includeLegacy }) => local.prepareLocal({ requestNonce, includeLegacy }) : null, completeLocal: local ? (result) => local.completeLocal(result) : null, cancelLocal: local && typeof local.cancel === 'function' ? (result) => local.cancel(result) : null });
+    return googleBridge;
+  }
   const callback = readOwnerAuthCallback(location.hash);
-  if (callback) {
+  const callbackUrl = new URL(location.href);
+  const callbackCode = callbackUrl.searchParams.get('code') || '';
+  const callbackError = callbackUrl.searchParams.has('error');
+  if (callback || callbackCode || callbackError) {
+    // Scrub OAuth callback material synchronously, before loading modules or awaiting anything.
     const cleanUrl = new URL(location.href);
-    cleanUrl.hash = '';
+    cleanUrl.hash = ''; cleanUrl.searchParams.delete('code'); cleanUrl.searchParams.delete('error'); cleanUrl.searchParams.delete('error_description');
     history.replaceState(history.state, '', cleanUrl);
   }
-
   const redirectTo = new URL('/profile/?view=posts', location.origin).toString();
   const element = (tag, className, text = '') => {
     const node = document.createElement(tag);
@@ -29,12 +48,41 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
     message.dataset.error = String(error);
   };
 
+  function refreshTransferControls(container = root) {
+    const retry = container.querySelector('[data-google-retry]');
+    const cancel = container.querySelector('[data-google-cancel]');
+    if (!retry || !cancel) return;
+    let pending = null;
+    try { pending = googleBridge?.readPendingIntent() || null; } catch { pending = null; }
+    retry.hidden = !pending?.targetId;
+    cancel.hidden = !pending;
+    if (retry.dataset.transferBound === 'true') return;
+    retry.dataset.transferBound = 'true';
+    cancel.dataset.transferBound = 'true';
+    retry.addEventListener('click', async () => {
+      retry.disabled = true; showMessage('Googleログインと引き継ぎ状態を確認しています…');
+      try { await (await loadGoogleBridge()).resumePendingLogin(); showMessage('この端末の作品引き継ぎを確認しました。'); await renderWorks(); }
+      catch (error) { showMessage(error.message || '引き継ぎを確認できませんでした。状態を保持して再試行できます。', true); refreshTransferControls(container); }
+      finally { retry.disabled = false; }
+    });
+    cancel.addEventListener('click', async () => {
+      try { (await loadGoogleBridge()).cancelPendingLogin(); showMessage('この端末のGoogleログイン準備を取り消しました。元の作品はこの端末に保持されています。'); refreshTransferControls(container); }
+      catch (error) { showMessage(error.message || 'ログイン準備を取り消せませんでした。', true); }
+    });
+  }
+
   function renderLogin() {
     root.innerHTML = `<header><h2>以前の公開作品を管理</h2><p>以前のPiXiEEDアカウントに保存した公開作品を確認し、世界地図に表示する場所を設定できます。投稿した新しい絵は、上の一覧で確認できます。</p></header>
-      <div class="legacy-placement__signin"><button type="button" data-google>Googleでログイン</button>
+      <div class="legacy-placement__signin"><button type="button" data-google>Googleでログイン</button><label><input type="checkbox" data-include-legacy>この端末の旧作品もアカウントに関連付ける</label><button type="button" data-google-retry hidden>引き継ぎを再試行</button><button type="button" data-google-cancel hidden>ログイン準備を取り消す</button>
       <form data-email-form><label>以前使ったメールアドレス<input type="email" name="email" required autocomplete="email" inputmode="email"></label><button type="submit">ログイン用リンクを送る</button></form></div>
       <p class="legacy-placement__message" data-placement-message role="status" aria-live="polite"></p>`;
-    root.querySelector('[data-google]').addEventListener('click', () => location.assign(api.oauthUrl(redirectTo)));
+    refreshTransferControls();
+    root.querySelector('[data-google]').addEventListener('click', async () => {
+      const button = root.querySelector('[data-google]'); button.disabled = true;
+      showMessage('この端末の引き継ぎ準備をしています…');
+      try { const bridge = await loadGoogleBridge(); if (!bridge.localAvailable) throw new Error('この端末の作品引き継ぎ機能を準備中です。ログインは開始していません。'); await bridge.beginGoogleLogin({ redirectTo, includeLegacy: root.querySelector('[data-include-legacy]')?.checked === true }); }
+      catch (error) { showMessage(error.message || 'Googleログインを開始できませんでした。', true); button.disabled = false; }
+    });
     root.querySelector('[data-email-form]').addEventListener('submit', async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -105,8 +153,9 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
 
   async function renderWorks() {
     root.innerHTML = `<header><h2>以前の公開作品</h2><p>過去のアカウントに保存された公開作品の表示場所を設定できます。</p></header>
-      <div class="legacy-placement__toolbar"><button type="button" data-signout>ログアウト</button></div>
+      <div class="legacy-placement__toolbar"><button type="button" data-signout>ログアウト</button><button type="button" data-google-retry hidden>引き継ぎを再試行</button><button type="button" data-google-cancel hidden>Googleログイン準備を取り消す</button></div>
       <section class="legacy-placement__section" aria-labelledby="legacy-old-posts-title"><h3 id="legacy-old-posts-title">以前の公開作品</h3><p class="legacy-placement__section-intro">場所を決めると、世界地図に表示できます。</p><div class="legacy-placement__works" data-works></div><p class="legacy-placement__message" data-placement-message role="status" aria-live="polite"></p></section>`;
+    refreshTransferControls();
     root.querySelector('[data-signout]').addEventListener('click', () => {
       api.signOut();
       document.dispatchEvent(new Event('pixieed:legacy-owner-signed-out'));
@@ -132,11 +181,26 @@ if (root && new URLSearchParams(location.search).get('view') === 'posts') {
   }
 
   renderLogin();
-  if (callback?.error) showMessage(callback.error, true);
-  else {
+  if (callback?.error || callback?.session || callbackCode || callbackError) {
     try {
-      if (await api.restore(callback?.session || null)) await renderWorks();
-    } catch { showMessage('ログイン状態を確認できませんでした。通信を確認して再度お試しください。', true); }
+      const result = await (await loadGoogleBridge()).handleCallback({ legacyCallback: callback, callbackCode, callbackError });
+      if (result.status === 'verified' || result.status === 'login_only') await renderWorks();
+      else if (result.message) showMessage(result.message, result.status !== 'cancelled');
+      refreshTransferControls();
+    } catch (error) {
+      showMessage(error.message || 'ログイン状態を確認できませんでした。通信を確認して再試行してください。', true);
+      refreshTransferControls();
+      const pending = googleBridge?.readPendingIntent();
+      if (pending && !pending.targetId) showMessage('ログイン先を確認できませんでした。ログイン準備を取り消してからGoogleログインをやり直してください。元の作品は保持されています。', true);
+    }
+  } else {
+    try {
+      googleBridge = await loadGoogleBridge();
+      refreshTransferControls();
+    } catch { /* Bridge is loaded again on an explicit Google click; no account action occurs here. */ }
+    try { if (await api.restore()) await renderWorks(); }
+    catch { showMessage('ログイン状態を確認できませんでした。通信を確認して再度お試しください。', true); }
+    refreshTransferControls();
   }
 }
 
@@ -627,6 +691,7 @@ async function mountMyPosts() {
     void (async () => { await loadPosts(); await updateLikeCount(); })();
   };
   document.addEventListener('pixieed:legacy-owner-signed-out', refreshAfterSessionChange);
+  window.addEventListener('pixieed:guest-account-confirmed', refreshAfterSessionChange);
   window.addEventListener('storage', (event) => {
     if (event.key == null || event.key === 'PiXiEED:legacy-owner-session:v1' || event.key === 'PiXiEED:supabase-session:v1' || /^sb-.+-auth-token$/.test(event.key)) {
       refreshAfterSessionChange();
@@ -657,3 +722,20 @@ function startMyPosts() {
 document.addEventListener('pixieed:profile-rendered', startMyPosts);
 document.addEventListener('DOMContentLoaded', startMyPosts);
 if (document.querySelector('[data-my-posts-root]')) startMyPosts();
+
+// Metadata only. Never decode a local drawing or upload it for account association.
+document.querySelector('[data-local-work-summary]')?.addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const status = document.querySelector('[data-local-work-status]');
+  button.disabled = true;
+  status.textContent = '端末内の関連付け情報を確認しています…';
+  try {
+    const [{ createLocalLoginTransfer }, { createGuestAuthAdapter }] = await Promise.all([import('../social/local-login-transfer.mjs'),import('../social/guest-auth-adapter.mjs')]);
+    const auth = createGuestAuthAdapter();
+    const session = await auth.getSession();
+    const accountId = session?.user?.is_anonymous === false ? session.user.id : undefined;
+    const summary = await createLocalLoginTransfer({auth}).listSummary({accountId});
+    status.textContent = `確認中のアカウントに関連付けた作品 ${summary.account}件、端末のゲスト作品 ${summary.device}件、所有者未記録の旧作品 ${summary.legacyUnknown}件。作品本体と公開状態は変更していません。旧作品は引き継ぎ時の明示選択で関連付けできます。`;
+  } catch { status.textContent = '関連付けを確認できませんでした。作品本体は変更していません。各ツールの作品一覧から利用できます。'; }
+  finally { button.disabled = false; }
+});

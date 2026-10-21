@@ -189,3 +189,8 @@ body.px-tool-header .px-site-header [data-editor-header-control]:focus-visible {
   body.hidden-object-editing #hidden-editor .hidden-target-list { bottom: calc(3.9rem + env(safe-area-inset-bottom)); }
   body.hidden-object-editing .hidden-edit-hint { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
 }
+
+#hidden-play-local .puzzle-audience-compact{display:none}
+body[data-tool-operation-bar] .tool-operation-slot #hidden-play-local .puzzle-audience-full{display:none}
+body[data-tool-operation-bar] .tool-operation-slot #hidden-play-local .puzzle-audience-compact{display:block}
+body[data-tool-operation-bar] .tool-operation-slot #hidden-play-local svg{width:20px;height:20px}

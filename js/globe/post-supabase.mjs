@@ -366,6 +366,39 @@ export function createSupabaseGlobeAuth() {
   return { getUser: () => user, login: () => user, logout() {}, subscribe() { return () => {}; } };
 }
 
+/** Submit one post through the existing create-post contract without constructing a feed store. */
+async function submitSupabasePost(post) {
+  if (post?.puzzle && supabaseConfig.puzzlePublicationEnabled !== true) {
+    throw new Error('パズル投稿は準備中です。公開機能の更新後にお試しください。');
+  }
+  const session = await ensureSession();
+  const response = await fetch(`${baseUrl()}/functions/v1/${encodeURIComponent(supabaseConfig.createPostFunction || 'create-post')}`, {
+    method: 'POST', headers: headers(session.access_token),
+    body: JSON.stringify(buildGlobePostPayload(post))
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  const result = await response.json();
+  if (post?.puzzle && result?.puzzleMode !== post.puzzle.mode) {
+    throw new Error('パズル投稿の公開設定を確認できませんでした。時間をおいて再試行してください。');
+  }
+  const submittedBy = session.owner
+    ? { id: session.owner.id, name: post.author?.id === session.owner.id ? String(post.author.name || '') : '' }
+    : post.author;
+  return { ...post, author: submittedBy, id: result.postId, status: result.status || 'pending', puzzleMode: result.puzzleMode || null, createdAt: Date.now() };
+}
+
+/** Lazily callable production actions; creating this object performs no auth or network work. */
+export function createSupabasePostActions() {
+  return {
+    submit: submitSupabasePost,
+    hasLiked,
+    setLike(postId, liked) {
+      if (!UUID.test(String(postId || ''))) throw new TypeError('この投稿にはいいねできません。');
+      return setPostLike(postId, Boolean(liked));
+    }
+  };
+}
+
 export function createSupabaseGlobeStore() {
   let published = [];
   const withdrawn = new Set();
@@ -454,23 +487,7 @@ export function createSupabaseGlobeStore() {
       return true;
     },
     async add(post) {
-      if (post?.puzzle && supabaseConfig.puzzlePublicationEnabled !== true) {
-        throw new Error('パズル投稿は準備中です。公開機能の更新後にお試しください。');
-      }
-      const session = await ensureSession();
-      const response = await fetch(`${baseUrl()}/functions/v1/${encodeURIComponent(supabaseConfig.createPostFunction || 'create-post')}`, {
-        method: 'POST', headers: headers(session.access_token),
-        body: JSON.stringify(buildGlobePostPayload(post))
-      });
-      if (!response.ok) throw new Error(await readError(response));
-      const result = await response.json();
-      if (post?.puzzle && result?.puzzleMode !== post.puzzle.mode) {
-        throw new Error('パズル投稿の公開設定を確認できませんでした。時間をおいて再試行してください。');
-      }
-      const submittedBy = session.owner
-        ? { id: session.owner.id, name: post.author?.id === session.owner.id ? String(post.author.name || '') : '' }
-        : post.author;
-      const created = { ...post, author: submittedBy, id: result.postId, status: result.status || 'pending', puzzleMode: result.puzzleMode || null, createdAt: Date.now() };
+      const created = await submitSupabasePost(post);
       if (created.status === 'published' && UUID.test(String(created.id || ''))) {
         // Make the submitted image visible immediately; replace it with the canonical public projection when available.
         upsertPublished(created);

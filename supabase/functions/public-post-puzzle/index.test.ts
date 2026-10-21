@@ -8,22 +8,22 @@ const POST_ID = "11111111-1111-4111-8111-111111111111";
 const PROJECT = "https://example.supabase.co";
 const NOW = "2026-09-28T12:00:00.000Z";
 
-async function fixture() {
+async function fixture(mode: "hidden_object" | "jigsaw" = "hidden_object") {
   const bytes = encodePng(createDrawDocument(16));
   const claim = { mimeType: "image/png", size: bytes.length, ...await inspectPixelPng(bytes) };
   const source = { schemaVersion: 1, original: { draftId: "draw", assetId: "asset", revisionId: "rev", contentHash: "a".repeat(64), hashScheme: "sha256-canonical-v1" } };
   const targets = [{ id: "flower", name: "花", pixels: [] as number[] }];
   for (let y = 5; y < 10; y += 1) for (let x = 5; x < 10; x += 1) targets[0].pixels.push(y * 16 + x);
-  const admitted = await admitPuzzleUpload({ mode: "hidden_object", source, definition: {
-    schemaVersion: 1, width: 16, height: 16, confirmed: true, targets,
-  } }, bytes, claim);
+  const admitted = await admitPuzzleUpload({ mode, source, definition: mode === "jigsaw" ? {
+    schemaVersion: 1, width: 16, height: 16, confirmed: true, layoutVersion: 1, pieceSize: 6, seed: "public-seed",
+  } : {schemaVersion: 1, width: 16, height: 16, confirmed: true, targets} }, bytes, claim);
   return {
     bytes,
     snapshot: {
       requestedPostId: POST_ID,
       parent: { id: POST_ID, status: "published", publishedAt: NOW, title: "公開作品", authorLabel: "作者", imageClaim: claim, authorId: "private" },
       point: { postId: POST_ID, publishedAt: NOW, imagePath: `${POST_ID}/original.png`, privateCell: "secret" },
-      puzzle: { postId: POST_ID, reviewState: "approved", mode: "hidden_object", schemaVersion: 1, definition: admitted.definition, source_metadata: source, moderation_note: "private" },
+      puzzle: { postId: POST_ID, reviewState: "approved", mode, schemaVersion: 1, definition: admitted.definition, source_metadata: source, moderation_note: "private" },
     },
   };
 }
@@ -47,8 +47,8 @@ Deno.test("OPTIONS returns an empty 204 and does not initialize Supabase", async
   assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
 });
 
-Deno.test("public reader returns only validated allowlist response from RPC snapshot and real PNG bytes", async () => {
-  const { bytes, snapshot } = await fixture();
+for (const mode of ["hidden_object", "jigsaw"] as const) Deno.test(`public reader validates one-image puzzle and strips private data (${mode})`, async () => {
+  const { bytes, snapshot } = await fixture(mode);
   const calls: string[] = [];
   const fakeClient = (() => ({
     rpc: async (name: string, args: Record<string, unknown>) => {
@@ -67,7 +67,7 @@ Deno.test("public reader returns only validated allowlist response from RPC snap
   assert.equal(result.headers.get("cache-control"), "no-store, max-age=0");
   const body = await result.json();
   assert.deepEqual(Object.keys(body), ["ok", "puzzle"]);
-  assert.equal(body.puzzle.mode, "hidden_object");
+  assert.equal(body.puzzle.mode, mode);
   assert.equal(body.puzzle.title, "公開作品");
   assert.equal(JSON.stringify(body).includes("private"), false);
   assert.equal(JSON.stringify(body).includes("secret"), false);

@@ -1,3 +1,4 @@
+import { scheduleLocalWorkSave } from './local-work-save-hook.mjs';
 import { decodePxd, encodePxd } from './pxd-codec.mjs';
 import { sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
 
@@ -233,6 +234,7 @@ export function createPxdStore({ adapter, idFactory = randomRevisionId } = {}) {
       const bytes = await encodePxd(savedProject);
       const summary = await summarizeProject(savedProject);
       await persistence.compareAndSwap(project.projectId, expectedRevisionId, { projectId: project.projectId, revisionId, bytes, updatedAt: Date.now(), summary });
+      void scheduleLocalWorkSave({namespace:'pxd',id:project.projectId,revisionId,existingWork:expectedRevisionId!==null});
       return { ...savedProject, entries: savedProject.entries.map((entry) => ({ ...entry, bytes: new Uint8Array(entry.bytes) })) };
     },
     async deleteProject(projectId, { expectedRevisionId } = {}) {

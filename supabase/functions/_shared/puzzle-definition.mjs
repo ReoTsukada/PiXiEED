@@ -5,6 +5,22 @@ const MAX_HIDDEN_TARGETS = 128;
 const MAX_MASK_PIXELS = 128 * 1024;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
+/** Immutable puzzle recipe only. Player progress and local source bytes are not publication fields. */
+export function validateJigsawPuzzleDefinition(definition, original) {
+  const keys = ['schemaVersion','confirmed','width','height','layoutVersion','pieceSize','seed'];
+  if (!definition || typeof definition !== 'object' || Array.isArray(definition)
+      || Object.keys(definition).length !== keys.length || !keys.every(key => Object.hasOwn(definition,key))
+      || definition.schemaVersion !== 1 || definition.confirmed !== true || definition.layoutVersion !== 1
+      || ![definition.width,definition.height].every(value => Number.isSafeInteger(value) && value >= 8 && value <= 512)
+      || !Number.isSafeInteger(definition.pieceSize) || definition.pieceSize < 3 || definition.pieceSize > Math.max(definition.width,definition.height)
+      || typeof definition.seed !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(definition.seed)) throw new TypeError('ジグソーの公開定義が不正です');
+  const columns = Math.max(1,Math.floor(definition.width/definition.pieceSize));
+  const rows = Math.max(1,Math.floor(definition.height/definition.pieceSize));
+  if (columns*rows > 4096) throw new RangeError('ジグソーのピース数が上限を超えています');
+  validateImage(original,definition.width,definition.height,'元画像');
+  return Object.fromEntries(keys.map(key => [key,definition[key]]));
+}
+
 function assertDefinition(definition, kind) {
   if (!definition || typeof definition !== 'object' || Array.isArray(definition)) throw new TypeError('パズル定義が不正です');
   if (definition.schemaVersion !== 1) throw new Error('未対応のパズル定義バージョンです');

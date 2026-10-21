@@ -170,6 +170,8 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         'js/legacy-project-entry.mjs', 'css/legacy-project-entry.css', 'css/legacy-reference.css',
         'help/index.html', 'glossary/index.html', 'projects/pixfind/index.html', 'projects/pixiedraw/index.html',
         'css/design-tokens.css', 'js/event-history.mjs',
+        'feed/index.html', 'css/social-feed.css', 'js/social/app.mjs', 'js/social/puzzle-audience.mjs',
+  'js/creation/jigsaw-publication.mjs', 'js/social/api.mjs', 'js/social/server-actions.mjs', 'js/social/guest-account.mjs', 'js/social/guest-auth-adapter.mjs', 'js/social/guest-account-ui.mjs', 'js/social/guest-google-bridge.mjs', 'js/social/local-login-transfer.mjs', 'js/creation/local-work-ownership.mjs', 'js/creation/local-work-save-hook.mjs', 'js/social/drafts.mjs', 'js/social/draft-audio.mjs', 'js/social/tool-handoff.mjs', 'js/social/tool-return.mjs',
         'js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
         'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
         'assets/og/output.png', 'assets/og/globe.png', 'assets/og/events.png', 'assets/og/stores.png',

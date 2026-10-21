@@ -1,5 +1,5 @@
 import { verifyPixelPngClaim, PixelPngError } from './pixel-png.mjs';
-import { validateHiddenPuzzleDefinition, validateSpotPuzzleDefinition } from './puzzle-definition.mjs';
+import { validateHiddenPuzzleDefinition, validateSpotPuzzleDefinition, validateJigsawPuzzleDefinition } from './puzzle-definition.mjs';
 
 const MAX_IMAGE_BYTES = 512 * 1024;
 
@@ -61,7 +61,7 @@ function normalizePuzzleSource(value, mode) {
 
 export async function admitPuzzleUpload(puzzle, originalBytes, originalClaim) {
   if (!puzzle || typeof puzzle !== 'object' || Array.isArray(puzzle)) reject('puzzle_invalid');
-  if (puzzle.mode !== 'spot_difference' && puzzle.mode !== 'hidden_object') reject('puzzle_mode_invalid');
+  if (!['spot_difference','hidden_object','jigsaw'].includes(puzzle.mode)) reject('puzzle_mode_invalid');
   const source = normalizePuzzleSource(puzzle.source, puzzle.mode);
 
   let original;
@@ -74,10 +74,10 @@ export async function admitPuzzleUpload(puzzle, originalBytes, originalClaim) {
   if (definition.schemaVersion !== 1) reject('puzzle_definition_version_unsupported');
   if (definition.width !== original.width || definition.height !== original.height) reject('puzzle_dimensions_mismatch');
 
-  if (puzzle.mode === 'hidden_object') {
+  if (puzzle.mode !== 'spot_difference') {
     if (Object.hasOwn(puzzle, 'changedImage')) reject('puzzle_changed_image_unexpected');
     try {
-      const clean = validateHiddenPuzzleDefinition(definition, original);
+      const clean = puzzle.mode === 'jigsaw' ? validateJigsawPuzzleDefinition(definition, original) : validateHiddenPuzzleDefinition(definition, original);
       return { mode: puzzle.mode, source, definition: clean, original: { width: original.width, height: original.height, colorCount: originalClaim.colorCount } };
     } catch { reject('puzzle_definition_invalid'); }
   }

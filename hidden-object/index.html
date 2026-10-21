@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
   <link rel="stylesheet" href="/css/puzzle-image-import.css?rev=20261003-puzzle-import-1">
-  <link rel="stylesheet" href="/css/creation-hidden-object.css?rev=20261006-maker-icons-1">
+  <link rel="stylesheet" href="/css/creation-hidden-object.css?audience=20261021-jigsaw-public-1&amp;rev=20261006-maker-icons-1">
   <link rel="stylesheet" href="/css/creation-pixfind.css?rev=20261017-game-editor-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/tool-operation-bar.css?rev=20261016-tool-operations-1">
@@ -73,8 +73,8 @@
       <div class="hidden-publish-actions" aria-label="確定したもの探しの操作">
         <p id="hidden-confirmed" class="hidden-confirmed" role="status" hidden>番号付きの枠が、遊ぶ人に見つけてもらう範囲です。</p>
         <button id="hidden-new" class="hidden-new" data-tool-operation type="button" hidden aria-label="新しく作る" title="新しく作る"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button>
-        <button id="hidden-play-local" data-tool-operation type="button" hidden disabled aria-label="確定した下書きを試しに遊ぶ" title="確定した下書きを試しに遊ぶ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 12 8-12 8z"/></svg></button>
-        <button id="hidden-publish" class="hidden-publish" type="button" hidden disabled aria-label="世界地図へ投稿" title="世界地図へ投稿"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M5 13v8h14v-8"/></svg></button>
+        <button id="hidden-play-local" data-tool-operation type="button" hidden disabled aria-label="自分だけで遊ぶ" title="保存した問題を自分だけで遊ぶ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4 12 8-12 8z"/></svg><span class="puzzle-audience-full">自分だけで遊ぶ</span><span class="puzzle-audience-compact" aria-hidden="true">自分だけ</span></button>
+        <button id="hidden-publish" class="hidden-publish" type="button" hidden disabled aria-label="投稿する" title="投稿先の内容確認へ進む" style="background:#fff;color:#49643c;box-shadow:none"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M5 13v8h14v-8"/></svg><span>投稿する</span></button>
       </div>
       <output id="hidden-zoom" class="hidden-zoom" aria-label="画像の拡大率">100%</output>
       <button id="hidden-undo" data-tool-operation type="button" hidden aria-label="元に戻す" title="元に戻す">元に戻す</button>
@@ -88,7 +88,7 @@
     <button id="hidden-save" type="button" aria-label="もの探しの下書きをこのブラウザーに保存" title="下書きを保存（まだ公開されません）" disabled>保存</button>
     <div class="tool-operation-slot" data-operation-slot="3" role="group" aria-label="ツール操作"></div><div class="tool-operation-slot" data-operation-slot="4" role="group" aria-label="ツール操作"></div>
   </nav>
-  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261018-direct-runtime-2&nav=20261016-tool-operations-1"></script>
+  <script type="module" src="/js/creation/hidden-object-page.mjs?rev=20261021-jigsaw-public-1&nav=20261016-tool-operations-1"></script>
   <script type="module" src="/js/arcade-dress.mjs?rev=20260929-claude-integration-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261021-header-layout-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>

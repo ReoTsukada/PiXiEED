@@ -22,7 +22,7 @@ const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 const eventCatalog = JSON.parse(await readFile(new URL('events/catalog.json', root), 'utf8'));
 const EVENT_NO_AD_PAGES = ['events/index.html', ...eventCatalog.ids.map(id => `events/${id}/index.html`)];
 const EXCLUDED_PAGES = [
-  'privacy/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
+  'feed/index.html', 'privacy/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
   'output/index.html', 'camera/index.html', 'draw/about/index.html',
@@ -70,8 +70,8 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   const established = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES, OFFERWALL_PAGE])];
   const expected = [...new Set([...established, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 43);
-  assert.equal(expected.length, 43 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  assert.equal(established.length, 44);
+  assert.equal(expected.length, 44 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
   for (const path of [...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES]) {
     assert.doesNotMatch(await html(path), /adsbygoogle|adsense-auto|display-ads|data-display-ad|adsense-offerwall/, `${path}: compatibility and factual event pages have no ad loader`);
   }

@@ -9,7 +9,7 @@ import { prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-
 import { imageToDrawDocument } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
-import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
+import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20261021-jigsaw-public-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20261018-direct-runtime-2';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261016-color-capability-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
@@ -32,7 +32,8 @@ const imageSlot = mountPuzzleImageSlot({ host: $('#hidden-image-slot'), input: i
 const imageReplaceButton = $('#hidden-image-replace');
 let adapter; let store; let sourceDraftId = null; let sourceRevision = null; let draft = null; let draftId = null; let savedConfirmedDraftId = null; let selectedTargetId = null; let editMode = 'paint'; let activePointer = null; let previousPoint = null; let cursorPixel = 0; let drawQueued = false; let totalMaskPixels = 0;
 let importingImage = false;
-let editorEpoch = 0;
+let editorEpoch = 0; let handoffBusy = false;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null;
 const touchPoints = new Map(); let touchStrokeSnapshot = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0;
 const undoStack = []; const redoStack = []; let historyApplying = false; let activeMaskSnapshot = null; let historyPixelCount = 0;
@@ -115,9 +116,10 @@ function redo() { if (draft?.confirmed || !redoStack.length) return; const entry
 function updateLocalPlayButton() {
   const ready = Boolean(draft?.confirmed && draftId && savedConfirmedDraftId === draftId);
   playLocalButton.hidden = !ready; playLocalButton.disabled = !ready;
-  publishButton.hidden = !ready; publishButton.disabled = !ready || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
-  const publishLabel = supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿は準備中';
-  publishButton.setAttribute('aria-label', publishLabel); publishButton.title = publishLabel;
+  publishButton.hidden = !ready; publishButton.disabled = handoffBusy || !ready || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
+  const publishLabel = supabaseConfig.puzzlePublicationEnabled === true ? '投稿する' : '投稿する（準備中）';
+  publishButton.querySelector('span').textContent = publishLabel;
+  publishButton.setAttribute('aria-label', publishLabel); publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? 'フィードで内容を確認してから投稿できます' : '投稿は準備中です';
 }
 
 function requestDraw() {
@@ -563,10 +565,19 @@ imageReplaceButton.addEventListener('click', () => {
 imageFileInput.addEventListener('cancel', () => { if (draft && !draft.confirmed) { displayEditor(); setStatus('画像の選択を取り消しました。作成中の内容を続けられます。'); } });
 playLocalButton.addEventListener('click', () => { if (draft?.confirmed && draftId && savedConfirmedDraftId === draftId) window.location.assign(`/play/hidden-object/?localHidden=${encodeURIComponent(draftId)}`); });
 publishButton.addEventListener('click', async () => {
-  if (!draft?.confirmed || !draftId || savedConfirmedDraftId !== draftId || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true) return;
-  publishButton.disabled = true; setStatus('固定版と投稿用PNGを確認しています…');
-  try { await openPuzzleHandoff({ mode: 'hidden_object', draftId, store, adapter }); }
-  catch (error) { publishButton.disabled = false; setStatus(`投稿を準備できませんでした：${error.message}`); }
+  if (handoffBusy || !draft?.confirmed || !draftId || savedConfirmedDraftId !== draftId || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true) return;
+  const id = draftId; const epoch = editorEpoch;
+  const isCurrent = () => epoch === editorEpoch && draft?.gameId === id && draftId === id && draft.confirmed === true && savedConfirmedDraftId === id;
+  handoffBusy = true; updateLocalPlayButton(); setStatus('フィードの投稿内容を準備しています…');
+  try {
+    await openPuzzleHandoff({ mode: 'hidden_object', draftId: id, localDraftId: UUID.test(id) ? id : undefined, destination: 'feed', isCurrent, store, adapter });
+  } catch (error) {
+    handoffBusy = false;
+    updateLocalPlayButton();
+    if (isCurrent()) { setStatus(`投稿を準備できませんでした：${error.message}`); }
+  } finally {
+    handoffBusy = false; updateLocalPlayButton();
+  }
 });
 $('#hidden-share-prompt-text').addEventListener('input', (event) => {
   if (!draft || draft.confirmed) return;

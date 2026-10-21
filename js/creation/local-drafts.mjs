@@ -1,3 +1,4 @@
+import { scheduleLocalWorkSave } from './local-work-save-hook.mjs';
 import { hashCanonical, validateAsset } from './asset-contract.mjs';
 
 const DB_NAME = 'pixieed-creation-drafts-v1';
@@ -130,7 +131,7 @@ export function createLocalDraftStore(adapter = createIndexedDbDraftAdapter(), {
       const revision = { schemaVersion: 1, revisionId, hashScheme: 'sha256-canonical-v1', documentHash, asset, document: snapshot };
       const record = { schemaVersion: 1, draftId, assetId: asset.assetId, revisions: [...(previous?.revisions || []), revision] };
       await validateRecord(record);
-      try { await swap(draftId, head, record); return copy(revision); }
+      try { await swap(draftId, head, record); void scheduleLocalWorkSave({namespace:'creation-draft',id:draftId,revisionId,existingWork:Boolean(previous)}); return copy(revision); }
       catch (error) {
         if (error instanceof LocalDraftConflictError && expectedRevisionId === undefined) continue;
         if (isQuota(error)) throw new LocalDraftQuotaError();
