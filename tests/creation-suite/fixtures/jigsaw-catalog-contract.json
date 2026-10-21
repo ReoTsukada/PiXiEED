@@ -1,0 +1,68 @@
+{
+  "observedAt": "2026-10-21T15:05:44.928Z",
+  "provenance": "Read-only function/constraint catalog observations supplied for drift checks; no application rows or credentials.",
+  "functions": [
+    {
+      "name": "pixieed_create_post",
+      "signature": "p_post jsonb, p_location jsonb, p_puzzle jsonb",
+      "definitionMd5": "9963ca38ed722329edfdeb5741e61ee7",
+      "searchPathEmpty": true,
+      "anonExecute": false,
+      "authenticatedExecute": false,
+      "serviceExecute": true,
+      "securityDefiner": false
+    },
+    {
+      "name": "pixieed_moderate_post",
+      "signature": "p_post_id uuid, p_action text, p_note text, p_point jsonb, p_changed_public_path text",
+      "definitionMd5": "47eef8bfe01300d6b77d4b2f4cf38cf0",
+      "searchPathEmpty": true,
+      "anonExecute": false,
+      "authenticatedExecute": false,
+      "serviceExecute": true,
+      "securityDefiner": false
+    },
+    {
+      "name": "pixieed_valid_puzzle_definition",
+      "signature": "p_mode text, p_definition jsonb",
+      "definitionMd5": "f73cf04c6075cc49a3c0dd59317a87d6",
+      "searchPathEmpty": true,
+      "anonExecute": false,
+      "authenticatedExecute": false,
+      "serviceExecute": true,
+      "securityDefiner": false
+    },
+    {
+      "name": "pixieed_valid_puzzle_source",
+      "signature": "p_mode text, p_source jsonb",
+      "definitionMd5": "f1be54f3eb96562c7d7e8afffea8751a",
+      "searchPathEmpty": true,
+      "anonExecute": false,
+      "authenticatedExecute": false,
+      "serviceExecute": true,
+      "securityDefiner": false
+    }
+  ],
+  "constraints": [
+    {
+      "table": "post_map_points",
+      "name": "post_map_points_puzzle_mode_check",
+      "definition": "CHECK (((puzzle_mode IS NULL) OR (puzzle_mode = ANY (ARRAY['spot_difference'::text, 'hidden_object'::text]))))"
+    },
+    {
+      "table": "user_post_puzzles",
+      "name": "user_post_puzzles_changed_image_valid",
+      "definition": "CHECK ((((mode = 'hidden_object'::text) AND (changed_image_path IS NULL) AND (changed_image_claim IS NULL)) OR ((mode = 'spot_difference'::text) AND (changed_image_path IS NOT NULL) AND ((char_length(changed_image_path) >= 1) AND (char_length(changed_image_path) <= 512)) AND (changed_image_path !~ '(^/|\\.\\.|\\\\|[?#])'::text) AND (changed_image_path ~ '\\.png$'::text) AND pixieed_valid_image_claim(changed_image_claim))))"
+    },
+    {
+      "table": "user_post_puzzles",
+      "name": "user_post_puzzles_mode_check",
+      "definition": "CHECK ((mode = ANY (ARRAY['spot_difference'::text, 'hidden_object'::text])))"
+    },
+    {
+      "table": "user_posts",
+      "name": "user_posts_submission_puzzle_mode_check",
+      "definition": "CHECK (((submission_puzzle_mode IS NULL) OR (submission_puzzle_mode = ANY (ARRAY['spot_difference'::text, 'hidden_object'::text]))))"
+    }
+  ]
+}
