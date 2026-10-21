@@ -10,6 +10,7 @@ import { addSiteDrawCta } from './site-draw-cta.mjs';
 import { addPageGutters } from './page-gutters.mjs';
 import { addInformationAutoAds } from './information-auto-ads.mjs';
 import { optimizeToolRuntimeDelivery } from './tool-runtime-delivery.mjs';
+import { optimizeSiteStartupDelivery } from './site-startup-delivery.mjs';
 import { isSampleWork } from '../js/public-work-policy.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -233,7 +234,9 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
     await writeFile(join(destination, '.nojekyll'), '');
     const runtimeDelivery = unique.includes('js/tool-direct.mjs')
       ? await optimizeToolRuntimeDelivery({ root: destination, esbuildPath }) : null;
-    return { files: unique.length + 1 + (runtimeDelivery ? 1 : 0), puzzlePages, eventPages, output: destination, runtimeDelivery };
+    const siteStartupDelivery = unique.includes('js/app.js') && unique.includes('js/home-startup.mjs')
+      ? await optimizeSiteStartupDelivery({ root: destination, files: unique, esbuildPath }) : null;
+    return { files: unique.length + 1 + (runtimeDelivery ? 1 : 0), puzzlePages, eventPages, output: destination, runtimeDelivery, siteStartupDelivery };
   } catch (error) {
     if (created) await rm(destination, { recursive: true, force: true });
     throw error;

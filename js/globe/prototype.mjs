@@ -1,15 +1,16 @@
-import { initPostUi } from './post-ui.mjs?v=20261021-puzzle-audience-1';
 import { initEnhancedMapEvents as initMapEvents } from './map-event-enhancements.mjs?rev=20261017-analytics-integrity-1';
 import { createMapGeometryLoader } from './map-geometry-loader.mjs?v=20261007-map-lazy-1';
-import { createSupabaseGlobeAuth, createSupabaseGlobeStore } from './post-supabase.mjs?rev=20261006-profile-artwork-1';
 import { createGlobeRenderer, decodeRasterData, getSelectionStageLabel, prepareGeoJsonFeatures } from './renderer.mjs?v=20261007-map-lazy-1';
-import { openHandoffComposer, pendingHandoff } from './post-handoff.mjs?v=20261004-camera-location-1';
 
 import { readMapNavigationState, writeMapNavigationState } from './map-navigation-state.mjs?rev=20261017-map-navigation-1';
 
+const postingModuleLoads = new Map();
+const MAX_POST_MODULE_RETRIES = 2;
 const telescopeTool = new URLSearchParams(location.search).get('tool') === 'telescope';
+const telescopePostModulesPromise = telescopeTool ? loadPostUiModules() : null;
 // Astronomy belongs to the stand-alone telescope; a map never starts its timers or catalogue.
 const astronomy = telescopeTool ? await Promise.all([import('./astro-ui.mjs?v=20261005-admin-boundary-1'), import('./real-sky.mjs?v=20260927-sky-events-v1')]) : null;
+const telescopePostModules = telescopePostModulesPromise ? await telescopePostModulesPromise : null;
 const embedMode = new URLSearchParams(location.search).get('embed') === '1';
 // Explicit artwork/post arrivals take precedence over a previous browsing position.
 let navigationState = null, navigationRestorationCancelled = false;
@@ -22,6 +23,8 @@ const canvas = document.querySelector('#globeCanvas');
 const globeStage = document.querySelector('#globeStage');
 for (const kind of ['pointerdown', 'keydown', 'wheel']) globeStage?.addEventListener(kind, event => { if (event.isTrusted) navigationRestorationCancelled = true; }, { capture: true, passive: true });
 const loadStatus = document.querySelector('#loadStatus');
+const mapLoadNotice = document.querySelector('#mapLoadNotice');
+const retryMapLoad = document.querySelector('#retryMapLoad');
 const selectionPanel = document.querySelector('#selectionPanel');
 const selectedOwner = document.querySelector('#selectedOwner');
 const selectedStage = document.querySelector('#selectedStage');
@@ -38,12 +41,138 @@ const viewSwitch = document.querySelector('#mapLayerSwitch');
 let eventUi = null;
 let mapContentLayer = 'posts';
 let postUi = null;
+let postUiInitializationStarted = false;
+let normalPostUiReadyPromise = null;
+let initialPostUiReadyPromise = null;
+let postUiStartupMessage = '';
+let postUiRetryAvailable = false;
+let postUiRetryLabel = '再試行';
 let currentSelection = null;
 
 const MAP_CELLS_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
 const MAP_ADMIN1_URL = 'assets/maps/map-admin1-mask-v2.json?v=20261007-map-lazy-1';
 const MAP_PREFECTURES_URL = 'assets/maps/map-prefectures-mask-v2.json?v=20261007-map-lazy-1';
 const RASTER_URL = 'assets/maps/globe-land-mask-v1.json?v=20260921-grid11-1';
+let retryStartup = () => window.location.reload();
+let geometryStartupMessage = '地図データを準備中…';
+let geometryRetryAvailable = false;
+let retryPostUi = () => {};
+
+function setStartupStatus(message, { retry = false, retryLabel = '再読み込み' } = {}) {
+  geometryStartupMessage = message;
+  geometryRetryAvailable = retry;
+  renderStartupStatus(retryLabel);
+}
+
+function setPostingStatus(message, { retry = false, retryLabel = '再試行' } = {}) {
+  postUiStartupMessage = message;
+  postUiRetryAvailable = retry;
+  postUiRetryLabel = retryLabel;
+  renderStartupStatus(retryLabel);
+}
+
+function renderStartupStatus(fallbackRetryLabel = '再読み込み') {
+  const messages = [geometryStartupMessage, postUiStartupMessage].filter(Boolean);
+  const canRetry = geometryRetryAvailable || postUiRetryAvailable;
+  loadStatus.textContent = messages.join(' ');
+  retryMapLoad.textContent = postUiRetryAvailable && postUiRetryLabel === '再読み込み'
+    ? '再読み込み'
+    : geometryRetryAvailable && postUiRetryAvailable ? '再試行' : postUiRetryAvailable ? postUiRetryLabel : fallbackRetryLabel;
+  retryMapLoad.hidden = !canRetry;
+  mapLoadNotice.hidden = !messages.length && !canRetry;
+  if (!messages.length && !canRetry) document.documentElement.classList.remove('is-map-loading');
+  else if (!telescopeTool) document.documentElement.classList.add('is-map-loading');
+}
+
+retryMapLoad.addEventListener('click', () => {
+  if (postUiRetryAvailable && postUiRetryLabel === '再読み込み') { retryPostUi(); return; }
+  if (geometryRetryAvailable) retryStartup();
+  if (postUiRetryAvailable) retryPostUi();
+});
+
+function loadPostUiModules() {
+  return Promise.all([
+    importPostingModule('post-ui', './post-ui.mjs?v=20261021-puzzle-audience-1'),
+    importPostingModule('post-supabase', './post-supabase.mjs?rev=20261021-guest-claim-1'),
+    importPostingModule('post-handoff', './post-handoff.mjs?v=20261004-camera-location-1')
+  ]).then(([postUiModule, supabaseModule, handoffModule]) => ({
+    initPostUi: postUiModule.initPostUi,
+    createSupabaseGlobeAuth: supabaseModule.createSupabaseGlobeAuth,
+    createSupabaseGlobeStore: supabaseModule.createSupabaseGlobeStore,
+    openHandoffComposer: handoffModule.openHandoffComposer,
+    pendingHandoff: handoffModule.pendingHandoff
+  }));
+}
+
+function importPostingModule(key, canonicalUrl) {
+  let state = postingModuleLoads.get(key);
+  if (!state) {
+    state = { module: null, promise: null, failures: 0 };
+    postingModuleLoads.set(key, state);
+  }
+  if (state.module) return Promise.resolve(state.module);
+  if (state.promise) return state.promise;
+  const requestedUrl = state.failures
+    ? `${canonicalUrl}${canonicalUrl.includes('?') ? '&' : '?'}retry=${state.failures}`
+    : canonicalUrl;
+  state.promise = import(requestedUrl).then(module => {
+    state.module = module;
+    state.promise = null;
+    return module;
+  }, error => {
+    state.failures += 1;
+    state.promise = null;
+    throw error;
+  });
+  return state.promise;
+}
+
+function waitForTwoPaints() {
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+async function initializeNormalPostUiAfterPaint({ waitForPaint = true } = {}) {
+  if (telescopeTool) return true;
+  if (postUi) return true;
+  if (normalPostUiReadyPromise) return normalPostUiReadyPromise;
+  normalPostUiReadyPromise = (async () => {
+    if (waitForPaint) await waitForTwoPaints();
+    setPostingStatus('投稿機能を準備しています…');
+    let modules;
+    try {
+      modules = await loadPostUiModules();
+    } catch (error) {
+      console.warn('Posting UI modules unavailable; map remains usable.', error);
+      const canRetry = Array.from(postingModuleLoads.values()).some(state => !state.module && state.failures <= MAX_POST_MODULE_RETRIES);
+      retryPostUi = canRetry
+        ? () => { void initializeNormalPostUiAfterPaint({ waitForPaint: false }); }
+        : () => { rememberNavigation(); window.location.reload(); };
+      setPostingStatus(
+        canRetry
+          ? '投稿機能を読み込めませんでした。地図は操作できます。再試行してください。'
+          : '投稿機能を読み込めませんでした。地図は操作できます。再読み込みで復旧できます。',
+        { retry: true, retryLabel: canRetry ? '再試行' : '再読み込み' }
+      );
+      return false;
+    }
+    try {
+      initializePostingUi(modules);
+      if (!postUi) throw new Error('Posting UI did not become ready.');
+      setPostingStatus('');
+      return true;
+    } catch (error) {
+      console.error('Posting UI initialization failed.', error);
+      retryPostUi = () => { rememberNavigation(); window.location.reload(); };
+      setPostingStatus('投稿機能を開始できませんでした。地図は操作できます。再読み込みで復旧できます。', { retry: true, retryLabel: '再読み込み' });
+      return false;
+    }
+  })();
+  try {
+    return await normalPostUiReadyPromise;
+  } finally {
+    normalPostUiReadyPromise = null;
+  }
+}
 
 function readJson(path) {
   return fetch(path, { cache: 'force-cache' }).then((response) => {
@@ -156,11 +285,9 @@ function createPrototypeRenderer(options = {}) {
   if (astronomy && !globalThis.__PIXIEED_ASTRO__) {
     try { astronomy[0].initAstroUi({ renderer, stage: globeStage, initiallyCollapsed: true }); } catch (error) { console.warn('Astronomy panel unavailable', error); }
   }
-  try {
-    postUi = initPostUi({ renderer, stage: globeStage, accountSlot: embedMode ? null : accountSlot, store: createSupabaseGlobeStore(), auth: createSupabaseGlobeAuth(), showMapPins: telescopeTool });
-    globalThis.__PIXIEED_POSTS__ = postUi;
-    adoptPostHandoff();
-  } catch (error) { console.warn('Posting UI unavailable', error); }
+  if (telescopeTool) {
+    try { initializePostingUi(telescopePostModules); } catch (error) { console.warn('Posting UI unavailable', error); }
+  }
   if (!telescopeTool) {
     eventUi = initMapEvents({ renderer, stage: globeStage, onChange: updateMapContent, onOpen: () => { postUi?.close(); showCellHover(null); } });
     globalThis.__PIXIEED_MAP_EVENTS__ = eventUi;
@@ -173,14 +300,44 @@ function createPrototypeRenderer(options = {}) {
     }
   }
   syncObservationViews();
+  updateStartupControls();
+  canvas.setAttribute('aria-busy', 'false');
   return renderer;
 }
 
+function updateStartupControls() {
+  const mapCoreReady = Boolean(renderer) && (telescopeTool || Boolean(eventUi));
+  for (const button of viewSwitch?.querySelectorAll('[data-map-content]') || []) button.disabled = !mapCoreReady;
+  if (viewCellPosts) viewCellPosts.disabled = telescopeTool ? !postUi : !eventUi || (mapContentLayer !== 'events' && !postUi);
+  if (placeHere) placeHere.disabled = !postUi;
+  if (primaryAction) primaryAction.disabled = telescopeTool ? !globalThis.__PIXIEED_ASTRO__ : !postUi;
+}
+
+function initializePostingUi(modules) {
+  if (postUi || postUiInitializationStarted) return postUi;
+  if (!modules) throw new Error('Posting UI modules are unavailable.');
+  postUiInitializationStarted = true;
+  postUi = modules.initPostUi({
+    renderer,
+    stage: globeStage,
+    accountSlot: embedMode ? null : accountSlot,
+    store: modules.createSupabaseGlobeStore(),
+    auth: modules.createSupabaseGlobeAuth(),
+    showMapPins: telescopeTool
+  });
+  globalThis.__PIXIEED_POSTS__ = postUi;
+  adoptPostHandoff(modules);
+  updateMapContent();
+  updateStartupControls();
+  try { window.frameElement?.dispatchEvent(new CustomEvent('pixieed:map-posts-ready')); } catch { /* Cross-origin parent access is optional. */ }
+  return postUi;
+}
+
 // A valid, source-matched local handoff opens the composer without submitting it.
-function adoptPostHandoff() {
-  const handoff = pendingHandoff(); if (!handoff) return;
+function adoptPostHandoff(modules) {
+  const handoff = modules.pendingHandoff(); if (!handoff) return;
   try {
-    openHandoffComposer(handoff, postUi);
+    modules.openHandoffComposer(handoff, postUi);
   } catch (error) { console.warn('Image handoff failed', error); }
 }
 
@@ -235,6 +392,7 @@ function setMapContentLayer(layer) {
   for (const button of viewSwitch?.querySelectorAll('[data-map-content]') || []) button.setAttribute('aria-pressed', String(button.dataset.mapContent === mapContentLayer));
   if (currentSelection) showSelection(currentSelection);
   if (currentHover) showCellHover(currentHover);
+  updateStartupControls();
 }
 function syncObservationViews() {
   if (viewSwitch) viewSwitch.hidden = telescopeTool;
@@ -305,11 +463,7 @@ try {
   ]);
   createPrototypeRenderer(telescope ? { rasterData: decodeRasterData(source) } : { mapCellData: source, mapPrefectureData, mapAdmin1Data });
   if (!telescope && !renderer.isMapLocationReady()) {
-    const status = document.createElement('p');
-    status.className = 'map-location-status'; status.setAttribute('role', 'status');
-    const message = document.createElement('span'), retry = document.createElement('button');
-    retry.type = 'button'; retry.textContent = '再試行'; retry.hidden = true;
-    status.append(message, retry); globeStage.append(status);
+    setStartupStatus('地図を表示しました。場所の情報を確認しています…');
     const loader = createMapGeometryLoader({
       assets: [[ 'prefectures', mapPrefectureData ], [ 'admin1', mapAdmin1Data ]]
         .filter(([, data]) => data?.geometryChecksum)
@@ -320,23 +474,25 @@ try {
         if (currentSelection) showSelection(currentSelection);
         if (currentHover) showCellHover(currentHover);
         performance.mark?.('map-location-ready');
+        setStartupStatus('');
       },
       onState(state) {
-        status.hidden = state === 'ready'; retry.hidden = state !== 'error';
-        message.textContent = state === 'error' ? '場所の確認に必要なデータを読み込めませんでした。' : '投稿・会場の場所を確認中…';
+        if (state === 'ready') setStartupStatus('');
+        else if (state === 'error') setStartupStatus('場所の情報を読み込めませんでした。再試行できます。', { retry: true, retryLabel: '再試行' });
+        else setStartupStatus('地図を表示しました。場所の情報を確認しています…');
       }
     });
     globalThis.__PIXIEED_MAP_GEOMETRY__ = loader;
-    retry.addEventListener('click', () => { void loader.load({ reload: true }).catch(error => console.warn('Map location data unavailable.', error)); });
+    retryStartup = () => { void loader.load({ reload: true }).catch(error => console.warn('Map location data unavailable.', error)); };
     window.addEventListener('pagehide', event => { if (!event.persisted) loader.destroy(); });
-    message.textContent = '投稿・会場の場所を確認中…';
     // Let the exact display map reach the screen and accept gestures before parsing polygons.
     requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
       performance.mark?.('map-location-load-start');
       void loader.load().catch(error => console.warn('Map location data unavailable.', error));
     }, 0)));
   }
-  loadStatus.textContent = '';
+  if (!telescope) initialPostUiReadyPromise = initializeNormalPostUiAfterPaint();
+  if (telescope || renderer.isMapLocationReady()) setStartupStatus('');
   openToolFromUrl();
   performance.mark?.('globe-ready');
   console.info(`[globe] ready in ${Math.round(performance.now())}ms (${preloaded ? 'preloaded' : 'late'} map)`);
@@ -345,6 +501,8 @@ try {
   // GeoJSON path remains available for recovery and never affects WebGL startup.
   console.warn('Generated map cells unavailable; using Canvas fallback.', rasterError);
   createPrototypeRenderer({ forceCanvas: true });
+  if (!telescopeTool) initialPostUiReadyPromise = initializeNormalPostUiAfterPaint();
+  setStartupStatus('地図を表示しました。場所の詳細を確認しています…');
   openToolFromUrl();
   try {
     const [world, prefectures] = await Promise.all([
@@ -355,9 +513,12 @@ try {
       worldFeatures: prepareGeoJsonFeatures(world, { idProperty: 'ADM0_A3' }),
       prefectureFeatures: prepareGeoJsonFeatures(prefectures, { idProperty: 'code' })
     });
-    loadStatus.textContent = '';
+    setStartupStatus('');
   } catch (error) {
-    loadStatus.textContent = '地図データを読み込めませんでした';
+    setStartupStatus('場所の情報を読み込めませんでした。ページを再試行してください。', { retry: true });
     console.error(error);
   }
 }
+
+// Keep the iframe load event as the parent integration's posting readiness signal.
+if (!telescopeTool) await initialPostUiReadyPromise;
