@@ -107,3 +107,20 @@ test('new secret key remains only on apikey header and is never returned or used
  }});
  assert.equal(response.status,206);assert.equal(response.headers.has('apikey'),false);assert.equal(response.headers.has('authorization'),false);
 });
+
+test('local Docker HTTP transport requires explicit opt-in and exactly the CLI internal origin', async () => {
+  const rejectFetch = () => assert.fail('unapproved HTTP origin must not receive credentials');
+  for (const overrides of [
+    { projectUrl: 'http://kong:8000' },
+    { projectUrl: 'http://kong:8000', allowLocalSupabaseHttp: 'true' },
+    ...['http://attacker.invalid', 'http://kong:8001', 'http://kong:8000/path', 'http://user@kong:8000'].map(projectUrl => ({ projectUrl, allowLocalSupabaseHttp: true })),
+  ]) {
+    const result = await fetchSocialAudioRange({ ...base, ...overrides, fetchImpl: rejectFetch });
+    assert.equal(result.status, 503);
+  }
+  const fetchImpl = fakeFetch();
+  const result = await fetchSocialAudioRange({ ...base, projectUrl: 'http://kong:8000', allowLocalSupabaseHttp: true, rangeHeader: 'bytes=2-5', fetchImpl });
+  assert.equal(result.status, 206);
+  assert.equal(fetchImpl.last.requestUrl, `http://kong:8000/storage/v1/object/sns-audio/${path}`);
+  assert.deepEqual([...new Uint8Array(await new Response(result.body).arrayBuffer())], [2, 3, 4, 5]);
+});

@@ -298,6 +298,7 @@ async function handleAudio(request: Request, deps: Deps) {
     projectUrl: deps.projectUrl ?? projectUrl, serviceKey: deps.serviceKey ?? serviceKey,
     path: `${post.media_owner_id || post.owner_id}/${post.id}.wav`, expectedBytes: Number(post.audio_bytes),
     rangeHeader: request.headers.get("range"), fetchImpl: deps.fetch ?? fetch, signal: request.signal,
+    allowLocalSupabaseHttp: env("PIXIEED_LOCAL_SUPABASE_HTTP") === "1",
   });
   if (result.status === 503) return failure(request, "audio_unavailable", 503);
   const headers = new Headers(corsHeaders(request, "audio/wav"));

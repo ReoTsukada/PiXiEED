@@ -395,7 +395,9 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 
 [functions.create-post]
 enabled = true
-verify_jwt = true
+# Auth.getUser verifies the caller before any privileged mutation. The legacy
+# Gateway JWT-secret verifier rejects valid asymmetric (ES256) Auth sessions.
+verify_jwt = false
 import_map = "./functions/create-post/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
@@ -423,10 +425,16 @@ entrypoint = "./functions/public-post-puzzle/index.ts"
 
 [functions.delete-post]
 enabled = true
-verify_jwt = true
+verify_jwt = false # Owner is verified with Auth.getUser inside the handler.
 entrypoint = "./functions/delete-post/index.ts"
 
 [functions.set-author-name]
 enabled = true
-verify_jwt = true
+verify_jwt = false # Owner is verified with Auth.getUser inside the handler.
 entrypoint = "./functions/set-author-name/index.ts"
+
+[functions.social-feed]
+enabled = true
+# Public reads require no session; every write independently calls Auth.getUser.
+verify_jwt = false
+entrypoint = "./functions/social-feed/index.ts"

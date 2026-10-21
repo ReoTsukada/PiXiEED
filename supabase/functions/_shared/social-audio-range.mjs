@@ -65,7 +65,7 @@ function limitedBody(body, expected, signal) {
 }
 
 /** Fetch a private audio object after the caller has completed DB/owner authorization.
- * @param {{projectUrl:string,serviceKey:string,path:string,expectedBytes:number,rangeHeader?:string|null,fetchImpl?:typeof fetch,signal?:AbortSignal}} options
+ * @param {{projectUrl:string,serviceKey:string,path:string,expectedBytes:number,rangeHeader?:string|null,fetchImpl?:typeof fetch,signal?:AbortSignal,allowLocalSupabaseHttp?:boolean}} options
  */
 export async function fetchSocialAudioRange({
   projectUrl,
@@ -75,6 +75,7 @@ export async function fetchSocialAudioRange({
   rangeHeader = null,
   fetchImpl = fetch,
   signal,
+  allowLocalSupabaseHttp = false,
 }) {
   if (!Number.isSafeInteger(expectedBytes) || expectedBytes < 1 || expectedBytes > MAX_AUDIO_BYTES) {
     return result(503);
@@ -85,7 +86,10 @@ export async function fetchSocialAudioRange({
   let origin;
   try {
     const parsed = new URL(projectUrl);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+    // Opt-in development transport for the CLI's isolated Docker bridge only.
+    // A flag never permits arbitrary HTTP origins or disables owner checks.
+    const localHttp = allowLocalSupabaseHttp === true && parsed.origin === 'http://kong:8000';
+    if ((parsed.protocol !== 'https:' && !localHttp) || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
       return result(503);
     }
     origin = parsed.origin;
