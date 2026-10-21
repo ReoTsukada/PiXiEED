@@ -22,4 +22,3 @@ test('review exclusion protects formal assets, arbitrary artwork and public rout
     'play/hidden-object/puzzles/pixfind-ho-a90bc7c5-e055-447c-b67f-d0b9fa61e3fa/ogp-abb89804d66dabb3.png',
   ]) assert.equal(isLocalReviewSource(name), false, name);
 });
-
