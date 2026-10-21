@@ -221,7 +221,7 @@ function eventPage(event, allEvents, indexableIds = new Set(allEvents.map((item)
 <link rel="canonical" href="${esc(canonical)}">
 <meta property="og:type" content="article"><meta property="og:site_name" content="PiXiEED"><meta property="og:title" content="${esc(pageTitle)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:image" content="${origin}/assets/og/events.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(pageTitle)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${origin}/assets/og/events.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
-<link rel="stylesheet" href="/css/event-pages.css?rev=20261016-event-history-1">
+<link rel="stylesheet" href="/css/event-pages.css?rev=20261021-event-compact-1">
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body>
@@ -242,7 +242,7 @@ ${relatedHtml}
 </main>
 <footer><a href="/events/">ドット絵イベント一覧へ戻る</a> · <a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261021-header-layout-1"></script>
 </body>
 </html>
 `;
@@ -306,7 +306,7 @@ function indexPage(events, allRecords = events) {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title><meta name="description" content="${esc(description)}">
 <link rel="canonical" href="${esc(canonical)}"><meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}"><meta property="og:image" content="${origin}/assets/og/events.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${origin}/assets/og/events.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「ドット絵イベント」のアイコン">
-<link rel="stylesheet" href="/css/event-pages.css?rev=20261016-event-history-1">
+<link rel="stylesheet" href="/css/event-pages.css?rev=20261021-event-compact-1">
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body>
@@ -329,8 +329,8 @@ ${yearSections}
 <p class="event-globe-link"><a href="/globe/">世界地図でイベントの地域を見る</a></p>
 </main><footer><a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
-<script type="module" src="/js/event-history.mjs?rev=20261016-tool-shell-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
+<script type="module" src="/js/event-history.mjs?rev=20261021-event-compact-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261021-header-layout-1"></script>
 </body>
 </html>
 `;

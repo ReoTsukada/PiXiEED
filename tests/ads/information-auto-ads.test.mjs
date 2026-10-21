@@ -20,8 +20,11 @@ const staticRoutes = [
 test('build-time opt-in covers exactly the static information routes and generated eligible event leaves', async () => {
   const catalog = JSON.parse(await readFile(new URL('../../data/pixel-art-events.json', import.meta.url), 'utf8'));
   const generatedEventRoutes = new Set(eligibleEvents(catalog).map(event => `events/${event.id}/index.html`));
-  assert.equal(generatedEventRoutes.size, 124);
-  assert.equal(staticRoutes.length + generatedEventRoutes.size, 133);
+  assert.ok(generatedEventRoutes.size > 0, 'exercise the current sourced event directory');
+  assert.equal(generatedEventRoutes.size, eligibleEvents(catalog).length, 'each eligible edition has one route');
+  for (const event of catalog.events.filter(event => !generatedEventRoutes.has(`events/${event.id}/index.html`))) {
+    assert.equal(addInformationAutoAds(sourceHtml, `events/${event.id}/index.html`, { generatedEventRoutes }).skipped, true, 'hub-only records do not gain a leaf opt-in');
+  }
 
   for (const [sourcePath, route] of staticRoutes) {
     const result = addInformationAutoAds(sourceHtml, sourcePath, { generatedEventRoutes });
@@ -39,6 +42,15 @@ test('build-time opt-in covers exactly the static information routes and generat
     'globe-prototype.html', 'profile/index.html', 'admin/index.html', 'events/unlisted/index.html',
     'events/../index.html',
   ]) assert.deepEqual(addInformationAutoAds(sourceHtml, sourcePath, { generatedEventRoutes }), { html: sourceHtml, added: false, skipped: true }, sourcePath);
+});
+
+test('generated event opt-in follows a supplied directory as new editions are added', () => {
+  const initial = new Set(['events/first-edition/index.html']);
+  const added = 'events/new-edition/index.html';
+  assert.equal(addInformationAutoAds(sourceHtml, added, { generatedEventRoutes: initial }).skipped, true);
+  const extended = new Set([...initial, added]);
+  assert.equal(addInformationAutoAds(sourceHtml, added, { generatedEventRoutes: extended }).skipped, false);
+  assert.equal(addInformationAutoAds(sourceHtml, 'events/not-generated/index.html', { generatedEventRoutes: extended }).skipped, true);
 });
 
 test('transform is idempotent, preserves page metadata/content, and places policy before the module', () => {

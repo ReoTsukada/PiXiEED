@@ -1,5 +1,5 @@
 import './site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261017-dedicated-routes-1';
+import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from './page-navigation.mjs?rev=20261021-page-navigation-1';
 import { installGlobeAnalyticsBridge } from './globe/analytics-bridge.mjs?rev=20261017-analytics-integrity-1';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
@@ -53,11 +53,11 @@ function bindPanelEffects() {
 
 const MENU_MARKUP = `
   <div class="site-menu-backdrop" data-menu-backdrop hidden></div>
-  <aside class="site-menu" id="site-menu" data-site-menu hidden role="dialog" aria-modal="true" aria-labelledby="site-menu-title">
-    <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">ページ</h2></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
+  <aside class="site-menu" id="site-menu" data-site-menu hidden role="dialog" aria-modal="true" aria-labelledby="site-menu-title" aria-describedby="site-menu-location">
+    <div class="site-menu__head"><div><span class="eyebrow">PiXiEED</span><h2 id="site-menu-title">ページ移動</h2><p class="site-menu__description" id="site-menu-location">移動先を選んでください。</p></div><button class="site-menu__close" type="button" data-menu-close aria-label="メニューを閉じる">×</button></div>
     <div class="site-menu__body">
     <nav class="site-menu__nav" aria-label="ページ移動">
-      ${PAGE_DESTINATIONS.map(group => `<div class="site-menu__group"><span class="site-menu__label">${group.label}</span>${group.links.map(([href, label]) => `<a href="${href}" data-menu-link><span>${label}</span><span class="site-menu__current" hidden>現在</span></a>`).join('')}</div>`).join('')}
+      ${PAGE_DESTINATIONS.map(group => `<div class="site-menu__group"><span class="site-menu__label">${group.label}</span>${group.links.map(([href, label, description, icon]) => `<a href="${href}" data-menu-link><img class="site-menu__icon" src="/assets/icons/pixieed/${icon}.svg" width="24" height="24" loading="lazy" decoding="async" alt="" aria-hidden="true"><span class="site-menu__link-copy"><span class="site-menu__link-title">${label}</span><span class="site-menu__link-description">${description}</span></span><span class="site-menu__current" hidden>✓ 現在のページ</span></a>`).join('')}</div>`).join('')}
     </nav>
     <div class="site-menu__utilities"><button type="button" data-menu-setting="all">設定を開く<span>表示・プライバシー</span></button></div>
     </div>
@@ -125,11 +125,14 @@ function mountSiteMenu(header, inner) {
     document.body.classList.toggle('is-menu-open', open);
     if (open) {
       const current = currentPageDestination(window.location, document.body.dataset.creationMode);
+      let currentLabel = '';
       for (const link of menu.querySelectorAll('[data-menu-link]')) {
         const selected = link.getAttribute('href') === current;
         if (selected) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
         link.querySelector('.site-menu__current').hidden = !selected;
+        if (selected) currentLabel = link.querySelector('.site-menu__link-title').textContent;
       }
+      menu.querySelector('#site-menu-location').textContent = currentLabel ? `現在地：${currentLabel}` : '移動先を選んでください。';
       window.requestAnimationFrame(() => close?.focus({ preventScroll: true }));
     }
     else if (returnFocus) toggle.focus({ preventScroll: true });

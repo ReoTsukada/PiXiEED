@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261018-direct-runtime-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261021-header-layout-1';
 import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';

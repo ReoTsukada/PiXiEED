@@ -219,7 +219,7 @@ test('event history stays fully available without JavaScript and is grouped with
   assert.match(hub, /value="in-person">現地開催（明記）/);
   assert.match(hub, /href="#event-year-2026"/);
   assert.match(hub, /id="event-year-2026" data-event-year-section="2026"/);
-  assert.match(hub, /src="\/js\/event-history\.mjs\?rev=20261016-tool-shell-1"/);
+  assert.match(hub, /src="\/js\/event-history\.mjs\?rev=20261021-event-compact-1"/);
   assert.doesNotMatch(hub, /<meta name="robots"/);
   const locationWithCountry = catalog.events.find((event) => event.country);
   assert.ok(hub.includes(`data-region="${locationWithCountry.country}"`));

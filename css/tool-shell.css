@@ -2,7 +2,7 @@
   --intro-accent: #e75445;
   --intro-accent-dark: #b83f34;
 }
-.tool-shell .site-header .header-inner { min-height: 4rem; }
+.tool-shell .site-header .header-inner { min-height: var(--px-header-height,64px); }
 .tool-shell .site-nav { display: flex; align-items: center; gap: 1rem; }
 .tool-shell .site-nav a { color: #4d5962; font-size: .84rem; font-weight: 700; text-underline-offset: .2em; }
 .tool-shell .tool-intro__hero { padding-block: clamp(1.15rem, 2.1vw, 1.8rem); }
@@ -62,7 +62,7 @@
 .tool-shell .site-footer { margin-top: 0; }
 
 @media (max-width: 720px) {
-  .tool-shell .site-header .header-inner { min-height: 3.7rem; }
+  .tool-shell .site-header .header-inner { min-height: var(--px-header-height,64px); }
   .tool-shell .site-nav { gap: .7rem; }
   .tool-shell .site-nav a { font-size: .75rem; }
   .tool-shell .tool-intro__hero { padding-block: 1rem 1.1rem; }

@@ -124,7 +124,7 @@ export function installDirectToolShell({ section, mode, search }) {
       const key = `--tool-direct-${name}`, next = `${value}px`;
       if (html.style.getPropertyValue(key) !== next) { html.style.setProperty(key, next); changed = true; }
     }
-    const height = `${bar.getBoundingClientRect().height || 60}px`;
+    const height = `${bar.getBoundingClientRect().height || 64}px`;
     changed ||= html.style.getPropertyValue('--tool-direct-bar') !== height;
     html.style.setProperty('--tool-direct-bar', height);
     if (changed) window.dispatchEvent(new Event('resize'));

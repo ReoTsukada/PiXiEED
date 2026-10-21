@@ -166,7 +166,7 @@ ${listedProducts.map(card).join('\n')}
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261020-yahoo-related-offers-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261020-yahoo-related-offers-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261018-direct-runtime-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261021-header-layout-1"></script>
 </body>
 </html>
 `;

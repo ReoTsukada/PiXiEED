@@ -4,7 +4,7 @@
 .px-header-ready body .site-header.px-site-header{display:block;position:sticky;top:0;z-index:35;min-height:var(--px-header-height);border:0;background:rgba(247,248,246,.97);box-shadow:0 1px 0 #1b202510}
 .px-site-header,.px-site-header *{box-sizing:border-box}
 .px-site-header .px-header-inner,.px-site-header.px-header-inner{display:flex;align-items:center;gap:8px;width:100%;min-height:var(--px-header-height);padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));margin:0;min-width:0}
-.px-site-header .px-header-brand{display:flex;align-items:center;gap:9px;flex:none;min-width:44px;min-height:44px;color:#1b2025;text-decoration:none;font:750 1rem/1 system-ui,-apple-system,sans-serif;letter-spacing:0}
+.px-site-header .px-header-brand{display:flex;align-items:center;gap:9px;flex:none;min-width:44px;width:auto;min-height:44px;padding:0!important;color:#1b2025;text-decoration:none;font:750 1rem/1 system-ui,-apple-system,sans-serif;letter-spacing:0}
 .px-header-brand img{display:block;width:40px;height:40px;border-radius:9px;background:#05090c;image-rendering:pixelated}
 :is(.site-header,.audio-heading,.lc-top,.px-site-header) .brand-mark{flex:none;width:40px;height:40px;background-size:40px 40px;border:0;border-radius:9px;transform:none} /* also before the header script runs: no stretched circle on first paint */
 /* ---- 特典ボタン (js/pass-button.mjs): ad → gold coin, free → mint gift, active → hourglass + 12-pixel bar ---- */
@@ -179,11 +179,13 @@ html[data-pixieed-motion=reduced] .px-pass button:active{transform:none}
 @keyframes px-panel-return-a{0%,100%{transform:none}45%{transform:scale(.96)}}
 @keyframes px-panel-return-b{0%,100%{transform:none}45%{transform:scale(.96)}}
 /* Tool headers keep file and site-menu launchers visible while editing actions scroll. */
-body[data-tool-name]{--px-header-height:56px;--header-h:var(--px-header-height)}
+body[data-tool-name]{--px-header-height:64px;--header-h:var(--px-header-height)}
+/* The retained editor's second row is an operation bar, below the site row. */
+body.creation-editor{--px-header-height:56px}
 body[data-tool-name] .px-site-header .px-header-brand--tool>span:not(.brand-mark){display:none!important}
 body[data-tool-name] .px-site-header .px-header-brand--tool{flex:0 0 44px;min-width:44px;width:44px;justify-content:center}
 body.px-tool-header .px-site-header .px-header-inner,body.px-tool-header .px-site-header.px-header-inner{gap:6px;padding:6px max(8px,env(safe-area-inset-right)) 6px max(8px,env(safe-area-inset-left))}
-body.px-tool-header .lc-top.px-site-header{min-height:56px;padding:6px 8px;gap:6px}
+body.px-tool-header .lc-top.px-site-header{min-height:64px;padding:6px 8px;gap:6px}
 .px-tool-header-controls{display:flex;align-items:center;gap:6px;flex:1 1 0;min-width:0;min-height:44px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;touch-action:pan-x}
 .px-tool-header-controls::-webkit-scrollbar{display:none}
 .px-tool-header-slot{display:flex;align-items:center;flex:none;min-height:44px}
@@ -217,9 +219,12 @@ body.px-tool-header .px-site-header .jigsaw-more__menu #jigsaw-new{grid-column:1
 body.px-tool-header .audio-toolbar .audio-header-actions:empty{display:none}
 
 /* Keep dismissal outside the content scroller on every shared header surface. */
-body .site-menu:not([hidden]),body.px-standalone-globe .site-menu:not([hidden]){display:flex;flex-direction:column;padding:0;overflow:hidden}
-body .site-menu__head{flex:none;margin:0;padding:max(1rem,env(safe-area-inset-top)) 1.25rem .8rem}
-body .site-menu__body{flex:1 1 auto;min-height:0;padding:0 1.25rem max(6rem,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
+body .site-menu:not([hidden]),body.px-standalone-globe .site-menu:not([hidden]){display:flex;flex-direction:column;padding:0;overflow:hidden;overflow:clip}
+body .site-menu__head{flex:none;gap:16px;margin:0;padding:max(16px,env(safe-area-inset-top)) 20px 12px}
+body .site-menu__head h2{margin:0;font-size:1.2rem;line-height:1.2}
+body .site-menu__head .eyebrow{font-size:.7rem;line-height:1.3}
+/* The panel covers page navigation: it needs no extra bottom-bar reservation. */
+body .site-menu__body{flex:1 1 auto;min-height:0;padding:0 20px max(24px,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
 body .site-settings,body.px-standalone-globe .site-settings{box-sizing:border-box;max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 24px);padding:0;overflow:hidden}
 body .site-settings[open],body.px-standalone-globe .site-settings[open]{display:flex;flex-direction:column}
 body .site-settings__head{flex:none;margin:0;padding:1.2rem 1.2rem .8rem}
@@ -240,6 +245,16 @@ body .site-menu__group a{display:flex;justify-content:space-between;gap:8px}
 body .site-menu__current{flex:none;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
 body .site-menu__current[hidden]{display:none}
 body .site-menu__group a[aria-current="page"]{font-weight:700;background:#2588bb12}
+body .site-menu__description{max-width:34rem;margin:.25rem 0 0;color:#59636c;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
+body .site-menu__head>div{display:grid;min-width:0;gap:4px;overflow-wrap:anywhere}
+body .site-menu__close{flex:0 0 44px}
+body .site-menu__group a{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:start;justify-content:initial;gap:.55rem .7rem;box-sizing:border-box;width:100%;padding:.6rem .55rem;white-space:normal}
+body .site-menu__group a:focus-visible{outline:3px solid #357bb3;outline-offset:-3px}
+body .site-menu__icon{display:block;flex:none;width:24px;height:24px;object-fit:contain;align-self:start}
+body .site-menu__link-copy{display:grid;min-width:0;gap:.18rem;overflow-wrap:anywhere}
+body .site-menu__link-title{min-width:0;font-size:.92rem;font-weight:650;line-height:1.4;overflow-wrap:anywhere}
+body .site-menu__link-description{min-width:0;color:#59636c;font-size:.78rem;font-weight:400;line-height:1.45;overflow-wrap:anywhere}
+body .site-menu__current{grid-column:2/-1;justify-self:start;max-width:100%;font-size:.75rem;line-height:1.4;white-space:normal;overflow-wrap:anywhere}
 body .site-menu__utilities{border-top:1px solid #1b202520;margin-top:16px;padding-top:12px}
 body .site-menu__utilities button{display:flex;flex-direction:column;align-items:flex-start;width:100%;gap:4px;border:0;background:#e9eceb;color:#1b2025;font:600 14px/1.4 system-ui,sans-serif;cursor:pointer}
 body .site-menu__utilities button span{font-size:11px;font-weight:400}
@@ -250,6 +265,8 @@ body .app-tabs--work > :is(a,button){width:auto!important;min-width:44px!importa
 /* Adapt existing catalog/event/output headers instead of inserting a second row. */
 body .px-site-header .site-nav,body .event-site-header.px-site-header > nav{display:none}
 @media(max-width:600px){body .catalog-header .px-header-inner > p,body .output-header.px-site-header .output-header__label{display:none}}
+/* Keep the books catalog's separator without adding a pixel below its 64px row. */
+body.books-page .catalog-header.px-site-header{border-bottom:0;box-shadow:0 1px 0 var(--catalog-line)}
 
 /* The site-wide reward is an optional entry and reports only an actual receipt. */
 .px-site-header .px-header-reward{display:grid;place-items:center;flex:0 0 auto;min-width:44px;min-height:44px;height:44px;margin-left:auto;padding:0 8px;border:1px solid #b8d1cb;border-radius:12px;background:#f2f8f6;color:#185e56;font:700 12px/1 system-ui,-apple-system,"Hiragino Sans",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;touch-action:manipulation}
@@ -274,6 +291,8 @@ body .hud-top__bar.px-site-header .px-header-reward{pointer-events:auto}
 body .pc-header.px-site-header.px-header-inner{width:auto;min-height:44px;padding:0;gap:6px}
 body .pc-header.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;background:#111923d9}
 @media(max-width:380px){
+  body .lc-top.px-site-header .menu-toggle{width:44px!important;min-width:44px;padding-inline:0!important}
+  body .lc-top.px-site-header .menu-toggle__label{display:none}
   body .hud-top__bar.px-site-header.px-header-inner{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:4px;width:100%;overflow:visible}
   body .hud-top__bar.px-site-header .hud-top__actions{display:flex;flex-wrap:nowrap;gap:4px;min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
   body .hud-top__bar.px-site-header .hud-top__actions--right{margin-left:0;justify-content:flex-start;flex:0 0 auto;overflow:visible}
