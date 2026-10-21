@@ -11,6 +11,7 @@ import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSit
 import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatchDownload, OUTPUT_FREE_BATCH_LIMIT, OUTPUT_REWARD_BATCH_LIMIT } from './output-reward-policy.mjs?rev=20261016-color-capability-1';
 import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261016-color-capability-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
+import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261021-jigsaw-public-1';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -31,6 +32,11 @@ const format = $('#output-format');
 const filename = $('#output-filename');
 const extension = $('#output-extension');
 const download = $('#output-download');
+const socialDraftLink = document.createElement('a');
+socialDraftLink.className = 'output-button output-button--secondary';
+socialDraftLink.textContent = '元の音源を下書きへ';
+socialDraftLink.hidden = true;
+download.insertAdjacentElement('afterend', socialDraftLink);
 const status = $('#output-status');
 const returnLink = $('#output-return');
 const animationToggle = $('#output-animation-toggle');
@@ -512,6 +518,7 @@ function setActiveItem(item) {
   displayMetadata(record, item.blob, item.metadata?.outputWidth || item.metadata?.width, item.metadata?.outputHeight || item.metadata?.height);
   setMedia(record);
   syncFilename();
+  updateSocialDraftLink();
   updateSettingsSummaries();
 }
 
@@ -966,6 +973,14 @@ function setBusy(busy, canCancel = false) {
   renderAssets();
 }
 
+function updateSocialDraftLink() {
+  const socialUrl = socialOutputUrl(record?.id);
+  let socialLaunch = false;
+  try { socialLaunch = new URL(record.returnUrl, location.origin).searchParams.get('social') === '1'; } catch {}
+  socialDraftLink.hidden = !socialUrl || !socialLaunch || !String(record?.sourceBlob?.type || '').toLowerCase().startsWith('audio/');
+  if (socialUrl) socialDraftLink.href = socialUrl;
+}
+
 function setCurrentBlob(blob, { width = null, height = null, animated = false } = {}) {
   const previous = fileUrl;
   currentBlob = blob;
@@ -980,6 +995,7 @@ function setCurrentBlob(blob, { width = null, height = null, animated = false } 
     }
   } else if (record.mime.startsWith('audio/')) audio.src = fileUrl;
   else if (record.mime.startsWith('video/')) video.src = fileUrl;
+  updateSocialDraftLink();
   if (previous && previous !== sourceUrl) URL.revokeObjectURL(previous);
   displayMetadata(record, blob, width, height);
   updatePreviewControls();

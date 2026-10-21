@@ -10,6 +10,7 @@ import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from 
 import { createCameraFileSave } from './file-save.mjs?rev=20261017-analytics-integrity-1';
 import { decodeCameraImageFile } from './image-source.mjs?rev=20261006-camera-upload-1';
 import { cameraPostDataUrl } from './camera-post.mjs?rev=20261004-post-size-256-1';
+import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20261016-color-capability-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20261016-color-capability-1';
 import { createPxdProject } from '../creation/pxd-codec.mjs';
@@ -2697,6 +2698,7 @@ $('#savePng').addEventListener('click', async (event) => {
   }
 });
 if (returnToAudio) $('#postCamera').textContent = '曲を作る';
+else if (new URLSearchParams(location.search).get('social') === '1') $('#postCamera').textContent = '投稿の下書きへ';
 $('#postCamera').addEventListener('click', async () => {
   if (state.mode !== 'captured' || !state.result || gif.pending) return;
   const button = $('#postCamera');
@@ -2707,7 +2709,8 @@ $('#postCamera').addEventListener('click', async () => {
     if (snapshot.generation !== downloadGeneration || state.mode !== 'captured' || state.result !== snapshot.frame || gif.pending !== snapshot.gif) throw new Error('画像が切り替わったため、世界地図へ送れません。もう一度お試しください。');
     const dataUrl = cameraPostDataUrl(snapshot.frame);
     localStorage.setItem('PiXiEED:camera-handoff:v1', JSON.stringify({ dataUrl, createdAt: Date.now() }));
-    location.assign(returnToAudio ? '/audio/' : '/globe/?from=pixel-camera');
+    if (returnToAudio) location.assign('/audio/');
+    else if (!navigateToSocialReturn({ kind: 'pixel-camera' })) location.assign('/globe/?from=pixel-camera');
   } catch (error) {
     say(error instanceof Error ? error.message : '撮影画像を準備できませんでした。', { visible: true });
   } finally {
