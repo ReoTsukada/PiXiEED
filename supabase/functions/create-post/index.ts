@@ -6,6 +6,8 @@ import { keyAwareFetch } from "../_shared/key-aware-fetch.ts";
 import { admitPuzzleUpload, PuzzleAdmissionError } from "../_shared/puzzle-admission.mjs";
 import { isUuid, requestDigest, rpcRecord } from "../_shared/post-publication.ts";
 
+import { postingPolicy, requirePostingConsent, postingConsentRecord, persistPostingConsent } from "../_shared/posting-consent.ts";
+
 const MAX_BYTES = 512 * 1024;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_COLORS = 128;
@@ -182,6 +184,8 @@ export async function createPostHandler(request: Request, deps: {
   projectUrl?: string;
   publishableKey?: string;
   serviceKey?: string;
+  postingPolicy?: any;
+  recordConsent?: typeof persistPostingConsent;
 } = {}) {
   const makeClient = deps.createClient || createClient;
   const projectUrl = deps.projectUrl ?? supabaseUrl;
@@ -204,6 +208,11 @@ export async function createPostHandler(request: Request, deps: {
 
   const body = await readBoundedJson(request);
   if (!body) return fail(request, "invalid_json_or_body_too_large", 413);
+
+  if (body.visibility != null && body.visibility !== "public") return fail(request, "post_visibility_invalid");
+  const policy = deps.postingPolicy ?? postingPolicy;
+  try { requirePostingConsent(body.postingConsent, policy); }
+  catch (error) { return fail(request, (error as any).code || "posting_consent_required", (error as any).code === "posting_policy_unavailable" ? 503 : 428); }
 
   const userClient = makeClient(projectUrl, publicKey, {
     auth: {
@@ -272,9 +281,10 @@ export async function createPostHandler(request: Request, deps: {
     definition: admittedPuzzle.definition,
     changedHash: admittedPuzzle.changed ? await sha256(admittedPuzzle.changed.bytes) : null,
   }) : null;
-  const digest = requestKey ? await requestDigest({
-    title, caption, postKind, location, imageHash: contentHash, puzzleHash,
-  }) : null;
+  const consentDigest = await requestDigest({ title, caption, postKind, location, imageHash: contentHash, puzzleHash });
+  const digest = requestKey ? consentDigest : null;
+  try { await (deps.recordConsent ?? persistPostingConsent)(admin, postingConsentRecord(userData.user.id, "image", String(requestKey || crypto.randomUUID()), consentDigest, policy)); }
+  catch { return fail(request, "posting_consent_save_failed", 503); }
   const finishCreate = async (record: Record<string, unknown>, statusCode: number) => {
     let completed = record;
     if (!admittedPuzzle) {

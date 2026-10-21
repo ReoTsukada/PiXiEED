@@ -1,8 +1,11 @@
+import {testPostingPolicy,consentedStore} from '../fixtures/posting-policy.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
-import { createSupabaseGlobeStore } from '../../js/globe/post-supabase.mjs';
+import { createSupabaseGlobeStore as createRawStore } from '../../js/globe/post-supabase.mjs';
 import { lookupCell } from '../../js/globe/geometry.mjs';
+
+const createSupabaseGlobeStore = () => consentedStore(createRawStore({postingPolicy:testPostingPolicy}));
 
 const response = (body, status = 200) => ({
   ok: status >= 200 && status < 300,

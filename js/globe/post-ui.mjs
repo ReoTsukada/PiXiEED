@@ -1,3 +1,4 @@
+import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261021-posting-consent-1';
 /**
  * Posting UI for the globe: pins on the sphere, the composer, the work viewer,
  * the gallery and the login gate.
@@ -143,6 +144,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
         </details>
         <p class="note">公開される場所は、選んだ<b>セル単位</b>です。入力した正確な緯度・経度は公開されません。</p>
       </section>
+      <div data-posting-consent></div>
       <footer class="composer__foot">
         <p data-missing role="status"></p>
         <button type="submit" class="primary" data-submit disabled>置く</button>
@@ -384,6 +386,8 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   }
   function invalidateRequestKey() { state.requestKey = null; state.requestFingerprint = null; persistPuzzleRetry(); }
 
+  const consentUi = createPostingConsentUi($(composer, '[data-posting-consent]'), { onChange: () => syncComposer() });
+
   function syncComposer() {
     const title = c.title.value.trim();
     const okArt = Boolean(state.image);
@@ -393,7 +397,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     const locationReady = renderer.isMapLocationReady?.() !== false;
     const okPlace = Boolean(state.pin) && locationReady;
     c.steps.forEach((step) => step.classList.toggle('is-done', { art: okArt, title: okTitle, place: okPlace }[step.dataset.step]));
-    const missing = [!okArt && '絵', !okOrigin && '制作確認', !okPuzzleRights && '権利確認', !okTitle && '題名', !okPlace && (state.pin && !locationReady ? '場所を確認中' : '場所')].filter(Boolean);
+    const missing = [!okArt && '絵', !okOrigin && '制作確認', !okPuzzleRights && '権利確認', !okTitle && '題名', !consentUi.accepted && (consentUi.ready ? '投稿条件への同意' : '投稿条件を準備中'), !okPlace && (state.pin && !locationReady ? '場所を確認中' : '場所')].filter(Boolean);
     c.submit.disabled = missing.length > 0 || state.submitting;
     c.missing.textContent = state.submitting ? '置いています…' : (missing.length ? `あと：${missing.join(' ・ ')}` : '準備できました');
     c.titleCount.textContent = `${c.title.value.length}/${TITLE_MAX}`;
@@ -486,7 +490,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     invalidateLocationRequest();
     imageRequestSequence += 1;
     state.image = null; state.postKind = 'pixel_art'; state.puzzle = null; state.pin = null; state.submitting = false; state.done = null; state.requestKey = null; state.requestFingerprint = null; puzzleRights.checked = false;
-    c.form.reset();
+    c.form.reset(); consentUi.reset();
     c.artError.textContent = ''; c.smartStatus.textContent = ''; c.smartStatus.dataset.state = '';
     c.form.hidden = false; c.done.hidden = true;
     syncComposer();
@@ -607,6 +611,8 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
   c.form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (c.submit.disabled || state.submitting || renderer.isMapLocationReady?.() === false) return;
+    let postingConsent;
+    try { postingConsent = consentUi.read(); } catch (error) { say(error.message); consentUi.focus(); return; }
     const user = currentUser();
     if (!user) {
       needLogin(state.puzzle ? () => { syncComposer(); say('ログインを確認しました。パズルの内容を確認して、もう一度投稿ボタンを押してください。'); } : () => c.form.requestSubmit());
@@ -619,7 +625,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
       if (!state.requestKey || state.requestFingerprint !== fingerprint) { state.requestKey = crypto.randomUUID(); state.requestFingerprint = fingerprint; }
       persistPuzzleRetry();
       const record = await store.add({
-        postKind: state.postKind,
+        postingConsent, postKind: state.postKind,
         title: c.title.value.trim(),
         caption: c.caption.value.trim(),
         image: { dataUrl: state.image.dataUrl, mimeType: state.image.mimeType, size: state.image.size, width: state.image.width, height: state.image.height, colorCount: state.image.colorCount },
@@ -1027,7 +1033,7 @@ export function initPostUi({ renderer, stage, store = createPostStore(), auth = 
     if (!viewer.hidden) { if (postById.has(state.viewerId)) openViewer(state.viewerId, { fly: false }); else closeSheets(); }
     stage.dispatchEvent(new CustomEvent('pixieed:map-postschange'));
   });
-  auth.subscribe(() => { renderAccount(); lastRefreshKey = ''; for (const marker of markers.values()) marker.classList.toggle('is-mine', isMine(postById.get(marker.dataset.id))); refresh(); if (!gallery.hidden) renderGallery(); if (!viewer.hidden) openViewer(state.viewerId, { fly: false }); });
+  auth.subscribe(() => { consentUi.reset(); renderAccount(); lastRefreshKey = ''; for (const marker of markers.values()) marker.classList.toggle('is-mine', isMine(postById.get(marker.dataset.id))); refresh(); if (!gallery.hidden) renderGallery(); if (!viewer.hidden) openViewer(state.viewerId, { fly: false }); });
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') { if (!modal.hidden) { modal.hidden = true; state.pendingAfterLogin = null; } else closeSheets(); return; }
     if (openSheet() === 'viewer' && !/INPUT|TEXTAREA|SELECT/.test(event.target?.tagName || '')) {

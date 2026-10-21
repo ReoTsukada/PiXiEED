@@ -1,3 +1,4 @@
+import { testPostingPolicy, testPostingConsent } from '../fixtures/posting-policy.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSocialApi, SocialApiError } from '../../js/social/api.mjs';
@@ -21,7 +22,7 @@ const oldRowsFetch = async (input) => {
 function serverModule(serverFetch) {
   const data = new Map();
   const memoryStorage = { getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key) };
-  return { createSocialServerActions: (options) => createSocialServerActions({ ...options, storage:options.storage || memoryStorage, fetchImpl: serverFetch, ownerApiFactory: () => ({ hasSavedSession: () => false }) }) };
+  return { createSocialServerActions: (options) => createSocialServerActions({ postingPolicy:testPostingPolicy, ...options, storage:options.storage || memoryStorage, fetchImpl: serverFetch, ownerApiFactory: () => ({ hasSavedSession: () => false }) }) };
 }
 
 test('public server posts merge with legacy list, map to SNS refs and expose only the audio endpoint', async () => {
@@ -159,9 +160,9 @@ test('audio submit uses multipart with original Blob and stable payload request 
     return oldRowsFetch(input, options);
   };
   const api = createSocialApi({ config, fetchImpl, loadServerActions: async () => serverModule(fetchImpl) });
-  await api.submit({ kind: 'music', title: 'Track', caption: 'Caption', visibility: 'public', requestKey: id, audio: { blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/wav' }), filename: 'original.wav' } });
+  await api.submit({ kind: 'music', title: 'Track', caption: 'Caption', visibility: 'public', postingConsent:testPostingConsent, requestKey: id, audio: { blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/wav' }), filename: 'original.wav' } });
   assert.equal(captured.body instanceof FormData, true);
-  assert.deepEqual(JSON.parse(captured.body.get('payload')), { action: 'create', kind: 'music', title: 'Track', visibility: 'public', requestKey: id, body: 'Caption' });
+  assert.deepEqual(JSON.parse(captured.body.get('payload')), { action: 'create', kind: 'music', title: 'Track', visibility: 'public', postingConsent:testPostingConsent, requestKey: id, body: 'Caption' });
   assert.equal(captured.body.get('audio').name, 'original.wav');
   assert.equal(captured.headers['Content-Type'], undefined);
 });

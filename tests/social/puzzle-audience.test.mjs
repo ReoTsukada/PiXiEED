@@ -1,3 +1,4 @@
+import { testPostingConsent } from '../fixtures/posting-policy.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -57,7 +58,7 @@ const handler=app.slice(app.indexOf('  async function submitPost(event)'),app.in
 function handlerFixture({visibility='private',submit=async()=>({id:postId,status:'published'})}={}){
  const adapter=memory();const store=createFeedDraftStore({adapter,makeId:()=>id});
  const calls=[],messages=[],links=[],navigation=[];
- const env={state:{mode:'puzzle',busy:false,submitted:false,archiveSaved:false,attachment:{...image,puzzle},localPuzzle:source,activeDraft:{...draft},saveChain:Promise.resolve(),pageHidden:false},
+ const env={consentUi:{read:()=>({...testPostingConsent}),focus(){}},state:{mode:'puzzle',busy:false,submitted:false,archiveSaved:false,attachment:{...image,puzzle},localPuzzle:source,activeDraft:{...draft},saveChain:Promise.resolve(),pageHidden:false},
  visibilityInput:{value:visibility},composer:{open:true},makeDraftFromInputs:()=>({...draft,...env.state.activeDraft,puzzle:env.state.attachment?.puzzle,localPuzzle:env.state.localPuzzle}),savePuzzleForSelf,localPuzzlePlayPath,publicPuzzlePlayPath,hasUncertainPuzzlePublication,
  niceError:e=>e?.message||'',tell:m=>messages.push(m),windowRef:{location:{assign:href=>navigation.push(href)}},
  titleInput:{value:draft.title},captionInput:{value:''},locationInput:{value:'0,0'},form:{},selectComposerPane(){},

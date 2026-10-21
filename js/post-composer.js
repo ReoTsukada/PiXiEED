@@ -1,3 +1,4 @@
+import { createPostingConsentUi } from './posting-consent-ui.mjs?rev=20261021-posting-consent-1';
 import { supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 import { normalizePixelFile } from './pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
@@ -163,6 +164,7 @@ export function bindUserPostComposer(root, options = {}) {
         <label><span>ひとこと <small>任意</small></span><textarea rows="3" maxlength="180" placeholder="この場所に置いた理由など" data-post-caption></textarea></label>
         <section class="map-post-location" aria-labelledby="map-post-location-title"><div class="map-post-location__head"><strong id="map-post-location-title">置く場所</strong><span data-post-location-state>未選択</span></div><div class="map-post-location__cell-preview" aria-hidden="true"><i></i><i></i><i></i><i></i><i class="is-target"></i><i></i><i></i><i></i><i></i></div><p data-post-location-summary>地図のセルを選んでください。</p><small class="map-post-location__note">細かい住所は公開しません。セル番号だけを保存し、選んだセル自体を掲載場所として表示します。</small><div class="map-post-location__actions"><button class="button button--quiet" type="button" data-post-map-location>地図から選ぶ</button></div></section>
         <p class="map-post-form__status" data-post-status role="status" aria-live="polite"></p>
+        <div data-posting-consent></div>
         <button class="button button--primary map-post-form__submit" type="submit" data-post-submit disabled>投稿を送る</button>
       </form>
       </div>
@@ -200,8 +202,9 @@ export function bindUserPostComposer(root, options = {}) {
   };
   const syncSubmit = () => {
     const complete = Boolean(state.meta && titleInput?.value.trim() && state.mapCell);
-    if (submit) submit.disabled = !complete || state.submitted;
+    if (submit) submit.disabled = !complete || state.submitted || state.submitting || !consentUi.accepted;
   };
+  const consentUi = createPostingConsentUi(panel.querySelector('[data-posting-consent]'), { onChange: () => syncSubmit() });
   const clearPreview = () => {
     if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
     state.objectUrl = '';
@@ -219,7 +222,7 @@ export function bindUserPostComposer(root, options = {}) {
     returnFocus = context.returnFocus || document.activeElement;
     clearPreview();
     state = { mapCell: context.cell ? makeLocationContext(context.cell) : (context.mapCell || null), file: null, meta: null, objectUrl: '', submitted: false };
-    form?.reset();
+    form?.reset(); consentUi.reset();
     setStatus(isConfigured() ? '' : '投稿を利用できません。時間をおいてお試しください。', isConfigured() ? '' : 'pending');
     syncLocation();
     syncSubmit();
@@ -264,6 +267,7 @@ export function bindUserPostComposer(root, options = {}) {
   });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (state.submitting || state.submitted) return;
     if (!state.file || !state.meta || !titleInput?.value.trim() || !state.mapCell) {
       setStatus('作品画像・作品名・地図上のセルを確認してください。', 'pending');
       syncSubmit();
@@ -273,15 +277,21 @@ export function bindUserPostComposer(root, options = {}) {
       setStatus('投稿接続が未設定です。Supabaseの公開設定を入れるまで送信されません。', 'pending');
       return;
     }
+    let postingConsent;
+    try { postingConsent = consentUi.read(); } catch (error) { setStatus(error.message, 'pending'); consentUi.focus(); return; }
+    state.submitting = true;
     submit.disabled = true;
     setStatus('投稿を送っています…', 'working');
     try {
+      const fingerprint = JSON.stringify([state.meta.base64, titleInput.value.trim(), captionInput?.value.trim(), state.mapCell, postingConsent]);
+      if (state.requestFingerprint !== fingerprint) { state.requestKey = crypto.randomUUID(); state.requestFingerprint = fingerprint; }
       const session = await ensureAnonymousSession();
       const endpoint = `${String(supabaseConfig.url).replace(/\/$/, '')}/functions/v1/${encodeURIComponent(supabaseConfig.createPostFunction || 'create-post')}`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { ...supabaseHeaders(session.access_token), Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
+          postingConsent, requestKey: state.requestKey,
           title: titleInput.value.trim(),
           caption: captionInput?.value.trim() || '',
           image: { mimeType: state.file.type, size: state.file.size, width: state.meta.width, height: state.meta.height, colorCount: state.meta.colorCount, base64: state.meta.base64 },
@@ -293,9 +303,8 @@ export function bindUserPostComposer(root, options = {}) {
       setStatus('受け付けました。確認が終わると地図のセルに表示されます。', 'ok');
       options.onSubmitted?.();
     } catch (error) {
-      submit.disabled = false;
       setStatus(error instanceof Error ? error.message : '投稿できませんでした。時間をおいて試してください。', 'error');
-    }
+    } finally { state.submitting = false; syncSubmit(); }
   });
 
   return {

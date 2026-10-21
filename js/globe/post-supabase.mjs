@@ -1,3 +1,4 @@
+import { postingPolicy, requirePostingConsent } from '../../data/posting-policy.mjs?rev=20261021-posting-consent-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
 import { projectLegacyShowcase } from './legacy-showcase.mjs';
@@ -352,7 +353,9 @@ export function buildGlobePostPayload(post) {
   const cell = getCellById(post.pin.cellId);
   return {
     title: post.title,
+    visibility: 'public',
     caption: post.caption,
+    ...(post.postingConsent ? { postingConsent: post.postingConsent } : {}),
     postKind: post.postKind === 'pixel_camera' ? 'pixel_camera' : 'pixel_art',
     image: { mimeType: post.image.mimeType, size: post.image.size, width: post.image.width, height: post.image.height, colorCount: post.image.colorCount, base64: dataUrlBase64(post.image.dataUrl) },
     location: { globeCell: { id: cell.id, version: cell.version, band: cell.band, column: cell.column } },
@@ -367,7 +370,10 @@ export function createSupabaseGlobeAuth() {
 }
 
 /** Submit one post through the existing create-post contract without constructing a feed store. */
-async function submitSupabasePost(post) {
+async function submitSupabasePost(post, policy = postingPolicy) {
+  if (post?.visibility === 'private') throw new Error('自分用の作品は公開投稿へ送信できません。端末内に保存してください。');
+  const postingConsent = requirePostingConsent(post?.postingConsent, policy);
+  post = { ...post, postingConsent };
   if (post?.puzzle && supabaseConfig.puzzlePublicationEnabled !== true) {
     throw new Error('パズル投稿は準備中です。公開機能の更新後にお試しください。');
   }
@@ -388,9 +394,9 @@ async function submitSupabasePost(post) {
 }
 
 /** Lazily callable production actions; creating this object performs no auth or network work. */
-export function createSupabasePostActions() {
+export function createSupabasePostActions({ postingPolicy: policy = postingPolicy } = {}) {
   return {
-    submit: submitSupabasePost,
+    submit: post => submitSupabasePost(post, policy),
     hasLiked,
     setLike(postId, liked) {
       if (!UUID.test(String(postId || ''))) throw new TypeError('この投稿にはいいねできません。');
@@ -399,7 +405,7 @@ export function createSupabasePostActions() {
   };
 }
 
-export function createSupabaseGlobeStore() {
+export function createSupabaseGlobeStore({ postingPolicy: policy = postingPolicy } = {}) {
   let published = [];
   const withdrawn = new Set();
   const listeners = new Set();
@@ -487,7 +493,7 @@ export function createSupabaseGlobeStore() {
       return true;
     },
     async add(post) {
-      const created = await submitSupabasePost(post);
+      const created = await submitSupabasePost(post, policy);
       if (created.status === 'published' && UUID.test(String(created.id || ''))) {
         // Make the submitted image visible immediately; replace it with the canonical public projection when available.
         upsertPublished(created);

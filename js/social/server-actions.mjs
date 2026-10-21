@@ -1,6 +1,8 @@
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs?rev=20261001-free-tools-1';
 
+import { postingPolicy, requirePostingConsent, PostingConsentError } from '../../data/posting-policy.mjs?rev=20261021-posting-consent-1';
+
 const authQueues = new WeakMap();
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -45,6 +47,7 @@ function writeStored(storage, session) {
 
 function safeFailure(status, code = '') {
   const normalized = String(code || '').toLowerCase();
+  if (['posting_policy_unavailable','posting_consent_required','posting_consent_version_mismatch'].includes(normalized)) return new SocialServerActionError(normalized, new PostingConsentError(normalized).message, status);
   if (['comments_disabled'].includes(normalized)) return new SocialServerActionError('comments_disabled', 'コメント機能は利用できません。', status);
   if (['guest_already_claimed','claim_conflict','claim_pending'].includes(normalized)) return new SocialServerActionError(normalized, '引き継ぎを確認できませんでした。元のデータを保持しています。投稿処理の完了後に再試行してください。', status);
   if (['post_not_found', 'target_not_found', 'comment_not_found', 'not_found'].includes(normalized)) {
@@ -68,7 +71,7 @@ function safeFailure(status, code = '') {
   return new SocialServerActionError('request_failed', '操作を完了できませんでした。時間をおいて再試行してください。', status);
 }
 
-export function createSocialServerActions({ config = supabaseConfig, fetchImpl = globalThis.fetch, storage = globalThis.localStorage, ownerApiFactory = (options) => createLegacyPlacementApi(options), timeoutMs = 12_000, locks = globalThis.navigator?.locks } = {}) {
+export function createSocialServerActions({ postingPolicy: policy = postingPolicy, config = supabaseConfig, fetchImpl = globalThis.fetch, storage = globalThis.localStorage, ownerApiFactory = (options) => createLegacyPlacementApi(options), timeoutMs = 12_000, locks = globalThis.navigator?.locks } = {}) {
   const cfg = safeConfig(config);
   const endpoint = `${cfg.origin}/functions/v1/social-feed`;
   const baseHeaders = (token = '') => ({ apikey: cfg.key, Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) });
@@ -215,6 +218,7 @@ export function createSocialServerActions({ config = supabaseConfig, fetchImpl =
   }
 
   async function request(action, payload = {}, { auth = false, ownerOnly = false, existingAuth = false, audio = null, signal } = {}) {
+    if (['create', 'edit'].includes(action) && payload.visibility === 'public') payload = { ...payload, postingConsent: requirePostingConsent(payload.postingConsent, policy) };
     const session = ownerOnly ? await requireOwnerSession() : auth ? await ensureWriteSession() : existingAuth ? await existingAuthSession() : null;
     const headers = baseHeaders(session?.access_token || '');
     let body;

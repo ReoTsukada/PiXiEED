@@ -1,3 +1,4 @@
+import { testPostingPolicy, testPostingConsent } from '../../../tests/fixtures/posting-policy.mjs';
 import assert from "node:assert/strict";
 import { socialFeedHandler } from "./index.ts";
 import { cursorDate } from "../_shared/social-contract.mjs";
@@ -305,6 +306,7 @@ function musicDeleteRequest() {
 
 function deps(factory: never) {
   return {
+    postingPolicy: testPostingPolicy, recordConsent: async (_admin: any, record: any) => record,
     createClient: factory,
     projectUrl: PROJECT,
     publishableKey: "public",
@@ -323,7 +325,7 @@ function jsonRequest(
       origin,
       ...(authorization ? { authorization } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...(body as any), ...((body as any)?.visibility === "public" && ["create","edit"].includes((body as any)?.action) ? {postingConsent:testPostingConsent} : {}) }),
   });
 }
 

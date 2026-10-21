@@ -13,3 +13,15 @@ test('actual text/music private submission only saves locally before validation,
   await run(mode);assert.equal(saved,1);assert.equal(state.attachment.original,'synthetic');
  }
 });
+
+test('actual image/photo private submit leaves originals on device before consent or API access',async()=>{
+ const begin=source.indexOf('  async function submitPost(event)');
+ const end=source.indexOf('  async function ',begin+10);
+ const fn=source.slice(begin,end);
+ for(const mode of ['art','photo','text','music']){
+  let saved=0;const state={mode,busy:false,submitted:false,attachment:{original:'synthetic'}};
+  const env={state,visibilityInput:{value:'private'},saveDraft:async()=>{saved++;},consentUi:{read(){throw Error('consent should be unnecessary');}}};
+  const run=new Function('env',`with(env){return (${fn});}`)(env);
+  await run({preventDefault(){}});assert.equal(saved,1);assert.equal(state.attachment.original,'synthetic');
+ }
+});

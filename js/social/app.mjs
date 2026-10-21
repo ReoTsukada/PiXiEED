@@ -1,5 +1,6 @@
+import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261021-posting-consent-1';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261021-jigsaw-public-1';
+import { createSocialApi } from './api.mjs?rev=20261021-posting-consent-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -66,6 +67,9 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const audioList = $('#draftAudioList', documentRef);
   const preview = $('#composerPreview', form), composerStatus = $('#composerStatus', form), modeStatus = $('#composerModeStatus', form);
   const submitButton = $('#composerSubmit', form), draftButton = $('#composerDraftSave', form);
+  const consentUi = createPostingConsentUi($('#composerPostingConsent', form), { documentRef, windowRef, onChange: () => { if (typeof state !== 'undefined') updateComposerSummary(); } });
+  const editConsents = new WeakMap();
+  let activeEditConsent = null;
   const live = $('#toast', documentRef), draftsHost = $('#localDrafts', documentRef);
   let releaseStartup;
   const startupReady = new Promise((resolve) => { releaseStartup = resolve; });
@@ -124,7 +128,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   function lockComposer(locked) {
     state.busy = locked;
     for (const element of $$('input, select, textarea, select, [data-action="composer-type"], [data-action="attach"], [data-action="attach-audio"], [data-action="detach-audio"], [data-action="draft-save"]', form)) element.disabled = locked;
-    submitButton.disabled = locked || state.submitted;
+    submitButton.disabled = locked || state.submitted || visibilityInput?.value === 'public' && !consentUi.accepted;
     if (locked) submitButton.setAttribute('aria-busy', 'true'); else submitButton.removeAttribute('aria-busy');
   }
   function freezeComposer() {
@@ -363,6 +367,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     }
   }
   function setMode(mode) {
+    consentUi.reset();
     if (!MODES.has(mode)) mode = 'art';
     if (mode === 'puzzle' && state.mode !== 'puzzle' && visibilityInput) visibilityInput.value = 'private';
     state.mode = mode;
@@ -383,14 +388,17 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     tell(mode === 'puzzle' ? (visibilityInput?.value === 'public' ? '投稿する設定です。内容を確認してから送信してください。' : '自分だけで遊ぶ設定です。素材を外へ送信しません。') : isServerType ? (visibilityInput?.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '自分用を選択しています。この端末に保存し、素材は送信しません。') : '投稿内容は既存の投稿方式で送信します。');
   }
   function updateComposerSummary() {
+    const publicChoice = visibilityInput?.value === 'public';
+    consentUi.setPublic(publicChoice);
+    submitButton.disabled = state.busy || state.submitted || publicChoice && !consentUi.accepted;
     const scope = $('#composerVisibilitySummary', form); if (!scope) return;
     const serverType = state.mode === 'text' || state.mode === 'music';
     const puzzle = state.mode === 'puzzle', publicPuzzle = puzzle && visibilityInput?.value === 'public';
-    if (puzzle) $('#composerLocationFields',form).hidden = !publicPuzzle;
-    submitButton.textContent = puzzle && !publicPuzzle ? (!hasUncertainPuzzlePublication(state.activeDraft) && localPuzzlePlayPath(state.localPuzzle) ? '自分だけで遊ぶ' : '自分用に保存') : serverType && visibilityInput?.value !== 'public' ? '自分用に保存' : '投稿する';
+    $('#composerLocationFields',form).hidden = serverType || !publicChoice;
+    submitButton.textContent = puzzle && !publicPuzzle ? (!hasUncertainPuzzlePublication(state.activeDraft) && localPuzzlePlayPath(state.localPuzzle) ? '自分だけで遊ぶ' : '自分用に保存') : visibilityInput?.value !== 'public' ? '自分用に保存' : '投稿する';
     scope.textContent = puzzle ? `パズル · ${publicPuzzle ? '投稿する（公開）' : '自分だけで遊ぶ（端末内）'}（タップして変更）` : serverType
       ? `${LABELS[state.mode]} · 公開範囲: ${visibilityInput?.value === 'public' ? '公開' : '自分用（この端末）'}（タップして設定）`
-      : `${LABELS[state.mode]} · 地図の掲載先: ${locationInput?.value.trim() ? '入力済み（タップして確認）' : '未設定（タップして入力）'}`;
+      : !publicChoice ? `${LABELS[state.mode]} · 自分用（この端末）` : `${LABELS[state.mode]} · 地図の掲載先: ${locationInput?.value.trim() ? '入力済み（タップして確認）' : '未設定（タップして入力）'}`;
   }
   function putAttachment(image, puzzle = null) {
     state.archiveSaved = false;
@@ -513,6 +521,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     } catch (error) { if (token === state.handoffToken) tell(`作品の引き継ぎを確認できませんでした。${niceError(error, '')}`); }
   }
   async function openComposer(mode = 'art', { historyPush = true, draft = null } = {}) {
+    consentUi.reset();
     const generation = ++state.composerGeneration;
     state.audioWarning = '';
     state.fileGeneration++;
@@ -591,6 +600,9 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       } catch (error) { tell(niceError(error,'この端末への保存を確認できませんでした。この保存では公開送信していません。以前の投稿結果は別に確認してください。')); }
       return;
     }
+    if (visibilityInput?.value !== 'public') { await saveDraft(); return; }
+    let postingConsent;
+    try { postingConsent = consentUi.read(); } catch (error) { tell(error.message); consentUi.focus(); return; }
     if (mode === 'puzzle' && !state.attachment?.puzzle) { tell('パズル作成ツールで作った問題を選んでください。画像だけではパズルとして投稿できません。'); return; }
     if (mode === 'text' || mode === 'music') { await submitServerPost(mode); return; }
     if (state.audioRecord || (!state.audioDetached && state.activeDraft?.audioId)) { tell('この投稿方式では音声を公開できません。音声を外すか、音楽のローカル下書きとして保存してください。'); return; }
@@ -610,7 +622,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       let requestKey = state.activeDraft?.requestKey;
       if (requestKey && state.activeDraft?.requestDigest && state.activeDraft.requestDigest !== sourceDigest) requestKey = null;
       requestKey ||= uuid();
-      const post = { title, caption, image: state.attachment, pin: { cellId: cell.id, latitude: cell.center.latitude, longitude: cell.center.longitude, source: 'cell' }, postKind: mode === 'photo' ? 'pixel_camera' : 'pixel_art', requestKey, ...(puzzlePayload ? { puzzle: puzzlePayload, visibility:'public' } : {}) };
+      const post = { title, caption, postingConsent, image: state.attachment, pin: { cellId: cell.id, latitude: cell.center.latitude, longitude: cell.center.longitude, source: 'cell' }, postKind: mode === 'photo' ? 'pixel_camera' : 'pixel_art', requestKey, ...(puzzlePayload ? { puzzle: puzzlePayload, visibility:'public' } : {}) };
       const sendingDraft = { ...makeDraftFromInputs(), requestKey, requestDigest: sourceDigest, ...(puzzlePayload ? {puzzlePublicationAttempt:{requestKey,status:'uncertain'}} : {}) };
       await queueActiveSave(sendingDraft); // Persist idempotency identity before any network write.
       const result = await api.submit(post);
@@ -654,6 +666,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (state.busy || state.submitted) return;
     // A private choice is an on-device save, never an implicit server upload.
     if (visibilityInput?.value !== 'public') { await saveDraft(); return; }
+    let postingConsent;
+    try { postingConsent = consentUi.read(); } catch (error) { tell(error.message); consentUi.focus(); return; }
     lockComposer(true);
     const invalid = (message, focus) => { tell(message); lockComposer(false); if (focus) { selectComposerPane(focus === locationInput ? 'settings' : 'content'); focus.focus({ preventScroll: true }); } };
     const title = text(titleInput.value, 60), caption = text(captionInput.value, 180);
@@ -686,7 +700,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       if (requestKey && state.activeDraft?.requestDigest && state.activeDraft.requestDigest !== requestDigest) requestKey = null;
       requestKey ||= uuid();
       await queueActiveSave({ ...selectedDraft(), visibility, requestKey, requestDigest });
-      const post = await api.submit({ kind: mode, title, caption, visibility, requestKey, ...(audio ? { audio } : {}) });
+      const post = await api.submit({ kind: mode, title, caption, visibility, requestKey, postingConsent, ...(audio ? { audio } : {}) });
       if (!post || post.source !== 'sns' || !/^sns:[a-f\d-]{36}$/i.test(String(post.id || '')) || post.visibility !== visibility) {
         throw new Error('サーバー応答で投稿の公開状態を確認できません。下書きと送信番号を保持しています。');
       }
@@ -702,6 +716,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     } finally { if (!state.submitted) lockComposer(false); }
   }
   function detailContent(post) {
+    activeEditConsent?.destroy(); activeEditConsent = null;
     const work = [], info = [];
     const title = node('h3', {}, post.title);
     const visibility = post.source === 'sns' ? ` · ${post.visibility === 'private' ? '非公開' : 'サーバー公開'}` : '';
@@ -731,6 +746,9 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       const select = node('select', { name: 'visibility', 'aria-label': '公開範囲' });
       for (const [value, label] of [['private', '非公開'], ['public', '公開']]) { const option = node('option', { value }, label); option.selected = post.visibility === value; select.append(option); }
       edit.append(node('label', { class: 'composer-label' }, '公開範囲'), select, node('button', { type: 'submit', class: 'detail-action', 'data-action': 'edit-post', 'data-post-id': post.postId, 'data-version': String(post.version) }, '変更を保存'), node('button', { type: 'button', class: 'detail-action detail-danger', 'data-action': 'delete-post', 'data-post-id': post.postId }, '自分の投稿を削除'));
+      const consentHost = node('div'); edit.append(consentHost);
+      const editConsent = createPostingConsentUi(consentHost, { documentRef, windowRef });
+      editConsent.setPublic(select.value === 'public'); select.addEventListener('change', () => editConsent.setPublic(select.value === 'public')); editConsents.set(edit, editConsent); activeEditConsent = editConsent;
       info.push(node('span', { class: 'owner-label' }, '自分の投稿を管理'));
       info.push(edit);
     }
@@ -797,6 +815,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const form = event.target.closest?.('form[data-action]'), action = form?.dataset.action;
     if (!['edit-post', 'report'].includes(action)) return;
     event.preventDefault();
+    if (form.dataset.saving === 'true') return;
     const data = new FormData(form); form.dataset.saving = 'true';
     const controls = [...form.querySelectorAll('input, select, textarea, button')].map(control => [control, control.disabled]);
     controls.forEach(([control]) => { control.disabled = true; });
@@ -807,7 +826,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
         const postId = form.dataset.postId;
         const current = (state.minePosts || []).concat(state.posts).find((post) => post.postId === postId && post.source === 'sns');
         if (!current?.owned) { setStatus('自分の投稿として確認できないため編集できません。'); return; }
-        const result = await api.edit({ postId, title: text(data.get('title'), 60), caption: text(data.get('body'), 180), visibility: data.get('visibility'), version: Number(form.dataset.version) });
+        const result = await api.edit({ postId, title: text(data.get('title'), 60), caption: text(data.get('body'), 180), visibility: data.get('visibility'), ...(data.get('visibility') === 'public' ? {postingConsent: editConsents.get(form).read()} : {}), version: Number(form.dataset.version) });
         state.minePosts = [result, ...(state.minePosts || []).filter((post) => post.postId !== postId)];
         state.posts = state.posts.map((post) => post.postId === postId ? result : post);
         state.detailPane = 'work'; detailContent(result); applyDetailPane(); render(); toast('自分の投稿を更新しました。'); return;
@@ -975,7 +994,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   composer.addEventListener('close', () => { $('#composerAudio', preview)?.pause(); });
   detail?.addEventListener('close', () => { state.detailId = null; });
   for (const input of [titleInput, captionInput, locationInput]) input?.addEventListener('input', () => { if (captionInput === input) $('#characterCount', documentRef).textContent = `${captionInput.value.length} / 180`; if (locationInput === input) updateComposerSummary(); state.archiveSaved = false; requestAutosave(); });
-  visibilityInput?.addEventListener('change', () => { state.archiveSaved = false; updateComposerSummary(); requestAutosave(); tell(state.mode === 'puzzle' && visibilityInput.value !== 'public' ? '自分だけで遊ぶ設定です。素材の送信や公開投稿はしません。' : visibilityInput.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '自分用を選択しています。この端末に保存し、素材は送信しません。'); });
+  visibilityInput?.addEventListener('change', () => { consentUi.reset(); state.archiveSaved = false; updateComposerSummary(); requestAutosave(); tell(state.mode === 'puzzle' && visibilityInput.value !== 'public' ? '自分だけで遊ぶ設定です。素材の送信や公開投稿はしません。' : visibilityInput.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '自分用を選択しています。この端末に保存し、素材は送信しません。'); });
   $$('.composer-types [data-action="composer-type"]', app).forEach((button) => button.addEventListener('click', () => setMode(button.dataset.type)));
   $('#newPostsButton', documentRef)?.addEventListener('click', acceptNewPosts);
   $('#composerFile', form)?.addEventListener('change', async (event) => {

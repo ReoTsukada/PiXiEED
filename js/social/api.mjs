@@ -6,7 +6,7 @@ const CELL_ID = /^globe:v11-meridian-parallel-quarter-degree:(0|[1-9]\d{0,2}):(0
 const OPTIONAL_MAP_COLUMNS = ['post_kind', 'puzzle_mode', 'author_name'];
 const MAX_LIST_LIMIT = 50;
 const DEFAULT_TIMEOUT_MS = 12_000;
-const SNS_ACTIONS_REV = '20261020-social-server-1';
+const SNS_ACTIONS_REV = '20261021-posting-consent-1';
 
 export class SocialApiError extends Error {
   constructor(code, message, status = 0) {
@@ -230,7 +230,7 @@ function mapSnsComment(row) {
   return Object.freeze({ id, target: row.target, body, authorName: cleanText(row.authorName, { max: 40 }) || '', createdAt, updatedAt: dateValue(row.updatedAt) || createdAt, version: Number.isSafeInteger(row.version) && row.version > 0 ? row.version : 1, ...(row.owned === true ? { owned: true } : {}) });
 }
 
-export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThis.fetch, storage = globalThis.localStorage, loadActions = () => import('../globe/post-supabase.mjs?rev=20261020-social-actions-1'), loadServerActions = () => import(`./server-actions.mjs?rev=${SNS_ACTIONS_REV}`), timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThis.fetch, storage = globalThis.localStorage, loadActions = () => import('../globe/post-supabase.mjs?rev=20261021-posting-consent-1'), loadServerActions = () => import(`./server-actions.mjs?rev=${SNS_ACTIONS_REV}`), timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   let actionsPromise = null;
   let serverActionsPromise = null;
   let readWarnings = [];

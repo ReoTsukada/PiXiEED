@@ -1,0 +1,6 @@
+.posting-consent{margin-block:12px;padding:12px;border:1px solid var(--line,#bcc7d6);border-radius:12px;font-size:.85rem;line-height:1.6;min-width:0;overflow-wrap:anywhere}
+.posting-consent[hidden]{display:none}
+.posting-consent p{margin:0 0 8px}.posting-consent p:last-child{margin-bottom:0}
+.posting-consent a{display:inline-block;margin-inline-end:10px;text-decoration:underline;text-underline-offset:3px}
+.posting-consent label{display:block;cursor:pointer}.posting-consent input{width:20px;height:20px;vertical-align:middle;margin-inline-end:5px}
+.posting-consent :focus-visible{outline:3px solid var(--accent,#147ad6);outline-offset:3px}

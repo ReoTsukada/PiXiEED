@@ -1,3 +1,4 @@
+import { testPostingPolicy, testPostingConsent } from '../../../tests/fixtures/posting-policy.mjs';
 import assert from "node:assert/strict";
 import { createDrawDocument, encodePng } from "../../../js/creation/draw-core.mjs";
 import { inspectPixelPng } from "../_shared/pixel-png.mjs";
@@ -25,7 +26,7 @@ type FixtureOptions = {
 async function body(requestKey?: string, puzzleMode?: PuzzleMode, postKind: "pixel_art" | "pixel_camera" = "pixel_art") {
   const bytes = encodePng(createDrawDocument(16));
   const payload: Record<string, unknown> = {
-    title: "作品", caption: "説明", postKind,
+    postingConsent: testPostingConsent, title: "作品", caption: "説明", postKind,
     image: { mimeType: "image/png", size: bytes.length, ...await inspectPixelPng(bytes), base64: btoa(String.fromCharCode(...bytes)) },
     location: { mapCell: { grid: 64, x: 3, y: 4, prefectureCode: "13" } },
     ...(requestKey ? { requestKey } : {}),
@@ -132,6 +133,7 @@ function request(payload: unknown) {
 }
 
 const deps = (factory: ReturnType<typeof mockCreateClient>["factory"]) => ({
+  postingPolicy: testPostingPolicy, recordConsent: async (_admin: any, record: any) => record,
   createClient: factory, projectUrl: PROJECT, publishableKey: "public", serviceKey: "secret",
 });
 

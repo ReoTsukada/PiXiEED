@@ -14,6 +14,8 @@ import {
   SocialWavError,
 } from "../_shared/social-wav.mjs";
 
+import { postingPolicy, requirePostingConsent, postingConsentRecord, persistPostingConsent } from "../_shared/posting-consent.ts";
+
 const env = (name: string) => Deno.env.get(name)?.trim() || "";
 const projectUrl = env("SUPABASE_URL");
 function keyFrom(name: string) {
@@ -50,6 +52,8 @@ type Deps = {
   publishableKey?: string;
   serviceKey?: string;
   fetch?: typeof fetch;
+  postingPolicy?: any;
+  recordConsent?: typeof persistPostingConsent;
 };
 
 function allowedOrigin(request: Request) {
@@ -312,6 +316,12 @@ async function processAction(
   if (["comments", "comment-create", "comment-edit", "comment-delete"].includes(action)) {
     return failure(request, "comments_disabled", 410);
   }
+  const policy = deps.postingPolicy ?? postingPolicy;
+  const publicWrite = ["create", "edit"].includes(action) && payload.visibility === "public";
+  if (publicWrite) {
+    try { requirePostingConsent(payload.postingConsent, policy); }
+    catch (error) { return failure(request, (error as any).code || "posting_consent_required", (error as any).code === "posting_policy_unavailable" ? 503 : 428); }
+  }
   const admin = adminClient(deps);
   if (action === "claim-guest") {
     const owner = await authUser(request, deps, true);
@@ -434,6 +444,10 @@ async function processAction(
       payload.visibility,
       facts?.sha256 || null,
     ]);
+    if (publicWrite) {
+      try { await (deps.recordConsent ?? persistPostingConsent)(admin, postingConsentRecord(owner!.id, "sns-create", String(payload.requestKey), digest, policy)); }
+      catch { return failure(request, "posting_consent_save_failed", 503); }
+    }
     const reservation = await admin.rpc("pixieed_sns_reserve_post", {
       p_owner_id: owner!.id,
       p_request_key: payload.requestKey,
@@ -538,6 +552,11 @@ async function processAction(
     const body = cleanSocialText(payload.body ?? "", 180, { multiline: true });
     if (title === null || body === null) {
       return failure(request, "text_length_invalid");
+    }
+    if (publicWrite) {
+      const digest = await canonicalHash([payload.postId, payload.version, title, body, payload.visibility, policy.terms.version, policy.privacy.version]);
+      try { await (deps.recordConsent ?? persistPostingConsent)(admin, postingConsentRecord(owner!.id, "sns-edit", isSocialUuid(payload.requestKey) ? String(payload.requestKey) : crypto.randomUUID(), digest, policy)); }
+      catch { return failure(request, "posting_consent_save_failed", 503); }
     }
     const { data, error } = await admin.from("sns_posts").update({
       title,

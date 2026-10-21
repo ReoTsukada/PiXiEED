@@ -1,8 +1,11 @@
+import {testPostingPolicy,consentedStore} from '../fixtures/posting-policy.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lookupCell } from '../../js/globe/geometry.mjs';
 import { projectLegacyShowcase } from '../../js/globe/legacy-showcase.mjs';
-import { createSupabaseGlobeStore } from '../../js/globe/post-supabase.mjs';
+import { createSupabaseGlobeStore as createRawStore } from '../../js/globe/post-supabase.mjs';
+
+const createSupabaseGlobeStore = () => consentedStore(createRawStore({postingPolicy:testPostingPolicy}));
 
 const id = '123e4567-e89b-42d3-a456-426614174000';
 const cell = lookupCell(139.69, 35.68);
