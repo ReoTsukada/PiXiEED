@@ -408,7 +408,9 @@ entrypoint = "./functions/create-post/index.ts"
 
 [functions.moderate-post]
 enabled = true
-verify_jwt = true
+# requireAdmin verifies Auth.getUser plus server-owned app_metadata/allowlist.
+# The legacy Gateway verifier cannot validate asymmetric Auth sessions.
+verify_jwt = false
 import_map = "./functions/moderate-post/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
