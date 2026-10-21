@@ -1,0 +1,69 @@
+.camera-canvas-settings__panel {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 1400;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 16px;
+  color: #f6f2e8;
+  background: #242424;
+  border: 1px solid #888;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px #0009;
+  font: inherit;
+}
+.camera-canvas-settings__panel[hidden] { display: none; }
+.camera-canvas-settings__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.camera-canvas-settings__header h2 { margin: 0; font-size: 1.15rem; }
+.camera-canvas-settings__panel button {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: #fff;
+  background: #333;
+  border: 1px solid #aaa;
+  border-radius: 9px;
+  font: inherit;
+  cursor: pointer;
+}
+.camera-canvas-settings__panel button:disabled { color: #bbb; background: #202020; border-color: #666; cursor: not-allowed; }
+.camera-canvas-settings__panel button[aria-pressed="true"] { outline: 2px solid #ffd45a; outline-offset: 1px; }
+.camera-canvas-settings__panel :focus-visible { outline: 3px solid #ffd45a; outline-offset: 3px; }
+.camera-canvas-settings__help { line-height: 1.5; }
+.camera-canvas-settings__current { margin: 12px 0; font-weight: 700; }
+.camera-canvas-settings__range-label { display: grid; gap: 8px; }
+.camera-canvas-settings__range-label input { box-sizing: border-box; width: 100%; min-height: 44px; accent-color: #ffd45a; }
+.camera-canvas-settings__presets, .camera-canvas-settings__aspects { display: grid; grid-template-columns: repeat(auto-fit, minmax(54px, 1fr)); gap: 8px; margin: 10px 0 14px; }
+.camera-canvas-settings__dimensions { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.camera-canvas-settings__number { display: flex; align-items: center; gap: 5px; }
+.camera-canvas-settings__number input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 48px;
+  min-height: 44px;
+  padding: 8px;
+  color: #fff;
+  background: #171717;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+  font: inherit;
+}
+.camera-canvas-settings__number input[aria-invalid="true"] { border-color: #ff8c8c; outline: 1px solid #ff8c8c; }
+.camera-canvas-settings__status { min-height: 2.8em; line-height: 1.4; }
+.camera-canvas-settings__panel footer { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid #777; }
+@media (max-width: 520px) {
+  .camera-canvas-settings__panel {
+    top: auto;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+    max-height: min(82dvh, 680px);
+    padding: 14px;
+  }
+  .camera-canvas-settings__dimensions { grid-template-columns: auto minmax(0, 1fr); }
+}
