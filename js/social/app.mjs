@@ -371,25 +371,25 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const isServerType = mode === 'text' || mode === 'music';
     $('#composerLocationFields', form).hidden = isServerType || mode === 'puzzle' && visibilityInput?.value !== 'public';
     $('#composerVisibilityFields', form).hidden = !(isServerType || mode === 'puzzle');
-    for (const option of visibilityInput?.options || []) option.textContent = mode === 'puzzle' ? (option.value === 'public' ? '投稿する（みんなが遊べる）' : '自分だけで遊ぶ（端末内）') : (option.value === 'public' ? '公開（フィードに掲載）' : '非公開（自分だけ）');
+    for (const option of visibilityInput?.options || []) option.textContent = mode === 'puzzle' ? (option.value === 'public' ? '投稿する（みんなが遊べる）' : '自分だけで遊ぶ（端末内）') : (option.value === 'public' ? '公開（フィードに掲載）' : '自分用（この端末）');
     const help = $('#composerVisibilityHelp',form); if (help) help.textContent = mode === 'puzzle' ? '自分だけなら素材は送信しません。投稿する場合だけ公開送信し、公開確認後に遊ぶリンクを表示します。' : 'ゲストでも投稿できます。公開を選ぶとフィードに掲載されます。下書きはこの端末に保存されます。';
     $('#musicPublishHelp', form).hidden = mode !== 'music';
     updateComposerSummary();
     modeStatus.textContent = mode === 'text' || mode === 'music'
-      ? `${LABELS[mode]}はサーバーに送信できます。公開範囲は初期設定で非公開です。送信後もこの端末の下書きと元音源は残ります。${state.attachment ? ' 添付画像はこの投稿には含めません。' : ''}${state.audioRecord && mode !== 'music' ? ' 添付音声はモードを変えても下書きに保持します。' : ''}`
+      ? `${LABELS[mode]}は公開を選んだときだけサーバーに送信します。初期設定は端末内の自分用保存です。元音源と下書きは保持します。${state.attachment ? ' 添付画像はこの投稿には含めません。' : ''}${state.audioRecord && mode !== 'music' ? ' 添付音声はモードを変えても下書きに保持します。' : ''}`
       : '作品画像と緯度・経度または地図URLを指定すると、既存の投稿方式で掲載できます。';
     if (mode === 'puzzle') modeStatus.textContent = '作成したパズルを端末内で遊ぶか、投稿してみんなに遊んでもらうか選べます。';
     submitButton.hidden = false;
-    tell(mode === 'puzzle' ? (visibilityInput?.value === 'public' ? '投稿する設定です。内容を確認してから送信してください。' : '自分だけで遊ぶ設定です。素材を外へ送信しません。') : isServerType ? (visibilityInput?.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '非公開を選択しています。サーバーが受理した場合、自分の投稿から確認できます。') : '投稿内容は既存の投稿方式で送信します。');
+    tell(mode === 'puzzle' ? (visibilityInput?.value === 'public' ? '投稿する設定です。内容を確認してから送信してください。' : '自分だけで遊ぶ設定です。素材を外へ送信しません。') : isServerType ? (visibilityInput?.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '自分用を選択しています。この端末に保存し、素材は送信しません。') : '投稿内容は既存の投稿方式で送信します。');
   }
   function updateComposerSummary() {
     const scope = $('#composerVisibilitySummary', form); if (!scope) return;
     const serverType = state.mode === 'text' || state.mode === 'music';
     const puzzle = state.mode === 'puzzle', publicPuzzle = puzzle && visibilityInput?.value === 'public';
     if (puzzle) $('#composerLocationFields',form).hidden = !publicPuzzle;
-    submitButton.textContent = puzzle && !publicPuzzle ? (!hasUncertainPuzzlePublication(state.activeDraft) && localPuzzlePlayPath(state.localPuzzle) ? '自分だけで遊ぶ' : '自分用に保存') : '投稿する';
+    submitButton.textContent = puzzle && !publicPuzzle ? (!hasUncertainPuzzlePublication(state.activeDraft) && localPuzzlePlayPath(state.localPuzzle) ? '自分だけで遊ぶ' : '自分用に保存') : serverType && visibilityInput?.value !== 'public' ? '自分用に保存' : '投稿する';
     scope.textContent = puzzle ? `パズル · ${publicPuzzle ? '投稿する（公開）' : '自分だけで遊ぶ（端末内）'}（タップして変更）` : serverType
-      ? `${LABELS[state.mode]} · 公開範囲: ${visibilityInput?.value === 'public' ? '公開' : '非公開'}（タップして設定）`
+      ? `${LABELS[state.mode]} · 公開範囲: ${visibilityInput?.value === 'public' ? '公開' : '自分用（この端末）'}（タップして設定）`
       : `${LABELS[state.mode]} · 地図の掲載先: ${locationInput?.value.trim() ? '入力済み（タップして確認）' : '未設定（タップして入力）'}`;
   }
   function putAttachment(image, puzzle = null) {
@@ -652,6 +652,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   }
   async function submitServerPost(mode) {
     if (state.busy || state.submitted) return;
+    // A private choice is an on-device save, never an implicit server upload.
+    if (visibilityInput?.value !== 'public') { await saveDraft(); return; }
     lockComposer(true);
     const invalid = (message, focus) => { tell(message); lockComposer(false); if (focus) { selectComposerPane(focus === locationInput ? 'settings' : 'content'); focus.focus({ preventScroll: true }); } };
     const title = text(titleInput.value, 60), caption = text(captionInput.value, 180);
@@ -973,7 +975,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   composer.addEventListener('close', () => { $('#composerAudio', preview)?.pause(); });
   detail?.addEventListener('close', () => { state.detailId = null; });
   for (const input of [titleInput, captionInput, locationInput]) input?.addEventListener('input', () => { if (captionInput === input) $('#characterCount', documentRef).textContent = `${captionInput.value.length} / 180`; if (locationInput === input) updateComposerSummary(); state.archiveSaved = false; requestAutosave(); });
-  visibilityInput?.addEventListener('change', () => { state.archiveSaved = false; updateComposerSummary(); requestAutosave(); tell(state.mode === 'puzzle' && visibilityInput.value !== 'public' ? '自分だけで遊ぶ設定です。素材の送信や公開投稿はしません。' : visibilityInput.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '非公開を選択しています。サーバーが受理した場合、自分の投稿から確認できます。'); });
+  visibilityInput?.addEventListener('change', () => { state.archiveSaved = false; updateComposerSummary(); requestAutosave(); tell(state.mode === 'puzzle' && visibilityInput.value !== 'public' ? '自分だけで遊ぶ設定です。素材の送信や公開投稿はしません。' : visibilityInput.value === 'public' ? '公開を選択しています。サーバーが受理した場合に公開状態を確認します。' : '自分用を選択しています。この端末に保存し、素材は送信しません。'); });
   $$('.composer-types [data-action="composer-type"]', app).forEach((button) => button.addEventListener('click', () => setMode(button.dataset.type)));
   $('#newPostsButton', documentRef)?.addEventListener('click', acceptNewPosts);
   $('#composerFile', form)?.addEventListener('change', async (event) => {
