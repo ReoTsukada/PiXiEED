@@ -1,7 +1,7 @@
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs?rev=20261001-free-tools-1';
 
-import { postingPolicy, requirePostingConsent, PostingConsentError } from '../../data/posting-policy.mjs?rev=20261021-posting-consent-2';
+import { postingPolicy, requirePostingConsent, PostingConsentError } from '../../data/posting-policy.mjs?rev=20261021-posting-consent-3';
 
 const authQueues = new WeakMap();
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';

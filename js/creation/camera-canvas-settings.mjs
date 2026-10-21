@@ -214,7 +214,11 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
     const long = Math.max(draft?.width ?? timeline().width, draft?.height ?? timeline().height);
     const [w, h] = sizeForLongSide(long, selectedAspect); setDraft(w, h);
   });
-  scope.listen(document, 'keydown', event => { if (event.key === 'Escape' && !panel.hidden) { close(); event.preventDefault(); } });
+  // The page's workspace Escape listener mounts before this lazy panel.
+  // Consume this panel's dismissal before that listener can hide the workspace.
+  scope.listen(document, 'keydown', event => {
+    if (event.key === 'Escape' && !panel.hidden && !document.querySelector('dialog[open]')) { close(); event.preventDefault(); }
+  }, { capture:true });
   scope.listen(document, 'focusin', event => {
     if (!panel.hidden && (event.target === width || event.target === height)) scope.frame(() => keepFocusedInputVisible(event.target));
   });

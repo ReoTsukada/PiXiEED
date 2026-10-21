@@ -1424,7 +1424,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20261021-posting-consent-2').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20261021-posting-consent-3').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;

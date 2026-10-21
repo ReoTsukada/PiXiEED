@@ -1,6 +1,6 @@
-import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261021-posting-consent-2';
+import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261021-posting-consent-3';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261021-posting-consent-2';
+import { createSocialApi } from './api.mjs?rev=20261021-posting-consent-3';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);

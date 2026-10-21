@@ -22,10 +22,10 @@ class Element {
  removeEventListener(k,f){this.listeners.set(k,(this.listeners.get(k)||[]).filter(x=>x!==f));}
  fire(k,event={}){for(const f of this.listeners.get(k)||[]) f(event);} focus(){this.ownerDocument.focus=this;}
 }
-function uiFixture(policy=postingPolicy){
+function uiFixture(policy=postingPolicy,onChange=()=>{}){
  const values=new Map(); const doc={createElement(tag){return new Element(tag,this);},createTextNode(text){return {textContent:text};}};
  doc.form=new Element('form',doc);const win=new Element('window',doc);win.localStorage={getItem:k=>values.get(k)};doc.defaultView=win;
- const host=new Element('div',doc);host.hidden=true;const controller=createPostingConsentUi(host,{policy,documentRef:doc,windowRef:win});
+ const host=new Element('div',doc);host.hidden=true;const controller=createPostingConsentUi(host,{policy,documentRef:doc,windowRef:win,onChange});
  return {host,doc,win,values,controller};
 }
 function all(element){return [element,...(element.children||[]).flatMap(all)];}
@@ -48,6 +48,15 @@ test('issued synthetic UI starts unchecked, resets on self-save/reopen/session s
  input.checked=true;input.fire('change');values.set('PiXiEED:legacy-owner-session:v1','another synthetic owner');assert.throws(()=>controller.read(),e=>e.code==='posting_consent_required');
  controller.destroy();assert.equal(win.listeners.get('storage').length,0);
 });
+test('identity created during a failed request visibly clears consent; a new explicit check binds before rendering',()=>{
+ let rendered=false;const f=uiFixture(testPostingPolicy,()=>{rendered=f.controller.accepted;});
+ const input=all(f.host).find(e=>e.tag==='input');f.controller.setPublic(true);
+ input.checked=true;input.fire('change');assert.equal(rendered,true);
+ f.values.set('PiXiEED:supabase-session:v1','new synthetic session after Auth initialization');
+ assert.equal(f.controller.accepted,false);assert.equal(input.checked,false);assert.equal(rendered,false);
+ input.checked=true;input.fire('change');assert.equal(rendered,true);assert.equal(input.checked,true);
+ assert.deepEqual(f.controller.read(),testPostingConsent);
+});
 test('public API stops before Auth, FormData/audio or network when policy/decision is absent',async()=>{
  let calls=0;const api=createSocialServerActions({config:{url:'https://project.example.test',publishableKey:'synthetic'},fetchImpl:()=>{calls++;throw Error('network forbidden');}});
  for(const kind of ['text','music']) await assert.rejects(api.submit({kind,visibility:'public'}),e=>e.code==='posting_policy_unavailable');
@@ -68,6 +77,8 @@ test('privacy candidate identifies approved operator/contact and preserves exist
 test('receipt table is service-only and is not reassigned by guest claim',async()=>{
  const sql=await readFile(new URL('../../supabase/migrations/20261021140044_posting_consent_receipts.sql',import.meta.url),'utf8');
  assert.match(sql,/enable row level security/i);assert.match(sql,/revoke all[^;]+PUBLIC, anon, authenticated/i);assert.match(sql,/grant select, insert[^;]+service_role/i);assert.doesNotMatch(sql,/grant[^;]+to (?:anon|authenticated)|security definer/i);
+ assert.ok(sql.indexOf('revoke all on table public.posting_consents from service_role;') < sql.indexOf('grant select, insert on table public.posting_consents to service_role;'));
+ assert.match(sql,/revoke all on table public\.posting_consents from service_role;/);
  const claim=await readFile(new URL('../../supabase/migrations/20261021092108_guest_claim.sql',import.meta.url),'utf8');assert.doesNotMatch(claim,/posting_consents/);
 });
 

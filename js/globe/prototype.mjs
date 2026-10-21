@@ -92,8 +92,8 @@ retryMapLoad.addEventListener('click', () => {
 
 function loadPostUiModules() {
   return Promise.all([
-    importPostingModule('post-ui', './post-ui.mjs?v=20261021-posting-consent-2'),
-    importPostingModule('post-supabase', './post-supabase.mjs?rev=20261021-posting-consent-2'),
+    importPostingModule('post-ui', './post-ui.mjs?v=20261021-posting-consent-3'),
+    importPostingModule('post-supabase', './post-supabase.mjs?rev=20261021-posting-consent-3'),
     importPostingModule('post-handoff', './post-handoff.mjs?v=20261004-camera-location-1')
   ]).then(([postUiModule, supabaseModule, handoffModule]) => ({
     initPostUi: postUiModule.initPostUi,

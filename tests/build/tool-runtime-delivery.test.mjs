@@ -20,12 +20,12 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.runtimeGraph.edges.length, 196);
   assert.equal(plan.dynamicRoots.length, 23);
   assert.equal(plan.dynamicGraph.modules.size, 102);
-  assert(plan.dynamicGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-2'));
-  assert(!plan.runtimeGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-2'));
+  assert(plan.dynamicGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-3'));
+  assert(!plan.runtimeGraph.modules.has('/data/posting-policy.mjs?rev=20261021-posting-consent-3'));
   assert.equal(plan.externalUrls.size, 53);
   assert.equal(plan.internalizedUrls.length, 51);
   assert(plan.externalUrls.has('/js/social/tool-return.mjs?rev=20261021-jigsaw-public-1'));
-  assert(plan.internalizedUrls.includes('/js/creation/camera-canvas-settings.mjs?rev=20261021-camera-canvas-1'));
+  assert(plan.internalizedUrls.includes('/js/creation/camera-canvas-settings.mjs?rev=20261021-camera-canvas-2'));
   // The two metadata-only save modules are shared external identities, never Auth imports.
   for (const file of ['local-work-save-hook.mjs', 'local-work-ownership.mjs']) {
     assert(plan.runtimeGraph.modules.has(`/js/creation/${file}`));

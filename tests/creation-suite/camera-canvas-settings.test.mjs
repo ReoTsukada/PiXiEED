@@ -29,15 +29,19 @@ class Element {
   fire(type, data = {}) { const event = { target: this, preventDefault() {}, ...data }; for (let n = this; n; n = n.parentElement) for (const fn of n.listeners.get(type) || []) fn(event); }
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-function setup({ delayed = 0, priorHistory = false } = {}) {
+function setup({ delayed = 0, priorHistory = false, shellEscape = false } = {}) {
   const doc = { activeElement: null };
   doc.body = new Element('body', doc); doc.createElement = tag => new Element(tag, doc);
-  doc.listeners = new Map(); doc.fire = (type, event) => { for (const fn of doc.listeners.get(type) || []) fn({ preventDefault() {}, ...event }); };
+  doc.listeners = new Map(); doc.captureListeners = new Map();
+  doc.querySelector = selector => selector === 'dialog[open]' && doc.modalOpen ? {} : doc.body.querySelectorAll(selector)[0] || null;
+  doc.fire = (type, event) => { const e = { defaultPrevented:false, preventDefault() { this.defaultPrevented=true; }, ...event }; for (const map of [doc.captureListeners,doc.listeners]) for (const fn of map.get(type) || []) fn(e); return e; };
+  let shellExits=0;
+  if(shellEscape)doc.listeners.set('keydown',[event=>{if(event.key==='Escape'&&!event.defaultPrevented&&!doc.modalOpen)shellExits++;}]);
   const saved = { document: globalThis.document, window: globalThis.window, matchMedia: globalThis.matchMedia };
   globalThis.document = doc; globalThis.window = { innerHeight: 844 }; globalThis.matchMedia = () => ({ matches: false });
   const cleanups = [], scope = {
     disposed: false, add(fn) { cleanups.push(fn); }, frame(fn) { fn(); },
-    listen(node, type, fn) { if (!node.listeners.has(type)) node.listeners.set(type, []); node.listeners.get(type).push(fn); }
+    listen(node, type, fn, options={}) { const map=node===doc&&options.capture?doc.captureListeners:node.listeners; if (!map.has(type)) map.set(type, []); map.get(type).push(fn); }
   };
   const source = createDrawDocument(16); source.pixels[0] = 1; source.pixels[255] = 2;
   const original = Array.from(source.pixels), session = createDrawAnimationSession(source), listeners = new Set();
@@ -73,13 +77,26 @@ function setup({ delayed = 0, priorHistory = false } = {}) {
     preset(px) { nodes().find(n => n.dataset.px === String(px)).fire('click'); },
     aspect(value) { nodes().find(n => n.dataset.ratio === value).fire('click'); },
     range(value) { const node = settings.panel.children.find(n => n.className === 'camera-canvas-settings__range-label').children[0]; node.value = String(value); node.fire('input'); },
-    get commits() { return commits; }, get maximumBusy() { return maximumBusy; }, get dirtyMarks() { return dirtyMarks; },
+    get commits() { return commits; }, get maximumBusy() { return maximumBusy; }, get dirtyMarks() { return dirtyMarks; }, get shellExits() { return shellExits; },
     deactivate() { active = false; settings.close({ restoreFocus: false }); },
     dispose() { scope.disposed = true; for (const fn of cleanups.reverse()) fn?.(); Object.assign(globalThis, saved); }
   };
 }
 
 test('camera settings controller', async t => {
+  await t.test('panel Escape runs before an earlier workspace listener, while native dialogs keep priority', () => {
+    const q=setup({shellEscape:true});
+    try {
+      const event=q.doc.fire('keydown',{key:'Escape'});
+      assert.equal(event.defaultPrevented,true);assert.equal(q.settings.panel.hidden,true);
+      assert.equal(q.doc.activeElement,q.trigger);assert.equal(q.shellExits,0);
+      q.settings.open({trigger:q.trigger});q.doc.modalOpen=true;
+      assert.equal(q.doc.fire('keydown',{key:'Escape'}).defaultPrevented,false);
+      assert.equal(q.settings.panel.hidden,false);assert.equal(q.shellExits,0);
+      q.doc.modalOpen=false;q.settings.close();q.doc.fire('keydown',{key:'Escape'});
+      assert.equal(q.shellExits,1,'workspace Escape remains available after the panel closes');
+    } finally { q.dispose(); }
+  });
   await t.test('presets and fixed ratios apply immediately, preserve source/palette, and do not drift after rounding', async () => {
     const q = setup();
     try {

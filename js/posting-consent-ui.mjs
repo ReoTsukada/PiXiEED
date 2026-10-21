@@ -1,10 +1,10 @@
-import { postingPolicy, isPostingPolicyReady, requirePostingConsent } from '../data/posting-policy.mjs?rev=20261021-posting-consent-2';
+import { postingPolicy, isPostingPolicyReady, requirePostingConsent } from '../data/posting-policy.mjs?rev=20261021-posting-consent-3';
 
 /** A fresh, non-persistent decision for one form. No consent is stored in drafts. */
 export function createPostingConsentUi(host, { policy = postingPolicy, documentRef = host?.ownerDocument, windowRef = documentRef?.defaultView, onChange = () => {} } = {}) {
   if (!host || !documentRef) throw new TypeError('Consent host is required');
   if (documentRef.head && !documentRef.querySelector?.('link[data-posting-consent-style]') && !documentRef.querySelector?.('link[href*="posting-consent.css"]')) {
-    const css = documentRef.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/posting-consent.css?rev=20261021-posting-consent-2'; css.setAttribute('data-posting-consent-style', ''); documentRef.head.append(css);
+    const css = documentRef.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/posting-consent.css?rev=20261021-posting-consent-3'; css.setAttribute('data-posting-consent-style', ''); documentRef.head.append(css);
   }
   policy = structuredClone(policy);
   const ready = isPostingPolicyReady(policy);
@@ -21,18 +21,20 @@ export function createPostingConsentUi(host, { policy = postingPolicy, documentR
     }
     const label = documentRef.createElement('label'); input = documentRef.createElement('input'); input.type = 'checkbox'; input.checked = false; input.autocomplete = 'off';
     label.append(input, documentRef.createTextNode(' 上記の利用規約とプライバシーポリシーに同意して公開投稿します。未成年の場合は保護者の同意を得ています。'));
-    host.append(links, label); input.addEventListener('change', onChange);
+    host.append(links, label);
   }
   const sessionStamp = () => { try { return ['PiXiEED:supabase-session:v1', 'PiXiEED:auth-session-recovery:v1', 'PiXiEED:legacy-owner-session:v1'].map(key => windowRef?.localStorage?.getItem(key) || '').join('\0'); } catch { return ''; } };
   let identityStamp = sessionStamp();
-  input?.addEventListener('change', () => { identityStamp = sessionStamp(); });
+  // Bind the user's new decision before consumers render its enabled state.
+  input?.addEventListener('change', () => { identityStamp = sessionStamp(); onChange(); });
   const reset = () => { if (input) input.checked = false; onChange(); };
   const onStorage = event => { if (!event.key || /supabase-session|auth-session|legacy-owner-session|guest-account/i.test(event.key)) reset(); };
   host.closest?.('form')?.addEventListener('reset', reset);
   windowRef?.addEventListener('storage', onStorage);
   windowRef?.addEventListener('pixieed:account-changed', reset);
   return {
-    get ready() { return ready; }, get accepted() { return ready && input?.checked === true; },
+    get ready() { return ready; },
+    get accepted() { if (input?.checked && identityStamp !== sessionStamp()) reset(); return ready && input?.checked === true; },
     setPublic(value) { const wasPublic = !host.hidden; host.hidden = !value; if (!value && wasPublic) reset(); }, reset,
     read() { if (input?.checked && identityStamp !== sessionStamp()) reset(); return requirePostingConsent({ accepted: input?.checked === true, termsVersion: policy.terms.version, privacyVersion: policy.privacy.version }, policy); },
     focus() { (input || status).focus(); },

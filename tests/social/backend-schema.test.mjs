@@ -56,3 +56,12 @@ test('real PostgreSQL: rate and capacity bounds include cleanup-pending tombston
  const audio=`do $$begin for i in 1..8 loop perform public.pixieed_sns_reserve_post('${A}',gen_random_uuid(),repeat('a',64),'music','合成','','Synthetic','private',16777216,1,repeat('f',64));end loop;end$$;update public.sns_posts set state='deleted',cleanup_pending=true;`;
  sql(audio+`select ${reserve(k,'private',A,'music',",1,1,repeat('f',64)")}`,{fail:/sns_music_capacity/});
 });
+
+test('real PostgreSQL: consent receipts stay append-only even under permissive service default grants',{skip:!enabled},()=>{
+ const grants=JSON.parse(sql(`select json_build_object('read',has_table_privilege('service_role','public.posting_consents','select'),'append',has_table_privilege('service_role','public.posting_consents','insert'),'update',has_table_privilege('service_role','public.posting_consents','update'),'delete',has_table_privilege('service_role','public.posting_consents','delete'),'truncate',has_table_privilege('service_role','public.posting_consents','truncate'),'client',has_table_privilege('authenticated','public.posting_consents','select'))`));
+ assert.deepEqual(grants,{read:true,append:true,update:false,delete:false,truncate:false,client:false});
+ const insert=`insert into public.posting_consents(owner_id,purpose,request_key,request_digest,terms_version,privacy_version,terms_sha256,privacy_sha256)values('${A}','image','${k}',repeat('a',64),'synthetic-1','synthetic-1',repeat('b',64),repeat('c',64));`;
+ assert.equal(sql(insert+'select count(*) from public.posting_consents'),'1');
+ sql(insert+"update public.posting_consents set terms_version='forged'",{fail:/permission denied/});
+ sql(insert+'delete from public.posting_consents',{fail:/permission denied/});
+});

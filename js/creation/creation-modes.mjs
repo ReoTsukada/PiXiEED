@@ -1,6 +1,6 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261017-editor-improvements-1';
-import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261021-camera-canvas-1';
+import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261021-camera-canvas-2';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-tool-shell-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';

@@ -16,6 +16,9 @@ create table public.posting_consents (
 );
 alter table public.posting_consents enable row level security;
 revoke all on table public.posting_consents from PUBLIC, anon, authenticated;
+-- Supabase default privileges may already grant ALL to service_role.
+-- Reset those inherited defaults before granting the intended append-only API.
+revoke all on table public.posting_consents from service_role;
 grant select, insert on table public.posting_consents to service_role;
 comment on table public.posting_consents is 'Server verified public-submission consent; no IP, fingerprint, tokens, or content; retention approval required';
 commit;

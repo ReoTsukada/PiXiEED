@@ -29,7 +29,9 @@ try {
     });
     const page = await context.newPage(), errors = [];
     page.setDefaultTimeout(15000); page.on('pageerror',error=>errors.push(error.message));
-    const ready = mode => page.waitForFunction(mode => document.documentElement.dataset.creationModesReady==='true' && document.body.dataset.creationMode===mode,mode);
+    // The mode label updates before its reveal finishes. Controls deliberately
+    // reject input until the transition releases the shared workspace.
+    const ready = mode => page.waitForFunction(mode => document.documentElement.dataset.creationModesReady==='true' && document.body.dataset.creationMode===mode && !document.body.hasAttribute('data-creation-transition') && document.querySelector('#creation-mode-menu')?.getAttribute('aria-busy')!=='true',mode);
     const open = async()=>{await page.locator('#creation-settings-open').click();await page.getByRole('button',{name:'PX数・比率',exact:true}).click();await page.locator('#camera-canvas-settings-panel').waitFor({state:'visible'});};
     const waitDimensions = (width,height)=>page.waitForFunction(({width,height})=>{
       const c=document.querySelector('#view');return c.width===width&&c.height===height;
@@ -58,7 +60,7 @@ try {
       await page.waitForFunction(()=>document.querySelector('#pixelStudio')?.dataset.mode==='live');await waitDimensions(16,16);
       const sourceHash = await page.evaluate(async()=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await window.__cameraSettingsQA.sourceFile.arrayBuffer()))).join(','));
       await open();await page.locator('[data-px="64"]').click();await waitDimensions(64,64);
-      await page.locator('[data-ratio="9:16"]').click();await waitDimensions(36,64);
+      await page.locator('#camera-canvas-settings-panel [data-ratio="9:16"]').click();await waitDimensions(36,64);
       const slider = page.getByRole('slider',{name:'キャンバスの長辺（px）'});
       await slider.scrollIntoViewIfNeeded();const box = await slider.boundingBox();
       await page.mouse.move(box.x+box.width*.25,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width*.65,box.y+box.height/2,{steps:10});await page.mouse.up();
@@ -66,7 +68,7 @@ try {
       const dragSize = Number(await slider.inputValue());assert.ok(dragSize>64&&dragSize<256);
       await waitDimensions(Math.max(1,Math.round(dragSize*9/16)),dragSize);
       await slider.press('End');await waitDimensions(144,256);
-      assert.equal(await page.locator('[data-ratio="9:16"]').getAttribute('aria-pressed'),'true');
+      assert.equal(await page.locator('#camera-canvas-settings-panel [data-ratio="9:16"]').getAttribute('aria-pressed'),'true');
       await page.getByRole('button',{name:'戻す',exact:true}).filter({visible:true}).click();
       await page.getByRole('button',{name:'この画面の変更をリセット',exact:true}).click();await waitDimensions(16,16);
       const width = page.locator('#camera-canvas-settings-width');

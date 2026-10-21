@@ -8,7 +8,7 @@
 - ゲスト投稿、新規メール登録時の同ID昇格、既存アカウントへの二者所有権確認による投稿移管、Google PKCE復帰、端末内作品のmetadata関連付け。元の私的作品をログインで公開しない。
 - 間違い探し/もの探しの端末内試遊と明示公開の分離。ジグソーは既存公開条件内の自分のDraw固定版のみ投稿候補に対応。写真/端末ファイル/PXD/他人の公開作品/旧分割ジグソーの投稿は未対応のまま、端末内プレイは保持。
 - Draw/Camera/Audio出力からSNS下書きへの返却導線。
-- カメラ固有PX/比率設定と操作適用コード。既知のブラウザー拒否後の実UIは未確認。
+- カメラ固有PX/比率設定と操作適用コード。追加の明示許可を受けた正式なローカル実行経路で、Chromeの320/390/1280px操作試験を完了。実カメラ・実機は未確認。
 - 地図の段階起動/失敗表示/投稿API準備完了待ち、情報ページの不要なデータ読込抑制、通常buildのapp/home-startup圧縮・内容版付け。
 - 自分用を選んだ文章/音楽も新規投稿UIでは端末内保存に留め、サーバー作成へ進まない。
 
@@ -18,17 +18,19 @@
 
 ## 検証境界
 
-通常のNode全体/関連試験、合成Auth/Storage/RPCを使うDeno、通常build2回の一致、依存/cache/画像除外を検証する。これらは実Supabase、実ブラウザー、実機、実広告の証拠ではない。既知browser/listen/MachPort/blocked-clientおよびinitdb shared-memory拒否を別経路で迂回しない。SQL専用試験のskipを成功扱いしない。
+通常のNode全体/関連試験、合成Auth/Storage/RPCを使うDeno、通常build2回の一致、依存/cache/画像除外を検証する。2026-10-21 15:48/15:49 UTCの追加許可に基づき、正式なrequire_escalated経路でローカルPostgreSQLとChromeの実行が成功した。古い実行拒否を別経路で迂回したものではない。実機・実広告・実Supabaseサービスの検証とは区別する。
 
-`supabase/migrations/20261021121542_jigsaw_publication.sql` の承認mapは空のまま。保存済み4制約・4関数の独立静的レビューは完了したが、実DB検証と本番実行承認は未了。`jigsaw_constraint_review_required` で停止し、guardを外して適用する候補ではない。
+`supabase/migrations/20261021121542_jigsaw_publication.sql` の承認mapは空のまま。保存済み4制約・4関数の独立レビューと合成catalog上の実PostgreSQL実行を完了したが、本番catalogへ適用する判断は未了。`jigsaw_constraint_review_required` で停止し、guardを外して適用する候補ではない。
 
 ## 本番公開の最小blocking項目
 
 1. **文書は確定候補、実基盤の発効条件は未了。** `/terms/` と `/privacy/` の本文、版（terms-20261021-1 / privacy-20261021-1）、SHA256、発効候補日2026-10-21を確定。作者権利維持・限定サイト内利用・将来ゲームへの適用・保護者同意・メール受付・完了対応記録の原則90日整理はユーザー承認済み。通常設定はstate=draftを維持し、未検証のまま公開送信を有効化しない。詳細は `posting-policy-review-20261021.md`。
-2. 許可された非本番DB/browserで実schema/RLS/Storage/Gateway、複数所有者、ゲスト→登録/既存所有者移管、公開/非公開/削除/通報、音源Range、実IndexedDB/keyboard/320/390/PCを確認する必要がある。既知拒否を回避する目的の別routeは使わない。新環境/契約/credentialsを勝手に作らない。
+2. ローカルPostgreSQLで実SQLのschema/権限/複数所有者/削除/通報/容量/移管競合を確認し、Chromeで実IndexedDB・下書き音源Blobの同一性・keyboard/320/390/1280pxを確認した。ただしDB側のAuth/Storage表は合成shim、ブラウザーのAuth/APIは合成adapterであり、実Supabase Auth/Storage/Gateway、音源HTTP Range、実認証経路の証拠ではない。既存connectorには本番1project/main branchのみで、独立stagingは確認できない。ローカルフルスタックに必要なDocker API互換ランタイムも未導入。新環境/ソフト/契約/credentialsは作成していない。
 3. project `kyyiuakrqomzlikfaire` の現在の匿名Auth/manual linking/メール確認・provider/Google redirect値は未確認。設定読取の専用ツールがなく、同条件で失敗済みの操作は繰り返していない。現在値を確認する権限・手段が必要。
 
-## 内容を特定して確認すべき本番変更（未承認・未適用）
+## 本番変更の承認境界（すべて未適用）
+
+2026-10-21 15:41 UTCに、SNS投稿/通報/引継ぎ/同意記録のservice限定保存先、private音源保存・公開投稿だけの配信、新SNSの公開閲覧と本人書込み、旧pixfind直接書込み制限について条件付き承認を受けた。実サービス検証前の適用はしない。匿名Auth/manual linking/メール確認/Google設定は承認範囲外で、現在値も未確認。下表のAuth関連は別の具体確認が必要。承認済みDB/Function/Storage変更について同じ承認を取り直す必要はない。
 
 | 項目 | 対象と誰へのアクセスか | 影響/条件 |
 | --- | --- | --- |
@@ -59,3 +61,15 @@
 2026-10-21方針確定追記: 正式候補文書と原則90日の対応記録整理方針を確定。専用台帳のdry-run/新規置換ファイル作成と手動メール整理の手順を追加したが、実メール/DBの削除・運用開始や自動定期実行は行っていない。同意・所有権/再試行安全記録を90日で一律消すものではない。
 
 ジグソー移行案は保存済みcatalogの4関数完全定義へ変更し、署名/MD5と4制約の正確な定義をDDL前に検査する。旧モード検証は逆変換fingerprintで保持を確認。幅/高さはjigsaw専用にJSON数値を要求。独立レビュー済みだが実SQL/DB未検証で、承認mapは空のまま。候補dfc8fbfcへの保存は本番適用ではない。
+
+## 正式な追加許可後のローカル実行結果
+
+以下は上記の初期段階の「実DB/browser未検証」記録を更新する結果であり、本番適用の証拠ではない。
+
+- PostgreSQL 17を専用Unix socket/TCP無効で一時起動。既存の画像投稿・削除・パズルSQL、新SNS、ゲスト移管、同意記録の移行と拒否条件を実行。SNS schema試験7件はskipなしで成功。移管と旧所有者の新規作成を実際に並行実行し、移管後の旧主体書込み拒否とprivate維持を確認した。
+- ジグソーは未変更の空mapが停止することを確認した後、独立レビュー済みcatalogだけを使う一時SQLコピーで実行し、旧パズル回帰とJSON数値条件を確認した。配布元migrationの空mapは変更していない。
+- Chromeはsandboxを維持し、独立context・loopback限定・カメラ/マイク/位置情報要求なしで実行。320/390/1280pxのSNS操作、実IndexedDB下書き/音源Blobの再読込とbytes同一性、アカウント変更による同意解除、合成API失敗/再試行/連打を確認。発効済みpolicyを返す試験は一時サーバー内だけのfixtureで、通常設定のdraftは維持した。
+- カメラ設定も3幅でpreset/比率/slider drag/keyboard/undo/reset/不正値debounce/元PNG同一性/Draw・Audio切替/範囲内表示/Escapeフォーカス復帰を確認。実ハードウェアは使用していない。
+- 検証で判明した3点を修正した。同意記録は既存service_roleデフォルト権限を明示撤回してからSELECT/INSERTだけを付与する。同意UIは初回guestセッション生成後の失敗で古い同意表示を解除し、再チェックの本人を描画前に確定する。カメラ設定のEscapeはページの作業終了より先に処理し、作業とフォーカスを保つ。独立レビューと回帰試験を実施した。
+
+実Supabase HTTPのAuth/Storage/Gatewayは上記の合成shim/adapterに含まれない。必要条件は、既存の正当な非本番フルスタック、または別途導入を許可されたローカルDocker API互換ランタイムとSupabaseフルスタック、および対象Auth設定の正当な現在値確認である。新しいソフト導入・cloud環境・認証主体・資格情報の作成、本番SQL/Function配備、広告要求、公開投稿、画像アップロードは実施していない。
