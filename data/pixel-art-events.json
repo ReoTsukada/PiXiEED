@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-20T00:06:54+00:00",
+  "updatedAt": "2026-10-21T00:09:10+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -1917,10 +1917,10 @@
       "startDate": "2026-10-20",
       "endDate": "2026-10-20",
       "dateLabel": "2026年10月20日（火）10:30–12:30（開催地現地表示） 主催者ページのタイトルは10〜15歳、本文は12〜16歳と対象年齢の表記に差がある。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://whatson.cityofsydney.nsw.gov.au/events/v2homeschool-maker-time-laser-cut-from-nature-12-16yrsv2",
       "description": "City of Sydney主催のホームスクール向けメイカースペース講座。Piskelで8-bit Pixel Artをデザイン・アニメーション化し、レーザーカットのキーホルダー等に仕上げる。公式ページのタイトルと本文で対象年齢表記が異なる。",
-      "checkedAt": "2026-10-14T00:04:00+00:00",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
       "kind": "pixel-art",
       "sourceLabel": "City of Sydney公式イベント情報"
     },
@@ -2120,10 +2120,10 @@
       "startDate": "2026-10-20",
       "endDate": "2026-10-20",
       "dateLabel": "2026年10月20日 15:00。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
       "description": "Vila Geek催事内で実施する無料Pixel Artワークショップ。市立Vila das Artes公式告知で開催日・内容・会場を確認。",
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Vila das Artes公式情報",
       "socialUrls": []
@@ -2225,7 +2225,7 @@
       "status": "upcoming",
       "sourceUrl": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
       "description": "Vila Geek催事内の無料Pixel Artワークショップ。10月20日回とは別日程の回として登録。Vila das Artes公式案内で日程・会場を確認。",
-      "checkedAt": "2026-10-14T23:59:30+00:00",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Vila das Artes公式情報",
       "socialUrls": []
@@ -2557,6 +2557,76 @@
       "sourceLabel": "主催者公式告知（株式会社thePIXEL）",
       "socialUrls": [],
       "officialName": "PIXEL LAYERED 第三弾 hermippe「円環」"
+    },
+    {
+      "id": "mplus-pixel-monster-workshop-2026-11-07-08",
+      "name": "Drop-in Activity: Pixel Monster",
+      "country": "香港",
+      "area": "西九文化區・九龍",
+      "venue": "M+ B1 Lightwell Hall（B1 光庭長廊）, 38 Museum Drive, West Kowloon Cultural District, Kowloon",
+      "startDate": "2026-11-07",
+      "endDate": "2026-11-08",
+      "dateLabel": "2026年11月7日 10:00–17:30、11月8日 10:00–19:30（香港時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/",
+      "additionalUrls": [
+        "https://www.mplus.org.hk/en/plan-your-visit/"
+      ],
+      "description": "M+のドロップイン・アクティビティ。ビデオゲームのpixel monsterを想像し、色紙などの紙彫刻素材で自分のモンスターを制作して共同の紙アート場面に加える。デジタル作画講座ではないが、ピクセルアートゲームを題材にした参加型アート企画として登録。無料・予約不要。",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "M+公式イベント・来館案内"
+    },
+    {
+      "id": "musee-chateau-mayenne-pixel-art-family-workshop-2026-11-01",
+      "name": "Pixel Art — animation en famille",
+      "country": "フランス",
+      "area": "Mayenne, Pays de la Loire",
+      "venue": "Musée du château de Mayenne（Place Juhel, 53100 Mayenne）",
+      "startDate": "2026-11-01",
+      "endDate": "2026-11-01",
+      "dateLabel": "2026年11月1日 14:30–16:30（フランス時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.museeduchateaudemayenne.fr/visite/animations/animation-en-famille/",
+      "additionalUrls": [
+        "https://www.museeduchateaudemayenne.fr/preparer-visite/acces/"
+      ],
+      "description": "Musée du château de Mayenneの家族向けPixel Artワークショップ。LEGOとビデオゲームの間にある、画像を組み立てる表現としてPixel Artを体験する。要予約、6ユーロ（博物館会員無料）。",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Musée du château de Mayenne公式"
+    },
+    {
+      "id": "brignais-pixel-art-workshop-2026-10-31",
+      "name": "Atelier numérique – Pixel Art（Briscope）",
+      "country": "フランス",
+      "area": "Brignais, Métropole de Lyon",
+      "venue": "Ludo-médiathèque de Brignais, Briscope（Parc de l’Hôtel de Ville, 69530 Brignais）",
+      "startDate": "2026-10-31",
+      "endDate": "2026-10-31",
+      "dateLabel": "2026年10月31日 15:00–16:45（フランス時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.billetweb.fr/atelier-numerique-pixel-art",
+      "description": "Brignaisのデジタル講座。オンラインツールでPixel Artを制作し、印刷する。対象10歳以上。",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Briscope / Ludo-médiathèque公式予約ページ"
+    },
+    {
+      "id": "brignais-pixel-art-workshop-2026-11-15",
+      "name": "Atelier numérique – Pixel Art（Médiathèque）",
+      "country": "フランス",
+      "area": "Brignais, Métropole de Lyon",
+      "venue": "Médiathèque de Brignais",
+      "startDate": "2026-11-15",
+      "endDate": "2026-11-15",
+      "dateLabel": "2026年11月15日 15:00–17:00（フランス時間）",
+      "status": "upcoming",
+      "sourceUrl": "https://brignais.com/agenda/atelier-numerique-pixel-art/",
+      "description": "Brignais市のデジタル講座。Pixel Artを制作する個別イベント。対象8歳以上、予約不要。公式案内に施設名はあるが番地は示されていないため、建物住所・座標は未設定。",
+      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Brignais市公式イベント案内"
     }
   ],
   "sources": [
@@ -3739,9 +3809,17 @@
         "https://x.com/JumpZipOfficial"
       ],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-07T00:46:29+00:00",
+      "lastCheckedAt": "2026-10-21T00:09:10+00:00",
       "result": "official-confirmed",
-      "notes": "主催者公式サイトで第1回の会期・ピクセルアート限定企画・会場住所を確認。主催者提供告知でも開催日時と企画を確認。"
+      "notes": "主催者公式サイトで第1回の会期・ピクセルアート限定企画・会場住所を確認。主催者提供告知でも開催日時と企画を確認。 2026-10-21確認: 公式サイトに「2026.10 COMING SOON」とあるが開催日・会場は未発表。公式Xは403で取得不能のため、具体的な開催回は追加せず次回告知待ち。",
+      "socialChecks": [
+        {
+          "url": "https://x.com/JumpZipOfficial",
+          "attemptedAt": "2026-10-21T00:09:10+00:00",
+          "result": "unavailable",
+          "notes": "公式Xを確認しようとしたが403で本文取得不能。Web告知の確認と区別。"
+        }
+      ]
     },
     {
       "id": "dfwyas-pixel-art-cube-workshop-2026-04-11",
@@ -4311,16 +4389,69 @@
       "lastCheckedAt": "2026-10-20T00:06:54+00:00",
       "result": "official-confirmed",
       "notes": "株式会社thePIXELの公式告知本文で、開催期間・MIYASHITA PARK全域58面のLEDビジョン・住所・上映頻度・ピクセルアート作品を確認。公開SNS投稿本文は未確認。"
+    },
+    {
+      "id": "mplus-pixel-monster-workshop-2026",
+      "url": "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/",
+      "additionalUrls": [
+        "https://www.mplus.org.hk/en/plan-your-visit/"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+      "result": "official-confirmed",
+      "notes": "公式イベント本文で11月7–8日、時間、B1 Lightwell Hall、ビデオゲームのpixel monsterを紙彫刻素材で制作する内容を確認。来館案内でM+の住所を確認。デジタル作画ではなく、pixel-art game題材のアート活動として登録。",
+      "socialChecks": []
+    },
+    {
+      "id": "musee-chateau-mayenne-pixel-art-2026",
+      "url": "https://www.museeduchateaudemayenne.fr/visite/animations/animation-en-famille/",
+      "additionalUrls": [
+        "https://www.museeduchateaudemayenne.fr/preparer-visite/acces/"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+      "result": "official-confirmed",
+      "notes": "博物館公式イベント本文で11月1日14:30–16:30、Pixel Art企画、予約・料金を確認。公式アクセス案内で会場住所を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "brignais-pixel-art-2026-10-31",
+      "url": "https://www.billetweb.fr/atelier-numerique-pixel-art",
+      "additionalUrls": [],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+      "result": "official-confirmed",
+      "notes": "Briscope/Ludo-médiathèqueの公式予約ページ本文で10月31日15:00–16:45、Pixel Art制作・印刷、対象年齢、会場を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "brignais-pixel-art-2026-11-15",
+      "url": "https://brignais.com/agenda/atelier-numerique-pixel-art/",
+      "additionalUrls": [],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+      "result": "official-confirmed",
+      "notes": "Brignais市公式本文で11月15日15:00–17:00、Pixel Art講座、対象年齢、Médiathèqueを確認。番地は掲載なし。",
+      "socialChecks": []
     }
   ],
   "research": {
-    "checkedAt": "2026-10-20T00:06:54+00:00",
-    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。",
+    "checkedAt": "2026-10-21T00:09:10+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
       "繽FUN博物館嘉年華 像素化視覺語言 2026",
-      "Retro Pixel Jam October 2026 pixel art encouraged official"
+      "Retro Pixel Jam October 2026 pixel art encouraged official",
+      "Drop-in Activity Pixel Monster M+ 2026",
+      "Mayenne Pixel Art animation famille novembre 2026",
+      "atelier numérique pixel art Brignais 2026",
+      "pixel art contest deadline October 2026",
+      "픽셀 아트 전시 2026"
     ],
     "scopeLanguages": [
       "ja",
@@ -4361,7 +4492,12 @@
       "フランス・リヨン",
       "東アジア",
       "京都府・京都市",
-      "香港・九龍"
+      "香港・九龍",
+      "フランス・Mayenne",
+      "フランス・Brignais",
+      "豪州・Sydney",
+      "ブラジル・Fortaleza",
+      "オンライン・欧州・北米・中南米"
     ],
     "verifiedSourceLanguages": [
       "es",
@@ -4444,7 +4580,10 @@
       "https://nrgevent.eu/compo/",
       "https://itch.io/jam/segment-pixel-jam-2026",
       "https://howardcounty.librarycalendar.com/events/list?age_groups%5B116%5D=116&age_groups%5B117%5D=117&age_groups%5B119%5D=119&age_groups%5B208%5D=208&page=0",
-      "https://prtimes.jp/main/html/rd/p/000000019.000142243.html"
+      "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
+      "https://www.museeduchateaudemayenne.fr/visite/animations/animation-en-famille/",
+      "https://www.billetweb.fr/atelier-numerique-pixel-art",
+      "https://brignais.com/agenda/atelier-numerique-pixel-art/"
     ],
     "regionalChecks": [
       {

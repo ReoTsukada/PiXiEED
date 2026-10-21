@@ -262,6 +262,8 @@
       "id": "region-c8af5159309d6a67",
       "label": "フランス",
       "eventIds": [
+        "brignais-pixel-art-workshop-2026-10-31",
+        "brignais-pixel-art-workshop-2026-11-15",
         "chateaubourg-pixel-art-workshop-2026-10-07",
         "fontenay-vendee-serigne-pixel-art-lego-2026-11-18",
         "herofestival-marseille-dendrob-pixel-art-2026",
@@ -281,11 +283,13 @@
         "moulins-association-artichaut-pixel-art-2026-12-05",
         "moulins-association-artichaut-pixel-art-2026-12-12",
         "moulins-association-artichaut-pixel-art-2026-12-19",
+        "musee-chateau-mayenne-pixel-art-family-workshop-2026-11-01",
         "pont-de-beauvoisin-pixel-art-geant-2026-11-25",
         "riedisheim-en-pixel-closing-2026",
         "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
       ],
       "areas": [
+        "Brignais, Métropole de Lyon",
         "Châteaubourg",
         "Ingwiller",
         "Jeumont",
@@ -296,6 +300,7 @@
         "Lyon / Part-Dieu",
         "Lyon / Saint-Rambert",
         "Marseille",
+        "Mayenne, Pays de la Loire",
         "Moulins",
         "Pont-de-Beauvoisin",
         "Riedisheim",
@@ -377,10 +382,12 @@
       "id": "region-d448d143c4e04eb6",
       "label": "香港",
       "eventIds": [
-        "hk-museum-festival-carnival-pixel-public-art-2026"
+        "hk-museum-festival-carnival-pixel-public-art-2026",
+        "mplus-pixel-monster-workshop-2026-11-07-08"
       ],
       "areas": [
-        "九龍・尖沙咀"
+        "九龍・尖沙咀",
+        "西九文化區・九龍"
       ]
     },
     {
@@ -929,6 +936,18 @@
       ]
     },
     {
+      "id": "venue-5bc9a178d0f77f3b",
+      "label": "Ludo-médiathèque de Brignais, Briscope（Parc de l’Hôtel de Ville, 69530 Brignais）",
+      "eventIds": [
+        "brignais-pixel-art-workshop-2026-10-31"
+      ],
+      "region": "フランス",
+      "area": "Brignais, Métropole de Lyon",
+      "sourceUrls": [
+        "https://www.billetweb.fr/atelier-numerique-pixel-art"
+      ]
+    },
+    {
       "id": "venue-5c031931d52017f9",
       "label": "EUKARYOTE（東京都渋谷区神宮前3-41-3）",
       "eventIds": [
@@ -1318,6 +1337,18 @@
       ]
     },
     {
+      "id": "venue-ad645d462368f02b",
+      "label": "M+ B1 Lightwell Hall（B1 光庭長廊）, 38 Museum Drive, West Kowloon Cultural District, Kowloon",
+      "eventIds": [
+        "mplus-pixel-monster-workshop-2026-11-07-08"
+      ],
+      "region": "香港",
+      "area": "西九文化區・九龍",
+      "sourceUrls": [
+        "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/"
+      ]
+    },
+    {
       "id": "venue-af75d046385d0299",
       "label": "Parc Chanot",
       "eventIds": [
@@ -1327,6 +1358,18 @@
       "area": "Marseille",
       "sourceUrls": [
         "https://www.herofestival.fr/villages-des-createurs-et-artisans/le-dendrob-atelier"
+      ]
+    },
+    {
+      "id": "venue-b01286a83f2218c2",
+      "label": "Musée du château de Mayenne（Place Juhel, 53100 Mayenne）",
+      "eventIds": [
+        "musee-chateau-mayenne-pixel-art-family-workshop-2026-11-01"
+      ],
+      "region": "フランス",
+      "area": "Mayenne, Pays de la Loire",
+      "sourceUrls": [
+        "https://www.museeduchateaudemayenne.fr/visite/animations/animation-en-famille/"
       ]
     },
     {
@@ -1412,6 +1455,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://www.sapporo-game-odyssey.jp/"
+      ]
+    },
+    {
+      "id": "venue-cb833f231da9f403",
+      "label": "Médiathèque de Brignais",
+      "eventIds": [
+        "brignais-pixel-art-workshop-2026-11-15"
+      ],
+      "region": "フランス",
+      "area": "Brignais, Métropole de Lyon",
+      "sourceUrls": [
+        "https://brignais.com/agenda/atelier-numerique-pixel-art/"
       ]
     },
     {
@@ -1686,6 +1741,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-0802277f87d88f09",
+      "label": "Drop-in Activity: Pixel Monster",
+      "eventIds": [
+        "mplus-pixel-monster-workshop-2026-11-07-08"
+      ],
+      "url": "https://www.mplus.org.hk/en/events/drop-in-activity-pixel-monster/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "香港"
+      ],
+      "areas": [
+        "西九文化區・九龍"
+      ],
+      "venues": [
+        "M+ B1 Lightwell Hall（B1 光庭長廊）, 38 Museum Drive, West Kowloon Cultural District, Kowloon"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1982,8 +2062,8 @@
       "lastKnownEventDate": "2026-04-26",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:46:29+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "notes": "主催者公式サイトで第1回の会期・ピクセルアート限定企画・会場住所を確認。主催者提供告知でも開催日時と企画を確認。 2026-10-21確認: 公式サイトに「2026.10 COMING SOON」とあるが開催日・会場は未発表。公式Xは403で取得不能のため、具体的な開催回は追加せず次回告知待ち。"
       }
     },
     {
@@ -2160,7 +2240,7 @@
       "lastKnownEventDate": "2026-10-20",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:04:00+00:00",
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2566,6 +2646,31 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-41c413a5d0519697",
+      "label": "Pixel Art — animation en famille",
+      "eventIds": [
+        "musee-chateau-mayenne-pixel-art-family-workshop-2026-11-01"
+      ],
+      "url": "https://www.museeduchateaudemayenne.fr/visite/animations/animation-en-famille/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Mayenne, Pays de la Loire"
+      ],
+      "venues": [
+        "Musée du château de Mayenne（Place Juhel, 53100 Mayenne）"
+      ],
+      "lastKnownEventDate": "2026-11-01",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -4023,6 +4128,31 @@
       }
     },
     {
+      "id": "source-8e8276a8e0fa8cab",
+      "label": "Atelier numérique – Pixel Art（Briscope）",
+      "eventIds": [
+        "brignais-pixel-art-workshop-2026-10-31"
+      ],
+      "url": "https://www.billetweb.fr/atelier-numerique-pixel-art",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Brignais, Métropole de Lyon"
+      ],
+      "venues": [
+        "Ludo-médiathèque de Brignais, Briscope（Parc de l’Hôtel de Ville, 69530 Brignais）"
+      ],
+      "lastKnownEventDate": "2026-10-31",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-8ff7eed642caae8f",
       "label": "CROSS PICO（クロスピコ）名古屋vol.3 × 名古屋ぴくせるあーと すぽっと",
       "eventIds": [
@@ -4805,6 +4935,31 @@
       }
     },
     {
+      "id": "source-bb2fbeea7e8c6b2e",
+      "label": "Atelier numérique – Pixel Art（Médiathèque）",
+      "eventIds": [
+        "brignais-pixel-art-workshop-2026-11-15"
+      ],
+      "url": "https://brignais.com/agenda/atelier-numerique-pixel-art/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Brignais, Métropole de Lyon"
+      ],
+      "venues": [
+        "Médiathèque de Brignais"
+      ],
+      "lastKnownEventDate": "2026-11-15",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-bf3a4ed737478f06",
       "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
       "eventIds": [
@@ -4824,8 +4979,9 @@
       ],
       "lastKnownEventDate": "2026-04-26",
       "check": {
-        "result": "pending",
-        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+        "result": "unavailable",
+        "attemptedAt": "2026-10-21T00:09:10+00:00",
+        "notes": "公式Xを確認しようとしたが403で本文取得不能。Web告知の確認と区別。"
       }
     },
     {
@@ -6092,7 +6248,7 @@
       "lastKnownEventDate": "2026-10-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6174,5 +6330,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-20T00:07:51+00:00"
+  "updatedAt": "2026-10-21T00:10:13+00:00"
 }
