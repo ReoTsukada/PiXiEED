@@ -1,10 +1,10 @@
-import { postingPolicy, isPostingPolicyReady, requirePostingConsent } from '../data/posting-policy.mjs?rev=20261021-posting-consent-3';
+import { postingPolicy, isPostingPolicyReady, requirePostingConsent } from '../data/posting-policy.mjs?rev=20261022-posting-live-1';
 
 /** A fresh, non-persistent decision for one form. No consent is stored in drafts. */
 export function createPostingConsentUi(host, { policy = postingPolicy, documentRef = host?.ownerDocument, windowRef = documentRef?.defaultView, onChange = () => {} } = {}) {
   if (!host || !documentRef) throw new TypeError('Consent host is required');
   if (documentRef.head && !documentRef.querySelector?.('link[data-posting-consent-style]') && !documentRef.querySelector?.('link[href*="posting-consent.css"]')) {
-    const css = documentRef.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/posting-consent.css?rev=20261021-posting-consent-3'; css.setAttribute('data-posting-consent-style', ''); documentRef.head.append(css);
+    const css = documentRef.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/posting-consent.css?rev=20261022-posting-live-1'; css.setAttribute('data-posting-consent-style', ''); documentRef.head.append(css);
   }
   policy = structuredClone(policy);
   const ready = isPostingPolicyReady(policy);

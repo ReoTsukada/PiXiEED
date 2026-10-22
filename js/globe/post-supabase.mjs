@@ -1,4 +1,4 @@
-import { postingPolicy, requirePostingConsent } from '../../data/posting-policy.mjs?rev=20261021-posting-consent-3';
+import { postingPolicy, requirePostingConsent } from '../../data/posting-policy.mjs?rev=20261022-posting-live-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
 import { projectLegacyShowcase } from './legacy-showcase.mjs';
