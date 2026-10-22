@@ -10,7 +10,7 @@ import { mountGameEditorSession } from './game-editor-session.mjs?rev=20261017-g
 import { createGameEditorHistory, retainDifferenceCandidates } from './game-editor-history.mjs?rev=20261017-game-editor-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
-import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20260928-puzzle-handoff-1';
+import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20261021-jigsaw-public-1';
 import { mountPxdTools } from './pxd-ui.mjs?rev=20261018-direct-runtime-2';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261016-color-capability-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
@@ -33,7 +33,8 @@ let inlineDraw = null; let inlineBeforeRevision = null; let inlineWorkingRevisio
 const candidateHistory = createGameEditorHistory();
 let gameSession = null;
 let candidateHistoryBusy = false;
-let sessionEpoch = 0; let inlineSessionEpoch = null;
+let sessionEpoch = 0; let inlineSessionEpoch = null; let handoffBusy = false;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let splitMode = false; let activePointer = null; let previousPixel = null; let pinchStart = null; let viewScale = 1; let viewPanX = 0; let viewPanY = 0; let cursorPixel = 0;
 
 function readStorage(key) { try { return localStorage.getItem(key); } catch { return null; } }
@@ -105,9 +106,10 @@ function updateActions() {
   playLocalButton.disabled = !canPlayLocal;
   playLocalButton.disabled = playLocalButton.hidden || !store || !adapter;
   publishButton.hidden = !canPlayLocal;
-  publishButton.disabled = !canPlayLocal || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
-  publishButton.setAttribute('aria-label', supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿機能は準備中');
-  publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? '世界地図へ投稿' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
+  publishButton.disabled = handoffBusy || !canPlayLocal || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true;
+  publishButton.querySelector('span').textContent = supabaseConfig.puzzlePublicationEnabled === true ? '投稿する' : '投稿する（準備中）';
+  publishButton.setAttribute('aria-label', supabaseConfig.puzzlePublicationEnabled === true ? '投稿する' : '投稿する（準備中）');
+  publishButton.title = supabaseConfig.puzzlePublicationEnabled === true ? 'フィードで内容を確認してから投稿できます' : '投稿機能は準備中です。端末内での保存と試遊は利用できます。';
 }
 function showEditor() {
   $('#spot-inline-draw').hidden = true; document.body.classList.remove('spot-inline-open');
@@ -438,10 +440,19 @@ playLocalButton.addEventListener('click', () => {
   window.location.assign(`/play/spot-difference/?localSpot=${encodeURIComponent(draft.gameId)}`);
 });
 publishButton.addEventListener('click', async () => {
-  if (!draft?.confirmed || savedConfirmedDraftId !== draft.gameId || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true) return;
-  publishButton.disabled = true; message('固定版と投稿用PNGを確認しています…');
-  try { await openPuzzleHandoff({ mode: 'spot_difference', draftId: draft.gameId, store, adapter }); }
-  catch (error) { publishButton.disabled = false; message(`投稿を準備できませんでした：${error.message}`); }
+  if (handoffBusy || !draft?.confirmed || savedConfirmedDraftId !== draft.gameId || !store || !adapter || supabaseConfig.puzzlePublicationEnabled !== true) return;
+  const id = draft.gameId; const epoch = sessionEpoch;
+  const isCurrent = () => epoch === sessionEpoch && draft?.gameId === id && draftId === id && draft.confirmed === true && savedConfirmedDraftId === id;
+  handoffBusy = true; updateActions(); message('フィードの投稿内容を準備しています…');
+  try {
+    await openPuzzleHandoff({ mode: 'spot_difference', draftId: id, localDraftId: UUID.test(id) ? id : undefined, destination: 'feed', isCurrent, store, adapter });
+  } catch (error) {
+    handoffBusy = false;
+    updateActions();
+    if (isCurrent()) { message(`投稿を準備できませんでした：${error.message}`); }
+  } finally {
+    handoffBusy = false; updateActions();
+  }
 });
 $('#spot-split-mode').addEventListener('click', (event) => {
   splitMode = !splitMode; event.currentTarget.setAttribute('aria-pressed', String(splitMode));

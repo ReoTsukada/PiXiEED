@@ -379,7 +379,7 @@ export async function moderatePost(admin: any, body: Record<string, unknown>) {
           if (puzzleCheck.error || !puzzleCheck.data || puzzleCheck.data.review_state !== "approved" ||
               puzzleCheck.data.mode !== puzzle.mode ||
               (puzzle.mode === "spot_difference" && puzzleCheck.data.changed_image_path !== changedPublicPath) ||
-              (puzzle.mode === "hidden_object" && puzzleCheck.data.changed_image_path != null)) {
+              (puzzle.mode !== "spot_difference" && puzzleCheck.data.changed_image_path != null)) {
             throw new Error("post_publish_outcome_unknown");
           }
         }

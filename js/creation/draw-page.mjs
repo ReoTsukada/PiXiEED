@@ -15,6 +15,7 @@ import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-dr
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
+import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
 import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
@@ -110,6 +111,10 @@ const resultView = createToolResultView({ key: 'draw-result', main: $('#main'), 
   onClose: () => requestAnimationFrame(placeOverlays) });
 const status = $('#draw-status'); const saveButton = $('#draw-save'); const resumeButton = $('#draw-resume');
 const globeButton = $('#draw-to-globe');
+if (new URLSearchParams(location.search).get('social') === '1') {
+  globeButton.setAttribute('aria-label', '投稿の下書きへ');
+  globeButton.title = '投稿の下書きへ';
+}
 const sizeSelect = $('#draw-size');
 const interactionEffects = createInteractionEffects();
 let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false; let drawRewardNotice = null;
@@ -2078,7 +2083,7 @@ globeButton.addEventListener('click', async () => {
     const serialized = await serializeDrawHandoff(png, revision.revisionId);
     if (scope.disposed) return;
     sessionStorage.setItem(DRAW_HANDOFF_KEY, serialized);
-    location.assign('/globe/?from=draw');
+    if (!navigateToSocialReturn({ kind: 'draw' })) location.assign('/globe/?from=draw');
   } catch (error) { if (!scope.disposed) status.textContent = `世界地図へ送れませんでした：${error.message}`; }
   finally { if (!scope.disposed) globeButton.disabled = false; }
 });

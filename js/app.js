@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261021-header-layout-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261022-social-release-1';
 import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
@@ -1424,7 +1424,7 @@ function renderDiscoveryMap(root) {
   let isSelectingPostCell = false;
   const openPostComposer = (context = {}) => {
     if (!postComposerPromise) {
-      postComposerPromise = import('./post-composer.js?rev=20261006-panel-close-1').then(({ bindUserPostComposer }) => {
+      postComposerPromise = import('./post-composer.js?rev=20261021-posting-consent-3').then(({ bindUserPostComposer }) => {
         postComposer = bindUserPostComposer(root, {
           onRequestMapCell: () => {
             isSelectingPostCell = true;
@@ -4115,7 +4115,7 @@ function renderPublicShell() {
   }
 
   const footerLinks = document.querySelector('.footer-links');
-  if (footerLinks) footerLinks.innerHTML = '<a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a>';
+  if (footerLinks) footerLinks.innerHTML = '<a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/terms/">利用規約</a><a href="/privacy/">プライバシー</a>';
   if (!document.documentElement.dataset.appConsentHandler) {
     document.documentElement.dataset.appConsentHandler = 'true';
     document.addEventListener('pixieed:analytics-consent-change', () => {

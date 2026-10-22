@@ -3,6 +3,7 @@ import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-
 const STATIC_INFORMATION_PATHS = new Set([
   '/',
   '/tools/',
+  '/feed/',
   '/about/',
   '/guide/',
   '/help/',

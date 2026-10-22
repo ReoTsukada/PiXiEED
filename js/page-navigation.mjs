@@ -20,6 +20,7 @@ export const PAGE_DESTINATIONS = Object.freeze([
     ['/hidden-object/', 'もの探しをつくる', '自分の絵でもの探しを作ります。', 'hidden-object'],
   ] },
   { label: '作品・イベントを探す', links: [
+    ['/feed/', 'みんなの作品', 'ドット絵や写真、パズルの作品を見つけます。', 'home'],
     ['/globe/', '世界地図で公開作品を見る', '地図から公開された作品を見つけます。', 'globe'],
     ['/globe/?post=1', 'ドット絵を投稿する', '作品を地図に投稿します。', 'add'],
     ['/events/', 'ドット絵イベントを探す', '開催されるイベントを探します。', 'telescope'],

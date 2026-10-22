@@ -1,6 +1,7 @@
 const STATIC_INFORMATION_ROUTES = new Map([
   ['index.html', '/'],
   ['tools/index.html', '/tools/'],
+  ['feed/index.html', '/feed/'],
   ['about/index.html', '/about/'],
   ['guide/index.html', '/guide/'],
   ['help/index.html', '/help/'],

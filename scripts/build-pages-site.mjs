@@ -36,6 +36,10 @@ export function isLocalReviewSource(name) {
 /** Give even standalone and previously generated redirect pages a local UI font.
  * Later component styles keep control of code, icons, and artwork typography.
  */
+export function removeLocalPreviewMarker(html) {
+  return html.replace(/<meta\b(?=[^>]*\bname\s*=\s*(["'])pixieed-local-preview\1)[^>]*>/gi, '');
+}
+
 export function addSiteFontFallback(html) {
   if (/\bdata-site-font\b/.test(html)) return html;
   return html.replace(/<head\b[^>]*>/i, '$&\n<style data-site-font>:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Meiryo",system-ui,sans-serif}button,input,select,textarea{font-family:inherit}</style>');
@@ -45,7 +49,7 @@ export function addSiteFontFallback(html) {
 export function addSiteHeaderBenefits(html, name = '') {
   // Shared CSS changes also apply to standalone and redirect compatibility shells.
   html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261021-header-layout-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261021-header-layout-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261022-social-release-1$2');
   if (headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html)) return { html, added: false, skipped: true };
   if (!/href="\/css\/site-header\.css(?:\?[^\"]*)?"/i.test(html)
       || !/src="\/js\/site-header\.mjs(?:\?[^\"]*)?"/i.test(html)) return { html, added: false, skipped: true };
@@ -171,6 +175,12 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         'js/legacy-project-entry.mjs', 'css/legacy-project-entry.css', 'css/legacy-reference.css',
         'help/index.html', 'glossary/index.html', 'projects/pixfind/index.html', 'projects/pixiedraw/index.html',
         'css/design-tokens.css', 'js/event-history.mjs',
+        'feed/index.html', 'css/social-feed.css', 'css/posting-consent.css', 'js/posting-consent-ui.mjs',
+        'js/social/app.mjs', 'js/social/puzzle-audience.mjs', 'js/social/api.mjs', 'js/social/server-actions.mjs',
+        'js/social/guest-account.mjs', 'js/social/guest-auth-adapter.mjs', 'js/social/guest-account-ui.mjs',
+        'js/social/guest-google-bridge.mjs', 'js/social/local-login-transfer.mjs', 'js/social/drafts.mjs',
+        'js/social/draft-audio.mjs', 'js/social/tool-handoff.mjs', 'js/social/tool-return.mjs',
+        'js/creation/jigsaw-publication.mjs', 'js/creation/local-work-ownership.mjs', 'js/creation/local-work-save-hook.mjs',
         'js/creation/camera-canvas-settings.mjs', 'css/camera-canvas-settings.css',
         'js/page-navigation.mjs', 'css/event-pages.css', 'css/navigation.css', 'css/site-draw-cta.css', 'css/creation-startup.css', 'js/creation/startup-mode.js',
         'js/canonical-entry.js', 'js/event-page-analytics.mjs', 'js/home-audio.mjs',
@@ -222,7 +232,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       const sourcePath = sourceFor(name);
       const outputPath = join(destination, name);
       if (/\.html?$/i.test(name)) {
-        const sourceHtml = await readFile(sourcePath, 'utf8');
+        const sourceHtml = removeLocalPreviewMarker(await readFile(sourcePath, 'utf8'));
         const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), name);
         const withBenefits = addSiteHeaderBenefits(transformed.html, name);
         const withGutters = addPageGutters(withBenefits.html, name, { generatedEventRoutes });
