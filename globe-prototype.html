@@ -10,7 +10,9 @@
   <script>
     (function () {
       var params = new URLSearchParams(location.search);
+      var isTelescope = params.get('tool') === 'telescope';
       if (params.get('embed') === '1') document.documentElement.classList.add('is-embedded');
+      if (!isTelescope) document.documentElement.classList.add('is-map-loading');
       if (location.protocol === 'file:') {
         var target = new URL('/globe-prototype.html', 'http://127.0.0.1:4173');
         target.search = location.search;
@@ -19,10 +21,17 @@
       }
     }());
   </script>
-  <link rel="stylesheet" href="css/globe-prototype.css?rev=20261008-event-filter-1">
+  <style>
+    html.is-map-loading .map-load-notice { pointer-events:none; position:absolute; z-index:8; top:max(76px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; width:max-content; max-width:calc(100% - 24px); min-height:44px; padding:8px 14px; border:1px solid rgba(140,210,226,.24); border-radius:999px; color:#d8edef; background:#071520ed; box-shadow:0 8px 24px rgba(0,0,0,.3); font:600 13px/1.35 system-ui,sans-serif; }
+    html.is-map-loading .map-load-notice[hidden] { display:flex; }
+    html.is-map-loading .map-load-notice p { margin:0; overflow:hidden; text-overflow:ellipsis; }
+    html.is-map-loading .map-load-notice p::before { content:""; display:inline-block; width:8px; height:8px; margin:0 9px 1px 0; vertical-align:middle; background:#78d9cd; box-shadow:0 0 12px rgba(120,217,205,.65); }
+    html.is-map-loading .map-load-notice button { pointer-events:auto; flex:none; min-width:44px; min-height:44px; padding:0 10px; border:1px solid rgba(140,210,226,.28); border-radius:999px; color:inherit; background:rgba(132,211,225,.12); font:inherit; }
+    html.is-map-loading .map-load-notice button[hidden] { display:none; }
+  </style>
+  <link rel="stylesheet" href="css/globe-prototype.css?rev=20261020-map-startup-2">
   <!-- Flatten the module waterfall and fetch the compact geographic raster in parallel. -->
   <link rel="modulepreload" href="js/globe/renderer.mjs?v=20261007-map-lazy-1">
-  <link rel="modulepreload" href="js/globe/post-ui.mjs?v=20261017-entry-integration-1">
   <link rel="modulepreload" href="js/globe/map-event-presentation.mjs?v=20261007-event-discovery-1">
   <link rel="modulepreload" href="js/globe/geometry.mjs?v=20261005-admin-boundary-1">
   <link rel="modulepreload" href="js/globe/topology.mjs?v=20261006-map-startup-1">
@@ -43,13 +52,6 @@
         .then(function (response) { if (!response.ok) throw new Error('Administrative regions unavailable'); return response.json(); });
       globalThis.__PIXIEED_MAP_ADMIN1__.catch(function () {});
     }
-    // If loading stalls, show a short recovery message instead of implementation details.
-    setTimeout(function () {
-      var status = document.getElementById('loadStatus');
-      if (!globalThis.__PIXIEED_GLOBE__ && status && status.textContent.indexOf('読み込み中') >= 0) {
-        status.textContent = '地図を読み込めませんでした。ページを再読み込みしてください。';
-      }
-    }, 8000);
   </script>
 
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -67,17 +69,20 @@
         <p class="eyebrow">PiXiEED</p>
         <h1 id="prototypeTitle" class="sr-only">PiXiEED地図</h1>
       </div>
-      <p id="loadStatus" class="load-status" role="status">地図データを読み込み中…</p>
       <div id="accountSlot" class="account" aria-label="アカウント"></div>
     </header>
 
     <section id="globeStage" class="globe-stage" aria-label="インタラクティブな地図">
       <canvas id="skyCanvas" aria-hidden="true"></canvas>
-      <canvas id="globeCanvas" tabindex="0" aria-label="地図。ドラッグで移動、横方向は繰り返し表示、ピンチまたはホイールでズーム、2本指タップで縮小、タップで地域を選択、ダブルクリックで拡大、Escapeで選択解除。キーボードでは矢印で移動、プラスとマイナスでズーム、0で初期表示"></canvas>
+      <canvas id="globeCanvas" tabindex="0" aria-busy="true" aria-label="地図。ドラッグで移動、横方向は繰り返し表示、ピンチまたはホイールでズーム、2本指タップで縮小、タップで地域を選択、ダブルクリックで拡大、Escapeで選択解除。キーボードでは矢印で移動、プラスとマイナスでズーム、0で初期表示"></canvas>
+      <div id="mapLoadNotice" class="map-load-notice" hidden>
+        <p id="loadStatus" class="load-status" role="status">地図データを準備中…</p>
+        <button id="retryMapLoad" type="button" hidden>再読み込み</button>
+      </div>
       <p id="gestureHint" class="gesture-hint" hidden><span>ドラッグで移動</span><span>ピンチで拡大・縮小</span><span>タップで地域を選択</span></p>
       <nav id="mapLayerSwitch" class="map-layers" aria-label="地図に表示する内容">
-        <button type="button" data-map-content="posts" aria-pressed="true"><i aria-hidden="true"></i><span>みんなの投稿</span></button>
-        <button type="button" data-map-content="events" aria-pressed="false"><i aria-hidden="true"></i><span>イベント</span></button>
+        <button type="button" data-map-content="posts" aria-pressed="true" disabled><i aria-hidden="true"></i><span>みんなの投稿</span></button>
+        <button type="button" data-map-content="events" aria-pressed="false" disabled><i aria-hidden="true"></i><span>イベント</span></button>
       </nav>
       <div id="cellTooltip" class="map-cell-tooltip" role="tooltip" hidden>
         <strong data-cell-name></strong><span data-cell-posts></span>
@@ -88,9 +93,9 @@
           <button id="clearCellSelection" class="selection-panel__close" type="button" aria-label="地域の選択を解除"><img src="/assets/icons/pixieed/close.svg" alt=""></button>
         </div>
         <div class="selection-panel__actions">
-          <button id="viewCellPosts" type="button"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span><span id="selectedContentKind">投稿 </span><span id="selectedPostCount">0</span>件</span></button>
+          <button id="viewCellPosts" type="button" disabled><img src="/assets/icons/pixieed/artwork.svg" alt=""><span><span id="selectedContentKind">投稿 </span><span id="selectedPostCount">0</span>件</span></button>
           <button id="zoomToCell" type="button" aria-label="選択した場所を拡大"><img src="/assets/icons/pixieed/zoom-in.svg" alt=""><span>拡大</span></button>
-          <button id="placeHere" class="place-here" type="button" aria-label="選択した地域に作品を置く"><img src="/assets/icons/pixieed/add.svg" alt=""><span>投稿する</span></button>
+          <button id="placeHere" class="place-here" type="button" aria-label="選択した地域に作品を置く" disabled><img src="/assets/icons/pixieed/add.svg" alt=""><span>投稿する</span></button>
         </div>
       </aside>
     </section>
@@ -99,11 +104,11 @@
   <nav class="globe-app-tabs" aria-label="アプリナビゲーション">
     <a href="/globe/" aria-label="地図" data-globe-nav-map><img src="/assets/icons/pixieed/globe.svg" alt=""></a>
     <a href="/camera/?from=globe" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a>
-    <button id="globePrimaryAction" type="button" aria-label="作品を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""></button>
+    <button id="globePrimaryAction" type="button" aria-label="作品を投稿する" disabled><img src="/assets/icons/pixieed/add.svg" alt=""></button>
     <a href="/tools/" aria-label="ツール" data-globe-nav-tools><img src="/assets/icons/pixieed/tools.svg" alt=""></a>
     <a href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a>
   </nav>
-  <script type="module" src="js/globe/prototype.mjs?rev=20261017-map-navigation-1"></script>
+  <script type="module" src="js/globe/prototype.mjs?rev=20261020-map-startup-2"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261021-header-layout-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261004-audio-sound-switch-1"></script>
 </body>

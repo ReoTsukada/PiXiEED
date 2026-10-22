@@ -4028,6 +4028,20 @@ function setupJapanMap(root, onScaleChange, onReset = () => {}, onRegionSelect =
   return { focusTo, reset, zoomTo };
 }
 
+// A staged map can recover its posting API after the iframe's initial load.
+function runWhenGlobePostsReady(frame, action) {
+  if (!frame) return;
+  const ready = () => {
+    if (!frame.contentWindow?.__PIXIEED_POSTS__) return;
+    frame.removeEventListener('load', ready);
+    frame.removeEventListener('pixieed:map-posts-ready', ready);
+    action();
+  };
+  frame.addEventListener('load', ready);
+  frame.addEventListener('pixieed:map-posts-ready', ready);
+  ready();
+}
+
 function renderPublicShell() {
   if (document.body.hasAttribute('data-admin-page')) return;
   const header = document.querySelector('.site-header');
@@ -4066,8 +4080,7 @@ function renderPublicShell() {
       else if (api?.__PIXIEED_ASTRO__?.orrery.isOpen()) api.__PIXIEED_ASTRO__.closeOrrery(compose);
       else compose();
     };
-    if (globe.contentWindow?.__PIXIEED_POSTS__) open();
-    else globe.addEventListener('load', open, { once: true });
+    runWhenGlobePostsReady(globe, open);
   };
   tabs.querySelector('[data-page-action="post"]')?.addEventListener('click', openGlobeComposer);
   tabs.querySelector('[data-page-action="view"]')?.addEventListener('click', () => {
@@ -4079,8 +4092,7 @@ function renderPublicShell() {
       if (api?.__PIXIEED_ASTRO__?.returnToGallery) api.__PIXIEED_ASTRO__.returnToGallery(view);
       else view();
     };
-    if (globe.contentWindow?.__PIXIEED_POSTS__) open();
-    else globe.addEventListener('load', open, { once: true });
+    runWhenGlobePostsReady(globe, open);
   });
   const mapParams = page === 'map' ? new URLSearchParams(window.location.search) : null;
   if (mapParams?.get('post') === '1') {
@@ -4092,8 +4104,7 @@ function renderPublicShell() {
       const api = globe?.contentWindow?.__PIXIEED_POSTS__;
       if (api?.store?.ready) void api.store.ready.then(() => api.openLinkedPost?.(artId));
     };
-    if (globe?.contentWindow?.__PIXIEED_POSTS__) open();
-    else globe?.addEventListener('load', open, { once: true });
+    runWhenGlobePostsReady(globe, open);
   }
   const toolAction = tabs.querySelector('[data-page-action="tools"]');
   const firstPublishedTool = document.querySelector('.tool-grid a[href], .tool-grid button:not([disabled])');
@@ -4354,17 +4365,40 @@ function startPublicDataRefresh() {
   }, interval);
 }
 
+function hasPublicDataSurface() {
+  return Boolean(document.querySelector([
+    '[data-home-stores]',
+    '[data-home-works]',
+    '[data-stores-root]',
+    '[data-work-detail-root]',
+    '[data-store-detail-root]',
+    '[data-collection-root]',
+    '[data-profile-root]',
+    '[data-found-count]',
+    '[data-total-count]',
+    // Keep support for legacy standalone map roots without treating the
+    // current globe page's iframe host as a data surface.
+    '[data-map-root]',
+    '[data-map-surface]'
+  ].join(',')));
+}
+
 async function boot() {
+  const needsPublicData = hasPublicDataSurface();
   renderPublicShell();
   mountSiteHeader();
   setActiveNav();
-  loadCachedPublicData();
-  loadCachedUserMapPosts();
+  if (needsPublicData) {
+    loadCachedPublicData();
+    loadCachedUserMapPosts();
+  }
   renderPublicDataSurfaces();
   scheduleAnalytics();
-  startPublicDataRefresh();
-  const result = await hydrateSiteData();
-  if (result.changed) renderPublicDataSurfaces();
+  if (needsPublicData) {
+    startPublicDataRefresh();
+    const result = await hydrateSiteData();
+    if (result.changed) renderPublicDataSurfaces();
+  }
 }
 
 void boot();

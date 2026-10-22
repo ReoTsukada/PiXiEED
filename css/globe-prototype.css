@@ -90,6 +90,51 @@ h1 {
   background: radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(0, 0, 0, .18) 72%, rgba(0, 0, 0, .62));
 }
 
+.map-load-notice {
+  pointer-events: none;
+  position: absolute;
+  top: max(76px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  min-height: 44px;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(140, 210, 226, .24);
+  border-radius: 999px;
+  color: #d8edef;
+  background: rgba(7, 21, 32, .93);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.map-load-notice[hidden] { display: none; }
+.map-load-notice p { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.map-load-notice p::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 9px 1px 0;
+  vertical-align: middle;
+  background: #78d9cd;
+  box-shadow: 0 0 12px rgba(120, 217, 205, .65);
+}
+.map-load-notice button {
+  pointer-events: auto;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid rgba(140, 210, 226, .28);
+  background: rgba(132, 211, 225, .12);
+}
+
 #globeCanvas {
   /* Out of flow: the canvas backing store (width/height attributes, scaled by the
      device pixel ratio) must never feed back into the stage's layout size. */
@@ -132,6 +177,7 @@ button {
 
 button:hover, button:focus-visible { background: rgba(132, 211, 225, .18); }
 button:focus-visible { outline: 2px solid #f4d45d; outline-offset: 2px; }
+button:disabled { opacity: .48; cursor: not-allowed; }
 button > img { display: block; flex: none; width: var(--control-icon); height: var(--control-icon); filter: brightness(0) invert(1); pointer-events: none; }
 
 .selection-panel {
@@ -796,11 +842,6 @@ html:not(.is-tool-telescope) .sheet .sheet__close { flex: 0 0 var(--control); mi
 
 /* Content layers share the map; changing a layer keeps its camera and cell grid. */
 .map-layers { position: absolute; top: 14px; right: 14px; z-index: 5; display: flex; gap: 4px; padding: 4px; border: 1px solid #365362; border-radius: 16px; background: #071520; }
-.map-location-status { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: calc(100% - 24px); margin: 0; padding: 7px 10px; border-radius: 8px; background: #071520e8; color: #b9cdd5; font-size: .75rem; pointer-events: none; }
-.map-location-status[hidden] { display: none; }
-.map-location-status button { margin-left: 8px; min-height: var(--control); padding: 0 8px; pointer-events: auto; }
-.map-location-status button[hidden] { display: none; }
-.map-location-status:has(button:not([hidden])) { z-index: 7; }
 .map-layers button { min-height: var(--control); padding: 0 12px; gap: 7px; border: 1px solid transparent; border-radius: 11px; color: #b9cdd5; font-size: .8rem; white-space: nowrap; }
 .map-layers button i { width: 10px; height: 10px; flex: 0 0 10px; background: #77aaff; border-radius: 2px; }
 .map-layers [data-map-content="events"] i { background: #f2ad55; }

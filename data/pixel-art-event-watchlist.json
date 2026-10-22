@@ -103,11 +103,13 @@
         "kai-whos-game-room-kaohsiung-2026",
         "kai-whos-game-room-kaohsiung-sanduo-2026",
         "kai-whos-game-room-taipei-2026",
-        "kai-whos-game-room-taoyuan-2026"
+        "kai-whos-game-room-taoyuan-2026",
+        "yilan-lanrenju-pixel-brick-workshop-2026-10-24"
       ],
       "areas": [
         "台北市",
         "嘉義市",
+        "宜蘭縣・宜蘭市",
         "桃園市",
         "高雄市"
       ]
@@ -264,6 +266,8 @@
       "eventIds": [
         "brignais-pixel-art-workshop-2026-10-31",
         "brignais-pixel-art-workshop-2026-11-15",
+        "caviar-pixel-art-en-mosaique-2026-12-19",
+        "caviar-pixel-art-en-mosaique-2027-03-03",
         "chateaubourg-pixel-art-workshop-2026-10-07",
         "fontenay-vendee-serigne-pixel-art-lego-2026-11-18",
         "herofestival-marseille-dendrob-pixel-art-2026",
@@ -284,8 +288,10 @@
         "moulins-association-artichaut-pixel-art-2026-12-12",
         "moulins-association-artichaut-pixel-art-2026-12-19",
         "musee-chateau-mayenne-pixel-art-family-workshop-2026-11-01",
+        "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25",
         "pont-de-beauvoisin-pixel-art-geant-2026-11-25",
         "riedisheim-en-pixel-closing-2026",
+        "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27",
         "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
       ],
       "areas": [
@@ -302,8 +308,11 @@
         "Marseille",
         "Mayenne, Pays de la Loire",
         "Moulins",
+        "Peymeinade, Alpes-Maritimes",
         "Pont-de-Beauvoisin",
+        "Rezé, Loire-Atlantique",
         "Riedisheim",
+        "Sablé-sur-Sarthe, Pays de la Loire",
         "Sérigné",
         "Villeneuve-d’Ascq, Hauts-de-France",
         "リヨン・6区"
@@ -344,6 +353,7 @@
         "pixel-layered-hermippe-shibuya-2026",
         "pixel-school-stage-2-2024",
         "pixelgirls-side-b-2025",
+        "retro-game-summit-lv6-dot-art-2026-11-07",
         "shibuya-pixel-art-2018",
         "shibuya-pixel-art-2020",
         "shibuya-pixel-art-2021",
@@ -359,6 +369,7 @@
         "yusuke-shigeta-continuous-discontinuous-migiwa-2026"
       ],
       "areas": [
+        "八王子市",
         "北千住",
         "千代田区",
         "台東区",
@@ -1313,6 +1324,18 @@
       ]
     },
     {
+      "id": "venue-9ec6ba938892b2d9",
+      "label": "Céline Louryのモザイク工房（51 rue St Denis, 72300 Sablé-sur-Sarthe）",
+      "eventIds": [
+        "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27"
+      ],
+      "region": "フランス",
+      "area": "Sablé-sur-Sarthe, Pays de la Loire",
+      "sourceUrls": [
+        "https://lahautecouleur.fr/cours-de-mosaique-avec-celine-loury/"
+      ]
+    },
+    {
       "id": "venue-9f1684bf438e426a",
       "label": "BnA Alter Museum",
       "eventIds": [
@@ -1334,6 +1357,18 @@
       "area": "Praha 6",
       "sourceUrls": [
         "https://villapelle.cz/atelier-pelle/artplay/"
+      ]
+    },
+    {
+      "id": "venue-a90d0fc358733d32",
+      "label": "Gymnase David Douillet（Chemin du stade, 06530 Peymeinade）",
+      "eventIds": [
+        "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25"
+      ],
+      "region": "フランス",
+      "area": "Peymeinade, Alpes-Maritimes",
+      "sourceUrls": [
+        "https://cotedazurfrance.fr/offres/festival-manga-et-arts-japonais-peymeinade-fr-5789256/"
       ]
     },
     {
@@ -1494,6 +1529,18 @@
       ]
     },
     {
+      "id": "venue-cf74283a4e39b367",
+      "label": "宜蘭青年交流中心",
+      "eventIds": [
+        "yilan-lanrenju-pixel-brick-workshop-2026-10-24"
+      ],
+      "region": "台湾",
+      "area": "宜蘭縣・宜蘭市",
+      "sourceUrls": [
+        "https://iiic.niu.edu.tw/p/406-1067-75378,r1274.php"
+      ]
+    },
+    {
       "id": "venue-dcdc623f624a043a",
       "label": "新光三越桃園站前店10F",
       "eventIds": [
@@ -1617,6 +1664,31 @@
         "https://kac.amebaownd.com/posts/56975241/",
         "https://kac.amebaownd.com/posts/58087057",
         "https://kac.amebaownd.com/posts/58724347"
+      ]
+    },
+    {
+      "id": "venue-eae9e34074a6ba5f",
+      "label": "東京たま未来メッセ",
+      "eventIds": [
+        "retro-game-summit-lv6-dot-art-2026-11-07"
+      ],
+      "region": "東京都",
+      "area": "八王子市",
+      "sourceUrls": [
+        "https://www.retrogamesummit.com/"
+      ]
+    },
+    {
+      "id": "venue-ee00320b45f4a74c",
+      "label": "Lieu associatif Le Trois 8（38 Rue Jean Jaurès, 44400 Rezé）",
+      "eventIds": [
+        "caviar-pixel-art-en-mosaique-2026-12-19",
+        "caviar-pixel-art-en-mosaique-2027-03-03"
+      ],
+      "region": "フランス",
+      "area": "Rezé, Loire-Atlantique",
+      "sourceUrls": [
+        "https://www.helloasso.com/associations/caviar/evenements/pixel-art-en-mosaique-2026-27"
       ]
     },
     {
@@ -1954,6 +2026,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-0da37ce06bcd447f",
+      "label": "《蘭人聚》拼出你的像素世界 — 積木像素磚掛畫手作體驗",
+      "eventIds": [
+        "yilan-lanrenju-pixel-brick-workshop-2026-10-24"
+      ],
+      "url": "https://iiic.niu.edu.tw/p/406-1067-75378,r1274.php",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "台湾"
+      ],
+      "areas": [
+        "宜蘭縣・宜蘭市"
+      ],
+      "venues": [
+        "宜蘭青年交流中心"
+      ],
+      "lastKnownEventDate": "2026-10-24",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2450,7 +2547,7 @@
       "lastKnownEventDate": "2026-10-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2530,6 +2627,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-3b8271fa3b5030e5",
+      "label": "Festival Manga et arts japonais（Pixel Artワークショップ併催）",
+      "eventIds": [
+        "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25"
+      ],
+      "url": "https://cotedazurfrance.fr/offres/festival-manga-et-arts-japonais-peymeinade-fr-5789256/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Peymeinade, Alpes-Maritimes"
+      ],
+      "venues": [
+        "Gymnase David Douillet（Chemin du stade, 06530 Peymeinade）"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3040,7 +3162,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:58:00+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3642,6 +3764,30 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-673fca812e2efcc7",
+      "label": "《蘭人聚》拼出你的像素世界 — 積木像素磚掛畫手作體驗",
+      "eventIds": [
+        "yilan-lanrenju-pixel-brick-workshop-2026-10-24"
+      ],
+      "url": "https://yyh.e-land.gov.tw/gathering",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "台湾"
+      ],
+      "areas": [
+        "宜蘭縣・宜蘭市"
+      ],
+      "venues": [
+        "宜蘭青年交流中心"
+      ],
+      "lastKnownEventDate": "2026-10-24",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -4580,7 +4726,7 @@
       "lastKnownEventDate": "2026-11-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4606,6 +4752,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-13T00:01:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-a2530ff05667b426",
+      "label": "Atelier mosaïque pour pratiquer le Pixel Art",
+      "eventIds": [
+        "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27"
+      ],
+      "url": "https://lahautecouleur.fr/cours-de-mosaique-avec-celine-loury/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Sablé-sur-Sarthe, Pays de la Loire"
+      ],
+      "venues": [
+        "Céline Louryのモザイク工房（51 rue St Denis, 72300 Sablé-sur-Sarthe）"
+      ],
+      "lastKnownEventDate": "2026-10-27",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4637,6 +4808,33 @@
       }
     },
     {
+      "id": "source-a69d6c606e52e187",
+      "label": "RETRO GAME SUMMIT Lv.6（ドットアート出展・展示販売）",
+      "eventIds": [
+        "retro-game-summit-lv6-dot-art-2026-11-07"
+      ],
+      "url": "https://www.retrogamesummit.com/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "八王子市"
+      ],
+      "venues": [
+        "東京たま未来メッセ"
+      ],
+      "lastKnownEventDate": "2026-11-07",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-ab61234502a96fbb",
       "label": "Newgrounds Pixel Day 2023",
       "eventIds": [
@@ -4655,6 +4853,30 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:14:44Z",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-ab93ad6b9011681d",
+      "label": "Festival Manga et arts japonais（Pixel Artワークショップ併催）",
+      "eventIds": [
+        "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25"
+      ],
+      "url": "https://www.peymeinade.fr/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Peymeinade, Alpes-Maritimes"
+      ],
+      "venues": [
+        "Gymnase David Douillet（Chemin du stade, 06530 Peymeinade）"
+      ],
+      "lastKnownEventDate": "2026-10-25",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -5134,7 +5356,7 @@
       "lastKnownEventDate": "2026-11-20",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-20T00:06:54+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5161,6 +5383,32 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-16T00:07:54+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c9a1be75c1bd56a3",
+      "label": "RETRO GAME SUMMIT Lv.6（ドットアート出展・展示販売）",
+      "eventIds": [
+        "retro-game-summit-lv6-dot-art-2026-11-07"
+      ],
+      "url": "https://www.retrogamesummit.com/circle/",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "八王子市"
+      ],
+      "venues": [
+        "東京たま未来メッセ"
+      ],
+      "lastKnownEventDate": "2026-11-07",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -5511,7 +5759,7 @@
       "lastKnownEventDate": "2026-10-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-16T00:08:33+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5883,6 +6131,32 @@
       }
     },
     {
+      "id": "source-e316a0f68797a6dd",
+      "label": "Pixel Art en mosaïque 2026/27 — Rezé開催回",
+      "eventIds": [
+        "caviar-pixel-art-en-mosaique-2026-12-19",
+        "caviar-pixel-art-en-mosaique-2027-03-03"
+      ],
+      "url": "https://www.helloasso.com/associations/caviar/evenements/pixel-art-en-mosaique-2026-27",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Rezé, Loire-Atlantique"
+      ],
+      "venues": [
+        "Lieu associatif Le Trois 8（38 Rue Jean Jaurès, 44400 Rezé）"
+      ],
+      "lastKnownEventDate": "2027-03-03",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-e458a53334a53d33",
       "label": "SHIBUYA PIXEL ART 2021 Reboot",
       "eventIds": [
@@ -6144,7 +6418,7 @@
       "lastKnownEventDate": "2026-12-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6248,7 +6522,7 @@
       "lastKnownEventDate": "2026-10-22",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6298,7 +6572,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-16T00:08:33+00:00",
+        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6330,5 +6604,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-21T00:10:13+00:00"
+  "updatedAt": "2026-10-22T00:05:42+00:00"
 }

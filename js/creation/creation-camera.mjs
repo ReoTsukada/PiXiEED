@@ -81,7 +81,11 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const stylesheet = await prepared(stylesheetLoad);
   style = document.createElement('style'); style.media = 'not all'; style.textContent = stylesheet;
   document.head.append(style);
-  const scoped = scopedRules(style.sheet.cssRules); style.textContent = scoped; style.media = 'all';
+  const scoped = scopedRules(style.sheet.cssRules);
+  // These Draw controls are mounted lazily after mode ownership is recorded.
+  // Scope their visibility to camera so retained Draw/Audio tools stay intact.
+  style.textContent = `${scoped}\nbody.creation-suite[data-creation-mode="camera"] :is(.draw-feature-actions, #main > .draw-size) { display:none !important; }`;
+  style.media = 'all';
   document.head.insertBefore(style, document.querySelector('link[href*="creation-modes.css"]'));
   board.closest('#main').append(surface, template.querySelector('#cameraImageStatus'), template.querySelector('#cameraSaveDialog'));
   // Portal the original camera controls into the actual shared operation dock.

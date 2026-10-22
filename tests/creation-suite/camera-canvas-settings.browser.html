@@ -1,0 +1,85 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Camera settings — synthetic local QA</title>
+<link rel="stylesheet" href="/css/camera-canvas-settings.css?qa=20261021">
+<style>
+  * { box-sizing:border-box } body { margin:0; padding:12px; color:#f4f0e4; background:#151d24; font:14px system-ui }
+  button { min-height:44px; padding:8px } canvas { width:96px; height:96px; image-rendering:pixelated; background:#fff }
+  #fixture-controls { display:flex; gap:8px; flex-wrap:wrap } #fixture-state { overflow-wrap:anywhere }
+</style>
+<h1>合成素材だけのカメラ設定QA</h1>
+<p>カメラ・マイク・画像ファイル・保存・通信を使用しません。</p>
+<div id="fixture-controls">
+  <button id="open-settings" aria-expanded="false">PX数・比率</button>
+  <button id="fixture-undo">外部から戻す</button>
+  <button id="fixture-delay">遅延処理：OFF</button>
+  <button id="fixture-burst">連続変更を検証</button>
+  <button id="fixture-invalid">無効入力を検証</button>
+  <button id="fixture-close-pending">閉じた後の反映を検証</button>
+</div>
+<p id="fixture-state" role="status"></p>
+<p id="fixture-checks" role="status"></p>
+<canvas id="synthetic-preview" aria-label="合成画像の配置プレビュー"></canvas>
+<script type="module">
+import { mountCameraCanvasSettings } from '/js/creation/camera-canvas-settings.mjs?qa=20261021';
+import { createModeScope } from '/js/creation/mode-scope.mjs';
+import { createDrawDocument } from '/js/creation/draw-core.mjs';
+import { createDrawAnimationSession } from '/js/creation/draw-animation-session.mjs';
+import { resizeAnimation, composeAnimationFrameRgba } from '/js/creation/animation-core.mjs';
+const source = createDrawDocument(16);
+for(let y=0;y<16;y++)for(let x=0;x<16;x++) source.pixels[y*16+x]=(x+y)%source.palette.length;
+const originalPixels=Array.from(source.pixels), originalPalette=[...source.palette];
+const session=createDrawAnimationSession(source), listeners=new Set(), scope=createModeScope();
+let delayed=false, active=true, commits=0, activeJobs=0, maximumJobs=0, errors=[];
+const out=document.querySelector('#fixture-state'), checks=document.querySelector('#fixture-checks');
+function emit(){
+  const animation=session.animation, preview=document.querySelector('canvas'), image=composeAnimationFrameRgba(animation,session.frameId);
+  preview.width=image.width;preview.height=image.height;preview.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(image.rgba),image.width,image.height),0,0);
+  out.textContent=`${animation.width}×${animation.height} px; commits=${commits}; maxConcurrent=${maximumJobs}; sourceUnchanged=${originalPixels.every((p,i)=>source.pixels[i]===p)}; paletteUnchanged=${animation.palette.every((p,i)=>p===originalPalette[i])}; cameraRequests=0`;
+  for(const fn of listeners)fn();
+}
+const draw={
+  getTimeline:()=>session.animation, subscribe:fn=>{listeners.add(fn);return()=>listeners.delete(fn)}, cancelInput(){},
+  get canUndo(){return session.canUndo},
+  snapshotTimeline:()=>({session:session.snapshot()}),
+  restoreTimelineSnapshot:snapshot=>{session.restore(snapshot.session);emit();return session.animation},
+  undo:()=>{const changed=session.undo();emit();return changed},
+  async setProjectSettings(settings,{expectedOwner}={}){
+    activeJobs++;maximumJobs=Math.max(maximumJobs,activeJobs);
+    try{
+      if(delayed)await new Promise(resolve=>setTimeout(resolve,240));
+      if(expectedOwner!==session.animation)throw new Error('The owner changed during the pending operation');
+      if(settings.palette.some((c,i)=>c!==session.animation.palette[i]))throw new Error('palette changed');
+      if(settings.width===session.animation.width&&settings.height===session.animation.height)return false;
+      session.apply(resizeAnimation(session.animation,settings.width,settings.height,{anchor:'center'}));commits++;emit();return true;
+    }finally{activeJobs--}
+  }
+};
+const settings=mountCameraCanvasSettings({draw,scope,isActive:()=>active});
+document.querySelector('#open-settings').onclick=()=>settings.open({trigger:document.querySelector('#open-settings')});
+document.querySelector('#fixture-undo').onclick=()=>draw.undo();
+document.querySelector('#fixture-delay').onclick=e=>{delayed=!delayed;e.target.textContent=`遅延処理：${delayed?'ON':'OFF'}`};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const field=()=>document.querySelector('#camera-canvas-settings-width');
+function input(value){field().value=String(value);field().dispatchEvent(new Event('input',{bubbles:true}))}
+document.querySelector('#fixture-burst').onclick=async()=>{
+  settings.open({trigger:document.querySelector('#open-settings')});delayed=true;
+  document.querySelector('[data-ratio="free"]').click();
+  input(65);await wait(180);input(80);await wait(180);input(96);await wait(700);
+  checks.textContent=`BURST ${session.animation.width===96&&maximumJobs===1?'PASS':'FAIL'} final=${session.animation.width}, maxConcurrent=${maximumJobs}`;
+};
+document.querySelector('#fixture-invalid').onclick=async()=>{
+  settings.open({trigger:document.querySelector('#open-settings')});const before=session.animation;
+  input(73);input('');await wait(450);
+  checks.textContent=`INVALID ${session.animation===before?'PASS':'FAIL'}; invalid=${field().getAttribute('aria-invalid')}`;
+};
+document.querySelector('#fixture-close-pending').onclick=async()=>{
+  settings.open({trigger:document.querySelector('#open-settings')});const before=session.animation;
+  input(77);settings.close();await wait(450);
+  checks.textContent=`CLOSE_PENDING ${session.animation===before?'PASS':'FAIL'}`;
+};
+window.addEventListener('error',e=>{errors.push(e.message);checks.textContent=`ERROR ${errors.join('; ')}`});
+window.addEventListener('unhandledrejection',e=>{errors.push(e.reason?.message||String(e.reason));checks.textContent=`ERROR ${errors.join('; ')}`});
+emit();
+</script>

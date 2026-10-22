@@ -16,17 +16,22 @@ const esbuildPath = path.join(repositoryRoot, 'node_modules/.bin/esbuild');
 test('delivery plan preserves runtime identities and bounds minification to startup/mode files', async () => {
   const plan = await deriveToolRuntimeDeliveryPlan({ root: repositoryRoot });
 
-  assert.equal(plan.runtimeGraph.modules.size, 100);
-  assert.equal(plan.runtimeGraph.edges.length, 191);
+  assert.equal(plan.runtimeGraph.modules.size, 101);
+  assert.equal(plan.runtimeGraph.edges.length, 192);
   assert.equal(plan.dynamicRoots.length, 23);
   assert.equal(plan.dynamicGraph.modules.size, 98);
   assert.equal(plan.externalUrls.size, 50);
-  assert.equal(plan.internalizedUrls.length, 50);
+  assert.equal(plan.internalizedUrls.length, 51);
   assert(plan.externalUrls.has('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
   assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261016-color-capability-1'));
   assert([...plan.modeGraph.modules.keys()].some(url => url.startsWith('/js/pixel-lens/app.mjs?')));
   assert([...plan.dynamicGraph.modules.keys()].some(url => url.startsWith('/js/creation/audio-export.mjs?')));
   assert(plan.physicalFiles.has('js/creation/creation-runtime.mjs'));
+  const cameraSettings = '/js/creation/camera-canvas-settings.mjs?rev=20261021-camera-canvas-2';
+  assert(plan.runtimeGraph.modules.has(cameraSettings));
+  assert(plan.internalizedUrls.includes(cameraSettings));
+  assert(plan.physicalFiles.has('js/creation/camera-canvas-settings.mjs'));
+  assert(![...plan.runtimeGraph.modules.keys()].some(url => url.includes('/social/')));
   assert(plan.physicalFiles.has('js/pixel-lens/app.mjs'));
   for (const optional of ['draw-text-panel.mjs', 'draw-color-adjustment-panel.mjs', 'draw-text-rasterizer.mjs', 'draw-color-adjustment.mjs']) {
     assert(![...plan.physicalFiles].some(file => file.endsWith('/' + optional)));
@@ -85,7 +90,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
     assert.equal(report.externalCount, 50);
-    assert.equal(report.internalizedCount, 50);
+    assert.equal(report.internalizedCount, 51);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
 

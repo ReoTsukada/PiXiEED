@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-21T00:09:10+00:00",
+  "updatedAt": "2026-10-22T00:03:56+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -116,7 +116,7 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "checkedAt": "2026-10-16T00:08:33+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -189,11 +189,11 @@
       },
       "startDate": "2026-10-23",
       "endDate": "2026-10-25",
-      "dateLabel": "2026年10月23日〜25日。作品提出締切は10月21日23:59（ポーランド時間 UTC+2）。遠隔応募可。",
+      "dateLabel": "2026年10月23日〜25日。作品提出締切は10月21日23:59（ポーランド時間 UTC+2／10月22日06:59 JST）で経過。催事自体は10月23日開始予定。",
       "status": "upcoming",
       "sourceUrl": "https://nrgevent.eu/compo/",
       "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
-      "checkedAt": "2026-10-16T00:08:33+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -1301,7 +1301,7 @@
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展作家の公式カレンダー",
       "description": "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。",
-      "checkedAt": "2026-10-07T00:05:03+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "socialUrls": [],
       "mapAreaLocation": {
@@ -1352,7 +1352,7 @@
         "https://www.instagram.com/skm_whoartyou/"
       ],
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
-      "checkedAt": "2026-10-14T23:58:00+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "mapAreaLocation": {
@@ -1379,7 +1379,7 @@
         "https://www.instagram.com/skm_whoartyou/"
       ],
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "mapAreaLocation": {
@@ -1406,7 +1406,7 @@
         "https://www.instagram.com/skm_whoartyou/"
       ],
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "mapAreaLocation": {
@@ -1433,7 +1433,7 @@
         "https://www.instagram.com/skm_whoartyou/"
       ],
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "mapAreaLocation": {
@@ -1460,7 +1460,7 @@
         "https://www.instagram.com/skm_whoartyou/"
       ],
       "description": "KAIの四色ピクセルアートを扱う巡回展。別店舗・別会期は別開催回として記録し、同じ会期の体験・作品を重複登録しない。",
-      "checkedAt": "2026-10-06T00:08:38+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者・会場の公式情報",
       "mapAreaLocation": {
@@ -1933,7 +1933,7 @@
       "startDate": "2026-10-21",
       "endDate": "2026-10-21",
       "dateLabel": "2026年10月21日 17:00（公式表示、タイムゾーン未記載）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.pixxelpoint.org/artists.html",
       "description": "Marko DrpićとtipoRenesansaによるPixel Artワークショップ。デジタルのPixel Art表現を、基本形のLEGOブロックを用いたアナログ印刷表現へ翻訳する。定員10名、無料、学生向け、要申込。Pixxelpointの公式日程にも掲載。",
       "checkedAt": "2026-10-14T23:59:30+00:00",
@@ -1952,7 +1952,7 @@
       "startDate": "2026-10-21",
       "endDate": "2026-10-21",
       "dateLabel": "2026年10月21日 15:30–16:30（公式表示）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.bm-lyon.fr/agenda/pixel-art-graffiti-0",
       "description": "リヨン市立図書館のPixel ArtとGraffitiを組み合わせたワークショップ。同じ企画の別会場・別日程は個別の開催回として記録。",
       "checkedAt": "2026-10-12T00:01:00+00:00",
@@ -2022,7 +2022,7 @@
         "https://montreal.ca/en/events/copie-de-mixlab-pixel-art-club-119687"
       ],
       "description": "モントリオール市のMixlabが開く8〜12歳向けピクセルアート入門。2Dキャラクター制作を通してデジタル技法の基礎を学ぶ。開催場所と住所は市の案内に明記。",
-      "checkedAt": "2026-10-13T00:03:00+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "モントリオール市公式イベント案内",
       "officialName": "Mixlab : Club d'art du pixel"
@@ -2137,7 +2137,7 @@
       "startDate": "2026-10-21",
       "endDate": "2026-10-21",
       "dateLabel": "2026年10月21日 14:30。7歳以上、要予約。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.les-garennes-sur-loire.fr/vie-quotidienne/infos-pratiques/agenda/atelier-pixel-art-avec-waldo/",
       "description": "Waldoと行うピクセルアートのモザイク制作ワークショップ。自治体公式案内で内容・会場・日時を確認。",
       "checkedAt": "2026-10-14T00:01:00+00:00",
@@ -2225,10 +2225,13 @@
       "status": "upcoming",
       "sourceUrl": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
       "description": "Vila Geek催事内の無料Pixel Artワークショップ。10月20日回とは別日程の回として登録。Vila das Artes公式案内で日程・会場を確認。",
-      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Vila das Artes公式情報",
-      "socialUrls": []
+      "socialUrls": [],
+      "additionalUrls": [
+        "https://viladasartesfortaleza.com.br/vila-das-artes-divulga-programacao-artistica-e-formativa-de-16-a-24-de-outubro/"
+      ]
     },
     {
       "id": "med1-gamejam-pixel-art-2026-10-12",
@@ -2325,7 +2328,7 @@
       "startDate": "2026-10-21",
       "endDate": "2026-10-21",
       "dateLabel": "16:00〜17:00（現地時間）。無料・満席",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://westvanlibrary.ca/series/featured-youth-tech-programs/",
       "description": "West Vancouver Memorial Libraryの公式シリーズページに掲載。Simbrixでピクセルアート作品を作るハロウィーン企画。無料だが満席。",
       "checkedAt": "2026-10-16T00:07:54+00:00",
@@ -2347,7 +2350,7 @@
       "status": "upcoming",
       "sourceUrl": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
       "description": "PAC-MANのゲームIPをテーマに、7組の作家が作品を展示・販売する企画。ピクセルアート作品だけの展覧会とは公式に明記されていないが、ドット絵ゲームに関する展示として掲載。",
-      "checkedAt": "2026-10-17T00:23:10+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "BnA Alter Museum公式イベント情報"
     },
@@ -2363,7 +2366,7 @@
       "status": "upcoming",
       "sourceUrl": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
       "description": "PAC-MANがゲーム内で食べるドットをモチーフにしたアクリル立体作品と、巨大ドットのインスタレーション。ドット絵ゲームに明確に関係する会場内企画の範囲で掲載。",
-      "checkedAt": "2026-10-17T00:23:10+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "BnA Alter Museum公式イベント情報"
     },
@@ -2552,7 +2555,7 @@
       "status": "upcoming",
       "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
       "description": "ピクセルアーティストhermippeの映像作品「円環」をMIYASHITA PARKの58面のLEDビジョンで展示。ヨーヨーのパフォーマンスとピクセルアートのループアニメーションを重ねた作品。",
-      "checkedAt": "2026-10-20T00:06:54+00:00",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者公式告知（株式会社thePIXEL）",
       "socialUrls": [],
@@ -2627,6 +2630,115 @@
       "checkedAt": "2026-10-21T00:09:10+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Brignais市公式イベント案内"
+    },
+    {
+      "id": "yilan-lanrenju-pixel-brick-workshop-2026-10-24",
+      "name": "《蘭人聚》拼出你的像素世界 — 積木像素磚掛畫手作體驗",
+      "country": "台湾",
+      "area": "宜蘭縣・宜蘭市",
+      "venue": "宜蘭青年交流中心",
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-24",
+      "dateLabel": "2026年10月24日（土）14:00–15:30（台湾時間）。18–45歳の青年を優先し、10月20日までに申込審査・結果通知の案内。現在の受付・参加可否は未確認。",
+      "status": "upcoming",
+      "sourceUrl": "https://iiic.niu.edu.tw/p/406-1067-75378,r1274.php",
+      "additionalUrls": [
+        "https://yyh.e-land.gov.tw/gathering"
+      ],
+      "description": "宜蘭青年交流中心の体験講座。Pixel Labと像素藝術（Pixel Art）を紹介し、画像構想・ピクセル化・配色を行って積み木のピクセル掛画を制作する。会場名は確認済みだが、主催者（国立宜蘭大学）の住所を会場住所として転用していない。",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "国立宜蘭大学創新育成中心公式案内"
+    },
+    {
+      "id": "retro-game-summit-lv6-dot-art-2026-11-07",
+      "name": "RETRO GAME SUMMIT Lv.6（ドットアート出展・展示販売）",
+      "country": "日本",
+      "prefecture": "東京都",
+      "area": "八王子市",
+      "venue": "東京たま未来メッセ",
+      "startDate": "2026-11-07",
+      "endDate": "2026-11-07",
+      "dateLabel": "2026年11月7日（土）11:30–18:00。サークル参加申込は9月7日で終了。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.retrogamesummit.com/",
+      "additionalUrls": [
+        "https://www.retrogamesummit.com/circle/"
+      ],
+      "description": "レトロゲーム同人・展示即売会。主催者は出展・頒布の対象にドットアート作品を明記している。一般ゲーム催事の名称だけを根拠にせず、ドットアートを含む出展内容を確認して登録。",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "RETRO GAME SUMMIT主催者公式"
+    },
+    {
+      "id": "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25",
+      "name": "Festival Manga et arts japonais（Pixel Artワークショップ併催）",
+      "country": "フランス",
+      "area": "Peymeinade, Alpes-Maritimes",
+      "venue": "Gymnase David Douillet（Chemin du stade, 06530 Peymeinade）",
+      "startDate": "2026-10-24",
+      "endDate": "2026-10-25",
+      "dateLabel": "2026年10月24日（土）・25日（日）各10:00–18:00（フランス時間）。Pixel Artワークショップ単独の時間は未掲載。",
+      "status": "upcoming",
+      "sourceUrl": "https://cotedazurfrance.fr/offres/festival-manga-et-arts-japonais-peymeinade-fr-5789256/",
+      "description": "第11回Festival Manga et arts japonais。主催自治体の案内を掲載するPays de Grasse Tourismeの公式観光案内に、催事の企画としてatelier pixel artを明記。イベント全体の日程・会場と、Pixel Art企画の時刻を区別して記録。",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Côte d’Azur France / Pays de Grasse Tourisme公式案内"
+    },
+    {
+      "id": "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27",
+      "name": "Atelier mosaïque pour pratiquer le Pixel Art",
+      "country": "フランス",
+      "area": "Sablé-sur-Sarthe, Pays de la Loire",
+      "venue": "Céline Louryのモザイク工房（51 rue St Denis, 72300 Sablé-sur-Sarthe）",
+      "startDate": "2026-10-27",
+      "endDate": "2026-10-27",
+      "dateLabel": "2026年10月27日（火）14:30–16:30（フランス時間）。",
+      "status": "upcoming",
+      "sourceUrl": "https://lahautecouleur.fr/cours-de-mosaique-avec-celine-loury/",
+      "description": "モザイク作家Céline LouryのPixel Art講座。モザイクタイルを貼り、Pixel Artとして図案を作る内容を本人の公式サイトで確認。5歳以上の子どもと大人が対象、参加費40ユーロ。会場は作家本人が自宅工房として明記した場所。",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Céline Loury / La haute couleur公式"
+    },
+    {
+      "id": "caviar-pixel-art-en-mosaique-2026-12-19",
+      "name": "Pixel Art en mosaïque 2026/27 — Rezé開催回",
+      "country": "フランス",
+      "area": "Rezé, Loire-Atlantique",
+      "venue": "Lieu associatif Le Trois 8（38 Rue Jean Jaurès, 44400 Rezé）",
+      "startDate": "2026-12-19",
+      "endDate": "2026-12-19",
+      "dateLabel": "2026年12月19日（土）14:00–17:00（フランス時間）。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.helloasso.com/associations/caviar/evenements/pixel-art-en-mosaique-2026-27",
+      "additionalUrls": [
+        "https://letrois8.fr/"
+      ],
+      "description": "CAVIAR主催の3時間講座。モザイクでPixel Artの図案を制作し、作品を持ち帰る。8歳以上推奨。",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "CAVIAR公式申込案内"
+    },
+    {
+      "id": "caviar-pixel-art-en-mosaique-2027-03-03",
+      "name": "Pixel Art en mosaïque 2026/27 — Rezé開催回",
+      "country": "フランス",
+      "area": "Rezé, Loire-Atlantique",
+      "venue": "Lieu associatif Le Trois 8（38 Rue Jean Jaurès, 44400 Rezé）",
+      "startDate": "2027-03-03",
+      "endDate": "2027-03-03",
+      "dateLabel": "2027年3月3日（水）9:30–12:30（フランス時間）。",
+      "status": "upcoming",
+      "sourceUrl": "https://www.helloasso.com/associations/caviar/evenements/pixel-art-en-mosaique-2026-27",
+      "additionalUrls": [
+        "https://letrois8.fr/"
+      ],
+      "description": "CAVIAR主催の3時間講座。モザイクでPixel Artの図案を制作し、作品を持ち帰る。8歳以上推奨。",
+      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "CAVIAR公式申込案内"
     }
   ],
   "sources": [
@@ -2732,9 +2844,9 @@
       "socialTags": [
         "#segmentpixeljam2026"
       ],
-      "lastCheckedAt": "2026-10-16T00:08:33+00:00",
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
       "result": "official-confirmed",
-      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。",
+      "notes": "公式本文で開催期間・企画内容を再確認。 2026年10月7日に公式本文を再確認。 2026-10-22確認: itch.io公式ページでPixel Art必須、応募締切10月24日17:00を再確認。タイムゾーンはページに記載なし。",
       "socialChecks": [
         {
           "tag": "#segmentpixeljam2026",
@@ -2781,9 +2893,9 @@
       "url": "https://nrgevent.eu/compo/",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-16T00:08:33+00:00",
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
       "result": "official-confirmed",
-      "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。 2026年10月7日に公式本文を再確認。",
+      "notes": "公式compo本文で10月21日23:59 UTC+2の締切とドット絵部門を再確認。公式トップで10月23〜25日とMTP Poznańを確認。 2026年10月7日に公式本文を再確認。 2026-10-22確認: 主催者公式規則で提出締切10月21日23:59ポーランド時間（UTC+2）の経過と、Pixel Art部門を再確認。催事日程は10月23〜25日。",
       "additionalUrls": [
         "https://nrgevent.eu/"
       ]
@@ -4004,9 +4116,9 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
       "result": "official-confirmed",
-      "notes": "モントリオール市の公式本文で10月22日17〜18時、ピクセルアート制作講座、Bibliothèque du Boisé内のMixlabと住所を確認。"
+      "notes": "モントリオール市の公式本文で10月22日17〜18時、ピクセルアート制作講座、Bibliothèque du Boisé内のMixlabと住所を確認。 2026-10-22確認: モントリオール市公式ページで10月22日17:00〜18:00、8〜12歳、無料・要登録、Bibliothèque du Boiséの住所を再確認。"
     },
     {
       "id": "liquidy-jam-2026",
@@ -4244,9 +4356,9 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
       "result": "official-confirmed",
-      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。"
+      "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。 2026-10-22確認: 市立Vila das Artes公式の10月16〜24日週間案内も確認し、10月22日15時の無料Pixel Art回を再確認。"
     },
     {
       "id": "med1-gamejam-pixel-art-2026-10-12",
@@ -4386,9 +4498,9 @@
       "url": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-20T00:06:54+00:00",
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
       "result": "official-confirmed",
-      "notes": "株式会社thePIXELの公式告知本文で、開催期間・MIYASHITA PARK全域58面のLEDビジョン・住所・上映頻度・ピクセルアート作品を確認。公開SNS投稿本文は未確認。"
+      "notes": "株式会社thePIXELの公式告知本文で、開催期間・MIYASHITA PARK全域58面のLEDビジョン・住所・上映頻度・ピクセルアート作品を確認。公開SNS投稿本文は未確認。 2026-10-22確認: 株式会社thePIXEL公式告知で10月21日開始、11月20日まで、MIYASHITA PARK全域58面の作品展示を再確認。"
     },
     {
       "id": "mplus-pixel-monster-workshop-2026",
@@ -4437,11 +4549,74 @@
       "result": "official-confirmed",
       "notes": "Brignais市公式本文で11月15日15:00–17:00、Pixel Art講座、対象年齢、Médiathèqueを確認。番地は掲載なし。",
       "socialChecks": []
+    },
+    {
+      "id": "yilan-lanrenju-pixel-brick-workshop-2026-10-24",
+      "url": "https://iiic.niu.edu.tw/p/406-1067-75378,r1274.php",
+      "additionalUrls": [
+        "https://yyh.e-land.gov.tw/gathering"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+      "result": "official-confirmed",
+      "notes": "国立宜蘭大学創新育成中心公式本文でPixel Lab/像素藝術、ピクセル化設計と積み木掛画の制作、10月24日14:00–15:30、宜蘭青年交流中心を確認。申込審査は10月20日までとの記載があり、現在の参加受付状態は不明。大学の所在地を会場住所として転用していない。",
+      "socialChecks": []
+    },
+    {
+      "id": "retro-game-summit-lv6-dot-art-2026-11-07",
+      "url": "https://www.retrogamesummit.com/",
+      "additionalUrls": [
+        "https://www.retrogamesummit.com/circle/"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+      "result": "official-confirmed",
+      "notes": "主催者公式本文で11月7日11:30–18:00、東京たま未来メッセ、出展・頒布ジャンルにドットアートを含むことを確認。サークル参加募集は終了済み。",
+      "socialChecks": []
+    },
+    {
+      "id": "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25",
+      "url": "https://cotedazurfrance.fr/offres/festival-manga-et-arts-japonais-peymeinade-fr-5789256/",
+      "additionalUrls": [
+        "https://www.peymeinade.fr/"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+      "result": "official-confirmed",
+      "notes": "Côte d’Azur France / Pays de Grasse Tourismeの公式案内で10月24・25日各10:00–18:00、Gymnase David Douillet、festival programのatelier pixel artを確認。ワークショップ個別の時刻は未掲載。",
+      "socialChecks": []
+    },
+    {
+      "id": "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27",
+      "url": "https://lahautecouleur.fr/cours-de-mosaique-avec-celine-loury/",
+      "additionalUrls": [],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+      "result": "official-confirmed",
+      "notes": "作家本人の公式ページ本文でPixel Artがモザイクタイルを貼って図案化する講座であること、10月27日14:30–16:30、本人の工房（51 rue St Denis, Sablé-sur-Sarthe）を確認。",
+      "socialChecks": []
+    },
+    {
+      "id": "caviar-pixel-art-en-mosaique-2026-27",
+      "url": "https://www.helloasso.com/associations/caviar/evenements/pixel-art-en-mosaique-2026-27",
+      "additionalUrls": [
+        "https://letrois8.fr/"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+      "result": "official-confirmed",
+      "notes": "CAVIAR主催申込本文でPixel Artをモザイクで制作する3時間講座、12月19日14:00–17:00と2027年3月3日9:30–12:30、Le Trois 8（38 Rue Jean Jaurès, Rezé）を確認。",
+      "socialChecks": []
     }
   ],
   "research": {
-    "checkedAt": "2026-10-21T00:09:10+00:00",
-    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。",
+    "checkedAt": "2026-10-22T00:03:56+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。 2026-10-22: 台湾・宜蘭の像素磚Pixel Art体験（10/24）、RETRO GAME SUMMIT Lv.6のドットアート出展（11/7）、フランスPeymeinadeの漫画祭内Pixel Art講座（10/24–25）、Sablé-sur-SartheのモザイクPixel Art講座（10/27）、Rezé CAVIARのPixel Artモザイク講座2回（12/19、2027/3/3）を公式本文で確認し追加。10/21開催の4件を終了扱いへ更新（予定日経過による整理で、現地実施を独立確認した意味ではない）。NRGは提出締切が経過したが大会本体は10/23–25のため upcoming 維持。Vila Geek、Montreal Mixlab、SPIEL、Pixel Layered、KAI高雄、PAC-MAN展示を再確認。アンジェの10/23・10/30 Pixel Artビーズ講座、CO-MAKER Lyon、パリのPixel Art講座は公式本文を直接取得できず登録保留。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
@@ -4451,7 +4626,14 @@
       "Mayenne Pixel Art animation famille novembre 2026",
       "atelier numérique pixel art Brignais 2026",
       "pixel art contest deadline October 2026",
-      "픽셀 아트 전시 2026"
+      "픽셀 아트 전시 2026",
+      "atelier Pixel Art mosaic octobre 2026 Sablé-sur-Sarthe",
+      "Pixel Art en mosaïque Rezé 2026 2027 CAVIAR",
+      "pixel art brick workshop Yilan Taiwan October 2026",
+      "RETRO GAME SUMMIT Lv.6 2026 dot art",
+      "festival manga Peymeinade pixel art octobre 2026",
+      "atelier pixel art octobre 2026 Angers 30 octobre",
+      "pixel art workshop October 2026 Montréal Brazil Japan"
     ],
     "scopeLanguages": [
       "ja",
@@ -4497,7 +4679,14 @@
       "フランス・Brignais",
       "豪州・Sydney",
       "ブラジル・Fortaleza",
-      "オンライン・欧州・北米・中南米"
+      "オンライン・欧州・北米・中南米",
+      "台湾・宜蘭県",
+      "日本・東京都八王子市",
+      "フランス・Peymeinade",
+      "フランス・Sablé-sur-Sarthe",
+      "フランス・Rezé",
+      "カナダ・Montreal",
+      "ドイツ・Essen"
     ],
     "verifiedSourceLanguages": [
       "es",
@@ -4583,7 +4772,12 @@
       "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
       "https://www.museeduchateaudemayenne.fr/visite/animations/animation-en-famille/",
       "https://www.billetweb.fr/atelier-numerique-pixel-art",
-      "https://brignais.com/agenda/atelier-numerique-pixel-art/"
+      "https://brignais.com/agenda/atelier-numerique-pixel-art/",
+      "https://iiic.niu.edu.tw/p/406-1067-75378,r1274.php",
+      "https://www.retrogamesummit.com/",
+      "https://cotedazurfrance.fr/offres/festival-manga-et-arts-japonais-peymeinade-fr-5789256/",
+      "https://lahautecouleur.fr/cours-de-mosaique-avec-celine-loury/",
+      "https://www.helloasso.com/associations/caviar/evenements/pixel-art-en-mosaique-2026-27"
     ],
     "regionalChecks": [
       {
@@ -5676,6 +5870,78 @@
           }
         ],
         "notes": "Pixel Artが必須でない一般ゲームジャム等は対象外。"
+      },
+      {
+        "checkedAt": "2026-10-22T00:03:56+00:00",
+        "regions": [
+          "台湾・宜蘭",
+          "日本・東京都八王子市",
+          "フランス・Peymeinade / Sablé-sur-Sarthe / Rezé / Lyon / Angers",
+          "ドイツ・Essen",
+          "カナダ・Montréal",
+          "ブラジル・Fortaleza",
+          "韓国",
+          "香港",
+          "オンライン"
+        ],
+        "languages": [
+          "ja",
+          "en",
+          "fr",
+          "zh",
+          "ko",
+          "pt"
+        ],
+        "queries": [
+          "atelier Pixel Art mosaic octobre novembre 2026 France",
+          "pixel art workshop October 2026 Taiwan Korea",
+          "RETRO GAME SUMMIT Lv.6 dot art 2026",
+          "Festival Manga et arts japonais Peymeinade atelier pixel art",
+          "pixel art October 2026 Montréal Fortaleza",
+          "픽셀아트 도트아트 행사 전시 워크숍 2026",
+          "像素藝術 像素磚 工作坊 宜蘭 2026"
+        ],
+        "addedIds": [
+          "yilan-lanrenju-pixel-brick-workshop-2026-10-24",
+          "retro-game-summit-lv6-dot-art-2026-11-07",
+          "peymeinade-manga-japanese-culture-festival-pixel-art-2026-10-24-25",
+          "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27",
+          "caviar-pixel-art-en-mosaique-2026-12-19",
+          "caviar-pixel-art-en-mosaique-2027-03-03"
+        ],
+        "recheckedIds": [
+          "moertel-spiel-2026",
+          "nrg-pixel-art-awards-2026",
+          "segment-pixel-jam-2026",
+          "montreal-mixlab-pixel-art-club-2026-10-22",
+          "vila-geek-pixel-art-workshop-fortaleza-2026-10-22",
+          "pixel-layered-hermippe-shibuya-2026",
+          "connecting-dots-256-pacman-ip-art-exhibition-bna-2026",
+          "connecting-dots-256-pacman-pixel-dot-field-kyoto-station-2026"
+        ],
+        "unconfirmed": [
+          {
+            "name": "Atelier Pixel Art Angers 23/30 octobre",
+            "sourceUrl": "https://www.helloasso.com/associations/association-pour-un-musee-des-feminismes/evenements/atelier-pixel-art",
+            "reason": "検索表示に告知要約は出たが、イベントページの本文は403で直接取得できず、登録を保留。"
+          },
+          {
+            "name": "CO-MAKER x ID d’Art Atelier Pixel-Art Lyon 22 novembre",
+            "sourceUrl": "https://www.billetweb.fr/co-maker-x-id-dart-atelier-pixel-art",
+            "reason": "ページの本文を取得できず、検索結果のみのため登録保留。"
+          },
+          {
+            "name": "Atelier Enfant Paris Pixel Art 24–25 octobre",
+            "sourceUrl": "https://www.atelierenfant.com/fr/paris/ateliers/ponctuels/atelier-pixel-art-5-99-ans-paris-5e-4032/",
+            "reason": "公式本文未読。検索結果だけでは登録しない。"
+          },
+          {
+            "name": "US library pixel-art workshops November 2026",
+            "sourceUrl": "https://crcpl.org/event/17444477",
+            "reason": "複数の公式図書館ページで本文取得不能（403/cache miss）。検索表示のみのため保留。"
+          }
+        ],
+        "notes": "台湾の積み木体験とフランスのモザイク講座は内容にPixel Artと明記されるため登録。開催日のみ経過した過去回は現地実施を推定しない。"
       }
     ],
     "historyCollection": {

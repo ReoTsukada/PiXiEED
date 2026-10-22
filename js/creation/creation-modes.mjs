@@ -1,5 +1,6 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261017-editor-improvements-1';
+import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261021-camera-canvas-2';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261016-tool-shell-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';
@@ -194,6 +195,14 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   });
   const say = error => { errorNode.textContent = error?.message || String(error); setModeMenu(true); };
   const settings = mountSharedProjectSettings({ draw, scope });
+  const cameraCanvasSettings = mountCameraCanvasSettings({ draw, scope, isActive: () => isActive() && mode === 'camera' });
+  const cameraCanvasCss = document.createElement('link'); cameraCanvasCss.rel = 'stylesheet'; cameraCanvasCss.href = '/css/camera-canvas-settings.css?rev=20261021-camera-canvas-1';
+  let cameraCanvasStylesFailed = false;
+  scope.listen(cameraCanvasCss, 'error', () => {
+    cameraCanvasStylesFailed = true; cameraCanvasSettings.close({ restoreFocus:false });
+    settingsStatus.textContent = 'PX数・比率の表示を読み込めません。画面を再読み込みしてください。';
+  }, { once:true });
+  document.head.append(cameraCanvasCss); scope.add(() => cameraCanvasCss.remove());
   draw.setSharedSettingsDismissal(settings);
   for (const node of settings.nodes) { if (!node.isConnected) document.body.append(node); own(node, 'shared'); }
   const closeSharedSettings = settings.close.bind(settings);
@@ -287,6 +296,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   const interrupted = () => new DOMException('制作モードの切替が更新されました。', 'AbortError');
   const currentRequest = version => !scope.disposed && isActive() && requestVersion === version;
   const stopCurrent = () => {
+    cameraCanvasSettings.close({ restoreFocus:false });
     try {
       if (mode !== 'camera') draw.suspend();
     } finally {
@@ -394,6 +404,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     if (!running && next === mode) return;
     if (!running && (document.querySelector('dialog[open]') || (body.hasAttribute('data-tool-result-open') && mode !== 'camera'))) throw new Error('開いている画面を閉じてから切り替えてください。');
     requestedMode = next; requestVersion++;
+    cameraCanvasSettings.close({ restoreFocus:false });
     settingsPanel.hidden = true; settingsButton.setAttribute('aria-expanded', 'false');
     focusReturnTarget = null;
     motion.cancel(); initializingScope?.dispose();
@@ -502,6 +513,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     if (outputStatus.textContent !== outputMessage) outputStatus.textContent = outputMessage;
   }
   function setSettingsMenu(open, { restoreFocus = false } = {}) {
+    canvasSettingsChoice.textContent = mode === 'camera' ? 'PX数・比率' : 'キャンバス・パレット';
     settingsPanel.hidden = !open; settingsButton.setAttribute('aria-expanded', String(open));
     if (open) focusFirst(settingsPanel, modeSettingsChoice);
     else if (restoreFocus && settingsButton.isConnected) settingsButton.focus({ preventScroll:true });
@@ -512,6 +524,15 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   });
   scope.listen(canvasSettingsChoice, 'click', () => {
     setSettingsMenu(false);
+    if (mode === 'camera') {
+      if (cameraCanvasStylesFailed) {
+        settingsStatus.textContent = 'PX数・比率の表示を読み込めません。画面を再読み込みしてください。';
+        settingsButton.focus({ preventScroll:true }); return;
+      }
+      focusReturnTarget = { panel:cameraCanvasSettings.panel, trigger:settingsButton };
+      cameraCanvasSettings.open({ trigger:settingsButton });
+      return;
+    }
     focusReturnTarget = { panel:settings.panel, trigger:settingsButton };
     settings.open();
     focusFirst(document.querySelector('#creation-project-width'), settingsButton);
