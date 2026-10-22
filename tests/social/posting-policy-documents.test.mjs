@@ -7,15 +7,21 @@ import { postingPolicy, isPostingPolicyReady } from '../../data/posting-policy.m
 import { policyArticle, policyDigest, verifyPolicyDocuments } from '../../scripts/check-posting-policy.mjs';
 import { DRAW_CTA_EXCLUDED_ROUTES } from '../../scripts/site-draw-cta.mjs';
 
-test('approved candidate has real routes, fixed versions/date and matching document hashes, without activating writes', async () => {
+test('approved release text has real routes, versions/date and matching hashes while writes remain gated', async () => {
   const docs = await verifyPolicyDocuments();
   assert.equal(docs.length, 2);
-  assert.equal(postingPolicy.effectiveCandidateDate, '2026-10-21');
+  assert.equal(postingPolicy.effectiveCandidateDate, '2026-10-22');
   assert.equal(postingPolicy.state, 'draft');
   assert.equal(isPostingPolicyReady(), false);
   assert.deepEqual(docs.map(d => d.url), ['https://pixieed.jp/terms/', 'https://pixieed.jp/privacy/']);
-  assert.equal(postingPolicy.terms.version, 'terms-20261021-1');
-  assert.equal(postingPolicy.privacy.version, 'privacy-20261021-1');
+  assert.equal(postingPolicy.terms.version, 'terms-20261022-1');
+  assert.equal(postingPolicy.privacy.version, 'privacy-20261022-1');
+  for (const doc of docs) assert.match(doc.sha256, /^[a-f0-9]{64}$/);
+  for (const kind of ['terms', 'privacy']) {
+    const html = await readFile(new URL(`../../${kind}/index.html`, import.meta.url), 'utf8');
+    assert.match(html, /2026年10月22日から適用します/);
+    assert.doesNotMatch(html, /候補|本番発効前|正式公開前/);
+  }
 });
 
 test('legal content changes require a new digest; navigation and CRLF formatting do not alter the document identity', async () => {

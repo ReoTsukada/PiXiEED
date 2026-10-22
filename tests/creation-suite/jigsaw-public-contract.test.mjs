@@ -59,11 +59,11 @@ test('jigsaw local archive/reload stays private without API load, only published
  let loaded=0;const api=createSocialApi({config:{url:project,publishableKey:'synthetic'},loadActions:async()=>{loaded++;throw Error('unexpected');}});
  await assert.rejects(api.submit({kind:'puzzle',puzzle:recipe,visibility:'private'}));assert.equal(loaded,0);
 });
-test('jigsaw DB proposal is transactional, service-only, guarded and does not add policies, buckets or legacy writes',async()=>{
+test('reviewed jigsaw migration is transactional, service-only, guarded and does not add policies, buckets or legacy writes',async()=>{
  const sql=await readFile(new URL('../../supabase/migrations/20261021121542_jigsaw_publication.sql',import.meta.url),'utf8');
- assert.match(sql,/UNAPPLIED LOCAL PROPOSAL/);assert.match(sql,/begin;/);assert.match(sql,/commit;/);
+ assert.match(sql,/Reviewed release 2026-10-22/);assert.match(sql,/begin;/);assert.match(sql,/commit;/);
  assert.match(sql,/jigsaw_function_definition_changed/);assert.match(sql,/jigsaw_function_signature_changed/);
- assert.match(sql,/approved_constraints constant jsonb := '\{\}'::jsonb/);assert.match(sql,/jigsaw_constraint_review_required/);assert.match(sql,/jigsaw_constraint_definition_changed/);
+ assert.match(sql,/approved_constraints constant jsonb := \$approved_constraint_json\$/);assert.match(sql,/approved_constraints->>constraint_name is distinct from actual_constraint/);assert.match(sql,/jigsaw_constraint_review_required/);assert.match(sql,/jigsaw_constraint_definition_changed/);
  assert.match(sql,/revoke all on function.*from public,anon,authenticated/);
  assert.doesNotMatch(sql,/create\s+(?:policy|table)|insert\s+into\s+(?:storage\.|public\.pixfind|auth\.)|grant[^;]+to\s+(?:anon|authenticated)/i);
 });

@@ -97,12 +97,13 @@ test('reversing only the four jigsaw additions reproduces each observed full-def
   }
 });
 
-test('preflight checks four functions and exact constraints before DDL, with approval still closed', async () => {
+test('preflight checks four functions and only independently approved exact constraints before DDL', async () => {
   const { sql } = await readDefinitions();
   const preflightEnd = sql.indexOf('$jigsaw_preflight$;', sql.indexOf('do $jigsaw_preflight$'));
   const firstDdl = sql.search(/CREATE OR REPLACE FUNCTION|ALTER TABLE|REVOKE ALL|GRANT EXECUTE/i);
   assert.ok(preflightEnd >= 0 && firstDdl > preflightEnd);
-  assert.match(sql, /approved_constraints constant jsonb := '\{\}'::jsonb/);
+  const approvedBlock = sql.match(/approved_constraints constant jsonb := \$approved_constraint_json\$([\s\S]*?)\$approved_constraint_json\$::jsonb;/);
+  assert.ok(approvedBlock, 'release approval contains exact reviewed constraint definitions');
   assert.match(sql, /jigsaw_constraint_review_required/);
   assert.match(sql, /jigsaw_constraint_definition_changed/);
   assert.match(sql, /pg_get_functiondef\(fn\)/);
@@ -111,10 +112,11 @@ test('preflight checks four functions and exact constraints before DDL, with app
   const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
   assert.equal(fixture.functions.length, 4);
   assert.equal(fixture.constraints.length, 4);
-  for (const constraint of fixture.constraints) assert.equal(sql.split(constraint.name).length - 1, 4);
   const expectedBlock = sql.match(/expected_constraints constant jsonb := \$constraint_json\$([\s\S]*?)\$constraint_json\$::jsonb;/);
   assert.ok(expectedBlock, 'the exact observed constraint definitions are encoded in preflight');
   assert.deepEqual(JSON.parse(expectedBlock[1]), Object.fromEntries(fixture.constraints.map(({ name, definition }) => [name, definition])));
+  assert.deepEqual(JSON.parse(approvedBlock[1]), Object.fromEntries(fixture.constraints.map(({ name, definition }) => [name, definition])));
+  assert.match(sql, /approved_constraints->>constraint_name is distinct from actual_constraint/);
 });
 
 test('jigsaw shares source, image, pending-review, and no-changed-image rules without changing old modes', async () => {
