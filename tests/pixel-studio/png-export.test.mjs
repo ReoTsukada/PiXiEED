@@ -4,25 +4,25 @@ import { encodeCameraPng, pngExportGeometry } from '../../js/pixel-studio/png-ex
 
 test('scales common 64, 128, 256, and 512 frames by exact integer factors', () => {
   for (const longEdge of [64, 128, 256, 512]) {
-    const scale = 2048 / longEdge;
+    const scale = 4096 / longEdge;
     for (const [width, height] of [[longEdge, longEdge], [longEdge, longEdge / 2], [longEdge / 2, longEdge]]) {
       const result = pngExportGeometry(width, height);
       assert.deepEqual(result, { width: width * scale, height: height * scale, scale });
       assert.equal(result.width / result.height, width / height, 'portrait, landscape, and square aspect ratios are exact');
-      assert.equal(Math.max(result.width, result.height), 2048);
+      assert.equal(Math.max(result.width, result.height), 4096);
     }
   }
 });
 
-test('uses floor integer scaling near the 2048 target and never shrinks a frame', () => {
-  assert.deepEqual(pngExportGeometry(67, 43), { width: 2010, height: 1290, scale: 30 });
-  assert.deepEqual(pngExportGeometry(1024, 512), { width: 2048, height: 1024, scale: 2 });
-  assert.deepEqual(pngExportGeometry(2048, 1024), { width: 2048, height: 1024, scale: 1 });
+test('uses floor integer scaling near the full 4096 target and never shrinks a frame', () => {
+  assert.deepEqual(pngExportGeometry(67, 43), { width: 4087, height: 2623, scale: 61 });
+  assert.deepEqual(pngExportGeometry(1024, 512), { width: 4096, height: 2048, scale: 4 });
+  assert.deepEqual(pngExportGeometry(2048, 1024), { width: 4096, height: 2048, scale: 2 });
   assert.deepEqual(pngExportGeometry(2049, 1000), { width: 2049, height: 1000, scale: 1 });
   assert.deepEqual(pngExportGeometry(8192, 2048), { width: 8192, height: 2048, scale: 1 });
 });
 
-test('an active reward can raise the direct PNG target to 4096 while preserving the same grid', () => {
+test('explicit technical targets preserve the pixel grid without entitlement checks', () => {
   assert.deepEqual(pngExportGeometry(16, 16, { longEdge: 4096 }), { width: 4096, height: 4096, scale: 256 });
   assert.deepEqual(pngExportGeometry(2000, 1000, { longEdge: 4096 }), { width: 4000, height: 2000, scale: 2 });
   assert.deepEqual(pngExportGeometry(3000, 1000, { longEdge: 2048 }), { width: 3000, height: 1000, scale: 1 });

@@ -7,7 +7,7 @@ test('bare and revisioned reward modules share one service and receipt state', (
   for (const key of ['requestSiteReward','getSiteRewardState','subscribeSiteReward','hasSiteReward','requireSiteReward','isSiteRewardPolicyEnabled','mountSiteRewardUI']) assert.equal(bare[key], versioned[key]);
   assert.deepEqual(bare.getSiteRewardState(), versioned.getSiteRewardState());
 });
-test('the ads-only rollout module exposes independent ads and restriction switches', () => {
-  assert.equal(rewardedAdsEnabled, true);
+test('the retired rewarded rollout disables delivery and feature restrictions', () => {
+  assert.equal(rewardedAdsEnabled, false);
   assert.equal(featureRestrictionsEnabled, false);
 });

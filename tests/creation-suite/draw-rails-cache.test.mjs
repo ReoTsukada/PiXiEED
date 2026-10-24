@@ -26,6 +26,21 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/tool-direct.mjs', 'js/tool-shell.mjs'
   ]);
+  const freeTools = new Set([
+    'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/creation-camera.mjs',
+    'js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
+    'js/creation/draw-page.mjs', 'js/creation/hidden-object-page.mjs', 'js/creation/jigsaw-page.mjs',
+    'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs', 'js/creation/spot-difference-page.mjs',
+    'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs'
+  ]);
+  const allToolsOfferwall = new Set([
+    'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/creation-camera.mjs',
+    'js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
+    'js/creation/draw-page.mjs', 'js/creation/hidden-object-page.mjs', 'js/creation/jigsaw-page.mjs',
+    'js/creation/output-page.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
+    'js/creation/spot-difference-page.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs',
+    'js/tool-direct.mjs', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs'
+  ]);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
@@ -42,9 +57,10 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/creation/pxd-ui.mjs': ['js/creation/project-workspace.mjs'],
     'js/creation/creation-camera.mjs': ['js/creation/project-workspace.mjs', 'js/pixel-lens/app.mjs'],
     'js/creation/creation-modes.mjs': ['js/creation/creation-camera.mjs'],
-    'js/creation/hidden-object-page.mjs': ['js/creation/pxd-ui.mjs'],
-    'js/creation/jigsaw-page.mjs': ['js/creation/pxd-ui.mjs'],
-    'js/creation/spot-difference-page.mjs': ['js/creation/pxd-ui.mjs'],
+    'js/creation/hidden-object-page.mjs': ['js/creation/pxd-ui.mjs', 'js/tool-offerwall-entry.mjs'],
+    'js/creation/jigsaw-page.mjs': ['js/creation/pxd-ui.mjs', 'js/tool-offerwall-entry.mjs'],
+    'js/creation/spot-difference-page.mjs': ['js/creation/pxd-ui.mjs', 'js/tool-offerwall-entry.mjs'],
+    'js/creation/output-page.mjs': ['js/tool-offerwall-entry.mjs'],
     'js/pixel-lens/app.mjs': ['js/creation/pxd-ui.mjs', 'js/pixel-lens/engine.mjs'],
     'js/pixel-lens/entry.mjs': ['js/pixel-lens/app.mjs'],
     'js/tool-direct.mjs': ['js/creation/creation-runtime.mjs'],
@@ -69,7 +85,9 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (currentModeIcon.has(target)) assert.equal(revisions[target], '20261024-mode-icon-1', `${target} invalidates the current mode icon and entry chain`);
+      if (allToolsOfferwall.has(target)) assert.equal(revisions[target], '20261024-all-tools-offerwall-1', `${target} invalidates fresh tool-entry state and its complete importer chain`);
+      else if (freeTools.has(target)) assert.equal(revisions[target], '20261024-free-tools-1', `${target} invalidates the free-tools behavior and every transitive importer`);
+      else if (currentModeIcon.has(target)) assert.equal(revisions[target], '20261024-mode-icon-1', `${target} invalidates the current mode icon and entry chain`);
       else if (contextualControls.has(target)) assert.equal(revisions[target], '20261024-context-controls-1', `${target} invalidates contextual controls and their entry chain`);
       else if (stagedStartup.has(target)) assert.equal(revisions[target], '20261020-staged-startup-1', 'staged startup invalidates changed modules and their parent URLs');
       else if (drawSearchRails.has(target)) assert.equal(revisions[target], '20261019-draw-search-rail-1', `${target} invalidates the Draw control and search guidance release`);

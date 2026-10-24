@@ -16,12 +16,17 @@ const esbuildPath = path.join(repositoryRoot, 'node_modules/.bin/esbuild');
 test('delivery plan preserves runtime identities and bounds minification to startup/mode files', async () => {
   const plan = await deriveToolRuntimeDeliveryPlan({ root: repositoryRoot });
 
-  assert.equal(plan.runtimeGraph.modules.size, 104);
-  assert.equal(plan.runtimeGraph.edges.length, 196);
+  assert.equal(plan.runtimeGraph.modules.size, 101);
+  assert.equal(plan.runtimeGraph.edges.length, 192);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 102);
-  assert.equal(plan.externalUrls.size, 53);
+  assert.equal(plan.dynamicGraph.modules.size, 99);
+  assert.equal(plan.externalUrls.size, 50);
   assert.equal(plan.internalizedUrls.length, 51);
+  const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
+  assert(files.includes('js/ads/site-feature-access-v20261024.mjs'));
+  for (const retired of ['gpt-rewarded-adapter.mjs', 'rewarded-controller.mjs', 'site-reward-rollout-v20261016.mjs', 'site-reward-runtime-v20261016-ads-only.mjs']) {
+    assert(!files.some(file => file.endsWith('/' + retired)), `Retired advertising runtime must stay off the startup graph: ${retired}`);
+  }
   assert(plan.externalUrls.has('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
   assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261016-color-capability-1'));
   assert([...plan.modeGraph.modules.keys()].some(url => url.startsWith('/js/pixel-lens/app.mjs?')));
@@ -91,7 +96,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 53);
+    assert.equal(report.externalCount, 50);
     assert.equal(report.internalizedCount, 51);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);

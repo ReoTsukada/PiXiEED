@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createDrawDocument, encodePng } from "../../../js/creation/draw-core.mjs";
 import { inspectPixelPng } from "../_shared/pixel-png.mjs";
 import { createPostHandler } from "./index.ts";
+import { postingPolicy } from "../_shared/posting-consent.ts";
 
 const POST_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -26,6 +27,7 @@ async function body(requestKey?: string, puzzleMode?: PuzzleMode, postKind: "pix
   const bytes = encodePng(createDrawDocument(16));
   const payload: Record<string, unknown> = {
     title: "作品", caption: "説明", postKind,
+    postingConsent: { accepted: true, termsVersion: postingPolicy.terms.version, privacyVersion: postingPolicy.privacy.version },
     image: { mimeType: "image/png", size: bytes.length, ...await inspectPixelPng(bytes), base64: btoa(String.fromCharCode(...bytes)) },
     location: { mapCell: { grid: 64, x: 3, y: 4, prefectureCode: "13" } },
     ...(requestKey ? { requestKey } : {}),
@@ -131,6 +133,25 @@ function request(payload: unknown) {
 
 const deps = (factory: ReturnType<typeof mockCreateClient>["factory"]) => ({
   createClient: factory, projectUrl: PROJECT, publishableKey: "public", serviceKey: "secret",
+  // These publication-path fixtures isolate consent persistence; its adapter
+  // is tested separately. Keep the owner and current policy binding explicit.
+  recordConsent: async (_admin: unknown, record: Record<string, unknown>) => {
+    assert.equal(record.owner_id, USER_ID);
+    assert.equal(record.privacy_version, postingPolicy.privacy.version);
+    assert.equal(record.privacy_sha256, postingPolicy.privacy.sha256);
+    return record;
+  },
+});
+
+Deno.test("missing or obsolete posting consent is refused before any image/storage/RPC side effects", async () => {
+  for (const consent of [undefined, { accepted: true, termsVersion: postingPolicy.terms.version, privacyVersion: `${postingPolicy.privacy.version}-old` }]) {
+    const fixture = mockCreateClient({});
+    const payload = await body();
+    payload.postingConsent = consent;
+    const response = await createPostHandler(request(payload), deps(fixture.factory));
+    assert.equal(response.status, 428);
+    assert.deepEqual(fixture.calls, []);
+  }
 });
 
 Deno.test("ordinary pixel_art and pixel_camera posts publish through the existing moderation path", async () => {

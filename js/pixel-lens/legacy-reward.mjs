@@ -1,4 +1,4 @@
-import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSiteReward, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSiteReward, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
 mountSiteRewardUI();

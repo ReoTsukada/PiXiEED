@@ -1,3 +1,4 @@
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-all-tools-offerwall-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
 import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261020-format-conversion-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
@@ -7,9 +8,9 @@ import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, 
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
 import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
 import { createOutputPreviewFit } from './output-preview-fit.mjs?rev=20261009-display-fit-5';
-import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSiteReward, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatchDownload, OUTPUT_FREE_BATCH_LIMIT, OUTPUT_REWARD_BATCH_LIMIT } from './output-reward-policy.mjs?rev=20261016-color-capability-1';
-import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261016-color-capability-1';
+import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
 import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261021-jigsaw-public-1';
 
@@ -60,8 +61,8 @@ const musicTotalPlaysHelp = $('#output-music-total-plays-help');
 const musicTotalPlaysField = $('#output-music-total-plays-field');
 const outputItemsList = $('#output-items');
 const batchSave = $('#output-batch-save');
-const rewardNote = $('#output-reward-note');
-const startRewardNote = $('#output-start-reward-note');
+const featureNote = $('#output-reward-note');
+const startFeatureNote = $('#output-start-reward-note');
 const addOutputItem = $('#output-add-item');
 const copyOutputItem = $('#output-copy-item');
 const deleteOutputItem = $('#output-delete-item');
@@ -171,19 +172,13 @@ let rasterProfile = null;
 let originRestoreItemId = '';
 let originResizeActiveItemId = '';
 
-mountSiteRewardUI();
 const outputRewardEnabled = () => isSiteRewardPolicyEnabled();
 const canUseOutputReward = (feature) => !outputRewardEnabled() || requireSiteReward(feature);
-const outputScaleRewardLabel = `${STATIC_IMAGE_FREE_LONG_EDGE + 1}〜${STATIC_IMAGE_REWARD_LONG_EDGE}pxの静止画出力`;
-function renderRewardNotice() {
-  const enabled = outputRewardEnabled();
-  if (rewardNote) rewardNote.hidden = !enabled;
-  if (startRewardNote) startRewardNote.hidden = !enabled;
-  if (enabled) {
-    const notice = `PNG・JPEG・GIF・WAVと通常の単独保存は無料です。静止画は長辺${STATIC_IMAGE_FREE_LONG_EDGE}pxまで通常出力でき、${STATIC_IMAGE_FREE_LONG_EDGE + 1}〜${STATIC_IMAGE_REWARD_LONG_EDGE}pxの新しい拡大出力、SVG・APNG・対応動画の新規作成、${OUTPUT_FREE_BATCH_LIMIT + 1}〜${OUTPUT_REWARD_BATCH_LIMIT}項目の一括保存には60分パスが必要です。既存の大きな画像は縮小せず保存できます。複数保存ではブラウザーがダウンロードの許可を尋ねる場合があります。`;
-    if (rewardNote) rewardNote.textContent = notice;
-    if (startRewardNote) startRewardNote.textContent = notice;
-  }
+const outputScaleRewardLabel = `長辺${STATIC_IMAGE_FREE_LONG_EDGE}pxまでの静止画出力`;
+function renderOutputCapabilities() {
+  const notice = `出力形式は素材とブラウザーに応じて選べます。静止画の拡大は長辺${STATIC_IMAGE_FREE_LONG_EDGE}px・約1,678万画素までで、既存の大きな画像は縮小しません。一括保存は最大${OUTPUT_REWARD_BATCH_LIMIT}項目です。複数保存ではブラウザーが許可を尋ねる場合があります。`;
+  if (featureNote) { featureNote.hidden = false; featureNote.textContent = notice; }
+  if (startFeatureNote) { startFeatureNote.hidden = false; startFeatureNote.textContent = notice; }
   renderBatchSaveState();
 }
 function renderBatchSaveState() {
@@ -194,7 +189,6 @@ function renderBatchSaveState() {
   if (count > OUTPUT_REWARD_BATCH_LIMIT) batchSave.title = `一度に保存できるのは${OUTPUT_REWARD_BATCH_LIMIT}項目です。`;
   else batchSave.removeAttribute('title');
 }
-subscribeSiteReward(() => { renderRewardNotice(); refreshScaleLimitsForEntitlement(); });
 
 function trackPending(promise) {
   const tracked = Promise.resolve(promise);
@@ -473,7 +467,7 @@ function outputMime(formatValue) {
 
 async function renderSongAudioSource(source, totalPlays, signal) {
   if (!source?.song) throw new TypeError('音楽素材を読み込めません。');
-  const { renderAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+  const { renderAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1');
   if (signal?.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
   const rendered = await renderAudioWav(source.song, { loops: totalPlays });
   if (signal?.aborted) throw new DOMException('動画の作成を中止しました。', 'AbortError');
@@ -569,7 +563,7 @@ function fillSourceAndFormatControls({ preferredFormat = activeItem?.extension }
   const formats = sourceFormats(activeSource);
   formatSelect.replaceChildren();
   for (const [value, label] of formats) {
-    const option = document.createElement('option'); option.value = value; option.textContent = `${label}（.${value}）${isRewardedOutputFormat(value) && outputRewardEnabled() ? ' · 60分パス' : ''}`; formatSelect.append(option);
+    const option = document.createElement('option'); option.value = value; option.textContent = `${label}（.${value}）`; formatSelect.append(option);
   }
   if (activeSource?.kind === 'audio-buffer') {
     for (const choice of listAudioOutputFormats().filter(choice => !choice.available)) {
@@ -878,7 +872,7 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         initialFilename = 'pixieed-video-preview.png';
         metadataValue = { width: imported.video.width, height: imported.video.height, durationSeconds: imported.video.durationSeconds, description: '動画の最初の映像コマをプレビューしています。' };
       } else {
-        const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+        const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1');
         if (controller.signal.aborted) throw new DOMException('素材の読み込みを中止しました。', 'AbortError');
         initialBlob = await encodeImportedAudioWav(newSources.find((source) => source.kind === 'audio-buffer'), {
           signal: controller.signal,
@@ -1030,7 +1024,7 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
       quality: Number(jpegQuality.value) / 100, totalPlays }, { encodeRaster: canvasRaster, signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } }), metadata: {} };
   }
   if (source?.kind === 'audio-song' && formatValue === 'wav') {
-    const { renderAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+    const { renderAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1');
     if (controller.signal.aborted) throw new DOMException('出力の作成を中止しました。', 'AbortError');
     const result = await renderAudioWav(source.song);
     return { blob: result.blob, metadata: { durationSeconds: result.seconds, sampleRate: 44100, loops: result.loops } };
@@ -1038,12 +1032,12 @@ async function createOutputBlob(source, formatValue, dimensions, controller) {
   if (source?.kind === 'audio-buffer' && formatValue !== 'wav') {
     const formatChoice = listAudioOutputFormats().find(choice => choice.value === formatValue && choice.available);
     if (!formatChoice) throw new Error('このブラウザーでは選択した音声形式を生成できません。');
-    const { encodeNativeAudio } = await import('./output-audio-encode.mjs?rev=20261020-format-conversion-1');
+    const { encodeNativeAudio } = await import('./output-audio-encode.mjs?rev=20261024-free-tools-1');
     const result = await encodeNativeAudio(source, { formatChoice, signal: controller.signal, onProgress: progress => { generationProgress.value = Math.round(progress * 100); } });
     return { blob: result.blob, metadata: { durationSeconds: result.seconds, durationIsApproximate: true, sourceSeconds: result.sourceSeconds, paddingSeconds: result.paddingSeconds, sampleRate: source.sampleRate, description: '音の欠落を避けるため先頭40ms・末尾80msの無音を加えています。圧縮による余白や長さの差があるため、厳密な長さはWAVを選んでください。' } };
   }
   if (source?.kind === 'audio-buffer' && formatValue === 'wav') {
-    const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1');
+    const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1');
     if (controller.signal.aborted) throw new DOMException('出力の作成を中止しました。', 'AbortError');
     const blob = await encodeImportedAudioWav(source, { signal: controller.signal, onProgress: (progress) => { generationProgress.value = Math.round(progress * 100); } });
     return { blob, metadata: { durationSeconds: source.durationSeconds, sampleRate: source.sampleRate } };
@@ -1135,7 +1129,7 @@ function rewardedStaticSize(width, height, sourceId = activeSource?.id) {
 async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false, staticEntitledAtStart = null } = {}) {
   if (!record || !activeItem || generationController || mediaWritePending || itemWritePending) return false;
   if (isRewardedOutputFormat(formatValue) && !canUseOutputReward('output.advanced-format')) {
-    status.textContent = 'この形式は60分パスが必要です。元の出力項目と素材は保持されています。';
+    status.textContent = 'この形式を作成できません。元の出力項目と素材は保持されています。';
     return false;
   }
   if (record.metadata?.previewOnly || activeItem.metadata?.previewOnly) {
@@ -1170,7 +1164,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
       policyEnabled: outputRewardEnabled(), sourceWidth: originalStaticSize.width, sourceHeight: originalStaticSize.height
     });
   if (needsStaticReward && staticEntitledAtStart !== true && !canUseOutputReward('output.static-image-upscale')) {
-    status.textContent = `${outputScaleRewardLabel}には60分パスが必要です。現在の出力と元の素材は保持されています。`;
+    status.textContent = `${outputScaleRewardLabel}を作成できません。現在の出力と元の素材は保持されています。`;
     return false;
   }
   const previousItem = activeItem;
@@ -1317,7 +1311,7 @@ function setupScaleInput({ width, height, startScale, startWidth, startHeight, k
   updateScaleSummary(width, height, kind, frameCount);
 }
 
-function refreshScaleLimitsForEntitlement() {
+function refreshScaleLimits() {
   if (!record || scaleSettings.hidden || !pngBaseSize) return;
   const frames = sourceFrames();
   if (!frames.length) return;
@@ -1343,7 +1337,7 @@ function buildScalePresets(width, height, kind, frameCount = 1) {
     button.addEventListener('click', () => {
       if (applySettings.disabled) return;
       if (rewardedStaticSize(width * scale, height * scale) && !canUseOutputReward('output.static-image-upscale')) {
-        status.textContent = `${outputScaleRewardLabel}には60分パスが必要です。表示中の出力は変更していません。`;
+        status.textContent = `${outputScaleRewardLabel}を作成できません。表示中の出力は変更していません。`;
         return;
       }
       scaleInput.value = String(scale);
@@ -1561,7 +1555,7 @@ async function applySelectedSize() {
   catch (error) { status.textContent = error?.message || '出力サイズを確認してください。'; return; }
   const hasRewardUpscale = rewardedStaticSize(dimensions.width, dimensions.height);
   if (hasRewardUpscale && !canUseOutputReward('output.static-image-upscale')) {
-    status.textContent = `${outputScaleRewardLabel}の新規作成には60分パスが必要です。現在の出力と元の素材は保持されています。`;
+    status.textContent = `${outputScaleRewardLabel}を作成できません。現在の出力と元の素材は保持されています。`;
     return;
   }
   await generateOutputItem({ dimensions, staticEntitledAtStart: outputRewardEnabled() && hasSiteReward() });
@@ -1661,8 +1655,12 @@ function setMedia(entry) {
 
 async function mount() {
   const params = new URLSearchParams(location.search);
-  if (params.getAll('id').length === 0) { showStart(); return; }
-  if (params.getAll('id').length !== 1) { setError('出力IDが複数あります。ツール一覧から新しく開いてください。'); return; }
+  if (params.getAll('id').length === 0) {
+    showStart();
+    notifyToolEntryReady(location.pathname === '/output/work/' && params.size === 0 && !location.hash);
+    return;
+  }
+  if (params.getAll('id').length !== 1) { setError('出力IDが複数あります。ツール一覧から新しく開いてください。'); notifyToolEntryReady(false); return; }
   try {
     record = await readToolOutput(params.get('id'));
     outputStart.hidden = true; outputLayout.hidden = false;
@@ -1695,7 +1693,8 @@ async function mount() {
     setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
     renderAssets(); updateSequenceControls();
     filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
-  } catch (error) { setError(error?.message || '端末内の出力を開けませんでした。'); }
+    notifyToolEntryReady(false);
+  } catch (error) { setError(error?.message || '端末内の出力を開けませんでした。'); notifyToolEntryReady(false); }
 }
 
 startChoose.addEventListener('click', () => fileInput.click());
@@ -1754,7 +1753,7 @@ batchSave.addEventListener('click', () => {
   if (!batch.allowed) {
     status.textContent = batch.selected.length > OUTPUT_REWARD_BATCH_LIMIT
       ? `一度に保存できるのは${OUTPUT_REWARD_BATCH_LIMIT}項目です。選択を減らしてください。`
-      : '複数項目の一括保存には60分パスが必要です。選択した作品と出力は保持されています。';
+      : '一括保存は最大${OUTPUT_REWARD_BATCH_LIMIT}項目です。選択した作品と出力は保持されています。';
     return;
   }
   const started = triggerOutputBatchDownload(batch.selected, { urlForItem: (item) => generatedDownloadUrls.get(item.id) });
@@ -1821,7 +1820,7 @@ formatSelect.addEventListener('change', () => {
     createVideoButton.hidden = !isVideoFormat();
     updateMusicPlayControl();
     updateSequenceControls();
-    status.textContent = 'この形式は60分パスが必要です。現在の出力はそのままです。';
+    status.textContent = 'この形式を作成できません。現在の出力はそのままです。';
     return;
   }
   updateFormatSettings();
@@ -1887,7 +1886,7 @@ scaleInput.addEventListener('input', () => {
   if (base?.width && base?.height && rewardedStaticSize(base.width * scale, base.height * scale)
       && !canUseOutputReward('output.static-image-upscale')) {
     restoreScaleFieldDimensions(); scaleInput.value = String(currentScale);
-    status.textContent = `${outputScaleRewardLabel}には60分パスが必要です。元のサイズと表示中の出力は保持されています。`;
+    status.textContent = `${outputScaleRewardLabel}を作成できません。元のサイズと表示中の出力は保持されています。`;
     return;
   }
   const width = pngBaseSize?.width || frame?.width; const height = pngBaseSize?.height || frame?.height;
@@ -1922,7 +1921,7 @@ function gateManualScaleChange() {
   if (rewardedStaticSize(Number(widthInput.value), Number(heightInput.value))
       && !canUseOutputReward('output.static-image-upscale')) {
     restoreScaleFieldDimensions();
-    status.textContent = `${outputScaleRewardLabel}の設定には60分パスが必要です。保存済みのサイズは変更していません。`;
+    status.textContent = `${outputScaleRewardLabel}を設定できません。保存済みのサイズは変更していません。`;
   }
 }
 widthInput.addEventListener('change', gateManualScaleChange);
@@ -1954,5 +1953,6 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) previewFit.reconnect();
 });
 
-renderRewardNotice();
+renderOutputCapabilities();
+refreshScaleLimits();
 void mount();

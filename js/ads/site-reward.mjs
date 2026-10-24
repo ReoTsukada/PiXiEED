@@ -1,2 +1,2 @@
-// A revisioned or bare facade always resolves the same reward service instance.
-export * from './site-reward-runtime-v20261016-ads-only.mjs';
+// Keep the facade URL stable while routing every caller to the inert service.
+export * from './site-feature-access-v20261024.mjs?rev=20261024-free-tools-1';

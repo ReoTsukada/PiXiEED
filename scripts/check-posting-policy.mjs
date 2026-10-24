@@ -25,9 +25,10 @@ export async function verifyPolicyDocuments({ root = fileURLToPath(new URL('../'
     if (!article.includes(`data-policy-version="${doc.version}"`)) throw new Error('policy_version_mismatch');
     const sha256 = policyDigest(html);
     if (sha256 !== doc.sha256) throw new Error('policy_digest_mismatch');
-    const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(policy.effectiveCandidateDate || '');
+    const effectiveDate = doc.effectiveDate || policy.effectiveCandidateDate;
+    const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(effectiveDate || '');
     if (!date || !article.includes(`${date[1]}年${Number(date[2])}月${Number(date[3])}日`)) throw new Error('policy_candidate_date_mismatch');
-    result.push({ kind, url: doc.url, version: doc.version, sha256 });
+    result.push({ kind, url: doc.url, version: doc.version, effectiveDate, sha256 });
   }
   return result;
 }

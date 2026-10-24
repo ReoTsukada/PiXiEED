@@ -32,3 +32,23 @@ test('drawing PNG encoder applies nearest-neighbour scaling and enforces the sha
     else globalThis.ImageData = previousImageData;
   }
 });
+
+import {
+  STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_MAX_EDGE, STATIC_IMAGE_MAX_PIXELS,
+  resolveStaticImageLongEdge, staticImageOutputGeometry
+} from '../../js/creation/static-output-policy.mjs';
+
+test('production static export defaults to the full safe cap without an entitlement', () => {
+  assert.equal(STATIC_IMAGE_FREE_LONG_EDGE, 4096);
+  assert.equal(STATIC_IMAGE_MAX_EDGE, 4096);
+  assert.equal(STATIC_IMAGE_MAX_PIXELS, 16 * 1024 * 1024);
+  assert.equal(resolveStaticImageLongEdge(), 4096);
+  assert.equal(resolveStaticImageLongEdge({ entitled: false }), 4096);
+  assert.equal(resolveStaticImageLongEdge({ policyEnabled: false, legacyLongEdge: 2048 }), 2048,
+    'explicit technical legacy target remains honored');
+  assert.deepEqual(staticImageOutputGeometry(16, 16), { width: 4096, height: 4096, scale: 256 });
+  assert.deepEqual(staticImageOutputGeometry(5000, 1000), { width: 5000, height: 1000, scale: 1 },
+    'existing larger images are not reduced');
+  assert.deepEqual(staticImageOutputGeometry(4000, 4000), { width: 4000, height: 4000, scale: 1 },
+    'the 16 MiB pixel budget still prevents an oversized enlargement');
+});

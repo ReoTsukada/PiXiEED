@@ -278,13 +278,13 @@ test('PXD project backups download directly from the editor and never navigate t
     'the PXD backup downloads the complete saved project snapshot');
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
   for (const [path, pattern] of [
-    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261018-direct-runtime-2/],
-    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261018-direct-runtime-2/],
-    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261018-direct-runtime-2/],
-    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261018-direct-runtime-2/],
-    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261018-direct-runtime-2/],
-    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261018-direct-runtime-2/],
-    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261018-direct-runtime-2/]
+    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261024-all-tools-offerwall-1/],
+    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261024-all-tools-offerwall-1/],
+    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261024-all-tools-offerwall-1/],
+    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261024-all-tools-offerwall-1/],
+    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261024-all-tools-offerwall-1/],
+    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261024-all-tools-offerwall-1/],
+    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261024-all-tools-offerwall-1/]
   ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), pattern, `${path} loads the direct-save PXD module revision`);
   const { OUTPUT_MIME_EXTENSIONS } = await import('../../js/creation/output-handoff.mjs');
   assert.equal(OUTPUT_MIME_EXTENSIONS['application/octet-stream'], undefined, 'PXD is not a generic shared output type');
@@ -572,7 +572,7 @@ test('validated draw, camera, and audio embeds flush editor saves then leave nat
 
 test('music exports use the existing file-save helper only for validated embed fallback', () => {
   const source = readFileSync(new URL('../../js/creation/draw-music.mjs', import.meta.url), 'utf8');
-  assert.match(source, /import \{ saveFile \} from '\.\.\/pixel-export\.mjs\?rev=20261017-analytics-integrity-1'/);
+  assert.match(source, /import \{ saveFile \} from '\.\.\/pixel-export\.mjs\?rev=20261024-free-tools-1'/);
   assert.match(source, /staged\.reason === 'embedded_native_save'[\s\S]*?await saveFile\(result\.blob, filename\)/);
   assert.match(source, /saved === 'cancelled'[\s\S]*?saved === 'shared'[\s\S]*?ダウンロードを開始しました/);
   assert.match(source, /if \(!staged\.ok && staged\.reason !== 'source_changed'\)/,

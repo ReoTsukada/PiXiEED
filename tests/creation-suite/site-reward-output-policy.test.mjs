@@ -8,7 +8,7 @@ import {
   OUTPUT_REWARD_BATCH_LIMIT
 } from '../../js/creation/output-reward-policy.mjs';
 import { REWARD_LIMITS } from '../../js/ads/site-reward-config.mjs';
-import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, resolveStaticImageLongEdge, staticImageOutputGeometry } from '../../js/creation/static-output-policy.mjs';
+import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, resolveStaticImageLongEdge, staticImageOutputGeometry, STATIC_IMAGE_MAX_EDGE, STATIC_IMAGE_MAX_PIXELS } from '../../js/creation/static-output-policy.mjs';
 
 test('advanced output formats are gated while ordinary exports stay free', () => {
   for (const format of ['svg', 'apng', 'mp4', 'webm']) assert.equal(isRewardedOutputFormat(format), true);
@@ -18,7 +18,9 @@ test('advanced output formats are gated while ordinary exports stay free', () =>
 test('static image output uses long-edge thresholds and keeps original large source dimensions', () => {
   assert.equal(resolveStaticImageLongEdge({ policyEnabled: true, entitled: false }), REWARD_LIMITS.staticImage.freeLongEdge);
   assert.equal(resolveStaticImageLongEdge({ policyEnabled: true, entitled: true }), REWARD_LIMITS.staticImage.rewardLongEdge);
-  assert.equal(resolveStaticImageLongEdge({ policyEnabled: false, entitled: true }), REWARD_LIMITS.staticImage.freeLongEdge);
+  assert.equal(resolveStaticImageLongEdge({ policyEnabled: false, entitled: true }), REWARD_LIMITS.staticImage.rewardLongEdge, 'disabled production policy uses the full safe cap');
+  assert.equal(resolveStaticImageLongEdge(), 4096);
+  assert.deepEqual([STATIC_IMAGE_MAX_EDGE, STATIC_IMAGE_MAX_PIXELS], [4096, 16 * 1024 * 1024]);
   assert.deepEqual(staticImageOutputGeometry(16, 16, { longEdge: 2048 }), { width: 2048, height: 2048, scale: 128 });
   assert.deepEqual(staticImageOutputGeometry(16, 16, { longEdge: 4096 }), { width: 4096, height: 4096, scale: 256 });
   assert.deepEqual(staticImageOutputGeometry(3000, 1500, { longEdge: 2048 }), { width: 3000, height: 1500, scale: 1 });

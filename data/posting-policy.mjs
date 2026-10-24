@@ -1,9 +1,9 @@
-// Approved final text. Published 2026-10-22 after the legal pages were verified.
+// Publish document versions together with matching HTML and server policy.
 // Keep consent explicit; never fill these from localStorage.
 export const postingPolicy = Object.freeze({
-  state: 'published', contactConfirmed: true, effectiveCandidateDate: '2026-10-22',
-  terms: Object.freeze({ url: 'https://pixieed.jp/terms/', version: 'terms-20261022-1', sha256: '4ef3e799ee9828c3797b0fdb0dfc52528313f054eda54421f487d5bf13d436d3' }),
-  privacy: Object.freeze({ url: 'https://pixieed.jp/privacy/', version: 'privacy-20261022-1', sha256: 'b5c257857c67ca70c54f072ebe7d9aff41d8cf86766c8314bd74682caf7fe7e9' }),
+  state: 'published', contactConfirmed: true, effectiveCandidateDate: '2026-10-24',
+  terms: Object.freeze({ url: 'https://pixieed.jp/terms/', version: 'terms-20261022-1', effectiveDate: '2026-10-22', sha256: '4ef3e799ee9828c3797b0fdb0dfc52528313f054eda54421f487d5bf13d436d3' }),
+  privacy: Object.freeze({ url: 'https://pixieed.jp/privacy/', version: 'privacy-20261024-1', effectiveDate: '2026-10-24', sha256: '9c74ee2571f49756626825ff1658c6e280d0bc8161b3710394eb2270a4ecebe5' }),
 });
 
 export class PostingConsentError extends Error {

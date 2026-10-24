@@ -7,8 +7,9 @@ export const MANUAL_PAGES = [
   'welcome/index.html', 'tools/index.html', 'about/index.html', 'guide/index.html',
   'stores/index.html', 'stores/ecowashcafe-nakanoshima.html'
 ];
-// These source pages have no manual provider/slot. Pages build adds informational auto ads where eligible.
-export const SOURCE_AUTO_AD_PAGES = ['index.html', 'feed/index.html', 'explore/index.html'];
+// The SNS home, feed, and explore screens are interactive; root-owned build logic no longer adds Auto Ads there.
+export const SOURCE_AUTO_AD_PAGES = [];
+const SOCIAL_NO_AD_PAGES = ['index.html', 'feed/index.html', 'explore/index.html'];
 export const RESULT_PAGES = [
   'pixel-camera.html', 'draw/index.html', 'audio/index.html', 'draw/editor.html', 'audio/editor.html', 'jigsaw/index.html',
   'play/spot-difference/index.html', 'play/hidden-object/index.html'
@@ -24,6 +25,7 @@ const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 const eventCatalog = JSON.parse(await readFile(new URL('events/catalog.json', root), 'utf8'));
 const EVENT_NO_AD_PAGES = ['events/index.html', ...eventCatalog.ids.map(id => `events/${id}/index.html`)];
 const EXCLUDED_PAGES = [
+  ...SOCIAL_NO_AD_PAGES,
   'privacy/index.html', 'terms/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
@@ -73,7 +75,7 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   const categorized = [...new Set([...established, ...SOURCE_AUTO_AD_PAGES])];
   const expected = [...new Set([...categorized, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 44);
+  assert.equal(established.length, 47);
   assert.equal(categorized.length, 47);
   assert.equal(expected.length, 47 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
   for (const path of SOURCE_AUTO_AD_PAGES) {
@@ -85,7 +87,8 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   }
   for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
   const output = await html(OFFERWALL_PAGE);
-  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=[^"]+"><\/script>\s*<script src="\/js\/adsense-auto\.js\?rev=[^"]+"><\/script>/);
+  assert.doesNotMatch(output, /adsense-auto\.js|adsbygoogle\.js/, 'output work no longer loads an unconditional provider');
+  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261024-all-tools-offerwall-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261024-all-tools-offerwall-1"><\/script>/);
   assert.doesNotMatch(await html('output/index.html'), /adsbygoogle\.js|adsense-auto\.js/);
 });
 
@@ -94,8 +97,12 @@ test('ads.txt seller and privacy disclosure agree with the installed publisher',
   const privacy = await html('privacy/index.html');
   assert.match(privacy, /Google AdSense/);
   assert.match(privacy, /無料/);
-  assert.match(privacy, /期間限定で特典対象の全機能を広告視聴なしで利用できます/);
-  assert.match(privacy, /開放期間中は、報酬型広告の視聴を求める案内や開始ボタンを表示しません/);
+  assert.match(privacy, /すべての制作機能を無料で利用できます。リワードによる個別の機能解放や期限付き特典は設けません/);
+  assert.match(privacy, /ツールの利用開始前の入口では、GoogleのOfferwallを表示する場合があります/);
+  assert.match(privacy, /広告視聴とアクセス条件は、Offerwallの画面で案内します/);
+  assert.match(privacy, /作業の再開、制作・プレイの途中や保存時、保存済みの出力を確認する画面では、新たな表示を許可しない制御を行います/);
+  assert.match(privacy, /配信元がすでに受け付けた案内の表示時点まではサイト側で保証できず/);
+  assert.doesNotMatch(privacy, /期間限定で特典対象の全機能|開放期間中は、報酬型広告/);
   assert.doesNotMatch(privacy, /広告視聴で60分間のリワード記録を受け取れます/);
   assert.doesNotMatch(privacy, /広告を.*1時間追加|残り時間の上限は2時間/);
 });

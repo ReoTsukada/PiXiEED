@@ -1,5 +1,5 @@
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { resolveStaticImageLongEdge, staticImageOutputGeometry } from '../creation/static-output-policy.mjs?rev=20261016-color-capability-1';
+import { resolveStaticImageLongEdge, staticImageOutputGeometry } from '../creation/static-output-policy.mjs?rev=20261024-free-tools-1';
 const MAX_SOURCE_EDGE = 8192;
 const MAX_SOURCE_PIXELS = 16 * 1024 * 1024;
 const PNG_ERROR = 'PNGを準備できませんでした。';

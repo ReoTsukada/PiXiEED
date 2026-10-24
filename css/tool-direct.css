@@ -32,10 +32,6 @@ html[data-tool-direct='work'] { --tool-direct-bar:56px; }
 .tool-direct__bar .tool-direct__help { width:44px; min-width:44px; padding:0; border-radius:50%; font-size:18px; }
 .tool-direct__merged-header { display:none!important; }
 .tool-direct__bar .project-bar.px-tool-header-files { position:relative; inset:auto; flex:0 0 44px; width:44px; height:44px; }
-.tool-direct__bar .pixieed-site-reward-status { position:relative; inset:auto; flex:0 0 66px; width:66px; height:44px; display:flex!important; align-items:center; gap:0; margin:0; padding:0; border:0; background:transparent; box-shadow:none; }
-.tool-direct__bar .pixieed-site-reward-status [data-renew] { box-sizing:border-box; width:66px; height:44px; min-height:44px; padding:0 4px; border-radius:20px; background:#fff; box-shadow:0 2px 12px #18283b24; color:#185e56; font-size:11px; }
-.tool-direct__bar .pixieed-site-reward-desktop { display:none!important; }
-.tool-direct__bar .pixieed-site-reward-mobile { display:inline-flex!important; align-items:center; justify-content:center; width:100%; height:100%; padding:0 4px; font-size:11px; font-weight:700; white-space:nowrap; }
 .tool-direct__status { font:12px system-ui; }
 html[data-direct-loading]:not([data-direct-error]) .tool-direct__status { display:none; }
 .tool-direct__boot-cue { position:fixed; z-index:200; top:calc(var(--tool-direct-top,0px) + (var(--tool-direct-height,100dvh) + 60px)/2); left:50%; display:flex; flex-direction:column; align-items:stretch; gap:12px; box-sizing:border-box; width:min(560px,calc(100vw - 32px)); max-width:calc(100vw - 32px); margin:0; padding:20px; transform:translate(-50%,-50%); border:1px solid #d9d5ca; border-radius:14px; background:#fff; color:#27251f; box-shadow:0 12px 40px #0003; font:700 14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -70,14 +66,9 @@ html[data-tool-direct='work'] body.creation-editor .draw-music-panel {
 }
 /* The existing benefits entry joins the consolidated toolbar so it cannot
    cover editor controls in short landscape viewports. */
-html[data-tool-direct='work'] .pixieed-site-reward { right:12px; top:calc(var(--tool-direct-top,0px) + var(--tool-direct-bar) + 6px); bottom:auto; }
-html[data-tool-direct='work'] .pixieed-site-reward:not(:has([data-dialog]:not([hidden]))) { z-index:36; }
-html[data-tool-direct='work'] .pixieed-site-reward-status { display:flex; gap:0; padding:0; background:transparent; border:0; box-shadow:none; }
 /* The status button carries the live state in its accessible name. */
-html[data-tool-direct='work'] .tool-direct__bar .pixieed-site-reward-status [data-status] { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
 html[data-direct-loading], html[data-direct-loading] body { background:#151d24!important; }
-html[data-direct-loading] .pixieed-site-reward { visibility:hidden; }
 
 /* A legacy PXD can require an explicit image-role choice before mount finishes. */
 html[data-direct-loading] [data-direct-owned]:not(dialog[open]) { visibility:hidden!important; }
@@ -119,7 +110,6 @@ html[data-tool-direct='work'] .draw-text-panel__card {
   }
 }
 @media (max-width:380px) {
-  .tool-direct__bar .pixieed-site-reward-status [data-renew] { border-radius:12px; }
 }
 @media (max-width:600px) {
   /* Camera progress is also shown in the preview. Keep the live status
@@ -129,9 +119,4 @@ html[data-tool-direct='work'] .draw-text-panel__card {
     overflow:hidden; clip-path:inset(50%); white-space:nowrap;
   }
   .tool-direct__bar strong { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-  .tool-direct__bar .pixieed-site-reward-status { flex-basis:44px; width:44px; }
-  .tool-direct__bar .pixieed-site-reward-status [data-renew] { width:44px; padding:0; }
-  .tool-direct__bar .pixieed-site-reward-mobile { padding:0; font-size:0; }
-  .tool-direct__bar .pixieed-site-reward-mobile::before { content:'✦'; font:700 22px/1 system-ui,sans-serif; }
-  .tool-direct__bar .pixieed-site-reward-status [data-renew][aria-label*='開放中'] .pixieed-site-reward-mobile::before { content:'✓'; }
 }

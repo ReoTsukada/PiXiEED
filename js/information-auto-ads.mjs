@@ -1,10 +1,10 @@
 import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-1';
+import { ordinaryAdConfig } from '../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
+import { mountInformationGutter } from './ads/ordinary-ad-entry.mjs?rev=20261024-ordinary-ad-entry-1';
+import { ordinaryAdUnitIsConfigured } from './ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 
 const STATIC_INFORMATION_PATHS = new Set([
-  '/',
   '/tools/',
-  '/feed/',
-  '/explore/',
   '/welcome/',
   '/about/',
   '/guide/',
@@ -56,7 +56,7 @@ export function isEligibleInformationAutoAdsPage({
 }
 
 /** Load the existing publisher SDK once on approved top-level production pages. */
-export function mountInformationAutoAds({ doc = document, win = window, config = displayAdConfig, client } = {}) {
+export function mountInformationAutoAds({ doc = document, win = window, config = displayAdConfig, client, manualConfig = ordinaryAdConfig.informationGutter, mountGutter = mountInformationGutter } = {}) {
   let isTopLevel = false;
   try { isTopLevel = win.top === win.self; } catch { return { loaded: false, reason: 'not-top-level' }; }
   const body = doc.body;
@@ -75,6 +75,14 @@ export function mountInformationAutoAds({ doc = document, win = window, config =
     embeddedExpanded: Boolean(doc.querySelector?.('.tool-embed--expanded')),
   });
   if (!eligible) return { loaded: false, reason: 'page-not-eligible' };
+
+  // An explicitly operator-enabled manual gutter owns this information page;
+  // do not also start Auto Ads and risk a second, uncontrolled placement.
+  if (manualConfig?.enabled === true && manualConfig?.unit?.placement === 'gutter'
+      && ordinaryAdUnitIsConfigured(manualConfig.unit)) {
+    void Promise.resolve(mountGutter({ config: manualConfig, doc, win, isEligiblePage: eligible })).catch(() => {});
+    return { loaded: false, reason: 'manual-gutter-selected' };
+  }
 
   const publisher = client || config?.client;
   if (!/^ca-pub-\d{16}$/.test(publisher || '') || !doc.head?.append || !doc.createElement) {

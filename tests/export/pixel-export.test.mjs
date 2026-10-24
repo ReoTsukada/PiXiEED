@@ -5,9 +5,9 @@ import { EXPORT_LONG_EDGE, exportScale, saveFile } from '../../js/pixel-export.m
 
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('pictures leave PiXiEED enlarged by a whole number, about 2048px on the long edge', () => {
-  assert.equal(EXPORT_LONG_EDGE, 2048);
-  assert.equal(exportScale(16, 16), 128); assert.equal(exportScale(64, 32), 32); assert.equal(exportScale(48, 16), 42);
+test('pictures leave PiXiEED enlarged by a whole number, up to the safe 4096px target on the long edge', () => {
+  assert.equal(EXPORT_LONG_EDGE, 4096);
+  assert.equal(exportScale(16, 16), 256); assert.equal(exportScale(64, 32), 64); assert.equal(exportScale(48, 16), 85);
   assert.equal(exportScale(4096, 10), 1);
   assert.throws(() => exportScale(0, 16), RangeError);
 });

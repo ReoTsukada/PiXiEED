@@ -10,7 +10,7 @@
  */
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { resolveStaticImageLongEdge, STATIC_IMAGE_FREE_LONG_EDGE } from './creation/static-output-policy.mjs?rev=20261016-color-capability-1';
+import { resolveStaticImageLongEdge, STATIC_IMAGE_FREE_LONG_EDGE } from './creation/static-output-policy.mjs?rev=20261024-free-tools-1';
 export const EXPORT_LONG_EDGE = STATIC_IMAGE_FREE_LONG_EDGE;
 export const EXPORT_MAX_EDGE = 4096;
 export const EXPORT_MAX_PIXELS = 16 * 1024 * 1024;

@@ -1,4 +1,4 @@
-// Ads-only rollout: reward inventory can be offered voluntarily without
-// enforcing reward-based feature limits.
-export const rewardedAdsEnabled = true;
+// Monetized reward policy has been permanently retired. Keep these exports for
+// cached/legacy consumers while ensuring production cannot enable restrictions.
+export const rewardedAdsEnabled = false;
 export const featureRestrictionsEnabled = false;

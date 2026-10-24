@@ -1,3 +1,4 @@
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-all-tools-offerwall-1';
 import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
@@ -13,12 +14,12 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261018-direct-runtime-2';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261024-all-tools-offerwall-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { createPuzzleHintController, jigsawPuzzleHintKey } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
-import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
@@ -79,10 +80,10 @@ jigsawHintNotice.style.cssText = 'font-size:.68rem;line-height:1.2;max-width:12e
 jigsawHintButton?.after(jigsawHintNotice);
 const jigsawHintController = createPuzzleHintController({
   feature: 'puzzle.hint', requireReward: requireSiteReward, hasReward: hasSiteReward, isRewardPolicyEnabled: isSiteRewardPolicyEnabled, subscribeReward: subscribeSiteReward,
-  onState: ({ pending, usedCount, freeLimit, freeRemaining, rewardActive, policyEnabled }) => {
+  onState: ({ pending }) => {
   if (!jigsawHintButton) return;
   jigsawHintButton.disabled = pending || !game || isJigsawWorkspaceComplete(game);
-  const allowance = !policyEnabled ? 'ヒント無制限' : freeRemaining ? `無料ヒント ${freeRemaining}回${freeLimit > 1 ? `（${usedCount}/${freeLimit}）` : ''}` : rewardActive ? `特典中：追加ヒント可${freeLimit > 1 ? `（無料${freeLimit}回使用済み）` : ''}` : `無料ヒント済み${freeLimit > 1 ? `（${freeLimit}回）` : ''}`;
+  const allowance = '追加ヒントはいつでも利用できます';
   jigsawHintNotice.textContent = allowance;
   jigsawHintButton.setAttribute('aria-label', `ヒント：未配置ピースの合う場所を一時表示。${allowance}`);
   jigsawHintButton.title = `未配置ピースの合う場所を一時表示（${allowance}）`;
@@ -1057,14 +1058,17 @@ resumeButton.hidden = !draftStore || !localStorageValue(JIGSAW_LAST_DRAFT_KEY);
 saveButton.disabled = true;
 mountPictureShelf($('#jigsaw-shelf'), { tool: 'jigsaw', adapter, onBrought: async ({ from }) => { sourceKind.value = 'draw'; await loadSourceOptions(); displaySourceFields(); updateStatus(`${from.label}の絵を持ってきました。`); }, onError: (error) => updateStatus(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdJigsaw();
-if (pxdBridge) {
-  const imported = await pxdBridge.ready;
-  if (!imported) { await loadSourceOptions(); await loadPublicOptions(); displaySourceFields(); }
-} else {
-  await loadSourceOptions(); await loadPublicOptions(); displaySourceFields();
-}
-const requestedLocalJigsaw = resolveJigsawRouteId('localJigsaw');
-const requestedPublicJigsaw = resolveJigsawRouteId('postPuzzle');
-if (requestedLocalJigsaw !== undefined && requestedLocalJigsaw !== null && requestedPublicJigsaw === undefined) await resumeGame(requestedLocalJigsaw);
-else if (requestedPublicJigsaw !== undefined && requestedLocalJigsaw === undefined) await openPublishedJigsaw(requestedPublicJigsaw);
-else if (requestedLocalJigsaw === null || requestedPublicJigsaw === null || requestedLocalJigsaw !== undefined && requestedPublicJigsaw !== undefined) updateStatus('ジグソーのリンクを確認できません。');
+try {
+  if (pxdBridge) {
+    const imported = await pxdBridge.ready;
+    if (!imported) { await loadSourceOptions(); await loadPublicOptions(); displaySourceFields(); }
+  } else {
+    await loadSourceOptions(); await loadPublicOptions(); displaySourceFields();
+  }
+  const requestedLocalJigsaw = resolveJigsawRouteId('localJigsaw');
+  const requestedPublicJigsaw = resolveJigsawRouteId('postPuzzle');
+  if (requestedLocalJigsaw !== undefined && requestedLocalJigsaw !== null && requestedPublicJigsaw === undefined) await resumeGame(requestedLocalJigsaw);
+  else if (requestedPublicJigsaw !== undefined && requestedLocalJigsaw === undefined) await openPublishedJigsaw(requestedPublicJigsaw);
+  else if (requestedLocalJigsaw === null || requestedPublicJigsaw === null || requestedLocalJigsaw !== undefined && requestedPublicJigsaw !== undefined) updateStatus('ジグソーのリンクを確認できません。');
+} catch (error) { notifyToolEntryReady(false); throw error; }
+notifyToolEntryReady(pxdBridge?.initialEntryFresh === true && !pxdBridge?.restoreError && !game && !location.search && !location.hash);

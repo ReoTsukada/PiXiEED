@@ -10,20 +10,20 @@ const engine = process.env.PIXIEED_UI_ENGINE || 'chromium';
 assert.ok(['chromium', 'webkit'].includes(engine));
 const modulePath = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 const playwright = await import(pathToFileURL(modulePath).href);
-const browser = await playwright[engine].launch({ headless: true, ...(engine === 'webkit' ? { executablePath: process.env.PIXIEEED_WEBKIT_EXECUTABLE || '/Users/tsukadareine/Library/Caches/ms-playwright/webkit-2272/pw_run.sh' } : {}) });
+const browser = await playwright[engine].launch({ headless: true, ignoreDefaultArgs: ['--no-sandbox'], ...(engine === 'webkit' ? { executablePath: process.env.PIXIEEED_WEBKIT_EXECUTABLE || '/Users/tsukadareine/Library/Caches/ms-playwright/webkit-2272/pw_run.sh' } : { executablePath: process.env.PIXIEED_CHROME_EXECUTABLE || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' }) });
 const paths = [
-  '/', '/tools/', '/draw/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/',
+  '/', '/tools/', '/draw/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/',
   '/play/spot-difference/', '/play/hidden-object/', '/globe/', '/about/', '/guide/',
   '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/stores/cafe-hoshi.html',
   '/stores/kaze-machi.html', '/stores/yoru-akari.html', '/pixel-camera.html',
-  '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/', '/output/', '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/', '/output/', '/output/work/', '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 ];
 const manualPages = ['/', '/tools/', '/about/', '/guide/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
-const autoAdsPage = '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const toolEntries = ['/draw/', '/camera/', '/audio/', '/spot-difference/', '/hidden-object/', '/jigsaw/', '/output/work/'];
 const sourcePrefix = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
 let checks = 0;
 try {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true, serviceWorkers: 'block' });
   let requests = [];
   let rewardedRequests = [];
   await context.addInitScript(() => { window.googlefc = { MessageTypeEnum: { OFFERWALL: 3 } }; });
@@ -46,25 +46,18 @@ try {
     requests = []; rewardedRequests = [];
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(150);
-    const isAutoAdsPage = path === autoAdsPage;
-    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), isAutoAdsPage ? 1 : 0, `${path}: only the output workspace loads the existing AdSense entrypoint`);
-    if (!manualPages.includes(path) && !isAutoAdsPage) {
+    assert.equal(await page.locator('script[src*="adsense-auto.js"]').count(), 0, `${path}: broad output SDK loader is retired`);
+    if (toolEntries.includes(path)) assert.equal(await page.locator('script[src*="tool-offerwall-entry.mjs"]').count(), 1, `${path}: guarded entry module is connected`);
+    if (!manualPages.includes(path)) {
       assert.equal(await page.locator('script[src*="adsbygoogle.js"]').count(), 0, `${path}: no loader without a result or manual placement`);
       assert.equal(requests.length, 0, `${path}: no provider request without a placement`);
     }
-    if (isAutoAdsPage) {
-      assert.equal(requests.length, 1, 'the private output workspace uses the existing provider script once');
-      assert.deepEqual(await page.evaluate(() => {
-        let args;
-        window.googlefc?.controlledMessagingFunction?.({ proceed: (...values) => { args = values; } });
-        return args;
-      }), [false, [3]], 'the output workspace suppresses only Offerwall and preserves other messaging');
-    } else if (path !== '/output/' && await page.evaluate(() => typeof window.googlefc?.controlledMessagingFunction === 'function')) {
+    if (path !== '/output/' && await page.evaluate(() => typeof window.googlefc?.controlledMessagingFunction === 'function')) {
       assert.deepEqual(await page.evaluate(() => {
         let args;
         window.googlefc.controlledMessagingFunction({ proceed: (...values) => { args = values; } });
         return args;
-      }), [false, [3]], `${path}: other pages suppress Offerwall only`);
+      }), [false, [3]], `${path}: loopback suppresses Offerwall without holding other CMP messages`);
     }
     assert.equal(await page.evaluate(() => localStorage.getItem('pixieed:pass:v1')), null, `${path}: ordinary ads grant no pass`);
     assert.equal(rewardedRequests.length, 0, `${path}: no unsolicited rewarded ad`);
@@ -108,7 +101,7 @@ try {
   checks += 4;
 
   // The loader may fail or return without an ad fill; the ordinary download remains usable.
-  const blockedContext = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+  const blockedContext = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true, serviceWorkers: 'block' });
   const blockedRequests = [];
   await blockedContext.route('**/*', (route) => {
     const url = route.request().url();
@@ -126,7 +119,7 @@ try {
   await blockedPage.locator('#output-download').click();
   await blockedDownload;
   assert.match(await blockedPage.locator('#output-status').textContent(), /ダウンロードを開始しました/, 'a blocked provider does not replace or disable normal save');
-  assert.equal(blockedRequests.length, 1, 'the existing provider request was intercepted locally');
+  assert.equal(blockedRequests.length, 0, 'saved private output never attempts a new provider load');
   await blockedContext.close();
   checks += 2;
   for (const path of ['/privacy/', '/profile/', '/collection/', '/admin/', '/game/', '/404.html']) {
@@ -151,9 +144,10 @@ try {
   await context.close();
 
   for (const viewport of [{ width: 320, height: 568 }, { width: 1280, height: 800 }]) {
-    const layout = await browser.newContext({ viewport });
+    const layout = await browser.newContext({ viewport, serviceWorkers: 'block' });
+    await layout.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     const view = await layout.newPage();
-    for (const path of ['/', '/tools/', '/draw/', '/audio/', '/jigsaw/']) {
+    for (const path of ['/', '/tools/', '/draw/', '/camera/', '/audio/', '/jigsaw/']) {
       await view.goto(base + path, { waitUntil: 'domcontentloaded' });
       await view.locator('.px-header-brand').waitFor();
       assert.equal(await view.locator('[data-header-pass]').count(), 0, 'free tools have no time gate');

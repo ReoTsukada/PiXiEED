@@ -1,6 +1,6 @@
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261018-direct-runtime-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261024-free-tools-1';
 import { createProjectSession } from './project-session.mjs?rev=20261016-color-capability-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261016-color-capability-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
@@ -32,12 +32,17 @@ async function sendPxdBackup(bytes, name) {
   return false;
 }
 
+export function isInitialProjectEntryFresh({ initialProject = null, pointer = null, hasQuery = false, hash = '', restoreError = '', operationError = '', failed = false } = {}) {
+  return !initialProject && !pointer && !hasQuery && !hash && !restoreError && !operationError && !failed;
+}
+
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
 export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, initialRestoreError = '', root = null, idPrefix = '', routePointer = true, isActive = () => true, rememberKey = null, rememberShared = true, allowImplicitImport = true }) {
   const store = createToolProjectStore(tool); let main = root || document.querySelector('#main') || document.querySelector('main');
   const lifecycle = new AbortController();
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
+  let initialEntryFresh = false;
   let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
   let activeCanvas = null;
   let transientNavigation = false;
@@ -496,9 +501,9 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       return session.persisted;
     }
     await session.initialize(blankProject(), { persisted: false, apply: tool !== 'camera' }); main.inert = true;
+    const params = new URLSearchParams(location.search); let pointer = null;
     try {
       if (initialRestoreError) throw new Error(initialRestoreError);
-      const params = new URLSearchParams(location.search); let pointer;
       // An explicit revision remains authoritative when the current tab reloads.
       if (!routePointer) {
         if (initialPointer) pointer = initialPointer;
@@ -532,6 +537,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       initialSelectionPending = false;
       locked = false; initialized = true; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update();
     }
+    initialEntryFresh = isInitialProjectEntryFresh({ initialProject, pointer, hasQuery: params.size > 0, hash: location.hash, restoreError: initialRestoreError, operationError, failed });
     return session.persisted;
   })();
   function scheduleAutoSave() {
@@ -618,6 +624,6 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     get currentProject() { return session.currentProject; }, get heldProject() { return null; }, get busy() { return locked; },
     get persistedProject() { return session.persistedProject; },
     get persisted() { return session.persisted; }, get dirty() { return session.dirty && editedSinceOpen; },
-    get restoreError() { return initialRestoreError; }
+    get restoreError() { return initialRestoreError; }, get initialEntryFresh() { return initialEntryFresh; }
   });
 }

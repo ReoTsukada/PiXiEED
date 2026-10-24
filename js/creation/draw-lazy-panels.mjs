@@ -6,7 +6,7 @@ const defaultLoaders = Object.freeze({
     : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1&attempt=${attempt}`),
   text: (attempt) => attempt === 0
     ? import('./draw-text-panel.mjs?rev=20261024-context-controls-1')
-    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261024-context-controls-1&attempt=${attempt}`)
+    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261024-free-tools-1&attempt=${attempt}`)
 });
 
 const importModule = (specifier) => import(specifier);

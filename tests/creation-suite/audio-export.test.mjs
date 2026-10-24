@@ -44,10 +44,10 @@ function pngFixture(width, height) {
 }
 
 test('PNG uses an integer enlargement while preserving rectangular music dimensions', () => {
-  assert.deepEqual(audioImageExportSize(16, 16), { width: 2048, height: 2048, scale: 128 });
-  assert.deepEqual(audioImageExportSize(32, 16), { width: 2048, height: 1024, scale: 64 });
-  assert.deepEqual(audioImageExportSize(64, 16), { width: 2048, height: 512, scale: 32 });
-  assert.deepEqual(audioImageExportSize(48, 16), { width: 2016, height: 672, scale: 42 });
+  assert.deepEqual(audioImageExportSize(16, 16), { width: 4096, height: 4096, scale: 256 });
+  assert.deepEqual(audioImageExportSize(32, 16), { width: 4096, height: 2048, scale: 128 });
+  assert.deepEqual(audioImageExportSize(64, 16), { width: 4096, height: 1024, scale: 64 });
+  assert.deepEqual(audioImageExportSize(48, 16), { width: 4080, height: 1360, scale: 85 });
   assert.deepEqual(audioImageExportSize(16, 16, 4096), { width: 4096, height: 4096, scale: 256 });
   assert.deepEqual(audioImageExportSize(3000, 1500, 2048), { width: 3000, height: 1500, scale: 1 }, 'a smaller target never shrinks the original');
 });
@@ -70,8 +70,8 @@ test('PXD working-image RGBA reaches the export canvas and integer scaling disab
   assert.deepEqual([...canvases[0].context.imageData.data.slice(0, 8)], [7, 8, 9, 0, 12, 34, 56, 127]);
   assert.equal(canvases[1].context.source, canvases[0]);
   assert.equal(canvases[1].context.imageSmoothingEnabled, false);
-  assert.equal(result.width, 2048); assert.equal(result.height, 2048);
-  assert.deepEqual(readPixelPngMetadata(new Uint8Array(await result.blob.arrayBuffer())), { version: 1, width: 16, height: 16, scale: 128 });
+  assert.equal(result.width, 4096); assert.equal(result.height, 4096);
+  assert.deepEqual(readPixelPngMetadata(new Uint8Array(await result.blob.arrayBuffer())), { version: 1, width: 16, height: 16, scale: 256 });
   assert.equal(canvases[0].width, 1); assert.equal(canvases[1].height, 1);
 });
 

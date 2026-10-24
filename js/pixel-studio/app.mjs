@@ -1,10 +1,10 @@
 import { createFrameLoop } from './frame-loop.mjs';
-import { encodeCameraPng, pngExportGeometry } from './png-export.mjs?rev=20261016-color-capability-1';
+import { encodeCameraPng, pngExportGeometry } from './png-export.mjs?rev=20261024-free-tools-1';
 import { FRAME_RATIOS, OUTPUT_SIZES, resolveAspect, centerCrop, frameGeometry, fitFrame } from './framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from './camera-ui-state.mjs';
 import { clearToolOutputReturnId, readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSiteReward, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
 const $ = (selector) => document.querySelector(selector);
@@ -22,7 +22,6 @@ const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true }
 const worker = new Worker(new URL('./boundary-preview-worker.mjs?v=20260925-lens-camera-4&rev=20261016-color-capability-1', import.meta.url), { type: 'module' });
 const EDGE_CAP = 640;
 let activeStream = null;
-let cameraRewardPaused = false;
 let cameraSequence = 0;
 let renderSequence = 0;
 let paletteEpoch = 0;
@@ -46,38 +45,23 @@ let displayedPaletteRevision = null;
 
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: 'screen', size: 256,
   colorDepth: '24', finish: 'soft', aiEdges: false };
-subscribeSiteReward((reward) => {
-  if (!isSiteRewardPolicyEnabled()) return;
-  if (!reward.active && state.colorDepth === '64' && state.mode === 'live' && !cameraRewardPaused) {
-    cameraRewardPaused = true;
-    loop?.stop();
-    stopTracks();
-    sayToast('60分パスが終了しました。現在の64色画像は保持しています');
-  } else if (reward.active && cameraRewardPaused) {
-    cameraRewardPaused = false;
-    if (state.mode === 'live') void startCamera({ focus: false });
-  }
-});
 
-function cameraPngRewardActive() { return isSiteRewardPolicyEnabled() && hasSiteReward(); }
 function renderCameraRewardNote() {
   const note = $('#cameraRewardNote');
   if (!note) return;
-  const policyEnabled = isSiteRewardPolicyEnabled();
-  const longEdge = cameraPngRewardActive() ? REWARD_LIMITS.staticImage.rewardLongEdge : REWARD_LIMITS.staticImage.freeLongEdge;
-  note.hidden = !policyEnabled;
-  note.textContent = `色は無料${REWARD_LIMITS.draw.colors}色・60分パス中${REWARD_LIMITS.draw.rewardColors}色まで選べます。PNGは原本を保ち、整数倍で長辺${longEdge}pxまで保存します。`;
+  const longEdge = REWARD_LIMITS.staticImage.rewardLongEdge;
+  note.hidden = false;
+  note.textContent = `色調整は最大${REWARD_LIMITS.draw.rewardColors}色です。PNGは原本を保ち、整数倍で長辺${longEdge}px・約1,678万画素まで保存します。カメラ利用時はブラウザーの許可が必要です。`;
 }
-mountSiteRewardUI();
 const colorSelect = $('#sizePopover [name="colors"]');
 if (colorSelect) {
-  for (const [value, label] of [['32', '32 色'], ['64', '64 色 · 60分パス']]) {
+  for (const [value, label] of [['32', '32 色'], ['64', '64 色']]) {
     if (colorSelect.querySelector(`option[value="${value}"]`)) continue;
     const option = document.createElement('option'); option.value = value; option.textContent = label; colorSelect.append(option);
   }
   const note = document.createElement('p'); note.id = 'cameraRewardNote'; note.className = 'pc-local-note';
   note.style.cssText = 'grid-column:1/-1;margin:0'; colorSelect.closest('.pc-settings-fields')?.append(note);
-  renderCameraRewardNote(); subscribeSiteReward(renderCameraRewardNote);
+  renderCameraRewardNote();
 }
 
 const LENS_FINISH = Object.freeze({
@@ -193,7 +177,7 @@ function updateSizeSummary() {
   $('#sizeSummary').textContent = state.mode === 'captured' ? `${dimensions.width} × ${dimensions.height}` : `${state.size} px`;
   $('#frameDimensions').textContent = `${dimensions.width} × ${dimensions.height}`;
   const saved = pngExportGeometry(dimensions.width, dimensions.height);
-  const maxLongEdge = cameraPngRewardActive() ? REWARD_LIMITS.staticImage.rewardLongEdge : REWARD_LIMITS.staticImage.freeLongEdge;
+  const maxLongEdge = REWARD_LIMITS.staticImage.rewardLongEdge;
   $('#outputSummary').textContent = `${saved.width} × ${saved.height} px · PNG（長辺${maxLongEdge}pxまで）`;
   $('#colorSummary').textContent = state.colorDepth === 'full' ? 'フルカラー' : `${state.colorDepth}色`;
   root.dataset.framing = state.ratio;
@@ -492,7 +476,7 @@ function closeCamera({ idle = true, message = '', focus = false, visible = false
 async function startCamera({ focus = true } = {}) {
   if (state.colorDepth === '64' && isSiteRewardPolicyEnabled() && !hasSiteReward()
     && !requireSiteReward('camera.colors64')) {
-    sayToast('現在の64色画像は保持しています。新しい撮影には60分パスが必要です');
+    sayToast('現在の64色画像は保持しています');
     return;
   }
   resumeOnVisible = false;
@@ -553,7 +537,7 @@ function capture() {
   if (state.mode !== 'live' || !state.result) return;
   if (state.colorDepth === '64' && isSiteRewardPolicyEnabled() && !hasSiteReward()
     && !requireSiteReward('camera.colors64')) {
-    sayToast('現在の64色画像は保持しています。新しい撮影には60分パスが必要です');
+    sayToast('現在の64色画像は保持しています');
     return;
   }
   invalidateCaptureDownload();
@@ -630,7 +614,7 @@ settingsPanel.addEventListener('change', (event) => {
       : input.name === 'pixels' ? String(state.size)
         : input.name === 'colors' ? state.colorDepth : input.name === 'finish' ? state.finish : input.value;
     requireSiteReward('camera.colors64');
-    sayToast('現在の64色画像は保持しています。色数を下げるか60分パスを更新してください');
+    sayToast('色数の上限を超える変更はできません。現在の画像は保持されています');
     return;
   }
   if (input instanceof HTMLInputElement && input.name === 'aiEdges') state.aiEdges = input.checked;
@@ -644,10 +628,7 @@ settingsPanel.addEventListener('change', (event) => {
   }
   else if (input instanceof HTMLSelectElement && input.name === 'finish' && Object.hasOwn(LENS_FINISH, input.value)) state.finish = input.value;
   else return;
-  if (cameraRewardPaused) {
-    cameraRewardPaused = false;
-    void startCamera({ focus: false });
-  } else restartPreview({ preserveCompleted: true });
+  restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
 });

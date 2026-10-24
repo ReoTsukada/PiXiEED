@@ -1,7 +1,7 @@
 import { AUDIO_INSTRUMENTS, AUDIO_PPQ, audioSongPixels, collectAudioEvents, createAudioPlayer } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { withPixelPngMetadata } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
-import { resolveStaticImageLongEdge, staticImageOutputGeometry } from './static-output-policy.mjs?rev=20261016-color-capability-1';
+import { resolveStaticImageLongEdge, staticImageOutputGeometry } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 
 export const AUDIO_EXPORT_MAX_SECONDS = 120;
 export const AUDIO_EXPORT_MAX_WAV_BYTES = 64 * 1024 * 1024;

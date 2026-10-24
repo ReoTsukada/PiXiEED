@@ -1,5 +1,5 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261024-all-tools-offerwall-1';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
@@ -60,7 +60,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   };
   const markupLoad = settle(readAsset('/pixel-camera.html', '撮影の操作を読み込めません。'));
   const stylesheetLoad = settle(readAsset('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', '撮影の表示を読み込めません。'));
-  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261020-staged-startup-1'));
+  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261024-all-tools-offerwall-1'));
   const markup = await prepared(markupLoad);
   const template = new DOMParser().parseFromString(markup, 'text/html');
   const surface = template.querySelector('#pixelStudio'), controls = surface?.querySelector('.lc-bottom'), shutter = template.querySelector('#capture');

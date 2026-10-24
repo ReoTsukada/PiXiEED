@@ -10,9 +10,9 @@ import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=
 import { setPxdJson } from './pxd-codec.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
-import { saveFile } from '../pixel-export.mjs?rev=20261017-analytics-integrity-1';
+import { saveFile } from '../pixel-export.mjs?rev=20261024-free-tools-1';
 import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
-import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 
 const preparedLegacyProjects = new WeakSet();
 
@@ -268,7 +268,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
       const workspace = draw.workspace;
       await workspace.assertCanSave(); if (!unchanged()) return;
       let result, filename;
-      if (kind === 'wav') { const { renderAudioWav } = await import('./audio-export.mjs?rev=20261016-color-capability-1'); if (!unchanged()) return; result = await renderAudioWav(source.song, { loops }); filename = `pixieed-dot-music-${Math.round(result.seconds)}s.wav`; }
+      if (kind === 'wav') { const { renderAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1'); if (!unchanged()) return; result = await renderAudioWav(source.song, { loops }); filename = `pixieed-dot-music-${Math.round(result.seconds)}s.wav`; }
       else {
         const { renderAudioVideo } = await import('./audio-video.mjs?rev=20261016-color-capability-1'); if (!unchanged()) return; videoController = new AbortController();
         const frames = timeline.frames.map(frame => { const doc = draw.getOutputFrame(frame.id, { includeMusic }); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray((doc.rgba || documentRgba({ ...doc, pixels: Array.from(doc.pixels) }))) }; });

@@ -146,7 +146,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   const paletteError = el('small', { id: 'creation-project-palette-error', class: 'creation-project-settings__field-error', hidden: '' });
   const paletteDetails = el('details', { class: 'creation-project-settings__disclosure creation-project-settings__palette-details' });
   paletteDetails.append(el('summary', {}, 'HEX・登録候補を編集'), paletteCountLabel, el('label', { for: paletteText.id }, 'HEXカラー'), paletteText, paletteError,
-    el('small', { id: 'creation-project-palette-help' }, 'HEXを改行またはカンマで区切ります。使用色は無料32色・60分特典64色（透明・未使用色を除く）、未使用を含む登録候補は128色まで保持できます。'));
+    el('small', { id: 'creation-project-palette-help' }, 'HEXを改行またはカンマで区切ります。使用色は最大64色（透明・未使用色を除く）、未使用色を含むパレット登録候補は最大128色です。'));
   palettePanel.append(paletteHelp, palettePreset, swatches, paletteDetails);
   const tabPanels = new Map([['area', areaPanel], ['scale', scalePanel], ['palette', palettePanel]]);
   body.append(areaPanel, scalePanel, palettePanel, compare, status, impactDetails, areaMore);

@@ -1,7 +1,10 @@
-import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261022-posting-live-1';
+import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261024-posting-policy-1';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261022-posting-live-1';
+import { createSocialApi } from './api.mjs?rev=20261024-posting-policy-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
+import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
+import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
+import { connectOptionalFeedAds, createFeedAdRuntime } from '../ads/ordinary-ad-entry.mjs?rev=20261024-ordinary-ad-entry-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -57,7 +60,7 @@ async function sha256Blob(blob) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore(), windowRef = window, documentRef = document } = {}) {
+function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore(), windowRef = window, documentRef = document, ordinaryAds = {} } = {}) {
   const explorePage = documentRef.body.dataset.socialPage === 'explore';
   const app = $('#socialApp', documentRef), feed = $('#feed', documentRef), status = $('#feedStatus', documentRef);
   const retry = $('#feedRetry', documentRef), composer = $('#composerDialog', documentRef), form = $('#composerForm', documentRef);
@@ -74,7 +77,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const live = $('#toast', documentRef), draftsHost = $('#localDrafts', documentRef);
   let releaseStartup;
   const startupReady = new Promise((resolve) => { releaseStartup = resolve; });
-  const state = { posts: [], minePosts: null, mineMode: false, staged: [], readWarnings: [], mode: 'art', composerPane: 'content', attachment: null, localPuzzle:null, receipt: null, outputId: null, output: null, outputDetached: false, audioRecord: null, audioDetached: false, audioWarning: '', audioGeneration: 0, audioListLoaded: false, activeDraft: null, filter: 'all', query: '', bookmarks: new Set(), liked: new Map(), loading: false, busy: false, submitted: false, submissionCleared: false, draftReady: false, archiveSaved: false, pageHidden: false, fileGeneration: 0, detailId: null, lastDetailId: null, detailPane: 'work', detailPaneScroll: new Map(), unsentComments: new Map(), priorFocus: null, priorDraftId: null, composerUrl: null, detailHistory: false, audioUrl: null, detailAudioUrl: null, saveChain: Promise.resolve(), initialized: false, handoffToken: 0, composerGeneration: 0, detailGeneration: 0, pendingCleanup: new Set() };
+  const state = { posts: [], minePosts: null, mineMode: false, staged: [], readWarnings: [], mode: 'art', composerPane: 'content', attachment: null, localPuzzle:null, receipt: null, outputId: null, output: null, outputDetached: false, audioRecord: null, audioDetached: false, audioWarning: '', audioGeneration: 0, audioListLoaded: false, activeDraft: null, filter: 'all', query: '', bookmarks: new Set(), liked: new Map(), loading: false, feedFailed: false, busy: false, submitted: false, submissionCleared: false, draftReady: false, archiveSaved: false, pageHidden: false, fileGeneration: 0, detailId: null, lastDetailId: null, detailPane: 'work', detailPaneScroll: new Map(), unsentComments: new Map(), priorFocus: null, priorDraftId: null, composerUrl: null, detailHistory: false, audioUrl: null, detailAudioUrl: null, saveChain: Promise.resolve(), initialized: false, handoffToken: 0, composerGeneration: 0, detailGeneration: 0, pendingCleanup: new Set() };
 
   const boundSearchInputs = new WeakSet();
   function bindSearch(input) {
@@ -241,6 +244,12 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     return card;
   }
   let publicFlow = [];
+  const renderedPostCards = new Map();
+  const ordinaryAdCards = new Map();
+  const renderedFeedInsertions = new Map();
+  const retiredOrdinaryAds = new Set();
+  const ordinaryAdActivations = new Map();
+  const ordinaryAdPageGate = createOrdinaryAdPageGate();
   const priorScrollRestoration = windowRef.history.scrollRestoration;
   windowRef.history.scrollRestoration = 'manual';
   const viewPositions = new Map();
@@ -250,8 +259,98 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     && ['127.0.0.1', 'localhost', '[::1]'].includes(windowRef.location.hostname)
     && new URL(windowRef.location.href).searchParams.get('layoutAds') === '1';
 
+  function feedAdContext(posts, publicFeed) {
+    let topLevel = false;
+    try { topLevel = windowRef.top === windowRef.self; } catch { /* framed page */ }
+    return {
+      enabled: ordinaryAds.enabled === true,
+      provider: ordinaryAds.provider,
+      unit: ordinaryAds.unit,
+      productionOrigin: ['https://pixieed.jp', 'https://www.pixieed.jp'].includes(windowRef.location?.origin),
+      placement: 'inline',
+      topLevel,
+      viewportWidth: windowRef.visualViewport?.width || windowRef.innerWidth || 0,
+      fullscreen: Boolean(documentRef.fullscreenElement),
+      editor: documentRef.body?.classList?.contains('creation-editor') || false,
+      publicFeed,
+      feedReady: state.initialized && !state.feedFailed,
+      partialWarning: state.readWarnings.length > 0,
+      loading: state.loading,
+      empty: posts.length === 0,
+      privateView: state.mineMode || ['local', 'saved'].includes(state.filter),
+      composerOpen: Boolean(composer.open),
+      detailOpen: Boolean(detail.open || tools.open || documentRef.querySelector('#guestAccountDialog[open], [data-auth-dialog][open], .account-dialog[open]')),
+      trustedContentEligible: ordinaryAds.trustedContentEligible === true,
+      eligiblePostCount: posts.length,
+    };
+  }
+
+  function reconcileFeed(nodes) {
+    for (let index = 0; index < nodes.length; index += 1) {
+      const current = feed.children[index] || null;
+      if (current !== nodes[index]) feed.insertBefore(nodes[index], current);
+    }
+    while (feed.children.length > nodes.length) feed.lastElementChild.remove();
+  }
+
+  function deactivateFeedAds() {
+    for (const [anchorId, shell] of ordinaryAdCards) {
+      ordinaryAdActivations.get(anchorId)?.cleanup?.();
+      shell.card.remove();
+      retiredOrdinaryAds.add(anchorId);
+    }
+  }
+
+  function activateFeedAds(posts, publicFeed) {
+    const context = feedAdContext(posts, publicFeed);
+    if (!ordinaryAdEligibility(context)) { deactivateFeedAds(); return; }
+    for (const [anchorId, shell] of ordinaryAdCards) {
+      if (!shell.card.isConnected || ordinaryAdActivations.has(anchorId)) continue;
+      if (!ordinaryAdPageGate.markAttempt(anchorId)) { shell.card.remove(); retiredOrdinaryAds.add(anchorId); continue; }
+      const mounted = activateOrdinaryDisplayAd({
+        ...shell,
+        provider: ordinaryAds.provider,
+        unit: ordinaryAds.unit,
+        enabled: ordinaryAds.enabled === true,
+        eligibility: context,
+        kind: 'inline',
+        onOutcome: (status) => { if (['unfilled', 'blocked', 'failed', 'empty'].includes(status)) retiredOrdinaryAds.add(anchorId); },
+      });
+      ordinaryAdActivations.set(anchorId, mounted);
+      if (!mounted.mounted) { shell.card.remove(); retiredOrdinaryAds.add(anchorId); }
+    }
+  }
+
   function renderFlowEntry(entry) {
-    if (entry.kind === 'post') return renderPost(entry.post);
+    if (entry.kind === 'post') {
+      const id = String(entry.post?.id ?? '');
+      const existing = renderedPostCards.get(id);
+      if (!existing || !id) {
+        const fresh = renderPost(entry.post);
+        if (id) renderedPostCards.set(id, fresh);
+        return fresh;
+      }
+      const fresh = renderPost(entry.post);
+      for (const attribute of [...existing.attributes]) existing.removeAttribute(attribute.name);
+      for (const attribute of [...fresh.attributes]) existing.setAttribute(attribute.name, attribute.value);
+      existing.replaceChildren(...[...fresh.childNodes]);
+      return existing;
+    }
+    if (entry.kind === 'ordinary-ad') {
+      if (retiredOrdinaryAds.has(entry.anchorId)
+          || !ordinaryAdPageGate.canAttempt(entry.anchorId)) return null;
+      let shell = ordinaryAdCards.get(entry.anchorId);
+      if (!shell) {
+        shell = createOrdinaryDisplayAdCard(documentRef, ordinaryAds.unit, 'inline');
+        if (!shell) { retiredOrdinaryAds.add(entry.anchorId); return null; }
+        shell.card.dataset.adAnchorId = entry.anchorId;
+        ordinaryAdCards.set(entry.anchorId, shell);
+      }
+      return shell.card;
+    }
+    const insertionKey = `${entry.kind}:${entry.anchorId}`;
+    const existingInsertion = renderedFeedInsertions.get(insertionKey);
+    if (existingInsertion) return existingInsertion;
     const card = node('aside', { class: `post-card feed-insert feed-insert--${entry.kind}`, 'data-feed-insert': entry.kind, 'data-anchor-id': entry.anchorId, 'aria-label': entry.kind === 'tool' ? 'PiXiEEDのツール紹介' : '広告枠のローカル確認' });
     if (entry.kind === 'tool') {
       card.append(node('p', { class: 'feed-insert-label' }, 'PiXiEEDのツール紹介'));
@@ -262,6 +361,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     } else {
       card.append(node('p', { class: 'feed-insert-label' }, '広告 · ローカル確認用'), node('p', {}, '広告が入る場合の表示位置です。現在は配信していません。'));
     }
+    renderedFeedInsertions.set(insertionKey, card);
     return card;
   }
 
@@ -302,15 +402,24 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const draftsPanel = $('#draftsPanel', documentRef); if (draftsPanel) draftsPanel.hidden = state.filter !== 'local';
     feed.hidden = state.filter === 'local';
     if (state.filter === 'local') {
-      renderDrafts(); feed.replaceChildren(); feed.setAttribute('aria-busy', 'false'); retry.hidden = true;
+      deactivateFeedAds(); renderDrafts(); feed.replaceChildren(); feed.setAttribute('aria-busy', 'false'); retry.hidden = true;
       updateReadWarningDetails(false); statusText('下書きはこの端末に保存されています。'); return;
     }
     const posts = filteredPosts();
     const showReadWarnings = state.filter !== 'saved';
     const eligible = !state.mineMode && state.filter === 'all' && !state.query;
-    const flow = planFeedFlow(posts, { enabled: eligible, previewAds, previousPlan: publicFlow });
+    const feedAdEligible = ordinaryAdEligibility(feedAdContext(posts, eligible));
+    const flow = planFeedFlow(posts, {
+      enabled: eligible,
+      previewAds,
+      ordinaryAdEnabled: feedAdEligible,
+      ordinaryAdAnchorId: ordinaryAdPageGate.attemptedAnchorId,
+      previousPlan: publicFlow,
+    });
     if (eligible) publicFlow = flow;
-    feed.replaceChildren(...flow.map(renderFlowEntry)); feed.setAttribute('aria-busy', 'false');
+    reconcileFeed(flow.map(renderFlowEntry).filter(Boolean));
+    activateFeedAds(posts, eligible);
+    feed.setAttribute('aria-busy', 'false');
     if (!posts.length) feed.append(renderEmptyState());
     if (showReadWarnings && state.readWarnings.length) {
       const range = posts.length ? `${posts.length}件を表示中。` : '取得できた範囲: 0件。';
@@ -395,13 +504,17 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   }
   async function refresh({ initial = false } = {}) {
     if (state.loading) return;
-    state.loading = true; retry.hidden = true; state.readWarnings = [];
+    state.loading = true; state.feedFailed = false; retry.hidden = true; state.readWarnings = [];
+    deactivateFeedAds();
     updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
     if (initial) { feed.setAttribute('aria-busy', 'true'); statusText('公開作品を読み込んでいます…'); }
     try {
       const latest = await api.list({ limit: 30 });
       state.readWarnings = typeof api.getReadWarnings === 'function' ? api.getReadWarnings() : [];
       updateReadWarningDetails();
+      // The successful response is ready before rendering. Otherwise the
+      // initial feed permanently renders with ad eligibility still loading.
+      state.loading = false;
       const oldIds = new Set(state.posts.map((post) => post.id));
       if (!state.initialized || initial) { state.posts = latest; state.initialized = true; render(); }
       else {
@@ -411,6 +524,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
         render();
       }
     } catch (error) {
+      state.feedFailed = true;
+      deactivateFeedAds();
       feed.setAttribute('aria-busy', 'false');
       if (state.filter === 'local') statusText('下書きはこの端末に保存されています。');
       else if (state.filter === 'saved') statusText('保存した作品はこの端末で管理されます。');
@@ -585,7 +700,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       updateComposerSummary(); state.activeDraft = { ...(state.activeDraft || {}), mode, puzzle: handoff.payload?.puzzle || undefined, handoffReceipt: handoff.receipt, ...(handedRequestKey ? { requestKey: handedRequestKey, requestDigest: undefined } : {}) };
       putAttachment(image, handoff.payload?.puzzle || null);
       tell(mode === 'puzzle' ? 'パズルを引き継ぎました。自分だけで遊ぶか、投稿するかを確認してください。まだ素材を送信していません。' : '制作ツールの作品を引き継ぎました。掲載先を入力して投稿するか、下書きとして保存できます。');
-      selectComposerPane('content'); if (!composer.open) composer.showModal(); titleInput?.focus({ preventScroll: true });
+      selectComposerPane('content'); deactivateFeedAds(); if (!composer.open) composer.showModal(); titleInput?.focus({ preventScroll: true });
     } catch (error) { if (token === state.handoffToken) tell(`作品の引き継ぎを確認できませんでした。${niceError(error, '')}`); }
   }
   async function openComposer(mode = 'art', { historyPush = true, draft = null } = {}) {
@@ -626,7 +741,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     setMode(mode); selectComposerPane('content');
     if (generation !== state.composerGeneration || state.pageHidden) return;
     state.draftReady = true;
-    if (!composer.open) composer.showModal();
+    deactivateFeedAds(); if (!composer.open) composer.showModal();
     state.composerUrl = new URL(windowRef.location.href);
     if (historyPush) { windowRef.history.pushState({ ...(windowRef.history.state || {}), socialComposer: true, composerType: mode }, '', `${windowRef.location.pathname}${windowRef.location.search}${windowRef.location.hash}`); }
     (titleInput || composer).focus({ preventScroll: true });
@@ -857,7 +972,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (!post) { toast('公開作品が見つかりません。'); return; }
     if (post.source === 'sns' && post.owned === true) state.minePosts = [post, ...(state.minePosts || []).filter((item) => item.postId !== post.postId)];
     if (state.lastDetailId !== id) state.detailPaneScroll.clear();
-    state.lastDetailId = id; state.detailId = id; state.detailPane = 'work'; state.priorFocus = documentRef.activeElement; detailContent(post); if (!detail.open) detail.showModal();
+    state.lastDetailId = id; state.detailId = id; state.detailPane = 'work'; state.priorFocus = documentRef.activeElement; detailContent(post); deactivateFeedAds(); if (!detail.open) detail.showModal();
     if (state.detailAudioUrl) { URL.revokeObjectURL(state.detailAudioUrl); state.detailAudioUrl = null; }
     if (post.source === 'sns' && post.kind === 'music' && post.visibility === 'private' && post.owned === true && typeof api.getAudio === 'function') {
       const player = $('[data-private-audio]', detailBody), audioStatus = $('[data-private-audio-status]', detailBody);
@@ -938,6 +1053,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (action.matches('[data-compose]')) { event.preventDefault(); void openComposer(action.dataset.type || 'art'); return; }
     const name = action.dataset.action;
     if (name === 'guest-account') {
+      deactivateFeedAds();
       documentRef.dispatchEvent(new windowRef.CustomEvent('pixieed:guest-account-open', { detail: { source: 'feed' } }));
       $('#guestAccountDialog', documentRef)?.showModal();
       try {
@@ -1001,7 +1117,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       $('#draftAudioRefresh', documentRef)?.focus({ preventScroll: true });
       return;
     }
-    if (name === 'tools') { tools?.showModal(); return; }
+    if (name === 'tools') { deactivateFeedAds(); tools?.showModal(); return; }
     if (name === 'like') {
       const id = action.closest('[data-post-id]')?.dataset.postId;
       action.disabled = true;
@@ -1211,7 +1327,16 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
 }
 
 if (typeof document !== 'undefined') {
-  const boot = () => { try { initSocialFeed(); } catch (error) { const status = $('#feedStatus'); if (status) status.textContent = `フィードを開始できませんでした。${niceError(error, '')}`; } };
+  const boot = async () => {
+    try {
+      const ordinaryAds = { enabled: false, trustedContentEligible: false, unit: null, provider: undefined };
+      const feed = initSocialFeed({ ordinaryAds });
+      connectOptionalFeedAds(feed, ordinaryAds, () => createFeedAdRuntime(ordinaryAdConfig.feed));
+    } catch (error) {
+      const status = $('#feedStatus');
+      if (status) status.textContent = `フィードを開始できませんでした。${niceError(error, '')}`;
+    }
+  };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true }); else boot();
 }
 
@@ -1226,8 +1351,8 @@ export { initSocialFeed };
  * returned by this function; pass it back on refresh so existing post-ID
  * anchors survive newly prepended posts. Callers should set `enabled: false`
  * for saved, mine, search, and local-draft views. `previewAds` is an explicit
- * local-only switch for a clearly labeled placeholder; it never represents an
- * ad network request.
+ * local-only placeholder; `ordinaryAdEnabled` is separately gated by a
+ * verified operator unit/provider and eligible feed context.
  */
 
 export const OFFICIAL_TOOL_CARDS = Object.freeze([
@@ -1287,7 +1412,7 @@ function priorInsertions(previousPlan, kind) {
 }
 
 /** Return posts and sparse, stable-ID anchored introductions in feed order. */
-export function planFeedFlow(posts, { enabled = true, previewAds = false, previousPlan = null } = {}) {
+export function planFeedFlow(posts, { enabled = true, previewAds = false, ordinaryAdEnabled = false, ordinaryAdAnchorId = null, previousPlan = null } = {}) {
   if (!Array.isArray(posts) || !posts.length) return [];
   const plan = posts.map((post) => ({ kind: 'post', post }));
   if (!enabled) return plan;
@@ -1341,7 +1466,23 @@ export function planFeedFlow(posts, { enabled = true, previewAds = false, previo
     }
   }
 
-  const insertions = [...toolInsertions, ...adInsertions];
+  const ordinaryAdInsertions = [];
+  if (ordinaryAdEnabled && posts.length >= AD_INTERVAL) {
+    const previous = priorInsertions(previousPlan, 'ordinary-ad').find((entry) => positions.has(entry.anchorId));
+    const minIndex = AD_INTERVAL - 1;
+    let index = ordinaryAdAnchorId && positions.has(ordinaryAdAnchorId)
+      ? positions.get(ordinaryAdAnchorId)
+      : ordinaryAdAnchorId ? -1 : previous ? positions.get(previous.anchorId) : minIndex;
+    if (!ordinaryAdAnchorId && (index < minIndex || !postId(posts[index]) || toolInsertions.some((item) => Math.abs(item.index - index) < 2))) {
+      index = posts.findIndex((post, candidateIndex) => candidateIndex >= minIndex && !!postId(post)
+        && !toolInsertions.some((item) => Math.abs(item.index - candidateIndex) < 2));
+    }
+    if (index >= minIndex && index < posts.length && postId(posts[index])) {
+      ordinaryAdInsertions.push({ kind: 'ordinary-ad', anchorId: postId(posts[index]), index });
+    }
+  }
+
+  const insertions = [...toolInsertions, ...adInsertions, ...ordinaryAdInsertions];
   if (!insertions.length) return plan;
   const byIndex = new Map(insertions.map((entry) => [entry.index, entry]));
   const result = [];
@@ -1350,7 +1491,7 @@ export function planFeedFlow(posts, { enabled = true, previewAds = false, previo
     const insertion = byIndex.get(index);
     if (insertion) {
       if (insertion.kind === 'tool') result.push({ kind: 'tool', card: insertion.card, anchorId: insertion.anchorId });
-      else result.push({ kind: 'ad-preview', anchorId: insertion.anchorId });
+      else result.push({ kind: insertion.kind, anchorId: insertion.anchorId });
     }
   }
   return result;

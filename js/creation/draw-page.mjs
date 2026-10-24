@@ -18,11 +18,11 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261024-all-tools-offerwall-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
-import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261017-analytics-integrity-1';
+import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261024-free-tools-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
@@ -64,8 +64,7 @@ const DRAW_REWARD_LIMITS = Object.freeze({ ...REWARD_LIMITS.draw });
 
 export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools, isActive = () => true, musicLayer = false } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
-const siteReward = await import('../ads/site-reward.mjs?rev=20261016-color-capability-1');
-siteReward.mountSiteRewardUI();
+const siteReward = await import('../ads/site-reward.mjs?rev=20261024-free-tools-1');
 const drawRewardPolicy = createSiteRewardDrawPolicy({
   enabled: siteReward.isSiteRewardPolicyEnabled,
   hasReward: siteReward.hasSiteReward,
@@ -117,7 +116,7 @@ if (new URLSearchParams(location.search).get('social') === '1') {
 }
 const sizeSelect = $('#draw-size');
 const interactionEffects = createInteractionEffects();
-let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false; let drawRewardNotice = null;
+let documentData = createDrawDocument(); let history = createDrawHistory(documentData); let selectedColor = 2; let tool = 'pen'; let drawing = false; let previousPoint = null; let strokeStartPixels = null; let activeDraftId = null; let source = { type: 'hand_drawn', assetId: null, revisionId: null }; let saved = false; let canvasPrepared = false; let sizeWasChosen = false;
 let inputStorage = null; try { inputStorage = globalThis.localStorage; } catch { /* Private mode may block preferences. */ }
 let inputSettings = readDrawInputSettings(inputStorage, documentData.palette), lastInputSettings = '', strokeBinding = null, lastInputSide = 'left';
 inputSettings.editedSide = 'left';
@@ -127,18 +126,6 @@ function effectiveColor() { return strokeBinding?.color ?? selectedColor; }
 let animationSession = createDrawAnimationSession(documentData, { musicLayer }), animationControls = null, strokeTracker = null;
 let drawOperationLease = null, colorEditorLease = null;
 let lastHistoryCommitRejected = false;
-drawRewardNotice = document.createElement('aside');
-drawRewardNotice.dataset.drawRewardNotice = 'true';
-drawRewardNotice.setAttribute('role', 'status');
-drawRewardNotice.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:8px auto;max-width:720px;padding:8px 12px;border:1px solid #d7c58b;border-radius:8px;background:#fff8dc;color:#332b14;font:13px/1.45 system-ui,sans-serif;position:relative;z-index:2';
-const drawRewardText = document.createElement('span');
-const drawRewardButton = document.createElement('button');
-drawRewardButton.type = 'button'; drawRewardButton.textContent = '60分特典を確認'; drawRewardButton.style.cssText = 'margin-left:8px;font:inherit;cursor:pointer';
-drawRewardNotice.append(drawRewardText, drawRewardButton);
-$('.draw-viewport')?.before(drawRewardNotice);
-drawRewardButton.addEventListener('click', () => siteReward.requireSiteReward('draw'));
-const unsubscribeDrawReward = siteReward.subscribeSiteReward(() => { setDrawRewardNotice(); });
-scope.listen(window, 'pagehide', unsubscribeDrawReward, { once: true });
 function drawRewardTarget(animation = animationSession.animation, frameId = animationSession.frameId, layerId = animationSession.layerId, colorIndex = selectedColor) {
   const frameIndex = animation.frames.findIndex(frame => frame.id === frameId);
   const artLayers = animation.layers.filter(layer => layer.role !== 'music');
@@ -277,13 +264,13 @@ function guardDrawTransition(nextAnimation, { lease = drawOperationLease || draw
     const nextFrameIds = protectsFrames ? nextAnimation.frames.slice(0, freeFrames).map(frame => frame.id) : [];
     const nextLayerIds = protectsLayers ? afterArtLayers.slice(0, freeLayers).map(layer => layer.id) : [];
     if (protectsFrames && freeFrameIds.join('\0') !== nextFrameIds.join('\0') || protectsLayers && freeLayerIds.join('\0') !== nextLayerIds.join('\0')) {
-      toast('特典外では超過コマ・レイヤーを移動したり、無料枠へ入れ替えたりできません。'); return false;
+      toast('アニメーションの上限（8レイヤー・128コマ）を超える変更はできません。'); return false;
     }
     if (!protectedDrawContentEqual(animationSession.animation, nextAnimation)) {
-      toast('特典外では超過レイヤー・コマの内容や色を変更できません。保存データは保持されています。'); return false;
+      toast('この操作では対応範囲外のレイヤー・コマを変更できません。作品データは保持されています。'); return false;
     }
     if (!bonusDrawColorContentEqual(beforeAnimation, nextAnimation, bonusColors)) {
-      toast('特典外では32色を超える色の画素を変更できません。保存データは保持されています。'); return false;
+      toast('色数の上限（64色）を超える画素変更はできません。作品データは保持されています。'); return false;
     }
   }
   const nextBonusColors = lease?.enabled && lease.entitled
@@ -309,10 +296,10 @@ function guardDrawDocumentTransition(beforeDocument, nextDocument, { lease = dra
     width: nextDocument.width, height: nextDocument.height, pixels: Uint8Array.from(nextDocument.pixels, value => value + 1)
   });
   if (lease?.enabled && !lease.entitled && !protectedDrawContentEqual(animation, nextAnimation)) {
-    toast('特典外では超過レイヤー・コマの内容や色を変更できません。保存データは保持されています。'); return false;
+    toast('この操作では対応範囲外のレイヤー・コマを変更できません。作品データは保持されています。'); return false;
   }
   if (lease?.enabled && !lease.entitled && !bonusDrawColorContentEqual(animation, nextAnimation, bonusColors)) {
-    toast('特典外では32色を超える色の画素を変更できません。保存データは保持されています。'); return false;
+    toast('色数の上限（64色）を超える画素変更はできません。作品データは保持されています。'); return false;
   }
   if (musicLayer && typeof musicTimelineValidator === 'function'
       && musicTimelineValidator({ before: animation, after: nextAnimation, operation: mutation,
@@ -327,23 +314,7 @@ function captureDrawOperation({ request = false } = {}) {
   drawOperationLease = drawRewardPolicy.capture('draw', { request });
   return drawOperationLease;
 }
-function setDrawRewardNotice() {
-  if (!drawRewardNotice) return;
-  const enabled = drawRewardPolicy.enabled();
-  drawRewardNotice.hidden = !enabled;
-  if (!enabled) return;
-  const limits = drawRewardPolicy.limits;
-  const state = drawRewardStats(animationSession.animation, documentData);
-  const active = drawRewardPolicy.hasReward();
-  const target = drawRewardTarget();
-  const lockedLayer = !active && target.layerIndex >= limits.layers;
-  const lockedFrame = !active && target.frameIndex >= limits.frames;
-  const excess = state.layers > limits.layers || state.frames > limits.frames || state.colors > limits.colors;
-  drawRewardText.textContent = active
-    ? `特典中：色${limits.rewardColors}色・レイヤー${limits.rewardLayers}・コマ${limits.rewardFrames}まで編集できます。`
-    : `無料：色${limits.colors}色・レイヤー${limits.layers}・コマ${limits.frames}。サイズ上限は従来どおり。${lockedLayer || lockedFrame ? ' 選択中の超過レイヤー／コマは表示専用です。' : ''}${excess ? ' 超過分は保持され、削除・縮小されません。' : ''}`;
-  drawRewardButton.hidden = active;
-}
+function setDrawRewardNotice() { /* Legacy callers retain a no-op compatibility hook. */ }
 if (musicLayer) documentData = animationSession.select(animationSession.frameId, animationSession.animation.layers.findLast(layer => layer.role !== 'music').id);
 let lastArtLayerId = animationSession.layerId;
 let musicReadOnlyReason = '';
@@ -815,7 +786,7 @@ function canEdit(value = documentData, { shared = false, allowMusicReadOnly = fa
   if (drawRewardPolicy.enabled() && !lease?.entitled && !drawRewardPolicy.hasReward()) {
     const target = drawRewardTarget();
     if (target.layerIndex >= drawRewardPolicy.limits.layers || target.frameIndex >= drawRewardPolicy.limits.frames) {
-      toast('選択中の超過レイヤー／コマは表示専用です。特典を再度有効にすると編集できます。'); return false;
+      toast('選択中のレイヤー／コマはこの操作の対象外です。'); return false;
     }
   }
   return true;
@@ -1438,7 +1409,7 @@ function handleCanvasPointerDown(event) {
   if (freeColorLimitReached || rewardColorLimitReached || coreColorLimitReached) {
     activePointers.delete(event.pointerId); strokeBinding = null; drawOperationLease = null;
     toast(freeColorLimitReached && drawRewardPolicy.limits.rewardColors > drawRewardPolicy.limits.colors
-      ? `無料で編集できる色は${drawRewardPolicy.limits.colors}色までです。特典中は${drawRewardPolicy.limits.rewardColors}色まで使えます。`
+      ? `色数の上限は${drawRewardPolicy.limits.rewardColors}色です。`
       : `使用中の色は最大${drawRewardPolicy.limits.rewardColors}色です。`); return;
   }
   strokeWasSaved = saved;
@@ -1750,7 +1721,7 @@ async function scaleSpriteCanvas(percent) {
     if (!plan.changed) { outcomeMessage = '丸め後のサイズが現在と同じため変更はありません。'; return false; }
     const next = scaleSpriteAnimation(before, percent);
     const lease = drawRewardPolicy.capture('draw');
-    if (!guardDrawTransition(next, { lease, mutation: 'sprite-scale' })) { outcomeMessage = '特典外では超過レイヤー・コマを含む倍率変更はできません。作品は保持されています。'; return false; }
+    if (!guardDrawTransition(next, { lease, mutation: 'sprite-scale' })) { outcomeMessage = 'この倍率変更では対応範囲外のレイヤー・コマを扱えません。作品は保持されています。'; return false; }
     const originalSelection = selection, originalDocument = documentData;
     const bridge = pxdBridge, project = bridge?.currentProject || bridge?.heldProject, role = musicLayer ? 'main' : pxdImageRole;
     spriteScaling = true; updateControls();
@@ -2135,7 +2106,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261018-direct-runtime-2');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261024-all-tools-offerwall-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2339,7 +2310,7 @@ async function exportTimelapse(detail) {
   if (timelapseExporting) return;
   const rewardLease = drawRewardPolicy.capture('draw', { request: Boolean(detail) });
   if (detail && rewardLease.enabled && !rewardLease.entitled) {
-    toast('8秒の詳細GIFは60分特典中に利用できます。通常の3秒GIFはそのまま使えます。'); return;
+    toast('8秒の詳細GIFは利用できます。通常のGIFは最大3秒です。'); return;
   }
   closeColorEditor(); editorUi.closePanels();
   const job = {
@@ -2464,7 +2435,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261018-direct-runtime-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261024-free-tools-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -2887,7 +2858,7 @@ return {
     if (featureSession || selectionTransform || drawingInputBusy() || colorEdit || playing || !canEdit(documentData, { shared: true })) throw new Error('現在の編集・再生を終えてから共通設定を変更してください。');
     const plan = settingsPlan(settings); if (!plan.changed) return false;
     const lease = drawRewardPolicy.capture('draw');
-    if (!guardDrawTransition(plan.animation, { lease, mutation: 'project-settings' })) throw new Error('特典外では超過レイヤー・コマの内容を変える共通設定を適用できません。作品は保持されています。');
+    if (!guardDrawTransition(plan.animation, { lease, mutation: 'project-settings' })) throw new Error('この共通設定では対応範囲外のレイヤー・コマを変更できません。作品は保持されています。');
     resizeViewStates.set(animationSession.animation, resizeViewState());
     resizeViewStates.set(plan.animation, translatedResizeView(plan.animation.width, plan.animation.height));
     installAnimationDocument(animationSession.apply(plan.animation)); sizeWasChosen = true; pxdBridge.markDirty(); return true;
@@ -2899,7 +2870,7 @@ return {
     const doc = imageToDrawDocument({ ...image, rgba: new Uint8Array(image.rgba) });
     const imported = createDrawAnimationSession(doc, { musicLayer }).animation;
     const lease = drawRewardPolicy.capture('draw');
-    if (!guardDrawTransition(imported, { lease, mutation: 'import' })) throw new Error('現在の特典状態では追加枠を含む作品を置き換えられません。元の作品は保持されています。');
+    if (!guardDrawTransition(imported, { lease, mutation: 'import' })) throw new Error('この作品を読み込めません。元の作品は保持されています。');
     const artLayerId = imported.layers.findLast(layer => layer.role !== 'music').id;
     installAnimationDocument(animationSession.apply(imported, { frameId: imported.frames[0].id, layerId: artLayerId }));
     saved = false; pxdBridge?.markDirty();
@@ -2922,7 +2893,7 @@ return {
     if (scope.disposed || animationSession.animation !== original) throw new Error('適用中にDraw作品が変わりました。もう一度お試しください。');
     const chosenCel = { frameId: animationSession.frameId, layerId: select ? musicId : animationSession.layerId };
     if (record && !guardDrawTransition(next, { lease: drawRewardPolicy.capture('draw'), target: drawRewardTarget(next, chosenCel.frameId, chosenCel.layerId), mutation: 'music-page' }))
-      throw new Error('この音楽ページは現在の無料枠では適用できません。音楽データは保持されています。');
+      throw new Error('この音楽ページを適用できません。音楽データは保持されています。');
     const image = record ? animationSession.apply(next, chosenCel) : animationSession.load(next, chosenCel);
     installAnimationDocument(image, { preserveTimelapse: true });
     saved = !record;
@@ -2962,7 +2933,7 @@ return {
     if (!canEdit(documentData, { allowMusicReadOnly: true }) || featureSession || selectionTransform || drawingInputBusy()) throw new Error('現在の編集を確定してから音の設定を変更してください。');
     const next = setLayerProperties(animationSession.animation, animationSession.layerId, {});
     prepare(next);
-    if (!guardDrawTransition(next, { lease: drawRewardPolicy.capture('draw'), mutation: 'metadata' })) throw new Error('特典外では超過レイヤー・コマに影響する設定を変更できません。');
+    if (!guardDrawTransition(next, { lease: drawRewardPolicy.capture('draw'), mutation: 'metadata' })) throw new Error('この設定は対応範囲外のレイヤー・コマに影響するため変更できません。');
     animationSession.apply(next); saved = false; paint(); pxdBridge?.markDirty();
   },
   suspend() {

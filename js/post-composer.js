@@ -1,4 +1,4 @@
-import { createPostingConsentUi } from './posting-consent-ui.mjs?rev=20261022-posting-live-1';
+import { createPostingConsentUi } from './posting-consent-ui.mjs?rev=20261024-posting-policy-1';
 import { supabaseConfig } from '../data/site-config.js?rev=20261001-free-tools-1';
 import { normalizePixelFile } from './pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';

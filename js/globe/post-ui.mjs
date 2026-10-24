@@ -1,4 +1,4 @@
-import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261022-posting-live-1';
+import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261024-posting-policy-1';
 /**
  * Posting UI for the globe: pins on the sphere, the composer, the work viewer,
  * the gallery and the login gate.

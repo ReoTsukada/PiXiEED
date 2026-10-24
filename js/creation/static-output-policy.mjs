@@ -1,10 +1,13 @@
-import { hasSiteReward, isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
-// Keep the standard file size familiar, with an optional larger target during
-// an active site reward. These limits apply only when enlarging still images.
-export const STATIC_IMAGE_FREE_LONG_EDGE = REWARD_LIMITS.staticImage?.freeLongEdge ?? 2048;
+// Use the full safe still-image output target by default. Limits apply only
+// when enlarging; existing larger images are preserved.
+// All callers now receive the existing safe maximum without an ad receipt.
+export const STATIC_IMAGE_FREE_LONG_EDGE = REWARD_LIMITS.staticImage?.rewardLongEdge ?? 4096;
 export const STATIC_IMAGE_REWARD_LONG_EDGE = REWARD_LIMITS.staticImage?.rewardLongEdge ?? 4096;
+// Retained only for explicitly simulated historical restricted-policy calls.
+const HISTORICAL_RESTRICTED_LONG_EDGE = REWARD_LIMITS.staticImage?.freeLongEdge ?? 2048;
 export const STATIC_IMAGE_MAX_EDGE = 4096;
 export const STATIC_IMAGE_MAX_PIXELS = 16 * 1024 * 1024;
 
@@ -14,7 +17,7 @@ export function resolveStaticImageLongEdge({
   legacyLongEdge = STATIC_IMAGE_FREE_LONG_EDGE
 } = {}) {
   if (!policyEnabled) return legacyLongEdge;
-  return entitled ? STATIC_IMAGE_REWARD_LONG_EDGE : STATIC_IMAGE_FREE_LONG_EDGE;
+  return entitled ? STATIC_IMAGE_REWARD_LONG_EDGE : HISTORICAL_RESTRICTED_LONG_EDGE;
 }
 
 /**
@@ -81,7 +84,7 @@ export function isRewardedStaticImageSize(width, height, {
   const requestedEdge = Math.max(width, height);
   const originalEdge = Math.max(sourceWidth, sourceHeight);
   // Existing large source files remain ordinary saves and can be retained.
-  return requestedEdge > STATIC_IMAGE_FREE_LONG_EDGE && requestedEdge > originalEdge;
+  return requestedEdge > HISTORICAL_RESTRICTED_LONG_EDGE && requestedEdge > originalEdge;
 }
 
 /** Enlarging a pixel image must use the same positive integer factor on both axes. */

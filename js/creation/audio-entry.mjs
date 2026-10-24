@@ -10,7 +10,7 @@ document.querySelector('#main')?.setAttribute('inert', '');
 const scope = createModeScope();
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });
 try {
-  const { mountAudioMode } = await import('./audio-page.mjs?rev=20261019-draw-search-rail-1');
+  const { mountAudioMode } = await import('./audio-page.mjs?rev=20261024-all-tools-offerwall-1');
   await mountAudioMode({ scope });
   document.documentElement.dataset.audioReady = 'true';
 } catch (error) {

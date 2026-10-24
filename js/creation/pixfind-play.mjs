@@ -3,7 +3,7 @@ import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-sh
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
-import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
 import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
@@ -393,10 +393,10 @@ function mount() {
   hintButton?.after(hintNotice);
   const hintController = createPuzzleHintController({
     feature: 'puzzle.hint', requireReward: requireSiteReward, hasReward: hasSiteReward, isRewardPolicyEnabled: isSiteRewardPolicyEnabled, subscribeReward: subscribeSiteReward,
-    onState: ({ pending, usedCount, freeLimit, freeRemaining, rewardActive, policyEnabled }) => {
+    onState: ({ pending }) => {
     if (!hintButton) return;
     hintButton.disabled = pending;
-    const allowance = !policyEnabled ? 'ヒント無制限' : freeRemaining ? `無料ヒント ${freeRemaining}回${freeLimit > 1 ? `（${usedCount}/${freeLimit}）` : ''}` : rewardActive ? `特典中：追加ヒント可${freeLimit > 1 ? `（無料${freeLimit}回使用済み）` : ''}` : `無料ヒント済み${freeLimit > 1 ? `（${freeLimit}回）` : ''}`;
+    const allowance = '追加ヒントはいつでも利用できます';
     hintNotice.textContent = allowance;
     hintButton.setAttribute('aria-label', `ヒント：未発見の場所を一時表示。${allowance}`);
     hintButton.setAttribute('aria-busy', String(pending));

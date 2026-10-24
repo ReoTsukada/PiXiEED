@@ -1,4 +1,4 @@
-import { encodeImportedAudioWav } from './audio-export.mjs?rev=20261016-color-capability-1';
+import { encodeImportedAudioWav } from './audio-export.mjs?rev=20261024-free-tools-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
 
 export const OUTPUT_AUDIO_MAX_SECONDS = 120;

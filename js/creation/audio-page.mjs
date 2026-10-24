@@ -1,9 +1,9 @@
 import { importAudioImage } from './audio-image.mjs?rev=20261016-color-capability-1';
 import { beginAudioCamera, takeAudioCameraReturn, readAudioCameraDraft } from './audio-camera-handoff.mjs?rev=20261016-color-capability-1';
-import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20261016-color-capability-1';
+import { exportAudioImage, renderAudioWav } from './audio-export.mjs?rev=20261024-free-tools-1';
 import { chooseAudioVideoMimeType, renderAudioVideo } from './audio-video.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
-import { saveFile } from '../pixel-export.mjs?rev=20261017-analytics-integrity-1';
+import { saveFile } from '../pixel-export.mjs?rev=20261024-free-tools-1';
 import { createAudioViewport } from './audio-viewport.mjs?rev=20261001-connected-editor-1';
 import { pixelCellAt, pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
@@ -12,7 +12,7 @@ import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { audioHslToHex, replaceAudioSourceColor } from './audio-color-edit.mjs?rev=20261016-color-capability-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261018-direct-runtime-2';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261024-all-tools-offerwall-1';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, pxdImageToAudioDocument, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
@@ -28,8 +28,8 @@ import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { createAudioHistory } from './audio-history.mjs?rev=20261016-color-capability-1';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
-import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward, mountSiteRewardUI } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
-import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS, getAudioRewardColorCount, getAudioRewardFeatures, getAudioRewardImageColorCount, initializeAudioRewardColorOwnership, preservesAudioRewardContent, preservesAudioRewardImageContent, preservesAudioRewardPaletteContent, writeAudioRewardColorOwnership } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
+import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS, getAudioRewardColorCount, getAudioRewardImageColorCount, initializeAudioRewardColorOwnership, preservesAudioRewardContent, preservesAudioRewardImageContent, preservesAudioRewardPaletteContent, writeAudioRewardColorOwnership } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
 import {
   AUDIO_BAR_TICKS, AUDIO_INSTRUMENTS, AUDIO_PIXEL_COLUMNS, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, AUDIO_PPQ,
   audioPixelColumns, createAudioRowPitchMap, resizeAudioCanvas, collectAudioEvents, createAudioPlayer, createAudioSong, getAudioColorInstrument, setAudioColorInstrument, setAudioPixel, setAudioPixelPalette, setAudioTempo, validateAudioSong
@@ -164,8 +164,6 @@ const trackAudioStart = createToolStartTracker('audio');
 let activeHistorySnapshot = null;
 let pendingTempoHistorySnapshot = null;
 let pendingColorHistorySnapshot = null;
-mountSiteRewardUI();
-scope.add(subscribeSiteReward(() => { if (!disposed()) refreshAudioUi(); }));
 
 function copyHistoryImage(image) {
   return image ? { ...image, rgba: new Uint8ClampedArray(image.rgba) } : null;
@@ -252,7 +250,7 @@ function moveAudioHistory(direction) {
   const currentProtectedState = current ? { ...current, song: projectAudioRewardSnapshot(current) } : currentAudioRewardState();
   const targetProtectedState = target ? { ...target, song: projectAudioRewardSnapshot(target) } : null;
   if (target && (!targetProtectedState?.song || !canChangeAudioRewardContent(currentProtectedState, targetProtectedState))) {
-    requestAudioReward(); setStatus('期限切れの追加音色・追加列は変更できません。リワードを更新すると履歴を適用できます。'); return false;
+    requestAudioReward(); setStatus('この履歴操作を適用できません。現在の音楽データは保持されています。'); return false;
   }
   const state = direction === 'undo' ? audioHistory.undo(current) : audioHistory.redo(current);
   if (!state) { refreshAudioHistoryButtons(); return false; }
@@ -334,7 +332,7 @@ function showAudioResult({ title, detail, preview = pixelCanvas }) {
 function refreshAudioUi() {
   if (disposed()) return;
   for (const option of sizeSelect.options) if (Number(option.value) > AUDIO_PIXEL_COLUMNS) {
-    option.textContent = `${option.value} × ${PITCHES.length}（リワード）`;
+    option.textContent = `${option.value} × ${PITCHES.length}`;
   }
   let limitNote = document.querySelector('#audio-reward-limits');
   if (!limitNote) {
@@ -344,11 +342,9 @@ function refreshAudioUi() {
     anchor.insertAdjacentElement('afterend', limitNote);
   }
   const enabled = rewardPolicyEnabled();
-  const active = rewardActive();
-  const features = getAudioRewardFeatures(song);
   limitNote.textContent = enabled
-    ? `無料: ${AUDIO_FREE_COLUMNS}列・基本4音色・共有画像32色。リワード中は共有画像64色、追加音色、最大${AUDIO_REWARD_COLUMNS}列。透明と未使用色は色数に含みません。${features.wideCanvas || features.hasAdditionalInstruments ? active ? '既存の追加データを編集できます。' : '既存の追加データは読み取り専用で保持し、再生・保存できます。' : ''}`
-    : `音楽は最大${AUDIO_REWARD_COLUMNS}列・${AUDIO_INSTRUMENTS.length}音色を利用できます。`;
+    ? `音楽キャンバスは最大${AUDIO_REWARD_COLUMNS}列・${AUDIO_INSTRUMENTS.length}音色、共有画像は最大64色です。保存済みの追加データも編集できます。透明と未使用色は音楽の色数に含みません。`
+    : `音楽キャンバスは最大${AUDIO_REWARD_COLUMNS}列・${AUDIO_INSTRUMENTS.length}音色を利用できます。`;
   pixelCanvas.removeAttribute('aria-disabled');
   tempoInput.disabled = false;
   sizeSelect.disabled = !audioCanvasResizable();
@@ -483,7 +479,7 @@ function promoteStaticImageToAnimation({ rewardForOperation = rewardActive() } =
     });
     if (!canChangeAudioRewardContent(currentAudioRewardState(), { ...currentAudioRewardState(), song: projection.song,
       animation: projection.animation, link: projection.link }, rewardForOperation)) {
-      requestAudioReward(); setStatus('このモード変更は期限切れの追加音色・追加列を変えるため、リワード更新後にできます。'); return false;
+      requestAudioReward(); setStatus('このモード変更を適用できません。現在の音楽データは保持されています。'); return false;
     }
     audioAnimation = projection.animation;
     song = projection.song;
@@ -522,7 +518,7 @@ function ensureAudioAnimationProjection({ rewardForOperation = rewardActive(), c
   });
   if (!canChangeAudioRewardContent(currentAudioRewardState(), { ...currentAudioRewardState(), song: projected.song,
     link: projected.link }, rewardForOperation)) {
-    if (commit) { requestAudioReward(); setStatus('期限切れの追加音色・追加列は変更できません。リワードを更新すると音楽への投影を更新できます。'); return null; }
+    if (commit) { requestAudioReward(); setStatus('音楽への投影を更新できません。現在の音楽データは保持されています。'); return null; }
     // Playback/export of an imported work stays available after expiry. If
     // projecting the current artwork would rewrite bonus audio, use the
     // preserved stored song without committing a lossy projection.
@@ -591,11 +587,11 @@ async function handleAudioAnimationAction(action) {
     const projectedSong = ensureAudioAnimationProjection({ rewardForOperation });
     if (!projectedSong) {
       restoreAudioHistoryState(historyBefore);
-      setStatus('期限切れの追加音色・追加列は変更できません。リワードを更新してください。'); return false;
+      setStatus('音楽データを変更できません。現在の音楽データは保持されています。'); return false;
     }
   } else renderSong();
   if (!canChangeAudioRewardContent({ ...historyBefore, song: protectedSongBefore }, currentAudioRewardState(), rewardForOperation)) {
-    restoreAudioHistoryState(historyBefore); requestAudioReward(); setStatus('期限切れの追加音色・追加列は変更できません。リワードを更新してください。'); return false;
+    restoreAudioHistoryState(historyBefore); requestAudioReward(); setStatus('音楽データを変更できません。現在の音楽データは保持されています。'); return false;
   }
   refreshAudioAnimationControls();
   commitAudioHistoryState(historyBefore);
@@ -744,7 +740,7 @@ function writeSourceColor(hex) {
     if (!colorId) {
       song = setAudioPixelPalette(song, { slotId: selectedTrack().instrument, color: hex });
       if (!canChangeAudioRewardContent(sourceBefore, currentAudioRewardState(), rewardForOperation)) {
-        song = sourceBefore.song; requestAudioReward(); setStatus('期限切れの追加音色は変更できません。リワードを更新してください。'); return currentEditorHex();
+        song = sourceBefore.song; requestAudioReward(); setStatus('音色を変更できません。現在の音楽データは保持されています。'); return currentEditorHex();
       }
       pxdBridge?.markDirty(); renderPalette(); renderGrid(); updateCanvasLabel(); renderPaletteSettings({ sound: false });
       commitAudioHistoryState(paletteHistoryBefore);
@@ -755,7 +751,7 @@ function writeSourceColor(hex) {
     audioAnimation = result.animation; pxdLink = result.link; song = result.song; selectedColorId = result.colorId;
     if (!canChangeAudioRewardContent(sourceBefore, currentAudioRewardState(), rewardForOperation)) {
       song = sourceBefore.song; pxdImage = sourceBefore.image; pxdLink = sourceBefore.link; audioAnimation = sourceBefore.animation; selectedColorId = sourceBefore.colorId;
-      requestAudioReward(); setStatus('期限切れの追加音色や音符は変更できません。リワードを更新してください。'); return currentEditorHex();
+      requestAudioReward(); setStatus('音色や音符を変更できません。現在の音楽データは保持されています。'); return currentEditorHex();
     }
     const owned = persistAudioColorOwnership(currentAudioRewardState(), sourceBefore.link, rewardForOperation);
     audioAnimation = owned.animation; pxdImage = owned.image; pxdLink = owned.link;
@@ -926,9 +922,9 @@ function renderInstrumentGroupPicker(activeInstrument) {
   for (const instrument of selectedGroup?.instruments || []) {
     const rewardOnly = rewardPolicyEnabled() && !AUDIO_BASIC_INSTRUMENT_IDS.includes(instrument.id);
     const button = document.createElement('button'); button.type = 'button'; button.dataset.instrument = instrument.id;
-    button.setAttribute('aria-pressed', String(instrument.id === activeInstrument)); button.setAttribute('aria-label', `${instrument.name}${rewardOnly ? '、リワード音色' : ''}を試聴して選択`); button.title = rewardOnly ? `${instrument.name}・リワード音色` : instrument.name;
+    button.setAttribute('aria-pressed', String(instrument.id === activeInstrument)); button.setAttribute('aria-label', `${instrument.name}を試聴して選択`); button.title = instrument.name;
     button.append(createInstrumentIcon(instrument.id, '#202a33', 'audio-instrument-icon'));
-    const label = document.createElement('span'); label.textContent = `${instrument.name}${rewardOnly ? '（リワード）' : ''}`; button.append(label); choices.append(button);
+    const label = document.createElement('span'); label.textContent = `${instrument.name}`; button.append(label); choices.append(button);
   }
   if (soundPanel) soundPanel.scrollTop = previousScroll;
   const focusTarget = focusedInstrument ? choices.querySelector(`button[data-instrument="${CSS.escape(focusedInstrument)}"]`)
@@ -979,7 +975,7 @@ function assignCurrentColor(slotId) {
     }
     if (!canChangeAudioRewardContent(sourceBefore, currentAudioRewardState(), rewardForOperation)) {
       song = sourceBefore.song; pxdLink = sourceBefore.link; audioAnimation = sourceBefore.animation;
-      requestAudioReward(); setStatus('期限切れの追加音色や音符は変更できません。リワードを更新してください。'); renderPaletteSettings(); return;
+      requestAudioReward(); setStatus('音色や音符を変更できません。現在の音楽データは保持されています。'); renderPaletteSettings(); return;
     }
     const owned = persistAudioColorOwnership(currentAudioRewardState(), sourceBefore.link, rewardForOperation);
     audioAnimation = owned.animation; pxdImage = owned.image; pxdLink = owned.link;
@@ -1033,7 +1029,7 @@ function changeInstrument(slotId, instrumentId) {
     }
     if (!canChangeAudioRewardContent(sourceBefore, currentAudioRewardState(), rewardForOperation)) {
       song = sourceBefore.song; pxdLink = sourceBefore.link; audioAnimation = sourceBefore.animation;
-      requestAudioReward(); setStatus('期限切れの追加音色や音符は変更できません。リワードを更新してください。'); renderPaletteSettings(); return;
+      requestAudioReward(); setStatus('音色や音符を変更できません。現在の音楽データは保持されています。'); renderPaletteSettings(); return;
     }
     const owned = persistAudioColorOwnership(currentAudioRewardState(), sourceBefore.link, rewardForOperation);
     audioAnimation = owned.animation; pxdImage = owned.image; pxdLink = owned.link;
@@ -1179,7 +1175,7 @@ function applyPixel(cell, mode, { render = true, announce = true, audition = tru
   const rejectRewardMutation = () => {
     if (canChangeAudioRewardContent(sourceBefore, currentAudioRewardState(), rewardForOperation)) return false;
     song = sourceBefore.song; pxdImage = sourceBefore.image; pxdLink = sourceBefore.link; audioAnimation = sourceBefore.animation;
-    requestAudioReward(); setStatus('期限切れの追加音色・追加列に関わる音符は編集できません。リワードを更新してください。');
+    requestAudioReward(); setStatus('この音符を編集できません。現在の音楽データは保持されています。');
     renderSong(); paintPixelCanvas(); return true;
   };
   const { x, y } = cell; const pitch = pitchAtCell(x, y); const tick = tickAtColumn(x);
@@ -1218,7 +1214,7 @@ function applyPixel(cell, mode, { render = true, announce = true, audition = tru
         colorToSlot: candidateLink.colorToSlot, timing: candidateLink.timing || null
       });
       if (!canChangeAudioRewardContent(sourceBefore, { song: projected.song, animation: candidate, link: projected.link }, rewardForOperation)) {
-        requestAudioReward(); setStatus('期限切れの追加音色・追加列に関わる音符は編集できません。リワードを更新してください。'); return false;
+        requestAudioReward(); setStatus('この音符を編集できません。現在の音楽データは保持されています。'); return false;
       }
       const owned = persistAudioColorOwnership({ song: projected.song, animation: candidate, image: composedAnimationImage(), link: projected.link }, sourceBefore.link, rewardForOperation);
       audioAnimation = owned.animation; song = owned.song; pxdLink = owned.link; pxdImage = owned.image;
@@ -1405,7 +1401,7 @@ scope.listen(sizeSelect, 'change', async () => {
   const currentColumns = columns();
   const operationReward = rewardActive();
   if (rewardPolicyEnabled() && !operationReward && (chosen !== currentColumns || chosen > AUDIO_FREE_COLUMNS)) {
-    requestAudioReward(); setStatus(`音楽キャンバスは無料で${AUDIO_FREE_COLUMNS}列までです。${AUDIO_FREE_COLUMNS + 1}〜${AUDIO_REWARD_COLUMNS}列はリワード更新後に編集できます。`); return;
+    requestAudioReward(); setStatus(`音楽キャンバスは最大${AUDIO_REWARD_COLUMNS}列です。`); return;
   }
   flushPendingAudioHistoryEdits();
   if (player.isPlaying || player.isStarting) player.stop();
@@ -1763,7 +1759,7 @@ try {
     const plan = prepareSharedAudioImageImport(baseSong, image, { rowPitchMap });
     if (!audioSharedImageSupported(plan.image)) throw new RangeError(`共有キャンバスは256px・${AUDIO_REWARD_COLORS}色までです。撮影画像と曲はそのままです。`);
     if (!canChangeAudioRewardContent(currentAudioRewardState(), { song: plan.song, image: plan.image, link: plan.link }, operationReward)) {
-      requestAudioReward(); setStatus('撮影画像を適用すると期限切れの追加音色・追加列が変わるため、リワード更新後に適用できます。');
+      requestAudioReward(); setStatus('撮影画像を適用できません。現在の音楽データは保持されています。');
       return { workspace: pxdBridge, dispose: disposeAudioMode };
     }
     await pxdBridge.save(); if (disposed()) return { workspace: pxdBridge, dispose: disposeAudioMode }; pxdBridge.reset();
@@ -1942,7 +1938,7 @@ function currentAudioReturnUrl() { return `${location.pathname}${location.search
     const plan = prepareSharedAudioImageImport(song, sourceImage, { rowPitchMap });
     if (!audioSharedImageSupported(plan.image)) { setStatus(`共有キャンバスは256px・${AUDIO_REWARD_COLORS}色までです。画像と曲はそのままです。`); return false; }
     if (!canChangeAudioRewardContent(sourceBefore, { song: plan.song, image: plan.image, link: plan.link }, operationReward)) {
-      requestAudioReward(); setStatus('この画像を適用すると期限切れの追加音色・追加列が変わるため、リワード更新後に適用できます。'); return false;
+      requestAudioReward(); setStatus('この画像を適用できません。現在の音楽データは保持されています。'); return false;
     }
     const owned = persistAudioColorOwnership({ song: plan.song, image: plan.image, link: plan.link }, sourceBefore.link, operationReward);
     song = owned.song; pxdImage = owned.image; pxdLink = owned.link; pxdMainImage = null;

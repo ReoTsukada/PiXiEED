@@ -36,13 +36,14 @@ test('shared camera color policy counts used RGBA colors, excludes transparent p
   assert.equal(evaluateSharedCanvasPolicy({ width: 64, height: 1, colorCount: 65 }, { passActive: true }).supported, false);
 });
 
-test('both camera UIs gate new 64-color processing and retain captured results after expiry', () => {
+test('both camera UIs retain 64-color processing without reward expiry or timed pass labels', () => {
   const lens = readFileSync(new URL('../../js/pixel-lens/app.mjs', import.meta.url), 'utf8');
   const studio = readFileSync(new URL('../../js/pixel-studio/app.mjs', import.meta.url), 'utf8');
   assert.match(lens, /c64: \{ colorDepth: '64', paletteMode: 'source' \}/);
-  assert.match(lens, /cameraRewardPaused = true;[\s\S]*?loop\?\.stop\(\);[\s\S]*?stopTracks\(\)/);
+  assert.doesNotMatch(lens, /cameraRewardPaused|subscribeSiteReward|60分パス/);
   assert.match(lens, /requireSiteReward\('camera\.colors64'\)/);
-  assert.match(studio, /\['32', '32 色'\], \['64', '64 色 · 60分パス'\]/);
+  assert.match(studio, /\['32', '32 色'\], \['64', '64 色'\]/);
+  assert.doesNotMatch(studio, /subscribeSiteReward|60分パス/);
   assert.match(studio, /requireSiteReward\('camera\.colors64'\)/);
   assert.match(studio, /現在の64色画像は保持しています/);
 });

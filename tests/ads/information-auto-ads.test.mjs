@@ -11,7 +11,7 @@ import { eligibleEvents } from '../../scripts/generate-event-pages.mjs';
 
 const sourceHtml = '<!doctype html><html><head><title>Keep this title</title><link rel="canonical" href="https://pixieed.jp/about/"></head><body class="app-page"><main>Keep this content.</main></body></html>';
 const staticRoutes = [
-  ['index.html', '/'], ['tools/index.html', '/tools/'], ['about/index.html', '/about/'],
+  ['tools/index.html', '/tools/'], ['about/index.html', '/about/'],
   ['guide/index.html', '/guide/'], ['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'],
   ['stores/index.html', '/stores/'], ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html'],
   ['events/index.html', '/events/'],
@@ -37,7 +37,7 @@ test('build-time opt-in covers exactly the static information routes and generat
     assert.match(result.html, /data-information-auto-ads="\/events\/[a-z0-9-]+\/"/);
   }
   for (const sourcePath of [
-    'privacy/index.html', 'books/index.html', 'pass/index.html', 'camera/index.html', 'draw/index.html',
+    'index.html', 'feed/index.html', 'explore/index.html', 'privacy/index.html', 'books/index.html', 'pass/index.html', 'camera/index.html', 'draw/index.html',
     'audio/index.html', 'output/index.html', 'output/work/index.html', 'play/spot-difference/index.html',
     'globe-prototype.html', 'profile/index.html', 'admin/index.html', 'events/unlisted/index.html',
     'events/../index.html',
@@ -64,12 +64,12 @@ test('transform is idempotent, preserves page metadata/content, and places polic
   assert.match(first.html, /<title>Keep this title<\/title>/);
   assert.match(first.html, /href="https:\/\/pixieed\.jp\/about\/"/);
   assert.match(first.html, /Keep this content\./);
-  assert.match(first.html, /rev=20261024-no-offerwall-1/);
+  assert.match(first.html, /rev=20261024-all-tools-offerwall-1/);
 
   const sourceWithOldPolicy = sourceHtml.replace('</head>', '<script src="/js/adsense-offerwall-policy.js?rev=old"></script></head>');
   const updatedPolicy = addInformationAutoAds(sourceWithOldPolicy, 'about/index.html').html;
   assert.equal((updatedPolicy.match(/adsense-offerwall-policy\.js/g) || []).length, 1);
-  assert.match(updatedPolicy, /adsense-offerwall-policy\.js\?rev=20261024-no-offerwall-1/);
+  assert.match(updatedPolicy, /adsense-offerwall-policy\.js\?rev=20261024-all-tools-offerwall-1/);
 
   const sourceWithEarlyAds = sourceHtml
     .replace('<head>', '<head><script src="https://example.test/ads.js"></script>')
@@ -93,6 +93,9 @@ test('runtime requires exact production origin, top-level state, matching route 
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, isTopLevel: false }), false);
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/privacy/', marker: '/privacy/' }), false);
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, marker: '/guide/' }), false);
+  assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/', marker: '/' }), false, 'SNS home never receives provider-controlled Auto Ads');
+  assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/feed/', marker: '/feed/' }), false, 'interactive SNS feed never receives provider-controlled Auto Ads');
+  assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/explore/', marker: '/explore/' }), false, 'interactive search/filter view never receives provider-controlled Auto Ads');
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/events/fake/', marker: '/events/fake/' }), true, 'a syntactically valid event route is trusted only with the build marker');
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/events/../about/', marker: '/events/../about/' }), false);
   for (const blocked of [
@@ -104,7 +107,7 @@ test('runtime requires exact production origin, top-level state, matching route 
 function mockDocument({ existingSdk = null } = {}) {
   const scripts = [];
   const doc = {
-    body: { dataset: { informationAutoAds: '/' }, classList: { contains: () => false, [Symbol.iterator]: function* () {} } },
+    body: { dataset: { informationAutoAds: '/about/' }, classList: { contains: () => false, [Symbol.iterator]: function* () {} } },
     documentElement: { dataset: {}, hasAttribute: () => false },
     head: { append(script) { scripts.push(script); } },
     querySelector(selector) {
@@ -121,24 +124,25 @@ function mockDocument({ existingSdk = null } = {}) {
 }
 
 function mockWindow(overrides = {}) {
-  const win = { location: { protocol: 'https:', host: 'pixieed.jp', hostname: 'pixieed.jp', pathname: '/' }, googlefc: { controlledMessagingFunction() {} }, ...overrides };
+  const win = { location: { protocol: 'https:', host: 'pixieed.jp', hostname: 'pixieed.jp', pathname: '/about/' }, googlefc: { controlledMessagingFunction() {} }, ...overrides };
   win.top = win;
   win.self = win;
   return win;
 }
 
-test('runtime appends the existing SDK once, never pushes ad units, and leaves Google messaging untouched', () => {
+test('Auto Ads fallback appends the existing SDK once when the manual gutter is disabled', () => {
   const { doc, scripts } = mockDocument();
   const win = mockWindow();
   const messaging = win.googlefc.controlledMessagingFunction;
-  const first = mountInformationAutoAds({ doc, win });
+  const manualConfig = { enabled: false };
+  const first = mountInformationAutoAds({ doc, win, manualConfig });
   assert.equal(first.loaded, true);
   assert.equal(first.appended, true);
   assert.equal(scripts.length, 1);
   assert.equal(scripts[0].async, true);
   assert.equal(scripts[0].crossOrigin, 'anonymous');
   assert.match(scripts[0].src, /^https:\/\/pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js\?client=ca-pub-9801602250480253$/);
-  assert.equal(mountInformationAutoAds({ doc, win }).appended, false);
+  assert.equal(mountInformationAutoAds({ doc, win, manualConfig }).appended, false);
   assert.equal(scripts.length, 1);
   scripts[0].errorListener();
   assert.equal(scripts.length, 1, 'an SDK load error does not start a retry loop');
@@ -150,7 +154,7 @@ test('runtime appends the existing SDK once, never pushes ad units, and leaves G
 test('runtime reuses the manual display-ad SDK and fails closed outside eligible pages/configuration', () => {
   const existingSdk = { src: 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253', async: false };
   const reused = mockDocument({ existingSdk });
-  assert.deepEqual(mountInformationAutoAds({ doc: reused.doc, win: mockWindow() }), { loaded: true, appended: false, script: existingSdk });
+  assert.deepEqual(mountInformationAutoAds({ doc: reused.doc, win: mockWindow(), manualConfig: { enabled: false } }), { loaded: true, appended: false, script: existingSdk });
   assert.equal(reused.scripts.length, 0);
   assert.equal(existingSdk.async, false, 'the existing provider element is not mutated');
 
@@ -160,7 +164,7 @@ test('runtime reuses the manual display-ad SDK and fails closed outside eligible
   assert.equal(blocked.scripts.length, 0);
 
   const badConfig = mockDocument();
-  assert.equal(mountInformationAutoAds({ doc: badConfig.doc, win: mockWindow(), config: { client: 'invalid' } }).reason, 'configuration-unavailable');
+  assert.equal(mountInformationAutoAds({ doc: badConfig.doc, win: mockWindow(), manualConfig: { enabled: false }, config: { client: 'invalid' } }).reason, 'configuration-unavailable');
   assert.equal(badConfig.scripts.length, 0);
 });
 
@@ -193,8 +197,7 @@ test('Pages review build copies the runtime and injects only eligible generated 
 
   const result = await buildPagesSite({ root, output });
   const builtHome = await readFile(join(result.output, 'index.html'), 'utf8');
-  assert.match(builtHome, /data-information-auto-ads="\/"/);
-  assert.match(builtHome, /adsense-offerwall-policy\.js\?rev=20261024-no-offerwall-1[\s\S]*information-auto-ads\.mjs\?rev=20261020-info-side-1/);
+  assert.doesNotMatch(builtHome, /data-information-auto-ads|information-auto-ads\.mjs|adsense-offerwall-policy/);
   assert.match(await readFile(join(result.output, 'events/index.html'), 'utf8'), /data-information-auto-ads="\/events\/"/);
   assert.match(await readFile(join(result.output, 'events/eligible-pixel-event/index.html'), 'utf8'), /data-information-auto-ads="\/events\/eligible-pixel-event\/"/);
   await assert.rejects(readFile(join(result.output, 'events/watch-pixel-event/index.html')));

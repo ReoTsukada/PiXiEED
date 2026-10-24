@@ -1,6 +1,6 @@
 import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { createToolStartTracker, trackSiteEvent } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20261016-color-capability-1';
+import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20261024-free-tools-1';
 import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
 import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?rev=20261019-camera-original-color-1';
@@ -17,7 +17,7 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261016-color-capability-1';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261016-color-capability-1';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261018-direct-runtime-2';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261024-all-tools-offerwall-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-3';
@@ -25,8 +25,9 @@ import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=202
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
 import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?v=20261005-miniature-1';
-import { hasSiteReward, isSiteRewardPolicyEnabled, mountSiteRewardUI, requireSiteReward, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261016-color-capability-1';
+import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
+import { STATIC_IMAGE_FREE_LONG_EDGE } from '../creation/static-output-policy.mjs?rev=20261024-free-tools-1';
 import { resolveCameraGifLimits } from '../creation/output-reward-policy.mjs?rev=20261016-color-capability-1';
 
 export async function mountPixelLensMode({ autoStart = true, isActive = () => true, mountWorkspace = mountPxdTools, onUseImage = null, draw = null, integratedShared = false, onProjectSettings = null, initialProjectSettings = null, onPreviewFrame = null, onPreviewError = null } = {}) {
@@ -60,41 +61,18 @@ if (returnToAudio && !audioCameraRequest) {
 const root = $('#pixelStudio');
 root.dataset.startupPhase = 'idle';
 const savePngLink = $('#savePng');
-mountSiteRewardUI();
 const cameraRewardNotice = document.createElement('p');
 cameraRewardNotice.className = 'lc-image-note';
 cameraRewardNotice.id = 'camera-reward-note';
-cameraRewardNotice.hidden = true;
 cameraRewardNotice.style.cssText = 'margin:0 auto 8px;max-width:48rem;padding:8px 12px;color:#465a5e;font-size:12px;line-height:1.45;text-align:center';
 const renderCameraRewardNotice = () => {
-  cameraRewardNotice.hidden = !isSiteRewardPolicyEnabled();
-  const limits = REWARD_LIMITS.camera;
-  const active = hasSiteReward();
-  const pngRewarded = isSiteRewardPolicyEnabled() && active;
-  const pngEdge = pngRewarded ? REWARD_LIMITS.staticImage.rewardLongEdge : REWARD_LIMITS.staticImage.freeLongEdge;
-  cameraRewardNotice.textContent = `画像の読み込み・原本の保持は無料です。PNGは整数倍で長辺${pngEdge}pxまで保存できます。色は無料32色・60分パス中64色まで選べます。共通プロジェクトも無料32色・60分パス中64色までです。GIFは${active ? limits.rewardGifSeconds : limits.freeGifSeconds}秒・${active ? limits.rewardGifFps : limits.freeGifFps}FPSまでです。ジオラマ効果には60分パスが必要です。`;
+  const gif = resolveCameraGifLimits();
+  cameraRewardNotice.textContent = `読み込んだ画像と原本を保ったままPNG出力できます（整数倍・長辺${STATIC_IMAGE_FREE_LONG_EDGE}px・約1,678万画素まで）。色調整は64色まで。共通プロジェクトの上限は256px・64色です。GIFは最大${gif.maxMs / 1000}秒・${gif.fps}FPSで、ジオラマ効果も利用できます。カメラ利用時はブラウザーの許可が必要です。`;
 };
-function canApplyCameraDiorama() {
-  if (!isSiteRewardPolicyEnabled() || !state.miniature || hasSiteReward()) return true;
-  return requireSiteReward('camera.diorama');
-}
-function canEditCameraSettings({ allowColorDowngrade = false } = {}) {
-  if (!allowColorDowngrade && state.colorDepth === '64' && isSiteRewardPolicyEnabled() && !hasSiteReward()) {
-    syncControls();
-    requireSiteReward('camera.colors64');
-    sayToast('現在の64色画像は保持しています。更新するには60分パスが必要です');
-    return false;
-  }
-  if (canApplyCameraDiorama()) return true;
-  // Check before mutating shared settings so an expired pass never leaves
-  // hidden, unapplied changes behind the still-visible diorama preview.
-  syncControls();
-  sayToast('ジオラマ設定の変更には60分パスが必要です');
-  return false;
-}
 renderCameraRewardNotice();
 $('#cameraSettingsPanel')?.prepend(cameraRewardNotice);
-subscribeSiteReward(renderCameraRewardNotice);
+function canApplyCameraDiorama() { return true; }
+function canEditCameraSettings() { return true; }
 if (integratedShared) {
   root.dataset.integratedShared = 'true';
 }
@@ -124,7 +102,6 @@ const miniatureSourceContext = miniatureSource.getContext('2d', { willReadFreque
 const miniatureCanvas = document.createElement('canvas');
 const miniatureContext = miniatureCanvas.getContext('2d');
 let activeStream = null;
-let cameraRewardPaused = false;
 let cameraSequence = 0;
 let renderSequence = 0;
 let paletteEpoch = 0;
@@ -160,15 +137,6 @@ let focusRequestToken = 0;
 // PiXiEELENS defaults (pixiee-lens/index.html): 4 colours, Game Boy palette, ordered dither, surface 55
 const state = { mode: 'idle', facing: 'environment', result: null, error: '', ratio: DEFAULT_FRAME_RATIO, size: normalizeOutputSize(audioCameraRequest?.width ?? 128),
   colorDepth: '16', paletteMode: 'source', gradientMode: 'none', ditherPattern: 'net8', surfaceSimplify: 0, camera: { ...CAMERA_SETTING_DEFAULTS }, zoom: 1, miniature: false };
-subscribeSiteReward((reward) => {
-  if (!isSiteRewardPolicyEnabled()) return;
-  if (!reward.active && state.colorDepth === '64' && state.mode === 'live' && !cameraRewardPaused) {
-    cameraRewardPaused = true;
-    loop?.stop();
-    stopTracks();
-    sayToast('60分パスが終了しました。現在の64色画像は保持しています');
-  } else if (reward.active && cameraRewardPaused) resumeRewardPausedCamera();
-});
 let outputHandoffInFlight = false;
 root.dataset.miniature = 'false';
 let sharedImageTarget = null;
@@ -1318,7 +1286,7 @@ function closeCamera({ idle = true, message = '', focus = false, visible = false
 async function startCamera({ focus = true } = {}) {
   if (state.colorDepth === '64' && isSiteRewardPolicyEnabled() && !hasSiteReward()
     && !requireSiteReward('camera.colors64')) {
-    sayToast('現在の64色画像は保持しています。新しい撮影には60分パスが必要です');
+    sayToast('現在の64色画像は保持しています。');
     return;
   }
   if (audioCameraInvalid || !isActive()) return;
@@ -1506,13 +1474,13 @@ cameraImageInput.addEventListener('change', () => {
 
 async function capture() {
   if (!canApplyCameraDiorama()) {
-    sayToast('ジオラマ効果の適用には60分パスが必要です。現在の画像は保持されています');
+    sayToast('ジオラマ効果を適用できません。現在の画像は保持されています');
     return;
   }
   if (captureInFlight || state.mode !== 'live' || !state.result) return;
   if (state.colorDepth === '64' && isSiteRewardPolicyEnabled() && !hasSiteReward()
     && !requireSiteReward('camera.colors64')) {
-    sayToast('現在の64色画像は保持しています。新しい撮影には60分パスが必要です');
+    sayToast('現在の64色画像は保持しています。');
     return;
   }
   imageSelectionSequence++;
@@ -1640,7 +1608,7 @@ async function capture() {
 
 function finishAudioCamera(frozen) {
   if (!canApplyCameraDiorama()) {
-    sayToast('ジオラマ効果の適用には60分パスが必要です。現在の画像は保持されています');
+    sayToast('ジオラマ効果を適用できません。現在の画像は保持されています');
     return;
   }
   const { sourceData: _rawSource, ...finalFrame } = frozen;
@@ -1778,28 +1746,20 @@ function applyChange({ restart = false } = {}) {
   if (state.colorDepth === '64' && isSiteRewardPolicyEnabled() && !hasSiteReward()
     && !requireSiteReward('camera.colors64')) {
     syncControls();
-    sayToast('現在の64色画像は保持しています。更新するには60分パスが必要です');
+    sayToast('現在の64色画像は保持しています。');
     return false;
   }
   if (!canApplyCameraDiorama()) {
-    sayToast('ジオラマ設定の適用には60分パスが必要です');
+    sayToast('ジオラマ設定を適用できません。現在の画像は保持されています');
     return false;
   }
   if (regionMergeSession) endRegionMerge({ restore: true });
   syncLens();
   syncControls();
-  if (restart && cameraRewardPaused) resumeRewardPausedCamera();
-  else if (restart) restartPreview({ preserveCompleted: true });
+  if (restart) restartPreview({ preserveCompleted: true });
   fitPreview(state.result);
   updateSizeSummary();
   updateSharedCaptureControls();
-}
-function resumeRewardPausedCamera() {
-  if (!cameraRewardPaused) return;
-  cameraRewardPaused = false;
-  if (state.mode !== 'live') return;
-  if (importedSource) loop?.start();
-  else void startCamera({ focus: false });
 }
 function setCameraPaletteFixed(enabled) {
   const next = Boolean(enabled);
@@ -2162,7 +2122,7 @@ $('#miniatureToggle').addEventListener('click', () => {
   // Turning a saved bonus effect off is always free; only a new activation
   // needs an entitlement.
   if (!state.miniature && isSiteRewardPolicyEnabled() && !requireSiteReward('camera.diorama')) {
-    sayToast('ジオラマ効果には60分パスが必要です');
+    sayToast('ジオラマ効果を適用できません。現在の画像は保持されています');
     return;
   }
   state.miniature = !state.miniature;
@@ -2487,7 +2447,7 @@ function gifProgress() {
 function startGif() {
   if (audioCameraRequest || importedSource || state.mode !== 'live' || !state.result) return;
   if (!canApplyCameraDiorama()) {
-    sayToast('ジオラマ効果を含む新しいGIF撮影には60分パスが必要です。現在の画像は保持されています');
+    sayToast('GIFを撮影できません。現在の画像は保持されています');
     return;
   }
   if (regionMergeSession) { sayToast('色統合中はGIFを撮影できません'); return; }

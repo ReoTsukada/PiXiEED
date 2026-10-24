@@ -1,3 +1,4 @@
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-all-tools-offerwall-1';
 import { mountGameEditorSession } from './game-editor-session.mjs?rev=20261017-game-editor-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { listOwnVersions, mountPictureShelf, savePicture } from './picture-shelf.mjs?rev=20261002-hidden-maker-1';
@@ -10,15 +11,15 @@ import { imageToDrawDocument } from './pxd-project.mjs?rev=20261016-color-capabi
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { HIDDEN_OBJECT_MAX_MASK_PIXELS, confirmHiddenObjectTargets, createHiddenObjectDraft, mapClientPointToPixel, resolveLocalDrawRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20261021-jigsaw-public-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261018-direct-runtime-2';
-import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261016-color-capability-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261024-all-tools-offerwall-1';
+import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261024-free-tools-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { zoomCanvasViewportAt } from './canvas-viewport.mjs?rev=20260930-pinch-anchor-1';
 import { applyDrawingToolIcons } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { mountPuzzleImageSlot } from './puzzle-image-slot.mjs?rev=20261003-puzzle-import-1';
-import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261018-direct-runtime-2';
+import { confirmPxdConversion } from './pxd-ui.mjs?rev=20261024-all-tools-offerwall-1';
 
 const LAST_KEY = 'pixieed:creation:hidden-object:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -624,11 +625,14 @@ window.addEventListener('resize', fitCanvas);
 resumeButton.hidden = !readStorage(LAST_KEY);
 mountPictureShelf($('#hidden-shelf'), { tool: 'hidden-object', adapter, onBrought: async ({ from }) => { await loadSources(); setStatus(`${from.label}の絵を持ってきました。`); }, onError: (error) => setStatus(`持ってこられませんでした：${error.message}`) });
 pxdBridge = mountPxdHidden();
-const pxdImported = pxdBridge ? await pxdBridge.ready : false;
-if (!pxdImported) await loadSources();
+try {
+  const pxdImported = pxdBridge ? await pxdBridge.ready : false;
+  if (!pxdImported) await loadSources();
+} catch (error) { notifyToolEntryReady(false); throw error; }
 
 // Target controls stay in the dedicated settings sheet.
 mountToolHeaderControls(document, { selectors: [] });
 
 mountGameEditorSession({ kind: 'hidden-object', isActive: () => Boolean(draft), isDirty: () => Boolean(pxdBridge?.dirty), workspace: () => pxdBridge });
 if (new URLSearchParams(location.search).has('resumeLocal')) await resume();
+notifyToolEntryReady(pxdBridge?.initialEntryFresh === true && !pxdBridge?.restoreError && !draft && !new URLSearchParams(location.search).has('resumeLocal') && !location.search && !location.hash);
