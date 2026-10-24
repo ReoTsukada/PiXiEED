@@ -13,7 +13,7 @@ const STATIC_INFORMATION_ROUTES = new Map([
   ['events/index.html', '/events/'],
 ]);
 
-export const INFORMATION_AUTO_ADS_POLICY_SCRIPT = '<script src="/js/adsense-offerwall-policy.js?rev=20261016-no-offerwall-1"></script>';
+export const INFORMATION_AUTO_ADS_POLICY_SCRIPT = '<script src="/js/adsense-offerwall-policy.js?rev=20261024-no-offerwall-1"></script>';
 export const INFORMATION_AUTO_ADS_MODULE = '<script type="module" src="/js/information-auto-ads.mjs?rev=20261020-info-side-1"></script>';
 
 function normalizeSourceRoute(path) {
@@ -34,12 +34,9 @@ function rewriteBodyMarker(html, route) {
 }
 
 function withOnePolicyScript(html) {
-  let found = false;
-  return html.replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/adsense-offerwall-policy\.js(?:\?[^"']*)?\1)[^>]*>\s*<\/script>/gi, () => {
-    if (found) return '';
-    found = true;
-    return INFORMATION_AUTO_ADS_POLICY_SCRIPT;
-  });
+  const withoutPolicy = html.replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/adsense-offerwall-policy\.js(?:\?[^"']*)?\1)[^>]*>\s*<\/script>\s*/gi, '');
+  // This synchronous policy must precede every script that can request Ads.
+  return withoutPolicy.replace(/(<head\b[^>]*>)\s*/i, `$1\n${INFORMATION_AUTO_ADS_POLICY_SCRIPT}\n`);
 }
 
 /** Opt approved source pages into the side-ad loader at build time only. */
@@ -55,9 +52,6 @@ export function addInformationAutoAds(html, sourcePath = '', { generatedEventRou
 
   let output = rewriteBodyMarker(html, route);
   output = withOnePolicyScript(output);
-  if (!/\bsrc\s*=\s*["']\/js\/adsense-offerwall-policy\.js(?:\?[^"']*)?["']/i.test(output)) {
-    output = output.replace(/<\/body\s*>/i, `${INFORMATION_AUTO_ADS_POLICY_SCRIPT}\n</body>`);
-  }
   if (!/\bsrc\s*=\s*["']\/js\/information-auto-ads\.mjs(?:\?[^"']*)?["']/i.test(output)) {
     output = output.replace(/<\/body\s*>/i, `${INFORMATION_AUTO_ADS_MODULE}\n</body>`);
   }

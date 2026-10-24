@@ -41,6 +41,16 @@ test('a missing Offerwall enum never holds or blocks consent', () => {
   window.googlefc.controlledMessagingFunction({ proceed: (...value) => { args = value; } });
   assert.deepEqual(args, [true]);
 });
+test('provider replacement of the bootstrap object still suppresses only Offerwall', () => {
+  const frame = {}; const window = { top:frame, self:frame };
+  vm.runInContext(source, vm.createContext({ window }));
+  const callback = window.googlefc.controlledMessagingFunction;
+  window.googlefc = { MessageTypeEnum:{ OFFERWALL:3 }, controlledMessagingFunction:callback };
+  let args;
+  callback({ proceed:(...value) => { args = value; } });
+  assert.equal(args[0], false);
+  assert.deepEqual(Array.from(args[1]), [3]);
+});
 test('embedded tools do not replace their host messaging policy', () => {
   const sentinel = () => {}; const googlefc = { controlledMessagingFunction: sentinel };
   vm.runInContext(source, vm.createContext({ window: { top: {}, self: {}, googlefc } }));

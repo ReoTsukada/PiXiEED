@@ -64,12 +64,20 @@ test('transform is idempotent, preserves page metadata/content, and places polic
   assert.match(first.html, /<title>Keep this title<\/title>/);
   assert.match(first.html, /href="https:\/\/pixieed\.jp\/about\/"/);
   assert.match(first.html, /Keep this content\./);
-  assert.match(first.html, /rev=20261016-no-offerwall-1/);
+  assert.match(first.html, /rev=20261024-no-offerwall-1/);
 
   const sourceWithOldPolicy = sourceHtml.replace('</head>', '<script src="/js/adsense-offerwall-policy.js?rev=old"></script></head>');
   const updatedPolicy = addInformationAutoAds(sourceWithOldPolicy, 'about/index.html').html;
   assert.equal((updatedPolicy.match(/adsense-offerwall-policy\.js/g) || []).length, 1);
-  assert.match(updatedPolicy, /adsense-offerwall-policy\.js\?rev=20261016-no-offerwall-1/);
+  assert.match(updatedPolicy, /adsense-offerwall-policy\.js\?rev=20261024-no-offerwall-1/);
+
+  const sourceWithEarlyAds = sourceHtml
+    .replace('<head>', '<head><script src="https://example.test/ads.js"></script>')
+    .replace('</body>', '<script src="/js/adsense-offerwall-policy.js?rev=old"></script></body>');
+  const reorderedPolicy = addInformationAutoAds(sourceWithEarlyAds, 'about/index.html').html;
+  assert.ok(reorderedPolicy.indexOf(INFORMATION_AUTO_ADS_POLICY_SCRIPT) < reorderedPolicy.indexOf('https://example.test/ads.js'));
+  assert.equal((reorderedPolicy.match(/adsense-offerwall-policy\.js/g) || []).length, 1);
+  assert.equal(addInformationAutoAds(reorderedPolicy, 'about/index.html').html, reorderedPolicy);
 
   const noDocument = addInformationAutoAds('<h1>plain fragment</h1>', 'about/index.html');
   assert.deepEqual(noDocument, { html: '<h1>plain fragment</h1>', added: false, skipped: true });
@@ -186,7 +194,7 @@ test('Pages review build copies the runtime and injects only eligible generated 
   const result = await buildPagesSite({ root, output });
   const builtHome = await readFile(join(result.output, 'index.html'), 'utf8');
   assert.match(builtHome, /data-information-auto-ads="\/"/);
-  assert.match(builtHome, /adsense-offerwall-policy\.js\?rev=20261016-no-offerwall-1[\s\S]*information-auto-ads\.mjs\?rev=20261020-info-side-1/);
+  assert.match(builtHome, /adsense-offerwall-policy\.js\?rev=20261024-no-offerwall-1[\s\S]*information-auto-ads\.mjs\?rev=20261020-info-side-1/);
   assert.match(await readFile(join(result.output, 'events/index.html'), 'utf8'), /data-information-auto-ads="\/events\/"/);
   assert.match(await readFile(join(result.output, 'events/eligible-pixel-event/index.html'), 'utf8'), /data-information-auto-ads="\/events\/eligible-pixel-event\/"/);
   await assert.rejects(readFile(join(result.output, 'events/watch-pixel-event/index.html')));
