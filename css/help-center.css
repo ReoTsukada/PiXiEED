@@ -1,0 +1,70 @@
+.help-action-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+.help-action-grid a {
+  grid-template-columns: 2.25rem minmax(0, 1fr) 16px;
+  grid-template-areas: "icon title arrow" "icon description arrow";
+  align-items: center;
+  gap: .2rem .7rem;
+  min-height: 6rem;
+  padding: 1rem;
+  transition: border-color .16s ease, background-color .16s ease, transform .16s ease;
+}
+.help-action-grid a:hover {
+  transform: translateY(-1px);
+  border-color: var(--pixieed-link);
+  background: var(--pixieed-surface);
+}
+.help-action-icon {
+  grid-area: icon;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: .65rem;
+  color: var(--pixieed-dark);
+  background: var(--pixieed-surface-muted);
+  font-size: 1.35rem;
+  font-weight: 750;
+}
+.help-action-grid strong { grid-area: title; }
+.help-action-grid span:not(.help-action-icon):not(.help-action-open) { grid-area: description; }
+.help-action-grid a::after { grid-area:arrow; content:'→'; color:var(--pixieed-muted); }
+.help-action-grid .help-action-open {
+  grid-area: open;
+  margin-top: .4rem;
+  color: var(--pixieed-link);
+  font-size: .88rem;
+  font-weight: 700;
+}
+.help-mode-details {
+  margin-top: 0;
+}
+.help-mode-details > summary,
+#termSearchClear {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: .45rem .8rem;
+  border: 1px solid var(--pixieed-line);
+  border-radius: .6rem;
+  color: var(--pixieed-dark);
+  background: var(--pixieed-surface);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.help-mode-details > summary:focus-visible,
+#termSearchClear:focus-visible {
+  outline: 3px solid rgba(49, 95, 208, .35);
+  outline-offset: 2px;
+}
+.help-mode-details > p { max-width: 65ch; }
+.help-mode-details[open] > summary { margin-bottom: .5rem; }
+#termSearchClear[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .help-action-grid a { transition: none; }
+  .help-action-grid a:hover { transform: none; }
+}
+
+.help-action-icon img { width:24px; height:24px; object-fit:contain; }

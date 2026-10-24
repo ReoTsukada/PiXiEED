@@ -1,4 +1,4 @@
-import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261009-seo-1';
+import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261024-intelligence-ui-1';
 
 const mountedDocuments = new WeakMap();
 const HELP_CSS_ID = 'px-tool-help-styles';
@@ -13,7 +13,7 @@ function addHelpStyles(document) {
   const link = document.createElement('link');
   link.id = HELP_CSS_ID;
   link.rel = 'stylesheet';
-  link.href = '/css/tool-help.css?rev=20261003-tool-help-3';
+  link.href = '/css/tool-help.css?rev=20261024-intelligence-ui-1';
   document.head?.append(link);
 }
 
@@ -61,10 +61,17 @@ function renderGuide(document, host, guide) {
   stepsSection.tabIndex = -1;
   const stepsHeading = el(document, 'h3', '', 'はじめ方');
   stepsHeading.id = 'px-tool-help-steps-title';
+  stepsHeading.tabIndex = -1;
   stepsSection.setAttribute('aria-labelledby', stepsHeading.id);
   stepsSection.append(stepsHeading);
   const steps = el(document, 'ol', 'px-tool-help__steps');
-  (Array.isArray(guide.steps) ? guide.steps : []).forEach((step) => steps.append(el(document, 'li', '', step)));
+  (Array.isArray(guide.steps) ? guide.steps : []).forEach((step, index) => {
+    const row = el(document, 'li');
+    const number = el(document, 'span', 'px-tool-help__step-number', String(index + 1).padStart(2, '0'));
+    number.setAttribute('aria-hidden', 'true');
+    row.append(number, el(document, 'span', '', step));
+    steps.append(row);
+  });
   stepsSection.append(steps);
   host.append(stepsSection);
 
@@ -74,12 +81,15 @@ function renderGuide(document, host, guide) {
   controlsSection.tabIndex = -1;
   const controlsHeading = el(document, 'h3', '', '操作');
   controlsHeading.id = 'px-tool-help-controls-title';
+  controlsHeading.tabIndex = -1;
   controlsSection.setAttribute('aria-labelledby', controlsHeading.id);
   controlsSection.append(controlsHeading);
-  const list = el(document, 'dl', 'px-tool-help__controls');
-  (Array.isArray(guide.controls) ? guide.controls : []).forEach(({ action, detail }) => {
-    const row = el(document, 'div', 'px-tool-help__control');
-    row.append(el(document, 'dt', '', action || ''), el(document, 'dd', '', detail || ''));
+  const list = el(document, 'div', 'px-tool-help__controls');
+  (Array.isArray(guide.controls) ? guide.controls : []).forEach(({ action, detail }, index) => {
+    const row = el(document, 'details', 'px-tool-help__control');
+    row.id = `px-tool-help-control-${guide.id}-${index + 1}`;
+    row.append(el(document, 'summary', 'px-tool-help__control-summary', action || '操作を見る'));
+    row.append(el(document, 'p', 'px-tool-help__control-detail', detail || ''));
     list.append(row);
   });
   controlsSection.append(list);
@@ -91,6 +101,7 @@ function renderGuide(document, host, guide) {
   notesSection.tabIndex = -1;
   const notesHeading = el(document, 'h3', '', '保存・ヒント');
   notesHeading.id = 'px-tool-help-notes-title';
+  notesHeading.tabIndex = -1;
   notesSection.setAttribute('aria-labelledby', notesHeading.id);
   notesSection.append(notesHeading);
   const notes = el(document, 'ul', 'px-tool-help__note-list');
@@ -147,12 +158,24 @@ export function mountToolHelp({ document = globalThis.document, window = globalT
   const title = el(document, 'h2', '', hub ? 'ツールの使い方' : routeGuide.title);
   title.id = 'px-tool-help-title';
   headingGroup.append(title);
-  const close = el(document, 'button', 'px-tool-help__close', '閉じる');
+  const close = el(document, 'button', 'px-tool-help__close');
   close.type = 'button';
   close.setAttribute('aria-label', '使い方を閉じる');
-  const back = el(document, 'button', 'px-tool-help__back', '一覧');
+  close.title = '使い方を閉じる';
+  const closeIcon = el(document, 'img', 'px-tool-help__button-icon');
+  closeIcon.src = '/assets/icons/pixieed/close.svg';
+  closeIcon.alt = '';
+  closeIcon.setAttribute('aria-hidden', 'true');
+  close.append(closeIcon);
+  const back = el(document, 'button', 'px-tool-help__back');
   back.type = 'button';
   back.setAttribute('aria-label', '一覧へ戻る');
+  back.title = '一覧へ戻る';
+  const backIcon = el(document, 'img', 'px-tool-help__button-icon');
+  backIcon.src = '/assets/icons/pixieed/back.svg';
+  backIcon.alt = '';
+  backIcon.setAttribute('aria-hidden', 'true');
+  back.append(backIcon);
   back.hidden = true;
   header.append(headingGroup, back, close);
   const sectionNav = el(document, 'nav', 'px-tool-help__section-nav');
@@ -182,10 +205,14 @@ export function mountToolHelp({ document = globalThis.document, window = globalT
     button.addEventListener('click', () => {
       const section = content.querySelector(`#px-tool-help-${item.id}`);
       if (!section) return;
+      for (let parent = section.parentElement; parent && parent !== content; parent = parent.parentElement) {
+        if (parent.tagName === 'DETAILS') parent.open = true;
+      }
+      const target = section.querySelector('h3') || section;
       const containerTop = content.getBoundingClientRect().top;
-      const sectionTop = section.getBoundingClientRect().top;
-      content.scrollTop += sectionTop - containerTop - 8;
-      section.focus({ preventScroll: true });
+      const targetTop = target.getBoundingClientRect().top;
+      content.scrollTop += targetTop - containerTop - 8;
+      target.focus({ preventScroll: true });
     });
     sectionNav.append(button);
   }
@@ -211,10 +238,17 @@ export function mountToolHelp({ document = globalThis.document, window = globalT
     content.scrollTop = 0;
     if (shouldRestoreFocus) content.querySelector('.px-tool-help__guide-choice')?.focus({ preventScroll: true });
   };
+  const activeRouteGuide = () => {
+    if (!routeGuide || !document.body?.classList?.contains('creation-suite')) return routeGuide;
+    const mode = document.body.dataset?.creationMode;
+    return ['draw', 'camera', 'audio'].includes(mode)
+      ? getToolGuide({ pathname: `/${mode}/` }) || routeGuide
+      : routeGuide;
+  };
   const open = (trigger, chooseGuide = routeGuide) => {
     opener = trigger || returnFocus || document.activeElement;
     if (!menu.hidden) onCloseMenu?.();
-    if (chooseGuide) showGuide(chooseGuide);
+    if (chooseGuide) showGuide(chooseGuide === routeGuide ? activeRouteGuide() : chooseGuide);
     else showPicker();
     if (!dialog.open) dialog.showModal();
     close.focus({ preventScroll: true });

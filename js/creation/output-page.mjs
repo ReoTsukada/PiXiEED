@@ -208,6 +208,8 @@ function setError(message) {
   outputLayout.hidden = true;
   pageTitle.textContent = '出力を開けません';
   intro.textContent = message;
+  intro.setAttribute('role', 'alert');
+  $('#output-retry-import')?.removeAttribute('hidden');
   preview.replaceChildren();
   metadata.textContent = '';
   format.textContent = '';
@@ -226,7 +228,7 @@ function showStart() {
   outputStart.hidden = false;
   outputLayout.hidden = true;
   pageTitle.textContent = '変換・書き出し';
-  intro.textContent = '画像や音声を端末内で確認し、対応形式へ変換できます。';
+  intro.textContent = '素材を選んで、仕上がりを見ながら保存。';
   returnLink.href = '/tools/';
   returnLink.textContent = 'ツール一覧へ戻る';
 }

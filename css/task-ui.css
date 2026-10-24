@@ -1,0 +1,29 @@
+/* Purpose-based entrances and short, visual workflows. */
+.task-guide-page .page-hero h1 { font-size:clamp(28px,5vw,44px); line-height:1.2; }
+.task-guide-page .page-hero { padding-block:28px 0; }
+.task-guide-page .section { padding-top:12px; }
+.task-guide-page .faq-list details > a { display:inline-flex; align-items:center; min-height:44px; color:#a34f42; font-weight:700; }
+.task-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:12px; margin-block:20px; }
+.task-card { box-sizing:border-box; display:grid; grid-template-columns:40px minmax(0,1fr); align-items:center; gap:12px; min-height:92px; padding:16px; border:1px solid #dce2dd; border-radius:14px; color:#25322c; background:#fff; text-decoration:none; }
+.task-card > img { width:32px; height:32px; object-fit:contain; }
+.task-card > span { display:grid; gap:4px; min-width:0; }
+.task-card strong { font-size:16px; line-height:1.3; }
+.task-card small { color:#66746d; font-size:12px; line-height:1.5; }
+.task-card:hover { border-color:#c36254; background:#fff7f3; }
+.task-card:focus-visible { outline:3px solid #2588bb; outline-offset:2px; }
+.task-flow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:16px 0 22px; padding:0; list-style:none; counter-reset:task-step; }
+.task-flow > li { display:flex; align-items:center; gap:8px; min-width:0; min-height:44px; padding:8px 10px; border:1px solid #dce2dd; border-radius:10px; background:#fff; color:#42544a; font:700 13px/1.35 system-ui,sans-serif; counter-increment:task-step; }
+.task-flow-number { display:grid; place-items:center; flex:none; width:22px; height:22px; border-radius:50%; background:#edf2ed; color:#3e6551; }
+.task-disclosure { margin-block:12px; padding:0 14px; border:1px solid #dce2dd; border-radius:12px; background:#fff; }
+.task-disclosure > summary { display:list-item; min-height:44px; padding-block:12px; color:#42544a; font:700 14px/1.4 system-ui,sans-serif; cursor:pointer; }
+.task-disclosure > summary:focus-visible { outline:3px solid #2588bb; outline-offset:2px; border-radius:8px; }
+.task-disclosure > :not(summary) { margin-block:0 14px; color:#647068; font-size:13px; line-height:1.7; }
+.task-actions { display:flex; flex-wrap:wrap; gap:8px; margin-block:16px; }
+.task-actions > a { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 14px; border:1px solid #dce2dd; border-radius:10px; background:#fff; color:#42544a; font-size:14px; font-weight:700; text-decoration:none; }
+.task-actions > a:focus-visible { outline:3px solid #2588bb; outline-offset:2px; }
+details.tool-screen-gallery > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:52px; cursor:pointer; list-style:none; }
+details.tool-screen-gallery > summary::-webkit-details-marker { display:none; }
+details.tool-screen-gallery > summary::after { content:'＋'; font-size:24px; }
+details.tool-screen-gallery[open] > summary::after { content:'−'; }
+details.tool-screen-gallery > summary h2 { margin:0; font:750 18px/1.4 system-ui,sans-serif; }
+@media (max-width:380px) { .task-flow { gap:4px; } .task-flow > li { gap:4px; padding:7px 5px; font-size:11px; } }

@@ -73,3 +73,22 @@ test('guide copy reflects conditional rotation, camera gestures, and Game phases
   assert.doesNotMatch(game.controls.map(({ detail }) => detail).join(' '), /プレビューと編集を切り替え/);
   assert.doesNotMatch(game.notes.join(' '), /ツール一覧|公開投稿/);
 });
+
+test('draw and audio steps match the shared editor controls and distinguish saving from export', () => {
+  const draw = getToolGuide({ pathname: '/draw/' });
+  assert.match(draw.steps[2], /画面下.*出力.*作品を保存/);
+  assert.doesNotMatch(draw.steps.join(' '), /中央の「保存」|ファイルに保存/);
+  assert.match(draw.controls.find(({ action }) => action === '取り消し・やり直し').detail, /中央の再生ボタン/);
+  assert.match(draw.notes.join(' '), /ブラウザーに保存/);
+
+  const audio = getToolGuide({ pathname: '/audio/' });
+  assert.match(audio.steps[0], /［モード］.*［音楽］/);
+  assert.match(audio.steps[2], /中央の再生.*［出力］/);
+  assert.match(audio.controls.find(({ action }) => action === '写真・保存・書き出し').detail, /この作品を保存.*別ファイル/);
+  assert.match(audio.notes.join(' '), /共通キャンバス・パレット.*専用レイヤー/);
+});
+
+test('camera guide keeps the explicit start action and browser permission step', () => {
+  const camera = getToolGuide({ pathname: '/camera/' });
+  assert.match(camera.steps[0], /「カメラを開始」.*ブラウザーの利用許可/);
+});

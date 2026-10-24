@@ -51,6 +51,7 @@ dialog.px-tool-help::backdrop { background: rgb(12 20 24 / 58%); }
 }
 .px-tool-help__head button { flex: none; padding: 8px 12px; }
 .px-tool-help__head button[hidden] { display: none; }
+.px-tool-help__button-icon { display: block; width: 24px; height: 24px; object-fit: contain; }
 .px-tool-help__head button:hover,
 .px-tool-help__section-jump:hover,
 .px-tool-help__hub-button:hover,
@@ -118,11 +119,18 @@ dialog.px-tool-help::backdrop { background: rgb(12 20 24 / 58%); }
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
-.px-tool-help__steps li::before { counter-increment: help-step; content: counter(help-step, decimal-leading-zero); display: grid; place-items: center; width: 31px; height: 31px; border-radius: 9px; color: #fff; background: #2c7469; font-size: 13px; font-weight: 800; line-height: 1; }
+.px-tool-help__step-number { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 9px; color: #fff; background: #2c7469; font-size: 13px; font-weight: 800; line-height: 1; }
+.px-tool-help__head :is(.px-tool-help__close,.px-tool-help__back) { box-sizing:border-box; display:grid; place-items:center; width:44px; height:44px; padding:9px; }
+.px-tool-help__head :is(.px-tool-help__close,.px-tool-help__back)[hidden] { display:none; }
 .px-tool-help__controls { display: grid; gap: 8px; margin: 0; }
-.px-tool-help__control { display: grid; grid-template-columns: minmax(132px, .72fr) minmax(0, 1.55fr); gap: 12px; padding: 11px 13px; border: 1px solid #e1ddd2; border-radius: 11px; background: #fffefa; }
-.px-tool-help__control dt { color: #2b5148; font-weight: 750; overflow-wrap: anywhere; }
-.px-tool-help__control dd { margin: 0; color: #374640; font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
+.px-tool-help__control { border: 1px solid #e1ddd2; border-radius: 11px; background: #fffefa; }
+.px-tool-help__control summary { position: relative; min-height: 44px; display: flex; align-items: center; padding: 9px 42px 9px 13px; color: #2b5148; font-weight: 750; line-height: 1.5; overflow-wrap: anywhere; list-style: none; cursor: pointer; touch-action: manipulation; }
+.px-tool-help__control summary::marker { content: ""; }
+.px-tool-help__control summary::-webkit-details-marker { display: none; }
+.px-tool-help__control summary::after { position: absolute; right: 15px; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; content: ""; transform: translateY(-2px) rotate(45deg); }
+.px-tool-help__control[open] summary::after { transform: translateY(2px) rotate(225deg); }
+.px-tool-help__control summary:focus-visible { outline: 3px solid #27786d; outline-offset: -3px; border-radius: 10px; }
+.px-tool-help__control-detail { margin: 0; padding: 0 13px 12px; color: #374640; font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
 .px-tool-help__notes-section { padding: 14px 15px; border: 1px solid #e8d6c5; border-radius: 13px; background: #f8eee3; }
 .px-tool-help__notes-section h3 { color: #624d3d; }
 .px-tool-help__notes-section h3::after { background: #cf7855; }
@@ -179,7 +187,6 @@ dialog.px-tool-help::backdrop { background: rgb(12 20 24 / 58%); }
   .px-tool-help__content { padding: 14px 13px 20px; }
   .px-tool-help__hero { grid-template-columns: 44px minmax(0, 1fr); gap: 11px; min-height: 76px; padding: 12px; }
   .px-tool-help__hero-icon { width: 42px; height: 42px; padding: 8px; }
-  .px-tool-help__control { grid-template-columns: 1fr; gap: 3px; }
   .px-tool-help__hub-button { max-width: 100%; white-space: normal; }
 }
 @media (max-width: 360px) {

@@ -2,6 +2,7 @@
 /* One compact header for public pages and full-screen tools. */
 :root{--px-header-height:56px;--header-h:var(--px-header-height);--px-press-time:140ms;--px-press-ease:cubic-bezier(.2,.7,.2,1)}
 .px-header-ready body .site-header.px-site-header{display:block;position:sticky;top:0;z-index:35;min-height:var(--px-header-height);border:0;background:rgba(247,248,246,.97);box-shadow:0 1px 0 #1b202510}
+.px-header-ready body .site-header.px-site-header.px-header-inner{display:flex}
 .px-site-header,.px-site-header *{box-sizing:border-box}
 .px-site-header .px-header-inner,.px-site-header.px-header-inner{display:flex;align-items:center;gap:8px;width:100%;min-height:var(--px-header-height);padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));margin:0;min-width:0}
 .px-site-header .px-header-brand{display:flex;align-items:center;gap:9px;flex:none;min-width:44px;width:auto;min-height:44px;padding:0!important;color:#1b2025;text-decoration:none;font:750 1rem/1 system-ui,-apple-system,sans-serif;letter-spacing:0}

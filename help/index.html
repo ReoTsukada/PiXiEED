@@ -27,32 +27,38 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="stylesheet" href="/css/legacy-reference.css">
+  <link rel="stylesheet" href="/css/help-center.css?rev=20261024-intelligence-ui-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261024-intelligence-ui-1">
 </head>
 <body class="legacy-reference">
-  <header class="legacy-reference-header"><a href="/">PiXiEED</a></header>
+  <header class="legacy-reference-header site-header"><a class="brand" href="/">PiXiEED</a></header>
   <main class="legacy-reference-page">
     <nav class="legacy-reference-breadcrumbs" aria-label="パンくず"><a href="/">ホーム</a> › <span aria-current="page">ヘルプ</span></nav>
     <h1>ヘルプ</h1>
-    <p class="legacy-reference-lead">使いたいことから案内ページを選んでください。ドット絵、画像・カメラ、音楽はPiXiEEDrawの制作モードとして利用できます。</p>
+    <p class="legacy-reference-lead">やりたいことを選んで、すぐに始められます。</p>
 
     <section class="legacy-reference-section" aria-labelledby="help-creation-title">
-      <h2 id="help-creation-title">つくる</h2>
-      <p>各ページでは使い方を確認し、そのまま制作モードを開けます。</p>
-      <ul class="legacy-reference-cards">
-        <li><a href="/draw/#draw-how-to"><strong>PiXiEEDrawでドット絵を描く</strong><span>ブラウザーで作品を制作・編集します。描画モードから始められます。</span><span>案内と制作画面を開く →</span></a></li>
-        <li><a href="/camera/"><strong>PiXiEELENSで画像を変換する</strong><span>画像を読み込むかカメラで撮影し、色数を調整してドット絵にします。</span><span>案内と画像・カメラモードを開く →</span></a></li>
-        <li><a href="/audio/"><strong>PiXiEEaudioで音楽をつくる</strong><span>色ごとに音色を割り当て、マス目に音を描いてループ曲を編集します。</span><span>案内と音楽モードを開く →</span></a></li>
+      <h2 id="help-creation-title">何をしますか？</h2>
+      <ul class="legacy-reference-cards help-action-grid">
+        <li><a href="/draw/?workspace=1"><span class="help-action-icon" aria-hidden="true"><img src="/assets/icons/pixieed/draw.svg" alt=""></span><strong>描く</strong><span>ドット絵を制作・編集</span></a></li>
+        <li><a href="/camera/?workspace=1"><span class="help-action-icon" aria-hidden="true"><img src="/assets/icons/pixieed/camera.svg" alt=""></span><strong>画像・カメラ</strong><span>写真をドット絵に変換</span></a></li>
+        <li><a href="/audio/?workspace=1"><span class="help-action-icon" aria-hidden="true"><img src="/assets/icons/pixieed/music.svg" alt=""></span><strong>音楽</strong><span>色を選んで曲をつくる</span></a></li>
+        <li><a href="/output/work/"><span class="help-action-icon" aria-hidden="true"><img src="/assets/icons/pixieed/artwork.svg" alt=""></span><strong>書き出し</strong><span>ファイルを変換・書き出し</span></a></li>
+        <li><a href="/explore/"><span class="help-action-icon" aria-hidden="true"><img src="/assets/icons/pixieed/telescope.svg" alt=""></span><strong>作品を探す</strong><span>公開作品や投稿を見る</span></a></li>
+        <li><a href="/guide/"><span class="help-action-icon" aria-hidden="true"><img src="/assets/icons/pixieed/tools.svg" alt=""></span><strong>使い方</strong><span>投稿・保存・サイトの案内</span></a></li>
       </ul>
     </section>
 
     <section class="legacy-reference-section" aria-labelledby="help-modes-title">
-      <h2 id="help-modes-title">3つのモードについて</h2>
-      <p>PiXiEEDrawの描画・カメラ・音楽モードは、同じ制作環境の中で切り替えて使います。PiXiEELENSは画像・カメラのモード、PiXiEEaudioは音楽のモードです。各案内ページには、用途に合わせてモードを開くリンクがあります。</p>
-      <ul class="legacy-reference-links" aria-label="制作モードを直接開く">
-        <li><a href="/draw/?mode=draw">描画モード</a></li>
-        <li><a href="/camera/">画像・カメラモード</a></li>
-        <li><a href="/audio/">音楽モード</a></li>
-      </ul>
+      <details class="help-mode-details">
+        <summary id="help-modes-title">制作モードの使い分け</summary>
+        <p>PiXiEEDrawの描画・カメラ・音楽モードは、同じ制作環境の中で切り替えて使います。PiXiEELENSは画像・カメラのモード、PiXiEEaudioは音楽のモードです。各案内ページには、用途に合わせてモードを開くリンクがあります。</p>
+        <ul class="legacy-reference-links" aria-label="制作モードを直接開く">
+          <li><a href="/draw/?workspace=1">描画モード</a></li>
+          <li><a href="/camera/?workspace=1">画像・カメラモード</a></li>
+          <li><a href="/audio/?workspace=1">音楽モード</a></li>
+        </ul>
+      </details>
     </section>
 
     <section class="legacy-reference-section" aria-labelledby="help-site-title">
@@ -66,5 +72,6 @@
     </section>
   </main>
   <footer class="legacy-reference-footer"><a href="/">PiXiEEDホームへ戻る</a></footer>
+  <script type="module" src="/js/site-header.mjs?rev=20261024-intelligence-ui-1"></script>
 </body>
 </html>

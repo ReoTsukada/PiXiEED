@@ -72,6 +72,7 @@ function insertLensToolbarCta(html) {
 
 function skipReason(route, html) {
   if (DRAW_CTA_EXCLUDED_ROUTES[route]) return DRAW_CTA_EXCLUDED_ROUTES[route];
+  if (/\bdata-social-page\s*=/i.test(html)) return 'social navigation already provides creation tools';
   if (/<script\b[^>]*src=["']\/js\/site-header\.mjs(?:\?[^"']*)?["']/i.test(html)) return 'shared navigation already provides the Create destination';
   for (const [prefix, reason] of EXCLUDED_PREFIXES) if (route.startsWith(prefix)) return reason;
   if (route === '/' || route === '/tools/') return 'existing primary Draw action is authored in the page';

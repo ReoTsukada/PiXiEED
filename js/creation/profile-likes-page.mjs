@@ -39,8 +39,15 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
       grid.append(...loaded.map(card));
       host.replaceChildren(grid);
       host.removeAttribute('role');
+    } else if (host.dataset.hasLegacyLikes === 'true') {
+      host.textContent = '';
     } else {
-      host.textContent = host.dataset.hasLegacyLikes === 'true' ? '' : 'いいねした作品はまだありません。';
+      const message = document.createElement('p');
+      message.textContent = 'いいねした作品はまだありません。';
+      const link = document.createElement('a');
+      link.href = '/globe/';
+      link.textContent = '地図で作品を見る';
+      host.replaceChildren(message, link);
     }
   }
 
@@ -48,8 +55,23 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
     const host = document.querySelector('[data-profile-liked-posts]');
     if (!host) return;
     if (loaded !== null) { render(); return; }
-    if (failed) { host.textContent = 'いいねした作品を読み込めませんでした。再読み込みしてください。'; return; }
+    if (failed) {
+      const message = document.createElement('p');
+      message.textContent = 'いいねした作品を読み込めませんでした。';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'button button--quiet';
+      retry.textContent = 'もう一度読み込む';
+      retry.addEventListener('click', () => {
+        failed = false;
+        loading = null;
+        mount();
+      }, { once: true });
+      host.replaceChildren(message, retry);
+      return;
+    }
     if (loading) return;
+    host.textContent = 'いいねした作品を確認しています…';
     loading = (async () => {
       const { listMyPublishedLikes, loadPublishedMapPostsByIds } = await import('../globe/post-supabase.mjs?rev=20261001-free-tools-1');
       const ids = await listMyPublishedLikes();
@@ -61,7 +83,7 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
     }).catch(() => {
       failed = true;
       const current = document.querySelector('[data-profile-liked-posts]');
-      if (current) current.textContent = 'いいねした作品を読み込めませんでした。再読み込みしてください。';
+      if (current) mount();
     });
   }
 

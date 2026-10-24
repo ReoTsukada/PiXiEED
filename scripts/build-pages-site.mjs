@@ -48,8 +48,8 @@ export function addSiteFontFallback(html) {
 /** Add the separately cache-busted reward entry only to pages with the common public header. */
 export function addSiteHeaderBenefits(html, name = '') {
   // Shared CSS changes also apply to standalone and redirect compatibility shells.
-  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261024-unified-nav-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261024-unified-nav-1$2');
+  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261024-intelligence-ui-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261024-intelligence-ui-1$2');
   if (headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html)) return { html, added: false, skipped: true };
   if (!/href="\/css\/site-header\.css(?:\?[^\"]*)?"/i.test(html)
       || !/src="\/js\/site-header\.mjs(?:\?[^\"]*)?"/i.test(html)) return { html, added: false, skipped: true };
@@ -128,7 +128,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       }
       // Explicit new public sources are also reviewable in a clean local build
       // before they are committed. Arbitrary untracked work stays excluded.
-      for (const name of ['explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+      for (const name of ['assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
         'assets/icons/pixieed/color-adjust.svg', 'assets/icons/pixieed/text.svg', 'assets/icons/pixieed/draw.svg',
         'assets/icons/pixieed/copy.svg', 'assets/icons/pixieed/cut.svg', 'assets/icons/pixieed/paste.svg',
         'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',

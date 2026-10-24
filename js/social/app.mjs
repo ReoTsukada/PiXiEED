@@ -5,7 +5,7 @@ import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1'
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const LABELS = { art: 'ドット絵', photo: '写真', puzzle: 'パズル', text: 'ことば', music: '音楽' };
+const LABELS = { art: 'ドット絵', photo: '写真加工', puzzle: 'パズル', text: 'ことば', music: '音楽' };
 const MODES = new Set(Object.keys(LABELS));
 const FEED_VIEWS = Object.freeze({
   feed: ['みんなの作品', '公開された作品を見つけるフィードです。'],
@@ -93,8 +93,13 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   function ensureSearch() {
     let input = $('#socialSearch', documentRef);
     if (!input) {
-      input = node('input', { id: 'socialSearch', type: 'search', placeholder: '読み込んだ投稿や作者を検索', 'aria-label': '読み込んだ投稿や作者を検索' });
-      $('#feedFilters', documentRef).after(input);
+      const label = node('label', { class: 'explore-search' }, '作品・作者を検索');
+      input = node('input', { id: 'socialSearch', type: 'search', placeholder: 'タイトル・作者・ことば', 'aria-label': '読み込んだ公開作品を検索' });
+      label.append(input);
+      const note = node('p', { class: 'explore-search-note' }, '最新30件の公開作品が対象です。');
+      const anchor = $('#feedViews', documentRef) || $('#feedFilterWrap', documentRef);
+      if (anchor) { anchor.before(label, note); }
+      else feed.before(label, note);
     }
     bindSearch(input);
     return input;
@@ -296,26 +301,57 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const scrollY = windowRef.scrollY;
     const draftsPanel = $('#draftsPanel', documentRef); if (draftsPanel) draftsPanel.hidden = state.filter !== 'local';
     feed.hidden = state.filter === 'local';
-    if (state.filter === 'local') { renderDrafts(); feed.replaceChildren(); feed.setAttribute('aria-busy', 'false'); retry.hidden = true; statusText('下書きはこの端末に保存されています。'); return; }
+    if (state.filter === 'local') {
+      renderDrafts(); feed.replaceChildren(); feed.setAttribute('aria-busy', 'false'); retry.hidden = true;
+      updateReadWarningDetails(false); statusText('下書きはこの端末に保存されています。'); return;
+    }
     const posts = filteredPosts();
+    const showReadWarnings = state.filter !== 'saved';
     const eligible = !state.mineMode && state.filter === 'all' && !state.query;
     const flow = planFeedFlow(posts, { enabled: eligible, previewAds, previousPlan: publicFlow });
     if (eligible) publicFlow = flow;
     feed.replaceChildren(...flow.map(renderFlowEntry)); feed.setAttribute('aria-busy', 'false');
-    if (!posts.length) statusText(state.mineMode ? '自分の投稿はありません。' : state.readWarnings.length
-      ? '一部の公開元を確認できませんでした。表示できる公開作品がない場合もあります。再試行してください。'
-      : state.filter === 'saved' ? '保存した公開作品はありません。' : state.query ? '検索に一致する公開作品はありません。' : state.posts.length ? 'この種類の公開作品はありません。' : '公開作品はまだ見つかりません。');
-    else statusText(state.readWarnings.length
-      ? `${posts.length}件を表示中（最新30件まで）。一部の公開元を読み込めませんでした。再試行できます。`
-      : `${posts.length}件を表示中${state.mineMode ? '（自分の投稿）' : '（最新30件まで）'}`);
-    retry.hidden = !state.readWarnings.length;
-    if (state.filter === 'local') renderDrafts(); updateFilters();
+    if (!posts.length) feed.append(renderEmptyState());
+    if (showReadWarnings && state.readWarnings.length) {
+      const range = posts.length ? `${posts.length}件を表示中。` : '取得できた範囲: 0件。';
+      statusText(`${range}公開元の一部は未取得です。再試行できます。`);
+    } else statusText(posts.length
+      ? `${posts.length}件を表示中${state.mineMode ? '（自分の投稿）' : '（最新30件まで）'}`
+      : '表示件数: 0件。');
+    updateReadWarningDetails(showReadWarnings);
+    retry.hidden = !showReadWarnings || !state.readWarnings.length;
+    updateFilters();
     if (restore) {
       const replacement = feed.querySelector(`[data-post-id="${CSS.escape(restore.id)}"] [data-action="${CSS.escape(restore.action)}"]`);
       replacement?.focus({ preventScroll: true });
       if (!replacement) $('#feedFilters [aria-pressed="true"]', app)?.focus({ preventScroll: true });
       windowRef.scrollTo({ top: scrollY, behavior: 'instant' });
     }
+  }
+  function renderEmptyState() {
+    let heading, message, action, actionLabel;
+    if (state.mineMode) {
+      heading = state.readWarnings.length ? '自分の投稿を確認できません' : '自分の投稿はありません'; message = state.readWarnings.length ? '公開元の一部を読み込めていません。再試行できます。' : '作品やことばを投稿すると、ここで確認できます。'; action = { 'data-compose': '', 'data-type': 'art' }; actionLabel = '作品を投稿する';
+    } else if (state.filter === 'saved') {
+      heading = '保存した作品はありません'; message = 'みんなの作品を見て、気になる作品を保存できます。'; action = { 'data-action': 'view', 'data-view': 'feed' }; actionLabel = 'みんなの作品を見る';
+    } else if (state.query) {
+      heading = state.readWarnings.length ? '取得できた作品に一致するものはありません' : '一致する作品はありません'; message = '別の言葉で検索するか、検索を消してください。'; action = { 'data-action': 'clear-search' }; actionLabel = '検索をクリア';
+    } else if (state.filter !== 'all') {
+      heading = state.readWarnings.length ? `取得できた範囲に${LABELS[state.filter] || 'この種類'}の作品はありません` : `${LABELS[state.filter] || 'この種類'}の作品はありません`; message = '種類をすべてに戻して、ほかの作品も見られます。'; action = { 'data-action': 'filter', 'data-type': 'all' }; actionLabel = 'すべての種類を見る';
+    } else {
+      heading = state.readWarnings.length ? '公開作品を確認できません' : '公開作品がまだ見つかりません'; message = state.readWarnings.length ? '公開元の一部を読み込めていません。再試行するか、作品を作れます。' : '作品を作って、公開する設定で投稿できます。'; action = { 'data-compose': '', 'data-type': 'art' }; actionLabel = '作品を作る';
+    }
+    const card = node('section', { class: 'feed-empty-state', 'aria-labelledby': 'feedEmptyTitle' });
+    card.append(node('span', { class: 'feed-empty-mark', 'aria-hidden': 'true' }, '＋'), node('h2', { id: 'feedEmptyTitle' }, heading), node('p', {}, message));
+    const button = node('button', { type: 'button', class: 'feed-empty-action', ...action }, actionLabel);
+    card.append(button);
+    return card;
+  }
+  function updateReadWarningDetails(visible = true) {
+    const details = $('#feedWarningDetails', documentRef), list = $('#feedWarningList', documentRef);
+    if (!details || !list) return;
+    details.hidden = !visible || !state.readWarnings.length;
+    list.replaceChildren(...state.readWarnings.map((warning) => node('li', {}, warning)));
   }
   function updateFilters() {
     $$('#feedFilters [data-action="filter"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.type === state.filter && !state.mineMode)));
@@ -324,6 +360,12 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const [title, description] = FEED_VIEWS[view];
     $('#pageTitle', documentRef).textContent = explorePage && view === 'feed' ? '探す' : title;
     $('#viewDescription', documentRef).textContent = explorePage && view === 'feed' ? '読み込んだ公開作品を、作者・ことば・種類から探します。' : description;
+    const searchLabel = $('#socialSearch', documentRef)?.closest('.explore-search');
+    if (searchLabel) {
+      searchLabel.hidden = view !== 'feed';
+      const note = searchLabel.nextElementSibling;
+      if (note?.classList.contains('explore-search-note')) note.hidden = view !== 'feed';
+    }
     for (const button of $$('.rail-link[data-action="saved"]', app)) button.setAttribute('aria-pressed', String(view === 'saved'));
     // Page destinations stay selected independently of local saved/draft tabs.
     $$('#feedViews [data-action="view"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
@@ -335,7 +377,11 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (!draftsHost || $('#draftsPanel', documentRef)?.hidden) return;
     const focusedId = documentRef.activeElement?.closest?.('[data-draft-id]')?.dataset.draftId;
     drafts.list().then((items) => {
-      if (!items.length) { draftsHost.replaceChildren(node('p', { class: 'drafts-empty' }, '保存した下書きはここに表示されます。')); return; }
+      if (!items.length) {
+        const empty = node('div', { class: 'drafts-empty-state' });
+        empty.append(node('p', {}, '下書きはこの端末に保存され、公開されません。'), node('button', { type: 'button', class: 'draft-empty-action', 'data-compose': '', 'data-type': 'art' }, '下書きを作る'));
+        draftsHost.replaceChildren(empty); return;
+      }
       const rows = items.map((draft) => {
         const row = node('article', { class: 'draft-row' });
         const open = node('button', { type: 'button', 'data-action': 'open-draft', 'data-draft-id': draft.id }, `${LABELS[draft.mode] || '下書き'} · ${draft.title || 'タイトル未設定'} · ${formatDate(draft.savedAt)}`);
@@ -349,26 +395,27 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   }
   async function refresh({ initial = false } = {}) {
     if (state.loading) return;
-    state.loading = true; retry.hidden = true;
+    state.loading = true; retry.hidden = true; state.readWarnings = [];
+    updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
     if (initial) { feed.setAttribute('aria-busy', 'true'); statusText('公開作品を読み込んでいます…'); }
     try {
       const latest = await api.list({ limit: 30 });
       state.readWarnings = typeof api.getReadWarnings === 'function' ? api.getReadWarnings() : [];
+      updateReadWarningDetails();
       const oldIds = new Set(state.posts.map((post) => post.id));
       if (!state.initialized || initial) { state.posts = latest; state.initialized = true; render(); }
       else {
         state.staged = latest.filter((post) => !oldIds.has(post.id));
         if (state.staged.length) { $('#newPostsSlot', documentRef).hidden = false; $('#newPostsButton', documentRef).textContent = `↑ 新着 ${state.staged.length} 件を表示`; }
         else toast('新しい公開投稿はありません。');
-      }
-      retry.hidden = !state.readWarnings.length;
-      if (state.readWarnings.length) statusText(`${state.readWarnings.join(' ')} 表示中の公開作品は取得できた範囲です。`);
-      else if (state.initialized && !state.staged.length) {
-        const visible = filteredPosts().length;
-        statusText(visible ? `${visible}件を表示中（最新30件まで）` : state.filter === 'saved' ? '保存した公開作品はありません。' : state.query ? '検索に一致する公開作品はありません。' : state.posts.length ? 'この種類の公開作品はありません。' : '公開作品はまだ見つかりません。');
+        render();
       }
     } catch (error) {
-      feed.setAttribute('aria-busy', 'false'); statusText(`公開作品を読み込めませんでした。${niceError(error, '接続を確認して再試行してください。')}`); retry.hidden = false;
+      feed.setAttribute('aria-busy', 'false');
+      if (state.filter === 'local') statusText('下書きはこの端末に保存されています。');
+      else if (state.filter === 'saved') statusText('保存した作品はこの端末で管理されます。');
+      else { statusText(`作品を読み込めませんでした。${niceError(error, '接続を確認して再試行してください。')}`); retry.hidden = false; }
+      updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
     } finally { state.loading = false; $('#refreshFeed', documentRef)?.removeAttribute('aria-busy'); }
   }
   function acceptNewPosts() {
@@ -917,6 +964,12 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (name === 'view') {
       void navigateView(action.dataset.view); return;
     }
+    if (name === 'clear-search') {
+      const search = ensureSearch(); search.value = ''; state.query = '';
+      const url = new URL(windowRef.location.href); url.searchParams.delete('q');
+      windowRef.history.replaceState(windowRef.history.state || {}, '', url);
+      render(); search.focus({ preventScroll: true }); return;
+    }
     if (name === 'filter') { state.mineMode = false; state.filter = action.dataset.type || 'all'; render(); void savePreferences({ filter: state.filter }); return; }
     if (name === 'mine') {
       action.disabled = true;
@@ -1140,9 +1193,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (initialView !== currentView()) await navigateView(initialView, { push: false, restore: false });
     windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, currentView()));
     state.query = params.get('q')?.trim() || '';
-    const search = $('#socialSearch', documentRef);
-    if (search) bindSearch(search);
-    else if (state.query) { ensureSearch(); $('#feedFilterWrap details', documentRef)?.setAttribute('open', ''); }
+    const search = ensureSearch();
+    if (state.query) search.focus({ preventScroll: true });
     const postRef = params.get('post'), outputRef = params.get('output'), compose = params.get('compose');
     if (outputRef) {
       await openComposer('music');

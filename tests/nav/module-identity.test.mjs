@@ -6,8 +6,9 @@ import { spawnSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
-  ['js/app.js', 'rev=20261023-sns-navigation-1'],
-  ['js/site-header.mjs', 'rev=20261024-unified-nav-1'],
+  ['js/app.js', 'rev=20261024-intelligence-ui-1'],
+  ['js/site-header.mjs', 'rev=20261024-intelligence-ui-1'],
+  ['js/creation/output-page.mjs', 'rev=20261024-intelligence-ui-1'],
   ['js/page-navigation.mjs', 'rev=20261023-sns-navigation-1'],
   ['js/display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['js/tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
@@ -23,7 +24,7 @@ const skippedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'docs
 async function sourceFiles(directory = '', result = []) {
   for (const entry of await readdir(new URL(directory ? `${directory}/` : './', root), { withFileTypes: true })) {
     const path = directory ? `${directory}/${entry.name}` : entry.name;
-    if (entry.isDirectory() && skippedDirectories.has(entry.name)) continue;
+    if (entry.isDirectory() && skippedDirectories.has(entry.name) && path !== 'output/work') continue;
     if (entry.isDirectory()) await sourceFiles(path, result);
     else if (entry.isFile() && (path.endsWith('.html') || path.startsWith('js/') && /\.(?:js|mjs)$/.test(path) || templates.has(path))) result.push(path);
   }
@@ -42,6 +43,7 @@ function targetFor(owner, value) {
 
 test('all production and generated-template references use one URL per shared module', async () => {
   const names = (await sourceFiles()).sort();
+  assert.ok(names.includes('output/work/index.html'), 'The public export workspace is part of the production URL contract.');
   const counts = new Map([...canonical.keys()].map(path => [path, 0]));
   for (const owner of names) {
     const source = await readFile(new URL(owner, root), 'utf8');

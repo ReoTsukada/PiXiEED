@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261024-unified-nav-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261024-intelligence-ui-1';
 import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
@@ -4126,7 +4126,7 @@ function renderStores() {
     <form class="filter-bar" data-store-filter>
       <div class="field"><label for="store-search">お店を探す</label><input id="store-search" name="search" type="search" placeholder="お店の名前・エリア"></div>
     </form>
-    <p class="filter-result" data-store-result></p>
+    <p class="filter-result" data-store-result role="status" aria-live="polite"></p>
     <div class="store-grid" data-store-grid></div>`;
   const form = root.querySelector('[data-store-filter]');
   const render = () => {
@@ -4137,8 +4137,18 @@ function renderStores() {
       return !search || haystack.includes(search);
     });
     root.querySelector('[data-store-result]').textContent = `${filtered.length}店舗を表示中`;
-    root.querySelector('[data-store-grid]').innerHTML = filtered.length ? filtered.map(storeCard).join('') : '<div class="empty-state">条件に合う店舗はまだありません。</div>';
+    root.querySelector('[data-store-grid]').innerHTML = filtered.length
+      ? filtered.map(storeCard).join('')
+      : search
+        ? '<div class="empty-state"><p>条件に合うお店はありません。</p><button class="button button--quiet" type="button" data-clear-store-search>検索をクリア</button></div>'
+        : '<div class="empty-state"><p>掲載中のお店はありません。</p><a class="button button--quiet" href="/globe/">地図で作品を見る</a></div>';
   };
+  root.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-clear-store-search]')) return;
+    form.reset();
+    render();
+    form.querySelector('input[type="search"]')?.focus();
+  });
   form.addEventListener('input', render);
   form.addEventListener('change', render);
   render();

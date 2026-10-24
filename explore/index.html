@@ -14,8 +14,8 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
   <title>作品・作者を探す｜PiXiEED</title>
-  <link rel="stylesheet" href="/css/social-feed.css?rev=20261024-unified-nav-1">
-  <script type="module" src="/js/social/app.mjs?rev=20261024-sns-release-1"></script>
+  <link rel="stylesheet" href="/css/social-feed.css?rev=20261024-intelligence-ui-1">
+  <script type="module" src="/js/social/app.mjs?rev=20261024-intelligence-ui-1"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
 </head>
 <body data-social-page="explore">
@@ -63,7 +63,7 @@
         <details class="filter-disclosure"><summary>種類で絞る</summary><nav class="feed-filters" id="feedFilters" aria-label="投稿の種類">
           <button type="button" data-action="filter" data-type="all" aria-pressed="true" disabled data-boot-disabled>すべて</button>
           <button type="button" data-action="filter" data-type="art" aria-pressed="false" disabled data-boot-disabled>ドット絵</button>
-          <button type="button" data-action="filter" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真</button>
+          <button type="button" data-action="filter" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真加工</button>
           <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button>
           <button type="button" data-action="filter" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button>
           <button type="button" data-action="filter" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
@@ -73,6 +73,7 @@
 
       <div class="new-posts-slot" id="newPostsSlot" hidden><button id="newPostsButton" type="button" data-action="show-new-posts" disabled data-boot-disabled><span aria-hidden="true">↑</span> 新しい投稿があります</button></div>
       <p class="feed-status" id="feedStatus" role="status" aria-live="polite"><span id="bootStatus">操作を準備しています。進まない場合は <a href="/feed/">再読み込み</a> できます。</span></p>
+      <details class="feed-warning-details" id="feedWarningDetails" hidden><summary>一部の公開元に問題があります</summary><ul id="feedWarningList"></ul></details>
       <button class="feed-retry" id="feedRetry" type="button" data-action="retry" hidden disabled data-boot-disabled>もう一度読み込む</button>
       <section class="feed-list" id="feed" aria-label="作品フィード" aria-busy="true">
         <article class="post-card post-skeleton" aria-hidden="true"><div class="skeleton-line"><span class="skeleton-avatar"></span><span class="skeleton-copy"></span></div><div class="skeleton-art"></div><div class="skeleton-line skeleton-line--short"></div></article>
@@ -82,11 +83,11 @@
       <section class="drafts-panel" id="draftsPanel" aria-labelledby="draftsTitle" hidden>
         <div class="section-heading"><div><p class="eyebrow">ON THIS DEVICE</p><h2 id="draftsTitle">ローカルの下書き</h2></div><span class="local-label">この端末内</span></div>
         <div id="localDrafts" class="drafts-list"><p class="drafts-empty">保存した下書きはここに表示されます。</p></div>
-        <section class="draft-audio-manager" aria-labelledby="draftAudioTitle">
-          <div class="draft-audio-heading"><h3 id="draftAudioTitle">保存した音声ファイル</h3><button type="button" id="draftAudioRefresh" class="draft-audio-refresh" data-action="refresh-audio" disabled data-boot-disabled>一覧を更新</button></div>
+        <details class="draft-audio-manager">
+          <summary id="draftAudioTitle">端末の音声ファイル</summary><div class="draft-audio-heading"><button type="button" id="draftAudioRefresh" class="draft-audio-refresh" data-action="refresh-audio" disabled data-boot-disabled>一覧を更新</button></div>
           <p class="composer-help">音声はこの端末のブラウザー保存領域に保管されます。ブラウザーのデータ消去や容量整理で失われる場合があります。必要な音源は元のファイルも保存してください（1ファイル64 MiBまで、合計256 MiBまで）。</p>
           <div id="draftAudioList" class="draft-audio-list"><p class="drafts-empty">音声ファイルの一覧は、ここを開いたときに読み込みます。</p></div>
-        </section>
+        </details>
       </section>
       <footer class="feed-footer"><span class="tiny-pixel" aria-hidden="true"></span> つくる人のための、ちいさなタイムライン</footer>
     </main>
@@ -96,10 +97,10 @@
       <section class="create-card" aria-labelledby="createTitle">
         <div class="section-heading"><div><p class="eyebrow">MAKE &amp; SHARE</p><h2 id="createTitle">つくる道具</h2></div></div>
         <a class="create-option" href="/draw/?workspace=1&amp;social=1"><span class="create-icon create-icon--art"><img src="/assets/icons/pixieed/artwork.svg" alt=""></span><span><strong>ドット絵を描く</strong><small>ピクセルスタジオ</small></span><b aria-hidden="true">↗</b></a>
-        <a class="create-option" href="/camera/?workspace=1&amp;social=1"><span class="create-icon create-icon--photo"><img src="/assets/icons/pixieed/camera.svg" alt=""></span><span><strong>写真をつくる</strong><small>ピクセルカメラ</small></span><b aria-hidden="true">↗</b></a>
-        <a class="create-option" href="/audio/?workspace=1&amp;social=1"><span class="create-icon create-icon--music"><img src="/assets/icons/pixieed/music.svg" alt=""></span><span><strong>音をつくる</strong><small>オーディオスタジオ</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/camera/?workspace=1&amp;social=1"><span class="create-icon create-icon--photo"><img src="/assets/icons/pixieed/camera.svg" alt=""></span><span><strong>写真をドット絵に</strong><small>ピクセルカメラ</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/audio/?workspace=1&amp;social=1"><span class="create-icon create-icon--music"><img src="/assets/icons/pixieed/music.svg" alt=""></span><span><strong>音楽を作る</strong><small>オーディオスタジオ</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/spot-difference/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/spot-difference.svg" alt=""></span><span><strong>間違い探し</strong><small>作品を遊びに</small></span><b aria-hidden="true">↗</b></a>
-        <a class="create-option" href="/hidden-object/?social=1"><span class="create-icon create-icon--hidden"><img src="/assets/icons/pixieed/hidden-object.svg" alt=""></span><span><strong>かくし絵をつくる</strong><small>ピクセルの中に発見</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/hidden-object/?social=1"><span class="create-icon create-icon--hidden"><img src="/assets/icons/pixieed/hidden-object.svg" alt=""></span><span><strong>かくし絵を作る</strong><small>ピクセルの中に発見</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/jigsaw/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/jigsaw.svg" alt=""></span><span><strong>ジグソー</strong><small>自分で遊ぶ・投稿する</small></span><b aria-hidden="true">↗</b></a>
         <p class="inline-demo-note">作品の作成は各ツールで行います。</p>
       </section>
@@ -123,7 +124,7 @@
         <header class="dialog-header"><div><p class="eyebrow">YOUR LITTLE WORK</p><h2 id="composerTitle">作品を投稿</h2></div><button class="icon-button dialog-close" id="composerClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header>
         <div class="composer-body">
           <div class="composer-types" role="group" aria-label="投稿の種類">
-            <button type="button" data-action="composer-type" data-type="art" aria-pressed="true" disabled data-boot-disabled>ドット絵</button><button type="button" data-action="composer-type" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真</button><button type="button" data-action="composer-type" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button><button type="button" data-action="composer-type" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button><button type="button" data-action="composer-type" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
+          <button type="button" data-action="composer-type" data-type="art" aria-pressed="true" disabled data-boot-disabled>ドット絵</button><button type="button" data-action="composer-type" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真加工</button><button type="button" data-action="composer-type" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button><button type="button" data-action="composer-type" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button><button type="button" data-action="composer-type" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
           </div>
           <nav class="composer-context" aria-label="投稿内容の設定">
             <button type="button" data-action="composer-pane" data-pane="content" aria-controls="composer-content" aria-pressed="true">内容</button>
@@ -148,7 +149,7 @@
           <label class="composer-file-label" for="composerFile">画像を選択</label><input id="composerFile" type="file" accept="image/png,image/webp" hidden>
           <label class="composer-file-label" for="composerAudioFile">音声を選択</label><input id="composerAudioFile" type="file" accept="audio/*" hidden>
           <div id="composerToolLinks" class="composer-tool-links" aria-label="作品を作るツール">
-            <a href="/draw/?workspace=1&amp;social=1">ドット絵を描く</a><a href="/camera/?workspace=1&amp;social=1">写真をつくる</a><a href="/audio/?workspace=1&amp;social=1">音をつくる</a><a href="/spot-difference/?social=1">間違い探し</a><a href="/hidden-object/?social=1">かくし絵をつくる</a><a href="/jigsaw/?social=1">ジグソー</a>
+            <a href="/draw/?workspace=1&amp;social=1">ドット絵を描く</a><a href="/camera/?workspace=1&amp;social=1">写真をドット絵に</a><a href="/audio/?workspace=1&amp;social=1">音楽を作る</a><a href="/spot-difference/?social=1">間違い探し</a><a href="/hidden-object/?social=1">かくし絵を作る</a><a href="/jigsaw/?social=1">ジグソー</a>
           </div>
           </div>
           <div class="composer-pane" id="composer-settings" data-composer-pane="settings" hidden>
@@ -190,7 +191,7 @@
     <dialog class="tools-dialog" id="toolsDialog" aria-labelledby="toolsTitle">
       <section class="tools-sheet"><header class="dialog-header"><div><p class="eyebrow">MAKE &amp; SHARE</p><h2 id="toolsTitle">つくる道具</h2></div><button class="icon-button" id="toolsClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header>
         <p>つくった作品は、各ツールの案内に沿ってフィードへ戻せます。</p>
-        <a href="/draw/?workspace=1&amp;social=1">ピクセルスタジオ<span>ドット絵を描く</span></a><a href="/camera/?workspace=1&amp;social=1">ピクセルカメラ<span>写真をつくる</span></a><a href="/audio/?workspace=1&amp;social=1">オーディオスタジオ<span>音をつくる</span></a><a href="/spot-difference/?social=1">間違い探し<span>パズルをつくる</span></a><a href="/hidden-object/?social=1">かくし絵<span>作品を遊びに</span></a><a href="/jigsaw/?social=1">ジグソー<span>絵を組み立てる</span></a>
+        <a href="/draw/?workspace=1&amp;social=1">ピクセルスタジオ<span>ドット絵を描く</span></a><a href="/camera/?workspace=1&amp;social=1">ピクセルカメラ<span>写真をドット絵に</span></a><a href="/audio/?workspace=1&amp;social=1">オーディオスタジオ<span>音楽を作る</span></a><a href="/spot-difference/?social=1">間違い探し<span>パズルを作る</span></a><a href="/hidden-object/?social=1">かくし絵<span>作品を遊びに</span></a><a href="/jigsaw/?social=1">ジグソー<span>絵を組み立てる</span></a>
       </section>
     </dialog>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>

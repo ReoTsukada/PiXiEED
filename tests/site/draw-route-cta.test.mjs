@@ -58,6 +58,15 @@ test('home and tools reuse their authored primary Draw links without adding a st
   }
 });
 
+test('SNS pages use their Create navigation without a second explanatory strip', async () => {
+  for (const file of ['index.html', 'feed/index.html', 'explore/index.html']) {
+    const html = await readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
+    const result = addSiteDrawCta(html, file);
+    assert.equal(result.added, false, file);
+    assert.equal(result.html, html, file);
+  }
+});
+
 test('books generator emits the authored static Draw CTA without changing product source logic', async () => {
   const root = await mkdtemp(join(tmpdir(), 'pixieed-books-cta-'));
   try {

@@ -14,9 +14,17 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // These are URL-only changes. Keep module bodies, revision semantics, and
 // runtime-specific query values out of this normalizer.
 const targets = new Map([
-  ['app.js', 'rev=20261023-sns-navigation-1'],
-  ['site-header.mjs', 'rev=20261024-unified-nav-1'],
+  ['app.js', 'rev=20261024-intelligence-ui-1'],
+  ['site-header.mjs', 'rev=20261024-intelligence-ui-1'],
   ['page-navigation.mjs', 'rev=20261023-sns-navigation-1'],
+  ['tool-help.mjs', 'rev=20261024-intelligence-ui-1'],
+  ['tool-help-data.mjs', 'rev=20261024-intelligence-ui-1'],
+  ['tool-help-bootstrap.mjs', 'rev=20261024-intelligence-ui-1'],
+  ['profile-likes-page.mjs', 'rev=20261024-intelligence-ui-1'],
+  ['output-page.mjs', 'rev=20261024-intelligence-ui-1'],
+  ['tool-output.css', 'rev=20261024-intelligence-ui-1'],
+  ['tool-help.css', 'rev=20261024-intelligence-ui-1'],
+  ['social-feed.css', 'rev=20261024-intelligence-ui-1'],
   ['display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['draw-core.mjs', 'rev=20261011-tool-size-1'],
@@ -28,8 +36,8 @@ const targets = new Map([
 
 async function walk(directory, files = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (entry.isDirectory() && excludedDirectories.has(entry.name)) continue;
     const path = join(directory, entry.name);
+    if (entry.isDirectory() && excludedDirectories.has(entry.name) && relative(root, path) !== 'output/work') continue;
     if (entry.isDirectory()) await walk(path, files);
     else if (entry.isFile() && entry.name.endsWith('.html')) files.push(path);
     else if (entry.isFile() && (relative(root, path).startsWith('js/') || generatedTemplates.has(relative(root, path)))

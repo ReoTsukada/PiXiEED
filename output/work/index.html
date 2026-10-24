@@ -11,9 +11,10 @@
   <script src="/js/adsense-auto.js?rev=20261009-output-offerwall-1"></script>
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/tool-output.css?rev=20261020-format-conversion-1">
+  <link rel="stylesheet" href="/css/tool-output.css?rev=20261024-intelligence-ui-1">
   <link rel="stylesheet" href="/css/output-side-ad.css?rev=20261020-side-ad-vertical-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/task-ui.css?rev=20261024-intelligence-ui-1">
 </head>
 <body data-page="output">
   <a class="output-skip" href="#main">本文へ移動</a>
@@ -26,12 +27,13 @@
       <p class="output-eyebrow"><span aria-hidden="true">✳</span> この端末で処理しています</p>
       <h1 id="output-title" tabindex="-1">作品を確認</h1>
       <p id="output-copy" class="output-copy">プレビューを確認して、必要ならサイズや名前を整えて保存できます。</p>
+      <ol class="task-flow" aria-label="ファイルの変換と保存"><li><span class="task-flow-number" aria-hidden="true">1</span>素材を選ぶ</li><li><span class="task-flow-number" aria-hidden="true">2</span>仕上がりを確認</li><li><span class="task-flow-number" aria-hidden="true">3</span>端末に保存</li></ol>
+      <a id="output-retry-import" class="output-button output-button--secondary" href="/output/work/" hidden>別のファイルを選ぶ</a>
     </div>
     <section id="output-start" class="output-start" aria-labelledby="output-start-title" hidden>
-        <div class="output-start__copy"><p class="output-eyebrow">端末の中で変換</p><h2 id="output-start-title">画像・動画・音声を選ぶ</h2><p>選んだファイルはこの端末内で読み込みます。PNG、JPEG、GIF、APNG、WebP画像、MP4/WebM動画と、ブラウザーがデコードできる音声を読み込めます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p><p id="output-start-reward-note" class="output-help" hidden></p></div>
+        <div class="output-start__copy"><p class="output-eyebrow">端末内で変換</p><h2 id="output-start-title">画像・動画・音声</h2><p>ファイルはサーバーに送信しません。</p><details class="task-disclosure"><summary>対応するファイル</summary><p>PNG、JPEG、GIF、APNG、WebP画像、MP4/WebM動画と、ブラウザーがデコードできる音声を読み込めます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p></details><p id="output-start-reward-note" class="output-help" hidden></p></div>
       <div id="output-drop" class="output-drop" aria-label="画像・動画または音声ファイルをここにドロップ">
-        <span class="output-drop__mark" aria-hidden="true">＋</span><strong>ファイルを選ぶ</strong><span>複数の画像を並べてGIF・APNG・対応動画にできます</span>
-        <button id="output-start-choose" class="output-button output-button--primary" type="button">端末からファイルを選ぶ</button>
+        <button id="output-start-choose" class="output-drop-trigger" type="button"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 9h14l5 6h9v25H10Z"/><path d="M24 21v12m-5-5 5 5 5-5"/></svg><strong>ファイルを選ぶ</strong><span>画像・動画・音声</span><small>複数選択・ドロップ対応</small></button>
       </div>
       <p id="output-import-status" class="output-status" role="status" aria-live="polite"></p>
       <progress id="output-import-progress" class="output-progress" max="100" value="0" aria-label="素材の読み込み状況" hidden></progress>
@@ -88,7 +90,7 @@
           <label class="output-field-label" for="output-filename">ファイル名</label>
           <div class="output-filename">
             <input id="output-filename" type="text" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="output-filename-help">
-            <button id="output-extension" class="output-extension" type="button" aria-haspopup="listbox" aria-expanded="false">.png <span aria-hidden="true">⌄</span></button>
+            <button id="output-extension" class="output-extension" type="button" aria-label="保存形式を選ぶ" aria-describedby="output-format" title="保存形式を選ぶ" aria-haspopup="listbox" aria-expanded="false">.png <span aria-hidden="true">⌄</span></button>
           </div>
           <div id="output-format-picker" class="output-format-picker" hidden>
             <label class="output-field-label" for="output-format-select">対応形式</label>
@@ -182,8 +184,8 @@
     <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
     <input id="output-scale" type="hidden" value="1">
   </main>
-  <script type="module" src="/js/creation/output-page.mjs?rev=20261021-social-return-1"></script>
+  <script type="module" src="/js/creation/output-page.mjs?rev=20261024-intelligence-ui-1"></script>
   <script type="module" src="/js/ads/output-side-ad.mjs?rev=20261020-side-ad-vertical-1"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261022-social-release-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261024-intelligence-ui-1"></script>
 </body>
 </html>
