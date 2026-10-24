@@ -9,8 +9,8 @@ test('header benefit build transform versions shared and embed CSS/modules and i
   const page = headerPage().replace('</head>', '<link rel="stylesheet" href="/css/tool-embed.css?rev=old"><script type="module" src="/js/tool-embed.mjs?rev=old"></script></head>');
   const result = addSiteHeaderBenefits(page, 'draw/index.html');
   assert.equal(result.added, true);
-  assert.match(result.html, /site-header\.css\?rev=20261023-compact-header-1/);
-  assert.match(result.html, /src="\/js\/site-header\.mjs\?rev=20261023-sns-navigation-1"/);
+  assert.match(result.html, /site-header\.css\?rev=20261024-unified-nav-1/);
+  assert.match(result.html, /src="\/js\/site-header\.mjs\?rev=20261024-unified-nav-1"/);
   assert.match(result.html, /site-header-benefits\.mjs\?rev=20261016-header-benefits-2/);
   assert.match(result.html, /tool-embed\.css\?rev=20261017-workspace-entry-1/);
   assert.match(result.html, /tool-embed\.mjs\?rev=20261017-workspace-entry-1/);

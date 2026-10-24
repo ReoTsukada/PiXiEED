@@ -48,8 +48,8 @@ export function addSiteFontFallback(html) {
 /** Add the separately cache-busted reward entry only to pages with the common public header. */
 export function addSiteHeaderBenefits(html, name = '') {
   // Shared CSS changes also apply to standalone and redirect compatibility shells.
-  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261023-compact-header-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261023-sns-navigation-1$2');
+  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261024-unified-nav-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261024-unified-nav-1$2');
   if (headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html)) return { html, added: false, skipped: true };
   if (!/href="\/css\/site-header\.css(?:\?[^\"]*)?"/i.test(html)
       || !/src="\/js\/site-header\.mjs(?:\?[^\"]*)?"/i.test(html)) return { html, added: false, skipped: true };

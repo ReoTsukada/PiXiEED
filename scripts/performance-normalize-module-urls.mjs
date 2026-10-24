@@ -15,7 +15,7 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // runtime-specific query values out of this normalizer.
 const targets = new Map([
   ['app.js', 'rev=20261023-sns-navigation-1'],
-  ['site-header.mjs', 'rev=20261023-sns-navigation-1'],
+  ['site-header.mjs', 'rev=20261024-unified-nav-1'],
   ['page-navigation.mjs', 'rev=20261023-sns-navigation-1'],
   ['display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],

@@ -25,7 +25,8 @@ export function mountPublicNavigation({ document: doc = globalThis.document, win
     }
   }
 
-  nav.className = 'mobile-nav app-tabs app-tabs--labeled public-destination-nav';
+  nav.className = 'mobile-nav public-destination-nav';
+  doc.body.classList.add('has-public-destination-nav');
   nav.setAttribute('aria-label', 'メインナビゲーション');
   nav.innerHTML = PUBLIC_NAV_ITEMS.map(({ key, label, href, icon }) =>
     `<a data-public-nav="${key}" href="${href}" aria-label="${label}"><img src="/assets/icons/pixieed/${icon}.svg" alt=""><span class="app-tab-label">${label}</span></a>`

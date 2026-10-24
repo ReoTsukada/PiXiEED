@@ -1,4 +1,4 @@
-@import url('./navigation.css?rev=20261023-sns-navigation-1');
+@import url('./navigation.css?rev=20261024-unified-nav-1');
 /* One compact header for public pages and full-screen tools. */
 :root{--px-header-height:56px;--header-h:var(--px-header-height);--px-press-time:140ms;--px-press-ease:cubic-bezier(.2,.7,.2,1)}
 .px-header-ready body .site-header.px-site-header{display:block;position:sticky;top:0;z-index:35;min-height:var(--px-header-height);border:0;background:rgba(247,248,246,.97);box-shadow:0 1px 0 #1b202510}

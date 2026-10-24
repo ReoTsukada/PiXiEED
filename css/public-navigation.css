@@ -1,0 +1,112 @@
+/* One responsive contract for ordinary page destinations. Tool operation bars
+   keep their own DOM and styles so capture/play actions remain independent. */
+body.has-public-destination-nav,
+body:has(.public-destination-nav) {
+  padding-bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+  scroll-padding-bottom: calc(78px + env(safe-area-inset-bottom));
+}
+html:has(.public-destination-nav) {
+  scroll-padding-bottom: calc(78px + env(safe-area-inset-bottom));
+}
+
+body .public-destination-nav {
+  position: fixed !important;
+  z-index: 30 !important;
+  left: 50% !important;
+  right: auto !important;
+  inset-inline-start: 50% !important;
+  inset-inline-end: auto !important;
+  inset-block-start: auto !important;
+  inset-block-end: calc(8px + env(safe-area-inset-bottom)) !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  grid-template-rows: 44px !important;
+  align-items: center;
+  gap: 2px !important;
+  box-sizing: border-box;
+  width: min(496px, calc(100% - 16px)) !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  padding: 6px !important;
+  margin: 0 !important;
+  overflow: visible;
+  transform: translateX(-50%) !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, .97) !important;
+  box-shadow: 0 8px 24px rgba(19, 35, 29, .14), 0 1px 3px rgba(19, 35, 29, .08), inset 0 0 0 1px rgba(34, 48, 43, .14) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+body .public-destination-nav > a[data-public-nav] {
+  display: flex !important;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px !important;
+  box-sizing: border-box;
+  width: 100% !important;
+  justify-self: stretch !important;
+  min-width: 44px !important;
+  max-width: none;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  color: #56625d !important;
+  background: transparent !important;
+  font: 700 11px/1.1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: 0 !important;
+  text-align: center;
+  text-decoration: none !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+  transform: none !important;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body .public-destination-nav > a[data-public-nav] > :is(img, svg) {
+  display: block !important;
+  flex: none;
+  width: 24px !important;
+  min-width: 24px;
+  height: 24px !important;
+  max-width: 24px;
+  max-height: 24px;
+  margin: 0 !important;
+  object-fit: contain;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body .public-destination-nav > a[data-public-nav] > span {
+  display: block !important;
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit !important;
+  font: inherit !important;
+  line-height: 1.1 !important;
+  letter-spacing: inherit !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body .public-destination-nav > a[data-public-nav][aria-current="page"] {
+  color: #bf4b40 !important;
+  background: #fff0ed !important;
+}
+
+body .public-destination-nav > a[data-public-nav]:is(:hover, :focus-visible) {
+  color: #bf4b40 !important;
+  background: #fff4f1 !important;
+}
+
+body .public-destination-nav > a[data-public-nav]:focus-visible {
+  outline: 3px solid #2588bb !important;
+  outline-offset: -3px;
+}

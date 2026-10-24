@@ -128,7 +128,7 @@ test('current published app callers compile from an owned copy without changing 
     assert.equal(report.htmlAppEntryCount, htmlCallers.length);
     assert.equal(report.appModuleCallerCount, 1);
     const app = await readFile(path.join(tempRoot, 'js/app.js'), 'utf8');
-    assert(app.includes('./site-header.mjs?rev=20261023-sns-navigation-1'), 'Keep the already-published header identity while optimizing the app.');
+    assert(app.includes('./site-header.mjs?rev=20261024-unified-nav-1'), 'Keep the current header identity while optimizing the app.');
     assert(!app.includes('function renderDiscoveryMap('), 'Unreferenced legacy map renderer should not ship in the optimized app copy.');
     const home = await readFile(path.join(tempRoot, 'welcome/index.html'), 'utf8');
     const socialHome = await readFile(path.join(tempRoot, 'index.html'), 'utf8');

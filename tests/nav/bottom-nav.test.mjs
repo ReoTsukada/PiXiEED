@@ -22,14 +22,36 @@ test('public destination navigation is stable and Create remains an ordinary pag
 
 test('shared header mounts destinations on public pages but skips tools and embedded frames', () => {
   const navigation = read('js/public-navigation.mjs');
+  const style = read('css/public-navigation.css');
   assert.match(navigation, /win\.top !== win\.self/);
   assert.match(navigation, /data-admin-page/);
   assert.match(navigation, /data-tool-short/);
   assert.match(navigation, /\.pc-header, \.lc-top, \.hud-top__bar/);
   assert.match(navigation, /app-page--tool-globe/);
   assert.match(navigation, /aria-current', 'page'/);
+  assert.match(navigation, /nav\.className = 'mobile-nav public-destination-nav'/);
+  assert.doesNotMatch(navigation, /nav\.className[^\n]*app-tabs/);
+  assert.match(navigation, /has-public-destination-nav/);
+  assert.match(style, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(style, /width: min\(496px, calc\(100% - 16px\)\)/);
+  assert.match(style, /height: 56px/);
+  assert.match(style, /min-width: 44px/);
+  assert.match(style, /width: 24px/);
+  assert.match(style, /aria-current="page"/);
+  assert.match(style, /safe-area-inset-bottom/);
   assert.match(read('events/index.html'), /site-header\.mjs/);
   assert.match(read('books/index.html'), /site-header\.mjs/);
+});
+
+test('SNS entry pages share the five lower destinations without a second desktop navigation', () => {
+  for (const file of ['index.html', 'feed/index.html', 'explore/index.html']) {
+    const html = read(file);
+    const nav = html.match(/<nav class="mobile-nav public-destination-nav"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+    assert.ok(nav, file);
+    assert.deepEqual([...nav.matchAll(/data-public-nav="([^"]+)"/g)].map(match => match[1]), ['home', 'explore', 'create', 'map', 'me'], file);
+    assert.doesNotMatch(html, /class="(?:left-rail|rail-nav)"/, file);
+  }
+  assert.match(read('css/social-feed.css'), /@import url\('\.\/public-navigation\.css\?rev=20261024-unified-nav-1'\)/);
 });
 
 test('shop entrances remain visible in the moved welcome discovery section', () => {

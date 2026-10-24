@@ -14,27 +14,13 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
   <title>作品・作者を探す｜PiXiEED</title>
-  <link rel="stylesheet" href="/css/social-feed.css?rev=20261023-sns-navigation-1">
+  <link rel="stylesheet" href="/css/social-feed.css?rev=20261024-unified-nav-1">
   <script type="module" src="/js/social/app.mjs?rev=20261024-sns-release-1"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
 </head>
 <body data-social-page="explore">
   <div class="social-app" id="socialApp">
-    <aside class="left-rail" aria-label="メインナビゲーション">
-      <a class="brand" href="/" aria-label="PiXiEED ホーム">
-        <img class="brand-logo" src="/assets/brand/pixieed-logo-48.png" width="24" height="24" alt="" aria-hidden="true">
-        <span>PiXiEED</span>
-      </a>
-      <nav class="rail-nav" aria-label="ページ切替"><a class="rail-link" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
-<a class="rail-link is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
-<a class="rail-link" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
-<a class="rail-link" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
-<a class="rail-link" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
-      <button class="rail-create" type="button" data-compose data-type="art" disabled data-boot-disabled><span class="plus-mark" aria-hidden="true">+</span> 投稿をつくる</button>
-      <div class="rail-note"><span class="note-dot" aria-hidden="true"></span><span>作品を見つける</span></div>
-    </aside>
-
-    <header class="mobile-header">
+<header class="mobile-header">
       <a class="brand" href="/" aria-label="PiXiEED ホーム"><img class="brand-logo" src="/assets/brand/pixieed-logo-48.png" width="24" height="24" alt="" aria-hidden="true"><span>PiXiEED</span></a>
       <a class="icon-button" href="/explore/" aria-label="検索"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></a>
     </header>
@@ -126,11 +112,11 @@
 
     </aside>
 
-    <nav class="mobile-nav" aria-label="ページ切替"><a class="mobile-nav__item" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
-<a class="mobile-nav__item is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
-<a class="mobile-nav__item" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
-<a class="mobile-nav__item" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
-<a class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
+    <nav class="mobile-nav public-destination-nav" aria-label="ページ切替"><a data-public-nav="home" class="mobile-nav__item" href="/"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
+<a data-public-nav="explore" class="mobile-nav__item is-current" href="/explore/" aria-current="page"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
+<a data-public-nav="create" class="mobile-nav__item" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
+<a data-public-nav="map" class="mobile-nav__item" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
+<a data-public-nav="me" class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
 
     <dialog class="composer-dialog" id="composerDialog" aria-labelledby="composerTitle">
       <form class="composer-sheet" id="composerForm" method="dialog">

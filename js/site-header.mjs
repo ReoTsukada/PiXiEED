@@ -3,7 +3,7 @@ import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } fr
 import { installGlobeAnalyticsBridge } from './globe/analytics-bridge.mjs?rev=20261017-analytics-integrity-1';
 import { installSiteInteractions } from './site-interactions.mjs?rev=20261001-interactions-1';
 import { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
-import { mountPublicNavigation } from './public-navigation.mjs?rev=20261023-public-nav-1';
+import { mountPublicNavigation } from './public-navigation.mjs?rev=20261024-unified-nav-1';
 export { mountToolHeaderControls } from './tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 
 const brandedLink = () => {
