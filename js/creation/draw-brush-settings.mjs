@@ -11,6 +11,10 @@ export function mountDrawBrushSettings({ scope, host, getState, onChange, before
   const doc = host.ownerDocument;
   const opener = doc.createElement('button'); opener.type = 'button'; opener.id = 'draw-brush-size-open'; opener.className = 'draw-brush-size-open';
   opener.setAttribute('aria-haspopup', 'dialog'); opener.setAttribute('aria-controls', 'draw-brush-settings-panel'); opener.setAttribute('aria-expanded', 'false');
+  const inlineControl = doc.createElement('div'); inlineControl.className = 'draw-brush-size-inline'; inlineControl.setAttribute('role', 'group'); inlineControl.setAttribute('aria-label', '線の太さ');
+  const inlineRange = doc.createElement('input'); inlineRange.type = 'range'; inlineRange.className = 'draw-brush-size-inline__range'; inlineRange.setAttribute('aria-label', '現在の線の太さ');
+  const inlineValue = doc.createElement('output'); inlineValue.className = 'draw-brush-size-inline__value'; inlineValue.setAttribute('aria-live', 'polite');
+  inlineControl.append(inlineRange, inlineValue, opener);
   const dialog = doc.createElement('dialog'); dialog.id = 'draw-brush-settings-panel'; dialog.className = 'draw-brush-settings'; dialog.setAttribute('aria-labelledby', 'draw-brush-settings-title');
   dialog.innerHTML = `<header><h2 id="draw-brush-settings-title">サイズ</h2><button type="button" data-brush-close aria-label="サイズ設定を閉じる">閉じる</button></header>
     <div class="draw-brush-settings__sides" role="group" aria-label="設定するマウスボタン"><button type="button" data-brush-side="left">左</button><button type="button" data-brush-side="right">右</button></div>
@@ -29,6 +33,11 @@ export function mountDrawBrushSettings({ scope, host, getState, onChange, before
     if (opener.textContent !== text) opener.textContent = text;
     opener.setAttribute('aria-label', `サイズ設定。${state.side === 'right' ? '右' : '左'}ボタン${setting.supported ? ` ${setting.value}px` : 'の道具はサイズ対象外'}`);
     opener.disabled = Boolean(state.blockedReason);
+    for (const input of [inlineRange]) { input.min = String(setting.min); input.max = String(setting.max); input.step = String(setting.step); input.disabled = !setting.supported || Boolean(state.blockedReason); input.value = String(setting.value); }
+    inlineRange.title = setting.supported ? setting.label : 'この道具は線の太さを使いません';
+    inlineRange.setAttribute('aria-valuetext', setting.supported ? `${state.side === 'right' ? '右' : '左'}ボタン ${setting.value}px` : 'この道具はサイズ対象外');
+    inlineValue.value = setting.supported ? `${setting.value}px` : '—';
+    inlineValue.textContent = inlineValue.value;
     if (!dialog.open) return;
     const binding = state.bindings[side], config = brushSettingForTool(binding);
     for (const button of dialog.querySelectorAll('[data-brush-side]')) button.setAttribute('aria-pressed', String(button.dataset.brushSide === side));
@@ -49,14 +58,17 @@ export function mountDrawBrushSettings({ scope, host, getState, onChange, before
   scope.listen(dialog, 'cancel', event => { event.preventDefault(); close(); });
   scope.listen(dialog, 'click', event => { if (event.target !== dialog) return; const r = dialog.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) close(); });
   for (const button of dialog.querySelectorAll('[data-brush-side]')) scope.listen(button, 'click', () => { side = button.dataset.brushSide; status.textContent = ''; sync(); });
-  function change(input) {
-    const config = brushSettingForTool(getState().bindings[side]), value = Number(input.value);
+  function change(input, targetSide = side) {
+    const state = getState();
+    if (state.blockedReason) return;
+    const config = brushSettingForTool(state.bindings[targetSide]), value = Number(input.value);
     if (!config.supported || !Number.isInteger(value) || value < config.min || value > config.max || config.key === 'spraySize' && value % 2 !== 1) {
-      status.textContent = config.key === 'spraySize' ? '範囲は1〜33pxの奇数で入力してください。' : '太さは1〜16pxの整数で入力してください。'; return;
+      if (dialog.open) status.textContent = config.key === 'spraySize' ? '範囲は1〜33pxの奇数で入力してください。' : '太さは1〜16pxの整数で入力してください。'; return;
     }
-    if (onChange(side, config.key, value) !== false) { status.textContent = `${value}pxに設定しました。`; sync(); }
+    if (onChange(targetSide, config.key, value) !== false) { if (dialog.open) status.textContent = `${value}pxに設定しました。`; sync(); }
   }
   scope.listen(number, 'change', () => change(number)); scope.listen(range, 'input', () => change(range));
-  scope.add(() => { if (dialog.open) dialog.close(); dialog.remove(); opener.remove(); });
-  sync(); return { opener, sync, close, get isOpen() { return dialog.open; } };
+  scope.listen(inlineRange, 'input', () => { const currentSide = getState().side === 'right' ? 'right' : 'left'; change(inlineRange, currentSide); });
+  scope.add(() => { if (dialog.open) dialog.close(); dialog.remove(); inlineControl.remove(); });
+  sync(); return { opener, inlineControl, sync, close, get isOpen() { return dialog.open; } };
 }

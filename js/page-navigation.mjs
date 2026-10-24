@@ -20,6 +20,7 @@ export const PAGE_DESTINATIONS = Object.freeze([
     ['/hidden-object/', 'もの探しをつくる', '自分の絵でもの探しを作ります。', 'hidden-object'],
   ] },
   { label: '作品・イベントを探す', links: [
+    ['/explore/', '作品を探す', '公開中の作品や投稿を探します。', 'telescope'],
     ['/feed/', 'みんなの作品', 'ドット絵や写真、パズルの作品を見つけます。', 'home'],
     ['/globe/', '世界地図で公開作品を見る', '地図から公開された作品を見つけます。', 'globe'],
     ['/globe/?post=1', 'ドット絵を投稿する', '作品を地図に投稿します。', 'add'],
@@ -41,7 +42,29 @@ export const PAGE_DESTINATIONS = Object.freeze([
   ] }
 ].map(group => Object.freeze({ ...group, links: Object.freeze(group.links.map(link => Object.freeze(link))) })));
 
+/** Stable destinations for the public site. Tool operation bars are separate. */
+export const PUBLIC_NAV_ITEMS = Object.freeze([
+  Object.freeze({ key: 'home', label: 'ホーム', href: '/', icon: 'home' }),
+  Object.freeze({ key: 'explore', label: '探す', href: '/explore/', icon: 'telescope' }),
+  Object.freeze({ key: 'create', label: 'つくる', href: '/tools/', icon: 'tools' }),
+  Object.freeze({ key: 'map', label: '地図', href: '/globe/', icon: 'globe' }),
+  Object.freeze({ key: 'me', label: '自分', href: '/profile/', icon: 'profile' }),
+]);
+
 const canonicalPath = path => path.replace(/\/index\.html$/, '/') || '/';
+
+/** Resolve one stable public destination for bottom navigation. */
+export function currentPublicNavKey(location) {
+  const url = new URL(location.href || String(location), 'https://pixieed.invalid');
+  const path = canonicalPath(url.pathname);
+  if (path === '/' || path === '/feed/') return 'home';
+  if (path.startsWith('/globe/')) return 'map';
+  if (path.startsWith('/profile/')) return 'me';
+  if (path.startsWith('/tools/')) return 'create';
+  if (path.startsWith('/explore/') || path.startsWith('/works/') || path.startsWith('/stores/')
+      || path.startsWith('/events/') || path.startsWith('/collection/') || path.startsWith('/books/')) return 'explore';
+  return null;
+}
 
 /** Identify one destination, including mode/view queries, rather than marking all siblings current. */
 export function currentPageDestination(location, creationMode) {

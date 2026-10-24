@@ -5,7 +5,8 @@ import { resolve } from 'node:path';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const pages = [
-  ['index.html', '/', 'site'], ['globe/index.html', '/globe/', 'globe'], ['tools/index.html', '/tools/', 'tools'], ['output/index.html', '/output/', 'output'],
+  ['index.html', '/', 'site'], ['explore/index.html', '/explore/', 'site'], ['welcome/index.html', '/welcome/', 'site'],
+  ['globe/index.html', '/globe/', 'globe'], ['tools/index.html', '/tools/', 'tools'], ['output/index.html', '/output/', 'output'],
   ['draw/index.html', '/draw/', 'draw'],
   ['draw/about/index.html', '/draw/about/', 'draw'], ['camera/index.html', '/camera/', 'camera'], ['audio/index.html', '/audio/', 'audio'], ['jigsaw/index.html', '/jigsaw/', 'jigsaw'],
   ['spot-difference/index.html', '/spot-difference/', 'spot-difference'], ['hidden-object/index.html', '/hidden-object/', 'hidden-object'],
@@ -23,6 +24,7 @@ const canonicalPathOverrides = new Map([
 const sitemapPages = pages
   .filter(([, path]) => !sitemapExcludedPaths.has(path));
 const eventIds = JSON.parse(readFileSync(resolve(root, 'events/catalog.json'), 'utf8')).ids;
+sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/privacy/') + 1, 0, ['terms/index.html', '/terms/']);
 sitemapPages.push(['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'], ['projects/pixfind/index.html', '/projects/pixfind/']);
 sitemapPages.push(['events/index.html', '/events/'], ...eventIds.map(id => [`events/${id}/index.html`, `/events/${id}/`]));
 const artworkLabels = {
@@ -154,6 +156,12 @@ test('sitemap lists the clean public page URLs without retired and private route
     assert.ok(!actual.includes(`https://pixieed.jp${path}`), `${path}: legacy route is excluded from sitemap`);
   }
   assert.doesNotMatch(sitemap, /\/(?:profile|admin|sale|localdrafts|works|gallery|game|collection|telescope)\//i);
+  const feed = read('feed/index.html');
+  const feedHead = feed.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1];
+  assert.ok(feedHead, 'feed compatibility route has a head');
+  assert.match(feedHead, /<meta\s+name=["']robots["']\s+content=["']noindex,nofollow["']/i, 'feed compatibility route remains noindex');
+  assert.equal([...feedHead.matchAll(/<link\b(?=[^>]*\brel=["']canonical["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/gi)][0]?.[1], 'https://pixieed.jp/feed/');
+  assert.ok(!actual.includes('https://pixieed.jp/feed/'), 'noindex feed compatibility route is excluded from the sitemap');
 });
 
 test('sitemap URLs point to indexable canonical pages without redirects or temporary parameters', () => {

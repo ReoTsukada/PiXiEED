@@ -223,8 +223,18 @@ export async function optimizeSiteStartupDelivery({ root, files, esbuildPath, re
   `Unexpected app.js module caller set: ${callers.moduleCallers.map(item => `${item.file}:${item.kind}`).join(', ') || 'none'}.`);
   const homeHtml = await readFile(path.join(absoluteRoot, 'index.html'), 'utf8');
   const homeCounts = rewriteHtml(homeHtml, 'index.html', revisions.appRevision, revisions.homeStartupRevision);
-  assert(homeCounts.appScripts === 0 && homeCounts.startupScripts === 1 && homeCounts.startupPreloads === 1,
-    'Home must expose exactly one startup module script and one matching modulepreload.');
+  if (/data-social-page="home"/.test(homeHtml)) {
+    assert(homeCounts.appScripts === 0 && homeCounts.startupScripts === 0 && homeCounts.startupPreloads === 0
+      && [...homeHtml.matchAll(/<script\b[^>]*src="\/js\/social\/app\.mjs\?[^"<>]+"/g)].length === 1,
+    'SNS home must expose exactly one social entry and no legacy home startup.');
+    const welcomeHtml = await readFile(path.join(absoluteRoot, 'welcome/index.html'), 'utf8');
+    const welcomeCounts = rewriteHtml(welcomeHtml, 'welcome/index.html', revisions.appRevision, revisions.homeStartupRevision);
+    assert(welcomeCounts.appScripts === 0 && welcomeCounts.startupScripts === 1 && welcomeCounts.startupPreloads === 1,
+      'The preserved welcome page must retain one matching legacy startup and preload.');
+  } else {
+    assert(homeCounts.appScripts === 0 && homeCounts.startupScripts === 1 && homeCounts.startupPreloads === 1,
+      'Home must expose exactly one startup module script and one matching modulepreload.');
+  }
 
   const tempRoot = await import('node:fs/promises').then(({ mkdtemp }) => mkdtemp(path.join(absoluteRoot, '.site-startup-')));
   try {

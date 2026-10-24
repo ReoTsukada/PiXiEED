@@ -1,4 +1,4 @@
-import { mountSiteHeader } from './site-header.mjs?rev=20261022-social-release-1';
+import { mountSiteHeader } from './site-header.mjs?rev=20261023-sns-navigation-1';
 import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { hasExplicitMapPlacement, isSampleWork, publicWorksOnly } from './public-work-policy.mjs?rev=20260927-map-gallery-2';
 import { events as fallbackEvents, stores as fallbackStores, works as fallbackWorks } from '../data/site-data.js?rev=20260924-no-samples-1';
@@ -4051,25 +4051,6 @@ function renderPublicShell() {
   // actions already mounted in this header intact.
   const brandLink = headerInner.querySelector('.brand'); if (brandLink) { brandLink.setAttribute('href', '/'); brandLink.setAttribute('aria-label', 'PiXiEED ホーム'); }
 
-  let tabs = document.querySelector('.mobile-nav');
-  if (!tabs) {
-    tabs = document.createElement('nav');
-    header.insertAdjacentElement('afterend', tabs);
-  }
-  tabs.className = 'app-tabs app-tabs--labeled';
-  tabs.setAttribute('aria-label', 'アプリナビゲーション');
-  const page = document.body.dataset.page || 'home';
-  const actions = {
-    home: '<a href="/draw/?workspace=1" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">描く</span></a>',
-    tools: '<a href="/draw/?workspace=1" aria-label="PiXiEEDrawで絵を描く"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">描く</span></a>',
-    map: '<button type="button" data-page-action="post" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿</span></button>',
-    works: '<a href="/collection/" aria-label="集めた作品を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">集めた絵</span></a>',
-    stores: '<a class="app-tab-context app-tab-context--stores" href="#store-search" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店を探す</span></a>',
-    shops: '<a href="/stores/" aria-label="お店を探す"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">お店</span></a>',
-    profile: '<a href="/profile/?view=posts" aria-label="投稿した絵を見る"><img src="/assets/icons/pixieed/artwork.svg" alt=""><span class="app-tab-label">投稿した絵</span></a>'
-  };
-  const contextAction = actions[page] || '<a href="/globe/?post=1" aria-label="ドット絵を投稿する"><img src="/assets/icons/pixieed/add.svg" alt=""><span class="app-tab-label">投稿</span></a>';
-  tabs.innerHTML = `<a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""><span class="app-tab-label">世界地図</span></a><a data-nav="camera" href="/camera/?workspace=1" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""><span class="app-tab-label">撮影</span></a>${contextAction}<a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""><span class="app-tab-label">ツール</span></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""><span class="app-tab-label">マイページ</span></a>`;
   const openGlobeComposer = () => {
     const globe = document.querySelector('.map-hero__globe-frame');
     if (!globe) return;
@@ -4082,19 +4063,7 @@ function renderPublicShell() {
     };
     runWhenGlobePostsReady(globe, open);
   };
-  tabs.querySelector('[data-page-action="post"]')?.addEventListener('click', openGlobeComposer);
-  tabs.querySelector('[data-page-action="view"]')?.addEventListener('click', () => {
-    const globe = document.querySelector('.map-hero__globe-frame');
-    if (!globe) return;
-    const open = () => {
-      const api = globe.contentWindow;
-      const view = () => api?.__PIXIEED_POSTS__?.openCellGallery?.(null);
-      if (api?.__PIXIEED_ASTRO__?.returnToGallery) api.__PIXIEED_ASTRO__.returnToGallery(view);
-      else view();
-    };
-    runWhenGlobePostsReady(globe, open);
-  });
-  const mapParams = page === 'map' ? new URLSearchParams(window.location.search) : null;
+  const mapParams = document.body.dataset.page === 'map' ? new URLSearchParams(window.location.search) : null;
   if (mapParams?.get('post') === '1') {
     window.requestAnimationFrame(openGlobeComposer);
   } else if (mapParams?.get('art')) {
@@ -4106,14 +4075,6 @@ function renderPublicShell() {
     };
     runWhenGlobePostsReady(globe, open);
   }
-  const toolAction = tabs.querySelector('[data-page-action="tools"]');
-  const firstPublishedTool = document.querySelector('.tool-grid a[href], .tool-grid button:not([disabled])');
-  if (toolAction && firstPublishedTool) {
-    toolAction.disabled = false;
-    toolAction.removeAttribute('aria-disabled');
-    toolAction.addEventListener('click', () => firstPublishedTool.click());
-  }
-
   const footerLinks = document.querySelector('.footer-links');
   if (footerLinks) footerLinks.innerHTML = '<a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/terms/">利用規約</a><a href="/privacy/">プライバシー</a>';
   if (!document.documentElement.dataset.appConsentHandler) {

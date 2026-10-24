@@ -1,137 +1,213 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <script src="/js/canonical-entry.js"></script>
-  <meta charset="UTF-8">
-  <script>(() => { const q = new URLSearchParams(location.search); if (['art', 'post', 'from'].some((k) => q.has(k))) location.replace('/globe/' + location.search + location.hash); })();</script>
-<title>描く・写真を加工する・音楽をつくる、パズルで遊ぶ｜PiXiEED</title>
-<meta name="description" content="写真をドット絵に加工したり、小さな絵やGIF、短いループ曲を作ったり。空いた時間にはジグソー・間違い探し・もの探しで遊べます。">
-<link rel="canonical" href="https://pixieed.jp/">
-<meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="描く・写真を加工する・音楽をつくる、パズルで遊ぶ｜PiXiEED"><meta property="og:description" content="写真をドット絵に加工したり、小さな絵やGIF、短いループ曲を作ったり。空いた時間にはジグソー・間違い探し・もの探しで遊べます。"><meta property="og:url" content="https://pixieed.jp/"><meta property="og:image" content="https://pixieed.jp/assets/og/site.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="描く・写真を加工する・音楽をつくる、パズルで遊ぶ｜PiXiEED"><meta name="twitter:description" content="写真をドット絵に加工したり、小さな絵やGIF、短いループ曲を作ったり。空いた時間にはジグソー・間違い探し・もの探しで遊べます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
-<link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180"><link rel="manifest" href="/manifest.webmanifest">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>try { if (localStorage.getItem('PiXiEED:motion-preference:v1') === 'reduced') document.documentElement.dataset.pixieedMotion = 'reduced'; } catch { /* storage may be blocked */ }</script>
-  <link rel="modulepreload" href="/js/home-startup.mjs?rev=20261018-direct-runtime-1">
-  <link rel="modulepreload" href="/js/home-play.mjs?rev=20261015-real-screens-1">
-  <link rel="modulepreload" href="/js/home-animation.mjs?rev=20261001-hero-rates-2">
-  <link rel="modulepreload" href="/js/tool-toys.mjs?rev=20261015-real-screens-1">
-  <link rel="modulepreload" href="/js/home-motion.mjs?rev=20261013-home-motion-1">
-  <link rel="modulepreload" href="/js/home-sand.mjs?rev=20261002-gyro-360-1">
-  <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
-  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/home.css?rev=20261018-pc-tool-previews-1">
-  <link rel="stylesheet" href="/css/home-discovery.css?rev=20261017-home-visual-grid-1">
-  <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/display-ads.css?rev=20261007-lazy-ads-1">
-  <script src="/js/adsense-offerwall-policy.js?rev=20261001-free-tools-1"></script>
+<script>(()=>{const q=new URLSearchParams(location.search);if(q.has("art")||q.get("post")==="1")location.replace("/globe/"+location.search+location.hash)})();</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8f6">
+  <meta name="robots" content="index,follow">
+  <meta name="description" content="PiXiEEDで公開されたドット絵、写真、パズル、音楽やことばの作品を見つけて、気になる作品から制作ツールへ進めます。">
+  <link rel="canonical" href="https://pixieed.jp/">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="PiXiEED"><meta property="og:locale" content="ja_JP"><meta property="og:title" content="PiXiEED｜みんなの作品とつくる道具"><meta property="og:description" content="PiXiEEDで公開されたドット絵、写真、パズル、音楽やことばの作品を見つけて、気になる作品から制作ツールへ進めます。"><meta property="og:url" content="https://pixieed.jp/"><meta property="og:image" content="https://pixieed.jp/assets/og/site.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
+  <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="PiXiEED｜みんなの作品とつくる道具"><meta name="twitter:description" content="PiXiEEDで公開されたドット絵、写真、パズル、音楽やことばの作品を見つけて、気になる作品から制作ツールへ進めます。"><meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png"><meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>PiXiEED｜みんなの作品とつくる道具</title>
+  <link rel="stylesheet" href="/css/social-feed.css?rev=20261023-sns-navigation-1">
+  <script type="module" src="/js/social/app.mjs?rev=20261024-sns-release-1"></script>
+<link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
 </head>
-<body data-page="home" class="app-page home-play">
-  <a class="skip-link" href="#main">本文へ移動</a>
-  <header class="site-header"><div class="container header-inner">
-    <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
-  </div></header>
-  <nav class="mobile-nav" aria-label="アプリナビゲーション"></nav>
-  <main id="main">
-    <!-- Real creation tools lead; the home playground follows as a separate play experience. -->
-    <section class="hp-hero container" aria-labelledby="hpTitle">
-      <div class="hp-intro">
-        <p class="hp-kicker">つくる・あそぶ・つながる</p>
-        <h1 id="hpTitle">つくる・あそぶを、すぐに。</h1>
-        <p class="hp-intro-copy">絵を描く、写真を加工する、短い曲を作る。パズルでも遊べます。</p>
-      </div>
-      <div class="hp-card-group home-primary-tools" aria-labelledby="homePrimaryToolsTitle">
-        <h2 class="hp-group-title" id="homePrimaryToolsTitle">制作ツール</h2>
-        <nav class="hp-card-grid hp-create-grid" aria-label="制作ツール">
-          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="editor" href="/draw/?workspace=1" data-static-tool="editor" data-draw-cta data-draw-context="general">
-            <span class="hp-tool-screen hp-tool-screen--draw"><picture><source type="image/webp" srcset="/assets/screenshots/previews/draw-pc-maou-480.webp 480w, /assets/screenshots/previews/draw-pc-maou-960.webp 960w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/draw-pc-maou.png" width="2880" height="1920" alt="魔王様の作例を読み込んだPiXiEEDrawのPC画面" fetchpriority="high"></picture></span>
-            <div class="hp-card-copy"><h3 class="hp-tool-title">ドット絵を描く</h3><span class="hp-toy-line">ゲーム素材・GIFアニメ</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/artwork.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEEDraw</small></span><span class="hp-card-link">ツール画面へ <span aria-hidden="true">→</span></span></div>
-          </a>
-          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="camera" href="/camera/?workspace=1" data-static-tool="camera">
-            <span class="hp-tool-screen hp-tool-screen--camera"><picture><source type="image/webp" srcset="/assets/screenshots/previews/home-camera-empty-480.webp?rev=20261019-photo16-preview-1 480w, /assets/screenshots/previews/home-camera-empty-960.webp?rev=20261019-photo16-preview-1 960w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/home-camera-empty.png?rev=20261019-photo16-preview-1" width="960" height="540" alt="写真調に生成した山と湖の風景をPiXiEELENSで写真から選ぶ16色・ディザなしで128×72へドット変換したPC横画面全体" loading="eager"></picture></span>
-            <div class="hp-card-copy"><h3 class="hp-tool-title">写真をドット絵に</h3><span class="hp-toy-line">描かずに加工・PNG保存</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/camera.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEELENS</small></span><span class="hp-card-link">ツール画面へ <span aria-hidden="true">→</span></span></div>
-          </a>
-          <a class="hp-toy hp-link-card hp-visual-tool-card" data-toy="sound" href="/audio/?workspace=1" data-static-tool="sound">
-            <span class="hp-tool-screen hp-tool-screen--audio"><picture><source type="image/webp" srcset="/assets/screenshots/previews/home-audio-empty-480.webp 480w, /assets/screenshots/previews/home-audio-empty-960.webp 960w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/home-audio-empty.png" width="960" height="540" alt="PiXiEEaudioのPC横画面。空の音楽レイヤーと音色設定" loading="eager"></picture></span>
-            <div class="hp-card-copy"><h3 class="hp-tool-title">音楽をつくる</h3><span class="hp-toy-line">短いループ曲を試す</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/music.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEEaudio</small></span><span class="hp-card-link">ツール画面へ <span aria-hidden="true">→</span></span></div>
-          </a>
-          <a class="hp-link-card hp-output-card hp-visual-tool-card" href="/output/">
-            <span class="hp-tool-screen hp-tool-screen--output"><picture><source type="image/webp" srcset="/assets/screenshots/previews/home-output-empty-480.webp 480w, /assets/screenshots/previews/home-output-empty-960.webp 960w" sizes="(min-width: 900px) 360px, 240px"><img src="/assets/screenshots/home-output-empty.png" width="960" height="540" alt="合成ツールのPC横画面。ファイル未選択の開始画面" loading="eager"></picture></span>
-            <div class="hp-card-copy"><h3 class="hp-tool-title">画像・音声を変換</h3><span class="hp-toy-line">PNG・JPEG変換／合成</span><span class="hp-tool-brandline"><img src="/assets/icons/pixieed/tools.svg" width="20" height="20" alt=""><small class="hp-tool-brand">PiXiEED</small></span><span class="hp-card-link">変換・合成ツールへ <span aria-hidden="true">→</span></span></div>
-          </a>
-        </nav>
-        <a class="hp-tools-about" href="/draw/#draw-how-to">PiXiEEDrawの機能と使い方</a>
-      </div>
-      <section class="hp-home-play" aria-labelledby="hpHomePlayTitle">
-        <h2 class="hp-home-play__title" id="hpHomePlayTitle">ホームのミニ体験</h2>
-      <div class="hp-play-shell">
-        <div class="hp-stage" id="hpStage">
-          <span class="hp-demo-badge">ホームのミニ体験</span>
-          <canvas id="hpCanvas" aria-label="ドット絵のあそび場。タップやドラッグで直接描けます。矢印キーで移動、スペースまたはEnterで描画" role="img" tabindex="0"></canvas>
-          <output class="hp-score" id="hpScore" hidden>★ 0</output>
-          <div class="hp-hero-copy"><p class="hp-hint" id="hpHint">ここをタップして、自由に描いてみよう。</p></div>
-        </div>
-        <div class="hp-controls">
-          <div class="hp-tools" role="toolbar" aria-label="あそび場の操作">
-            <button class="hp-control hp-playback" id="hpPlayback" type="button" aria-pressed="true">一時停止</button>
-            <button class="hp-control hp-palette-toggle" id="hpPaletteToggle" type="button" aria-expanded="false" aria-controls="hpPalette" aria-label="色・編集"><span id="hpCurrentColor" class="hp-current-color" aria-hidden="true"></span><span>色・編集</span></button>
-          </div>
-          <div class="hp-palette" id="hpPalette" hidden>
-            <p>色で、音色も変わる。</p>
-            <button class="hp-control hp-undo" id="hpUndo" type="button" disabled aria-label="ひとつ戻す" title="ひとつ戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h9a6 6 0 0 1 0 12"/></svg><span>ひとつ戻す</span></button>
-            <div class="hp-colors" id="hpColors" role="radiogroup" aria-label="色と音色"></div>
-            <button class="hp-palette-clear" id="hpMotion" type="button" aria-pressed="false">端末を傾けて遊ぶ</button>
-            <button class="hp-palette-clear" id="hpClear" type="button">あそび場を消す</button>
-          </div>
-        </div>
-        <p class="hp-playback-status" id="hpPlaybackStatus" aria-live="polite"></p>
-        <output class="hp-gyro-status" id="hpGyroStatus" aria-live="polite"></output>
-      </div>
-      <output id="hpAudioState" class="hp-audio-state" aria-live="polite">最初のタップで音が出ます</output>
-      <output id="hpStatus" class="visually-hidden" aria-live="polite"></output>
+<body data-social-page="home">
+  <div class="social-app" id="socialApp">
+    <aside class="left-rail" aria-label="メインナビゲーション">
+      <a class="brand" href="/" aria-label="PiXiEED ホーム">
+        <img class="brand-logo" src="/assets/brand/pixieed-logo-48.png" width="24" height="24" alt="" aria-hidden="true">
+        <span>PiXiEED</span>
+      </a>
+      <nav class="rail-nav" aria-label="ページ切替"><a class="rail-link is-current" href="/" aria-current="page"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
+<a class="rail-link" href="/explore/"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
+<a class="rail-link" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
+<a class="rail-link" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
+<a class="rail-link" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
+      <button class="rail-create" type="button" data-compose data-type="art" disabled data-boot-disabled><span class="plus-mark" aria-hidden="true">+</span> 投稿をつくる</button>
+      <div class="rail-note"><span class="note-dot" aria-hidden="true"></span><span>作品を見つける</span></div>
+    </aside>
+
+    <header class="mobile-header">
+      <a class="brand" href="/" aria-label="PiXiEED ホーム"><img class="brand-logo" src="/assets/brand/pixieed-logo-48.png" width="24" height="24" alt="" aria-hidden="true"><span>PiXiEED</span></a>
+      <a class="icon-button" href="/explore/" aria-label="検索"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></a>
+    </header>
+
+    <main class="feed-column">
+      <noscript><p>フィードの閲覧と下書き保存にはJavaScriptが必要です。<a href="/tools/">制作ツール一覧</a>も利用できます。</p></noscript>
+      <aside class="demo-banner" id="localPreviewNotice" aria-label="ローカルプレビューのお知らせ" hidden>
+        <span class="demo-banner__dot" aria-hidden="true"></span>
+        <p><strong>ローカルプレビュー</strong><span>投稿の表示・保存状態はこの環境で確認できます</span></p>
+      </aside>
+
+      <section class="feed-heading" aria-labelledby="pageTitle">
+        <div><h1 id="pageTitle">みんなの作品</h1><p class="feed-lede" id="viewDescription">ドット絵や写真、パズルとの出会いをここから。</p></div>
+        <button class="refresh-button" id="refreshFeed" type="button" aria-label="作品を更新" title="作品を更新" data-action="refresh" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4.5 17a8 8 0 0 0 13.9-2M4 17v-5h5M19.5 7A8 8 0 0 0 5.6 9"></path></svg></button>
+        <button type="button" class="account-transfer-button" aria-label="アカウントに保存・引き継ぐ" title="アカウントに保存・引き継ぐ" id="guestAccountOpen" data-action="guest-account" aria-controls="guestAccountDialog"><img src="/assets/icons/pixieed/profile.svg" alt=""></button>
       </section>
-      <dialog class="hp-clear-dialog" id="hpClearDialog" aria-labelledby="hpClearTitle"><h2 id="hpClearTitle">あそび場を消しますか？</h2><p>描いたドットが消えます。消した後も「ひとつ戻す」で取り消せます。</p><div><button id="hpClearCancel" type="button" autofocus>残して戻る</button><button id="hpClearConfirm" type="button">消す</button></div></dialog>
-    </section>
 
-    <section class="home-discovery container" aria-labelledby="homeGalleryTitle">
-      <div class="home-gallery">
-        <div class="home-gallery__heading"><div><h2 id="homeGalleryTitle">公開作品</h2><p>公式に公開された作品を、地図の場所とあわせて。</p></div><a href="/globe/">地図の投稿を見る <span aria-hidden="true">↗</span></a></div>
-        <div class="home-gallery__grid" data-home-gallery data-state="loading" tabindex="-1" aria-live="polite" aria-busy="true"><p class="home-gallery__status">公開作品を確認しています…</p></div>
-      </div>
-    </section>
 
-    <section class="hp-section" aria-labelledby="hpToysTitle">
-      <div class="container">
-        <h2 class="hp-heading" id="hpToysTitle">あそぶ・出会う</h2>
-        <p class="hp-section-lede">空いた時間にパズルで遊んだり、作品やイベントに出会ったり。</p>
+
+      <nav class="feed-destinations" aria-label="作品から探しに行く">
+        <a href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt="">ドットマップ</a>
+        <a href="/events/"><img src="/assets/icons/pixieed/celestial.svg" alt="">イベント</a>
+        <a href="/tools/">ツール一覧</a>
+      </nav>
+
+      <section class="composer-prompt" aria-label="投稿を作成">
+        <span class="prompt-avatar" aria-hidden="true"><img src="/assets/icons/pixieed/add.svg" alt=""></span>
+        <button class="prompt-open" type="button" data-compose data-type="art" disabled data-boot-disabled>作品やことばを投稿する</button>
+        <button class="prompt-add" type="button" data-compose data-type="photo" aria-label="作品を投稿" disabled data-boot-disabled><img src="/assets/icons/pixieed/camera.svg" alt=""></button>
+      </section>
+
+      <nav class="feed-views" id="feedViews" aria-label="閲覧する場所">
+        <button type="button" data-action="view" data-view="feed" aria-pressed="true" disabled data-boot-disabled>みんなの作品</button>
+        <button type="button" data-action="view" data-view="saved" aria-pressed="false" disabled data-boot-disabled>保存した作品</button>
+        <button type="button" data-action="view" data-view="local" aria-pressed="false" disabled data-boot-disabled>下書き</button>
+        <button type="button" id="minePosts" data-action="mine" data-view="mine" aria-pressed="false" disabled data-boot-disabled>自分の投稿</button>
+      </nav>
+      <div class="filter-wrap" id="feedFilterWrap">
+        <details class="filter-disclosure"><summary>種類で絞る</summary><nav class="feed-filters" id="feedFilters" aria-label="投稿の種類">
+          <button type="button" data-action="filter" data-type="all" aria-pressed="true" disabled data-boot-disabled>すべて</button>
+          <button type="button" data-action="filter" data-type="art" aria-pressed="false" disabled data-boot-disabled>ドット絵</button>
+          <button type="button" data-action="filter" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真</button>
+          <button type="button" data-action="filter" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button>
+          <button type="button" data-action="filter" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button>
+          <button type="button" data-action="filter" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
+        </nav></details>
       </div>
-      <div class="container">
-        <div class="hp-card-group" aria-labelledby="hpPlayTitle">
-          <h3 class="hp-group-title" id="hpPlayTitle">あそぶ</h3>
-          <nav class="hp-card-grid hp-puzzle-grid" aria-label="パズル">
-            <a class="hp-toy hp-link-card" data-toy="jigsaw" href="/jigsaw/" style="--tone:#e9e3d6" data-static-tool="jigsaw"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/jigsaw.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">ジグソーパズル</h3><span class="hp-toy-line">写真や画像から作って遊ぼう。</span><span class="hp-card-link">パズルを組む <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="diff" href="/play/spot-difference/" style="--tone:#e6edf3" data-static-tool="diff"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/spot-difference.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">間違い探し</h3><span class="hp-toy-line">2枚の絵から違いを見つけよう。</span><span class="hp-card-link">違いを探す <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-toy hp-link-card" data-toy="find" href="/play/hidden-object/" style="--tone:#dcebd2" data-static-tool="find"><span class="hp-view hp-tool-icon"><img src="/assets/icons/pixieed/hidden-object.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">もの探し</h3><span class="hp-toy-line">絵の中から、お題のアイテムを探そう。</span><span class="hp-card-link">ものを探す <span aria-hidden="true">→</span></span></div></a>
+      <div class="mine-controls"><span id="mineStatus" role="status" aria-live="polite"></span></div>
+
+      <div class="new-posts-slot" id="newPostsSlot" hidden><button id="newPostsButton" type="button" data-action="show-new-posts" disabled data-boot-disabled><span aria-hidden="true">↑</span> 新しい投稿があります</button></div>
+      <p class="feed-status" id="feedStatus" role="status" aria-live="polite"><span id="bootStatus">操作を準備しています。進まない場合は <a href="/feed/">再読み込み</a> できます。</span></p>
+      <button class="feed-retry" id="feedRetry" type="button" data-action="retry" hidden disabled data-boot-disabled>もう一度読み込む</button>
+      <section class="feed-list" id="feed" aria-label="作品フィード" aria-busy="true">
+        <article class="post-card post-skeleton" aria-hidden="true"><div class="skeleton-line"><span class="skeleton-avatar"></span><span class="skeleton-copy"></span></div><div class="skeleton-art"></div><div class="skeleton-line skeleton-line--short"></div></article>
+        <article class="post-card post-skeleton post-skeleton--second" aria-hidden="true"><div class="skeleton-line"><span class="skeleton-avatar"></span><span class="skeleton-copy"></span></div><div class="skeleton-art"></div></article>
+      </section>
+
+      <section class="drafts-panel" id="draftsPanel" aria-labelledby="draftsTitle" hidden>
+        <div class="section-heading"><div><p class="eyebrow">ON THIS DEVICE</p><h2 id="draftsTitle">ローカルの下書き</h2></div><span class="local-label">この端末内</span></div>
+        <div id="localDrafts" class="drafts-list"><p class="drafts-empty">保存した下書きはここに表示されます。</p></div>
+        <section class="draft-audio-manager" aria-labelledby="draftAudioTitle">
+          <div class="draft-audio-heading"><h3 id="draftAudioTitle">保存した音声ファイル</h3><button type="button" id="draftAudioRefresh" class="draft-audio-refresh" data-action="refresh-audio" disabled data-boot-disabled>一覧を更新</button></div>
+          <p class="composer-help">音声はこの端末のブラウザー保存領域に保管されます。ブラウザーのデータ消去や容量整理で失われる場合があります。必要な音源は元のファイルも保存してください（1ファイル64 MiBまで、合計256 MiBまで）。</p>
+          <div id="draftAudioList" class="draft-audio-list"><p class="drafts-empty">音声ファイルの一覧は、ここを開いたときに読み込みます。</p></div>
+        </section>
+      </section>
+      <footer class="feed-footer"><span class="tiny-pixel" aria-hidden="true"></span> つくる人のための、ちいさなタイムライン</footer>
+    </main>
+
+    <aside class="right-column" aria-label="PiXiEEDのツールと案内">
+
+      <section class="create-card" aria-labelledby="createTitle">
+        <div class="section-heading"><div><p class="eyebrow">MAKE &amp; SHARE</p><h2 id="createTitle">つくる道具</h2></div></div>
+        <a class="create-option" href="/draw/?workspace=1&amp;social=1"><span class="create-icon create-icon--art"><img src="/assets/icons/pixieed/artwork.svg" alt=""></span><span><strong>ドット絵を描く</strong><small>ピクセルスタジオ</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/camera/?workspace=1&amp;social=1"><span class="create-icon create-icon--photo"><img src="/assets/icons/pixieed/camera.svg" alt=""></span><span><strong>写真をつくる</strong><small>ピクセルカメラ</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/audio/?workspace=1&amp;social=1"><span class="create-icon create-icon--music"><img src="/assets/icons/pixieed/music.svg" alt=""></span><span><strong>音をつくる</strong><small>オーディオスタジオ</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/spot-difference/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/spot-difference.svg" alt=""></span><span><strong>間違い探し</strong><small>作品を遊びに</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/hidden-object/?social=1"><span class="create-icon create-icon--hidden"><img src="/assets/icons/pixieed/hidden-object.svg" alt=""></span><span><strong>かくし絵をつくる</strong><small>ピクセルの中に発見</small></span><b aria-hidden="true">↗</b></a>
+        <a class="create-option" href="/jigsaw/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/jigsaw.svg" alt=""></span><span><strong>ジグソー</strong><small>自分で遊ぶ・投稿する</small></span><b aria-hidden="true">↗</b></a>
+        <p class="inline-demo-note">作品の作成は各ツールで行います。</p>
+      </section>
+      <section class="event-card" aria-labelledby="eventTitle">
+        <div class="section-heading"><div><p class="eyebrow">MEET &amp; PLAY</p><h2 id="eventTitle">イベントを探す</h2></div><span class="event-pixel" aria-hidden="true"></span></div>
+        <p>近くのドット絵イベントや、作品が集まる場所を見つけよう。</p>
+        <a href="/events/" class="event-link"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>イベント一覧をひらく</span><b aria-hidden="true">→</b></a>
+        <a href="/globe/" class="map-link"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図で作品を探す</span><b aria-hidden="true">→</b></a>
+      </section>
+
+    </aside>
+
+    <nav class="mobile-nav" aria-label="ページ切替"><a class="mobile-nav__item is-current" href="/" aria-current="page"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
+<a class="mobile-nav__item" href="/explore/"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
+<a class="mobile-nav__item" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
+<a class="mobile-nav__item" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
+<a class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
+
+    <dialog class="composer-dialog" id="composerDialog" aria-labelledby="composerTitle">
+      <form class="composer-sheet" id="composerForm" method="dialog">
+        <header class="dialog-header"><div><p class="eyebrow">YOUR LITTLE WORK</p><h2 id="composerTitle">作品を投稿</h2></div><button class="icon-button dialog-close" id="composerClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header>
+        <div class="composer-body">
+          <div class="composer-types" role="group" aria-label="投稿の種類">
+            <button type="button" data-action="composer-type" data-type="art" aria-pressed="true" disabled data-boot-disabled>ドット絵</button><button type="button" data-action="composer-type" data-type="photo" aria-pressed="false" disabled data-boot-disabled>写真</button><button type="button" data-action="composer-type" data-type="puzzle" aria-pressed="false" disabled data-boot-disabled>パズル</button><button type="button" data-action="composer-type" data-type="text" aria-pressed="false" disabled data-boot-disabled>ことば</button><button type="button" data-action="composer-type" data-type="music" aria-pressed="false" disabled data-boot-disabled>音楽</button>
+          </div>
+          <nav class="composer-context" aria-label="投稿内容の設定">
+            <button type="button" data-action="composer-pane" data-pane="content" aria-controls="composer-content" aria-pressed="true">内容</button>
+            <button type="button" data-action="composer-pane" data-pane="attachment" aria-controls="composer-attachment" aria-pressed="false">添付・道具</button>
+            <button type="button" data-action="composer-pane" data-pane="settings" aria-controls="composer-settings" aria-pressed="false">掲載設定</button>
           </nav>
+          <button class="composer-visibility-summary" id="composerVisibilitySummary" type="button" data-action="composer-pane" data-pane="settings" aria-controls="composer-settings">掲載先を選んでください。</button>
+          <p class="composer-mode-status" id="composerModeStatus" role="status" aria-live="polite">作品を選んで、地図の掲載先を設定してください。</p>
+          <p class="composer-author" id="composerAuthor">ログイン状態に応じた作者情報は <a href="/profile/">自分のページ</a> で確認できます。</p>
+          <div class="composer-pane" id="composer-content" data-composer-pane="content">
+          <div class="composer-fields">
+            <label class="composer-label" for="composerTitleInput">作品タイトル <span>60文字まで</span></label>
+            <input id="composerTitleInput" name="title" type="text" maxlength="60" autocomplete="off" placeholder="作品の名前">
+            <label class="composer-label" for="composerText">ひとこと <span>180文字まで</span></label>
+            <textarea id="composerText" name="text" rows="4" maxlength="180" placeholder="作品について書いてみよう" aria-describedby="composerLocationHelp composerStatus"></textarea>
+              <p id="musicPublishHelp" class="composer-help" hidden>サーバー投稿に使える音源は WAV（PCM / IEEE float）、16 MiB以下、再生時間600秒以下です。形式が合わない音源もこの端末の下書きに残せます。端末への保存上限64 MiBは変わりません。</p>
+          </div>
+          </div>
+          <div class="composer-pane" id="composer-attachment" data-composer-pane="attachment" hidden>
+          <div id="composerPreview" class="composer-preview" aria-live="polite"></div>
+          <div class="composer-tools"><button type="button" class="attachment-button" id="composerAttachment" data-action="attach" disabled data-boot-disabled><span aria-hidden="true">＋</span> PNG / WebP を添える</button><button type="button" class="attachment-button" id="composerAudioAttach" data-action="attach-audio" disabled data-boot-disabled><span aria-hidden="true">＋</span> 音声を添える</button><button type="button" id="composerAudioDetach" class="attachment-button" data-action="detach-audio" hidden disabled data-boot-disabled>音声を外す</button><span class="composer-local-label">公開せず下書きに保存できます</span></div>
+          <label class="composer-file-label" for="composerFile">画像を選択</label><input id="composerFile" type="file" accept="image/png,image/webp" hidden>
+          <label class="composer-file-label" for="composerAudioFile">音声を選択</label><input id="composerAudioFile" type="file" accept="audio/*" hidden>
+          <div id="composerToolLinks" class="composer-tool-links" aria-label="作品を作るツール">
+            <a href="/draw/?workspace=1&amp;social=1">ドット絵を描く</a><a href="/camera/?workspace=1&amp;social=1">写真をつくる</a><a href="/audio/?workspace=1&amp;social=1">音をつくる</a><a href="/spot-difference/?social=1">間違い探し</a><a href="/hidden-object/?social=1">かくし絵をつくる</a><a href="/jigsaw/?social=1">ジグソー</a>
+          </div>
+          </div>
+          <div class="composer-pane" id="composer-settings" data-composer-pane="settings" hidden>
+            <div id="composerVisibilityFields" class="composer-settings-fields" hidden>
+              <label class="composer-label" for="composerVisibility">公開範囲</label>
+              <select id="composerVisibility" name="visibility" aria-describedby="composerVisibilityHelp"><option value="private" selected>非公開（自分だけ）</option><option value="public">公開（フィードに掲載）</option></select>
+              <p id="composerVisibilityHelp" class="composer-help">ゲストでも投稿できます。公開を選ぶとフィードに掲載されます。下書きはこの端末に保存されます。</p>
+            </div>
+            <div id="composerLocationFields">
+              <label class="composer-label" for="composerLocation">地図の掲載先 <span>手入力または地図URL</span></label>
+              <input id="composerLocation" name="location" type="text" autocomplete="off" placeholder="緯度, 経度 または地図URL" aria-describedby="composerLocationHelp">
+              <p id="composerLocationHelp" class="composer-help">既存の投稿方式は地図の掲載先が必要です。場所は緯度・経度または地図URLで入力できます。位置情報は自動取得しません。</p>
+            </div>
+          </div>
+          <p id="composerStatus" class="composer-status" role="status" aria-live="polite">投稿内容は既存の投稿方式を使います。対応していない形式は下書きに保存してください。</p>
         </div>
-        <div class="hp-card-group" aria-labelledby="hpDiscoverTitle">
-          <h3 class="hp-group-title" id="hpDiscoverTitle">出会う</h3>
-          <nav class="hp-card-grid hp-discover-grid" aria-label="作品・イベント・お店">
-            <a class="hp-toy hp-link-card" data-toy="map" href="/globe/" style="--tone:#10202e"><canvas aria-hidden="true"></canvas><div class="hp-card-copy"><h3 class="hp-toy-name">世界地図で作品に出会う</h3><span class="hp-toy-line">場所をたどって、投稿作品を見つけよう。</span><span class="hp-card-link">世界地図を見る <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-link-card hp-static-card" href="/feed/"><span class="hp-static-visual" aria-hidden="true"><img src="/assets/icons/pixieed/home.svg" width="40" height="40" alt=""></span><div class="hp-card-copy"><h3 class="hp-toy-name">みんなの作品</h3><span class="hp-toy-line">ドット絵や写真、パズルに出会おう。</span><span class="hp-card-link">作品フィードを見る <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-link-card hp-static-card hp-event-card" href="/events/"><span class="hp-static-visual" aria-hidden="true"><span class="hp-pixel-sun"></span><span class="hp-pixel-stage"></span></span><div class="hp-card-copy"><h3 class="hp-toy-name">ドット絵イベント</h3><span class="hp-toy-line">展示やワークショップの開催情報。</span><span class="hp-card-link">イベントを見る <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-link-card hp-static-card hp-store-card" href="/stores/"><span class="hp-static-visual" aria-hidden="true"><span class="hp-pixel-shop"></span></span><div class="hp-card-copy"><h3 class="hp-toy-name">作品に会えるお店</h3><span class="hp-toy-line">街のお店や会場で、作品に出会おう。</span><span class="hp-card-link">お店を見る <span aria-hidden="true">→</span></span></div></a>
-            <a class="hp-link-card hp-catalog-card" href="/books/"><div class="hp-card-copy"><h3 class="hp-toy-name">ドット絵の本・グッズ</h3><span class="hp-toy-line">本、おもちゃ、制作道具を探す</span></div><span class="hp-card-link">商品を見る <span aria-hidden="true">→</span></span></a>
-          </nav>
-        </div>
-      </div>
-    </section>
-  </main>
-  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
-  <script type="module" src="/js/home-startup.mjs?rev=20261018-direct-runtime-1"></script>
-  <script type="module" src="/js/home-gallery.mjs?rev=20261015-home-gallery-2"></script>
-  <script type="module" src="/js/site-header.mjs?rev=20261022-social-release-1"></script>
-  <script type="module" src="/js/display-ads.mjs?rev=20261007-lazy-ads-1"></script>
-  <aside class="container px-display-ad" data-display-ad="home" data-ad-reserve data-ad-tail aria-label="広告" style="margin-bottom: 0"><div class="px-display-ad__inner"><span class="px-display-ad__label">広告</span></div></aside>
+        <div id="composerPostingConsent" hidden></div>
+        <footer class="composer-footer"><span class="character-count" id="characterCount">0 / 180</span><button id="composerDraftSave" class="draft-save-button" type="button" data-action="draft-save" disabled data-boot-disabled>下書きに保存</button><button id="composerSubmit" class="submit-button" type="submit" data-action="submit-post" disabled data-boot-disabled><span>投稿する</span><b aria-hidden="true">→</b></button></footer>
+      </form>
+    </dialog>
+
+    <dialog class="detail-dialog" id="detailDialog" aria-labelledby="detailTitle">
+      <section class="detail-sheet"><header class="dialog-header"><div><p class="eyebrow">A LITTLE SOMETHING</p><h2 id="detailTitle">作品の詳細</h2></div><button class="icon-button" id="detailClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header><nav class="detail-context" aria-label="作品詳細"><button type="button" data-action="detail-pane" data-pane="work" aria-pressed="true">作品</button><button type="button" data-action="detail-pane" data-pane="info" aria-pressed="false">情報・管理</button></nav><div id="detailBody"></div></section>
+    </dialog>
+    <!-- Integration hook: listen for pixieed:guest-account-open on document. Never report success until an authenticated, verified transfer completes. -->
+    <dialog class="detail-dialog" id="guestAccountDialog" aria-labelledby="guestAccountTitle"><section class="detail-sheet"><header class="dialog-header"><div><p class="eyebrow">KEEP YOUR WORK</p><h2 id="guestAccountTitle">作品をアカウントに引き継ぐ</h2></div><button class="icon-button" type="button" data-action="guest-account-close" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header><p>ゲストの作品や下書きは、このブラウザーセッションから利用できます。ブラウザーデータの削除、別の端末・ブラウザーでの利用、セッションの消失により、登録・ログイン後の確認と検証済み引き継ぎができるまで復元できない場合があります。</p><p id="guestAccountStatus" role="status" aria-live="polite">アカウント操作を準備しています…</p>
+<form id="guestAccountForm" class="account-form" novalidate>
+<label>引き継ぎ方法<select name="accountMode"><option value="new">新しく登録して残す</option><option value="existing">既存アカウントへ引き継ぐ</option></select></label>
+<label>メールアドレス<input name="email" type="email" autocomplete="email" inputmode="email" maxlength="254"></label>
+<label class="account-legacy-choice"><input type="checkbox" name="includeLegacy"> この端末の所有者未記録の旧作品も、自分の作品として関連付ける</label>
+<button type="submit" value="send" disabled>確認メールを依頼</button>
+<label>メールの確認コード<input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>
+<button type="submit" value="verify" disabled>確認して引き継ぐ</button>
+<button type="submit" value="claim" disabled>ログイン済みのアカウントへ引き継ぐ</button>
+<button type="submit" value="cancel" disabled>引き継ぎ準備を取り消す</button>
+<small>登録後はメール認証でログインします。登録・引き継ぎの失敗時も元の作品は消しません。再読み込み後はメールとコードを再入力できます。端末内だけの作品・下書き・音源は、このブラウザーに残り、別端末へ自動同期されません。</small>
+</form></section></dialog>
+
+    <dialog class="tools-dialog" id="toolsDialog" aria-labelledby="toolsTitle">
+      <section class="tools-sheet"><header class="dialog-header"><div><p class="eyebrow">MAKE &amp; SHARE</p><h2 id="toolsTitle">つくる道具</h2></div><button class="icon-button" id="toolsClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header>
+        <p>つくった作品は、各ツールの案内に沿ってフィードへ戻せます。</p>
+        <a href="/draw/?workspace=1&amp;social=1">ピクセルスタジオ<span>ドット絵を描く</span></a><a href="/camera/?workspace=1&amp;social=1">ピクセルカメラ<span>写真をつくる</span></a><a href="/audio/?workspace=1&amp;social=1">オーディオスタジオ<span>音をつくる</span></a><a href="/spot-difference/?social=1">間違い探し<span>パズルをつくる</span></a><a href="/hidden-object/?social=1">かくし絵<span>作品を遊びに</span></a><a href="/jigsaw/?social=1">ジグソー<span>絵を組み立てる</span></a>
+      </section>
+    </dialog>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </div>
 </body>
 </html>

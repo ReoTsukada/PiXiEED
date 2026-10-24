@@ -1,5 +1,10 @@
 const PAGE_GUTTER_ROUTES = new Map([
   ['index.html', 'home'],
+  ['welcome/index.html', 'home'],
+  ['globe/index.html', 'content'],
+  ['profile/index.html', 'content'],
+  ['feed/index.html', 'home'],
+  ['explore/index.html', 'home'],
   ['tools/index.html', 'listing'],
   ['about/index.html', 'content'],
   ['guide/index.html', 'content'],

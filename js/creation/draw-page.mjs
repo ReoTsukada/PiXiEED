@@ -32,7 +32,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261019-draw-search-rail-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261024-context-controls-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
@@ -56,8 +56,8 @@ import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261012
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261010-selection-handles-1';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261016-color-capability-1';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261020-staged-startup-1';
-import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261019-draw-search-rail-1';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261024-context-controls-1';
+import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
 const DRAW_REWARD_LIMITS = Object.freeze({ ...REWARD_LIMITS.draw });
@@ -1153,10 +1153,13 @@ brushSettingsPanel = mountDrawBrushSettings({ scope, host: $('#main'),
 });
 $('.draw-settings-panel').prepend($('#draw-mirror-rail'));
 const featureActions = $('.draw-feature-actions');
+// Stable slots survive lazy panel replacement and desktop/mobile reparenting.
+const colorSlot = document.createElement('div'); colorSlot.className = 'draw-color-adjustment-slot';
+colorSlot.append(colorAdjustmentPanel.opener); fixedLeft.append(colorSlot);
+const textSlot = document.createElement('div'); textSlot.className = 'draw-text-tool-slot';
+textSlot.append(textPanel.opener); $('.draw-tool-menu .draw-tool-group').append(textSlot);
 if (featureActions) {
-  const textOpener = textPanel.opener || $('#main .draw-text-opener');
-  featureActions.append(colorAdjustmentPanel.opener, brushSettingsPanel.opener, selectionPanel.deselectButton);
-  if (textOpener) featureActions.insertBefore(textOpener, brushSettingsPanel.opener);
+  featureActions.append(brushSettingsPanel.inlineControl, selectionPanel.deselectButton);
 }
 function placeToolMenu() {
   const menu = $('.draw-tool-menu'), summary = $('#draw-tool-summary'); if (!menu || !summary) return;

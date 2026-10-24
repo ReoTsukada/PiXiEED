@@ -14,7 +14,7 @@ import { optimizeSiteStartupDelivery } from './site-startup-delivery.mjs';
 import { isSampleWork } from '../js/public-work-policy.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const excluded = new Set(['docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
+const excluded = new Set(['work', 'docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
 const retiredPublicPages = new Set(['shops/index.html']);
 const publishableBooksPages = new Set(['books/index.html']);
 const publishableBooksAssets = new Set(['assets/books/room-products.json', 'assets/books/room-commerce.json']);
@@ -48,8 +48,8 @@ export function addSiteFontFallback(html) {
 /** Add the separately cache-busted reward entry only to pages with the common public header. */
 export function addSiteHeaderBenefits(html, name = '') {
   // Shared CSS changes also apply to standalone and redirect compatibility shells.
-  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261021-header-layout-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261022-social-release-1$2');
+  html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261023-compact-header-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261023-sns-navigation-1$2');
   if (headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html)) return { html, added: false, skipped: true };
   if (!/href="\/css\/site-header\.css(?:\?[^\"]*)?"/i.test(html)
       || !/src="\/js\/site-header\.mjs(?:\?[^\"]*)?"/i.test(html)) return { html, added: false, skipped: true };
@@ -128,7 +128,11 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       }
       // Explicit new public sources are also reviewable in a clean local build
       // before they are committed. Arbitrary untracked work stays excluded.
-      for (const name of ['js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+      for (const name of ['explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+        'assets/icons/pixieed/color-adjust.svg', 'assets/icons/pixieed/text.svg', 'assets/icons/pixieed/draw.svg',
+        'assets/icons/pixieed/copy.svg', 'assets/icons/pixieed/cut.svg', 'assets/icons/pixieed/paste.svg',
+        'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',
+        'assets/icons/pixieed/selection.svg', 'assets/icons/pixieed/adjustments.svg',
         'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
         'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/draw-lazy-panels.mjs',
         'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',

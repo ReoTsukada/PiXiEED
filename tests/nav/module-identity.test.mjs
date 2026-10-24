@@ -6,8 +6,10 @@ import { spawnSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
-  ['js/app.js', 'rev=20261021-header-layout-1'],
-  ['js/site-header.mjs', 'rev=20261021-header-layout-1'],
+  ['js/app.js', 'rev=20261023-sns-navigation-1'],
+  ['js/site-header.mjs', 'rev=20261023-sns-navigation-1'],
+  ['js/page-navigation.mjs', 'rev=20261023-sns-navigation-1'],
+  ['js/display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['js/tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['js/creation/draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['js/creation/drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],
@@ -16,7 +18,7 @@ const canonical = new Map([
   ['js/creation/jigsaw-file.mjs', 'rev=20260929-claude-integration-1'],
 ]);
 const templates = new Set(['scripts/generate-books-catalog.mjs', 'scripts/generate-event-pages.mjs']);
-const skippedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'docs', 'tests', 'vendor', 'node_modules']);
+const skippedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'docs', 'tests', 'work', 'vendor', 'node_modules']);
 
 async function sourceFiles(directory = '', result = []) {
   for (const entry of await readdir(new URL(directory ? `${directory}/` : './', root), { withFileTypes: true })) {

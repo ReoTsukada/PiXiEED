@@ -9,34 +9,29 @@
   <link rel="canonical" href="https://pixieed.jp/feed/">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <title>作品フィード｜PiXiEED</title>
-  <link rel="stylesheet" href="/css/social-feed.css?rev=20261021-social-layout-1">
-  <script type="module" src="/js/social/app.mjs?rev=20261022-posting-live-1"></script>
+  <link rel="stylesheet" href="/css/social-feed.css?rev=20261023-sns-navigation-1">
+  <script type="module" src="/js/social/app.mjs?rev=20261024-sns-release-1"></script>
 <link rel="stylesheet" href="/css/posting-consent.css?rev=20261022-posting-live-1">
 </head>
-<body>
+<body data-social-page="home">
   <div class="social-app" id="socialApp">
     <aside class="left-rail" aria-label="メインナビゲーション">
       <a class="brand" href="/" aria-label="PiXiEED ホーム">
         <img class="brand-logo" src="/assets/brand/pixieed-logo-48.png" width="24" height="24" alt="" aria-hidden="true">
         <span>PiXiEED</span>
       </a>
-      <nav class="rail-nav">
-        <a class="rail-link is-current" href="/feed/" aria-current="page" data-action="view" data-view="feed"><img src="/assets/icons/pixieed/home.svg" alt=""><span>作品フィード</span></a>
-        <button class="rail-link" type="button" data-action="search" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg><span>さがす</span></button>
-        <button class="rail-link" type="button" data-action="saved" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.8c0-.8.7-1.5 1.5-1.5h9c.8 0 1.5.7 1.5 1.5v16l-6-3.7-6 3.7z"></path></svg><span>保存した作品</span></button>
-        <button class="rail-link" type="button" data-action="tools" disabled data-boot-disabled><img src="/assets/icons/pixieed/tools.svg" alt=""><span>ツールでつくる</span></button>
-        <a class="rail-link" href="/jigsaw/"><img src="/assets/icons/pixieed/jigsaw.svg" alt=""><span>パズルで遊ぶ</span></a>
-        <a class="rail-link" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>ドットマップ</span><span class="outbound" aria-hidden="true">↗</span></a>
-        <a class="rail-link" href="/events/"><img src="/assets/icons/pixieed/celestial.svg" alt=""><span>イベント</span><span class="outbound" aria-hidden="true">↗</span></a>
-        <a class="rail-link" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分のページ</span><span class="outbound" aria-hidden="true">↗</span></a>
-      </nav>
+      <nav class="rail-nav" aria-label="ページ切替"><a class="rail-link is-current" href="/" aria-current="page"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
+<a class="rail-link" href="/explore/"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
+<a class="rail-link" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
+<a class="rail-link" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
+<a class="rail-link" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
       <button class="rail-create" type="button" data-compose data-type="art" disabled data-boot-disabled><span class="plus-mark" aria-hidden="true">+</span> 投稿をつくる</button>
       <div class="rail-note"><span class="note-dot" aria-hidden="true"></span><span>作品を見つける</span></div>
     </aside>
 
     <header class="mobile-header">
       <a class="brand" href="/" aria-label="PiXiEED ホーム"><img class="brand-logo" src="/assets/brand/pixieed-logo-48.png" width="24" height="24" alt="" aria-hidden="true"><span>PiXiEED</span></a>
-      <button class="icon-button" type="button" data-action="search" aria-label="検索" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></button>
+      <a class="icon-button" href="/explore/" aria-label="検索"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"></circle><path d="m15.4 15.4 4.5 4.5"></path></svg></a>
     </header>
 
     <main class="feed-column">
@@ -47,11 +42,12 @@
       </aside>
 
       <section class="feed-heading" aria-labelledby="pageTitle">
-        <div><p class="eyebrow">PIXEL COMMUNITY</p><h1 id="pageTitle">みんなの作品</h1><p class="feed-lede" id="viewDescription">ドット絵や写真、パズルとの出会いをここから。</p></div>
-        <button class="refresh-button" id="refreshFeed" type="button" data-action="refresh" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4.5 17a8 8 0 0 0 13.9-2M4 17v-5h5M19.5 7A8 8 0 0 0 5.6 9"></path></svg><span>更新</span></button>
+        <div><h1 id="pageTitle">みんなの作品</h1><p class="feed-lede" id="viewDescription">ドット絵や写真、パズルとの出会いをここから。</p></div>
+        <button class="refresh-button" id="refreshFeed" type="button" aria-label="作品を更新" title="作品を更新" data-action="refresh" disabled data-boot-disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4.5 17a8 8 0 0 0 13.9-2M4 17v-5h5M19.5 7A8 8 0 0 0 5.6 9"></path></svg></button>
+        <button type="button" class="account-transfer-button" aria-label="アカウントに保存・引き継ぐ" title="アカウントに保存・引き継ぐ" id="guestAccountOpen" data-action="guest-account" aria-controls="guestAccountDialog"><img src="/assets/icons/pixieed/profile.svg" alt=""></button>
       </section>
 
-      <div class="account-entry"><button type="button" class="account-transfer-button" id="guestAccountOpen" data-action="guest-account" aria-controls="guestAccountDialog">アカウントに保存・引き継ぐ</button></div>
+
 
       <nav class="feed-destinations" aria-label="作品から探しに行く">
         <a href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt="">ドットマップ</a>
@@ -104,21 +100,16 @@
     </main>
 
     <aside class="right-column" aria-label="PiXiEEDのツールと案内">
-      <section class="welcome-card">
-        <div class="welcome-spark" aria-hidden="true"><span></span><span></span><span></span></div>
-        <p class="eyebrow">MAKE A LITTLE MAGIC</p><h2>できた！を<br>作品にしよう。</h2><p>描く、撮る、音をつくる。作品に合う道具から始められます。</p>
-        <a class="welcome-cta" href="/draw/?workspace=1&amp;social=1">ピクセルスタジオへ <span aria-hidden="true">→</span></a>
-        <div class="welcome-doodle" aria-hidden="true">PIXEL<br>BY PIXEL</div>
-      </section>
+
       <section class="create-card" aria-labelledby="createTitle">
-        <div class="section-heading"><div><p class="eyebrow">MAKE &amp; SHARE</p><h2 id="createTitle">つくる道具</h2></div><span class="section-index">01 — 06</span></div>
+        <div class="section-heading"><div><p class="eyebrow">MAKE &amp; SHARE</p><h2 id="createTitle">つくる道具</h2></div></div>
         <a class="create-option" href="/draw/?workspace=1&amp;social=1"><span class="create-icon create-icon--art"><img src="/assets/icons/pixieed/artwork.svg" alt=""></span><span><strong>ドット絵を描く</strong><small>ピクセルスタジオ</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/camera/?workspace=1&amp;social=1"><span class="create-icon create-icon--photo"><img src="/assets/icons/pixieed/camera.svg" alt=""></span><span><strong>写真をつくる</strong><small>ピクセルカメラ</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/audio/?workspace=1&amp;social=1"><span class="create-icon create-icon--music"><img src="/assets/icons/pixieed/music.svg" alt=""></span><span><strong>音をつくる</strong><small>オーディオスタジオ</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/spot-difference/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/spot-difference.svg" alt=""></span><span><strong>間違い探し</strong><small>作品を遊びに</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/hidden-object/?social=1"><span class="create-icon create-icon--hidden"><img src="/assets/icons/pixieed/hidden-object.svg" alt=""></span><span><strong>かくし絵をつくる</strong><small>ピクセルの中に発見</small></span><b aria-hidden="true">↗</b></a>
         <a class="create-option" href="/jigsaw/?social=1"><span class="create-icon create-icon--puzzle"><img src="/assets/icons/pixieed/jigsaw.svg" alt=""></span><span><strong>ジグソー</strong><small>自分で遊ぶ・投稿する</small></span><b aria-hidden="true">↗</b></a>
-        <p class="inline-demo-note">作品の作成は各ツールで行います。ここに投稿サンプルや仮の作者情報は表示しません。</p>
+        <p class="inline-demo-note">作品の作成は各ツールで行います。</p>
       </section>
       <section class="event-card" aria-labelledby="eventTitle">
         <div class="section-heading"><div><p class="eyebrow">MEET &amp; PLAY</p><h2 id="eventTitle">イベントを探す</h2></div><span class="event-pixel" aria-hidden="true"></span></div>
@@ -126,16 +117,14 @@
         <a href="/events/" class="event-link"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>イベント一覧をひらく</span><b aria-hidden="true">→</b></a>
         <a href="/globe/" class="map-link"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図で作品を探す</span><b aria-hidden="true">→</b></a>
       </section>
-      <section class="community-card"><div class="community-stamp" aria-hidden="true">PIX<br>IE</div><div><strong>ひとりの「できた」が、<br>みんなのひらめきに。</strong><small>PiXiEED community</small></div></section>
+
     </aside>
 
-    <nav class="mobile-nav" aria-label="メインナビゲーション">
-      <a class="mobile-nav__item is-current" href="/feed/" aria-current="page" data-action="view" data-view="feed"><img src="/assets/icons/pixieed/home.svg" alt=""><span>フィード</span></a>
-      <button type="button" class="mobile-nav__item" data-action="tools" aria-label="ツールでつくる" disabled data-boot-disabled><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></button>
-      <button type="button" class="mobile-nav__item mobile-nav__create" data-compose data-type="art" aria-label="作品やことばを投稿する" disabled data-boot-disabled><span class="mobile-plus">+</span><span>投稿</span></button>
-      <a class="mobile-nav__item" href="/jigsaw/"><img src="/assets/icons/pixieed/jigsaw.svg" alt=""><span>遊ぶ</span></a>
-      <a class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>マイページ</span></a>
-    </nav>
+    <nav class="mobile-nav" aria-label="ページ切替"><a class="mobile-nav__item is-current" href="/" aria-current="page"><img src="/assets/icons/pixieed/home.svg" alt=""><span>ホーム</span></a>
+<a class="mobile-nav__item" href="/explore/"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span>探す</span></a>
+<a class="mobile-nav__item" href="/tools/"><img src="/assets/icons/pixieed/tools.svg" alt=""><span>つくる</span></a>
+<a class="mobile-nav__item" href="/globe/"><img src="/assets/icons/pixieed/globe.svg" alt=""><span>地図</span></a>
+<a class="mobile-nav__item" href="/profile/"><img src="/assets/icons/pixieed/profile.svg" alt=""><span>自分</span></a></nav>
 
     <dialog class="composer-dialog" id="composerDialog" aria-labelledby="composerTitle">
       <form class="composer-sheet" id="composerForm" method="dialog">
@@ -190,7 +179,7 @@
     </dialog>
 
     <dialog class="detail-dialog" id="detailDialog" aria-labelledby="detailTitle">
-      <section class="detail-sheet"><header class="dialog-header"><div><p class="eyebrow">A LITTLE SOMETHING</p><h2 id="detailTitle">作品の詳細</h2></div><button class="icon-button" id="detailClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header><nav class="detail-context" aria-label="作品詳細"><button type="button" data-action="detail-pane" data-pane="work" aria-pressed="true">作品</button><button type="button" data-action="detail-pane" <button type="button" data-action="detail-pane" data-pane="info" aria-pressed="false">情報・管理</button></nav><div id="detailBody"></div></section>
+      <section class="detail-sheet"><header class="dialog-header"><div><p class="eyebrow">A LITTLE SOMETHING</p><h2 id="detailTitle">作品の詳細</h2></div><button class="icon-button" id="detailClose" type="button" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header><nav class="detail-context" aria-label="作品詳細"><button type="button" data-action="detail-pane" data-pane="work" aria-pressed="true">作品</button><button type="button" data-action="detail-pane" data-pane="info" aria-pressed="false">情報・管理</button></nav><div id="detailBody"></div></section>
     </dialog>
     <!-- Integration hook: listen for pixieed:guest-account-open on document. Never report success until an authenticated, verified transfer completes. -->
     <dialog class="detail-dialog" id="guestAccountDialog" aria-labelledby="guestAccountTitle"><section class="detail-sheet"><header class="dialog-header"><div><p class="eyebrow">KEEP YOUR WORK</p><h2 id="guestAccountTitle">作品をアカウントに引き継ぐ</h2></div><button class="icon-button" type="button" data-action="guest-account-close" aria-label="閉じる"><img src="/assets/icons/pixieed/close.svg" alt=""></button></header><p>ゲストの作品や下書きは、このブラウザーセッションから利用できます。ブラウザーデータの削除、別の端末・ブラウザーでの利用、セッションの消失により、登録・ログイン後の確認と検証済み引き継ぎができるまで復元できない場合があります。</p><p id="guestAccountStatus" role="status" aria-live="polite">アカウント操作を準備しています…</p>

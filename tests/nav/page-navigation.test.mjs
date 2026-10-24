@@ -1,7 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { PAGE_DESTINATIONS, currentPageDestination, creationModeDestination } from '../../js/page-navigation.mjs';
+import { PAGE_DESTINATIONS, PUBLIC_NAV_ITEMS, currentPageDestination, currentPublicNavKey, creationModeDestination } from '../../js/page-navigation.mjs';
+
+test('public navigation has five fixed destination links with route-based active state', () => {
+  assert.deepEqual(PUBLIC_NAV_ITEMS.map(({ key, label, href }) => [key, label, href]), [
+    ['home', 'ホーム', '/'],
+    ['explore', '探す', '/explore/'],
+    ['create', 'つくる', '/tools/'],
+    ['map', '地図', '/globe/'],
+    ['me', '自分', '/profile/'],
+  ]);
+  const current = path => currentPublicNavKey(`https://example.test${path}`);
+  assert.equal(current('/'), 'home');
+  assert.equal(current('/feed/?view=saved'), 'home');
+  assert.equal(current('/explore/?q=cat'), 'explore');
+  assert.equal(current('/works/sea-cat.html'), 'explore');
+  assert.equal(current('/tools/'), 'create');
+  assert.equal(current('/globe/?post=1'), 'map');
+  assert.equal(current('/profile/?view=posts'), 'me');
+  assert.equal(current('/draw/?workspace=1'), null, 'editor pages retain their own operation navigation');
+});
 
 test('all public menu destinations exist and include the prior direct feature entrances', () => {
   const links = PAGE_DESTINATIONS.flatMap(group => group.links);
@@ -11,7 +30,7 @@ test('all public menu destinations exist and include the prior direct feature en
     const path = new URL(href, 'https://example.test').pathname;
     assert.ok(existsSync(new URL(`../../${path.slice(1)}${path.endsWith('/') ? 'index.html' : ''}`, import.meta.url)), `${label}: ${path}`);
   }
-  for (const href of ['/', '/draw/', '/camera/', '/audio/', '/output/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/globe/', '/globe/?post=1', '/events/', '/stores/', '/books/', '/profile/', '/collection/', '/privacy/']) assert.ok(hrefs.includes(href), href);
+  for (const href of ['/', '/draw/', '/camera/', '/audio/', '/output/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/explore/', '/globe/', '/globe/?post=1', '/events/', '/stores/', '/books/', '/profile/', '/collection/', '/privacy/']) assert.ok(hrefs.includes(href), href);
   assert.ok(!hrefs.includes('/pixiee-lens/'), 'retired PiXiEELENS is a compatibility entry, not a promoted destination');
   assert.ok(!hrefs.includes('/shops/'), 'retired shop invitation is not a public destination');
 });

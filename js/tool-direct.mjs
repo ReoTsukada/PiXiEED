@@ -32,7 +32,7 @@ export function installDirectToolShell({ section, mode, search }) {
   const start = document.querySelector('[data-embed-start]');
   const status = section.querySelector('[data-embed-status]');
   const bootstrapBack = document.querySelector('[data-direct-bootstrap-back]');
-  const bar = document.createElement('div'); bar.className = 'tool-direct__bar'; bar.dataset.directChrome = ''; bar.hidden = true;
+  const bar = document.createElement('div'); bar.className = 'tool-direct__bar px-site-header px-header-inner'; bar.dataset.directChrome = ''; bar.hidden = true;
   const bootCue = document.createElement('div'); bootCue.className = 'tool-direct__boot-cue'; bootCue.dataset.directChrome = ''; bootCue.hidden = true;
   const bootCueStatus = document.createElement('p'); bootCueStatus.setAttribute('role', 'status'); bootCueStatus.setAttribute('aria-live', 'polite');
   const bootCueBack = document.createElement('button'); bootCueBack.type = 'button'; bootCueBack.textContent = '説明へ戻る';
@@ -41,8 +41,10 @@ export function installDirectToolShell({ section, mode, search }) {
   const message = document.createElement('span'); message.className = 'tool-direct__status'; message.setAttribute('role', 'status');
   const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = '再試行'; retry.hidden = true;
   const recovery = document.createElement('button'); recovery.type = 'button'; recovery.textContent = '作品を選ぶ'; recovery.hidden = true;
-  const explanation = document.createElement('button'); explanation.type = 'button'; explanation.textContent = '説明を見る'; explanation.dataset.shellExplanation = '';
-    bar.append(label, message, retry, recovery, explanation);
+  const explanation = document.createElement('button'); explanation.type = 'button'; explanation.textContent = '?'; explanation.setAttribute('aria-label', '説明を見る'); explanation.title = '説明を見る'; explanation.dataset.shellExplanation = '';
+  explanation.className = 'tool-direct__help';
+  const chromeMoves = [];
+  bar.append(label, message, retry, recovery, explanation);
   barObserver?.observe(bar);
   const publicApi = Object.freeze({ kind: 'direct', get active() { return open && !disposed; }, get runtime() { return runtime; }, getState: () => runtime?.getState(), show: () => show(true), hide: () => hide(true), dispose });
   window.__PIXIEED_CREATION_HOST__ = publicApi;
@@ -129,6 +131,31 @@ export function installDirectToolShell({ section, mode, search }) {
     html.style.setProperty('--tool-direct-bar', height);
     if (changed) window.dispatchEvent(new Event('resize'));
   }
+  function moveIntoBar(node) {
+    if (!node?.parentNode || node.parentNode === bar || chromeMoves.some(item => item.node === node)) return;
+    const marker = document.createComment('direct-tool-header-position');
+    node.before(marker);
+    chromeMoves.push({ node, marker });
+    bar.insertBefore(node, explanation);
+  }
+  function restoreBarNodes() {
+    for (const { node, marker } of chromeMoves.splice(0)) {
+      if (marker.parentNode) marker.replaceWith(node);
+      else node.remove();
+    }
+    document.querySelector('.tool-direct__merged-header')?.classList.remove('tool-direct__merged-header');
+  }
+  function mergeEditorChrome() {
+    if (!open || !bar.isConnected) return;
+    const header = [...owned.keys()].find(node => node.matches?.('.site-header'));
+    if (header) header.classList.add('tool-direct__merged-header');
+    const projectBar = document.querySelector('.project-bar.px-tool-header-files');
+    const controls = header?.querySelector('.px-tool-header-controls') || document.querySelector('.px-tool-header-controls');
+    moveIntoBar(projectBar);
+    moveIntoBar(controls);
+    const rewardStatus = document.querySelector('.pixieed-site-reward-status');
+    if (rewardStatus && !bar.contains(rewardStatus)) moveIntoBar(rewardStatus);
+  }
   function useWork() {
     if (!description) return;
     description.hidden = true; description.inert = true;
@@ -137,10 +164,11 @@ export function installDirectToolShell({ section, mode, search }) {
     html.dataset.toolDirect = 'work';
     for (const [node, state] of owned) { node.hidden = state.hidden; node.inert = state.inert; }
     for (const [node, disabled] of styles) node.disabled = disabled;
-    bar.hidden = coreReady || !loadingCardVisible; bootCue.hidden = !loadingCardVisible; viewport();
+    bar.hidden = coreReady || !loadingCardVisible; bootCue.hidden = !loadingCardVisible; mergeEditorChrome(); viewport();
   }
   function useDescription({ restoreFocus = true } = {}) {
     if (!description) return;
+    restoreBarNodes();
     for (const [node, state] of owned) { state.hidden = node.hidden; state.inert = node.inert; node.hidden = true; node.inert = true; }
     for (const node of styles.keys()) node.disabled = true;
     workAttributes = attributes(body);
@@ -309,7 +337,7 @@ export function installDirectToolShell({ section, mode, search }) {
       prepareHost(template);
       // Start evaluating the already-required graph while the editor styles load.
       // The handled result is consumed only after CSS and restore-state checks.
-      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261020-staged-startup-1'))()
+      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261024-mode-icon-1'))()
         .then(module => ({ module }), error => { reloadRequired = true; return { error }; });
       const cssLoads = [];
       const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));
@@ -397,6 +425,7 @@ export function installDirectToolShell({ section, mode, search }) {
       await waitForMountedStyles();
       // A newer show owns this retained runtime. Hide/dispose own suspension.
       if (generation !== token || !open || disposed) return;
+      mergeEditorChrome();
       clearTimeout(loadingCardTimer); loadingCardTimer = 0; loadingCardVisible = true; bar.hidden = false; bootCue.hidden = true;
       workAttributes = attributes(body); label.textContent = { draw:'PiXiEEDraw', camera:'PiXiEED カメラ', audio:'PiXiEED 音楽' }[editor.state.mode];
       coreReady = true;
@@ -464,6 +493,7 @@ export function installDirectToolShell({ section, mode, search }) {
     // Keep ownership observers until an in-flight mount has released its partial scope.
     teardown = Promise.allSettled([mounting, pendingActivation]).then(() => {
     runtime?.dispose(); bodyObserver?.disconnect(); headObserver?.disconnect();
+    restoreBarNodes();
     clearAttempt();
     bar.remove(); bootCue.remove();
     if (description) {

@@ -142,6 +142,25 @@ body .app-tabs--work {
   padding-inline: 8px;
   gap: 8px;
 }
+body .public-destination-nav {
+  width: min(31rem, calc(100% - 1rem));
+  position:fixed!important;
+  display:grid!important;
+  left:50%!important;
+  right:auto!important;
+  bottom:max(8px,env(safe-area-inset-bottom))!important;
+  top:auto!important;
+  transform:translateX(-50%)!important;
+}
+body:has(.public-destination-nav) { padding-bottom:calc(88px + env(safe-area-inset-bottom)); }
+body .public-destination-nav .app-tab-label {
+  font-size: clamp(.62rem, 2.8vw, .72rem);
+  letter-spacing: .01em;
+}
+body .public-destination-nav [aria-current="page"] {
+  color: var(--pixieed-accent, #e75445);
+  background: rgba(231, 84, 69, .09);
+}
 body :is(.app-tabs,.globe-app-tabs) > :is(a,button) {
   -webkit-tap-highlight-color: transparent;
   cursor: pointer;

@@ -1,10 +1,9 @@
-/* Persistent feature row above the editor controls. It remains reachable even
-   when the selection mask is empty or the whole drawing is transparent. */
+/* Persistent size control; selection actions appear only when needed. */
 body.creation-editor[data-page="draw"] .draw-feature-actions {
-  flex: 0 0 44px;
+  flex: 0 0 46px;
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) 44px;
   gap: 4px;
   min-width: 0;
 }
@@ -36,7 +35,7 @@ body[data-page="draw"] .draw-feature-actions > .draw-selection-controls__deselec
   color: #17232d !important;
 }
 body[data-page="draw"] .draw-feature-actions > [hidden] { display: none !important; }
-body[data-page="draw"] .draw-feature-actions:has(> .draw-selection-controls__deselect[hidden]) > .draw-brush-size-open { grid-column: 3 / span 2; }
+body[data-page="draw"] .draw-feature-actions:has(> .draw-selection-controls__deselect[hidden]) { grid-template-columns: minmax(0, 1fr); }
 body[data-page="draw"] .draw-feature-actions > button:focus-visible {
   outline: 3px solid #8ecdf0;
   outline-offset: 2px;
@@ -67,3 +66,38 @@ body[data-page="draw"] .draw-board[data-selection-hover="move"] canvas { cursor:
   body[data-page="draw"] .draw-feature-actions { gap: 4px; }
   body[data-page="draw"] .draw-feature-actions > button { font-size: 11px; }
 }
+/* Vector glyphs inherit the control's foreground in every editor mode. */
+body[data-page="draw"] .draw-color-adjustment-slot { grid-row:3; }
+body[data-page="draw"] .draw-text-tool-slot { min-width:0; }
+body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener) {
+  display:grid; place-items:center; box-sizing:border-box; width:44px; min-width:44px;
+  height:44px; min-height:44px; padding:0; border:1px solid #ffffff38; border-radius:10px;
+  background:#26333d; color:#f3f6f7; font-size:0;
+}
+body[data-page="draw"] .draw-tool-menu .draw-text-opener { width:100%; min-height:52px; background:#2b3742; }
+body[data-page="draw"] .draw-color-adjustment-open { --draw-action-icon:url('/assets/icons/pixieed/color-adjust.svg'); }
+body[data-page="draw"] .draw-text-opener { --draw-action-icon:url('/assets/icons/pixieed/text.svg'); }
+body[data-page="draw"] .draw-brush-size-open { --draw-action-icon:url('/assets/icons/pixieed/adjustments.svg'); }
+body[data-page="draw"] [data-selection-action="copy"] { --draw-action-icon:url('/assets/icons/pixieed/copy.svg'); }
+body[data-page="draw"] [data-selection-action="cut"] { --draw-action-icon:url('/assets/icons/pixieed/cut.svg'); }
+body[data-page="draw"] [data-selection-action="paste"] { --draw-action-icon:url('/assets/icons/pixieed/paste.svg'); }
+body[data-page="draw"] [data-selection-action="confirm"] { --draw-action-icon:url('/assets/icons/pixieed/confirm.svg'); }
+body[data-page="draw"] #draw-selection-controls [data-selection-action="confirm"] { background:#ffd35a!important; border-color:#ffd35a; color:#17232d!important; }
+body[data-page="draw"] [data-selection-action="cancel"] { --draw-action-icon:url('/assets/icons/pixieed/close.svg'); }
+body[data-page="draw"] [data-selection-action="back"] { --draw-action-icon:url('/assets/icons/pixieed/selection.svg'); }
+body[data-page="draw"] [data-selection-action="deselect"] { --draw-action-icon:url('/assets/icons/pixieed/deselect.svg'); }
+body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener,.draw-brush-size-open,[data-slot-kind="action"],.draw-selection-controls__deselect) { font-size:0!important; }
+body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener,.draw-brush-size-open,[data-slot-kind="action"],.draw-selection-controls__deselect)::before {
+  content:''!important; display:block; width:24px; height:24px; background-color:currentColor;
+  -webkit-mask:var(--draw-action-icon) center / contain no-repeat; mask:var(--draw-action-icon) center / contain no-repeat;
+}
+body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener)[aria-expanded="true"] { border-color:#ffd35a; color:#ffd35a; }
+body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener)[aria-busy="true"]::before {
+  width:20px; height:20px; box-sizing:border-box; background:none; mask:none; -webkit-mask:none;
+  border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:draw-feature-loading .8s linear infinite;
+}
+body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener)[aria-label$="（再試行）"]::before {
+  content:'!'!important; background:none; mask:none; -webkit-mask:none; font:800 22px/24px system-ui; color:#ffd35a;
+}
+@keyframes draw-feature-loading { to { transform:rotate(1turn); } }
+@media (prefers-reduced-motion:reduce) { body[data-page="draw"] [aria-busy="true"]::before { animation:none!important; } }

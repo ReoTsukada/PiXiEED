@@ -170,6 +170,10 @@ body.draw-desktop-active #draw-canvas {
   border-color: #ffffff30;
 }
 body.draw-desktop-active .draw-desktop-toolbar-context { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 3px; overflow: hidden; }
+body.draw-desktop-active .draw-desktop-toolbar-context { flex-wrap:wrap; overflow:visible; }
+body.draw-desktop-active .draw-desktop-toolbar-context > .draw-feature-actions { flex:1 1 200px; min-width:0; }
+body.draw-desktop-active .draw-desktop-layers-panel > .draw-color-adjustment-slot { flex:none; margin:4px 0; }
+body.draw-desktop-active .draw-desktop-group__buttons > .draw-text-tool-slot { width:44px; height:44px; }
 body.draw-desktop-active .draw-desktop-toolbar-context .draw-size { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--desktop-muted); font-size: 11px; white-space: nowrap; }
 body.draw-desktop-active .draw-desktop-toolbar-context #draw-size { width: 76px; min-height: 32px; }
 body.draw-desktop-active .draw-desktop-toolbar-context #draw-clear { flex: 0 0 36px; width: 36px; min-width: 36px; min-height: 34px; height: 34px; padding: 5px; border: 1px solid #ffffff24; border-radius: 7px; background: #202b33; color: #edf1ec; }
@@ -347,17 +351,8 @@ body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::
   place-items: center;
   font: 700 17px/1 system-ui, sans-serif;
 }
-body.draw-desktop-active .draw-desktop-features .draw-text-opener::before { content: "文"; }
-body.draw-desktop-active .draw-desktop-features .draw-color-adjustment-open::before { content: "色"; }
-body.draw-desktop-active .draw-desktop-features .draw-brush-size-open::before { content: "筆"; }
 body.draw-desktop-active .draw-desktop-features .draw-selection-controls__deselect::before { content: "×"; }
 body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::before { content: "数"; }
-body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="confirm"]::before { content: "✓"; }
-body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="cancel"]::before { content: "×"; }
-body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="copy"]::before { content: "複"; }
-body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="cut"]::before { content: "切"; }
-body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="paste"]::before { content: "貼"; }
-body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="back"]::before { content: "範"; }
 body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="filled"]::before { content: "塗"; }
 body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="contiguous"]::before { content: "隣"; }
 body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="empty"]::before { content: "—"; }

@@ -58,6 +58,7 @@ async function sha256Blob(blob) {
 }
 
 function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore(), windowRef = window, documentRef = document } = {}) {
+  const explorePage = documentRef.body.dataset.socialPage === 'explore';
   const app = $('#socialApp', documentRef), feed = $('#feed', documentRef), status = $('#feedStatus', documentRef);
   const retry = $('#feedRetry', documentRef), composer = $('#composerDialog', documentRef), form = $('#composerForm', documentRef);
   const detail = $('#detailDialog', documentRef), detailBody = $('#detailBody', documentRef), tools = $('#toolsDialog', documentRef);
@@ -75,6 +76,29 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const startupReady = new Promise((resolve) => { releaseStartup = resolve; });
   const state = { posts: [], minePosts: null, mineMode: false, staged: [], readWarnings: [], mode: 'art', composerPane: 'content', attachment: null, localPuzzle:null, receipt: null, outputId: null, output: null, outputDetached: false, audioRecord: null, audioDetached: false, audioWarning: '', audioGeneration: 0, audioListLoaded: false, activeDraft: null, filter: 'all', query: '', bookmarks: new Set(), liked: new Map(), loading: false, busy: false, submitted: false, submissionCleared: false, draftReady: false, archiveSaved: false, pageHidden: false, fileGeneration: 0, detailId: null, lastDetailId: null, detailPane: 'work', detailPaneScroll: new Map(), unsentComments: new Map(), priorFocus: null, priorDraftId: null, composerUrl: null, detailHistory: false, audioUrl: null, detailAudioUrl: null, saveChain: Promise.resolve(), initialized: false, handoffToken: 0, composerGeneration: 0, detailGeneration: 0, pendingCleanup: new Set() };
 
+  const boundSearchInputs = new WeakSet();
+  function bindSearch(input) {
+    if (!input) return;
+    input.value = state.query;
+    if (boundSearchInputs.has(input)) return;
+    boundSearchInputs.add(input);
+    input.addEventListener('input', () => {
+      state.query = input.value.trim();
+      const url = new URL(windowRef.location.href);
+      if (state.query) url.searchParams.set('q', state.query); else url.searchParams.delete('q');
+      windowRef.history.replaceState(windowRef.history.state || {}, '', url);
+      render();
+    });
+  }
+  function ensureSearch() {
+    let input = $('#socialSearch', documentRef);
+    if (!input) {
+      input = node('input', { id: 'socialSearch', type: 'search', placeholder: '読み込んだ投稿や作者を検索', 'aria-label': '読み込んだ投稿や作者を検索' });
+      $('#feedFilters', documentRef).after(input);
+    }
+    bindSearch(input);
+    return input;
+  }
   function announce(message) { if (live) { live.hidden = false; live.textContent = message; } }
   function tell(message) { if (composerStatus) composerStatus.textContent = message; }
   function statusText(message) { if (status) status.textContent = message; }
@@ -298,13 +322,10 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const mine = $('#minePosts', documentRef); if (mine) mine.setAttribute('aria-pressed', String(state.mineMode));
     const view = state.mineMode ? 'mine' : state.filter === 'local' ? 'local' : state.filter === 'saved' ? 'saved' : 'feed';
     const [title, description] = FEED_VIEWS[view];
-    $('#pageTitle', documentRef).textContent = title;
-    $('#viewDescription', documentRef).textContent = description;
+    $('#pageTitle', documentRef).textContent = explorePage && view === 'feed' ? '探す' : title;
+    $('#viewDescription', documentRef).textContent = explorePage && view === 'feed' ? '読み込んだ公開作品を、作者・ことば・種類から探します。' : description;
     for (const button of $$('.rail-link[data-action="saved"]', app)) button.setAttribute('aria-pressed', String(view === 'saved'));
-    for (const link of $$('a[href="/feed/"]', app)) {
-      link.classList.toggle('is-current', view === 'feed');
-      if (view === 'feed') link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current');
-    }
+    // Page destinations stay selected independently of local saved/draft tabs.
     $$('#feedViews [data-action="view"]', app).forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === view)));
     const filters = $('#feedFilterWrap', documentRef); if (filters) filters.hidden = view !== 'feed';
     const filterSummary = filters?.querySelector('summary');
@@ -903,7 +924,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     }
     if (name === 'refresh' || name === 'retry') { void refresh({ initial: state.posts.length === 0 }); return; }
     if (name === 'show-new-posts') { acceptNewPosts(); return; }
-    if (name === 'search') { if (currentView() !== 'feed') await navigateView('feed'); $('#feedFilterWrap details')?.setAttribute('open', ''); let input = $('#socialSearch', documentRef); if (!input) { input = node('input', { id: 'socialSearch', type: 'search', placeholder: '読み込んだ投稿や作者を検索', 'aria-label': '読み込んだ投稿や作者を検索' }); $('#feedFilters', documentRef).after(input); input.addEventListener('input', () => { state.query = input.value.trim(); render(); input.focus({ preventScroll: true }); }); } input.focus(); return; }
+    if (name === 'search') { if (currentView() !== 'feed') await navigateView('feed'); $('#feedFilterWrap details', documentRef)?.setAttribute('open', ''); ensureSearch().focus(); return; }
     if (name === 'saved') { void navigateView('saved'); return; }
     if (name === 'open-draft') { state.priorDraftId = action.dataset.draftId; const draft = await drafts.get(action.dataset.draftId); if (draft) void openComposer(draft.mode, { draft }); return; }
     if (name === 'remove-draft') { if (!windowRef.confirm('この端末の下書きを削除しますか？\nキャンセルすると内容を残します。')) return; try { await drafts.remove(action.dataset.draftId); renderDrafts(); if (state.audioListLoaded) void refreshAudioList(); toast('下書きを削除しました。'); } catch (error) { toast(`下書きを削除できませんでした。${niceError(error, '')}`); } return; }
@@ -1115,9 +1136,13 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     app.dataset.ready = 'true';
     updateFilters(); renderDrafts();
     const params = new URLSearchParams(windowRef.location.search);
-    const initialView = params.has('view') ? readFeedView(windowRef.location.href) : currentView();
+    const initialView = params.has('view') ? readFeedView(windowRef.location.href) : 'feed';
     if (initialView !== currentView()) await navigateView(initialView, { push: false, restore: false });
     windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, currentView()));
+    state.query = params.get('q')?.trim() || '';
+    const search = $('#socialSearch', documentRef);
+    if (search) bindSearch(search);
+    else if (state.query) { ensureSearch(); $('#feedFilterWrap details', documentRef)?.setAttribute('open', ''); }
     const postRef = params.get('post'), outputRef = params.get('output'), compose = params.get('compose');
     if (outputRef) {
       await openComposer('music');

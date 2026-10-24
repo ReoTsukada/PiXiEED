@@ -11,7 +11,7 @@ const html = '<!doctype html><html lang="ja"><head><title>Original title</title>
 
 test('only explicitly listed public and tool-landing routes receive a static gutter opt-in', () => {
   const routes = [
-    ['index.html', 'home'], ['tools/index.html', 'listing'], ['about/index.html', 'content'],
+    ['index.html', 'home'], ['feed/index.html', 'home'], ['explore/index.html', 'home'], ['welcome/index.html', 'home'], ['globe/index.html', 'content'], ['profile/index.html', 'content'], ['tools/index.html', 'listing'], ['about/index.html', 'content'],
     ['guide/index.html', 'content'], ['privacy/index.html', 'content'], ['help/index.html', 'legacy'],
     ['glossary/index.html', 'glossary'], ['stores/index.html', 'content'],
     ['stores/ecowashcafe-nakanoshima.html', 'content'], ['books/index.html', 'catalog'],
@@ -30,7 +30,7 @@ test('only explicitly listed public and tool-landing routes receive a static gut
   assert.match(addPageGutters(html, 'events/verified-event/index.html', { generatedEventRoutes }).html, /data-page-gutters="events"/);
   for (const path of [
     'draw/editor.html', 'audio/editor.html', 'camera/work/index.html', 'output/work/index.html',
-    'play/spot-difference/index.html', 'globe/index.html', 'profile/index.html', 'collection/index.html',
+    'play/spot-difference/index.html', 'collection/index.html',
     '404.html', 'events/unknown-event/index.html', 'events/../index.html',
   ]) {
     assert.deepEqual(addPageGutters(html, path), { html, added: false, skipped: true }, path);

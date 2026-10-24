@@ -1,6 +1,6 @@
-@import url('./navigation.css?rev=20261012-nav-polish-1');
+@import url('./navigation.css?rev=20261023-sns-navigation-1');
 /* One compact header for public pages and full-screen tools. */
-:root{--px-header-height:64px;--header-h:var(--px-header-height);--px-press-time:140ms;--px-press-ease:cubic-bezier(.2,.7,.2,1)}
+:root{--px-header-height:56px;--header-h:var(--px-header-height);--px-press-time:140ms;--px-press-ease:cubic-bezier(.2,.7,.2,1)}
 .px-header-ready body .site-header.px-site-header{display:block;position:sticky;top:0;z-index:35;min-height:var(--px-header-height);border:0;background:rgba(247,248,246,.97);box-shadow:0 1px 0 #1b202510}
 .px-site-header,.px-site-header *{box-sizing:border-box}
 .px-site-header .px-header-inner,.px-site-header.px-header-inner{display:flex;align-items:center;gap:8px;width:100%;min-height:var(--px-header-height);padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));margin:0;min-width:0}
@@ -179,7 +179,7 @@ html[data-pixieed-motion=reduced] .px-pass button:active{transform:none}
 @keyframes px-panel-return-a{0%,100%{transform:none}45%{transform:scale(.96)}}
 @keyframes px-panel-return-b{0%,100%{transform:none}45%{transform:scale(.96)}}
 /* Tool headers keep file and site-menu launchers visible while editing actions scroll. */
-body[data-tool-name]{--px-header-height:64px;--header-h:var(--px-header-height)}
+body[data-tool-name]{--px-header-height:56px;--header-h:var(--px-header-height)}
 /* The retained editor's second row is an operation bar, below the site row. */
 body.creation-editor{--px-header-height:56px}
 body[data-tool-name] .px-site-header .px-header-brand--tool>span:not(.brand-mark){display:none!important}
@@ -302,3 +302,11 @@ body .pc-header.px-site-header .menu-toggle{color:#fff;border-color:#ffffff35;ba
   body .hud-top__bar.px-site-header .menu-toggle__label{display:none}
   body .hud-top__bar.px-site-header .site-draw-cta--lens{flex:0 0 80px;max-width:80px;min-height:44px;padding:3px;font-size:10px;line-height:1.1}
 }
+
+/* Compact shared chrome: labels stay available through accessible names. */
+body .px-site-header .menu-toggle { width:44px!important; min-width:44px; flex:0 0 44px; padding-inline:0; }
+body .px-site-header .menu-toggle__label,
+body .px-site-header [data-header-reward-label] { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+body .px-site-header .px-header-reward { width:44px; min-width:44px; padding:0; }
+body .px-site-header .px-header-reward::before { content:'✦'; font-size:22px; }
+body .px-site-header .px-header-reward:is([data-open-period="true"],[data-active="true"])::before { content:'✓'; }

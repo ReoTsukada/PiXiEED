@@ -115,7 +115,7 @@ test('current published app callers compile from an owned copy without changing 
     const source = await readFile(path.join(repositoryRoot, relative), 'utf8');
     if (source.includes('/js/app.js?rev=')) htmlCallers.push(relative);
   }
-  const files = [...htmlCallers, 'index.html', ...sourcePaths].filter((relative, index, all) => all.indexOf(relative) === index);
+  const files = [...htmlCallers, 'index.html', 'welcome/index.html', ...sourcePaths].filter((relative, index, all) => all.indexOf(relative) === index);
   const before = Object.fromEntries(await Promise.all([...sourcePaths, ...htmlCallers].map(async relative => [relative, await readFile(path.join(repositoryRoot, relative), 'utf8')])));
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'pixieed-site-startup-real-'));
   try {
@@ -128,9 +128,12 @@ test('current published app callers compile from an owned copy without changing 
     assert.equal(report.htmlAppEntryCount, htmlCallers.length);
     assert.equal(report.appModuleCallerCount, 1);
     const app = await readFile(path.join(tempRoot, 'js/app.js'), 'utf8');
-    assert(app.includes('./site-header.mjs?rev=20261021-header-layout-1'), 'Keep the already-published header identity while optimizing the app.');
+    assert(app.includes('./site-header.mjs?rev=20261023-sns-navigation-1'), 'Keep the already-published header identity while optimizing the app.');
     assert(!app.includes('function renderDiscoveryMap('), 'Unreferenced legacy map renderer should not ship in the optimized app copy.');
-    const home = await readFile(path.join(tempRoot, 'index.html'), 'utf8');
+    const home = await readFile(path.join(tempRoot, 'welcome/index.html'), 'utf8');
+    const socialHome = await readFile(path.join(tempRoot, 'index.html'), 'utf8');
+    assert.match(socialHome, /data-social-page="home"/);
+    assert.equal((socialHome.match(/\/js\/social\/app\.mjs\?rev=/g) || []).length, 1);
     assert.equal((home.match(new RegExp(`/js/home-startup\\.mjs\\?rev=${report.homeStartupRevision}`, 'g')) || []).length, 2);
     for (const relative of htmlCallers) {
       const html = await readFile(path.join(tempRoot, relative), 'utf8');

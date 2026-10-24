@@ -242,7 +242,7 @@ ${relatedHtml}
 </main>
 <footer><a href="/events/">ドット絵イベント一覧へ戻る</a> · <a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261022-social-release-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261023-sns-navigation-1"></script>
 </body>
 </html>
 `;
@@ -330,7 +330,7 @@ ${yearSections}
 </main><footer><a href="/">PiXiEEDホーム</a> · <a href="/privacy/">プライバシー</a></footer>
 <script type="module" src="/js/event-page-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
 <script type="module" src="/js/event-history.mjs?rev=20261021-event-compact-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261022-social-release-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261023-sns-navigation-1"></script>
 </body>
 </html>
 `;

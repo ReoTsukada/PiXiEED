@@ -5,8 +5,8 @@ const defaultLoaders = Object.freeze({
     ? import('./draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1')
     : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1&attempt=${attempt}`),
   text: (attempt) => attempt === 0
-    ? import('./draw-text-panel.mjs?rev=20261010-features-1')
-    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261010-features-1&attempt=${attempt}`)
+    ? import('./draw-text-panel.mjs?rev=20261024-context-controls-1')
+    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261024-context-controls-1&attempt=${attempt}`)
 });
 
 const importModule = (specifier) => import(specifier);
@@ -35,7 +35,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
   opener.setAttribute('aria-label', kind === 'color' ? '色調を調整' : '文字を入力');
   opener.setAttribute('aria-haspopup', 'dialog');
   opener.setAttribute('aria-expanded', 'false');
-  if (kind === 'text') opener.title = '文字を入力';
+  opener.title = kind === 'color' ? '色調を調整' : '文字を入力';
   const labelNode = doc.createTextNode(spec.button);
   const status = doc.createElement('span');
   status.className = 'visually-hidden';
@@ -75,6 +75,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
       const panel = realPanel?.panel || host.querySelector(kind === 'text' ? '.draw-text-panel' : '.draw-color-adjustment');
       if (!realOpener || typeof realPanel?.open !== 'function') throw new TypeError(`Loaded ${kind} panel returned an invalid controller`);
       realOpener.append(status);
+      realOpener.title = realOpener.getAttribute('aria-label') || spec.button;
       opener.replaceWith(realOpener);
       scope.add(() => panelScope.dispose());
       mounted = { opener: realOpener, panel, open: () => realPanel.open(), close: options => realPanel.close?.(options), get isOpen() { return realPanel.isOpen; } };
@@ -100,6 +101,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
       } catch {
         setStatus(spec.error);
         labelNode.textContent = '再試行';
+        opener.title = spec.error;
         opener.setAttribute('aria-label', kind === 'color' ? '色調を調整（再試行）' : '文字を入力（再試行）');
         return false;
       }
@@ -118,7 +120,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
         opener.disabled = false;
         opener.removeAttribute('aria-busy');
         labelNode.textContent = spec.button;
-        opener.title = '';
+        opener.title = opener.getAttribute('aria-label') || spec.button;
         if (!available() || doc.hidden) { setStatus(spec.ready); return false; }
         // A disabled loading button can lose focus to body. Respect any real
         // focus move made while waiting, instead of opening over the next task.
@@ -136,6 +138,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
           if (!loadedModule) retryAttempt += 1;
           setStatus(spec.error);
           labelNode.textContent = '再試行';
+          opener.title = spec.error;
           opener.setAttribute('aria-label', kind === 'color' ? '色調を調整（再試行）' : '文字を入力（再試行）');
         }
         return false;

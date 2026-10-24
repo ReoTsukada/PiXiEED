@@ -69,8 +69,8 @@ test('home startup waits while hidden and handles app import failures', async ()
   assert.deepEqual(errors, ['load failed']);
 });
 
-test('home index keeps motion preference available before the eagerly loaded hero module', () => {
-  const html = read('index.html');
+test('welcome page keeps motion preference available before the eagerly loaded hero module', () => {
+  const html = read('welcome/index.html');
   assert.ok(html.indexOf("localStorage.getItem('PiXiEED:motion-preference:v1')") < html.indexOf('home-startup.mjs'));
   assert.match(html, /document\.documentElement\.dataset\.pixieedMotion = 'reduced'/);
   assert.match(html, /modulepreload" href="\/js\/home-play\.mjs\?rev=[\w-]+/);
@@ -78,12 +78,23 @@ test('home index keeps motion preference available before the eagerly loaded her
   assert.doesNotMatch(html, /src="\/js\/app\.js\?rev=/);
 });
 
-test('home mounts startup and gallery once across cache revisions', () => {
-  const home = read('index.html');
+test('welcome page mounts startup and gallery once across cache revisions', () => {
+  const home = read('welcome/index.html');
   assert.doesNotMatch(home, /^(?:<{7}|={7}|>{7})/m, 'home contains no unresolved merge markers');
   const scripts = [...home.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)]
     .map(([, source]) => new URL(source, 'https://pixieed.jp').pathname);
   for (const path of ['/js/home-startup.mjs', '/js/home-gallery.mjs']) {
     assert.equal(scripts.filter(source => source === path).length, 1, `${path} loads exactly once`);
   }
+});
+
+
+test('SNS home keeps the feed entry and five public destinations', () => {
+  const home = read('index.html');
+  assert.match(home, /<body data-social-page="home">/);
+  assert.match(home, /<section class="feed-list" id="feed"/);
+  assert.ok(home.includes('href="/explore/"'));
+  for (const href of ['/', '/explore/', '/tools/', '/globe/', '/profile/']) assert.ok(home.includes(`href="${href}"`), href);
+  for (const label of ['ホーム', '探す', 'つくる', '地図', '自分']) assert.ok(home.includes(`>${label}</span></a>`), label);
+  assert.doesNotMatch(home, /src="\/js\/home-startup\.mjs|src="\/js\/home-gallery\.mjs/);
 });

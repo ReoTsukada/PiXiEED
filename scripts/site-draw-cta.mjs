@@ -72,6 +72,7 @@ function insertLensToolbarCta(html) {
 
 function skipReason(route, html) {
   if (DRAW_CTA_EXCLUDED_ROUTES[route]) return DRAW_CTA_EXCLUDED_ROUTES[route];
+  if (/<script\b[^>]*src=["']\/js\/site-header\.mjs(?:\?[^"']*)?["']/i.test(html)) return 'shared navigation already provides the Create destination';
   for (const [prefix, reason] of EXCLUDED_PREFIXES) if (route.startsWith(prefix)) return reason;
   if (route === '/' || route === '/tools/') return 'existing primary Draw action is authored in the page';
   if (route === '/output/' && /<a\b[^>]*href\s*=\s*["']\/draw\/(?:\?workspace=1)?["']/i.test(html)) return 'existing conversion guide link';

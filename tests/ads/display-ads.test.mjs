@@ -5,7 +5,7 @@ import { displayAdConfig } from '../../data/site-config.js';
 import { mountDisplayAds, resolveDisplayAd } from '../../js/display-ads.mjs';
 
 const pages = [
-  ['index.html', 'home', '/'], ['tools/index.html', 'tools', '/tools/'],
+  ['welcome/index.html', 'home', '/welcome/'], ['tools/index.html', 'tools', '/tools/'],
   ['about/index.html', 'info', '/about/'], ['guide/index.html', 'info', '/guide/'],
   ['stores/index.html', 'stores', '/stores/'],
   ['stores/ecowashcafe-nakanoshima.html', 'store-detail', '/stores/ecowashcafe-nakanoshima.html']
@@ -19,11 +19,13 @@ test('public placements use the owner-provided pages unit; blank configuration r
     assert.deepEqual(resolveDisplayAd(displayAdConfig, key, path), { client: 'ca-pub-9801602250480253', slot: '8825932060' });
     assert.equal(resolveDisplayAd(blank, key, path), null);
   }
+  assert.deepEqual(resolveDisplayAd(displayAdConfig, 'home', '/'), { client: 'ca-pub-9801602250480253', slot: '8825932060' }, 'legacy root home route remains allowed');
 });
 test('each configured placement belongs only to its explicit public page', () => {
   for (const [, key, path] of pages) {
     assert.deepEqual(resolveDisplayAd(config, key, path), { client: config.client, slot: '1234567890' });
     if (path.endsWith('/')) assert.ok(resolveDisplayAd(config, key, path + 'index.html'));
+    if (key === 'home') assert.deepEqual(resolveDisplayAd(config, key, '/'), { client: config.client, slot: '1234567890' });
   }
 });
 test('blank, malformed and mistyped unit IDs never request advertising', () => {
@@ -31,6 +33,7 @@ test('blank, malformed and mistyped unit IDs never request advertising', () => {
     assert.equal(resolveDisplayAd({ ...config, slots: { home: slot } }, 'home', '/'), null);
   }
   assert.deepEqual(resolveDisplayAd({ ...config, slots: { home: ' 1234567890 ' } }, 'home', '/'), { client: config.client, slot: '1234567890' });
+  assert.deepEqual(resolveDisplayAd({ ...config, slots: { home: '1234567890' } }, 'home', '/welcome/'), { client: config.client, slot: '1234567890' });
 });
 test('private and working screens stay excluded even with a valid unit ID', () => {
   for (const path of ['/privacy/', '/profile/', '/collection/', '/admin/', '/draw/', '/audio/', '/jigsaw/', '/globe/', '/pixel-camera.html', '/play/spot-difference/']) {

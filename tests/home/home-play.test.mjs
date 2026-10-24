@@ -6,7 +6,7 @@ import { captureHomePlayState, restoreHomePlayState, pushHomePlayHistory, finish
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
 test('home: tool cards have working toys and creation links lead the page', () => {
-  const html = read('index.html'); const source = read('js/home-play.mjs'); const toysSource = read('js/tool-toys.mjs');
+  const html = read('welcome/index.html'); const source = read('js/home-play.mjs'); const toysSource = read('js/tool-toys.mjs');
   const toys = [...html.matchAll(/data-toy="([a-z]+)"/g)].map((m) => m[1]);
   assert.ok(toys.length >= 7);
   for (const toy of toys) assert.match(toysSource, new RegExp(`\\n  ${toy}\\(el\\) \\{`), toy);
@@ -21,7 +21,7 @@ test('home: tool cards have working toys and creation links lead the page', () =
 });
 
 test('home hero: draw, let go and it drops; a full row clears; letters burst; stars can be caught', () => {
-  const html = read('index.html'); const source = read('js/home-play.mjs');
+  const html = read('welcome/index.html'); const source = read('js/home-play.mjs');
   assert.match(html + source, /hpScore/);
   assert.match(source, /指で描けます。文字や星はタップ。/);
   for (const fn of ['burstLetter', 'catchStar', 'inkAt', 'release', 'invite']) assert.match(source, new RegExp(`function ${fn}\\(`), fn);
@@ -56,7 +56,7 @@ test('home hero: the play leads somewhere — invitations matched to what the vi
 });
 
 test('home: real creation tools lead the mini experience and gallery follows play', () => {
-  const html = read('index.html'); const source = read('js/home-play.mjs');
+  const html = read('welcome/index.html'); const source = read('js/home-play.mjs');
   for (const path of ['/camera/?workspace=1', '/draw/#draw-how-to', '/globe/', '/jigsaw/', '/play/spot-difference/', '/play/hidden-object/', '/output/']) assert.ok(html.includes(`href="${path}"`), path);
   assert.match(html, /hp-link-card hp-visual-tool-card" data-toy="camera" href="\/camera\/\?workspace=1"/); assert.match(html, /hp-link-card" data-toy="map"/); assert.match(html, /hp-card-grid/); assert.match(html, /hp-output-card hp-visual-tool-card" href="\/output\/"/);
   assert.match(html, /id="homePrimaryToolsTitle">制作ツール/);
@@ -119,7 +119,7 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
   assert.match(source, /createHomeMotion/);
   assert.doesNotMatch(source, /catchCat|nextCat|wordTop|wordBottom|CAT\s*=/);
   assert.match(source, /ctx\.putImageData\(img, 0, 0\)/, 'drawn through one ImageData');
-  const html = read('index.html');
+  const html = read('welcome/index.html');
   assert.match(html, /id="hpPlayback"[^>]*>一時停止<\/button>/, 'hero motion has a visible play/pause control');
   assert.match(html, /id="hpPlaybackStatus" aria-live="polite"/);
   assert.match(source, /let playbackPaused = false;/, 'the hero starts automatically even when reduced motion is enabled');
@@ -158,7 +158,7 @@ test('home hero state: undo snapshots stay one operation and bounded', () => {
 });
 
 test('home hero controls keep gesture-gated sound, guarded clear and undo with scoped playback', () => {
-  const html = read('index.html'); const source = read('js/home-play.mjs');
+  const html = read('welcome/index.html'); const source = read('js/home-play.mjs');
   assert.match(html, /id="hpPaletteToggle"[^>]*aria-expanded="false" aria-controls="hpPalette"/);
   assert.match(html, /id="hpPalette" hidden/); assert.match(html, /id="hpUndo"[^>]*disabled/);
   assert.match(html, /id="hpClearDialog"/); assert.match(html, /id="hpStatus"[^>]*aria-live="polite"/);

@@ -1,5 +1,9 @@
 /* Desktop whitespace for explicitly opted-in public and tool-landing pages. */
 @media (min-width: 1440px) {
+  body[data-page-gutters="content"][data-page="map"] #main {
+    width:min(1200px,calc(100% - 320px));
+    margin-inline:auto;
+  }
   html:not([data-tool-direct="work"]):not([data-direct-loading]) body[data-page-gutters]:not(.creation-editor):not(.tool-shell--workspace-open):not(:has(.tool-embed--expanded)) {
     --page-gutters-edge: max(160px, calc((100vw - 1200px) / 2));
   }

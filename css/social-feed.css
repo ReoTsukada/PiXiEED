@@ -35,7 +35,7 @@ button:disabled { opacity: .48; cursor: wait !important; }
 .social-app { display: grid; grid-template-columns: 218px minmax(0, 620px) 286px; gap: 36px; justify-content: center; min-height: 100vh; padding: 0 28px; }
 .left-rail { position: sticky; top: 0; display: flex; flex-direction: column; align-self: start; height: 100vh; height: 100dvh; min-height: 0; overflow-y: auto; padding: 29px 10px 22px 0; }
 .brand { display: inline-flex; align-items: center; gap: 10px; width: max-content; min-height: 44px; color: var(--ink); font-size: 22px; font-weight: 950; letter-spacing: -.065em; text-decoration: none; }
-.brand-logo { display: block; flex: none; width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; }
+.brand-logo { display: block; flex: none; width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; background:#05090c; border-radius:5px; }
 .rail-nav { display: grid; gap: 5px; margin-top: 24px; }
 .rail-link { position: relative; display: flex; align-items: center; gap: 13px; min-height: 48px; padding: 0 13px; border: 0; border-radius: 12px; background: transparent; color: #4e595b; font-size: 14px; font-weight: 700; text-decoration: none; text-align: left; cursor: pointer; transition: background .16s ease, color .16s ease; }
 .rail-link img, .rail-link svg { flex: none; width: 22px; height: 22px; object-fit: contain; color: currentColor; }
@@ -60,7 +60,7 @@ button:disabled { opacity: .48; cursor: wait !important; }
 .eyebrow { margin: 0 0 5px; color: #80908a; font-size: 9px; font-weight: 900; letter-spacing: .17em; line-height: 1.2; }
 .feed-heading h1 { margin: 0; font-size: 25px; font-weight: 950; letter-spacing: -.055em; line-height: 1.23; }
 .feed-lede { margin: 6px 0 0; color: #75807e; font-size: 12px; line-height: 1.5; }
-.refresh-button { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 6px; min-width: 70px; min-height: 44px; padding: 0 10px; border: 1px solid #dce2dd; border-radius: 10px; background: #fff; color: #58645f; font-size: 11px; font-weight: 800; cursor: pointer; transition: background .15s ease, border .15s ease; }
+.refresh-button { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 6px; width:44px; min-width:44px; min-height: 44px; padding: 0; border: 1px solid #dce2dd; border-radius: 10px; background: #fff; color: #58645f; font-size: 11px; font-weight: 800; cursor: pointer; transition: background .15s ease, border .15s ease; }
 .refresh-button:hover { border-color: #c8d4ce; background: #eff4f0; }
 .refresh-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .composer-prompt { display: flex; align-items: center; gap: 10px; min-height: 63px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 15px; background: #fff; box-shadow: 0 3px 12px rgba(33,45,40,.025); }
@@ -403,3 +403,25 @@ button:disabled { opacity: .48; cursor: wait !important; }
 .account-form{display:grid;gap:12px;min-width:0;padding:12px 0}.account-form label{display:grid;gap:6px;font-size:.875rem}.account-form input,.account-form select,.account-form button{box-sizing:border-box;width:100%;min-width:0;min-height:44px;font:inherit;border-radius:10px;padding:10px 12px;border:1px solid var(--line,#d8d8df)}.account-form small{line-height:1.6;overflow-wrap:anywhere}.account-form [disabled]{opacity:.55;cursor:wait}.account-form :focus-visible{outline:3px solid #a34b31;outline-offset:3px}
 
 .account-form .account-legacy-choice{grid-template-columns:20px minmax(0,1fr);align-items:start;min-height:44px;line-height:1.6;overflow-wrap:anywhere}.account-form input[type="checkbox"]{width:20px;min-height:20px;padding:0;margin:2px 0}
+
+/* Compact browsing chrome, with one heading and a separate fixed page nav. */
+.feed-heading .account-transfer-button { width:44px; min-width:44px; height:44px; margin:0; padding:10px; position:absolute; top:0; right:52px; }
+.account-transfer-button img { width:22px; height:22px; object-fit:contain; }
+.feed-heading { padding-right:52px; position:relative; min-height:44px; }
+.feed-heading .refresh-button { position:absolute; right:0; top:0; }
+.feed-heading > div { padding-right:40px; }
+.explore-search { display:grid; gap:8px; font-size:14px; font-weight:650; margin-block:18px 8px; }
+.explore-search input { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:16px; }
+.explore-search-note { margin:0 0 10px; color:var(--muted); font-size:12px; }
+body[data-social-page="explore"] .composer-prompt { display:none; }
+@media (max-width:760px) {
+  :root { --social-view-top:52px; }
+  .mobile-header { min-height:52px; padding-block:4px; }
+  .feed-heading { margin:0; padding:0; min-height:0; height:0; }
+  .feed-heading > div { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .feed-heading .refresh-button { position:fixed; top:4px; right:60px; z-index:6; }
+  .feed-heading .account-transfer-button { position:fixed; top:4px; right:108px; z-index:6; }
+  .refresh-button { min-width:44px; }
+  .feed-destinations { margin-block:8px; }
+  body[data-social-page="home"] .feed-destinations { display:none; }
+}

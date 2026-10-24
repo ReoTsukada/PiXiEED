@@ -51,7 +51,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   own(document.querySelector('#draw-animation-play'), 'draw');
   const launcher = nav.querySelector('[data-nav="camera"]');
   const menu = document.createElement('details'); menu.id = 'creation-mode-menu';
-  menu.innerHTML = `<summary aria-label="制作モードを切り替え" title="制作モード"><img src="/assets/icons/pixieed/shoot.svg" alt=""><span class="app-tab-label">モード</span><span class="visually-hidden">制作モード</span></summary><div class="creation-mode-menu__panel" role="group" aria-label="制作モード"><button type="button" data-creation-mode="draw" aria-pressed="true">描画</button><button type="button" data-creation-mode="camera" aria-pressed="false">カメラ</button><button type="button" data-creation-mode="audio" aria-pressed="false">音楽</button><p>同じ作品・キャンバス・パレットを使います。音楽は全コマ共通の専用レイヤーで編集します。</p><p>以前の独立作品は「作品を管理 → 取り込む」で選べます。元の作品を残したコピーとして開きます。</p><p class="creation-mode-error" role="status" aria-live="polite"></p></div>`;
+  menu.innerHTML = `<summary aria-label="描画モード。制作モードを切り替え" title="描画モード。制作モードを切り替え"><img src="/assets/icons/pixieed/draw.svg" alt=""><span class="app-tab-label">モード</span><span class="visually-hidden">制作モード</span></summary><div class="creation-mode-menu__panel" role="group" aria-label="制作モード"><button type="button" data-creation-mode="draw" aria-pressed="true">描画</button><button type="button" data-creation-mode="camera" aria-pressed="false">カメラ</button><button type="button" data-creation-mode="audio" aria-pressed="false">音楽</button><p>同じ作品・キャンバス・パレットを使います。音楽は全コマ共通の専用レイヤーで編集します。</p><p>以前の独立作品は「作品を管理 → 取り込む」で選べます。元の作品を残したコピーとして開きます。</p><p class="creation-mode-error" role="status" aria-live="polite"></p></div>`;
   launcher.replaceWith(menu);
   const modeButtons = [...menu.querySelectorAll('[data-creation-mode]')];
   const errorNode = menu.querySelector('.creation-mode-error');
@@ -329,8 +329,10 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     for (const button of modeButtons) button.setAttribute('aria-pressed', String(button.dataset.creationMode === owner));
     const label = { draw:'描画', camera:'カメラ', audio:'音楽' }[owner];
     modeSettingsChoice.textContent = `${label}の設定`;
-    menu.querySelector('summary').setAttribute('aria-label', `${label}モード。制作モードを切り替え`);
-    menu.querySelector('summary img').src = `/assets/icons/pixieed/${owner === 'audio' ? 'music' : 'shoot'}.svg`;
+    const currentModeLabel = `${label}モード。制作モードを切り替え`;
+    menu.querySelector('summary').setAttribute('aria-label', currentModeLabel);
+    menu.querySelector('summary').title = currentModeLabel;
+    menu.querySelector('summary img').src = `/assets/icons/pixieed/${({ draw:'draw', camera:'camera', audio:'music' })[owner]}.svg`;
     placeSettings(owner);
     updateCameraActionState();
   }

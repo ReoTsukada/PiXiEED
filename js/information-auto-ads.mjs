@@ -4,6 +4,8 @@ const STATIC_INFORMATION_PATHS = new Set([
   '/',
   '/tools/',
   '/feed/',
+  '/explore/',
+  '/welcome/',
   '/about/',
   '/guide/',
   '/help/',

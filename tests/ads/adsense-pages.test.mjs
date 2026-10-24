@@ -4,9 +4,11 @@ import { readFile, readdir } from 'node:fs/promises';
 
 const root = new URL('../../', import.meta.url);
 export const MANUAL_PAGES = [
-  'index.html', 'tools/index.html', 'about/index.html', 'guide/index.html',
+  'welcome/index.html', 'tools/index.html', 'about/index.html', 'guide/index.html',
   'stores/index.html', 'stores/ecowashcafe-nakanoshima.html'
 ];
+// These source pages have no manual provider/slot. Pages build adds informational auto ads where eligible.
+export const SOURCE_AUTO_AD_PAGES = ['index.html', 'feed/index.html', 'explore/index.html'];
 export const RESULT_PAGES = [
   'pixel-camera.html', 'draw/index.html', 'audio/index.html', 'draw/editor.html', 'audio/editor.html', 'jigsaw/index.html',
   'play/spot-difference/index.html', 'play/hidden-object/index.html'
@@ -22,7 +24,7 @@ const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 const eventCatalog = JSON.parse(await readFile(new URL('events/catalog.json', root), 'utf8'));
 const EVENT_NO_AD_PAGES = ['events/index.html', ...eventCatalog.ids.map(id => `events/${id}/index.html`)];
 const EXCLUDED_PAGES = [
-  'privacy/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
+  'privacy/index.html', 'terms/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
   'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
   'output/index.html', 'camera/index.html', 'draw/about/index.html',
@@ -35,7 +37,7 @@ const html = (path) => readFile(new URL(path, root), 'utf8');
 for (const path of MANUAL_PAGES) test(`${path}: manual units own their lazy ad requests`, async () => {
   const source = await html(path);
   assert.match(source, /data-display-ad=/);
-  assert.match(source, /src="\/js\/display-ads\.mjs\?rev=20261007-lazy-ads-1"/);
+  assert.match(source, /src="\/js\/display-ads\.mjs\?rev=20261024-public-layout-1"/);
   assert.match(source, /href="\/css\/display-ads\.css\?rev=20261007-lazy-ads-1"/);
   assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
 });
@@ -68,10 +70,16 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
     return found;
   }
   const established = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES, OFFERWALL_PAGE])];
-  const expected = [...new Set([...established, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
+  const categorized = [...new Set([...established, ...SOURCE_AUTO_AD_PAGES])];
+  const expected = [...new Set([...categorized, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 43);
-  assert.equal(expected.length, 43 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  assert.equal(established.length, 44);
+  assert.equal(categorized.length, 47);
+  assert.equal(expected.length, 47 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  for (const path of SOURCE_AUTO_AD_PAGES) {
+    const source = await html(path);
+    assert.doesNotMatch(source, /adsbygoogle|adsense-auto|display-ads|data-display-ad/, `${path}: source has no manual provider or slot`);
+  }
   for (const path of [...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES]) {
     assert.doesNotMatch(await html(path), /adsbygoogle|adsense-auto|display-ads|data-display-ad|adsense-offerwall/, `${path}: compatibility and factual event pages have no ad loader`);
   }

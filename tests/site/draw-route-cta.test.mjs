@@ -48,7 +48,7 @@ test('CTA transform is idempotent and respects an authored books CTA', () => {
 });
 
 test('home and tools reuse their authored primary Draw links without adding a strip', async () => {
-  for (const file of ['index.html', 'tools/index.html']) {
+  for (const file of ['welcome/index.html', 'tools/index.html']) {
     const html = await readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
     const result = addSiteDrawCta(html, file);
     assert.equal(result.added, false, file);
@@ -191,8 +191,10 @@ test('fresh build output contains static CTAs while route exclusions and existin
 
     assert.equal((home.match(/data-draw-cta/g) || []).length, 1, 'home keeps its authored primary action');
     assert.equal((await builtHtml('tools/index.html')).match(/data-draw-cta/g)?.length, 1, 'tools keeps its authored primary action');
-    assert.match(eventIndex, /data-draw-context="event"[\s\S]*?href="\/draw\/\?workspace=1"/);
-    assert.match(eventLeaf, /data-draw-context="event"[\s\S]*?href="\/draw\/\?workspace=1"/);
+    assert.doesNotMatch(eventIndex, /data-draw-cta/);
+    assert.match(eventIndex, /\/js\/site-header\.mjs\?rev=/);
+    assert.doesNotMatch(eventLeaf, /data-draw-cta/);
+    assert.match(eventLeaf, /\/js\/site-header\.mjs\?rev=/);
     assert.equal((books.match(/data-draw-cta/g) || []).length, 1, 'books keeps its authored CTA without a duplicate strip');
     assert.match(books, /books-editor-invite[\s\S]*?data-draw-context="books"/);
     assert.equal((outputGuide.match(/href="\/draw\/\?workspace=1"/g) || []).length, 1, 'conversion guide keeps its existing link');

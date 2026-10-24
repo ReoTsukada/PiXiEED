@@ -33,10 +33,10 @@ test('purpose metadata and direct-use links describe existing modes without a se
     for (const attribute of ['property="og:description"', 'name="twitter:description"']) {
       assert.ok(html.includes(`${attribute} content="${description}"`));
     }
-    for (const entry of ['index.html', 'tools/index.html']) {
+    for (const entry of ['welcome/index.html', 'tools/index.html']) {
       assert.ok(read(entry).includes(`href="/${mode}/?workspace=1"`));
     }
   }
-  assert.doesNotMatch(read('index.html') + read('tools/index.html'), /href="\/gif(?:[/?#"])/);
+  assert.doesNotMatch(read('welcome/index.html') + read('index.html') + read('tools/index.html'), /href="\/gif(?:[/?#"])/);
   assert.match(read('audio/index.html'), /音声ファイルを保存してから<a href="\/output\/">/);
 });

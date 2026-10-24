@@ -32,7 +32,9 @@ export function mountDrawTextPanel({ scope, host, getState, onBegin, onPreview, 
   function closePanel({ restore = true } = {}) {
     if (!active) return;
     active = false; revision += 1; panel.hidden = true; opener.setAttribute('aria-expanded', 'false'); for (const [node, wasInert] of inertNodes) node.inert = wasInert; inertNodes = [];
-    if (restore) onCancel(); source = null; state = null; opener.focus();
+    if (restore) onCancel(); source = null; state = null;
+    const focusTarget = opener.closest('details:not([open])')?.querySelector('summary') || opener;
+    focusTarget.focus({ preventScroll:true });
   }
   async function updatePreview() {
     if (!active || !state || !source) return;

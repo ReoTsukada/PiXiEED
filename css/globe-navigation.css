@@ -1,5 +1,5 @@
 /* Page navigation and map purpose, scoped to the globe route and iframe. */
-body.app-page--tool-globe { --px-header-height: 64px; --header-h: 64px; }
+body.app-page--tool-globe { --px-header-height: 56px; --header-h: 56px; }
 body.app-page--tool-globe:not(:has(.map-event-detail-host:not([hidden]))) {
   height: auto;
   min-height: 100dvh;
