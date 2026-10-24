@@ -1,4 +1,5 @@
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-all-tools-offerwall-1';
+import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
 import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261020-format-conversion-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
@@ -1657,7 +1658,7 @@ async function mount() {
   const params = new URLSearchParams(location.search);
   if (params.getAll('id').length === 0) {
     showStart();
-    notifyToolEntryReady(location.pathname === '/output/work/' && params.size === 0 && !location.hash);
+    notifyToolEntryReady(getToolStartRoute(location.pathname)?.id === 'convert' && isFreshToolStartRequest(location.href, history.state));
     return;
   }
   if (params.getAll('id').length !== 1) { setError('出力IDが複数あります。ツール一覧から新しく開いてください。'); notifyToolEntryReady(false); return; }

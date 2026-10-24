@@ -19,14 +19,15 @@ const paths = [
   '/globe-prototype.html?embed=1&tool=telescope', '/pixiee-lens/', '/output/', '/output/work/', '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 ];
 const manualPages = ['/', '/tools/', '/about/', '/guide/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
-const toolEntries = ['/draw/', '/camera/', '/audio/', '/spot-difference/', '/hidden-object/', '/jigsaw/', '/output/work/'];
+const toolEntries = ['/tools/start/draw/', '/tools/start/camera/', '/tools/start/audio/', '/tools/start/spot-difference/', '/tools/start/hidden-object/', '/tools/start/jigsaw/', '/tools/start/convert/'];
+paths.push(...toolEntries);
 const sourcePrefix = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
 let checks = 0;
 try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true, serviceWorkers: 'block' });
   let requests = [];
   let rewardedRequests = [];
-  await context.addInitScript(() => { window.googlefc = { MessageTypeEnum: { OFFERWALL: 3 } }; });
+  await context.addInitScript(() => { window.googlefc = { MessageTypeEnum: { OFFERWALL: 3 } }; if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Synthetic media denial', 'NotAllowedError'); }; });
   await context.route('**/*', (route) => {
     const url = route.request().url();
     if (url.startsWith(sourcePrefix)) {

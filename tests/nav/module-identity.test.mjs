@@ -6,13 +6,14 @@ import { spawnSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
-  ['js/app.js', 'rev=20261024-posting-policy-1'],
-  ['js/site-header.mjs', 'rev=20261024-intelligence-ui-1'],
-  ['js/creation/output-page.mjs', 'rev=20261024-all-tools-offerwall-1'],
-  ['js/creation/project-workspace.mjs', 'rev=20261024-all-tools-offerwall-1'],
-  ['js/creation/pxd-ui.mjs', 'rev=20261024-all-tools-offerwall-1'],
-  ['js/tool-offerwall-entry.mjs', 'rev=20261024-all-tools-offerwall-1'],
-  ['js/page-navigation.mjs', 'rev=20261023-sns-navigation-1'],
+  ['js/app.js', 'rev=20261024-common-tool-start-1'],
+  ['js/site-header.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/creation/output-page.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/creation/project-workspace.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/creation/pxd-ui.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/tool-offerwall-entry.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['js/tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['js/creation/draw-core.mjs', 'rev=20261011-tool-size-1'],

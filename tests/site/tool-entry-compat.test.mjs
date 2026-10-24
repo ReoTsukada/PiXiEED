@@ -21,7 +21,7 @@ function run({ route = 'draw', search = '', hash = '', frame = null } = {}) {
 test('three public tool pages load one shared synchronous preflight before route content', () => {
   for (const route of routes) {
     const html = readFileSync(new URL(`../../${route}/index.html`, import.meta.url), 'utf8');
-    assert.match(html, /<script src="\/js\/tool-entry-compat\.js\?rev=20261020-first-paint-1"><\/script>/);
+    assert.match(html, /<script src="\/js\/tool-entry-compat\.js\?rev=20261024-common-tool-start-1"><\/script>/);
     assert.ok(html.indexOf('tool-entry-compat.js') < html.indexOf('<title>'));
     assert.doesNotMatch(html, /const validBridge = value/);
   }

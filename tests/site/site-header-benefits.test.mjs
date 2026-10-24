@@ -13,7 +13,7 @@ test('normal builds retire the unlock entry without removing shared navigation o
   assert.equal(result.added, false);
   assert.equal(result.removed, true);
   assert.doesNotMatch(result.html, /site-header-benefits/);
-  assert.match(result.html, /site-header\.mjs\?rev=20261024-intelligence-ui-1/);
+  assert.match(result.html, /site-header\.mjs\?rev=20261024-common-tool-start-1/);
   assert.match(result.html, /site-header\.css\?rev=20261024-free-tools-1/);
   assert.match(result.html, /adsense-offerwall-policy\.js/);
   assert.match(result.html, /制作を続ける/);

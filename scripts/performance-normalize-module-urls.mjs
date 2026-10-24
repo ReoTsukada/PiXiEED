@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -14,14 +14,28 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // These are URL-only changes. Keep module bodies, revision semantics, and
 // runtime-specific query values out of this normalizer.
 const targets = new Map([
-  ['app.js', 'rev=20261024-posting-policy-1'],
-  ['site-header.mjs', 'rev=20261024-intelligence-ui-1'],
-  ['page-navigation.mjs', 'rev=20261023-sns-navigation-1'],
+  ['tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
+  ['tool-direct.mjs', 'rev=20261024-common-tool-start-1'],
+  ['tool-shell.mjs', 'rev=20261024-common-tool-start-1'],
+  ['tool-workspace-state.mjs', 'rev=20261024-common-tool-start-1'],
+  ['tool-offerwall-entry.mjs', 'rev=20261024-common-tool-start-1'],
+  ['public-navigation.mjs', 'rev=20261024-common-tool-start-1'],
+  ['tool-entry-compat.js', 'rev=20261024-common-tool-start-1'],
+  ['project-workspace.mjs', 'rev=20261024-common-tool-start-1'],
+  ['jigsaw-page.mjs', 'rev=20261024-common-tool-start-1'],
+  ['spot-difference-page.mjs', 'rev=20261024-common-tool-start-1'],
+  ['hidden-object-page.mjs', 'rev=20261024-common-tool-start-1'],
+  ['draw-page.mjs', 'rev=20261024-common-tool-start-1'],
+  ['creation-runtime.mjs', 'rev=20261024-common-tool-start-1'],
+  ['creation-modes.mjs', 'rev=20261024-common-tool-start-1'],
+  ['app.js', 'rev=20261024-common-tool-start-1'],
+  ['site-header.mjs', 'rev=20261024-common-tool-start-1'],
+  ['page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
   ['tool-help.mjs', 'rev=20261024-intelligence-ui-1'],
   ['tool-help-data.mjs', 'rev=20261024-intelligence-ui-1'],
   ['tool-help-bootstrap.mjs', 'rev=20261024-intelligence-ui-1'],
   ['profile-likes-page.mjs', 'rev=20261024-intelligence-ui-1'],
-  ['output-page.mjs', 'rev=20261024-all-tools-offerwall-1'],
+  ['output-page.mjs', 'rev=20261024-common-tool-start-1'],
   ['tool-output.css', 'rev=20261024-intelligence-ui-1'],
   ['tool-help.css', 'rev=20261024-intelligence-ui-1'],
   ['social-feed.css', 'rev=20261024-intelligence-ui-1'],
@@ -33,6 +47,8 @@ const targets = new Map([
   ['audio-timbres.mjs', 'rev=20261005-audio-drums-1'],
   ['jigsaw-file.mjs', 'rev=20260929-claude-integration-1'],
 ]);
+
+const commonToolStartModules = new Set(["js/adsense-offerwall-policy.js", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/output-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-startup.mjs", "js/page-navigation.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/public-navigation.mjs", "js/site-header.mjs", "js/social/app.mjs", "js/tool-direct.mjs", "js/tool-embed.mjs", "js/tool-entry-compat.js", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs", "js/tool-start-routes.mjs", "js/tool-workspace-state.mjs"]);
 
 async function walk(directory, files = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -62,6 +78,17 @@ function normalize(source, file) {
       return `${quote}${prefix}${filename}?${query}${quote}`;
     });
   }
+  // Keep the complete importer closure on the same release URL, preserving
+  // unrelated runtime parameters and the historical core/animation identities.
+  changed = changed.replace(/(["'`])([^"'`\s<>]+?\.(?:mjs|js))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//') || query.includes('attempt=')) return whole;
+    const owner = relative(root, file).replaceAll('\\', '/');
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(owner), path));
+    if (!commonToolStartModules.has(target)) return whole;
+    const revision = '20261024-common-tool-start-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
+    return `${quote}${path}${next}${quote}`;
+  });
   return changed;
 }
 

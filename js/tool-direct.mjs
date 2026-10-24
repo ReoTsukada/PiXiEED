@@ -1,4 +1,6 @@
-import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261017-workspace-entry-1';
+import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261024-common-tool-start-1';
+import { getToolStartRoute, toolStartHref, isFreshToolStartRequest } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+import { notifyToolEntryReady } from './tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 
 const DRAFT_KEY = 'pixieed:pxd:last:direct-workspace:v1';
 const attributes = node => [...node.attributes].map(a => [a.name, a.value]);
@@ -12,6 +14,8 @@ function restoreAttributes(node, saved) {
 
 /** A single retained, real creation runtime in this document. No editor bootstrap is evaluated. */
 export function installDirectToolShell({ section, mode, search }) {
+  const startRoute = getToolStartRoute(location.pathname);
+  const initialEntryRequestFresh = isFreshToolStartRequest(location.href, history.state);
   const body = document.body, html = document.documentElement;
   let runtime = null, mounting = null, open = false, generation = 0, disposed = false, activated = false;
   let description = null, shellAttributes = null, workAttributes = null, bodyObserver = null, headObserver = null;
@@ -337,7 +341,7 @@ export function installDirectToolShell({ section, mode, search }) {
       prepareHost(template);
       // Start evaluating the already-required graph while the editor styles load.
       // The handled result is consumed only after CSS and restore-state checks.
-      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261024-all-tools-offerwall-1'))()
+      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261024-common-tool-start-1'))()
         .then(module => ({ module }), error => { reloadRequired = true; return { error }; });
       const cssLoads = [];
       const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));
@@ -374,7 +378,7 @@ export function installDirectToolShell({ section, mode, search }) {
       const { mountCreationRuntime } = importedRuntime.module;
       checkAlive();
       setLoadingStage(initialPointer ? '保存済みの作品を開いています…' : '制作画面を組み立てています…');
-      runtime = await mountCreationRuntime({ signal: lifecycle.signal, isActive: () => open && !disposed, role: mode, requestedMode: mode, search: adapted.search, restoreLast: false, initialPointer, workspaceOptions: { rememberKey: DRAFT_KEY, rememberShared: false, allowImplicitImport: false, initialRestoreError }, deferInitialMode: true, onBootPhase: phase => {
+      runtime = await mountCreationRuntime({ signal: lifecycle.signal, isActive: () => open && !disposed, role: mode, requestedMode: mode, search: adapted.search, restoreLast: false, initialPointer, workspaceOptions: { rememberKey: DRAFT_KEY, rememberShared: false, allowImplicitImport: false, initialRestoreError, initialEntryRequestFresh }, deferInitialMode: true, onBootPhase: phase => {
         const labels = { draw: '編集画面を準備しています…', workspace: '作品と保存状態を確認しています…', mode: '選択したモードを準備しています…' };
         if (labels[phase] && open) setLoadingStage(labels[phase]);
       } });
@@ -429,6 +433,7 @@ export function installDirectToolShell({ section, mode, search }) {
       clearTimeout(loadingCardTimer); loadingCardTimer = 0; loadingCardVisible = true; bar.hidden = false; bootCue.hidden = true;
       workAttributes = attributes(body); label.textContent = { draw:'PiXiEEDraw', camera:'PiXiEED カメラ', audio:'PiXiEED 音楽' }[editor.state.mode];
       coreReady = true;
+      if (startRoute) notifyToolEntryReady(initialEntryRequestFresh && editor.draw.workspace.initialEntryFresh === true && !editor.draw.workspace.restoreError);
       start.setAttribute('aria-busy', 'false'); start.setAttribute('aria-disabled', 'false'); start.setAttribute('aria-expanded', 'true');
       status.removeAttribute('aria-busy');
       showRestoreState(); delete html.dataset.directLoading; delete html.dataset.directBootstrap;
@@ -437,6 +442,7 @@ export function installDirectToolShell({ section, mode, search }) {
       viewport(); window.dispatchEvent(new Event('resize'));
       if (document.activeElement === start) document.querySelector('#draw-canvas')?.focus({ preventScroll: true });
     } catch (error) {
+      if (startRoute) notifyToolEntryReady(false);
       if (disposed || generation !== token) return;
       clearTimeout(loadingCardTimer); loadingCardTimer = 0; loadingCardVisible = true; bar.hidden = false; bootCue.hidden = true;
       coreReady = false;
@@ -510,7 +516,13 @@ export function installDirectToolShell({ section, mode, search }) {
     });
     return teardown;
   }
-  start.addEventListener('click', () => { if (start.getAttribute('aria-disabled') === 'true') return; void show(true); }, { signal: lifecycle.signal });
+  start.addEventListener('click', () => {
+    if (start.getAttribute('aria-disabled') === 'true') return;
+    // A canonical description starts the real grouped tool document in one click.
+    const target = !runtime && !startRoute ? toolStartHref(location.href) : location.href;
+    if (target !== location.href && target !== `${location.pathname}${location.search}${location.hash}`) { location.assign(target); return; }
+    void show(true);
+  }, { signal: lifecycle.signal });
   bootCueBack.addEventListener('click', () => void hide(true), { signal: lifecycle.signal });
   explanation.addEventListener('click', () => void hide(true), { signal: lifecycle.signal });
   recovery.addEventListener('click', () => void runtime?.draw.workspace.showProjects({ pane: 'library' }), { signal: lifecycle.signal });

@@ -1,5 +1,6 @@
+import { getToolStartRoute } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261024-all-tools-offerwall-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261024-common-tool-start-1';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
@@ -60,7 +61,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   };
   const markupLoad = settle(readAsset('/pixel-camera.html', '撮影の操作を読み込めません。'));
   const stylesheetLoad = settle(readAsset('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', '撮影の表示を読み込めません。'));
-  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261024-all-tools-offerwall-1'));
+  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261024-common-tool-start-1'));
   const markup = await prepared(markupLoad);
   const template = new DOMParser().parseFromString(markup, 'text/html');
   const surface = template.querySelector('#pixelStudio'), controls = surface?.querySelector('.lc-bottom'), shutter = template.querySelector('#capture');
@@ -428,10 +429,11 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
       if (epoch !== enterEpoch || !isCurrent()) return;
       updatePlacement();
       applyButton.textContent = from === 'draw' ? '描画へ適用' : '音楽へ適用';
-      // The mode controller calls resume after the camera view is active. This
-      // keeps the permission request tied to one explicit WORK entry and out
-      // of ordinary visibility/embed resumes.
-      startOnEntryResume = true;
+      // Legacy explicit WORK entry retains its existing camera behavior.
+      // Grouped start navigation prepares only the UI until the camera button.
+      // Grouped starts activate the UI without a camera permission gesture.
+      // The existing camera-start/retry controls remain the explicit gesture.
+      startOnEntryResume = !getToolStartRoute(location.pathname);
     },
     suspend() { enterEpoch++; startOnEntryResume = false; setInteractive(false); instance.closeResult(); instance.suspend(); },
     closeResult: () => instance.closeResult(),

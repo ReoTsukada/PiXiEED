@@ -1,4 +1,5 @@
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-all-tools-offerwall-1';
+import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
@@ -12,7 +13,7 @@ import { createGameEditorHistory, retainDifferenceCandidates } from './game-edit
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20261021-jigsaw-public-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261024-all-tools-offerwall-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261024-common-tool-start-1';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261024-free-tools-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
@@ -582,4 +583,4 @@ mountToolHeaderControls(document, { selectors: ['#spot-play-local'] });
 
 gameSession = mountGameEditorSession({ kind: 'spot-difference', isActive: () => Boolean(draft || inlineDraw), isDirty: () => Boolean(pxdBridge?.dirty), workspace: () => pxdBridge });
 if (new URLSearchParams(location.search).has('resumeLocal')) await resume();
-notifyToolEntryReady(pxdBridge?.initialEntryFresh === true && !pxdBridge?.restoreError && !draft && !inlineDraw && !location.search && !location.hash);
+notifyToolEntryReady(pxdBridge?.initialEntryFresh === true && !pxdBridge?.restoreError && !draft && !inlineDraw && isFreshStartSearch(new URLSearchParams(location.search)) && !location.hash);

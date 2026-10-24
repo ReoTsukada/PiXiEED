@@ -1,4 +1,5 @@
 import { creationModeEntryUrl } from './creation/mode-entry.mjs?rev=20261016-tool-shell-1';
+import { legacyToolPath } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 
 const section = document.querySelector('[data-tool-embed][data-tool-shell]');
 const shell = document.querySelector('body[data-tool-shell]');
@@ -8,8 +9,9 @@ const params = new URLSearchParams(location.search);
 const knownModes = new Set(['draw', 'camera', 'audio']);
 const requestedMode = params.get('mode');
 const directCandidate = params.get('runtime') !== 'iframe';
-const isAudioRoute = location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '') === '/audio';
-const isCameraRoute = location.pathname.replace(/index\.html$/, '').replace(/\/+$/, '') === '/camera';
+const logicalPath = legacyToolPath(location.pathname).replace(/index\.html$/, '').replace(/\/+$/, '');
+const isAudioRoute = logicalPath === '/audio';
+const isCameraRoute = logicalPath === '/camera';
 const mode = directCandidate && knownModes.has(requestedMode) ? requestedMode : isAudioRoute ? 'audio' : isCameraRoute ? 'camera' : knownModes.has(requestedMode) ? requestedMode : 'draw';
 section.dataset.toolMode = mode;
 shell.classList.remove('tool-shell--draw', 'tool-shell--camera', 'tool-shell--audio');
@@ -74,7 +76,7 @@ if (forwarded) {
 if ((isAudioRoute || isCameraRoute) && !forwarded.has('mode')) forwarded.append('mode', mode);
 
 if (directCandidate) {
-  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261024-all-tools-offerwall-1');
+  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261024-common-tool-start-1');
   installDirectToolShell({ section, mode, search: forwarded });
 } else {
 
@@ -92,6 +94,6 @@ runtime.hash = location.hash;
 section.dataset.embedUrl = runtime.href;
 
 // The controller consumes data-embed-url and data-embed-auto on import.
-await import('/js/tool-embed.mjs?rev=20261017-workspace-entry-1');
+await import('/js/tool-embed.mjs?rev=20261024-common-tool-start-1');
 }
 }

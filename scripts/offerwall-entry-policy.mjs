@@ -1,5 +1,9 @@
-export const OFFERWALL_ENTRY_POLICY_VERSION = '20261024-all-tools-offerwall-1';
-export const OFFERWALL_TOOL_PATHS = Object.freeze(['/draw/', '/camera/', '/audio/', '/spot-difference/', '/hidden-object/', '/jigsaw/', '/output/work/']);
+export const OFFERWALL_ENTRY_POLICY_VERSION = '20261024-common-tool-start-1';
+export const OFFERWALL_TOOL_PATHS = Object.freeze([
+  '/tools/start/draw/', '/tools/start/camera/', '/tools/start/audio/',
+  '/tools/start/spot-difference/', '/tools/start/hidden-object/',
+  '/tools/start/jigsaw/', '/tools/start/convert/',
+]);
 export const OFFERWALL_ENTRY_POLICY_SCRIPT = `<script src="/js/adsense-offerwall-policy.js?rev=${OFFERWALL_ENTRY_POLICY_VERSION}"></script>`;
 export const OFFERWALL_ENTRY_LOADER_SCRIPT = `<script type="module" src="/js/tool-offerwall-entry.mjs?rev=${OFFERWALL_ENTRY_POLICY_VERSION}"></script>`;
 

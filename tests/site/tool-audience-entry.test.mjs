@@ -34,7 +34,7 @@ test('purpose metadata and direct-use links describe existing modes without a se
       assert.ok(html.includes(`${attribute} content="${description}"`));
     }
     for (const entry of ['welcome/index.html', 'tools/index.html']) {
-      assert.ok(read(entry).includes(`href="/${mode}/?workspace=1"`));
+      assert.ok(read(entry).includes(`href="/${mode}/?workspace=1"`) || read(entry).includes(`href="/tools/start/${mode}/"`), "legacy-compatible or grouped one-action start");
     }
   }
   assert.doesNotMatch(read('welcome/index.html') + read('index.html') + read('tools/index.html'), /href="\/gif(?:[/?#"])/);

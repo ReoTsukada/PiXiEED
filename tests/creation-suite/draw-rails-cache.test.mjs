@@ -41,6 +41,18 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/creation/spot-difference-page.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs',
     'js/tool-direct.mjs', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs'
   ]);
+  const commonToolStart = new Set([
+    'js/adsense-offerwall-policy.js', 'js/app.js', 'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs',
+    'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs',
+    'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/creation/hidden-object-page.mjs',
+    'js/creation/jigsaw-page.mjs', 'js/creation/output-page.mjs', 'js/creation/project-workspace.mjs',
+    'js/creation/pxd-ui.mjs', 'js/creation/spot-difference-page.mjs', 'js/home-startup.mjs',
+    'js/page-navigation.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/public-navigation.mjs',
+    'js/site-header.mjs', 'js/social/app.mjs', 'js/tool-direct.mjs', 'js/tool-embed.mjs',
+    'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
+    'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
+  ]);
+  for (const target of allToolsOfferwall) assert.equal(revisions[target], '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
@@ -85,7 +97,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (allToolsOfferwall.has(target)) assert.equal(revisions[target], '20261024-all-tools-offerwall-1', `${target} invalidates fresh tool-entry state and its complete importer chain`);
+      if (commonToolStart.has(target)) assert.equal(revisions[target], '20261024-common-tool-start-1', `${target} invalidates the common tool-start dependency closure`);
       else if (freeTools.has(target)) assert.equal(revisions[target], '20261024-free-tools-1', `${target} invalidates the free-tools behavior and every transitive importer`);
       else if (currentModeIcon.has(target)) assert.equal(revisions[target], '20261024-mode-icon-1', `${target} invalidates the current mode icon and entry chain`);
       else if (contextualControls.has(target)) assert.equal(revisions[target], '20261024-context-controls-1', `${target} invalidates contextual controls and their entry chain`);

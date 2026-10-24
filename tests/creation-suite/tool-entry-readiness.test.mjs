@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { isInitialProjectEntryFresh } from '../../js/creation/project-workspace.mjs?rev=20261024-all-tools-offerwall-1';
+import { isInitialProjectEntryFresh } from '../../js/creation/project-workspace.mjs?rev=20261024-common-tool-start-1';
 
 const root = new URL('../../', import.meta.url);
 const source = (path) => readFile(new URL(path, root), 'utf8');
-const entryImport = /import \{ notifyToolEntryReady \} from ['"]\.\.\/tool-offerwall-entry\.mjs\?rev=20261024-all-tools-offerwall-1['"]/;
+const entryImport = /import \{ notifyToolEntryReady \} from ['"]\.\.\/tool-offerwall-entry\.mjs\?rev=20261024-common-tool-start-1['"]/;
 
 test('workspace freshness starts false and is granted only after a clean, successful first bootstrap', async () => {
   const workspace = await source('js/creation/project-workspace.mjs');
   assert.match(workspace, /let initialEntryFresh = false;/);
-  assert.match(workspace, /initialEntryFresh = isInitialProjectEntryFresh\(\{ initialProject, pointer, hasQuery: params\.size > 0, hash: location\.hash, restoreError: initialRestoreError, operationError, failed \}\);/);
+  assert.match(workspace, /const entryRequestClean = initialEntryRequestFresh \?\? isFreshToolStartRequest\(location\.href, history\.state\);/);
+  assert.match(workspace, /initialEntryFresh = isInitialProjectEntryFresh\(\{ initialProject, pointer, hasQuery: !entryRequestClean && \(params\.size > 0 \|\| Boolean\(newStartRoute\)\), hash: location\.hash, restoreError: initialRestoreError, operationError, failed \}\);/);
   assert.match(workspace, /get initialEntryFresh\(\) \{ return initialEntryFresh; \}/);
   assert.equal((workspace.match(/initialEntryFresh =/g) || []).length, 2, 'freshness is never rearmed by later project actions');
   assert.match(workspace, /finally \{\s*initialSelectionPending = false;[\s\S]*?\}\s*initialEntryFresh = isInitialProjectEntryFresh/);
@@ -37,7 +38,7 @@ test('puzzle tool entries signal only after restoration bootstrap and reject res
   ]) {
     const page = await source(path);
     assert.match(page, entryImport, `${path} imports the shared entry notifier`);
-    assert.match(page, new RegExp(`notifyToolEntryReady\\(pxdBridge\\?\\.initialEntryFresh === true && !pxdBridge\\?\\.restoreError && ${activeState.replaceAll('!', '\\!')}[\\s\\S]*?!location\\.search && !location\\.hash\\)`), `${path} requires a fresh, inactive, clean route`);
+    assert.match(page, new RegExp(`notifyToolEntryReady\\(pxdBridge\\?\\.initialEntryFresh === true && !pxdBridge\\?\\.restoreError && ${activeState.replaceAll('!', '\\!')}[\\s\\S]*?isFreshStartSearch[\\s\\S]*?!location\\.hash\\)`), `${path} requires a fresh, inactive, clean route`);
     assert.match(page, /catch \(error\) \{ notifyToolEntryReady\(false\); throw error; \}/, `${path} fails closed if initial loading rejects`);
     const signal = page.lastIndexOf('notifyToolEntryReady(pxdBridge?.initialEntryFresh');
     assert.ok(signal > page.lastIndexOf('await pxdBridge.ready'), `${path} signals after the workspace promise resolves`);
@@ -53,7 +54,7 @@ test('puzzle tool entries signal only after restoration bootstrap and reject res
 test('output workspace signals only a clean empty start after its start panel is installed', async () => {
   const output = await source('js/creation/output-page.mjs');
   assert.match(output, entryImport);
-  assert.match(output, /showStart\(\);\s*notifyToolEntryReady\(location\.pathname === ['"]\/output\/work\/['"] && params\.size === 0 && !location\.hash\);\s*return;/);
+  assert.match(output, /showStart\(\);\s*notifyToolEntryReady\(getToolStartRoute\(location\.pathname\)\?\.id === 'convert' && isFreshToolStartRequest\(location\.href, history\.state\)\);\s*return;/);
   assert.match(output, /setError\('出力IDが複数あります[^;]+; notifyToolEntryReady\(false\); return;/);
   assert.match(output, /notifyToolEntryReady\(false\);\s*\}\s*catch \(error\) \{ setError\([^;]+; notifyToolEntryReady\(false\); \}/);
 });

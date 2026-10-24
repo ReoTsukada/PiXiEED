@@ -1,3 +1,4 @@
+import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
 import { importToolProject } from './tool-project-import.mjs?rev=20261024-free-tools-1';
@@ -37,7 +38,7 @@ export function isInitialProjectEntryFresh({ initialProject = null, pointer = nu
 }
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
-export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, initialRestoreError = '', root = null, idPrefix = '', routePointer = true, isActive = () => true, rememberKey = null, rememberShared = true, allowImplicitImport = true }) {
+export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, initialRestoreError = '', root = null, idPrefix = '', routePointer = true, isActive = () => true, rememberKey = null, rememberShared = true, allowImplicitImport = true, initialEntryRequestFresh = null }) {
   const store = createToolProjectStore(tool); let main = root || document.querySelector('#main') || document.querySelector('main');
   const lifecycle = new AbortController();
   main.inert = true; main.setAttribute('aria-busy', 'true');
@@ -51,6 +52,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
   document.body.classList.add('project-workspace-ready');
+  const newStartRoute = getToolStartRoute(location.pathname);
+  const entryRequestClean = initialEntryRequestFresh ?? isFreshToolStartRequest(location.href, history.state);
   const bar = node('div', 'project-bar'); bar.setAttribute('aria-label', 'このツールの作品');
   const launcher = button('', 'project-open', () => void showProjects()); launcher.className = 'project-bar__open'; launcher.setAttribute('aria-haspopup', 'dialog');
   launcher.innerHTML = `${icon('folder')}<span class="project-bar__name" aria-hidden="true"></span><span class="project-bar__state" aria-hidden="true"></span>`;
@@ -537,7 +540,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       initialSelectionPending = false;
       locked = false; initialized = true; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update();
     }
-    initialEntryFresh = isInitialProjectEntryFresh({ initialProject, pointer, hasQuery: params.size > 0, hash: location.hash, restoreError: initialRestoreError, operationError, failed });
+    initialEntryFresh = isInitialProjectEntryFresh({ initialProject, pointer, hasQuery: !entryRequestClean && (params.size > 0 || Boolean(newStartRoute)), hash: location.hash, restoreError: initialRestoreError, operationError, failed });
     return session.persisted;
   })();
   function scheduleAutoSave() {

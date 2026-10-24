@@ -5,6 +5,7 @@ import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1'
 import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
 import { connectOptionalFeedAds, createFeedAdRuntime } from '../ads/ordinary-ad-entry.mjs?rev=20261024-ordinary-ad-entry-1';
+import { toolStartHref } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -1360,28 +1361,28 @@ export const OFFICIAL_TOOL_CARDS = Object.freeze([
     id: 'pixel-drawing',
     title: 'ドット絵を描いてみる',
     description: 'ピクセルスタジオで小さな作品をつくり、フィードに戻せます。',
-    href: '/draw/?workspace=1&social=1',
+    href: toolStartHref('/draw/?workspace=1&social=1'),
     icon: '/assets/icons/pixieed/artwork.svg'
   }),
   Object.freeze({
     id: 'pixel-camera',
     title: '写真をドット絵にする',
     description: 'ピクセルカメラで写真を変換し、作品としてフィードに戻せます。',
-    href: '/camera/?workspace=1&social=1',
+    href: toolStartHref('/camera/?workspace=1&social=1'),
     icon: '/assets/icons/pixieed/camera.svg'
   }),
   Object.freeze({
     id: 'pixel-audio',
     title: '絵から音楽をつくる',
     description: 'オーディオスタジオで色を置いて、短いループ曲をつくれます。',
-    href: '/audio/?workspace=1&social=1',
+    href: toolStartHref('/audio/?workspace=1&social=1'),
     icon: '/assets/icons/pixieed/music.svg'
   }),
   Object.freeze({
     id: 'spot-difference',
     title: '作品で間違い探しをつくる',
     description: '自分の絵を使って、見比べて遊べるパズルをつくれます。',
-    href: '/spot-difference/?social=1',
+    href: toolStartHref('/spot-difference/?social=1'),
     icon: '/assets/icons/pixieed/spot-difference.svg'
   })
 ]);

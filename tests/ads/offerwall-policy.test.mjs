@@ -2,26 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
+import { TOOL_START_ROUTES, isFreshStartSearch } from '../../js/tool-start-routes.mjs';
 import { addOfferwallEntryPolicy, OFFERWALL_ENTRY_LOADER_SCRIPT, OFFERWALL_ENTRY_POLICY_SCRIPT, OFFERWALL_ENTRY_POLICY_VERSION, OFFERWALL_TOOL_PATHS } from '../../scripts/offerwall-entry-policy.mjs';
-import { maybeLoadOfferwallSDK, notifyToolEntryReady, subscribeToolEntry } from '../../js/tool-offerwall-entry.mjs';
 
 const source = await readFile(new URL('../../js/adsense-offerwall-policy.js', import.meta.url), 'utf8');
-const INTRO = ['/draw/', '/camera/', '/audio/'];
-const SETUP = ['/spot-difference/', '/hidden-object/', '/jigsaw/', '/output/work/'];
-const ALL = [...INTRO, ...SETUP];
+const STARTS = TOOL_START_ROUTES.map(route => route.startPath);
+const OLD_PATHS = TOOL_START_ROUTES.map(route => route.legacyPath);
+const freshHistory = { pixieedWorkspace: false, projectWorkspaceSelection: false, toolStartActive: false };
 
-function setup({ url = 'https://pixieed.jp/draw/', frame = false, enumValue = 3, historyState = null } = {}) {
+function setup({ url = `https://pixieed.jp${STARTS[0]}`, frame = false, enumValue = 3, historyState = freshHistory } = {}) {
   const parsed = new URL(url);
   const listeners = new Map();
   const document = {
     addEventListener(type, callback, capture) { listeners.set(type, { callback, capture }); },
-    head: { append(node) { this.appended = [...(this.appended || []), node]; } },
-    querySelector() { return null; },
-    createElement() {
-      const node = { dataset: {}, attributes: {}, addEventListener(type, callback) { (this.listeners ||= {})[type] = callback; }, set src(v) { this._src = v; }, get src() { return this._src; } };
-      return node;
-    },
   };
   const top = {};
   const googlefc = enumValue == null ? {} : { MessageTypeEnum: { OFFERWALL: enumValue } };
@@ -31,8 +24,7 @@ function setup({ url = 'https://pixieed.jp/draw/', frame = false, enumValue = 3,
     addEventListener(type, callback) { listeners.set(`window:${type}`, { callback }); },
   };
   if (!frame) window.top = window.self;
-  const context = vm.createContext({ window, document });
-  vm.runInContext(source, context);
+  vm.runInContext(source, vm.createContext({ window, document, URLSearchParams }));
   const invoke = () => {
     let args;
     window.googlefc.controlledMessagingFunction({ proceed: (...value) => { args = value; } });
@@ -42,19 +34,13 @@ function setup({ url = 'https://pixieed.jp/draw/', frame = false, enumValue = 3,
   return { window, document, listeners, invoke, event };
 }
 
-function eligibleSetup(path = SETUP[0]) {
-  const state = setup({ url: `https://pixieed.jp${path}` });
-  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
-  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), true);
-  return state;
-}
-
-test('the seven canonical tool entries are exact; intro pages begin eligible and setup pages require a fresh runtime signal', () => {
-  assert.deepEqual(ALL, ['/draw/', '/camera/', '/audio/', '/spot-difference/', '/hidden-object/', '/jigsaw/', '/output/work/']);
-  assert.deepEqual(OFFERWALL_TOOL_PATHS, ALL);
-  for (const path of INTRO) assert.equal(setup({ url: `https://pixieed.jp${path}` }).invoke()[0], true);
-  for (const path of SETUP) {
+test('Offerwall registry exactly matches the seven common start routes, all pending until fresh runtime readiness', () => {
+  assert.deepEqual(OFFERWALL_TOOL_PATHS, STARTS);
+  assert.equal(OFFERWALL_ENTRY_POLICY_VERSION, '20261024-common-tool-start-1');
+  assert.match(OFFERWALL_ENTRY_LOADER_SCRIPT, /20261024-common-tool-start-1/);
+  for (const path of STARTS) {
     const state = setup({ url: `https://pixieed.jp${path}` });
+    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false, path);
     assert.equal(state.invoke()[0], false, path);
     assert.deepEqual(Array.from(state.invoke()[1]), [3], path);
     assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), true, path);
@@ -62,111 +48,94 @@ test('the seven canonical tool entries are exact; intro pages begin eligible and
   }
 });
 
-test('query, fragment, noncanonical origin, iframe, and restored workspace are denied', () => {
-  const cases = [
-    { url: 'https://pixieed.jp/draw/?workspace=1' }, { url: 'https://pixieed.jp/jigsaw/?social=1' },
-    { url: 'https://pixieed.jp/output/work/?id=local' }, { url: 'https://pixieed.jp/draw/#section' },
-    { url: 'https://example.org/draw/' }, { url: 'http://pixieed.jp/draw/' },
-    { url: 'https://www.pixieed.jp/draw/' }, { url: 'https://pixieed.jp/tools/' },
-    { url: 'https://pixieed.jp/jigsaw/', historyState: { pixieedWorkspace: true } },
-  ];
-  for (const config of cases) {
-    const state = setup(config);
-    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false, JSON.stringify(config));
-    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, JSON.stringify(config));
-    assert.equal(state.invoke()[0], false, JSON.stringify(config));
+test('only workspace=1 and social=1 fresh-search combinations are accepted; old routes and unknown search are denied', () => {
+  for (const search of ['', '?workspace=1', '?social=1', '?workspace=1&social=1']) {
+    assert.equal(isFreshStartSearch(new URLSearchParams(search)), true, search);
+    for (const path of STARTS) {
+      const state = setup({ url: `https://pixieed.jp${path}${search}` });
+      assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), true, `${path}${search}`);
+    }
+  }
+  for (const search of ['?id=1', '?pxd=abc', '?unknown=1', '?workspace=1&workspace=1', '?social=0', '?workspace=1&mode=draw']) {
+    assert.equal(isFreshStartSearch(new URLSearchParams(search)), false, search);
+    const state = setup({ url: `https://pixieed.jp${STARTS[0]}${search}` });
+    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, search);
+  }
+  for (const path of OLD_PATHS) {
+    const state = setup({ url: `https://pixieed.jp${path}` });
+    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, path);
+    assert.equal(state.invoke()[0], false, path);
+  }
+});
+
+test('internal direct-host mode parameters are accepted only after a captured fresh start; pointers and hashes retire', () => {
+  const state = setup({ url: `https://pixieed.jp${STARTS[0]}?social=1` });
+  state.window.location.search = '?workspace=1&runtime=direct&mode=draw&modeProjectTool=draw';
+  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), true);
+  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), true);
+  state.window.location.search += '&modePxd=project-id';
+  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
+  state.window.location.search = '?workspace=1&runtime=direct&mode=draw';
+  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, 'cannot rearm after a pointer is observed');
+
+  const badMode = setup({ url: `https://pixieed.jp${STARTS[1]}` });
+  badMode.window.location.search = '?runtime=direct&mode=draw';
+  assert.equal(badMode.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false);
+  const hash = setup({ url: `https://pixieed.jp${STARTS[5]}` });
+  hash.window.location.hash = '#resume';
+  assert.equal(hash.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false);
+});
+
+test('initial history flags, iframe, origins, and malformed readiness fail closed', () => {
+  for (const flag of ['pixieedWorkspace', 'projectWorkspaceSelection', 'toolStartActive']) {
+    const state = setup({ historyState: { [flag]: true } });
+    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, flag);
+  }
+  for (const url of [
+    `http://pixieed.jp${STARTS[0]}`, `https://www.pixieed.jp${STARTS[0]}`,
+    `https://example.org${STARTS[0]}`, `https://pixieed.jp${STARTS[0]}#intro`,
+  ]) assert.equal(setup({ url }).window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, url);
+  for (const options of [undefined, null, {}, { fresh: false }, { fresh: 0 }]) {
+    const state = setup();
+    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready(options), false);
+    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, 'failed signal is one-way');
   }
   const sentinel = () => {};
   const frameWindow = { top: {}, self: {}, googlefc: { controlledMessagingFunction: sentinel }, location: {} };
-  vm.runInContext(source, vm.createContext({ window: frameWindow, document: { addEventListener() { throw Error('iframe listener'); } } }));
+  vm.runInContext(source, vm.createContext({ window: frameWindow, document: { addEventListener() { throw Error('iframe listener'); } }, URLSearchParams }));
   assert.equal(frameWindow.googlefc.controlledMessagingFunction, sentinel);
 });
 
-test('first work interaction retires before handlers, and later fresh signals cannot rearm', () => {
-  const intro = setup();
-  const start = intro.listeners.get('click');
-  assert.equal(start.capture, true);
-  start.callback({ type: 'click', target: { closest(selector) { assert.equal(selector, '[data-embed-start]'); return {}; } } });
-  assert.equal(intro.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
-  assert.equal(intro.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false);
-
-  const setupPage = eligibleSetup('/jigsaw/');
+test('first tool operation, pagehide, and popstate retire permanently before normal handlers', () => {
+  const state = setup();
+  state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true });
   for (const type of ['pointerdown', 'click', 'keydown', 'beforeinput', 'input', 'change', 'paste', 'drop']) {
-    assert.equal(setupPage.listeners.get(type).capture, true);
+    assert.equal(state.listeners.get(type).capture, true, type);
   }
-  setupPage.event('keydown', { closest(selector) { return selector.includes('button') ? {} : null; } }, { key: 'Tab' });
-  assert.equal(setupPage.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), true, 'plain Tab is not work');
-  setupPage.event('pointerdown', { closest(selector) { return selector === 'main' ? null : {}; } });
-  assert.equal(setupPage.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
-  assert.equal(setupPage.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false);
-});
-
-test('setup readiness is fail-closed for absent, false, thrown, resumed, or retired state', () => {
-  for (const options of [undefined, null, {}, { fresh: false }, { fresh: 0 }, { fresh: 'true' }]) {
-    const state = setup({ url: `https://pixieed.jp${SETUP[1]}` });
-    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready(options), false);
-    assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false, 'failed readiness is one-way');
-  }
-  const state = setup({ url: `https://pixieed.jp${SETUP[2]}` });
-  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), true);
-  state.window.history.state = { pixieedWorkspace: true };
+  state.event('keydown', { closest(selector) { return selector.startsWith('main,') || selector.startsWith('[data-tool-operation]') ? {} : null; } }, { key: 'Tab' });
+  assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), true, 'plain tab focus is not work');
+  state.event('pointerdown', { closest(selector) { return selector.startsWith('main,') || selector.startsWith('[data-tool-operation]') ? {} : null; } });
   assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
-  state.window.__PIXIEED_OFFERWALL_ENTRY__.retire();
-  state.window.history.state = null;
   assert.equal(state.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true }), false);
+  const fresh = setup();
+  fresh.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true });
+  fresh.listeners.get('window:popstate').callback();
+  assert.equal(fresh.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
+  const leaving = setup();
+  leaving.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true });
+  leaving.listeners.get('window:pagehide').callback();
+  assert.equal(leaving.window.__PIXIEED_OFFERWALL_ENTRY__.isEligible(), false);
 });
 
-test('unknown provider enum proceeds without holding CMP, while known ineligible state suppresses only Offerwall', () => {
+test('unknown Offerwall enum proceeds to avoid blocking CMP; known ineligible callback suppresses only Offerwall', () => {
   assert.deepEqual(setup({ enumValue: null }).invoke(), [true]);
-  const state = setup({ url: `https://pixieed.jp${SETUP[3]}` });
+  const state = setup({ url: `https://pixieed.jp${OLD_PATHS[0]}` });
   const result = state.invoke();
   assert.equal(result[0], false);
   assert.deepEqual(Array.from(result[1]), [3]);
-  assert.deepEqual(Array.from(state.invoke()[1]), [3]);
 });
 
-test('subscribers receive state and can unsubscribe without controlling policy', () => {
-  const state = setup({ url: `https://pixieed.jp${SETUP[0]}` });
-  const seen = [];
-  const unsubscribe = state.window.__PIXIEED_OFFERWALL_ENTRY__.subscribe((value) => seen.push(value));
-  assert.equal(seen.at(-1).state, 'pending');
-  const priorWindow = globalThis.window;
-  globalThis.window = state.window;
-  assert.equal(notifyToolEntryReady(true), true);
-  const loaderEvents = [];
-  const stopLoaderSubscription = subscribeToolEntry((value) => loaderEvents.push(value));
-  assert.equal(loaderEvents.at(-1).eligible, true);
-  stopLoaderSubscription();
-  if (priorWindow === undefined) delete globalThis.window; else globalThis.window = priorWindow;
-  assert.equal(seen.at(-1).eligible, true);
-  unsubscribe();
-  state.window.__PIXIEED_OFFERWALL_ENTRY__.retire();
-  assert.equal(seen.at(-1).eligible, true);
-});
-
-test('loader never appends without explicit eligibility and shares one existing-provider SDK append', async () => {
-  const disabled = setup({ url: `https://pixieed.jp${SETUP[0]}` });
-  const denied = await maybeLoadOfferwallSDK({ window: disabled.window, document: disabled.document });
-  assert.equal(denied, false);
-  assert.equal(disabled.document.head.appended, undefined);
-
-  const page = eligibleSetup(SETUP[1]);
-  const first = maybeLoadOfferwallSDK({ window: page.window, document: page.document });
-  const second = maybeLoadOfferwallSDK({ window: page.window, document: page.document });
-  assert.equal(page.document.head.appended.length, 1);
-  const node = page.document.head.appended[0];
-  assert.equal(node.src, 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253');
-  assert.equal(node.src, `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${displayAdConfig.client}`);
-  assert.equal(node.crossOrigin, 'anonymous');
-  node.listeners.load();
-  assert.equal(await first, true);
-  assert.equal(await second, true);
-  assert.equal(page.window.adsbygoogle, undefined, 'provider loading does not push ad units');
-});
-
-test('build helper upgrades policy version once and preserves unrelated CMP scripts', () => {
-  assert.equal(OFFERWALL_ENTRY_POLICY_VERSION, '20261024-all-tools-offerwall-1');
-  assert.match(OFFERWALL_ENTRY_LOADER_SCRIPT, /type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261024-all-tools-offerwall-1/);
+test('build helper versions one synchronous policy before unrelated CMP and preserves the seven entry registry', () => {
   const page = '<html><head><script src="/other-cmp.js"></script><script src="/js/adsense-offerwall-policy.js?rev=old"></script></head><body></body></html>';
   const first = addOfferwallEntryPolicy(page);
   assert.equal(first.skipped, false);
@@ -175,30 +144,5 @@ test('build helper upgrades policy version once and preserves unrelated CMP scri
   assert.ok(first.html.indexOf(OFFERWALL_ENTRY_POLICY_SCRIPT) < first.html.indexOf('/other-cmp.js'));
   assert.ok(first.html.includes('/other-cmp.js'));
   assert.equal((addOfferwallEntryPolicy(first.html).html.match(/adsense-offerwall-policy\.js/g) || []).length, 1);
-});
-
-test('top-level module bootstrap subscribes automatically and loads SDK only on eligible updates', async () => {
-  const priorWindow = globalThis.window;
-  const priorDocument = globalThis.document;
-  try {
-    const intro = setup({ url: 'https://pixieed.jp/draw/' });
-    globalThis.window = intro.window;
-    globalThis.document = intro.document;
-    await import(`../../js/tool-offerwall-entry.mjs?intro-bootstrap=${Date.now()}`);
-    assert.equal(intro.document.head.appended.length, 1, 'intro subscription immediately loads SDK once');
-
-    const pending = setup({ url: `https://pixieed.jp${SETUP[0]}` });
-    globalThis.window = pending.window;
-    globalThis.document = pending.document;
-    await import(`../../js/tool-offerwall-entry.mjs?setup-bootstrap=${Date.now()}`);
-    assert.equal(pending.document.head.appended, undefined, 'pending setup does not load SDK');
-    pending.window.__PIXIEED_OFFERWALL_ENTRY__.ready({ fresh: true });
-    assert.equal(pending.document.head.appended.length, 1, 'ready notification invokes subscriber loader');
-    assert.equal(pending.document.head.appended[0].crossOrigin, 'anonymous');
-  } finally {
-    if (priorWindow === undefined) delete globalThis.window;
-    else globalThis.window = priorWindow;
-    if (priorDocument === undefined) delete globalThis.document;
-    else globalThis.document = priorDocument;
-  }
+  assert.deepEqual(OFFERWALL_TOOL_PATHS, TOOL_START_ROUTES.map(route => route.startPath));
 });

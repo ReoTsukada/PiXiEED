@@ -1,5 +1,5 @@
 import { trackSiteEvent, createEmbeddedAnalyticsReceiver } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261017-workspace-entry-1';
+import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261024-common-tool-start-1';
 
 const PROTOCOL = 'pixieed-tool-embed';
 const VERSION = 1;

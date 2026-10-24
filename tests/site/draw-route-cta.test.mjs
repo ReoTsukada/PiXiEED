@@ -26,7 +26,7 @@ test('build-time CTA is a static anchor after the header with page-specific cont
     assert.equal(result.context, context, file);
     assert.match(result.html, new RegExp(`<nav class="site-draw-cta" data-draw-cta data-draw-context="${context}"`), file);
     assert.match(result.html, /class="site-draw-cta__description">ブラウザで使えるドット絵エディター<\/span>/, file);
-    assert.match(result.html, new RegExp(`<a class="site-draw-cta__link" href="/draw/\\?workspace=1">\\s*<span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw<\\/small>`), file);
+    assert.match(result.html, new RegExp(`<a class="site-draw-cta__link" href="/tools/start/draw/">\\s*<span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw<\\/small>`), file);
     assert.ok(result.html.indexOf('</header>') < result.html.indexOf('data-draw-cta'), `${file}: CTA follows the header`);
     assert.match(result.html, /href="\/css\/site-draw-cta\.css\?rev=20261014-route-cta-1"/);
     assert.equal(original, page(), 'the transform does not mutate its source string');
@@ -54,7 +54,7 @@ test('home and tools reuse their authored primary Draw links without adding a st
     assert.equal(result.added, false, file);
     assert.equal(result.html, html);
     assert.equal((html.match(/data-draw-cta/g) || []).length, 1, file);
-    assert.match(html, /href="\/draw\/\?workspace=1"[^>]*data-draw-cta[^>]*data-draw-context="(?:general|creation)"/);
+    assert.match(html, /href="(?:\/draw\/\?workspace=1|\/tools\/start\/draw\/)"[^>]*data-draw-cta[^>]*data-draw-context="(?:general|creation)"/);
   }
 });
 
@@ -206,10 +206,10 @@ test('fresh build output contains static CTAs while route exclusions and existin
     assert.match(eventLeaf, /\/js\/site-header\.mjs\?rev=/);
     assert.equal((books.match(/data-draw-cta/g) || []).length, 1, 'books keeps its authored CTA without a duplicate strip');
     assert.match(books, /books-editor-invite[\s\S]*?data-draw-context="books"/);
-    assert.equal((outputGuide.match(/href="\/draw\/\?workspace=1"/g) || []).length, 1, 'conversion guide keeps its existing link');
+    assert.equal((outputGuide.match(/href="\/tools\/start\/draw\/"/g) || []).length, 1, 'conversion guide keeps its existing link');
     assert.match(outputGuide, /ブラウザで使えるドット絵エディター[\s\S]*?ドット絵を描いてみる/);
     for (const html of [privacy, editor, admin]) assert.doesNotMatch(html, /data-draw-cta/);
-    assert.match(globe, /data-draw-context="creation"[\s\S]*?href="\/draw\/\?workspace=1"/, 'the normal globe page remains eligible despite its embedded map');
+    assert.match(globe, /data-draw-context="creation"[\s\S]*?href="\/tools\/start\/draw\/"/, 'the normal globe page remains eligible despite its embedded map');
     assert.doesNotMatch(lens, /data-draw-cta/, 'the retired route does not receive a promoted CTA');
     assert.match(await builtHtml('css/site-draw-cta.css'), /\.site-draw-cta__link/);
     const beforeSecondBuild = await Promise.all(['index.html', 'events/index.html', 'events/fixture-event/index.html', 'pixiee-lens/index.html'].map(builtHtml));

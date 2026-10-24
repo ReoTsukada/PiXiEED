@@ -64,12 +64,12 @@ test('transform is idempotent, preserves page metadata/content, and places polic
   assert.match(first.html, /<title>Keep this title<\/title>/);
   assert.match(first.html, /href="https:\/\/pixieed\.jp\/about\/"/);
   assert.match(first.html, /Keep this content\./);
-  assert.match(first.html, /rev=20261024-all-tools-offerwall-1/);
+  assert.match(first.html, /rev=20261024-common-tool-start-1/);
 
   const sourceWithOldPolicy = sourceHtml.replace('</head>', '<script src="/js/adsense-offerwall-policy.js?rev=old"></script></head>');
   const updatedPolicy = addInformationAutoAds(sourceWithOldPolicy, 'about/index.html').html;
   assert.equal((updatedPolicy.match(/adsense-offerwall-policy\.js/g) || []).length, 1);
-  assert.match(updatedPolicy, /adsense-offerwall-policy\.js\?rev=20261024-all-tools-offerwall-1/);
+  assert.match(updatedPolicy, /adsense-offerwall-policy\.js\?rev=20261024-common-tool-start-1/);
 
   const sourceWithEarlyAds = sourceHtml
     .replace('<head>', '<head><script src="https://example.test/ads.js"></script>')

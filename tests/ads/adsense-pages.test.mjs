@@ -88,7 +88,7 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
   const output = await html(OFFERWALL_PAGE);
   assert.doesNotMatch(output, /adsense-auto\.js|adsbygoogle\.js/, 'output work no longer loads an unconditional provider');
-  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261024-all-tools-offerwall-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261024-all-tools-offerwall-1"><\/script>/);
+  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261024-common-tool-start-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261024-common-tool-start-1"><\/script>/);
   assert.doesNotMatch(await html('output/index.html'), /adsbygoogle\.js|adsense-auto\.js/);
 });
 

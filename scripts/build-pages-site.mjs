@@ -13,6 +13,7 @@ import { addOfferwallEntryPolicy, OFFERWALL_TOOL_PATHS, OFFERWALL_ENTRY_POLICY_S
 import { optimizeToolRuntimeDelivery } from './tool-runtime-delivery.mjs';
 import { optimizeSiteStartupDelivery } from './site-startup-delivery.mjs';
 import { isSampleWork } from '../js/public-work-policy.mjs';
+import { TOOL_START_ROUTES, getToolStartRoute, toolStartHref } from '../js/tool-start-routes.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const excluded = new Set(['work', 'docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
@@ -50,7 +51,7 @@ export function addSiteHeaderBenefits(html, name = '') {
   const original = html;
   // Keep the established shared-header version normalization.
   html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261024-free-tools-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261024-intelligence-ui-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261024-common-tool-start-1$2');
   html = html.replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/site-header-benefits\.mjs(?:\?[^"']*)?\1)[^>]*>\s*<\/script>\s*/gi, '');
   const skipped = headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html);
   return { html, added: false, removed: html !== original, skipped };
@@ -68,13 +69,26 @@ export function addOrdinaryAdStyle(html, name = '') {
 /** Attach the guarded existing-publisher SDK entry only to real tool entry templates. */
 export function addToolOfferwallEntry(html, name = '') {
   const route = `/${name.replace(/index\.html$/, '')}`;
-  if (!OFFERWALL_TOOL_PATHS.includes(route)) return { html, added: false };
   const withoutLoaders = html
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/tool-offerwall-entry\.mjs(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '')
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/adsense-auto\.js(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '');
+  if (!OFFERWALL_TOOL_PATHS.includes(route)) return { html: withoutLoaders, added: false };
   const policy = addOfferwallEntryPolicy(withoutLoaders);
   const output = policy.html.replace(OFFERWALL_ENTRY_POLICY_SCRIPT, `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n${OFFERWALL_ENTRY_LOADER_SCRIPT}`);
   return { html: output, added: output !== html };
+}
+
+/** Same real document/runtime, generated from its maintained canonical template. */
+export function toolStartDocument(html, route) {
+  const withoutRobots = html.replace(/<meta\b(?=[^>]*\bname=["']robots["'])[^>]*>\s*/gi, '');
+  return withoutRobots.replace(/<head\b[^>]*>/i, '$&\n<meta name="robots" content="noindex,follow">')
+    .replace(/<body\b/i, `<body data-tool-start="${route.id}"`);
+}
+
+/** Only navigation surfaces change fresh start URLs; saved/shared links survive verbatim. */
+export function normalizeFreshToolLinks(html, { onlyExplicit = false } = {}) {
+  return html.replace(/(<a\b[^>]*\bhref=)(["'])([^"']+)\2/gi,
+    (whole, prefix, quote, href) => onlyExplicit && !/[?&](?:workspace|social)=1(?:&|$)/.test(href) ? whole : `${prefix}${quote}${toolStartHref(href)}${quote}`);
 }
 
 /** Copy tracked public sources and only the generator's validated per-puzzle output. */
@@ -85,7 +99,8 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
   if (destination === root || root.startsWith(destination + '/')) throw new Error('Output must not replace the repository');
   let eventRoot = null, created = false;
   const generatedSources = new Set();
-  const sourceFor = name => join(generatedSources.has(name) ? eventRoot : root, name);
+  const toolStartSources = new Map();
+  const sourceFor = name => join(generatedSources.has(name) ? eventRoot : root, toolStartSources.get(name)?.sourcePath || name);
   try {
     const names = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
     const booksAssets = new Set(publishableBooksAssets);
@@ -206,7 +221,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         'js/books-catalog.mjs',
         'js/site-header-benefits.mjs', 'js/ads/site-feature-access-v20261024.mjs', 'js/ads/site-reward-runtime-v20261016-ads-only.mjs', 'js/ads/site-reward-rollout-v20261016.mjs',
         'js/ads/ordinary-ad-placement.mjs', 'css/ordinary-ad-placement.css',
-        'data/ordinary-ad-config.mjs', 'js/ads/ordinary-ad-provider.mjs', 'js/ads/ordinary-ad-entry.mjs', 'js/tool-offerwall-entry.mjs',
+        'data/ordinary-ad-config.mjs', 'js/ads/ordinary-ad-provider.mjs', 'js/ads/ordinary-ad-entry.mjs', 'js/tool-offerwall-entry.mjs', 'js/tool-start-routes.mjs',
         'js/creation/music-output-preferences.mjs', 'js/creation/pxd-original-backup.mjs',
         'js/creation/legacy-lens-entry.mjs', 'js/creation/shared-project-settings-core.mjs',
         'css/creation-camera-idle.css', 'css/draw-palette-instruments.css',
@@ -241,6 +256,12 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         puzzlePages++;
       }
     }
+    for (const route of TOOL_START_ROUTES) {
+      if (!files.includes(route.sourcePath)) continue;
+      const name = `${route.startPath.slice(1)}index.html`;
+      toolStartSources.set(name, route);
+      files.push(name);
+    }
     const unique = [...new Set(files)].filter(name => !isLocalReviewSource(name)).sort();
     for (const name of unique) {
       if (!(await lstat(sourceFor(name))).isFile()) throw new Error(`Public source is not a regular file: ${name}`);
@@ -252,8 +273,10 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       const sourcePath = sourceFor(name);
       const outputPath = join(destination, name);
       if (/\.html?$/i.test(name)) {
-        const sourceHtml = removeLocalPreviewMarker(await readFile(sourcePath, 'utf8'));
-        const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), name);
+        const startRoute = toolStartSources.get(name);
+        const template = removeLocalPreviewMarker(await readFile(sourcePath, 'utf8'));
+        const sourceHtml = startRoute ? toolStartDocument(template, startRoute) : template;
+        const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), startRoute?.sourcePath || name);
         const withBenefits = addSiteHeaderBenefits(transformed.html, name);
         const withGutters = addPageGutters(withBenefits.html, name, { generatedEventRoutes });
         const withInformationAutoAds = addInformationAutoAds(withGutters.html, name, { generatedEventRoutes });
@@ -262,7 +285,8 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
           || /\bsrc=["']\/js\/adsense-offerwall-policy\.js[?"']/.test(withOrdinaryStyle.html);
         const withOfferwallPolicy = needsOfferwallPolicy ? addOfferwallEntryPolicy(withOrdinaryStyle.html) : withOrdinaryStyle;
         const withToolOfferwallEntry = addToolOfferwallEntry(withOfferwallPolicy.html, name);
-        await writeFile(outputPath, withToolOfferwallEntry.html);
+        const navigationSurface = ['index.html', 'feed/index.html', 'explore/index.html', 'tools/index.html'].includes(name);
+        await writeFile(outputPath, normalizeFreshToolLinks(withToolOfferwallEntry.html, { onlyExplicit: !navigationSurface }));
       } else await copyFile(sourcePath, outputPath);
     }
     await writeFile(join(destination, '.nojekyll'), '');

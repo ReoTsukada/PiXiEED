@@ -166,7 +166,7 @@ ${listedProducts.map(card).join('\n')}
   </dialog>
   <script type="module" src="/js/books-catalog.mjs?rev=20261020-yahoo-related-offers-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261020-yahoo-related-offers-1"></script>
-<script type="module" src="/js/site-header.mjs?rev=20261024-intelligence-ui-1"></script>
+<script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
 </body>
 </html>
 `;

@@ -66,7 +66,7 @@ function insertLensToolbarCta(html) {
   const actions = /(<(?:div|nav)\b[^>]*class\s*=\s*["'][^"']*\bhud-top__actions\b[^"']*["'][^>]*>)/i.exec(html);
   if (!actions) return html;
   const index = actions.index + actions[0].length;
-  const link = '<a class="site-draw-cta__link site-draw-cta--lens" aria-label="ブラウザで使えるドット絵エディターを開く" data-draw-cta data-draw-context="creation" href="/draw/?workspace=1">ドット絵エディターで描く</a>\n';
+  const link = '<a class="site-draw-cta__link site-draw-cta--lens" aria-label="ブラウザで使えるドット絵エディターを開く" data-draw-cta data-draw-context="creation" href="/tools/start/draw/">ドット絵エディターで描く</a>\n';
   return `${html.slice(0, index)}\n${link}${html.slice(index)}`;
 }
 
@@ -90,7 +90,7 @@ function skipReason(route, html) {
 
 function markup(context) {
   const label = LABELS[context] || LABELS.general;
-  return `\n<nav class="site-draw-cta" data-draw-cta data-draw-context="${context}" aria-label="ドット絵をつくる"><span class="site-draw-cta__description">ブラウザで使えるドット絵エディター</span><a class="site-draw-cta__link" href="/draw/?workspace=1"><span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw</small><span aria-hidden="true">→</span></a></nav>\n`;
+  return `\n<nav class="site-draw-cta" data-draw-cta data-draw-context="${context}" aria-label="ドット絵をつくる"><span class="site-draw-cta__description">ブラウザで使えるドット絵エディター</span><a class="site-draw-cta__link" href="/tools/start/draw/"><span>${label}</span><small class="site-draw-cta__brand">PiXiEEDraw</small><span aria-hidden="true">→</span></a></nav>\n`;
 }
 
 function insertAfterHeader(html, block) {

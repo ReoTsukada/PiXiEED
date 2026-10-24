@@ -1,3 +1,5 @@
+import { getToolStartRoute, legacyToolPath, toolStartHref } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+
 /** Public destinations only; editor actions and project modes have their own UI. */
 export const PAGE_DESTINATIONS = Object.freeze([
   { label: 'はじめる', links: [
@@ -5,19 +7,19 @@ export const PAGE_DESTINATIONS = Object.freeze([
     ['/tools/', 'ツール一覧', '使いたいツールを選びます。', 'tools'],
   ] },
   { label: 'つくる', links: [
-    ['/draw/', 'ドット絵を描く', 'キャンバスでドット絵を描きます。', 'artwork'],
-    ['/camera/', 'カメラ・写真をドット絵に変換', '撮影や画像の読み込みから変換します。', 'camera'],
-    ['/audio/', '絵を描いて音楽を作る', 'マス目に色を置いてループ曲を作ります。', 'music'],
-    ['/output/', '画像・音声の書き出し', '画像の形式変換や音声・動画の保存をします。', 'artwork'],
+    [toolStartHref('/draw/'), 'ドット絵を描く', 'キャンバスでドット絵を描きます。', 'artwork'],
+    [toolStartHref('/camera/'), 'カメラ・写真をドット絵に変換', '撮影や画像の読み込みから変換します。', 'camera'],
+    [toolStartHref('/audio/'), '絵を描いて音楽を作る', 'マス目に色を置いてループ曲を作ります。', 'music'],
+    [toolStartHref('/output/work/'), '画像・音声の書き出し', '画像の形式変換や音声・動画の保存をします。', 'artwork'],
   ] },
   { label: '遊ぶ', links: [
-    ['/jigsaw/', 'ジグソーパズル', 'ピクセル絵のパズルで遊びます。', 'jigsaw'],
+    [toolStartHref('/jigsaw/'), 'ジグソーパズル', 'ピクセル絵のパズルで遊びます。', 'jigsaw'],
     ['/play/spot-difference/', 'ドット絵間違い探し', '2つの絵を見比べて違いを探します。', 'spot-difference'],
     ['/play/hidden-object/', 'ドット絵もの探し', '絵の中に隠れたものを探します。', 'hidden-object'],
   ] },
   { label: '問題をつくる', links: [
-    ['/spot-difference/', '間違い探しをつくる', '自分の絵で間違い探しを作ります。', 'spot-difference'],
-    ['/hidden-object/', 'もの探しをつくる', '自分の絵でもの探しを作ります。', 'hidden-object'],
+    [toolStartHref('/spot-difference/'), '間違い探しをつくる', '自分の絵で間違い探しを作ります。', 'spot-difference'],
+    [toolStartHref('/hidden-object/'), 'もの探しをつくる', '自分の絵でもの探しを作ります。', 'hidden-object'],
   ] },
   { label: '作品・イベントを探す', links: [
     ['/explore/', '作品を探す', '公開中の作品や投稿を探します。', 'telescope'],
@@ -73,7 +75,14 @@ export function currentPageDestination(location, creationMode) {
   let mode = creationMode || url.searchParams.get('mode') || 'draw';
   if (path === '/works/') path = '/globe/';
   if (path === '/pixel-camera.html' && !url.searchParams.has('standalone')) { path = '/camera/'; mode = 'camera'; }
-  if (path === '/draw/') return mode === 'camera' ? '/camera/' : mode === 'audio' ? '/audio/' : '/draw/';
+  if (path === '/draw/') path = mode === 'camera' ? '/camera/' : mode === 'audio' ? '/audio/' : '/draw/';
+  if (path === '/output/' || path === '/output/guide/') path = '/output/work/';
+  const startRoute = getToolStartRoute(path);
+  if (startRoute) path = startRoute.startPath;
+  else {
+    const legacyPath = legacyToolPath(path);
+    path = new URL(toolStartHref(`https://pixieed.jp${legacyPath}`), 'https://pixieed.jp').pathname;
+  }
   if (path === '/profile/') {
     const view = url.searchParams.get('view');
     return ['posts', 'likes', 'history'].includes(view) ? `/profile/?view=${view}` : '/profile/';

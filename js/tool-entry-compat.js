@@ -5,7 +5,9 @@
   // A tiny parser-time cue for direct workspace links. Query state wins over
   // history state, as it does in the retained host; bridges and legacy routes
   // keep their existing independent entry behavior.
-  const workspace = params.has('workspace') ? params.get('workspace') === '1' : typeof history !== 'undefined' && history.state?.pixieedWorkspace === true;
+  const startRoute = /^\/tools\/start\/(?:draw|camera|audio)\/(?:index\.html)?$/.test(location.pathname);
+  const workspace = params.has('workspace') ? params.get('workspace') === '1'
+    : typeof history !== 'undefined' && typeof history.state?.pixieedWorkspace === 'boolean' ? history.state.pixieedWorkspace : startRoute;
   if (workspace && params.get('runtime') !== 'iframe' && !validBridge(params) && !independentLegacy && typeof document !== 'undefined') {
     document.documentElement.dataset.directBootstrap = '';
     const restoreShellStylesheet = link => {

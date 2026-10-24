@@ -1,4 +1,4 @@
-import { PUBLIC_NAV_ITEMS, currentPublicNavKey } from './page-navigation.mjs?rev=20261023-sns-navigation-1';
+import { PUBLIC_NAV_ITEMS, currentPublicNavKey } from './page-navigation.mjs?rev=20261024-common-tool-start-1';
 
 const isToolPage = (body) => {
   if (!body) return false;
