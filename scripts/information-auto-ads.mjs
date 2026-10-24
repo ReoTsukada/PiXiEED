@@ -1,7 +1,6 @@
 import { OFFERWALL_ENTRY_POLICY_SCRIPT } from './offerwall-entry-policy.mjs';
 
 const STATIC_INFORMATION_ROUTES = new Map([
-  ['tools/index.html', '/tools/'],
   ['welcome/index.html', '/welcome/'],
   ['about/index.html', '/about/'],
   ['guide/index.html', '/guide/'],
@@ -13,7 +12,7 @@ const STATIC_INFORMATION_ROUTES = new Map([
 ]);
 
 export const INFORMATION_AUTO_ADS_POLICY_SCRIPT = OFFERWALL_ENTRY_POLICY_SCRIPT;
-export const INFORMATION_AUTO_ADS_MODULE = '<script type="module" src="/js/information-auto-ads.mjs?rev=20261024-ordinary-display-1"></script>';
+export const INFORMATION_AUTO_ADS_MODULE = '<script type="module" src="/js/information-auto-ads.mjs?rev=20261024-side-ad-layout-1"></script>';
 
 function normalizeSourceRoute(path) {
   const value = String(path || '').replaceAll('\\', '/').replace(/^\.\//, '');

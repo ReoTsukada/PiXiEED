@@ -1,4 +1,4 @@
-import { ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
+import { ordinaryAdEligibility, ordinaryAdUnitIsConfigured } from './ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 
 const attemptedGutterDocuments = new WeakSet();
 
@@ -8,22 +8,77 @@ function isEnabledPlacement(config, placement) {
 }
 
 /** Resolve a placement without importing the network-capable adapter when off. */
-export async function createFeedAdRuntime(config, { doc = globalThis.document, win = globalThis.window } = {}) {
-  if (!isEnabledPlacement(config, 'inline') || config.trustedContentEligible !== true) {
-    return { enabled: false, trustedContentEligible: false, unit: null, provider: undefined };
+export async function createFeedAdRuntime(config, { doc = globalThis.document, win = globalThis.window, gutterConfig = null, gutterContentEligible = false } = {}) {
+  const inlineEnabled = isEnabledPlacement(config, 'inline') && config.trustedContentEligible === true;
+  const gutterEnabled = isEnabledPlacement(gutterConfig, 'gutter');
+  if (!inlineEnabled && !gutterEnabled) {
+    return {
+      enabled: false, trustedContentEligible: false, unit: null, provider: undefined,
+      ...(gutterConfig ? { gutter: { enabled: false, unit: null, provider: undefined } } : {}),
+    };
   }
   const { createAdSenseDisplayProvider } = await import('./ordinary-ad-provider.mjs?rev=20261024-ordinary-ad-provider-1');
+  const provider = createAdSenseDisplayProvider({ doc, win });
   return {
-    enabled: true, trustedContentEligible: true, unit: config.unit,
-    provider: createAdSenseDisplayProvider({ doc, win }),
+    enabled: inlineEnabled, trustedContentEligible: inlineEnabled,
+    unit: inlineEnabled ? config.unit : null, provider: inlineEnabled ? provider : undefined,
+    ...(gutterConfig ? { gutter: gutterEnabled
+      ? { enabled: true, unit: gutterConfig.unit, provider, trustedContentEligible: gutterContentEligible === true }
+      : { enabled: false, unit: null, provider: undefined } } : {}),
   };
+}
+
+/** Tight page/context gate for the single static gutter beside the primary feed. */
+export function isPublicFeedGutterEligible({
+  enabled, provider, unit, pathname = '', origin = '', topLevel = false,
+  search = '', hash = '', historyState = null,
+  viewportWidth = 0, viewportHeight = 0, publicFeed = false, feedReady = false,
+  partialWarning = true, loading = true, empty = true, privateView = true,
+  composerOpen = true, detailOpen = true, fullscreen = false, editor = false,
+  trustedContentEligible = false, eligiblePostCount = 0, pageVisible = true,
+} = {}) {
+  const route = pathname === '/feed/' || pathname === '/feed/index.html';
+  const params = new URLSearchParams(search);
+  const querySafe = [...params].every(([key, value]) => key === 'view' && value === 'feed')
+    && params.getAll('view').length <= 1;
+  const historySafe = !historyState?.socialDetail && !historyState?.socialComposer
+    && !historyState?.detailId && !historyState?.composerType
+    && !historyState?.post && !historyState?.postId && !historyState?.compose && !historyState?.output
+    && (!historyState?.socialView || historyState.socialView === 'feed');
+  return route && pageVisible === true && ['https://pixieed.jp', 'https://www.pixieed.jp'].includes(origin)
+    && !hash && querySafe && historySafe
+    && publicFeed === true && feedReady === true && partialWarning === false
+    && trustedContentEligible === true
+    && ordinaryAdUnitIsConfigured(unit) && unit.placement === 'gutter'
+    && ordinaryAdEligibility({
+      enabled, provider, unit, placement: 'gutter', productionOrigin: true,
+      topLevel, desktop: viewportWidth > 1190 && viewportHeight >= 672,
+      viewportWidth, viewportHeight, gutterFits: viewportWidth > 1190,
+      contentReady: eligiblePostCount >= 24, publicFeed, feedReady,
+      partialWarning, loading, empty, privateView, composerOpen, detailOpen,
+      fullscreen, editor, trustedContentEligible,
+    });
+}
+
+/** A mounted or failed gutter is retired for the rest of this document. */
+export function createPublicFeedGutterGate() {
+  let attempted = false, retired = false;
+  return Object.freeze({
+    get attempted() { return attempted; },
+    get retired() { return retired; },
+    canAttempt() { return !attempted && !retired; },
+    markAttempt() { if (attempted || retired) return false; attempted = true; return true; },
+    retire() { if (attempted) retired = true; },
+  });
 }
 
 /** Resolve optional feed ads after the feed has booted; adapter errors stay local to ads. */
 export function connectOptionalFeedAds(app, ordinaryAds, loadRuntime) {
   let active = true;
   Promise.resolve().then(loadRuntime).then((runtime) => {
-    if (!active || !runtime?.enabled || !app || typeof app.render !== 'function') return;
+    const inlineReady = runtime?.enabled === true && typeof runtime.provider === 'function' && runtime.unit;
+    const gutterReady = runtime?.gutter?.enabled === true && typeof runtime.gutter.provider === 'function' && runtime.gutter.unit;
+    if (!active || (!inlineReady && !gutterReady) || !app || typeof app.render !== 'function') return;
     Object.assign(ordinaryAds, runtime);
     app.render();
   }).catch(() => {});

@@ -4,7 +4,7 @@ import { createSocialApi } from './api.mjs?rev=20261024-posting-policy-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
 import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
-import { connectOptionalFeedAds, createFeedAdRuntime } from '../ads/ordinary-ad-entry.mjs?rev=20261024-ordinary-ad-entry-1';
+import { connectOptionalFeedAds, createFeedAdRuntime, createPublicFeedGutterGate, isPublicFeedGutterEligible } from '../ads/ordinary-ad-entry.mjs?rev=20261024-side-ad-layout-1';
 import { toolStartHref } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -65,6 +65,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const explorePage = documentRef.body.dataset.socialPage === 'explore';
   const app = $('#socialApp', documentRef), feed = $('#feed', documentRef), status = $('#feedStatus', documentRef);
   const retry = $('#feedRetry', documentRef), composer = $('#composerDialog', documentRef), form = $('#composerForm', documentRef);
+  const ordinaryGutterHost = $('#ordinaryFeedGutter', documentRef);
   const detail = $('#detailDialog', documentRef), detailBody = $('#detailBody', documentRef), tools = $('#toolsDialog', documentRef);
   if (!app || !feed || !composer || !form) return null;
   const titleInput = $('#composerTitleInput', form), captionInput = $('#composerText', form), locationInput = $('#composerLocation', form), visibilityInput = $('#composerVisibility', form);
@@ -251,6 +252,8 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const retiredOrdinaryAds = new Set();
   const ordinaryAdActivations = new Map();
   const ordinaryAdPageGate = createOrdinaryAdPageGate();
+  let ordinaryGutterActivation = null;
+  const ordinaryGutterGate = createPublicFeedGutterGate();
   const priorScrollRestoration = windowRef.history.scrollRestoration;
   windowRef.history.scrollRestoration = 'manual';
   const viewPositions = new Map();
@@ -286,6 +289,85 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     };
   }
 
+  function feedGutterContext(posts, publicFeed) {
+    const gutter = ordinaryAds.gutter || {};
+    let topLevel = false;
+    try { topLevel = windowRef.top === windowRef.self; } catch { /* framed page */ }
+    return {
+      enabled: gutter.enabled === true, provider: gutter.provider, unit: gutter.unit,
+      pathname: windowRef.location?.pathname || '', origin: windowRef.location?.origin || '', topLevel,
+      search: windowRef.location?.search || '', hash: windowRef.location?.hash || '', historyState: windowRef.history?.state || null,
+      viewportWidth: windowRef.visualViewport?.width || windowRef.innerWidth || 0,
+      viewportHeight: windowRef.visualViewport?.height || windowRef.innerHeight || 0,
+      publicFeed, feedReady: state.initialized && !state.feedFailed,
+      partialWarning: state.readWarnings.length > 0, loading: state.loading,
+      empty: posts.length === 0, privateView: state.mineMode || state.filter !== 'all' || Boolean(state.query),
+      composerOpen: Boolean(composer.open),
+      detailOpen: Boolean(detail.open || tools.open || documentRef.querySelector('#guestAccountDialog[open], [data-auth-dialog][open], .account-dialog[open]')),
+      fullscreen: Boolean(documentRef.fullscreenElement), editor: documentRef.body?.classList?.contains('creation-editor') || false,
+      trustedContentEligible: gutter.trustedContentEligible === true, eligiblePostCount: posts.length,
+      pageVisible: documentRef.visibilityState !== 'hidden',
+    };
+  }
+
+  function retireFeedGutter() {
+    if (!ordinaryGutterActivation && !ordinaryGutterGate.attempted) return;
+    ordinaryGutterGate.retire();
+    ordinaryGutterActivation?.cleanup?.();
+    ordinaryGutterActivation = null;
+    ordinaryGutterHost?.replaceChildren();
+    if (ordinaryGutterHost) ordinaryGutterHost.hidden = true;
+    app.classList.remove('has-ordinary-feed-gutter');
+  }
+
+  function updateFeedGutter(posts, publicFeed) {
+    if (!ordinaryGutterHost) return;
+    const context = feedGutterContext(posts, publicFeed);
+    const eligible = context.pageVisible && isPublicFeedGutterEligible(context);
+    if (!eligible) { if (ordinaryGutterActivation) retireFeedGutter(); return; }
+    if (!ordinaryGutterGate.canAttempt()) return;
+    const gutter = ordinaryAds.gutter || {};
+    const shell = createOrdinaryDisplayAdCard(documentRef, gutter.unit, 'gutter');
+    if (!shell) return;
+    ordinaryGutterHost.replaceChildren(shell.card);
+    ordinaryGutterHost.hidden = false;
+    app.classList.add('has-ordinary-feed-gutter');
+    const rightColumn = ordinaryGutterHost.closest('.right-column');
+    const feedColumn = $('.feed-column', app);
+    const hostRect = ordinaryGutterHost.getBoundingClientRect?.();
+    const rightRect = rightColumn?.getBoundingClientRect?.();
+    const feedRect = feedColumn?.getBoundingClientRect?.();
+    const visible = Boolean(ordinaryGutterHost.getClientRects?.().length
+      && documentRef.defaultView?.getComputedStyle?.(ordinaryGutterHost)?.display !== 'none'
+      && documentRef.defaultView?.getComputedStyle?.(rightColumn)?.display !== 'none');
+    const geometryFits = visible && hostRect && rightRect && feedRect
+      && Math.abs(hostRect.width - 300) <= 2 && rightRect.width >= 300
+      && hostRect.height >= 624
+      && hostRect.left >= feedRect.right + 16 && hostRect.right <= rightRect.right + 1
+      && hostRect.left >= 0 && hostRect.right <= context.viewportWidth;
+    if (!geometryFits) {
+      ordinaryGutterHost.replaceChildren(); ordinaryGutterHost.hidden = true;
+      app.classList.remove('has-ordinary-feed-gutter');
+      return;
+    }
+    if (!ordinaryGutterGate.markAttempt()) {
+      ordinaryGutterHost.replaceChildren(); ordinaryGutterHost.hidden = true;
+      app.classList.remove('has-ordinary-feed-gutter');
+      return;
+    }
+    const activation = activateOrdinaryDisplayAd({
+      ...shell, provider: gutter.provider, unit: gutter.unit, enabled: gutter.enabled === true,
+      eligibility: { ...context, productionOrigin: true, desktop: context.viewportWidth > 1190 && context.viewportHeight >= 672,
+        gutterFits: context.viewportWidth > 1190, contentReady: posts.length >= 24, empty: posts.length === 0 },
+      kind: 'gutter',
+      onOutcome(status) {
+        if (['unfilled', 'blocked', 'failed', 'empty'].includes(status)) retireFeedGutter();
+      },
+    });
+    ordinaryGutterActivation = activation;
+    if (!activation.mounted) retireFeedGutter();
+  }
+
   function reconcileFeed(nodes) {
     for (let index = 0; index < nodes.length; index += 1) {
       const current = feed.children[index] || null;
@@ -295,6 +377,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   }
 
   function deactivateFeedAds() {
+    retireFeedGutter();
     for (const [anchorId, shell] of ordinaryAdCards) {
       ordinaryAdActivations.get(anchorId)?.cleanup?.();
       shell.card.remove();
@@ -422,6 +505,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     activateFeedAds(posts, eligible);
     feed.setAttribute('aria-busy', 'false');
     if (!posts.length) feed.append(renderEmptyState());
+    updateFeedGutter(posts, eligible);
     if (showReadWarnings && state.readWarnings.length) {
       const range = posts.length ? `${posts.length}件を表示中。` : '取得できた範囲: 0件。';
       statusText(`${range}公開元の一部は未取得です。再試行できます。`);
@@ -1252,6 +1336,10 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     syncViewportHeight();
   };
   addViewportListeners();
+  const reconcileGutterViewport = () => updateFeedGutter(filteredPosts(), !state.mineMode && state.filter === 'all' && !state.query);
+  windowRef.addEventListener('resize', reconcileGutterViewport, { passive: true });
+  windowRef.addEventListener('popstate', reconcileGutterViewport);
+  documentRef.addEventListener('fullscreenchange', reconcileGutterViewport);
   windowRef.addEventListener('popstate', (event) => {
     if (composer.open && !event.state?.socialComposer) closeComposer({ fromPop: true });
     else if (!composer.open && event.state?.socialComposer) void openComposer(event.state.composerType || 'art', { historyPush: false });
@@ -1271,6 +1359,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   });
   windowRef.addEventListener('pagehide', () => {
     removeViewportListeners();
+    retireFeedGutter();
     windowRef.history.scrollRestoration = priorScrollRestoration;
     state.pageHidden = true; state.composerGeneration++; state.detailGeneration++; state.handoffToken++;
     if (composer.open && state.draftReady && !state.submitted && !state.archiveSaved) requestAutosave();
@@ -1332,7 +1421,10 @@ if (typeof document !== 'undefined') {
     try {
       const ordinaryAds = { enabled: false, trustedContentEligible: false, unit: null, provider: undefined };
       const feed = initSocialFeed({ ordinaryAds });
-      connectOptionalFeedAds(feed, ordinaryAds, () => createFeedAdRuntime(ordinaryAdConfig.feed));
+      connectOptionalFeedAds(feed, ordinaryAds, () => createFeedAdRuntime(ordinaryAdConfig.feed, {
+        gutterConfig: ordinaryAdConfig.informationGutter,
+        gutterContentEligible: ordinaryAdConfig.feed.trustedContentEligible === true,
+      }));
     } catch (error) {
       const status = $('#feedStatus');
       if (status) status.textContent = `フィードを開始できませんでした。${niceError(error, '')}`;

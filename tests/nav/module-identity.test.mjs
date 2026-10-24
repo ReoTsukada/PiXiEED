@@ -13,6 +13,9 @@ const canonical = new Map([
   ['js/creation/pxd-ui.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/tool-offerwall-entry.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
+  ['js/social/app.mjs', 'rev=20261024-side-ad-layout-1'],
+  ['js/ads/ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-1'],
+  ['css/social-feed.css', 'rev=20261024-side-ad-layout-1'],
   ['js/page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['js/tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
@@ -30,13 +33,13 @@ async function sourceFiles(directory = '', result = []) {
     const path = directory ? `${directory}/${entry.name}` : entry.name;
     if (entry.isDirectory() && skippedDirectories.has(entry.name) && path !== 'output/work') continue;
     if (entry.isDirectory()) await sourceFiles(path, result);
-    else if (entry.isFile() && (path.endsWith('.html') || path.startsWith('js/') && /\.(?:js|mjs)$/.test(path) || templates.has(path))) result.push(path);
+    else if (entry.isFile() && (path.endsWith('.html') || path.endsWith('.css') || path.startsWith('js/') && /\.(?:js|mjs)$/.test(path) || templates.has(path))) result.push(path);
   }
   return result;
 }
 
 function references(source) {
-  return [...source.matchAll(/["'`]([^"'`\s<>]+\.(?:mjs|js)(?:\?[^"'`\s<>]*)?)["'`]/g)].map(match => match[1]);
+  return [...source.matchAll(/["'`]([^"'`\s<>]+\.(?:mjs|js|css)(?:\?[^"'`\s<>]*)?)["'`]/g)].map(match => match[1]);
 }
 
 function targetFor(owner, value) {

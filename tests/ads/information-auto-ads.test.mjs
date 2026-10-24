@@ -11,7 +11,7 @@ import { eligibleEvents } from '../../scripts/generate-event-pages.mjs';
 
 const sourceHtml = '<!doctype html><html><head><title>Keep this title</title><link rel="canonical" href="https://pixieed.jp/about/"></head><body class="app-page"><main>Keep this content.</main></body></html>';
 const staticRoutes = [
-  ['tools/index.html', '/tools/'], ['about/index.html', '/about/'],
+  ['about/index.html', '/about/'],
   ['guide/index.html', '/guide/'], ['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'],
   ['stores/index.html', '/stores/'], ['stores/ecowashcafe-nakanoshima.html', '/stores/ecowashcafe-nakanoshima.html'],
   ['events/index.html', '/events/'],
@@ -37,7 +37,7 @@ test('build-time opt-in covers exactly the static information routes and generat
     assert.match(result.html, /data-information-auto-ads="\/events\/[a-z0-9-]+\/"/);
   }
   for (const sourcePath of [
-    'index.html', 'feed/index.html', 'explore/index.html', 'privacy/index.html', 'books/index.html', 'pass/index.html', 'camera/index.html', 'draw/index.html',
+    'index.html', 'feed/index.html', 'explore/index.html', 'tools/index.html', 'privacy/index.html', 'books/index.html', 'pass/index.html', 'camera/index.html', 'draw/index.html',
     'audio/index.html', 'output/index.html', 'output/work/index.html', 'play/spot-difference/index.html',
     'globe-prototype.html', 'profile/index.html', 'admin/index.html', 'events/unlisted/index.html',
     'events/../index.html',
@@ -96,6 +96,7 @@ test('runtime requires exact production origin, top-level state, matching route 
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/', marker: '/' }), false, 'SNS home never receives provider-controlled Auto Ads');
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/feed/', marker: '/feed/' }), false, 'interactive SNS feed never receives provider-controlled Auto Ads');
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/explore/', marker: '/explore/' }), false, 'interactive search/filter view never receives provider-controlled Auto Ads');
+  assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/tools/', marker: '/tools/' }), false, 'tool catalog is not an information-ad route');
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/events/fake/', marker: '/events/fake/' }), true, 'a syntactically valid event route is trusted only with the build marker');
   assert.equal(isEligibleInformationAutoAdsPage({ ...eligible, pathname: '/events/../about/', marker: '/events/../about/' }), false);
   for (const blocked of [

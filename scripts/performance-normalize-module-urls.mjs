@@ -38,7 +38,10 @@ const targets = new Map([
   ['output-page.mjs', 'rev=20261024-common-tool-start-1'],
   ['tool-output.css', 'rev=20261024-intelligence-ui-1'],
   ['tool-help.css', 'rev=20261024-intelligence-ui-1'],
-  ['social-feed.css', 'rev=20261024-intelligence-ui-1'],
+  ['social-feed.css', 'rev=20261024-side-ad-layout-1'],
+  ['social/app.mjs', 'rev=20261024-side-ad-layout-1'],
+  ['ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-1'],
+  ['information-auto-ads.mjs', 'rev=20261024-side-ad-layout-1'],
   ['display-ads.mjs', 'rev=20261024-public-layout-1'],
   ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['draw-core.mjs', 'rev=20261011-tool-size-1'],
@@ -48,7 +51,7 @@ const targets = new Map([
   ['jigsaw-file.mjs', 'rev=20260929-claude-integration-1'],
 ]);
 
-const commonToolStartModules = new Set(["js/adsense-offerwall-policy.js", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/output-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-startup.mjs", "js/page-navigation.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/public-navigation.mjs", "js/site-header.mjs", "js/social/app.mjs", "js/tool-direct.mjs", "js/tool-embed.mjs", "js/tool-entry-compat.js", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs", "js/tool-start-routes.mjs", "js/tool-workspace-state.mjs"]);
+const commonToolStartModules = new Set(["js/adsense-offerwall-policy.js", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/output-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-startup.mjs", "js/page-navigation.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/public-navigation.mjs", "js/site-header.mjs", "js/tool-direct.mjs", "js/tool-embed.mjs", "js/tool-entry-compat.js", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs", "js/tool-start-routes.mjs", "js/tool-workspace-state.mjs"]);
 
 async function walk(directory, files = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

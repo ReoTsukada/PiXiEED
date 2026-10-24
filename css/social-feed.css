@@ -34,6 +34,7 @@ button:disabled { opacity: .48; cursor: wait !important; }
 [hidden] { display: none !important; }
 
 .social-app { display: grid; grid-template-columns: minmax(0, 620px) 286px; column-gap: 24px; row-gap: 0; align-items: start; justify-content: center; min-height: 100vh; padding: 0 28px; }
+.social-app.has-ordinary-feed-gutter { grid-template-columns: minmax(0, 620px) 300px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; width: max-content; min-height: 44px; color: var(--ink); font-size: 22px; font-weight: 950; letter-spacing: -.065em; text-decoration: none; }
 .brand-logo { display: block; flex: none; width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; background:#05090c; border-radius:5px; }
 .rail-nav { display: grid; gap: 5px; margin-top: 24px; }
@@ -157,6 +158,11 @@ button:disabled { opacity: .48; cursor: wait !important; }
 .draft-audio-row button:disabled { cursor: not-allowed; opacity: .55; }
 
 .right-column { display: flex; flex-direction: column; gap: 17px; min-width: 0; padding: 48px 0 32px; }
+.ordinary-feed-gutter-host { width: 300px; min-width: 0; margin-top: 31px; }
+.ordinary-ad--gutter { width: 300px; min-height: 624px; padding: 0; overflow: hidden; border: 0; border-radius: 12px; background: #fff; }
+.ordinary-ad--gutter .ordinary-ad__label { height: 24px; margin: 0; color: #718079; font-size: 10px; line-height: 24px; text-align: center; }
+.ordinary-ad--gutter .ordinary-ad__slot { width: 300px; height: 600px; min-height: 600px; overflow: hidden; }
+.ordinary-ad--gutter .ordinary-ad__slot > ins { max-width: 100%; }
 .welcome-card { position: relative; min-height: 239px; padding: 22px 20px 20px; overflow: hidden; border-radius: 17px; background: #f4d18b; color: #29353a; }
 .welcome-card .eyebrow { color: #8c7150; }
 .welcome-card h2 { position: relative; z-index: 1; margin: 11px 0 8px; font-size: 24px; font-weight: 950; letter-spacing: -.055em; line-height: 1.2; }
@@ -337,6 +343,7 @@ button:disabled { opacity: .48; cursor: wait !important; }
 }
 @media (max-width: 1190px) and (min-width: 761px) {
   .social-app { grid-template-columns: minmax(0, 620px); padding-inline: 24px; }
+  .social-app.has-ordinary-feed-gutter { grid-template-columns: minmax(0, 620px); }
   .right-column { display: none; }
 }
 @media (max-width: 760px) {

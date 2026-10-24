@@ -48,7 +48,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/creation/jigsaw-page.mjs', 'js/creation/output-page.mjs', 'js/creation/project-workspace.mjs',
     'js/creation/pxd-ui.mjs', 'js/creation/spot-difference-page.mjs', 'js/home-startup.mjs',
     'js/page-navigation.mjs', 'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/public-navigation.mjs',
-    'js/site-header.mjs', 'js/social/app.mjs', 'js/tool-direct.mjs', 'js/tool-embed.mjs',
+    'js/site-header.mjs', 'js/tool-direct.mjs', 'js/tool-embed.mjs',
     'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
     'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
   ]);

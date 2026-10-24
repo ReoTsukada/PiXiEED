@@ -1,10 +1,9 @@
 import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-1';
 import { ordinaryAdConfig } from '../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
-import { mountInformationGutter } from './ads/ordinary-ad-entry.mjs?rev=20261024-ordinary-ad-entry-1';
+import { mountInformationGutter } from './ads/ordinary-ad-entry.mjs?rev=20261024-side-ad-layout-1';
 import { ordinaryAdUnitIsConfigured } from './ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 
 const STATIC_INFORMATION_PATHS = new Set([
-  '/tools/',
   '/welcome/',
   '/about/',
   '/guide/',

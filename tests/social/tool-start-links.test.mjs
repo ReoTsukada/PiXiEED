@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OFFICIAL_TOOL_CARDS } from '../../js/social/app.mjs?rev=20261024-free-tools-1';
+import { OFFICIAL_TOOL_CARDS } from '../../js/social/app.mjs?rev=20261024-side-ad-layout-1';
 import { getToolStartRoute } from '../../js/tool-start-routes.mjs?rev=20261024-all-tools-offerwall-1';
 
 test('official social tool cards open new tool-start documents without editor-state parameters', () => {
