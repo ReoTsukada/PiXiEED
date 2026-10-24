@@ -27,7 +27,7 @@ test('public-feed side slot uses the distinct configured 300x600 gutter unit', (
 
 test('side slot is limited to the primary public feed with complete ready content', () => {
   for (const blocked of [
-    { pathname: '/' }, { pathname: '/explore/' }, { pathname: '/tools/' }, { origin: 'http://pixieed.jp' },
+    { pathname: '/explore/' }, { pathname: '/tools/' }, { origin: 'http://pixieed.jp' },
     { search: '?post=opaque' }, { search: '?compose=art' }, { search: '?output=opaque' }, { search: '?q=cat' },
     { search: '?view=saved' }, { search: '?view=feed&view=feed' }, { hash: '#restore' }, { historyState: { socialDetail: 'post' } },
     { historyState: { socialComposer: true } }, { historyState: { socialView: 'mine' } },
@@ -38,6 +38,7 @@ test('side slot is limited to the primary public feed with complete ready conten
     { detailOpen: true }, { fullscreen: true }, { editor: true }, { pageVisible: false },
     { enabled: false }, { provider: undefined }, { unit: { ...unit, verifiedActive: false } },
   ]) assert.equal(isPublicFeedGutterEligible({ ...eligible, ...blocked }), false, JSON.stringify(blocked));
+  assert.equal(isPublicFeedGutterEligible({ ...eligible, pathname: '/' }), true, 'the homepage is also the public feed');
 });
 
 test('configured gutter runtime is independent of inline-feed activation', async () => {

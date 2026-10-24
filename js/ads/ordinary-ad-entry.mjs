@@ -37,7 +37,7 @@ export function isPublicFeedGutterEligible({
   composerOpen = true, detailOpen = true, fullscreen = false, editor = false,
   trustedContentEligible = false, eligiblePostCount = 0, pageVisible = true,
 } = {}) {
-  const route = pathname === '/feed/' || pathname === '/feed/index.html';
+  const route = pathname === '/' || pathname === '/feed/' || pathname === '/feed/index.html';
   const params = new URLSearchParams(search);
   const querySafe = [...params].every(([key, value]) => key === 'view' && value === 'feed')
     && params.getAll('view').length <= 1;

@@ -4,7 +4,7 @@ import { createSocialApi } from './api.mjs?rev=20261024-posting-policy-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
 import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
-import { connectOptionalFeedAds, createFeedAdRuntime, createPublicFeedGutterGate, isPublicFeedGutterEligible } from '../ads/ordinary-ad-entry.mjs?rev=20261024-side-ad-layout-1';
+import { connectOptionalFeedAds, createFeedAdRuntime, createPublicFeedGutterGate, isPublicFeedGutterEligible } from '../ads/ordinary-ad-entry.mjs?rev=20261024-side-ad-layout-2';
 import { toolStartHref } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
