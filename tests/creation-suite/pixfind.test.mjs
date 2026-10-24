@@ -218,7 +218,7 @@ test('local trial control is initially hidden and script links only an opaque dr
   const page = readFileSync(new URL('../../js/creation/spot-difference-page.mjs', import.meta.url), 'utf8');
   const player = readFileSync(new URL('../../js/creation/pixfind-play.mjs', import.meta.url), 'utf8');
   assert.match(html, /id="spot-play-local"[^>]*hidden[^>]*disabled/);
-  assert.match(html, /確定した下書きを試しに遊ぶ/);
+  assert.match(html, /自分だけで遊ぶ/);
   assert.match(page, /\/play\/spot-difference\/\?localSpot=\$\{encodeURIComponent\(draft\.gameId\)\}/);
   assert.doesNotMatch(page, /dataUrl|base64/);
   assert.ok(player.indexOf('const localId = resolveLocalSpotDraftId') < player.indexOf('const [posts, puzzleRows]'));

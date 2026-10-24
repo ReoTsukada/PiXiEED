@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSupabaseGlobeStore } from '../../js/globe/post-supabase.mjs';
+import { createSupabasePostActions } from '../../js/globe/post-supabase.mjs';
 import { lookupCell } from '../../js/globe/geometry.mjs';
+import { currentPostingConsent, withCurrentPostingConsent } from '../fixtures/current-posting-consent.mjs';
 
 const postId = '3a0f26f8-8309-4fe3-9b9c-03f977e8b952';
 const cell = lookupCell(139.69, 35.68);
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, async json() { return body; } });
-const fixture = () => ({
+const fixture = () => withCurrentPostingConsent({
   title: 'すぐ見える投稿', caption: 'caption',
   image: { dataUrl: 'data:image/png;base64,AQID', mimeType: 'image/png', size: 3, width: 8, height: 8, colorCount: 2 },
   pin: { cellId: cell.id, latitude: cell.center.latitude, longitude: cell.center.longitude, source: 'cell' }
@@ -70,7 +72,7 @@ test('a temporary canonical read failure keeps the submitted image visible', asy
   const store = createSupabaseGlobeStore();
   await store.ready;
   const submitted = fixture();
-  const created = await store.add(submitted);
+  const created = await store.add(withCurrentPostingConsent(submitted));
 
   assert.equal(created.status, 'published');
   assert.equal(store.list().length, 1);
@@ -240,4 +242,16 @@ test('failed author refresh preserves the image and retries on the next page vis
   await handlers.get('pageshow')();
   assert.equal(store.list()[0].author.name, '再取得した作者名');
   assert.equal(store.list()[0].image.dataUrl, before.image.dataUrl);
+});
+
+test('public writes fail before requests when consent is absent or stale', async () => {
+  const previousFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; throw new Error('synthetic fetch should not run'); };
+  try {
+    const actions = createSupabasePostActions();
+    await assert.rejects(actions.submit({ visibility: 'public' }), error => error.code === 'posting_consent_required');
+    await assert.rejects(actions.submit({ visibility: 'public', postingConsent: { ...currentPostingConsent, termsVersion: 'stale-test-version' } }), error => error.code === 'posting_consent_version_mismatch');
+    assert.equal(calls, 0);
+  } finally { globalThis.fetch = previousFetch; }
 });

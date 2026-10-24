@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createSupabaseGlobeStore } from '../../js/globe/post-supabase.mjs';
 import { lookupCell } from '../../js/globe/geometry.mjs';
+import { withCurrentPostingConsent } from '../fixtures/current-posting-consent.mjs';
 
 const response = (body, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -54,7 +55,7 @@ test('puzzle publication gate blocks old API fallback and accepts only a matchin
     let callbackCalled = false;
     await assert.rejects(
       async () => {
-        await store.add(postFixture({ mode: 'spot_difference' }));
+        await store.add(withCurrentPostingConsent(postFixture({ mode: 'spot_difference' })));
         callbackCalled = true;
       },
       /パズル投稿は準備中です/
@@ -66,7 +67,7 @@ test('puzzle publication gate blocks old API fallback and accepts only a matchin
   supabaseConfig.puzzlePublicationEnabled = false;
   const regularStore = createSupabaseGlobeStore();
   await regularStore.ready;
-  const regular = await regularStore.add(postFixture());
+  const regular = await regularStore.add(withCurrentPostingConsent(postFixture()));
   assert.equal(regular.status, 'pending');
   assert.equal(calls.at(-1).url.pathname, '/functions/v1/create-post');
   assert.equal('puzzle' in JSON.parse(calls.at(-1).init.body), false);
@@ -75,7 +76,7 @@ test('puzzle publication gate blocks old API fallback and accepts only a matchin
   const puzzleStore = createSupabaseGlobeStore();
   await puzzleStore.ready;
   createResponse = { postId: '22222222-2222-4222-8222-222222222222', status: 'pending', puzzleMode: 'spot_difference' };
-  const accepted = await puzzleStore.add(postFixture({ mode: 'spot_difference' }));
+  const accepted = await puzzleStore.add(withCurrentPostingConsent(postFixture({ mode: 'spot_difference' })));
   assert.equal(accepted.puzzleMode, 'spot_difference');
 
   for (const serverResponse of [
@@ -85,7 +86,7 @@ test('puzzle publication gate blocks old API fallback and accepts only a matchin
     createResponse = serverResponse;
     let callbackCalled = false;
     await assert.rejects(async () => {
-      await puzzleStore.add(postFixture({ mode: 'spot_difference' }));
+      await puzzleStore.add(withCurrentPostingConsent(postFixture({ mode: 'spot_difference' })));
       callbackCalled = true;
     }, /パズル投稿の公開設定を確認できませんでした/);
     assert.equal(callbackCalled, false);

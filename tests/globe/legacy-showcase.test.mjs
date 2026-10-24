@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { lookupCell } from '../../js/globe/geometry.mjs';
 import { projectLegacyShowcase } from '../../js/globe/legacy-showcase.mjs';
 import { createSupabaseGlobeStore } from '../../js/globe/post-supabase.mjs';
+import { withCurrentPostingConsent } from '../fixtures/current-posting-consent.mjs';
 
 const id = '123e4567-e89b-42d3-a456-426614174000';
 const cell = lookupCell(139.69, 35.68);
@@ -78,7 +79,7 @@ test('globe posting keeps the real session JWT in Authorization', async () => {
   };
   try {
     const store = createSupabaseGlobeStore(); await store.ready;
-    await store.add({ title: '投稿', caption: '', postKind: 'pixel_art', image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } });
+    await store.add(withCurrentPostingConsent({ title: '投稿', caption: '', postKind: 'pixel_art', image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } }));
     const postCall = calls.find(({ url }) => url.pathname.endsWith('/functions/v1/create-post'));
     assert.equal(postCall.options.headers.apikey, 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4');
     assert.equal(postCall.options.headers.Authorization, 'Bearer real-user-jwt');
@@ -99,7 +100,7 @@ test('a verified existing owner session is used for new globe posts and returned
   };
   try {
     const store = createSupabaseGlobeStore(); await store.ready;
-    const result = await store.add({ title: 'Owner投稿', caption: '', postKind: 'pixel_art', author: { id: 'anonymous', name: 'ゲスト' }, image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } });
+    const result = await store.add(withCurrentPostingConsent({ title: 'Owner投稿', caption: '', postKind: 'pixel_art', author: { id: 'anonymous', name: 'ゲスト' }, image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } }));
     const signup = calls.find(({ url }) => url.pathname.endsWith('/auth/v1/signup'));
     const postCall = calls.find(({ url }) => url.pathname.endsWith('/functions/v1/create-post'));
     assert.equal(signup, undefined);
@@ -121,8 +122,8 @@ test('an invalid saved owner session stops posting without guest signup fallback
   try {
     const store = createSupabaseGlobeStore(); await store.ready;
     const post = { title: '投稿', caption: '', image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } };
-    await assert.rejects(store.add(post), /もう一度ログイン/);
-    await assert.rejects(store.add(post), /もう一度ログイン/);
+    await assert.rejects(store.add(withCurrentPostingConsent(post)), /もう一度ログイン/);
+    await assert.rejects(store.add(withCurrentPostingConsent(post)), /もう一度ログイン/);
     assert.ok(values.has('PiXiEED:legacy-owner-session:v1'));
     assert.equal(calls.some(({ url }) => url.pathname.endsWith('/auth/v1/signup')), false);
     assert.equal(calls.some(({ url }) => url.pathname.endsWith('/functions/v1/create-post')), false);
@@ -150,8 +151,8 @@ test('refresh identity mismatch remains fail-closed on every add retry', async (
   try {
     const store = createSupabaseGlobeStore(); await store.ready;
     const post = { title: '投稿', caption: '', image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } };
-    await assert.rejects(store.add(post), /もう一度ログイン/);
-    await assert.rejects(store.add(post), /もう一度ログイン/);
+    await assert.rejects(store.add(withCurrentPostingConsent(post)), /もう一度ログイン/);
+    await assert.rejects(store.add(withCurrentPostingConsent(post)), /もう一度ログイン/);
     assert.ok(values.has('PiXiEED:legacy-owner-session:v1'));
     assert.equal(JSON.parse(values.get('PiXiEED:legacy-owner-session:v1')).user_id, ownerId);
     assert.equal(calls.some(({ url }) => url.pathname.endsWith('/auth/v1/signup')), false);
@@ -172,7 +173,7 @@ test('without an owner session globe posting retains anonymous signup', async ()
   };
   try {
     const store = createSupabaseGlobeStore(); await store.ready;
-    const result = await store.add({ title: 'ゲスト投稿', caption: '', author: { id: 'anonymous', name: 'ゲスト' }, image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } });
+    const result = await store.add(withCurrentPostingConsent({ title: 'ゲスト投稿', caption: '', author: { id: 'anonymous', name: 'ゲスト' }, image: { mimeType: 'image/png', size: 1, width: 1, height: 1, colorCount: 1, dataUrl: 'data:image/png;base64,AA==' }, pin: { cellId: cell.id } }));
     const postCall = calls.find(({ url }) => url.pathname.endsWith('/functions/v1/create-post'));
     assert.equal(calls.filter(({ url }) => url.pathname.endsWith('/auth/v1/signup')).length, 1);
     assert.equal(postCall.options.headers.Authorization, 'Bearer guest-jwt');
