@@ -14,6 +14,7 @@ import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=202
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-draw-search-rail-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
+import { createAnimationFrameCache, createFrameBatcher, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261025-draw-render-optimization-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
@@ -124,6 +125,22 @@ selectedColor = inputSettings.bindings.left.color; tool = inputSettings.bindings
 function effectiveTool() { return strokeBinding?.tool || tool; }
 function effectiveColor() { return strokeBinding?.color ?? selectedColor; }
 let animationSession = createDrawAnimationSession(documentData, { musicLayer }), animationControls = null, strokeTracker = null;
+const animationRenderCache = createAnimationFrameCache({ maxEntries: 8, maxBytes: 4 * 1024 * 1024 });
+const framePreviewCache = createAnimationFrameCache({ maxEntries: 6, maxBytes: 6 * 256 * 256 * 4 });
+scope.add(() => { animationRenderCache.clear(); framePreviewCache.clear(); });
+function cachedAnimationFrame(animation, key, render) {
+  const cached = animationRenderCache.get(animation, key);
+  if (cached !== undefined) return cached;
+  const rendered = render();
+  // Count indexed JS-array elements conservatively; RGBA buffers have an exact byte size.
+  const bytes = rendered.rgba?.byteLength ?? rendered.pixels.length * 8;
+  return animationRenderCache.set(animation, key, rendered, bytes);
+}
+const outputPreviewBatch = createFrameBatcher({
+  requestFrame: callback => scope.frame(callback), cancelFrame: id => scope.cancelFrame(id),
+  callback: () => { if ($('#draw-output')?.open) updateOutputPreview(); }
+});
+scope.add(() => outputPreviewBatch.dispose());
 let drawOperationLease = null, colorEditorLease = null;
 let lastHistoryCommitRejected = false;
 function drawRewardTarget(animation = animationSession.animation, frameId = animationSession.frameId, layerId = animationSession.layerId, colorIndex = selectedColor) {
@@ -489,7 +506,8 @@ function syncPlaybackControl() {
   animationControls?.showPlaybackFrame?.(playing ? playbackFrame : null);
 }
 function composeDisplayFrame(animation, frameId) {
-  return animationNeedsRgba(animation) ? composeAnimationFrameRgba(animation, frameId) : composeAnimationFrame(animation, frameId);
+  return cachedAnimationFrame(animation, `display:${frameId}`, () =>
+    animationNeedsRgba(animation) ? composeAnimationFrameRgba(animation, frameId) : composeAnimationFrame(animation, frameId));
 }
 function paint(changed = null) {
   if (readOnlyImage) { setCanvasDimensions(); canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(readOnlyImage.rgba), readOnlyImage.width, readOnlyImage.height), 0, 0); paintOnion(readOnlyImage); updateControls(); return; }
@@ -499,8 +517,8 @@ function paint(changed = null) {
     : featurePreviewAnimation ? composeDisplayFrame(featurePreviewAnimation, animationSession.frameId)
       : animationSession.composite(selectionPreview || documentData, changed);
   if (display.rgba) pixelSurface.paintRgba(display.rgba, playing ? null : changed); else pixelSurface.paint(display.pixels, display.palette, playing ? null : changed);
-  paintOnion(display);
-  if ($('#draw-output')?.open) updateOutputPreview();
+  paintOnion(display, changed);
+  if (musicLayer && $('#draw-output')?.open) outputPreviewBatch.schedule();
   updateControls(); setDrawRewardNotice();
   notifyEditorChange();
 }
@@ -553,25 +571,27 @@ function toggleAnimation() {
   };
   animationControls?.refresh(); tick(playbackStarted);
 }
-let onionKey = '', onionGuide = null;
-function paintOnion(display) {
+let onionKey = '', onionGuide = null, onionImage = null;
+function paintOnion(display, changed = null) {
+  const wasHidden = onionCanvas.hidden;
   onionCanvas.hidden = !shouldShowDrawOnion({ enabled: onion && animationSession.animation.frames.length >= 2, playing, readOnly: Boolean(readOnlyImage) });
   if (onionCanvas.hidden) return;
   const animation = animationSession.animation, key = `${animationSession.frameId}:${animation.frames.map((frame) => frame.id).join(',')}`;
   if (onionKey !== key || onionGuide?.animation !== animation) {
     const index = animation.frames.findIndex((frame) => frame.id === animationSession.frameId);
     onionGuide = { animation, previous: index > 0 ? composeAnimationFrameRgba(animation, animation.frames[index - 1].id) : null,
-      next: index + 1 < animation.frames.length ? composeAnimationFrameRgba(animation, animation.frames[index + 1].id) : null }; onionKey = key;
+      next: index + 1 < animation.frames.length ? composeAnimationFrameRgba(animation, animation.frames[index + 1].id) : null }; onionKey = key; changed = null;
   }
-  onionCanvas.width = display.width; onionCanvas.height = display.height;
-  const data = new Uint8ClampedArray(display.width * display.height * 4);
-  for (let index = 0; index < display.width * display.height; index++) {
-    if (display.rgba ? display.rgba[index * 4 + 3] > 0 : display.pixels[index] >= 0) continue;
-    const previous = onionGuide.previous?.rgba[index * 4 + 3] > 0, next = onionGuide.next?.rgba[index * 4 + 3] > 0;
-    if (!previous && !next) continue;
-    data.set(previous ? [255, 100, 110, 95] : [85, 185, 255, 95], index * 4);
+  const resized = onionCanvas.width !== display.width || onionCanvas.height !== display.height;
+  if (onionCanvas.width !== display.width) onionCanvas.width = display.width;
+  if (onionCanvas.height !== display.height) onionCanvas.height = display.height;
+  if (resized || !onionImage) { onionImage = onionCanvas.getContext('2d').createImageData(display.width, display.height); changed = null; }
+  if (wasHidden) changed = null;
+  const dirty = updateOnionImageData(onionImage, display, onionGuide.previous, onionGuide.next, changed);
+  if (dirty) {
+    onionCanvas.getContext('2d').putImageData(onionImage, 0, 0, dirty.x, dirty.y, dirty.width, dirty.height);
   }
-  onionCanvas.getContext('2d').putImageData(new ImageData(data, display.width, display.height), 0, 0); placeOverlays();
+  placeOverlays();
 }
 function handleAnimationAction(action) {
   if (cameraOpening || spriteScaling || featureSession) return false;
@@ -626,7 +646,14 @@ animationControls = mountAnimationControls({ host: $('#draw-animation-controls')
   onionControlExternal: true, dismissibleMenus: true,
   onAction: handleAnimationAction,
   getCelHasContent: (frameId, layerId) => hasAnimationCelContent(animationSession.animation, frameId, layerId),
-  getFramePreview: (frameId) => { const doc = composeDisplayFrame(animationSession.animation, frameId); return new ImageData(new Uint8ClampedArray(documentRgba(doc)), doc.width, doc.height); }
+  getFramePreview: (frameId) => {
+    const animation = animationSession.animation;
+    const cached = framePreviewCache.get(animation, frameId);
+    if (cached !== undefined) return cached;
+    const doc = composeDisplayFrame(animation, frameId);
+    const image = new ImageData(new Uint8ClampedArray(documentRgba(doc)), doc.width, doc.height);
+    return framePreviewCache.set(animation, frameId, image, image.data.byteLength);
+  }
 });
 function renderPalette() {
   const palette = $('#draw-palette'); palette.replaceChildren();
@@ -2132,14 +2159,22 @@ $('#draw-output [data-output-project]')?.addEventListener('click', () => {
 });
 
 function composeCurrentOutputFrame(frameId = animationSession.frameId, { includeMusic = outputPreferences.includeMusic } = {}) {
-  return composeOutputFrame(animationSession.animation, frameId, { includeMusic: musicLayer && includeMusic });
+  const animation = animationSession.animation, withMusic = Boolean(musicLayer && includeMusic);
+  return cachedAnimationFrame(animation, `output:${frameId}:${withMusic}`, () => composeOutputFrame(animation, frameId, { includeMusic: withMusic }));
 }
+let outputPreviewImageData = null;
 function updateOutputPreview() {
+  outputPreviewBatch.cancel();
   const preview = $('#draw-output-music-preview');
-  if (!preview || !musicLayer) return;
+  if (!preview || !musicLayer || !$('#draw-output')?.open) return;
   const image = composeCurrentOutputFrame();
-  preview.width = image.width; preview.height = image.height;
-  preview.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(documentRgba(image)), image.width, image.height), 0, 0);
+  const resized = preview.width !== image.width || preview.height !== image.height;
+  if (preview.width !== image.width) preview.width = image.width;
+  if (preview.height !== image.height) preview.height = image.height;
+  const context = preview.getContext('2d');
+  if (resized || !outputPreviewImageData) outputPreviewImageData = context.createImageData(image.width, image.height);
+  outputPreviewImageData.data.set(documentRgba(image));
+  context.putImageData(outputPreviewImageData, 0, 0);
 }
 function applyOutputPreferences(preferences = {}, { persist = true } = {}) {
   if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) throw new TypeError('出力設定が不正です。');

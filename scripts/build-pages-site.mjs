@@ -163,7 +163,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',
         'assets/icons/pixieed/selection.svg', 'assets/icons/pixieed/adjustments.svg',
         'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
-        'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/draw-lazy-panels.mjs',
+        'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/draw-render-optimization.mjs',
         'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
         'js/globe/map-page-layout.mjs',
         // User-approved site introduction assets; local review captures remain excluded.

@@ -31,6 +31,7 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
     'assets/books/thumb.png': 'registered thumbnail', 'assets/books/unregistered.png': 'private draft',
     'assets/books/room-scene.json': '{}', 'css/books.css': '.catalog{}', 'css/books-room.css': 'canvas{}',
     'js/books-catalog.mjs': 'export {};', 'js/books-commerce.mjs': 'export {};', 'js/books-room-catalog.mjs': 'export {};', 'js/books-room.mjs': 'export {};',
+    'js/creation/draw-render-optimization.mjs': 'export const localBuildSource = true;',
     'shops/index.html': '<h1>retired route</h1>', 'stores/cafe-hoshi.html': '<h1>legacy store</h1>'
   };
   for (const [name, value] of Object.entries(entries)) { await mkdir(join(root, name, '..'), { recursive: true }); await writeFile(join(root, name), value); }
@@ -47,10 +48,12 @@ test('Pages artifact includes tracked site and generated OGP, excludes private a
   await writeFile(join(root, legacyPage, 'index.html'), '<meta property="og:image">');
   await writeFile(join(root, legacyPage, 'ogp-fedcba0987654321.png'), 'PNG');
   const result = await buildPagesSite({ root, output: join(scratch, 'site') });
-  assert.equal(result.puzzlePages, 2); assert.equal(result.files, 18);
+  assert.equal(result.puzzlePages, 2); assert.equal(result.files, 19);
   assert.equal(await readFile(join(result.output, 'index.html'), 'utf8'), '<h1>site</h1>');
   assert.equal(await readFile(join(result.output, 'books/index.html'), 'utf8'), '<h1>catalog</h1>');
   assert.equal(await readFile(join(result.output, 'assets/books/room-products.json'), 'utf8'), entries['assets/books/room-products.json']);
+  assert.equal(await readFile(join(result.output, 'js/creation/draw-render-optimization.mjs'), 'utf8'), entries['js/creation/draw-render-optimization.mjs'],
+    'the reviewed Draw optimization helper is explicitly carried into clean local Pages builds');
   assert.equal(await readFile(join(result.output, 'assets/books/thumb.png'), 'utf8'), 'registered thumbnail');
   await assert.rejects(readFile(join(result.output, 'assets/books/unregistered.png')), { code: 'ENOENT' });
   assert.equal(await readFile(join(result.output, 'assets/books/room-commerce.json'), 'utf8'), '{"associateName":"PiXiEED","enrollmentConfirmed":true}');
