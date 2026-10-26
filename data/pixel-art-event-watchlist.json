@@ -6572,7 +6572,7 @@
       "lastKnownEventDate": "2026-10-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "lastCheckedAt": "2026-10-26T00:04:20+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6604,5 +6604,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-22T00:05:42+00:00"
+  "updatedAt": "2026-10-26T00:05:08+00:00"
 }

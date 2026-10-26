@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-22T00:03:56+00:00",
+  "updatedAt": "2026-10-26T00:04:20+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -110,7 +110,7 @@
       "startDate": "2026-10-11",
       "endDate": "2026-10-24",
       "dateLabel": "2026年10月11日11:30〜24日17:00（公式表示。タイムゾーン未記載）",
-      "status": "active",
+      "status": "ended",
       "sourceUrl": "https://itch.io/jam/segment-pixel-jam-2026",
       "description": "ドット絵を使用するゲームが参加条件のゲームジャム。",
       "socialTags": [
@@ -189,11 +189,11 @@
       },
       "startDate": "2026-10-23",
       "endDate": "2026-10-25",
-      "dateLabel": "2026年10月23日〜25日。作品提出締切は10月21日23:59（ポーランド時間 UTC+2／10月22日06:59 JST）で経過。催事自体は10月23日開始予定。",
-      "status": "upcoming",
+      "dateLabel": "2026年10月23日〜25日。ドット絵部門（128×128 Pixel Art、Pixel Art、Digital Art）の作品提出締切は10月24日12:00（ポーランド時間 UTC+2／同日19:00 JST）に終了。",
+      "status": "ended",
       "sourceUrl": "https://nrgevent.eu/compo/",
       "description": "128×128・PICO-8の16色部門と、最大320×256・256色のドット絵コンテスト。現地イベントの日程と応募締切は別。",
-      "checkedAt": "2026-10-22T00:03:56+00:00",
+      "checkedAt": "2026-10-26T00:04:20+00:00",
       "kind": "pixel-art",
       "sourceLabel": "主催者の公式情報"
     },
@@ -1297,7 +1297,7 @@
       "startDate": "2026-10-22",
       "endDate": "2026-10-25",
       "dateLabel": "2026-10-22〜2026-10-25（作家本人の公式出展カレンダー）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://moer.tel/",
       "sourceLabel": "出展作家の公式カレンダー",
       "description": "ピクセルアーティストStefanie Fehling（Moertel）の出展予定。一般催事全体ではなく作家のピクセルアート出展の範囲で掲載。同じ開催回の作家別水増しは行わない。",
@@ -1345,7 +1345,7 @@
       "startDate": "2026-10-02",
       "endDate": "2026-10-25",
       "dateLabel": "2026-10-02〜2026-10-25。各店の展示内容は店別告知を要確認。",
-      "status": "active",
+      "status": "ended",
       "sourceUrl": "https://culture.skm.com.tw/actevent/?ActUUID=ba8e417b-c438-40e1-8163-ca0d9eaf9ab6",
       "socialUrls": [
         "https://www.instagram.com/kai_pixelart/",
@@ -2016,7 +2016,7 @@
       "startDate": "2026-10-22",
       "endDate": "2026-10-22",
       "dateLabel": "2026年10月22日 17:00–18:00（モントリオール現地時間）。無料・要申込。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://montreal.ca/evenements/mixlab-club-dart-du-pixel-119687",
       "additionalUrls": [
         "https://montreal.ca/en/events/copie-de-mixlab-pixel-art-club-119687"
@@ -2222,7 +2222,7 @@
       "startDate": "2026-10-22",
       "endDate": "2026-10-22",
       "dateLabel": "2026年10月22日 15:00。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://viladasartesfortaleza.com.br/vila-das-artes-celebra-20-anos-de-formacao-artistica-com-programacao-especial-gratuita-em-outubro/",
       "description": "Vila Geek催事内の無料Pixel Artワークショップ。10月20日回とは別日程の回として登録。Vila das Artes公式案内で日程・会場を確認。",
       "checkedAt": "2026-10-22T00:03:56+00:00",
@@ -2347,7 +2347,7 @@
       "startDate": "2026-10-17",
       "endDate": "2026-12-13",
       "dateLabel": "2026年10月17日〜12月13日。入場無料、11:00〜24:00（バー営業18:00〜24:00）。初日10月17日は19:00〜22:00。",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
       "description": "PAC-MANのゲームIPをテーマに、7組の作家が作品を展示・販売する企画。ピクセルアート作品だけの展覧会とは公式に明記されていないが、ドット絵ゲームに関する展示として掲載。",
       "checkedAt": "2026-10-22T00:03:56+00:00",
@@ -2363,7 +2363,7 @@
       "startDate": "2026-10-17",
       "endDate": "2026-11-03",
       "dateLabel": "2026年10月17日〜11月3日。京都駅ビル芸術祭の開催時間は13:00〜20:00だが、この設置作品の個別開場時間は公式本文に記載なし。",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://bnaaltermuseum.com/event/ip-art_pac-man/",
       "description": "PAC-MANがゲーム内で食べるドットをモチーフにしたアクリル立体作品と、巨大ドットのインスタレーション。ドット絵ゲームに明確に関係する会場内企画の範囲で掲載。",
       "checkedAt": "2026-10-22T00:03:56+00:00",
@@ -2392,7 +2392,7 @@
       "startDate": "2026-10-24",
       "endDate": "2026-10-31",
       "dateLabel": "itch.ioヘッダー: 10月24日22:00〜10月31日22:20。本文: 開始10月24日19:00、締切10月31日19:20（同ページはitch.ioの現地時刻と説明）。両表示の時刻差は未解決のため併記。Pixel Artは推奨だが必須ではない。",
-      "status": "upcoming",
+      "status": "active",
       "online": true,
       "sourceUrl": "https://itch.io/jam/retro-pixel-jam",
       "description": "8/16-bit時代のゲーム様式をテーマにしたオンラインゲームジャム。主催本文はPixel Art、小さなスプライト、限られた色数などを強く推奨し、参加者はそのレトロ表現のゲームを制作する。ユーザー指定に沿い、ドット絵ゲームに関係する企画として掲載するが、ドット絵必須ではないことを明記。",
@@ -2441,7 +2441,7 @@
       "startDate": "2026-10-24",
       "endDate": "2026-10-24",
       "dateLabel": "2026年10月24日 09:30–13:30（スペイン現地時間）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://espaciobinomio.com/2026/08/26/taller-26-27-creacion-de-juegos/",
       "description": "18歳以上向けのゲーム制作講座。Whimtaleを使い、キャラクター・物体・背景をピクセルアートで作り、ビジュアルスクリプティングで動かすゲームを制作する。4時間、参加費50€。",
       "checkedAt": "2026-10-18T09:04:17+09:00",
@@ -2552,7 +2552,7 @@
       "startDate": "2026-10-21",
       "endDate": "2026-11-20",
       "dateLabel": "2026年10月21日（水）〜11月20日（金）。施設営業時間内、1時間に5回（1回約1分）上映予定。",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
       "description": "ピクセルアーティストhermippeの映像作品「円環」をMIYASHITA PARKの58面のLEDビジョンで展示。ヨーヨーのパフォーマンスとピクセルアートのループアニメーションを重ねた作品。",
       "checkedAt": "2026-10-22T00:03:56+00:00",
@@ -2640,7 +2640,7 @@
       "startDate": "2026-10-24",
       "endDate": "2026-10-24",
       "dateLabel": "2026年10月24日（土）14:00–15:30（台湾時間）。18–45歳の青年を優先し、10月20日までに申込審査・結果通知の案内。現在の受付・参加可否は未確認。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://iiic.niu.edu.tw/p/406-1067-75378,r1274.php",
       "additionalUrls": [
         "https://yyh.e-land.gov.tw/gathering"
@@ -2679,7 +2679,7 @@
       "startDate": "2026-10-24",
       "endDate": "2026-10-25",
       "dateLabel": "2026年10月24日（土）・25日（日）各10:00–18:00（フランス時間）。Pixel Artワークショップ単独の時間は未掲載。",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://cotedazurfrance.fr/offres/festival-manga-et-arts-japonais-peymeinade-fr-5789256/",
       "description": "第11回Festival Manga et arts japonais。主催自治体の案内を掲載するPays de Grasse Tourismeの公式観光案内に、催事の企画としてatelier pixel artを明記。イベント全体の日程・会場と、Pixel Art企画の時刻を区別して記録。",
       "checkedAt": "2026-10-22T00:03:56+00:00",
@@ -4615,8 +4615,8 @@
     }
   ],
   "research": {
-    "checkedAt": "2026-10-22T00:03:56+00:00",
-    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。 2026-10-22: 台湾・宜蘭の像素磚Pixel Art体験（10/24）、RETRO GAME SUMMIT Lv.6のドットアート出展（11/7）、フランスPeymeinadeの漫画祭内Pixel Art講座（10/24–25）、Sablé-sur-SartheのモザイクPixel Art講座（10/27）、Rezé CAVIARのPixel Artモザイク講座2回（12/19、2027/3/3）を公式本文で確認し追加。10/21開催の4件を終了扱いへ更新（予定日経過による整理で、現地実施を独立確認した意味ではない）。NRGは提出締切が経過したが大会本体は10/23–25のため upcoming 維持。Vila Geek、Montreal Mixlab、SPIEL、Pixel Layered、KAI高雄、PAC-MAN展示を再確認。アンジェの10/23・10/30 Pixel Artビーズ講座、CO-MAKER Lyon、パリのPixel Art講座は公式本文を直接取得できず登録保留。",
+    "checkedAt": "2026-10-26T00:04:20+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。 2026-10-22: 台湾・宜蘭の像素磚Pixel Art体験（10/24）、RETRO GAME SUMMIT Lv.6のドットアート出展（11/7）、フランスPeymeinadeの漫画祭内Pixel Art講座（10/24–25）、Sablé-sur-SartheのモザイクPixel Art講座（10/27）、Rezé CAVIARのPixel Artモザイク講座2回（12/19、2027/3/3）を公式本文で確認し追加。10/21開催の4件を終了扱いへ更新（予定日経過による整理で、現地実施を独立確認した意味ではない）。NRGは提出締切が経過したが大会本体は10/23–25のため upcoming 維持。Vila Geek、Montreal Mixlab、SPIEL、Pixel Layered、KAI高雄、PAC-MAN展示を再確認。アンジェの10/23・10/30 Pixel Artビーズ講座、CO-MAKER Lyon、パリのPixel Art講座は公式本文を直接取得できず登録保留。 2026-10-26: NRG公式compo/開催ページを再確認。Pixel Art各部門の提出締切は10/24 12:00 CEST（19:00 JST）で終了、NRG開催期間も10/25までで終了。10/22〜25のNRG、SPIEL/Moertel、KAI、Montreal Mixlab、Vila Geek、Whimtale、宜蘭Pixel Brick、Peymeinade、および10/24終了のSegment Pixel Jamを予定日経過でendedへ更新（開催実施の独立確認を意味しない）。10/26を期間に含む既存イベントはactiveに整理。新規追加なし。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
@@ -4633,7 +4633,10 @@
       "RETRO GAME SUMMIT Lv.6 2026 dot art",
       "festival manga Peymeinade pixel art octobre 2026",
       "atelier pixel art octobre 2026 Angers 30 octobre",
-      "pixel art workshop October 2026 Montréal Brazil Japan"
+      "pixel art workshop October 2026 Montréal Brazil Japan",
+      "NRG 2026 official Pixel Art deadline 24 October 12:00",
+      "Pixel Art events 26 October 2026 active status",
+      "itch.io Segment Pixel Jam 2026 deadline"
     ],
     "scopeLanguages": [
       "ja",
