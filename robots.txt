@@ -3,3 +3,4 @@ Allow: /
 Disallow: /admin/
 
 Sitemap: https://pixieed.jp/sitemap.xml
+Sitemap: https://pixieed.jp/sitemap-conversions.xml

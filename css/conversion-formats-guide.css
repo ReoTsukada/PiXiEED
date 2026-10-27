@@ -1,0 +1,30 @@
+/* Static documentation only; the converter and advertisement layouts are unchanged. */
+.conversion-formats-page { font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Meiryo",system-ui,sans-serif; background:var(--paper,#f7f4ec); color:var(--ink,#172333); }
+.conversion-formats-page .format-guide { width:min(960px,calc(100% - 40px)); margin:0 auto; padding:24px 0 56px; line-height:1.9; overflow-wrap:anywhere; }
+.format-guide .format-breadcrumbs { display:flex; flex-wrap:wrap; gap:8px; font-size:.82rem; margin-bottom:32px; }
+.format-guide .format-guide-hero { padding:24px 0; max-width:780px; }
+.format-guide h1 { font-family:inherit; font-size:clamp(1.75rem,4vw,2.75rem); line-height:1.4; letter-spacing:-.02em; margin:8px 0 20px; }
+.format-guide h2 { font-family:inherit; font-size:clamp(1.25rem,2.3vw,1.65rem); line-height:1.5; margin:0 0 16px; }
+.format-guide p { margin:12px 0; }
+.format-guide a { color:var(--blue,#185d78); text-underline-offset:4px; }
+.format-guide a:focus-visible,.format-guide summary:focus-visible { outline:3px solid var(--blue,#185d78); outline-offset:4px; }
+.format-guide .format-eyebrow,.format-guide .format-small { font-size:.85rem; color:var(--ink-soft,#4f5964); }
+.format-guide .format-start { display:inline-flex; min-height:48px; align-items:center; justify-content:center; padding:10px 22px; margin:12px 0; border:1px solid var(--coral,#dd6a4d); border-radius:999px; background:var(--coral,#dd6a4d); color:#fff; font-weight:700; text-decoration:none; text-align:center; }
+.format-guide .format-toc { display:flex; flex-wrap:wrap; gap:8px; margin:24px 0 36px; }
+.format-guide .format-toc a { display:inline-flex; min-height:44px; align-items:center; padding:8px 12px; border:1px solid var(--line,#cbd1cd); border-radius:10px; background:var(--white,#fffdf8); }
+.format-guide section { margin:36px 0 0; padding:28px 0 0; border-top:1px solid var(--line,#cbd1cd); scroll-margin-top:100px; }
+.format-guide .format-steps { padding-left:24px; }
+.format-guide .format-steps li { padding:4px 0; }
+.format-guide .format-steps p { margin:4px 0 12px; }
+.format-guide .format-note,.format-guide .format-example { padding:16px 18px; border-radius:12px; background:var(--white,#fffdf8); border:1px solid var(--line,#cbd1cd); }
+.format-guide .format-note { border-left:3px solid var(--blue,#185d78); }
+.format-guide .format-example { font-size:.9rem; }
+.format-guide .format-definitions { margin:18px 0; }
+.format-guide .format-definitions div { padding:12px 0; }
+.format-guide dt { font-weight:700; }
+.format-guide dd { margin:6px 0 0; }
+.format-guide details { border-bottom:1px solid var(--line,#cbd1cd); padding:12px 0; }
+.format-guide summary { cursor:pointer; min-height:44px; padding:8px 0; font-weight:700; }
+.format-guide .format-next { padding-bottom:24px; }
+@media(max-width:520px) { .conversion-formats-page .format-guide { width:calc(100% - 32px); padding-top:16px; } .format-guide .format-guide-hero { padding:12px 0; } .format-guide .format-start { width:100%; box-sizing:border-box; } .format-guide .format-breadcrumbs { margin-bottom:20px; } }
+@media print { .conversion-formats-page :is(.site-header,.mobile-nav,.site-footer,.format-start) { display:none!important; } .conversion-formats-page .format-guide { width:100%; } }
