@@ -1,6 +1,6 @@
 /** One ordinary display unit on the PUBLIC conversion guide, never the workspace. */
 const documents = new WeakMap();
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261027-guide-loader-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261024-public-layout-1';
 export const OUTPUT_GUIDE_CANONICAL = 'https://pixieed.jp/output/';
 
 export function isOutputGuideAdEligible({ origin, pathname, search = '', topLevel,
@@ -18,6 +18,14 @@ export function resolveOutputGuideAd(config) {
       || !/^ca-pub-\d{16}$/.test(unit.client || '')
       || !/^\d{6,20}$/.test(String(unit.slot || ''))) return null;
   return { client: unit.client, slot: String(unit.slot) };
+}
+
+/** Match the CSS rail breakpoint. Choose only before the first ad request. */
+export function getOutputGuideAdLayout(win = {}) {
+  const wide = typeof win.matchMedia === 'function'
+    ? win.matchMedia('(min-width:1120px)').matches
+    : Number(win.innerWidth || 0) >= 1120;
+  return wide ? 'vertical' : 'rectangle';
 }
 
 function eligible(doc, win) {
@@ -57,10 +65,17 @@ export function mountOutputGuideAd({ doc = globalThis.document, win = globalThis
   unit.className = 'adsbygoogle output-guide-ad__unit';
   unit.style.display = 'block';
   unit.style.width = '100%';
-  unit.style.height = '250px';
   unit.dataset.adClient = resolved.client;
   unit.dataset.adSlot = resolved.slot;
   unit.dataset.fullWidthResponsive = 'false';
+  const prepareLayout = () => {
+    if (requested || disposed) return;
+    const layout = getOutputGuideAdLayout(win);
+    host.dataset.adLayout = layout;
+    unit.dataset.adFormat = layout;
+    unit.style.height = layout === 'vertical' ? '600px' : '250px';
+  };
+  prepareLayout();
   slot.append(unit);
   host.hidden = false;
   host.dataset.adState = 'ready';
@@ -83,14 +98,16 @@ export function mountOutputGuideAd({ doc = globalThis.document, win = globalThis
     collapseOffscreen();
   };
   const request = () => {
-    if (requested || disposed || !host.isConnected || !eligible(doc, win)
+    if (requested || disposed) return;
+    prepareLayout();
+    if (!host.isConnected || !eligible(doc, win)
         || doc.visibilityState === 'hidden' || host.hidden || !near()
         || host.getClientRects?.().length === 0
         || ['hidden', 'collapse'].includes(win.getComputedStyle?.(host)?.visibility)) return;
     requested = true; // Never retry or refresh, even after a network/ad-block failure.
     host.dataset.adState = 'requested';
     try {
-      // Use the same SDK instance and error handling as the public tools page.
+      // Use the canonical SDK module URL and the same instance as the public tools page.
       loader = getAdsenseLoader(doc, win, resolved.client);
       if (loader.failed) { failed(); return; }
       loader.errors.add(failed);

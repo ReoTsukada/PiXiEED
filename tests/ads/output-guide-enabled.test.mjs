@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { outputGuideAdConfig } from '../../data/output-guide-ad-config.mjs';
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
-import { getAdsenseLoader } from '../../js/display-ads.mjs?rev=20261027-guide-loader-1';
-import { mountOutputGuideAd, resolveOutputGuideAd } from '../../js/ads/output-guide-ad.mjs';
+import { getAdsenseLoader } from '../../js/display-ads.mjs?rev=20261024-public-layout-1';
+import { mountOutputGuideAd, resolveOutputGuideAd, getOutputGuideAdLayout } from '../../js/ads/output-guide-ad.mjs';
 
 // A local DOM fixture: no network, vendor code, impressions or clicks.
 function fixture({ url = 'https://pixieed.jp/output/', top = 100, existingSdk = false,
-  sdkQuery = true, blocked = false, visibility = 'visible' } = {}) {
+  sdkQuery = true, blocked = false, visibility = 'visible', width = 390 } = {}) {
   const scripts = [], units = [];
   const rect = { top, bottom: top + 300, width: 300, height: 300 };
   const element = () => Object.assign(new EventTarget(), { style: {}, dataset: {}, isConnected: false });
@@ -34,7 +34,7 @@ function fixture({ url = 'https://pixieed.jp/output/', top = 100, existingSdk = 
   });
   let requests = 0;
   const win = Object.assign(new EventTarget(), {
-    location: new URL(url), innerHeight: 800,
+    location: new URL(url), innerHeight: 800, innerWidth: width,
     getComputedStyle: () => ({ visibility: 'visible' }),
     adsbygoogle: { push() { requests++; if (blocked) throw new Error('Simulated blocked SDK'); } },
   });
@@ -168,4 +168,68 @@ test('cleanup removes guide callbacks from the shared loader', () => {
   assert.equal(shared.errors.size, 1);
   result.cleanup();
   assert.equal(shared.errors.size, 0);
+});
+
+test('wide screens request a vertical 600px unit', () => {
+  const f = fixture({ width: 1440 });
+  const result = mount(f);
+  assert.equal(f.host.dataset.adLayout, 'vertical');
+  assert.equal(f.units[0].dataset.adFormat, 'vertical');
+  assert.equal(f.units[0].style.height, '600px');
+  assert.equal(f.units[0].dataset.fullWidthResponsive, 'false');
+  assert.equal(f.requests, 1);
+  result.cleanup();
+});
+
+test('mobile screens request a rectangle without a desktop-height blank space', () => {
+  const f = fixture({ width: 390 });
+  const result = mount(f);
+  assert.equal(f.host.dataset.adLayout, 'rectangle');
+  assert.equal(f.units[0].dataset.adFormat, 'rectangle');
+  assert.equal(f.units[0].style.height, '250px');
+  result.cleanup();
+});
+
+test('layout breakpoint matches CSS and media queries take precedence', () => {
+  assert.equal(getOutputGuideAdLayout({ innerWidth: 1119 }), 'rectangle');
+  assert.equal(getOutputGuideAdLayout({ innerWidth: 1120 }), 'vertical');
+  assert.equal(getOutputGuideAdLayout({ innerWidth: 1500, matchMedia: query => {
+    assert.equal(query, '(min-width:1120px)'); return { matches: false };
+  } }), 'rectangle');
+});
+
+test('resize before first request selects the current layout', () => {
+  const f = fixture({ width: 1440, top: 3000 });
+  const result = mount(f);
+  assert.equal(f.requests, 0);
+  f.win.innerWidth = 390;
+  f.rect.top = 100; f.rect.bottom = 400;
+  f.win.dispatchEvent(new Event('resize'));
+  assert.equal(f.requests, 1);
+  assert.equal(f.units[0].dataset.adFormat, 'rectangle');
+  assert.equal(f.units[0].style.height, '250px');
+  result.cleanup();
+});
+
+test('resize after requesting never replaces or refreshes the creative', () => {
+  const f = fixture({ width: 1440 });
+  const result = mount(f);
+  f.win.innerWidth = 390;
+  for (const name of ['resize', 'scroll', 'resize']) f.win.dispatchEvent(new Event(name));
+  assert.equal(f.requests, 1);
+  assert.equal(f.units.length, 1);
+  assert.equal(f.units[0].dataset.adFormat, 'vertical');
+  assert.equal(f.units[0].style.height, '600px');
+  result.cleanup();
+});
+
+test('too-narrow space never requests an ad until a safe width is available', () => {
+  const f = fixture();
+  f.rect.width = 200;
+  const result = mount(f);
+  assert.equal(f.requests, 0);
+  f.rect.width = 300;
+  f.win.dispatchEvent(new Event('resize'));
+  assert.equal(f.requests, 1);
+  result.cleanup();
 });
