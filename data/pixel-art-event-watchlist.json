@@ -264,11 +264,13 @@
       "id": "region-c8af5159309d6a67",
       "label": "フランス",
       "eventIds": [
+        "atelier-enfant-paris-pixel-art-2026-10-31",
         "brignais-pixel-art-workshop-2026-10-31",
         "brignais-pixel-art-workshop-2026-11-15",
         "caviar-pixel-art-en-mosaique-2026-12-19",
         "caviar-pixel-art-en-mosaique-2027-03-03",
         "chateaubourg-pixel-art-workshop-2026-10-07",
+        "co-maker-lyon-pixel-art-2026-11-22",
         "fontenay-vendee-serigne-pixel-art-lego-2026-11-18",
         "herofestival-marseille-dendrob-pixel-art-2026",
         "ingwiller-maison-famille-pixel-art-2026-11-04",
@@ -308,6 +310,7 @@
         "Marseille",
         "Mayenne, Pays de la Loire",
         "Moulins",
+        "Paris 5e",
         "Peymeinade, Alpes-Maritimes",
         "Pont-de-Beauvoisin",
         "Rezé, Loire-Atlantique",
@@ -712,6 +715,7 @@
       "region": "フランス",
       "area": "Moulins",
       "sourceUrls": [
+        "https://explore.moulins-tourisme.com/fr/evenements/atelier-pixel-art",
         "https://www.moulins-tourisme.com/fete-manifestation/atelier-pixel-art-2/"
       ]
     },
@@ -896,6 +900,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://tryme12.2-d.jp/12/"
+      ]
+    },
+    {
+      "id": "venue-53bfdb30a3a6d362",
+      "label": "Atelier Enfant（Rue des Boulangers, 75005 Paris）",
+      "eventIds": [
+        "atelier-enfant-paris-pixel-art-2026-10-31"
+      ],
+      "region": "フランス",
+      "area": "Paris 5e",
+      "sourceUrls": [
+        "https://www.atelierenfant.com/fr/paris/ateliers/ponctuels/atelier-pixel-art-5-99-ans-paris-5e-4032/"
       ]
     },
     {
@@ -1115,6 +1131,18 @@
       "sourceUrls": [
         "https://dot-daisakusen.com/",
         "https://dot-daisakusen.com/2024_summer/"
+      ]
+    },
+    {
+      "id": "venue-7196babb1a387a7b",
+      "label": "La Sucrière（49 Quai Rambaud, Lyon Confluence）",
+      "eventIds": [
+        "co-maker-lyon-pixel-art-2026-11-22"
+      ],
+      "region": "フランス",
+      "area": "Lyon",
+      "sourceUrls": [
+        "https://www.billetweb.fr/co-maker-x-id-dart-atelier-pixel-art"
       ]
     },
     {
@@ -1889,8 +1917,8 @@
       "lastKnownEventDate": "2026-12-19",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-16T00:07:54+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+        "notes": "公式ページ本文で日付、Pixel Art内容、開催会場またはオンライン参加を確認。 10/27にExplore Moulins観光公式イベント本文を再読し、各土曜のPixel Art内容と14:00–16:00の回を確認。"
       }
     },
     {
@@ -2603,6 +2631,36 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-14T23:59:30+00:00",
         "notes": "主催者公式本文で2026年11月1日11:00–15:00、札幌コンベンションセンター大ホールを確認。サークル本人の告知は委託参加予定。"
+      }
+    },
+    {
+      "id": "source-39020b409879f3d8",
+      "label": "Atelier Pixel Art en perles à repasser — Association Artichaut 03（14/11）",
+      "eventIds": [
+        "moulins-association-artichaut-pixel-art-2026-11-14",
+        "moulins-association-artichaut-pixel-art-2026-11-21",
+        "moulins-association-artichaut-pixel-art-2026-11-28",
+        "moulins-association-artichaut-pixel-art-2026-12-05",
+        "moulins-association-artichaut-pixel-art-2026-12-12",
+        "moulins-association-artichaut-pixel-art-2026-12-19"
+      ],
+      "url": "https://explore.moulins-tourisme.com/fr/evenements/atelier-pixel-art",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Moulins"
+      ],
+      "venues": [
+        "Association Artichaut 03（1 rue Bréchimbault, 03000 Moulins）"
+      ],
+      "lastKnownEventDate": "2026-12-19",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -5018,6 +5076,31 @@
       }
     },
     {
+      "id": "source-b322fc8eeba88cb6",
+      "label": "Atelier Pixel Art — Paris 5e（2026-10-31）",
+      "eventIds": [
+        "atelier-enfant-paris-pixel-art-2026-10-31"
+      ],
+      "url": "https://www.atelierenfant.com/fr/paris/ateliers/ponctuels/atelier-pixel-art-5-99-ans-paris-5e-4032/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Paris 5e"
+      ],
+      "venues": [
+        "Atelier Enfant（Rue des Boulangers, 75005 Paris）"
+      ],
+      "lastKnownEventDate": "2026-10-31",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-b3956625e6273be5",
       "label": "asaha個展「ようこそ、お寿司もうさぎもメンダコも住む町へ」",
       "eventIds": [
@@ -6028,6 +6111,31 @@
       }
     },
     {
+      "id": "source-dd894509011bf3f9",
+      "label": "Atelier Pixel-Art — CO-MAKER x ID D’art（2026-11-22）",
+      "eventIds": [
+        "co-maker-lyon-pixel-art-2026-11-22"
+      ],
+      "url": "https://www.billetweb.fr/co-maker-x-id-dart-atelier-pixel-art",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Lyon"
+      ],
+      "venues": [
+        "La Sucrière（49 Quai Rambaud, Lyon Confluence）"
+      ],
+      "lastKnownEventDate": "2026-11-22",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-de391fb51be41b0c",
       "label": "Frosted Vibes 2025 — 北海道銘菓のドット絵展示",
       "eventIds": [
@@ -6604,5 +6712,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-26T00:05:08+00:00"
+  "updatedAt": "2026-10-27T00:06:37+00:00"
 }
