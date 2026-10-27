@@ -1,0 +1,16 @@
+/* Scoped additions only; never imported by /output/work/. */
+.output-guide-page .output-purpose-nav { display:flex; flex-wrap:wrap; gap:.65rem; margin:1.5rem 0 0; }
+.output-guide-page .output-purpose-nav a { padding:.65rem .9rem; border:1px solid var(--line, #cbd1cd); border-radius:.7rem; color:var(--blue, #185d78); background:var(--white, #fffdf8); text-underline-offset:3px; }
+.output-guide-page .output-purpose-nav a:focus-visible,
+.output-guide-page [data-output-copy]:focus-visible { outline:3px solid var(--blue, #185d78); outline-offset:3px; }
+.output-guide-page [id^="output-purpose-"] { scroll-margin-top:6rem; }
+.output-guide-page .output-guide-ad { box-sizing:border-box; width:100%; margin:64px 0; padding:16px 0; border-block:1px solid var(--line, #d6dad6); }
+.output-guide-page .output-guide-ad[hidden], .output-guide-page [data-output-copy][hidden] { display:none!important; }
+.output-guide-page .output-guide-ad__label { margin:0 auto 10px; font-size:.75rem; line-height:1.4; text-align:center; color:var(--ink-soft, #4f5964); }
+.output-guide-page .output-guide-ad__slot { width:100%; max-width:970px; min-height:250px; margin-inline:auto; }
+.output-guide-page .output-guide-ad__unit { display:block; width:100%; height:250px; }
+.output-guide-page .output-guide-return { margin-top:3rem; padding:1.3rem; border:1px solid var(--line, #d6dad6); border-radius:1rem; }
+.output-guide-page .output-guide-return p { line-height:1.8; }
+.output-guide-page .output-guide-return .hero-actions { margin-top:1rem; }
+.output-guide-page [data-output-copy-status] { min-height:1.8em; overflow-wrap:anywhere; }
+@media print { .output-guide-page .output-guide-ad { display:none!important; } }
