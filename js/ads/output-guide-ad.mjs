@@ -1,6 +1,6 @@
 /** One ordinary display unit on the PUBLIC conversion guide, never the workspace. */
 const documents = new WeakMap();
-const SDK_PREFIX = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261027-guide-loader-1';
 export const OUTPUT_GUIDE_CANONICAL = 'https://pixieed.jp/output/';
 
 export function isOutputGuideAdEligible({ origin, pathname, search = '', topLevel,
@@ -52,7 +52,7 @@ export function mountOutputGuideAd({ doc = globalThis.document, win = globalThis
   const slot = host.querySelector('[data-output-guide-ad-slot]');
   if (!slot) return { mounted: false, reason: 'missing-slot' };
   let requested = false, disposed = false, unfilled = false;
-  let observer, statusObserver, script;
+  let observer, statusObserver, loader;
   const unit = doc.createElement('ins');
   unit.className = 'adsbygoogle output-guide-ad__unit';
   unit.style.display = 'block';
@@ -90,19 +90,10 @@ export function mountOutputGuideAd({ doc = globalThis.document, win = globalThis
     requested = true; // Never retry or refresh, even after a network/ad-block failure.
     host.dataset.adState = 'requested';
     try {
-      script = doc.querySelector(`script[src^="${SDK_PREFIX}"]`);
-      if (script && new URL(script.src).searchParams.get('client') !== resolved.client) {
-        failed(); return;
-      }
-      if (!script) {
-        script = doc.createElement('script');
-        script.async = true;
-        script.crossOrigin = 'anonymous';
-        script.dataset.outputGuideAdSdk = 'true';
-        script.src = `${SDK_PREFIX}?client=${encodeURIComponent(resolved.client)}`;
-        script.addEventListener('error', failed, { once: true });
-        doc.head.append(script);
-      } else script.addEventListener('error', failed, { once: true });
+      // Use the same SDK instance and error handling as the public tools page.
+      loader = getAdsenseLoader(doc, win, resolved.client);
+      if (loader.failed) { failed(); return; }
+      loader.errors.add(failed);
       (win.adsbygoogle = win.adsbygoogle || []).push({});
     } catch { failed(); }
   };
@@ -115,7 +106,7 @@ export function mountOutputGuideAd({ doc = globalThis.document, win = globalThis
     win.removeEventListener('resize', onVisibility);
     win.removeEventListener('scroll', onVisibility);
     win.removeEventListener('pagehide', cleanup);
-    script?.removeEventListener('error', failed);
+    loader?.errors.delete(failed);
   };
   if (typeof win.MutationObserver === 'function') {
     statusObserver = new win.MutationObserver(() => {
@@ -164,7 +155,7 @@ if (typeof document !== 'undefined' && typeof window !== 'undefined'
   let track = () => {};
   bindOutputGuideActions({ track: (...args) => track(...args) });
   // Loading local configuration is harmless; the guard blocks all advertising off production.
-  void import('../../data/output-guide-ad-config.mjs?rev=20261027-output-guide-1')
+  void import('../../data/output-guide-ad-config.mjs?rev=20261027-guide-loader-1')
     .then(({ outputGuideAdConfig }) => mountOutputGuideAd({ config: outputGuideAdConfig }))
     .catch(() => {});
   void import('../site-analytics.mjs?rev=20261007-safe-analytics-1')

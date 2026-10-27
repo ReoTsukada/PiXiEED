@@ -13,7 +13,7 @@ const mounted = new WeakSet();
 const loaders = new WeakMap();
 const flowPlacements = new Set(['home', 'tools', 'info', 'stores', 'store-detail']);
 
-function getAdsenseLoader(doc, win, client) {
+export function getAdsenseLoader(doc, win, client) {
   let state = loaders.get(doc);
   if (state) return state;
   const source = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
