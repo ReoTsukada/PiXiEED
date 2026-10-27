@@ -202,11 +202,28 @@ test('private output workspace is excluded from indexing and keeps only generic 
   assert.doesNotMatch(read('sitemap.xml'), /https:\/\/pixieed\.jp\/output\/work/);
 });
 
-test('robots.txt announces the root sitemap without blocking its public routes', () => {
+test('robots.txt announces the public sitemaps without blocking their routes', () => {
   const robots = read('robots.txt');
-  assert.deepEqual([...robots.matchAll(/^Sitemap:\s*(\S+)\s*$/gmi)].map(([, url]) => url), ['https://pixieed.jp/sitemap.xml']);
+  assert.deepEqual([...robots.matchAll(/^Sitemap:\s*(\S+)\s*$/gmi)].map(([, url]) => url), [
+    'https://pixieed.jp/sitemap.xml',
+    'https://pixieed.jp/sitemap-conversions.xml',
+  ]);
   const blockedPaths = [...robots.matchAll(/^Disallow:\s*(\S+)\s*$/gmi)].map(([, path]) => path);
-  for (const [, path] of sitemapPages) {
+  const conversionUrls = [...read('sitemap-conversions.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) => new URL(url));
+  assert.deepEqual(conversionUrls.map(url => url.href), [
+    'https://pixieed.jp/output/image-formats/',
+    'https://pixieed.jp/output/audio-formats/',
+  ]);
+  for (const url of conversionUrls) {
+    assert.equal(url.origin, 'https://pixieed.jp');
+    assert.equal(url.search, '');
+    assert.equal(url.hash, '');
+    const source = read(`${url.pathname.slice(1)}index.html`);
+    assert.ok(source.includes(`rel="canonical" href="${url.href}"`));
+    assert.doesNotMatch(source, /<meta\b(?=[^>]*\bname=["'](?:robots|googlebot)["'])[^>]*\b(?:noindex|none)\b/i);
+    assert.doesNotMatch(source, /<meta\b[^>]*\bhttp-equiv=["']refresh["']/i);
+  }
+  for (const path of [...sitemapPages.map(([, path]) => path), ...conversionUrls.map(url => url.pathname)]) {
     assert.ok(!blockedPaths.some((blocked) => path.startsWith(blocked)), `${path}: crawlable`);
   }
 });
