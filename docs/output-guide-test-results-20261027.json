@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-27",
+  "base_commit": "43904413086c1f3f954f64eabfd7635da70e7901",
+  "node": {"version": "22.16.0", "test_file": "tests/ads/output-guide-ad.test.mjs", "passed": 22, "failed": 0},
+  "chromium_offline_dom": {"script": "scripts/test-output-guide-isolated.py", "passed": 36, "failed": 0, "widths": [320, 390, 1440], "location_ad_provider_clipboard": "mocked", "bootstrap": "omitted", "shared_css": "simplified fixture"},
+  "live_ad_requests": 0,
+  "ad_clicks": 0,
+  "full_site_build": "not_run",
+  "full_site_tests": "not_run",
+  "live_module_loading": "not_verified",
+  "adsense_account": "not_accessible_in_current_browser_context",
+  "revenue": "not_measured",
+  "production_deployed": false
+}
