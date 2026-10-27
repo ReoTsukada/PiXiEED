@@ -66,17 +66,17 @@
     </section>
     <section class="guide-format-summary" aria-labelledby="guide-formats-title">
       <h2 id="guide-formats-title">よく使う形式から、専門的な形式まで。</h2>
-      <p>PNG · JPEG · WebP · TIFF · BMP · TGA · QOI · ICO<br>PBM · PGM · PPM · PAM · SVG · GIF · APNG<br>WAV · AIFF · AU · 対応環境のM4A / WebM / Ogg</p>
+      <p>PNG · JPEG · WebP · TIFF · BMP · TGA · QOI · ICO<br>PBM · PGM · PPM · PAM · SVG · GIF · APNG<br>WAV · AIFF · AU · FLAC（16bit） · 対応環境のM4A / WebM / Ogg</p>
       <details id="guide-format-details" class="guide-format-details"><summary>読み込み・保存形式と制限を確認</summary>
         <div class="guide-format-copy">
           <h3>画像</h3><p>PNG・JPEG・WebP・GIF・APNGと、BMP（24/32bit非圧縮）、TIFF（8bit RGB/グレー・非圧縮/PackBits/LZW・先頭ページ）、TGA（RGB/グレー、RLE対応）、QOI、ICO（PNG内包または24/32bit）、PBM・PGM・PPM・PAMを読み込めます。</p>
           <p>PNG・JPEG・WebP・GIF・APNG・SVG・BMP・TIFF・TGA・QOI・ICO・PBM・PGM・PPM・PAMへ保存できます。WebP保存とアニメーションの読み込みはブラウザーによります。APNG保存は複数コマの素材に表示されます。ICO保存は単一サイズ・最大256px。静的SVGの読み込みは外部参照なし、2MB・5000要素までです。</p>
           <p>各辺4096px・合計800万画素・1ファイル64MBまで。TIFFのCMYK・JPEG/Deflate圧縮・16bitや、HEIC/HEIF・PSD・RAW等は未対応です。SVG保存は画素を四角形で表す方式で、輪郭のベクター化ではありません。JPEG等は透過部分を背景色に合成します。画像のICC・EXIF・レイヤー等は保持しません。</p>
-          <h3>音声</h3><p>AIFF/AIFCのPCM、AUのPCM・浮動小数点・μ-law・A-lawと、ブラウザーが読み込めるMP3・WAV等を読み込めます。WAV・AIFF・AUは16/24/32bit PCMで保存可能。対応環境ではM4A・WebM・Oggも選べます。MP3・FLAC出力は未対応です。</p>
+          <h3>音声</h3><p>AIFF/AIFCのPCM、AUのPCM・浮動小数点・μ-law・A-lawと、ブラウザーが読み込めるMP3・WAV等を読み込めます。WAV・AIFF・AUは16/24/32bit PCMで保存可能。対応環境ではM4A・WebM・Oggも選べます。FLACは16bit固定・非圧縮フレームで保存できます（サイズ削減や16bitを超える精度の維持は保証しません）。MP3出力は未対応です。</p>
           <p>120秒以内・モノラル/ステレオ・8〜48kHz・64MBまで。ブラウザー依存の一部入力は4MBまでです。読み込み時に再サンプリングされることがあります。圧縮形式は長さ程度の作成時間が必要で、先頭40ms・末尾80msの無音を加えます。元のタグは保持しません。</p>
           <div class="capability-table-wrap"><table class="capability-table"><caption>従来のワークスペースの対応形式</caption><thead><tr><th scope="col">素材</th><th scope="col">保存形式</th><th scope="col">注意点</th></tr></thead><tbody>
             <tr><th scope="row">PNG・JPEG・静止WebP・静止GIF</th><td>PNG・JPEG・WebP・GIF・SVGなど</td><td>WebP出力はブラウザー対応時に選べます。JPEG・WebPは非可逆圧縮です。アニメWebPの出力には対応していません。</td></tr>
-            <tr><th scope="row">音声</th><td>WAV、対応環境のM4A・WebM・Ogg</td><td>120秒以内・モノラル/ステレオ・8〜48kHz。AIFF・AUの保存は簡易変換をご利用ください。</td></tr>
+            <tr><th scope="row">音声</th><td>WAV、対応環境のM4A・WebM・Ogg</td><td>120秒以内・モノラル/ステレオ・8〜48kHz。AIFF・AU・FLACの保存は簡易変換をご利用ください。</td></tr>
             <tr><th scope="row">GIF・動画＋音楽</th><td>音付き動画</td><td>GIFの映像を音楽に合わせた長さで繰り返して合成します。出力できる動画形式はブラウザーのMediaRecorder対応状況によります。元動画の音声は含みません。</td></tr>
           </tbody></table></div>
           <h3>動画・アニメーション</h3><p>MP4/WebMの1コマを画像として保存できます。動画への音楽合成、複数画像からのGIF作成、出力の一括管理は詳細ワークスペースを利用してください。動画合成では元動画の音声は含みません。</p>
@@ -102,10 +102,10 @@
       </section>
       <section id="output-purpose-audio" class="guide-task-panel" data-guide-panel="audio" aria-labelledby="guide-audio-title">
         <h3 id="guide-audio-title">音声をWAVなどへ</h3>
-        <p class="guide-task-copy">ブラウザーが読み込める音声を変換。詳細ワークスペースはWAVと、対応環境のM4A・WebM・Oggに対応します。AIFF・AUは簡易変換から保存してください。</p>
+        <p class="guide-task-copy">ブラウザーが読み込める音声を変換。詳細ワークスペースはWAVと、対応環境のM4A・WebM・Oggに対応します。AIFF・AU・FLACは簡易変換から保存してください。</p>
         <p class="guide-format-flow"><span>読み込める音声</span><span aria-hidden="true">→</span><span>WAV / 対応する圧縮形式</span></p>
         <ol class="guide-steps"><li><strong>音声を選ぶ</strong><span>120秒以内のモノラル・ステレオ音声。</span></li><li><strong>保存形式を選ぶ</strong><span>正確な長さを優先するならWAV。</span></li><li><strong>作成して保存</strong><span>圧縮出力の作成中は画面を離れないでください。</span></li></ol>
-        <p class="guide-limit"><strong>先に確認</strong>元音声は120秒以内。MP3・FLAC出力は未対応。圧縮形式はブラウザーにより異なり、作成には元音声の長さ程度かかります。</p>
+        <p class="guide-limit"><strong>先に確認</strong>元音声は120秒以内。FLACは簡易変換で16bit固定・非圧縮フレームとして保存可能。MP3出力は未対応。圧縮形式はブラウザーにより異なり、作成には元音声の長さ程度かかります。</p>
       </section>
       <section id="output-purpose-video" class="guide-task-panel" data-guide-panel="video" aria-labelledby="guide-video-title">
         <h3 id="guide-video-title">画像・GIF・動画に音楽を付ける</h3>

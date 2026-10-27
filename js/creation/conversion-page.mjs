@@ -1,4 +1,4 @@
-import {FILE_ACCEPT, loadConversionFile, conversionChoices, outputNotice, convertLocal, safeConvertedName} from './conversion-service.mjs?rev=20261028-conversion-1';
+import {FILE_ACCEPT, loadConversionFile, conversionChoices, outputNotice, convertLocal, safeConvertedName} from './conversion-service.mjs?rev=20261028-flac-1';
 import {notifyToolEntryReady} from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 
 /** Local-only task UI. File names and bytes never enter URLs, storage or analytics. */
@@ -45,7 +45,7 @@ export function mountConversionPage(doc=document, win=window) {
       <progress data-progress aria-label="変換の進行状況" hidden></progress><button class="convert-secondary" data-cancel type="button" hidden>中止</button>
       <p class="convert-status" data-status role="status" aria-live="polite"></p>
     </section>
-    <div class="convert-support"><p>複数画像のGIF・動画と音楽の合成は <a href="/output/work/" data-advanced>詳細ワークスペース</a> へ。</p><details><summary>読み込める形式と制限</summary><p>PNG・JPEG・WebP・GIF・APNGに加え、BMP（24/32bit非圧縮）、TIFF（8bit RGB/グレー・非圧縮/PackBits/LZW・先頭ページ）、TGA（RGB/グレー、RLE）、QOI、ICO（PNG内包または24/32bit）、PBM・PGM・PPM・PAM、静的SVGに対応します。画像は各辺4096px・合計800万画素まで。アニメーションの読込はブラウザーに依存します。</p><p>音声はAIFF/AIFC（PCM）、AU（PCM/浮動小数点/μ-law/A-law）と、ブラウザーが読み込めるWAV・MP3等。120秒以内・モノラル/ステレオ・8〜48kHzが対象です。ブラウザー依存の一部入力は4MBまでです。MP3・FLACへの保存、HEIC/HEIF・PSD・RAW等は未対応です。</p><p>SVGは2MB・5000要素以内。スクリプト・外部参照・埋め込み・アニメーションは読み込めません。画像出力では色プロファイル・EXIF・レイヤーを、音声出力ではタグを保持しません。元のファイルは変更しません。</p></details></div>`;
+    <div class="convert-support"><p>複数画像のGIF・動画と音楽の合成は <a href="/output/work/" data-advanced>詳細ワークスペース</a> へ。</p><details><summary>読み込める形式と制限</summary><p>PNG・JPEG・WebP・GIF・APNGに加え、BMP（24/32bit非圧縮）、TIFF（8bit RGB/グレー・非圧縮/PackBits/LZW・先頭ページ）、TGA（RGB/グレー、RLE）、QOI、ICO（PNG内包または24/32bit）、PBM・PGM・PPM・PAM、静的SVGに対応します。画像は各辺4096px・合計800万画素まで。アニメーションの読込はブラウザーに依存します。</p><p>音声はAIFF/AIFC（PCM）、AU（PCM/浮動小数点/μ-law/A-law）と、ブラウザーが読み込めるWAV・MP3等。120秒以内・モノラル/ステレオ・8〜48kHzが対象です。ブラウザー依存の一部入力は4MBまでです。FLACは16bit固定・非圧縮フレームで保存します。ファイルサイズの削減や16bitを超える精度の維持は保証しません。MP3への保存、HEIC/HEIF・PSD・RAW等は未対応です。</p><p>SVGは2MB・5000要素以内。スクリプト・外部参照・埋め込み・アニメーションは読み込めません。画像出力では色プロファイル・EXIF・レイヤーを、音声出力ではタグを保持しません。元のファイルは変更しません。</p></details></div>`;
   const $=selector=>main.querySelector(selector), input=$('[data-file]'), format=$('[data-format]'), status=$('[data-status]'), progress=$('[data-progress]');
   input.accept=FILE_ACCEPT;
   let source=null, controller=null, busy=false, resultUrl=null, previewUrl=null, revision=0, unsaved=false;
