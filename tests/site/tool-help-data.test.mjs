@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { TOOL_GUIDES, getToolGuide } from '../../js/tool-help-data.mjs';
+import { MAX_IMPORT_FILE_BYTES, MAX_IMPORT_SOURCE_PIXELS } from '../../js/creation/draw-import.mjs';
+import { JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS } from '../../js/creation/jigsaw-core.mjs';
+import { MAX_PIXEL_FILE_BYTES, MAX_PIXEL_IMAGE_EDGE, MAX_PIXEL_IMAGE_PIXELS } from '../../js/pixel-scale.mjs';
 
 const expected = new Map([
   ['/draw/', 'draw'],
@@ -91,4 +95,79 @@ test('draw and audio steps match the shared editor controls and distinguish savi
 test('camera guide keeps the explicit start action and browser permission step', () => {
   const camera = getToolGuide({ pathname: '/camera/' });
   assert.match(camera.steps[0], /「カメラを開始」.*ブラウザーの利用許可/);
+});
+
+test('jigsaw startup guidance does not ask players to choose the hidden engine grid size', () => {
+  const guide = getToolGuide({ pathname: '/jigsaw/' });
+  const html = readFileSync(new URL('../../jigsaw/index.html', import.meta.url), 'utf8');
+  const arcade = readFileSync(new URL('../../js/creation/jigsaw-arcade.mjs', import.meta.url), 'utf8');
+  assert.match(html, /<label class="jigsaw-field" hidden aria-hidden="true">[^<]*<select id="jigsaw-grid-size"/);
+  assert.match(html, /<button id="jigsaw-start"[^>]*>パズルをはじめる<\/button>/);
+  assert.match(arcade, /const gridField = grid\.closest\('label'\); if \(gridField\) gridField\.hidden = true;/);
+  assert.doesNotMatch(arcade, /gridField\.hidden\s*=\s*false/);
+  assert.match(arcade, /const start = \$\('#jigsaw-start'\)/);
+  assert.match(arcade, /start\.textContent = 'スタート'/);
+  assert.match(arcade, /start\.addEventListener\('click'/);
+  assert.doesNotMatch(guide.steps[1], /ピースの大きさを選び/);
+  assert.match(guide.steps[1], /開始ボタンを押して、パズルをはじめます/);
+});
+
+test('tool guide image formats, size limits, and import steps match implementation', () => {
+  const paths = { draw: '/draw/', camera: '/camera/', jigsaw: '/jigsaw/', spot: '/spot-difference/', hidden: '/hidden-object/' };
+  const noteText = id => {
+    const guide = getToolGuide({ pathname: paths[id] });
+    return [...guide.steps, ...guide.notes].join(' ');
+  };
+  const megabytes = bytes => `${bytes / 1024 / 1024}MB`;
+  const approximatePixels = pixels => `${Math.round(pixels / 100_000) * 10}万画素`;
+
+  const draw = noteText('draw');
+  assert.match(draw, /PNG・WebP/);
+  assert.ok(draw.includes(megabytes(MAX_IMPORT_FILE_BYTES)));
+  assert.ok(draw.includes(approximatePixels(MAX_IMPORT_SOURCE_PIXELS)));
+  assert.match(draw, /最大256×256px/);
+  const drawSource = readFileSync(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
+  assert.match(drawSource, /value > 256/);
+
+  const camera = noteText('camera');
+  assert.match(camera, /PNG・JPEG・WebP/);
+  assert.ok(camera.includes(megabytes(MAX_PIXEL_FILE_BYTES)));
+  assert.match(camera, /4096px.*1600万画素/);
+  const cameraGuide = getToolGuide({ pathname: '/camera/' });
+  assert.match(cameraGuide.steps[0], /下部の［ファイル］→［画像を読み込む］/);
+  const cameraHtml = readFileSync(new URL('../../camera/index.html', import.meta.url), 'utf8');
+  assert.match(cameraHtml, /下部の［ファイル］→［画像を読み込む］/);
+  const cameraSource = readFileSync(new URL('../../js/pixel-lens/image-source.mjs', import.meta.url), 'utf8');
+  assert.match(cameraSource, /image\/png', 'image\/jpeg', 'image\/webp/);
+
+  const jigsaw = noteText('jigsaw');
+  assert.match(jigsaw, /PNG・WebP・JPEG/);
+  assert.ok(jigsaw.includes(megabytes(JIGSAW_MAX_IMAGE_BYTES)));
+  assert.ok(jigsaw.includes(approximatePixels(JIGSAW_MAX_SOURCE_PIXELS)));
+  const jigsawSource = readFileSync(new URL('../../js/creation/jigsaw-page.mjs', import.meta.url), 'utf8');
+  assert.match(jigsawSource, /image\/png', 'image\/webp', 'image\/jpeg/);
+
+  const spot = noteText('spot');
+  assert.match(spot, /PNG・WebP/);
+  assert.ok(spot.includes(megabytes(MAX_IMPORT_FILE_BYTES)));
+  assert.ok(spot.includes(approximatePixels(MAX_IMPORT_SOURCE_PIXELS)));
+  assert.match(spot, /同じ幅・高さ/);
+  const spotSource = readFileSync(new URL('../../js/creation/spot-image-import.mjs', import.meta.url), 'utf8');
+  assert.match(spotSource, /keepScale:\s*true/);
+
+  const hidden = noteText('hidden');
+  assert.match(hidden, /PNG・WebP/);
+  assert.ok(hidden.includes(megabytes(MAX_IMPORT_FILE_BYTES)));
+  assert.match(hidden, /4096px.*1600万画素/);
+  assert.ok(hidden.includes(approximatePixels(MAX_IMPORT_SOURCE_PIXELS)));
+  const hiddenHtml = readFileSync(new URL('../../hidden-object/index.html', import.meta.url), 'utf8');
+  assert.match(hiddenHtml, /accept="image\/png,image\/webp"/);
+});
+
+test('integrated output guide documents formats and limits exposed by the converter', () => {
+  const outputGuide = readFileSync(new URL('../../output/index.html', import.meta.url), 'utf8');
+  assert.match(outputGuide, /PNG・JPEG・静止WebP・静止GIF/);
+  assert.match(outputGuide, /WAV.*M4A.*WebM.*Ogg/);
+  assert.match(outputGuide, /120秒以内.*モノラル\/ステレオ.*8〜48kHz/);
+  assert.match(outputGuide, /出力できる動画形式はブラウザーのMediaRecorder対応状況によります/);
 });

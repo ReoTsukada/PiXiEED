@@ -24,6 +24,9 @@ const canonical = new Map([
   ['js/pixel-png-metadata.mjs', 'rev=20260928-pixel-roundtrip-1'],
   ['js/creation/audio-timbres.mjs', 'rev=20261005-audio-drums-1'],
   ['js/creation/jigsaw-file.mjs', 'rev=20260929-claude-integration-1'],
+  ['js/tool-help.mjs', 'rev=20261027-guide-constraints-1'],
+  ['js/tool-help-data.mjs', 'rev=20261027-guide-constraints-1'],
+  ['js/tool-help-bootstrap.mjs', 'rev=20261027-guide-constraints-1'],
 ]);
 const templates = new Set(['scripts/generate-books-catalog.mjs', 'scripts/generate-event-pages.mjs']);
 const skippedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'docs', 'tests', 'work', 'vendor', 'node_modules']);

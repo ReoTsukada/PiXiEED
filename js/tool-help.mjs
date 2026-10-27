@@ -1,4 +1,4 @@
-import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261024-intelligence-ui-1';
+import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261027-guide-constraints-1';
 
 const mountedDocuments = new WeakMap();
 const HELP_CSS_ID = 'px-tool-help-styles';
