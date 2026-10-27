@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f4">
+  <title>TGA・QOI・TIFF・ICO・PNMの画像変換と保存方法｜PiXiEED</title>
+  <meta name="description" content="PNGからTGA・QOI・TIFF・BMP・ICO・PBM・PGM・PPM・PAMを作成する方法。逆方向のPNG保存、透過、最大サイズ、未対応の圧縮方式まで確認できます。">
+  <link rel="canonical" href="https://pixieed.jp/output/image-formats/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="TGA・QOI・TIFF・ICO・PNMの画像変換と保存方法｜PiXiEED">
+  <meta property="og:description" content="PNGからTGA・QOI・TIFF・BMP・ICO・PBM・PGM・PPM・PAMを作成する方法。逆方向のPNG保存、透過、最大サイズ、未対応の圧縮方式まで確認できます。">
+  <meta property="og:url" content="https://pixieed.jp/output/image-formats/">
+  <meta property="og:image" content="https://pixieed.jp/assets/og/output.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="TGA・QOI・TIFF・ICO・PNMの画像変換と保存方法｜PiXiEED">
+  <meta name="twitter:description" content="PNGからTGA・QOI・TIFF・BMP・ICO・PBM・PGM・PPM・PAMを作成する方法。逆方向のPNG保存、透過、最大サイズ、未対応の圧縮方式まで確認できます。">
+  <meta name="twitter:image" content="https://pixieed.jp/assets/og/output.png">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/conversion-formats-guide.css?rev=20261028-format-guide-1">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://pixieed.jp/output/image-formats/#page","url":"https://pixieed.jp/output/image-formats/","name":"TGA・QOI・TIFF・ICO・PNMの画像変換と保存方法｜PiXiEED","description":"PNGからTGA・QOI・TIFF・BMP・ICO・PBM・PGM・PPM・PAMを作成する方法。逆方向のPNG保存、透過、最大サイズ、未対応の圧縮方式まで確認できます。","inLanguage":"ja","breadcrumb":{"@id":"https://pixieed.jp/output/image-formats/#breadcrumb"},"isPartOf":{"@type":"WebSite","name":"PiXiEED","url":"https://pixieed.jp/"}},{"@type":"BreadcrumbList","@id":"https://pixieed.jp/output/image-formats/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"PiXiEED","item":"https://pixieed.jp/"},{"@type":"ListItem","position":2,"name":"ファイル変換","item":"https://pixieed.jp/output/"},{"@type":"ListItem","position":3,"name":"専門的な画像形式に変換・保存","item":"https://pixieed.jp/output/image-formats/"}]}]}</script>
+</head>
+<body data-page="tools" class="app-page conversion-formats-page">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner">
+    <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
+    <nav class="site-nav" aria-label="メインナビゲーション"><a data-nav="home" href="/globe/">世界地図</a><a data-nav="works" href="/works/">絵</a><a data-nav="stores" href="/stores/">お店</a><a data-nav="collection" href="/collection/">集めた</a><a data-nav="tools" href="/tools/">ツール</a></nav>
+  </div></header>
+  <nav class="mobile-nav" aria-label="アプリナビゲーション"><a data-nav="home" href="/globe/"><span aria-hidden="true">⌖</span>世界地図</a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span>絵</a><a data-nav="stores" href="/stores/"><span aria-hidden="true">⌂</span>お店</a><a data-nav="collection" href="/collection/"><span aria-hidden="true">✳</span>集めた</a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span>ツール</a></nav>
+  <main id="main" class="format-guide">
+    <nav class="format-breadcrumbs" aria-label="パンくずリスト"><a href="/">ホーム</a><span aria-hidden="true">›</span><a href="/output/">ファイル変換</a><span aria-hidden="true">›</span><span aria-current="page">専門的な画像形式に変換・保存</span></nav>
+    <header class="format-guide-hero">
+      <p class="format-eyebrow">PiXiEED · 形式ガイド</p>
+      <h1>専門的な画像形式に変換・保存</h1>
+      <p>PNGやJPEGからマイナーな画像形式を作りたい方へ。保存できる中身と、読み込める範囲を分けて確認できます。</p>
+      <a class="format-start" href="/output/work/?mode=convert">ファイルを選んで変換</a>
+      <p class="format-small">登録不要・無料。ファイルは端末内で処理します。保存形式は読み込み後に選びます。</p>
+    </header>
+    <nav class="format-toc" aria-label="画像形式から探す">
+      <a href="#tga">TGA</a><a href="#qoi">QOI</a><a href="#tiff">TIFF / TIF</a><a href="#bmp">BMP</a><a href="#ico">ICO</a><a href="#netpbm">PBM・PGM・PPM・PAM</a><a href="#svg">SVG</a><a href="#image-help">変換できないとき</a>
+    </nav>
+    <section aria-labelledby="image-steps">
+      <h2 id="image-steps">画像を別の拡張子に変換する手順</h2>
+      <ol class="format-steps"><li><strong>元の画像を選ぶ</strong><p>PNG・JPEGなどの画像を読み込みます。プレビューと大きさを確認してください。</p></li><li><strong>保存形式を選ぶ</strong><p>TGA・QOI・TIFF・ICOなどを選びます。サイズ・背景色・画質は必要なときだけ詳細設定で調整します。</p></li><li><strong>変換して保存する</strong><p>変換後に表示される「保存する」からダウンロードします。拡張子だけを変更するのではなく、選択した形式のデータを作ります。</p></li></ol>
+      <p class="format-note">各辺4096px・画像全体で800万画素・1ファイル64MBまで。画像は8bit/チャンネルの画素として処理し、ICCプロファイル・EXIF・レイヤーは保持しません。画像の形式を変えても、元の解像度や失われた情報は復元されません。</p>
+    </section>
+    <section id="tga" aria-labelledby="tga-title">
+      <h2 id="tga-title">PNGからTGAへ・TGAからPNGへ変換</h2>
+      <p>TGA（Targa）形式で渡したい画像は、PNGなどを読み込み、保存形式に「TGA」を選びます。PiXiEEDは非圧縮32bit RGBAのTGAを書き出すため、元画像の透過を含めて保存できます。</p>
+      <p>TGAを開いて確認したい場合は、TGAを読み込んでPNGに保存できます。読み込みはRGB24/32bit・グレー8bitの非圧縮またはRLE方式に対応します。カラーマップ方式など、すべてのTGAを読めるわけではありません。</p>
+      <p class="format-example">変換例：PNG → TGA、JPEG → TGA、TGA → PNG、TGA → WebP（WebP出力対応時）</p>
+    </section>
+    <section id="qoi" aria-labelledby="qoi-title">
+      <h2 id="qoi-title">PNGからQOIへ・QOIからPNGへ変換</h2>
+      <p>QOIファイル（.qoi）を作るには、画像を読み込んで保存形式「QOI」を選びます。書き出しはRGBAの可逆圧縮で、読み込んだ画像の画素と透過を保存します。元ファイルのメタデータまでそのまま戻す機能ではありません。</p>
+      <p>QOIを一般的な画像として扱いたい場合は、QOIを読み込んでPNGへ変換します。JPEGに変える場合は透過部分が背景色になり、非可逆圧縮になります。QOIに変換しても、必ずPNGより小さくなるとは限りません。</p>
+      <p class="format-example">変換例：PNG → QOI、QOI → PNG、QOI → JPEG</p>
+    </section>
+    <section id="tiff" aria-labelledby="tiff-title">
+      <h2 id="tiff-title">PNGからTIFFへ・TIFFからPNG / JPEGへ変換</h2>
+      <p>PNG・JPEGからTIFFを作る場合は「TIFF」を選びます。保存するTIFFは1ページ・8bit RGBA・非圧縮です。CMYK・16bit・レイヤー付きのTIFFや、複数ページをまとめたTIFFを作成する機能ではありません。</p>
+      <p>.tif / .tiffの読み込みは8bit RGB・グレー画像の非圧縮、PackBits、LZWに対応し、先頭ページを使用します。CMYK・16bit・JPEG/Deflate圧縮などは対象外です。印刷用の色管理や全ページを保つ用途では、元データを保持してください。</p>
+      <p class="format-example">変換例：PNG → TIFF、JPEG → TIFF、TIFF → PNG、TIF → JPEG</p>
+    </section>
+    <section id="bmp" aria-labelledby="bmp-title">
+      <h2 id="bmp-title">PNG / JPEGからBMPへ・BMPからPNGへ変換</h2>
+      <p>BMP出力は非圧縮24bit RGBです。透過部分は詳細設定で選んだ背景色に合成します。透過を保持したい場合はPNG・TGA・QOIなど、透過対応の保存形式を選んでください。</p>
+      <p>BMPの読み込みは非圧縮24/32bitに対応します。32bit BMPも、この読み込み処理では不透明な画像として扱います。パレット画像やRLE圧縮BMPは対象外です。BMPにするだけで写真の情報量や画質が増えるわけではありません。</p>
+      <p class="format-example">変換例：PNG → BMP、JPEG → BMP、BMP → PNG</p>
+    </section>
+    <section id="ico" aria-labelledby="ico-title">
+      <h2 id="ico-title">PNGからICOを作成・ICOからPNGを取り出す</h2>
+      <p>アイコン用のICOファイルを作るには画像を選び、保存形式を「ICO」にします。単一サイズ・最大256×256pxのICOを出力します。256pxを超える場合は縦横比を保って縮小するため、正方形が必要なら元画像を正方形に整えてください。</p>
+      <p>ICOを読み込む場合は、内部の最大サイズの画像を使います。PNG内包または24/32bit非圧縮の画像に対応します。16px・32px・48pxなど複数サイズを一つにまとめるICO作成や、CURカーソルの出力には対応していません。</p>
+      <p class="format-example">変換例：PNG → ICO、JPEG → ICO、ICO → PNG</p>
+    </section>
+    <section id="netpbm" aria-labelledby="netpbm-title">
+      <h2 id="netpbm-title">PNGからPBM・PGM・PPM・PAMへ変換（Netpbm / PNM）</h2>
+      <p>Netpbm系の形式が必要な場合は、色と透過の要否に合わせて保存形式を選びます。PNMはPBM・PGM・PPMをまとめて扱う呼び名として使われます。保存では必要な形式を具体的に選びます。</p>
+      <dl class="format-definitions"><div><dt>PBM：白黒2色・P4</dt><dd>白黒の画像を作ります。詳細設定の「白黒のしきい値」で境界を調整できます。グレーの階調は残りません。</dd></div><div><dt>PGM：グレースケール・P5</dt><dd>色をグレーの階調に変換します。透過部分は背景色に合成されます。</dd></div><div><dt>PPM：RGBカラー・P6</dt><dd>RGBのカラー画像を保存します。透過は保持しません。</dd></div><div><dt>PAM：RGBA・P7</dt><dd>RGBとアルファを保存します。透過が必要な場合の選択肢です。</dd></div></dl>
+      <p>読み込みはPBM・PGM・PPMのASCII/バイナリと、対応するPAMに対応します。高い最大値の入力も8bitの画像へ正規化するため、16bitの測定値・画素値をそのまま保存する用途には向きません。書き出しは上記のバイナリ形式です。</p>
+      <p class="format-example">変換例：PNG → PBM、PNG → PGM、PNG → PPM、PNG → PAM、PPM → PNG、PGM → PNG、PBM → PNG</p>
+    </section>
+    <section id="svg" aria-labelledby="svg-title">
+      <h2 id="svg-title">SVGからPNGへ・画像からSVGへの違い</h2>
+      <p>静的SVGはPNGなどの画像へ描画して保存できます。読み込み条件は2MB・5000要素以内、外部参照・スクリプト・埋め込み・アニメーションなしです。文字の見た目は利用端末のフォントに依存します。</p>
+      <p>反対にPNGなどからSVGへ保存する場合は、画素を四角形として並べたSVGになります。ロゴや写真の輪郭を滑らかなパスに変えるベクター化・自動トレースではありません。高解像度の画像ではSVGの容量が大きくなることがあります。</p>
+    </section>
+    <section id="image-help" aria-labelledby="image-help-title">
+      <h2 id="image-help-title">画像が変換できないとき</h2>
+      <details><summary>拡張子は対応しているのに読み込めません</summary><p>同じ拡張子でも圧縮方式やビット深度が違います。特にTIFF・BMP・ICOは上記の条件を確認してください。ファイル名だけを変更しても中身の形式は変わりません。</p></details>
+      <details><summary>透過やアニメーションを残したいです</summary><p>JPEG・BMP・PPM・PGM・PBMは透過を保持しません。複数コマの素材を静止画形式で保存すると1コマになります。GIFやAPNGの保存、コマ選択は読み込みに成功した素材で利用してください。</p></details>
+      <details><summary>HEIC・PSD・RAWを変換できますか？</summary><p>この変換ツールの対応対象外です。対応している形式へ別のソフトで書き出した画像は読み込めますが、元のレイヤーやRAW情報を引き継ぐことはできません。</p></details>
+    </section>
+    <section class="format-next" aria-labelledby="format-next-title">
+      <h2 id="format-next-title">形式を決めたら、変換へ</h2>
+      <p>元のファイルは変更しません。必要な形式が一覧にあることを確認し、変換後のファイルを保存してください。</p>
+      <a class="format-start" href="/output/work/?mode=convert">変換画面を開く</a>
+      <p><a href="/output/">すべての変換機能と対応条件</a> · <a href="/output/audio-formats/">AIFF・AUなどの音声変換</a></p>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
+  <script type="module" src="/js/app.js?rev=20261024-common-tool-start-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
+</body>
+</html>

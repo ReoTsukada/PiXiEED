@@ -17,8 +17,11 @@ export const RESULT_PAGES = [
 export const WORKSPACE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pixiee-lens/index.html', 'globe/index.html'];
 const OFFERWALL_PAGE = 'output/work/index.html';
 const COMPATIBILITY_PAGES = ['PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html'];
-// This isolated mock page never participates in the site's AdSense loading.
-const REFERENCE_NO_AD_PAGES = ['help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html'];
+// Static reference pages have no manual units and never load a provider eagerly.
+const REFERENCE_NO_AD_PAGES = [
+  'help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html',
+  'output/image-formats/index.html', 'output/audio-formats/index.html'
+];
 const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 // These are source templates. The Pages build injects the informational loader
 // only after checking its explicit route allowlist and generated-event set.
@@ -83,7 +86,7 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
     assert.doesNotMatch(source, /adsbygoogle|adsense-auto|display-ads|data-display-ad/, `${path}: source has no manual provider or slot`);
   }
   for (const path of [...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES]) {
-    assert.doesNotMatch(await html(path), /adsbygoogle|adsense-auto|display-ads|data-display-ad|adsense-offerwall/, `${path}: compatibility and factual event pages have no ad loader`);
+    assert.doesNotMatch(await html(path), /adsbygoogle|adsense-auto|display-ads|data-display-ad|adsense-offerwall/, `${path}: compatibility and factual reference pages have no ad loader`);
   }
   for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
   const output = await html(OFFERWALL_PAGE);

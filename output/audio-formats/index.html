@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f4">
+  <title>WAV・AIFF・AUの音声変換｜16・24・32bit PCM保存｜PiXiEED</title>
+  <meta name="description" content="WAVからAIFF・AUへ、AIFF・AIF・AU・SNDからWAVへ変換する方法。16・24・32bit PCMの保存、μ-law入力とPCM出力の違い、120秒などの条件を説明します。">
+  <link rel="canonical" href="https://pixieed.jp/output/audio-formats/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:title" content="WAV・AIFF・AUの音声変換｜16・24・32bit PCM保存｜PiXiEED">
+  <meta property="og:description" content="WAVからAIFF・AUへ、AIFF・AIF・AU・SNDからWAVへ変換する方法。16・24・32bit PCMの保存、μ-law入力とPCM出力の違い、120秒などの条件を説明します。">
+  <meta property="og:url" content="https://pixieed.jp/output/audio-formats/">
+  <meta property="og:image" content="https://pixieed.jp/assets/og/output.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="WAV・AIFF・AUの音声変換｜16・24・32bit PCM保存｜PiXiEED">
+  <meta name="twitter:description" content="WAVからAIFF・AUへ、AIFF・AIF・AU・SNDからWAVへ変換する方法。16・24・32bit PCMの保存、μ-law入力とPCM出力の違い、120秒などの条件を説明します。">
+  <meta name="twitter:image" content="https://pixieed.jp/assets/og/output.png">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/conversion-formats-guide.css?rev=20261028-format-guide-1">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebPage","@id":"https://pixieed.jp/output/audio-formats/#page","url":"https://pixieed.jp/output/audio-formats/","name":"WAV・AIFF・AUの音声変換｜16・24・32bit PCM保存｜PiXiEED","description":"WAVからAIFF・AUへ、AIFF・AIF・AU・SNDからWAVへ変換する方法。16・24・32bit PCMの保存、μ-law入力とPCM出力の違い、120秒などの条件を説明します。","inLanguage":"ja","breadcrumb":{"@id":"https://pixieed.jp/output/audio-formats/#breadcrumb"},"isPartOf":{"@type":"WebSite","name":"PiXiEED","url":"https://pixieed.jp/"}},{"@type":"BreadcrumbList","@id":"https://pixieed.jp/output/audio-formats/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"PiXiEED","item":"https://pixieed.jp/"},{"@type":"ListItem","position":2,"name":"ファイル変換","item":"https://pixieed.jp/output/"},{"@type":"ListItem","position":3,"name":"AIFF・AU・WAVに変換・保存","item":"https://pixieed.jp/output/audio-formats/"}]}]}</script>
+</head>
+<body data-page="tools" class="app-page conversion-formats-page">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner">
+    <a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a>
+    <nav class="site-nav" aria-label="メインナビゲーション"><a data-nav="home" href="/globe/">世界地図</a><a data-nav="works" href="/works/">絵</a><a data-nav="stores" href="/stores/">お店</a><a data-nav="collection" href="/collection/">集めた</a><a data-nav="tools" href="/tools/">ツール</a></nav>
+  </div></header>
+  <nav class="mobile-nav" aria-label="アプリナビゲーション"><a data-nav="home" href="/globe/"><span aria-hidden="true">⌖</span>世界地図</a><a data-nav="works" href="/works/"><span aria-hidden="true">▧</span>絵</a><a data-nav="stores" href="/stores/"><span aria-hidden="true">⌂</span>お店</a><a data-nav="collection" href="/collection/"><span aria-hidden="true">✳</span>集めた</a><a data-nav="tools" href="/tools/"><span aria-hidden="true">✦</span>ツール</a></nav>
+  <main id="main" class="format-guide">
+    <nav class="format-breadcrumbs" aria-label="パンくずリスト"><a href="/">ホーム</a><span aria-hidden="true">›</span><a href="/output/">ファイル変換</a><span aria-hidden="true">›</span><span aria-current="page">AIFF・AU・WAVに変換・保存</span></nav>
+    <header class="format-guide-hero">
+      <p class="format-eyebrow">PiXiEED · 形式ガイド</p>
+      <h1>AIFF・AU・WAVに変換・保存</h1>
+      <p>音声を指定のPCM形式で渡したい方へ。拡張子だけでなく、ビット深度と読み込み条件まで確認できます。</p>
+      <a class="format-start" href="/output/work/?mode=convert">ファイルを選んで変換</a>
+      <p class="format-small">登録不要・無料。ファイルは端末内で処理します。保存形式は読み込み後に選びます。</p>
+    </header>
+    <nav class="format-toc" aria-label="音声形式から探す"><a href="#aiff">AIFF / AIF / AIFC</a><a href="#au">AU / SND</a><a href="#wav">WAV</a><a href="#bit-depth">16・24・32bit</a><a href="#audio-help">音声が変換できないとき</a></nav>
+    <section aria-labelledby="audio-steps">
+      <h2 id="audio-steps">WAV・AIFF・AUへ保存する手順</h2>
+      <ol class="format-steps"><li><strong>音声ファイルを選ぶ</strong><p>読み込みに成功すると、サンプルレート・チャンネル数・秒数が表示されます。変換前に確認してください。</p></li><li><strong>保存形式とビット深度を選ぶ</strong><p>WAV・AIFF・AUを選びます。16bitが標準です。必要なときだけ「音声の詳細設定」を開いて24bitまたは32bitを選びます。</p></li><li><strong>変換して保存する</strong><p>完了後に「保存する」を押します。音声ファイルはサーバーへアップロードせず、端末内で処理します。</p></li></ol>
+      <p class="format-note">音声は120秒以内、モノラル/ステレオ、8〜48kHzが対象です。1ファイル64MBまでですが、ブラウザーが読み込む一部の音声は4MBまでです。読み込み時に再サンプリングされる場合があり、元ファイルのタグ・ジャケット画像などは保持しません。</p>
+    </section>
+    <section id="aiff" aria-labelledby="aiff-title">
+      <h2 id="aiff-title">WAVからAIFFへ・AIFFからWAVへ変換</h2>
+      <p>AIFFファイルを作るには、WAVなどの読み込める音声を選び、保存形式に「AIFF」を指定します。出力は非圧縮の整数PCMで、16・24・32bitから選べます。保存ファイルの拡張子は.aiffです。</p>
+      <p>.aif / .aiffの入力と、対応するPCM方式のAIFCを読み込めます。AIFCという拡張子だけで判断せず、内部が対応するPCMである必要があります。圧縮AIFCをすべて読み込む機能や、AIFCとして書き出す機能ではありません。</p>
+      <p class="format-example">変換例：WAV → AIFF、AIFF → WAV、AIF → WAV、対応するPCM AIFC → WAV</p>
+    </section>
+    <section id="au" aria-labelledby="au-title">
+      <h2 id="au-title">WAVからAUへ・AU / SNDからWAVへ変換</h2>
+      <p>AU（Sun / NeXT）形式で音声を保存したい場合は、保存形式に「AU」を指定します。書き出すのは整数PCMのAUで、16・24・32bitを選べます。AUのμ-lawやA-lawを読み込めても、その方式で書き出す機能はありません。</p>
+      <p>入力はAUヘッダーを持つ.au / .sndで、対応するPCM・浮動小数点・μ-law・A-lawを扱います。.sndという名前でも別の内部形式なら読み込めません。読み込み後に表示されたサンプルレートや秒数を確認してください。</p>
+      <p class="format-example">変換例：WAV → AU、AIFF → AU、AU → WAV、AU → AIFF、AU形式のSND → WAV</p>
+    </section>
+    <section id="wav" aria-labelledby="wav-title">
+      <h2 id="wav-title">AIFF・AU・読み込めるMP3からWAVへ変換</h2>
+      <p>保存形式「WAV」は整数PCMで書き出します。対応するAIFFやAUをWAVへ変換できます。MP3などはブラウザーが読み込める場合に利用できますが、同じ拡張子の全ファイルに対応する保証はありません。</p>
+      <p>MP3などの非可逆圧縮からWAVに変えても、圧縮時に失われた情報は復元されません。出力サイズが大きくなる場合もあります。音声の長さや形式を確認してから利用してください。</p>
+      <p class="format-example">変換例：AIFF → WAV、AU → WAV、MP3 → WAV（ブラウザーが読み込める場合）</p>
+    </section>
+    <section id="bit-depth" aria-labelledby="bit-depth-title">
+      <h2 id="bit-depth-title">16bit・24bit・32bit PCMの選び方と制限</h2>
+      <dl class="format-definitions"><div><dt>16bit PCM</dt><dd>変換画面の標準設定です。受け取り側からビット深度の指定がない場合の初期値です。</dd></div><div><dt>24bit / 32bit PCM</dt><dd>受け取り側の仕様に合わせる場合に選択します。この出力の32bitは整数PCMであり、32bit floatではありません。</dd></div></dl>
+      <p>数値を増やしても元の音声情報は増えません。ブラウザー経由の読み込みでは再サンプリングや精度の変化が起こる場合があるため、元ファイルのビット単位での一致は保証しません。この画面にサンプルレートを自由に指定して変更する機能はありません。</p>
+      <p>WAV・AIFF・AUのPCM書き出しでは、読み込み後のサンプル数とサンプルレートを使用し、録音方式の圧縮出力のような前後の無音を追加しません。元のファイルを残し、納品先の仕様と変換結果を照合してください。</p>
+    </section>
+    <section id="audio-help" aria-labelledby="audio-help-title">
+      <h2 id="audio-help-title">音声が変換できないとき</h2>
+      <details><summary>AUを選べますが、μ-lawで保存できますか？</summary><p>できません。μ-law・A-lawは読み込み側の対応で、AUの保存は整数PCMです。必要な符号化方式と拡張子を別々に確認してください。</p></details>
+      <details><summary>音声の容量が小さくても読み込めません</summary><p>120秒、チャンネル数、8〜48kHzの範囲、内部のコーデックを確認してください。容量と長さは別の制限です。ブラウザーによる読み込みにも対応差があります。</p></details>
+      <details><summary>M4A・Ogg・WebMはどう違いますか？</summary><p>対応するブラウザーで作成できるときだけ表示される圧縮出力です。作成には音声の長さ程度の時間がかかり、先頭40ms・末尾80msの無音を加えます。処理中に画面を離れると中止します。このガイドで扱うPCM出力とは動作が異なります。</p></details>
+      <details><summary>詳しい作業画面との違いは？</summary><p>AIFF・AUやPCMビット深度の選択には「ファイルを選んで変換」から簡易変換を利用してください。画像やGIFに音楽を重ねる場合は、<a href="/output/work/">詳細ワークスペース</a>を使います。</p></details>
+    </section>
+    <section class="format-next" aria-labelledby="format-next-title">
+      <h2 id="format-next-title">形式を決めたら、変換へ</h2>
+      <p>元のファイルは変更しません。必要な形式が一覧にあることを確認し、変換後のファイルを保存してください。</p>
+      <a class="format-start" href="/output/work/?mode=convert">変換画面を開く</a>
+      <p><a href="/output/">すべての変換機能と対応条件</a> · <a href="/output/image-formats/">TGA・QOI・TIFFなどの画像変換</a></p>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/" aria-label="PiXiEED ホーム"><span class="brand-mark" aria-hidden="true">P</span><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
+  <script type="module" src="/js/app.js?rev=20261024-common-tool-start-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
+</body>
+</html>
