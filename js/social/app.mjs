@@ -22,10 +22,20 @@ export function readFeedView(href) {
   const value = new URL(href, 'https://pixieed.invalid').searchParams.get('view');
   return value === 'drafts' ? 'local' : Object.hasOwn(FEED_VIEWS, value) ? value : 'feed';
 }
-export function feedViewUrl(href, view) {
+export function readFeedQuery(href, view = readFeedView(href)) {
+  return view === 'feed' ? new URL(href, 'https://pixieed.invalid').searchParams.get('q')?.trim() || '' : '';
+}
+export function feedViewUrl(href, view, query) {
   const url = new URL(href, 'https://pixieed.invalid');
-  if (view === 'feed' || !Object.hasOwn(FEED_VIEWS, view)) url.searchParams.delete('view');
-  else url.searchParams.set('view', view === 'local' ? 'drafts' : view);
+  const targetView = Object.hasOwn(FEED_VIEWS, view) ? view : 'feed';
+  if (targetView === 'feed') url.searchParams.delete('view');
+  else url.searchParams.set('view', targetView === 'local' ? 'drafts' : targetView);
+  if (targetView !== 'feed') url.searchParams.delete('q');
+  else if (query !== undefined) {
+    const normalizedQuery = String(query || '').trim();
+    if (normalizedQuery) url.searchParams.set('q', normalizedQuery);
+    else url.searchParams.delete('q');
+  }
   return `${url.pathname}${url.search}${url.hash}`;
 }
 const uuid = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
@@ -463,7 +473,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       } catch (error) {
         if (generation !== viewGeneration) return;
         $('#mineStatus', documentRef).textContent = `自分の投稿を読み込めませんでした。${niceError(error, '')}`;
-        if (!push) windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, prior));
+        if (!push) windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, prior, state.query));
         return;
       }
     }
@@ -473,7 +483,11 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     state.filter = view === 'local' || view === 'saved' ? view : view === 'feed' ? saved?.filter && !['saved', 'local'].includes(saved.filter) ? saved.filter : 'all' : 'all';
     state.query = view === 'feed' ? saved?.query || '' : '';
     const search = $('#socialSearch', documentRef); if (search) search.value = state.query;
-    if (push && prior !== view) windowRef.history.pushState({ ...(windowRef.history.state || {}), socialView: view }, '', feedViewUrl(windowRef.location.href, view));
+    if (prior !== view) {
+      const url = feedViewUrl(windowRef.location.href, view, state.query);
+      if (push) windowRef.history.pushState({ ...(windowRef.history.state || {}), socialView: view }, '', url);
+      else windowRef.history.replaceState(windowRef.history.state || {}, '', url);
+    }
     render(); void savePreferences({ filter: state.filter });
     if (restore && prior !== view) windowRef.scrollTo({ top: saved?.scroll || 0, behavior: 'instant' });
   }
@@ -1396,9 +1410,10 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     updateFilters(); renderDrafts();
     const params = new URLSearchParams(windowRef.location.search);
     const initialView = params.has('view') ? readFeedView(windowRef.location.href) : 'feed';
+    const initialQuery = readFeedQuery(windowRef.location.href, initialView);
     if (initialView !== currentView()) await navigateView(initialView, { push: false, restore: false });
-    windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, currentView()));
-    state.query = params.get('q')?.trim() || '';
+    state.query = initialQuery;
+    windowRef.history.replaceState(windowRef.history.state || {}, '', feedViewUrl(windowRef.location.href, currentView(), state.query));
     const search = ensureSearch();
     if (state.query) search.focus({ preventScroll: true });
     const postRef = params.get('post'), outputRef = params.get('output'), compose = params.get('compose');

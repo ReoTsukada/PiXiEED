@@ -66,14 +66,20 @@ export function createIndexedDbDraftAdapter(indexedDb = globalThis.indexedDB, db
       const db = await database;
       return new Promise((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite'); const store = transaction.objectStore(STORE_NAME);
-        let conflict = false;
+        let conflict = false; let writeError = null;
         const request = store.get(draftId);
         request.onsuccess = () => {
           if (headOf(request.result) !== expectedHead) { conflict = true; transaction.abort(); return; }
-          try { store.put(copy(record)); } catch { transaction.abort(); }
+          try {
+            const putRequest = store.put(copy(record));
+            putRequest.onerror = () => { writeError = putRequest.error || null; };
+          } catch (error) { writeError = error; transaction.abort(); }
         };
         transaction.oncomplete = () => resolve();
-        transaction.onerror = transaction.onabort = () => reject(conflict ? new LocalDraftConflictError() : isQuota(transaction.error) ? new LocalDraftQuotaError() : transaction.error || new Error('Could not save local draft'));
+        transaction.onerror = transaction.onabort = () => {
+          const failure = writeError || transaction.error;
+          reject(conflict ? new LocalDraftConflictError() : isQuota(failure) ? new LocalDraftQuotaError() : failure || new Error('Could not save local draft'));
+        };
       });
     }
   };
@@ -115,8 +121,8 @@ export function createLocalDraftStore(adapter = createIndexedDbDraftAdapter(), {
   async function save({ draftId = idFactory(), kind, ownerId = 'local-owner', document, source = { type: 'hand_drawn', assetId: null, revisionId: null }, preview = null, expectedRevisionId }) {
     if (typeof draftId !== 'string' || !draftId || !document || typeof document !== 'object') throw new TypeError('Draft id and document are required');
     if (expectedRevisionId !== undefined && expectedRevisionId !== null && typeof expectedRevisionId !== 'string') throw new TypeError('expectedRevisionId must be a revision id or null');
-    const documentHash = await hashCanonical(document);
     const snapshot = copy(document);
+    const documentHash = await hashCanonical(snapshot);
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const previous = await adapter.get(draftId);
       if (previous) await validateRecord(previous);

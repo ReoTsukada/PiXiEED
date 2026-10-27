@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isToolsHubPath, mountToolHelp } from '../../js/tool-help.mjs?rev=20261003-tool-help-1';
+import { isToolsHubPath, mountToolHelp } from '../../js/tool-help.mjs?rev=20261027-guide-constraints-1';
 
 test('tool help module imports without a browser document', () => {
   assert.equal(typeof mountToolHelp, 'function');

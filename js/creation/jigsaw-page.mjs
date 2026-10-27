@@ -54,10 +54,11 @@ let jigsawHintTimer = 0;
 let pxdOriginalRefs = null; let pxdPreservedPayload = null; let pxdBridge = null; let pendingPxdSource = null;
 let activePointer = null; let panGesture = null; let pendingPaint = 0; let view = { scale: 1, x: 0, y: 0 }; let lastWorkspaceSize = null;
 let publishBusy = false;
-let resultRun = 0; let resultShownRun = -1; let resultTimer = 0;
+let resultRun = 0; let resultShownRun = -1; let resultTimer = 0; let resumeRequestId = 0;
 const MAX_TRAY_DOM = 80;
 const jigsawResult = createToolResultView({ key: 'jigsaw-result', main: $('#main'), returnLabel: '問題一覧に戻る', returnHref: '/jigsaw/',
   beforeShow: closeSourcePreview, onReturn: showJigsawList, onClose: () => { if (game && !playSection.hidden) queuePaint(); } });
+function invalidatePendingJigsawResume() { resumeRequestId += 1; }
 function cancelJigsawResult(openingNewRun = false) {
   window.clearTimeout(resultTimer); resultTimer = 0;
   if (openingNewRun) resultRun += 1;
@@ -599,6 +600,7 @@ function showGame() {
 }
 
 function showJigsawList() {
+  invalidatePendingJigsawResume(); resumeButton.disabled = false;
   cancelJigsawResult(); closeSourcePreview(); cancelPendingPaint();
   window.clearTimeout(jigsawHintTimer); jigsawHintTimer = 0; jigsawHint = null;
   document.querySelector('.jigsaw-more')?.removeAttribute('open');
@@ -629,6 +631,7 @@ function requestJigsawHint() {
 
 async function startGame() {
   if (sourceKind.value === 'draw' && !adapter) return;
+  invalidatePendingJigsawResume(); resumeButton.disabled = false;
   const pendingSource = pendingPxdSource;
   cancelJigsawResult(true); resultShownRun = -1;
   setSourcePreview(null);
@@ -733,51 +736,69 @@ async function saveGame() {
 }
 
 async function resumeGame(requestedDraftId = null) {
-  cancelJigsawResult(true); resultShownRun = -1;
   if (!draftStore || !adapter) return;
-  setSourcePreview(null);
+  const requestId = ++resumeRequestId; const initialGame = game; const initialGameDraftId = gameDraftId; const initialResultRun = resultRun;
+  const isCurrent = () => requestId === resumeRequestId && game === initialGame && gameDraftId === initialGameDraftId && resultRun === initialResultRun;
   const draftId = requestedDraftId || localStorageValue(JIGSAW_LAST_DRAFT_KEY);
   if (!draftId) { resumeButton.hidden = true; updateStatus('前回のパズルはありません。'); return; }
   resumeButton.disabled = true; updateStatus('前回の配置と元の固定版を確認しています…');
+  let installed = false;
+  const isLatestRequest = () => requestId === resumeRequestId;
   try {
     const revision = await draftStore.load(draftId);
+    if (!isCurrent()) return;
     if (!revision || revision.asset.kind !== 'jigsaw' || revision.asset.owner.type !== 'local' || revision.asset.owner.id !== 'local-owner' || revision.asset.visibility !== 'draft') throw new Error('保存したパズルが見つかりません');
     const stored = revision.document; const isLegacy = stored?.schemaVersion === 1;
     const savedGame = isLegacy ? stored : validateJigsawWorkspace(stored);
     if (savedGame.gameId !== draftId) throw new Error('パズルIDが一致しません');
-    let rgba; let width; let height;
+    let rgba; let width; let height; let nextSourceDraftId = null; let nextSourceRevision = null; let nextSourceLabel = '';
     if (savedGame.source.type === 'public') {
       if (savedGame.source.puzzleMode === 'jigsaw') {
         const publicId = /^map:([a-f\d-]{36})$/i.exec(savedGame.source.postId)?.[1];
         const current = publicId ? await readPublishedJigsaw(publicId) : null;
+        if (!isCurrent()) return;
         if (!current || current.url !== savedGame.source.url || current.width !== savedGame.layout.width || current.height !== savedGame.layout.height
           || current.definition.pieceSize !== savedGame.layout.pieceSize || current.definition.seed !== savedGame.layout.seed) throw new Error('公開ジグソーの定義が保存時と一致しません。端末内の配置は保持しています');
       }
       await assertListedPublicSource(savedGame.source.postId, savedGame.source.url, savedGame.source.puzzleId || null);
-      const bytes = await fetchImageBytes(savedGame.source.url); if (await fingerprintBytes(bytes) !== savedGame.source.fingerprint) throw new Error('公開画像が保存時から変わっています。別の絵へ自動変更はしません');
-      const blobUrl = URL.createObjectURL(new Blob([bytes])); try { rgba = boundedRgba(await decodeImage(blobUrl)); } finally { URL.revokeObjectURL(blobUrl); }
+      if (!isCurrent()) return;
+      const bytes = await fetchImageBytes(savedGame.source.url);
+      if (!isCurrent()) return;
+      const fingerprint = await fingerprintBytes(bytes);
+      if (!isCurrent()) return;
+      if (fingerprint !== savedGame.source.fingerprint) throw new Error('公開画像が保存時から変わっています。別の絵へ自動変更はしません');
+      const blobUrl = URL.createObjectURL(new Blob([bytes])); try { const decoded = await decodeImage(blobUrl); if (!isCurrent()) return; rgba = boundedRgba(decoded); } finally { URL.revokeObjectURL(blobUrl); }
       width = rgba.width; height = rgba.height; if (width !== savedGame.source.width || height !== savedGame.source.height) throw new Error('公開画像のサイズが保存時から変わっています。別の絵へ自動変更はしません');
-      sourceLabel.textContent = `${savedGame.source.title} · PiXiEEDの投稿`;
+      nextSourceLabel = `${savedGame.source.title} · PiXiEEDの投稿`;
     } else if (savedGame.source.type === 'file') {
-      validateJigsawSource(savedGame.source); if (await fingerprintBytes(bytesFromDataUrl(savedGame.source.dataUrl)) !== savedGame.source.fingerprint) throw new Error('保存した画像の内容が一致しません。別の絵へ自動変更はしません'); rgba = boundedRgba(await decodeImage(savedGame.source.dataUrl)); width = rgba.width; height = rgba.height;
-      if (width !== savedGame.source.width || height !== savedGame.source.height) throw new Error('保存した画像サイズが一致しません。別の絵へ自動変更はしません'); sourceLabel.textContent = '端末で選んだ画像';
+      validateJigsawSource(savedGame.source); const fileFingerprint = await fingerprintBytes(bytesFromDataUrl(savedGame.source.dataUrl));
+      if (!isCurrent()) return;
+      if (fileFingerprint !== savedGame.source.fingerprint) throw new Error('保存した画像の内容が一致しません。別の絵へ自動変更はしません');
+      const decoded = await decodeImage(savedGame.source.dataUrl); if (!isCurrent()) return; rgba = boundedRgba(decoded); width = rgba.width; height = rgba.height;
+      if (width !== savedGame.source.width || height !== savedGame.source.height) throw new Error('保存した画像サイズが一致しません。別の絵へ自動変更はしません'); nextSourceLabel = '端末で選んだ画像';
     } else {
       const fixedSource = await resolveLocalDrawRevision(adapter, savedGame.source.draftId, savedGame.source.revisionId);
+      if (!isCurrent()) return;
       if (fixedSource.asset.assetId !== savedGame.source.assetId || fixedSource.documentHash !== savedGame.source.contentHash || fixedSource.hashScheme !== savedGame.source.hashScheme) throw new Error('元の保存版が一致しません。別の版へ自動変更はしません');
-      sourceDraftId = savedGame.source.draftId; sourceRevision = fixedSource; width = fixedSource.document.width; height = fixedSource.document.height; rgba = { width, height, rgba: documentRgba(fixedSource.document) };
-      sourceLabel.textContent = `自分の保存版 ${fixedSource.revisionId.slice(0, 8)} · ${width}×${height}px`;
+      nextSourceDraftId = savedGame.source.draftId; nextSourceRevision = fixedSource; width = fixedSource.document.width; height = fixedSource.document.height; rgba = { width, height, rgba: documentRgba(fixedSource.document) };
+      nextSourceLabel = `自分の保存版 ${fixedSource.revisionId.slice(0, 8)} · ${width}×${height}px`;
     }
+    let nextLayoutData; let nextGame;
     if (isLegacy) {
-      layoutData = createJigsawLayout({ width, height, pieceSize: 'auto', seed: savedGame.gameId, legacyGridSize: savedGame.gridSize });
-      game = migrateLegacyJigsawGame(savedGame, { width, height, seed: savedGame.gameId });
+      nextLayoutData = createJigsawLayout({ width, height, pieceSize: 'auto', seed: savedGame.gameId, legacyGridSize: savedGame.gridSize });
+      nextGame = migrateLegacyJigsawGame(savedGame, { width, height, seed: savedGame.gameId });
     } else {
       if (savedGame.layout.width !== width || savedGame.layout.height !== height) throw new Error('保存した作業スペースと元画像の寸法が一致しません');
-      layoutData = createJigsawLayout(savedGame.layout);
-      if (layoutData.columns !== savedGame.layout.columns || layoutData.rows !== savedGame.layout.rows || layoutData.pieceSize !== savedGame.layout.pieceSize) throw new Error('保存したピース境界を再現できません');
-      game = savedGame;
+      nextLayoutData = createJigsawLayout(savedGame.layout);
+      if (nextLayoutData.columns !== savedGame.layout.columns || nextLayoutData.rows !== savedGame.layout.rows || nextLayoutData.pieceSize !== savedGame.layout.pieceSize) throw new Error('保存したピース境界を再現できません');
+      nextGame = savedGame;
     }
-    clearSelectionCache();
-    pieces = sliceJigsawPieces(rgba, layoutData); setSourcePreview(rgba); gameDraftId = draftId; selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
+    const nextPieces = sliceJigsawPieces(rgba, nextLayoutData);
+    if (!isCurrent()) return;
+    cancelJigsawResult(true); resultShownRun = -1; clearSelectionCache();
+    game = nextGame; layoutData = nextLayoutData; pieces = nextPieces; sourceDraftId = nextSourceDraftId; sourceRevision = nextSourceRevision; sourceLabel.textContent = nextSourceLabel; gameDraftId = draftId; selectedGroupId = null; trayPage = 0; view = { scale: 1, x: 0, y: 0 };
+    installed = true;
+    setSourcePreview(rgba);
     pxdOriginalRefs = null; pxdPreservedPayload = null; pxdBridge?.reset();
     showGame();
     if (savedGame.viewport && !isLegacy) {
@@ -785,7 +806,8 @@ async function resumeGame(requestedDraftId = null) {
       renderGame();
     }
     resumeButton.disabled = false; updateStatus(isLegacy ? '前回の配置を新しい作業スペースへ引き継ぎました。元の履歴は残っています。' : '前回の配置を、同じ元の固定版で再開しました。');
-  } catch (error) { resumeButton.disabled = false; updateStatus(`再開できませんでした：${error.message}`); }
+  } catch (error) { if (isCurrent() || installed && isLatestRequest()) updateStatus(`再開できませんでした：${error.message}`); }
+  finally { if (isLatestRequest()) resumeButton.disabled = false; }
 }
 
 function resolveJigsawRouteId(name) {
@@ -803,6 +825,7 @@ async function readPublishedJigsaw(postId) {
 }
 async function openPublishedJigsaw(postId) {
   if (!postId) { updateStatus('公開ジグソーのIDを確認できません。'); return; }
+  invalidatePendingJigsawResume(); resumeButton.disabled = false;
   updateStatus('公開されたジグソーを確認しています…');
   try {
     const publicPuzzle = await readPublishedJigsaw(postId);
@@ -859,6 +882,7 @@ async function encodePxdJigsawImage(image) {
 }
 
 async function openPxdJigsaw(project) {
+  invalidatePendingJigsawResume(); resumeButton.disabled = false;
   cancelJigsawResult(true); resultShownRun = -1;
   if (!draftStore || !adapter) throw new Error('端末内保存を利用できません。');
   pendingPxdSource = null; delete globalThis.__pixieedJigsawPendingSourcePreview;
@@ -984,7 +1008,7 @@ sourceKind.addEventListener('change', sourceChoiceStatus);
 sourceSelect.addEventListener('change', sourceChoiceStatus);
 publicSelect.addEventListener('change', sourceChoiceStatus);
 fileInput.addEventListener('change', sourceChoiceStatus);
-resumeButton.addEventListener('click', resumeGame);
+resumeButton.addEventListener('click', () => { void resumeGame(); });
 saveButton.addEventListener('click', saveGame);
 trayElement.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-group-id]'); if (!button || !game) return;
@@ -1034,6 +1058,7 @@ globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('
 });
 
 $('#jigsaw-new').addEventListener('click', () => {
+  invalidatePendingJigsawResume(); resumeButton.disabled = false;
   levelTracker.reset(); levelTracker = createLevelTracker('jigsaw'); levelGameId = null;
   cancelJigsawResult(true); resultShownRun = -1;
   setSourcePreview(null);
@@ -1050,7 +1075,7 @@ $('#jigsaw-new').addEventListener('click', () => {
   pendingPxdSource = null; delete globalThis.__pixieedJigsawPendingSourcePreview;
   updateStatus('絵とむずかしさを選んでください。');
 });
-$('#jigsaw-current').addEventListener('click', () => { if (game) { showGame(); workspaceElement.focus({ preventScroll: true }); } });
+$('#jigsaw-current').addEventListener('click', () => { if (game) { invalidatePendingJigsawResume(); resumeButton.disabled = false; showGame(); workspaceElement.focus({ preventScroll: true }); } });
 publishButton?.addEventListener('click', () => { void prepareJigsawPost(); });
 
 jigsawHintButton?.addEventListener('click', () => { void requestJigsawHint(); });

@@ -6,6 +6,7 @@ const DATABASE_NAME = 'pixieed-pxd-v1';
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'projects';
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+const isQuotaError = (error) => error?.name === 'QuotaExceededError' || error?.code === 22;
 
 export class PxdStoreError extends Error {
   constructor(code, message = code) { super(message); this.name = 'PxdStoreError'; this.code = code; }
@@ -156,7 +157,7 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
       return new Promise((resolve, reject) => {
         const transaction = database.transaction(STORE_NAME, 'readwrite');
         const store = transaction.objectStore(STORE_NAME); const request = store.get(projectId);
-        let conflict = false; let failure = false; let deleted = false;
+        let conflict = false; let failure = false; let deleted = false; let writeError = null;
         request.onsuccess = () => {
           const row = request.result; const current = row?.history?.at(-1)?.revisionId ?? null;
           if (current !== expectedRevisionId) { conflict = true; transaction.abort(); return; }
@@ -164,13 +165,14 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
           try {
             if (row?.history?.some((item) => item.revisionId === record.revisionId)) { failure = true; transaction.abort(); return; }
             const history = [...(row?.history ?? []), copyRecord(record)];
-            store.put({ projectId, history });
-          } catch { failure = true; transaction.abort(); }
+            const write = store.put({ projectId, history });
+            write.onerror = () => { writeError = write.error ?? writeError; };
+          } catch (error) { failure = true; writeError = error; transaction.abort(); }
         };
         request.onerror = () => { failure = true; transaction.abort(); };
         transaction.oncomplete = () => resolve();
-        transaction.onabort = () => reject(conflict ? new PxdStoreConflictError() : deleted ? new PxdStoreError('PXD_PROJECT_DELETED', 'このPXDプロジェクトは削除済みです。復元してから保存してください。') : new PxdStoreError('PXD_IDB_WRITE_FAILED'));
-        transaction.onerror = () => { failure = true; };
+        transaction.onabort = () => reject(conflict ? new PxdStoreConflictError() : deleted ? new PxdStoreError('PXD_PROJECT_DELETED', 'このPXDプロジェクトは削除済みです。復元してから保存してください。') : isQuotaError(writeError) || isQuotaError(transaction.error) ? new PxdStoreError('PXD_STORE_QUOTA', '端末の空き容量が足りないため保存できませんでした。今の編集内容は残っています。空き容量を確保してから、もう一度保存してください。') : new PxdStoreError('PXD_IDB_WRITE_FAILED'));
+        transaction.onerror = (event) => { failure = true; if (!isQuotaError(writeError)) writeError = transaction.error ?? event?.target?.error ?? writeError; };
       });
     },
     async setDeleted(projectId, expectedRevisionId, deletedAt, restoreRecord = null) {
