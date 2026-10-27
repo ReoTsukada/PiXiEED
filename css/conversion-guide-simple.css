@@ -1,0 +1,18 @@
+/* A short entry point; detailed help is available without interrupting the task. */
+.output-guide-page { font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP",sans-serif; }
+.output-guide-page .landing-main > .guide-format-summary { grid-row:3; }
+.output-guide-page .landing-main > .guide-help { grid-row:4; }
+.output-guide-page .landing-hero { padding:32px; }
+.output-guide-page .landing-hero h1 { font-size:clamp(2rem,4.2vw,3rem); line-height:1.35; }
+.output-guide-page .guide-format-summary { margin:28px 0 0; }
+.output-guide-page .guide-format-summary h2 { font-size:1rem; line-height:1.7; margin:0 0 8px; }
+.output-guide-page .guide-format-summary > p { font-size:.83rem; line-height:2; color:#516257; }
+.output-guide-page .guide-format-copy { padding:0 18px 16px; font-size:.82rem; line-height:1.85; }
+.output-guide-page .guide-format-copy h3 { font-size:.9rem; margin:16px 0 6px; }
+.output-guide-page .guide-help { margin-top:12px; }
+.output-guide-page .guide-help > .output-purpose-nav, .output-guide-page .guide-help > .output-guide-context { padding:0 16px; margin-top:10px; }
+.output-guide-page .guide-help .guide-task-panel { padding:18px; border:0; }
+.output-guide-page .guide-help .guide-steps { grid-template-columns:1fr; }
+.output-guide-page .output-guide-return { background:transparent; border:0; border-top:1px solid var(--guide-border); border-radius:0; padding:24px 0; }
+@media(min-width:1120px) { .output-guide-page .landing-main > :is(.guide-format-summary,.guide-help) { grid-column:1; }.output-guide-page .landing-main > .output-guide-ad { grid-row:2 / span 3; } }
+@media(max-width:600px) { .output-guide-page .landing-hero { padding:22px; }.output-guide-page .guide-help .guide-purpose-caption { display:none; } }

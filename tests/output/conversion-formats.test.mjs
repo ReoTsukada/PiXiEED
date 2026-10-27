@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {encodeRaster,decodeRaster,sniffRaster,RASTER_MIME} from '../../js/creation/conversion-raster.mjs';
+import {encodePcm,decodePcm,sniffPcm} from '../../js/creation/conversion-pcm.mjs';
+import {safeConvertedName,shouldUseSimpleConversion,conversionChoices} from '../../js/creation/conversion-service.mjs';
+const sample={width:3,height:2,data:new Uint8ClampedArray([255,0,0,255,0,255,0,127,0,0,255,0,30,40,50,255,1,2,3,200,10,20,30,255])};
+const bytes=async blob=>new Uint8Array(await blob.arrayBuffer());
+for(const format of Object.keys(RASTER_MIME))test(`${format}: valid signature, dimensions, pixels and alpha`,async()=>{
+ const blob=encodeRaster(sample,format);assert.equal(blob.type,RASTER_MIME[format]);const b=await bytes(blob),kind=sniffRaster(b,`file.${format}`),f=decodeRaster(b,kind);assert.equal(f.width,3);assert.equal(f.height,2);
+ if(['qoi','tiff','tga','ico','pam'].includes(format))assert.deepEqual(f.data,sample.data);
+ else {assert.equal(f.data.length,24);assert.equal(f.data[3],255);}
+});
+for(const format of Object.keys(RASTER_MIME))test(`${format}: truncated input rejected`,async()=>{const b=await bytes(encodeRaster(sample,format));const kind=sniffRaster(b,`file.${format}`);const limit=format==='tga'?20:Math.min(b.length-1,24);assert.throws(()=>decodeRaster(b.slice(0,limit),kind));});
+test('no cross-format interpretation or extension-only format change',async()=>{assert.throws(()=>decodeRaster(awaitless,'qoi'));const b=await bytes(encodeRaster(sample,'bmp'));assert.throws(()=>decodeRaster(b,'qoi'));});
+const awaitless=new Uint8Array(24);
+test('dimension and integer bounds before output allocation',()=>{for(const shape of [[0,1],[9000,1],[4096,4096],[1.5,1]])assert.throws(()=>encodeRaster({width:shape[0],height:shape[1],data:new Uint8Array(4)},'qoi'));});
+test('QOI dimension bomb rejected before allocation',async()=>{const b=await bytes(encodeRaster(sample,'qoi'));new DataView(b.buffer).setUint32(4,0xffffffff);assert.throws(()=>decodeRaster(b,'qoi'));});
+test('ICO dimensions are capped at 256px',()=>assert.throws(()=>encodeRaster({width:257,height:1,data:new Uint8Array(1028)},'ico')));
+test('PNM binary raster whitespace is a pixel, not discarded',()=>{const h=new TextEncoder().encode('P6\n1 1\n255\n'),b=new Uint8Array(h.length+3);b.set(h);b.set([10,32,35],h.length);assert.deepEqual([...decodeRaster(b,'pnm').data],[10,32,35,255]);});
+test('PNM ASCII comments, 16bit scaling and black-white polarity',()=>{for(const [text,rgba] of [['P3\n# test\n1 1\n65535\n65535 0 32768',[255,0,128,255]],['P1\n1 1\n1',[0,0,0,255]]])assert.deepEqual([...decodeRaster(new TextEncoder().encode(text),'pnm').data],rgba);});
+test('PAM CRLF header accepted',async()=>{const b=await bytes(encodeRaster(sample,'pam'));const end=new TextDecoder().decode(b).indexOf('ENDHDR\n')+7;const head=new TextEncoder().encode(new TextDecoder().decode(b.subarray(0,end)).replaceAll('\n','\r\n'));const c=new Uint8Array(head.length+b.length-end);c.set(head);c.set(b.subarray(end),head.length);assert.deepEqual(decodeRaster(c,'pam').data,sample.data);});
+for(const fmt of ['aiff','au'])for(const bitDepth of [16,24,32])test(`${fmt} ${bitDepth}bit PCM preserves exact integer samples`,async()=>{
+ const factor=2**(bitDepth-1),channel=new Float64Array([-1,-1/factor,0,1/factor,(factor-1)/factor]);const source={channels:[channel,channel.slice()],sampleRate:16000};const b=await bytes(encodePcm(source,fmt,{bitDepth}));assert.equal(sniffPcm(b),fmt);const decoded=decodePcm(b);assert.equal(decoded.sampleRate,16000);assert.equal(decoded.channels.length,2);assert.deepEqual(decoded.channels[0],channel);
+});
+for(const bitDepth of [16,24,32])test(`WAV ${bitDepth}bit signed PCM header and exact sample value`,async()=>{const b=await bytes(encodePcm({channels:[new Float64Array([-.5,0,.5])],sampleRate:8000},'wav',{bitDepth}));const v=new DataView(b.buffer);assert.equal(new TextDecoder().decode(b.subarray(0,4)),'RIFF');assert.equal(v.getUint16(20,true),1);assert.equal(v.getUint16(34,true),bitDepth);assert.equal(v.getUint32(40,true),3*bitDepth/8);});
+test('malformed and oversized PCM rejected',()=>{for(const source of [{channels:[new Float32Array(1)],sampleRate:999999},{channels:[new Float32Array([NaN])],sampleRate:16000},{channels:[new Float32Array(1),new Float32Array(2)],sampleRate:16000}])assert.throws(()=>encodePcm(source,'aiff'));assert.throws(()=>decodePcm(new Uint8Array(2)));});
+test('source and persisted handoff routes cannot be hijacked',()=>{for(const search of ['', '?id=private&mode=convert','?mode=other','?mode=convert&id='])assert.equal(shouldUseSimpleConversion({pathname:'/output/work/',search}),false);assert.equal(shouldUseSimpleConversion({pathname:'/output/work/',search:'?mode=convert'}),true);assert.equal(shouldUseSimpleConversion({pathname:'/output/',search:'?mode=convert'}),false);});
+test('download filename strips path and control characters',()=>{assert.equal(safeConvertedName('../../secret.png','qoi'),'secret.qoi');assert.equal(safeConvertedName('<script>\u0000.png','tiff'),'-script--.tiff');assert.throws(()=>safeConvertedName('file','html'));});
+test('capabilities exclude unsupported MP3/FLAC and conditional image codecs',()=>{const audio=conversionChoices({kind:'audio'},{MediaRecorderImpl:null});assert.deepEqual(audio.map(x=>x.value),['wav','aiff','au']);const images=conversionChoices({kind:'image',frames:[sample]},{webp:false});assert.ok(!images.some(x=>['apng','webp'].includes(x.value)));assert.ok(images.some(x=>x.value==='qoi'));});
+test('public guide remains separate from local file handling and advertisements',async()=>{const root=new URL('../../',import.meta.url),html=await readFile(new URL('output/index.html',root),'utf8'),work=await readFile(new URL('output/work/index.html',root),'utf8');assert.match(html,/\/output\/work\/\?mode=convert/);assert.doesNotMatch(html,/<input[^>]+type="file"/);assert.equal((html.match(/data-output-guide-ad aria/g)||[]).length,1);assert.match(work,/conversion-entry\.mjs/);const code=await readFile(new URL('js/creation/conversion-page.mjs',root),'utf8');assert.doesNotMatch(code,/\b(fetch|XMLHttpRequest|adsbygoogle|localStorage|sessionStorage)\s*[.(]/);});

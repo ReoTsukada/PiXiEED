@@ -1,0 +1,55 @@
+.simple-conversion-page { background:#f7f8f6; color:#243a31; font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans CJK JP",sans-serif; }
+.simple-conversion-page .conversion-main { box-sizing:border-box; width:min(760px,calc(100% - 40px)); margin:36px auto 96px; }
+.conversion-main *, .conversion-main *::before, .conversion-main *::after { box-sizing:border-box; }
+.conversion-main [hidden] { display:none!important; }
+.conversion-main :is(h1,h2,button,input,select,summary) { font-family:inherit; }
+.conversion-main h1 { margin:20px 0 8px; font-size:clamp(1.65rem,4vw,2.2rem); font-weight:750; letter-spacing:-.025em; line-height:1.4; }
+.convert-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:.78rem; color:#53655c; }
+.convert-heading a { color:inherit; text-underline-offset:4px; }
+.convert-lead { margin:0 0 24px; color:#596a60; font-size:.95rem; line-height:1.8; }
+.convert-card { background:#fff; border:1px solid #d4ddd6; border-radius:20px; padding:28px; }
+.convert-drop { padding:28px 12px; border:1px dashed #b6c7bb; border-radius:12px; text-align:center; }
+.convert-drop.is-dragging { background:#e8f1e9; outline:2px solid #23583f; }
+.convert-drop-icon { display:block; margin-bottom:16px; font-size:2.2rem; color:#42664f; }
+.convert-drop p { margin:14px 0 7px; font-size:.85rem; color:#56685d; }
+.convert-drop small { font-size:.75rem; color:#5d6d64; }
+.conversion-main :is(button,a.convert-primary) { cursor:pointer; }
+.convert-primary,.convert-secondary { display:inline-flex; align-items:center; justify-content:center; min-height:48px; padding:11px 24px; border-radius:10px; font-size:.95rem; line-height:1.5; font-weight:700; text-decoration:none; border:1px solid transparent; }
+.convert-primary { background:#24593f; color:#fff; }
+.convert-primary:hover { background:#173e2b; }
+.convert-secondary { background:#fff; color:#345441; border-color:#cbd6cc; font-size:.82rem; padding:10px 14px; }
+.conversion-main button:disabled { cursor:wait; opacity:.6; }
+.convert-file { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+.convert-file > div { min-width:0; }
+.convert-file strong { display:block; overflow-wrap:anywhere; line-height:1.5; font-size:.98rem; }
+.convert-file p { margin:5px 0 0; color:#617167; font-size:.8rem; }
+.convert-file button { flex:none; }
+.convert-preview { display:flex; justify-content:center; align-items:center; margin:22px 0; padding:12px; background:repeating-conic-gradient(#f1f3f0 0 25%,#fff 0 50%) 0 / 16px 16px; border:1px solid #e1e7e0; border-radius:10px; }
+.convert-preview canvas { display:block; max-width:100%; max-height:260px; object-fit:contain; height:auto; }
+.convert-format { margin:24px 0 10px; }
+.conversion-main label { display:block; font-size:.85rem; font-weight:600; line-height:1.6; }
+.conversion-main :is(select,input[type=number]) { display:block; min-height:48px; width:100%; margin-top:6px; padding:10px 12px; border:1px solid #a9bdae; border-radius:8px; background:#fff; color:#243a31; font-size:1rem; }
+.conversion-main input[type=range] { display:block; width:100%; margin:12px 0; min-height:30px; accent-color:#24593f; }
+.conversion-main input[type=color] { display:block; margin-top:8px; width:72px; height:44px; border:1px solid #bccabe; border-radius:8px; background:#fff; }
+.convert-notice,.convert-source-note { font-size:.78rem; color:#5e675a; line-height:1.8; margin:10px 0 18px; }
+.convert-source-note { border-left:3px solid #ba9050; padding:8px 12px; background:#fbf7ed; }
+.convert-options { margin:20px 0; border-top:1px solid #e0e6df; border-bottom:1px solid #e0e6df; }
+.convert-options summary { cursor:pointer; padding:16px 0; min-height:48px; font-size:.84rem; font-weight:600; }
+.convert-options fieldset { border:0; padding:8px 0 16px; margin:0; min-width:0; }
+.convert-options legend { font-size:.8rem; color:#5c6e61; }
+.convert-options fieldset > label { margin-top:16px; }
+.convert-options p { font-size:.8rem; line-height:1.8; }
+.convert-fields { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.conversion-main .convert-check { display:flex; align-items:center; gap:10px; min-height:44px; }
+.convert-check input { width:18px; height:18px; accent-color:#24593f; }
+.convert-actions { display:flex; flex-wrap:wrap; gap:12px; }
+.convert-actions .convert-primary { flex:1; }
+.conversion-main progress { width:100%; height:10px; margin:20px 0 0; accent-color:#24593f; }
+.convert-status { margin:14px 0 0; min-height:1.5em; font-size:.85rem; line-height:1.8; overflow-wrap:anywhere; }
+.convert-support { margin:22px 4px; color:#586a5d; font-size:.8rem; line-height:1.9; }
+.convert-support a { color:#24593f; text-underline-offset:4px; }
+.convert-support summary { cursor:pointer; min-height:44px; padding:10px 0; }
+.convert-support details p { margin:0 0 12px; }
+.conversion-main :is(button,a,input,select,summary):focus-visible { outline:3px solid #285c48; outline-offset:4px; }
+@media(max-width:520px) { .simple-conversion-page .conversion-main { width:calc(100% - 28px); margin-top:24px; } .convert-card { padding:18px; border-radius:14px; }.convert-file { gap:12px; align-items:flex-start; }.convert-file button { min-height:44px; padding:8px 10px; }.convert-heading { font-size:.7rem; }.convert-drop { padding:26px 8px; }.convert-actions { flex-direction:column; }.convert-actions .convert-primary { width:100%; } }
+@media(prefers-reduced-motion:reduce) { .conversion-main * { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
