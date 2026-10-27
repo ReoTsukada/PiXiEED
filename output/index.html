@@ -74,6 +74,11 @@
           <p>各辺4096px・合計800万画素・1ファイル64MBまで。TIFFのCMYK・JPEG/Deflate圧縮・16bitや、HEIC/HEIF・PSD・RAW等は未対応です。SVG保存は画素を四角形で表す方式で、輪郭のベクター化ではありません。JPEG等は透過部分を背景色に合成します。画像のICC・EXIF・レイヤー等は保持しません。</p>
           <h3>音声</h3><p>AIFF/AIFCのPCM、AUのPCM・浮動小数点・μ-law・A-lawと、ブラウザーが読み込めるMP3・WAV等を読み込めます。WAV・AIFF・AUは16/24/32bit PCMで保存可能。対応環境ではM4A・WebM・Oggも選べます。MP3・FLAC出力は未対応です。</p>
           <p>120秒以内・モノラル/ステレオ・8〜48kHz・64MBまで。ブラウザー依存の一部入力は4MBまでです。読み込み時に再サンプリングされることがあります。圧縮形式は長さ程度の作成時間が必要で、先頭40ms・末尾80msの無音を加えます。元のタグは保持しません。</p>
+          <div class="capability-table-wrap"><table class="capability-table"><caption>従来のワークスペースの対応形式</caption><thead><tr><th scope="col">素材</th><th scope="col">保存形式</th><th scope="col">注意点</th></tr></thead><tbody>
+            <tr><th scope="row">PNG・JPEG・静止WebP・静止GIF</th><td>PNG・JPEG・WebP・GIF・SVGなど</td><td>WebP出力はブラウザー対応時に選べます。JPEG・WebPは非可逆圧縮です。アニメWebPの出力には対応していません。</td></tr>
+            <tr><th scope="row">音声</th><td>WAV、対応環境のM4A・WebM・Ogg</td><td>120秒以内・モノラル/ステレオ・8〜48kHz。AIFF・AUの保存は簡易変換をご利用ください。</td></tr>
+            <tr><th scope="row">GIF・動画＋音楽</th><td>音付き動画</td><td>GIFの映像を音楽に合わせた長さで繰り返して合成します。出力できる動画形式はブラウザーのMediaRecorder対応状況によります。元動画の音声は含みません。</td></tr>
+          </tbody></table></div>
           <h3>動画・アニメーション</h3><p>MP4/WebMの1コマを画像として保存できます。動画への音楽合成、複数画像からのGIF作成、出力の一括管理は詳細ワークスペースを利用してください。動画合成では元動画の音声は含みません。</p>
         </div>
       </details>
@@ -109,6 +114,7 @@
         <ol class="guide-steps"><li><strong>素材を選ぶ</strong><span>画像・GIF・動画と、重ねる音楽を用意。</span></li><li><strong>音楽を合わせる</strong><span>出力項目で音楽・繰り返しを設定。</span></li><li><strong>確認して保存</strong><span>対応する動画形式で書き出し。</span></li></ol>
         <p class="guide-limit"><strong>先に確認</strong>動画と音楽の合成は詳細ワークスペースから。元動画の音声は含みません。音楽は120秒以内。動画の出力形式はブラウザーの対応状況によります。</p>
       </section>
+      <p class="guide-task-copy">素材を新しく作るときは、<a href="/draw/?workspace=1" data-draw-cta data-draw-context="creation">ドット絵を描いてみる</a>。</p>
       <a class="guide-detail-link" href="#guide-format-details" data-guide-reveal="guide-format-details">対応形式・容量・音質の詳しい条件 <span aria-hidden="true">↓</span></a>
     </div>
     </details>
