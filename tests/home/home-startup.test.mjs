@@ -89,11 +89,11 @@ test('welcome page mounts startup and gallery once across cache revisions', () =
 });
 
 
-test('SNS home keeps the feed entry and five public destinations', () => {
+test('portal home links to Explore and keeps all five destinations', () => {
   const home = read('index.html');
-  assert.match(home, /<body data-social-page="home">/);
-  assert.match(home, /<section class="feed-list" id="feed"/);
-  assert.ok(home.includes('href="/explore/"'));
+  assert.match(home, /<body class="home-portal">/);
+  assert.match(home, /class="portal-bento"/);
+  assert.doesNotMatch(home, /id="feed"|src="\/js\/social\/app\.mjs/);
   for (const href of ['/', '/explore/', '/tools/', '/globe/', '/profile/']) assert.ok(home.includes(`href="${href}"`), href);
   for (const label of ['ホーム', '探す', 'つくる', '地図', '自分']) assert.ok(home.includes(`>${label}</span></a>`), label);
   assert.doesNotMatch(home, /src="\/js\/home-startup\.mjs|src="\/js\/home-gallery\.mjs/);
