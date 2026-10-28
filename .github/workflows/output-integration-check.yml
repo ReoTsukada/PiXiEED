@@ -1,0 +1,55 @@
+name: Output integration check
+on:
+  push:
+    branches: [finish/output-text-20261028]
+permissions:
+  contents: write
+concurrency:
+  group: output-integration-check
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      PIXIEED_CHROME_EXECUTABLE: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Integrate reviewed feature branches on the isolated branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git merge --no-edit 3e03c151cab757c0c71b5d6f26af6fcba92c551d
+          git push origin HEAD:refs/heads/finish/output-text-20261028
+      - name: Capture exact integration source
+        if: always()
+        run: |
+          mkdir -p /tmp/output-integration-evidence
+          git status --short > /tmp/output-integration-evidence/git-status.txt
+          git log -5 --oneline > /tmp/output-integration-evidence/commits.txt
+          git diff --check > /tmp/output-integration-evidence/diff-check.txt || true
+          tar --exclude=.git --exclude=node_modules -czf /tmp/output-integration-evidence/source.tar.gz .
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install build dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test site
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/output-integration-evidence/tests.log
+      - name: Build site
+        if: success() || failure()
+        run: |
+          set -o pipefail
+          npm run build -- --output /tmp/pixieed-site-check 2>&1 | tee /tmp/output-integration-evidence/build.log
+      - name: Retain integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-integration-evidence
+          path: /tmp/output-integration-evidence
+          retention-days: 7
