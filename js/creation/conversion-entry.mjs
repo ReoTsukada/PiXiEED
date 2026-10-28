@@ -27,3 +27,9 @@ try {
 } catch (error) {
   console.warn('Text tools unavailable; existing media conversion remains usable.', error);
 }
+
+// Search/guide intent is a suggestion, never an automatic conversion. Private handoffs win.
+try {
+  const { installConversionIntent } = await import('./conversion-intent.mjs?rev=20261028-discovery-1');
+  installConversionIntent();
+} catch { /* The ordinary converter remains available without the enhancement. */ }

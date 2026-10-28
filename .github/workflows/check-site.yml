@@ -34,7 +34,9 @@ jobs:
           PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
           PIXIEED_BROWSER_ROOT: /tmp/pixieed-site-check
           PIXIEED_BROWSER_ARTIFACTS: /tmp/pixieed-output-browser
-        run: node scripts/output-integration-browser-harness.mjs
+        run: |
+          node scripts/output-integration-browser-harness.mjs
+          node scripts/conversion-discovery-browser-harness.mjs
       - name: Retain browser verification evidence
         if: always()
         uses: actions/upload-artifact@v4

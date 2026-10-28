@@ -1,4 +1,6 @@
 /** One ordinary display unit on the PUBLIC conversion guide, never the workspace. */
+import { PUBLIC_GUIDE_PATHS } from '../creation/conversion-intent.mjs?rev=20261028-discovery-1';
+import { guideLinkTarget, publicGuideSlug } from '../output-guide-metrics.mjs?rev=20261028-discovery-1';
 const documents = new WeakMap();
 import { getAdsenseLoader } from '../display-ads.mjs?rev=20261024-public-layout-1';
 export const OUTPUT_GUIDE_CANONICAL = 'https://pixieed.jp/output/';
@@ -6,7 +8,7 @@ export const OUTPUT_GUIDE_CANONICAL = 'https://pixieed.jp/output/';
 export function isOutputGuideAdEligible({ origin, pathname, search = '', topLevel,
   marker, privateContext = true } = {}) {
   return ['https://pixieed.jp', 'https://www.pixieed.jp'].includes(origin)
-    && ['/output/', '/output/index.html', '/output/text/', '/output/text/index.html'].includes(pathname)
+    && PUBLIC_GUIDE_PATHS.includes(pathname)
     && search === '' && topLevel === true && marker === 'guide-v1'
     && privateContext === false;
 }
@@ -150,8 +152,13 @@ export function mountOutputGuideAd({ doc = globalThis.document, win = globalThis
 export function bindOutputGuideActions({ doc = globalThis.document, win = globalThis.window,
   track = () => {} } = {}) {
   const onClick = async event => {
-    if (event.target?.closest?.('a[data-output-start]')) {
+    const start = event.target?.closest?.('a[data-output-start]');
+    if (start && !event.defaultPrevented) {
       try { track('select_content', { tool: 'output', content_type: 'tool' }); } catch { /* navigation wins */ }
+      const target = guideLinkTarget(start.getAttribute?.('href'));
+      if (target && publicGuideSlug(win?.location?.pathname)) {
+        try { track('conversion_entry', { tool: 'output', target_format: target }); } catch { /* optional */ }
+      }
     }
     if (!event.target?.closest?.('[data-output-copy]')) return;
     const status = doc.querySelector('[data-output-copy-status]');

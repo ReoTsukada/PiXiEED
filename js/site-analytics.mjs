@@ -1,6 +1,8 @@
 /** Shared, consent-gated GA4 boundary for public PiXiEED pages. */
 import { analyticsConfig } from '../data/site-config.js?rev=20261007-safe-analytics-1';
 
+import { OUTPUT_GUIDE_SLUGS, guideEntryParameters } from './output-guide-metrics.mjs?rev=20261028-discovery-1';
+
 const CONSENT_KEY = 'PiXiEED:analytics-consent:v1';
 const DEBUG_KEY = 'pixieed:ga-debug';
 export const EMBED_TOOL_START_EVENT = 'pixieed:embed-tool-start';
@@ -8,6 +10,7 @@ export const EMBED_ANALYTICS_EVENT = 'pixieed:embed-analytics';
 const ALLOWED_HOSTS = new Set(['pixieed.jp', 'www.pixieed.jp']);
 const EMBED_TOOL_STARTS = new Set(['draw', 'audio', 'pixel-camera']);
 const TOOLS = new Set([
+  ...OUTPUT_GUIDE_SLUGS,
   'home', 'about', 'guide', 'privacy', 'globe', 'shops', 'stores', 'works', 'collection',
   'profile', 'pass', 'tools', 'draw', 'animation', 'audio', 'game', 'jigsaw', 'hidden-object',
   'spot-difference', 'pixfind', 'pixel-camera', 'pixel-camera-studio', 'pixiee-lens', 'telescope',
@@ -20,7 +23,7 @@ const EVENTS = new Set([
   'pass_sheet_open', 'pass_ad_open', 'pass_granted', 'pass_no_ad',
   'tool_start', 'camera_capture', 'level_start', 'level_end', 'select_content',
   'event_outbound', 'share', 'link_copy',
-  'project_open', 'project_open_pixiee_lens'
+  'project_open', 'project_open_pixiee_lens', 'conversion_entry'
 ]);
 const GAME_TYPES = new Set(['spot_difference', 'hidden_object', 'jigsaw', 'walk']);
 const COMPLETION_KINDS = new Set(['solved', 'candidates_reviewed', 'goal']);
@@ -76,6 +79,9 @@ function parametersFor(name, input = {}) {
   const out = { tool: safeTool(input.tool) || pageSlug((window.location || globalThis.location)?.pathname || '/') };
   const put = (key, value) => { if (value !== null && value !== undefined) out[key] = value; };
   switch (name) {
+    case 'conversion_entry':
+      Object.assign(out, guideEntryParameters((window.location || globalThis.location)?.pathname, input) || {});
+      break;
     case 'page_view': {
       const loc = window.location || globalThis.location;
       const path = pageSlug(loc?.pathname || '/');
@@ -130,6 +136,11 @@ let debug = false;
 function emit(name, params = {}) {
   try {
     if (!consentAllowed() || !EVENTS.has(name)) return false;
+    if (name === 'conversion_entry') {
+      const loc = window.location || globalThis.location;
+      const query = new URLSearchParams(loc?.search || '');
+      if (query.has('id') || query.has('file') || !guideEntryParameters(loc?.pathname, params)) return false;
+    }
     const safe = parametersFor(name, params);
     if (debug) safe.debug_mode = true;
     pushCommand('event', name, safe);
