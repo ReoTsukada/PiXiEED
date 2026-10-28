@@ -1,4 +1,5 @@
 /** Move existing tool controls without importing the site's analytics or menus. */
+import { installEditorDownloadRouting } from './creation/output-router.mjs?rev=20261028-unified-output-1';
 const movedControls = new WeakMap();
 const mountedDismissals = new WeakSet();
 
@@ -18,9 +19,7 @@ function addPanelClose(doc, details) {
   });
   panel.prepend(close);
 }
-
 function installHeaderDismissals(doc, controls) {
-  // Drawing and music already use the shared editor's dismissal controller.
   if (['draw', 'audio'].includes(doc.body.dataset.page) || mountedDismissals.has(controls)) return;
   const panels = () => [...controls.querySelectorAll('details[data-editor-header-control][open]')];
   const close = panel => { panel.open = false; panel.querySelector('summary')?.setAttribute('aria-expanded', 'false'); };
@@ -30,65 +29,42 @@ function installHeaderDismissals(doc, controls) {
     panel.querySelector('summary')?.setAttribute('aria-expanded', String(panel.open));
     if (panel.open) for (const other of panels()) if (other !== panel && !other.contains(panel) && !panel.contains(other)) close(other);
   }, true);
-  doc.addEventListener('pointerdown', event => {
-    for (const panel of panels()) if (!panel.contains(event.target)) close(panel);
-  });
+  doc.addEventListener('pointerdown', event => { for (const panel of panels()) if (!panel.contains(event.target)) close(panel); });
   doc.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
-    const panel = panels().at(-1);
-    if (!panel) return;
-    event.preventDefault();
-    for (const open of panels()) close(open);
+    const panel = panels().at(-1); if (!panel) return;
+    event.preventDefault(); for (const open of panels()) close(open);
     panel.querySelector('summary')?.focus({ preventScroll: true });
   });
   mountedDismissals.add(controls);
 }
-
 export function mountToolHeaderControls(doc = document, { selectors = [], projectBar = null, scope = null } = {}) {
+  installEditorDownloadRouting(doc, doc.defaultView);
   const header = doc.querySelector('.site-header, .audio-heading, .lc-top');
   if (!header || !doc.body.dataset.toolName) return null;
   const inner = header.querySelector('.header-inner') || header;
   doc.body.classList.add('px-tool-header');
   let controls = inner.querySelector('.px-tool-header-controls');
   if (!controls) {
-    controls = doc.createElement('div');
-    controls.className = 'px-tool-header-controls';
-    controls.setAttribute('role', 'group');
-    controls.setAttribute('aria-label', '編集の操作');
+    controls = doc.createElement('div'); controls.className = 'px-tool-header-controls'; controls.setAttribute('role', 'group'); controls.setAttribute('aria-label', '編集の操作');
     inner.insertBefore(controls, inner.querySelector('[data-menu-toggle]'));
   }
   installHeaderDismissals(doc, controls);
-  if (projectBar) {
-    projectBar.classList.add('px-tool-header-files');
-    inner.insertBefore(projectBar, controls);
-  }
+  if (projectBar) { projectBar.classList.add('px-tool-header-files'); inner.insertBefore(projectBar, controls); }
   for (const selector of selectors) {
     const node = typeof selector === 'string' ? doc.querySelector(selector) : selector;
-    // Tool operation bars own these controls and may move them before the
-    // shared header mounts. Do not wrap them in a header slot or reparent them.
     if (!node || node.hasAttribute('data-tool-operation') || movedControls.has(node)) continue;
-    // Keep controls belonging to a hidden setup/edit/result section hidden too.
     const ancestors = [];
     for (let parent = node.parentElement; parent && parent !== doc.body; parent = parent.parentElement) ancestors.push(parent);
-    const slot = doc.createElement('div');
-    slot.className = 'px-tool-header-slot';
-    node.dataset.editorHeaderControl = '';
-    node.classList.add('px-tool-header-control');
-    controls.append(slot);
-    slot.append(node);
-    addPanelClose(doc, node);
+    const slot = doc.createElement('div'); slot.className = 'px-tool-header-slot'; node.dataset.editorHeaderControl = ''; node.classList.add('px-tool-header-control'); controls.append(slot); slot.append(node); addPanelClose(doc, node);
     const update = () => {
-      slot.hidden = node.hidden || ancestors.some((parent) => parent.hidden);
-      slot.inert = node.inert || ancestors.some((parent) => parent.inert);
+      slot.hidden = node.hidden || ancestors.some(parent => parent.hidden); slot.inert = node.inert || ancestors.some(parent => parent.inert);
       if (slot.hidden && node.matches('details[open]')) node.open = false;
     };
-    const Observer = doc.defaultView.MutationObserver;
-    const observer = Observer ? new Observer(update) : null;
+    const Observer = doc.defaultView.MutationObserver; const observer = Observer ? new Observer(update) : null;
     observer?.observe(node, { attributes: true, attributeFilter: ['hidden', 'inert'] });
     for (const parent of ancestors) observer?.observe(parent, { attributes: true, attributeFilter: ['hidden', 'inert'] });
-    movedControls.set(node, { slot, observer });
-    scope?.add(() => { observer?.disconnect(); movedControls.delete(node); });
-    update();
+    movedControls.set(node, { slot, observer }); scope?.add(() => { observer?.disconnect(); movedControls.delete(node); }); update();
   }
   return controls;
 }

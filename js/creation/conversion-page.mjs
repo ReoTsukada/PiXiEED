@@ -251,4 +251,21 @@ export function mountConversionPage(doc = document, win = window) {
   const beforeLeave = event => { if (busy || unsaved) { event.preventDefault(); event.returnValue = ''; } }; win.addEventListener('beforeunload', beforeLeave);
   win.addEventListener('pagehide', () => { stop(); controller?.abort(); if (resultUrl) win.URL.revokeObjectURL(resultUrl); raw.width = raw.height = canvas.width = canvas.height = 1; doc.removeEventListener('visibilitychange', hide); win.removeEventListener('beforeunload', beforeLeave); }, { once: true });
   notifyToolEntryReady(false);
+  return {
+    setSource(next, settings = {}) {
+      if (busy) throw new Error('処理中は素材を変更できません。');
+      acceptSource(next);
+      if (Number.isFinite(settings.playbackRate) && settings.playbackRate >= .25 && settings.playbackRate <= 4) rate = settings.playbackRate;
+      if ([...format.options].some(option => option.value === settings.format)) format.value = settings.format;
+      refresh(); renderFrames();
+    },
+    offerOriginal(blob, filename) {
+      if (busy || !blob?.size) return;
+      clearResult(); resultUrl = win.URL.createObjectURL(blob); resultName = filename;
+      for (const selector of ['[data-download]', '[data-previous]']) { $(selector).href = resultUrl; $(selector).download = resultName; }
+      $('[data-download]').textContent = 'この作品を保存 ↓'; $('[data-download]').hidden = false; $('[data-convert]').hidden = true;
+      unsaved = false;
+      text('制作画面から引き継ぎました。そのまま保存するか、形式・設定を変更できます。');
+    }
+  };
 }

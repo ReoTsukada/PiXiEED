@@ -1,27 +1,16 @@
-/**
- * Saving pixel art out of PiXiEED, the same way in every tool.
- *
- * Pictures leave PiXiEED enlarged: each dot becomes an integer block of pixels (no smoothing), so a
- * 16×16 drawing arrives as a crisp 2048×2048 PNG that looks right in any photo app or SNS. PiXiEED
- * itself reads the original dot size stored in the PNG. Re-encoded images without that information
- * use exact repeated pixel blocks to estimate the dot grid instead.
- *
- * On phones the file goes to the share sheet (so it can be saved to Photos); elsewhere it downloads.
- */
+/** Pixel-art export preparation. Device delivery happens only in the output workspace. */
 import { withPixelPngMetadata } from './pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { trackSiteEvent } from './site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { resolveStaticImageLongEdge, STATIC_IMAGE_FREE_LONG_EDGE } from './creation/static-output-policy.mjs?rev=20261024-free-tools-1';
+import { isEditorOutput, routeEditorFile, reportOutputError } from './creation/output-router.mjs?rev=20261028-unified-output-1';
 export const EXPORT_LONG_EDGE = STATIC_IMAGE_FREE_LONG_EDGE;
 export const EXPORT_MAX_EDGE = 4096;
 export const EXPORT_MAX_PIXELS = 16 * 1024 * 1024;
 
-/** The integer enlargement that brings the long edge to about `longEdge` (never below 1×). */
 export function exportScale(width, height, longEdge = resolveStaticImageLongEdge()) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) throw new RangeError('invalid image size');
   return Math.max(1, Math.floor(longEdge / Math.max(width, height)));
 }
-
-/** RGBA pixels → an enlarged canvas (nearest-neighbour). */
 export function enlargedCanvas({ width, height, data }, { scale = exportScale(width, height), background = null, documentRef = globalThis.document } = {}) {
   if (![width, height, scale].every(Number.isSafeInteger) || width < 1 || height < 1 || scale < 1 || width * scale > EXPORT_MAX_EDGE || height * scale > EXPORT_MAX_EDGE || width * height * scale * scale > EXPORT_MAX_PIXELS || !data || data.length !== width * height * 4) throw new RangeError('invalid image size or scale');
   const small = documentRef.createElement('canvas'); small.width = width; small.height = height;
@@ -32,12 +21,9 @@ export function enlargedCanvas({ width, height, data }, { scale = exportScale(wi
   context.drawImage(small, 0, 0, big.width, big.height);
   return big;
 }
-
 export function canvasToPng(canvas) {
   return new Promise((resolve, reject) => canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('PNGを作れませんでした'))), 'image/png'));
 }
-
-/** Enlarged PNG of RGBA pixels. Returns { blob, width, height, scale }. */
 export async function enlargedPng(image, options = {}) {
   const canvas = enlargedCanvas(image, options);
   try {
@@ -46,22 +32,18 @@ export async function enlargedPng(image, options = {}) {
     return { blob, width, height, scale };
   } finally { canvas.width = 1; canvas.height = 1; }
 }
-
 const touchFirst = () => globalThis.matchMedia?.('(pointer: coarse)')?.matches === true;
 
-/**
- * Hand a finished file to the person: the share sheet on phones (when it can take files), a download elsewhere.
- * Resolves 'shared', 'downloaded' or 'cancelled'.
- */
+/** 'staged' is navigation, not a completed download or share. */
 export async function saveFile(blob, filename, options = {}) {
+  if (isEditorOutput(options.locationRef || globalThis.location)) {
+    try { return await routeEditorFile(blob, filename, options); }
+    catch (error) { reportOutputError(error, options.documentRef); throw error; }
+  }
   const result = await saveFileNow(blob, filename, options);
   if (result !== 'cancelled') {
     const fileType = String(filename).split('.').pop().toLowerCase();
-    trackSiteEvent('file_export', {
-      file_type: fileType,
-      method: result,
-      export_status: result === 'shared' ? 'share_handoff' : 'download_started'
-    });
+    trackSiteEvent('file_export', { file_type: fileType, method: result, export_status: result === 'shared' ? 'share_handoff' : 'download_started' });
   }
   return result;
 }
