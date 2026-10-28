@@ -19,3 +19,11 @@ try {
     const link = document.createElement('a'); link.href = '/output/'; link.textContent = '変換ガイドを開く'; main.append(message, back, link);
   }
 }
+
+// Add text input/output without replacing media conversion or private handoff state.
+try {
+  const { installTextTools } = await import('./text-tools.mjs?rev=20261028-text-1');
+  await installTextTools();
+} catch (error) {
+  console.warn('Text tools unavailable; existing media conversion remains usable.', error);
+}

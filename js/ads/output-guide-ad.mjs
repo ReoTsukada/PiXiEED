@@ -6,7 +6,7 @@ export const OUTPUT_GUIDE_CANONICAL = 'https://pixieed.jp/output/';
 export function isOutputGuideAdEligible({ origin, pathname, search = '', topLevel,
   marker, privateContext = true } = {}) {
   return ['https://pixieed.jp', 'https://www.pixieed.jp'].includes(origin)
-    && ['/output/', '/output/index.html'].includes(pathname)
+    && ['/output/', '/output/index.html', '/output/text/', '/output/text/index.html'].includes(pathname)
     && search === '' && topLevel === true && marker === 'guide-v1'
     && privateContext === false;
 }
