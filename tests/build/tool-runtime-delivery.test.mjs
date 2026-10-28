@@ -12,15 +12,18 @@ import {
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const esbuildPath = path.join(repositoryRoot, 'node_modules/.bin/esbuild');
+const guideMetricsUrl = '/js/output-guide-metrics.mjs?rev=20261028-discovery-1';
 
 test('delivery plan preserves runtime identities and bounds minification to startup/mode files', async () => {
   const plan = await deriveToolRuntimeDeliveryPlan({ root: repositoryRoot });
 
-  assert.equal(plan.runtimeGraph.modules.size, 105);
-  assert.equal(plan.runtimeGraph.edges.length, 200);
+  // Public-guide analytics adds one dependency-free shared module. Keep exact
+  // graph budgets and canonical identity checks rather than relaxing the limits.
+  assert.equal(plan.runtimeGraph.modules.size, 106);
+  assert.equal(plan.runtimeGraph.edges.length, 201);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 103);
-  assert.equal(plan.externalUrls.size, 53);
+  assert.equal(plan.dynamicGraph.modules.size, 104);
+  assert.equal(plan.externalUrls.size, 54);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
@@ -28,6 +31,12 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert(files.includes('js/creation/output-router.mjs'), 'editor exports use the unified staging module');
   assert(files.includes('js/creation/output-handoff-core.mjs'), 'existing storage identity stays shared');
   assert(files.includes('js/ads/site-feature-access-v20261024.mjs'));
+  const guideModules = [...plan.runtimeGraph.modules.values()].filter(module => module.file === 'js/output-guide-metrics.mjs');
+  assert.deepEqual(guideModules.map(module => module.url), [guideMetricsUrl], 'Guide metrics must retain one canonical module identity.');
+  assert.equal(plan.runtimeGraph.edges.filter(edge => edge.to === guideMetricsUrl).length, 1);
+  assert.equal(plan.runtimeGraph.edges.filter(edge => edge.from === guideMetricsUrl).length, 0, 'The metrics allowlist must not pull conversion or ad runtimes into editor startup.');
+  assert(plan.externalUrls.has(guideMetricsUrl), 'Shared analytics helpers must not be duplicated inside the runtime bundle.');
+  assert(plan.dynamicGraph.modules.has(guideMetricsUrl));
   for (const retired of ['gpt-rewarded-adapter.mjs', 'rewarded-controller.mjs', 'site-reward-rollout-v20261016.mjs', 'site-reward-runtime-v20261016-ads-only.mjs']) {
     assert(!files.some(file => file.endsWith('/' + retired)), `Retired advertising runtime must stay off the startup graph: ${retired}`);
   }
@@ -100,7 +109,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 53);
+    assert.equal(report.externalCount, 54);
     assert.equal(report.internalizedCount, 52);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
@@ -112,6 +121,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     const direct = await readFile(path.join(buildRoot, 'js/tool-direct.mjs'), 'utf8');
     assert(direct.includes(`./creation/creation-runtime.bundle.mjs?rev=${report.revision}`));
     assert(direct.includes('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
+    assert(direct.includes(guideMetricsUrl), 'Public-guide metrics must keep its shared canonical URL in the optimized delivery.');
     for (const route of plan.htmlRoutes) {
       const html = await readFile(path.join(buildRoot, route), 'utf8');
       assert(html.includes(`/js/tool-shell.mjs?rev=${report.revision}`), `Missing cache revision in ${route}`);
