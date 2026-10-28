@@ -231,7 +231,7 @@ export async function optimizeSiteStartupDelivery({ root, files, esbuildPath, re
     const welcomeCounts = rewriteHtml(welcomeHtml, 'welcome/index.html', revisions.appRevision, revisions.homeStartupRevision);
     assert(welcomeCounts.appScripts === 0 && welcomeCounts.startupScripts === 1 && welcomeCounts.startupPreloads === 1,
       'The preserved welcome page must retain one matching legacy startup and preload.');
-  } else if (/<body class="home-portal">/.test(homeHtml)) {
+  } else if (homeHtml.includes('/js/home-portal.mjs?rev=')) {
     assert(homeCounts.appScripts === 0 && homeCounts.startupScripts === 0 && homeCounts.startupPreloads === 0
       && [...homeHtml.matchAll(/<script\b[^>]*src="\/js\/home-portal\.mjs\?[^"<>]+"/g)].length === 1
       && !homeHtml.includes('/js/social/app.mjs'),
