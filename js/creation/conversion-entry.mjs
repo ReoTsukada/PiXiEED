@@ -8,3 +8,11 @@ if(simple){
 }else{
   await import('./output-page.mjs?rev=20261024-common-tool-start-1');
 }
+
+// Add text input/output without replacing media conversion or private handoff state.
+try {
+  const { installTextTools } = await import('./text-tools.mjs?rev=20261028-text-1');
+  await installTextTools();
+} catch (error) {
+  console.warn('Text tools unavailable; existing media conversion remains usable.', error);
+}
