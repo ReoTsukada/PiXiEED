@@ -17,36 +17,52 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
-      - name: Integrate reviewed feature branches on the isolated branch
+      - name: Apply locally verified integration fixes once
         run: |
           set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git merge --no-edit 3e03c151cab757c0c71b5d6f26af6fcba92c551d
-          git push origin HEAD:refs/heads/finish/output-text-20261028
+          if [ -f scripts/apply-output-integration-fixes.py ]; then
+            python3 scripts/apply-output-integration-fixes.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add js tests
+            git rm scripts/apply-output-integration-fixes.py
+            git diff --cached --check
+            git commit -m 'fix: complete unified PXD handoff and reconcile output contracts'
+            git push origin HEAD:refs/heads/finish/output-text-20261028
+          fi
       - name: Capture exact integration source
         if: always()
         run: |
           mkdir -p /tmp/output-integration-evidence
           git status --short > /tmp/output-integration-evidence/git-status.txt
           git log -5 --oneline > /tmp/output-integration-evidence/commits.txt
-          git diff --check > /tmp/output-integration-evidence/diff-check.txt || true
+          git diff --check > /tmp/output-integration-evidence/diff-check.txt
           tar --exclude=.git --exclude=node_modules -czf /tmp/output-integration-evidence/source.tar.gz .
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Install build dependency
+      - name: Install pinned build dependency
         run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Test site
+      - name: Test entire site
         run: |
           set -o pipefail
           npm test 2>&1 | tee /tmp/output-integration-evidence/tests.log
-      - name: Build site
+      - name: Build production site
         if: success() || failure()
         run: |
           set -o pipefail
           npm run build -- --output /tmp/pixieed-site-check 2>&1 | tee /tmp/output-integration-evidence/build.log
-      - name: Retain integration evidence
+      - name: Install pinned browser harness
+        run: npm install --prefix /tmp/pixieed-browser --ignore-scripts --no-audit --no-fund playwright@1.56.1
+      - name: Verify real browser output on production build
+        env:
+          PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
+          PIXIEED_BROWSER_ROOT: /tmp/pixieed-site-check
+          PIXIEED_BROWSER_ARTIFACTS: /tmp/output-integration-evidence/browser
+        run: |
+          set -o pipefail
+          node scripts/output-integration-browser-harness.mjs 2>&1 | tee /tmp/output-integration-evidence/browser.log
+      - name: Retain exact source and verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
