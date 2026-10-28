@@ -13,7 +13,7 @@ concurrency:
 jobs:
   check:
     runs-on: macos-15
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       PIXIEED_CHROME_EXECUTABLE: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
     steps:
@@ -27,3 +27,19 @@ jobs:
         run: npm test
       - name: Build site
         run: npm run build -- --output /tmp/pixieed-site-check
+      - name: Install pinned browser harness
+        run: npm install --prefix /tmp/pixieed-browser --ignore-scripts --no-audit --no-fund playwright@1.56.1
+      - name: Verify output conversions in a real browser
+        env:
+          PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
+          PIXIEED_BROWSER_ROOT: /tmp/pixieed-site-check
+          PIXIEED_BROWSER_ARTIFACTS: /tmp/pixieed-output-browser
+        run: node scripts/output-integration-browser-harness.mjs
+      - name: Retain browser verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-browser-verification
+          path: /tmp/pixieed-output-browser
+          if-no-files-found: ignore
+          retention-days: 7

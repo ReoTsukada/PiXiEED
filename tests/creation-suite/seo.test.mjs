@@ -207,7 +207,7 @@ test('robots.txt announces the root and conversion sitemaps without blocking the
   assert.deepEqual([...robots.matchAll(/^Sitemap:\s*(\S+)\s*$/gmi)].map(([, url]) => url), ['https://pixieed.jp/sitemap.xml', 'https://pixieed.jp/output/sitemap.xml']);
   const blockedPaths = [...robots.matchAll(/^Disallow:\s*(\S+)\s*$/gmi)].map(([, path]) => path);
   const conversionUrls = [...read('output/sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) => url);
-  assert.deepEqual(conversionUrls, ['https://pixieed.jp/output/', 'https://pixieed.jp/output/gif-speed/']);
+  assert.deepEqual(conversionUrls, ['https://pixieed.jp/output/', 'https://pixieed.jp/output/gif-speed/', 'https://pixieed.jp/output/text/']);
   for (const [, path] of [...sitemapPages, ...conversionUrls.map(url => [null, new URL(url).pathname])]) {
     assert.ok(!blockedPaths.some((blocked) => path.startsWith(blocked)), `${path}: crawlable`);
   }

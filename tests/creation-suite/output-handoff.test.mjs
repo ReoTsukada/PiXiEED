@@ -260,13 +260,13 @@ test('output item validation rejects a mismatched extension without changing the
   assert.equal(loaded.outputs.length, 1); assert.equal(loaded.outputs[0].filename, 'my-art.png');
 });
 
-test('PXD project backups download directly from the editor and never navigate to the output page', async () => {
+test('PXD backups use unified file staging and never enter lossy media conversion', async () => {
   for (const path of ['../../js/creation/pxd-ui.mjs', '../../js/creation/project-workspace.mjs']) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /output-handoff\.mjs|sendToolOutput/);
-    assert.match(source, /async function sendPxdBackup\(bytes, name\) \{\s*await download\(bytes, name\);\s*return false;/);
+    assert.match(source, /async function sendPxdBackup\(bytes, name\)[\s\S]*?await routeEditorFile\(new Blob\(\[bytes\], \{ type: 'application\/octet-stream' \}\), name\);[\s\S]*?return true;/);
     assert.match(source, /const staged = await sendPxdBackup\(/);
-    assert.match(source, /URL\.createObjectURL\(blob\).*?link\.download = name; link\.click\(\)/s, 'the project tool creates a local browser download');
+    assert.doesNotMatch(source, /link\.click\(\)/, 'detached anchors must not bypass the output workspace');
   }
   const outputPage = readFileSync(new URL('../../js/creation/output-page.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(outputPage, /application\/octet-stream|pxd: 'application/);
@@ -547,13 +547,14 @@ test('output handoff stays on the editor and reports save failure so the caller 
   assert.equal(outputLocation.assigned, '');
 });
 
-test('validated draw, camera, and audio embeds flush editor saves then leave native file saving to the caller', async () => {
+test('validated draw, camera, and audio embeds save then navigate the host to unified output', async () => {
   for (const role of ['draw', 'camera', 'audio']) {
     const calls = [];
-    const locationRef = { origin: 'https://example.test', assigned: '', assign(url) { this.assigned = url; } };
+    const locationRef = { origin: 'https://example.test', pathname: `/${role}/`, search: '', hash: '', assigned: '', assign(url) { this.assigned = url; } };
+    const parentLocation = { ...locationRef };
     const windowRef = {
-      location: { origin: locationRef.origin },
-      parent: { location: { origin: locationRef.origin } },
+      location: locationRef,
+      parent: { location: parentLocation },
       __PIXIEED_TOOL_EMBED__: { role, channel: validId }
     };
     const result = await sendToolOutputAfterSaving({
@@ -562,11 +563,11 @@ test('validated draw, camera, and audio embeds flush editor saves then leave nat
       dirty: true,
       async assertCanSave() { calls.push('authorize'); },
       async save() { calls.push('save'); this.dirty = false; }
-    }, () => true, { locationRef, windowRef });
+    }, () => true, { locationRef, windowRef, indexedDBRef: new FakeIndexedDB(), cryptoRef: { randomUUID: () => validId }, now: () => 1000 });
     assert.deepEqual(calls, ['authorize', 'save']);
-    assert.equal(result.ok, false);
-    assert.equal(result.reason, 'embedded_native_save', `${role} embed uses caller's native file save`);
-    assert.equal(locationRef.assigned, '');
+    assert.equal(result.ok, true);
+    assert.match(parentLocation.assigned, /^https:\/\/example\.test\/output\/work\/\?id=/);
+    assert.equal(locationRef.assigned, '', 'only the parent navigates');
   }
 });
 

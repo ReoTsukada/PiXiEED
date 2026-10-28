@@ -1,3 +1,4 @@
+import { routeEditorFile } from './output-router.mjs?rev=20261028-unified-output-1';
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
@@ -24,13 +25,10 @@ const icons = {
 function icon(name) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`; }
 function node(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text) el.textContent = text; return el; }
 function button(label, id, action) { const el = node('button', '', label); el.type = 'button'; el.id = id; el.addEventListener('click', action); return el; }
-async function download(bytes, name) {
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob); const link = node('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); return false;
-}
 async function sendPxdBackup(bytes, name) {
-  await download(bytes, name);
-  return false;
+  // Stage the exact backup; PXD is never decoded by the image converter.
+  await routeEditorFile(new Blob([bytes], { type: 'application/octet-stream' }), name);
+  return true;
 }
 
 export function isInitialProjectEntryFresh({ initialProject = null, pointer = null, hasQuery = false, hash = '', restoreError = '', operationError = '', failed = false } = {}) {

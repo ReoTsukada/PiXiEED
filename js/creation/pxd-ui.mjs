@@ -1,3 +1,4 @@
+import { routeEditorFile } from './output-router.mjs?rev=20261028-unified-output-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createPxdStore } from './pxd-store.mjs?rev=20261016-color-capability-1';
 import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20261016-color-capability-1';
@@ -19,13 +20,10 @@ function style() {
   const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/css/pxd-tools.css?rev=20261006-panel-close-1'; link.dataset.pxdCss = ''; document.head.append(link);
 }
 function button(text, id, run) { const node = document.createElement('button'); node.type = 'button'; node.textContent = text; node.id = id; node.addEventListener('click', run); return node; }
-async function download(bytes, name) {
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
-  const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); return false;
-}
 async function sendPxdBackup(bytes, name) {
-  await download(bytes, name);
-  return false;
+  // Stage the exact backup; PXD is never decoded by the image converter.
+  await routeEditorFile(new Blob([bytes], { type: 'application/octet-stream' }), name);
+  return true;
 }
 function preview(image) {
   const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
