@@ -23,7 +23,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/home-portal.css?rev=20261029-portal-1">
   <title>PiXiEED｜つくる・変換する・遊ぶ</title>
-  <script>(()=>{const q=new URLSearchParams(location.search);if(q.has("art")||q.get("post")==="1")location.replace("/globe/"+location.search+location.hash);else if(location.pathname==="/index.html")location.replace("/"+location.search+location.hash)})();</script>
+  <script>(()=>{const q=new URLSearchParams(location.search);if(q.has("art")||q.get("post")==="1")location.replace("/globe/"+location.search+location.hash);else if(q.has("view")||q.has("compose")||q.has("output")||q.has("q"))location.replace("/explore/"+location.search+location.hash);else if(location.pathname==="/index.html")location.replace("/"+location.search+location.hash)})();</script>
   <script type="module" src="/js/home-portal.mjs?rev=20261029-portal-1"></script>
   <script type="module" src="/js/site-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
 </head>
