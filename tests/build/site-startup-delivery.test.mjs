@@ -131,9 +131,10 @@ test('current published app callers compile from an owned copy without changing 
     assert(app.includes('./site-header.mjs?rev=20261024-common-tool-start-1'), 'Keep the current header identity while optimizing the app.');
     assert(!app.includes('function renderDiscoveryMap('), 'Unreferenced legacy map renderer should not ship in the optimized app copy.');
     const home = await readFile(path.join(tempRoot, 'welcome/index.html'), 'utf8');
-    const socialHome = await readFile(path.join(tempRoot, 'index.html'), 'utf8');
-    assert.match(socialHome, /data-social-page="home"/);
-    assert.equal((socialHome.match(/\/js\/social\/app\.mjs\?rev=/g) || []).length, 1);
+    const portalHome = await readFile(path.join(tempRoot, 'index.html'), 'utf8');
+    assert.match(portalHome, /<body class="home-portal">/);
+    assert.match(portalHome, /src="\/js\/home-portal\.mjs\?rev=/);
+    assert.doesNotMatch(portalHome, /\/js\/social\/app\.mjs|\/js\/home-startup\.mjs/);
     assert.equal((home.match(new RegExp(`/js/home-startup\\.mjs\\?rev=${report.homeStartupRevision}`, 'g')) || []).length, 2);
     for (const relative of htmlCallers) {
       const html = await readFile(path.join(tempRoot, relative), 'utf8');

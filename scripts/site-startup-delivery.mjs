@@ -231,6 +231,15 @@ export async function optimizeSiteStartupDelivery({ root, files, esbuildPath, re
     const welcomeCounts = rewriteHtml(welcomeHtml, 'welcome/index.html', revisions.appRevision, revisions.homeStartupRevision);
     assert(welcomeCounts.appScripts === 0 && welcomeCounts.startupScripts === 1 && welcomeCounts.startupPreloads === 1,
       'The preserved welcome page must retain one matching legacy startup and preload.');
+  } else if (homeHtml.includes('/js/home-portal.mjs?rev=')) {
+    assert(homeCounts.appScripts === 0 && homeCounts.startupScripts === 0 && homeCounts.startupPreloads === 0
+      && [...homeHtml.matchAll(/<script\b[^>]*src="\/js\/home-portal\.mjs\?[^"<>]+"/g)].length === 1
+      && !homeHtml.includes('/js/social/app.mjs'),
+    'Portal home must have one dedicated entry, not load legacy editor or SNS startup.');
+    const welcomeHtml = await readFile(path.join(absoluteRoot, 'welcome/index.html'), 'utf8');
+    const welcomeCounts = rewriteHtml(welcomeHtml, 'welcome/index.html', revisions.appRevision, revisions.homeStartupRevision);
+    assert(welcomeCounts.appScripts === 0 && welcomeCounts.startupScripts === 1 && welcomeCounts.startupPreloads === 1,
+      'The preserved welcome page must retain its legacy startup and preload.');
   } else {
     assert(homeCounts.appScripts === 0 && homeCounts.startupScripts === 1 && homeCounts.startupPreloads === 1,
       'Home must expose exactly one startup module script and one matching modulepreload.');

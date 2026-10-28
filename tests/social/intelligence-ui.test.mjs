@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 
-test('all SNS entry routes expose concise action labels and a recoverable warning detail', () => {
-  for (const path of ['index.html', 'feed/index.html', 'explore/index.html']) {
+test('SNS feed and explore routes expose concise action labels and a recoverable warning detail', () => {
+  for (const path of ['feed/index.html', 'explore/index.html']) {
     const html = read(path);
     assert.match(html, /id="feedWarningDetails"[^>]*hidden/ , path);
     assert.match(html, /id="feedWarningList"/ , path);

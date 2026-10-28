@@ -38,6 +38,39 @@ async function download(selector = '[data-download]') {
   assert.equal(await file.failure(), null); return { name: file.suggestedFilename(), bytes: await readFile(await file.path()) };
 }
 try {
+  // The homepage is a light navigation portal; social interactions stay on Explore.
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 920 });
+    await open('/');
+    await page.locator('.portal-bento .portal-card').first().waitFor({ state: 'visible' });
+    assert.equal(await page.locator('h1').count(), 1);
+    assert.equal(await page.locator('.portal-card').count(), 7);
+    assert.equal(await page.locator('#socialApp').count(), 0);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    pass('Home portal at '+width+'px: links, one heading, no overflow');
+    if ([390,1440].includes(width)) await page.screenshot({ path: output+'/home-'+width+'.png', fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 920 });
+  await open('/');
+  await page.locator('#portal-query').fill('ＧＩＦ');
+  await page.locator('#portal-results a').first().waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#portal-results a').first().getAttribute('href'), '/output/gif-speed/');
+  await page.locator('#portal-query').fill('SNS');
+  assert.equal(await page.locator('#portal-results a').first().getAttribute('href'), '/explore/');
+  await page.locator('#portal-query').press('Enter');
+  await page.waitForURL(base+'/explore/');
+  assert.ok(await page.locator('#feed').count());
+  assert.ok(await page.locator('#composerDialog').count());
+  pass('Homepage intent search navigates to real SNS feed and retains composer');
+  await open('/');
+  assert.ok(await page.locator('.portal-more-disclosure').isVisible());
+  assert.equal(await page.locator('.portal-more-disclosure').getAttribute('open'), null);
+  await page.locator('.portal-more-disclosure summary').click();
+  assert.ok(await page.locator('a[href="/output/formats/"]').isVisible());
+  pass('Additional tools are progressively disclosed rather than a button wall');
+  await open('/?view=saved');
+  await page.waitForURL(base+'/explore/?view=saved');
+  pass('Old home social bookmarks redirect to Explore');
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 }); await open('/output/formats/qoi/');
     assert.equal(await page.locator('h1').count(), 1);
