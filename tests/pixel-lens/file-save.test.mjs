@@ -16,7 +16,7 @@ globalThis.document = {
   addEventListener() {},
   createElement() { return {}; }
 };
-const { createCameraFileSave } = await import('../../js/pixel-lens/file-save.mjs');
+const { createCameraFileSave } = await import('../../js/pixel-lens/file-save-core.mjs');
 
 const analyticsRows = () => window.dataLayer.filter((entry) => entry?.[0] === 'event');
 

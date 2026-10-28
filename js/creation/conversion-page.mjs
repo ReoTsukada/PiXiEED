@@ -104,7 +104,9 @@ export function mountConversionPage(doc = document, win = window) {
   }
   function disable(value) {
     busy = value; main.setAttribute('aria-busy', String(value));
-    for (const el of main.querySelectorAll('button,input,select')) if (!el.matches('[data-cancel]')) el.disabled = value || el.dataset.boundary === 'true';
+    const controls = main.querySelector('.text-legacy') || main;
+    for (const el of controls.querySelectorAll('button,input,select')) if (!el.matches('[data-cancel]')) el.disabled = value || el.dataset.boundary === 'true';
+    for (const button of main.querySelectorAll('.text-mode-nav button')) button.disabled = value;
     $('[data-cancel]').hidden = !value; progress.hidden = !value;
     if (value) { progress.removeAttribute('value'); stop(); }
     else $('[data-convert]').disabled = !valid;

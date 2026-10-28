@@ -104,5 +104,5 @@ test('search page is static, canonical, linked and listed in a dedicated sitemap
   assert.match(guide, /<title>GIFの再生速度/); assert.match(guide, /rel="canonical" href="https:\/\/pixieed.jp\/output\/gif-speed\/"/);
   assert.doesNotMatch(guide, /name="robots"[^>]*noindex/);
   assert.match(index, /href="\/output\/gif-speed\/"/); assert.match(map, /https:\/\/pixieed.jp\/output\/gif-speed\//); assert.match(robots, /Sitemap: https:\/\/pixieed.jp\/output\/sitemap.xml/);
-  assert.match(entry, /!query\.has\('id'\)/); assert.match(entry, /output-page\.mjs\?rev=20261024-common-tool-start-1/);
+  assert.match(entry, /if \(query\.has\('id'\) \|\| query\.has\('file'\)\)/); assert.match(entry, /else if \(query\.get\('mode'\) === 'convert'\)/); assert.match(entry, /output-page\.mjs\?rev=20261024-common-tool-start-1/);
 });

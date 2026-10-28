@@ -135,3 +135,16 @@ test('public interface preserves storage API, simple entry and original-file rec
   assert.match(entry, /mountSharedOutput/); assert.match(converter, /offerOriginal/); assert.match(header, /installEditorDownloadRouting/);
   assert.doesNotMatch(entry, /adsbygoogle|analytics|localStorage/);
 });
+
+
+test('camera save wrapper stages once and never opens the removed editor dialog', async () => {
+  const { createCameraFileSave } = await import('../../js/pixel-lens/file-save.mjs');
+  const d = deps('/camera/'), blob = file().blob;
+  const controller = createCameraFileSave({ ...d, dialog: { showModal() { assert.fail('editor save dialog'); } } });
+  assert.equal(controller.show({ blob, filename: 'camera.png', isCurrent: () => false }), false);
+  assert.equal(controller.show({ blob, filename: 'camera.png', isCurrent: () => true }), true);
+  assert.equal(controller.show({ blob, filename: 'camera.png', isCurrent: () => true }), false);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(d.assigned.length, 1);
+  assert.equal(await (await readOutputFile(ID, d)).blob.text(), await blob.text());
+});

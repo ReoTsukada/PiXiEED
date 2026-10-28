@@ -175,8 +175,13 @@ export async function installTextTools(doc = document, win = window) {
   win.addEventListener('pagehide',()=>{aborter?.abort();for(const url of urls.values())win.URL.revokeObjectURL(url);win.removeEventListener('beforeunload',leave);},{once:true});
   const params=new URLSearchParams(win.location.search);const initial=params.get('text');
   if(initial==='input'||initial==='output')showMode(initial);
-  const id=params.get('id');
-  if(id&&params.getAll('id').length===1&&!params.has('file')&&/^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(id)){
-    try{const {readToolOutput}=await import('./output-handoff.mjs?rev=20261028-text-1');const record=await readToolOutput(id);if(record.blob)chooseFile(new File([record.blob],record.filename,{type:record.blob.type}));}catch{/* The existing receiver reports unavailable private files. */}
+  const key=params.has('id')?'id':params.has('file')?'file':null, id=key&&params.get(key);
+  if(id&&params.getAll(key).length===1&&!(params.has('id')&&params.has('file'))&&/^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(id)){
+    try {
+      const record=key==='id'
+        ?await (await import('./output-handoff.mjs?rev=20261028-unified-output-1')).readToolOutput(id)
+        :await (await import('./output-router.mjs?rev=20261028-unified-output-1')).readOutputFile(id);
+      if(record.blob)chooseFile(new File([record.blob],record.filename,{type:record.blob.type}));
+    }catch{/* The existing receiver reports unavailable private files. */}
   }
 }
