@@ -64,6 +64,9 @@ test('Explore CSS is scoped, responsive, keyboard accessible and does not add an
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
   assert.match(css, /explore-tools-more\[open\]/);
   assert.match(css, /:focus-within/);
+  assert.match(css, /\.composer-prompt\{display:flex/);
+  assert.match(css, /\.feed-heading>div\{position:static/);
+  assert.match(css, /\.feed-heading \.refresh-button[^\n]*position:static/);
   assert.match(explore, /<details class="explore-tools-more"/);
   assert.doesNotMatch(explore, /data-wait-seconds|data-ad-countdown/);
 });

@@ -20,7 +20,9 @@ body[data-social-page="explore"] .feed-column{padding:26px 0 52px}
 .explore-hero{position:relative;isolation:isolate;min-height:264px;overflow:hidden;border-radius:26px;background:linear-gradient(126deg,#dfefe2 4%,#d4eadf 64%,#cbe6d8 100%);box-shadow:0 7px 28px rgba(24,70,49,.045)}
 .explore-hero-copy{position:relative;z-index:2;width:100%;padding:30px 28px 22px}
 .explore-eyebrow{margin:0 0 9px;font-size:10px;letter-spacing:.18em;font-weight:900;color:#387d60}
-body[data-social-page="explore"] .feed-heading{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 17px}
+body[data-social-page="explore"] .feed-heading{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 17px;padding:0;min-height:64px;height:auto}
+body[data-social-page="explore"] .feed-heading>div{position:static;min-width:0;width:auto;height:auto;margin:0;padding:0;overflow:visible;clip-path:none;white-space:normal}
+body[data-social-page="explore"] .feed-heading .refresh-button,body[data-social-page="explore"] .feed-heading .account-transfer-button{position:static;inset:auto;z-index:auto}
 body[data-social-page="explore"] .feed-heading h1{font-size:clamp(28px,3.6vw,39px);line-height:1.18;font-weight:940;letter-spacing:-.055em;color:#194e3f}
 body[data-social-page="explore"] .feed-heading .feed-lede{margin-top:8px;color:#567665;font-size:12px;line-height:1.4;max-width:39ch}
 .explore-hero-controls{display:flex;align-items:center;gap:7px;flex:none}
@@ -45,7 +47,7 @@ body[data-social-page="explore"] .explore-search-note{position:relative;z-index:
 .explore-art-tile--two{width:87px;height:92px;right:0;top:29px;background:#edc5bc;transform:rotate(9deg);display:grid;place-items:center;color:#a24f5d;font-size:49px}
 .explore-art-heart{transform:translateY(-2px);font-family:Georgia,serif}
 .explore-art-tile--three{width:96px;height:86px;right:19px;bottom:-2px;background:#b0b9e2;transform:rotate(-4deg);display:grid;place-items:center;color:#f7e5a6;font-size:54px}
-body[data-social-page="explore"] .composer-prompt{margin-top:15px;min-height:73px;gap:10px;padding:11px 14px;border:1px solid #dbe8dc;border-radius:19px;background:#fff;box-shadow:0 6px 18px rgba(37,63,40,.035)}
+body[data-social-page="explore"] .composer-prompt{display:flex;margin-top:15px;min-height:73px;gap:10px;padding:11px 14px;border:1px solid #dbe8dc;border-radius:19px;background:#fff;box-shadow:0 6px 18px rgba(37,63,40,.035)}
 body[data-social-page="explore"] .prompt-avatar{width:44px;height:44px;border:none;border-radius:14px;background:#e6f2e8}
 body[data-social-page="explore"] .prompt-avatar img{width:22px;height:22px}
 body[data-social-page="explore"] .prompt-open{padding:0 4px;color:#285c46;font-size:15px;font-weight:850;text-align:left}

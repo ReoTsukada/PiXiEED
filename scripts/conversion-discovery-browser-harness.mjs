@@ -80,6 +80,8 @@ try {
     assert.equal(await page.locator('#feedViews [data-action="view"]').count(), 3);
     assert.equal(await page.locator('#feedViews [data-action="mine"]').count(), 1);
     assert.equal(await page.locator('#socialSearch').count(), 1);
+    assert.ok(await page.locator('#pageTitle').isVisible(), 'The community heading must be visible, including on mobile');
+    assert.ok(await page.locator('.prompt-open').isVisible(), 'The post composer entrance must be visible');
     assert.equal(await page.locator('#composerDialog').count(), 1);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     if (width >= 1191) assert.ok(await page.locator('.explore-maker-feature').isVisible());
