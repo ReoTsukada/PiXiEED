@@ -169,6 +169,48 @@ try {
   await open(staged.url + '&to=qoi'); await page.locator('[data-download]').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.convert-intent').count(),0); assert.deepEqual((await download()).bytes,png);
   pass('Real IndexedDB handoff ignores intent and preserves original file bytes');
+
+  // The compact Draw menu uses the production HTML/CSS. Reproduce the runtime
+  // text-tool reparenting and measure hit areas with the same Chrome engine.
+  const drawHtml = await readFile(resolve(root, './draw/editor.html'), 'utf8');
+  const pickerMarkup = drawHtml.match(/<details id="draw-tool-picker"[\s\S]*?<\/details>/)?.[0];
+  assert.ok(pickerMarkup, 'Draw tool picker must be present in the published editor');
+  const layoutPage = await context.newPage();
+  await layoutPage.setContent('<!doctype html><html><body data-page="draw"><div class="draw-controls"><div class="draw-fixed-left">'+pickerMarkup+'</div></div></body></html>');
+  const menuCss = await readFile(resolve(root, './css/draw-tool-picker.css'), 'utf8');
+  const textCss = await readFile(resolve(root, './css/draw-text-panel.css'), 'utf8');
+  await layoutPage.addStyleTag({ content: menuCss + '\n' + textCss });
+  await layoutPage.evaluate(() => {
+    const slot = document.createElement('div'); slot.className = 'draw-text-tool-slot';
+    const button = document.createElement('button');
+    button.className = 'draw-text-opener'; button.type = 'button'; button.textContent = '文字';
+    button.setAttribute('aria-label', '文字を入力'); slot.append(button);
+    document.querySelector('.draw-tool-menu .draw-tool-group').append(slot);
+    document.getElementById('draw-tool-picker').open = true;
+  });
+  for (const width of [320, 390, 650, 900]) {
+    await layoutPage.setViewportSize({ width, height: 820 });
+    const measure = await layoutPage.evaluate(() => {
+      const rect = element => { const r=element.getBoundingClientRect(); return { x:r.x, y:r.y, width:r.width, height:r.height }; };
+      const selection = [...document.querySelectorAll('.draw-select-tool-modes > button')].map(rect);
+      const text = rect(document.querySelector('.draw-text-opener'));
+      const spray = rect(document.querySelector('[data-draw-tool="spray"]'));
+      const groups = [...document.querySelectorAll('.draw-tool-group')];
+      return { selection, text, spray, overflow: groups.some(g => g.scrollWidth > g.clientWidth + 1),
+        menu:rect(document.querySelector('.draw-tool-menu')) };
+    });
+    assert.equal(measure.selection.length, 3);
+    assert.ok(measure.selection.every(e => Math.abs(e.y - measure.selection[0].y) < 1), 'selection modes must be on the same row');
+    assert.ok(measure.selection.every(e => Math.abs(e.width - measure.selection[0].width) < 2), 'selection modes must be equally wide');
+    assert.ok(Math.abs(measure.text.width - measure.spray.width) < 2 && Math.abs(measure.text.height - measure.spray.height) < 1,
+      'text tool and spray must share a full-sized touch target');
+    assert.ok(measure.text.width >= 48 && measure.text.height >= 48);
+    assert.equal(measure.overflow, false, 'no individual tool section should overflow its grid');
+    assert.ok(measure.menu.x >= 0 && measure.menu.x + measure.menu.width <= width, 'menu must remain within viewport');
+    pass('Draw compact tool menu at '+width+'px: aligned selection and text buttons');
+    if (width === 390) await layoutPage.screenshot({ path: output+'/draw-tool-grid-390.png', fullPage: false });
+  }
+  await layoutPage.close();
   const staticContext = await browser.newContext({ javaScriptEnabled: false });
   const staticPage = await staticContext.newPage(); await staticPage.goto(base+'/output/formats/tga/');
   assert.equal(await staticPage.locator('.format-route-start').count(),4); assert.ok(await staticPage.locator('h1').isVisible()); await staticContext.close();
