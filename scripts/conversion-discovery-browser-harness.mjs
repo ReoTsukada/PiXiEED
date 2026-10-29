@@ -211,6 +211,67 @@ try {
     if (width === 390) await layoutPage.screenshot({ path: output+'/draw-tool-grid-390.png', fullPage: false });
   }
   await layoutPage.close();
+  // Exercise the real Draw runtime, not a mocked renderer: a single dispatched
+  // pointer move containing many high-resolution samples should draw every
+  // pixel but queue only one paint for the frame.
+  const drawPage = await context.newPage();
+  drawPage.setDefaultTimeout(25000);
+  const drawErrors = [];
+  drawPage.on('pageerror', error => drawErrors.push(error.message));
+  await drawPage.addInitScript(() => {
+    window.__drawStrokeAudit = { paints: 0 };
+    const original = CanvasRenderingContext2D.prototype.putImageData;
+    CanvasRenderingContext2D.prototype.putImageData = function (...args) {
+      if (this.canvas?.id === 'draw-canvas') window.__drawStrokeAudit.paints++;
+      return original.apply(this, args);
+    };
+  });
+  await drawPage.setViewportSize({ width: 390, height: 844 });
+  await drawPage.goto(base + '/draw/', { waitUntil: 'domcontentloaded' });
+  await drawPage.waitForFunction(() => {
+    const canvas = document.querySelector('#draw-canvas');
+    return Boolean(canvas?.dataset.tool && !document.querySelector('#main')?.inert);
+  }, null, { timeout: 40000 });
+  const drawProbe = await drawPage.evaluate(async () => {
+    const canvas = document.querySelector('#draw-canvas');
+    const bounds = canvas.getBoundingClientRect();
+    const y = bounds.y + bounds.height * 0.5;
+    const px = x => bounds.x + bounds.width * ((x + 0.5) / canvas.width);
+    const rgba = () => {
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      return [...data].filter((_, i) => i % 4 === 3 && data[i] > 0).length;
+    };
+    const make = (type, x, buttons, samples = null) => {
+      const e = new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 711, pointerType: 'mouse',
+        button: 0, buttons, clientX: px(x), clientY: y,
+      });
+      if (samples) Object.defineProperty(e, 'getCoalescedEvents', { value: () =>
+        samples.map(sample => new PointerEvent('pointermove', {
+          pointerId: 711, pointerType: 'mouse', button: 0, buttons: 1,
+          clientX: px(sample), clientY: y,
+        })) });
+      canvas.dispatchEvent(e);
+    };
+    const before = rgba();
+    make('pointerdown', 2, 1);
+    const afterDown = window.__drawStrokeAudit.paints;
+    make('pointermove', 12, 1, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    const afterSamples = window.__drawStrokeAudit.paints;
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const afterFrame = window.__drawStrokeAudit.paints;
+    make('pointerup', 12, 0);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    return { before, after: rgba(), afterDown, afterSamples, afterFrame, afterUp: window.__drawStrokeAudit.paints };
+  });
+  assert.ok(drawProbe.after > drawProbe.before, 'a high-frequency coalesced stroke must paint actual pixels');
+  assert.equal(drawProbe.afterSamples, drawProbe.afterDown, 'no redundant synchronous composite per coalesced sample');
+  assert.ok(drawProbe.afterFrame - drawProbe.afterDown <= 2, 'one animation frame must consolidate the pointer samples');
+  assert.ok(drawProbe.afterUp >= drawProbe.afterFrame, 'final pointerup must commit a visible stroke');
+  assert.deepEqual(drawErrors, [], 'drawing should not throw page errors');
+  pass('Draw real canvas: coalesced samples render once per frame and release commits pixels');
+  await drawPage.screenshot({ path: output+'/draw-stroke-after.png', fullPage: false });
+  await drawPage.close();
   const staticContext = await browser.newContext({ javaScriptEnabled: false });
   const staticPage = await staticContext.newPage(); await staticPage.goto(base+'/output/formats/tga/');
   assert.equal(await staticPage.locator('.format-route-start').count(),4); assert.ok(await staticPage.locator('h1').isVisible()); await staticContext.close();
