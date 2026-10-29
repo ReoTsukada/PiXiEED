@@ -566,8 +566,9 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const mine = $('#minePosts', documentRef); if (mine) mine.setAttribute('aria-pressed', String(state.mineMode));
     const view = state.mineMode ? 'mine' : state.filter === 'local' ? 'local' : state.filter === 'saved' ? 'saved' : 'feed';
     const [title, description] = FEED_VIEWS[view];
-    $('#pageTitle', documentRef).textContent = explorePage && view === 'feed' ? '探す' : title;
-    $('#viewDescription', documentRef).textContent = explorePage && view === 'feed' ? '読み込んだ公開作品を、作者・ことば・種類から探します。' : description;
+    if (explorePage) documentRef.body.dataset.exploreView = view;
+    $('#pageTitle', documentRef).textContent = explorePage && view === 'feed' ? 'みんなの作品' : title;
+    $('#viewDescription', documentRef).textContent = explorePage && view === 'feed' ? '気になる作品に出会おう。' : description;
     const searchLabel = $('#socialSearch', documentRef)?.closest('.explore-search');
     if (searchLabel) {
       searchLabel.hidden = view !== 'feed';

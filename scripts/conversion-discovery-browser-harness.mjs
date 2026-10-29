@@ -71,6 +71,41 @@ try {
   await open('/?view=saved');
   await page.waitForURL(base+'/explore/?view=saved');
   pass('Old home social bookmarks redirect to Explore');
+  // Explore uses the actual social controller and local IndexedDB, not seeded posts.
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 950 });
+    await open('/explore/');
+    await page.locator('.explore-hero').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('h1').count(), 1);
+    assert.equal(await page.locator('#feedViews [data-action="view"]').count(), 3);
+    assert.equal(await page.locator('#feedViews [data-action="mine"]').count(), 1);
+    assert.equal(await page.locator('#socialSearch').count(), 1);
+    assert.ok(await page.locator('#pageTitle').isVisible(), 'The community heading must be visible, including on mobile');
+    assert.ok(await page.locator('.prompt-open').isVisible(), 'The post composer entrance must be visible');
+    assert.equal(await page.locator('#composerDialog').count(), 1);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    if (width >= 1191) assert.ok(await page.locator('.explore-maker-feature').isVisible());
+    pass('Explore at '+width+'px: responsive SNS hero, search, views, composer');
+    if ([390,1440].includes(width)) await page.screenshot({ path: output+'/explore-'+width+'.png', fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 950 });
+  await open('/explore/');
+  await page.waitForFunction(() => document.querySelector('#socialApp')?.dataset.ready === 'true', { timeout: 12000 });
+  await page.locator('#feedViews [data-view="saved"]').click();
+  await page.waitForFunction(() => document.body.dataset.exploreView === 'saved');
+  assert.equal(await page.locator('#socialSearch').isVisible(), false);
+  await page.locator('#feedViews [data-view="local"]').click();
+  await page.waitForFunction(() => document.body.dataset.exploreView === 'local');
+  assert.ok(await page.locator('#draftsPanel').isVisible());
+  await page.locator('#feedViews [data-view="feed"]').click();
+  await page.waitForFunction(() => document.body.dataset.exploreView === 'feed');
+  assert.ok(await page.locator('#socialSearch').isVisible());
+  await page.locator('.prompt-open').click();
+  await page.locator('#composerDialog').waitFor({ state: 'visible' });
+  assert.ok(await page.locator('#composerForm').isVisible());
+  await page.locator('#composerClose').click();
+  await page.locator('#composerDialog').waitFor({ state: 'hidden' });
+  pass('Explore: real saved/draft/feed switching and existing composer dialog');
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 }); await open('/output/formats/qoi/');
     assert.equal(await page.locator('h1').count(), 1);
