@@ -260,7 +260,96 @@ try {
   assert.deepEqual(drawErrors, [], 'drawing should not throw page errors');
   pass('Draw real mouse gesture paints and undo restores exact original pixels');
   await drawPage.screenshot({ path: output+'/draw-stroke-after.png', fullPage: false });
+  // Exercise the real Draw document at progressively larger canvas sizes.
+  // Frame intervals are diagnostic CI-machine samples, not device FPS promises.
+  report.drawCanvasAudit = [];
+  for (const size of [32, 64, 128, 256]) {
+    await drawPage.evaluate(next => {
+      const input = document.querySelector('#draw-size');
+      input.value = String(next);
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, size);
+    const panel = drawPage.locator('#creation-project-settings-panel');
+    await panel.waitFor({ state: 'visible', timeout: 15000 });
+    await drawPage.locator('[data-project-action="preview"]').click();
+    await drawPage.waitForFunction(() => !document.querySelector('[data-project-action="apply"]')?.disabled, null, { timeout: 20000 });
+    await drawPage.locator('[data-project-action="apply"]').click();
+    await drawPage.waitForFunction(next => document.querySelector('#draw-canvas')?.width === next, size, { timeout: 20000 });
+    await panel.locator('.creation-project-settings__close').click();
+    await panel.waitFor({ state: 'hidden' });
+    const basePixels = await rgbaCount();
+    const canvasBox = await drawCanvas.boundingBox();
+    assert.ok(canvasBox && canvasBox.width > 0 && canvasBox.height > 0, 'resized canvas must be visible');
+    const row = Math.max(1, Math.floor(size * .85));
+    const moveY = canvasBox.y + canvasBox.height * (row + .5) / size;
+    const moveX = n => canvasBox.x + canvasBox.width * (n + .5) / size;
+    await drawPage.evaluate(() => {
+      const audit = { gaps: [], previous: 0, stopped: false };
+      window.__drawFrameProbe = audit;
+      window.__drawStrokeAudit.paints = 0;
+      const measure = at => {
+        if (audit.stopped) return;
+        if (audit.previous) audit.gaps.push(at - audit.previous);
+        audit.previous = at;
+        requestAnimationFrame(measure);
+      };
+      requestAnimationFrame(measure);
+    });
+    const started = Date.now();
+    await drawPage.mouse.move(moveX(2), moveY);
+    await drawPage.mouse.down();
+    await drawPage.mouse.move(moveX(size - 3), moveY, { steps: 20 });
+    await drawPage.mouse.up();
+    await drawPage.waitForTimeout(70);
+    const elapsedMs = Date.now() - started;
+    const strokePixels = await rgbaCount();
+    assert.ok(strokePixels > basePixels, 'Draw at '+size+'px must write visible pixels');
+    assert.ok(await drawPage.locator('#draw-undo').isEnabled(), 'Stroke at '+size+'px must be undoable');
+    const frameStats = await drawPage.evaluate(() => {
+      const audit = window.__drawFrameProbe; audit.stopped = true;
+      const sorted = [...audit.gaps].sort((a,b)=>a-b);
+      return { frames: sorted.length, p95FrameGapMs: sorted[Math.min(sorted.length-1, Math.floor(sorted.length*.95))] || null,
+        maxFrameGapMs: sorted.at(-1) || null, drawCanvasPaintCalls: window.__drawStrokeAudit.paints };
+    });
+    await drawPage.locator('#draw-undo').click();
+    assert.equal(await rgbaCount(), basePixels, 'Undo at '+size+'px must restore all prior pixels');
+    report.drawCanvasAudit.push({ canvasSize: size, strokeWallMs: elapsedMs, writtenPixels: strokePixels - basePixels, ...frameStats });
+    pass('Draw '+size+'px: real stroke, undo, frame timing sampled without content loss');
+  }
+  await writeFile(output+'/draw-canvas-audit.json', JSON.stringify(report.drawCanvasAudit, null, 2));
   await drawPage.close();
+
+  // A fresh browser context emulates a 390px touch screen. This is not a physical Android device.
+  const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 },
+    isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  await touchContext.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+  const touchPage = await touchContext.newPage();
+  const touchErrors = [];
+  touchPage.on('pageerror', error => touchErrors.push(error.message));
+  await touchPage.goto(base+'/draw/editor.html', { waitUntil: 'domcontentloaded' });
+  await touchPage.waitForFunction(() => {
+    const canvas = document.querySelector('#draw-canvas');
+    return Boolean(canvas?.dataset.tool && !document.querySelector('#main')?.inert);
+  }, null, { timeout: 40000 });
+  const touchCanvas = touchPage.locator('#draw-canvas');
+  const touchPixels = () => touchCanvas.evaluate(canvas => {
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let count = 0; for (let i=3;i<data.length;i+=4) if(data[i]) count++;
+    return count;
+  });
+  const touchStart = await touchPixels();
+  const touchRect = await touchCanvas.boundingBox();
+  assert.ok(touchRect && touchRect.width > 0 && touchRect.height > 0);
+  await touchPage.touchscreen.tap(touchRect.x + touchRect.width * .36, touchRect.y + touchRect.height * .36);
+  await touchPage.waitForTimeout(80);
+  const touchEnd = await touchPixels();
+  assert.ok(touchEnd > touchStart, 'Emulated touch tap must paint a visible pixel');
+  await touchPage.locator('#draw-undo').click();
+  assert.equal(await touchPixels(), touchStart, 'Emulated touch undo must restore the original pixels');
+  assert.deepEqual(touchErrors, [], 'Emulated touch drawing must not throw');
+  report.drawTouchAudit = { viewportWidth: 390, writtenPixels: touchEnd - touchStart, undoRestored: true, emulated: true };
+  pass('Draw 390px emulated touch: tap, visible pigment and exact undo');
+  await touchContext.close();
   const staticContext = await browser.newContext({ javaScriptEnabled: false });
   const staticPage = await staticContext.newPage(); await staticPage.goto(base+'/output/formats/tga/');
   assert.equal(await staticPage.locator('.format-route-start').count(),4); assert.ok(await staticPage.locator('h1').isVisible()); await staticContext.close();
