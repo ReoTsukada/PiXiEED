@@ -278,6 +278,21 @@ try {
     await panel.locator('.creation-project-settings__close').click();
     await panel.waitFor({ state: 'hidden' });
     const basePixels = await rgbaCount();
+    // Idle control on the same CI browser/viewport, not a presumed 60fps baseline.
+    const idle = await drawPage.evaluate(() => new Promise(resolve => {
+      let first = 0, prior = 0; const gaps = [];
+      function sample(at) {
+        if (!first) first = at;
+        if (prior) gaps.push(at - prior);
+        prior = at;
+        if (at - first >= 550) {
+          const ordered = gaps.sort((a, b) => a - b);
+          resolve({ idleFrames: ordered.length, idleP95FrameGapMs: ordered[Math.min(ordered.length-1, Math.floor(ordered.length*.95))] || null,
+            idleMaxFrameGapMs: ordered.at(-1) || null });
+        } else requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
+    }));
     const canvasBox = await drawCanvas.boundingBox();
     assert.ok(canvasBox && canvasBox.width > 0 && canvasBox.height > 0, 'resized canvas must be visible');
     const row = Math.max(1, Math.floor(size * .85));
@@ -313,7 +328,10 @@ try {
     });
     await drawPage.locator('#draw-undo').click();
     assert.equal(await rgbaCount(), basePixels, 'Undo at '+size+'px must restore all prior pixels');
-    report.drawCanvasAudit.push({ canvasSize: size, strokeWallMs: elapsedMs, writtenPixels: strokePixels - basePixels, ...frameStats });
+    report.drawCanvasAudit.push({ canvasSize: size, strokeWallMs: elapsedMs, writtenPixels: strokePixels - basePixels,
+      ...idle, ...frameStats,
+      relativeP95Gap: idle.idleP95FrameGapMs && frameStats.p95FrameGapMs
+        ? Math.round(100 * frameStats.p95FrameGapMs / idle.idleP95FrameGapMs) / 100 : null });
     pass('Draw '+size+'px: real stroke, undo, frame timing sampled without content loss');
   }
   await writeFile(output+'/draw-canvas-audit.json', JSON.stringify(report.drawCanvasAudit, null, 2));
