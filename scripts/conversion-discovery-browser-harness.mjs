@@ -233,44 +233,32 @@ try {
     const canvas = document.querySelector('#draw-canvas');
     return Boolean(canvas?.dataset.tool && !document.querySelector('#main')?.inert);
   }, null, { timeout: 40000 });
-  const drawProbe = await drawPage.evaluate(async () => {
-    const canvas = document.querySelector('#draw-canvas');
-    const bounds = canvas.getBoundingClientRect();
-    const y = bounds.y + bounds.height * 0.5;
-    const px = x => bounds.x + bounds.width * ((x + 0.5) / canvas.width);
-    const rgba = () => {
-      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-      return [...data].filter((_, i) => i % 4 === 3 && data[i] > 0).length;
-    };
-    const make = (type, x, buttons, samples = null) => {
-      const e = new PointerEvent(type, {
-        bubbles: true, cancelable: true, pointerId: 711, pointerType: 'mouse',
-        button: 0, buttons, clientX: px(x), clientY: y,
-      });
-      if (samples) Object.defineProperty(e, 'getCoalescedEvents', { value: () =>
-        samples.map(sample => new PointerEvent('pointermove', {
-          pointerId: 711, pointerType: 'mouse', button: 0, buttons: 1,
-          clientX: px(sample), clientY: y,
-        })) });
-      canvas.dispatchEvent(e);
-    };
-    const before = rgba();
-    make('pointerdown', 2, 1);
-    const afterDown = window.__drawStrokeAudit.paints;
-    make('pointermove', 12, 1, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    const afterSamples = window.__drawStrokeAudit.paints;
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    const afterFrame = window.__drawStrokeAudit.paints;
-    make('pointerup', 12, 0);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    return { before, after: rgba(), afterDown, afterSamples, afterFrame, afterUp: window.__drawStrokeAudit.paints };
+  // Browser-trusted mouse events exercise the real captured gesture; synthetic
+  // pointerdown cannot establish capture and must not be used to assert input.
+  const drawCanvas = drawPage.locator('#draw-canvas');
+  const box = await drawCanvas.boundingBox();
+  assert.ok(box && box.width > 0 && box.height > 0, 'Draw canvas must be visible and sized');
+  const grid = await drawCanvas.evaluate(canvas => ({ width: canvas.width, height: canvas.height }));
+  const rgbaCount = () => drawCanvas.evaluate(canvas => {
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let count = 0; for (let i=3; i<data.length; i+=4) if (data[i]) count++;
+    return count;
   });
-  assert.ok(drawProbe.after > drawProbe.before, 'a high-frequency coalesced stroke must paint actual pixels');
-  assert.equal(drawProbe.afterSamples, drawProbe.afterDown, 'no redundant synchronous composite per coalesced sample');
-  assert.ok(drawProbe.afterFrame - drawProbe.afterDown <= 2, 'one animation frame must consolidate the pointer samples');
-  assert.ok(drawProbe.afterUp >= drawProbe.afterFrame, 'final pointerup must commit a visible stroke');
+  const beforePixels = await rgbaCount();
+  const y = box.y + box.height * Math.floor(grid.height * .5) / grid.height + box.height / (grid.height * 2);
+  const xAt = n => box.x + box.width * (n + .5) / grid.width;
+  await drawPage.mouse.move(xAt(2), y);
+  await drawPage.mouse.down();
+  await drawPage.mouse.move(xAt(Math.max(3, grid.width - 3)), y, { steps: 14 });
+  await drawPage.mouse.up();
+  await drawPage.waitForTimeout(90);
+  const afterPixels = await rgbaCount();
+  assert.ok(afterPixels > beforePixels, 'real mouse stroke must paint canvas pixels');
+  assert.ok(await drawPage.locator('#draw-undo').isEnabled(), 'real stroke must commit one history transaction');
+  await drawPage.locator('#draw-undo').click();
+  assert.equal(await rgbaCount(), beforePixels, 'undo restores original canvas without dropped pixels');
   assert.deepEqual(drawErrors, [], 'drawing should not throw page errors');
-  pass('Draw real canvas: coalesced samples render once per frame and release commits pixels');
+  pass('Draw real mouse gesture paints and undo restores exact original pixels');
   await drawPage.screenshot({ path: output+'/draw-stroke-after.png', fullPage: false });
   await drawPage.close();
   const staticContext = await browser.newContext({ javaScriptEnabled: false });
