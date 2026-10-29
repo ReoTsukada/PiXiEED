@@ -14,7 +14,7 @@ import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=202
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-draw-search-rail-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
-import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261025-draw-render-optimization-1';
+import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
