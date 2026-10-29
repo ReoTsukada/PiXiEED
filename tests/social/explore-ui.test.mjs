@@ -22,6 +22,7 @@ test('Explore is the community experience and matches the home visual language',
   assert.match(explore, /href="\/globe\/"/);
   assert.match(explore, /href="\/tools\/"/);
   assert.doesNotMatch(explore, /data-social-page="home"/);
+  assert.ok(!explore.split('\n').some(line => line.trim() === 'ide>'), 'No broken closing tag fragment');
   assert.ok(!feed.includes('social-explore.css'), 'legacy feed keeps its own original styling');
 });
 
