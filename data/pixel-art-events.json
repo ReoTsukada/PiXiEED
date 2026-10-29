@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-29T00:02:07+00:00",
+  "updatedAt": "2026-10-29T23:58:13+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -1183,7 +1183,7 @@
       "startDate": "2026-10-30",
       "endDate": "2026-11-03",
       "dateLabel": "2026年10月30日〜11月3日。10月31日16:00–18:00はイベント予約者のみ。会場閲覧自由、展示作品の試遊は2,000円（ZINE付き）。",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://honkbooks.com/asobanight-20/",
       "sourceLabel": "主催・会場の公式展示案内",
       "description": "ゲームとアートの複合展示に、ドット絵イラストを制作するsanaenvyやピクセルアーティストを含むMidnight Peppermintが参加。10月31日のトークは別料金2,500円・要予約。",
@@ -2429,7 +2429,7 @@
       "startDate": "2026-10-30",
       "endDate": "2026-10-30",
       "dateLabel": "2026年10月30日 10:00–11:00（英国現地時間）",
-      "status": "upcoming",
+      "status": "active",
       "sourceUrl": "https://gloslibraries.uk/event/chipping-campden-library-chipping-campden-lab-spooky-pixel-art-gifs-30-10-2026",
       "description": "7〜14歳向け。自分で不気味なピクセルアートをデザインし、アニメーションGIFにするワークショップ。14歳未満は大人同伴、要予約、参加費£2。",
       "checkedAt": "2026-10-18T09:04:17+09:00",
@@ -2599,7 +2599,7 @@
         "https://www.museeduchateaudemayenne.fr/preparer-visite/acces/"
       ],
       "description": "Musée du château de Mayenneの家族向けPixel Artワークショップ。LEGOとビデオゲームの間にある、画像を組み立てる表現としてPixel Artを体験する。要予約、6ユーロ（博物館会員無料）。",
-      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "checkedAt": "2026-10-29T23:58:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Musée du château de Mayenne公式"
     },
@@ -2615,7 +2615,7 @@
       "status": "upcoming",
       "sourceUrl": "https://www.billetweb.fr/atelier-numerique-pixel-art",
       "description": "Brignaisのデジタル講座。オンラインツールでPixel Artを制作し、印刷する。対象10歳以上。",
-      "checkedAt": "2026-10-21T00:09:10+00:00",
+      "checkedAt": "2026-10-29T23:58:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Briscope / Ludo-médiathèque公式予約ページ"
     },
@@ -2870,7 +2870,7 @@
       "status": "upcoming",
       "sourceUrl": "https://www.atelierenfant.com/fr/paris/ateliers/ponctuels/atelier-pixel-art-5-99-ans-paris-5e-4032/",
       "description": "5歳以上向けのPixel Artモザイク制作。図案を選び、グリッド上に色タイルを並べて固定し、作品を持ち帰る。料金39ユーロ。",
-      "checkedAt": "2026-10-27T00:05:19+00:00",
+      "checkedAt": "2026-10-29T23:58:13+00:00",
       "kind": "pixel-art",
       "sourceLabel": "Atelier Enfant公式"
     },
@@ -2953,6 +2953,31 @@
       "kind": "pixel-art",
       "sourceLabel": "市の文化機関・会場の公式情報",
       "officialName": "Nostalgia for technological scarcity — Atelier de pixel art pentru copii"
+    },
+    {
+      "id": "epfl-coding-club-basel-pixel-art-2026-11-07",
+      "name": "EPFL Coding Club for Girls — Pixel Art（Schule Brunnmatt, Basel）",
+      "country": "スイス",
+      "area": "バーゼル＝シュタット準州・バーゼル市",
+      "venue": "Schule Brunnmatt（Ingelsteinweg 6, 4053 Basel）",
+      "locationPrecision": "venue",
+      "mapAreaLocation": {
+        "latitude": 47.539463,
+        "longitude": 7.592768,
+        "precision": "venue",
+        "sourceUrl": "https://www.bing.com/maps/search?FORM=MPSRPL&cp=47.539463~7.592768&lvl=11&mepi=0~~Embedded~Address_Link&ppois=47.53946304321289_7.592767715454102_Brunnmatt-Schule_YN47136F006BD8BCD1~&q=Brunnmatt-Schule&sV=1&ss=id.ypid%3AYN47136F006BD8BCD1&style=r&ty=18&v=2"
+      },
+      "startDate": "2026-11-07",
+      "endDate": "2026-11-07",
+      "dateLabel": "2026年11月7日 09:30–12:00 または13:30–16:00（公式ページにタイムゾーン記載なし）",
+      "status": "upcoming",
+      "sourceUrl": "https://memento.epfl.ch/event/coding-club-for-girls-in-basel-9/",
+      "description": "11〜15歳の女子向け無料講座。JavaScript/HTMLでピクセル化した作品を作り、描画プログラムで2人用パズルゲームも制作する。予約必須。",
+      "participation": "公式申込フォームで事前登録（無料）。",
+      "checkedAt": "2026-10-29T23:58:13+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "EPFL公式イベント情報",
+      "officialName": "Coding Club for Girls in Basel — Pixel Art"
     }
   ],
   "sources": [
@@ -3811,9 +3836,10 @@
       ],
       "socialUrls": [],
       "lastCheckedAt": "2026-10-05T07:18:39+00:00",
-      "result": "official-confirmed",
-      "notes": "公式本文で内容・開催日・場所を確認。",
-      "socialChecks": []
+      "result": "unavailable",
+      "notes": "公式本文で内容・開催日・場所を確認。 今回の公式ページ再取得はタイムアウト。前回読了した案内は保持し、現況の変更有無は未確認。",
+      "socialChecks": [],
+      "attemptedAt": "2026-10-29T23:58:13+00:00"
     },
     {
       "id": "crosspico-nagoya-vol-3-2026",
@@ -4866,9 +4892,9 @@
       ],
       "socialUrls": [],
       "socialTags": [],
-      "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+      "lastCheckedAt": "2026-10-29T23:58:13+00:00",
       "result": "official-confirmed",
-      "notes": "Atelier Enfant公式ページでPixel Artモザイクの内容と10/31 10:00–17:00予約枠を確認。所要時間表記に30–45分と1時間の差がある。"
+      "notes": "Atelier Enfant公式ページでPixel Artモザイクの内容と10/31 10:00–17:00予約枠を確認。所要時間表記に30–45分と1時間の差がある。 2026-10-30に公式本文で10/31予約枠・Pixel Artモザイク内容・住所を再確認。所要時間の記載差を維持。"
     },
     {
       "id": "akbank-sanat-yunt-pixel-art-2026-11-14",
@@ -4923,11 +4949,25 @@
         "timisoara-nostalgia-pixel-art-workshop-2026-11-03"
       ],
       "notes": "Centrul de Proiecte公式本文で展示2–4 Nov、子ども向けpixel-art講座11/3 17:00–18:00、Hama BeadsでPixel Artの歴史とピクセル画像原理を学ぶ内容を確認。Galeria 5公式会場ページで所在地を確認。座標は未確認。"
+    },
+    {
+      "id": "chipping-campden-spooky-pixel-art-gifs-2026-10-30",
+      "url": "https://gloslibraries.uk/event/chipping-campden-library-chipping-campden-lab-spooky-pixel-art-gifs-30-10-2026",
+      "additionalUrls": [],
+      "socialUrls": [],
+      "socialTags": [],
+      "eventIds": [
+        "chipping-campden-spooky-pixel-art-gifs-2026-10-30"
+      ],
+      "lastCheckedAt": "2026-10-18T09:04:17+09:00",
+      "attemptedAt": "2026-10-29T23:58:13+00:00",
+      "result": "unavailable",
+      "notes": "今回の公式ページ再取得はCache miss。10/18の本文読了で10/30開催とSpooky Pixel Art GIF制作を確認済み。現在の変更有無は未確認。"
     }
   ],
   "research": {
-    "checkedAt": "2026-10-29T00:02:07+00:00",
-    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。 2026-10-22: 台湾・宜蘭の像素磚Pixel Art体験（10/24）、RETRO GAME SUMMIT Lv.6のドットアート出展（11/7）、フランスPeymeinadeの漫画祭内Pixel Art講座（10/24–25）、Sablé-sur-SartheのモザイクPixel Art講座（10/27）、Rezé CAVIARのPixel Artモザイク講座2回（12/19、2027/3/3）を公式本文で確認し追加。10/21開催の4件を終了扱いへ更新（予定日経過による整理で、現地実施を独立確認した意味ではない）。NRGは提出締切が経過したが大会本体は10/23–25のため upcoming 維持。Vila Geek、Montreal Mixlab、SPIEL、Pixel Layered、KAI高雄、PAC-MAN展示を再確認。アンジェの10/23・10/30 Pixel Artビーズ講座、CO-MAKER Lyon、パリのPixel Art講座は公式本文を直接取得できず登録保留。 2026-10-26: NRG公式compo/開催ページを再確認。Pixel Art各部門の提出締切は10/24 12:00 CEST（19:00 JST）で終了、NRG開催期間も10/25までで終了。10/22〜25のNRG、SPIEL/Moertel、KAI、Montreal Mixlab、Vila Geek、Whimtale、宜蘭Pixel Brick、Peymeinade、および10/24終了のSegment Pixel Jamを予定日経過でendedへ更新（開催実施の独立確認を意味しない）。10/26を期間に含む既存イベントはactiveに整理。新規追加なし。 2026-10-27: フランスのMoulinsで観光局公式に明示されたPixel Artアイロンビーズ講座6回（11/14〜12/19）、CO-MAKER Lyonの11/22 Pixel Artマイクロモザイク講座、Paris 5eの10/31 Pixel Artモザイク回を公式本文で確認・追加。ビーズ/モザイク素材の利用だけでは除外せず、Pixel Art制作が明示された個別講座のみ対象。La Bourboule 11/7は既存登録を再確認。韓国語・中国語圏の新規確認済み候補なし。 2026-10-28: トルコAkbank Sanatの11/14 YUNT講座は公式本文でPixel Artの絵をビーズで制作する内容・開催時刻・会場を確認し追加。フランスFestival ConnexionsのBesse 11/7 15:00–17:00 Pixel Artシルクスクリーン講座は、既存La Bourboule午前回と別会場のため独立回として追加。Retro Pixel Jamは公式本文でPixel Art推奨のレトロゲームジャムと確認、既存登録を再確認。Pixel Forge Mega JamはPixelが運営名でドット絵企画は確認できず除外。Portland Digital Dabblersの11/28講座は公式一覧と個別ページの日付矛盾で保留、MayenneのLego Pixel Art展は公式本文を取得できず保留。香港博物館節は公式本文で10/31–11/1、11:00–18:00のPixel貼紙参加型公共作品を再確認。 2026-10-29: 韓国H.I.Pの参加作紹介でCOLORFLYがpixel-art worldのゲームであること、10/31–11/1の一般公開時間と弘大Mijin Floorを確認し、当該ゲーム出展の範囲に限って追加。韓国Steam公式ストアと会場運営者ページで作品のPixel Art表記・住所を補強、座標なし。ルーマニアTimișoaraの市文化機関公式案内で11/3 17:00–18:00の子ども向けPixel Art講座を確認、会場Galeria 5の住所も公式会場ページで照合、座標なし。10/27–28終了日のオランダ/英国/フランス3件をendedへ整理（開催実施の独立確認を意味しない）。日本の11/1札幌・登別の開催案内を公式/作家ページで再確認。新宿の公式案内はタイムアウトのため現況保留。",
+    "checkedAt": "2026-10-29T23:58:13+00:00",
+    "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。 2026-10-22: 台湾・宜蘭の像素磚Pixel Art体験（10/24）、RETRO GAME SUMMIT Lv.6のドットアート出展（11/7）、フランスPeymeinadeの漫画祭内Pixel Art講座（10/24–25）、Sablé-sur-SartheのモザイクPixel Art講座（10/27）、Rezé CAVIARのPixel Artモザイク講座2回（12/19、2027/3/3）を公式本文で確認し追加。10/21開催の4件を終了扱いへ更新（予定日経過による整理で、現地実施を独立確認した意味ではない）。NRGは提出締切が経過したが大会本体は10/23–25のため upcoming 維持。Vila Geek、Montreal Mixlab、SPIEL、Pixel Layered、KAI高雄、PAC-MAN展示を再確認。アンジェの10/23・10/30 Pixel Artビーズ講座、CO-MAKER Lyon、パリのPixel Art講座は公式本文を直接取得できず登録保留。 2026-10-26: NRG公式compo/開催ページを再確認。Pixel Art各部門の提出締切は10/24 12:00 CEST（19:00 JST）で終了、NRG開催期間も10/25までで終了。10/22〜25のNRG、SPIEL/Moertel、KAI、Montreal Mixlab、Vila Geek、Whimtale、宜蘭Pixel Brick、Peymeinade、および10/24終了のSegment Pixel Jamを予定日経過でendedへ更新（開催実施の独立確認を意味しない）。10/26を期間に含む既存イベントはactiveに整理。新規追加なし。 2026-10-27: フランスのMoulinsで観光局公式に明示されたPixel Artアイロンビーズ講座6回（11/14〜12/19）、CO-MAKER Lyonの11/22 Pixel Artマイクロモザイク講座、Paris 5eの10/31 Pixel Artモザイク回を公式本文で確認・追加。ビーズ/モザイク素材の利用だけでは除外せず、Pixel Art制作が明示された個別講座のみ対象。La Bourboule 11/7は既存登録を再確認。韓国語・中国語圏の新規確認済み候補なし。 2026-10-28: トルコAkbank Sanatの11/14 YUNT講座は公式本文でPixel Artの絵をビーズで制作する内容・開催時刻・会場を確認し追加。フランスFestival ConnexionsのBesse 11/7 15:00–17:00 Pixel Artシルクスクリーン講座は、既存La Bourboule午前回と別会場のため独立回として追加。Retro Pixel Jamは公式本文でPixel Art推奨のレトロゲームジャムと確認、既存登録を再確認。Pixel Forge Mega JamはPixelが運営名でドット絵企画は確認できず除外。Portland Digital Dabblersの11/28講座は公式一覧と個別ページの日付矛盾で保留、MayenneのLego Pixel Art展は公式本文を取得できず保留。香港博物館節は公式本文で10/31–11/1、11:00–18:00のPixel貼紙参加型公共作品を再確認。 2026-10-29: 韓国H.I.Pの参加作紹介でCOLORFLYがpixel-art worldのゲームであること、10/31–11/1の一般公開時間と弘大Mijin Floorを確認し、当該ゲーム出展の範囲に限って追加。韓国Steam公式ストアと会場運営者ページで作品のPixel Art表記・住所を補強、座標なし。ルーマニアTimișoaraの市文化機関公式案内で11/3 17:00–18:00の子ども向けPixel Art講座を確認、会場Galeria 5の住所も公式会場ページで照合、座標なし。10/27–28終了日のオランダ/英国/フランス3件をendedへ整理（開催実施の独立確認を意味しない）。日本の11/1札幌・登別の開催案内を公式/作家ページで再確認。新宿の公式案内はタイムアウトのため現況保留。 2026-10-30: スイス・バーゼルのEPFL Coding Club for Girls公式本文で、11/7「Pixel Art」回（09:30–12:00または13:30–16:00）、11〜15歳向け、無料・要予約、Schule Brunnmattを確認して追加。公式イベントページのBing地図リンクに掲載された会場座標を使い、venue精度で記録。Brignais 10/31、Paris 5e 10/31、Mayenne 11/1の公式案内を再確認。日付を迎えた新宿展示とChipping Campden講座をactiveに整理。新宿公式ページはタイムアウト、Chipping Campden公式ページはCache missのため、過去の成功確認を保持し今回の取得失敗を台帳に記録。富里の11/3ビーズ候補は詳細公式ページ503でドット絵内容の確認保留。池袋Dot Coloringは数字に沿ってドット塗りする壁画でPixel Art記載なしのため対象外。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
       "Connecting Dots:256 PAC-MAN IP ART Kyoto 2026",
@@ -6380,7 +6420,10 @@
       "site:akbanksanat.com pixel art mosaic workshop 14 November 2026 YUNT",
       "site:cc-massifdusancy.fr festival connexions 2026 Besse atelier Pixel Art 7 novembre",
       "site:digitaldabblers.com Intro to Pixel Art Animation Aseprite November 28 2026",
-      "site:destination-mayenne.com exposition Lego Pixel Art Ambrières novembre 2026"
+      "site:destination-mayenne.com exposition Lego Pixel Art Ambrières novembre 2026",
+      "EPFL Coding Club for Girls Basel Pixel Art 7 November 2026",
+      "ドット絵 ピクセルアート イベント 2026 11月 展示 講座",
+      "pixel art workshop exhibition contest November December 2026 official"
     ],
     "languages": [
       "en",
@@ -6392,7 +6435,8 @@
       "pt",
       "sl",
       "pl",
-      "tr"
+      "tr",
+      "de"
     ]
   }
 }

@@ -356,6 +356,16 @@
       ]
     },
     {
+      "id": "region-ca1747cb15644b37",
+      "label": "スイス",
+      "eventIds": [
+        "epfl-coding-club-basel-pixel-art-2026-11-07"
+      ],
+      "areas": [
+        "バーゼル＝シュタット準州・バーゼル市"
+      ]
+    },
+    {
       "id": "region-ce76fe655d41af06",
       "label": "東京都",
       "eventIds": [
@@ -876,6 +886,18 @@
       "area": "Montréal・Saint-Laurent, Québec",
       "sourceUrls": [
         "https://montreal.ca/evenements/mixlab-club-dart-du-pixel-119687"
+      ]
+    },
+    {
+      "id": "venue-3d9641fd07323577",
+      "label": "Schule Brunnmatt（Ingelsteinweg 6, 4053 Basel）",
+      "eventIds": [
+        "epfl-coding-club-basel-pixel-art-2026-11-07"
+      ],
+      "region": "スイス",
+      "area": "バーゼル＝シュタット準州・バーゼル市",
+      "sourceUrls": [
+        "https://memento.epfl.ch/event/coding-club-for-girls-in-basel-9/"
       ]
     },
     {
@@ -2969,7 +2991,7 @@
       "lastKnownEventDate": "2026-11-01",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "lastCheckedAt": "2026-10-29T23:58:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3149,9 +3171,10 @@
       ],
       "lastKnownEventDate": "2026-11-03",
       "check": {
-        "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "result": "unavailable",
+        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
+        "attemptedAt": "2026-10-29T23:58:13+00:00",
+        "notes": "公式本文で内容・開催日・場所を確認。 今回の公式ページ再取得はタイムアウト。前回読了した案内は保持し、現況の変更有無は未確認。"
       }
     },
     {
@@ -4595,7 +4618,7 @@
       "lastKnownEventDate": "2026-10-31",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "lastCheckedAt": "2026-10-29T23:58:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5019,9 +5042,10 @@
       ],
       "lastKnownEventDate": "2026-10-30",
       "check": {
-        "result": "official-confirmed",
+        "result": "unavailable",
         "lastCheckedAt": "2026-10-18T09:04:17+09:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "attemptedAt": "2026-10-29T23:58:13+00:00",
+        "notes": "今回の公式ページ再取得はCache miss。10/18の本文読了で10/30開催とSpooky Pixel Art GIF制作を確認済み。現在の変更有無は未確認。"
       }
     },
     {
@@ -5388,7 +5412,7 @@
       "lastKnownEventDate": "2026-10-31",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+        "lastCheckedAt": "2026-10-29T23:58:13+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6640,6 +6664,31 @@
       }
     },
     {
+      "id": "source-eb7114a2b5b2d6c8",
+      "label": "EPFL Coding Club for Girls — Pixel Art（Schule Brunnmatt, Basel）",
+      "eventIds": [
+        "epfl-coding-club-basel-pixel-art-2026-11-07"
+      ],
+      "url": "https://memento.epfl.ch/event/coding-club-for-girls-in-basel-9/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スイス"
+      ],
+      "areas": [
+        "バーゼル＝シュタット準州・バーゼル市"
+      ],
+      "venues": [
+        "Schule Brunnmatt（Ingelsteinweg 6, 4053 Basel）"
+      ],
+      "lastKnownEventDate": "2026-11-07",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-10-29T23:58:13+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-eb9eb0cf54847c7b",
       "label": "Taller 26/27: Creación de juegos — Whimtaleでピクセルアートゲーム制作",
       "eventIds": [
@@ -7004,5 +7053,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-29T00:02:37+00:00"
+  "updatedAt": "2026-10-29T23:59:02+00:00"
 }
