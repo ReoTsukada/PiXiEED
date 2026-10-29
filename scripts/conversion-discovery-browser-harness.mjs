@@ -83,6 +83,9 @@ try {
     assert.ok(await page.locator('#pageTitle').isVisible(), 'The community heading must be visible, including on mobile');
     assert.ok(await page.locator('.prompt-open').isVisible(), 'The post composer entrance must be visible');
     assert.equal(await page.locator('#composerDialog').count(), 1);
+    assert.deepEqual(await page.locator('#socialApp').evaluate(element =>
+      [...element.childNodes].filter(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim()).map(node => node.textContent.trim())
+    ), [], 'No stray markup fragments may be visible outside SNS sections');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     if (width >= 1191) assert.ok(await page.locator('.explore-maker-feature').isVisible());
     pass('Explore at '+width+'px: responsive SNS hero, search, views, composer');
