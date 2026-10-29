@@ -227,7 +227,8 @@ try {
     };
   });
   await drawPage.setViewportSize({ width: 390, height: 844 });
-  await drawPage.goto(base + '/draw/', { waitUntil: 'domcontentloaded' });
+  await drawPage.goto(base + '/draw/editor.html', { waitUntil: 'domcontentloaded' });
+  await drawPage.locator('#draw-canvas').waitFor({ state: 'attached' });
   await drawPage.waitForFunction(() => {
     const canvas = document.querySelector('#draw-canvas');
     return Boolean(canvas?.dataset.tool && !document.querySelector('#main')?.inert);
