@@ -113,3 +113,46 @@ export function createFrameBatcher({ requestFrame, cancelFrame, callback } = {})
     dispose() { if (disposed) return; disposed = true; cancel(); }
   };
 }
+
+
+/**
+ * Collect the pixels of multiple pointer samples and paint at most once per
+ * animation frame. Writes to the document remain synchronous, only rendering
+ * is coalesced; cancelling a stroke drops stale dirty indices.
+ */
+export function createStrokePaintScheduler({ requestFrame, cancelFrame, paint, maxDirtyPixels = 16384 } = {}) {
+  if (typeof paint !== 'function' || !Number.isSafeInteger(maxDirtyPixels) || maxDirtyPixels < 1) {
+    throw new TypeError('Stroke painter needs a paint callback and a positive dirty-pixel limit');
+  }
+  const pending = new Set();
+  let full = false, disposed = false;
+  function render() {
+    if (disposed) return;
+    const changed = full ? null : Array.from(pending);
+    pending.clear(); full = false;
+    if (changed === null || changed.length) paint(changed);
+  }
+  const batcher = createFrameBatcher({ requestFrame, cancelFrame, callback: render });
+  return {
+    queue(indices) {
+      if (disposed) return false;
+      if (!indices || typeof indices === 'string' || typeof indices[Symbol.iterator] !== 'function') throw new TypeError('Dirty stroke pixels must be iterable');
+      let touched = false;
+      for (const index of indices) {
+        if (!Number.isSafeInteger(index) || index < 0) continue;
+        touched = true;
+        if (full) break;
+        pending.add(index);
+        if (pending.size > maxDirtyPixels) { pending.clear(); full = true; }
+      }
+      if (touched) batcher.schedule();
+      return touched;
+    },
+    flush() {
+      if (disposed) return;
+      batcher.cancel(); render();
+    },
+    cancel() { batcher.cancel(); pending.clear(); full = false; },
+    dispose() { if (disposed) return; disposed = true; batcher.dispose(); pending.clear(); full = false; },
+  };
+}

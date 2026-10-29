@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAnimation, addAnimationFrame, writeAnimationCel, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, setLayerProperties } from '../../js/creation/animation-core.mjs';
-import { createAnimationFrameCache, createFrameBatcher, updateOnionImageData } from '../../js/creation/draw-render-optimization.mjs';
+import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from '../../js/creation/draw-render-optimization.mjs';
 
 function imageData(width, height) { const data = new Uint8ClampedArray(width * height * 4); return { width, height, data, rgba: data }; }
 function referenceOnion(display, previous, next) {
@@ -148,4 +148,55 @@ test('frame batcher collapses repaint requests without dropping synchronous inpu
   assert.equal(pending.has(queuedId), false);
   batcher.schedule(); batcher.dispose(); batcher.schedule();
   assert.equal(pending.size, 0);
+});
+
+test('stroke rendering coalesces changed pixels without losing the last sample', () => {
+  let id = 0;
+  const jobs = new Map(), painted = [];
+  const scheduler = createStrokePaintScheduler({
+    requestFrame(callback) { const next = ++id; jobs.set(next, callback); return next; },
+    cancelFrame(key) { jobs.delete(key); },
+    paint(indices) { painted.push(indices); },
+  });
+  scheduler.queue([2, 3, 4]);
+  scheduler.queue([4, 5, 6]);
+  scheduler.queue(Uint32Array.from([6, 7]));
+  assert.equal(jobs.size, 1, 'one frame is requested for all coalesced pointer samples');
+  const [key, callback] = jobs.entries().next().value;
+  jobs.delete(key);
+  callback();
+  assert.deepEqual(painted, [[2, 3, 4, 5, 6, 7]], 'every changed pixel reaches the one paint');
+  scheduler.queue([9, 10]);
+  scheduler.flush();
+  assert.deepEqual(painted.at(-1), [9, 10], 'synchronous flush keeps final dirty pixels');
+  assert.equal(jobs.size, 0, 'flush cancels the scheduled frame');
+  scheduler.queue([11, 12]);
+  scheduler.cancel();
+  assert.equal(jobs.size, 0, 'cancelled input cannot repaint an old stroke');
+  scheduler.dispose();
+  assert.equal(scheduler.queue([13]), false);
+  assert.equal(jobs.size, 0);
+});
+
+test('large strokes fall back to one full repaint without retaining unlimited pixel sets', () => {
+  const callbacks = new Map(), calls = [];
+  let id = 0;
+  const painter = createStrokePaintScheduler({
+    requestFrame(callback) { const next = ++id; callbacks.set(next, callback); return next; },
+    cancelFrame(key) { callbacks.delete(key); },
+    paint(changed) { calls.push(changed); },
+    maxDirtyPixels: 3,
+  });
+  painter.queue([0, 1, 2]);
+  painter.queue([3, 4, 5]);
+  assert.equal(callbacks.size, 1);
+  const [key, callback] = callbacks.entries().next().value;
+  callbacks.delete(key);
+  callback();
+  assert.deepEqual(calls, [null], 'full paint includes all pixels when the dirty set is too large');
+  painter.queue([7, 8]); painter.flush();
+  assert.deepEqual(calls.at(-1), [7, 8]);
+  assert.equal(painter.queue([]), false);
+  assert.throws(() => painter.queue('text'), /Dirty stroke pixels/);
+  painter.dispose();
 });
