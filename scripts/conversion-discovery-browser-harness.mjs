@@ -169,6 +169,98 @@ try {
   await open(staged.url + '&to=qoi'); await page.locator('[data-download]').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.convert-intent').count(),0); assert.deepEqual((await download()).bytes,png);
   pass('Real IndexedDB handoff ignores intent and preserves original file bytes');
+
+  // The compact Draw menu uses the production HTML/CSS. Reproduce the runtime
+  // text-tool reparenting and measure hit areas with the same Chrome engine.
+  const drawHtml = await readFile(resolve(root, './draw/editor.html'), 'utf8');
+  const pickerMarkup = drawHtml.match(/<details id="draw-tool-picker"[\s\S]*?<\/details>/)?.[0];
+  assert.ok(pickerMarkup, 'Draw tool picker must be present in the published editor');
+  const layoutPage = await context.newPage();
+  await layoutPage.setContent('<!doctype html><html><body data-page="draw"><div class="draw-controls"><div class="draw-fixed-left">'+pickerMarkup+'</div></div></body></html>');
+  const menuCss = await readFile(resolve(root, './css/draw-tool-picker.css'), 'utf8');
+  const textCss = await readFile(resolve(root, './css/draw-text-panel.css'), 'utf8');
+  await layoutPage.addStyleTag({ content: menuCss + '\n' + textCss });
+  await layoutPage.evaluate(() => {
+    const slot = document.createElement('div'); slot.className = 'draw-text-tool-slot';
+    const button = document.createElement('button');
+    button.className = 'draw-text-opener'; button.type = 'button'; button.textContent = '文字';
+    button.setAttribute('aria-label', '文字を入力'); slot.append(button);
+    document.querySelector('.draw-tool-menu .draw-tool-group').append(slot);
+    document.getElementById('draw-tool-picker').open = true;
+  });
+  for (const width of [320, 390, 650, 900]) {
+    await layoutPage.setViewportSize({ width, height: 820 });
+    const measure = await layoutPage.evaluate(() => {
+      const rect = element => { const r=element.getBoundingClientRect(); return { x:r.x, y:r.y, width:r.width, height:r.height }; };
+      const selection = [...document.querySelectorAll('.draw-select-tool-modes > button')].map(rect);
+      const text = rect(document.querySelector('.draw-text-opener'));
+      const spray = rect(document.querySelector('[data-draw-tool="spray"]'));
+      const groups = [...document.querySelectorAll('.draw-tool-group')];
+      return { selection, text, spray, overflow: groups.some(g => g.scrollWidth > g.clientWidth + 1),
+        menu:rect(document.querySelector('.draw-tool-menu')) };
+    });
+    assert.equal(measure.selection.length, 3);
+    assert.ok(measure.selection.every(e => Math.abs(e.y - measure.selection[0].y) < 1), 'selection modes must be on the same row');
+    assert.ok(measure.selection.every(e => Math.abs(e.width - measure.selection[0].width) < 2), 'selection modes must be equally wide');
+    assert.ok(Math.abs(measure.text.width - measure.spray.width) < 2 && Math.abs(measure.text.height - measure.spray.height) < 1,
+      'text tool and spray must share a full-sized touch target');
+    assert.ok(measure.text.width >= 48 && measure.text.height >= 48);
+    assert.equal(measure.overflow, false, 'no individual tool section should overflow its grid');
+    assert.ok(measure.menu.x >= 0 && measure.menu.x + measure.menu.width <= width, 'menu must remain within viewport');
+    pass('Draw compact tool menu at '+width+'px: aligned selection and text buttons');
+    if (width === 390) await layoutPage.screenshot({ path: output+'/draw-tool-grid-390.png', fullPage: false });
+  }
+  await layoutPage.close();
+  // Exercise the real Draw runtime, not a mocked renderer: a single dispatched
+  // pointer move containing many high-resolution samples should draw every
+  // pixel but queue only one paint for the frame.
+  const drawPage = await context.newPage();
+  drawPage.setDefaultTimeout(25000);
+  const drawErrors = [];
+  drawPage.on('pageerror', error => drawErrors.push(error.message));
+  await drawPage.addInitScript(() => {
+    window.__drawStrokeAudit = { paints: 0 };
+    const original = CanvasRenderingContext2D.prototype.putImageData;
+    CanvasRenderingContext2D.prototype.putImageData = function (...args) {
+      if (this.canvas?.id === 'draw-canvas') window.__drawStrokeAudit.paints++;
+      return original.apply(this, args);
+    };
+  });
+  await drawPage.setViewportSize({ width: 390, height: 844 });
+  await drawPage.goto(base + '/draw/editor.html', { waitUntil: 'domcontentloaded' });
+  await drawPage.locator('#draw-canvas').waitFor({ state: 'attached' });
+  await drawPage.waitForFunction(() => {
+    const canvas = document.querySelector('#draw-canvas');
+    return Boolean(canvas?.dataset.tool && !document.querySelector('#main')?.inert);
+  }, null, { timeout: 40000 });
+  // Browser-trusted mouse events exercise the real captured gesture; synthetic
+  // pointerdown cannot establish capture and must not be used to assert input.
+  const drawCanvas = drawPage.locator('#draw-canvas');
+  const box = await drawCanvas.boundingBox();
+  assert.ok(box && box.width > 0 && box.height > 0, 'Draw canvas must be visible and sized');
+  const grid = await drawCanvas.evaluate(canvas => ({ width: canvas.width, height: canvas.height }));
+  const rgbaCount = () => drawCanvas.evaluate(canvas => {
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let count = 0; for (let i=3; i<data.length; i+=4) if (data[i]) count++;
+    return count;
+  });
+  const beforePixels = await rgbaCount();
+  const y = box.y + box.height * Math.floor(grid.height * .5) / grid.height + box.height / (grid.height * 2);
+  const xAt = n => box.x + box.width * (n + .5) / grid.width;
+  await drawPage.mouse.move(xAt(2), y);
+  await drawPage.mouse.down();
+  await drawPage.mouse.move(xAt(Math.max(3, grid.width - 3)), y, { steps: 14 });
+  await drawPage.mouse.up();
+  await drawPage.waitForTimeout(90);
+  const afterPixels = await rgbaCount();
+  assert.ok(afterPixels > beforePixels, 'real mouse stroke must paint canvas pixels');
+  assert.ok(await drawPage.locator('#draw-undo').isEnabled(), 'real stroke must commit one history transaction');
+  await drawPage.locator('#draw-undo').click();
+  assert.equal(await rgbaCount(), beforePixels, 'undo restores original canvas without dropped pixels');
+  assert.deepEqual(drawErrors, [], 'drawing should not throw page errors');
+  pass('Draw real mouse gesture paints and undo restores exact original pixels');
+  await drawPage.screenshot({ path: output+'/draw-stroke-after.png', fullPage: false });
+  await drawPage.close();
   const staticContext = await browser.newContext({ javaScriptEnabled: false });
   const staticPage = await staticContext.newPage(); await staticPage.goto(base+'/output/formats/tga/');
   assert.equal(await staticPage.locator('.format-route-start').count(),4); assert.ok(await staticPage.locator('h1').isVisible()); await staticContext.close();

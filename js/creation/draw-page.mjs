@@ -14,7 +14,7 @@ import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=202
 import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-draw-search-rail-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
-import { createAnimationFrameCache, createFrameBatcher, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261025-draw-render-optimization-1';
+import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
 import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixels } from './draw-handoff.mjs';
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
@@ -522,6 +522,14 @@ function paint(changed = null) {
   updateControls(); setDrawRewardNotice();
   notifyEditorChange();
 }
+// Live brush pixels are applied immediately; expensive composite and UI work
+// is shown at most once per animation frame, not once per coalesced sample.
+const strokePaintScheduler = createStrokePaintScheduler({
+  requestFrame: callback => scope.frame(callback),
+  cancelFrame: id => scope.cancelFrame(id),
+  paint: changed => paint(changed),
+});
+scope.add(() => strokePaintScheduler.dispose());
 function installAnimationDocument(doc, { preserveTimelapse = false } = {}) {
   const retainedTimelapse = preserveTimelapse ? timelapse.snapshot() : null;
   cancelCamera();
@@ -1491,7 +1499,7 @@ scope.listen($('.draw-board'), 'pointerdown', event => {
 scope.listen($('.draw-board'), 'pointermove', event => {
   if (event.target !== canvas && !drawing && !virtualCursor?.enabled) selectionControls.hover(selectionHandleAtEvent(event) || '');
 });
-function applyDrawPoint(point, event) {
+function applyDrawPoint(point, event, deferPaint = false) {
   if (!drawing || !previousPoint || effectiveTool() === 'fill' || effectiveTool() === 'picker') return;
   if (effectiveTool() === 'select') { updateSelection(selectionDrag?.mode === 'select' || !event ? point : exactSelectionPoint(event), event); previousPoint = point; return; }
   if (point.x === previousPoint.x && point.y === previousPoint.y) return;
@@ -1500,7 +1508,8 @@ function applyDrawPoint(point, event) {
     markShape(lineStart, point); previousPoint = point; saved = false; paint(); return;
   }
   const changed = effectiveTool() === 'spray' ? markSpray(previousPoint, point) : markSegment(previousPoint, point, selectedPixelValue());
-  previousPoint = point; saved = false; paint(changed);
+  previousPoint = point; saved = false;
+  if (deferPaint) strokePaintScheduler.queue(changed); else paint(changed);
 }
 function applyPointerMoveSamples(event) {
   if (!drawing || event.pointerId !== drawingPointerId) return;
@@ -1508,10 +1517,10 @@ function applyPointerMoveSamples(event) {
   if (coalescedTool && typeof event.getCoalescedEvents === 'function') {
     let samples = [];
     try { samples = event.getCoalescedEvents() || []; } catch { samples = []; }
-    for (const sample of samples) applyDrawPoint(pointFromEvent(sample));
+    for (const sample of samples) applyDrawPoint(pointFromEvent(sample), null, true);
   }
   // The dispatched event carries the latest point even on engines whose coalesced list omits it.
-  applyDrawPoint(pointFromEvent(event), event);
+  applyDrawPoint(pointFromEvent(event), event, coalescedTool);
 }
 function handleCanvasPointerMove(event) {
   if (virtualCursor?.realMove(event)) return;
@@ -1544,6 +1553,8 @@ function handleCanvasPointerMove(event) {
 }
 canvas.addEventListener('pointermove', handleCanvasPointerMove);
 function endStroke(cancel = false, releaseEvent = null) {
+  // The final synchronous paint below supersedes any queued pointer frame.
+  strokePaintScheduler.cancel();
   const endedSelectionDrag = selectionDrag;
   const hadBinding = Boolean(strokeBinding);
   if (drawingPointerId === -7106) { activePointers.delete(drawingPointerId); virtualCursor?.resetPress(); }

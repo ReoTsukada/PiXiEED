@@ -254,3 +254,54 @@ body[data-page="draw"] .draw-tool-menu__tip {
   font-size: .72rem;
   line-height: 1.4;
 }
+
+
+/* The text tool is mounted after the picker; keep its hit area level with
+   every other tool instead of inheriting its standalone 42px light button. */
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > .draw-text-tool-slot {
+  min-width: 0 !important;
+  width: 100% !important;
+  align-self: stretch !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .draw-text-opener {
+  box-sizing: border-box !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 52px !important;
+  height: 52px !important;
+  padding: 0 3px !important;
+  border: 1px solid #ffffff25 !important;
+  border-radius: 12px !important;
+  background: #2b3742 !important;
+  color: #f5f2e8 !important;
+  font: 700 12px/1 system-ui, sans-serif !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .draw-text-opener[aria-expanded="true"] {
+  border-color: #ffd35a !important;
+  box-shadow: inset 0 0 0 1px #ffd35a !important;
+}
+/* Three selection choices are peers, not a two-column subgrid with the third
+   shifted to a second row opposite the eyedropper. */
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > .draw-select-tool-modes {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-select-tool-modes > button {
+  display: grid !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 52px !important;
+  height: 52px !important;
+  padding: 0 !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: 28px 16px !important;
+  align-content: center !important;
+  justify-items: center !important;
+}
