@@ -1,0 +1,11 @@
+/* Local-only automatic text previews. Keep the existing converter layout. */
+.tx-live-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-top:16px; padding:12px; border:1px solid #d7e3da; border-radius:12px; background:#f4f8f5; }
+.tx-live-controls .tx-check { display:flex; align-items:center; min-height:44px; margin:0; gap:8px; }
+.tx-live-controls input { width:18px; height:18px; accent-color:#267157; }
+.tx-live-controls button { min-height:44px; }
+.tx-live-controls p { flex-basis:100%; margin:0; color:#53665a; font-size:12px; line-height:1.6; }
+.tx-live-controls [hidden] { display:none !important; }
+.tx-live-controls :focus-visible { outline:3px solid #2588bb; outline-offset:3px; }
+.tx-preview-stale [data-tx-badge] { background:#fff2d8; color:#71511c; }
+[data-tx-live-blocked] { opacity:.55; cursor:not-allowed; }
+[data-tx-text-result] { font-family:ui-monospace,"SFMono-Regular",Consolas,monospace; tab-size:4; white-space:pre; }
