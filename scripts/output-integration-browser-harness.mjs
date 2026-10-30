@@ -42,7 +42,15 @@ async function open(query = '?mode=convert&text=input') {
   await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
 }
 async function run(success = true) {
-  await page.locator('[data-tx-run]').click();
+  const mode = await page.locator('.text-mode-nav [aria-pressed="true"]').getAttribute('data-text-mode');
+  await page.locator('#output-nav-export').click();
+  if (mode === 'output') {
+    await page.waitForFunction(() => ['ready', 'error'].includes(document.querySelector('[data-text-tools]')?.dataset.txLiveState));
+    const state = await page.locator('[data-text-tools]').getAttribute('data-tx-live-state');
+    assert.equal(state, success ? 'ready' : 'error');
+    if (success) assert.match(await page.locator('[data-tx-status]').innerText(), /プレビューを更新しました/);
+    return;
+  }
   await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
   if (success) assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
 }
@@ -110,10 +118,14 @@ try {
   assert.match(await page.locator('[data-tx-status]').innerText(), /16MB/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Oversize input fails before encoding and preserves the previous result');
-  await page.locator('[data-tx-file]').setInputFiles({ name: 'cancel.pxd', mimeType: 'application/octet-stream', buffer: bytes });
-  await page.evaluate(() => { document.querySelector('[data-tx-run]').click(); document.querySelector('[data-tx-cancel]').click(); });
+  await page.locator('[data-text-mode="input"]').click();
+  const cancelText = 'キャンセル前に保持する合成テキスト';
+  await page.locator('[data-tx-source]').fill(cancelText);
+  await page.locator('[data-tx-action]').selectOption('text');
+  await page.evaluate(() => { document.querySelector('#output-nav-export').click(); document.querySelector('[data-tx-cancel]').click(); });
   await page.waitForFunction(() => document.querySelector('[data-text-tools]').getAttribute('aria-busy') === 'false');
   assert.match(await page.locator('[data-tx-status]').innerText(), /中止しました/);
+  assert.equal(await page.locator('[data-tx-source]').inputValue(), cancelText);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Cancellation preserves the input and prior successful result');
   await page.setViewportSize({ width: 375, height: 812 });
