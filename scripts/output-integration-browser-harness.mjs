@@ -41,6 +41,11 @@ async function open(query = '?mode=convert&text=input') {
   await page.goto(base + '/output/work/' + query, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
 }
+async function exportFromVisibleAction() {
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#output-nav-export').click()]);
+  assert.equal(await download.failure(), null);
+  return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
+}
 async function run(success = true) {
   const mode = await page.locator('.text-mode-nav [aria-pressed="true"]').getAttribute('data-text-mode');
   if (mode === 'output') {
@@ -51,11 +56,10 @@ async function run(success = true) {
     return null;
   }
   if (success) {
-    const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#output-nav-export').click()]);
+    const pendingDownload = exportFromVisibleAction();
     await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
     assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
-    assert.equal(await download.failure(), null);
-    return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
+    return pendingDownload;
   }
   await page.locator('#output-nav-export').click();
   await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
@@ -64,8 +68,8 @@ async function run(success = true) {
 async function download(selector) {
   const link = page.locator(selector);
   const hidden = await link.evaluate(node => node.hidden || Boolean(node.closest('[hidden]')) || getComputedStyle(node).display === 'none');
-  const action = hidden ? page.locator('#output-nav-export') : link;
-  const [download] = await Promise.all([page.waitForEvent('download'), action.click()]);
+  if (hidden) return exportFromVisibleAction();
+  const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
   assert.equal(await download.failure(), null);
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
 }
@@ -83,10 +87,8 @@ try {
   await page.screenshot({ path: output + '/text-desktop.png', fullPage: true });
   await page.locator('[data-tx-use]').click();
   await page.waitForFunction(() => !document.querySelector('[data-editor]').hidden && document.querySelector('#main').getAttribute('aria-busy') === 'false');
-  await page.locator('[data-format]').selectOption('jpeg');
-  await page.locator('[data-convert]').click();
-  await page.locator('[data-download]').waitFor({ state: 'visible' });
-  const jpeg = await download('[data-download]');
+  await page.locator('[data-sc-format]').selectOption('jpeg');
+  const jpeg = await exportFromVisibleAction();
   assert.equal(jpeg.bytes.subarray(0, 2).toString('hex'), 'ffd8');
   pass('Text-generated PNG enters the existing media converter and saves a real JPEG');
   await page.locator('[data-text-mode="output"]').click();
@@ -164,9 +166,7 @@ try {
   await open('?mode=convert');
   await page.locator('[data-demo]').click();
   await page.locator('[data-rate="2"]').click();
-  await page.locator('[data-convert]').click();
-  await page.locator('[data-download]').waitFor({ state: 'visible' });
-  const gif = await download('[data-download]');
+  const gif = await exportFromVisibleAction();
   assert.match(gif.bytes.subarray(0, 6).toString(), /^GIF8[79]a$/);
   pass('Existing animated GIF conversion and playback-speed controls still export a real GIF');
   assert.ok(report.workers.some(url => url.includes('/text-worker.mjs')));
