@@ -45,6 +45,6 @@ try {
 }
 
 // Advertising is optional and never awaited by import, preview, generation or saving.
-void import('../ads/conversion-display-ad.mjs?rev=20261030-converter-ads-1')
+void import('../ads/conversion-display-ad.mjs?rev=20261030-converter-ads-2')
   .then(({ mountConversionDisplayAd }) => mountConversionDisplayAd())
   .catch(() => { /* Conversion and download remain available without advertising. */ });
