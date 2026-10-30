@@ -26,4 +26,12 @@ jobs:
       - name: Search, descriptions and capability tests
         run: node --test tests/format-picker.test.mjs
       - name: Real converter and picker, localhost only
-        run: node scripts/check-format-picker.mjs
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const p='scripts/check-format-picker.mjs';
+          let s=fs.readFileSync(p,'utf8');
+          s=s.replace("check('picker fits '+width+'x'+height,", "console.log('PICKER_GEOMETRY',JSON.stringify(g));check('picker fits '+width+'x'+height,");
+          fs.writeFileSync(p,s);
+          JS
+          node scripts/check-format-picker.mjs
