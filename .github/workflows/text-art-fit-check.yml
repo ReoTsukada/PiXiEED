@@ -7,6 +7,7 @@ on:
       - '.github/workflows/text-art-fit-check.yml'
       - 'js/creation/text-art-viewer.mjs'
       - 'js/creation/text-pixel-origin.mjs'
+      - 'js/creation/text-tools.mjs'
       - 'css/text-art-viewer.css'
       - 'scripts/check-text-art-fit.mjs'
       - 'tests/text-art-fit.test.mjs'
@@ -31,7 +32,7 @@ jobs:
           import fs from 'node:fs';
           const path='scripts/check-text-art-fit.mjs';
           let source=fs.readFileSync(path,'utf8');
-          source=source.replace('return {mode:h.dataset.viewMode', 'return {view:a.toJSON(),art:b.toJSON(),documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,mode:h.dataset.viewMode');
+          source=source.replace('return {mode:h.dataset.viewMode', 'return {view:a.toJSON(),art:b.toJSON(),natural:[p.offsetWidth,p.offsetHeight],client:[v.clientWidth,v.clientHeight],scroll:[v.scrollLeft,v.scrollTop,v.scrollHeight],preStyle:p.style.cssText,preComputed:[getComputedStyle(p).transform,getComputedStyle(p).transformOrigin,getComputedStyle(p).font,getComputedStyle(p).margin,getComputedStyle(p).position],surface:[p.parentElement.style.cssText,p.parentElement.getBoundingClientRect().toJSON()],ancestors:[...function*(n){while(n&&n!==document.body){yield [n.className,getComputedStyle(n).transform,getComputedStyle(n).zoom];n=n.parentElement;}}(p)],documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,mode:h.dataset.viewMode');
           source=source.replace('const g=await geometry();check(', 'const g=await geometry();console.log("FIT_GEOMETRY",JSON.stringify(g));check(');
           fs.writeFileSync(path,source);
           JS
