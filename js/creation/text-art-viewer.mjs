@@ -33,11 +33,15 @@ export function createTextArtViewer(root, { document: doc = document, window: wi
   if (textLabel) raw.append(textLabel);
   raw.append(textarea, result.querySelector('[data-tx-preview-note]'));
   let mode = 'fit', scale = 1, manual = 1, source = null, frame = 0, disposed = false, resetScroll = true;
-  const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/text-art-viewer.css?rev=20261030-text-fit-1';
+  const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/text-art-viewer.css?rev=20261030-text-fit-2';
   sheet.addEventListener('load', schedule); doc.head.append(sheet);
   function draw() {
     frame = 0;
     if (disposed || host.hidden || !viewport.clientWidth || !viewport.clientHeight) return;
+    // Set overflow policy before measuring: native scrollbars change the usable width.
+    host.dataset.viewMode = mode;
+    viewport.style.overflowX = mode === 'manual' ? 'auto' : 'hidden';
+    viewport.style.overflowY = mode === 'fit' ? 'hidden' : 'auto';
     const width = pre.offsetWidth, height = pre.offsetHeight;
     if (!width || !height) return;
     const old = scale;
@@ -88,6 +92,7 @@ export function createTextArtViewer(root, { document: doc = document, window: wi
       raw.hidden = false;
       if (!art) raw.open = true;
       else if (wasHidden && changedSource) raw.open = false;
+      draw();
       schedule();
     },
     clear() { host.hidden = true; raw.hidden = true; pre.textContent = ''; },
