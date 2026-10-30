@@ -1,0 +1,29 @@
+name: Text art fit and native pixels
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/text-art-fit-check.yml'
+      - 'js/creation/text-art-viewer.mjs'
+      - 'js/creation/text-pixel-origin.mjs'
+      - 'css/text-art-viewer.css'
+      - 'scripts/check-text-art-fit.mjs'
+      - 'tests/text-art-fit.test.mjs'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 5
+    env:
+      PIXIEED_CHROME_EXECUTABLE: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Exact-pixel and preview geometry unit tests
+        run: node --test tests/text-art-fit.test.mjs
+      - name: Real converter on localhost with external traffic blocked
+        run: node scripts/check-text-art-fit.mjs
