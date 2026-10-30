@@ -22,7 +22,7 @@ try {
 
 // Add text input/output without replacing media conversion or private handoff state.
 try {
-  const { installTextTools } = await import('./text-tools.mjs?rev=20261028-text-1');
+  const { installTextTools } = await import('./text-tools.mjs?rev=20261030-live-text-1');
   await installTextTools();
 } catch (error) {
   console.warn('Text tools unavailable; existing media conversion remains usable.', error);
@@ -36,7 +36,7 @@ try {
 
 // Share one contextual UI and fixed export action without replacing any conversion engine.
 try {
-  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261030-smart-convert-1');
+  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261030-live-text-1');
   mountSmartConversion();
 } catch (error) {
   console.warn('Smart conversion UI unavailable; original conversion controls remain available.', error);
