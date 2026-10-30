@@ -4,7 +4,14 @@ import { getAdsenseLoader } from '../display-ads.mjs?rev=20261024-public-layout-
 const mounted = new WeakMap();
 const paths = new Set(['/tools/start/convert/', '/output/work/']);
 const allowedQuery = new Map([['mode', new Set(['convert'])], ['text', new Set(['input', 'output'])]]);
-const filled = unit => ['filled', 'unfill-optimized'].includes(unit?.dataset.adStatus);
+
+/** Google's unfill-optimized preserves the unit, but is not a filled advertising creative.
+ * https://support.google.com/adsense/answer/10762946
+ */
+export function conversionAdDeliveryState(status) {
+  return ['filled', 'unfilled', 'unfill-optimized'].includes(status) ? status : 'pending';
+}
+const preservesUnit = unit => ['filled', 'unfill-optimized'].includes(conversionAdDeliveryState(unit?.dataset.adStatus));
 
 /** Private handoffs and arbitrary query data never become advertising URLs. */
 export function conversionAdEligible({ origin, pathname, search = '', hash = '', topLevel = false } = {}) {
@@ -64,11 +71,13 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
   unit.dataset.fullWidthResponsive = 'false'; inner.append(unit);
   let requested = false, disposed = false, styled = false, failed = false, frozenSize = null;
   let frame = 0, idle = null, loader, layout;
-  const report = state => {
+  const report = (state, reason = '') => {
     host.dataset.adState = state;
+    if (reason) host.dataset.adReason = reason;
+    else delete host.dataset.adReason;
     doc.dispatchEvent(new win.CustomEvent('pixieed:conversion-ad', {
-      detail: { state, layout: layout?.rail ? 'rail' : 'flow', width: layout?.width, height: layout?.height }
-    })); // No filenames, input, preview content or URL parameters.
+      detail: { state, reason, layout: layout?.rail ? 'rail' : 'flow', width: layout?.width, height: layout?.height }
+    })); // Local diagnostic event only. No filenames, source media or URL parameters.
   };
   const contextReady = () => eligible() && doc.visibilityState !== 'hidden' && !doc.fullscreenElement
     && !main.querySelector('[role="alert"]') && main.getAttribute('aria-busy') !== 'true'
@@ -82,11 +91,17 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
     return r.width > 0 && r.height > 0 && r.top < bottom - 100 && r.bottom > 0;
   };
   const collapseEmptyBelowView = () => {
-    if (!failed || filled(unit)) return;
+    if (!failed || preservesUnit(unit)) return;
     // Never move content while a finger is on the visible area; don't collapse above it either.
-    if (host.getBoundingClientRect().top >= win.innerHeight) { host.hidden = true; report('empty'); }
+    if (host.getBoundingClientRect().top >= win.innerHeight) { host.hidden = true; report('empty', host.dataset.adReason); }
   };
-  const markFailed = () => { if (filled(unit)) return; failed = true; report('unfilled'); collapseEmptyBelowView(); };
+  const markFailed = (reason = 'no-ad-returned') => {
+    if (preservesUnit(unit)) return;
+    failed = true;
+    report(reason === 'no-ad-returned' ? 'unfilled' : 'error', reason);
+    collapseEmptyBelowView();
+  };
+  const onScriptError = () => markFailed('script-load-error');
   function update() {
     frame = 0; if (disposed || !styled) return;
     const rect = main.getBoundingClientRect(), wrap = wrapper.getBoundingClientRect();
@@ -111,20 +126,22 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
         requested = true; frozenSize = { width: layout.width, height: layout.height }; report('requested');
         try {
           loader = load(doc, win, client);
-          if (loader.failed) { markFailed(); return; }
-          loader.errors.add(markFailed);
+          if (loader.failed) { onScriptError(); return; }
+          loader.errors.add(onScriptError);
           (win.adsbygoogle = win.adsbygoogle || []).push({});
-        } catch { markFailed(); }
+        } catch { markFailed('request-error'); }
       };
       idle = win.requestIdleCallback ? win.requestIdleCallback(request, { timeout: 1500 }) : win.setTimeout(request, 120);
     }
   }
   function schedule() { if (!disposed && !frame) frame = win.requestAnimationFrame(update); }
   sheet.addEventListener('load', () => { styled = true; schedule(); }, { once: true });
-  sheet.addEventListener('error', () => { host.hidden = true; report('stylesheet-failed'); }, { once: true });
+  sheet.addEventListener('error', () => { host.hidden = true; report('stylesheet-failed', 'stylesheet-load-error'); }, { once: true });
   const statusObserver = new win.MutationObserver(() => {
-    if (filled(unit)) { failed = false; host.hidden = false; report('filled'); }
-    else if (unit.dataset.adStatus === 'unfilled') markFailed();
+    const state = conversionAdDeliveryState(unit.dataset.adStatus);
+    if (state === 'filled' || state === 'unfill-optimized') {
+      failed = false; host.hidden = false; report(state);
+    } else if (state === 'unfilled') markFailed();
   });
   statusObserver.observe(unit, { attributes: true, attributeFilter: ['data-ad-status'] });
   const stateObserver = new win.MutationObserver(schedule);
@@ -142,7 +159,7 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
     win.cancelAnimationFrame(frame);
     if (idle !== null) { if (win.cancelIdleCallback) win.cancelIdleCallback(idle); else win.clearTimeout(idle); }
     statusObserver.disconnect(); stateObserver.disconnect(); resizeObserver?.disconnect(); intersection?.disconnect();
-    loader?.errors.delete(markFailed);
+    loader?.errors.delete(onScriptError);
     for (const type of ['resize', 'scroll', 'pageshow']) win.removeEventListener(type, schedule);
     for (const type of ['visibilitychange', 'fullscreenchange', 'focusout']) doc.removeEventListener(type, schedule);
     win.removeEventListener('pagehide', onHide);
