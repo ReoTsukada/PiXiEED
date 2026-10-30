@@ -1,0 +1,29 @@
+name: Converter format picker
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'js/creation/format-picker.mjs'
+      - 'css/format-picker.css'
+      - 'js/creation/conversion-entry.mjs'
+      - 'tests/format-picker.test.mjs'
+      - 'scripts/check-format-picker.mjs'
+      - '.github/workflows/format-picker-check.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 8
+    env:
+      PIXIEED_CHROME_EXECUTABLE: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Search, descriptions and capability tests
+        run: node --test tests/format-picker.test.mjs
+      - name: Real converter and picker, localhost only
+        run: node scripts/check-format-picker.mjs
