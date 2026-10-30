@@ -63,8 +63,15 @@ async function run(success = true) {
     return null;
   }
   if (success) {
+    const previousStatus = await page.locator('[data-tx-status]').innerText();
     const pendingDownload = exportFromVisibleAction();
-    await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
+    await page.waitForFunction(previous => {
+      const root = document.querySelector('[data-text-tools]');
+      const status = document.querySelector('[data-tx-status]')?.innerText;
+      return root?.getAttribute('aria-busy') === 'true' || (status && status !== previous);
+    }, previousStatus);
+    await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false'
+      && /完了しました/.test(document.querySelector('[data-tx-status]')?.innerText || ''));
     assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
     return pendingDownload;
   }
