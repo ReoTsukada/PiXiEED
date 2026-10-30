@@ -1,0 +1,18 @@
+/* One flow/rail placement. No fixed ads, overlays, sticky creatives or narrowed workspace. */
+.conversion-ad-layout { position:relative; width:100%; min-width:0; }
+.conversion-companion { box-sizing:border-box; width:min(920px,calc(100% - 32px)); margin:32px auto 0; padding:24px 0 max(180px,calc(120px + env(safe-area-inset-bottom))); color:#344a3c; font:14px/1.75 system-ui,sans-serif; overflow-wrap:anywhere; border-top:1px solid #dce5df; }
+.conversion-companion h2 { margin:4px 0 20px; font-size:20px; line-height:1.5; }
+.conversion-companion h3 { margin:0 0 8px; font-size:15px; }
+.conversion-companion p { margin:0 0 18px; }
+.conversion-companion__eyebrow { color:#65776b; font-size:12px; font-weight:700; }
+.conversion-companion__more { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.conversion-display-ad { box-sizing:content-box; width:var(--conversion-ad-width,300px); margin:48px auto; padding:0; border:0; background:transparent; }
+.conversion-display-ad[hidden] { display:none!important; }
+.conversion-display-ad__label { display:block; height:24px; color:#707b73; font:11px/24px system-ui,sans-serif; text-align:center; }
+.conversion-display-ad__slot, .conversion-display-ad__unit { display:block; box-sizing:content-box; width:var(--conversion-ad-width,300px); height:var(--conversion-ad-height,250px); margin:0; padding:0; border:0; }
+.conversion-ad-layout[data-ad-layout="rail"] .conversion-companion { position:absolute; top:24px; left:var(--conversion-rail-left); width:var(--conversion-ad-width); margin:0; padding:0 0 180px; border:0; font-size:12px; }
+.conversion-ad-layout[data-ad-layout="rail"] .conversion-companion h2 { font-size:16px; }
+.conversion-ad-layout[data-ad-layout="rail"] .conversion-companion__intro { display:none; }
+.conversion-ad-layout[data-ad-layout="rail"] .conversion-companion__more { grid-template-columns:1fr; gap:18px; }
+.conversion-ad-layout[data-ad-layout="rail"] .conversion-display-ad { margin:24px 0 48px; }
+@media (max-width:600px) { .conversion-companion__more { grid-template-columns:1fr; gap:12px; } }
