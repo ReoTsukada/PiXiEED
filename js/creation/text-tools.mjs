@@ -1,6 +1,8 @@
 import { detectText, decodeTextFile, MAX_CODE_CHARS, MAX_FILE_BYTES, safeName, encodeDocument } from './text-codec.mjs?rev=20261028-text-1';
 import { renderText, canvasBlob } from './text-render.mjs?rev=20261028-text-1';
 import { installTextLivePreview } from './text-live-preview.mjs?rev=20261030-live-text-1';
+import { createTextArtViewer } from './text-art-viewer.mjs?rev=20261030-text-fit-1';
+import { textPixelOrigin } from './text-pixel-origin.mjs?rev=20261030-text-fit-1';
 
 /** An additive local workspace. Existing conversion state is kept, never rebuilt. */
 export async function installTextTools(doc = document, win = window) {
@@ -35,6 +37,7 @@ export async function installTextTools(doc = document, win = window) {
           <div class="tx-file-label"><span aria-hidden="true">↥</span><div><strong data-tx-file-name>ファイルを選んでください</strong><small data-tx-file-size>画像・音声・動画・PXDなど、16MBまで</small></div></div>
           <label class="tx-label">どう表現する？<select data-tx-style><option value="encode">元ファイルへ戻せる復元コード</option><option value="ascii">ASCII文字アート</option><option value="block">ブロック文字アート</option><option value="braille">点字パターンアート</option><option value="emoji">絵文字アート</option><option value="custom">好きな文字で描く</option><option value="pixels">画素を編集できる文字列</option><option value="base64">Base64（開発者向け）</option><option value="dataurl">Data URL（開発者向け）</option></select></label>
           <div data-tx-art-options hidden><label class="tx-label">横の文字数<input data-tx-columns type="range" min="8" max="160" value="64"><output data-tx-columns-value>64文字</output></label><label data-tx-custom-field hidden>使う文字<input data-tx-characters type="text" value="PiXiEED" maxlength="128"></label><label class="tx-check"><input data-tx-invert type="checkbox">明暗を反転</label><label class="tx-check"><input data-tx-attach type="checkbox">元ファイルの復元コードも添える</label></div>
+          <div data-tx-native-options hidden><label class="tx-check"><input data-tx-native-grid type="checkbox" checked>拡大ドット絵を元のドット数で読む</label><p class="tx-native-hint" data-tx-native-hint>完全一致する整数倍拡大だけを縮小します。元ファイル・復元コードは変更しません。</p></div>
           <p class="tx-hint" data-tx-file-hint>元ファイルの内容を保った復元コードです。暗号化ではありません。共有すると元ファイル全体が相手に渡ります。</p>
         </div>
         <input type="file" data-tx-file hidden><input type="file" data-tx-text-file accept=".txt,.md,.json,.pxtxt,text/plain,text/markdown,application/json" hidden>
@@ -60,13 +63,15 @@ export async function installTextTools(doc = document, win = window) {
   main.append(nav, legacy, root);
   const $ = selector => root.querySelector(selector), source = $('[data-tx-source]'), textResult = $('[data-tx-text-result]');
   source.maxLength = MAX_CODE_CHARS;
+  const artViewer = createTextArtViewer(root, { document: doc, window: win });
   let mode = 'media', selected = null, outputText = '', artText = '', restoredFile = null, busy = false, aborter = null, dirtyResult = false;
-  let frameCache = null, frameFile = null; const urls = new Map();
+  let frameCache = null, frameFile = null, originCache = null; const urls = new Map();
   const status = message => { $('[data-tx-status]').textContent = message; };
   const options = () => ({ width: Number($('[data-tx-width]').value), fontSize: Number($('[data-tx-font-size]').value), padding: Number($('[data-tx-padding]').value), lineHeight: Number($('[data-tx-line-height]').value), font: $('[data-tx-font]').value, foreground: $('[data-tx-foreground]').value, background: $('[data-tx-background]').value, wrap: $('[data-tx-wrap]').checked });
   function applyOptions(value) { for (const [key, selector] of Object.entries({ width:'width',fontSize:'font-size',padding:'padding',lineHeight:'line-height',font:'font',foreground:'foreground',background:'background' })) if (value[key] !== undefined) $(`[data-tx-${selector}]`).value = value[key]; if (typeof value.wrap === 'boolean') $('[data-tx-wrap]').checked = value.wrap; }
   function blobLink(selector, blob, name) { if (urls.has(selector)) win.URL.revokeObjectURL(urls.get(selector)); const url = win.URL.createObjectURL(blob); urls.set(selector, url); const link = $(selector); link.href = url; link.download = safeName(name); link.hidden = false; }
   function resetResult() {
+    artViewer.clear();
     for (const url of urls.values()) win.URL.revokeObjectURL(url); urls.clear();
     for (const el of root.querySelectorAll('[data-tx-result] button,[data-tx-result] a')) { el.hidden = true; el.removeAttribute('href'); }
     $('[data-tx-preview]').replaceChildren(); $('[data-tx-preview]').hidden = true; textResult.hidden = true; textResult.value = ''; $('[data-tx-preview-note]').hidden = true;
@@ -78,6 +83,7 @@ export async function installTextTools(doc = document, win = window) {
     $('[data-tx-copy]').hidden = false; $('[data-tx-select]').hidden = false; $('[data-tx-art-image]').hidden = !art;
     $('[data-tx-result-note]').textContent = note; $('[data-tx-badge]').textContent = `${text.length.toLocaleString()}文字`;
     blobLink('[data-tx-txt]',new Blob([text],{type:'text/plain;charset=utf-8'}),`${safeName(selected?.name || 'pixieed')}.txt`);
+    artViewer.show(art, { source: selected });
   }
   async function showTextImage(text, settings, signal) {
     await doc.fonts?.ready; if (signal.aborted) throw new DOMException('中止','AbortError');
@@ -102,14 +108,15 @@ export async function installTextTools(doc = document, win = window) {
     $('[data-tx-result-note]').textContent=`${restoredFile.name} · ${restoredFile.size.toLocaleString()} bytes。${result.verified ? '保存されたSHA-256と内容が一致しました。改ざん者の本人確認をする署名ではありません。' : '元の検査値がないため、元ファイルとの一致は未検証です。形式の誤りがある場合は元データを確認してください。'}`;
     $('[data-tx-badge]').textContent=result.verified?'復元・破損検査済み':'ファイルに復元'; blobLink('[data-tx-download]',restoredFile,restoredFile.name); $('[data-tx-use]').hidden=!/^(image|audio|video)\//.test(result.type);
   }
-  function chooseFile(file) { if(!file)return; if(!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果'; selected=file; frameCache=frameFile=null; $('[data-tx-file-name]').textContent=file.name; $('[data-tx-file-size]').textContent=`${file.size.toLocaleString()} bytes · ${file.type||'形式未指定'}`; root.textLivePreview?.invalidate(); }
+  function chooseFile(file) { if(!file)return; if(!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果'; selected=file; frameCache=frameFile=originCache=null; $('[data-tx-file-name]').textContent=file.name; $('[data-tx-file-size]').textContent=`${file.size.toLocaleString()} bytes · ${file.type||'形式未指定'}`; root.textLivePreview?.invalidate(); }
   function kind() { return $('[data-tx-action]').value==='auto'?detectText(source.value):$('[data-tx-action]').value; }
   function refresh() {
     const action=kind(); $('[data-tx-count]').textContent=`${source.value.length.toLocaleString()}文字`;
     const labels={text:'文章として画像にできます',restore:'元ファイルの復元コードを検出',pixels:'画素テキストを検出',document:'文章とレイアウトの保存データを検出',dataurl:'Data URLを検出',base64:'Base64を明示的に指定中'};
     $('[data-tx-detected]').textContent=labels[action]; $('[data-tx-render-options]').hidden=!['text','document'].includes(action);
     const style=$('[data-tx-style]').value, art=['ascii','block','braille','emoji','custom'].includes(style); $('[data-tx-art-options]').hidden=!art; $('[data-tx-custom-field]').hidden=style!=='custom'; $('[data-tx-columns-value]').textContent=$('[data-tx-columns]').value+'文字';
-    $('[data-tx-file-hint]').textContent=art?'画像の先頭コマを文字で表現します。文字アートだけでは元画像へ完全復元できません。復元コードを添えると元ファイル全体を共有します。絵文字・点字パターンの見え方は環境によって異なります。':style==='pixels'?'65,536画素以内のRGBAを色番号で保存します。読み込んだ画素からの復元で、元画像ファイルの付加情報は含みません。':'元ファイルの内容を文字列にします。暗号化ではありません。元ファイルより大きくなります（16MBまで）。PXDはファイル内容を保持しますが、再編集には対応する制作画面で開いてください。';
+    $('[data-tx-native-options]').hidden=!(art||style==='pixels');
+    $('[data-tx-file-hint]').textContent=art?'画像の先頭コマを文字で表現します。文字アートだけでは元画像へ完全復元できません。復元コードを添えると元ファイル全体を共有します。絵文字・点字パターンの見え方は環境によって異なります。':style==='pixels'?'65,536画素以内のRGBAを色番号で保存します。読み込んだ画素からの復元で、元画像ファイルの付加情報は含みません。色番号の書き換えでマス目を編集できます。':'元ファイルの内容を文字列にします。暗号化ではありません。元ファイルより大きくなります（16MBまで）。PXDはファイル内容を保持しますが、再編集には対応する制作画面で開いてください。';
     $('[data-tx-run]').textContent=mode==='output'?'文字にする →':action==='text'?'画像にする →':action==='document'?'文章を開いて再編集 →':'復元する →';
   }
   function showMode(next) {
@@ -139,6 +146,7 @@ export async function installTextTools(doc = document, win = window) {
     const file = selected, style = $('[data-tx-style]').value;
     const settings = { style, columns:Number($('[data-tx-columns]').value), invert:$('[data-tx-invert]').checked, characters:$('[data-tx-characters]').value };
     const attached = $('[data-tx-attach]').checked;
+    const useNativeGrid = $('[data-tx-native-grid]').checked;
     const check = () => { if (signal.aborted) throw new DOMException('中止','AbortError'); };
     check();
     if(!file)throw new Error('文字にするファイルを選んでください。');
@@ -156,9 +164,25 @@ export async function installTextTools(doc = document, win = window) {
       frame=loaded.frames[0];
       if(selected===file){frameCache=frame;frameFile=file;}
     }
+    const fileFrame = frame;
+    if (useNativeGrid) {
+      let normalized = originCache;
+      if (!normalized) {
+        normalized = await textPixelOrigin(fileFrame, { signal }); check();
+        if (selected === file && frameFile === file) originCache = normalized;
+      }
+      frame = normalized.frame;
+      const d = normalized.detection;
+      $('[data-tx-native-hint]').textContent = frame !== fileFrame
+        ? `ファイル ${fileFrame.width} × ${fileFrame.height}px → 読み込み ${frame.width} × ${frame.height}px（完全一致 ${d.scale}倍）。画素からの推定で、制作時の原寸とは限りません。チェックを外すとファイル寸法に戻せます。`
+        : `読み込み ${fileFrame.width} × ${fileFrame.height}px。${d.status === 'candidate' ? '単色・単純な縞模様は原寸を判断できないため、縮小しません。' : d.reason === 'pixel-limit' ? '自動検出の上限を超えるため、元の寸法を保ちます。' : '完全一致する縮小格子がないため、元の寸法を保ちます。'}`;
+    } else {
+      $('[data-tx-native-hint]').textContent = `ファイル寸法 ${fileFrame.width} × ${fileFrame.height}pxで読み込みます。元ファイルは変更しません。`;
+    }
+    check();
     if(style==='pixels'){
       const text=await worker('pixels',frame,{},signal);check();
-      showText(text,'画素の色・透明度・配置を保持します。元ファイルのメタデータは含みません。色番号の書き換えでマス目を編集できます。');return;
+      showText(text,`${frame.width} × ${frame.height}px。`+'画素の色・透明度・配置を保持します。元ファイルのメタデータは含みません。色番号の書き換えでマス目を編集できます。');return;
     }
     const art=await worker('art',frame,settings,signal);check();
     let text=art;
@@ -179,6 +203,7 @@ export async function installTextTools(doc = document, win = window) {
   nav.addEventListener('click',event=>{const button=event.target.closest('[data-text-mode]');if(button)showMode(button.dataset.textMode);});
   root.addEventListener('input',event=>{refresh();if(mode!=='output'&&!event.target.matches('[data-tx-text-result]')&&!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果';});
   root.addEventListener('change',refresh);
+  $('[data-tx-native-grid]').addEventListener('change',()=>root.textLivePreview?.invalidate());
   $('[data-tx-run]').addEventListener('click',()=>mode==='output'&&root.textLivePreview?root.textLivePreview.refresh():run(mode==='output'?createOutput:createInput));$('[data-tx-cancel]').addEventListener('click',()=>aborter?.abort());
   $('[data-tx-pick]').addEventListener('click',()=>$('[data-tx-file]').click());$('[data-tx-read]').addEventListener('click',()=>$('[data-tx-text-file]').click());
   $('[data-tx-file]').addEventListener('change',event=>{chooseFile(event.target.files?.[0]);event.target.value='';});
@@ -186,11 +211,11 @@ export async function installTextTools(doc = document, win = window) {
   function showModeAfterRead(){mode='input';root.textLivePreview?.invalidate();$('[data-tx-input-pane]').hidden=false;$('[data-tx-output-pane]').hidden=true;for(const button of nav.querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.textMode==='input'));}
   $('[data-tx-text-file]').addEventListener('change',event=>{const file=event.target.files?.[0];event.target.value='';void readTextFile(file);});
   root.addEventListener('dragover',event=>{event.preventDefault();});root.addEventListener('drop',event=>{event.preventDefault();if(busy)return;const files=event.dataTransfer?.files;if(files?.length!==1){status('一度に1ファイルを選んでください。');return;}if(mode==='input')void readTextFile(files[0]);else chooseFile(files[0]);});
-  const capture=event=>{if(root.contains(event.target))return;const files=event.type==='drop'?event.dataTransfer?.files:event.target?.files;if(files?.length===1)chooseFile(files[0]);else if(files?.length>1){selected=null;frameCache=frameFile=null;root.textLivePreview?.invalidate();$('[data-tx-file-name]').textContent='文字出力は1ファイルずつ選んでください';$('[data-tx-file-size]').textContent='複数画像のGIF・動画は画像・音声・動画タブから';}};
+  const capture=event=>{if(root.contains(event.target))return;const files=event.type==='drop'?event.dataTransfer?.files:event.target?.files;if(files?.length===1)chooseFile(files[0]);else if(files?.length>1){selected=null;frameCache=frameFile=originCache=null;root.textLivePreview?.invalidate();$('[data-tx-file-name]').textContent='文字出力は1ファイルずつ選んでください';$('[data-tx-file-size]').textContent='複数画像のGIF・動画は画像・音声・動画タブから';}};
   legacy.addEventListener('change',capture,true);legacy.addEventListener('drop',capture,true);
   $('[data-tx-example]').addEventListener('click',()=>{showMode('input');source.value='つくる。つなぐ。\nまた、つくり直せる。\n\nPiXiEEDで、ことばをかたちに。';$('[data-tx-action]').value='text';refresh();void run(createInput);});
-  $('[data-tx-copy]').addEventListener('click',async()=>{try{if(!win.navigator.clipboard?.writeText)throw new Error();await win.navigator.clipboard.writeText(outputText);dirtyResult=false;status('全文をコピーしました。');}catch{textResult.value=outputText;textResult.focus();textResult.select();$('[data-tx-preview-note]').hidden=true;status('自動コピーを利用できません。選択中の全文をコピーするか、TXTで保存してください。');}});
-  $('[data-tx-select]').addEventListener('click',()=>{textResult.value=outputText;textResult.focus();textResult.select();$('[data-tx-preview-note]').hidden=true;status('全文を選択しました。端末のコピー操作で保存してください。');});
+  $('[data-tx-copy]').addEventListener('click',async()=>{try{if(!win.navigator.clipboard?.writeText)throw new Error();await win.navigator.clipboard.writeText(outputText);dirtyResult=false;status('全文をコピーしました。');}catch{artViewer.openRaw();textResult.value=outputText;textResult.focus();textResult.select();$('[data-tx-preview-note]').hidden=true;status('自動コピーを利用できません。選択中の全文をコピーするか、TXTで保存してください。');}});
+  $('[data-tx-select]').addEventListener('click',()=>{artViewer.openRaw();textResult.value=outputText;textResult.focus();textResult.select();$('[data-tx-preview-note]').hidden=true;status('全文を選択しました。端末のコピー操作で保存してください。');});
   $('[data-tx-art-image]').addEventListener('click',()=>{const text=artText;showMode('input');source.value=text;$('[data-tx-action]').value='text';applyOptions({font:'mono',fontSize:16,width:1600,padding:32,lineHeight:110,wrap:false});refresh();void run(createInput);});
   $('[data-tx-use]').addEventListener('click',()=>{const input=legacy.querySelector('[data-file],#output-file-input');if(!restoredFile||!input){status('ファイルを保存してから、画像・音声の変換に読み込んでください。');return;}try{const transfer=new DataTransfer();transfer.items.add(restoredFile);input.files=transfer.files;showMode('media');input.dispatchEvent(new Event('change',{bubbles:true}));}catch{status('ファイルを保存してから読み込んでください。');}});
   root.addEventListener('click',event=>{if(event.target.closest('a[download]'))dirtyResult=false;});
