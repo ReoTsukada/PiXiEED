@@ -33,3 +33,11 @@ try {
   const { installConversionIntent } = await import('./conversion-intent.mjs?rev=20261028-discovery-1');
   installConversionIntent();
 } catch { /* The ordinary converter remains available without the enhancement. */ }
+
+// Share one contextual UI and fixed export action without replacing any conversion engine.
+try {
+  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261030-smart-convert-1');
+  mountSmartConversion();
+} catch (error) {
+  console.warn('Smart conversion UI unavailable; original conversion controls remain available.', error);
+}
