@@ -29,9 +29,12 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs';
-          const p='scripts/check-format-picker.mjs';
+          const p='scripts/check-text-art-fit.mjs';
           let s=fs.readFileSync(p,'utf8');
-          s=s.replace("check('picker fits '+width+'x'+height,", "console.log('PICKER_GEOMETRY',JSON.stringify(g));check('picker fits '+width+'x'+height,");
+          const from="throw Error('Timeout '+label+': '+await evaluate(()=>document.querySelector('[data-tx-status]')?.textContent))";
+          const to="throw Error('Timeout '+label+': '+JSON.stringify({errors,dom:await evaluate(()=>({url:location.href,editor:document.querySelector('[data-editor]')?.outerHTML.slice(0,200),native:document.querySelector('[data-format]')?.outerHTML,shared:document.querySelector('[data-sc-format]')?.outerHTML,status:document.querySelector('[data-status]')?.textContent,mode:document.querySelector('.text-mode-nav [aria-pressed=true]')?.dataset.textMode,dialog:document.querySelector('dialog')?.open,demoDisabled:document.querySelector('[data-demo]')?.disabled}))}))";
+          if(!s.includes(from))throw Error('Diagnostic anchor changed');
+          s=s.replace(from,to).replace('assert.ok(value,name);checks.push(name);','assert.ok(value,name);checks.push(name);console.log("PASS",name);');
           fs.writeFileSync(p,s);
           JS
           node scripts/check-format-picker.mjs
