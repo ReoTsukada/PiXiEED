@@ -24,7 +24,7 @@ try {
 
 // Add text input/output without replacing media conversion or private handoff state.
 try {
-  const { installTextTools } = await import('./text-tools.mjs?rev=20261030-live-text-1');
+  const { installTextTools } = await import('./text-tools.mjs?rev=20261030-text-fit-1');
   await installTextTools();
 } catch (error) {
   console.warn('Text tools unavailable; existing media conversion remains usable.', error);
