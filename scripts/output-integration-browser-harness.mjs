@@ -41,6 +41,13 @@ async function open(query = '?mode=convert&text=input') {
   await page.goto(base + '/output/work/' + query, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
 }
+async function selectMode(mode) {
+  const source = page.locator('[data-sc-source]'), target = page.locator('[data-sc-target]');
+  if (mode === 'output') { await source.selectOption('file'); await target.selectOption('text'); }
+  else if (mode === 'input') { await target.selectOption('file'); await source.selectOption('text'); }
+  else { await source.selectOption('file'); await target.selectOption('file'); }
+  await page.waitForFunction(expected => document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode === expected, mode);
+}
 async function exportFromVisibleAction() {
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#output-nav-export').click()]);
   assert.equal(await download.failure(), null);
@@ -91,7 +98,7 @@ try {
   const jpeg = await exportFromVisibleAction();
   assert.equal(jpeg.bytes.subarray(0, 2).toString('hex'), 'ffd8');
   pass('Text-generated PNG enters the existing media converter and saves a real JPEG');
-  await page.locator('[data-text-mode="output"]').click();
+  await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'pixels.png', mimeType: 'image/png', buffer: png.bytes });
   for (const style of ['ascii', 'block', 'braille', 'emoji', 'custom']) {
     await page.locator('[data-tx-style]').selectOption(style);
@@ -110,7 +117,7 @@ try {
   await run();
   const code = (await download('[data-tx-txt]')).bytes.toString();
   assert.match(code, /BEGIN PIXIEED RESTORE 1/);
-  await page.locator('[data-text-mode="input"]').click();
+  await selectMode('input');
   await page.locator('[data-tx-source]').fill('メモの前文\n' + code + '\nメモの後文');
   const restored = await run();
   assert.equal(restored.name, '原本.pxd'); assert.equal(hash(restored.bytes), hash(bytes));
@@ -122,13 +129,13 @@ try {
   assert.match(await page.locator('[data-tx-status]').innerText(), /検査に失敗/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Corruption is rejected without discarding the last successful download');
-  await page.locator('[data-text-mode="output"]').click();
+  await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'too-large.pxd', mimeType: 'application/octet-stream', buffer: Buffer.alloc(16 * 1024 * 1024 + 1) });
   await run(false);
   assert.match(await page.locator('[data-tx-status]').innerText(), /16MB/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Oversize input fails before encoding and preserves the previous result');
-  await page.locator('[data-text-mode="input"]').click();
+  await selectMode('input');
   const cancelText = 'キャンセル前に保持する合成テキスト';
   await page.locator('[data-tx-source]').fill(cancelText);
   await page.locator('[data-tx-action]').selectOption('text');
@@ -139,7 +146,7 @@ try {
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Cancellation preserves the input and prior successful result');
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.locator('[data-text-mode="input"]').click();
+  await selectMode('input');
   await page.locator('[data-tx-source]').fill('スマートフォンでも\n文字から画像へ。');
   await run();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
@@ -158,7 +165,7 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-tx-file-name]')?.textContent === 'exact.pxd');
     const direct = await download('.text-legacy a[download]');
     assert.equal(hash(direct.bytes), hash(bytes));
-    await page.locator('[data-text-mode="output"]').click();
+    await selectMode('output');
     await run();
     assert.match(await page.locator('[data-tx-text-result]').inputValue(), /BEGIN PIXIEED RESTORE 1/);
     pass(`${mode}: real IndexedDB handoff → common output → byte-exact PXD download and text encoding`);
