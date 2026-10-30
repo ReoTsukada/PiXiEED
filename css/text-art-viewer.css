@@ -5,11 +5,14 @@
 .text-tools .tx-art-toolbar button[aria-pressed="true"] { background:#e4f0e5; border-color:#56836a; }
 .text-tools .tx-art-meta { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 10px; margin:8px 0; color:#52695a; font:11px/1.6 system-ui,sans-serif; }
 .text-tools .tx-art-meta output { font-variant-numeric:tabular-nums; }
-.text-tools .tx-art-viewport { box-sizing:border-box; width:100%; height:360px; height:clamp(180px,44dvh,460px); padding:0; border:1px solid #cbd7c7; border-radius:12px; background:#f6f8f1; overflow:auto; touch-action:pan-x pan-y pinch-zoom; overscroll-behavior:auto; }
-.text-tools .tx-art-surface { position:relative; min-width:100%; min-height:100%; overflow:hidden; }
+.text-tools .tx-art-viewport { box-sizing:border-box; width:100%; height:360px; height:clamp(180px,44dvh,460px); padding:0; border:1px solid #cbd7c7; border-radius:12px; background:#f6f8f1; overflow:auto; touch-action:pan-x pan-y pinch-zoom; overscroll-behavior:auto; scroll-behavior:auto; overflow-anchor:none; }
+.text-tools .tx-art-surface { position:relative; min-width:0; min-height:0; overflow:hidden; }
 .text-tools .tx-art-surface pre { position:absolute; top:12px; left:12px; display:block; width:max-content; max-width:none; height:max-content; margin:0; padding:0; border:0; color:#243c31; white-space:pre; overflow-wrap:normal; word-break:normal; tab-size:4; font:13px/1.8 ui-monospace,"SFMono-Regular",Consolas,"MS Gothic",monospace; font-variant-ligatures:none; letter-spacing:0; transform-origin:top left; }
 .text-tools .tx-art-raw { margin:12px 0; }
 .text-tools .tx-art-raw > summary { min-height:44px; padding:10px 0; cursor:pointer; color:#3a5a41; font-size:12px; }
 .text-tools .tx-native-hint { margin:6px 0 14px; color:#52695a; font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
 @media(max-width:380px) { .text-tools .tx-art-toolbar { gap:4px; } .text-tools .tx-art-toolbar button { padding-inline:7px; } }
 @media(prefers-reduced-motion:reduce) { .text-tools .tx-art-viewport { scroll-behavior:auto; } }
+
+/* Geometry updates must be immediate even when the host page animates layout. */
+.text-tools .tx-art-viewport, .text-tools .tx-art-surface, .text-tools .tx-art-surface pre { animation:none !important; transition:none !important; }
