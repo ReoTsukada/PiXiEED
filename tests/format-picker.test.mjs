@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {describeFormat,filterFormats,normalizeFormatQuery} from '../js/creation/format-picker.mjs';
+const option=(value,label=value,extra={})=>({value,label,...extra});
+test('full-width and case-insensitive query normalization',()=>assert.equal(normalizeFormatQuery(' ＪＰＧ '),'jpg'));
+test('JPEG is searchable by JPG alias and photo use',()=>{const x=[describeFormat(option('jpeg','JPEG画像'))];assert.equal(filterFormats(x,'jpg').length,1);assert.equal(filterFormats(x,'写真').length,1);});
+test('unsupported options keep the engine reason',()=>{const x=describeFormat(option('m4a','M4A',{disabled:true,title:'encoder unavailable'}));assert.equal(x.disabled,true);assert.equal(x.reason,'encoder unavailable');});
+test('group filtering never invents a capability',()=>{const x=['png','wav','ascii'].map(v=>describeFormat(option(v)));assert.deepEqual(filterFormats(x,'','audio').map(i=>i.value),['wav']);assert.equal(filterFormats(x,'mp3').length,0);});
+test('unknown engine values remain available without invented support',()=>{const x=describeFormat(option('custom-format','独自形式'));assert.equal(x.group,'other');assert.equal(x.label,'独自形式');});
+test('WebM audio and video are classified by native label',()=>{assert.equal(describeFormat(option('webm','WebM音声')).group,'audio');assert.equal(describeFormat(option('webm','WebM動画')).group,'motion');});
+test('input restoration and output encoding have distinct descriptions',()=>{assert.notEqual(describeFormat(option('base64'),'input').detail,describeFormat(option('base64'),'output').detail);});
+test('multiple search terms and empty results are deterministic',()=>{const x=['png','jpeg','wav'].map(v=>describeFormat(option(v)));assert.deepEqual(filterFormats(x,'PNG 透過').map(i=>i.value),['png']);assert.equal(filterFormats(x,'not-a-format').length,0);});
+test('disabled optgroups are respected',()=>assert.equal(describeFormat(option('png','PNG',{parentElement:{disabled:true}})).disabled,true));
+test('labels remain plain strings, not HTML',()=>assert.equal(describeFormat(option('x','<img src=x onerror=alert(1)>')).label,'<img src=x onerror=alert(1)>'));
