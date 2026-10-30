@@ -101,7 +101,7 @@ try {
   await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'pixels.png', mimeType: 'image/png', buffer: png.bytes });
   for (const style of ['ascii', 'block', 'braille', 'emoji', 'custom']) {
-    await page.locator('[data-tx-style]').selectOption(style);
+    await page.locator('[data-sc-format]').selectOption(style);
     await run();
     const art = await page.locator('[data-tx-text-result]').inputValue();
     assert.ok(art.length > 0);
@@ -113,7 +113,7 @@ try {
   pass('Full-text selection remains available independently of clipboard permissions');
   const bytes = Buffer.from(Array.from({ length: 16384 }, (_, index) => index * 37 & 255));
   await page.locator('[data-tx-file]').setInputFiles({ name: '原本.pxd', mimeType: 'application/octet-stream', buffer: bytes });
-  await page.locator('[data-tx-style]').selectOption('encode');
+  await page.locator('[data-sc-format]').selectOption('encode');
   await run();
   const code = (await download('[data-tx-txt]')).bytes.toString();
   assert.match(code, /BEGIN PIXIEED RESTORE 1/);
@@ -138,7 +138,7 @@ try {
   await selectMode('input');
   const cancelText = 'キャンセル前に保持する合成テキスト';
   await page.locator('[data-tx-source]').fill(cancelText);
-  await page.locator('[data-tx-action]').selectOption('text');
+  await page.locator('[data-sc-format]').selectOption('text');
   await page.evaluate(() => { document.querySelector('#output-nav-export').click(); document.querySelector('[data-tx-cancel]').click(); });
   await page.waitForFunction(() => document.querySelector('[data-text-tools]').getAttribute('aria-busy') === 'false');
   assert.match(await page.locator('[data-tx-status]').innerText(), /中止しました/);
