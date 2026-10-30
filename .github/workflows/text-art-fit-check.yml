@@ -26,4 +26,13 @@ jobs:
       - name: Exact-pixel and preview geometry unit tests
         run: node --test tests/text-art-fit.test.mjs
       - name: Real converter on localhost with external traffic blocked
-        run: node scripts/check-text-art-fit.mjs
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const path='scripts/check-text-art-fit.mjs';
+          let source=fs.readFileSync(path,'utf8');
+          source=source.replace('return {mode:h.dataset.viewMode', 'return {view:a.toJSON(),art:b.toJSON(),documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,mode:h.dataset.viewMode');
+          source=source.replace('const g=await geometry();check(', 'const g=await geometry();console.log("FIT_GEOMETRY",JSON.stringify(g));check(');
+          fs.writeFileSync(path,source);
+          JS
+          node scripts/check-text-art-fit.mjs
