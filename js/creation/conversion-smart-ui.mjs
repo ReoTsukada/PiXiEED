@@ -11,6 +11,7 @@ export function mountSmartConversion(doc = document, win = window) {
   const setAttr = (node, key, value) => { if (node.getAttribute(key) !== value) node.setAttribute(key, value); };
   const media = () => $('.text-legacy') || main;
   const mode = () => $('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode || 'media';
+  const liveText = () => mode() === 'output' ? $('[data-text-tools]')?.textLivePreview : null;
   const find = selector => media().querySelector(selector);
   const selectMode = next => {
     const control = $(`[data-text-mode="${next}"]`);
@@ -55,16 +56,20 @@ export function mountSmartConversion(doc = document, win = window) {
   let lastTextUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
   let sizeDirty = false, fpsDirty = false, stopped = false, controlSignature = '';
   const nativeFormat = () => mode() === 'input' ? $('[data-tx-action]') : mode() === 'output' ? $('[data-tx-style]') : find('[data-format],#output-format-select');
-  const result = () => mode() === 'media'
-    ? blobLink(find('[data-download],#output-download')) || blobLink(find('a.convert-primary[download]:not([data-previous])'))
-    : blobLink($('[data-tx-download]')) || blobLink($('[data-tx-txt]'));
+  const result = () => {
+    if (mode() === 'media') return blobLink(find('[data-download],#output-download')) || blobLink(find('a.convert-primary[download]:not([data-previous])'));
+    const live = liveText(), renderedMode = $('[data-text-tools]')?.dataset.txResultMode;
+    if ((live && live.state !== 'ready') || (renderedMode && renderedMode !== mode())) return null;
+    return blobLink($('[data-tx-download]')) || blobLink($('[data-tx-txt]'));
+  };
   const cancelAction = () => {
-    const selectors = mode() === 'media' ? '[data-cancel],#output-cancel-generation,#output-cancel-settings,#output-cancel-import' : '[data-tx-cancel]';
+    const selectors = mode() === 'media' ? '[data-cancel],#output-cancel-generation,#output-cancel-settings,#output-cancel-import' : '[data-tx-cancel],[data-tx-live-cancel]';
     return [...main.querySelectorAll(selectors)].find(available) || null;
   };
+  // Live text generation does not lock its settings; only saving waits for a fresh result.
   const busy = () => main.getAttribute('aria-busy') === 'true'
     || (mode() !== 'media' && $('[data-text-tools]')?.getAttribute('aria-busy') === 'true')
-    || Boolean(cancelAction())
+    || (!liveText() && Boolean(cancelAction()))
     || (mode() === 'media' && Boolean(find('#output-format-select')?.disabled) && loaded());
   const matchesFormat = link => {
     const control = find('#output-format-select');
@@ -78,7 +83,7 @@ export function mountSmartConversion(doc = document, win = window) {
     : $('[data-tx-status]'))?.textContent?.trim() || '';
   const loaded = () => mode() === 'media'
     ? available(find('[data-editor],#output-layout')) || Boolean(result())
-    : mode() === 'input' ? Boolean($('[data-tx-source]')?.value.trim()) : Boolean($('[data-tx-file-name]')?.textContent && !$('[data-tx-file-name]').textContent.includes('選んでください'));
+    : mode() === 'input' ? Boolean($('[data-tx-source]')?.value.trim()) : liveText() ? liveText().hasSource : Boolean($('[data-tx-file-name]')?.textContent && !$('[data-tx-file-name]').textContent.includes('選んでください'));
   function schedule() { if (!stopped && !frame) frame = win.requestAnimationFrame(() => { frame = 0; render(); }); }
   function ensureNav() {
     let next = doc.querySelector('.public-destination-nav');
@@ -115,7 +120,9 @@ export function mountSmartConversion(doc = document, win = window) {
   }
   function render() {
     ensureNav();
-    const currentMode = mode(), working = busy(), link = result(), href = link?.getAttribute('href') || '';
+    const currentMode = mode(), locked = busy(), live = liveText();
+    const working = locked || Boolean(live && ['queued','rendering'].includes(live.state));
+    const link = result(), href = link?.getAttribute('href') || '';
     if (currentMode !== lastMode) { pending = null; revision++; lastMode = currentMode; }
     if (currentMode === 'media') {
       if (href && href !== lastMediaUrl && !working) { lastMediaUrl = href; mediaDirty = !matchesFormat(link); }
@@ -127,23 +134,23 @@ export function mountSmartConversion(doc = document, win = window) {
     target.options[1].disabled = currentMode === 'input';
     setText(target.options[0], 'ファイル');
     const hasText = Boolean($('[data-text-tools]'));
-    source.disabled = working || !hasText; target.disabled = working || !hasText;
-    ui('[data-sc-pick]').disabled = working; ui('[data-sc-paste]').disabled = working;
+    source.disabled = locked || !hasText; target.disabled = locked || !hasText;
+    ui('[data-sc-pick]').disabled = locked; ui('[data-sc-paste]').disabled = locked;
     mirrorFormat();
     main.dataset.smartLoaded = String(loaded());
     setText(ui('[data-sc-pick]'), loaded() ? '素材を変更' : 'ファイルを選ぶ');
     button.disabled = working;
     setAttr(button, 'aria-busy', String(working));
-    const ready = Boolean(link && (currentMode === 'media' ? !mediaDirty && !sizeDirty && !fpsDirty : !textDirty && textResultMode === currentMode));
-    const label = working ? '処理中' : !loaded() ? (currentMode === 'input' ? '文字を入力' : '素材を選ぶ') : '出力';
+    const ready = Boolean(link && (live ? live.state === 'ready' : currentMode === 'media' ? !mediaDirty && !sizeDirty && !fpsDirty : !textDirty && textResultMode === currentMode));
+    const label = working ? (live ? '更新中' : '処理中') : !loaded() ? (currentMode === 'input' ? '文字を入力' : '素材を選ぶ') : '出力';
     setText(buttonLabel, label);
-    setAttr(button, 'aria-label', working ? '変換処理中' : ready ? '現在の結果を端末に保存' : loaded() ? '現在の設定で変換して出力' : label);
+    setAttr(button, 'aria-label', working ? 'プレビューを更新中' : ready ? '現在の結果を端末に保存' : loaded() ? (live ? 'プレビューを更新（保存はしません）' : '現在の設定で変換して出力') : label);
     cancel.hidden = !working || !cancelAction();
     const nativeStatus = statusText();
     const summary = working ? nativeStatus || '変換しています…' : nativeStatus || (ready ? '保存できます。中央の出力ボタンから保存。' : '素材・形式を選んで、中央から出力。');
     setText(message, summary);
     const hint = currentMode === 'input' ? '文章・文字アート・復元コードを判別します。設定は必要なときだけ開けます。'
-      : currentMode === 'output' ? '元のファイルは保持します。復元コードは暗号化ではありません。'
+      : currentMode === 'output' ? '設定変更でプレビューを自動更新。中央の出力で確認済みの結果を保存します。復元コードは暗号化ではありません。'
       : loaded() ? '形式に応じた設定だけを表示しています。出力ボタンは画面下に固定されています。'
       : 'ファイルを選ぶと対応形式を表示します。TXT・メモは文字入力へ自動で切り替えます。';
     setText(ui('[data-sc-hint]'), hint);
@@ -157,13 +164,12 @@ export function mountSmartConversion(doc = document, win = window) {
         if (completed.stage === 'fps' || completed.stage === 'size') beginExport();
         else if (currentMode !== 'media' || matchesFormat(link)) save(link);
         else setText(message, '選択した形式を確認してください。異なる形式の結果は自動保存しません。');
-      } else if (pending.sawBusy) pending = null; // Error/cancel: never download the previous result.
+      } else if (pending.sawBusy) pending = null;
     }
   }
   function save(link) {
     if (!blobLink(link)) return;
     link.click();
-    // A second direct tap remains available on browsers that require a fresh gesture.
     setText(message, '保存を開始しました。保存されない場合は、中央の出力をもう一度押してください。');
     button.focus({ preventScroll: true });
   }
@@ -182,7 +188,7 @@ export function mountSmartConversion(doc = document, win = window) {
     action.click();
     if (pending) pending.sawBusy = busy();
     render();
-    if (pending && !pending.sawBusy && !busy()) pending = null; // Synchronous validation refused the operation.
+    if (pending && !pending.sawBusy && !busy()) pending = null;
   }
   function choose() {
     picker.multiple = mode() === 'media';
@@ -193,6 +199,13 @@ export function mountSmartConversion(doc = document, win = window) {
     if (busy() || pending) return;
     if (!loaded()) {
       if (mode() === 'input') $('[data-tx-source]')?.focus(); else choose();
+      return;
+    }
+    const live = liveText();
+    if (live) {
+      // Generate/refresh only, never schedule an automatic download of an unseen result.
+      if (live.state === 'ready' && result()) save(result());
+      else if (!['queued','rendering'].includes(live.state)) live.refresh();
       return;
     }
     if (mode() !== 'media') {
@@ -252,9 +265,10 @@ export function mountSmartConversion(doc = document, win = window) {
     }
   }, true);
   main.addEventListener('input', changed); main.addEventListener('change', changed);
+  main.addEventListener('pixieed:text-preview', schedule);
   main.addEventListener('click', event => {
     const el = event.target.closest('button'); if (!el) return;
-    if (el.matches('#output-cancel-generation,#output-cancel-settings,#output-cancel-import,[data-cancel],[data-tx-cancel]')) pending = null;
+    if (el.matches('#output-cancel-generation,#output-cancel-settings,#output-cancel-import,[data-cancel],[data-tx-cancel],[data-tx-live-cancel]')) pending = null;
     if (el.matches('[data-rate],[data-reset],[data-apply-seconds],[data-move],.output-preset')) { mediaDirty = true; revision++; pending = null; }
     schedule();
   });
@@ -275,6 +289,7 @@ export function mountSmartConversion(doc = document, win = window) {
   function destroy() {
     stopped = true; if (frame) win.cancelAnimationFrame(frame); observer.disconnect(); bodyObserver.disconnect(); navObserver?.disconnect();
     main.removeEventListener('input', changed); main.removeEventListener('change', changed);
+    main.removeEventListener('pixieed:text-preview', schedule);
     win.removeEventListener('pagehide', onHide); win.removeEventListener('pageshow', onShow);
   }
   return { refresh: schedule, destroy };
