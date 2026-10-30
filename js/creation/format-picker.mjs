@@ -96,7 +96,7 @@ export async function mountConversionFormatPicker(doc = globalThis.document, win
   const filters = $('.px-format-filters'), list = $('.px-format-list'), empty = $('.px-format-empty');
   const count = $('.px-format-count'), current = $('.px-format-current');
   const bindings = new Map(), removers = [];
-  let owner = null, items = [], shown = [], group = 'all', active = -1, frame = 0, disposed = false, backdropDown = false;
+  let owner = null, items = [], shown = [], group = 'all', active = -1, frame = 0, disposed = false, backdropDown = false, triggerSerial = 0;
   let previousOverflow = null, previousGutter = null;
   const on = (el, type, handler, options) => { el.addEventListener(type, handler, options); removers.push(() => el.removeEventListener(type, handler, options)); };
   const text = (el, value) => { if (el.textContent !== value) el.textContent = value; };
@@ -119,6 +119,7 @@ export async function mountConversionFormatPicker(doc = globalThis.document, win
     const vv = win.visualViewport, width = Math.min(vv?.width || win.innerWidth, doc.documentElement.clientWidth), height = vv?.height || win.innerHeight;
     const ox = vv?.offsetLeft || 0, oy = vv?.offsetTop || 0, mobile = width <= 640 || height < 500;
     dialog.dataset.layout = mobile ? 'sheet' : 'popover';
+    dialog.dataset.compact = String(height < 500);
     const w = mobile ? Math.min(560, width - 16) : Math.min(480, width - 32);
     const bounds = owner.trigger.getBoundingClientRect();
     const below = oy + height - bounds.bottom - 24, above = bounds.top - oy - 24;
@@ -233,7 +234,7 @@ export async function mountConversionFormatPicker(doc = globalThis.document, win
   }
   function enhance(select) {
     if (bindings.has(select) || select.multiple) return;
-    const trigger = doc.createElement('button'); trigger.type = 'button'; trigger.className = 'px-format-trigger'; trigger.id = `${id}-trigger-${bindings.size}`;
+    const trigger = doc.createElement('button'); trigger.type = 'button'; trigger.className = 'px-format-trigger'; trigger.id = `${id}-trigger-${triggerSerial++}`;
     trigger.setAttribute('aria-haspopup', 'dialog'); trigger.setAttribute('aria-controls', dialog.id); trigger.setAttribute('aria-expanded', 'false');
     trigger.innerHTML = `<span class="px-format-badge" aria-hidden="true"></span><span class="px-format-trigger-copy"><strong></strong><span></span></span><span class="px-format-chevron">${ICON}<path d="m7 10 5 5 5-5"/></svg></span>`;
     const parent = select.closest('label'); const originalFor = parent?.getAttribute('for');
@@ -277,7 +278,7 @@ export async function mountConversionFormatPicker(doc = globalThis.document, win
   });
   on($('.px-format-close'), 'click', () => close());
   on(dialog, 'cancel', event => { event.preventDefault(); close(); });
-  on(dialog, 'close', () => { if (owner) close(); });
+  on(dialog, 'close', () => { if (!dialog.open && owner) close(); });
   on(dialog, 'pointerdown', event => {
     const b = dialog.getBoundingClientRect(); backdropDown = event.target === dialog && (event.clientX < b.left || event.clientX > b.right || event.clientY < b.top || event.clientY > b.bottom);
   });
