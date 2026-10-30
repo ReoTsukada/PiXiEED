@@ -28,6 +28,26 @@ test('each configured placement belongs only to its explicit public page', () =>
     if (key === 'home') assert.deepEqual(resolveDisplayAd(config, key, '/'), { client: config.client, slot: '1234567890' });
   }
 });
+test('the event archive reuses its existing information unit and owns no event detail route', () => {
+  assert.deepEqual(resolveDisplayAd(displayAdConfig, 'info', '/events/'), {
+    client: displayAdConfig.client, slot: '8825932060'
+  });
+  assert.equal(resolveDisplayAd(displayAdConfig, 'info', '/events/pixel-art-event/'), null);
+});
+test('the long glossary has one separated information unit that hides during filtering', async () => {
+  const source = await readFile(new URL('../../glossary/index.html', import.meta.url), 'utf8');
+  const rendering = source.indexOf('id="rendering"');
+  const ad = source.indexOf('class="px-display-ad glossary-inline-ad"');
+  const animation = source.indexOf('id="animation"');
+  assert.ok(rendering >= 0 && rendering < ad && ad < animation, 'place the unit between reference sections');
+  assert.equal((source.match(/data-display-ad="info"/g) || []).length, 1);
+  assert.match(source, /body\.glossary-filter-active \.glossary-inline-ad\{display:none!important\}/);
+  assert.match(source, /classList\.toggle\('glossary-filter-active', Boolean\(q\)\)/);
+  assert.doesNotMatch(source, /<main\b/);
+  assert.deepEqual(resolveDisplayAd(displayAdConfig, 'info', '/glossary/'), {
+    client: displayAdConfig.client, slot: '8825932060'
+  });
+});
 test('blank, malformed and mistyped unit IDs never request advertising', () => {
   for (const slot of ['', ' ', '12345', 'abc', 'ca-pub-9801602250480253', '/23379831154/pixieed_rewarded', 1234567890, null]) {
     assert.equal(resolveDisplayAd({ ...config, slots: { home: slot } }, 'home', '/'), null);

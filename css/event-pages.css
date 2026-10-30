@@ -59,6 +59,7 @@ h2 { margin: 2rem 0 .7rem; font-size: 1.2rem; }
 .event-globe-link { margin-top: 2rem; padding: 1rem 1.2rem; background: var(--event-surface); border: 1px solid var(--event-line); border-radius: .8rem; }
 .event-index-count { color: var(--event-muted); font-size: .9rem; }
 .event-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: .7rem; align-items: stretch; }
+.event-list-ad { grid-column: 1 / -1; min-width: 0; list-style: none; }
 .event-card {
   min-width: 0;
   overflow-wrap: anywhere;

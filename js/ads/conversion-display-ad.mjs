@@ -1,5 +1,5 @@
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261024-public-layout-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
 
 const mounted = new WeakMap();
 const paths = new Set(['/tools/start/convert/', '/output/work/']);

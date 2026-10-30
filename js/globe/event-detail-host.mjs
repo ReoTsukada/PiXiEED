@@ -135,7 +135,7 @@ function renderEventDetail(doc, root, event, onClose) {
 export function createMapEventDetailHost({ doc = globalThis.document, win = globalThis.window,
   iframe = doc?.querySelector?.('#globeFrame'), host = doc?.querySelector?.('#mapEventDetailHost'),
   detail = doc?.querySelector?.('#mapEventDetail'), ad = doc?.querySelector?.('#mapDetailAd'),
-  createCalendarSection, loadAds = () => import('../display-ads.mjs?rev=20261024-public-layout-1') } = {}) {
+  createCalendarSection, loadAds = () => import('../display-ads.mjs?rev=20261030-event-inline-ads-1') } = {}) {
   if (!doc || !win || !iframe || !host || !detail || !ad) return { dispose() {} };
   let ready = false, currentEventId = '', disposed = false, adMounted = false, adFailed = false, adCleanup = null, adsModulePromise, calendarModule;
   let calendarPromise, returnScroll = null;

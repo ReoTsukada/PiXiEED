@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { outputGuideAdConfig } from '../../data/output-guide-ad-config.mjs';
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
-import { getAdsenseLoader } from '../../js/display-ads.mjs?rev=20261024-public-layout-1';
+import { getAdsenseLoader } from '../../js/display-ads.mjs?rev=20261030-event-inline-ads-1';
 import { mountOutputGuideAd, resolveOutputGuideAd, getOutputGuideAdLayout } from '../../js/ads/output-guide-ad.mjs';
 
 // A local DOM fixture: no network, vendor code, impressions or clicks.

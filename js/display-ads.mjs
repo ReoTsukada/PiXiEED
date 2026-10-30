@@ -2,7 +2,7 @@ import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-
 
 // Explicit page ownership prevents accidental ads in editors, private pages or embedded tools.
 const placements = new Map([
-  ['home', ['/', '/welcome/']], ['tools', ['/tools/']], ['info', ['/about/', '/guide/']],
+  ['home', ['/', '/welcome/']], ['tools', ['/tools/']], ['info', ['/about/', '/guide/', '/events/', '/glossary/']],
   ['stores', ['/stores/']], ['store-detail', ['/stores/ecowashcafe-nakanoshima.html']],
   ['map-detail', ['/globe/']],
   ['camera-result', ['/pixel-camera.html']], ['draw-result', ['/draw/']],

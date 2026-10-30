@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 const root = new URL('../../', import.meta.url);
 export const MANUAL_PAGES = [
   'welcome/index.html', 'tools/index.html', 'about/index.html', 'guide/index.html',
-  'stores/index.html', 'stores/ecowashcafe-nakanoshima.html'
+  'stores/index.html', 'stores/ecowashcafe-nakanoshima.html', 'glossary/index.html'
 ];
 // The SNS home, feed, and explore screens are interactive; root-owned build logic no longer adds Auto Ads there.
 export const SOURCE_AUTO_AD_PAGES = [];
@@ -18,12 +18,13 @@ export const WORKSPACE_PAGES = ['pixel-camera.html', 'globe-prototype.html', 'pi
 const OFFERWALL_PAGE = 'output/work/index.html';
 const COMPATIBILITY_PAGES = ['PiXiEEDraw/index.html', 'pixiedraw/index.html', 'pixiedraw2/index.html', 'studio/index.html'];
 // Reference guides never load an ad provider; the conversion landing keeps its existing placement.
-const REFERENCE_NO_AD_PAGES = ['help/index.html', 'glossary/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html', 'output/gif-speed/index.html'];
+const REFERENCE_NO_AD_PAGES = ['help/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html', 'output/gif-speed/index.html'];
 const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 // These are source templates. The Pages build injects the informational loader
 // only after checking its explicit route allowlist and generated-event set.
 const eventCatalog = JSON.parse(await readFile(new URL('events/catalog.json', root), 'utf8'));
-const EVENT_NO_AD_PAGES = ['events/index.html', ...eventCatalog.ids.map(id => `events/${id}/index.html`)];
+const BUILD_AD_PAGES = ['events/index.html'];
+const EVENT_NO_AD_PAGES = eventCatalog.ids.map(id => `events/${id}/index.html`);
 const EXCLUDED_PAGES = [
   ...SOCIAL_NO_AD_PAGES,
   'privacy/index.html', 'terms/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
@@ -39,7 +40,8 @@ const html = (path) => readFile(new URL(path, root), 'utf8');
 for (const path of MANUAL_PAGES) test(`${path}: manual units own their lazy ad requests`, async () => {
   const source = await html(path);
   assert.match(source, /data-display-ad=/);
-  assert.match(source, /src="\/js\/display-ads\.mjs\?rev=20261024-public-layout-1"/);
+  const moduleRevision = '20261030-event-inline-ads-1';
+  assert.ok(source.includes(`/js/display-ads.mjs?rev=${moduleRevision}`));
   assert.match(source, /href="\/css\/display-ads\.css\?rev=20261007-lazy-ads-1"/);
   assert.doesNotMatch(source, /adsbygoogle\.js|adsense-auto\.js/);
 });
@@ -71,16 +73,19 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
     }
     return found;
   }
-  const established = [...new Set([...MANUAL_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES, OFFERWALL_PAGE])];
+  const established = [...new Set([...MANUAL_PAGES, ...BUILD_AD_PAGES, ...RESULT_PAGES, ...WORKSPACE_PAGES, ...EXCLUDED_PAGES, OFFERWALL_PAGE])];
   const categorized = [...new Set([...established, ...SOURCE_AUTO_AD_PAGES])];
   const expected = [...new Set([...categorized, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 48);
-  assert.equal(categorized.length, 48);
-  assert.equal(expected.length, 48 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  assert.equal(established.length, 50);
+  assert.equal(categorized.length, 50);
+  assert.equal(expected.length, 50 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
   for (const path of SOURCE_AUTO_AD_PAGES) {
     const source = await html(path);
     assert.doesNotMatch(source, /adsbygoogle|adsense-auto|display-ads|data-display-ad/, `${path}: source has no manual provider or slot`);
+  }
+  for (const path of BUILD_AD_PAGES) {
+    assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, `${path}: build-time manual markers do not request ads in source`);
   }
   for (const path of [...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES]) {
     assert.doesNotMatch(await html(path), /adsbygoogle|adsense-auto|display-ads|data-display-ad|adsense-offerwall/, `${path}: compatibility and factual event pages have no ad loader`);

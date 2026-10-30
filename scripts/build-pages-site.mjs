@@ -8,6 +8,7 @@ import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
 import { generateEventPages } from './generate-event-pages.mjs?rev=20261018-direct-runtime-1';
 import { addSiteDrawCta } from './site-draw-cta.mjs';
 import { addPageGutters } from './page-gutters.mjs';
+import { addEventArchiveAdSlots } from './event-archive-ad-slots.mjs';
 import { addInformationAutoAds } from './information-auto-ads.mjs';
 import { addOfferwallEntryPolicy, OFFERWALL_TOOL_PATHS, OFFERWALL_ENTRY_POLICY_SCRIPT, OFFERWALL_ENTRY_LOADER_SCRIPT } from './offerwall-entry-policy.mjs';
 import { optimizeToolRuntimeDelivery } from './tool-runtime-delivery.mjs';
@@ -157,7 +158,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       }
       // Explicit new public sources are also reviewable in a clean local build
       // before they are committed. Arbitrary untracked work stays excluded.
-      for (const name of ['assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+      for (const name of ['assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'js/event-archive-ad-policy.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
         'assets/icons/pixieed/color-adjust.svg', 'assets/icons/pixieed/text.svg', 'assets/icons/pixieed/draw.svg',
         'assets/icons/pixieed/copy.svg', 'assets/icons/pixieed/cut.svg', 'assets/icons/pixieed/paste.svg',
         'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',
@@ -278,7 +279,8 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         const sourceHtml = startRoute ? toolStartDocument(template, startRoute) : template;
         const transformed = addSiteDrawCta(addSiteFontFallback(sourceHtml), startRoute?.sourcePath || name);
         const withBenefits = addSiteHeaderBenefits(transformed.html, name);
-        const withGutters = addPageGutters(withBenefits.html, name, { generatedEventRoutes });
+        const withEventAds = addEventArchiveAdSlots(withBenefits.html, name);
+        const withGutters = addPageGutters(withEventAds.html, name, { generatedEventRoutes });
         const withInformationAutoAds = addInformationAutoAds(withGutters.html, name, { generatedEventRoutes });
         const withOrdinaryStyle = addOrdinaryAdStyle(withInformationAutoAds.html, name);
         const needsOfferwallPolicy = OFFERWALL_TOOL_PATHS.includes(`/${name.replace(/index\.html$/, '')}`)

@@ -44,3 +44,27 @@ test('request no longer waits for focus, preview or the near-viewport check',asy
  assert.match(code,/mounted\.set\(doc, result\); schedule\(\);/);
  assert.match(code,/requested = true; frozenSize/);
 });
+
+test('the actual workspace uses one optional ad outside the active work area',async()=>{
+ const read=path=>readFile(new URL(path,import.meta.url),'utf8');
+ const [page,entry,ad,css,config]=await Promise.all([
+  read('../../output/work/index.html'),
+  read('../../js/creation/conversion-entry.mjs'),
+  read('../../js/ads/conversion-display-ad.mjs'),
+  read('../../css/conversion-display-ad.css'),
+  read('../../data/site-config.js')
+ ]);
+ assert.match(page,/\/js\/creation\/conversion-entry\.mjs/);
+ assert.doesNotMatch(page,/data-display-ad=|<ins\b[^>]*adsbygoogle/);
+ assert.match(entry,/void import\('\.\.\/ads\/conversion-display-ad\.mjs/);
+ assert.doesNotMatch(entry,/await import\('\.\.\/ads\/conversion-display-ad\.mjs/);
+ assert.match(ad,/paths = new Set\(\['\/tools\/start\/convert\/', '\/output\/work\/'\]\)/);
+ assert.match(ad,/main\.before\(wrapper\); wrapper\.append\(main\);/);
+ assert.match(ad,/wrapper\.append\(guide\);/);
+ assert.equal((ad.match(/doc\.createElement\('ins'\)/g)||[]).length,1);
+ assert.match(ad,/config\?\.slots\?\.tools/);
+ assert.match(config,/tools:\s*'8825932060'/);
+ assert.match(ad,/doc\.fullscreenElement \|\| doc\.querySelector\('dialog\[open\]/);
+ assert.match(css,/data-ad-layout="rail"\]\s*\.conversion-companion\s*\{\s*position:absolute/);
+ assert.doesNotMatch(css,/position:\s*(?:fixed|sticky)/);
+});

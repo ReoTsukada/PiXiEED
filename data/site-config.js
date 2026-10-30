@@ -44,7 +44,7 @@ export const displayAdConfig = {
   slots: {
     home: '8825932060',
     tools: '8825932060',
-    info: '8825932060', // About・利用ガイド
+    info: '8825932060', // About・利用ガイド・用語集・イベント一覧
     stores: '8825932060',
     'store-detail': '8825932060', // 公開中の実店舗詳細
     'map-detail': '8825932060', // 公開イベント詳細を選択中の地図
