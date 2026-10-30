@@ -1,5 +1,7 @@
 /** All editor handoffs and local conversions share one output destination. */
 const query = new URLSearchParams(location.search);
+// This converter uses ordinary page advertising, not an entry gate. CMP consent is untouched.
+try { window.__PIXIEED_OFFERWALL_ENTRY__?.retire?.(); } catch { /* Optional site policy. */ }
 try {
   if (query.has('id') || query.has('file')) {
     const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261028-unified-output-1');
@@ -41,3 +43,8 @@ try {
 } catch (error) {
   console.warn('Smart conversion UI unavailable; original conversion controls remain available.', error);
 }
+
+// Advertising is optional and never awaited by import, preview, generation or saving.
+void import('../ads/conversion-display-ad.mjs?rev=20261030-converter-ads-1')
+  .then(({ mountConversionDisplayAd }) => mountConversionDisplayAd())
+  .catch(() => { /* Conversion and download remain available without advertising. */ });
