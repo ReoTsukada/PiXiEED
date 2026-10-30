@@ -1,5 +1,6 @@
 import { detectText, decodeTextFile, MAX_CODE_CHARS, MAX_FILE_BYTES, safeName, encodeDocument } from './text-codec.mjs?rev=20261028-text-1';
 import { renderText, canvasBlob } from './text-render.mjs?rev=20261028-text-1';
+import { installTextLivePreview } from './text-live-preview.mjs?rev=20261030-live-text-1';
 
 /** An additive local workspace. Existing conversion state is kept, never rebuilt. */
 export async function installTextTools(doc = document, win = window) {
@@ -70,7 +71,7 @@ export async function installTextTools(doc = document, win = window) {
     for (const el of root.querySelectorAll('[data-tx-result] button,[data-tx-result] a')) { el.hidden = true; el.removeAttribute('href'); }
     $('[data-tx-preview]').replaceChildren(); $('[data-tx-preview]').hidden = true; textResult.hidden = true; textResult.value = ''; $('[data-tx-preview-note]').hidden = true;
     outputText = ''; artText = ''; restoredFile = null; $('[data-tx-empty]').hidden = true; $('[data-tx-result]').hidden = false;
-    dirtyResult = true;
+    dirtyResult = true; root.dataset.txResultMode = mode;
   }
   function showText(text, note, art = '') {
     resetResult(); outputText = text; artText = art; textResult.value = text.slice(0,64000); textResult.hidden = false; $('[data-tx-preview-note]').hidden = text.length <= 64000;
@@ -101,7 +102,7 @@ export async function installTextTools(doc = document, win = window) {
     $('[data-tx-result-note]').textContent=`${restoredFile.name} · ${restoredFile.size.toLocaleString()} bytes。${result.verified ? '保存されたSHA-256と内容が一致しました。改ざん者の本人確認をする署名ではありません。' : '元の検査値がないため、元ファイルとの一致は未検証です。形式の誤りがある場合は元データを確認してください。'}`;
     $('[data-tx-badge]').textContent=result.verified?'復元・破損検査済み':'ファイルに復元'; blobLink('[data-tx-download]',restoredFile,restoredFile.name); $('[data-tx-use]').hidden=!/^(image|audio|video)\//.test(result.type);
   }
-  function chooseFile(file) { if(!file)return; if(!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果'; selected=file; frameCache=frameFile=null; $('[data-tx-file-name]').textContent=file.name; $('[data-tx-file-size]').textContent=`${file.size.toLocaleString()} bytes · ${file.type||'形式未指定'}`; }
+  function chooseFile(file) { if(!file)return; if(!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果'; selected=file; frameCache=frameFile=null; $('[data-tx-file-name]').textContent=file.name; $('[data-tx-file-size]').textContent=`${file.size.toLocaleString()} bytes · ${file.type||'形式未指定'}`; root.textLivePreview?.invalidate(); }
   function kind() { return $('[data-tx-action]').value==='auto'?detectText(source.value):$('[data-tx-action]').value; }
   function refresh() {
     const action=kind(); $('[data-tx-count]').textContent=`${source.value.length.toLocaleString()}文字`;
@@ -118,7 +119,7 @@ export async function installTextTools(doc = document, win = window) {
     $('[data-tx-input-pane]').hidden=mode!=='input'; $('[data-tx-output-pane]').hidden=mode!=='output';
     $('[data-tx-heading]').textContent=mode==='output'?'画像を、文字へ。':'ことばを、かたちに。';
     $('[data-tx-intro]').textContent=mode==='output'?'見て楽しむ文字アート。元のファイルへ戻せるコード。':'メモを貼る。画像にする。復元コードなら、元のファイルへ。';
-    main.classList.toggle('has-text-tools',mode!=='media');refresh();
+    main.classList.toggle('has-text-tools',mode!=='media');refresh();root.textLivePreview?.invalidate();
   }
   function setBusy(value) { busy=value; root.setAttribute('aria-busy',String(value)); for(const el of root.querySelectorAll('button,input,select,textarea'))if(!el.matches('[data-tx-cancel]'))el.disabled=value;for(const button of nav.querySelectorAll('button'))button.disabled=value; $('[data-tx-process]').hidden=!value; }
   function worker(operation,data,options,signal) {
@@ -134,15 +135,37 @@ export async function installTextTools(doc = document, win = window) {
   }
   async function run(job) { if(busy)return;aborter=new AbortController();setBusy(true);status('素材を確認しています…');try{await new Promise(resolve=>win.requestAnimationFrame(resolve));await job(aborter.signal);if(!aborter.signal.aborted)status('完了しました。すぐにコピー・保存できます。');}catch(error){status(error.name==='AbortError'?'中止しました。入力と前回の結果は保持しています。':error.message||'変換できませんでした。');}finally{setBusy(false);aborter=null;} }
   async function createOutput(signal) {
-    if(!selected)throw new Error('文字にするファイルを選んでください。');
-    if(selected.size>MAX_FILE_BYTES)throw new Error('文字列化は16MBまでです。小さなファイルを選んでください。');
-    const style=$('[data-tx-style]').value;status('文字列を作成しています…');
-    if(['encode','base64','dataurl'].includes(style)){const bytes=await selected.arrayBuffer();const text=await worker(style,bytes,{name:selected.name,type:selected.type},signal);showText(text,style==='encode'?'元ファイルを復元できるコードです。メモへ全文を保存し、後日「文字・メモから」に貼り付けてください。':'標準の文字列符号化です。暗号化・圧縮ではありません。Base64のみではファイル名・種類は含まれません。');return;}
-    if(frameFile!==selected){const {loadConversionFile}=await import('./conversion-service.mjs?rev=20261028-conversion-1');const loaded=await loadConversionFile(selected,{signal});if(loaded.kind!=='image'||!loaded.frames?.length)throw new Error('文字アート・画素テキストには画像を選んでください。');frameCache=loaded.frames[0];frameFile=selected;}
-    if(style==='pixels'){const text=await worker('pixels',frameCache,{},signal);showText(text,'画素の色・透明度・配置を保持します。元ファイルのメタデータは含みません。色番号の書き換えでマス目を編集できます。');return;}
-    const art=await worker('art',frameCache,{style,columns:Number($('[data-tx-columns]').value),invert:$('[data-tx-invert]').checked,characters:$('[data-tx-characters]').value},signal);
-    let text=art;const attached=$('[data-tx-attach]').checked;
-    if(attached){status('元ファイルの復元コードを添えています…');text+='\n\n'+await worker('encode',await selected.arrayBuffer(),{name:selected.name,type:selected.type},signal);}
+    // Snapshot every control before awaiting; never combine two slider/file revisions.
+    const file = selected, style = $('[data-tx-style]').value;
+    const settings = { style, columns:Number($('[data-tx-columns]').value), invert:$('[data-tx-invert]').checked, characters:$('[data-tx-characters]').value };
+    const attached = $('[data-tx-attach]').checked;
+    const check = () => { if (signal.aborted) throw new DOMException('中止','AbortError'); };
+    check();
+    if(!file)throw new Error('文字にするファイルを選んでください。');
+    if(file.size>MAX_FILE_BYTES)throw new Error('文字列化は16MBまでです。小さなファイルを選んでください。');
+    if(['encode','base64','dataurl'].includes(style)){
+      const bytes=await file.arrayBuffer();check();
+      const text=await worker(style,bytes,{name:file.name,type:file.type},signal);check();
+      showText(text,style==='encode'?'元ファイルを復元できるコードです。メモへ全文を保存し、後日「文字・メモから」に貼り付けてください。':'標準の文字列符号化です。暗号化・圧縮ではありません。Base64のみではファイル名・種類は含まれません。');return;
+    }
+    let frame = frameFile===file ? frameCache : null;
+    if(!frame){
+      const {loadConversionFile}=await import('./conversion-service.mjs?rev=20261028-conversion-1');check();
+      const loaded=await loadConversionFile(file,{signal});check();
+      if(loaded.kind!=='image'||!loaded.frames?.length)throw new Error('文字アート・画素テキストには画像を選んでください。');
+      frame=loaded.frames[0];
+      if(selected===file){frameCache=frame;frameFile=file;}
+    }
+    if(style==='pixels'){
+      const text=await worker('pixels',frame,{},signal);check();
+      showText(text,'画素の色・透明度・配置を保持します。元ファイルのメタデータは含みません。色番号の書き換えでマス目を編集できます。');return;
+    }
+    const art=await worker('art',frame,settings,signal);check();
+    let text=art;
+    if(attached){
+      const bytes=await file.arrayBuffer();check();
+      text+='\n\n'+await worker('encode',bytes,{name:file.name,type:file.type},signal);check();
+    }
     showText(text,attached?'文字アートと元ファイルの復元コードです。共有すると元ファイル全体が相手に渡ります。':'文字アートのみです。元画像への完全復元データは含みません。',art);
   }
   async function createInput(signal) {
@@ -154,16 +177,16 @@ export async function installTextTools(doc = document, win = window) {
     showFile(await worker(operation,text,{},signal));
   }
   nav.addEventListener('click',event=>{const button=event.target.closest('[data-text-mode]');if(button)showMode(button.dataset.textMode);});
-  root.addEventListener('input',event=>{refresh();if(!event.target.matches('[data-tx-text-result]')&&!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果';});
+  root.addEventListener('input',event=>{refresh();if(mode!=='output'&&!event.target.matches('[data-tx-text-result]')&&!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果';});
   root.addEventListener('change',refresh);
-  $('[data-tx-run]').addEventListener('click',()=>run(mode==='output'?createOutput:createInput));$('[data-tx-cancel]').addEventListener('click',()=>aborter?.abort());
+  $('[data-tx-run]').addEventListener('click',()=>mode==='output'&&root.textLivePreview?root.textLivePreview.refresh():run(mode==='output'?createOutput:createInput));$('[data-tx-cancel]').addEventListener('click',()=>aborter?.abort());
   $('[data-tx-pick]').addEventListener('click',()=>$('[data-tx-file]').click());$('[data-tx-read]').addEventListener('click',()=>$('[data-tx-text-file]').click());
   $('[data-tx-file]').addEventListener('change',event=>{chooseFile(event.target.files?.[0]);event.target.value='';});
   async function readTextFile(file){if(!file||busy)return;await run(async signal=>{if(file.size>MAX_CODE_CHARS)throw new Error('テキストファイルは24MBまでです。');const text=decodeTextFile(await file.arrayBuffer(),$('[data-tx-encoding]').value);if(signal.aborted)throw new DOMException('中止','AbortError');source.value=text;showModeAfterRead();refresh();});}
-  function showModeAfterRead(){mode='input';$('[data-tx-input-pane]').hidden=false;$('[data-tx-output-pane]').hidden=true;for(const button of nav.querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.textMode==='input'));}
+  function showModeAfterRead(){mode='input';root.textLivePreview?.invalidate();$('[data-tx-input-pane]').hidden=false;$('[data-tx-output-pane]').hidden=true;for(const button of nav.querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.textMode==='input'));}
   $('[data-tx-text-file]').addEventListener('change',event=>{const file=event.target.files?.[0];event.target.value='';void readTextFile(file);});
   root.addEventListener('dragover',event=>{event.preventDefault();});root.addEventListener('drop',event=>{event.preventDefault();if(busy)return;const files=event.dataTransfer?.files;if(files?.length!==1){status('一度に1ファイルを選んでください。');return;}if(mode==='input')void readTextFile(files[0]);else chooseFile(files[0]);});
-  const capture=event=>{if(root.contains(event.target))return;const files=event.type==='drop'?event.dataTransfer?.files:event.target?.files;if(files?.length===1)chooseFile(files[0]);else if(files?.length>1){selected=null;frameCache=frameFile=null;$('[data-tx-file-name]').textContent='文字出力は1ファイルずつ選んでください';$('[data-tx-file-size]').textContent='複数画像のGIF・動画は画像・音声・動画タブから';}};
+  const capture=event=>{if(root.contains(event.target))return;const files=event.type==='drop'?event.dataTransfer?.files:event.target?.files;if(files?.length===1)chooseFile(files[0]);else if(files?.length>1){selected=null;frameCache=frameFile=null;root.textLivePreview?.invalidate();$('[data-tx-file-name]').textContent='文字出力は1ファイルずつ選んでください';$('[data-tx-file-size]').textContent='複数画像のGIF・動画は画像・音声・動画タブから';}};
   legacy.addEventListener('change',capture,true);legacy.addEventListener('drop',capture,true);
   $('[data-tx-example]').addEventListener('click',()=>{showMode('input');source.value='つくる。つなぐ。\nまた、つくり直せる。\n\nPiXiEEDで、ことばをかたちに。';$('[data-tx-action]').value='text';refresh();void run(createInput);});
   $('[data-tx-copy]').addEventListener('click',async()=>{try{if(!win.navigator.clipboard?.writeText)throw new Error();await win.navigator.clipboard.writeText(outputText);dirtyResult=false;status('全文をコピーしました。');}catch{textResult.value=outputText;textResult.focus();textResult.select();$('[data-tx-preview-note]').hidden=true;status('自動コピーを利用できません。選択中の全文をコピーするか、TXTで保存してください。');}});
@@ -171,8 +194,9 @@ export async function installTextTools(doc = document, win = window) {
   $('[data-tx-art-image]').addEventListener('click',()=>{const text=artText;showMode('input');source.value=text;$('[data-tx-action]').value='text';applyOptions({font:'mono',fontSize:16,width:1600,padding:32,lineHeight:110,wrap:false});refresh();void run(createInput);});
   $('[data-tx-use]').addEventListener('click',()=>{const input=legacy.querySelector('[data-file],#output-file-input');if(!restoredFile||!input){status('ファイルを保存してから、画像・音声の変換に読み込んでください。');return;}try{const transfer=new DataTransfer();transfer.items.add(restoredFile);input.files=transfer.files;showMode('media');input.dispatchEvent(new Event('change',{bubbles:true}));}catch{status('ファイルを保存してから読み込んでください。');}});
   root.addEventListener('click',event=>{if(event.target.closest('a[download]'))dirtyResult=false;});
+  installTextLivePreview({ root, getMode:()=>mode, hasSource:()=>Boolean(selected), render:async signal=>{await createOutput(signal);dirtyResult=false;}, document:doc, window:win });
   const leave=event=>{if(busy||dirtyResult){event.preventDefault();event.returnValue='';}};win.addEventListener('beforeunload',leave);
-  win.addEventListener('pagehide',()=>{aborter?.abort();for(const url of urls.values())win.URL.revokeObjectURL(url);win.removeEventListener('beforeunload',leave);},{once:true});
+  win.addEventListener('pagehide',event=>{aborter?.abort();if(!event.persisted){for(const url of urls.values())win.URL.revokeObjectURL(url);win.removeEventListener('beforeunload',leave);}});
   const params=new URLSearchParams(win.location.search);const initial=params.get('text');
   if(initial==='input'||initial==='output')showMode(initial);
   const key=params.has('id')?'id':params.has('file')?'file':null, id=key&&params.get(key);
