@@ -2,7 +2,7 @@
 import { PUBLIC_GUIDE_PATHS } from '../creation/conversion-intent.mjs?rev=20261028-discovery-1';
 import { guideLinkTarget, publicGuideSlug } from '../output-guide-metrics.mjs?rev=20261028-discovery-1';
 const documents = new WeakMap();
-import { getAdsenseLoader } from '../display-ads.mjs?rev=20261024-public-layout-1';
+import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
 export const OUTPUT_GUIDE_CANONICAL = 'https://pixieed.jp/output/';
 
 export function isOutputGuideAdEligible({ origin, pathname, search = '', topLevel,

@@ -34,7 +34,11 @@ async function open(path) {
   if (path.startsWith('/output/work/')) await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
 }
 async function download(selector = '[data-download]') {
-  const [file] = await Promise.all([page.waitForEvent('download'), page.locator(selector).click()]);
+  const link = page.locator(selector);
+  const hidden = await link.evaluate(node => node.hidden || Boolean(node.closest('[hidden]')) || getComputedStyle(node).display === 'none');
+  const action = hidden ? page.locator('#output-nav-export') : link;
+  if (hidden) await action.waitFor({ state: 'visible' });
+  const [file] = await Promise.all([page.waitForEvent('download'), action.click()]);
   assert.equal(await file.failure(), null); return { name: file.suggestedFilename(), bytes: await readFile(await file.path()) };
 }
 try {
@@ -139,7 +143,6 @@ try {
     await page.waitForFunction(target => document.querySelector('[data-format]')?.value === target, target);
     assert.equal(await page.locator('.convert-intent').getAttribute('data-state'), 'ready');
     if (target === 'qoi') await page.screenshot({ path: `${output}/intent-qoi.png`, fullPage: true });
-    await page.locator('[data-convert]').click(); await page.locator('[data-download]').waitFor({ state: 'visible' });
     const result = await download(); assert.ok(result.name.endsWith('.' + target)); assert.ok(result.bytes.length > 16);
     if (signature[target]) { const [offset, text] = signature[target]; assert.equal(result.bytes.subarray(offset,offset+text.length).toString(),text); }
     if (target === 'ico') assert.equal(result.bytes.subarray(0,4).toString('hex'),'00000100');
@@ -149,7 +152,7 @@ try {
   await open('/output/work/?mode=convert&to=qoi');
   await page.locator('[data-file]').setInputFiles({ name: 'sample.png', mimeType: 'image/png', buffer: png });
   await page.waitForFunction(() => document.querySelector('[data-format]').value === 'qoi');
-  await page.locator('[data-format]').selectOption('png'); assert.equal(await page.locator('.convert-intent').isVisible(), false);
+  await page.locator('[data-sc-format]').selectOption('png'); assert.equal(await page.locator('.convert-intent').isVisible(), false);
   await page.locator('[data-file]').setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: png });
   await page.waitForFunction(() => document.querySelector('[data-name]')?.textContent === 'second.png' && !document.querySelector('[data-convert]').disabled);
   assert.equal(await page.locator('[data-format]').inputValue(), 'png');
@@ -166,7 +169,7 @@ try {
     const { storeOutputFile } = await import('/js/creation/output-router.mjs?rev=20261028-unified-output-1');
     return storeOutputFile(new Blob([new Uint8Array(bytes)], { type: 'image/png' }), 'original.png', '/draw/');
   }, [...png]);
-  await open(staged.url + '&to=qoi'); await page.locator('[data-download]').waitFor({ state: 'visible' });
+  await open(staged.url + '&to=qoi'); await page.locator('#output-nav-export').waitFor({ state: 'visible' });
   assert.equal(await page.locator('.convert-intent').count(),0); assert.deepEqual((await download()).bytes,png);
   pass('Real IndexedDB handoff ignores intent and preserves original file bytes');
 

@@ -1,7 +1,10 @@
+import { shouldShowEventArchiveAd } from './event-archive-ad-policy.mjs?rev=20261030-event-inline-ads-1';
+
 const form = document.querySelector('[data-event-filters]');
 if (form) {
   const cards = [...document.querySelectorAll('[data-event-card]')];
   const sections = [...document.querySelectorAll('[data-event-year-section]')];
+  const adSlots = [...document.querySelectorAll('[data-event-ad-slot]')];
   const result = document.querySelector('[data-event-result]');
   const yearNav = document.querySelector('.event-year-nav');
   const yearLinks = [...(yearNav?.querySelectorAll('a') || [])];
@@ -117,6 +120,14 @@ if (form) {
         const count = link.querySelector('[data-year-count]');
         if (count) count.textContent = String(visibleInYear);
       }
+    }
+    for (const slot of adSlots) {
+      const section = slot.closest('[data-event-year-section]');
+      const visibleInYear = section?.querySelectorAll('[data-event-card]:not([hidden])').length || 0;
+      slot.hidden = !shouldShowEventArchiveAd({
+        status, query, format, region, visibleEventCount: visibleInYear,
+        minimumVisibleEvents: Number(slot.dataset.eventAdMinVisible),
+      });
     }
     const archiveEnd = document.querySelector('.event-index > .event-globe-link');
     const orderedSections = status === 'near'

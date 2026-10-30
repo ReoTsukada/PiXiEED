@@ -46,7 +46,7 @@ export function createToolResultView({ key, main, returnLabel = '戻る', return
   let opened = false, disposed = false, previousFocus, previousScroll = 0, controlsPlacement, suspended = [];
   let currentAdEligible = [];
   const adCleanups = [];
-  const adImportGate = createOptionalImportGate(() => import('./display-ads.mjs?rev=20261024-public-layout-1'));
+  const adImportGate = createOptionalImportGate(() => import('./display-ads.mjs?rev=20261030-event-inline-ads-1'));
   let navButton, navState;
 
   function element(tag, className, text) {

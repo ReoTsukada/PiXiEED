@@ -17,7 +17,7 @@ const canonical = new Map([
   ['js/ads/ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-2'],
   ['css/social-feed.css', 'rev=20261024-side-ad-layout-1'],
   ['js/page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
-  ['js/display-ads.mjs', 'rev=20261024-public-layout-1'],
+  ['js/display-ads.mjs', 'rev=20261030-event-inline-ads-1'],
   ['js/tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['js/creation/draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['js/creation/drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],

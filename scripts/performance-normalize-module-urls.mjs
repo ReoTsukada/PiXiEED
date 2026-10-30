@@ -42,7 +42,7 @@ const targets = new Map([
   ['social/app.mjs', 'rev=20261029-explore-1'],
   ['ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-2'],
   ['information-auto-ads.mjs', 'rev=20261024-side-ad-layout-1'],
-  ['display-ads.mjs', 'rev=20261024-public-layout-1'],
+  ['display-ads.mjs', 'rev=20261030-event-inline-ads-1'],
   ['tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
   ['draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],

@@ -27,7 +27,7 @@ test('section-root ad mounting uses its document for DOM creation and visibility
 test('results are flow content, not a modal, and keep public puzzles display-only', async () => {
   const source = await readFile(new URL('../../js/tool-result-view.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /import\s*\{[^}]*mountDisplayAds[^}]*\}\s*from\s*['"]\.\/display-ads\.mjs/);
-  assert.match(source, /import\('\.\/display-ads\.mjs\?rev=20261024-public-layout-1'\)/);
+  assert.match(source, /import\('\.\/display-ads\.mjs\?rev=20261030-event-inline-ads-1'\)/);
   assert.match(source, /Promise\.resolve\(\)\.then\(loader\)\.catch\(\(\) => null\)/);
   assert.match(source, /!disposed && opened && !section\.hidden && currentAdEligible\.length > 0/);
   assert.match(source, /node\.dataset\.displayAd = key/);

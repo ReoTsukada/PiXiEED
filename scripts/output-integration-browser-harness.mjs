@@ -41,13 +41,49 @@ async function open(query = '?mode=convert&text=input') {
   await page.goto(base + '/output/work/' + query, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
 }
+async function selectMode(mode) {
+  const source = page.locator('[data-sc-source]'), target = page.locator('[data-sc-target]');
+  if (mode === 'output') { await source.selectOption('file'); await target.selectOption('text'); }
+  else if (mode === 'input') { await target.selectOption('file'); await source.selectOption('text'); }
+  else { await source.selectOption('file'); await target.selectOption('file'); }
+  await page.waitForFunction(expected => document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode === expected, mode);
+}
+async function exportFromVisibleAction() {
+  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#output-nav-export').click()]);
+  assert.equal(await download.failure(), null);
+  return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
+}
 async function run(success = true) {
-  await page.locator('[data-tx-run]').click();
+  const mode = await page.locator('.text-mode-nav [aria-pressed="true"]').getAttribute('data-text-mode');
+  if (mode === 'output') {
+    await page.waitForFunction(() => ['ready', 'error'].includes(document.querySelector('[data-text-tools]')?.dataset.txLiveState));
+    const state = await page.locator('[data-text-tools]').getAttribute('data-tx-live-state');
+    assert.equal(state, success ? 'ready' : 'error');
+    if (success) assert.match(await page.locator('[data-tx-status]').innerText(), /プレビューを更新しました/);
+    return null;
+  }
+  if (success) {
+    const previousStatus = await page.locator('[data-tx-status]').innerText();
+    const pendingDownload = exportFromVisibleAction();
+    await page.waitForFunction(previous => {
+      const root = document.querySelector('[data-text-tools]');
+      const status = document.querySelector('[data-tx-status]')?.innerText;
+      return root?.getAttribute('aria-busy') === 'true' || (status && status !== previous);
+    }, previousStatus);
+    await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false'
+      && /完了しました/.test(document.querySelector('[data-tx-status]')?.innerText || ''));
+    assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
+    return pendingDownload;
+  }
+  await page.locator('#output-nav-export').click();
   await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
-  if (success) assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
+  return null;
 }
 async function download(selector) {
-  const [download] = await Promise.all([page.waitForEvent('download'), page.locator(selector).click()]);
+  const link = page.locator(selector);
+  const hidden = await link.evaluate(node => node.hidden || Boolean(node.closest('[hidden]')) || getComputedStyle(node).display === 'none');
+  if (hidden) return exportFromVisibleAction();
+  const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
   assert.equal(await download.failure(), null);
   return { name: download.suggestedFilename(), bytes: await readFile(await download.path()) };
 }
@@ -55,8 +91,7 @@ try {
   await open();
   const text = 'PiXiEED\n日本語 & <script>not executed</script>\n文章を画像と保存データへ。';
   await page.locator('[data-tx-source]').fill(text);
-  await run();
-  const png = await download('[data-tx-download]');
+  const png = await run();
   assert.equal(png.bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   const svg = await download('[data-tx-svg]');
   assert.match(svg.bytes.toString(), /&lt;script&gt;not executed&lt;\/script&gt;/);
@@ -66,16 +101,14 @@ try {
   await page.screenshot({ path: output + '/text-desktop.png', fullPage: true });
   await page.locator('[data-tx-use]').click();
   await page.waitForFunction(() => !document.querySelector('[data-editor]').hidden && document.querySelector('#main').getAttribute('aria-busy') === 'false');
-  await page.locator('[data-format]').selectOption('jpeg');
-  await page.locator('[data-convert]').click();
-  await page.locator('[data-download]').waitFor({ state: 'visible' });
-  const jpeg = await download('[data-download]');
+  await page.locator('[data-sc-format]').selectOption('jpeg');
+  const jpeg = await exportFromVisibleAction();
   assert.equal(jpeg.bytes.subarray(0, 2).toString('hex'), 'ffd8');
   pass('Text-generated PNG enters the existing media converter and saves a real JPEG');
-  await page.locator('[data-text-mode="output"]').click();
+  await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'pixels.png', mimeType: 'image/png', buffer: png.bytes });
   for (const style of ['ascii', 'block', 'braille', 'emoji', 'custom']) {
-    await page.locator('[data-tx-style]').selectOption(style);
+    await page.locator('[data-sc-format]').selectOption(style);
     await run();
     const art = await page.locator('[data-tx-text-result]').inputValue();
     assert.ok(art.length > 0);
@@ -87,14 +120,13 @@ try {
   pass('Full-text selection remains available independently of clipboard permissions');
   const bytes = Buffer.from(Array.from({ length: 16384 }, (_, index) => index * 37 & 255));
   await page.locator('[data-tx-file]').setInputFiles({ name: '原本.pxd', mimeType: 'application/octet-stream', buffer: bytes });
-  await page.locator('[data-tx-style]').selectOption('encode');
+  await page.locator('[data-sc-format]').selectOption('encode');
   await run();
   const code = (await download('[data-tx-txt]')).bytes.toString();
   assert.match(code, /BEGIN PIXIEED RESTORE 1/);
-  await page.locator('[data-text-mode="input"]').click();
+  await selectMode('input');
   await page.locator('[data-tx-source]').fill('メモの前文\n' + code + '\nメモの後文');
-  await run();
-  const restored = await download('[data-tx-download]');
+  const restored = await run();
   assert.equal(restored.name, '原本.pxd'); assert.equal(hash(restored.bytes), hash(bytes));
   pass('Binary/PXD → TXT → restore preserves filename and every byte (SHA-256 match)');
   const previous = await page.locator('[data-tx-download]').getAttribute('href');
@@ -104,20 +136,24 @@ try {
   assert.match(await page.locator('[data-tx-status]').innerText(), /検査に失敗/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Corruption is rejected without discarding the last successful download');
-  await page.locator('[data-text-mode="output"]').click();
+  await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'too-large.pxd', mimeType: 'application/octet-stream', buffer: Buffer.alloc(16 * 1024 * 1024 + 1) });
   await run(false);
   assert.match(await page.locator('[data-tx-status]').innerText(), /16MB/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Oversize input fails before encoding and preserves the previous result');
-  await page.locator('[data-tx-file]').setInputFiles({ name: 'cancel.pxd', mimeType: 'application/octet-stream', buffer: bytes });
-  await page.evaluate(() => { document.querySelector('[data-tx-run]').click(); document.querySelector('[data-tx-cancel]').click(); });
+  await selectMode('input');
+  const cancelText = 'キャンセル前に保持する合成テキスト';
+  await page.locator('[data-tx-source]').fill(cancelText);
+  await page.locator('[data-sc-format]').selectOption('text');
+  await page.evaluate(() => { document.querySelector('#output-nav-export').click(); document.querySelector('[data-tx-cancel]').click(); });
   await page.waitForFunction(() => document.querySelector('[data-text-tools]').getAttribute('aria-busy') === 'false');
   assert.match(await page.locator('[data-tx-status]').innerText(), /中止しました/);
+  assert.equal(await page.locator('[data-tx-source]').inputValue(), cancelText);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Cancellation preserves the input and prior successful result');
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.locator('[data-text-mode="input"]').click();
+  await selectMode('input');
   await page.locator('[data-tx-source]').fill('スマートフォンでも\n文字から画像へ。');
   await run();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
@@ -136,7 +172,7 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-tx-file-name]')?.textContent === 'exact.pxd');
     const direct = await download('.text-legacy a[download]');
     assert.equal(hash(direct.bytes), hash(bytes));
-    await page.locator('[data-text-mode="output"]').click();
+    await selectMode('output');
     await run();
     assert.match(await page.locator('[data-tx-text-result]').inputValue(), /BEGIN PIXIEED RESTORE 1/);
     pass(`${mode}: real IndexedDB handoff → common output → byte-exact PXD download and text encoding`);
@@ -144,9 +180,7 @@ try {
   await open('?mode=convert');
   await page.locator('[data-demo]').click();
   await page.locator('[data-rate="2"]').click();
-  await page.locator('[data-convert]').click();
-  await page.locator('[data-download]').waitFor({ state: 'visible' });
-  const gif = await download('[data-download]');
+  const gif = await exportFromVisibleAction();
   assert.match(gif.bytes.subarray(0, 6).toString(), /^GIF8[79]a$/);
   pass('Existing animated GIF conversion and playback-speed controls still export a real GIF');
   assert.ok(report.workers.some(url => url.includes('/text-worker.mjs')));
