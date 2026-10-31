@@ -1,3 +1,5 @@
+import { mountConversionStage } from './conversion-stage.mjs?rev=20261031-material-stage-1';
+
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
 export function mountConversionWorkspace(main, toolbar, doc = document, win = window) {
   const panel = doc.createElement('dialog'); panel.id = 'sc-settings-panel'; panel.className = 'sc-settings-panel';
@@ -64,6 +66,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   views.setAttribute('role', 'group'); views.setAttribute('aria-label', 'プレビューを選ぶ');
   views.innerHTML = '<button type="button" data-sc-source-view aria-pressed="true">編集プレビュー</button><button type="button" data-sc-result-view aria-pressed="false">出力ファイル</button>';
   if (stage) stage.prepend(views);
+  const materialStage = mountConversionStage({ main, toolbar, panel, showSettings: panelController.show, doc, win });
   let lastUrl = '', mediaNode = null, lastLink = null, eligible = false, inspectResult = false;
   const hidden = (node, value) => { if (node.hidden !== value) node.hidden = value; };
   const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
@@ -90,7 +93,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   }
   views.querySelector('[data-sc-source-view]').addEventListener('click', () => selectView(false));
   views.querySelector('[data-sc-result-view]').addEventListener('click', () => selectView(true));
-  function update({ media, loaded, ready, link, working = false, saveDisabled = false, status = '', progress, canCancel = false }) {
+  function update({ media, loaded, ready, link, working = false, saveDisabled = false, status = '', progress, canCancel = false, saveLabel = '保存' }) {
     open.disabled = false; panel.querySelector('[data-sc-settings-close]').disabled = false;
     panelController.update(media);
     main.dataset.workspaceMedia = String(media);
@@ -106,7 +109,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     eligible = Boolean(media && ready && link && stage); lastLink = link;
     hidden(views, !eligible); selectView(inspectResult);
     if (panelSave.disabled !== saveDisabled) panelSave.disabled = saveDisabled;
-    text(panelSave, working && saveDisabled ? '作成中…' : '保存');
+    text(panelSave, saveLabel);
     text(footer.querySelector('[data-sc-panel-status]'), status);
     hidden(panelCancel, !canCancel);
     if (panelCancel.disabled) panelCancel.disabled = false;
@@ -115,10 +118,11 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
       if (panelProgress.max !== progress.max) panelProgress.max = progress.max;
       if (!panelProgress.hasAttribute('value') || panelProgress.value !== progress.value) panelProgress.value = progress.value;
     } else if (panelProgress.hasAttribute('value')) panelProgress.removeAttribute('value');
+    materialStage.update({ media, loaded, ready, link, working, status });
     geometry();
   }
   geometry();
-  return { update, bindActions(next) { actions = next; }, focusSave(fallback) { (panel.matches(':modal') ? panelSave : fallback)?.focus({ preventScroll: true }); }, reveal: panelController.show, destroy() { mediaNode?.pause?.(); resize.disconnect(); win.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('scroll', geometry); panelController.destroy(); } };
+  return { update, bindActions(next) { actions = next; materialStage.bindActions(next); }, focusSave(fallback) { (panel.matches(':modal') ? panelSave : fallback)?.focus({ preventScroll: true }); }, reveal: panelController.show, destroy() { materialStage.destroy(); mediaNode?.pause?.(); resize.disconnect(); win.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('scroll', geometry); panelController.destroy(); } };
 }
 
 /** History owns a mobile sheet; closing never reloads or resets conversion controls. */

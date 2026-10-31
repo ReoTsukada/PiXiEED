@@ -122,7 +122,7 @@ body.has-smart-conversion:has([data-workspace-media="true"]) { padding-bottom: 0
 [data-workspace-media="true"] .convert-file .convert-eyebrow, [data-workspace-media="true"] [data-replace] { display: none; }
 [data-workspace-media="true"] .convert-file strong { font-size: 13px; }
 [data-workspace-media="true"] .convert-file p { margin-top: 2px; font-size: 11px; }
-[data-workspace-media="true"] .convert-workbench { display: flex; min-height: 0; padding-top: 8px; }
+[data-workspace-media="true"] .convert-workbench { display: flex; align-items: stretch; min-height: 0; padding-top: 8px; }
 [data-workspace-media="true"] .convert-stage { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 [data-workspace-media="true"] .convert-preview { flex: 1; min-height: 100px; max-height: none; padding: 28px 12px 10px; }
 [data-workspace-media="true"] .convert-preview canvas { max-height: 100%; max-width: 100%; object-fit: contain; }
@@ -217,3 +217,51 @@ body.has-smart-conversion:has([data-workspace-media="true"]) .public-destination
 .sc-preview-choice[hidden], .sc-panel-footer [hidden] { display: none !important; }
 [data-workspace-media="false"] #sc-settings-panel [data-sequence] { display: none !important; }
 .sc-guide-link { display: flex; align-items: center; min-height: 44px; margin-top: 8px; color: #315940; font-size: 13px; }
+
+/* One material surface becomes the live preview; only file dragging shows an overlay. */
+[data-workspace-media="true"].has-conversion-stage [data-sc-pick] { display: none; }
+.sc-material-surface { position: relative; box-sizing: border-box; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+[data-workspace-media="true"].has-conversion-stage .convert-card { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: auto; }
+[data-workspace-media="true"].has-conversion-stage .convert-card > .convert-intent { flex: none; }
+[data-workspace-media="true"].has-conversion-stage .convert-card > .sc-material-surface { flex: 1 1 auto; height: auto; min-height: 120px; overflow: auto; overscroll-behavior: contain; }
+[data-workspace-media="true"].has-conversion-stage .convert-card > :is([data-status],[data-progress],[data-cancel]) { display: none !important; }
+[data-workspace-media="true"] .sc-material-surface { height: 100%; overflow: auto; overscroll-behavior: contain; }
+[data-workspace-media="true"] .sc-material-surface > :is([data-editor],#output-layout,[data-drop],#output-start) { flex: 1 0 120px; height: auto; min-height: 120px; }
+[data-workspace-media="true"] .sc-material-surface > [data-editor] { display: flex; flex-direction: column; }
+[data-workspace-media="true"] .sc-material-surface .convert-workbench { flex: 1; padding-top: 0; }
+[data-workspace-media="true"] .sc-material-surface .convert-file { display: none; }
+[data-workspace-media="true"] .sc-material-surface .output-preview-column { min-height: 100%; height: auto; box-sizing: border-box; }
+.sc-material-heading { display: flex; align-items: center; flex-wrap: wrap; flex: none; gap: 4px 12px; padding: 8px 10px 0; min-width: 0; }
+.sc-material-heading > div:first-child { flex: 1 1 160px; min-width: 0; }
+.sc-material-heading strong { display: block; overflow-wrap: anywhere; color: #31553e; font-size: 14px; }
+.sc-material-heading [data-sc-material-count] { display: block; margin-top: 3px; font-size: 11px; color: #617466; }
+.sc-material-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+.sc-material-surface :is(button,select) { box-sizing: border-box; min-height: 44px; max-width: 100%; padding: 7px 10px; border: 1px solid #c9d6ca; border-radius: 9px; color: #31553e; background: #fffefb; font: 700 12px/1.4 system-ui,sans-serif; cursor: pointer; }
+.sc-material-surface :is(button,select):focus-visible { outline: 3px solid #2588bb; outline-offset: 2px; }
+.sc-material-surface :disabled { opacity: .6; cursor: default; }
+.sc-material-note { flex-basis: 100%; margin: 0; color: #617466; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.sc-preview-summary { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 0 10px; }
+.sc-preview-summary .sc-format { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; max-width: 100%; gap: 6px; margin: 0; color: #31553e; font: 700 12px system-ui,sans-serif; }
+.sc-preview-summary select { width: auto; min-width: 0; max-width: min(100%, 240px); font-size: 16px; }
+.sc-preview-summary p { margin: 0; color: #617466; font-size: 11px; }
+.sc-material-strip { display: flex; flex: none; gap: 6px; overflow: auto; padding: 2px 10px; }
+.sc-material-thumb { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; max-width: 250px; border: 1px solid #e1e8e2; border-radius: 10px; padding: 3px 5px; }
+.sc-material-thumb canvas { width: 48px; height: 48px; flex: none; object-fit: contain; border-radius: 6px; background: #eff3ec; }
+.sc-material-thumb span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #31553e; font-size: 11px; }
+.sc-setting-chips { display: flex; flex: none; gap: 6px; flex-wrap: wrap; padding: 0 10px; }
+.sc-setting-chips > span { display: inline-flex; max-width: 100%; gap: 2px; }
+.sc-setting-chips button { background: #edf5ef; overflow-wrap: anywhere; }
+.sc-material-feedback { flex: none; margin: 0 10px; padding: 8px 10px; border-left: 3px solid #a48745; background: #faf6e9; color: #625332; font: 12px/1.6 system-ui,sans-serif; overflow-wrap: anywhere; }
+.sc-material-drop-overlay { position: absolute; z-index: 3; inset: 4px; display: grid; place-items: center; pointer-events: none; padding: 16px; border: 2px dashed #438668; border-radius: 14px; background: #edf5eff2; color: #285a40; font: 700 16px/1.6 system-ui,sans-serif; text-align: center; }
+.sc-material-surface [hidden] { display: none !important; }
+.sc-single-material .output-assets { display: none !important; }
+.sc-export-status [data-sc-batch] { min-height: 44px; white-space: normal; }
+@media (max-width: 600px) {
+  .sc-material-heading { padding-inline: 8px; }
+  .sc-material-heading > div:first-child { flex-basis: 100%; }
+  .sc-material-buttons { width: 100%; }
+  .sc-material-buttons button { flex: 1; padding-inline: 7px; }
+  .sc-preview-summary { padding-inline: 8px; }
+}
+
+.sc-preview-summary [data-sc-stage-warning] { flex-basis: 100%; color: #765b2d; line-height: 1.5; }

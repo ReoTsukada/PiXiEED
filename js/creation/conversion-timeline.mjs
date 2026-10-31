@@ -17,26 +17,34 @@ export function validateTimeline(frames) {
 }
 
 /** All-or-nothing import: an invalid later file never replaces a previous successful job. */
-export async function loadTimelineFiles(files, { signal, load = loadConversionFile } = {}) {
+export async function loadTimelineFiles(files, { signal, load = loadConversionFile, idForFile = (_file, index) => `material-${index + 1}` } = {}) {
   const selected = Array.from(files || []);
   if (!selected.length || selected.length > TIMELINE_LIMITS.files) throw new RangeError('一度に1〜8ファイルを選んでください。');
   if (selected.some(f => !f || !Number.isSafeInteger(f.size) || f.size < 1 || f.size > 64 * 1024 * 1024)
     || selected.reduce((n, f) => n + f.size, 0) > TIMELINE_LIMITS.bytes) throw new RangeError('1ファイル64MB、合計128MB以内で選んでください。');
   abort(signal);
-  if (selected.length === 1) { const result = await load(selected[0], { signal }); abort(signal); return { ...result, sequence: false }; }
-  const frames = []; const notes = [];
-  for (const file of selected) {
+  if (selected.length === 1) {
+    const file = selected[0], id = idForFile(file, 0);
+    const result = await load(file, { signal }); abort(signal);
+    const frames = result.frames?.map((frame, frameIndex) => ({ ...frame, assetId: id, frameId: `${id}:${frameIndex}` })) || [];
+    return { ...result, frames, sequence: false, assets: [{ id, name: file.name, bytes: file.size, kind: result.kind, rawFrames: frames }] };
+  }
+  const frames = []; const notes = [], assets = [];
+  for (const [index, file] of selected.entries()) {
     abort(signal);
     const next = await load(file, { signal });
     abort(signal);
     if (next.kind !== 'image' || next.video) throw new Error('複数選択は画像専用です。動画・音楽の組み合わせは詳細ワークスペースをご利用ください。');
+    const id = idForFile(file, index);
     const still = next.frames.length === 1;
-    frames.push(...next.frames.map((f, i) => ({ ...f, name: f.name || `${file.name}${still ? '' : ` · ${i + 1}`}`, delayMs: still ? 1000 : f.delayMs })));
+    const assetFrames = next.frames.map((f, i) => ({ ...f, assetId: id, frameId: `${id}:${i}`, name: f.name || `${file.name}${still ? '' : ` · ${i + 1}`}`, delayMs: still ? 1000 : f.delayMs }));
+    assets.push({ id, name: file.name, bytes: file.size, kind: next.kind, rawFrames: assetFrames });
+    frames.push(...assetFrames);
     if (next.note) notes.push(next.note);
     validateTimeline(frames);
   }
-  const fitted = fitOutputFrames(frames);
-  return { kind: 'image', frames: fitted, totalPlays: 0, sequence: true, name: selected[0].name, inputFormat: 'sequence',
+  const fitted = fitOutputFrames(frames).map((frame, index) => ({ ...frame, assetId: frames[index].assetId, frameId: frames[index].frameId }));
+  return { kind: 'image', frames: fitted, assets, totalPlays: 0, sequence: true, name: selected[0].name, inputFormat: 'sequence',
     note: [...new Set(notes), '選択した順に再生します。縦横比を保って共通サイズにそろえ、余白を追加します。'].join(' ') };
 }
 

@@ -14,6 +14,7 @@ import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatch
 import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
 import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261021-jigsaw-public-1';
+import { describeOutputMaterialState, replaceOutputMaterialSource } from './output-material-state.mjs?rev=20261031-material-api-1';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -773,11 +774,51 @@ function renderAssets() {
   assetsNote.textContent = frames.length > 1 ? `↑↓で順番を変更 · 各コマのFPSを編集 · 合計 ${((frameDuration(frames) / 1000) / (Number(mediaSettings.playbackRate) || 1)).toFixed(2)}秒` : '画像は元の縦横比を保って読み込みました。';
 }
 
-async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
+const MATERIAL_SETTING_SELECTORS = [
+  '#output-format-select', '#output-filename', '#output-width', '#output-height', '#output-scale', '#output-aspect-lock',
+  '#output-fps', '#output-fps-preset', '#output-loop-count', '#output-music-source', '#output-music-total-plays',
+  '#output-jpeg-background', '#output-jpeg-quality', '#output-png-background-mode', '#output-png-background',
+  '#output-gif-background-mode', '#output-gif-background', '#output-still-frame',
+];
+
+function captureMaterialSettings() {
+  return {
+    itemId: activeItem?.id || '', sourceId: activeSource?.id || '',
+    values: new Map(MATERIAL_SETTING_SELECTORS.map((selector) => {
+      const element = $(selector); return [selector, element ? { value: element.value, checked: element.type === 'checkbox' ? element.checked : undefined } : null];
+    })),
+  };
+}
+
+function restoreMaterialSettings(snapshot) {
+  if (!snapshot || snapshot.itemId !== activeItem?.id || snapshot.sourceId !== activeSource?.id) return false;
+  const formatValue = snapshot.values.get('#output-format-select')?.value;
+  if ([...formatSelect.options].some((option) => option.value === formatValue && !option.disabled)) formatSelect.value = formatValue;
+  updateFormatSettings(); updateMusicPlayControl();
+  for (const [selector, saved] of snapshot.values) {
+    if (!saved || selector === '#output-format-select') continue;
+    const element = $(selector); if (!element) continue;
+    if (element.tagName === 'SELECT') {
+      if ([...element.options].some((option) => option.value === saved.value && !option.disabled)) element.value = saved.value;
+      continue;
+    }
+    if (element.type === 'checkbox') { element.checked = saved.checked; continue; }
+    // Keep even an invalid pending number visible; normal save validation explains it.
+    element.value = saved.value;
+  }
+  formatButton.textContent = `.${formatSelect.value || activeItem?.extension || ''} ⌄`;
+  createVideoButton.hidden = !isVideoFormat();
+  jpegQualityValue.value = `${jpegQuality.value}%`; jpegQualityValue.textContent = `${jpegQuality.value}%`;
+  updateFormatSettings(); updateSettingsSummaries();
+  return true;
+}
+
+async function persistMediaSources(nextSources, nextSettings = mediaSettings, { mutation = 'materials' } = {}) {
   if (!record || mediaWritePending || itemWritePending || generationController) {
     status.textContent = '別の出力処理中です。終わってからもう一度操作してください。';
     return false;
   }
+  const editableSettings = captureMaterialSettings();
   mediaWritePending = true; renderAssets();
   try {
     const saved = await trackPending(saveToolOutputMedia(record.id, nextSources, nextSettings, { expectedRevision: record.revision || 0 }));
@@ -785,9 +826,11 @@ async function persistMediaSources(nextSources, nextSettings = mediaSettings) {
     record.revision = saved.revision;
     activeSource = mediaSources.find((source) => source.id === activeSource?.id) || mediaSources[0] || null;
     record.mediaSources = mediaSources; record.mediaSettings = mediaSettings; record.mediaSource = activeSource?.mediaSource || null;
-    fillSourceAndFormatControls({ preferredFormat: formatSelect.value || activeItem?.extension });
+    fillSourceAndFormatControls({ preferredFormat: editableSettings.values.get('#output-format-select')?.value || activeItem?.extension });
     renderAssets(); updateSequenceControls(); setMedia(record); updateMusicPlayControl();
+    restoreMaterialSettings(editableSettings);
     status.textContent = '素材の並びと設定を保存しました。出力ファイルは次の作成時に反映します。';
+    main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation, status: status.textContent } }));
     return true;
   } catch (error) {
     status.textContent = error?.message || '素材設定を保存できませんでした。前の設定はそのままです。';
@@ -803,9 +846,10 @@ function sourcesFromImport(imported) {
   return sources;
 }
 
-async function handleImport(files, { replaceAudio = false } = {}) {
-  if (importController) return;
-  const selected = [...(files || [])]; if (!selected.length) return;
+async function handleImport(files, { replaceAudio = false, replaceSourceId = '' } = {}) {
+  if (importController) return false;
+  const selected = [...(files || [])]; if (!selected.length) return false;
+  let committed = false;
   const controller = new AbortController(); importController = controller;
   if (record) renderAssets();
   const targetStatus = record ? status : importStatus;
@@ -821,38 +865,44 @@ async function handleImport(files, { replaceAudio = false } = {}) {
         ? `${name}のコマを読み込み中（${framesDone}/${framesTotal}）…`
         : `${name}を読み込み中（${current}/${total}）…`;
     } });
-    if (controller.signal.aborted || pageDisposed) return;
+    if (controller.signal.aborted || pageDisposed) return false;
     if (imported.previewOnly && record) throw new Error('この画像はプレビュー専用のため、既存の出力素材には追加できません。現在の出力は保持されています。');
     const newSources = sourcesFromImport(imported);
     if (record) {
       let next = [...mediaSources];
-      if (replaceAudio) {
+      if (replaceSourceId) {
+        next = replaceOutputMaterialSource(next, newSources, replaceSourceId, selected.length);
+      } else if (replaceAudio) {
         const existingAudio = audioBufferSource();
         const replacement = newSources.find((source) => source.kind === 'audio-buffer');
         if (!existingAudio || selected.length !== 1 || !replacement || imported.frames.length) throw new Error('置き換えには音声ファイルを1つだけ選んでください。画像や既存素材は変更していません。');
-        replacement.id = existingAudio.id;
-        next = next.map((source) => source.id === existingAudio.id ? replacement : source);
-      } else if (imported.audio && audioBufferSource()) {
-        throw new Error('音声素材は1つまでです。音声素材の「置き換え」から新しい音声を選んでください。');
+        next = replaceOutputMaterialSource(next, newSources, existingAudio.id, selected.length);
       }
-      const appendedImages = newSources.find((source) => source.kind === 'rgba-frames');
-      const existingImages = next.find((source) => source.kind === 'rgba-frames' && source.id === 'local-images');
-      if (!replaceAudio && appendedImages && existingImages) {
-        const frames = fitOutputFrames([...existingImages.mediaSource.frames, ...appendedImages.mediaSource.frames]);
-        const merged = { ...existingImages, label: `画像 (${frames.length}コマ)`, mediaSource: { ...existingImages.mediaSource, width: frames[0].width, height: frames[0].height, frames } };
-        next = next.map((source) => source.id === existingImages.id ? merged : source);
-      }
-      const additions = replaceAudio ? [] : newSources.filter((source) => !(appendedImages && existingImages && source === appendedImages));
-      for (const source of additions) {
-        if (next.some((item) => item.id === source.id)) source.id = `${source.id}-${createItemId().slice(0, 8)}`;
-        next.push(source);
+      if (!replaceAudio && !replaceSourceId) {
+        if (imported.audio && audioBufferSource()) {
+          throw new Error('音声素材は1つまでです。音声素材の「置き換え」から新しい音声を選んでください。');
+        }
+        const appendedImages = newSources.find((source) => source.kind === 'rgba-frames');
+        const existingImages = next.find((source) => source.kind === 'rgba-frames' && source.id === 'local-images');
+        if (appendedImages && existingImages) {
+          const frames = fitOutputFrames([...existingImages.mediaSource.frames, ...appendedImages.mediaSource.frames]);
+          const merged = { ...existingImages, label: `画像 (${frames.length}コマ)`, mediaSource: { ...existingImages.mediaSource, width: frames[0].width, height: frames[0].height, frames } };
+          next = next.map((source) => source.id === existingImages.id ? merged : source);
+        }
+        const additions = newSources.filter((source) => !(appendedImages && existingImages && source === appendedImages));
+        for (const source of additions) {
+          if (next.some((item) => item.id === source.id)) source.id = `${source.id}-${createItemId().slice(0, 8)}`;
+          next.push(source);
+        }
       }
       if (next.length > 8) throw new RangeError('素材は8種類まで追加できます。不要な素材を削除してください。');
       if (!(await persistMediaSources(next))) throw new Error('素材を端末内に保存できませんでした。元の素材と出力はそのままです。');
+      committed = true;
       if (replaceAudio) {
         const refreshed = await generateOutputItem({ sourceId: audioBufferSource()?.id, formatValue: 'wav' });
         if (refreshed) targetStatus.textContent = '音声を置き換え、新しいWAVをプレビューできる状態にしました。';
-      } else targetStatus.textContent = `${selected.length}個のファイルを追加しました。素材の順番と表示時間を調整できます。`;
+      } else if (replaceSourceId) targetStatus.textContent = '選択した素材を置き換えました。出力項目はそのまま保持され、次の作成時に新しい素材を反映します。';
+      else targetStatus.textContent = `${selected.length}個のファイルを追加しました。素材の順番と表示時間を調整できます。`;
       updateSequenceControls(); renderAssets();
     } else {
       let initialBlob; let initialFilename; let metadataValue = {};
@@ -895,6 +945,7 @@ async function handleImport(files, { replaceAudio = false } = {}) {
     if (record) { generationProgress.hidden = true; cancelGeneration.hidden = true; }
     if (record) renderAssets();
   }
+  return committed;
 }
 
 async function persistOutputItems(nextItems, { duringGeneration = false } = {}) {
@@ -1731,20 +1782,20 @@ async function applySelectedFps() {
   const nextFrames = frames.map((frame) => ({ ...frame, delayMs }));
   return persistMediaSources(mediaSources.map((source) => source.id === selectedSourceId
     ? { ...source, mediaSource: { ...source.mediaSource, frames: nextFrames } }
-    : source), { ...mediaSettings, playbackRate: 1 });
+    : source), { ...mediaSettings, playbackRate: 1 }, { mutation: 'settings' });
 }
 applyFps.addEventListener('click', () => { void applySelectedFps(); });
-loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, totalPlays: Number(loopCount.value) }); });
+loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, totalPlays: Number(loopCount.value) }, { mutation: 'settings' }); });
 musicTotalPlaysControl?.addEventListener('change', () => {
   const plays = Number(musicTotalPlaysControl.value);
   const maximum = Math.max(1, ...[...musicTotalPlaysControl.options].filter((option) => !option.disabled).map((option) => Number(option.value) || 1));
   if (!Number.isSafeInteger(plays) || plays < 1 || plays > maximum) { musicTotalPlaysControl.value = String(mediaSettings.musicTotalPlays || 1); return; }
-  void persistMediaSources(mediaSources, { ...mediaSettings, musicTotalPlays: plays });
+  void persistMediaSources(mediaSources, { ...mediaSettings, musicTotalPlays: plays }, { mutation: 'settings' });
 });
 musicSourceSelect?.addEventListener('change', () => {
   const source = availableMusicSources().find((item) => item.id === musicSourceSelect.value);
   if (!source) { updateMusicPlayControl(); return; }
-  void persistMediaSources(mediaSources, { ...mediaSettings, musicSourceId: source.id });
+  void persistMediaSources(mediaSources, { ...mediaSettings, musicSourceId: source.id }, { mutation: 'settings' });
 });
 createAudioButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
 createVideoButton.addEventListener('click', () => { void generateOutputItem({ sourceId: sourceSelect.value, formatValue: formatSelect.value }); });
@@ -1955,8 +2006,57 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) previewFit.reconnect();
 });
 
+function materialState() {
+  return { ...describeOutputMaterialState({
+    record, mediaSources, outputItems, activeId: sourceSelect.value, activeItemId: activeItem?.id || '',
+    busy: Boolean(mediaWritePending || itemWritePending || generationController || importController),
+  }), previewKind: timelineCanvas.hidden ? 'output' : 'material' };
+}
+
+function materialNotice(message) {
+  status.textContent = message;
+  main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: false, status: message } }));
+}
+
+async function addMaterialFiles(files) {
+  if (!record) { materialNotice('詳細ワークスペースの素材だけ追加できます。'); return false; }
+  const committed = await handleImport(files);
+  if (!committed && !importController) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: false, status: status.textContent } }));
+  return committed === true;
+}
+
+async function replaceMaterialFiles(id, files) {
+  if (!record) { materialNotice('詳細ワークスペースの素材だけ置き換えできます。'); return false; }
+  const target = mediaSources.find((source) => source.id === id);
+  if (!target) { materialNotice('置き換える素材が見つかりません。現在の素材はそのままです。'); return false; }
+  if (!['rgba-frames', 'audio-buffer', 'video-source'].includes(target.kind)) {
+    materialNotice('この素材形式はここから置き換えできません。現在の素材はそのままです。'); return false;
+  }
+  const committed = await handleImport(files, { replaceSourceId: id });
+  if (!committed && !importController) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: false, status: status.textContent } }));
+  return committed === true;
+}
+
+async function removeMaterial(id) {
+  const target = mediaSources.find((source) => source.id === id);
+  if (!target) { materialNotice('削除する素材が見つかりません。'); return false; }
+  if (outputItems.some((item) => item.sourceId === id)) {
+    materialNotice('出力項目がこの素材を使用しています。先に出力項目を削除するか、別の素材へ割り当ててください。'); return false;
+  }
+  if (mediaWritePending || itemWritePending || generationController || importController) {
+    materialNotice('別の処理が終わってから素材を削除してください。'); return false;
+  }
+  const committed = await persistMediaSources(mediaSources.filter((source) => source.id !== id));
+  if (!committed) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: false, status: status.textContent } }));
+  return committed;
+}
+
 Object.defineProperty(outputLayout, 'conversionActions', { value: Object.freeze({
   get busy() { return Boolean(mediaWritePending || itemWritePending || generationController || importController); },
+  getMaterialState: materialState,
+  addFiles: addMaterialFiles,
+  replaceFiles: replaceMaterialFiles,
+  removeAsset: removeMaterial,
   applyFps: applySelectedFps, applySize: applySelectedSize, generate: generateOutputItem,
 }) });
 renderOutputCapabilities();
