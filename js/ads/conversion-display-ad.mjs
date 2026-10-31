@@ -23,39 +23,24 @@ export function conversionAdEligible({ origin, pathname, search = '', hash = '',
 }
 
 /** Keep the converter's existing width. A rail is used only in genuinely spare space. */
-export function conversionAdLayout({ viewportWidth, viewportHeight, mainRight, frozenSize = null } = {}) {
+export function conversionAdLayout({ viewportWidth, viewportHeight, mainRight, railTop = 24, bottomDock = 120, frozenSize = null } = {}) {
   if (![viewportWidth, viewportHeight, mainRight].every(Number.isFinite)) return null;
   const spare = viewportWidth - 24 - mainRight - 48;
-  const width = frozenSize?.width || (spare >= 300 ? 300 : spare >= 160 && viewportHeight >= 900 ? 160 : viewportWidth < 340 ? 250 : 300);
-  const height = frozenSize?.height || (spare >= width && viewportHeight >= 900 ? 600 : 250);
-  return { width, height, rail: spare >= width, left: mainRight + 48 };
+  const width = frozenSize?.width || (spare >= 300 ? 300 : spare >= 160 ? 160 : viewportWidth < 340 ? 250 : 300);
+  const height = frozenSize?.height || (viewportHeight >= 900 ? 600 : 250);
+  const rail = height >= 600 && spare >= width && railTop >= 0 && railTop + height + 24 <= viewportHeight - bottomDock;
+  return { width, height, rail, left: mainRight + 48 };
 }
 
 // Essential geometry is available synchronously, even when the decorative CSS is
 // cached, slow or unavailable. The ad unit itself also has explicit inline dimensions.
 const criticalLayout = `
 .conversion-ad-layout{position:relative;width:100%;min-width:0}
-.conversion-companion{box-sizing:border-box;width:min(920px,calc(100% - 32px));margin:32px auto 0;padding:24px 0 max(180px,calc(120px + env(safe-area-inset-bottom)))}
 .conversion-display-ad{box-sizing:content-box;width:var(--conversion-ad-width,300px);margin:48px auto;padding:0;border:0}
 .conversion-display-ad[hidden]{display:none!important}
 .conversion-display-ad__label{display:block;height:24px;font:11px/24px system-ui,sans-serif;text-align:center}
 .conversion-display-ad__slot,.conversion-display-ad__unit{display:block;box-sizing:content-box;width:var(--conversion-ad-width,300px);height:var(--conversion-ad-height,250px);margin:0;padding:0;border:0}
-.conversion-ad-layout[data-ad-layout="rail"] .conversion-companion{position:absolute;top:24px;left:var(--conversion-rail-left);width:var(--conversion-ad-width);margin:0;padding:0 0 180px;border:0}
-.conversion-ad-layout[data-ad-layout="rail"] .conversion-companion__intro{display:none}
-.conversion-ad-layout[data-ad-layout="rail"] .conversion-display-ad{margin:24px 0 48px}`;
-
-const guideMarkup = `
-  <header><p class="conversion-companion__eyebrow">形式と保存のヒント</p><h2>仕上がりに合う形式を選ぶ</h2></header>
-  <div class="conversion-companion__intro"><h3>写真と透過画像</h3><p>透過を残す画像にはPNG、透過が不要な写真にはJPEGが候補です。JPEGでは透明部分を保持できません。背景色と画像サイズを確認してから保存してください。</p></div>
-  <aside class="conversion-display-ad" aria-label="広告" hidden>
-    <span class="conversion-display-ad__label">広告</span><div class="conversion-display-ad__slot"></div>
-  </aside>
-  <div class="conversion-companion__more">
-    <section><h3>容量と大きさ</h3><p>画像の幅・高さを小さくすると、画素数を減らせます。縦横比を保つと形のゆがみを避けられます。JPEGは画質を下げると細部が失われるため、プレビューと用途を見て調整してください。</p></section>
-    <section><h3>文字アートと復元コード</h3><p>ASCII・点字・絵文字などのアートは、画像の見え方を文字で表現します。文字アートだけでは元画像へ完全には戻せません。元のファイルを戻したい場合は復元コードを使います。復元コードやBase64は暗号化ではなく、元のファイルより大きくなる場合があります。</p></section>
-    <section><h3>動きと音声</h3><p>アニメーションを静止画にすると動きは残りません。動画・音声の対応形式はブラウザーによって異なります。選べる形式で出力し、利用先でも再生できるか確認してください。</p></section>
-    <section><h3>共有前の確認</h3><p>復元コードには元ファイルの情報が含まれます。位置情報や編集情報など、相手に渡してよい内容か確認してください。ダウンロード開始の表示と、端末への保存完了は異なります。保存先はブラウザーのダウンロード一覧で確認できます。</p></section>
-  </div>`;
+.conversion-ad-layout[data-ad-layout="rail"] .conversion-display-ad{position:absolute;top:var(--conversion-rail-top,24px);left:var(--conversion-rail-left);margin:0}`;
 
 /** One normal asynchronous manual unit, requested once without waiting for editor
  * focus, preview idleness, scroll position or a secondary stylesheet load event.
@@ -76,7 +61,7 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
   const fallback = doc.createElement('style'); fallback.dataset.conversionAdLayout = '';
   fallback.textContent = criticalLayout; doc.head.append(fallback);
   const sheet = doc.createElement('link'); sheet.rel = 'stylesheet';
-  sheet.href = '/css/conversion-display-ad.css?rev=20261030-converter-ads-1';
+  sheet.href = '/css/conversion-display-ad.css?rev=20261031-workspace-2';
   const wrapper = doc.createElement('div'); wrapper.className = 'conversion-ad-layout';
   // Reparenting the workspace can blur an input while the user is typing.
   const focused = main.contains(doc.activeElement) ? doc.activeElement : null;
@@ -90,9 +75,11 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
     focused.focus({ preventScroll: true });
     if (selection) focused.setSelectionRange(...selection);
   }
-  const guide = doc.createElement('section'); guide.className = 'conversion-companion';
-  guide.setAttribute('aria-label', '変換と保存のガイド'); guide.innerHTML = guideMarkup; wrapper.append(guide);
-  const host = guide.querySelector('.conversion-display-ad'), inner = host.querySelector('.conversion-display-ad__slot');
+  const host = doc.createElement('aside'); host.className = 'conversion-display-ad';
+  host.setAttribute('aria-label', '広告'); host.hidden = true;
+  host.innerHTML = '<span class="conversion-display-ad__label">広告</span><div class="conversion-display-ad__slot"></div>';
+  wrapper.append(host);
+  const inner = host.querySelector('.conversion-display-ad__slot');
   const unit = doc.createElement('ins'); unit.className = 'adsbygoogle conversion-display-ad__unit';
   unit.dataset.adClient = client; unit.dataset.adSlot = slot;
   unit.dataset.fullWidthResponsive = 'false'; inner.append(unit);
@@ -109,8 +96,9 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
   const requestBlocker = () => {
     if (!eligible()) return 'private-route';
     if (doc.visibilityState === 'hidden') return 'document-hidden';
-    if (doc.fullscreenElement || doc.querySelector('dialog[open], .tool-embed--expanded')) return 'overlay-open';
+    if (doc.fullscreenElement || doc.querySelector('dialog:modal, [role="dialog"][aria-modal="true"], .tool-embed--expanded')) return 'overlay-open';
     if (errorOnly()) return 'error-page';
+    if (!layout?.rail) return 'no-safe-rail';
     if (!host.isConnected || host.hidden) return 'container-hidden';
     const rect = unit.getBoundingClientRect(), css = win.getComputedStyle(unit);
     if (rect.width <= 0 || rect.height <= 0 || !unit.getClientRects().length
@@ -130,18 +118,23 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
   function update() {
     frame = 0; if (disposed) return;
     const rect = main.getBoundingClientRect(), wrap = wrapper.getBoundingClientRect();
+    const header = doc.querySelector('header');
+    const headerBottom = header?.getBoundingClientRect().bottom || 0;
+    const railTop = Math.max(24, headerBottom + 24, rect.top + 24);
     layout = conversionAdLayout({ viewportWidth: doc.documentElement.clientWidth,
-      viewportHeight: win.innerHeight, mainRight: rect.right, frozenSize });
+      viewportHeight: win.innerHeight, mainRight: rect.right, railTop, frozenSize });
     if (!layout) return;
     if (!requested) {
       unit.style.display = 'block'; unit.style.width = `${layout.width}px`; unit.style.height = `${layout.height}px`;
     }
     wrapper.dataset.adLayout = layout.rail ? 'rail' : 'flow';
     wrapper.style.setProperty('--conversion-rail-left', `${layout.left - wrap.left}px`);
+    wrapper.style.setProperty('--conversion-rail-top', `${railTop - wrap.top}px`);
     wrapper.style.setProperty('--conversion-ad-width', `${layout.width}px`);
     wrapper.style.setProperty('--conversion-ad-height', `${layout.height}px`);
-    if (!requested) host.hidden = false;
-    wrapper.style.minHeight = layout.rail ? `${guide.offsetHeight + 24}px` : '';
+    if (!layout.rail) host.hidden = true;
+    else if (host.hidden && !failed) host.hidden = false;
+    wrapper.style.minHeight = '';
     collapseEmptyBelowView();
     if (requested) return;
     const reason = requestBlocker(); report(reason ? 'waiting' : 'ready', reason);
@@ -168,7 +161,7 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
   doc.head.append(sheet);
   const statusObserver = new win.MutationObserver(() => {
     const state = conversionAdDeliveryState(unit.dataset.adStatus);
-    if (state === 'filled' || state === 'unfill-optimized') { failed = false; host.hidden = false; report(state); }
+    if (state === 'filled' || state === 'unfill-optimized') { failed = false; host.hidden = !layout?.rail; report(state); }
     else if (state === 'unfilled') markFailed();
   });
   statusObserver.observe(unit, { attributes: true, attributeFilter: ['data-ad-status'] });
@@ -180,7 +173,7 @@ export function mountConversionDisplayAd({ doc = globalThis.document, win = glob
   });
   overlayObserver.observe(doc.body, { attributes: true, subtree: true, attributeFilter: ['open', 'class'] });
   const resizeObserver = win.ResizeObserver ? new win.ResizeObserver(schedule) : null;
-  resizeObserver?.observe(main); resizeObserver?.observe(guide);
+  resizeObserver?.observe(main);
   const intersection = win.IntersectionObserver ? new win.IntersectionObserver(schedule) : null;
   intersection?.observe(host);
   for (const type of ['resize', 'scroll', 'pageshow', 'popstate', 'hashchange']) win.addEventListener(type, schedule, { passive: true });

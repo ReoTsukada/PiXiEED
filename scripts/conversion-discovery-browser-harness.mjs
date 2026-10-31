@@ -41,6 +41,12 @@ async function download(selector = '[data-download]') {
   const [file] = await Promise.all([page.waitForEvent('download'), action.click()]);
   assert.equal(await file.failure(), null); return { name: file.suggestedFilename(), bytes: await readFile(await file.path()) };
 }
+async function selectWorkspace(selector, value) {
+  const panel=page.locator('#sc-settings-panel');
+  if (await panel.count() && !(await panel.evaluate(node=>node.open))) await page.locator('[data-sc-settings-open]').click();
+  await page.locator(selector).selectOption(value);
+  if (await panel.evaluate(node=>node.matches(':modal'))) { await page.keyboard.press('Escape'); await page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open); }
+}
 try {
   // The homepage is a light navigation portal; social interactions stay on Explore.
   for (const width of [320, 390, 768, 1440]) {
@@ -152,7 +158,7 @@ try {
   await open('/output/work/?mode=convert&to=qoi');
   await page.locator('[data-file]').setInputFiles({ name: 'sample.png', mimeType: 'image/png', buffer: png });
   await page.waitForFunction(() => document.querySelector('[data-format]').value === 'qoi');
-  await page.locator('[data-sc-format]').selectOption('png'); assert.equal(await page.locator('.convert-intent').isVisible(), false);
+  await selectWorkspace('[data-sc-format]','png'); assert.equal(await page.locator('.convert-intent').isVisible(), false);
   await page.locator('[data-file]').setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: png });
   await page.waitForFunction(() => document.querySelector('[data-name]')?.textContent === 'second.png' && !document.querySelector('[data-convert]').disabled);
   assert.equal(await page.locator('[data-format]').inputValue(), 'png');

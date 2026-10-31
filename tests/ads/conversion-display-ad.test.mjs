@@ -28,3 +28,12 @@ test('freeze served size across resize, no refresh',()=>{
  assert.deepEqual(conversionAdLayout({viewportWidth:390,viewportHeight:844,mainRight:390,frozenSize:{width:160,height:600}}),{width:160,height:600,rail:false,left:438});
 });
 test('invalid measurement does not mount a rail',()=>assert.equal(conversionAdLayout({viewportWidth:NaN,viewportHeight:900,mainRight:1280}),null));
+test('rail requires room for the full labeled unit above the bottom dock',()=>{
+ assert.equal(conversionAdLayout({viewportWidth:1920,viewportHeight:800,mainRight:1500}).rail,false);
+ assert.equal(conversionAdLayout({viewportWidth:1920,viewportHeight:1000,mainRight:1500,railTop:300}).rail,false);
+ assert.equal(conversionAdLayout({viewportWidth:1920,viewportHeight:1000,mainRight:1500}).rail,true);
+});
+test('rail top is measured in viewport coordinates',()=>{
+ assert.equal(conversionAdLayout({viewportWidth:1920,viewportHeight:1080,mainRight:1500,railTop:400}).rail,false);
+ assert.equal(conversionAdLayout({viewportWidth:1920,viewportHeight:1080,mainRight:1500,railTop:300}).rail,true);
+});

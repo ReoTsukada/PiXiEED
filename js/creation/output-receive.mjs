@@ -3,7 +3,7 @@ import { readToolOutput } from './output-handoff.mjs?rev=20261028-unified-output
 import { readOutputFile } from './output-router.mjs?rev=20261028-unified-output-1';
 import { loadConversionFile } from './conversion-service.mjs?rev=20261028-conversion-1';
 import { validateTimeline } from './conversion-timeline.mjs?rev=20261028-motion-1';
-import { mountConversionPage } from './conversion-page.mjs?rev=20261028-unified-output-1';
+import { mountConversionPage } from './conversion-page.mjs?rev=20261031-workspace-2';
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 export function sharedOutputRequest(search) {
   const query = new URLSearchParams(search);
@@ -56,7 +56,7 @@ function renderFile(record, doc, win) {
 export async function mountSharedOutput(request, doc = document, win = window) {
   const record = request.key === 'id' ? await readToolOutput(request.id) : await readOutputFile(request.id);
   if (request.key === 'id' && (request.advanced || needsDetailedOutput(record))) {
-    await import('./output-page.mjs?rev=20261024-common-tool-start-1');
+    await import('./output-page.mjs?rev=20261031-workspace-2');
     return 'detailed';
   }
   addStyles(doc);

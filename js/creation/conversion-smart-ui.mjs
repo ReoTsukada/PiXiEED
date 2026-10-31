@@ -1,3 +1,4 @@
+import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261031-workspace-2';
 import { PUBLIC_NAV_ITEMS } from '../page-navigation.mjs?rev=20261024-common-tool-start-1';
 
 /** Presentation adapter only: all decoding, validation and saving stay in the existing engines. */
@@ -9,7 +10,7 @@ export function mountSmartConversion(doc = document, win = window) {
   const blobLink = node => available(node) && /^blob:/.test(node.getAttribute('href') || '') ? node : null;
   const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
   const setAttr = (node, key, value) => { if (node.getAttribute(key) !== value) node.setAttribute(key, value); };
-  const media = () => $('.text-legacy') || main;
+  const media = () => main;
   const mode = () => $('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode || 'media';
   const liveText = () => mode() === 'output' ? $('[data-text-tools]')?.textLivePreview : null;
   const find = selector => media().querySelector(selector);
@@ -23,7 +24,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; link.dataset.smartStyle = key; doc.head.append(link);
   };
   style('/css/public-navigation.css?rev=20261030-smart-convert-1', 'navigation');
-  style('/css/conversion-smart-ui.css?rev=20261030-smart-convert-1', 'conversion');
+  style('/css/conversion-smart-ui.css?rev=20261031-workspace-2', 'conversion');
 
   const toolbar = doc.createElement('section'); toolbar.className = 'sc-toolbar'; toolbar.setAttribute('aria-label', '変換の設定');
   toolbar.innerHTML = `<header class="sc-heading"><div><p>PIXIEED / CONVERT</p><h1>変換・出力</h1></div><span>端末内で処理</span></header>
@@ -32,7 +33,7 @@ export function mountSmartConversion(doc = document, win = window) {
     <label class="sc-format" data-sc-format-row hidden><span data-sc-format-label>出力形式</span><select data-sc-format></select></label>
     <p class="sc-hint" data-sc-hint>素材を選ぶと、対応する形式と必要な設定だけを表示します。</p><input type="file" data-sc-file multiple hidden>`;
   main.prepend(toolbar);
-  const ui = selector => toolbar.querySelector(selector);
+  const ui = selector => main.querySelector(selector);
   const source = ui('[data-sc-source]'), target = ui('[data-sc-target]'), format = ui('[data-sc-format]'), picker = ui('[data-sc-file]');
   const nativeInput = find('[data-file],#output-file-input');
   picker.accept = [nativeInput?.accept || 'image/*,video/*,audio/*', '.txt,.md,.json,.pxtxt,text/plain'].join(',');
@@ -46,14 +47,16 @@ export function mountSmartConversion(doc = document, win = window) {
     for (const node of [...fileSettings.children]) if (node.matches('#output-items,#output-reward-note,.output-item-actions,#output-add-item,#output-source-label,#output-source')) advanced.append(node);
     fileSettings.append(advanced);
   }
+  const workspace = mountConversionWorkspace(main, toolbar, doc, win);
   const button = doc.createElement('button'); button.type = 'button'; button.id = 'output-nav-export';
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
   const buttonLabel = button.querySelector('span');
   const dock = doc.createElement('div'); dock.className = 'sc-export-status';
-  dock.innerHTML = '<span class="sc-export-message" role="status" aria-live="polite"></span><button type="button" hidden>中止</button>';
+  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><span class="sc-export-message" role="status" aria-live="polite"></span><button type="button" hidden>中止</button>';
   const message = dock.querySelector('span'), cancel = dock.querySelector('button');
-  let nav = null, navObserver = null, frame = 0, pending = null, revision = 0, lastMode = mode();
+  let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
   let lastTextUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
+  let lastSaved = null, pendingDimensions = null;
   let sizeDirty = false, fpsDirty = false, stopped = false, controlSignature = '';
   const nativeFormat = () => mode() === 'input' ? $('[data-tx-action]') : mode() === 'output' ? $('[data-tx-style]') : find('[data-format],#output-format-select');
   const result = () => {
@@ -68,11 +71,12 @@ export function mountSmartConversion(doc = document, win = window) {
   };
   // Live text generation does not lock its settings; only saving waits for a fresh result.
   const busy = () => main.getAttribute('aria-busy') === 'true'
+    || Boolean($('#output-layout')?.conversionActions?.busy)
     || (mode() !== 'media' && $('[data-text-tools]')?.getAttribute('aria-busy') === 'true')
     || (!liveText() && Boolean(cancelAction()))
-    || (mode() === 'media' && Boolean(find('#output-format-select')?.disabled) && loaded());
+    || (mode() === 'media' && !$('#output-layout')?.conversionActions && Boolean(find('#output-format-select')?.disabled) && loaded());
   const matchesFormat = link => {
-    const control = find('#output-format-select');
+    const control = find('[data-format],#output-format-select');
     if (!control || !link?.download) return true;
     const normalize = value => ({ jpg: 'jpeg', tif: 'tiff' }[value] || value);
     const extension = link.download.split('.').pop().toLowerCase();
@@ -123,7 +127,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const currentMode = mode(), locked = busy(), live = liveText();
     const working = locked || Boolean(live && ['queued','rendering'].includes(live.state));
     const link = result(), href = link?.getAttribute('href') || '';
-    if (currentMode !== lastMode) { pending = null; revision++; lastMode = currentMode; }
+    if (currentMode !== lastMode) { saveIntent.cancel(); revision++; lastMode = currentMode; }
     if (currentMode === 'media') {
       if (href && href !== lastMediaUrl && !working) { lastMediaUrl = href; mediaDirty = !matchesFormat(link); }
     } else if (href && href !== lastTextUrl && !working) {
@@ -139,94 +143,97 @@ export function mountSmartConversion(doc = document, win = window) {
     mirrorFormat();
     main.dataset.smartLoaded = String(loaded());
     setText(ui('[data-sc-pick]'), loaded() ? '素材を変更' : 'ファイルを選ぶ');
-    button.disabled = working;
+    button.disabled = locked || saveIntent.pending || (working && !live);
     setAttr(button, 'aria-busy', String(working));
     const ready = Boolean(link && (live ? live.state === 'ready' : currentMode === 'media' ? !mediaDirty && !sizeDirty && !fpsDirty : !textDirty && textResultMode === currentMode));
-    const label = working ? (live ? '更新中' : '処理中') : !loaded() ? (currentMode === 'input' ? '文字を入力' : '素材を選ぶ') : '出力';
+    const nativeProgress = [...main.querySelectorAll('progress:not([data-sc-progress]):not([data-sc-panel-progress])')].find(available);
+    const progress = dock.querySelector('progress'); progress.hidden = !working;
+    if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
+    const label = working && (!live || saveIntent.pending) ? '処理中' : !loaded() ? (currentMode === 'input' ? '文字を入力' : '素材を選ぶ') : '保存';
     setText(buttonLabel, label);
-    setAttr(button, 'aria-label', working ? 'プレビューを更新中' : ready ? '現在の結果を端末に保存' : loaded() ? (live ? 'プレビューを更新（保存はしません）' : '現在の設定で変換して出力') : label);
+    setAttr(button, 'aria-label', working ? '最新設定の出力を作成中' : ready ? '現在の結果を端末に保存' : loaded() ? '現在の設定で変換して端末に保存' : label);
     cancel.hidden = !working || !cancelAction();
     const nativeStatus = statusText();
-    const summary = working ? nativeStatus || '変換しています…' : nativeStatus || (ready ? '保存できます。中央の出力ボタンから保存。' : '素材・形式を選んで、中央から出力。');
-    setText(message, summary);
+    const actualSize = ready ? link?.textContent?.match(/(?:[\d,.]+\s*(?:KB|MB|bytes|バイト))/i)?.[0] : '';
+    const savedCurrent = lastSaved?.mode === currentMode && lastSaved.revision === revision && lastSaved.href === href;
+    const summary = working ? nativeStatus || '変換しています…' : savedCurrent ? 'ダウンロードを開始しました。保存ボタンで再保存できます。' : nativeStatus || (ready ? '保存できます。保存ボタンで再保存できます。' : '仕上がりを調整して、保存。必要な変換は保存時に行います。');
+    const displayedStatus = actualSize ? `${summary} 実出力 ${actualSize}` : summary;
+    setText(message, displayedStatus);
+    workspace.update({ media: currentMode === 'media', loaded: loaded(), ready, link, working, saveDisabled: button.disabled, status: displayedStatus, progress: nativeProgress, canCancel: !cancel.hidden });
     const hint = currentMode === 'input' ? '文章・文字アート・復元コードを判別します。設定は必要なときだけ開けます。'
       : currentMode === 'output' ? '設定変更でプレビューを自動更新。中央の出力で確認済みの結果を保存します。復元コードは暗号化ではありません。'
       : loaded() ? '形式に応じた設定だけを表示しています。出力ボタンは画面下に固定されています。'
       : 'ファイルを選ぶと対応形式を表示します。TXT・メモは文字入力へ自動で切り替えます。';
     setText(ui('[data-sc-hint]'), hint);
-    if (pending) {
-      if (pending.mode !== currentMode || pending.revision !== revision) pending = null;
-      else if (working) pending.sawBusy = true;
-      else if (href && href !== pending.before) {
-        const completed = pending; pending = null;
-        if (completed.stage === 'fps') fpsDirty = false;
-        if (completed.stage === 'size') sizeDirty = false;
-        if (completed.stage === 'fps' || completed.stage === 'size') beginExport();
-        else if (currentMode !== 'media' || matchesFormat(link)) save(link);
-        else setText(message, '選択した形式を確認してください。異なる形式の結果は自動保存しません。');
-      } else if (pending.sawBusy) pending = null;
-    }
+    saveIntent.observe();
   }
+
   function save(link) {
     if (!blobLink(link)) return;
-    link.click();
+    link.click(); lastSaved = { mode: mode(), revision, href: link.getAttribute('href') };
     setText(message, '保存を開始しました。保存されない場合は、中央の出力をもう一度押してください。');
-    button.focus({ preventScroll: true });
+    schedule(); win.requestAnimationFrame(() => workspace.focusSave(button));
   }
   function validInputs(scope) {
     for (const input of scope.querySelectorAll('input,textarea,select')) {
       if (input.disabled || input.type === 'file' || input.type === 'hidden' || input.closest('[hidden]') || !input.willValidate || input.checkValidity()) continue;
       for (let parent = input.parentElement; parent && parent !== main; parent = parent.parentElement) if (parent.tagName === 'DETAILS') parent.open = true;
-      input.reportValidity(); return false;
+      workspace.reveal(); input.reportValidity(); return false;
     }
     return true;
-  }
-  function start(action, stage = 'convert') {
-    if (!available(action)) return;
-    if (!validInputs(mode() === 'media' ? media() : $('[data-text-tools]'))) return;
-    pending = { mode: mode(), revision, before: result()?.getAttribute('href') || '', stage, sawBusy: false };
-    action.click();
-    if (pending) pending.sawBusy = busy();
-    render();
-    if (pending && !pending.sawBusy && !busy()) pending = null;
   }
   function choose() {
     picker.multiple = mode() === 'media';
     picker.accept = mode() === 'output' ? '' : mode() === 'input' ? $('[data-tx-text-file]')?.accept || '.txt,.md,.json,.pxtxt' : [nativeInput?.accept || 'image/*,video/*,audio/*', '.txt,.md,.json,.pxtxt,text/plain'].join(',');
     picker.click();
   }
-  function beginExport() {
-    if (busy() || pending) return;
-    if (!loaded()) {
-      if (mode() === 'input') $('[data-tx-source]')?.focus(); else choose();
-      return;
-    }
-    const live = liveText();
-    if (live) {
-      // Generate/refresh only, never schedule an automatic download of an unseen result.
-      if (live.state === 'ready' && result()) save(result());
-      else if (!['queued','rendering'].includes(live.state)) live.refresh();
-      return;
-    }
-    if (mode() !== 'media') {
-      if (result() && !textDirty && textResultMode === mode()) save(result());
-      else start($('[data-tx-run]'));
-      return;
-    }
-    if (fpsDirty && available($('#output-apply-fps'))) { start($('#output-apply-fps'), 'fps'); return; }
-    if (sizeDirty && available($('#output-apply-settings'))) { start($('#output-apply-settings'), 'size'); return; }
-    const direct = result();
-    if (direct && !mediaDirty) { save(direct); return; }
-    const action = [find('[data-convert]'), $('#output-create-video'), $('#output-create-audio')].find(available);
-    if (action) start(action);
-    else if (direct && !mediaDirty) save(direct);
-    else { setText(message, '設定の反映を確認してください。前回の結果は自動保存しません。'); }
+  function saveSnapshot() {
+    const currentMode = mode(), live = liveText(), link = result();
+    return { mode: currentMode, revision, loaded: loaded(), live: Boolean(live),
+      working: busy() || Boolean(live && ['queued','rendering'].includes(live.state)),
+      link, href: link?.getAttribute('href') || '', matchesFormat: currentMode !== 'media' || matchesFormat(link),
+      ready: Boolean(link && (live ? live.state === 'ready' : currentMode === 'media' ? !mediaDirty && !sizeDirty && !fpsDirty : !textDirty && textResultMode === currentMode)),
+      fpsDirty: currentMode === 'media' && fpsDirty && available($('#output-apply-fps')),
+      sizeDirty: currentMode === 'media' && sizeDirty && available($('#output-apply-settings')) };
   }
+  const saveIntent = createConversionSaveIntent({ snapshot: saveSnapshot, save, settled: schedule,
+    choose() { if (mode() === 'input') $('[data-tx-source]')?.focus(); else choose(); },
+    stageComplete(stage) {
+      if (stage === 'fps') {
+        fpsDirty = false;
+        if (pendingDimensions) { $('#output-width').value = pendingDimensions.width; $('#output-height').value = pendingDimensions.height; pendingDimensions = null; }
+      }
+      if (stage === 'size') sizeDirty = false;
+    },
+    blocked() { setText(message, '設定の反映を確認してください。前回の結果は保存しません。'); },
+    run(stage) {
+      if (stage === 'live') {
+        const live = liveText();
+        if (!live) return false;
+        if (!['queued','rendering'].includes(live.state)) live.refresh();
+        schedule(); return true;
+      }
+      const detailed = mode() === 'media' && $('#output-layout')?.conversionActions;
+      if (detailed) {
+        if (!validInputs(media())) return false;
+        return stage === 'fps' ? detailed.applyFps() : stage === 'size' ? detailed.applySize() : detailed.generate();
+      }
+      const action = stage === 'fps' ? $('#output-apply-fps') : stage === 'size' ? $('#output-apply-settings') : mode() !== 'media' ? $('[data-tx-run]')
+        : [find('[data-convert]'), $('#output-create-video'), $('#output-create-audio')].find(available);
+      if (!available(action) || !validInputs(mode() === 'media' ? media() : $('[data-text-tools]'))) return false;
+      action.click(); schedule(); return true;
+    },
+  });
+  function beginExport() {
+    if (!saveIntent.pending) pendingDimensions = fpsDirty && sizeDirty ? { width: $('#output-width')?.value, height: $('#output-height')?.value } : null;
+    saveIntent.request(); schedule();
+  }
+  workspace.bindActions({ save: beginExport, cancel() { saveIntent.cancel(); cancelAction()?.click(); schedule(); } });
   function changed(event) {
     if (toolbar.contains(event.target)) return;
     const element = event.target;
-    if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub]')) return;
-    revision++; pending = null;
+    if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub]') || element.closest('#output-items')) return;
+    revision++; saveIntent.cancel();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
     if (element.matches('#output-width,#output-height,#output-aspect-lock')) sizeDirty = true;
     if (element.matches('#output-fps,#output-fps-preset')) fpsDirty = true;
@@ -268,26 +275,30 @@ export function mountSmartConversion(doc = document, win = window) {
   main.addEventListener('pixieed:text-preview', schedule);
   main.addEventListener('click', event => {
     const el = event.target.closest('button'); if (!el) return;
-    if (el.matches('#output-cancel-generation,#output-cancel-settings,#output-cancel-import,[data-cancel],[data-tx-cancel],[data-tx-live-cancel]')) pending = null;
-    if (el.matches('[data-rate],[data-reset],[data-apply-seconds],[data-move],.output-preset')) { mediaDirty = true; revision++; pending = null; }
+    if (el.matches('#output-cancel-generation,#output-cancel-settings,#output-cancel-import,[data-cancel],[data-tx-cancel],[data-tx-live-cancel]')) saveIntent.cancel();
+    if (el.matches('.output-item__select,#output-add-item,#output-copy-item,#output-delete-item')) {
+      sizeDirty = false; fpsDirty = false; revision++; saveIntent.cancel();
+    }
+    if (el.matches('[data-rate],[data-reset],[data-apply-seconds],[data-move],.output-preset,#output-add-assets') || el.closest('#output-assets-list')) { mediaDirty = true; revision++; saveIntent.cancel(); }
     schedule();
   });
   button.addEventListener('click', beginExport);
-  cancel.addEventListener('click', () => { pending = null; cancelAction()?.click(); schedule(); });
+  cancel.addEventListener('click', () => { saveIntent.cancel(); cancelAction()?.click(); schedule(); });
   const observer = new win.MutationObserver(records => {
     if (records.some(record => !toolbar.contains(record.target) && (
       record.type === 'attributes' || record.target.closest?.('.text-mode-nav,#output-status,#output-import-status,[data-status],[data-tx-status],select,[data-tx-file-name]')
     ))) schedule();
   });
-  observer.observe(main, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden','disabled','aria-busy','aria-pressed','href','download'] });
+  observer.observe(main, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden','disabled','aria-busy','aria-pressed','href','download','value'] });
   const bodyObserver = new win.MutationObserver(ensureNav); bodyObserver.observe(doc.body, { childList: true });
   main.dataset.smartConversion = 'true';
   render();
-  const onHide = event => { pending = null; if (!event.persisted) destroy(); };
+  const onHide = event => { saveIntent.cancel(); if (!event.persisted) destroy(); };
   const onShow = () => schedule();
   win.addEventListener('pagehide', onHide); win.addEventListener('pageshow', onShow);
   function destroy() {
     stopped = true; if (frame) win.cancelAnimationFrame(frame); observer.disconnect(); bodyObserver.disconnect(); navObserver?.disconnect();
+    workspace.destroy();
     main.removeEventListener('input', changed); main.removeEventListener('change', changed);
     main.removeEventListener('pixieed:text-preview', schedule);
     win.removeEventListener('pagehide', onHide); win.removeEventListener('pageshow', onShow);

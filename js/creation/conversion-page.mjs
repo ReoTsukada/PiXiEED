@@ -104,8 +104,8 @@ export function mountConversionPage(doc = document, win = window) {
   }
   function disable(value) {
     busy = value; main.setAttribute('aria-busy', String(value));
-    const controls = main.querySelector('.text-legacy') || main;
-    for (const el of controls.querySelectorAll('button,input,select')) if (!el.matches('[data-cancel]')) el.disabled = value || el.dataset.boundary === 'true';
+    const controls = main; // Settings can live in the workspace panel, outside the preview wrapper.
+    for (const el of controls.querySelectorAll('button,input,select')) if (!el.matches('[data-cancel],[data-sc-settings-open],[data-sc-settings-close]')) el.disabled = value || el.dataset.boundary === 'true';
     for (const button of main.querySelectorAll('.text-mode-nav button')) button.disabled = value;
     $('[data-cancel]').hidden = !value; progress.hidden = !value;
     if (value) { progress.removeAttribute('value'); stop(); }
@@ -243,7 +243,7 @@ export function mountConversionPage(doc = document, win = window) {
       for (const selector of ['[data-download]', '[data-previous]']) { $(selector).href = resultUrl; $(selector).download = resultName; }
       const link = $('[data-download]'); link.textContent = `保存する ↓ · ${blob.size >= 1048576 ? (blob.size / 1048576).toFixed(2) + ' MB' : (blob.size / 1024).toFixed(1) + ' KB'}`;
       link.hidden = false; $('[data-convert]').hidden = true; unsaved = true;
-      text('変換できました。保存ボタンから端末に保存できます。'); link.focus({ preventScroll: true });
+      text('変換できました。保存ボタンから端末に保存できます。'); (doc.getElementById('output-nav-export') || link).focus({ preventScroll: true });
     } catch (error) { $('[data-previous]').hidden = !resultUrl; text(error.name === 'AbortError' ? '変換を中止しました。素材・設定と前回の結果は保持しています。' : error.message || '変換できませんでした。'); }
     finally { disable(false); controller = null; }
   });

@@ -4,13 +4,13 @@ const query = new URLSearchParams(location.search);
 try { window.__PIXIEED_OFFERWALL_ENTRY__?.retire?.(); } catch { /* Optional site policy. */ }
 try {
   if (query.has('id') || query.has('file')) {
-    const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261028-unified-output-1');
+    const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261031-workspace-2');
     await mountSharedOutput(sharedOutputRequest(location.search));
   } else if (query.get('mode') === 'convert') {
     const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/conversion-simple.css?rev=20261028-motion-1'; document.head.append(css);
-    const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261028-unified-output-1'); mountConversionPage();
+    const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261031-workspace-2'); mountConversionPage();
   } else {
-    await import('./output-page.mjs?rev=20261024-common-tool-start-1');
+    await import('./output-page.mjs?rev=20261031-workspace-2');
   }
 } catch (error) {
   const main = document.getElementById('main');
@@ -38,13 +38,13 @@ try {
 
 // Share one contextual UI and fixed export action without replacing any conversion engine.
 try {
-  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261030-live-text-1');
+  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261031-workspace-2');
   mountSmartConversion();
 } catch (error) {
   console.warn('Smart conversion UI unavailable; original conversion controls remain available.', error);
 }
 
 // Advertising is optional and never awaited by import, preview, generation or saving.
-void import('../ads/conversion-display-ad.mjs?rev=20261030-converter-ads-3')
+void import('../ads/conversion-display-ad.mjs?rev=20261031-workspace-2')
   .then(({ mountConversionDisplayAd }) => mountConversionDisplayAd())
   .catch(() => { /* Conversion and download remain available without advertising. */ });

@@ -64,6 +64,18 @@
       <p class="guide-start-note">登録不要・無料保存。変換ファイルは端末内で処理します。</p>
       <a class="guide-detail-link" href="/output/work/">動画合成・複数出力は詳細ワークスペースへ</a>
     </section>
+    <section class="guide-format-summary" aria-labelledby="guide-workspace-title">
+      <h2 id="guide-workspace-title">仕上がりを見てから、保存。</h2>
+      <p>作業画面は素材のプレビューが中心です。「形式・サイズ」から調整し、「保存」を押すと必要な変換を行ってダウンロードを開始します。設定パネル内にも保存ボタンがあり、先に閉じる必要はありません。設定パネルを閉じても値は残ります。PCは右側、スマートフォンは下から設定を開きます。</p>
+      <details class="guide-format-details"><summary>使い方と保存前の確認</summary>
+        <div class="guide-format-copy">
+          <h3>素材と出力を分けて確認</h3><p>素材のプレビューは変換前の画像です。保存後は「出力ファイル」で作成した内容を任意に確認できます。「編集プレビュー」に戻ると、コマ送りや再生操作を続けられます。表示できない形式はその旨を表示します。容量は生成後に分かる実出力サイズで、目標容量への自動調整は行いません。保存開始と端末への保存完了は異なるため、保存先はブラウザーのダウンロード一覧で確認してください。</p>
+          <h3>透明・動き・画質</h3><p>透過を残すならPNGなどの対応形式を使います。JPEGは透明部分を背景色に合成し、画質を下げると細部が失われます。GIFは256色以内で半透明を保持できません。アニメーションを静止画にすると動きは残りません。利用先での再生も確認してください。</p>
+          <h3>複数出力と元ファイル</h3><p>詳細ワークスペースでは「複数出力・素材の管理」で出力の追加・複製・一括保存を行えます。簡易変換からも詳細ワークスペースへ進めます。制作画面から受け渡した元ファイルの保存リンクは設定内に残ります。別形式への変換は編集情報やメタデータを保持できない場合があります。</p>
+          <h3>文字アートと復元コード</h3><p>ASCII・点字・絵文字の文字アートだけでは元ファイルへ完全には戻せません。復元コードは元ファイルの情報を含み、暗号化ではありません。位置情報や編集情報も含め、渡してよい内容か確認してください。Base64や復元コードは元ファイルより大きくなる場合があります。</p>
+        </div>
+      </details>
+    </section>
     <section class="guide-format-summary" aria-labelledby="guide-formats-title">
       <h2 id="guide-formats-title">よく使う形式から、専門的な形式まで。</h2>
       <p><a href="/output/gif-speed/">GIFの再生速度を変更・複数画像からGIFを作成 →</a></p>
@@ -72,7 +84,7 @@
         <div class="guide-format-copy">
           <h3>画像</h3><p>PNG・JPEG・WebP・GIF・APNGと、BMP（24/32bit非圧縮）、TIFF（8bit RGB/グレー・非圧縮/PackBits/LZW・先頭ページ）、TGA（RGB/グレー、RLE対応）、QOI、ICO（PNG内包または24/32bit）、PBM・PGM・PPM・PAMを読み込めます。</p>
           <p>PNG・JPEG・WebP・GIF・APNG・SVG・BMP・TIFF・TGA・QOI・ICO・PBM・PGM・PPM・PAMへ保存できます。WebP保存とアニメーションの読み込みはブラウザーによります。APNG保存は複数コマの素材に表示されます。ICO保存は単一サイズ・最大256px。静的SVGの読み込みは外部参照なし、2MB・5000要素までです。</p>
-          <p>各辺4096px・合計800万画素・1ファイル64MBまで。TIFFのCMYK・JPEG/Deflate圧縮・16bitや、HEIC/HEIF・PSD・RAW等は未対応です。SVG保存は画素を四角形で表す方式で、輪郭のベクター化ではありません。JPEG等は透過部分を背景色に合成します。画像のICC・EXIF・レイヤー等は保持しません。</p>
+          <p>各辺4096px・合計800万画素・1ファイル64MBまで。簡易変換で一度に選べるのは8ファイル・合計128MBまでです。複数選択は画像専用で、アニメーションは600コマ以内です。GIFは10ms刻み・最短20msに調整します。TIFFのCMYK・JPEG/Deflate圧縮・16bitや、HEIC/HEIF・PSD・RAW等は未対応です。SVG保存は画素を四角形で表す方式で、輪郭のベクター化ではありません。JPEG等は透過部分を背景色に合成します。画像のICC・EXIF・レイヤー等は保持しません。</p>
           <h3>音声</h3><p>AIFF/AIFCのPCM、AUのPCM・浮動小数点・μ-law・A-lawと、ブラウザーが読み込めるMP3・WAV等を読み込めます。WAV・AIFF・AUは16/24/32bit PCMで保存可能。対応環境ではM4A・WebM・Oggも選べます。MP3・FLAC出力は未対応です。</p>
           <p>120秒以内・モノラル/ステレオ・8〜48kHz・64MBまで。ブラウザー依存の一部入力は4MBまでです。読み込み時に再サンプリングされることがあります。圧縮形式は長さ程度の作成時間が必要で、先頭40ms・末尾80msの無音を加えます。元のタグは保持しません。</p>
           <div class="capability-table-wrap"><table class="capability-table"><caption>従来のワークスペースの対応形式</caption><thead><tr><th scope="col">素材</th><th scope="col">保存形式</th><th scope="col">注意点</th></tr></thead><tbody>

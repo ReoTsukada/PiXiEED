@@ -20,7 +20,7 @@
   "js/creation/jigsaw-file.mjs": "20260929-claude-integration-1",
   "js/creation/mode-entry.mjs": "20261016-tool-shell-1",
   "js/creation/output-handoff.mjs": "20261020-format-conversion-1",
-  "js/creation/output-page.mjs": "20261024-common-tool-start-1",
+  "js/creation/output-page.mjs": "20261031-workspace-2",
   "js/creation/pixfind-play.mjs": "20261024-free-tools-1",
   "js/creation/project-components-ui.mjs": "20261016-tool-shell-1",
   "js/creation/project-components.mjs": "20261016-tool-shell-1",
