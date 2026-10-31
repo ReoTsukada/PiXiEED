@@ -185,7 +185,10 @@ try {
   }
   await open('?mode=convert');
   await page.locator('[data-demo]').click();
+  const motionPanel = page.locator('#sc-settings-panel');
+  if (!(await motionPanel.evaluate(node => node.open))) await page.locator('[data-sc-settings-open]').click();
   await page.locator('[data-rate="2"]').click();
+  if (await motionPanel.evaluate(node => node.matches(':modal'))) { await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('#sc-settings-panel').open); }
   const gif = await exportFromVisibleAction();
   assert.match(gif.bytes.subarray(0, 6).toString(), /^GIF8[79]a$/);
   pass('Existing animated GIF conversion and playback-speed controls still export a real GIF');
