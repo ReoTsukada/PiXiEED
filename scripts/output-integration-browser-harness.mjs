@@ -176,7 +176,7 @@ try {
       }, { mode, bytes: [...bytes] })
     ]);
     await page.waitForFunction(() => document.querySelector('[data-tx-file-name]')?.textContent === 'exact.pxd');
-    const direct = await download('.sc-original-tools a[download]');
+    const direct = await exportFromVisibleAction();
     assert.equal(hash(direct.bytes), hash(bytes));
     await selectMode('output');
     await run();
