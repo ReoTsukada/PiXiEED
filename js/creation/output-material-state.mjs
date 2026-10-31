@@ -1,5 +1,20 @@
 const REPLACEABLE = new Set(['rgba-frames', 'audio-buffer', 'video-source']);
 
+/** Replace exactly one same-kind source without mutating imported or stored inputs. */
+export function replaceOutputMaterialSource(current, incoming, id, selectedCount) {
+  const existing = current.find((source) => source.id === id);
+  const replacement = incoming.length === 1 ? incoming[0] : null;
+  if (selectedCount !== 1 || !existing || !replacement || replacement.kind !== existing.kind || !REPLACEABLE.has(existing.kind)) {
+    throw new Error('置き換えには同じ種類の素材を1つ選んでください。現在の素材と出力はそのままです。');
+  }
+  const mediaSource = replacement.mediaSource
+    ? { ...replacement.mediaSource, frames: replacement.mediaSource.frames?.map((frame) => ({ ...frame })) }
+    : replacement.mediaSource;
+  const nextReplacement = { ...replacement, id: existing.id, ...(mediaSource ? { mediaSource } : {}) };
+  if (!nextReplacement.label) nextReplacement.label = existing.label;
+  return current.map((source) => source.id === id ? nextReplacement : source);
+}
+
 /** Return a read-only snapshot; frame pixel buffers are referenced, never copied. */
 export function describeOutputMaterialState({ record, mediaSources = [], outputItems = [], activeId = '', activeItemId = '', busy = false } = {}) {
   const assets = mediaSources.map((source) => {

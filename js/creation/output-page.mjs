@@ -14,7 +14,7 @@ import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatch
 import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
 import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261021-jigsaw-public-1';
-import { describeOutputMaterialState } from './output-material-state.mjs?rev=20261031-material-api-1';
+import { describeOutputMaterialState, replaceOutputMaterialSource } from './output-material-state.mjs?rev=20261031-material-api-1';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -871,34 +871,29 @@ async function handleImport(files, { replaceAudio = false, replaceSourceId = '' 
     if (record) {
       let next = [...mediaSources];
       if (replaceSourceId) {
-        const existing = next.find((source) => source.id === replaceSourceId);
-        const replacement = newSources.length === 1 ? newSources[0] : null;
-        if (selected.length !== 1 || !existing || !replacement || replacement.kind !== existing.kind
-          || !['rgba-frames', 'audio-buffer', 'video-source'].includes(existing.kind)) {
-          throw new Error('置き換えには同じ種類の素材を1つ選んでください。現在の素材と出力はそのままです。');
-        }
-        replacement.id = existing.id;
-        next = next.map((source) => source.id === existing.id ? { ...replacement, label: replacement.label || existing.label } : source);
+        next = replaceOutputMaterialSource(next, newSources, replaceSourceId, selected.length);
       } else if (replaceAudio) {
         const existingAudio = audioBufferSource();
         const replacement = newSources.find((source) => source.kind === 'audio-buffer');
         if (!existingAudio || selected.length !== 1 || !replacement || imported.frames.length) throw new Error('置き換えには音声ファイルを1つだけ選んでください。画像や既存素材は変更していません。');
-        replacement.id = existingAudio.id;
-        next = next.map((source) => source.id === existingAudio.id ? replacement : source);
-      } else if (imported.audio && audioBufferSource()) {
-        throw new Error('音声素材は1つまでです。音声素材の「置き換え」から新しい音声を選んでください。');
+        next = replaceOutputMaterialSource(next, newSources, existingAudio.id, selected.length);
       }
-      const appendedImages = newSources.find((source) => source.kind === 'rgba-frames');
-      const existingImages = next.find((source) => source.kind === 'rgba-frames' && source.id === 'local-images');
-      if (!replaceAudio && appendedImages && existingImages) {
-        const frames = fitOutputFrames([...existingImages.mediaSource.frames, ...appendedImages.mediaSource.frames]);
-        const merged = { ...existingImages, label: `画像 (${frames.length}コマ)`, mediaSource: { ...existingImages.mediaSource, width: frames[0].width, height: frames[0].height, frames } };
-        next = next.map((source) => source.id === existingImages.id ? merged : source);
-      }
-      const additions = replaceAudio ? [] : newSources.filter((source) => !(appendedImages && existingImages && source === appendedImages));
-      for (const source of additions) {
-        if (next.some((item) => item.id === source.id)) source.id = `${source.id}-${createItemId().slice(0, 8)}`;
-        next.push(source);
+      if (!replaceAudio && !replaceSourceId) {
+        if (imported.audio && audioBufferSource()) {
+          throw new Error('音声素材は1つまでです。音声素材の「置き換え」から新しい音声を選んでください。');
+        }
+        const appendedImages = newSources.find((source) => source.kind === 'rgba-frames');
+        const existingImages = next.find((source) => source.kind === 'rgba-frames' && source.id === 'local-images');
+        if (appendedImages && existingImages) {
+          const frames = fitOutputFrames([...existingImages.mediaSource.frames, ...appendedImages.mediaSource.frames]);
+          const merged = { ...existingImages, label: `画像 (${frames.length}コマ)`, mediaSource: { ...existingImages.mediaSource, width: frames[0].width, height: frames[0].height, frames } };
+          next = next.map((source) => source.id === existingImages.id ? merged : source);
+        }
+        const additions = newSources.filter((source) => !(appendedImages && existingImages && source === appendedImages));
+        for (const source of additions) {
+          if (next.some((item) => item.id === source.id)) source.id = `${source.id}-${createItemId().slice(0, 8)}`;
+          next.push(source);
+        }
       }
       if (next.length > 8) throw new RangeError('素材は8種類まで追加できます。不要な素材を削除してください。');
       if (!(await persistMediaSources(next))) throw new Error('素材を端末内に保存できませんでした。元の素材と出力はそのままです。');
