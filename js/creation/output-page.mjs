@@ -1559,7 +1559,7 @@ async function applySelectedSize() {
     status.textContent = `${outputScaleRewardLabel}を作成できません。現在の出力と元の素材は保持されています。`;
     return;
   }
-  await generateOutputItem({ dimensions, staticEntitledAtStart: outputRewardEnabled() && hasSiteReward() });
+  return generateOutputItem({ dimensions, staticEntitledAtStart: outputRewardEnabled() && hasSiteReward() });
 }
 
 function displayFormat(entry) {
@@ -1718,10 +1718,10 @@ timelinePlay.addEventListener('click', () => {
   timelineTimer = setTimeout(playTimelineNext, delay);
 });
 fpsPreset.addEventListener('change', () => { if (fpsPreset.value) fpsInput.value = fpsPreset.value; });
-applyFps.addEventListener('click', () => {
-  if (mediaWritePending || generationController || importController || !activeSource) return;
+async function applySelectedFps() {
+  if (mediaWritePending || generationController || importController || !activeSource) return false;
   const frames = sourceFrames();
-  if (frames.length < 2) return;
+  if (frames.length < 2) return false;
   const formatValue = formatSelect.value;
   const options = formatValue === 'gif' ? { minDelayMs: 20, maxDelayMs: 655350 } : { minDelayMs: 1, maxDelayMs: 3600000 };
   let delayMs;
@@ -1729,10 +1729,11 @@ applyFps.addEventListener('click', () => {
   catch { status.textContent = formatValue === 'gif' ? 'GIFに設定できるFPSは約0.00153〜50です。' : 'FPSは0.000278〜1000の範囲で指定してください。'; return; }
   const selectedSourceId = activeSource.id;
   const nextFrames = frames.map((frame) => ({ ...frame, delayMs }));
-  void persistMediaSources(mediaSources.map((source) => source.id === selectedSourceId
+  return persistMediaSources(mediaSources.map((source) => source.id === selectedSourceId
     ? { ...source, mediaSource: { ...source.mediaSource, frames: nextFrames } }
     : source), { ...mediaSettings, playbackRate: 1 });
-});
+}
+applyFps.addEventListener('click', () => { void applySelectedFps(); });
 loopCount.addEventListener('change', () => { void persistMediaSources(mediaSources, { ...mediaSettings, totalPlays: Number(loopCount.value) }); });
 musicTotalPlaysControl?.addEventListener('change', () => {
   const plays = Number(musicTotalPlaysControl.value);
@@ -1954,6 +1955,10 @@ window.addEventListener('pageshow', (event) => {
   if (event.persisted) previewFit.reconnect();
 });
 
+Object.defineProperty(outputLayout, 'conversionActions', { value: Object.freeze({
+  get busy() { return Boolean(mediaWritePending || itemWritePending || generationController || importController); },
+  applyFps: applySelectedFps, applySize: applySelectedSize, generate: generateOutputItem,
+}) });
 renderOutputCapabilities();
 refreshScaleLimits();
 void mount();

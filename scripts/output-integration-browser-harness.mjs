@@ -43,10 +43,16 @@ async function open(query = '?mode=convert&text=input') {
 }
 async function selectMode(mode) {
   const source = page.locator('[data-sc-source]'), target = page.locator('[data-sc-target]');
-  if (mode === 'output') { await source.selectOption('file'); await target.selectOption('text'); }
-  else if (mode === 'input') { await target.selectOption('file'); await source.selectOption('text'); }
-  else { await source.selectOption('file'); await target.selectOption('file'); }
+  if (mode === 'output') { await selectWorkspace('[data-sc-source]','file'); await selectWorkspace('[data-sc-target]','text'); }
+  else if (mode === 'input') { await selectWorkspace('[data-sc-target]','file'); await selectWorkspace('[data-sc-source]','text'); }
+  else { await selectWorkspace('[data-sc-source]','file'); await selectWorkspace('[data-sc-target]','file'); }
   await page.waitForFunction(expected => document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode === expected, mode);
+}
+async function selectWorkspace(selector,value) {
+  const panel=page.locator('#sc-settings-panel');
+  if (!(await panel.evaluate(node=>node.open))) await page.locator('[data-sc-settings-open]').click();
+  await page.locator(selector).selectOption(value);
+  if (await panel.evaluate(node=>node.matches(':modal'))) { await page.keyboard.press('Escape'); await page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open); }
 }
 async function exportFromVisibleAction() {
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#output-nav-export').click()]);
@@ -101,14 +107,14 @@ try {
   await page.screenshot({ path: output + '/text-desktop.png', fullPage: true });
   await page.locator('[data-tx-use]').click();
   await page.waitForFunction(() => !document.querySelector('[data-editor]').hidden && document.querySelector('#main').getAttribute('aria-busy') === 'false');
-  await page.locator('[data-sc-format]').selectOption('jpeg');
+  await selectWorkspace('[data-sc-format]','jpeg');
   const jpeg = await exportFromVisibleAction();
   assert.equal(jpeg.bytes.subarray(0, 2).toString('hex'), 'ffd8');
   pass('Text-generated PNG enters the existing media converter and saves a real JPEG');
   await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'pixels.png', mimeType: 'image/png', buffer: png.bytes });
   for (const style of ['ascii', 'block', 'braille', 'emoji', 'custom']) {
-    await page.locator('[data-sc-format]').selectOption(style);
+    await selectWorkspace('[data-sc-format]',style);
     await run();
     const art = await page.locator('[data-tx-text-result]').inputValue();
     assert.ok(art.length > 0);
@@ -120,7 +126,7 @@ try {
   pass('Full-text selection remains available independently of clipboard permissions');
   const bytes = Buffer.from(Array.from({ length: 16384 }, (_, index) => index * 37 & 255));
   await page.locator('[data-tx-file]').setInputFiles({ name: '原本.pxd', mimeType: 'application/octet-stream', buffer: bytes });
-  await page.locator('[data-sc-format]').selectOption('encode');
+  await selectWorkspace('[data-sc-format]','encode');
   await run();
   const code = (await download('[data-tx-txt]')).bytes.toString();
   assert.match(code, /BEGIN PIXIEED RESTORE 1/);
@@ -145,7 +151,7 @@ try {
   await selectMode('input');
   const cancelText = 'キャンセル前に保持する合成テキスト';
   await page.locator('[data-tx-source]').fill(cancelText);
-  await page.locator('[data-sc-format]').selectOption('text');
+  await selectWorkspace('[data-sc-format]','text');
   await page.evaluate(() => { document.querySelector('#output-nav-export').click(); document.querySelector('[data-tx-cancel]').click(); });
   await page.waitForFunction(() => document.querySelector('[data-text-tools]').getAttribute('aria-busy') === 'false');
   assert.match(await page.locator('[data-tx-status]').innerText(), /中止しました/);
@@ -170,7 +176,7 @@ try {
       }, { mode, bytes: [...bytes] })
     ]);
     await page.waitForFunction(() => document.querySelector('[data-tx-file-name]')?.textContent === 'exact.pxd');
-    const direct = await download('.text-legacy a[download]');
+    const direct = await download('.sc-original-tools a[download]');
     assert.equal(hash(direct.bytes), hash(bytes));
     await selectMode('output');
     await run();

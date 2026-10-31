@@ -52,7 +52,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
     'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
   ]);
-  for (const target of allToolsOfferwall) assert.equal(revisions[target], '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
+  for (const target of allToolsOfferwall) assert.equal(revisions[target], target === 'js/creation/output-page.mjs' ? '20261031-workspace-2' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',

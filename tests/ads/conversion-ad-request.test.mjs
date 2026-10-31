@@ -60,11 +60,20 @@ test('the actual workspace uses one optional ad outside the active work area',as
  assert.doesNotMatch(entry,/await import\('\.\.\/ads\/conversion-display-ad\.mjs/);
  assert.match(ad,/paths = new Set\(\['\/tools\/start\/convert\/', '\/output\/work\/'\]\)/);
  assert.match(ad,/main\.before\(wrapper\); wrapper\.append\(main\);/);
- assert.match(ad,/wrapper\.append\(guide\);/);
+ assert.match(ad,/wrapper\.append\(host\);/);
  assert.equal((ad.match(/doc\.createElement\('ins'\)/g)||[]).length,1);
  assert.match(ad,/config\?\.slots\?\.tools/);
  assert.match(config,/tools:\s*'8825932060'/);
- assert.match(ad,/doc\.fullscreenElement \|\| doc\.querySelector\('dialog\[open\]/);
- assert.match(css,/data-ad-layout="rail"\]\s*\.conversion-companion\s*\{\s*position:absolute/);
+ assert.match(ad,/doc\.fullscreenElement \|\| doc\.querySelector\('dialog:modal/);
+ assert.match(css,/data-ad-layout="rail"\]\s*\.conversion-display-ad\s*\{\s*position:absolute/);
  assert.doesNotMatch(css,/position:\s*(?:fixed|sticky)/);
+});
+test('work screen has no companion guide and requests only with a safe rail',async()=>{
+ const code=await readFile(new URL('../../js/ads/conversion-display-ad.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(code,/conversion-companion|guideMarkup/);
+ assert.match(code,/if \(!layout\?\.rail\) return 'no-safe-rail'/);
+ assert.match(code,/if \(!layout\.rail\) host\.hidden = true/);
+ assert.match(code,/dialog:modal/);
+ assert.doesNotMatch(code,/dialog\[open\]/);
+
 });
