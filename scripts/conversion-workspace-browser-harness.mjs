@@ -37,7 +37,7 @@ if(server.listening){
     await page.waitForFunction(wide=>{const panel=document.querySelector('#sc-settings-panel');return Boolean(panel&&(wide?panel.open&&!panel.matches(':modal'):!panel.open));},width>=960);
     await stable();
   };
-  await page.goto(base+'/output/work/?mode=convert',{waitUntil:'domcontentloaded'});
+  await page.goto(base+'/output/work/?mode=convert&to=jpeg',{waitUntil:'domcontentloaded'});
   const dialog=page.locator('#sc-settings-panel'),launcher=page.locator('[data-sc-settings-open]');await dialog.waitFor({state:'attached'});
   for(const [w,h,name] of [[320,640,'mobile-320'],[390,844,'mobile-390'],[1365,900,'desktop']]){await resizeViewport(w,h);await stable();await noOverflow(name);await page.screenshot({path:`${output}/${name}.png`,fullPage:true});}
   await resizeViewport(390,844);await launcher.click();assert.equal(await dialog.evaluate(e=>e.open),true);await page.locator('[data-sc-settings-close]').click();await closed();assert.equal(await dialog.evaluate(e=>e.open),false);assert.equal(await launcher.evaluate(e=>e===document.activeElement),true);pass('mobile settings closes and restores focus');
@@ -45,7 +45,10 @@ if(server.listening){
   await launcher.click();await page.goBack();await page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open);pass('browser Back closes settings');
   await resizeViewport(1365,900);assert.equal(await dialog.evaluate(e=>e.open),true,'desktop settings panel expected visible');await noOverflow('desktop settings');
   const png=await syntheticPng();await page.locator('[data-file]').setInputFiles({name:'synthetic-320x640.png',mimeType:'image/png',buffer:png});
-  await page.locator('[data-sc-format]').waitFor({state:'visible'});await page.locator('[data-sc-format]').selectOption('jpeg');
+  await page.locator('[data-sc-format]').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('.convert-intent')?.dataset.state==='ready'&&document.querySelector('[data-format]')?.value==='jpeg'&&document.querySelector('[data-sc-format]')?.value==='jpeg'&&document.querySelector('.sc-material-surface')?.dataset.loaded==='true');await stable();
+  assert.equal(await page.locator('.convert-intent').isVisible(),true,'JPEG intent remains visible after PNG import');
+  const bounds=await page.evaluate(()=>{const rect=s=>document.querySelector(s)?.getBoundingClientRect();const preview=rect('.convert-preview'),surface=rect('.sc-material-surface'),main=rect('#main');return {previewBottom:preview?.bottom,surfaceBottom:surface?.bottom,mainBottom:main?.bottom};});
+  assert.ok(bounds.previewBottom<=bounds.surfaceBottom+1&&bounds.surfaceBottom<=bounds.mainBottom+1,`loaded preview is clipped: ${JSON.stringify(bounds)}`);
   await page.locator('.convert-options > summary').click(); await page.locator('[data-width]').fill('20');
   const [jpegDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);
   assert.equal(await jpegDownload.failure(),null);const jpeg=await readFile(await jpegDownload.path());assert.equal(jpeg.subarray(0,2).toString('hex'),'ffd8');
