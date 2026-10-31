@@ -14,12 +14,20 @@ replace("await change('[data-sc-format]','ascii');", `await evaluate(async()=>{w
  await change('[data-sc-format]','ascii');`);
 replace('const change=async(selector,value)=>evaluate(', `const change=async(selector,value)=>{
    if(selector==='[data-sc-format]'){
+     await evaluate(()=>{const panel=document.querySelector('#sc-settings-panel');if(panel&&!panel.open)document.querySelector('[data-sc-settings-open]').click();});
+     await paint();
      await evaluate(()=>document.querySelector('[data-sc-format-row] .px-format-trigger').click());
      await evaluate(value=>{const row=[...document.querySelectorAll('.px-format-option')].find(e=>e.dataset.value===value);if(!row)throw Error('Missing choice '+value);row.click();},value);
      await paint(); return;
    }
    return evaluate(`);
 replace('},selector,value);\n const paint=', '},selector,value);};\n const paint=');
+replace('const click=selector=>evaluate(', `const click=async selector=>{
+   if(selector.includes('.px-format-trigger')||selector==='#output-extension'){
+     await evaluate(()=>{const panel=document.querySelector('#sc-settings-panel');if(panel&&!panel.open)document.querySelector('[data-sc-settings-open]').click();});await paint();
+   }
+   return evaluate(`);
+replace('},selector);\n const geometry=', '},selector);};\n const geometry=');
 const extra = `
  // The same end-to-end suite above now uses the custom picker for every format change.
  const latestBeforePicker=await text();
