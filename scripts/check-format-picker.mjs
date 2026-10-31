@@ -27,7 +27,7 @@ replace('const click=selector=>evaluate(', `const click=async selector=>{
      await evaluate(()=>{const panel=document.querySelector('#sc-settings-panel');if(panel&&!panel.open)document.querySelector('[data-sc-settings-open]').click();});await paint();
    }
    return evaluate(`);
-replace('},selector);\n const geometry=', '},selector);};\n const geometry=');
+replace('.click(),selector);\n const geometry=', '.click(),selector);};\n const geometry=');
 const extra = `
  // The same end-to-end suite above now uses the custom picker for every format change.
  const latestBeforePicker=await text();
