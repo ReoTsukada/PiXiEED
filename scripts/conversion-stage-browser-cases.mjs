@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 
 export async function checkConversionMaterialStage({ page, png, pass }) {
   const materialState = () => page.evaluate(() => document.querySelector('#main').conversionMaterials.getState());
-  const count = n => page.waitForFunction(n => { const m = document.querySelector('#main'); return m.getAttribute('aria-busy') !== 'true' && m.conversionMaterials.getState().assets.length === n; }, n);
+  // Material events update their model synchronously; the shared surface renders on RAF.
+  // Await both semantics without replacing the visibility assertions below.
+  const count = n => page.waitForFunction(n => {
+    const m = document.querySelector('#main'), surface = m.querySelector('.sc-material-surface'), strip = m.querySelector('.sc-material-strip');
+    return m.getAttribute('aria-busy') !== 'true' && m.conversionMaterials.getState().assets.length === n
+      && surface?.dataset.loaded === String(n > 0)
+      && (n < 2 ? strip?.hidden : !strip?.hidden && strip?.childElementCount === n);
+  }, n);
   const choose = async (selector, file) => {
     const chooser = page.waitForEvent('filechooser'); await page.locator(selector).click(); await (await chooser).setFiles(file);
   };
