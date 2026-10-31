@@ -4,13 +4,13 @@ const query = new URLSearchParams(location.search);
 try { window.__PIXIEED_OFFERWALL_ENTRY__?.retire?.(); } catch { /* Optional site policy. */ }
 try {
   if (query.has('id') || query.has('file')) {
-    const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261031-workspace-2');
+    const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261031-material-stage-1');
     await mountSharedOutput(sharedOutputRequest(location.search));
   } else if (query.get('mode') === 'convert') {
     const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/conversion-simple.css?rev=20261028-motion-1'; document.head.append(css);
-    const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261031-workspace-2'); mountConversionPage();
+    const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261031-material-stage-1'); mountConversionPage();
   } else {
-    await import('./output-page.mjs?rev=20261031-workspace-2');
+    await import('./output-page.mjs?rev=20261031-material-stage-1');
   }
 } catch (error) {
   const main = document.getElementById('main');
@@ -38,7 +38,7 @@ try {
 
 // Share one contextual UI and fixed export action without replacing any conversion engine.
 try {
-  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261031-workspace-2');
+  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261031-material-stage-1');
   mountSmartConversion();
 } catch (error) {
   console.warn('Smart conversion UI unavailable; original conversion controls remain available.', error);

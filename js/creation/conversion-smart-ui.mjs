@@ -1,4 +1,5 @@
-import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261031-workspace-2';
+import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261031-material-stage-1';
+import { saveActionLabel, materialChangeInvalidatesSave } from './conversion-stage.mjs?rev=20261031-material-stage-1';
 import { PUBLIC_NAV_ITEMS } from '../page-navigation.mjs?rev=20261024-common-tool-start-1';
 
 /** Presentation adapter only: all decoding, validation and saving stay in the existing engines. */
@@ -24,7 +25,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; link.dataset.smartStyle = key; doc.head.append(link);
   };
   style('/css/public-navigation.css?rev=20261030-smart-convert-1', 'navigation');
-  style('/css/conversion-smart-ui.css?rev=20261031-workspace-2', 'conversion');
+  style('/css/conversion-smart-ui.css?rev=20261031-material-stage-1', 'conversion');
 
   const toolbar = doc.createElement('section'); toolbar.className = 'sc-toolbar'; toolbar.setAttribute('aria-label', '変換の設定');
   toolbar.innerHTML = `<header class="sc-heading"><div><p>PIXIEED / CONVERT</p><h1>変換・出力</h1></div><span>端末内で処理</span></header>
@@ -52,8 +53,8 @@ export function mountSmartConversion(doc = document, win = window) {
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
   const buttonLabel = button.querySelector('span');
   const dock = doc.createElement('div'); dock.className = 'sc-export-status';
-  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><span class="sc-export-message" role="status" aria-live="polite"></span><button type="button" hidden>中止</button>';
-  const message = dock.querySelector('span'), cancel = dock.querySelector('button');
+  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><span class="sc-export-message" role="status" aria-live="polite"></span><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button>';
+  const message = dock.querySelector('span'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
   let lastTextUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
   let lastSaved = null, pendingDimensions = null;
@@ -112,14 +113,15 @@ export function mountSmartConversion(doc = document, win = window) {
   }
   function mirrorFormat() {
     const original = nativeFormat(), row = ui('[data-sc-format-row]');
-    row.hidden = !original || original.options.length === 0 || (mode() === 'media' && !loaded());
+    const hideRow = !original || original.options.length === 0 || (mode() === 'media' && !loaded());
+    if (row.hidden !== hideRow) row.hidden = hideRow;
     if (row.hidden) return;
     const signature = [...original.options].map(o => `${o.value}\0${o.textContent}\0${o.disabled}`).join('\n');
     if (signature !== controlSignature) {
       format.replaceChildren(...[...original.options].map(o => o.cloneNode(true))); controlSignature = signature;
     }
     if (format.value !== original.value) format.value = original.value;
-    format.disabled = busy() || original.disabled;
+    const disableFormat = busy() || original.disabled; if (format.disabled !== disableFormat) format.disabled = disableFormat;
     setText(ui('[data-sc-format-label]'), mode() === 'input' ? '文字からつくるもの' : mode() === 'output' ? '文字の表現' : '出力形式');
   }
   function render() {
@@ -149,7 +151,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const nativeProgress = [...main.querySelectorAll('progress:not([data-sc-progress]):not([data-sc-panel-progress])')].find(available);
     const progress = dock.querySelector('progress'); progress.hidden = !working;
     if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
-    const label = working && (!live || saveIntent.pending) ? '処理中' : !loaded() ? (currentMode === 'input' ? '文字を入力' : '素材を選ぶ') : '保存';
+    const label = saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: nativeFormat()?.value, filename: link?.download });
     setText(buttonLabel, label);
     setAttr(button, 'aria-label', working ? '最新設定の出力を作成中' : ready ? '現在の結果を端末に保存' : loaded() ? '現在の設定で変換して端末に保存' : label);
     cancel.hidden = !working || !cancelAction();
@@ -159,7 +161,14 @@ export function mountSmartConversion(doc = document, win = window) {
     const summary = working ? nativeStatus || '変換しています…' : savedCurrent ? 'ダウンロードを開始しました。保存ボタンで再保存できます。' : nativeStatus || (ready ? '保存できます。保存ボタンで再保存できます。' : '仕上がりを調整して、保存。必要な変換は保存時に行います。');
     const displayedStatus = actualSize ? `${summary} 実出力 ${actualSize}` : summary;
     setText(message, displayedStatus);
-    workspace.update({ media: currentMode === 'media', loaded: loaded(), ready, link, working, saveDisabled: button.disabled, status: displayedStatus, progress: nativeProgress, canCancel: !cancel.hidden });
+    workspace.update({ media: currentMode === 'media', loaded: loaded(), ready, link, working, saveDisabled: button.disabled, status: displayedStatus, progress: nativeProgress, canCancel: !cancel.hidden, saveLabel: label });
+    const batchAction = $('#output-batch-save');
+    const batchCount = Number(batchAction?.textContent.match(/（(\d+)）/)?.[1] || 0);
+    batch.hidden = currentMode !== 'media' || batchCount < 2;
+    batch.disabled = locked || saveIntent.pending || !batchAction || batchAction.disabled;
+    setText(batch, `出力${batchCount}件を保存`);
+    batch.title = '選択した作成済みの出力を保存します。現在の設定変更は中央の保存から反映します。';
+    setAttr(batch, 'aria-label', `選択済みの出力${batchCount}件をまとめて保存`);
     const hint = currentMode === 'input' ? '文章・文字アート・復元コードを判別します。設定は必要なときだけ開けます。'
       : currentMode === 'output' ? '設定変更でプレビューを自動更新。中央の出力で確認済みの結果を保存します。復元コードは暗号化ではありません。'
       : loaded() ? '形式に応じた設定だけを表示しています。出力ボタンは画面下に固定されています。'
@@ -228,7 +237,7 @@ export function mountSmartConversion(doc = document, win = window) {
     if (!saveIntent.pending) pendingDimensions = fpsDirty && sizeDirty ? { width: $('#output-width')?.value, height: $('#output-height')?.value } : null;
     saveIntent.request(); schedule();
   }
-  workspace.bindActions({ save: beginExport, cancel() { saveIntent.cancel(); cancelAction()?.click(); schedule(); } });
+  workspace.bindActions({ save: beginExport, replace: acceptFiles, refresh: schedule, cancel() { saveIntent.cancel(); cancelAction()?.click(); schedule(); } });
   function changed(event) {
     if (toolbar.contains(event.target)) return;
     const element = event.target;
@@ -265,7 +274,7 @@ export function mountSmartConversion(doc = document, win = window) {
   toolbar.addEventListener('dragover', event => event.preventDefault());
   toolbar.addEventListener('drop', event => { event.preventDefault(); acceptFiles(event.dataTransfer?.files); });
   main.addEventListener('drop', event => {
-    if (busy() || toolbar.contains(event.target) || event.target.closest('[data-text-tools]')) return;
+    if (busy() || toolbar.contains(event.target) || event.target.closest('[data-text-tools],.sc-material-surface')) return;
     const files = event.dataTransfer?.files;
     if (files?.length === 1 && /\.(txt|md|pxtxt|json)$/i.test(files[0].name) && $('[data-tx-text-file]')) {
       event.preventDefault(); event.stopPropagation(); acceptFiles(files);
@@ -273,6 +282,14 @@ export function mountSmartConversion(doc = document, win = window) {
   }, true);
   main.addEventListener('input', changed); main.addEventListener('change', changed);
   main.addEventListener('pixieed:text-preview', schedule);
+  function materialsChanged(event) {
+    if (event.detail?.changed) {
+      if (materialChangeInvalidatesSave(event.detail)) { revision++; saveIntent.cancel(); }
+      mediaDirty = true; lastSaved = null;
+    }
+    schedule();
+  }
+  main.addEventListener('pixieed:materials', materialsChanged);
   main.addEventListener('click', event => {
     const el = event.target.closest('button'); if (!el) return;
     if (el.matches('#output-cancel-generation,#output-cancel-settings,#output-cancel-import,[data-cancel],[data-tx-cancel],[data-tx-live-cancel]')) saveIntent.cancel();
@@ -283,6 +300,7 @@ export function mountSmartConversion(doc = document, win = window) {
     schedule();
   });
   button.addEventListener('click', beginExport);
+  batch.addEventListener('click', () => { const action = $('#output-batch-save'); if (!busy() && !saveIntent.pending && action && !action.disabled) action.click(); schedule(); });
   cancel.addEventListener('click', () => { saveIntent.cancel(); cancelAction()?.click(); schedule(); });
   const observer = new win.MutationObserver(records => {
     if (records.some(record => !toolbar.contains(record.target) && (
@@ -301,6 +319,7 @@ export function mountSmartConversion(doc = document, win = window) {
     workspace.destroy();
     main.removeEventListener('input', changed); main.removeEventListener('change', changed);
     main.removeEventListener('pixieed:text-preview', schedule);
+    main.removeEventListener('pixieed:materials', materialsChanged);
     win.removeEventListener('pagehide', onHide); win.removeEventListener('pageshow', onShow);
   }
   return { refresh: schedule, destroy };

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/** UNRUN real-Chromium regression for the compact conversion workspace. */
+/** Real-Chromium regression for the compact conversion workspace; local bind restrictions remain respected. */
 import assert from 'node:assert/strict';
+import { checkConversionMaterialStage } from './conversion-stage-browser-cases.mjs';
 import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -47,7 +48,8 @@ if(server.listening){
   const resultVisible=await page.locator('[data-sc-result-view]').getAttribute('aria-pressed');assert.equal(resultVisible,'true');
   await page.locator('[data-sc-source-view]').click();assert.equal(await page.locator('[data-sc-source-view]').getAttribute('aria-pressed'),'true');
   const dims=await page.evaluate(async bytes=>{const blob=new Blob([new Uint8Array(bytes)],{type:'image/jpeg'});const img=new Image();img.src=URL.createObjectURL(blob);await img.decode();return [img.naturalWidth,img.naturalHeight];},[...jpeg]);assert.deepEqual(dims,[20,40]);pass('one-click JPEG save yields valid 20x40 output; optional result view and live source view toggle');
-  for(const [w,h] of [[320,640],[390,844],[1365,900]]) { await page.setViewportSize({width:w,height:h});await stable();await noOverflow(`loaded ${w}x${h}`); }
+  await checkConversionMaterialStage({page,png,pass});
+  for(const [w,h] of [[320,640],[390,844],[1365,900]]) { await page.setViewportSize({width:w,height:h});await stable();await noOverflow(`loaded ${w}x${h}`);await page.screenshot({path:`${output}/preview-${w}x${h}.png`,fullPage:false}); }
   await page.setViewportSize({width:390,height:844});await launcher.click();assert.equal(await page.locator('[data-width]').inputValue(),'20');await page.keyboard.press('Escape');await closed();
   await launcher.click();
   const [panelSave]=await Promise.all([page.waitForEvent('download'),page.locator('[data-sc-panel-save]').click()]);assert.equal(await panelSave.failure(),null);assert.equal(await dialog.evaluate(e=>e.open),true,'mobile save keeps settings panel open');pass('mobile settings panel saves while remaining open');await page.keyboard.press('Escape');await closed();

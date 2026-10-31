@@ -1,6 +1,7 @@
 import { FILE_ACCEPT, conversionChoices, outputNotice, safeConvertedName } from './conversion-service.mjs?rev=20261028-conversion-1';
-import { loadTimelineFiles, animationPlan, frameAt, setFrameSeconds, moveFrame, convertWithTimeline } from './conversion-timeline.mjs?rev=20261028-motion-1';
+import { loadTimelineFiles, animationPlan, frameAt, setFrameSeconds, moveFrame, convertWithTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
+import { addConversionMaterials, countConversionMaterialFrames, describeConversionMaterials, removeConversionMaterial, snapshotConversionMaterialSource, validateConversionMaterialFiles } from './conversion-materials.mjs?rev=20261031-materials-1';
 
 /** Contextual, local-only conversion. Media, names and settings are never sent to analytics. */
 export function mountConversionPage(doc = document, win = window) {
@@ -68,7 +69,7 @@ export function mountConversionPage(doc = document, win = window) {
   const input = $('[data-file]'), format = $('[data-format]'), status = $('[data-status]'), progress = $('[data-progress]');
   input.accept = FILE_ACCEPT;
   const canvas = $('[data-canvas]'), raw = doc.createElement('canvas');
-  let source = null, original = null, controller = null, busy = false, rate = 1, plan = null, valid = true;
+  let source = null, original = null, controller = null, busy = false, rate = 1, plan = null, valid = true, assetSequence = 0;
   let resultUrl = null, resultName = '', unsaved = false, playing = false, raf = null, elapsed = 0, epoch = 0, shown = -1;
   const webp = (() => { try { return doc.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp'); } catch { return false; } })();
   const text = message => { status.textContent = message; };
@@ -159,11 +160,20 @@ export function mountConversionPage(doc = document, win = window) {
     if (isImage) draw(motion ? 0 : Math.max(0, Math.min(source.frames.length - 1, Number($('[data-frame]').value) - 1)));
     $('[data-convert]').disabled = busy || !valid;
   }
-  function acceptSource(next) {
+  function acceptSource(next, { preserveSettings = false } = {}) {
+    if (!next.assets?.length) {
+      const id = next.assetId || `material-${++assetSequence}`;
+      const frames = next.frames?.map((frame, index) => ({ ...frame, assetId: frame.assetId || id, frameId: frame.frameId || `${id}:${index}` })) || [];
+      next = { ...next, frames, assets: [{ id, name: next.name || '素材', bytes: 0, kind: next.kind, rawFrames: frames }] };
+    }
+    const settings = preserveSettings ? { format: format.value, width: $('[data-width]').value, height: $('[data-height]').value,
+      quality: $('[data-quality]').value, background: $('[data-background]').value, threshold: $('[data-threshold]').value,
+      frame: $('[data-frame]').value, bits: $('[data-bits]').value, ratio: $('[data-ratio]').checked,
+      loop: $('[data-loop]').value, rate } : null;
     main.classList.add('has-source');
     main.querySelector('h1').textContent = next.kind === 'image' && next.frames.length > 1 ? '動きを整える。' : 'ファイルを変換';
-    source = { ...next, frames: next.frames?.map(f => ({ ...f })) || [] }; original = { ...source, frames: [...source.frames] };
-    clearResult(); rate = 1; $('[data-drop]').hidden = true; $('[data-editor]').hidden = false;
+    source = snapshotConversionMaterialSource(next); original = snapshotConversionMaterialSource(source);
+    clearResult(); rate = settings?.rate ?? 1; $('[data-drop]').hidden = true; $('[data-editor]').hidden = false;
     $('[data-name]').textContent = next.sequence ? `${next.frames.length}コマの画像` : next.name;
     $('[data-meta]').textContent = next.kind === 'image' ? `${next.frames[0].width} × ${next.frames[0].height}px · ${next.frames.length}コマ` : `${next.audio.sampleRate.toLocaleString()} Hz · ${next.audio.channels.length}ch · ${(next.audio.channels[0].length / next.audio.sampleRate).toFixed(2)}秒`;
     $('[data-source-note]').textContent = next.note || ''; $('[data-source-note]').hidden = !next.note;
@@ -171,15 +181,53 @@ export function mountConversionPage(doc = document, win = window) {
     format.value = next.kind === 'audio' ? 'wav' : next.frames.length > 1 ? (String(next.inputFormat).toLowerCase() === 'apng' ? 'apng' : 'gif') : 'png';
     if (next.kind === 'image') { $('[data-width]').value = next.frames[0].width; $('[data-height]').value = next.frames[0].height; $('[data-frame]').value = 1; $('[data-frame]').max = next.frames.length; }
     $('[data-ratio]').checked = true; setLoop(next.totalPlays ?? 1);
+    if (settings) {
+      if ([...format.options].some(option => option.value === settings.format)) format.value = settings.format;
+      for (const [key, selector] of [['width','[data-width]'],['height','[data-height]'],['quality','[data-quality]'],['background','[data-background]'],['threshold','[data-threshold]'],['frame','[data-frame]'],['bits','[data-bits]']]) if (settings[key] !== '') $(selector).value = settings[key];
+      $('[data-ratio]').checked = settings.ratio; setLoop(Number(settings.loop)); $('[data-rate-input]').value = rate;
+    }
     $('[data-timing-details]').open = Boolean(next.sequence); $('[data-sequence]').open = false;
-    renderFrames(); refresh(); text('形式と設定を確認して、変換できます。');
+    renderFrames(); refresh(); text('形式と設定を確認して、変換できます。'); emitMaterials();
   }
   async function load(files) {
-    if (busy || !files?.length) return;
+    if (busy || !files?.length) return false;
     controller = new AbortController(); disable(true); text('ファイルを確認しています…');
-    try { const next = await loadTimelineFiles(files, { signal: controller.signal }); acceptSource(next); }
-    catch (error) { text(error.name === 'AbortError' ? '読み込みを中止しました。前の素材はそのままです。' : error.message || '読み込めませんでした。'); }
+    let loaded = false;
+    try { const next = await loadTimelineFiles(files, { signal: controller.signal, idForFile: file => `material-${++assetSequence}-${file.name}` }); acceptSource(next); loaded = true; }
+    catch (error) { text(error.name === 'AbortError' ? '読み込みを中止しました。前の素材はそのままです。' : error.message || '読み込めませんでした。'); emitMaterials(false); }
     finally { disable(false); controller = null; input.value = ''; if (source) format.focus({ preventScroll: true }); }
+    return loaded;
+  }
+  function emitMaterials(changed = true) { main.dispatchEvent(new win.CustomEvent('pixieed:materials', { bubbles: true, detail: { changed } })); }
+  function materialError(error) { text(error?.message || '素材を追加できませんでした。'); emitMaterials(false); }
+  async function addFiles(files) {
+    if (busy || !source || source.kind !== 'image' || source.video || !files?.length) return false;
+    let selected;
+    try { selected = validateConversionMaterialFiles(source, files); }
+    catch (error) { materialError(error); return false; }
+    controller = new AbortController(); disable(true); text('画像を追加しています…');
+    try {
+      const additions = [];
+      for (const file of selected) {
+        const loaded = await loadTimelineFiles([file], { signal: controller.signal, idForFile: item => `material-${++assetSequence}-${item.name}` });
+        if (loaded.kind !== 'image' || loaded.video) throw new Error('追加できる素材は画像だけです。動画・音声は「素材を変更」から1つずつ選んでください。');
+        additions.push(...loaded.assets);
+      }
+      const merged = addConversionMaterials(source, additions);
+      const baseline = addConversionMaterials(original, additions);
+      acceptSource(merged, { preserveSettings: true }); original = baseline; return true;
+    } catch (error) { if (error?.name !== 'AbortError') materialError(error); else { text('追加を中止しました。素材と設定はそのままです。'); emitMaterials(false); } return false; }
+    finally { disable(false); controller = null; }
+  }
+  function removeAsset(id) {
+    if (busy || !source) return false;
+    try {
+      const next = removeConversionMaterial(source, id); if (next === source) return false;
+      const baseline = removeConversionMaterial(original, id);
+      if (!next) { clearResult(); source = original = null; plan = null; main.classList.remove('has-source'); $('[data-editor]').hidden = true; $('[data-drop]').hidden = false; stop(true); text('素材を選んでください。'); emitMaterials(); }
+      else { acceptSource(next, { preserveSettings: true }); original = baseline; }
+      return true;
+    } catch (error) { materialError(error); return false; }
   }
   function changed() { if (busy) return; markDirty(); refresh(); if (valid) text('設定を変更しました。変換すると保存ファイルに反映されます。'); }
   function demo() {
@@ -253,6 +301,22 @@ export function mountConversionPage(doc = document, win = window) {
   const beforeLeave = event => { if (busy || unsaved) { event.preventDefault(); event.returnValue = ''; } }; win.addEventListener('beforeunload', beforeLeave);
   win.addEventListener('pagehide', () => { stop(); controller?.abort(); if (resultUrl) win.URL.revokeObjectURL(resultUrl); raw.width = raw.height = canvas.width = canvas.height = 1; doc.removeEventListener('visibilitychange', hide); win.removeEventListener('beforeunload', beforeLeave); }, { once: true });
   notifyToolEntryReady(false);
+  const materials = {
+    getState() {
+      const assets = describeConversionMaterials(source).map(asset => {
+        const firstFrame = source?.frames?.find(frame => frame.assetId === asset.id) || source?.assets?.find(item => item.id === asset.id)?.frames?.[0];
+        return firstFrame ? { ...asset, firstFrame } : asset;
+      });
+      const bytes = source?.assets?.reduce((sum, asset) => sum + (asset.bytes || 0), 0) || 0;
+      return { assets: assets.map(asset => ({ ...asset, canRemove: true, canReplace: true })),
+        canAdd: Boolean(source?.kind === 'image' && !source.video && assets.length < 8 && bytes < 128 * 1024 * 1024),
+        canReplace: true, canRemove: assets.length > 0, loaded: Boolean(source), frameCount: countConversionMaterialFrames(source) };
+    },
+    async addFiles(files) { return addFiles(files); },
+    async replaceFiles(files) { return load(files); },
+    removeAsset(id) { return removeAsset(id); },
+  };
+  main.conversionMaterials = materials;
   return {
     setSource(next, settings = {}) {
       if (busy) throw new Error('処理中は素材を変更できません。');
