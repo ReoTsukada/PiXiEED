@@ -241,7 +241,8 @@ export function mountSmartConversion(doc = document, win = window) {
   function changed(event) {
     if (toolbar.contains(event.target)) return;
     const element = event.target;
-    if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub]') || element.closest('#output-items')) return;
+    if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub]')) return;
+    if (element.closest('#output-items')) { schedule(); return; }
     revision++; saveIntent.cancel();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
     if (element.matches('#output-width,#output-height,#output-aspect-lock')) sizeDirty = true;
