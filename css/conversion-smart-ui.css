@@ -122,7 +122,7 @@ body.has-smart-conversion:has([data-workspace-media="true"]) { padding-bottom: 0
 [data-workspace-media="true"] .convert-file .convert-eyebrow, [data-workspace-media="true"] [data-replace] { display: none; }
 [data-workspace-media="true"] .convert-file strong { font-size: 13px; }
 [data-workspace-media="true"] .convert-file p { margin-top: 2px; font-size: 11px; }
-[data-workspace-media="true"] .convert-workbench { display: flex; min-height: 0; padding-top: 8px; }
+[data-workspace-media="true"] .convert-workbench { display: flex; align-items: stretch; min-height: 0; padding-top: 8px; }
 [data-workspace-media="true"] .convert-stage { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 [data-workspace-media="true"] .convert-preview { flex: 1; min-height: 100px; max-height: none; padding: 28px 12px 10px; }
 [data-workspace-media="true"] .convert-preview canvas { max-height: 100%; max-width: 100%; object-fit: contain; }

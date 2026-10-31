@@ -7,15 +7,22 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
   // Await both semantics without replacing the visibility assertions below.
   const count = n => page.waitForFunction(n => {
     const m = document.querySelector('#main'), surface = m.querySelector('.sc-material-surface'), strip = m.querySelector('.sc-material-strip');
-    return m.getAttribute('aria-busy') !== 'true' && m.conversionMaterials.getState().assets.length === n
+    const state = m.conversionMaterials.getState();
+    return m.getAttribute('aria-busy') !== 'true' && state.assets.length === n
       && surface?.dataset.loaded === String(n > 0)
-      && (n < 2 ? strip?.hidden : !strip?.hidden && strip?.childElementCount === n);
+      && (n < 2 ? strip?.hidden : !strip?.hidden && strip?.childElementCount === n)
+      && (n !== 1 || surface.querySelector('[data-sc-material-name]')?.textContent === state.assets[0]?.name);
   }, n);
   const choose = async (selector, file) => {
     const chooser = page.waitForEvent('filechooser'); await page.locator(selector).click(); await (await chooser).setFiles(file);
   };
   const file = name => ({ name, mimeType: 'image/png', buffer: png });
   assert.equal((await materialState()).assets.length, 1);
+  const previewSpace = await page.evaluate(() => ({
+    workbench: document.querySelector('.convert-workbench').getBoundingClientRect().height,
+    stage: document.querySelector('.convert-stage').getBoundingClientRect().height,
+  }));
+  assert.ok(previewSpace.stage >= previewSpace.workbench - 2, `preview fills its workbench: ${JSON.stringify(previewSpace)}`);
   assert.equal(await page.locator('.sc-material-strip').isVisible(), false);
   const idleMutations = await page.evaluate(async () => {
     let count = 0; const observer = new MutationObserver(records => { count += records.length; });
