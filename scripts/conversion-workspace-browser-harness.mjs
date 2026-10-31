@@ -32,13 +32,18 @@ if(server.listening){
   let downloads=0; page.on('download',()=>downloads++); page.on('dialog', d=>d.accept());
   const closed=()=>page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open);
   const stable=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  const resizeViewport=async(width,height)=>{
+    await page.setViewportSize({width,height});
+    await page.waitForFunction(wide=>{const panel=document.querySelector('#sc-settings-panel');return Boolean(panel&&(wide?panel.open&&!panel.matches(':modal'):!panel.open));},width>=960);
+    await stable();
+  };
   await page.goto(base+'/output/work/?mode=convert',{waitUntil:'domcontentloaded'});
   const dialog=page.locator('#sc-settings-panel'),launcher=page.locator('[data-sc-settings-open]');await dialog.waitFor({state:'attached'});
-  for(const [w,h,name] of [[320,640,'mobile-320'],[390,844,'mobile-390'],[1365,900,'desktop']]){await page.setViewportSize({width:w,height:h});await stable();await noOverflow(name);await page.screenshot({path:`${output}/${name}.png`,fullPage:true});}
-  await page.setViewportSize({width:390,height:844});await launcher.click();assert.equal(await dialog.evaluate(e=>e.open),true);await page.locator('[data-sc-settings-close]').click();await closed();assert.equal(await dialog.evaluate(e=>e.open),false);assert.equal(await launcher.evaluate(e=>e===document.activeElement),true);pass('mobile settings closes and restores focus');
+  for(const [w,h,name] of [[320,640,'mobile-320'],[390,844,'mobile-390'],[1365,900,'desktop']]){await resizeViewport(w,h);await stable();await noOverflow(name);await page.screenshot({path:`${output}/${name}.png`,fullPage:true});}
+  await resizeViewport(390,844);await launcher.click();assert.equal(await dialog.evaluate(e=>e.open),true);await page.locator('[data-sc-settings-close]').click();await closed();assert.equal(await dialog.evaluate(e=>e.open),false);assert.equal(await launcher.evaluate(e=>e===document.activeElement),true);pass('mobile settings closes and restores focus');
   await launcher.click();await page.keyboard.press('Escape');await closed();assert.equal(await dialog.evaluate(e=>e.open),false);assert.equal(await launcher.evaluate(e=>e===document.activeElement),true);pass('Escape closes settings and restores focus');
   await launcher.click();await page.goBack();await page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open);pass('browser Back closes settings');
-  await page.setViewportSize({width:1365,height:900});assert.equal(await dialog.evaluate(e=>e.open),true,'desktop settings panel expected visible');await noOverflow('desktop settings');
+  await resizeViewport(1365,900);assert.equal(await dialog.evaluate(e=>e.open),true,'desktop settings panel expected visible');await noOverflow('desktop settings');
   const png=await syntheticPng();await page.locator('[data-file]').setInputFiles({name:'synthetic-320x640.png',mimeType:'image/png',buffer:png});
   await page.locator('[data-sc-format]').waitFor({state:'visible'});await page.locator('[data-sc-format]').selectOption('jpeg');
   await page.locator('.convert-options > summary').click(); await page.locator('[data-width]').fill('20');
@@ -49,12 +54,12 @@ if(server.listening){
   await page.locator('[data-sc-source-view]').click();assert.equal(await page.locator('[data-sc-source-view]').getAttribute('aria-pressed'),'true');
   const dims=await page.evaluate(async bytes=>{const blob=new Blob([new Uint8Array(bytes)],{type:'image/jpeg'});const img=new Image();img.src=URL.createObjectURL(blob);await img.decode();return [img.naturalWidth,img.naturalHeight];},[...jpeg]);assert.deepEqual(dims,[20,40]);pass('one-click JPEG save yields valid 20x40 output; optional result view and live source view toggle');
   await checkConversionMaterialStage({page,png,pass});
-  for(const [w,h] of [[320,640],[390,844],[1365,900]]) { await page.setViewportSize({width:w,height:h});await stable();await noOverflow(`loaded ${w}x${h}`);await page.screenshot({path:`${output}/preview-${w}x${h}.png`,fullPage:false}); }
-  await page.setViewportSize({width:390,height:844});await launcher.click();assert.equal(await page.locator('[data-width]').inputValue(),'20');await page.keyboard.press('Escape');await closed();
+  for(const [w,h] of [[320,640],[390,844],[1365,900]]) { await resizeViewport(w,h);await stable();await noOverflow(`loaded ${w}x${h}`);await page.screenshot({path:`${output}/preview-${w}x${h}.png`,fullPage:false}); }
+  await resizeViewport(390,844);await launcher.click();assert.equal(await page.locator('[data-width]').inputValue(),'20');await page.keyboard.press('Escape');await closed();
   await launcher.click();
   const [panelSave]=await Promise.all([page.waitForEvent('download'),page.locator('[data-sc-panel-save]').click()]);assert.equal(await panelSave.failure(),null);assert.equal(await dialog.evaluate(e=>e.open),true,'mobile save keeps settings panel open');pass('mobile settings panel saves while remaining open');await page.keyboard.press('Escape');await closed();
-  await page.setViewportSize({width:844,height:390});await stable();await launcher.click();assert.equal(await dialog.evaluate(e=>e.matches(':modal')),true);await page.keyboard.press('Escape');await closed();
-  await page.setViewportSize({width:1365,height:900});await stable();
+  await resizeViewport(844,390);await stable();await launcher.click();assert.equal(await dialog.evaluate(e=>e.matches(':modal')),true);await page.keyboard.press('Escape');await closed();
+  await resizeViewport(1365,900);await stable();
   await noOverflow('loaded preview');await page.screenshot({path:output+'/preview.png',fullPage:true});
   await page.goto(base+'/output/work/?mode=convert',{waitUntil:'domcontentloaded'});await page.locator('[data-demo]').click();await page.locator('[data-rate="2"]').click();
   const [gifDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);const gif=await readFile(await gifDownload.path());assert.match(gif.subarray(0,6).toString(),/^GIF8[79]a$/);pass('GIF demo speed control one-click saves actual GIF bytes');
