@@ -158,6 +158,16 @@
       ]
     },
     {
+      "id": "region-6c0d1142c80dc685",
+      "label": "アメリカ合衆国",
+      "eventIds": [
+        "couch-dog-salem-pixel-party-art-night-2026-11-08"
+      ],
+      "areas": [
+        "Salem, Massachusetts"
+      ]
+    },
+    {
       "id": "region-72446fce7237cd50",
       "label": "オランダ",
       "eventIds": [
@@ -1054,6 +1064,18 @@
       "area": "札幌市",
       "sourceUrls": [
         "https://www.do-johodai.ac.jp/topics/9694350/"
+      ]
+    },
+    {
+      "id": "venue-5da810580d191277",
+      "label": "Couch Dog Brewing Co., 76 Lafayette St, Salem, MA 01970",
+      "eventIds": [
+        "couch-dog-salem-pixel-party-art-night-2026-11-08"
+      ],
+      "region": "アメリカ合衆国",
+      "area": "Salem, Massachusetts",
+      "sourceUrls": [
+        "https://www.couchdogbrewing.com/events/pixel-party-art-night-w-rob-lynch"
       ]
     },
     {
@@ -1958,7 +1980,7 @@
       "lastKnownEventDate": "2026-12-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -1983,7 +2005,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2771,7 +2793,7 @@
       "lastKnownEventDate": "2026-11-01",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T23:59:30+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "主催者公式本文で2026年11月1日11:00–15:00、札幌コンベンションセンター大ホールを確認。サークル本人の告知は委託参加予定。"
       }
     },
@@ -2826,7 +2848,7 @@
       "lastKnownEventDate": "2026-11-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-13T00:03:00+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2991,7 +3013,7 @@
       "lastKnownEventDate": "2026-11-01",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-29T23:58:13+00:00",
+        "lastCheckedAt": "2026-11-01T00:05:29+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3037,7 +3059,7 @@
       "lastKnownEventDate": "2026-11-01",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-29T00:02:07+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3120,7 +3142,7 @@
       "lastKnownEventDate": "2026-11-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:01:00+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3171,10 +3193,9 @@
       ],
       "lastKnownEventDate": "2026-11-03",
       "check": {
-        "result": "unavailable",
-        "lastCheckedAt": "2026-10-05T07:18:39+00:00",
-        "attemptedAt": "2026-10-29T23:58:13+00:00",
-        "notes": "公式本文で内容・開催日・場所を確認。 今回の公式ページ再取得はタイムアウト。前回読了した案内は保持し、現況の変更有無は未確認。"
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -3838,7 +3859,7 @@
       "lastKnownEventDate": "2026-11-15",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3886,7 +3907,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4380,7 +4401,7 @@
       "lastKnownEventDate": "2026-11-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-14T00:03:00+00:00",
+        "lastCheckedAt": "2026-11-01T00:05:29+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4407,7 +4428,7 @@
       "lastKnownEventDate": "2026-11-01",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-05T15:00:59+09:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5131,6 +5152,31 @@
       }
     },
     {
+      "id": "source-a4811d6f1f5ca377",
+      "label": "Pixel Party — art night w/ Rob Lynch",
+      "eventIds": [
+        "couch-dog-salem-pixel-party-art-night-2026-11-08"
+      ],
+      "url": "https://www.couchdogbrewing.com/events/pixel-party-art-night-w-rob-lynch",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "アメリカ合衆国"
+      ],
+      "areas": [
+        "Salem, Massachusetts"
+      ],
+      "venues": [
+        "Couch Dog Brewing Co., 76 Lafayette St, Salem, MA 01970"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-01T00:05:29+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-a63f8c4e755a3ea1",
       "label": "SHIBUYA PIXEL ART 2023 HAKKO",
       "eventIds": [
@@ -5180,7 +5226,7 @@
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5356,7 +5402,7 @@
       "lastKnownEventDate": "2026-11-01",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-17T00:23:10+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5626,7 +5672,7 @@
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6137,7 +6183,7 @@
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6684,7 +6730,7 @@
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-29T23:58:13+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6867,7 +6913,7 @@
       "lastKnownEventDate": "2026-12-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -7053,5 +7099,5 @@
       }
     }
   ],
-  "updatedAt": "2026-10-29T23:59:02+00:00"
+  "updatedAt": "2026-11-01T00:07:03+00:00"
 }
