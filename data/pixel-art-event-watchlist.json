@@ -226,6 +226,16 @@
       ]
     },
     {
+      "id": "region-a34b3a8afb7a05f8",
+      "label": "滋賀県",
+      "eventIds": [
+        "sagawa-art-museum-capcom-pixel-lab-2026-27"
+      ],
+      "areas": [
+        "守山市"
+      ]
+    },
+    {
       "id": "region-aa5ab35a9174c206",
       "label": "USA",
       "eventIds": [
@@ -823,6 +833,7 @@
       "region": "フランス",
       "area": "La Bourboule",
       "sourceUrls": [
+        "https://www.cc-massifdusancy.fr/festival-connexions-2026/",
         "https://www.sancy.com/fr/fiche/fete-et-manifestation/animation-atelier-pixel-art-serigraphie-la-bourboule-festival-connexions-2026-la-bourboule_TFO7996777/"
       ]
     },
@@ -896,6 +907,18 @@
       "area": "Montréal・Saint-Laurent, Québec",
       "sourceUrls": [
         "https://montreal.ca/evenements/mixlab-club-dart-du-pixel-119687"
+      ]
+    },
+    {
+      "id": "venue-3cfb43bae4feab4c",
+      "label": "佐川美術館（〒524-0102 滋賀県守山市水保町北川2891）",
+      "eventIds": [
+        "sagawa-art-museum-capcom-pixel-lab-2026-27"
+      ],
+      "region": "滋賀県",
+      "area": "守山市",
+      "sourceUrls": [
+        "https://www.sagawa-artmuseum.or.jp/plan/2026/10/post-183.html"
       ]
     },
     {
@@ -1823,6 +1846,18 @@
       ]
     },
     {
+      "id": "venue-edcde7949d44a51f",
+      "label": "Mixlab de la Bibliothèque du Boisé, 2727 boulevard Thimens, Montréal (Québec) H4R 1T4",
+      "eventIds": [
+        "montreal-mixlab-pixel-art-character-workshop-2026-11-05"
+      ],
+      "region": "Canada",
+      "area": "",
+      "sourceUrls": [
+        "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736"
+      ]
+    },
+    {
       "id": "venue-ee00320b45f4a74c",
       "label": "Lieu associatif Le Trois 8（38 Rue Jean Jaurès, 44400 Rezé）",
       "eventIds": [
@@ -2005,7 +2040,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2082,8 +2117,8 @@
       "lastKnownEventDate": "2026-11-04",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "notes": "自治体公式の2026年9〜12月プログラムを確認。Ingwiller、Maison de la famille、11月4日10〜12時、4〜8歳向けpixel art講座の掲載を確認。"
+        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
+        "notes": "2026-11-02 JSTに公式プログラム本文を再読。11月4日10〜12時、Maison de la famille à Ingwiller、4〜8歳向けPixel Art制作を確認。個別イベントURLは今回Cache missのため、別ソースとして取得不能記録を保持。"
       }
     },
     {
@@ -2682,12 +2717,13 @@
       ],
       "areas": [],
       "venues": [
-        "Bibliothèque du Boisé, Saint-Laurent"
+        "Bibliothèque du Boisé, Saint-Laurent",
+        "Mixlab de la Bibliothèque du Boisé, 2727 boulevard Thimens, Montréal (Québec) H4R 1T4"
       ],
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-15T00:00:00+00:00",
+        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4066,7 +4102,8 @@
       "id": "source-66c930c64e3fa16d",
       "label": "Atelier Pixel Art / sérigraphie — Médiathèque de Besse（2026-11-07）",
       "eventIds": [
-        "festival-connexions-besse-pixel-art-serigraphy-2026-11-07"
+        "festival-connexions-besse-pixel-art-serigraphy-2026-11-07",
+        "la-bourboule-pixel-art-serigraphie-2026-11-07"
       ],
       "url": "https://www.cc-massifdusancy.fr/festival-connexions-2026/",
       "kind": "website",
@@ -4075,15 +4112,17 @@
         "フランス"
       ],
       "areas": [
-        "Besse-et-Saint-Anastaise"
+        "Besse-et-Saint-Anastaise",
+        "La Bourboule"
       ],
       "venues": [
+        "Médiathèque La Bourboule（Avenue Guillaume-Duliège, 63150 La Bourboule）",
         "Médiathèque de Besse"
       ],
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-28T00:05:00+00:00",
+        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4228,9 +4267,10 @@
       ],
       "lastKnownEventDate": "2026-11-08",
       "check": {
-        "result": "official-confirmed",
+        "result": "unavailable",
         "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "attemptedAt": "2026-11-01T23:59:43+00:00",
+        "notes": "2026-11-02 JSTに作家の公式出展紹介URLを再取得したがCache miss。直近成功確認は保持。主催者公式トップでは11月7〜8日、Parc ChanotのHeroFestival開催を確認したが、この作家ブースの当年出展は再確認できず。"
       }
     },
     {
@@ -5672,7 +5712,7 @@
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6415,9 +6455,10 @@
       ],
       "lastKnownEventDate": "2026-11-04",
       "check": {
-        "result": "official-confirmed",
+        "result": "unavailable",
         "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "attemptedAt": "2026-11-01T23:59:43+00:00",
+        "notes": "2026-11-02 JSTに個別イベントURLを再取得したがCache miss。直近成功確認は保持。別の自治体公式プログラム本文で11月4日10〜12時、Ingwillerの会場、対象年齢、Pixel Art内容を確認。"
       }
     },
     {
@@ -6548,6 +6589,33 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-e13af63104c755e6",
+      "label": "大カプコン展 — カプコンピクセルラボ（ドット絵制作体験）",
+      "eventIds": [
+        "sagawa-art-museum-capcom-pixel-lab-2026-27"
+      ],
+      "url": "https://www.sagawa-artmuseum.or.jp/plan/2026/10/post-183.html",
+      "kind": "website",
+      "prefectures": [
+        "滋賀県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "守山市"
+      ],
+      "venues": [
+        "佐川美術館（〒524-0102 滋賀県守山市水保町北川2891）"
+      ],
+      "lastKnownEventDate": "2027-02-28",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -7099,5 +7167,5 @@
       }
     }
   ],
-  "updatedAt": "2026-11-01T00:07:03+00:00"
+  "updatedAt": "2026-11-02T00:01:04+00:00"
 }
