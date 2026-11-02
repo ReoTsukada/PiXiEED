@@ -1,6 +1,13 @@
-import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261031-material-stage-1';
-import { saveActionLabel, materialChangeInvalidatesSave } from './conversion-stage.mjs?rev=20261031-material-stage-1';
-import { PUBLIC_NAV_ITEMS } from '../page-navigation.mjs?rev=20261024-common-tool-start-1';
+import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
+import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
+import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261101-empty-area-1';
+import { saveActionLabel, materialChangeInvalidatesSave } from './conversion-stage.mjs?rev=20261101-empty-area-1';
+import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
+
+/** Use the same navigation DOM as other pages, once, retaining existing nodes. */
+export function ensureConversionNavigation(doc, win) {
+  return doc.querySelector('.public-destination-nav') || mountPublicNavigation({ document: doc, window: win });
+}
 
 /** Presentation adapter only: all decoding, validation and saving stay in the existing engines. */
 export function mountSmartConversion(doc = document, win = window) {
@@ -24,14 +31,13 @@ export function mountSmartConversion(doc = document, win = window) {
     if (doc.querySelector(`link[data-smart-style="${key}"]`)) return;
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; link.dataset.smartStyle = key; doc.head.append(link);
   };
-  style('/css/public-navigation.css?rev=20261030-smart-convert-1', 'navigation');
-  style('/css/conversion-smart-ui.css?rev=20261031-material-stage-1', 'conversion');
+  style('/css/conversion-smart-ui.css?rev=20261101-route-choice-1', 'conversion');
 
   const toolbar = doc.createElement('section'); toolbar.className = 'sc-toolbar'; toolbar.setAttribute('aria-label', '変換の設定');
   toolbar.innerHTML = `<header class="sc-heading"><div><p>PIXIEED / CONVERT</p><h1>変換・出力</h1></div><span>端末内で処理</span></header>
-    <div class="sc-route"><label>素材<select data-sc-source><option value="file">ファイル</option><option value="text">文字</option></select></label><span aria-hidden="true">→</span><label>出力先<select data-sc-target><option value="file">ファイル</option><option value="text">文字</option></select></label></div>
+    <div class="sc-route"><div class="sc-route-native"><label>元のデータ<select data-sc-source><option value="file">ファイル</option><option value="text">文字</option></select></label><span aria-hidden="true">→</span><label>作るもの<select data-sc-target><option value="file">ファイル</option><option value="text">文字</option></select></label></div></div>
     <div class="sc-input-actions"><button type="button" data-sc-pick>ファイルを選ぶ</button><button type="button" data-sc-paste>文字を貼り付ける</button></div>
-    <label class="sc-format" data-sc-format-row hidden><span data-sc-format-label>出力形式</span><select data-sc-format></select></label>
+    <label class="sc-format" data-sc-format-row hidden><span data-sc-format-label>保存形式</span><select data-sc-format></select></label>
     <p class="sc-hint" data-sc-hint>素材を選ぶと、対応する形式と必要な設定だけを表示します。</p><input type="file" data-sc-file multiple hidden>`;
   main.prepend(toolbar);
   const ui = selector => main.querySelector(selector);
@@ -39,6 +45,11 @@ export function mountSmartConversion(doc = document, win = window) {
   const nativeInput = find('[data-file],#output-file-input');
   picker.accept = [nativeInput?.accept || 'image/*,video/*,audio/*', '.txt,.md,.json,.pxtxt,text/plain'].join(',');
   if (!$('[data-text-tools]')) { source.disabled = true; target.disabled = true; ui('[data-sc-paste]').hidden = true; }
+
+  const routeChoices = mountConversionRouteChoices({ container: ui('.sc-route'), native: ui('.sc-route-native'), groups: [
+    { select: source, label: '元のデータ', name: 'sc-source-choice' },
+    { select: target, label: '作るもの', name: 'sc-target-choice' },
+  ], doc, win });
 
   // Keep the original nodes and their handlers; never rebuild private handoff state.
   const fileSettings = $('#output-file-settings');
@@ -52,9 +63,10 @@ export function mountSmartConversion(doc = document, win = window) {
   const button = doc.createElement('button'); button.type = 'button'; button.id = 'output-nav-export';
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
   const buttonLabel = button.querySelector('span');
-  const dock = doc.createElement('div'); dock.className = 'sc-export-status';
-  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><span class="sc-export-message" role="status" aria-live="polite"></span><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button>';
-  const message = dock.querySelector('span'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
+  const dock = doc.createElement('div'); dock.className = 'sc-export-status sc-save-bar';
+  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite"></span></div><div class="sc-save-actions"><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
+  dock.querySelector('.sc-save-actions').prepend(button);
+  const message = dock.querySelector('.sc-export-message'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
   let lastTextUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
   let lastSaved = null, pendingDimensions = null;
@@ -87,27 +99,16 @@ export function mountSmartConversion(doc = document, win = window) {
     ? (available($('#output-start')) ? $('#output-import-status') : find('[data-status],#output-status'))
     : $('[data-tx-status]'))?.textContent?.trim() || '';
   const loaded = () => mode() === 'media'
-    ? available(find('[data-editor],#output-layout')) || Boolean(result())
+    ? ((main.conversionMaterials?.getState?.() || $('#output-layout')?.conversionActions?.getMaterialState?.())?.loaded ?? (available(find('[data-editor],#output-layout')) || Boolean(result())))
     : mode() === 'input' ? Boolean($('[data-tx-source]')?.value.trim()) : liveText() ? liveText().hasSource : Boolean($('[data-tx-file-name]')?.textContent && !$('[data-tx-file-name]').textContent.includes('選んでください'));
   function schedule() { if (!stopped && !frame) frame = win.requestAnimationFrame(() => { frame = 0; render(); }); }
   function ensureNav() {
-    let next = doc.querySelector('.public-destination-nav');
-    if (!next) {
-      next = doc.createElement('nav'); next.className = 'mobile-nav public-destination-nav'; next.setAttribute('aria-label', 'メインナビゲーション');
-      for (const item of PUBLIC_NAV_ITEMS) {
-        const link = doc.createElement('a'); link.href = item.href; link.dataset.publicNav = item.key;
-        const icon = doc.createElement('img'); icon.src = `/assets/icons/pixieed/${item.icon}.svg`; icon.alt = '';
-        const label = doc.createElement('span'); label.textContent = item.label; link.append(icon, label); next.append(link);
-      }
-      doc.body.append(next);
-    }
+    const next = ensureConversionNavigation(doc, win);
+    if (!next) return;
     if (next !== nav) {
       navObserver?.disconnect(); nav = next;
       navObserver = new win.MutationObserver(ensureNav); navObserver.observe(nav, { childList: true });
     }
-    const center = nav.querySelector('[data-public-nav="create"]');
-    if (center) center.replaceWith(button);
-    else if (!nav.contains(button)) { navObserver.disconnect(); return; }
     if (!dock.isConnected) doc.body.append(dock);
     doc.body.classList.add('has-public-destination-nav', 'has-smart-conversion');
   }
@@ -122,7 +123,7 @@ export function mountSmartConversion(doc = document, win = window) {
     }
     if (format.value !== original.value) format.value = original.value;
     const disableFormat = busy() || original.disabled; if (format.disabled !== disableFormat) format.disabled = disableFormat;
-    setText(ui('[data-sc-format-label]'), mode() === 'input' ? '文字からつくるもの' : mode() === 'output' ? '文字の表現' : '出力形式');
+    setText(ui('[data-sc-format-label]'), mode() === 'input' ? '文字からつくるもの' : mode() === 'output' ? '文字の表現' : '保存形式');
   }
   function render() {
     ensureNav();
@@ -137,10 +138,13 @@ export function mountSmartConversion(doc = document, win = window) {
     }
     source.value = currentMode === 'input' ? 'text' : 'file';
     target.value = currentMode === 'output' ? 'text' : 'file';
-    target.options[1].disabled = currentMode === 'input';
+    if (target.options[1].disabled !== (currentMode === 'input')) target.options[1].disabled = currentMode === 'input';
     setText(target.options[0], 'ファイル');
     const hasText = Boolean($('[data-text-tools]'));
-    source.disabled = locked || !hasText; target.disabled = locked || !hasText;
+    const routesDisabled = locked || !hasText;
+    if (source.disabled !== routesDisabled) source.disabled = routesDisabled;
+    if (target.disabled !== routesDisabled) target.disabled = routesDisabled;
+    routeChoices?.update();
     ui('[data-sc-pick]').disabled = locked; ui('[data-sc-paste]').disabled = locked;
     mirrorFormat();
     main.dataset.smartLoaded = String(loaded());
@@ -153,25 +157,25 @@ export function mountSmartConversion(doc = document, win = window) {
     if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
     const label = saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: nativeFormat()?.value, filename: link?.download });
     setText(buttonLabel, label);
-    setAttr(button, 'aria-label', working ? '最新設定の出力を作成中' : ready ? '現在の結果を端末に保存' : loaded() ? '現在の設定で変換して端末に保存' : label);
+    setAttr(button, 'aria-label', label);
     cancel.hidden = !working || !cancelAction();
     const nativeStatus = statusText();
-    const actualSize = ready ? link?.textContent?.match(/(?:[\d,.]+\s*(?:KB|MB|bytes|バイト))/i)?.[0] : '';
     const savedCurrent = lastSaved?.mode === currentMode && lastSaved.revision === revision && lastSaved.href === href;
-    const summary = working ? nativeStatus || '変換しています…' : savedCurrent ? 'ダウンロードを開始しました。保存ボタンで再保存できます。' : nativeStatus || (ready ? '保存できます。保存ボタンで再保存できます。' : '仕上がりを調整して、保存。必要な変換は保存時に行います。');
-    const displayedStatus = actualSize ? `${summary} 実出力 ${actualSize}` : summary;
+    const displayedStatus = conversionSaveMessage({ loaded: loaded(), working, saved: savedCurrent, nativeStatus });
     setText(message, displayedStatus);
     workspace.update({ media: currentMode === 'media', loaded: loaded(), ready, link, working, saveDisabled: button.disabled, status: displayedStatus, progress: nativeProgress, canCancel: !cancel.hidden, saveLabel: label });
     const batchAction = $('#output-batch-save');
     const batchCount = Number(batchAction?.textContent.match(/（(\d+)）/)?.[1] || 0);
     batch.hidden = currentMode !== 'media' || batchCount < 2;
     batch.disabled = locked || saveIntent.pending || !batchAction || batchAction.disabled;
-    setText(batch, `出力${batchCount}件を保存`);
-    batch.title = '選択した作成済みの出力を保存します。現在の設定変更は中央の保存から反映します。';
-    setAttr(batch, 'aria-label', `選択済みの出力${batchCount}件をまとめて保存`);
+    const batchFormats = [...main.querySelectorAll('#output-items .output-item')].filter(row => row.querySelector('input[type="checkbox"]')?.checked).map(row => row.querySelector('.output-item__select strong')?.textContent?.trim() || '');
+    const batchLabel = batchSaveActionLabel(batchFormats, batchCount);
+    setText(batch, batchLabel);
+    batch.title = '選択した作成済みの出力を保存します。現在の設定変更は保存ボタンから反映します。';
+    setAttr(batch, 'aria-label', batchLabel);
     const hint = currentMode === 'input' ? '文章・文字アート・復元コードを判別します。設定は必要なときだけ開けます。'
-      : currentMode === 'output' ? '設定変更でプレビューを自動更新。中央の出力で確認済みの結果を保存します。復元コードは暗号化ではありません。'
-      : loaded() ? '形式に応じた設定だけを表示しています。出力ボタンは画面下に固定されています。'
+      : currentMode === 'output' ? '設定変更でプレビューを自動更新。保存ボタンで最新の結果を保存します。復元コードは暗号化ではありません。'
+      : loaded() ? '形式に応じた設定だけを表示しています。保存ボタンは画面下に固定されています。'
       : 'ファイルを選ぶと対応形式を表示します。TXT・メモは文字入力へ自動で切り替えます。';
     setText(ui('[data-sc-hint]'), hint);
     saveIntent.observe();
@@ -180,7 +184,7 @@ export function mountSmartConversion(doc = document, win = window) {
   function save(link) {
     if (!blobLink(link)) return;
     link.click(); lastSaved = { mode: mode(), revision, href: link.getAttribute('href') };
-    setText(message, '保存を開始しました。保存されない場合は、中央の出力をもう一度押してください。');
+    setText(message, 'ダウンロードを開始しました。');
     schedule(); win.requestAnimationFrame(() => workspace.focusSave(button));
   }
   function validInputs(scope) {
@@ -241,7 +245,7 @@ export function mountSmartConversion(doc = document, win = window) {
   function changed(event) {
     if (toolbar.contains(event.target)) return;
     const element = event.target;
-    if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub]')) return;
+    if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub],[data-sc-source],[data-sc-target]') || element.closest('[data-sc-route-choice]')) return;
     if (element.closest('#output-items')) { schedule(); return; }
     revision++; saveIntent.cancel();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
@@ -263,8 +267,17 @@ export function mountSmartConversion(doc = document, win = window) {
     } catch { setText(message, 'このブラウザーでは素材欄のファイル選択を使ってください。'); }
     schedule();
   }
-  source.addEventListener('change', () => { selectMode(source.value === 'text' ? 'input' : target.value === 'text' ? 'output' : 'media'); render(); });
-  target.addEventListener('change', () => { selectMode(target.value === 'text' ? 'output' : source.value === 'text' ? 'input' : 'media'); render(); });
+  function changeRoute(next) {
+    const focused = doc.activeElement, fromChoices = focused?.closest?.('[data-sc-route-choice]');
+    selectMode(next); render();
+    if (fromChoices) {
+      const dialog = focused.closest('dialog');
+      if (dialog && !dialog.open) ui('[data-sc-settings-open]')?.focus({ preventScroll: true });
+      else if (focused.isConnected && !focused.disabled) focused.focus({ preventScroll: true });
+    }
+  }
+  source.addEventListener('change', () => changeRoute(source.value === 'text' ? 'input' : target.value === 'text' ? 'output' : 'media'));
+  target.addEventListener('change', () => changeRoute(target.value === 'text' ? 'output' : source.value === 'text' ? 'input' : 'media'));
   format.addEventListener('change', () => {
     const original = nativeFormat(); if (!original || original.disabled || busy()) return;
     original.value = format.value; original.dispatchEvent(new win.Event('change', { bubbles: true })); schedule();
@@ -308,7 +321,7 @@ export function mountSmartConversion(doc = document, win = window) {
       record.type === 'attributes' || record.target.closest?.('.text-mode-nav,#output-status,#output-import-status,[data-status],[data-tx-status],select,[data-tx-file-name]')
     ))) schedule();
   });
-  observer.observe(main, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden','disabled','aria-busy','aria-pressed','href','download','value'] });
+  observer.observe(main, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden','disabled','aria-busy','aria-pressed','href','download','value','open'] });
   const bodyObserver = new win.MutationObserver(ensureNav); bodyObserver.observe(doc.body, { childList: true });
   main.dataset.smartConversion = 'true';
   render();
@@ -317,7 +330,7 @@ export function mountSmartConversion(doc = document, win = window) {
   win.addEventListener('pagehide', onHide); win.addEventListener('pageshow', onShow);
   function destroy() {
     stopped = true; if (frame) win.cancelAnimationFrame(frame); observer.disconnect(); bodyObserver.disconnect(); navObserver?.disconnect();
-    workspace.destroy();
+    workspace.destroy(); routeChoices?.destroy();
     main.removeEventListener('input', changed); main.removeEventListener('change', changed);
     main.removeEventListener('pixieed:text-preview', schedule);
     main.removeEventListener('pixieed:materials', materialsChanged);

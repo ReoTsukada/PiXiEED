@@ -431,19 +431,13 @@ export async function saveToolOutputItems(id, items, { indexedDBRef = globalThis
   const normalized = normalizeOutputItems(items);
   const database = await openDatabase(indexedDBRef);
   try {
-    await updateStoredRecord(database, id, (record) => {
+    return await updateStoredRecord(database, id, (record) => {
       const sourceIds = new Set((record.mediaSources || []).map((source) => source.id));
       const legacyImageSource = sourceIds.size === 0 && record.mime.startsWith('image/');
       if (normalized.some((item) => item.sourceId && !sourceIds.has(item.sourceId) && !(legacyImageSource && item.sourceId === 'legacy'))) throw new Error('出力素材との関連を確認できません。');
       record.outputs = normalized;
-      return true;
+      return { items: copyStoredValue(normalized), revision: (Number.isSafeInteger(record.revision) && record.revision >= 0 ? record.revision : 0) + 1 };
     }, now, expectedRevision);
-    const verified = await transactionResult(database, 'readonly', (store) => store.get(id));
-    if (!Array.isArray(verified?.outputs) || verified.outputs.length !== normalized.length
-      || verified.outputs.some((item, index) => item.blob?.size !== normalized[index].blob.size || item.filename !== normalized[index].filename)) {
-      throw new Error('出力項目を端末内に保存できませんでした。前の出力は保持されています。');
-    }
-    return { items: verified.outputs.map((item) => ({ ...item })), revision: Number.isSafeInteger(verified.revision) ? verified.revision : 0 };
   } finally { database.close?.(); }
 }
 
@@ -453,18 +447,71 @@ export async function saveToolOutputMedia(id, mediaSources, mediaSettings = {}, 
   const safeSettings = safeMediaSettings(mediaSettings);
   const database = await openDatabase(indexedDBRef);
   try {
-    await updateStoredRecord(database, id, (record) => {
+    return await updateStoredRecord(database, id, (record) => {
       const sourceIds = new Set(safeSources.map((source) => source.id));
       if ((record.outputs || []).some((item) => item.sourceId && !sourceIds.has(item.sourceId))) throw new Error('出力項目が使っている素材は削除できません。出力項目を先に削除してください。');
       record.mediaSources = safeSources;
       record.mediaSettings = safeSettings;
-      return true;
+      record.materialInputState = safeSources.length ? 'present' : 'empty';
+      return { mediaSources: copyStoredValue(safeSources), mediaSettings: { ...safeSettings }, revision: (Number.isSafeInteger(record.revision) && record.revision >= 0 ? record.revision : 0) + 1 };
     }, now, expectedRevision);
-    const verified = await transactionResult(database, 'readonly', (store) => store.get(id));
-    if (!verified || verified.mediaSources?.length !== safeSources.length || JSON.stringify(verified.mediaSettings || {}) !== JSON.stringify(safeSettings)) {
-      throw new Error('素材設定を端末内に保存できませんでした。前の素材と出力はそのまま使えます。');
-    }
-    return { mediaSources: cloneMediaSources(verified.mediaSources), mediaSettings: safeMediaSettings(verified.mediaSettings), revision: Number.isSafeInteger(verified.revision) ? verified.revision : 0 };
+  } finally { database.close?.(); }
+}
+
+function copyStoredValue(value) {
+  if (value === undefined) return undefined;
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return value;
+}
+
+function captureMaterialRecord(record) {
+  const snapshot = { recordId: record.id };
+  for (const key of ['mediaSources', 'mediaSource', 'mediaSettings', 'outputs', 'materialInputState']) {
+    snapshot[key] = Object.prototype.hasOwnProperty.call(record, key) ? copyStoredValue(record[key]) : undefined;
+  }
+  return snapshot;
+}
+
+/** Delete one source and detach output references in one revision-guarded transaction.
+ *  The snapshot contains raw storage values so virtual legacy sources never pass through
+ *  the current-source validator and can be restored exactly.
+ */
+export async function removeToolOutputMaterial(id, sourceId, { indexedDBRef = globalThis.indexedDB, now = Date.now, expectedRevision = null } = {}) {
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(String(sourceId || ''))) throw new TypeError('削除する素材を確認できません。');
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new TypeError('削除する素材の改訂番号を確認できません。');
+  const database = await openDatabase(indexedDBRef);
+  try {
+    let committedSnapshot;
+    const committed = await updateStoredRecord(database, id, (record) => {
+      const currentSources = Array.isArray(record.mediaSources) ? record.mediaSources : [];
+      const storedMatch = currentSources.some((source) => source?.id === sourceId);
+      const virtualLegacyMatch = sourceId === 'legacy' && !currentSources.length && (record.mediaSource || record.blob);
+      if (!storedMatch && !virtualLegacyMatch) throw new Error('削除する素材が見つかりません。');
+      committedSnapshot = captureMaterialRecord(record);
+      const nextSources = currentSources.filter((source) => source?.id !== sourceId);
+      record.mediaSources = nextSources;
+      if (virtualLegacyMatch || (sourceId === 'legacy' && record.mediaSource && !nextSources.length)) record.mediaSource = null;
+      if (Array.isArray(record.outputs)) record.outputs = record.outputs.map((item) => item?.sourceId === sourceId ? { ...item, sourceId: '' } : item);
+      record.materialInputState = nextSources.length ? 'present' : 'empty';
+      return { snapshot: committedSnapshot, revision: (Number.isSafeInteger(record.revision) && record.revision >= 0 ? record.revision : 0) + 1 };
+    }, now, expectedRevision);
+    return committed;
+  } finally { database.close?.(); }
+}
+
+/** Restore a previously removed source snapshot only if no intervening record write occurred. */
+export async function restoreToolOutputMaterial(id, snapshot, { indexedDBRef = globalThis.indexedDB, now = Date.now, expectedRevision } = {}) {
+  if (!snapshot || snapshot.recordId !== id || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) throw new TypeError('元に戻す素材の状態を確認できません。');
+  const database = await openDatabase(indexedDBRef);
+  try {
+    const revision = await updateStoredRecord(database, id, (record) => {
+      for (const key of ['mediaSources', 'mediaSource', 'mediaSettings', 'outputs', 'materialInputState']) {
+        if (snapshot[key] === undefined) delete record[key];
+        else record[key] = copyStoredValue(snapshot[key]);
+      }
+      return (Number.isSafeInteger(record.revision) && record.revision >= 0 ? record.revision : 0) + 1;
+    }, now, expectedRevision);
+    return { revision };
   } finally { database.close?.(); }
 }
 

@@ -1,13 +1,16 @@
-import { mountConversionStage } from './conversion-stage.mjs?rev=20261031-material-stage-1';
+import { workspaceAvailableHeight, conversionDockBottom } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
+import { mountConversionStage } from './conversion-stage.mjs?rev=20261101-empty-area-1';
 
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
 export function mountConversionWorkspace(main, toolbar, doc = document, win = window) {
   const panel = doc.createElement('dialog'); panel.id = 'sc-settings-panel'; panel.className = 'sc-settings-panel';
   panel.setAttribute('aria-labelledby', 'sc-settings-title');
-  panel.innerHTML = '<header class="sc-panel-heading"><h2 id="sc-settings-title">仕上がりを調整</h2><button type="button" data-sc-settings-close aria-label="設定を閉じる">完了</button></header><div class="sc-panel-body"></div>';
+  panel.innerHTML = '<header class="sc-panel-heading"><h2 id="sc-settings-title">保存の設定</h2><button type="button" data-sc-settings-close aria-label="設定を閉じる">完了</button></header><div class="sc-panel-body"></div>';
   const body = panel.querySelector('.sc-panel-body');
-  for (const node of toolbar.querySelectorAll('.sc-route,.sc-format,.sc-hint')) body.append(node);
-  const warning = doc.createElement('p'); warning.className = 'sc-context-warning'; warning.dataset.scWarning = ''; warning.setAttribute('role', 'status'); warning.hidden = true; body.append(warning);
+  const routes = doc.createElement('details'); routes.className = 'sc-route-options'; routes.innerHTML = '<summary>文字との変換</summary>';
+  const route = toolbar.querySelector('.sc-route'); if (route) routes.append(route); body.append(routes);
+  for (const node of toolbar.querySelectorAll('.sc-format,.sc-hint')) body.append(node);
+  const warning = doc.createElement('p'); warning.className = 'sc-context-warning'; warning.dataset.scWarning = ''; warning.setAttribute('role', 'status'); warning.hidden = true; const formatHelp = doc.createElement('details'); formatHelp.className = 'sc-format-help'; formatHelp.innerHTML = '<summary>形式の注意点</summary>'; formatHelp.hidden = true; formatHelp.append(warning); body.append(formatHelp);
   const settings = main.querySelector('.convert-settings,.output-settings');
   if (settings) body.append(settings);
   // Sequence editing belongs with settings, rather than below the preview.
@@ -29,7 +32,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   panelSave.addEventListener('click', () => actions.save?.()); panelCancel.addEventListener('click', () => actions.cancel?.());
   main.append(panel);
   const open = doc.createElement('button'); open.type = 'button'; open.dataset.scSettingsOpen = '';
-  open.setAttribute('aria-controls', panel.id); open.setAttribute('aria-haspopup', 'dialog'); open.textContent = '形式・サイズ';
+  open.setAttribute('aria-controls', panel.id); open.setAttribute('aria-haspopup', 'dialog'); open.textContent = '設定';
   toolbar.querySelector('.sc-input-actions').append(open);
   const back = doc.createElement('a'); back.dataset.scBack = ''; back.className = 'sc-back';
   const origin = main.querySelector('#output-return,.convert-heading a');
@@ -53,18 +56,26 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     const keyboardInset = Math.max(0, win.innerHeight - height - (viewport?.offsetTop || 0));
     doc.body.style.setProperty('--sc-keyboard-inset', `${keyboardInset}px`);
     panel.style.maxHeight = `${Math.max(120, height - 12)}px`;
-    main.style.setProperty('--sc-space', `${Math.max(180, height - top - 124)}px`);
+    const dock = doc.querySelector('.sc-save-bar'), nav = doc.querySelector('.public-destination-nav');
+    if (dock && dock !== observedDock) { observedDock = dock; resize.observe(dock); }
+    const navTop = nav?.getBoundingClientRect().top;
+    doc.body.style.setProperty('--sc-save-bottom', `${conversionDockBottom({ layoutHeight: win.innerHeight, navTop })}px`);
+    const available = workspaceAvailableHeight({ viewportHeight: height, offsetTop: viewport?.offsetTop || 0, headerBottom: top, dockTop: dock?.getBoundingClientRect().top, navTop, minHeight: 0 });
+    main.style.setProperty('--sc-space', `${Math.max(180, available)}px`);
+    doc.body.classList.toggle('sc-scroll-fallback', available < 180);
+    doc.body.style.setProperty('--sc-bottom-reserve', `${Math.max(0, height + (viewport?.offsetTop || 0) - (dock?.getBoundingClientRect().top || height))}px`);
   }
+  let observedDock = null;
   const resize = new win.ResizeObserver(geometry); if (header) resize.observe(header);
   win.addEventListener('resize', geometry); win.visualViewport?.addEventListener('resize', geometry); win.visualViewport?.addEventListener('scroll', geometry);
-  const sourceTag = main.querySelector('.convert-preview-tag'); if (sourceTag) sourceTag.textContent = '素材のプレビュー';
+  const sourceTag = main.querySelector('.convert-preview-tag'); if (sourceTag) sourceTag.textContent = '元の素材';
   const stage = main.querySelector('.convert-stage,.output-preview-column');
   const preview = doc.createElement('section'); preview.dataset.scResultPreview = ''; preview.className = 'sc-result-preview'; preview.hidden = true;
   preview.innerHTML = '<p class="sc-result-label">保存するファイル <span data-sc-result-name></span></p><img alt="保存するファイルのプレビュー" hidden><audio controls hidden></audio><video controls playsinline hidden></video><p data-sc-result-fallback hidden>この形式はここでは表示できません。ファイルは保存できます。</p>';
   if (stage) stage.prepend(preview);
   const views = doc.createElement('div'); views.className = 'sc-preview-choice'; views.hidden = true;
   views.setAttribute('role', 'group'); views.setAttribute('aria-label', 'プレビューを選ぶ');
-  views.innerHTML = '<button type="button" data-sc-source-view aria-pressed="true">編集プレビュー</button><button type="button" data-sc-result-view aria-pressed="false">出力ファイル</button>';
+  views.innerHTML = '<button type="button" data-sc-source-view aria-pressed="true">元の素材</button><button type="button" data-sc-result-view aria-pressed="false">作成済みファイル</button>';
   if (stage) stage.prepend(views);
   const materialStage = mountConversionStage({ main, toolbar, panel, showSettings: panelController.show, doc, win });
   let lastUrl = '', mediaNode = null, lastLink = null, eligible = false, inspectResult = false;
@@ -98,13 +109,16 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     panelController.update(media);
     main.dataset.workspaceMedia = String(media);
     main.dataset.workspaceReady = String(media && ready);
-    text(open, loaded ? '形式・サイズ' : '素材・出力先');
-    if (settings) hidden(settings, !media || !loaded);
+    text(open, '設定');
+    hidden(routes, !main.querySelector('[data-text-tools]'));
+    const materialState = main.querySelector('#output-layout')?.conversionActions?.getMaterialState?.();
+    text(views.querySelector('[data-sc-source-view]'), materialState?.previewKind === 'output' ? '現在のプレビュー' : '元の素材');
+    if (settings) hidden(settings, !media || (!loaded && !materialState?.outputCount));
     hidden(extras, !media || !loaded);
     const returnHref = origin?.getAttribute('href'); if (returnHref && back.getAttribute('href') !== returnHref) back.href = returnHref;
     text(back, origin?.textContent?.includes('編集') ? '← 編集へ' : '← ガイド');
     const notice = media && loaded ? main.querySelector('[data-notice],#output-conversion-note')?.textContent?.trim() || '' : '';
-    text(warning, notice); hidden(warning, !notice);
+    text(warning, notice); hidden(warning, !notice); hidden(formatHelp, !notice);
     // Editing preview and playback stay primary. Inspecting encoded bytes is optional.
     eligible = Boolean(media && ready && link && stage); lastLink = link;
     hidden(views, !eligible); selectView(inspectResult);

@@ -1,7 +1,7 @@
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261020-format-conversion-1';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, removeToolOutputMaterial, restoreToolOutputMaterial, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261031-material-history-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261020-format-conversion-1';
 import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
@@ -14,7 +14,7 @@ import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatch
 import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
 import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261021-jigsaw-public-1';
-import { describeOutputMaterialState, replaceOutputMaterialSource } from './output-material-state.mjs?rev=20261031-material-api-1';
+import { describeOutputMaterialState, replaceOutputMaterialSource, outputMaterialSelectionAfterRemoval } from './output-material-state.mjs?rev=20261101-direct-material-1';
 
 const MAX_IMAGE_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16 * 1024 * 1024;
@@ -166,6 +166,10 @@ let mediaSettings = { playbackRate: 1, totalPlays: 0, musicTotalPlays: 1, musicS
 let lastImportedMedia = null;
 let mediaWritePending = false;
 let itemWritePending = false;
+let materialUndoTicket = null;
+let materialPreviewUrl = null;
+let materialPreviewActive = false;
+let materialPreviewController = null;
 let previewZoom = 1;
 const previewFit = createOutputPreviewFit(preview, [image, timelineCanvas, video], { getZoom: () => previewZoom });
 let rasterSettingsEpoch = 0;
@@ -493,7 +497,7 @@ function setActiveItem(item) {
   activeItem = item;
   setPreviewZoom(1);
   const foundSource = mediaSources.find((source) => source.id === item.sourceId);
-  activeSource = foundSource || mediaSources[0] || null;
+  activeSource = foundSource || (record.materialInputState ? null : mediaSources[0] || null);
   record.mime = item.mime; record.extension = item.extension; record.filename = item.filename; record.blob = item.blob;
   item.metadata = { ...(record.metadata || {}), ...(item.metadata || {}) };
   record.currentMetadata = item.metadata;
@@ -704,8 +708,11 @@ function renderAssets() {
   const audioSources = mediaSources.filter((source) => source.kind === 'audio-buffer');
   const videoSources = mediaSources.filter((source) => source.kind === 'video-source');
   const localAssets = [...imageSources, ...audioSources, ...videoSources];
-  assetsSection.hidden = !localAssets.length;
-  if (!localAssets.length) return;
+  assetsSection.hidden = !localAssets.length && !record?.materialInputState;
+  if (!localAssets.length) {
+    if (record?.materialInputState) assetsNote.textContent = '素材がありません。追加して出力を作成できます。保存済みの出力ファイルはそのまま利用できます。';
+    return;
+  }
   for (const source of imageSources) {
     const frames = source.mediaSource.frames;
     frames.forEach((frame, index) => {
@@ -822,13 +829,15 @@ async function persistMediaSources(nextSources, nextSettings = mediaSettings, { 
   mediaWritePending = true; renderAssets();
   try {
     const saved = await trackPending(saveToolOutputMedia(record.id, nextSources, nextSettings, { expectedRevision: record.revision || 0 }));
+    materialUndoTicket = null;
     mediaSources = saved.mediaSources; mediaSettings = saved.mediaSettings;
     record.revision = saved.revision;
     activeSource = mediaSources.find((source) => source.id === activeSource?.id) || mediaSources[0] || null;
     record.mediaSources = mediaSources; record.mediaSettings = mediaSettings; record.mediaSource = activeSource?.mediaSource || null;
+    record.materialInputState = mediaSources.length ? 'present' : 'empty';
     fillSourceAndFormatControls({ preferredFormat: editableSettings.values.get('#output-format-select')?.value || activeItem?.extension });
-    renderAssets(); updateSequenceControls(); setMedia(record); updateMusicPlayControl();
-    restoreMaterialSettings(editableSettings);
+    renderAssets(); updateSequenceControls(); updateMusicPlayControl();
+    if (activeSource) await selectMaterialAsset(activeSource.id, { settings: editableSettings, notify: false });
     status.textContent = '素材の並びと設定を保存しました。出力ファイルは次の作成時に反映します。';
     main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation, status: status.textContent } }));
     return true;
@@ -1628,6 +1637,9 @@ function displayFormat(entry) {
 }
 
 function setMedia(entry) {
+  materialPreviewController?.abort(); materialPreviewController = null;
+  if (materialPreviewUrl) { URL.revokeObjectURL(materialPreviewUrl); materialPreviewUrl = null; }
+  materialPreviewActive = false;
   const type = entry.mime;
   releaseRasterPreview();
   if (posterUrl) URL.revokeObjectURL(posterUrl);
@@ -1721,8 +1733,8 @@ async function mount() {
     returnLink.href = record.returnUrl;
     returnLink.textContent = new URL(record.returnUrl, location.origin).pathname === '/output/' ? '素材選択へ戻る' : '編集画面へ戻る';
     mediaSources = record.mediaSources || [];
-    if (!mediaSources.length && record.mediaSource) mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'legacy-image', mediaSource: record.mediaSource }];
-    if (!mediaSources.length && record.mime.startsWith('image/') && !record.metadata?.previewOnly) {
+    if (record.materialInputState !== 'empty' && !mediaSources.length && record.mediaSource) mediaSources = [{ id: 'legacy', label: '元の画像', kind: 'legacy-image', mediaSource: record.mediaSource }];
+    if (record.materialInputState !== 'empty' && !mediaSources.length && !record.materialInputState && record.mime.startsWith('image/') && !record.metadata?.previewOnly) {
       let sourceUrlToRelease = null; let sourceCanvas = null;
       try {
         const original = new Image(); sourceUrlToRelease = URL.createObjectURL(record.sourceBlob); original.src = sourceUrlToRelease; await original.decode();
@@ -1736,12 +1748,12 @@ async function mount() {
       } catch { /* Keep the original file downloadable when pixel decoding is unavailable. */ }
       finally { if (sourceCanvas) sourceCanvas.width = sourceCanvas.height = 1; if (sourceUrlToRelease) URL.revokeObjectURL(sourceUrlToRelease); }
     }
-    if (!mediaSources.length) mediaSources = [{ id: 'legacy', label: record.source || '元のファイル', kind: 'legacy-file', blob: record.sourceBlob, mime: record.mime, extension: record.extension }];
+    if (record.materialInputState !== 'empty' && !mediaSources.length) mediaSources = [{ id: 'legacy', label: record.source || '元のファイル', kind: 'legacy-file', blob: record.sourceBlob, mime: record.mime, extension: record.extension }];
   const importedTotalPlays = mediaSources.find((source) => source.mediaSource?.totalPlays !== undefined || source.mediaSource?.loopCount !== undefined)?.mediaSource?.totalPlays ?? mediaSources.find((source) => source.mediaSource?.loopCount !== undefined)?.mediaSource?.loopCount ?? 0;
     mediaSettings = { playbackRate: record.mediaSettings?.playbackRate || 1, totalPlays: record.mediaSettings?.totalPlays ?? record.mediaSettings?.loopCount ?? importedTotalPlays, musicTotalPlays: Math.max(1, Math.min(8, Number(record.mediaSettings?.musicTotalPlays) || 1)), musicSourceId: record.mediaSettings?.musicSourceId || '' };
     outputItems = record.outputs?.length ? record.outputs : [{ id: 'default', sourceId: mediaSources[0]?.id || '', mime: record.mime, extension: record.extension, filename: record.filename, blob: record.blob, metadata: record.currentMetadata || {} }];
     activeItem = outputItems[0];
-    if (!activeItem.sourceId) activeItem.sourceId = mediaSources[0]?.id || '';
+    if (!activeItem.sourceId && !record.materialInputState) activeItem.sourceId = mediaSources[0]?.id || '';
     setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
     renderAssets(); updateSequenceControls();
     filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
@@ -1998,9 +2010,11 @@ window.addEventListener('pagehide', (event) => {
   previewFit.suspend();
   if (event.persisted) return;
   pageDisposed = true;
+  materialPreviewController?.abort(); materialPreviewController = null;
   previewFit.disconnect();
   generationController?.abort();
-  for (const url of [sourceUrl, fileUrl, previewUrl, posterUrl, ...generatedDownloadUrls.values()]) if (url) URL.revokeObjectURL(url);
+  for (const url of [sourceUrl, fileUrl, previewUrl, posterUrl, materialPreviewUrl, ...generatedDownloadUrls.values()]) if (url) URL.revokeObjectURL(url);
+  materialPreviewUrl = null;
 });
 window.addEventListener('pageshow', (event) => {
   if (event.persisted) previewFit.reconnect();
@@ -2010,7 +2024,9 @@ function materialState() {
   return { ...describeOutputMaterialState({
     record, mediaSources, outputItems, activeId: sourceSelect.value, activeItemId: activeItem?.id || '',
     busy: Boolean(mediaWritePending || itemWritePending || generationController || importController),
-  }), previewKind: timelineCanvas.hidden ? 'output' : 'material' };
+  }), previewKind: materialPreviewActive ? 'material' : 'output',
+    canUndo: Boolean(materialUndoTicket && materialUndoTicket.revision === record?.revision),
+    undoName: materialUndoTicket?.sourceName || '' };
 }
 
 function materialNotice(message) {
@@ -2040,15 +2056,127 @@ async function replaceMaterialFiles(id, files) {
 async function removeMaterial(id) {
   const target = mediaSources.find((source) => source.id === id);
   if (!target) { materialNotice('削除する素材が見つかりません。'); return false; }
-  if (outputItems.some((item) => item.sourceId === id)) {
-    materialNotice('出力項目がこの素材を使用しています。先に出力項目を削除するか、別の素材へ割り当ててください。'); return false;
-  }
   if (mediaWritePending || itemWritePending || generationController || importController) {
     materialNotice('別の処理が終わってから素材を削除してください。'); return false;
   }
-  const committed = await persistMediaSources(mediaSources.filter((source) => source.id !== id));
-  if (!committed) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: false, status: status.textContent } }));
-  return committed;
+  const localTicket = { sourceId: id, sourceName: target.label || target.filename || '素材', sources: mediaSources,
+    settings: mediaSettings, activeSourceId: activeSource?.id || '', ui: captureMaterialSettings() };
+  mediaWritePending = true; renderAssets(); let committedWrite = false;
+  try {
+    const committed = await trackPending(removeToolOutputMaterial(record.id, id, { expectedRevision: record.revision || 0 }));
+    committedWrite = true;
+    materialUndoTicket = { ...localTicket, snapshot: committed.snapshot, revision: committed.revision };
+    mediaSources = mediaSources.filter((source) => source.id !== id);
+    outputItems = outputItems.map((item) => item.sourceId === id ? { ...item, sourceId: '' } : item);
+    record.outputs = outputItems; record.mediaSources = mediaSources; record.mediaSettings = mediaSettings;
+    if (id === 'legacy' && !mediaSources.length) record.mediaSource = null;
+    record.materialInputState = mediaSources.length ? 'present' : 'empty'; record.revision = committed.revision;
+    activeItem = outputItems.find((item) => item.id === activeItem?.id) || outputItems[0] || null;
+    const selectedId = outputMaterialSelectionAfterRemoval(localTicket.sources, id, localTicket.activeSourceId);
+    activeSource = mediaSources.find((source) => source.id === selectedId) || null;
+    sourceSelect.value = activeSource?.id || '';
+    fillSourceAndFormatControls({ preferredFormat: localTicket.ui.values.get('#output-format-select')?.value || activeItem?.extension });
+    renderAssets(); updateSequenceControls(); renderOutputItems();
+    if (activeSource) await selectMaterialAsset(activeSource.id, { settings: localTicket.ui, notify: false });
+    else { stopTimelinePreview(); audio.pause(); video.pause(); rasterSettingsController?.abort(); releaseRasterPreview(); }
+    status.textContent = mediaSources.length ? `${localTicket.sourceName}を削除しました。元に戻せます。` : '素材を削除しました。出力ファイルは保存されています。素材を追加して再作成できます。';
+    main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation: 'material-remove', status: status.textContent } }));
+    return true;
+  } catch (error) {
+    materialNotice(committedWrite ? '素材の削除は保存されました。表示を更新できませんでした。画面を再読み込みして確認してください。'
+      : error?.message || '素材を削除できませんでした。元の素材と出力はそのままです。');
+    return committedWrite;
+  } finally { mediaWritePending = false; renderAssets(); }
+}
+
+async function undoMaterialRemoval() {
+  const ticket = materialUndoTicket;
+  if (!ticket || ticket.revision !== record?.revision || mediaWritePending || itemWritePending || generationController || importController) return false;
+  const pendingUi = captureMaterialSettings();
+  mediaWritePending = true; renderAssets(); let committedWrite = false;
+  try {
+    const restored = await trackPending(restoreToolOutputMaterial(record.id, ticket.snapshot, { expectedRevision: ticket.revision }));
+    committedWrite = true;
+    materialUndoTicket = null;
+    mediaSources = ticket.sources; mediaSettings = ticket.settings;
+    record.mediaSources = ticket.snapshot.mediaSources; record.mediaSource = ticket.snapshot.mediaSource;
+    record.mediaSettings = ticket.snapshot.mediaSettings; record.outputs = ticket.snapshot.outputs;
+    if (ticket.snapshot.materialInputState === undefined) delete record.materialInputState;
+    else record.materialInputState = ticket.snapshot.materialInputState;
+    record.revision = restored.revision;
+    outputItems = ticket.snapshot.outputs || outputItems;
+    activeItem = outputItems.find((item) => item.id === activeItem?.id) || outputItems[0] || null;
+    activeSource = mediaSources.find((source) => source.id === ticket.activeSourceId) || mediaSources[0] || null;
+    sourceSelect.value = activeSource?.id || '';
+    fillSourceAndFormatControls({ preferredFormat: ticket.ui.values.get('#output-format-select')?.value || activeItem?.extension });
+    renderAssets(); updateSequenceControls(); renderOutputItems();
+    const restoredUi = pendingUi.sourceId && pendingUi.sourceId === activeSource?.id ? pendingUi : ticket.ui;
+    if (activeSource) await selectMaterialAsset(activeSource.id, { settings: restoredUi, notify: false });
+    status.textContent = `${ticket.sourceName}を元に戻しました。`;
+    main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation: 'material-undo', status: status.textContent } }));
+    return true;
+  } catch (error) {
+    if (!committedWrite) materialUndoTicket = null;
+    materialNotice(committedWrite ? '元に戻す処理は保存されました。表示を更新できませんでした。画面を再読み込みして確認してください。'
+      : error?.message || '素材を元に戻せませんでした。最新の状態を読み込み直してください。');
+    return committedWrite;
+  } finally { mediaWritePending = false; renderAssets(); }
+}
+
+async function selectMaterialAsset(id, { settings = null, notify = true } = {}) {
+  const source = mediaSources.find((item) => item.id === id);
+  if (!source || (notify && (mediaWritePending || itemWritePending || generationController || importController))) return false;
+  const previousId = activeSource?.id;
+  const pendingUi = settings || captureMaterialSettings();
+  materialPreviewController?.abort();
+  const previewController = new AbortController(); materialPreviewController = previewController;
+  activeSource = source; sourceSelect.value = source.id;
+  // Source selection never starts origin inference or generates a replacement output.
+  rasterSettingsController?.abort(); rasterSettingsEpoch++; releaseRasterPreview();
+  materialPreviewActive = true; stopTimelinePreview(); audio.pause(); video.pause();
+  if (materialPreviewUrl) { URL.revokeObjectURL(materialPreviewUrl); materialPreviewUrl = null; }
+  fillSourceAndFormatControls({ preferredFormat: pendingUi.values.get('#output-format-select')?.value || formatSelect.value });
+  const frames = sourceFrames(source);
+  if (frames.length) {
+    const { width, height } = frames[0];
+    rasterProfile = { sourceId: id, width, height, status: 'skip', canUseOrigin: false, preferredScale: 1 };
+    pngBaseSize = { width, height };
+    const startWidth = Number(pendingUi.values.get('#output-width')?.value) || width;
+    const startHeight = Number(pendingUi.values.get('#output-height')?.value) || height;
+    const animated = isAnimatedOutputFormat(formatSelect.value) && frames.length > 1;
+    setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight,
+      kind: animated ? 'gif' : 'png', frameCount: animated ? frames.length : 1 });
+    scaleSettings.hidden = false;
+    scaleNote.textContent = '元の素材を保持し、保存時に出力サイズを反映します。';
+  } else { rasterProfile = null; scaleSettings.hidden = true; }
+  const values = new Map(pendingUi.values);
+  if (!settings && previousId !== id) { values.delete('#output-fps'); values.delete('#output-fps-preset'); values.delete('#output-still-frame'); }
+  restoreMaterialSettings({ ...pendingUi, values, itemId: activeItem?.id || '', sourceId: id });
+  // A newly selected material starts on its first frame, independent of the old output's metadata.
+  const requestedFrame = settings?.sourceId === id ? settings.values.get('#output-still-frame')?.value : previousId === id ? stillFrameSelect.value : '0';
+  const frameIndex = Math.max(0, Math.min(frames.length - 1, Number(requestedFrame) || 0));
+  if (frames.length) stillFrameSelect.value = String(frameIndex);
+  for (const element of [image, audio, video, fileCard, timelineCanvas, timelinePlay]) element.hidden = true;
+  if (frames.length) {
+    timelineCanvas.hidden = false; timelinePlay.hidden = frames.length < 2;
+    paintTimelineFrame(frameIndex);
+  } else if (source.kind === 'video-source' && source.blob) {
+    materialPreviewUrl = URL.createObjectURL(source.blob); video.controls = true; video.src = materialPreviewUrl; video.hidden = false;
+  } else if (source.kind === 'audio-buffer') {
+    const selectionEpoch = rasterSettingsEpoch;
+    const { encodeImportedAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1');
+    let blob;
+    try { blob = await encodeImportedAudioWav(source, { signal: previewController.signal }); }
+    catch (error) { if (error?.name === 'AbortError') return false; throw error; }
+    if (previewController.signal.aborted || activeSource?.id !== id || selectionEpoch !== rasterSettingsEpoch || pageDisposed) return false;
+    materialPreviewUrl = URL.createObjectURL(blob); audio.controls = true; audio.src = materialPreviewUrl; audio.hidden = false;
+  } else {
+    fileTitle.textContent = source.label || source.filename || '素材';
+    fileDescription.textContent = source.kind === 'audio-song' ? '音楽の素材。保存する形式を選べます。' : '選択した元の素材'; fileCard.hidden = false;
+  }
+  updatePreviewControls();
+  if (notify) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation: 'material-selection' } }));
+  return true;
 }
 
 Object.defineProperty(outputLayout, 'conversionActions', { value: Object.freeze({
@@ -2057,6 +2185,8 @@ Object.defineProperty(outputLayout, 'conversionActions', { value: Object.freeze(
   addFiles: addMaterialFiles,
   replaceFiles: replaceMaterialFiles,
   removeAsset: removeMaterial,
+  selectAsset: selectMaterialAsset,
+  undoRemove: undoMaterialRemoval,
   applyFps: applySelectedFps, applySize: applySelectedSize, generate: generateOutputItem,
 }) });
 renderOutputCapabilities();
