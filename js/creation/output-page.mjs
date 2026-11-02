@@ -350,7 +350,8 @@ function releaseRasterPreview() {
 }
 
 function hasPixelArtEvidence() {
-  return rasterProfile?.sourceId === activeSource?.id && ['detected', 'verified'].includes(rasterProfile.status);
+  const sourceId = activeSource?.id;
+  return Boolean(rasterProfile && sourceId && rasterProfile.sourceId === sourceId && ['detected', 'verified'].includes(rasterProfile.status));
 }
 
 function setPreviewSourceDimensions(element, width, height) {
@@ -1169,7 +1170,7 @@ function isStaticOutputFormat(formatValue) { return ['png', 'jpeg', 'webp', 'svg
 function isAnimatedOutputFormat(formatValue) { return ['gif', 'apng'].includes(String(formatValue || '').toLowerCase()); }
 
 function outputSourceOriginalSize(sourceId, frames) {
-  if (rasterProfile?.sourceId === sourceId && rasterProfile.width > 0 && rasterProfile.height > 0) {
+  if (rasterProfile && rasterProfile.sourceId === sourceId && rasterProfile.width > 0 && rasterProfile.height > 0) {
     return { width: rasterProfile.width, height: rasterProfile.height };
   }
   if (activeItem && (activeItem.sourceId === sourceId || rasterProfile?.sourceId === sourceId)) {
