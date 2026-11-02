@@ -116,7 +116,9 @@ if(server.listening){
   await noOverflow('loaded preview');await page.screenshot({path:output+'/preview.png',fullPage:true});
   await page.goto(base+'/output/work/?mode=convert',{waitUntil:'domcontentloaded'});await page.locator('[data-demo]').click();await page.locator('[data-rate="2"]').click();
   const [gifDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);const gif=await readFile(await gifDownload.path());assert.match(gif.subarray(0,6).toString(),/^GIF8[79]a$/);pass('GIF demo speed control one-click saves actual GIF bytes');
-  await page.locator('[data-sc-format]').selectOption('jpeg');await page.locator('[data-frame]').fill('2');
+  await page.locator('[data-sc-format]').selectOption('jpeg');
+  const convertOptions=page.locator('.convert-options');if(!(await convertOptions.evaluate(node=>node.open)))await page.locator('.convert-options > summary').click();
+  await page.locator('[data-frame]').fill('2');
   const gifAdd=page.waitForEvent('filechooser');await page.locator('.sc-material-heading [data-sc-material-add]').click();await(await gifAdd).setFiles({name:'after-gif.png',mimeType:'image/png',buffer:png});
   await page.waitForFunction(()=>document.querySelector('#main').conversionMaterials.getState().assets.length===2&&document.querySelector('#main').getAttribute('aria-busy')!=='true');
   const unchangedFrame=await page.locator('[data-frame]').inputValue();await page.locator('.sc-material-card').last().hover();await page.locator('.sc-material-card [data-remove-material]').last().click();
