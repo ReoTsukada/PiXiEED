@@ -64,8 +64,16 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
   assert.deepEqual((await materialState()).assets.map(a => a.id), ids, 'invalid input preserves previous sources');
   assert.equal(await page.locator('[data-width]').inputValue(), '20');
   await choose('[data-sc-material-add]', file('retry.png')); await count(3);
-  await page.locator('.sc-material-card [data-remove-material]').last().click(); await count(2);
-  await page.locator('.sc-material-card [data-remove-material]').last().click(); await count(1);
+  const beforeUnselectedRemoval = await materialState();
+  assert.notEqual(beforeUnselectedRemoval.assets.at(-1).id, beforeUnselectedRemoval.activeId, 'remove a material other than the active preview');
+  const unselectedLast = page.locator('.sc-material-card').last();
+  await unselectedLast.hover();
+  assert.equal(await unselectedLast.locator('[data-remove-material]').isVisible(), true);
+  await unselectedLast.locator('[data-remove-material]').click(); await count(2);
+  assert.equal((await materialState()).activeId, beforeUnselectedRemoval.activeId, 'deleting the unselected last material preserves the active selection');
+  const nextLast = page.locator('.sc-material-card').last();
+  await nextLast.hover();
+  await nextLast.locator('[data-remove-material]').click(); await count(1);
   assert.equal(await page.locator('.sc-material-strip').isVisible(), true);
   await page.locator('.sc-material-card [data-remove-material]').click(); await count(0);
   await page.locator('[data-sc-material-undo]').click(); await count(1);
