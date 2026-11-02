@@ -51,7 +51,18 @@ async function selectMode(mode) {
 async function selectWorkspace(selector,value) {
   const panel=page.locator('#sc-settings-panel');
   if (!(await panel.evaluate(node=>node.open))) await page.locator('[data-sc-settings-open]').click();
-  await page.locator(selector).selectOption(value);
+  const routeName = selector === '[data-sc-source]' ? 'sc-source-choice'
+    : selector === '[data-sc-target]' ? 'sc-target-choice' : '';
+  const routeGroup = routeName ? page.locator(`[data-sc-route-name="${routeName}"]`) : null;
+  if (routeGroup && await routeGroup.count()) {
+    const radio = routeGroup.locator(`input[type="radio"][value="${value}"]`);
+    await radio.check();
+    await page.waitForFunction(({ selector, value }) => document.querySelector(selector)?.value === value,
+      { selector, value });
+    assert.equal(await radio.isChecked(), true);
+  } else {
+    await page.locator(selector).selectOption(value);
+  }
   if (await panel.evaluate(node=>node.matches(':modal'))) { await page.keyboard.press('Escape'); await page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open); }
 }
 async function exportFromVisibleAction() {
