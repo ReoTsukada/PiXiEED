@@ -55,6 +55,8 @@ async function selectWorkspace(selector,value) {
     : selector === '[data-sc-target]' ? 'sc-target-choice' : '';
   const routeGroup = routeName ? page.locator(`[data-sc-route-name="${routeName}"]`) : null;
   if (routeGroup && await routeGroup.count()) {
+    const routeDetails = page.locator('.sc-route-options');
+    if (!(await routeDetails.evaluate(node => node.open))) await page.locator('.sc-route-options > summary').click();
     const radio = routeGroup.locator(`input[type="radio"][value="${value}"]`);
     await radio.check();
     await page.waitForFunction(({ selector, value }) => document.querySelector(selector)?.value === value,
