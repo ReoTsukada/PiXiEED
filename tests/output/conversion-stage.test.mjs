@@ -56,13 +56,14 @@ test('cancelled chooser is a no-op, initial files use native import, and additio
   assert.equal(await applyMaterialFiles({ api: {}, files, loaded: true, intent: 'add', fallback }), false);
   assert.equal(calls.length, 3);
 });
-test('detailed replacement requires a selected source and passes that ID without touching output IDs', async () => {
+test('detailed replacement uses the asset captured when its chooser opened, despite later selection changes', async () => {
   const calls = [], files = [{ name: 'next.wav' }];
   const api = { getMaterialState() {}, replaceFiles: (id, values) => { calls.push([id, values]); return true; } };
   assert.equal(await applyMaterialFiles({ api, files, loaded: true, intent: 'replace', activeId: '' }), false);
   assert.equal(calls.length, 0);
+  assert.equal(await applyMaterialFiles({ api, files, loaded: true, intent: 'replace', activeId: 'new-selection', targetId: 'hovered-source' }), true);
   assert.equal(await applyMaterialFiles({ api, files, loaded: true, intent: 'replace', activeId: 'source-audio' }), true);
-  assert.deepEqual(calls, [['source-audio', files]]);
+  assert.deepEqual(calls, [['hovered-source', files], ['source-audio', files]]);
 });
 test('failed material operation stays failed; retry uses the same files and selected source', async () => {
   let attempts = 0; const files = [{ name: 'safe.png' }];
@@ -92,4 +93,22 @@ test('material replacement invalidates pending save; FPS settings persistence le
   assert.equal(materialChangeInvalidatesSave({ changed: true, mutation: 'materials' }), true);
   state.ready = false; api.request(); notify({ changed: true });
   assert.equal(api.pending, false);
+});
+
+
+test('last-input deletion with Undo retains the original setting reset baseline', () => {
+  const baselines = createSettingBaselineTracker();
+  baselines.read({ids:['original'],values:{width:'16',height:'16'}});
+  assert.deepEqual(baselines.read({ids:[],values:{width:'32',height:'32'},retainEmpty:true}),{width:'16',height:'16'});
+  assert.deepEqual(baselines.read({ids:['original'],values:{width:'32',height:'32'}}),{width:'16',height:'16'});
+  baselines.read({ids:[],values:{},retainEmpty:false});
+  assert.deepEqual(baselines.read({ids:['new'],values:{width:'64',height:'64'}}),{width:'64',height:'64'});
+});
+
+
+test('a source-specific chooser never falls back to importing over an empty workspace', async () => {
+  const attempted=[], files=[{name:'replacement.png'}];let imports=0;
+  const api={getMaterialState(){return {assets:[]};},replaceFiles(id){attempted.push(id);return false;}};
+  assert.equal(await applyMaterialFiles({api,files,intent:'replace',loaded:false,targetId:'deleted-source',activeId:'',fallback(){imports++;return true;}}),false);
+  assert.deepEqual(attempted,['deleted-source']);assert.equal(imports,0);
 });

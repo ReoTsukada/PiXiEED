@@ -19,12 +19,9 @@ export function replaceOutputMaterialSource(current, incoming, id, selectedCount
 export function describeOutputMaterialState({ record, mediaSources = [], outputItems = [], activeId = '', activeItemId = '', busy = false } = {}) {
   const assets = mediaSources.map((source) => {
     const frames = source.mediaSource?.frames || [];
-    const referenced = outputItems.some((item) => item.sourceId === source.id);
     const supportedReplace = REPLACEABLE.has(source.kind);
     const first = frames[0];
-    const removeReason = referenced
-      ? '出力項目がこの素材を使用しています。先に出力項目を削除するか、別の素材へ割り当ててください。'
-      : busy ? '処理が終わってから素材を削除してください。' : '';
+    const removeReason = busy ? '処理が終わってから素材を削除してください。' : '';
     const replaceReason = !supportedReplace
       ? 'この素材形式はここから置き換えできません。'
       : busy ? '処理が終わってから素材を置き換えてください。' : '';
@@ -34,7 +31,7 @@ export function describeOutputMaterialState({ record, mediaSources = [], outputI
       kind: source.kind,
       ...(first ? { firstFrame: { name: first.name || '', width: first.width, height: first.height, data: first.data } } : {}),
       grouped: source.id === 'local-images' && frames.length > 0,
-      canRemove: !referenced && !busy,
+      canRemove: !busy,
       removeReason,
       canReplace: supportedReplace && !busy,
       replaceReason,
@@ -60,4 +57,12 @@ export function describeOutputMaterialState({ record, mediaSources = [], outputI
     frameCount: mediaSources.reduce((count, source) => count + (source.mediaSource?.frames?.length || 0), 0),
     outputCount: outputItems.length,
   };
+}
+
+/** Keep selection on a surviving input, or select the nearest survivor after deletion. */
+export function outputMaterialSelectionAfterRemoval(sources, removedId, activeId) {
+  const remaining = sources.filter(source => source.id !== removedId);
+  if (remaining.some(source => source.id === activeId)) return activeId;
+  const removedAt = Math.max(0, sources.findIndex(source => source.id === removedId));
+  return remaining[Math.min(removedAt, remaining.length - 1)]?.id || '';
 }

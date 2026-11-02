@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeOutputMaterialState, replaceOutputMaterialSource } from '../../js/creation/output-material-state.mjs';
+import { describeOutputMaterialState, replaceOutputMaterialSource, outputMaterialSelectionAfterRemoval } from '../../js/creation/output-material-state.mjs';
 
 test('keeps image asset groups, frames, and output rows as separate counts', () => {
   const pixels = new Uint8Array([1, 2, 3, 4]);
@@ -21,7 +21,7 @@ test('keeps image asset groups, frames, and output rows as separate counts', () 
   assert.equal(state.assets[0].firstFrame.name, 'a.png');
 });
 
-test('reports capability reasons for output-referenced and unsupported assets', () => {
+test('allows safe detach of output-referenced assets and explains unsupported replacement', () => {
   const state = describeOutputMaterialState({
     record: {}, activeId: 'video',
     mediaSources: [
@@ -30,7 +30,7 @@ test('reports capability reasons for output-referenced and unsupported assets', 
     ],
     outputItems: [{ id: 'movie', sourceId: 'audio' }],
   });
-  assert.equal(state.assets[0].canRemove, false); assert.match(state.assets[0].removeReason, /出力項目/);
+  assert.equal(state.assets[0].canRemove, true); assert.equal(state.assets[0].removeReason, '');
   assert.equal(state.assets[0].canReplace, true);
   assert.equal(state.assets[1].canReplace, false); assert.match(state.replaceReason, /置き換えできません/);
   assert.equal(state.canReplace, false); assert.equal(state.canAdd, true);
@@ -74,4 +74,13 @@ test('replacement rejects missing, mismatched, or multi-file input atomically', 
     [[{ id: 'x', kind: 'audio-buffer' }], 'absent', 1],
   ]) assert.throws(() => replaceOutputMaterialSource(current, incoming, id, count), /同じ種類の素材を1つ/);
   assert.deepEqual(current, before);
+});
+
+
+test('removal keeps a surviving selection or targets a neighboring input, including last to empty', () => {
+  const sources = ['a','b','c'].map(id=>({id}));
+  assert.equal(outputMaterialSelectionAfterRemoval(sources,'b','a'),'a');
+  assert.equal(outputMaterialSelectionAfterRemoval(sources,'b','b'),'c');
+  assert.equal(outputMaterialSelectionAfterRemoval(sources,'c','c'),'b');
+  assert.equal(outputMaterialSelectionAfterRemoval([{id:'a'}],'a','a'),'');
 });

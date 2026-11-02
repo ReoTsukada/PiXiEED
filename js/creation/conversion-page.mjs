@@ -1,7 +1,7 @@
 import { FILE_ACCEPT, conversionChoices, outputNotice, safeConvertedName } from './conversion-service.mjs?rev=20261028-conversion-1';
 import { loadTimelineFiles, animationPlan, frameAt, setFrameSeconds, moveFrame, convertWithTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
-import { addConversionMaterials, countConversionMaterialFrames, describeConversionMaterials, removeConversionMaterial, snapshotConversionMaterialSource, validateConversionMaterialFiles } from './conversion-materials.mjs?rev=20261031-materials-1';
+import { addConversionMaterials, countConversionMaterialFrames, describeConversionMaterials, firstConversionAssetFrameIndex, moveConversionMaterial, preserveConversionFrameAfterRemoval, removeConversionMaterialWithTicket, restoreConversionMaterial, snapshotConversionMaterialSource, validateConversionMaterialFiles } from './conversion-materials.mjs?rev=20261101-direct-material-1';
 
 /** Contextual, local-only conversion. Media, names and settings are never sent to analytics. */
 export function mountConversionPage(doc = document, win = window) {
@@ -70,6 +70,7 @@ export function mountConversionPage(doc = document, win = window) {
   input.accept = FILE_ACCEPT;
   const canvas = $('[data-canvas]'), raw = doc.createElement('canvas');
   let source = null, original = null, controller = null, busy = false, rate = 1, plan = null, valid = true, assetSequence = 0;
+  let activeId = null, undoTicket = null;
   let resultUrl = null, resultName = '', unsaved = false, playing = false, raf = null, elapsed = 0, epoch = 0, shown = -1;
   const webp = (() => { try { return doc.createElement('canvas').toDataURL('image/webp').startsWith('data:image/webp'); } catch { return false; } })();
   const text = message => { status.textContent = message; };
@@ -83,6 +84,7 @@ export function mountConversionPage(doc = document, win = window) {
   function draw(index) {
     if (!source || source.kind !== 'image' || !source.frames[index]) return;
     const frame = source.frames[index];
+    if (frame.assetId && activeId !== frame.assetId) { activeId = frame.assetId; emitMaterials(false, 'selection'); }
     if (shown !== index) {
       raw.width = frame.width; raw.height = frame.height;
       raw.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frame.data), frame.width, frame.height), 0, 0);
@@ -160,7 +162,7 @@ export function mountConversionPage(doc = document, win = window) {
     if (isImage) draw(motion ? 0 : Math.max(0, Math.min(source.frames.length - 1, Number($('[data-frame]').value) - 1)));
     $('[data-convert]').disabled = busy || !valid;
   }
-  function acceptSource(next, { preserveSettings = false } = {}) {
+  function acceptSource(next, { preserveSettings = false, preserveUndo = false } = {}) {
     if (!next.assets?.length) {
       const id = next.assetId || `material-${++assetSequence}`;
       const frames = next.frames?.map((frame, index) => ({ ...frame, assetId: frame.assetId || id, frameId: frame.frameId || `${id}:${index}` })) || [];
@@ -173,6 +175,7 @@ export function mountConversionPage(doc = document, win = window) {
     main.classList.add('has-source');
     main.querySelector('h1').textContent = next.kind === 'image' && next.frames.length > 1 ? '動きを整える。' : 'ファイルを変換';
     source = snapshotConversionMaterialSource(next); original = snapshotConversionMaterialSource(source);
+    activeId = source.assets[0]?.id || null; if (!preserveUndo) undoTicket = null;
     clearResult(); rate = settings?.rate ?? 1; $('[data-drop]').hidden = true; $('[data-editor]').hidden = false;
     $('[data-name]').textContent = next.sequence ? `${next.frames.length}コマの画像` : next.name;
     $('[data-meta]').textContent = next.kind === 'image' ? `${next.frames[0].width} × ${next.frames[0].height}px · ${next.frames.length}コマ` : `${next.audio.sampleRate.toLocaleString()} Hz · ${next.audio.channels.length}ch · ${(next.audio.channels[0].length / next.audio.sampleRate).toFixed(2)}秒`;
@@ -198,7 +201,7 @@ export function mountConversionPage(doc = document, win = window) {
     finally { disable(false); controller = null; input.value = ''; if (source) format.focus({ preventScroll: true }); }
     return loaded;
   }
-  function emitMaterials(changed = true) { main.dispatchEvent(new win.CustomEvent('pixieed:materials', { bubbles: true, detail: { changed } })); }
+  function emitMaterials(changed = true, mutation = 'source') { main.dispatchEvent(new win.CustomEvent('pixieed:materials', { bubbles: true, detail: { changed, mutation } })); }
   function materialError(error) { text(error?.message || '素材を追加できませんでした。'); emitMaterials(false); }
   async function addFiles(files) {
     if (busy || !source || source.kind !== 'image' || source.video || !files?.length) return false;
@@ -215,19 +218,78 @@ export function mountConversionPage(doc = document, win = window) {
       }
       const merged = addConversionMaterials(source, additions);
       const baseline = addConversionMaterials(original, additions);
-      acceptSource(merged, { preserveSettings: true }); original = baseline; return true;
+      acceptSource(merged, { preserveSettings: true, preserveUndo: true }); original = baseline; return true;
     } catch (error) { if (error?.name !== 'AbortError') materialError(error); else { text('追加を中止しました。素材と設定はそのままです。'); emitMaterials(false); } return false; }
     finally { disable(false); controller = null; }
   }
   function removeAsset(id) {
     if (busy || !source) return false;
     try {
-      const next = removeConversionMaterial(source, id); if (next === source) return false;
-      const baseline = removeConversionMaterial(original, id);
-      if (!next) { clearResult(); source = original = null; plan = null; main.classList.remove('has-source'); $('[data-editor]').hidden = true; $('[data-drop]').hidden = false; stop(true); text('素材を選んでください。'); emitMaterials(); }
-      else { acceptSource(next, { preserveSettings: true }); original = baseline; }
+      const index = source.assets.findIndex(asset => asset.id === id); if (index < 0) return false;
+      const previousSource = source;
+      const selectedFrame = source.frames[animated() ? Math.max(0, shown) : Number($('[data-frame]').value) - 1];
+      const previousActiveId = activeId;
+      const removed = removeConversionMaterialWithTicket(source, id); if (!removed.ticket) return false;
+      const baseline = removeConversionMaterialWithTicket(original, id);
+      undoTicket = { current: removed.ticket, original: baseline.ticket, activeIdBefore: previousActiveId, selectedFrameIdBefore: selectedFrame?.frameId };
+      source = removed.source;
+      if (!source) { clearResult(); original = baseline.source; activeId = null; plan = null; main.classList.remove('has-source'); $('[data-editor]').hidden = true; $('[data-drop]').hidden = false; stop(true); text('素材を削除しました。削除を取り消すか、素材を選んでください。'); emitMaterials(true, 'remove'); }
+      else {
+        const preserved = preserveConversionFrameAfterRemoval(previousSource, source, id, previousActiveId, selectedFrame?.frameId);
+        acceptSource(source, { preserveSettings: true, preserveUndo: true }); original = baseline.source; activeId = preserved.activeId;
+        if (preserved.frameIndex >= 0 && preserved.frameIndex < source.frames.length) {
+          if (animated()) {
+            elapsed = plan?.frameDelaysMs.slice(0, preserved.frameIndex).reduce((sum, delay) => sum + delay, 0) || 0;
+            draw(preserved.frameIndex);
+          } else { $('[data-frame]').value = preserved.frameIndex + 1; draw(preserved.frameIndex); }
+        }
+        emitMaterials(true, 'remove');
+      }
       return true;
     } catch (error) { materialError(error); return false; }
+  }
+  function selectAsset(id) {
+    if (busy || !source?.assets.some(asset => asset.id === id)) return false;
+    const first = source.frames.findIndex(frame => frame.assetId === id); if (first < 0) return false;
+    if (activeId === id && (animated() ? shown === first : Number($('[data-frame]').value) === first + 1)) return true;
+    const previous = activeId; activeId = id;
+    if (animated()) {
+      stop(); elapsed = plan?.frameDelaysMs.slice(0, first).reduce((sum, delay) => sum + delay, 0) || 0;
+      draw(first); emitMaterials(false, 'selection'); return true;
+    }
+    const changedFrame = Number($('[data-frame]').value) !== first + 1;
+    $('[data-frame]').value = first + 1; draw(first);
+    if (changedFrame) { markDirty(); text('選択した素材を静止画の出力対象にしました。'); emitMaterials(true, 'frame-selection'); }
+    else if (previous !== id) emitMaterials(false, 'selection');
+    return true;
+  }
+  function undoRemove() {
+    if (busy || !undoTicket) return false;
+    try {
+      const restored = restoreConversionMaterial(source, undoTicket.current);
+      const restoredOriginal = restoreConversionMaterial(original, undoTicket.original);
+      if (!restored) return false;
+      const ticket = undoTicket; undoTicket = null;
+      acceptSource(restored, { preserveSettings: true }); original = restoredOriginal || snapshotConversionMaterialSource(restored);
+      const restoreActive = restored.assets.some(asset => asset.id === ticket.activeIdBefore) ? ticket.activeIdBefore : ticket.current.id;
+      activeId = restoreActive;
+      const previousFrame = restored.frames.findIndex(frame => frame.frameId === ticket.selectedFrameIdBefore);
+      if (previousFrame >= 0) {
+        if (animated()) elapsed = plan?.frameDelaysMs.slice(0, previousFrame).reduce((sum, delay) => sum + delay, 0) || 0;
+        else $('[data-frame]').value = previousFrame + 1;
+        draw(previousFrame);
+      } else { activeId = null; selectAsset(restoreActive); }
+      text(`${ticket.current.asset.name}を元に戻しました。`); emitMaterials(true, 'undo-remove'); return true;
+    } catch (error) { materialError(error); return false; }
+  }
+  function moveAsset(id, direction) {
+    if (busy) return false;
+    const next = moveConversionMaterial(source, id, direction); if (next === source) return false;
+    const selectedId = activeId;
+    source = next; markDirty(); refresh(); renderFrames(); activeId = selectedId;
+    const first = firstConversionAssetFrameIndex(source, selectedId);
+    if (first >= 0) { if (animated()) selectAsset(selectedId); else { $('[data-frame]').value = first + 1; draw(first); } }
+    emitMaterials(true, 'reorder'); return true;
   }
   function changed() { if (busy) return; markDirty(); refresh(); if (valid) text('設定を変更しました。変換すると保存ファイルに反映されます。'); }
   function demo() {
@@ -304,17 +366,21 @@ export function mountConversionPage(doc = document, win = window) {
   const materials = {
     getState() {
       const assets = describeConversionMaterials(source).map(asset => {
-        const firstFrame = source?.frames?.find(frame => frame.assetId === asset.id) || source?.assets?.find(item => item.id === asset.id)?.frames?.[0];
+        const firstFrame = source?.assets?.find(item => item.id === asset.id)?.rawFrames?.[0] || source?.frames?.find(frame => frame.assetId === asset.id);
         return firstFrame ? { ...asset, firstFrame } : asset;
       });
       const bytes = source?.assets?.reduce((sum, asset) => sum + (asset.bytes || 0), 0) || 0;
       return { assets: assets.map(asset => ({ ...asset, canRemove: true, canReplace: true })),
         canAdd: Boolean(source?.kind === 'image' && !source.video && assets.length < 8 && bytes < 128 * 1024 * 1024),
-        canReplace: true, canRemove: assets.length > 0, loaded: Boolean(source), frameCount: countConversionMaterialFrames(source) };
+        canReplace: true, canRemove: assets.length > 0, loaded: Boolean(source), frameCount: countConversionMaterialFrames(source),
+        activeId, canUndo: Boolean(undoTicket), undoName: undoTicket?.current.asset.name || '' };
     },
     async addFiles(files) { return addFiles(files); },
     async replaceFiles(files) { return load(files); },
     removeAsset(id) { return removeAsset(id); },
+    selectAsset(id) { return selectAsset(id); },
+    undoRemove() { return undoRemove(); },
+    moveAsset(id, direction) { return moveAsset(id, direction); },
   };
   main.conversionMaterials = materials;
   return {
