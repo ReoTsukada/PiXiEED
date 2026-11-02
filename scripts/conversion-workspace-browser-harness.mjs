@@ -108,7 +108,7 @@ if(server.listening){
   pass('source/output radio choices retain three legal routes, media inputs, pending dimensions and text; keyboard arrows restore file conversion');
 
   for(const [w,h] of [[320,640],[390,844],[1365,900]]) { await resizeViewport(w,h);await stable();await noOverflow(`loaded ${w}x${h}`);await checkCommonNav(`loaded ${w}x${h}`);await page.screenshot({path:`${output}/preview-${w}x${h}.png`,fullPage:false}); }
-  await resizeViewport(390,844);await launcher.click();assert.equal(await page.locator('#sc-settings-panel [data-sc-format]').isVisible(),true,'format remains reachable inside modal');assert.equal(await page.locator('[data-width]').inputValue(),'20');await page.keyboard.press('Escape');await closed();
+  await resizeViewport(390,844);await launcher.click();await page.locator('#sc-settings-panel [data-sc-format]').waitFor({state:'visible'});assert.equal(await page.locator('#sc-settings-panel [data-sc-format]').isVisible(),true,'format remains reachable inside modal');assert.equal(await page.locator('[data-width]').inputValue(),'20');await page.keyboard.press('Escape');await closed();
   await launcher.click();
   const [panelSave]=await Promise.all([page.waitForEvent('download'),page.locator('[data-sc-panel-save]').click()]);assert.equal(await panelSave.failure(),null);assert.equal(await dialog.evaluate(e=>e.open),true,'mobile save keeps settings panel open');pass('mobile settings panel saves while remaining open');await page.keyboard.press('Escape');await closed();
   await resizeViewport(844,390);await stable();await launcher.click();assert.equal(await dialog.evaluate(e=>e.matches(':modal')),true);await page.keyboard.press('Escape');await closed();
