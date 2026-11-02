@@ -56,6 +56,7 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
   assert.equal(await page.locator('[data-frame]').inputValue(), '2', 'selected thumbnail is the static export target');
   await page.locator('[data-select-material]').last().focus(); await page.keyboard.press('Home');
   assert.equal((await materialState()).activeId, ids[0]);
+  await page.waitForFunction(() => document.querySelector('[data-select-material]') === document.activeElement);
   assert.equal(await page.locator('[data-select-material]').first().evaluate(node => node === document.activeElement), true);
   await page.locator('[data-sc-material-file]').setInputFiles([]);
   assert.deepEqual((await materialState()).assets.map(a => a.id), ids, 'cancel is a no-op');
