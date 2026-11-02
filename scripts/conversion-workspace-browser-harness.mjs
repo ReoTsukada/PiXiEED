@@ -32,6 +32,12 @@ if(server.listening){
   let downloads=0; page.on('download',()=>downloads++); page.on('dialog', d=>d.accept());
   const closed=()=>page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open);
   const stable=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  const conversionMaterialCount=count=>page.waitForFunction(count=>{
+    const main=document.querySelector('#main'),state=main?.conversionMaterials?.getState(),surface=document.querySelector('.sc-material-surface');
+    const rendered=[...document.querySelectorAll('.sc-material-card [data-select-material]')].map(button=>button.dataset.assetId);
+    return main?.getAttribute('aria-busy')!=='true'&&state?.assets?.length===count&&surface?.dataset.loaded===String(count>0)
+      &&rendered.length===count&&rendered.every((id,index)=>id===state.assets[index]?.id);
+  },count);
   const resizeViewport=async(width,height)=>{
     await page.setViewportSize({width,height});
     await page.waitForFunction(wide=>{const panel=document.querySelector('#sc-settings-panel');return Boolean(panel&&(wide?panel.open&&!panel.matches(':modal'):!panel.open));},width>=960);
@@ -120,10 +126,14 @@ if(server.listening){
   const convertOptions=page.locator('.convert-options');if(!(await convertOptions.evaluate(node=>node.open)))await page.locator('.convert-options > summary').click();
   await page.locator('[data-frame]').fill('2');
   const gifAdd=page.waitForEvent('filechooser');await page.locator('.sc-material-heading [data-sc-material-add]').click();await(await gifAdd).setFiles({name:'after-gif.png',mimeType:'image/png',buffer:png});
-  await page.waitForFunction(()=>document.querySelector('#main').conversionMaterials.getState().assets.length===2&&document.querySelector('#main').getAttribute('aria-busy')!=='true');
-  const unchangedFrame=await page.locator('[data-frame]').inputValue();await page.locator('.sc-material-card').last().hover();await page.locator('.sc-material-card [data-remove-material]').last().click();
-  await page.waitForFunction(()=>document.querySelector('#main').conversionMaterials.getState().assets.length===1);assert.equal(await page.locator('[data-frame]').inputValue(),unchangedFrame);
-  await page.locator('[data-sc-material-undo]').click();await page.waitForFunction(()=>document.querySelector('#main').conversionMaterials.getState().assets.length===2);assert.equal(await page.locator('[data-frame]').inputValue(),unchangedFrame);
+  await conversionMaterialCount(2);
+  const unchangedFrame=await page.locator('[data-frame]').inputValue();
+  const addedMaterialId=await page.evaluate(()=>document.querySelector('#main').conversionMaterials.getState().assets.at(-1).id);
+  const addedCard=page.locator('.sc-material-card').filter({has:page.locator(`[data-select-material][data-asset-id="${addedMaterialId}"]`)});
+  assert.equal(await addedCard.count(),1,'the added material has a rendered card');
+  await addedCard.hover();await addedCard.locator('[data-remove-material]').click();
+  await conversionMaterialCount(1);assert.equal(await page.locator('[data-frame]').inputValue(),unchangedFrame);
+  await page.locator('[data-sc-material-undo]').click();await conversionMaterialCount(2);assert.equal(await page.locator('[data-frame]').inputValue(),unchangedFrame);
   pass('hover delete and Undo preserve a non-first static frame within an animated input');
   // Synthetic 0.1-second PCM tone, no device or private media access.
   const wav=Buffer.alloc(44+1600);wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(1600,40);for(let i=0;i<800;i++)wav.writeInt16LE(Math.round(Math.sin(i/8000*440*Math.PI*2)*4000),44+i*2);
@@ -154,7 +164,12 @@ if(server.listening){
   pass('changing output selection refreshes the fixed batch action; one click downloads two actual PNG outputs');
   // New clarity cases are prepared for approved CI; never run to bypass local bind denial.
   const detailApi = () => page.evaluate(() => document.querySelector('#output-layout').conversionActions.getMaterialState());
-  const detailCount = count => page.waitForFunction(count => { const state = document.querySelector('#output-layout').conversionActions.getMaterialState(); return !state.busy && state.assets.length === count && document.querySelector('.sc-material-surface')?.dataset.loaded === String(count > 0); }, count);
+  const detailCount = count => page.waitForFunction(count => {
+    const state = document.querySelector('#output-layout').conversionActions.getMaterialState();
+    const rendered = [...document.querySelectorAll('.sc-material-card [data-select-material]')].map(button => button.dataset.assetId);
+    return !state.busy && state.assets.length === count && document.querySelector('.sc-material-surface')?.dataset.loaded === String(count > 0)
+      && rendered.length === count && rendered.every((id,index) => id === state.assets[index]?.id);
+  }, count);
   const outputBytes = () => page.evaluate(async () => Promise.all([...document.querySelectorAll('.output-item__download')].map(async link => ({ name:link.download, bytes:[...new Uint8Array(await (await fetch(link.href)).arrayBuffer())] }))));
   const keptOutputs = await outputBytes();
   await page.locator('[data-sc-size-edit]').click();await page.locator('#output-width').fill('120');
@@ -162,7 +177,23 @@ if(server.listening){
   await page.locator('#output-timeline-preview').waitFor({state:'visible'});
   assert.equal(await page.locator('#output-width').inputValue(),'120','single-source selection preserves pending size');
   const addAudio = page.waitForEvent('filechooser'); await page.locator('.sc-material-heading [data-sc-material-add]').click(); await(await addAudio).setFiles({name:'history.wav',mimeType:'audio/wav',buffer:wav}); await detailCount(2);
-  const originalSource = (await detailApi()).assets.find(asset=>asset.kind==='rgba-frames').id;
+  const materialSources=(await detailApi()).assets;
+  const originalSource=materialSources.find(asset=>asset.kind==='rgba-frames')?.id;
+  const audioSource=materialSources.find(asset=>asset.kind==='audio-buffer')?.id;
+  assert.ok(originalSource&&audioSource,'the detailed workspace has image and audio-buffer sources');
+  const selectionEvents=await page.evaluate(async ({imageId,audioId})=>{
+    const main=document.querySelector('#main'),api=document.querySelector('#output-layout').conversionActions;
+    await api.selectAsset(imageId);
+    let total=0,immediate=0;
+    const onMaterials=event=>{if(event.detail?.changed&&event.detail?.mutation==='material-selection')total++;};
+    main.addEventListener('pixieed:materials',onMaterials);
+    try { const pending=api.selectAsset(audioId);immediate=total;await pending; }
+    finally { main.removeEventListener('pixieed:materials',onMaterials);await api.selectAsset(imageId); }
+    return {immediate,total};
+  },{imageId:originalSource,audioId:audioSource});
+  assert.equal(selectionEvents.immediate,1,'audio source selection emits invalidation before awaiting its preview');
+  assert.equal(selectionEvents.total,1,'audio source selection emits one invalidation');
+  pass('detailed audio source selection invalidates once before async preview work');
   await page.evaluate(id=>document.querySelector('#output-layout').conversionActions.selectAsset(id),originalSource);
   await page.locator('[data-sc-size-edit]').click(); await page.locator('#output-width').fill('120');
   await page.evaluate(id=>document.querySelector('#output-layout').conversionActions.removeAsset(id),originalSource); await detailCount(1);

@@ -1,7 +1,7 @@
 import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
 import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261101-empty-area-1';
-import { saveActionLabel, materialChangeInvalidatesSave } from './conversion-stage.mjs?rev=20261101-empty-area-1';
+import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261102-deferred-focus-1';
 import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
 
 /** Use the same navigation DOM as other pages, once, retaining existing nodes. */
@@ -19,6 +19,8 @@ export function mountSmartConversion(doc = document, win = window) {
   const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
   const setAttr = (node, key, value) => { if (node.getAttribute(key) !== value) node.setAttribute(key, value); };
   const media = () => main;
+  const saveFocusGuard = createDeferredFocusGuard({ doc, win });
+  let saveFocusTicket = null;
   const mode = () => $('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode || 'media';
   const liveText = () => mode() === 'output' ? $('[data-text-tools]')?.textLivePreview : null;
   const find = selector => media().querySelector(selector);
@@ -130,7 +132,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const currentMode = mode(), locked = busy(), live = liveText();
     const working = locked || Boolean(live && ['queued','rendering'].includes(live.state));
     const link = result(), href = link?.getAttribute('href') || '';
-    if (currentMode !== lastMode) { saveIntent.cancel(); revision++; lastMode = currentMode; }
+    if (currentMode !== lastMode) { saveIntent.cancel(); saveFocusGuard.invalidate(); revision++; lastMode = currentMode; }
     if (currentMode === 'media') {
       if (href && href !== lastMediaUrl && !working) { lastMediaUrl = href; mediaDirty = !matchesFormat(link); }
     } else if (href && href !== lastTextUrl && !working) {
@@ -185,7 +187,11 @@ export function mountSmartConversion(doc = document, win = window) {
     if (!blobLink(link)) return;
     link.click(); lastSaved = { mode: mode(), revision, href: link.getAttribute('href') };
     setText(message, 'ダウンロードを開始しました。');
-    schedule(); win.requestAnimationFrame(() => workspace.focusSave(button));
+    schedule();
+    const ticket = saveFocusTicket;
+    if (ticket && ticket.mode === mode() && ticket.revision === revision) saveFocusGuard.schedule(ticket.guard, () => {
+      if (ticket.mode === mode() && ticket.revision === revision) workspace.focusSave(button);
+    });
   }
   function validInputs(scope) {
     for (const input of scope.querySelectorAll('input,textarea,select')) {
@@ -238,6 +244,7 @@ export function mountSmartConversion(doc = document, win = window) {
     },
   });
   function beginExport() {
+    saveFocusTicket = { guard: saveFocusGuard.begin(button), mode: mode(), revision };
     if (!saveIntent.pending) pendingDimensions = fpsDirty && sizeDirty ? { width: $('#output-width')?.value, height: $('#output-height')?.value } : null;
     saveIntent.request(); schedule();
   }
@@ -247,7 +254,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const element = event.target;
     if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub],[data-sc-source],[data-sc-target]') || element.closest('[data-sc-route-choice]')) return;
     if (element.closest('#output-items')) { schedule(); return; }
-    revision++; saveIntent.cancel();
+    revision++; saveIntent.cancel(); saveFocusGuard.invalidate();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
     if (element.matches('#output-width,#output-height,#output-aspect-lock')) sizeDirty = true;
     if (element.matches('#output-fps,#output-fps-preset')) fpsDirty = true;
@@ -298,7 +305,7 @@ export function mountSmartConversion(doc = document, win = window) {
   main.addEventListener('pixieed:text-preview', schedule);
   function materialsChanged(event) {
     if (event.detail?.changed) {
-      if (materialChangeInvalidatesSave(event.detail)) { revision++; saveIntent.cancel(); }
+      if (materialChangeInvalidatesSave(event.detail)) { revision++; saveIntent.cancel(); saveFocusGuard.invalidate(); }
       mediaDirty = true; lastSaved = null;
     }
     schedule();
@@ -308,9 +315,9 @@ export function mountSmartConversion(doc = document, win = window) {
     const el = event.target.closest('button'); if (!el) return;
     if (el.matches('#output-cancel-generation,#output-cancel-settings,#output-cancel-import,[data-cancel],[data-tx-cancel],[data-tx-live-cancel]')) saveIntent.cancel();
     if (el.matches('.output-item__select,#output-add-item,#output-copy-item,#output-delete-item')) {
-      sizeDirty = false; fpsDirty = false; revision++; saveIntent.cancel();
+      sizeDirty = false; fpsDirty = false; revision++; saveIntent.cancel(); saveFocusGuard.invalidate();
     }
-    if (el.matches('[data-rate],[data-reset],[data-apply-seconds],[data-move],.output-preset,#output-add-assets') || el.closest('#output-assets-list')) { mediaDirty = true; revision++; saveIntent.cancel(); }
+    if (el.matches('[data-rate],[data-reset],[data-apply-seconds],[data-move],.output-preset,#output-add-assets') || el.closest('#output-assets-list')) { mediaDirty = true; revision++; saveIntent.cancel(); saveFocusGuard.invalidate(); }
     schedule();
   });
   button.addEventListener('click', beginExport);
@@ -329,7 +336,7 @@ export function mountSmartConversion(doc = document, win = window) {
   const onShow = () => schedule();
   win.addEventListener('pagehide', onHide); win.addEventListener('pageshow', onShow);
   function destroy() {
-    stopped = true; if (frame) win.cancelAnimationFrame(frame); observer.disconnect(); bodyObserver.disconnect(); navObserver?.disconnect();
+    stopped = true; saveFocusGuard.destroy(); if (frame) win.cancelAnimationFrame(frame); observer.disconnect(); bodyObserver.disconnect(); navObserver?.disconnect();
     workspace.destroy(); routeChoices?.destroy();
     main.removeEventListener('input', changed); main.removeEventListener('change', changed);
     main.removeEventListener('pixieed:text-preview', schedule);

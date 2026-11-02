@@ -1,5 +1,5 @@
 import { workspaceAvailableHeight, conversionDockBottom } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionStage } from './conversion-stage.mjs?rev=20261101-empty-area-1';
+import { mountConversionStage } from './conversion-stage.mjs?rev=20261102-deferred-focus-1';
 
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
 export function mountConversionWorkspace(main, toolbar, doc = document, win = window) {
@@ -212,14 +212,14 @@ export function createConversionSaveIntent({ snapshot, run, save, choose, stageC
   function advance(state) {
     if (!state.loaded) { choose(); return; }
     if (state.live) {
-      if (state.ready && !state.working) save(state.link);
+      if (state.ready && state.matchesFormat !== false && !state.working) save(state.link);
       else start('live', state);
       return;
     }
     if (state.working) return;
     if (state.fpsDirty) { start('fps', state); return; }
     if (state.sizeDirty) { start('size', state); return; }
-    if (state.ready) { save(state.link); return; }
+    if (state.ready && state.matchesFormat !== false) { save(state.link); return; }
     start('convert', state);
   }
   return {

@@ -2157,6 +2157,7 @@ async function selectMaterialAsset(id, { settings = null, notify = true } = {}) 
   const frameIndex = Math.max(0, Math.min(frames.length - 1, Number(requestedFrame) || 0));
   if (frames.length) stillFrameSelect.value = String(frameIndex);
   for (const element of [image, audio, video, fileCard, timelineCanvas, timelinePlay]) element.hidden = true;
+  if (notify) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation: 'material-selection' } }));
   if (frames.length) {
     timelineCanvas.hidden = false; timelinePlay.hidden = frames.length < 2;
     paintTimelineFrame(frameIndex);
@@ -2175,7 +2176,6 @@ async function selectMaterialAsset(id, { settings = null, notify = true } = {}) 
     fileDescription.textContent = source.kind === 'audio-song' ? '音楽の素材。保存する形式を選べます。' : '選択した元の素材'; fileCard.hidden = false;
   }
   updatePreviewControls();
-  if (notify) main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation: 'material-selection' } }));
   return true;
 }
 

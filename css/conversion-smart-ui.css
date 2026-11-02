@@ -410,10 +410,10 @@ body.has-smart-conversion.sc-scroll-fallback:has([data-workspace-media="true"]) 
   flex: none; align-self: center; margin: 0;
 }
 [data-workspace-media="true"].has-conversion-stage .sc-material-surface[data-loaded="false"] > .sc-empty-state#output-start {
-  display: flex; flex: 1 0 180px; flex-direction: column; gap: 0; min-height: 0; overflow: auto;
+  display: flex; flex: 1 0 180px; flex-direction: column; align-items: stretch; gap: 0; min-width: 0; min-height: 0; overflow: auto;
 }
 [data-workspace-media="true"].has-conversion-stage .sc-material-surface[data-loaded="false"] #output-start > #output-drop {
-  display: flex; flex: 1 0 auto; min-height: 180px; padding: 0; border: 0; background: transparent; overflow: visible;
+  display: flex; flex: 1 0 auto; min-width: 0; min-height: 180px; padding: 0; border: 0; background: transparent; overflow: visible;
 }
 [data-workspace-media="true"].has-conversion-stage .sc-material-surface[data-loaded="false"] #output-start-choose {
   display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; justify-content: center;

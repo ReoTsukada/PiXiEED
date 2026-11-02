@@ -56,6 +56,34 @@ export async function applyMaterialFiles({ api, files, intent, loaded, activeId,
 // Settings persistence may be part of an existing save intent (for example FPS).
 export const materialChangeInvalidatesSave = detail => Boolean(detail?.changed && detail.mutation !== 'settings');
 
+/** Own one deferred focus move until a newer operation or user interaction takes focus. */
+export function createDeferredFocusGuard({ doc = document, win = window } = {}) {
+  let interaction = 0, sequence = 0, destroyed = false;
+  const invalidate = () => { interaction++; };
+  for (const type of ['pointerdown', 'keydown', 'focusin']) doc.addEventListener(type, invalidate, true);
+  return {
+    begin(owner = doc.activeElement) {
+      if (destroyed) return null;
+      return { sequence: ++sequence, interaction, owner };
+    },
+    schedule(ticket, callback, succeeded = true) {
+      if (!ticket || destroyed || !succeeded) return;
+      win.requestAnimationFrame(() => {
+        if (destroyed || ticket.sequence !== sequence || ticket.interaction !== interaction) return;
+        const active = doc.activeElement;
+        if (active !== ticket.owner && active !== doc.body && active !== doc.documentElement) return;
+        callback();
+      });
+    },
+    invalidate() { sequence++; },
+    destroy() {
+      if (destroyed) return;
+      destroyed = true; sequence++;
+      for (const type of ['pointerdown', 'keydown', 'focusin']) doc.removeEventListener(type, invalidate, true);
+    },
+  };
+}
+
 /** Enlarge the existing native chooser while keeping its registered click handler. */
 export function enhanceEmptyChooserButton(button, { title, category, instruction, hint } = {}) {
   if (!button || button.dataset.scEmptyChooserEnhanced === 'true') return button;
@@ -128,6 +156,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   const formatRow = main.querySelector('[data-sc-format-row]');
   const anchor = doc.createComment('format settings position'); if (formatRow) formatRow.before(anchor);
   const $ = selector => surface.querySelector(selector);
+  const focusGuard = createDeferredFocusGuard({ doc, win });
   const hidden = (node, value) => { if (node && node.hidden !== value) node.hidden = value; };
   const disabled = (node, value) => { if (node.disabled !== value) node.disabled = value; };
   const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
@@ -137,14 +166,14 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   const api = () => main.conversionMaterials || main.querySelector('#output-layout')?.conversionActions;
   const getState = () => api()?.getState?.() || api()?.getMaterialState?.() || { assets: [], loaded: false };
   const activeAsset = () => state.assets.find(asset => asset.id === state.activeId) || state.assets[0];
-  function restoreMaterialFocus(id, scrollLeft, reveal = false) {
-    win.requestAnimationFrame(() => {
+  function restoreMaterialFocus(ticket, id, scrollLeft, reveal = false, succeeded = true) {
+    focusGuard.schedule(ticket, () => {
       list.scrollLeft = scrollLeft;
       const buttons = Array.from(list.querySelectorAll('[data-select-material]'));
       const target = buttons.find(button => button.dataset.assetId === id) || buttons.find(button => button.getAttribute('aria-pressed') === 'true');
       (target || $('[data-sc-material-undo]') || $('[data-sc-material-add]'))?.focus({ preventScroll: true });
       if (reveal && target) { const bounds = list.getBoundingClientRect(), item = target.closest('.sc-material-card').getBoundingClientRect(); if (item.left < bounds.left) list.scrollLeft += item.left - bounds.left; else if (item.right > bounds.right) list.scrollLeft += item.right - bounds.right; }
-    });
+    }, succeeded);
   }
   const readSettings = (visibleOnly = true) => Object.fromEntries(Object.entries(fields).flatMap(([key, selector]) => {
     const field = main.querySelector(selector); return field && (!visibleOnly || !field.closest('[hidden]')) ? [[key, field.value]] : [];
@@ -179,9 +208,11 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   $('[data-sc-material-add]').addEventListener('click', () => choose(current.loaded ? 'add' : 'replace'));
   $('[data-sc-material-undo]').addEventListener('click', async () => {
     if (current.working || !state.canUndo) return;
+    const ticket = focusGuard.begin(doc.activeElement);
     const scrollLeft = list.scrollLeft; localError = '';
-    try { await api()?.undoRemove?.(); } catch (error) { localError = error?.message || '削除を元に戻せませんでした。'; }
-    actions.refresh?.(); restoreMaterialFocus(lastRemovedId || activeAsset()?.id, scrollLeft);
+    let result = false;
+    try { result = await api()?.undoRemove?.(); } catch (error) { result = false; localError = error?.message || '削除を元に戻せませんでした。'; }
+    actions.refresh?.(); restoreMaterialFocus(ticket, lastRemovedId || activeAsset()?.id, scrollLeft, false, result !== false);
   });
   input.addEventListener('change', () => { const files = Array.from(input.files || []), targetId = pickAssetId, intent = pickIntent; input.value = ''; pickAssetId = null; void accept(files, intent, targetId); });
   $('[data-sc-size-edit]').addEventListener('click', () => reveal('width'));
@@ -199,20 +230,24 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     const button = event.target.closest('button'); if (!button || current.working) return;
     const id = button.dataset.assetId; localError = '';
     const scrollLeft = list.scrollLeft;
+    if (button.matches('[data-sc-material-replace]')) { choose('replace', id); return; }
+    if (!button.matches('[data-remove-material],[data-move-material],[data-select-material]')) return;
+    const ticket = focusGuard.begin(button);
+    let result = true;
     try {
-      if (button.matches('[data-sc-material-replace]')) { choose('replace', id); return; }
-      if (button.matches('[data-remove-material]')) { lastRemovedId = id; await api()?.removeAsset?.(id); }
-      else if (button.matches('[data-move-material]')) await api()?.moveAsset?.(id, Number(button.dataset.moveMaterial));
-      else if (button.matches('[data-select-material]')) await api()?.selectAsset?.(id);
-    } catch (error) { localError = error?.message || '素材を変更できませんでした。'; }
-    actions.refresh?.(); restoreMaterialFocus(button.matches('[data-select-material]') ? id : state.activeId || id, scrollLeft);
+      if (button.matches('[data-remove-material]')) { lastRemovedId = id; result = await api()?.removeAsset?.(id); }
+      else if (button.matches('[data-move-material]')) result = await api()?.moveAsset?.(id, Number(button.dataset.moveMaterial));
+      else if (button.matches('[data-select-material]')) result = await api()?.selectAsset?.(id);
+    } catch (error) { result = false; localError = error?.message || '素材を変更できませんでした。'; }
+    actions.refresh?.(); restoreMaterialFocus(ticket, button.matches('[data-select-material]') ? id : state.activeId || id, scrollLeft, false, result !== false);
   });
   list.addEventListener('keydown', async event => {
     if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
       const selected = activeAsset(); if (!selected || typeof api()?.moveAsset !== 'function' || current.working) return;
-      event.preventDefault(); const scrollLeft = list.scrollLeft;
-      try { await api().moveAsset(selected.id, event.key === 'ArrowLeft' ? -1 : 1); } catch (error) { localError = error?.message || '素材の順序を変更できませんでした。'; }
-      actions.refresh?.(); restoreMaterialFocus(selected.id, scrollLeft, true); return;
+      event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(doc.activeElement);
+      let result = false;
+      try { result = await api().moveAsset(selected.id, event.key === 'ArrowLeft' ? -1 : 1); } catch (error) { result = false; localError = error?.message || '素材の順序を変更できませんでした。'; }
+      actions.refresh?.(); restoreMaterialFocus(ticket, selected.id, scrollLeft, true, result !== false); return;
     }
     const target = event.target.closest('[data-select-material]');
     if (!target || event.altKey || event.ctrlKey || event.metaKey || current.working) return;
@@ -223,10 +258,10 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     if (event.key === 'Home') next = state.assets[0];
     if (event.key === 'End') next = state.assets.at(-1);
     if (event.key === 'Delete' && target.getAttribute('aria-pressed') === 'true') {
-      const asset = activeAsset(); if (asset && asset.canRemove !== false) { event.preventDefault(); const scrollLeft = list.scrollLeft; lastRemovedId = asset.id; try { await api()?.removeAsset?.(asset.id); } catch (error) { localError = error?.message || '素材を削除できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(state.activeId || asset.id, scrollLeft); }
+      const asset = activeAsset(); if (asset && asset.canRemove !== false) { event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(target); lastRemovedId = asset.id; let result = false; try { result = await api()?.removeAsset?.(asset.id); } catch (error) { result = false; localError = error?.message || '素材を削除できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(ticket, state.activeId || asset.id, scrollLeft, false, result !== false); }
       return;
     }
-    if (next && next !== state.assets[index]) { event.preventDefault(); const scrollLeft = list.scrollLeft; try { await api()?.selectAsset?.(next.id); } catch (error) { localError = error?.message || '素材を選択できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(next.id, scrollLeft, true); }
+    if (next && next !== state.assets[index]) { event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(target); let result = false; try { result = await api()?.selectAsset?.(next.id); } catch (error) { result = false; localError = error?.message || '素材を選択できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(ticket, next.id, scrollLeft, true, result !== false); }
   });
   chips.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button || current.working) return;
@@ -371,5 +406,5 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     main.classList.toggle('sc-single-material', state.assets.length === 1 && frames <= 1);
     if (!enabled || next.working) hidden(overlay, true);
   }
-  return { update, bindActions(value) { actions = value; }, destroy() { hidden(overlay, true); win.removeEventListener('dragend', clearDrag); } };
+  return { update, bindActions(value) { actions = value; }, destroy() { focusGuard.destroy(); hidden(overlay, true); win.removeEventListener('dragend', clearDrag); } };
 }

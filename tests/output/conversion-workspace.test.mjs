@@ -91,6 +91,8 @@ test('paused live preview refreshes and saves with the same click; text input us
 });
 test('wrong-format completion is blocked, and no source opens selection without creating work', () => {
   const f = saveFixture(); f.api.request(); f.state.matchesFormat = false; f.finish(); assert.equal(f.rejected, 1); assert.equal(f.saves.length, 0);
+  const stale = saveFixture({ href: 'blob:wrong-format', link: { href: 'blob:wrong-format' }, ready: true, matchesFormat: false });
+  stale.api.request(); assert.deepEqual(stale.calls, ['convert']); assert.equal(stale.saves.length, 0);
   const empty = saveFixture({ loaded: false }); empty.api.request(); assert.equal(empty.chosen, 1); assert.deepEqual(empty.calls, []);
 });
 test('validation refusal or a no-op engine cannot leave a pending save lock', () => {
