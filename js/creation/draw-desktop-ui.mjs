@@ -55,7 +55,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261024-context-controls-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261024-context-controls-1&icon=20261102-numeric-transform-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
