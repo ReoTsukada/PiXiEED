@@ -204,6 +204,16 @@
       ]
     },
     {
+      "id": "region-8c09017fddd43adf",
+      "label": "ルクセンブルク",
+      "eventIds": [
+        "spektrum-rumelange-interactive-pixel-art-display-2026-11-14"
+      ],
+      "areas": [
+        "Rumelange"
+      ]
+    },
+    {
       "id": "region-9c73dc3c0b8b156b",
       "label": "ポーランド",
       "eventIds": [
@@ -229,9 +239,11 @@
       "id": "region-a34b3a8afb7a05f8",
       "label": "滋賀県",
       "eventIds": [
-        "sagawa-art-museum-capcom-pixel-lab-2026-27"
+        "sagawa-art-museum-capcom-pixel-lab-2026-27",
+        "seian-one-day-seian-moving-dot-character-2026-12-13"
       ],
       "areas": [
+        "大津市",
         "守山市"
       ]
     },
@@ -554,6 +566,18 @@
       ]
     },
     {
+      "id": "venue-055d85ee8c87611f",
+      "label": "Bibliothèque Part-Dieu, Jeunesse (niveau -1), 30 Bd Marius Vivier Merle, 69003 Lyon",
+      "eventIds": [
+        "lyon-pixel-art-graffiti-part-dieu-2026-11-07"
+      ],
+      "region": "フランス",
+      "area": "Lyon / Part-Dieu",
+      "sourceUrls": [
+        "https://www.bm-lyon.fr/agenda/pixel-art-graffiti-0"
+      ]
+    },
+    {
       "id": "venue-08f6c2e16c89e41b",
       "label": "新光三越高雄三多店12F",
       "eventIds": [
@@ -623,6 +647,18 @@
       "area": "イスタンブール・スルタンベイリ",
       "sourceUrls": [
         "https://www.akbanksanat.com/en/event/mozaik-teknigiyle-piksel-resim-atolyesi-6-10-yas-14-11-26"
+      ]
+    },
+    {
+      "id": "venue-1535d4578e35ed59",
+      "label": "SPEKTRUM / Site Albert Hames Asbl（14–16 rue de la Bruyère, L-3714 Rumelange）",
+      "eventIds": [
+        "spektrum-rumelange-interactive-pixel-art-display-2026-11-14"
+      ],
+      "region": "ルクセンブルク",
+      "area": "Rumelange",
+      "sourceUrls": [
+        "https://spektrum.lu/en/agenda/porte-ouverte-exposition-interactive-particle/index.html"
       ]
     },
     {
@@ -859,6 +895,18 @@
       "area": "福岡市・天神",
       "sourceUrls": [
         "https://pixel-marche.com/"
+      ]
+    },
+    {
+      "id": "venue-33876e5fdf4d7693",
+      "label": "成安造形大学（〒520-0248 滋賀県大津市仰木の里東4-3-1）",
+      "eventIds": [
+        "seian-one-day-seian-moving-dot-character-2026-12-13"
+      ],
+      "region": "滋賀県",
+      "area": "大津市",
+      "sourceUrls": [
+        "https://event.seian.ac.jp/1213.php"
       ]
     },
     {
@@ -2040,7 +2088,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2117,8 +2165,8 @@
       "lastKnownEventDate": "2026-11-04",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
-        "notes": "2026-11-02 JSTに公式プログラム本文を再読。11月4日10〜12時、Maison de la famille à Ingwiller、4〜8歳向けPixel Art制作を確認。個別イベントURLは今回Cache missのため、別ソースとして取得不能記録を保持。"
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "2026-11-03 JSTに自治体公式プログラム本文を再読。11月4日10〜12時、Maison de la famille à Ingwiller、4〜8歳向けPixel Art講座を確認。個別イベントURLは取得不能のため失敗記録を別途保持。"
       }
     },
     {
@@ -2539,7 +2587,7 @@
       "lastKnownEventDate": "2026-11-03",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T23:58:00+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2723,7 +2771,7 @@
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2859,7 +2907,7 @@
       "lastKnownEventDate": "2026-12-19",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-27T00:05:19+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -2884,7 +2932,7 @@
       "lastKnownEventDate": "2026-11-13",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3171,6 +3219,7 @@
         "Lyon / Saint-Rambert"
       ],
       "venues": [
+        "Bibliothèque Part-Dieu, Jeunesse (niveau -1), 30 Bd Marius Vivier Merle, 69003 Lyon",
         "Bibliothèque de Saint-Rambert",
         "Bibliothèque de la Part-Dieu",
         "Bibliothèque du 9e la Duchère（4 place Gisèle Halimi, 69009 Lyon）"
@@ -3178,7 +3227,7 @@
       "lastKnownEventDate": "2026-11-25",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3305,9 +3354,10 @@
       ],
       "lastKnownEventDate": "2026-11-14",
       "check": {
-        "result": "official-confirmed",
+        "result": "unavailable",
         "lastCheckedAt": "2026-10-28T00:04:01+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "attemptedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "公式個別ページを2026-11-03 JSTに再取得したがCache miss。直近成功確認は保持。"
       }
     },
     {
@@ -3895,7 +3945,7 @@
       "lastKnownEventDate": "2026-11-15",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -3943,7 +3993,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4122,7 +4172,7 @@
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -4269,8 +4319,8 @@
       "check": {
         "result": "unavailable",
         "lastCheckedAt": "2026-10-07T00:05:03+00:00",
-        "attemptedAt": "2026-11-01T23:59:43+00:00",
-        "notes": "2026-11-02 JSTに作家の公式出展紹介URLを再取得したがCache miss。直近成功確認は保持。主催者公式トップでは11月7〜8日、Parc ChanotのHeroFestival開催を確認したが、この作家ブースの当年出展は再確認できず。"
+        "attemptedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "作家の公式出展紹介は2026-11-03 JSTもCache miss。直近成功確認は保持。主催者公式トップでフェス日程とParc Chanotは確認したが、当年の作家ブースは未再確認。"
       }
     },
     {
@@ -4780,6 +4830,31 @@
       }
     },
     {
+      "id": "source-93bc06a81651f69c",
+      "label": "WORKSHOP — Create Your Own Interactive Pixel Art Display（SPEKTRUM）",
+      "eventIds": [
+        "spektrum-rumelange-interactive-pixel-art-display-2026-11-14"
+      ],
+      "url": "https://spektrum.lu/en/agenda/workshop-cree-ton-ecran-pixel-art-interactif-4/index.html",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ルクセンブルク"
+      ],
+      "areas": [
+        "Rumelange"
+      ],
+      "venues": [
+        "SPEKTRUM / Site Albert Hames Asbl（14–16 rue de la Bruyère, L-3714 Rumelange）"
+      ],
+      "lastKnownEventDate": "2026-11-14",
+      "check": {
+        "result": "unavailable",
+        "attemptedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "SPEKTRUMの個別イベント詳細URLは2026-11-03 JSTにCache miss。公式アジェンダ本文で11月14日14〜16時、企画名、予約制、無料・全年齢、会場住所を確認。"
+      }
+    },
+    {
       "id": "source-93e7647de93633a6",
       "label": "九州ピクセルマルシェ",
       "eventIds": [
@@ -4851,6 +4926,31 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
         "notes": "年別公式ページで実施概要・日付・pixel art内容確認"
+      }
+    },
+    {
+      "id": "source-9441539cb4d17c41",
+      "label": "WORKSHOP — Create Your Own Interactive Pixel Art Display（SPEKTRUM）",
+      "eventIds": [
+        "spektrum-rumelange-interactive-pixel-art-display-2026-11-14"
+      ],
+      "url": "https://spektrum.lu/en/agenda/porte-ouverte-exposition-interactive-particle/index.html",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ルクセンブルク"
+      ],
+      "areas": [
+        "Rumelange"
+      ],
+      "venues": [
+        "SPEKTRUM / Site Albert Hames Asbl（14–16 rue de la Bruyère, L-3714 Rumelange）"
+      ],
+      "lastKnownEventDate": "2026-11-14",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -5212,7 +5312,7 @@
       "lastKnownEventDate": "2026-11-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:05:29+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5266,7 +5366,7 @@
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5362,9 +5462,10 @@
       ],
       "lastKnownEventDate": "2026-11-15",
       "check": {
-        "result": "official-confirmed",
+        "result": "unavailable",
         "lastCheckedAt": "2026-10-14T00:02:36+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "attemptedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "公式個別ページを2026-11-03 JSTに再取得したがCache miss。直近成功確認は保持。"
       }
     },
     {
@@ -5662,7 +5763,7 @@
       "lastKnownEventDate": "2026-11-15",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-21T00:09:10+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5712,7 +5813,7 @@
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T23:59:43+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6457,8 +6558,8 @@
       "check": {
         "result": "unavailable",
         "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "attemptedAt": "2026-11-01T23:59:43+00:00",
-        "notes": "2026-11-02 JSTに個別イベントURLを再取得したがCache miss。直近成功確認は保持。別の自治体公式プログラム本文で11月4日10〜12時、Ingwillerの会場、対象年齢、Pixel Art内容を確認。"
+        "attemptedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "個別イベントURLは2026-11-03 JSTに再取得したがCache miss。直近成功確認は保持。自治体の公式9〜12月プログラム本文は本日再読でき、開催日・Ingwiller会場・内容を確認。"
       }
     },
     {
@@ -6798,7 +6899,7 @@
       "lastKnownEventDate": "2026-11-07",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-01T00:04:38+00:00",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -7090,6 +7191,33 @@
       }
     },
     {
+      "id": "source-fbe03fe3e2bf8339",
+      "label": "ワンデイセイアン — 動くドット絵キャラクターを描こう",
+      "eventIds": [
+        "seian-one-day-seian-moving-dot-character-2026-12-13"
+      ],
+      "url": "https://event.seian.ac.jp/1213.php",
+      "kind": "website",
+      "prefectures": [
+        "滋賀県"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "大津市"
+      ],
+      "venues": [
+        "成安造形大学（〒520-0248 滋賀県大津市仰木の里東4-3-1）"
+      ],
+      "lastKnownEventDate": "2026-12-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-fd765a1a0cc83401",
       "label": "Pixxelpoint 2026 — Pixel-artワークショップ（Marko Drpić / tipoRenesansa）",
       "eventIds": [
@@ -7167,5 +7295,5 @@
       }
     }
   ],
-  "updatedAt": "2026-11-02T00:01:04+00:00"
+  "updatedAt": "2026-11-03T11:57:27+00:00"
 }
