@@ -352,7 +352,19 @@ body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::
   font: 700 17px/1 system-ui, sans-serif;
 }
 body.draw-desktop-active .draw-desktop-features .draw-selection-controls__deselect::before { content: "×"; }
-body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::before { content: "数"; }
+body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background-color: currentColor;
+  -webkit-mask: url("/assets/icons/pixieed/selection-transform.svg") center / contain no-repeat;
+  mask: url("/assets/icons/pixieed/selection-transform.svg") center / contain no-repeat;
+}
+body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers[open] > summary {
+  border-color: var(--desktop-accent);
+  background: #403b2b;
+  color: #fff4c6;
+}
 body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="filled"]::before { content: "塗"; }
 body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="contiguous"]::before { content: "隣"; }
 body.draw-desktop-active .draw-desktop-shell #draw-selection-controls .draw-selection-controls__row > [data-selection-action="empty"]::before { content: "—"; }
