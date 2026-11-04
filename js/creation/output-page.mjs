@@ -1,13 +1,16 @@
+import { validateOutputDimensions } from './output-input-constraints.mjs?rev=20261104-engine-boundaries-3';
+import { createConversionReturnGate } from './conversion-return-controller.mjs?rev=20261104-controllers-2';
+import { outputDimensionGuidance } from './output-dimension-guidance.mjs?rev=20261104-output-controller-1';
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, removeToolOutputMaterial, restoreToolOutputMaterial, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261031-material-history-1';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, removeToolOutputMaterial, restoreToolOutputMaterial, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261104-engine-boundaries-3';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261020-format-conversion-1';
 import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
 import { boundedPreviewDimensions, createBoundedRasterPreview, fitOutputFrames, importOutputFiles, resolveRasterPreviewDimensions } from './output-import.mjs?rev=20261020-format-conversion-1';
 import { getEffectiveOutputFps, getOutputTiming, outputFpsToDelayMs } from './output-timing.mjs?rev=20261009-fps-1';
-import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261009-output-origin-restore-3';
+import { inferIntegerPixelScale, resizeRgbaNearest, shouldAutoSelectPixelOrigin, verifyPixelScaleClaim } from './output-render.mjs?rev=20261104-output-controller-1';
 import { createOutputPreviewFit } from './output-preview-fit.mjs?rev=20261009-display-fit-5';
 import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatchDownload, OUTPUT_FREE_BATCH_LIMIT, OUTPUT_REWARD_BATCH_LIMIT } from './output-reward-policy.mjs?rev=20261016-color-capability-1';
@@ -51,6 +54,8 @@ const heightInput = $('#output-height');
 const aspectLock = $('#output-aspect-lock');
 const sizeSummary = $('#output-size-summary');
 const scaleNote = $('#output-scale-note');
+const dimensionNotice = document.createElement('p'); dimensionNotice.id = 'output-dimension-notice'; dimensionNotice.setAttribute('role', 'status'); dimensionNotice.hidden = true; scaleNote.after(dimensionNotice);
+for (const field of [widthInput, heightInput]) field.setAttribute('aria-describedby', [field.getAttribute('aria-describedby'), dimensionNotice.id].filter(Boolean).join(' '));
 const applySettings = $('#output-apply-settings');
 const cancelSettings = $('#output-cancel-settings');
 const animationSettings = $('#output-animation-settings');
@@ -162,6 +167,7 @@ let timelineTimer = null;
 let timelineFrameIndex = 0;
 let assetPreviewUrls = [];
 let pendingWrites = new Set();
+let returnGate = null;
 let mediaSettings = { playbackRate: 1, totalPlays: 0, musicTotalPlays: 1, musicSourceId: '' };
 let lastImportedMedia = null;
 let mediaWritePending = false;
@@ -199,6 +205,7 @@ function renderBatchSaveState() {
 function trackPending(promise) {
   const tracked = Promise.resolve(promise);
   pendingWrites.add(tracked);
+  returnGate?.observeWrite(tracked);
   tracked.finally(() => pendingWrites.delete(tracked)).catch(() => {});
   return tracked;
 }
@@ -1188,7 +1195,7 @@ function rewardedStaticSize(width, height, sourceId = activeSource?.id) {
   });
 }
 
-async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false, staticEntitledAtStart = null } = {}) {
+async function generateOutputItem({ sourceId = sourceSelect.value, formatValue = formatSelect.value, dimensions = null, preservePrevious = false, autoPixelOrigin = false, staticEntitledAtStart = null, pixelOriginChoice = null } = {}) {
   if (!record || !activeItem || generationController || mediaWritePending || itemWritePending) return false;
   if (isRewardedOutputFormat(formatValue) && !canUseOutputReward('output.advanced-format')) {
     status.textContent = 'この形式を作成できません。元の出力項目と素材は保持されています。';
@@ -1216,10 +1223,11 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     }
   }
   const originalStaticSize = outputSourceOriginalSize(sourceId, framesForSource);
-  if (isStaticOutputFormat(extensionValue) && outputDimensions
-      && !isIntegerStaticImageEnlargement(outputDimensions.width, outputDimensions.height, originalStaticSize.width, originalStaticSize.height)) {
-    status.textContent = 'ドット絵の拡大は、縦横とも同じ整数倍にしてください。現在の出力と元の素材は保持されています。';
-    return false;
+  if (outputDimensions) {
+    try { outputDimensions = validateOutputDimensions({ ...outputDimensions, format: extensionValue, frameCount: framesForSource.length,
+      requiresIntegerEnlargement: isStaticOutputFormat(extensionValue), originalSize: originalStaticSize,
+      isIntegerEnlargement: isStaticOutputFormat(extensionValue) ? isIntegerStaticImageEnlargement : null, maxEdge: MAX_IMAGE_EDGE, maxPixels: MAX_IMAGE_PIXELS }); }
+    catch (error) { status.textContent = error.message; updateDimensionNotice(); return false; }
   }
   const needsStaticReward = isStaticOutputFormat(extensionValue) && outputDimensions
     && isRewardedStaticImageSize(outputDimensions.width, outputDimensions.height, {
@@ -1255,7 +1263,7 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     const metadataValue = {
       ...(frames[0] ? { width: frames[0].width, height: frames[0].height } : {}),
       ...(outputDimensions ? { outputWidth: outputDimensions.width, outputHeight: outputDimensions.height } : {}),
-      ...(previousItem.metadata?.pixelOriginChoice ? { pixelOriginChoice: previousItem.metadata.pixelOriginChoice } : {}),
+      ...((pixelOriginChoice || previousItem.metadata?.pixelOriginChoice) ? { pixelOriginChoice: pixelOriginChoice || previousItem.metadata.pixelOriginChoice } : {}),
       ...(previousItem.metadata?.userFilename === true ? { userFilename: true } : {}),
       ...(isStaticOutputFormat(extensionValue) ? { staticFrameIndex: Number(stillFrameSelect.value) || 0 } : {}),
       ...(['jpeg', 'webp'].includes(extensionValue) ? { jpegQuality: Number(jpegQuality.value) || 90 } : {}),
@@ -1380,7 +1388,7 @@ function refreshScaleLimits() {
   const width = pngBaseSize.width; const height = pngBaseSize.height;
   const startWidth = Number(widthInput.value) || width;
   const startHeight = Number(heightInput.value) || height;
-  const animated = isAnimatedOutputFormat(formatSelect.value) && frames.length > 1;
+  const animated = isAnimatedOutputFormat(formatSelect.value);
   setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight,
     kind: animated ? 'gif' : 'png', frameCount: animated ? frames.length : 1 });
 }
@@ -1390,6 +1398,7 @@ function buildScalePresets(width, height, kind, frameCount = 1) {
   const candidates = [1, 2, 4, currentScale, maxScale].filter((value, index, values) => values.indexOf(value) === index && value >= 1 && value <= maxScale);
   if (maxScale < 4 && !candidates.includes(maxScale)) candidates.push(maxScale);
   for (const scale of candidates) {
+    if (outputDimensionGuidance({ format: formatSelect.value, width: width * scale, height: height * scale, frameCount })) continue;
     const button = document.createElement('button');
     button.className = 'output-preset'; button.type = 'button'; button.dataset.scale = String(scale);
     button.setAttribute('aria-pressed', 'false');
@@ -1422,6 +1431,14 @@ function updatePresetSelection(width, height) {
   }
 }
 
+function updateDimensionNotice() {
+  const issue = outputDimensionGuidance({ format: formatSelect.value, width: Number(widthInput.value), height: Number(heightInput.value), frameCount: sourceFrames().length });
+  dimensionNotice.hidden = !issue; dimensionNotice.textContent = issue?.message || '';
+  dimensionNotice.dataset.summary = issue?.summary || '';
+  for (const field of [widthInput, heightInput]) field.setAttribute('aria-invalid', String(Boolean(issue)));
+  return issue;
+}
+
 function updateScaleSummary(width, height, kind, frameCount = 1) {
   const requested = Math.max(1, Math.min(maxScale, Math.round(Number(scaleInput.value) || currentScale || 1)));
   const outWidth = Math.max(1, Math.round(Number(widthInput.value) || width * requested));
@@ -1429,6 +1446,7 @@ function updateScaleSummary(width, height, kind, frameCount = 1) {
   const uniformScale = outWidth / width === outHeight / height && Number.isInteger(outWidth / width) && outWidth / width >= 1;
   sizeSummary.textContent = `${width} × ${height}px → ${outWidth} × ${outHeight}px${uniformScale ? ` · ${outWidth / width}倍` : ''}`;
   updatePresetSelection(width, height);
+  updateDimensionNotice();
   updateSettingsSummaries();
   if (kind === 'gif' && record?.mediaSource?.frames?.length) {
     const seconds = getOutputTiming(record.mediaSource.frames, { format: 'gif' }).durationMs / 1000;
@@ -1547,7 +1565,7 @@ async function prepareRasterSettings(entry, frames, { autoResize = true } = {}) 
   const startHeight = savedHeight || (canUseOrigin ? height : height * declaredScale);
   rasterProfile = { sourceId, width, height, status: detection.status, preferredScale: declaredScale, canUseOrigin };
   pngBaseSize = { width, height };
-  const selectedOutputIsAnimated = isAnimatedOutputFormat(formatSelect.value) && frames.length > 1;
+  const selectedOutputIsAnimated = isAnimatedOutputFormat(formatSelect.value);
   setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight,
     kind: selectedOutputIsAnimated ? 'gif' : 'png', frameCount: selectedOutputIsAnimated ? frames.length : 1 });
   scaleNote.textContent = canUseOrigin
@@ -1593,21 +1611,12 @@ async function prepareRasterSettings(entry, frames, { autoResize = true } = {}) 
 }
 
 function targetDimensions() {
-  const width = Number(widthInput.value); const height = Number(heightInput.value);
-  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1
-      || width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
-    throw new RangeError('出力サイズが上限を超えています。幅と高さを小さくしてください。');
-  }
-  if (isAnimatedOutputFormat(formatSelect.value) && sourceFrames().length > 1 && width * height * sourceFrames().length > MAX_GIF_INPUT_PIXELS) {
-    throw new RangeError('GIFの全フレーム合計が800万画素を超えています。幅と高さを小さくしてください。');
-  }
-  if (isStaticOutputFormat(formatSelect.value)) {
-    const original = outputSourceOriginalSize(activeSource?.id, sourceFrames());
-    if (!isIntegerStaticImageEnlargement(width, height, original.width, original.height)) {
-      throw new RangeError('ドット絵の拡大は、縦横とも同じ整数倍にしてください。');
-    }
-  }
-  return { width, height };
+  const requiresIntegerEnlargement = isStaticOutputFormat(formatSelect.value);
+  return validateOutputDimensions({ width: widthInput.value, height: heightInput.value, format: formatSelect.value,
+    frameCount: sourceFrames().length, requiresIntegerEnlargement,
+    isIntegerEnlargement: requiresIntegerEnlargement ? isIntegerStaticImageEnlargement : null,
+    originalSize: requiresIntegerEnlargement ? outputSourceOriginalSize(activeSource?.id, sourceFrames()) : null,
+    maxEdge: MAX_IMAGE_EDGE, maxPixels: MAX_IMAGE_PIXELS });
 }
 
 async function applySelectedSize() {
@@ -1620,7 +1629,7 @@ async function applySelectedSize() {
     status.textContent = `${outputScaleRewardLabel}を作成できません。現在の出力と元の素材は保持されています。`;
     return;
   }
-  return generateOutputItem({ dimensions, staticEntitledAtStart: outputRewardEnabled() && hasSiteReward() });
+  return generateOutputItem({ dimensions, staticEntitledAtStart: outputRewardEnabled() && hasSiteReward(), pixelOriginChoice: 'custom' });
 }
 
 function displayFormat(entry) {
@@ -1828,12 +1837,17 @@ batchSave.addEventListener('click', () => {
     : 'ダウンロードを開始しました。完了はブラウザーの保存先で確認してください。';
   for (const item of batch.selected.slice(0, started)) trackSave(item);
 });
+returnGate = createConversionReturnGate({
+  pending: () => pendingWrites,
+  navigate: href => location.assign(href),
+  isCurrent: () => !pageDisposed,
+  reportFailure() { status.textContent = '保存の反映を確認できませんでした。この画面で設定を確認し、もう一度お試しください。'; },
+});
 returnLink.addEventListener('click', async (event) => {
-  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !pendingWrites.size) return;
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || (!pendingWrites.size && !returnGate.pending)) return;
   event.preventDefault();
-  const href = returnLink.href;
-  await Promise.allSettled([...pendingWrites]);
-  location.assign(href);
+  try { await returnGate.request(returnLink.href); }
+  catch { status.textContent = '戻れませんでした。この画面で出力と設定を確認してください。'; }
 });
 window.addEventListener('beforeunload', (event) => {
   if (!pendingWrites.size) return;
@@ -1890,6 +1904,8 @@ formatSelect.addEventListener('change', () => {
     return;
   }
   updateFormatSettings();
+  refreshScaleLimits();
+  updateDimensionNotice();
   createVideoButton.hidden = !isVideoFormat();
   updateMusicPlayControl();
   updateSequenceControls();
@@ -2144,7 +2160,7 @@ async function selectMaterialAsset(id, { settings = null, notify = true } = {}) 
     pngBaseSize = { width, height };
     const startWidth = Number(pendingUi.values.get('#output-width')?.value) || width;
     const startHeight = Number(pendingUi.values.get('#output-height')?.value) || height;
-    const animated = isAnimatedOutputFormat(formatSelect.value) && frames.length > 1;
+    const animated = isAnimatedOutputFormat(formatSelect.value);
     setupScaleInput({ width, height, startScale: startWidth / width, startWidth, startHeight,
       kind: animated ? 'gif' : 'png', frameCount: animated ? frames.length : 1 });
     scaleSettings.hidden = false;
@@ -2192,4 +2208,5 @@ Object.defineProperty(outputLayout, 'conversionActions', { value: Object.freeze(
 }) });
 renderOutputCapabilities();
 refreshScaleLimits();
-void mount();
+// Entry awaits restoration before revealing the workspace. The module still mounts once.
+export const outputPageReady = mount();

@@ -13,23 +13,29 @@ import {
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const esbuildPath = path.join(repositoryRoot, 'node_modules/.bin/esbuild');
 const guideMetricsUrl = '/js/output-guide-metrics.mjs?rev=20261028-discovery-1';
+const metadataUrl = '/js/creation/output-record-metadata.mjs?rev=20261104-engine-boundaries-3';
 
 test('delivery plan preserves runtime identities and bounds minification to startup/mode files', async () => {
   const plan = await deriveToolRuntimeDeliveryPlan({ root: repositoryRoot });
 
-  // Public-guide analytics adds one dependency-free shared module. Keep exact
-  // graph budgets and canonical identity checks rather than relaxing the limits.
-  assert.equal(plan.runtimeGraph.modules.size, 106);
-  assert.equal(plan.runtimeGraph.edges.length, 201);
+  // Metadata validation is now one shared dependency-free leaf, alongside
+  // guide metrics. Keep exact graph counts and verify the added identity/edge.
+  assert.equal(plan.runtimeGraph.modules.size, 107);
+  assert.equal(plan.runtimeGraph.edges.length, 202);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 104);
-  assert.equal(plan.externalUrls.size, 54);
+  assert.equal(plan.dynamicGraph.modules.size, 105);
+  assert.equal(plan.externalUrls.size, 55);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
   assert(files.includes('js/creation/draw-render-optimization.mjs'));
   assert(files.includes('js/creation/output-router.mjs'), 'editor exports use the unified staging module');
   assert(files.includes('js/creation/output-handoff-core.mjs'), 'existing storage identity stays shared');
+  assert.deepEqual([...plan.runtimeGraph.modules.values()].filter(module => module.file === 'js/creation/output-record-metadata.mjs').map(module => module.url), [metadataUrl]);
+  assert.equal(plan.runtimeGraph.edges.filter(edge => edge.to === metadataUrl).length, 1);
+  assert.equal(plan.runtimeGraph.edges.filter(edge => edge.from === metadataUrl).length, 0, 'Record validation must not pull codec, DOM or ad modules into shared startup.');
+  assert(plan.externalUrls.has(metadataUrl));
+  assert(plan.dynamicGraph.modules.has(metadataUrl));
   assert(files.includes('js/ads/site-feature-access-v20261024.mjs'));
   const guideModules = [...plan.runtimeGraph.modules.values()].filter(module => module.file === 'js/output-guide-metrics.mjs');
   assert.deepEqual(guideModules.map(module => module.url), [guideMetricsUrl], 'Guide metrics must retain one canonical module identity.');
@@ -109,7 +115,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 54);
+    assert.equal(report.externalCount, 55);
     assert.equal(report.internalizedCount, 52);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);

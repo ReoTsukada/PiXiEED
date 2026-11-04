@@ -15,21 +15,30 @@
   <link rel="stylesheet" href="/css/output-side-ad.css?rev=20261020-side-ad-vertical-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/task-ui.css?rev=20261024-intelligence-ui-2">
+  <link rel="stylesheet" href="/css/conversion-startup.css?rev=20261104-startup-1">
+  <link rel="stylesheet" href="/css/conversion-smart-ui.css?rev=20261103-compact-workspace-2" data-smart-style="conversion">
+  <link rel="stylesheet" href="/css/conversion-simple.css?rev=20261028-motion-1" data-conversion-style>
+  <link rel="stylesheet" href="/css/text-tools.css?rev=20261028-text-1" data-text-style>
 </head>
 <body data-page="output">
-  <a class="output-skip" href="#main">本文へ移動</a>
+  <a class="output-skip" href="#conversion-startup">本文へ移動</a>
   <header class="output-header">
     <a class="output-brand" href="/" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span>PiXiEED</a>
     <span class="output-header__label">作品を保存</span>
   </header>
   <nav class="mobile-nav public-destination-nav" aria-label="メインナビゲーション"><a data-public-nav="home" href="/" aria-label="ホーム"><img src="/assets/icons/pixieed/home.svg" alt=""><span class="app-tab-label">ホーム</span></a><a data-public-nav="explore" href="/explore/" aria-label="探す"><img src="/assets/icons/pixieed/telescope.svg" alt=""><span class="app-tab-label">探す</span></a><a data-public-nav="create" href="/tools/" aria-label="つくる"><img src="/assets/icons/pixieed/tools.svg" alt=""><span class="app-tab-label">つくる</span></a><a data-public-nav="map" href="/globe/" aria-label="地図"><img src="/assets/icons/pixieed/globe.svg" alt=""><span class="app-tab-label">地図</span></a><a data-public-nav="me" href="/profile/" aria-label="自分"><img src="/assets/icons/pixieed/profile.svg" alt=""><span class="app-tab-label">自分</span></a></nav>
-  <main id="main" class="output-main">
-    <div class="output-intro">
-      <p class="output-eyebrow"><span aria-hidden="true">✳</span> この端末で処理しています</p>
-      <h1 id="output-title" tabindex="-1">作品を確認</h1>
-      <p id="output-copy" class="output-copy">プレビューを確認して、必要ならサイズや名前を整えて保存できます。</p>
-      <ol class="task-flow" aria-label="ファイルの変換と保存"><li><span class="task-flow-number" aria-hidden="true">1</span>素材を選ぶ</li><li><span class="task-flow-number" aria-hidden="true">2</span>仕上がりを確認</li><li><span class="task-flow-number" aria-hidden="true">3</span>端末に保存</li></ol>
-      <a id="output-retry-import" class="output-button output-button--secondary" href="/output/work/" hidden>別のファイルを選ぶ</a>
+  <section id="conversion-startup" class="sc-startup" tabindex="-1" aria-labelledby="conversion-startup-title" aria-busy="true">
+    <header class="sc-heading" data-conversion-heading><div><h1 id="conversion-startup-title">変換・出力</h1></div><span>端末内で処理</span></header>
+    <div class="sc-startup-preview"><p id="conversion-startup-status" role="status" aria-live="polite">素材を追加できるよう準備しています…</p><p>ファイルは端末内で処理します。</p></div>
+    <div class="sc-startup-recovery"><a href="" data-conversion-reload>再読み込み</a><a href="/output/">使い方・対応形式</a></div>
+    <div class="sc-startup-save"><button type="button" disabled>準備中 · 保存</button></div>
+    <noscript><p>変換にはJavaScriptが必要です。ブラウザーの設定を確認して再読み込みしてください。</p></noscript>
+  </section>
+  <main id="main" class="output-main" tabindex="-1" hidden inert></main>
+  <template id="output-engine-template">
+    <div class="output-engine-status" hidden>
+      <span id="output-title"></span><p id="output-copy"></p>
+      <a id="output-retry-import" href="/output/work/" hidden>別のファイルを選ぶ</a>
     </div>
     <section id="output-start" class="output-start" aria-labelledby="output-start-title" hidden>
         <div class="output-start__copy"><p class="output-eyebrow">端末内で変換</p><h2 id="output-start-title">画像・動画・音声</h2><p>ファイルはサーバーに送信しません。</p><details class="task-disclosure"><summary>対応するファイル</summary><p>PNG、JPEG、GIF、APNG、WebP画像、MP4/WebM動画と、ブラウザーがデコードできる音声を読み込めます。アニメーション画像は全コマ読み込み機能がある場合に対応します。</p></details><p id="output-start-reward-note" class="output-help" hidden></p></div>
@@ -184,8 +193,8 @@
     <input id="output-file-input" type="file" accept="image/png,image/jpeg,image/gif,image/apng,image/webp,audio/*,video/mp4,video/webm,.mp4,.webm" multiple hidden>
     <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
     <input id="output-scale" type="hidden" value="1">
-  </main>
-  <script type="module" src="/js/creation/conversion-entry.mjs?rev=20261101-route-choice-1"></script>
+  </template>
+  <script type="module" src="/js/creation/conversion-entry.mjs?rev=20261104-engine-boundaries-3" onerror="document.getElementById('conversion-startup').setAttribute('aria-busy','false');document.getElementById('conversion-startup-status').setAttribute('role','alert');document.getElementById('conversion-startup-status').textContent='出力画面を読み込めませんでした。通信を確認して再読み込みしてください。'"></script>
   <script type="module" src="/js/ads/output-side-ad.mjs?rev=20261020-side-ad-vertical-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
 </body>

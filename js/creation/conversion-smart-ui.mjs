@@ -1,7 +1,12 @@
+import { createConversionSaveIntent } from './conversion-save-controller.mjs?rev=20261104-controllers-2';
+import { downloadConversionResult } from './conversion-save-bridge.mjs?rev=20261104-controllers-2';
+import { createConversionFormatOptions } from './conversion-format-view.mjs?rev=20261104-output-controller-1';
+import { createConversionFormatController } from './conversion-format-controller.mjs?rev=20261104-output-controller-1';
+import { createNativeFormatBridge } from './conversion-format-bridge.mjs?rev=20261104-output-controller-1';
 import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionWorkspace, createConversionSaveIntent } from './conversion-workspace.mjs?rev=20261101-empty-area-1';
-import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261102-deferred-focus-1';
+import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261104-engine-boundaries-3';
+import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261104-controllers-2';
 import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
 
 /** Use the same navigation DOM as other pages, once, retaining existing nodes. */
@@ -33,7 +38,7 @@ export function mountSmartConversion(doc = document, win = window) {
     if (doc.querySelector(`link[data-smart-style="${key}"]`)) return;
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; link.dataset.smartStyle = key; doc.head.append(link);
   };
-  style('/css/conversion-smart-ui.css?rev=20261101-route-choice-1', 'conversion');
+  style('/css/conversion-smart-ui.css?rev=20261103-compact-workspace-2', 'conversion');
 
   const toolbar = doc.createElement('section'); toolbar.className = 'sc-toolbar'; toolbar.setAttribute('aria-label', '変換の設定');
   toolbar.innerHTML = `<header class="sc-heading"><div><p>PIXIEED / CONVERT</p><h1>変換・出力</h1></div><span>端末内で処理</span></header>
@@ -41,6 +46,9 @@ export function mountSmartConversion(doc = document, win = window) {
     <div class="sc-input-actions"><button type="button" data-sc-pick>ファイルを選ぶ</button><button type="button" data-sc-paste>文字を貼り付ける</button></div>
     <label class="sc-format" data-sc-format-row hidden><span data-sc-format-label>保存形式</span><select data-sc-format></select></label>
     <p class="sc-hint" data-sc-hint>素材を選ぶと、対応する形式と必要な設定だけを表示します。</p><input type="file" data-sc-file multiple hidden>`;
+  // The initial HTML owns this heading; keep the same node through hydration.
+  const initialHeading = doc.querySelector('[data-conversion-heading]');
+  if (initialHeading) toolbar.querySelector('.sc-heading').replaceWith(initialHeading);
   main.prepend(toolbar);
   const ui = selector => main.querySelector(selector);
   const source = ui('[data-sc-source]'), target = ui('[data-sc-target]'), format = ui('[data-sc-format]'), picker = ui('[data-sc-file]');
@@ -72,8 +80,9 @@ export function mountSmartConversion(doc = document, win = window) {
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
   let lastTextUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
   let lastSaved = null, pendingDimensions = null;
-  let sizeDirty = false, fpsDirty = false, stopped = false, controlSignature = '';
+  let sizeDirty = false, fpsDirty = false, stopped = false, controlSignature = '', saveError = '';
   const nativeFormat = () => mode() === 'input' ? $('[data-tx-action]') : mode() === 'output' ? $('[data-tx-style]') : find('[data-format],#output-format-select');
+  const formatController = createConversionFormatController(createNativeFormatBridge({ getSelect: nativeFormat, getMode: mode, EventImpl: win.Event }));
   const result = () => {
     if (mode() === 'media') return blobLink(find('[data-download],#output-download')) || blobLink(find('a.convert-primary[download]:not([data-previous])'));
     const live = liveText(), renderedMode = $('[data-text-tools]')?.dataset.txResultMode;
@@ -91,11 +100,11 @@ export function mountSmartConversion(doc = document, win = window) {
     || (!liveText() && Boolean(cancelAction()))
     || (mode() === 'media' && !$('#output-layout')?.conversionActions && Boolean(find('#output-format-select')?.disabled) && loaded());
   const matchesFormat = link => {
-    const control = find('[data-format],#output-format-select');
-    if (!control || !link?.download) return true;
+    const state = formatController.snapshot();
+    if (!state.available || !link?.download) return true;
     const normalize = value => ({ jpg: 'jpeg', tif: 'tiff' }[value] || value);
     const extension = link.download.split('.').pop().toLowerCase();
-    return normalize(extension) === normalize(control.value.toLowerCase());
+    return normalize(extension) === normalize(state.value.toLowerCase());
   };
   const statusText = () => (mode() === 'media'
     ? (available($('#output-start')) ? $('#output-import-status') : find('[data-status],#output-status'))
@@ -115,16 +124,16 @@ export function mountSmartConversion(doc = document, win = window) {
     doc.body.classList.add('has-public-destination-nav', 'has-smart-conversion');
   }
   function mirrorFormat() {
-    const original = nativeFormat(), row = ui('[data-sc-format-row]');
-    const hideRow = !original || original.options.length === 0 || (mode() === 'media' && !loaded());
+    const state = formatController.snapshot({ busy: busy() }), row = ui('[data-sc-format-row]');
+    const hideRow = !state.available || state.options.length === 0 || (mode() === 'media' && !loaded());
     if (row.hidden !== hideRow) row.hidden = hideRow;
     if (row.hidden) return;
-    const signature = [...original.options].map(o => `${o.value}\0${o.textContent}\0${o.disabled}`).join('\n');
+    const signature = JSON.stringify([state.mode, state.options]);
     if (signature !== controlSignature) {
-      format.replaceChildren(...[...original.options].map(o => o.cloneNode(true))); controlSignature = signature;
+      format.replaceChildren(...createConversionFormatOptions(doc, state.options)); controlSignature = signature;
     }
-    if (format.value !== original.value) format.value = original.value;
-    const disableFormat = busy() || original.disabled; if (format.disabled !== disableFormat) format.disabled = disableFormat;
+    if (format.value !== state.value) format.value = state.value;
+    if (format.disabled !== state.disabled) format.disabled = state.disabled;
     setText(ui('[data-sc-format-label]'), mode() === 'input' ? '文字からつくるもの' : mode() === 'output' ? '文字の表現' : '保存形式');
   }
   function render() {
@@ -157,13 +166,13 @@ export function mountSmartConversion(doc = document, win = window) {
     const nativeProgress = [...main.querySelectorAll('progress:not([data-sc-progress]):not([data-sc-panel-progress])')].find(available);
     const progress = dock.querySelector('progress'); progress.hidden = !working;
     if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
-    const label = saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: nativeFormat()?.value, filename: link?.download });
+    const label = saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: formatController.snapshot().value, filename: link?.download });
     setText(buttonLabel, label);
     setAttr(button, 'aria-label', label);
     cancel.hidden = !working || !cancelAction();
     const nativeStatus = statusText();
     const savedCurrent = lastSaved?.mode === currentMode && lastSaved.revision === revision && lastSaved.href === href;
-    const displayedStatus = conversionSaveMessage({ loaded: loaded(), working, saved: savedCurrent, nativeStatus });
+    const displayedStatus = saveError || conversionSaveMessage({ loaded: loaded(), working, saved: savedCurrent, nativeStatus });
     setText(message, displayedStatus);
     workspace.update({ media: currentMode === 'media', loaded: loaded(), ready, link, working, saveDisabled: button.disabled, status: displayedStatus, progress: nativeProgress, canCancel: !cancel.hidden, saveLabel: label });
     const batchAction = $('#output-batch-save');
@@ -183,15 +192,15 @@ export function mountSmartConversion(doc = document, win = window) {
     saveIntent.observe();
   }
 
-  function save(link) {
-    if (!blobLink(link)) return;
-    link.click(); lastSaved = { mode: mode(), revision, href: link.getAttribute('href') };
+  function save(link, state) {
+    if (!downloadConversionResult({ link, expectedHref: state?.href, available })) return false; lastSaved = { mode: mode(), revision, href: link.getAttribute('href') };
     setText(message, 'ダウンロードを開始しました。');
     schedule();
     const ticket = saveFocusTicket;
     if (ticket && ticket.mode === mode() && ticket.revision === revision) saveFocusGuard.schedule(ticket.guard, () => {
       if (ticket.mode === mode() && ticket.revision === revision) workspace.focusSave(button);
     });
+    return true;
   }
   function validInputs(scope) {
     for (const input of scope.querySelectorAll('input,textarea,select')) {
@@ -224,7 +233,7 @@ export function mountSmartConversion(doc = document, win = window) {
       }
       if (stage === 'size') sizeDirty = false;
     },
-    blocked() { setText(message, '設定の反映を確認してください。前回の結果は保存しません。'); },
+    blocked(error) { saveError = error?.message || '設定の反映を確認してください。前回の結果は保存しません。'; setText(message, saveError); },
     run(stage) {
       if (stage === 'live') {
         const live = liveText();
@@ -244,6 +253,7 @@ export function mountSmartConversion(doc = document, win = window) {
     },
   });
   function beginExport() {
+    saveError = '';
     saveFocusTicket = { guard: saveFocusGuard.begin(button), mode: mode(), revision };
     if (!saveIntent.pending) pendingDimensions = fpsDirty && sizeDirty ? { width: $('#output-width')?.value, height: $('#output-height')?.value } : null;
     saveIntent.request(); schedule();
@@ -254,7 +264,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const element = event.target;
     if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub],[data-sc-source],[data-sc-target]') || element.closest('[data-sc-route-choice]')) return;
     if (element.closest('#output-items')) { schedule(); return; }
-    revision++; saveIntent.cancel(); saveFocusGuard.invalidate();
+    saveError = ''; revision++; saveIntent.cancel(); saveFocusGuard.invalidate();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
     if (element.matches('#output-width,#output-height,#output-aspect-lock')) sizeDirty = true;
     if (element.matches('#output-fps,#output-fps-preset')) fpsDirty = true;
@@ -275,6 +285,7 @@ export function mountSmartConversion(doc = document, win = window) {
     schedule();
   }
   function changeRoute(next) {
+    saveError = '';
     const focused = doc.activeElement, fromChoices = focused?.closest?.('[data-sc-route-choice]');
     selectMode(next); render();
     if (fromChoices) {
@@ -286,8 +297,12 @@ export function mountSmartConversion(doc = document, win = window) {
   source.addEventListener('change', () => changeRoute(source.value === 'text' ? 'input' : target.value === 'text' ? 'output' : 'media'));
   target.addEventListener('change', () => changeRoute(target.value === 'text' ? 'output' : source.value === 'text' ? 'input' : 'media'));
   format.addEventListener('change', () => {
-    const original = nativeFormat(); if (!original || original.disabled || busy()) return;
-    original.value = format.value; original.dispatchEvent(new win.Event('change', { bubbles: true })); schedule();
+    try { formatController.choose(format.value, { busy: busy() }); }
+    catch (error) {
+      const field = mode() === 'media' ? find('[data-status],#output-status') : $('[data-tx-status]');
+      if (field) field.textContent = error?.message || '形式を切り替えられませんでした。';
+    }
+    schedule();
   });
   ui('[data-sc-pick]').addEventListener('click', choose);
   ui('[data-sc-paste]').addEventListener('click', () => { if (selectMode('input')) { render(); $('[data-tx-source]')?.focus(); } });
@@ -305,6 +320,7 @@ export function mountSmartConversion(doc = document, win = window) {
   main.addEventListener('pixieed:text-preview', schedule);
   function materialsChanged(event) {
     if (event.detail?.changed) {
+      saveError = '';
       if (materialChangeInvalidatesSave(event.detail)) { revision++; saveIntent.cancel(); saveFocusGuard.invalidate(); }
       mediaDirty = true; lastSaved = null;
     }

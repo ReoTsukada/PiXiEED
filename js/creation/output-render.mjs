@@ -26,7 +26,7 @@ const DEFAULT_INFERENCE_PIXELS = 4_000_000;
 
 /** Respect an explicit output-size choice made by the user over automatic pixel-origin selection. */
 export function shouldAutoSelectPixelOrigin({ selection, needsAutoResize }) {
-  return Boolean(needsAutoResize) && selection !== 'original';
+  return Boolean(needsAutoResize) && !['original', 'custom'].includes(selection);
 }
 
 function validFrame(frame) {

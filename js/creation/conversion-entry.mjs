@@ -1,50 +1,47 @@
-/** All editor handoffs and local conversions share one output destination. */
+import { createConversionStartupView } from './conversion-startup-view.mjs?rev=20261104-startup-1';
+
+/** Output startup owns visibility; conversion engines continue to own media and storage. */
 const query = new URLSearchParams(location.search);
+const main = document.getElementById('main');
+const view = createConversionStartupView(document);
 // This converter uses ordinary page advertising, not an entry gate. CMP consent is untouched.
 try { window.__PIXIEED_OFFERWALL_ENTRY__?.retire?.(); } catch { /* Optional site policy. */ }
+let result;
 try {
-  if (query.has('id') || query.has('file')) {
-    const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261101-direct-material-1');
-    await mountSharedOutput(sharedOutputRequest(location.search));
-  } else if (query.get('mode') === 'convert') {
-    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/conversion-simple.css?rev=20261028-motion-1'; document.head.append(css);
-    const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261101-direct-material-1'); mountConversionPage();
-  } else {
-    await import('./output-page.mjs?rev=20261101-direct-material-1');
-  }
-} catch (error) {
-  const main = document.getElementById('main');
-  if (main) {
-    main.replaceChildren();
-    const message = document.createElement('p'); message.setAttribute('role', 'alert'); message.textContent = error?.message || '出力画面を開けませんでした。制作画面からもう一度書き出してください。';
-    const back = document.createElement('button'); back.type = 'button'; back.textContent = '前の画面に戻る'; back.addEventListener('click', () => history.back());
-    const link = document.createElement('a'); link.href = '/output/'; link.textContent = '変換ガイドを開く'; main.append(message, back, link);
-  }
+  const { runConversionStartup } = await import('./conversion-startup.mjs?rev=20261104-startup-1');
+  result = await runConversionStartup({
+    view,
+    native: window.top !== window.self,
+    async loadEngine() {
+      for (const link of document.querySelectorAll('link[data-smart-style="conversion"],link[href*="conversion-startup.css"]')) {
+        if (!link.sheet) throw new Error('画面のスタイルを読み込めませんでした。通信を確認して再読み込みしてください。');
+      }
+      const template = document.getElementById('output-engine-template');
+      if (!template) throw new Error('出力画面の構成を確認できませんでした。再読み込みしてください。');
+      main.replaceChildren(template.content.cloneNode(true)); template.remove();
+      if (query.has('id') || query.has('file')) {
+        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261104-engine-boundaries-3');
+        await mountSharedOutput(sharedOutputRequest(location.search));
+      } else if (query.get('mode') === 'convert') {
+        const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261104-startup-1');
+        mountConversionPage();
+      } else {
+        const { outputPageReady } = await import('./output-page.mjs?rev=20261104-engine-boundaries-3');
+        await outputPageReady;
+      }
+      const failure = main.querySelector('[role="alert"]');
+      if (failure) throw new Error(failure.textContent || '端末内の出力を開けませんでした。');
+    },
+    loadText: () => import('./text-tools.mjs?rev=20261104-engine-boundaries-3'),
+    loadIntent: () => import('./conversion-intent.mjs?rev=20261028-discovery-1'),
+    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261104-engine-boundaries-3'),
+    onWarning(error) { console.warn('Optional conversion module unavailable; media conversion remains available.', error); },
+  });
+} catch (error) { view.fail(error); }
+
+// Advertising stays optional and starts only after a usable workspace is exposed.
+if (result?.status === 'ready') {
+  void import('../ads/conversion-display-ad.mjs?rev=20261031-workspace-2')
+    .then(({ mountConversionDisplayAd }) => mountConversionDisplayAd())
+    .catch(() => { /* Conversion and download remain available without advertising. */ });
 }
-
-// Add text input/output without replacing media conversion or private handoff state.
-try {
-  const { installTextTools } = await import('./text-tools.mjs?rev=20261030-text-fit-1');
-  await installTextTools();
-} catch (error) {
-  console.warn('Text tools unavailable; existing media conversion remains usable.', error);
-}
-
-// Search/guide intent is a suggestion, never an automatic conversion. Private handoffs win.
-try {
-  const { installConversionIntent } = await import('./conversion-intent.mjs?rev=20261028-discovery-1');
-  installConversionIntent();
-} catch { /* The ordinary converter remains available without the enhancement. */ }
-
-// Share one contextual UI and fixed export action without replacing any conversion engine.
-try {
-  const { mountSmartConversion } = await import('./conversion-smart-ui.mjs?rev=20261101-route-choice-1');
-  mountSmartConversion();
-} catch (error) {
-  console.warn('Smart conversion UI unavailable; original conversion controls remain available.', error);
-}
-
-// Advertising is optional and never awaited by import, preview, generation or saving.
-void import('../ads/conversion-display-ad.mjs?rev=20261031-workspace-2')
-  .then(({ mountConversionDisplayAd }) => mountConversionDisplayAd())
-  .catch(() => { /* Conversion and download remain available without advertising. */ });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { clearToolOutputReturnId, readToolOutput, sanitizeOutputFilename, saveToolOutputFilename, saveToolOutputVariant, saveToolOutputItems, saveToolOutputMedia, sendToolOutput, sendToolOutputAfterSaving, stageToolOutput } from '../../js/creation/output-handoff.mjs';
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
-import { resizeRgbaNearest } from '../../js/creation/output-render.mjs';
+import { resizeRgbaNearest, shouldAutoSelectPixelOrigin } from '../../js/creation/output-render.mjs';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from '../../js/pixel-lens/output-handoff.mjs';
 
 class FakeTransaction {
@@ -155,7 +155,7 @@ test('converted frame choice and approximate audio timing survive reload with bo
   assert.equal(await sanitized.sourceBlob.text(), 'pixels');
 });
 
-test('explicit original pixel-size choice survives output-item persistence and reload', async () => {
+test('explicit original and custom pixel-size choices survive output-item persistence and reload', async () => {
   const deps = dependencies();
   await stageToolOutput(file(), deps);
   const loaded = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
@@ -166,10 +166,23 @@ test('explicit original pixel-size choice survives output-item persistence and r
   assert.equal(reloaded.outputs[0].metadata.pixelOriginChoice, 'original');
   assert.equal(reloaded.outputs[1].filename, 'my-art-pixel.png');
   assert.equal(await reloaded.sourceBlob.text(), 'pixels');
-  const invalidChoice = { ...reloaded.outputs[0], metadata: { ...reloaded.outputs[0].metadata, pixelOriginChoice: 'pixel' } };
-  await saveToolOutputItems(validId, [invalidChoice, reloaded.outputs[1]], { indexedDBRef: deps.indexedDBRef, now: deps.now });
-  const sanitized = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
-  assert.equal(sanitized.outputs[0].metadata.pixelOriginChoice, undefined, 'only the explicit original choice is accepted');
+  const custom = { ...reloaded.outputs[0], id: 'custom-size', extension: 'jpeg', mime: 'image/jpeg', filename: 'my-art-custom.jpeg',
+    blob: new Blob(['custom jpeg'], { type: 'image/jpeg' }), metadata: { width: 128, height: 128, outputWidth: 4096, outputHeight: 4096, pixelOriginChoice: 'custom' } };
+  await saveToolOutputItems(validId, [custom, reloaded.outputs[1]], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  const formatChanged = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+  assert.deepEqual([formatChanged.outputs[0].extension, formatChanged.outputs[0].metadata.outputWidth,
+    formatChanged.outputs[0].metadata.outputHeight, formatChanged.outputs[0].metadata.pixelOriginChoice], ['jpeg', 4096, 4096, 'custom']);
+  assert.equal(await formatChanged.sourceBlob.text(), 'pixels', 'format changes retain the original source bytes');
+  assert.equal(shouldAutoSelectPixelOrigin({ selection: formatChanged.outputs[0].metadata.pixelOriginChoice, needsAutoResize: true }), false);
+  assert.equal(shouldAutoSelectPixelOrigin({ selection: formatChanged.outputs[1].metadata.pixelOriginChoice, needsAutoResize: true }), true);
+  for (const invalidChoice of ['pixel', 1, null]) {
+    const invalid = { ...reloaded.outputs[0], metadata: { ...reloaded.outputs[0].metadata, pixelOriginChoice: invalidChoice } };
+    await saveToolOutputItems(validId, [invalid, formatChanged.outputs[1]], { indexedDBRef: deps.indexedDBRef, now: deps.now });
+    const sanitized = await readToolOutput(validId, { indexedDBRef: deps.indexedDBRef, now: deps.now });
+    assert.equal(sanitized.outputs[0].metadata.pixelOriginChoice, undefined, `unsupported choice ${String(invalidChoice)} is rejected`);
+    assert.equal(sanitized.outputs[1].metadata.pixelOriginChoice, undefined, 'missing choice remains missing');
+    assert.equal(await sanitized.sourceBlob.text(), 'pixels');
+  }
 });
 
 test('user filename provenance survives output-item persistence and reload', async () => {
