@@ -172,7 +172,6 @@ export function mountConversionPage(doc = document, win = window) {
       frame: $('[data-frame]').value, bits: $('[data-bits]').value, ratio: $('[data-ratio]').checked,
       loop: $('[data-loop]').value, rate } : null;
     main.classList.add('has-source');
-    main.querySelector('h1').textContent = next.kind === 'image' && next.frames.length > 1 ? '動きを整える。' : 'ファイルを変換';
     source = snapshotConversionMaterialSource(next); original = snapshotConversionMaterialSource(source);
     activeId = source.assets[0]?.id || null; if (!preserveUndo) undoTicket = null;
     clearResult(); rate = settings?.rate ?? 1; $('[data-drop]').hidden = true; $('[data-editor]').hidden = false;
