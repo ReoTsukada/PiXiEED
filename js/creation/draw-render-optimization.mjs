@@ -134,6 +134,10 @@ export function createStrokePaintScheduler({ requestFrame, cancelFrame, paint, m
   }
   const batcher = createFrameBatcher({ requestFrame, cancelFrame, callback: render });
   return {
+    queueFull() {
+      if (disposed) return false;
+      pending.clear(); full = true; batcher.schedule(); return true;
+    },
     queue(indices) {
       if (disposed) return false;
       if (!indices || typeof indices === 'string' || typeof indices[Symbol.iterator] !== 'function') throw new TypeError('Dirty stroke pixels must be iterable');

@@ -200,3 +200,26 @@ test('large strokes fall back to one full repaint without retaining unlimited pi
   assert.throws(() => painter.queue('text'), /Dirty stroke pixels/);
   painter.dispose();
 });
+
+test('shape previews can request one full paint per frame, while release and cancel discard stale work', () => {
+  let id = 0; const jobs = new Map(), painted = [];
+  const painter = createStrokePaintScheduler({
+    requestFrame(callback) { jobs.set(++id, callback); return id; },
+    cancelFrame(key) { jobs.delete(key); },
+    paint(changed) { painted.push(changed); }
+  });
+  painter.queue([1, 2]);
+  for (let i = 0; i < 40; i++) painter.queueFull();
+  painter.queue([3]);
+  assert.equal(jobs.size, 1);
+  painter.flush();
+  assert.deepEqual(painted, [null], 'the latest full preview replaces every older dirty region');
+  assert.equal(jobs.size, 0);
+  painter.queueFull(); painter.cancel();
+  assert.equal(jobs.size, 0);
+  painter.flush();
+  assert.equal(painted.length, 1, 'cancel/release cleanup cannot later paint a stale preview');
+  painter.queueFull(); painter.dispose();
+  assert.equal(painter.queueFull(), false);
+  assert.equal(jobs.size, 0);
+});

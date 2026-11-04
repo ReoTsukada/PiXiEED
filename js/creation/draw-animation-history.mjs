@@ -1,4 +1,4 @@
-import { estimateRetainedAnimationBytes, validateAnimation } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { createRetainedAnimationBytesCounter, estimateRetainedAnimationBytes, validateAnimation } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 export const DRAW_ANIMATION_HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 
@@ -9,8 +9,25 @@ export function createDrawAnimationHistory(initial, { maxBytes = DRAW_ANIMATION_
   let current = initial; const past = []; const future = [];
   const trim = () => {
     while (past.length + future.length > maxEntries) { if (past.length) past.shift(); else future.shift(); }
-    const extraBytes = () => estimateRetainedAnimationBytes([...past, ...future, current]) - estimateRetainedAnimationBytes([current]);
-    while (extraBytes() > maxBytes) { if (past.length) past.shift(); else if (future.length) future.shift(); else break; }
+    const timeline = () => [...past, ...future, current];
+    let retainedBytes = estimateRetainedAnimationBytes(timeline());
+    const currentBytes = estimateRetainedAnimationBytes([current]);
+    while (retainedBytes - currentBytes > maxBytes) {
+      const removed = past.length ? past.shift() : future.shift();
+      if (!removed) break;
+      retainedBytes = estimateRetainedAnimationBytes(timeline());
+      if (retainedBytes - currentBytes <= maxBytes) break;
+      // The common no-eviction and one-entry-eviction paths keep the original
+      // lightweight estimator. Build a refcount only when another full scan
+      // would otherwise be needed for repeated eviction.
+      const retained = createRetainedAnimationBytesCounter(timeline());
+      while (retained.bytes - currentBytes > maxBytes) {
+        const next = past.length ? past.shift() : future.shift();
+        if (!next) break;
+        retained.remove(next);
+      }
+      break;
+    }
   };
   return {
     get current() { return current; }, get canUndo() { return past.length > 0; }, get canRedo() { return future.length > 0; },
