@@ -407,6 +407,7 @@
         "honkbooks-asobanight-special-weekend-pixel-art-2026",
         "juuni-comitia-158-pixel-art-2026",
         "kac-hermippe-pointless-2025",
+        "kac-hermippe-solo-exhibition-2026-11-12",
         "kac-super-nice-thankass-2025",
         "kac-ultra-dope-motocross-2026",
         "keisuke-katsuki-afterglows-2026",
@@ -445,6 +446,7 @@
         "台東区・東上野",
         "新宿区",
         "東京",
+        "東京都江東区亀戸",
         "江東区",
         "江東区・亀戸",
         "江東区・清澄白河／オンライン",
@@ -456,6 +458,16 @@
         "港区・南青山",
         "港区・赤坂",
         "足立区・北千住"
+      ]
+    },
+    {
+      "id": "region-cf2abf0c5be326cb",
+      "label": "日本",
+      "eventIds": [
+        "ffrs-japan-wide-dot-ff-campaign-2026"
+      ],
+      "areas": [
+        "日本全国（47都道府県）"
       ]
     },
     {
@@ -495,11 +507,13 @@
       "id": "region-e8900cb0689eae74",
       "label": "ドイツ",
       "eventIds": [
+        "ccon-moertel-pixel-artist-stuttgart-2026",
         "moertel-polaris-2026",
         "moertel-spiel-2026",
         "retrocon-saar-17-pixel-art-2026"
       ],
       "areas": [
+        "Stuttgart",
         "エッセン",
         "ハンブルク",
         "フェルクリンゲン"
@@ -719,6 +733,18 @@
       "area": "アルメンドラレホ（バダホス）",
       "sourceUrls": [
         "https://www.festivalfps.com/"
+      ]
+    },
+    {
+      "id": "venue-1a1923c8cac4e035",
+      "label": "Messe Stuttgart",
+      "eventIds": [
+        "ccon-moertel-pixel-artist-stuttgart-2026"
+      ],
+      "region": "ドイツ",
+      "area": "Stuttgart",
+      "sourceUrls": [
+        "https://www.comiccon.de/acts/stefanie-fehling/"
       ]
     },
     {
@@ -1943,6 +1969,18 @@
       ]
     },
     {
+      "id": "venue-f43f3ec0a0cd0663",
+      "label": "亀戸アートセンター",
+      "eventIds": [
+        "kac-hermippe-solo-exhibition-2026-11-12"
+      ],
+      "region": "東京都",
+      "area": "東京都江東区亀戸",
+      "sourceUrls": [
+        "https://prtimes.jp/main/html/rd/p/000000019.000142243.html"
+      ]
+    },
+    {
       "id": "venue-fbb9f6a1ac790f4e",
       "label": "Otherwise Gallery（東京都港区南青山5-7-17 小原流会館B1F）",
       "eventIds": [
@@ -2411,6 +2449,31 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-18634e623644666c",
+      "label": "CCON Comic Con Stuttgart 2026 — Pixel Artist Moertel参加",
+      "eventIds": [
+        "ccon-moertel-pixel-artist-stuttgart-2026"
+      ],
+      "url": "https://www.comiccon.de/acts/stefanie-fehling/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ドイツ"
+      ],
+      "areas": [
+        "Stuttgart"
+      ],
+      "venues": [
+        "Messe Stuttgart"
+      ],
+      "lastKnownEventDate": "2026-11-29",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -3550,6 +3613,31 @@
       }
     },
     {
+      "id": "source-4de630f26b201c5b",
+      "label": "Ateliers numériques : Pixel art de bibliothèque",
+      "eventIds": [
+        "lyon-pixel-art-de-bibliotheque-2026-11-14"
+      ],
+      "url": "https://bm-lyon.fr/agenda/ateliers-numeriques-pixel-art-de-bibliotheque",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "リヨン・6区"
+      ],
+      "venues": [
+        "Bibliothèque du 6e（Salle d’animation, rez-de-chaussée）, 35 rue Bossuet, 69006 Lyon"
+      ],
+      "lastKnownEventDate": "2026-11-14",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
+        "notes": "公式ページで11/14 16:00〜17:30、7〜12歳、無料、申込終了、ピクセル化した作品を紙片モザイクにする内容を再確認。本文内の所要時間2時間表記との不一致を保持。"
+      }
+    },
+    {
       "id": "source-4e220705e4189e54",
       "label": "モトクロス斉藤 個展「ウルトラドープ」",
       "eventIds": [
@@ -3652,6 +3740,30 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-16T00:07:54+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-5818e21c4ff81665",
+      "label": "Festival FPS 2026 — Pixel Artワークショップ",
+      "eventIds": [
+        "festival-fps-pixel-art-workshop-2026"
+      ],
+      "url": "https://www.festivalfps.com/event/-1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "アルメンドラレホ（バダホス）"
+      ],
+      "venues": [
+        "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）"
+      ],
+      "lastKnownEventDate": "2026-11-21",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -3950,6 +4062,28 @@
       }
     },
     {
+      "id": "source-61649a6e6c4becf5",
+      "label": "FINAL FANTASY RESONANCE「#日本全国ドットFF」キャンペーン",
+      "eventIds": [
+        "ffrs-japan-wide-dot-ff-campaign-2026"
+      ],
+      "url": "https://x.com/FFRS_JP",
+      "kind": "social",
+      "prefectures": [],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "日本全国（47都道府県）"
+      ],
+      "venues": [],
+      "lastKnownEventDate": "2026-12-21",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
       "id": "source-61a1c0059537f94e",
       "label": "Pixel Art & Alternative Interfaces — NOVA FCT",
       "eventIds": [
@@ -4019,6 +4153,29 @@
       "check": {
         "result": "pending",
         "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
+      }
+    },
+    {
+      "id": "source-6444452518b5e848",
+      "label": "FINAL FANTASY RESONANCE「#日本全国ドットFF」キャンペーン",
+      "eventIds": [
+        "ffrs-japan-wide-dot-ff-campaign-2026"
+      ],
+      "url": "https://jp.finalfantasy.com/news/2001034/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "日本全国（47都道府県）"
+      ],
+      "venues": [],
+      "lastKnownEventDate": "2026-12-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -4954,6 +5111,31 @@
       }
     },
     {
+      "id": "source-94d1f4733e53fb85",
+      "label": "Festival FPS 2026 — Pixel Artワークショップ",
+      "eventIds": [
+        "festival-fps-pixel-art-workshop-2026"
+      ],
+      "url": "https://www.festivalfps.com/pages/taller-02-videojuegos",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "アルメンドラレホ（バダホス）"
+      ],
+      "venues": [
+        "Centro Cultural San Antonio, Almendralejo（スペイン・バダホス）"
+      ],
+      "lastKnownEventDate": "2026-11-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
+        "notes": "公式ワークショップ本文でGONSTARによる初心者向けPixel Art制作内容を確認。申込ページで11/21 17:00〜19:00を照合。"
+      }
+    },
+    {
       "id": "source-9b12a6aa49fec6c4",
       "label": "HeroFestival Marseille — Le Dendrob’AtelierのPixel Art作品出展",
       "eventIds": [
@@ -5213,6 +5395,7 @@
       "id": "source-a16186da9f207629",
       "label": "Moertel ドット絵作品出展（Polaris 2026）",
       "eventIds": [
+        "ccon-moertel-pixel-artist-stuttgart-2026",
         "moertel-polaris-2026",
         "moertel-spiel-2026",
         "moertel-viecc-2026"
@@ -5225,6 +5408,7 @@
         "ドイツ"
       ],
       "areas": [
+        "Stuttgart",
         "ウィーン",
         "エッセン",
         "ハンブルク"
@@ -5232,12 +5416,13 @@
       "venues": [
         "Messe Essen",
         "Messe Hamburg（ドイツ・ハンブルク）、B4.EG 212-2",
+        "Messe Stuttgart",
         "Messe Wien"
       ],
-      "lastKnownEventDate": "2026-11-22",
+      "lastKnownEventDate": "2026-11-29",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5262,7 +5447,7 @@
       "lastKnownEventDate": "2026-11-14",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-13T00:01:00+00:00",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -5768,6 +5953,27 @@
       }
     },
     {
+      "id": "source-bdffd3798f24b4d7",
+      "label": "Kiri Pixel Art Jam #1",
+      "eventIds": [
+        "kiri-pixel-art-jam-1-2026"
+      ],
+      "url": "https://itch.io/jam/kiri-pixel-art-jam-1",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン"
+      ],
+      "lastKnownEventDate": "2026-11-30",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-bf3a4ed737478f06",
       "label": "점집 JumpZip — 韓国初のピクセルアート限定即売展示",
       "eventIds": [
@@ -5923,6 +6129,7 @@
       "id": "source-c8ac9e5c5e029782",
       "label": "PIXEL LAYERED 第三弾 hermippe「円環」",
       "eventIds": [
+        "kac-hermippe-solo-exhibition-2026-11-12",
         "pixel-layered-hermippe-shibuya-2026"
       ],
       "url": "https://prtimes.jp/main/html/rd/p/000000019.000142243.html",
@@ -5934,16 +6141,42 @@
         "日本"
       ],
       "areas": [
+        "東京都江東区亀戸",
         "渋谷区・神宮前"
       ],
       "venues": [
-        "MIYASHITA PARK 全域58面のLEDビジョン（東京都渋谷区神宮前6-20-10）"
+        "MIYASHITA PARK 全域58面のLEDビジョン（東京都渋谷区神宮前6-20-10）",
+        "亀戸アートセンター"
       ],
-      "lastKnownEventDate": "2026-11-20",
+      "lastKnownEventDate": "2026-11-24",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-22T00:03:56+00:00",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-c91d9d5221b1f6f5",
+      "label": "CCON Comic Con Stuttgart 2026 — Pixel Artist Moertel参加",
+      "eventIds": [
+        "ccon-moertel-pixel-artist-stuttgart-2026"
+      ],
+      "url": "https://www.comiccon.de/acts_kategorien/artists/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "ドイツ"
+      ],
+      "areas": [
+        "Stuttgart"
+      ],
+      "venues": [
+        "Messe Stuttgart"
+      ],
+      "lastKnownEventDate": "2026-11-29",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -6506,7 +6739,7 @@
       "lastKnownEventDate": "2026-11-21",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-12T00:03:34+00:00",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6556,10 +6789,9 @@
       ],
       "lastKnownEventDate": "2026-11-04",
       "check": {
-        "result": "unavailable",
-        "lastCheckedAt": "2026-10-08T00:01:13+00:00",
-        "attemptedAt": "2026-11-03T11:56:16+00:00",
-        "notes": "個別イベントURLは2026-11-03 JSTに再取得したがCache miss。直近成功確認は保持。自治体の公式9〜12月プログラム本文は本日再読でき、開催日・Ingwiller会場・内容を確認。"
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
     {
@@ -7026,7 +7258,7 @@
       "lastKnownEventDate": "2026-12-08",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-07T00:05:03+00:00",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -7052,7 +7284,7 @@
       "lastKnownEventDate": "2026-12-11",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-10-06T04:33:14+00:00",
+        "lastCheckedAt": "2026-11-04T00:11:00+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -7114,6 +7346,28 @@
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-07T06:30:42+00:00",
         "notes": "会場公式アクセス本文を確認。建物住所はオリマチ錦1-Aと表示し、同ページでオリマチ錦2-Aをレンタルスペースとして別記。イベントの2-Aは建物内の開催区画。"
+      }
+    },
+    {
+      "id": "source-f736fbeda80767fa",
+      "label": "FINAL FANTASY RESONANCE「#日本全国ドットFF」キャンペーン",
+      "eventIds": [
+        "ffrs-japan-wide-dot-ff-campaign-2026"
+      ],
+      "url": "https://www.jp.square-enix.com/FFRS/cp/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "日本全国（47都道府県）"
+      ],
+      "venues": [],
+      "lastKnownEventDate": "2026-12-21",
+      "check": {
+        "result": "pending",
+        "notes": "公式ページから巡回先として発見。リンク先本文は未確認。"
       }
     },
     {
@@ -7295,5 +7549,5 @@
       }
     }
   ],
-  "updatedAt": "2026-11-03T11:57:27+00:00"
+  "updatedAt": "2026-11-04T00:13:50+00:00"
 }
