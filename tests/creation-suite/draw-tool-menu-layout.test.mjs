@@ -25,8 +25,8 @@ test('compact tool menu keeps its paint, shapes and selection controls together'
 test('live pointer input queues changed pixels and final stroke paint cancels old frame', () => {
   assert.match(runtime, /createStrokePaintScheduler/);
   assert.match(runtime, /if \(deferPaint\) strokePaintScheduler\.queue\(changed\); else paint\(changed\)/);
-  assert.match(runtime, /applyDrawPoint\(pointFromEvent\(sample\), null, true\)/);
-  assert.match(runtime, /applyDrawPoint\(pointFromEvent\(event\), event, coalescedTool\)/);
+  assert.match(runtime, /applyDrawPoint\(pointFromEvent\(sample, canvasRect\), null, true, canvasRect\)/);
+  assert.match(runtime, /applyDrawPoint\(pointFromEvent\(event, canvasRect\), event, coalescedTool, canvasRect\)/);
   assert.match(runtime, /function endStroke\([\s\S]*?strokePaintScheduler\.cancel\(\)/);
   assert.match(runtime, /scope\.add\(\(\) => strokePaintScheduler\.dispose\(\)\)/);
 });

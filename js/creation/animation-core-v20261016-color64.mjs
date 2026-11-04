@@ -25,6 +25,9 @@ export const ANIMATION_METADATA_BUDGET = 1024 * 1024;
 const internals = new WeakMap();
 const validatedSnapshots = new WeakSet();
 const drawRewardBonusColorsByAnimation = new WeakMap();
+// Pixel snapshots are immutable. Retain at most the whole-timeline result and
+// one active-cel exclusion per snapshot; callers always receive their own Set.
+const usedColorIndicesCache = new WeakMap();
 let nextId = 1;
 const newId = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${(nextId++).toString(36)}`}`;
 const fail = (code, message) => { const error = new TypeError(message); error.code = code; throw error; };
@@ -222,6 +225,9 @@ export function getAnimationUsedColorIndices(animation, { excludeFrameId, exclud
   validateAnimation(animation);
   if ((excludeFrameId === undefined) !== (excludeLayerId === undefined)) throw new TypeError('除外するコマとレイヤーを両方指定してください。');
   if (excludeFrameId !== undefined) ensureCell(animation, excludeFrameId, excludeLayerId);
+  const cached = usedColorIndicesCache.get(animation);
+  if (excludeFrameId === undefined && cached?.all) return new Set(cached.all);
+  if (excludeFrameId !== undefined && cached?.excluded?.frameId === excludeFrameId && cached.excluded.layerId === excludeLayerId) return new Set(cached.excluded.values);
   const used = new Set(); const checkedTiles = new Set(); const data = internal(animation);
   const expectedTileCount = Math.ceil(animation.width / ANIMATION_TILE_SIZE) * Math.ceil(animation.height / ANIMATION_TILE_SIZE);
   for (const frame of animation.frames) for (const layer of animation.layers) {
@@ -236,6 +242,10 @@ export function getAnimationUsedColorIndices(animation, { excludeFrameId, exclud
       for (const value of bytes) { if (value === 0) used.add(-1); else used.add(value - 1); }
     }
   }
+  const entry = cached || {};
+  if (excludeFrameId === undefined) entry.all = [...used];
+  else entry.excluded = { frameId: excludeFrameId, layerId: excludeLayerId, values: [...used] };
+  usedColorIndicesCache.set(animation, entry);
   return used;
 }
 export function composeAnimationFrame(animation, frameId, { layerIds, excludeMusic = false } = {}) {
@@ -456,6 +466,42 @@ export function createAnimationFromSerialized(meta, serializedTiles) {
   }
   if (payloadSize(pool) > ANIMATION_PIXEL_BUDGET) throw new RangeError('アニメーション画素の保存上限を超えています。');
   return makeAnimation(meta, cels, pool, { share: true });
+}
+
+/** Track a temporary set of immutable snapshots while counting distinct COW buffers once. */
+export function createRetainedAnimationBytesCounter(animations) {
+  const encoder = new TextEncoder(), bufferRefs = new Map(), metadataSizes = new Map();
+  let total = 0;
+  for (const animation of animations) {
+    validateAnimation(animation);
+    const metadataBytes = encoder.encode(JSON.stringify(animation)).byteLength;
+    total += metadataBytes;
+    const sizes = metadataSizes.get(animation) ?? [];
+    sizes.push(metadataBytes); metadataSizes.set(animation, sizes);
+    const unique = new Set();
+    for (const { bytes } of internal(animation).pool.values()) unique.add(bytes);
+    for (const bytes of unique) {
+      const refs = bufferRefs.get(bytes);
+      if (refs) refs.count++;
+      else { bufferRefs.set(bytes, { count: 1, byteLength: bytes.byteLength }); total += bytes.byteLength; }
+    }
+  }
+  return {
+    get bytes() { return total; },
+    remove(animation) {
+      const sizes = metadataSizes.get(animation);
+      if (!sizes?.length) throw new TypeError('履歴外のアニメーションは保持サイズから除外できません。');
+      total -= sizes.pop();
+      if (!sizes.length) metadataSizes.delete(animation);
+      const unique = new Set();
+      for (const { bytes } of internal(animation).pool.values()) unique.add(bytes);
+      for (const bytes of unique) {
+        const refs = bufferRefs.get(bytes);
+        if (!refs) throw new TypeError('保持タイルの参照数が不正です。');
+        if (--refs.count === 0) { total -= refs.byteLength; bufferRefs.delete(bytes); }
+      }
+    },
+  };
 }
 
 /** Estimate retained metadata plus distinct COW tile buffers without serializing/copying them. */

@@ -599,7 +599,11 @@ function paintOnion(display, changed = null) {
   if (dirty) {
     onionCanvas.getContext('2d').putImageData(onionImage, 0, 0, dirty.x, dirty.y, dirty.width, dirty.height);
   }
-  placeOverlays();
+  // Pixel updates do not change viewport geometry. View/resize/selection paths
+  // place their own controls; only a newly visible or resized onion needs it here.
+  if (wasHidden || resized) placeOverlays();
+  // Selection visibility/editability can still change when its pixels are erased.
+  else if (selection || selectionTransform) placeSelection();
 }
 function handleAnimationAction(action) {
   if (cameraOpening || spriteScaling || featureSession) return false;
@@ -855,16 +859,16 @@ function commitChange(operation) {
   if (!canEdit(next)) return;
   if (history.commit(next)) { trackDrawStart(); saved = false; paint(changed && typeof changed.length === 'number' ? changed : null); }
 }
-function pointFromEvent(event) {
-  return rawPixelCellAt(event, canvas.getBoundingClientRect(), documentData.width, documentData.height);
+function pointFromEvent(event, rect = null) {
+  return rawPixelCellAt(event, rect || canvas.getBoundingClientRect(), documentData.width, documentData.height);
 }
-function exactSelectionPoint(event) {
-  const r = canvas.getBoundingClientRect();
+function exactSelectionPoint(event, rect = null) {
+  const r = rect || canvas.getBoundingClientRect();
   return { x: (event.clientX - r.left) * documentData.width / r.width, y: (event.clientY - r.top) * documentData.height / r.height };
 }
-function selectionHandleAtEvent(event) {
-  const handle = selectionControls.hit(exactSelectionPoint(event), event.pointerType);
-  if (handle === 'pivot' && event.altKey && selectionFrame() && selectionContains(selectionFrame(), exactSelectionPoint(event))) return null;
+function selectionHandleAtEvent(event, rect = null) {
+  const handle = selectionControls.hit(exactSelectionPoint(event, rect), event.pointerType);
+  if (handle === 'pivot' && event.altKey && selectionFrame() && selectionContains(selectionFrame(), exactSelectionPoint(event, rect))) return null;
   return handle;
 }
 const ZOOM_MAX = 8;
@@ -1187,13 +1191,13 @@ const cursorTwins = Array.from({ length: 7 }, (_, index) => {
   return twin;
 });
 function hideCursors() { $('.draw-cursor').hidden = true; cursorTwins.forEach(node => { node.hidden = true; }); }
-function showCursor(event) {
-  selectionControls.hover(selectionDrag?.handle || selectionHandleAtEvent(event) || '');
+function showCursor(event, geometry = null) {
+  selectionControls.hover(selectionDrag?.handle || selectionHandleAtEvent(event, geometry?.canvasRect) || '');
   const cursor = $('.draw-cursor'); if (!cursor) return;
   if (event.pointerType === 'touch' && !drawing) { hideCursors(); return; }
-  const p = pointFromEvent(event);
+  const p = pointFromEvent(event, geometry?.canvasRect);
   if (p.x < 0 || p.y < 0 || p.x >= documentData.width || p.y >= documentData.height) { hideCursors(); return; }
-  const board = $('.draw-board'), b = board.getBoundingClientRect(), r = canvas.getBoundingClientRect(), cw = r.width / documentData.width, ch = r.height / documentData.height;
+  const board = $('.draw-board'), b = geometry?.boardRect || board.getBoundingClientRect(), r = geometry?.canvasRect || canvas.getBoundingClientRect(), cw = r.width / documentData.width, ch = r.height / documentData.height;
   const points = effectiveTool() === 'select' || effectiveTool() === 'picker' ? [p] : symmetryPoints(p, documentData.width, documentData.height, drawingSymmetry());
   [cursor, ...cursorTwins].forEach((node, index) => {
     const point = points[index]; node.hidden = !point;
@@ -1499,28 +1503,28 @@ scope.listen($('.draw-board'), 'pointerdown', event => {
 scope.listen($('.draw-board'), 'pointermove', event => {
   if (event.target !== canvas && !drawing && !virtualCursor?.enabled) selectionControls.hover(selectionHandleAtEvent(event) || '');
 });
-function applyDrawPoint(point, event, deferPaint = false) {
+function applyDrawPoint(point, event, deferPaint = false, canvasRect = null) {
   if (!drawing || !previousPoint || effectiveTool() === 'fill' || effectiveTool() === 'picker') return;
-  if (effectiveTool() === 'select') { updateSelection(selectionDrag?.mode === 'select' || !event ? point : exactSelectionPoint(event), event); previousPoint = point; return; }
+  if (effectiveTool() === 'select') { updateSelection(selectionDrag?.mode === 'select' || !event ? point : exactSelectionPoint(event, canvasRect), event); previousPoint = point; return; }
   if (point.x === previousPoint.x && point.y === previousPoint.y) return;
   if (SHAPE_TOOLS.has(effectiveTool())) {
     cancelDrawStroke(documentData, strokeTracker); strokeTracker = beginDrawStroke(documentData, { trusted: true });
-    markShape(lineStart, point); previousPoint = point; saved = false; paint(); return;
+    markShape(lineStart, point); previousPoint = point; saved = false; strokePaintScheduler.queueFull(); return;
   }
   const changed = effectiveTool() === 'spray' ? markSpray(previousPoint, point) : markSegment(previousPoint, point, selectedPixelValue());
   previousPoint = point; saved = false;
   if (deferPaint) strokePaintScheduler.queue(changed); else paint(changed);
 }
-function applyPointerMoveSamples(event) {
+function applyPointerMoveSamples(event, canvasRect = null) {
   if (!drawing || event.pointerId !== drawingPointerId) return;
   const coalescedTool = effectiveTool() === 'pen' || effectiveTool() === 'eraser' || effectiveTool() === 'spray';
   if (coalescedTool && typeof event.getCoalescedEvents === 'function') {
     let samples = [];
     try { samples = event.getCoalescedEvents() || []; } catch { samples = []; }
-    for (const sample of samples) applyDrawPoint(pointFromEvent(sample), null, true);
+    for (const sample of samples) applyDrawPoint(pointFromEvent(sample, canvasRect), null, true, canvasRect);
   }
   // The dispatched event carries the latest point even on engines whose coalesced list omits it.
-  applyDrawPoint(pointFromEvent(event), event, coalescedTool);
+  applyDrawPoint(pointFromEvent(event, canvasRect), event, coalescedTool, canvasRect);
 }
 function handleCanvasPointerMove(event) {
   if (virtualCursor?.realMove(event)) return;
@@ -1542,10 +1546,13 @@ function handleCanvasPointerMove(event) {
   }
   if (pendingTap && event.pointerId === pendingTapPointerId && event.pointerType === 'mouse' && (event.buttons & (strokeBinding?.mask || pendingTapMask)) === 0) { releasePointer({ ...event, type: 'pointerup', pointerId: event.pointerId, pointerType: event.pointerType, clientX: event.clientX, clientY: event.clientY, buttons: event.buttons }); return; }
   if (drawing && event.pointerId !== drawingPointerId) return;
-  showCursor(event);
+  // Read geometry before cursor styles are written, then reuse it for every
+  // sample belonging to this one dispatched pointermove.
+  const geometry = { canvasRect: canvas.getBoundingClientRect(), boardRect: $('.draw-board').getBoundingClientRect() };
+  showCursor(event, geometry);
   const mousePrimaryReleased = drawing && event.pointerId === drawingPointerId
     && event.pointerType === 'mouse' && typeof event.buttons === 'number' && (event.buttons & (strokeBinding?.mask || 1)) === 0;
-  applyPointerMoveSamples(event);
+  applyPointerMoveSamples(event, geometry.canvasRect);
   if (mousePrimaryReleased && drawing && event.pointerId === drawingPointerId) {
     if (event.buttons === 0) activePointers.delete(event.pointerId);
     endStroke(false);
