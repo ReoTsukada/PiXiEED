@@ -178,8 +178,9 @@ body.has-smart-conversion:has([data-workspace-media="true"]) { padding-bottom: 0
 @media (max-width: 600px) {
   [data-workspace-media="true"] { width: calc(100% - 16px) !important; }
   [data-workspace-media="true"] .sc-toolbar { padding: 4px 8px; }
+  [data-workspace-media="true"] .sc-heading { min-width: 0; }
   [data-workspace-media="true"] .sc-heading h1 { font-size: 16px; }
-  [data-workspace-media="true"] .sc-input-actions { flex-wrap: nowrap; width: 100%; }
+  [data-workspace-media="true"] .sc-input-actions { flex: none; flex-wrap: nowrap; width: auto; }
   [data-workspace-media="true"] .sc-input-actions button { min-height: 44px; padding: 6px 8px; font-size: 13px; }
   .sc-panel-body { padding-inline: 12px; }
   .sc-settings-panel { height: min(84dvh, 780px); }
@@ -283,9 +284,9 @@ body.has-smart-conversion .public-destination-nav { inset-block-end: calc(8px + 
   position: sticky; z-index: 2; top: 0; flex-wrap: wrap; justify-content: space-between;
   min-height: 44px; padding: 4px 10px; border-bottom: 1px solid #e0e9e1; background: #fffefb;
 }
-[data-workspace-media="true"].has-conversion-stage .sc-material-heading > div:first-child { flex: 1 1 auto; }
+[data-workspace-media="true"].has-conversion-stage .sc-material-heading > div:first-child { display: flex; flex: 1 1 0; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
 [data-workspace-media="true"].has-conversion-stage .sc-material-heading strong { font-size: 14px; }
-[data-workspace-media="true"].has-conversion-stage .sc-material-heading [data-sc-material-count] { font-size: 13px; }
+[data-workspace-media="true"].has-conversion-stage .sc-material-heading [data-sc-material-count] { min-width: 0; margin-top: 0; font-size: 13px; overflow-wrap: anywhere; }
 [data-workspace-media="true"].has-conversion-stage .sc-material-heading [data-sc-material-add] { min-height: 44px; flex: none; padding-inline: 10px; font-size: 14px; }
 [data-workspace-media="true"].has-conversion-stage [data-sc-material-replace] {
   min-height: 44px; flex: none; padding-inline: 12px; font-size: 14px; font-weight: 650;
@@ -331,10 +332,6 @@ body.has-smart-conversion .public-destination-nav { inset-block-end: calc(8px + 
 [data-workspace-media="true"].has-conversion-stage .sc-material-card-actions [data-remove-material] {
   color: #8a4141; border-color: #dfc3c0; background: #fffafa;
 }
-[data-workspace-media="true"].has-conversion-stage .sc-material-add-tile {
-  flex: 0 0 148px; min-height: 108px; padding: 10px; border: 1px dashed #7fa38a;
-  background: #f5faf5; color: #24563b; font-size: 15px; font-weight: 700; scroll-snap-align: start;
-}
 [data-workspace-media="true"].has-conversion-stage .sc-size-control {
   display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 44px;
   padding: 2px 4px; border-radius: 9px; background: #f3f7f3; color: #284c34;
@@ -373,6 +370,9 @@ body.has-smart-conversion .sc-export-status.sc-save-bar [data-sc-cancel] {
   [data-workspace-media="true"].has-conversion-stage .sc-material-heading { padding-inline: 8px; }
   [data-workspace-media="true"].has-conversion-stage .sc-material-strip { padding-inline: 8px; }
   [data-workspace-media="true"].has-conversion-stage .sc-material-card { flex-basis: min(270px, 78vw); }
+  /* Keep labels visible without giving the short delete action half the card. */
+  [data-workspace-media="true"].has-conversion-stage .sc-material-card-actions [data-remove-material] { flex: 0 0 44px; }
+  [data-workspace-media="true"].has-conversion-stage .sc-material-card-actions [data-sc-material-replace] { flex: 1 1 calc(100% - 50px); padding-inline: 6px; font-size: 13px; }
   body.has-smart-conversion .sc-export-status.sc-save-bar { bottom: var(--sc-save-bottom,calc(72px + env(safe-area-inset-bottom) + var(--sc-keyboard-inset,0px))); }
 }
 [data-workspace-media="true"].has-conversion-stage :is(button,a,select):focus-visible {

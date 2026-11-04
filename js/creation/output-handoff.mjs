@@ -1,6 +1,6 @@
-/** Public handoff API. Storage and backward-compatible record validation remain unchanged. */
-export * from './output-handoff-core.mjs?rev=20261031-material-history-1';
-import { sendToolOutput as storedOutput } from './output-handoff-core.mjs?rev=20261031-material-history-1';
+/** Public handoff API. Storage schema and existing record contracts are preserved. */
+export * from './output-handoff-core.mjs?rev=20261104-engine-boundaries-3';
+import { sendToolOutput as storedOutput } from './output-handoff-core.mjs?rev=20261104-engine-boundaries-3';
 import { navigationContext, flushOutputWorkspace, reportOutputError, outputReturnUrl } from './output-router.mjs?rev=20261028-unified-output-1';
 
 // The storage implementation predates unified output and exempted direct/embedded editors.

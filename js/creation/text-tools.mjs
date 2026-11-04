@@ -8,7 +8,9 @@ import { textPixelOrigin } from './text-pixel-origin.mjs?rev=20261030-text-fit-1
 export async function installTextTools(doc = document, win = window) {
   const main = doc.getElementById('main');
   if (!main || main.querySelector('[data-text-tools]')) return;
-  const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/text-tools.css?rev=20261028-text-1'; doc.head.append(sheet);
+  if (!doc.querySelector('link[data-text-style]')) {
+    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/text-tools.css?rev=20261028-text-1'; sheet.dataset.textStyle = ''; doc.head.append(sheet);
+  }
   const legacy = doc.createElement('div'); legacy.className = 'text-legacy';
   while (main.firstChild) legacy.append(main.firstChild);
   const root = doc.createElement('section'); root.dataset.textTools = ''; root.className = 'text-tools'; root.hidden = true;
@@ -228,7 +230,7 @@ export async function installTextTools(doc = document, win = window) {
   if(id&&params.getAll(key).length===1&&!(params.has('id')&&params.has('file'))&&/^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(id)){
     try {
       const record=key==='id'
-        ?await (await import('./output-handoff.mjs?rev=20261028-unified-output-1')).readToolOutput(id)
+        ?await (await import('./output-handoff.mjs?rev=20261104-engine-boundaries-3')).readToolOutput(id)
         :await (await import('./output-router.mjs?rev=20261028-unified-output-1')).readOutputFile(id);
       if(record.blob)chooseFile(new File([record.blob],record.filename,{type:record.blob.type}));
     }catch{/* The existing receiver reports unavailable private files. */}

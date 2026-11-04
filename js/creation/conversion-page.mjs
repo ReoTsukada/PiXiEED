@@ -13,8 +13,7 @@ export function mountConversionPage(doc = document, win = window) {
   const header = doc.querySelector('.output-header__label');
   if (header) header.textContent = 'ファイルを変換';
   main.innerHTML = `
-    <div class="convert-heading"><a href="/output/">← 変換ガイド</a><span><i aria-hidden="true"></i> 端末内で処理・無料</span></div>
-    <header class="convert-intro"><p class="convert-eyebrow">PIXIEED / CONVERT</p><h1>欲しい形式に。<br><span>動きも、思いどおりに。</span></h1><p class="convert-lead">ファイルを選ぶと、必要な設定だけが現れます。</p></header>
+    <a data-conversion-return href="/output/" hidden>変換ガイドへ戻る</a>
     <section class="convert-card" aria-label="ファイル変換">
       <div class="convert-drop" data-drop>
         <div class="convert-drop-art" aria-hidden="true"><span></span><span></span><span>↥</span></div>
@@ -173,7 +172,6 @@ export function mountConversionPage(doc = document, win = window) {
       frame: $('[data-frame]').value, bits: $('[data-bits]').value, ratio: $('[data-ratio]').checked,
       loop: $('[data-loop]').value, rate } : null;
     main.classList.add('has-source');
-    main.querySelector('h1').textContent = next.kind === 'image' && next.frames.length > 1 ? '動きを整える。' : 'ファイルを変換';
     source = snapshotConversionMaterialSource(next); original = snapshotConversionMaterialSource(source);
     activeId = source.assets[0]?.id || null; if (!preserveUndo) undoTicket = null;
     clearResult(); rate = settings?.rate ?? 1; $('[data-drop]').hidden = true; $('[data-editor]').hidden = false;

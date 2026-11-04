@@ -1,5 +1,8 @@
+import { createConversionReturnController } from './conversion-return-controller.mjs?rev=20261104-controllers-2';
+import { createNativeReturnBridge } from './conversion-return-bridge.mjs?rev=20261104-controllers-2';
 import { workspaceAvailableHeight, conversionDockBottom } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionStage } from './conversion-stage.mjs?rev=20261102-deferred-focus-1';
+import { mountConversionStage } from './conversion-stage.mjs?rev=20261104-controllers-2';
+import { createConversionPreviewController } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
 
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
 export function mountConversionWorkspace(main, toolbar, doc = document, win = window) {
@@ -35,11 +38,16 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   open.setAttribute('aria-controls', panel.id); open.setAttribute('aria-haspopup', 'dialog'); open.textContent = '設定';
   toolbar.querySelector('.sc-input-actions').append(open);
   const back = doc.createElement('a'); back.dataset.scBack = ''; back.className = 'sc-back';
-  const origin = main.querySelector('#output-return,.convert-heading a');
-  back.href = origin?.getAttribute('href') || '/output/'; back.textContent = origin?.textContent?.includes('編集') ? '← 編集へ' : '← ガイド';
+  const returnController = createConversionReturnController(createNativeReturnBridge(() => main.querySelector('#output-return,[data-conversion-return]')));
+  const initialReturn = returnController.snapshot();
+  back.href = initialReturn.href; back.textContent = initialReturn.label;
   back.addEventListener('click', event => {
-    if (!origin || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault(); origin.click(); // Retain the native pending-write return handler.
+    try { returnController.request(event); }
+    catch (error) {
+      const textMode = main.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode;
+      const status = textMode && textMode !== 'media' ? main.querySelector('[data-tx-status]') : main.querySelector('#output-status,[data-status]');
+      if (status) status.textContent = error?.message || '戻れませんでした。現在の出力は保持しています。';
+    }
   });
   toolbar.querySelector('.sc-input-actions').prepend(back);
   const desktop = win.matchMedia('(min-width: 960px)');
@@ -78,32 +86,46 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   views.innerHTML = '<button type="button" data-sc-source-view aria-pressed="true">元の素材</button><button type="button" data-sc-result-view aria-pressed="false">作成済みファイル</button>';
   if (stage) stage.prepend(views);
   const materialStage = mountConversionStage({ main, toolbar, panel, showSettings: panelController.show, doc, win });
-  let lastUrl = '', mediaNode = null, lastLink = null, eligible = false, inspectResult = false;
+  const previewController = createConversionPreviewController();
+  let mediaNode = null, previewState = previewController.update();
   const hidden = (node, value) => { if (node.hidden !== value) node.hidden = value; };
   const text = (node, value) => { if (node.textContent !== value) node.textContent = value; };
-  function hydrate() {
-    if (!lastLink || lastUrl === lastLink.href) return;
-    lastUrl = lastLink.href;
-    if (mediaNode) { mediaNode.pause?.(); mediaNode.removeAttribute('src'); mediaNode.hidden = true; }
-    const name = lastLink.download || '', extension = name.split('.').pop().toLowerCase();
-    const audioSource = main.querySelector('[data-audio-poster],#output-audio');
-    const type = (extension === 'webm' && audioSource && !audioSource.hidden) || /^(wav|mp3|ogg|opus|flac|aiff|m4a)$/.test(extension) ? 'audio' : /^(mp4|webm)$/.test(extension) ? 'video' : /^(png|jpg|jpeg|webp|gif|apng|svg|bmp|ico)$/.test(extension) ? 'img' : null;
-    const fallback = preview.querySelector('[data-sc-result-fallback]'); hidden(fallback, Boolean(type));
-    text(preview.querySelector('[data-sc-result-name]'), name);
-    mediaNode = type && preview.querySelector(type);
-    if (mediaNode) { hidden(mediaNode, false); mediaNode.onerror = () => { hidden(mediaNode, true); hidden(fallback, false); }; mediaNode.src = lastLink.href; }
+  function clearMedia() {
+    if (!mediaNode) return;
+    mediaNode.pause?.(); mediaNode.onerror = null; mediaNode.removeAttribute('src'); mediaNode.hidden = true;
   }
-  function selectView(value) {
-    inspectResult = Boolean(value && eligible);
-    main.dataset.workspaceInspectResult = String(inspectResult);
-    hidden(preview, !inspectResult);
-    for (const [selector, pressed] of [['[data-sc-source-view]', !inspectResult], ['[data-sc-result-view]', inspectResult]]) {
+  function applyPreviewState(state) {
+    previewState = state;
+    main.dataset.workspaceInspectResult = String(state.inspectResult);
+    hidden(preview, !state.inspectResult);
+    for (const [selector, pressed] of [['[data-sc-source-view]', !state.inspectResult], ['[data-sc-result-view]', state.inspectResult]]) {
       const node = views.querySelector(selector); if (node.getAttribute('aria-pressed') !== String(pressed)) node.setAttribute('aria-pressed', String(pressed));
     }
-    if (inspectResult) hydrate(); else mediaNode?.pause?.();
+    const fallback = preview.querySelector('[data-sc-result-fallback]');
+    hidden(fallback, Boolean(state.type) && !state.failed);
+    text(preview.querySelector('[data-sc-result-name]'), state.filename);
+    if (state.load) {
+      clearMedia();
+      const previousNode = state.type && preview.querySelector(state.type);
+      if (previousNode) {
+        const node = previousNode.cloneNode(false), identity = state.identity;
+        previousNode.onerror = null;
+        previousNode.replaceWith(node);
+        mediaNode = node;
+        hidden(node, false);
+        node.onerror = () => {
+          const failure = previewController.fail(identity);
+          if (failure.identity === identity && failure.failed) {
+            hidden(node, true); hidden(fallback, false);
+          }
+        };
+        node.src = state.href;
+      }
+    } else if (!state.inspectResult) mediaNode?.pause?.();
+    if (state.failed) { mediaNode?.pause?.(); hidden(mediaNode, true); hidden(fallback, false); }
   }
-  views.querySelector('[data-sc-source-view]').addEventListener('click', () => selectView(false));
-  views.querySelector('[data-sc-result-view]').addEventListener('click', () => selectView(true));
+  views.querySelector('[data-sc-source-view]').addEventListener('click', () => applyPreviewState(previewController.selectInspect(false)));
+  views.querySelector('[data-sc-result-view]').addEventListener('click', () => applyPreviewState(previewController.selectInspect(true)));
   function update({ media, loaded, ready, link, working = false, saveDisabled = false, status = '', progress, canCancel = false, saveLabel = '保存' }) {
     open.disabled = false; panel.querySelector('[data-sc-settings-close]').disabled = false;
     panelController.update(media);
@@ -115,13 +137,16 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     text(views.querySelector('[data-sc-source-view]'), materialState?.previewKind === 'output' ? '現在のプレビュー' : '元の素材');
     if (settings) hidden(settings, !media || (!loaded && !materialState?.outputCount));
     hidden(extras, !media || !loaded);
-    const returnHref = origin?.getAttribute('href'); if (returnHref && back.getAttribute('href') !== returnHref) back.href = returnHref;
-    text(back, origin?.textContent?.includes('編集') ? '← 編集へ' : '← ガイド');
+    const returnState = returnController.snapshot();
+    if (back.getAttribute('href') !== returnState.href) back.href = returnState.href;
+    text(back, returnState.label);
     const notice = media && loaded ? main.querySelector('[data-notice],#output-conversion-note')?.textContent?.trim() || '' : '';
     text(warning, notice); hidden(warning, !notice); hidden(formatHelp, !notice);
     // Editing preview and playback stay primary. Inspecting encoded bytes is optional.
-    eligible = Boolean(media && ready && link && stage); lastLink = link;
-    hidden(views, !eligible); selectView(inspectResult);
+    const audioSource = main.querySelector('[data-audio-poster],#output-audio');
+    const previewResult = previewController.update({ media, ready, stageAvailable: Boolean(stage), result: link ? { href: link.href, filename: link.download } : null, audioHint: Boolean(audioSource && !audioSource.hidden) });
+    if (previewState.identity && previewResult.identity !== previewState.identity) clearMedia();
+    hidden(views, !previewResult.eligible); applyPreviewState(previewResult);
     if (panelSave.disabled !== saveDisabled) panelSave.disabled = saveDisabled;
     text(panelSave, saveLabel);
     text(footer.querySelector('[data-sc-panel-status]'), status);
@@ -136,7 +161,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     geometry();
   }
   geometry();
-  return { update, bindActions(next) { actions = next; materialStage.bindActions(next); }, focusSave(fallback) { (panel.matches(':modal') ? panelSave : fallback)?.focus({ preventScroll: true }); }, reveal: panelController.show, destroy() { materialStage.destroy(); mediaNode?.pause?.(); resize.disconnect(); win.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('scroll', geometry); panelController.destroy(); } };
+  return { update, bindActions(next) { actions = next; materialStage.bindActions(next); }, focusSave(fallback) { (panel.matches(':modal') ? panelSave : fallback)?.focus({ preventScroll: true }); }, reveal: panelController.show, destroy() { materialStage.destroy(); clearMedia(); resize.disconnect(); win.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('resize', geometry); win.visualViewport?.removeEventListener('scroll', geometry); panelController.destroy(); } };
 }
 
 /** History owns a mobile sheet; closing never reloads or resets conversion controls. */
@@ -183,62 +208,5 @@ export function createWorkspacePanel({ panel, open, desktop, win }) {
   }, destroy() { destroyed = true; clearHistoryMarker(); open.removeEventListener('click', show); win.removeEventListener('popstate', pop); desktop.removeEventListener('change', layout); } };
 }
 
-/** One explicit save intent follows its settings revision through existing engines. */
-export function createConversionSaveIntent({ snapshot, run, save, choose, stageComplete = () => {}, blocked = () => {}, settled = () => {} }) {
-  let pending = null;
-  function start(stage, state) {
-    pending = { mode: state.mode, revision: state.revision, before: state.href, stage, sawBusy: state.working };
-    const task = run(stage);
-    if (task === false) { pending = null; return; }
-    if (task && typeof task.then === 'function') {
-      const job = pending; job.awaiting = true;
-      Promise.resolve(task).then(ok => {
-        if (pending !== job) return;
-        job.awaiting = false;
-        // Native actions report whether persistence/encoding succeeded; a settings
-        // write (FPS) need not create a Blob before the final generation stage.
-        if (ok !== true) pending = null;
-        else job.succeeded = true;
-        settled();
-      }, () => { if (pending === job) { pending = null; blocked(); settled(); } });
-      return;
-    }
-    const next = snapshot();
-    if (!pending) return;
-    pending.sawBusy ||= next.working;
-    // No task was started (for example an unchanged FPS); do not leave saving locked.
-    if (!next.working && next.href === pending.before && !pending.sawBusy) pending = null;
-  }
-  function advance(state) {
-    if (!state.loaded) { choose(); return; }
-    if (state.live) {
-      if (state.ready && state.matchesFormat !== false && !state.working) save(state.link);
-      else start('live', state);
-      return;
-    }
-    if (state.working) return;
-    if (state.fpsDirty) { start('fps', state); return; }
-    if (state.sizeDirty) { start('size', state); return; }
-    if (state.ready && state.matchesFormat !== false) { save(state.link); return; }
-    start('convert', state);
-  }
-  return {
-    get pending() { return Boolean(pending); },
-    request() { if (!pending) advance(snapshot()); },
-    cancel() { pending = null; },
-    observe() {
-      if (!pending) return;
-      const state = snapshot();
-      if (state.mode !== pending.mode || state.revision !== pending.revision) { pending = null; return; }
-      if (pending.awaiting || state.working) { pending.sawBusy = true; return; }
-      if (pending.succeeded && pending.stage === 'fps') { pending = null; stageComplete('fps'); advance(snapshot()); return; }
-      if (state.href && state.href !== pending.before) {
-        const completed = pending; pending = null;
-        if (completed.stage === 'fps' || completed.stage === 'size') {
-          stageComplete(completed.stage); advance(snapshot());
-        } else if (state.ready && state.matchesFormat) save(state.link);
-        else blocked();
-      } else if (pending.sawBusy) pending = null; // Error/cancel never saves the old result.
-    },
-  };
-}
+// Compatibility export; save decisions live outside this DOM/layout module.
+export { createConversionSaveIntent } from './conversion-save-controller.mjs?rev=20261104-controllers-2';

@@ -1,9 +1,9 @@
 /** Receive staged editor files without sending private IDs or media to analytics. */
-import { readToolOutput } from './output-handoff.mjs?rev=20261028-unified-output-1';
+import { readToolOutput } from './output-handoff.mjs?rev=20261104-engine-boundaries-3';
 import { readOutputFile } from './output-router.mjs?rev=20261028-unified-output-1';
 import { loadConversionFile } from './conversion-service.mjs?rev=20261028-conversion-1';
 import { validateTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
-import { mountConversionPage } from './conversion-page.mjs?rev=20261101-direct-material-1';
+import { mountConversionPage } from './conversion-page.mjs?rev=20261104-startup-1';
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 export function sharedOutputRequest(search) {
   const query = new URLSearchParams(search);
@@ -25,11 +25,8 @@ function addStyles(doc) {
   const css = doc.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/conversion-simple.css?rev=20261028-motion-1'; css.dataset.conversionStyle = ''; doc.head.append(css);
 }
 function addOriginControls(record, doc, win, request) {
-  const main = doc.getElementById('main'), heading = main.querySelector('.convert-heading');
-  if (heading) {
-    const back = heading.querySelector('a'); back.href = record.returnUrl; back.textContent = '← 編集に戻る';
-    const status = heading.querySelector('span'); if (status) status.textContent = '共通の出力画面 · 端末内で処理';
-  }
+  const main = doc.getElementById('main'), back = main.querySelector('[data-conversion-return]');
+  if (back) { back.href = record.returnUrl; back.textContent = '編集に戻る'; }
   const details = doc.createElement('details'); details.className = 'convert-support';
   const summary = doc.createElement('summary'); summary.textContent = '元の作品ファイルを保持しています';
   const description = doc.createElement('p'); description.textContent = 'そのまま保存すると元のファイルの内容を保てます。別形式への変換では、再編集情報やメタデータを保持できない場合があります。';
@@ -42,9 +39,9 @@ function addOriginControls(record, doc, win, request) {
 }
 function renderFile(record, doc, win) {
   const main = doc.getElementById('main'); main.replaceChildren(); main.className = 'conversion-main'; doc.body.classList.add('simple-conversion-page');
-  const top = doc.createElement('div'); top.className = 'convert-heading';
-  const back = doc.createElement('a'); back.href = record.returnUrl; back.textContent = '← 編集に戻る'; top.append(back);
-  const heading = doc.createElement('h1'); heading.textContent = '作品を書き出す。';
+  const top = doc.createElement('div');
+  const back = doc.createElement('a'); back.href = record.returnUrl; back.textContent = '編集に戻る'; back.dataset.conversionReturn = ''; back.hidden = true; top.append(back);
+  const heading = doc.createElement('h2'); heading.textContent = '元のファイルを保存';
   const name = doc.createElement('p'); name.textContent = record.filename;
   const note = doc.createElement('p'); note.textContent = '元の内容を変更せずに保存します。';
   const url = win.URL.createObjectURL(record.blob), save = doc.createElement('a'); save.className = 'convert-primary'; save.href = url; save.download = record.filename; save.textContent = 'ファイルを保存 ↓';
@@ -57,7 +54,8 @@ function renderFile(record, doc, win) {
 export async function mountSharedOutput(request, doc = document, win = window) {
   const record = request.key === 'id' ? await readToolOutput(request.id) : await readOutputFile(request.id);
   if (request.key === 'id' && (request.advanced || needsDetailedOutput(record))) {
-    await import('./output-page.mjs?rev=20261101-direct-material-1');
+    const { outputPageReady } = await import('./output-page.mjs?rev=20261104-engine-boundaries-3');
+    await outputPageReady;
     return 'detailed';
   }
   addStyles(doc);

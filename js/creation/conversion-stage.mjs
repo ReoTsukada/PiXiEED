@@ -1,3 +1,8 @@
+import { createConversionSettingsController, changedSettingChips, createSettingBaselineTracker } from './conversion-settings-controller.mjs?rev=20261104-controllers-2';
+import { createConversionSettingsBridge } from './conversion-settings-bridge.mjs?rev=20261104-controllers-2';
+import { createConversionMaterialController, applyMaterialFiles } from './conversion-material-controller.mjs?rev=20261104-controllers-2';
+export { changedSettingChips, createSettingBaselineTracker } from './conversion-settings-controller.mjs?rev=20261104-controllers-2';
+export { applyMaterialFiles } from './conversion-material-controller.mjs?rev=20261104-controllers-2';
 import { formatControlDestination, materialKindLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
 
 /** Local presentation: input materials, editable preview and encoded output stay distinct. */
@@ -7,50 +12,6 @@ export function saveActionLabel({ loaded, working, mode = 'media', format = '', 
   if (mode === 'output') return 'TXTで保存';
   const extension = mode === 'media' ? format || filename.split('.').pop() : filename.includes('.') ? filename.split('.').pop() : '';
   return /^[a-z0-9]{1,8}$/i.test(extension) ? `${extension.toUpperCase()}で保存` : '変換して保存';
-}
-
-export function changedSettingChips(current, baseline) {
-  if (!baseline) return [];
-  const result = [];
-  const add = (id, label, resetLabel, keys) => result.push({ id, label, resetLabel, keys });
-  if (current.width && current.height && baseline.width && baseline.height && (current.width !== baseline.width || current.height !== baseline.height))
-    add('size', `${current.width} × ${current.height}px`, `サイズを${baseline.width} × ${baseline.height}pxに戻す`, ['width', 'height']);
-  for (const [key, title, suffix] of [['quality','画質','%'], ['rate','速度','倍'], ['fps','FPS',''], ['threshold','白黒しきい値',''], ['loop','再生','回'], ['bits','音声','bit'], ['background','背景','']]) {
-    if (current[key] !== undefined && baseline[key] !== undefined && current[key] !== baseline[key])
-      add(key, key === 'loop' && current[key] === '0' ? 'ずっと再生' : `${title} ${current[key]}${suffix}`, `${title}だけを${baseline[key]}${suffix}に戻す`, [key]);
-  }
-  return result;
-}
-
-/** Baselines follow an output item; adding/removing inputs never resets edited settings. */
-export function createSettingBaselineTracker() {
-  const contexts = new Map();
-  return {
-    read({ ids = [], context = 'inputs', values, replaced = false, retainEmpty = false }) {
-      if (!ids.length) { const previous = contexts.get(context); if (!retainEmpty) contexts.delete(context); return retainEmpty ? previous?.values || null : null; }
-      const previous = contexts.get(context);
-      if (!previous || replaced || !ids.some(id => previous.ids.includes(id))) {
-        contexts.set(context, { ids: [...ids], values: { ...values } });
-      } else previous.ids = [...ids];
-      return contexts.get(context).values;
-    },
-  };
-}
-
-/** The simple engine replaces all inputs; detailed replacements target one source. */
-export async function applyMaterialFiles({ api, files, intent, loaded, activeId, targetId, fallback }) {
-  const selected = Array.from(files || []);
-  if (!selected.length) return false;
-  // A source-specific chooser never becomes a workspace-wide import if the source disappears.
-  if (intent === 'replace' && targetId && api?.getMaterialState) return api.replaceFiles?.(targetId, selected) ?? false;
-  if (!loaded) return fallback?.(selected);
-  if (intent === 'add') return api?.addFiles?.(selected) ?? false;
-  if (!api?.replaceFiles) return fallback?.(selected);
-  if (api.getMaterialState) {
-    const id = targetId ?? activeId;
-    return id ? api.replaceFiles(id, selected) : false;
-  }
-  return api.replaceFiles(selected);
 }
 
 // Settings persistence may be part of an existing save intent (for example FPS).
@@ -141,7 +102,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   list.setAttribute('role', 'list'); list.setAttribute('aria-label', '入力素材。出力項目とは別です');
   const summary = doc.createElement('div'); summary.className = 'sc-preview-summary';
   summary.setAttribute('aria-label', '保存するファイル');
-  summary.innerHTML = '<strong class="sc-output-group-title">保存するファイル</strong><div class="sc-size-control"><span>出力サイズ</span><button type="button" data-sc-size-edit aria-label="出力サイズを編集">サイズを編集</button><button type="button" data-size-reset data-setting-chip="size" data-reset-setting="true" hidden>元のサイズ</button></div><p data-sc-output-bytes>保存容量は生成後に確定</p><p data-sc-preview-kind></p><p data-sc-stage-warning role="status" hidden></p>';
+  summary.innerHTML = '<strong class="sc-output-group-title">保存するファイル</strong><div class="sc-size-control"><span>出力サイズ</span><button type="button" data-sc-size-edit aria-label="出力サイズを編集">サイズを編集</button><button type="button" data-size-reset data-setting-chip="size" data-reset-setting="true" hidden>元のサイズ</button></div><p data-sc-output-bytes>保存容量は生成後に確定</p><p data-sc-preview-kind></p><p id="sc-stage-warning" data-sc-stage-warning role="status" hidden></p>';
   const materialNote = doc.createElement('p'); materialNote.className = 'sc-material-note'; materialNote.hidden = true; materialNote.id = 'sc-material-note';
   header.append(materialNote);
   const chips = doc.createElement('div'); chips.className = 'sc-setting-chips'; chips.hidden = true;
@@ -165,6 +126,13 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   const pixelKey = value => { if (!value || typeof value !== 'object') return 0; if (!pixels.has(value)) pixels.set(value, ++pixelSequence); return pixels.get(value); };
   const api = () => main.conversionMaterials || main.querySelector('#output-layout')?.conversionActions;
   const getState = () => api()?.getState?.() || api()?.getMaterialState?.() || { assets: [], loaded: false };
+  const invokeMaterial = (name, ...args) => { const native = api(); return typeof native?.[name] === 'function' ? native[name](...args) : false; };
+  const workingNow = () => current.working || main.getAttribute('aria-busy') === 'true' || Boolean(api()?.busy);
+  const materialController = createConversionMaterialController({ read: getState, isBusy: workingNow, actions: {
+    selectAsset: id => invokeMaterial('selectAsset', id), removeAsset: id => invokeMaterial('removeAsset', id),
+    moveAsset: (id, direction) => invokeMaterial('moveAsset', id, direction), undoRemove: () => invokeMaterial('undoRemove'),
+  } });
+  const settingsController = createConversionSettingsController({ ...createConversionSettingsBridge({ main, fields, EventImpl: win.Event }), isBusy: workingNow });
   const activeAsset = () => state.assets.find(asset => asset.id === state.activeId) || state.assets[0];
   function restoreMaterialFocus(ticket, id, scrollLeft, reveal = false, succeeded = true) {
     focusGuard.schedule(ticket, () => {
@@ -175,9 +143,13 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       if (reveal && target) { const bounds = list.getBoundingClientRect(), item = target.closest('.sc-material-card').getBoundingClientRect(); if (item.left < bounds.left) list.scrollLeft += item.left - bounds.left; else if (item.right > bounds.right) list.scrollLeft += item.right - bounds.right; }
     }, succeeded);
   }
-  const readSettings = (visibleOnly = true) => Object.fromEntries(Object.entries(fields).flatMap(([key, selector]) => {
-    const field = main.querySelector(selector); return field && (!visibleOnly || !field.closest('[hidden]')) ? [[key, field.value]] : [];
-  }));
+  const readSettings = (visibleOnly = true) => Object.fromEntries(Object.entries(settingsController.snapshot({ visibleOnly })).map(([key, field]) => [key, field.value]));
+  function resetSettings(keys) {
+    localError = '';
+    try { if (!settingsController.reset(keys, baseline)) localError = workingNow() ? '処理中は設定を戻せません。完了後にもう一度お試しください。' : 'この設定は現在戻せません。設定項目を確認してください。'; }
+    catch (error) { localError = error?.message || '設定を戻せませんでした。現在の値を確認してください。'; }
+    actions.refresh?.();
+  }
   function reveal(key) {
     showSettings();
     const field = main.querySelector(fields[key] || fields.width);
@@ -211,7 +183,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     const ticket = focusGuard.begin(doc.activeElement);
     const scrollLeft = list.scrollLeft; localError = '';
     let result = false;
-    try { result = await api()?.undoRemove?.(); } catch (error) { result = false; localError = error?.message || '削除を元に戻せませんでした。'; }
+    try { result = await materialController.undo(); } catch (error) { result = false; localError = error?.message || '削除を元に戻せませんでした。'; }
     actions.refresh?.(); restoreMaterialFocus(ticket, lastRemovedId || activeAsset()?.id, scrollLeft, false, result !== false);
   });
   input.addEventListener('change', () => { const files = Array.from(input.files || []), targetId = pickAssetId, intent = pickIntent; input.value = ''; pickAssetId = null; void accept(files, intent, targetId); });
@@ -220,11 +192,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     if (current.working || !baseline) return;
     const chip = changedSettingChips(readSettings(), baseline).find(item => item.id === 'size');
     if (!chip) return;
-    for (const key of chip.keys) {
-      const field = main.querySelector(fields[key]); if (!field || field.disabled) continue;
-      field.value = baseline[key]; field.dispatchEvent(new win.Event('input', { bubbles: true })); field.dispatchEvent(new win.Event('change', { bubbles: true }));
-    }
-    actions.refresh?.();
+    resetSettings(chip.keys);
   });
   list.addEventListener('click', async event => {
     const button = event.target.closest('button'); if (!button || current.working) return;
@@ -235,9 +203,9 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     const ticket = focusGuard.begin(button);
     let result = true;
     try {
-      if (button.matches('[data-remove-material]')) { lastRemovedId = id; result = await api()?.removeAsset?.(id); }
-      else if (button.matches('[data-move-material]')) result = await api()?.moveAsset?.(id, Number(button.dataset.moveMaterial));
-      else if (button.matches('[data-select-material]')) result = await api()?.selectAsset?.(id);
+      if (button.matches('[data-remove-material]')) { lastRemovedId = id; result = await materialController.remove(id); }
+      else if (button.matches('[data-move-material]')) result = await materialController.move(id, Number(button.dataset.moveMaterial));
+      else if (button.matches('[data-select-material]')) result = await materialController.select(id);
     } catch (error) { result = false; localError = error?.message || '素材を変更できませんでした。'; }
     actions.refresh?.(); restoreMaterialFocus(ticket, button.matches('[data-select-material]') ? id : state.activeId || id, scrollLeft, false, result !== false);
   });
@@ -246,7 +214,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       const selected = activeAsset(); if (!selected || typeof api()?.moveAsset !== 'function' || current.working) return;
       event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(doc.activeElement);
       let result = false;
-      try { result = await api().moveAsset(selected.id, event.key === 'ArrowLeft' ? -1 : 1); } catch (error) { result = false; localError = error?.message || '素材の順序を変更できませんでした。'; }
+      try { result = await materialController.move(selected.id, event.key === 'ArrowLeft' ? -1 : 1); } catch (error) { result = false; localError = error?.message || '素材の順序を変更できませんでした。'; }
       actions.refresh?.(); restoreMaterialFocus(ticket, selected.id, scrollLeft, true, result !== false); return;
     }
     const target = event.target.closest('[data-select-material]');
@@ -258,21 +226,17 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     if (event.key === 'Home') next = state.assets[0];
     if (event.key === 'End') next = state.assets.at(-1);
     if (event.key === 'Delete' && target.getAttribute('aria-pressed') === 'true') {
-      const asset = activeAsset(); if (asset && asset.canRemove !== false) { event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(target); lastRemovedId = asset.id; let result = false; try { result = await api()?.removeAsset?.(asset.id); } catch (error) { result = false; localError = error?.message || '素材を削除できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(ticket, state.activeId || asset.id, scrollLeft, false, result !== false); }
+      const asset = activeAsset(); if (asset && asset.canRemove !== false) { event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(target); lastRemovedId = asset.id; let result = false; try { result = await materialController.remove(asset.id); } catch (error) { result = false; localError = error?.message || '素材を削除できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(ticket, state.activeId || asset.id, scrollLeft, false, result !== false); }
       return;
     }
-    if (next && next !== state.assets[index]) { event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(target); let result = false; try { result = await api()?.selectAsset?.(next.id); } catch (error) { result = false; localError = error?.message || '素材を選択できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(ticket, next.id, scrollLeft, true, result !== false); }
+    if (next && next !== state.assets[index]) { event.preventDefault(); const scrollLeft = list.scrollLeft, ticket = focusGuard.begin(target); let result = false; try { result = await materialController.select(next.id); } catch (error) { result = false; localError = error?.message || '素材を選択できませんでした。'; } actions.refresh?.(); restoreMaterialFocus(ticket, next.id, scrollLeft, true, result !== false); }
   });
   chips.addEventListener('click', event => {
     const button = event.target.closest('button'); if (!button || current.working) return;
     const chip = changedSettingChips(readSettings(), baseline).find(x => x.id === button.dataset.settingChip);
     if (!chip) return;
     if (!button.dataset.resetSetting) { reveal(chip.keys[0]); return; }
-    for (const key of chip.keys) {
-      const field = main.querySelector(fields[key]); if (!field || field.disabled) continue;
-      field.value = baseline[key]; field.dispatchEvent(new win.Event('input', { bubbles: true })); field.dispatchEvent(new win.Event('change', { bubbles: true }));
-    }
-    actions.refresh?.();
+    resetSettings(chip.keys);
   });
   const fileDrag = event => Array.from(event.dataTransfer?.types || []).includes('Files');
   surface.addEventListener('dragenter', event => { if (!fileDrag(event) || current.working) return; event.preventDefault(); hidden(overlay, false); });
@@ -306,6 +270,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       select.dataset.selectMaterial = ''; select.dataset.assetId = asset.id; select.setAttribute('aria-pressed', String(selected));
       select.setAttribute('aria-label', `${asset.name}, ${materialKindLabel(asset.kind)}${selected ? ', 選択中' : ''}`);
       const name = doc.createElement('strong'); name.textContent = asset.name || '名前のない素材';
+      select.title = name.textContent;
       const kind = doc.createElement('span'); kind.className = 'sc-material-kind'; kind.textContent = materialKindLabel(asset.kind);
       const thumbnail = item.querySelector('.sc-material-pixel'); if (thumbnail) select.append(thumbnail);
       select.append(name, kind); item.append(select);
@@ -315,11 +280,11 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       controls.append(remove);
       {
         const replace = doc.createElement('button'); replace.type = 'button'; replace.dataset.scMaterialReplace = '';
-        replace.textContent = main.conversionMaterials && state.assets.length > 1 ? 'すべての素材を差し替え' : 'この素材を差し替え';
+        replace.textContent = main.conversionMaterials && state.assets.length > 1 ? '全素材を差し替え' : '差し替え';
         replace.dataset.assetId = asset.id;
         replace.disabled = current.working || asset.canReplace === false;
-        replace.title = asset.replaceReason || '';
         replace.setAttribute('aria-label', main.conversionMaterials && state.assets.length > 1 ? '入力素材すべてを差し替え' : `${asset.name}を差し替え`);
+        replace.title = asset.replaceReason || replace.getAttribute('aria-label');
         replace.setAttribute('aria-describedby', 'sc-material-note');
         controls.append(replace);
       }
@@ -332,10 +297,6 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       }
       item.append(controls); list.append(item);
     }
-    const add = doc.createElement('button'); add.type = 'button'; add.className = 'sc-material-add-tile';
-    add.dataset.scMaterialAdd = ''; add.textContent = '＋ 素材を追加'; add.disabled = current.working || state.canAdd === false;
-    add.setAttribute('aria-label', '素材を追加'); list.append(add);
-    add.addEventListener('click', () => choose(current.loaded ? 'add' : 'replace'));
   }
   function update(next) {
     current = next; const nativeState = getState(); state = { ...nativeState, assets: nativeState.assets || [] };
@@ -371,19 +332,21 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       if (button.matches('[data-remove-material]')) {
         const asset = state.assets.find(item => item.id === button.dataset.assetId);
         disabled(button, Boolean(next.working || asset?.canRemove === false)); button.title = asset?.removeReason || '';
-      } else if (button.matches('[data-select-material],[data-sc-material-add]')) disabled(button, Boolean(next.working) || (button.matches('[data-sc-material-add]') && state.canAdd === false));
+      } else if (button.matches('[data-select-material]')) disabled(button, Boolean(next.working));
       else if (button.matches('[data-move-material]')) { const index = state.assets.findIndex(item => item.id === button.dataset.assetId), delta = Number(button.dataset.moveMaterial); disabled(button, Boolean(next.working || index + delta < 0 || index + delta >= state.assets.length)); }
-      else if (button.matches('[data-sc-material-replace]')) { const asset = state.assets.find(item => item.id === button.dataset.assetId); disabled(button, Boolean(next.working || asset?.canReplace === false)); button.title = asset?.replaceReason || ''; }
+      else if (button.matches('[data-sc-material-replace]')) { const asset = state.assets.find(item => item.id === button.dataset.assetId); disabled(button, Boolean(next.working || asset?.canReplace === false)); button.title = asset?.replaceReason || button.getAttribute('aria-label'); }
     }
     const values = readSettings();
     const dims = values.width && values.height ? `${values.width} × ${values.height}px` : '';
-    hidden($('[data-sc-size-edit]'), !dims); text($('[data-sc-size-edit]'), dims || 'サイズを編集');
+    const dimensionIssue = main.querySelector('#output-dimension-notice:not([hidden])');
+    hidden($('[data-sc-size-edit]'), !dims); text($('[data-sc-size-edit]'), dims ? `${dims}${dimensionIssue ? ' · 上限超過' : ''}` : 'サイズを編集');
+    $('[data-sc-size-edit]').setAttribute('aria-describedby', 'sc-stage-warning');
     const sizeChange = changedSettingChips(values, baseline).find(chip => chip.id === 'size');
     const sizeReset = $('[data-size-reset]'); hidden(sizeReset, !sizeChange); if (sizeChange) sizeReset.setAttribute('aria-label', sizeChange.resetLabel);
     text($('[data-sc-preview-kind]'), main.dataset.workspaceInspectResult === 'true' ? '保存するファイルのプレビュー' : state.previewKind === 'output' ? (next.ready ? '現在の出力プレビュー' : '前回の出力プレビュー · 保存で変更を反映') : '元の素材');
     const outputFormat = main.querySelector('[data-sc-format]')?.value || '';
     const isStill = /^(png|jpeg|webp|bmp|tiff|tga|qoi|ico|ppm|pgm|pbm|pnm|pam|svg)$/.test(outputFormat);
-    const notice = [outputFormat === 'jpeg' ? 'JPEGでは透過を背景色に合成します。' : outputFormat === 'gif' ? 'GIFは最大256色・半透明を保持しません。' : '', state.frameCount > 1 && isStill ? '選んだ1コマを静止画で保存します。' : ''].filter(Boolean).join(' ');
+    const notice = [outputFormat === 'jpeg' ? 'JPEGでは透過を背景色に合成します。' : outputFormat === 'gif' ? 'GIFは最大256色・半透明を保持しません。' : '', state.frameCount > 1 && isStill ? '選んだ1コマを静止画で保存します。' : '', dimensionIssue?.dataset.summary || ''].filter(Boolean).join(' ');
     text($('[data-sc-stage-warning]'), notice); hidden($('[data-sc-stage-warning]'), !notice);
     const size = next.ready ? next.link?.textContent?.match(/[\d,.]+\s*(?:KB|MB|bytes|バイト)/i)?.[0] : '';
     text($('[data-sc-output-bytes]'), size ? `実出力 ${size}` : '保存容量は生成後に確定');
