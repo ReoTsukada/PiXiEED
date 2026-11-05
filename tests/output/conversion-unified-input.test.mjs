@@ -50,6 +50,12 @@ test('media material labels use the actual assets state and retain a useful mult
   assert.equal(unifiedMaterialLabel({ loaded: false, assets: [] }), '');
 });
 
+test('original-file passthrough without a media controller cannot abort unified startup', () => {
+  assert.equal(unifiedMaterialLabel(null), '');
+  assert.equal(unifiedMaterialLabel(undefined), '');
+  assert.equal(unifiedMaterialLabel({ loaded: false }), '');
+});
+
 test('art and restore require a suitable single raw file, independently of media asset groups', () => {
   assert.deepEqual(unifiedFilePurposeAvailability(null), { art: false, restore: false, artReason: 'ファイルを1つ選んでください。', restoreReason: 'ファイルを1つ選んでください。' });
   assert.equal(unifiedFilePurposeAvailability({ name: 'movie.mp4', type: 'video/mp4', size: 200 }).art, false);

@@ -246,6 +246,9 @@ try {
   console.error(error);
   report.failureState = await page.evaluate(() => ({
     mode: document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode,
+    startup: document.body.dataset.conversionStartup,
+    startupError: document.querySelector('[data-conversion-error]')?.textContent,
+    originalLinks: [...document.querySelectorAll('a.convert-primary[download]')].map(node => ({ name: node.download, blob: node.getAttribute('href')?.startsWith('blob:'), hidden: Boolean(node.closest('[hidden]')) })),
     busy: document.querySelector('[data-text-tools]')?.getAttribute('aria-busy'),
     textStatus: document.querySelector('[data-tx-status]')?.textContent,
     nativeStatusVisibleText: document.querySelector('[data-tx-status]')?.innerText,

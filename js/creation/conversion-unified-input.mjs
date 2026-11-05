@@ -47,6 +47,7 @@ export function unifiedNativeFormatForPurpose(purpose, nativeOptions = []) {
 }
 
 export function unifiedMaterialLabel(state = {}) {
+  state ??= {}; // Original-file passthrough has no image/audio material controller.
   const assets = Array.isArray(state.assets) ? state.assets : [];
   if (!state.loaded && assets.length === 0) return '';
   const active = assets.find(asset => asset?.id === state.activeId) || assets[0];
