@@ -458,6 +458,9 @@ export function mountSmartConversion(doc = document, win = window) {
     localRecoveryHost.innerHTML = '<details><summary><span data-sc-local-recovery-status role="status">端末内の保存を確認しています。</span></summary><p>このブラウザーの端末内だけに保存します。共有端末ではデータが残ります。保存停止や取消でも前回保存版は消しません。合計256MBまで。ブラウザーのデータ消去では失われます。</p><button type="button" data-recovery-save>端末内に保存</button><button type="button" data-recovery-cancel>保存を停止</button><button type="button" data-recovery-fork hidden>今の内容を別の復元版として保存</button><button type="button" data-recovery-previous hidden>今の内容を保存して前の復元版を開く</button></details>';
     main.querySelector('.sc-unified-composer').append(localRecoveryHost);
     const updateRecovery = state => {
+      localRecoveryHost.dataset.phase = state.phase;
+      localRecoveryHost.dataset.dirty = String(state.dirty);
+      setAttr(localRecoveryHost, 'aria-busy', String(state.loading || state.restoring || state.saving));
       let stateMessage = state.message;
       if(state.paused && state.phase!=='paused')stateMessage += ' 自動保存は停止中です。';
       try { if(win.history.state?.pixieedConversionRecoveryPaused!==state.paused)win.history.replaceState({...win.history.state,pixieedConversionRecoveryPaused:state.paused},'',win.location.href); }

@@ -37,13 +37,14 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
   // Returning from source comparison can still encode the newly edited size.
   // Measure idle rendering only after that real asynchronous work has finished.
   await page.waitForFunction(() => {
-    const main=document.querySelector('#main'),surface=main.querySelector('.sc-result-surface'),img=surface?.querySelector('.sc-result-content img');
+    const main=document.querySelector('#main'),surface=main.querySelector('.sc-result-surface'),img=surface?.querySelector('.sc-result-content img'),recovery=main.querySelector('.sc-local-recovery');
     return main.getAttribute('aria-busy')!=='true' && surface?.dataset.state==='ready' && surface.dataset.current==='true'
-      && !document.querySelector('#output-nav-export').disabled && img?.complete && img.naturalWidth>0;
+      && !document.querySelector('#output-nav-export').disabled && img?.complete && img.naturalWidth>0
+      && recovery?.dataset.phase==='saved' && recovery.dataset.dirty==='false' && recovery.getAttribute('aria-busy')==='false';
   });
   const idleMutations = await page.evaluate(async () => {
     const changes = []; const observer = new MutationObserver(records => {
-      for(const record of records)changes.push({attribute:record.attributeName,tag:record.target.tagName,id:record.target.id,classes:record.target.className,hidden:record.target.hidden,disabled:record.target.disabled});
+      for(const record of records)changes.push({attribute:record.attributeName,tag:record.target.tagName,id:record.target.id,classes:record.target.className,data:{...record.target.dataset},hidden:record.target.hidden,disabled:record.target.disabled});
     });
     observer.observe(document.querySelector('#main'), { subtree: true, attributes: true, attributeFilter: ['hidden','disabled'] });
     for (let i = 0; i < 8; i++) await new Promise(done => requestAnimationFrame(done));
