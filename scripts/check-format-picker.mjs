@@ -92,7 +92,12 @@ try{
     const url=new URL(staged.url,location.origin);url.searchParams.set('view','advanced');return url.search;
   });
   await open(advancedQuery);await page.locator('[data-sc-unified-format]').selectOption('jpeg');
-  await page.waitForFunction(()=>document.querySelector('#output-format-select')?.value==='jpeg'&&document.querySelector('[data-sc-format]')?.value==='jpeg');
+  await page.waitForFunction(()=>{
+    const main=document.querySelector('#main'),layout=document.querySelector('#output-layout'),link=document.querySelector('#output-download');
+    return document.querySelector('#output-format-select')?.value==='jpeg'&&document.querySelector('[data-sc-format]')?.value==='jpeg'
+      && !layout?.conversionActions?.busy && main?.getAttribute('aria-busy')!=='true' && !document.querySelector('#output-nav-export')?.disabled
+      && /\.(jpe?g)$/i.test(link?.download||'') && document.querySelector('.sc-result-surface')?.dataset.current==='true';
+  });
   const [advancedDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);assert.equal((await bytes(advancedDownload)).subarray(0,3).toString('hex'),'ffd8ff');assert.equal(downloads,3);
   pass('advanced handoff uses the visible destination, synchronizes native settings and saves JPEG');
   // Optional component fixture. Its injection is NOT production UI evidence.
@@ -114,5 +119,15 @@ try{
   await page.goto(base+'/__format-picker-fixture/?fallback=1',{waitUntil:'domcontentloaded'});await page.route('**/css/format-picker.css*',route=>route.abort());
   assert.equal(await page.evaluate(async()=>await(await import('/js/creation/format-picker.mjs')).mountConversionFormatPicker()),null);assert.equal(await page.locator('#output-format-select').isVisible(),true);assert.equal(await page.locator('.px-format-trigger').count(),0);pass('isolated picker stylesheet failure keeps the native selector usable');
   assert.deepEqual(report.errors,[]);assert.equal(downloads,3,'fixture cannot add a download');report.status='PASS';
-}catch(error){report.status='FAIL';report.failure=error.stack;console.error(error);process.exitCode=1;}
+}catch(error){report.status='FAIL';report.failure=error.stack;console.error(error);process.exitCode=1;
+  if(browser){try{
+    const page=browser.contexts().flatMap(context=>context.pages()).at(-1);if(page)report.failureDom=await page.evaluate(()=>({url:location.href,mode:document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode,
+      nativeFormat:document.querySelector('#output-format-select,[data-format]')?.value,visibleFormat:document.querySelector('[data-sc-unified-format]')?.value,
+      nativeStatus:document.querySelector('#output-status,[data-status]')?.textContent,saveStatus:document.querySelector('.sc-export-message')?.textContent,
+      busy:document.querySelector('#main')?.getAttribute('aria-busy'),detailBusy:document.querySelector('#output-layout')?.conversionActions?.busy,
+      download:document.querySelector('#output-download')?.download,saveDisabled:document.querySelector('#output-nav-export')?.disabled,
+      resultState:document.querySelector('.sc-result-surface')?.dataset.state,current:document.querySelector('.sc-result-surface')?.dataset.current,
+      invalid:[...document.querySelectorAll('input,select,textarea')].filter(node=>node.willValidate&&!node.checkValidity()).map(node=>({id:node.id,type:node.type,message:node.validationMessage}))}));
+  }catch{} }
+}
 finally{if(browser)await browser.close();if(server.listening)server.close();await writeFile(output+'/report.json',JSON.stringify(report,null,2));}
