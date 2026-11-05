@@ -108,7 +108,14 @@ try{
     await page.setViewportSize({width,height});await trigger.click();await page.waitForFunction(()=>{const d=document.querySelector('.px-format-dialog'),r=d.getBoundingClientRect();return d.open&&r.left>=0&&r.top>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1;});
     assert.equal(await page.locator('.px-format-option').count(),await page.locator('#output-format-select').evaluate(node=>node.options.length));await page.locator('.px-format-close').click();pass(`isolated picker fits ${width}x${height} and preserves all native choices`);
   }
-  await trigger.click();await page.locator('.px-format-search').fill('点字');assert.equal(await page.locator('.px-format-option').count(),1);assert.equal(await page.locator('.px-format-option').getAttribute('data-value'),'braille');await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
+  await trigger.click();await page.locator('.px-format-search').fill('点字');assert.equal(await page.locator('.px-format-option').count(),1);assert.equal(await page.locator('.px-format-option').getAttribute('data-value'),'braille');await page.keyboard.press('Escape');
+  if(await dialog.evaluate(node=>node.open)){
+    // Chromium's native search input consumes the first Escape to clear text.
+    // Require that exact transition; do not hide a non-responsive dialog.
+    assert.equal(await page.locator('.px-format-search').inputValue(),'');
+    await page.keyboard.press('Escape');
+  }
+  await dialog.waitFor({state:'hidden'});assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
   await trigger.click();await page.locator('.px-format-search').fill('not-a-format');assert.equal(await page.locator('.px-format-empty').isVisible(),true);await page.locator('.px-format-empty button').click();assert.equal(await page.locator('.px-format-option').count(),5);
   await page.locator('.px-format-close').click();await trigger.click();await page.locator('.px-format-search').fill('ＪＰＧ');assert.equal(await page.locator('.px-format-option').getAttribute('data-value'),'jpeg');await page.locator('.px-format-option').click();assert.equal(await page.locator('#output-format-select').inputValue(),'jpeg');pass('isolated picker semantic/full-width search, empty recovery and Escape focus return');
   await trigger.focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('Home');await page.keyboard.press('End');await page.keyboard.press('Enter');assert.equal(await dialog.evaluate(node=>node.open),true,'disabled last option cannot commit');assert.equal(await page.locator('#output-format-select').inputValue(),'jpeg');
