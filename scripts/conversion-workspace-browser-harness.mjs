@@ -93,9 +93,9 @@ if(server.listening){
   const [jpegDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);
   assert.equal(await jpegDownload.failure(),null);const jpeg=await readFile(await jpegDownload.path());assert.equal(jpeg.subarray(0,2).toString('hex'),'ffd8');
   await page.locator('.sc-result-content img').waitFor({state:'visible'});
-  await page.locator('[data-result-source]').click();assert.equal(await page.locator('[data-result-source]').getAttribute('aria-pressed'),'true');
+  await page.locator('button[data-result-source]').click();assert.equal(await page.locator('button[data-result-source]').getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('[data-canvas]').isVisible(),true,'source comparison is explicitly available');
-  await page.locator('[data-result-source]').click();assert.equal(await page.locator('[data-result-source]').getAttribute('aria-pressed'),'false');
+  await page.locator('button[data-result-source]').click();assert.equal(await page.locator('button[data-result-source]').getAttribute('aria-pressed'),'false');
   const dims=await page.evaluate(async bytes=>{const blob=new Blob([new Uint8Array(bytes)],{type:'image/jpeg'});const img=new Image();img.src=URL.createObjectURL(blob);await img.decode();return [img.naturalWidth,img.naturalHeight];},[...jpeg]);assert.deepEqual(dims,[20,40]);pass('one-click JPEG save yields valid 20x40 output; optional result view and live source view toggle');
   assert.equal(await page.locator('.sc-save-actions #output-nav-export').count(), 1, 'primary save has a dedicated action bar');
   assert.equal(await page.locator('.public-destination-nav [data-public-nav="create"]').count(), 1, 'global Create navigation retained');

@@ -40,6 +40,8 @@ page.setDefaultTimeout(20000);
 async function open(query = '?mode=convert&text=input') {
   await page.goto(base + '/output/work/' + query, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
+  await page.waitForFunction(() => document.body.dataset.conversionStartup === 'ready'
+    && document.querySelector('#main')?.dataset.smartConversion === 'true');
 }
 async function selectMode(mode) {
   const source = page.locator('[data-sc-source]'), target = page.locator('[data-sc-target]');
