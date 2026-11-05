@@ -88,11 +88,15 @@
         "binomio-bitsy3d-pixel-art-game-workshop-2027-03-20",
         "binomio-txiki-bitsy3d-pixel-art-game-workshop-2027-03-06",
         "binomio-whimtale-pixel-art-game-workshop-2026-10-24",
+        "citm-pixel-to-frame-animation-workshop-2026-11-13",
         "digital-jove-pixel-art-workshop-2026",
-        "festival-fps-pixel-art-workshop-2026"
+        "festival-fps-pixel-art-workshop-2026",
+        "ibercaja-huesca-piskel-pixel-art-cad-workshop-2026-11-21"
       ],
       "areas": [
         "Deusto, Bilbao",
+        "Huesca",
+        "Terrassa",
         "アルメンドラレホ（バダホス）",
         "バレンシア"
       ]
@@ -191,6 +195,7 @@
       "id": "region-800953e13eb760b1",
       "label": "北海道",
       "eventIds": [
+        "barrier-free-toy-expo-nayoro-3d-dot-art-2026-12-06",
         "frosted-vibes-sapporo-2025",
         "hokkaido-comitia-24-juni-pixel-art-2026",
         "iwamisawa-ibox-tahara-2025",
@@ -198,6 +203,7 @@
         "sapporo-game-odyssey-commentator-2026"
       ],
       "areas": [
+        "名寄市",
         "岩見沢市",
         "札幌市",
         "登別市"
@@ -404,6 +410,7 @@
         "asaha-mendako-tokyo-pixel-2026",
         "asaha-tokyo-pixel-exhibition-2023",
         "beyond-pixel-art-award-exhibition-2021",
+        "digigame-expo-gridpixels-gilden-pixel-art-game-2026-11-08",
         "honkbooks-asobanight-special-weekend-pixel-art-2026",
         "juuni-comitia-158-pixel-art-2026",
         "kac-hermippe-pointless-2025",
@@ -442,6 +449,7 @@
         "八王子市",
         "北千住",
         "千代田区",
+        "千代田区・秋葉原",
         "台東区",
         "台東区・東上野",
         "新宿区",
@@ -897,6 +905,18 @@
       "sourceUrls": [
         "https://www.cc-massifdusancy.fr/festival-connexions-2026/",
         "https://www.sancy.com/fr/fiche/fete-et-manifestation/animation-atelier-pixel-art-serigraphie-la-bourboule-festival-connexions-2026-la-bourboule_TFO7996777/"
+      ]
+    },
+    {
+      "id": "venue-2df1c59ebd649bb1",
+      "label": "秋葉原UDX 2階 アキバ・スクエア（grid&pixels B-05ab）",
+      "eventIds": [
+        "digigame-expo-gridpixels-gilden-pixel-art-game-2026-11-08"
+      ],
+      "region": "東京都",
+      "area": "千代田区・秋葉原",
+      "sourceUrls": [
+        "https://digigame-expo.org/circlelist"
       ]
     },
     {
@@ -1407,6 +1427,18 @@
       ]
     },
     {
+      "id": "venue-7a91c2ceec95f935",
+      "label": "Sala Sant Cugat - Cambra de Comerç de Terrassa, c/ Blasco de Garay 29",
+      "eventIds": [
+        "citm-pixel-to-frame-animation-workshop-2026-11-13"
+      ],
+      "region": "スペイン",
+      "area": "Terrassa",
+      "sourceUrls": [
+        "https://www.citm.upc.edu/cat/agenda/2026/11/13/taller-del-pixel-al-frame-com-abordar-lanimacio-en-pixel-art/4475/"
+      ]
+    },
+    {
       "id": "venue-7ab43aa29a2327c9",
       "label": "渋谷ヒカリエ 8/ CUBE ほか",
       "eventIds": [
@@ -1707,6 +1739,18 @@
       "area": "Orchard Road, Singapore",
       "sourceUrls": [
         "https://www.lcclcoding.com/holidays/game-design/"
+      ]
+    },
+    {
+      "id": "venue-c091f69c24d4c4f3",
+      "label": "Fundación Ibercaja Huesca, Plaza Conde de Guara 1, Huesca 22001",
+      "eventIds": [
+        "ibercaja-huesca-piskel-pixel-art-cad-workshop-2026-11-21"
+      ],
+      "region": "スペイン",
+      "area": "Huesca",
+      "sourceUrls": [
+        "https://www.fundacionibercaja.es/actividades/cursos-y-talleres/dibujo-asistido-por-ordenador-cad-huesca-2026/"
       ]
     },
     {
@@ -2183,6 +2227,27 @@
       }
     },
     {
+      "id": "source-0a1b2032daf70b1c",
+      "label": "Pixel Joint & Pixelation Secret Santa 2026 — ピクセルアート作品交換",
+      "eventIds": [
+        "pixeljoint-secret-santa-2026"
+      ],
+      "url": "https://pixeljoint.com/2026/10/22/7530/Secret_Santa_2026_Sign_Up.htm",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [],
+      "areas": [],
+      "venues": [
+        "オンライン（Pixel Joint / Pixelation）"
+      ],
+      "lastKnownEventDate": "2026-12-27",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-05T00:03:57+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-0a7ec2d2c7dcf106",
       "label": "Atelier création de pixel art — Maison de la famille",
       "eventIds": [
@@ -2528,6 +2593,31 @@
       }
     },
     {
+      "id": "source-1c1ddd3a80837b83",
+      "label": "Del Píxel al Frame: Com Abordar l'Animació en Pixel Art — ピクセルアートアニメーション講座",
+      "eventIds": [
+        "citm-pixel-to-frame-animation-workshop-2026-11-13"
+      ],
+      "url": "https://www.citm.upc.edu/cat/agenda/2026/11/13/taller-del-pixel-al-frame-com-abordar-lanimacio-en-pixel-art/4475/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "Terrassa"
+      ],
+      "venues": [
+        "Sala Sant Cugat - Cambra de Comerç de Terrassa, c/ Blasco de Garay 29"
+      ],
+      "lastKnownEventDate": "2026-11-13",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-05T00:03:57+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-1ce6c3db1d5d32e1",
       "label": "SAPPORO GAME ODYSSEY 2026 — コメンテーター（ピクセルアートゲーム）出展",
       "eventIds": [
@@ -2784,6 +2874,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T15:14:12+09:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-2a0c59f0bef3b04a",
+      "label": "Dibujo Asistido por Ordenador (CAD) — Piskelでピクセル画像・GIF制作",
+      "eventIds": [
+        "ibercaja-huesca-piskel-pixel-art-cad-workshop-2026-11-21"
+      ],
+      "url": "https://www.fundacionibercaja.es/actividades/cursos-y-talleres/dibujo-asistido-por-ordenador-cad-huesca-2026/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "スペイン"
+      ],
+      "areas": [
+        "Huesca"
+      ],
+      "venues": [
+        "Fundación Ibercaja Huesca, Plaza Conde de Guara 1, Huesca 22001"
+      ],
+      "lastKnownEventDate": "2026-11-21",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-05T00:03:57+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -6019,8 +6134,8 @@
       "lastKnownEventDate": "2026-11-05",
       "check": {
         "result": "official-confirmed",
-        "lastCheckedAt": "2026-11-03T11:56:16+00:00",
-        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+        "lastCheckedAt": "2026-11-05T00:03:57+00:00",
+        "notes": "2026-11-05 JSTに主催者の公式プログラム本文を再確認：11/5 09:30〜10:30、UPV美術学部Edificio 3N Sala B-0-2、Pixel Art入門・ゲーム用スプライト制作演習。会場ページは現地タイムゾーンを明記せず。"
       }
     },
     {
@@ -6795,6 +6910,33 @@
       }
     },
     {
+      "id": "source-dbd896315b2953e0",
+      "label": "デジゲー博2026 — grid&pixels「GILDEN」（ドット絵RPG）参加",
+      "eventIds": [
+        "digigame-expo-gridpixels-gilden-pixel-art-game-2026-11-08"
+      ],
+      "url": "https://digigame-expo.org/circlelist",
+      "kind": "website",
+      "prefectures": [
+        "東京都"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "千代田区・秋葉原"
+      ],
+      "venues": [
+        "秋葉原UDX 2階 アキバ・スクエア（grid&pixels B-05ab）"
+      ],
+      "lastKnownEventDate": "2026-11-08",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-05T00:03:57+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
       "id": "source-dc4b535ecc1b2ab3",
       "label": "Cheltenham Lab — Spooky Pixel Art GIFs",
       "eventIds": [
@@ -6895,6 +7037,31 @@
       "check": {
         "result": "official-confirmed",
         "lastCheckedAt": "2026-10-05T06:24:03+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
+    {
+      "id": "source-deb2b7b54c1b22a2",
+      "label": "バリアフリーおもちゃ博 in なよろ — 立体ドット絵メーカー共同制作",
+      "eventIds": [
+        "barrier-free-toy-expo-nayoro-3d-dot-art-2026-12-06"
+      ],
+      "url": "https://prtimes.jp/main/html/rd/p/000000033.000174615.html",
+      "kind": "website",
+      "prefectures": [
+        "北海道"
+      ],
+      "countries": [
+        "日本"
+      ],
+      "areas": [
+        "名寄市"
+      ],
+      "venues": [],
+      "lastKnownEventDate": "2026-12-06",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-05T00:03:57+00:00",
         "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
       }
     },
@@ -7549,5 +7716,5 @@
       }
     }
   ],
-  "updatedAt": "2026-11-04T00:13:50+00:00"
+  "updatedAt": "2026-11-05T00:06:52+00:00"
 }
