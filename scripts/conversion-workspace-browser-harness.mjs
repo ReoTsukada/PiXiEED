@@ -48,12 +48,14 @@ if(server.listening){
     const area=await page.evaluate(()=>{
       const empty=document.querySelector('.sc-empty-state'),button=document.querySelector('[data-sc-unified-add]');
       const visible=node=>node&&getComputedStyle(node).display!=='none'&&!node.hidden;
-      const composer=document.querySelector('.sc-unified-composer'),draft=document.querySelector('[data-tx-source]'),drop=document.querySelector('[data-drop]');
+      // The compact converter uses data-drop; the detailed editor retains its
+      // native output-start drop target. Both are the shared empty surface.
+      const draft=document.querySelector('[data-tx-source]'),drop=document.querySelector('[data-drop],#output-start');
       return {empty:empty?.getBoundingClientRect().toJSON(),button:button?.getBoundingClientRect().toJSON(),draft:visible(draft),drop:visible(drop),
         purpose:visible(document.querySelector('[data-sc-unified-format]')),minHeight:button?getComputedStyle(button).minHeight:null};
     });
     assert.ok(area.empty&&area.button,`${label}: unified empty chooser exists`);
-    assert.ok(area.draft&&area.drop&&area.purpose,`${label}: unified draft, drop area and purpose controls are reachable`);
+    assert.ok(area.draft&&area.drop&&area.purpose,`${label}: unified draft, drop area and purpose controls are reachable ${JSON.stringify(area)}`);
     assert.ok(area.button.height>=44,`${label}: file add target remains touch sized ${JSON.stringify(area)}`);
   };
   const checkCommonNav = async label => {
