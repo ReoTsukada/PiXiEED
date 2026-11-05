@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { shouldAutoSelectPixelOrigin } from '../../js/creation/output-render.mjs';
+import { sanitizeOutputFilename } from '../../js/creation/output-handoff-core.mjs';
 
 const source = readFileSync(new URL('../../js/creation/output-page.mjs', import.meta.url), 'utf8');
 function extract(start, end) {
@@ -47,7 +48,7 @@ function generationContext({ failAt = 'persist' } = {}) {
     resolveOutputFilename: ({ extension }) => `art.${extension}`, sanitizeOutputFilename: value => value, outputMime: format => `image/${format}`,
     stillFrameSelect: { value: '0' }, jpegQuality: { value: '90' }, getOutputTiming: () => ({ durationMs: 0 }),
     persistOutputItems: async items => { persisted.push(items); if (failAt === 'persist') throw new Error('fixture persistence failure'); return items; },
-    fillSourceAndFormatControls() {}, renderOutputItems() {}, displayMetadata() {}, setCurrentBlob() {}, setMedia() {}, updateMusicPlayControl() {},
+    fillSourceAndFormatControls() {}, renderOutputItems() {}, displayMetadata() {}, setCurrentBlob() {}, setMedia() {}, updateMusicPlayControl() {}, syncFilename() {},
     displayFormat: entry => entry.extension.toUpperCase(), format: { textContent: '' }, extension: { textContent: '' },
     formatButton: { textContent: '', setAttribute() {} }, formatPicker: { hidden: true },
   };
@@ -95,6 +96,34 @@ test('real generation completes explicit 32x output and keeps its choice on a la
   assert.equal(context.activeItem.extension, 'jpeg');
   assert.equal(context.activeItem.metadata.pixelOriginChoice, 'custom');
   assert.deepEqual([context.activeItem.metadata.outputWidth, context.activeItem.metadata.outputHeight], [4096,2048]);
+});
+
+test('committed format generation publishes the download name before any click; failures retain the old link', async () => {
+  for (const failAt of [null, 'encode', 'persist']) {
+    const { context, previous } = generationContext({ failAt });
+    context.record.extension = 'png'; context.record.filename = 'art.png';
+    context.fileUrl = 'blob:original';
+    let clicks = 0;
+    context.download = { href: 'blob:original', download: 'art.png', click() { clicks++; } };
+    context.sanitizeOutputFilename = sanitizeOutputFilename;
+    context.setCurrentBlob = () => { context.fileUrl = 'blob:encoded'; context.download.href = context.fileUrl; };
+    vm.createContext(context);
+    vm.runInContext(extract('function currentFilename()', '\nfunction setPreviewZoom'), context);
+    vm.runInContext(extract('function syncFilename()', '\nfunction trackSave'), context);
+    vm.runInContext(extract('async function generateOutputItem(', '\nasync function prepareRasterSettings'), context);
+    const completed = await vm.runInContext("generateOutputItem({formatValue:'jpeg'})", context);
+    assert.equal(clicks, 0, 'generation and link synchronization never start a download');
+    assert.equal(completed, failAt === null);
+    if (completed) {
+      assert.equal(context.download.download, 'art.jpeg');
+      assert.equal(context.download.href, 'blob:encoded');
+      assert.equal(context.activeItem.extension, 'jpeg');
+    } else {
+      assert.equal(context.download.download, 'art.png');
+      assert.equal(context.download.href, 'blob:original');
+      assert.equal(context.activeItem, previous);
+    }
+  }
 });
 
 test('the real raster preparation does not replace persisted custom 32x output with a matching original', async () => {

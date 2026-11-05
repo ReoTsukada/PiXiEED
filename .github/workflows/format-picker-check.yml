@@ -1,12 +1,31 @@
 name: Converter format picker
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'js/creation/format-picker.mjs'
+      - 'css/format-picker.css'
+      - 'js/creation/conversion-entry.mjs'
+      - 'js/creation/output-page.mjs'
+      - 'js/creation/output-receive.mjs'
+      - 'output/work/index.html'
+      - 'js/creation/conversion-unified-input.mjs'
+      - 'js/creation/conversion-output-destination.mjs'
+      - 'tests/format-picker.test.mjs'
+      - 'scripts/check-format-picker.mjs'
+      - '.github/workflows/format-picker-check.yml'
   push:
     branches: [main]
     paths:
       - 'js/creation/format-picker.mjs'
       - 'css/format-picker.css'
       - 'js/creation/conversion-entry.mjs'
+      - 'js/creation/output-page.mjs'
+      - 'js/creation/output-receive.mjs'
+      - 'output/work/index.html'
+      - 'js/creation/conversion-unified-input.mjs'
+      - 'js/creation/conversion-output-destination.mjs'
       - 'tests/format-picker.test.mjs'
       - 'scripts/check-format-picker.mjs'
       - '.github/workflows/format-picker-check.yml'
@@ -25,16 +44,23 @@ jobs:
           node-version: '22'
       - name: Search, descriptions and capability tests
         run: node --test tests/format-picker.test.mjs
-      - name: Real converter and picker, localhost only
-        run: |
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          const p='scripts/check-text-art-fit.mjs';
-          let s=fs.readFileSync(p,'utf8');
-          const from="throw Error('Timeout '+label+': '+await evaluate(()=>document.querySelector('[data-tx-status]')?.textContent))";
-          const to="throw Error('Timeout '+label+': '+JSON.stringify({errors,dom:await evaluate(()=>({url:location.href,editor:document.querySelector('[data-editor]')?.outerHTML.slice(0,200),native:document.querySelector('[data-format]')?.outerHTML,shared:document.querySelector('[data-sc-format]')?.outerHTML,status:document.querySelector('[data-status]')?.textContent,mode:document.querySelector('.text-mode-nav [aria-pressed=true]')?.dataset.textMode,dialog:document.querySelector('dialog')?.open,demoDisabled:document.querySelector('[data-demo]')?.disabled}))}))";
-          if(!s.includes(from))throw Error('Diagnostic anchor changed');
-          s=s.replace(from,to).replace('assert.ok(value,name);checks.push(name);','assert.ok(value,name);checks.push(name);console.log("PASS",name);');
-          fs.writeFileSync(p,s);
-          JS
-          node scripts/check-format-picker.mjs
+      - name: Install pinned build dependency
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Build the shipped workspace
+        run: npm run build -- --output /tmp/pixieed-format-picker-site
+      - name: Install pinned browser harness
+        run: npm install --prefix /tmp/pixieed-browser --ignore-scripts --no-audit --no-fund playwright@1.56.1
+      - name: Visible output selection and isolated optional picker
+        env:
+          PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
+          PIXIEED_BROWSER_ROOT: /tmp/pixieed-format-picker-site
+          PIXIEED_BROWSER_ARTIFACTS: /tmp/pixieed-format-picker-browser
+        run: node scripts/check-format-picker.mjs
+      - name: Retain functional report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: format-selection-verification
+          path: /tmp/pixieed-format-picker-browser/report.json
+          if-no-files-found: ignore
+          retention-days: 7
