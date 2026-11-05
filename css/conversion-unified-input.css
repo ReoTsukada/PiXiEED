@@ -171,6 +171,7 @@
 [data-unified-result="true"] .sc-result-surface > .sc-result-content { order: 2; }
 [data-unified-result="true"] .sc-result-surface > header { order: 3; }
 [data-unified-result="true"] .sc-result-surface > [data-result-state] { order: 4; }
+[data-unified-result="true"] .sc-result-surface[data-current="false"] > [data-result-state] { order: 1; }
 [data-unified-result="true"] .sc-result-surface > .tx-result-card { order: 5; }
 [data-unified-result="true"] .sc-result-surface > .text-legacy { order: 6; }
 [data-unified-result="true"] .sc-result-surface .sc-setting-chips { flex: none; }
