@@ -1359,6 +1359,9 @@ async function generateOutputItem({ sourceId = sourceSelect.value, formatValue =
     updateMusicPlayControl();
     format.textContent = displayFormat(record); extension.textContent = `.${activeItem.extension}`; filename.value = outputBaseName(activeItem.filename, activeItem.extension);
     filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
+    // Consumers check this link before clicking it. Publish its committed name
+    // with the new Blob instead of waiting for the legacy click handler.
+    syncFilename();
     fillSourceAndFormatControls({ preferredFormat: activeItem.extension });
     renderOutputItems(); displayMetadata(record, activeItem.blob, outputWidth, outputHeight);
     status.textContent = `${formats.find(([value]) => value === extensionValue)?.[1] || extensionValue.toUpperCase()}を端末内に準備しました。ダウンロードを開始できます。`;

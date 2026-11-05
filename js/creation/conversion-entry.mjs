@@ -20,13 +20,13 @@ try {
       if (!template) throw new Error('出力画面の構成を確認できませんでした。再読み込みしてください。');
       main.replaceChildren(template.content.cloneNode(true)); template.remove();
       if (query.has('id') || query.has('file')) {
-        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261105-video-size-1');
+        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261105-download-name-1');
         await mountSharedOutput(sharedOutputRequest(location.search));
       } else if (query.get('mode') === 'convert') {
         const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261105-video-size-1');
         mountConversionPage();
       } else {
-        const { outputPageReady } = await import('./output-page.mjs?rev=20261105-video-size-1');
+        const { outputPageReady } = await import('./output-page.mjs?rev=20261105-download-name-1');
         await outputPageReady;
       }
       const failure = main.querySelector('[role="alert"]');
