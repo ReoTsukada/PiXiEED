@@ -14,19 +14,28 @@ replace("await change('[data-sc-format]','ascii');", `await evaluate(async()=>{w
  await change('[data-sc-format]','ascii');`);
 replace('const change=async(selector,value)=>evaluate(', `const change=async(selector,value)=>{
    if(selector==='[data-sc-format]'){
+     await evaluate(()=>{const panel=document.querySelector('#sc-settings-panel');if(panel&&!panel.open)document.querySelector('[data-sc-settings-open]').click();});
+     await paint();
      await evaluate(()=>document.querySelector('[data-sc-format-row] .px-format-trigger').click());
      await evaluate(value=>{const row=[...document.querySelectorAll('.px-format-option')].find(e=>e.dataset.value===value);if(!row)throw Error('Missing choice '+value);row.click();},value);
      await paint(); return;
    }
    return evaluate(`);
 replace('},selector,value);\n const paint=', '},selector,value);};\n const paint=');
+replace('const click=selector=>evaluate(', `const click=async selector=>{
+   if(selector.includes('.px-format-trigger')||selector==='#output-extension'){
+     await evaluate(()=>{const panel=document.querySelector('#sc-settings-panel');if(panel&&!panel.open)document.querySelector('[data-sc-settings-open]').click();});await paint();
+   }
+   return evaluate(`);
+replace('.click(),selector);\n const geometry=', '.click(),selector);};\n const geometry=');
 const extra = `
  // The same end-to-end suite above now uses the custom picker for every format change.
  const latestBeforePicker=await text();
  for(const [width,height] of [[320,568],[390,844],[844,390],[768,1024],[1366,900]]){
    await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await paint();
    await click('[data-sc-format-row] .px-format-trigger');await paint();
-   await wait(()=>{const d=document.querySelector('.px-format-dialog'),r=d.getBoundingClientRect();return d.open&&r.x>=0&&r.y>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1;},'settled picker geometry');
+   try { await wait(()=>{const d=document.querySelector('.px-format-dialog'),r=d.getBoundingClientRect();return d.open&&r.x>=0&&r.y>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1;},'settled picker geometry'); }
+   catch(error) { throw Error(error.message+' '+JSON.stringify(await evaluate(()=>{const d=document.querySelector('.px-format-dialog'),p=document.querySelector('#sc-settings-panel');return {pickerOpen:d.open,picker:d.getBoundingClientRect().toJSON(),pickerStyle:d.style.cssText,panelOpen:p?.open,panel:p?.getBoundingClientRect().toJSON(),width:innerWidth,height:innerHeight,active:document.activeElement?.outerHTML.slice(0,200)};}))); }
    const g=await evaluate(()=>{const d=document.querySelector('.px-format-dialog'),r=d.getBoundingClientRect();return {open:d.open,x:r.x,y:r.y,w:r.width,h:r.height,vw:innerWidth,vh:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1,options:document.querySelectorAll('.px-format-option').length,native:document.querySelector('[data-sc-format]').options.length};});
    check('picker fits '+width+'x'+height,g.open&&g.x>=0&&g.y>=0&&g.x+g.w<=g.vw+1&&g.y+g.h<=g.vh+1&&!g.overflow);
    check('native choices preserved '+width+'x'+height,g.options===g.native);
