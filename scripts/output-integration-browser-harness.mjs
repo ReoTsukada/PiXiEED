@@ -106,21 +106,25 @@ async function run(success = true) {
     await page.waitForFunction(() => ['ready', 'error'].includes(document.querySelector('[data-text-tools]')?.dataset.txLiveState));
     const state = await page.locator('[data-text-tools]').getAttribute('data-tx-live-state');
     assert.equal(state, success ? 'ready' : 'error');
-    if (success) assert.match(await page.locator('[data-tx-status]').innerText(), /プレビューを更新しました/);
+    if (success) assert.match(await page.locator('[data-tx-status]').textContent(), /プレビューを更新しました/);
     return null;
   }
   if (success) {
-    const previousStatus = await page.locator('[data-tx-status]').innerText();
+    // Native controls/status live in collapsed settings; visible Save has its own status.
+    const previousStatus = await page.locator('[data-tx-status]').textContent();
     const pendingDownload = exportFromVisibleAction();
     await page.waitForFunction(previous => {
       const root = document.querySelector('[data-text-tools]');
-      const status = document.querySelector('[data-tx-status]')?.innerText;
+      const status = document.querySelector('[data-tx-status]')?.textContent;
       return root?.getAttribute('aria-busy') === 'true' || (status && status !== previous);
     }, previousStatus);
     await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false'
-      && /完了しました/.test(document.querySelector('[data-tx-status]')?.innerText || ''));
-    assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
-    return pendingDownload;
+      && /完了しました/.test(document.querySelector('[data-tx-status]')?.textContent || ''));
+    assert.match(await page.locator('[data-tx-status]').textContent(), /完了しました/);
+    const saved = await pendingDownload;
+    await page.waitForFunction(() => /ダウンロードを開始しました/.test(document.querySelector('.sc-export-message')?.textContent || ''));
+    assert.equal(await page.locator('.sc-export-message').isVisible(), true);
+    return saved;
   }
   await page.locator('#output-nav-export').click();
   await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
@@ -244,6 +248,7 @@ try {
     mode: document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode,
     busy: document.querySelector('[data-text-tools]')?.getAttribute('aria-busy'),
     textStatus: document.querySelector('[data-tx-status]')?.textContent,
+    nativeStatusVisibleText: document.querySelector('[data-tx-status]')?.innerText,
     saveStatus: document.querySelector('.sc-export-message')?.textContent,
     textLength: document.querySelector('[data-tx-source]')?.value.length,
     action: document.querySelector('[data-tx-action]')?.value,
