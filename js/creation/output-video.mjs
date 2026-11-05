@@ -1,5 +1,6 @@
-import { audioVideoFrameSize, chooseAudioVideoMimeType, AUDIO_VIDEO_MAX_SECONDS } from './audio-video.mjs?rev=20261016-color-capability-1';
+import { audioVideoFrameSize, chooseAudioVideoMimeType, AUDIO_VIDEO_MAX_SECONDS } from './audio-video.mjs?rev=20261105-video-size-1';
 import { getOutputTiming } from './output-timing.mjs?rev=20261009-fps-1';
+import { validateVideoOutputSize, verifyEncodedVideoSize } from './video-output-size.mjs?rev=20261105-video-size-1';
 
 function abortError() { try { return new DOMException('動画の作成を中止しました。', 'AbortError'); } catch { const error = new Error('動画の作成を中止しました。'); error.name = 'AbortError'; return error; } }
 function assertFrame(frame) {
@@ -15,11 +16,13 @@ export async function renderOutputVideo(frames, {
   audioSource = null, audioTotalPlays = 1, videoSource = null, playbackRate = 1, mimeChoice = chooseAudioVideoMimeType(),
   MediaRecorderImpl = globalThis.MediaRecorder, AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext,
   MediaStreamImpl = globalThis.MediaStream, documentRef = globalThis.document,
+  outputSize = null, verifyVideoSize = verifyEncodedVideoSize,
   signal, onProgress = () => {}, now = globalThis.performance?.now?.bind(globalThis.performance) || Date.now,
   setTimeoutImpl = globalThis.setTimeout.bind(globalThis), clearTimeoutImpl = globalThis.clearTimeout.bind(globalThis),
   requestFrame = globalThis.requestAnimationFrame?.bind(globalThis) || ((callback) => setTimeoutImpl(() => callback(now()), 33)),
   cancelFrame = globalThis.cancelAnimationFrame?.bind(globalThis) || clearTimeoutImpl
 } = {}) {
+  const explicitSize = validateVideoOutputSize(outputSize, { mimeType: mimeChoice?.mimeType });
   const hasVideoSource = Boolean(videoSource);
   if (hasVideoSource) {
     if (!Number.isSafeInteger(videoSource.videoWidth) || !Number.isSafeInteger(videoSource.videoHeight) || videoSource.videoWidth < 1 || videoSource.videoHeight < 1 || !Number.isFinite(videoSource.duration) || videoSource.duration <= 0 || videoSource.duration > AUDIO_VIDEO_MAX_SECONDS) throw new TypeError('動画素材をデコードできません。');
@@ -42,7 +45,7 @@ export async function renderOutputVideo(frames, {
   const durationSeconds = audioSource ? audioSeconds * audioTotalPlays : imageSeconds;
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > AUDIO_VIDEO_MAX_SECONDS) throw new RangeError('動画は120秒以内で作成できます。コマ数や音声の長さを短くしてください。');
 
-  const frameSize = audioVideoFrameSize(width, height);
+  const frameSize = explicitSize || (hasVideoSource ? { width, height } : audioVideoFrameSize(width, height));
   const canvas = documentRef.createElement('canvas'); canvas.width = frameSize.width; canvas.height = frameSize.height;
   const context = canvas.getContext('2d', { alpha: false });
   if (!context || typeof canvas.captureStream !== 'function') throw new Error('このブラウザーは動画の画像記録に対応していません。PNG/GIFとWAVは引き続き保存できます。');
@@ -78,12 +81,13 @@ export async function renderOutputVideo(frames, {
 
   let canvasStream = null; let audioContext = null; let audioStream = null; let stream = null; let recorder = null; let audioNode = null; let raf = null; let stopTimer = null; let watchdog = null;
   let disposed = false; let resolveResult; let rejectResult; let canceled = false; let startedAt = 0; let audioStartAt = 0;
+  const sizeProbeController = explicitSize ? new AbortController() : null;
   const chunks = [];
   const tracks = new Set();
   const resultPromise = new Promise((resolve, reject) => { resolveResult = resolve; rejectResult = reject; });
   const rejectOnce = (error) => { if (disposed) return; disposed = true; rejectResult(error); };
   const stopRecording = () => { if (recorder?.state === 'recording') { try { recorder.stop(); } catch {} } };
-  const abort = () => { canceled = true; rejectOnce(abortError()); stopRecording(); };
+  const abort = () => { canceled = true; sizeProbeController?.abort(); rejectOnce(abortError()); stopRecording(); };
   const onVisibility = () => { if (documentRef.visibilityState === 'hidden') abort(); };
   const onData = (event) => { if (!canceled && event.data?.size) chunks.push(event.data); };
   const onStop = () => {
@@ -100,8 +104,17 @@ export async function renderOutputVideo(frames, {
         ? signature.length === 8 && String.fromCharCode(...signature.subarray(4, 8)) === 'ftyp'
         : signature.length >= 4 && signature[0] === 0x1a && signature[1] === 0x45 && signature[2] === 0xdf && signature[3] === 0xa3;
       if (!valid) { rejectOnce(new Error('作成した動画ファイルの識別情報が不正です。元データはそのままです。')); return; }
-      disposed = true;
-      resolveResult({ blob, extension, mimeType: actualMime, seconds: durationSeconds, width: frameSize.width, height: frameSize.height, hasAudio: Boolean(audioSource) });
+      const finish = async () => {
+        if (explicitSize && watchdog !== null) { clearTimeoutImpl(watchdog); watchdog = null; }
+        const verifiedSize = explicitSize
+          ? await verifyVideoSize(blob, explicitSize, { signal: sizeProbeController.signal, documentRef })
+          : frameSize;
+        if (signal?.aborted || canceled || sizeProbeController?.signal.aborted) throw abortError();
+        disposed = true;
+        resolveResult({ blob, extension, mimeType: actualMime, seconds: durationSeconds,
+          width: verifiedSize.width, height: verifiedSize.height, hasAudio: Boolean(audioSource) });
+      };
+      void finish().catch((error) => rejectOnce(error));
     }).catch(() => rejectOnce(new Error('作成した動画を確認できませんでした。元データはそのままです。')));
   };
 
@@ -163,6 +176,7 @@ export async function renderOutputVideo(frames, {
     if (!disposed) rejectOnce(error);
     throw error;
   } finally {
+    sizeProbeController?.abort();
     canceled ||= signal?.aborted || false;
     signal?.removeEventListener('abort', abort);
     documentRef.removeEventListener?.('visibilitychange', onVisibility);

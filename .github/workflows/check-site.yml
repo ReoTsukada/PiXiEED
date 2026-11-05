@@ -44,6 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: output-browser-verification
-          path: /tmp/pixieed-output-browser
+          # Keep functional reports; preview/test screenshots must stay off uploads.
+          path: /tmp/pixieed-output-browser/**/*.json
           if-no-files-found: ignore
           retention-days: 7

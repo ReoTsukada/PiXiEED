@@ -1,3 +1,11 @@
+import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261105-video-size-1';
+import { textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
+import { createConversionRecoveryStore, createIndexedDbConversionRecoveryAdapter } from './conversion-recovery-store.mjs?rev=20261105-video-size-1';
+import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261105-video-size-1';
+import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261105-video-size-1';
+import { activateRetainedConversionInput } from './conversion-input-receipts.mjs?rev=20261105-video-size-1';
+import { mountUnifiedConversionInput } from './conversion-unified-input.mjs?rev=20261105-video-size-1';
+import { createUnifiedImportController, importUnifiedMediaFiles } from './conversion-unified-import.mjs?rev=20261105-video-size-1';
 import { createConversionSaveIntent } from './conversion-save-controller.mjs?rev=20261104-controllers-2';
 import { downloadConversionResult } from './conversion-save-bridge.mjs?rev=20261104-controllers-2';
 import { createConversionFormatOptions } from './conversion-format-view.mjs?rev=20261104-output-controller-1';
@@ -5,13 +13,23 @@ import { createConversionFormatController } from './conversion-format-controller
 import { createNativeFormatBridge } from './conversion-format-bridge.mjs?rev=20261104-output-controller-1';
 import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261104-engine-boundaries-3';
-import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261104-controllers-2';
+import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261105-video-size-1';
+import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
 
 /** Use the same navigation DOM as other pages, once, retaining existing nodes. */
 export function ensureConversionNavigation(doc, win) {
   return doc.querySelector('.public-destination-nav') || mountPublicNavigation({ document: doc, window: win });
+}
+
+/** A selected SVG/project link is not evidence that a new text render completed. */
+export function settleTextGeneration({ generationHref, previousGenerationHref, working, dirty, resultMode, mode }) {
+  return generationHref && generationHref !== previousGenerationHref && !working
+    ? { previousGenerationHref:generationHref, dirty:false, resultMode:mode }
+    : { previousGenerationHref, dirty, resultMode };
+}
+export function textRenderSaveLabel({format,loaded,working}) {
+  return working?'作成中…':!loaded?'文字を入力':format==='pxtxt'?'文章と設定を保存':`${format==='svg'?'SVG':'PNG'}で保存`;
 }
 
 /** Presentation adapter only: all decoding, validation and saving stay in the existing engines. */
@@ -38,7 +56,7 @@ export function mountSmartConversion(doc = document, win = window) {
     if (doc.querySelector(`link[data-smart-style="${key}"]`)) return;
     const link = doc.createElement('link'); link.rel = 'stylesheet'; link.href = href; link.dataset.smartStyle = key; doc.head.append(link);
   };
-  style('/css/conversion-smart-ui.css?rev=20261103-compact-workspace-2', 'conversion');
+  style('/css/conversion-smart-ui.css?rev=20261105-video-size-1', 'conversion');
 
   const toolbar = doc.createElement('section'); toolbar.className = 'sc-toolbar'; toolbar.setAttribute('aria-label', '変換の設定');
   toolbar.innerHTML = `<header class="sc-heading"><div><p>PIXIEED / CONVERT</p><h1>変換・出力</h1></div><span>端末内で処理</span></header>
@@ -69,6 +87,9 @@ export function mountSmartConversion(doc = document, win = window) {
     for (const node of [...fileSettings.children]) if (node.matches('#output-items,#output-reward-note,.output-item-actions,#output-add-item,#output-source-label,#output-source')) advanced.append(node);
     fileSettings.append(advanced);
   }
+  let unified = null;
+  let unifiedImport = null;
+  let localRecovery = null, inputCount = 0;
   const workspace = mountConversionWorkspace(main, toolbar, doc, win);
   const button = doc.createElement('button'); button.type = 'button'; button.id = 'output-nav-export';
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
@@ -78,8 +99,8 @@ export function mountSmartConversion(doc = document, win = window) {
   dock.querySelector('.sc-save-actions').prepend(button);
   const message = dock.querySelector('.sc-export-message'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
-  let lastTextUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
-  let lastSaved = null, pendingDimensions = null;
+  let lastTextGenerationUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
+  let lastSaved = null, pendingDimensions = null, resultSurface = null;
   let sizeDirty = false, fpsDirty = false, stopped = false, controlSignature = '', saveError = '';
   const nativeFormat = () => mode() === 'input' ? $('[data-tx-action]') : mode() === 'output' ? $('[data-tx-style]') : find('[data-format],#output-format-select');
   const formatController = createConversionFormatController(createNativeFormatBridge({ getSelect: nativeFormat, getMode: mode, EventImpl: win.Event }));
@@ -87,6 +108,7 @@ export function mountSmartConversion(doc = document, win = window) {
     if (mode() === 'media') return blobLink(find('[data-download],#output-download')) || blobLink(find('a.convert-primary[download]:not([data-previous])'));
     const live = liveText(), renderedMode = $('[data-text-tools]')?.dataset.txResultMode;
     if ((live && live.state !== 'ready') || (renderedMode && renderedMode !== mode())) return null;
+    if(mode()==='input' && $('[data-tx-action]')?.value==='text')return blobLink($(textRenderOutputSelector(main.textConversion?.snapshot().renderFormat||'png')));
     return blobLink($('[data-tx-download]')) || blobLink($('[data-tx-txt]'));
   };
   const cancelAction = () => {
@@ -94,7 +116,8 @@ export function mountSmartConversion(doc = document, win = window) {
     return [...main.querySelectorAll(selectors)].find(available) || null;
   };
   // Live text generation does not lock its settings; only saving waits for a fresh result.
-  const busy = () => main.getAttribute('aria-busy') === 'true'
+  const busy = () => Boolean(localRecovery?.restoring || unifiedImport?.pending || main.textConversion?.snapshot?.().importing || main.textConversion?.snapshot?.().composing)
+    || main.getAttribute('aria-busy') === 'true'
     || Boolean($('#output-layout')?.conversionActions?.busy)
     || (mode() !== 'media' && $('[data-text-tools]')?.getAttribute('aria-busy') === 'true')
     || (!liveText() && Boolean(cancelAction()))
@@ -144,8 +167,10 @@ export function mountSmartConversion(doc = document, win = window) {
     if (currentMode !== lastMode) { saveIntent.cancel(); saveFocusGuard.invalidate(); revision++; lastMode = currentMode; }
     if (currentMode === 'media') {
       if (href && href !== lastMediaUrl && !working) { lastMediaUrl = href; mediaDirty = !matchesFormat(link); }
-    } else if (href && href !== lastTextUrl && !working) {
-      lastTextUrl = href; textResultMode = currentMode; textDirty = false;
+    } else {
+      const generationHref=(blobLink($('[data-tx-download]'))||blobLink($('[data-tx-txt]')))?.getAttribute('href')||'';
+      const settled=settleTextGeneration({generationHref,previousGenerationHref:lastTextGenerationUrl,working,dirty:textDirty,resultMode:textResultMode,mode:currentMode});
+      lastTextGenerationUrl=settled.previousGenerationHref;textDirty=settled.dirty;textResultMode=settled.resultMode;
     }
     source.value = currentMode === 'input' ? 'text' : 'file';
     target.value = currentMode === 'output' ? 'text' : 'file';
@@ -166,7 +191,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const nativeProgress = [...main.querySelectorAll('progress:not([data-sc-progress]):not([data-sc-panel-progress])')].find(available);
     const progress = dock.querySelector('progress'); progress.hidden = !working;
     if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
-    const label = saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: formatController.snapshot().value, filename: link?.download });
+    const label = currentMode==='input'&&$('[data-tx-action]')?.value==='text' ? textRenderSaveLabel({format:main.textConversion?.snapshot().renderFormat||'png',loaded:loaded(),working:working&&(!live||saveIntent.pending)}) : saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: formatController.snapshot().value, filename: link?.download });
     setText(buttonLabel, label);
     setAttr(button, 'aria-label', label);
     cancel.hidden = !working || !cancelAction();
@@ -189,6 +214,10 @@ export function mountSmartConversion(doc = document, win = window) {
       : loaded() ? '形式に応じた設定だけを表示しています。保存ボタンは画面下に固定されています。'
       : 'ファイルを選ぶと対応形式を表示します。TXT・メモは文字入力へ自動で切り替えます。';
     setText(ui('[data-sc-hint]'), hint);
+    unified?.update();
+    const previewApi=main.conversionMaterials||$('#output-layout')?.conversionActions;
+    const capability=previewApi?.previewCapability?.()||{supported:false,automatic:false,reason:'素材・形式を確認してください。生成できる状態になると保存前にプレビューを更新できます。'};
+    resultSurface?.update({mode:currentMode,loaded:loaded(),ready,working,key:`${currentMode}:${revision}:${Number(fpsDirty)}:${Number(sizeDirty)}`,pendingFps:fpsDirty,pendingSize:sizeDirty,api:previewApi,capability,link,originalFile:main.textConversion?.snapshot?.().file});
     saveIntent.observe();
   }
 
@@ -206,15 +235,18 @@ export function mountSmartConversion(doc = document, win = window) {
     for (const input of scope.querySelectorAll('input,textarea,select')) {
       if (input.disabled || input.type === 'file' || input.type === 'hidden' || input.closest('[hidden]') || !input.willValidate || input.checkValidity()) continue;
       for (let parent = input.parentElement; parent && parent !== main; parent = parent.parentElement) if (parent.tagName === 'DETAILS') parent.open = true;
-      workspace.reveal(); input.reportValidity(); return false;
+      if (!unified || mode() === 'media') workspace.reveal();
+      input.focus({ preventScroll: true }); input.reportValidity(); return false;
     }
     return true;
   }
   function choose() {
-    picker.multiple = mode() === 'media';
-    picker.accept = mode() === 'output' ? '' : mode() === 'input' ? $('[data-tx-text-file]')?.accept || '.txt,.md,.json,.pxtxt' : [nativeInput?.accept || 'image/*,video/*,audio/*', '.txt,.md,.json,.pxtxt,text/plain'].join(',');
+    // Input type follows the chosen files, never the currently displayed engine.
+    picker.multiple = true;
+    picker.accept = '';
     picker.click();
   }
+
   function saveSnapshot() {
     const currentMode = mode(), live = liveText(), link = result();
     return { mode: currentMode, revision, loaded: loaded(), live: Boolean(live),
@@ -253,18 +285,19 @@ export function mountSmartConversion(doc = document, win = window) {
     },
   });
   function beginExport() {
+    if (busy() || main.textConversion?.snapshot?.().composing) return false;
     saveError = '';
     saveFocusTicket = { guard: saveFocusGuard.begin(button), mode: mode(), revision };
     if (!saveIntent.pending) pendingDimensions = fpsDirty && sizeDirty ? { width: $('#output-width')?.value, height: $('#output-height')?.value } : null;
     saveIntent.request(); schedule();
   }
-  workspace.bindActions({ save: beginExport, replace: acceptFiles, refresh: schedule, cancel() { saveIntent.cancel(); cancelAction()?.click(); schedule(); } });
+  workspace.bindActions({ save: beginExport, add: choose, replace: acceptFiles, refresh: schedule, cancel() { saveIntent.cancel(); cancelAction()?.click(); schedule(); } });
   function changed(event) {
     if (toolbar.contains(event.target)) return;
     const element = event.target;
     if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub],[data-sc-source],[data-sc-target]') || element.closest('[data-sc-route-choice]')) return;
     if (element.closest('#output-items')) { schedule(); return; }
-    saveError = ''; revision++; saveIntent.cancel(); saveFocusGuard.invalidate();
+    saveError = ''; revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
     if (element.matches('#output-width,#output-height,#output-aspect-lock')) sizeDirty = true;
     if (element.matches('#output-fps,#output-fps-preset')) fpsDirty = true;
@@ -272,18 +305,20 @@ export function mountSmartConversion(doc = document, win = window) {
     schedule();
   }
   function acceptFiles(files) {
-    if (!files?.length || busy()) return;
-    const text = files.length === 1 && /\.(txt|md|pxtxt|json)$/i.test(files[0].name);
-    let input;
-    if (text && mode() !== 'output' && $('[data-tx-text-file]')) { selectMode('input'); input = $('[data-tx-text-file]'); }
-    else input = mode() === 'input' ? $('[data-tx-text-file]') : mode() === 'output' ? $('[data-tx-file]') : nativeInput;
-    if (!input) return;
+    if (files?.length && main.textConversion?.snapshot?.().composing) {
+      saveError = '文字入力を確定してからファイルを追加してください。入力内容は保持しています。';
+      setText(message, saveError); schedule(); return false;
+    }
+    if (unifiedImport) return unifiedImport.request(files);
+    // Optional text-tool startup failure leaves the existing media engine usable.
+    if (!files?.length || busy() || !nativeInput) return false;
     try {
       const transfer = new win.DataTransfer(); for (const file of files) transfer.items.add(file);
-      input.files = transfer.files; input.dispatchEvent(new win.Event('change', { bubbles: true }));
-    } catch { setText(message, 'このブラウザーでは素材欄のファイル選択を使ってください。'); }
-    schedule();
+      nativeInput.files = transfer.files; nativeInput.dispatchEvent(new win.Event('change', { bubbles: true }));
+      return true;
+    } catch { setText(message, 'このブラウザーでは素材欄のファイル選択を使ってください。'); return false; }
   }
+
   function changeRoute(next) {
     saveError = '';
     const focused = doc.activeElement, fromChoices = focused?.closest?.('[data-sc-route-choice]');
@@ -310,12 +345,46 @@ export function mountSmartConversion(doc = document, win = window) {
   toolbar.addEventListener('dragover', event => event.preventDefault());
   toolbar.addEventListener('drop', event => { event.preventDefault(); acceptFiles(event.dataTransfer?.files); });
   main.addEventListener('drop', event => {
-    if (busy() || toolbar.contains(event.target) || event.target.closest('[data-text-tools],.sc-material-surface')) return;
-    const files = event.dataTransfer?.files;
-    if (files?.length === 1 && /\.(txt|md|pxtxt|json)$/i.test(files[0].name) && $('[data-tx-text-file]')) {
-      event.preventDefault(); event.stopPropagation(); acceptFiles(files);
+    if (!unified) return;
+    const files = event.dataTransfer?.files, text = event.dataTransfer?.getData('text/plain') || '';
+    const editable = event.target.closest?.('textarea,input,[contenteditable="true"]');
+    if (!files?.length && (!text || editable)) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    for (const overlay of main.querySelectorAll('.sc-material-drop-overlay')) overlay.hidden = true;
+    for (const node of main.querySelectorAll('[data-drop].is-over,#output-drop.is-over')) node.classList.remove('is-over');
+    void acceptFiles(files?.length ? files : [new win.File([text], 'ドロップした文章.txt', { type: 'text/plain' })]);
+  }, true);
+  main.addEventListener('paste', event => {
+    if (!unified || event.defaultPrevented) return;
+    const data = event.clipboardData, files = data?.files, text = data?.getData('text/plain') || '';
+    const editable = event.target.closest?.('textarea,input,[contenteditable="true"]');
+    // Native text paste/IME owns editable text. An image-only clipboard remains a file import.
+    if (editable && (text || !files?.length)) return;
+    if (files?.length) { event.preventDefault(); event.stopImmediatePropagation(); void acceptFiles(files); }
+    else if (text && !editable) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      void acceptFiles([new win.File([text], '貼り付けた文章.txt', { type: 'text/plain' })]);
     }
   }, true);
+  function textSourceChanged(event) {
+    saveError = '';
+    revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate(); if(event?.detail?.kind!=='render-format')textDirty = true; lastSaved = null;
+    schedule();
+  }
+  main.addEventListener('pixieed:text-source', textSourceChanged);
+  function committedFiles(event) {
+    if (!unified || unifiedImport?.pending) return;
+    const files = Array.from(event.detail?.files || []);
+    if (files.length) main.textConversion?.selectFile(files.length === 1 ? files[0] : null);
+    schedule();
+  }
+  main.addEventListener('pixieed:input-files', committedFiles);
+  function useGeneratedFile(event) {
+    if (!unified || busy()) return;
+    event.preventDefault();
+    void acceptFiles(event.detail?.files);
+  }
+  main.addEventListener('pixieed:use-generated-file', useGeneratedFile);
   main.addEventListener('input', changed); main.addEventListener('change', changed);
   main.addEventListener('pixieed:text-preview', schedule);
   function materialsChanged(event) {
@@ -347,15 +416,99 @@ export function mountSmartConversion(doc = document, win = window) {
   observer.observe(main, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden','disabled','aria-busy','aria-pressed','href','download','value','open'] });
   const bodyObserver = new win.MutationObserver(ensureNav); bodyObserver.observe(doc.body, { childList: true });
   main.dataset.smartConversion = 'true';
+  if (main.textConversion) {
+    const textApi = main.textConversion;
+    unifiedImport = createUnifiedImportController({
+      snapshot: () => textApi.snapshot(),
+      isBusy: () => busy(),
+      isCurrent: () => !stopped,
+      appendTextFiles: files => textApi.appendTextFiles(files),
+      async importMedia(files) {
+        const api = main.conversionMaterials || $('#output-layout')?.conversionActions;
+        if (!api) throw new Error('この素材の形式変換には、新しいファイル変換画面を開いてください。文字入力と元ファイルは保持しています。');
+        return importUnifiedMediaFiles(api, files);
+      },
+      selectFile: file => textApi.selectFile(file),
+      activateMedia: () => textApi.setMode('media'),
+      activateText: () => textApi.setMode('input'),
+      activateCode() {
+        if (!textApi.setMode('output')) return false;
+        return formatController.choose('encode', { busy: false }) || formatController.snapshot().value === 'encode';
+      },
+      report(text) { saveError = text; setText(message, text); schedule(); },
+      onInvalidate() { revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate(); saveError = ''; },
+      onEntriesChange(entries) { schedule(); const urgent = entries.length > inputCount; inputCount = entries.length; localRecovery?.changed({ urgent }); },
+      onSettled: schedule,
+    });
+    unified = mountUnifiedConversionInput({ main, toolbar, doc, win, getMode: mode,
+      setMode: next => textApi.setMode(next), acceptFiles, choose, formatController, isBusy: busy, schedule,
+      getInputs: () => unifiedImport.snapshotEntries(),
+      retryInput: id => unifiedImport.retryEntry(id),
+      holdInput: id => unifiedImport.holdEntry(id),
+      openInput: entry => activateRetainedConversionInput(entry, { api: textApi, formatController, busy: busy() }),
+    });
+  }
+  if(unified)resultSurface=mountResultSurface({main,doc,win,schedule,refreshText:()=>{if(busy())return;if(liveText())liveText().refresh();else $('[data-tx-run]')?.click();schedule();},cancelText:()=>{saveIntent.cancel();cancelAction()?.click();schedule();}});
   render();
-  const onHide = event => { saveIntent.cancel(); if (!event.persisted) destroy(); };
+  let localRecoveryHost = null, recoveryIdentity = null;
+  const recoveryChanged = () => localRecovery?.changed();
+  const beforeRecoveryLeave = event => { if (localRecovery?.dirty || localRecovery?.snapshot().saving) { event.preventDefault(); event.returnValue = ''; } };
+  if (unified && main.textConversion) {
+    localRecoveryHost = doc.createElement('section'); localRecoveryHost.className = 'sc-local-recovery';
+    localRecoveryHost.innerHTML = '<details><summary><span data-sc-local-recovery-status role="status">端末内の保存を確認しています。</span></summary><p>このブラウザーの端末内だけに保存します。共有端末ではデータが残ります。保存停止や取消でも前回保存版は消しません。合計256MBまで。ブラウザーのデータ消去では失われます。</p><button type="button" data-recovery-save>端末内に保存</button><button type="button" data-recovery-cancel>保存を停止</button><button type="button" data-recovery-fork hidden>今の内容を別の復元版として保存</button><button type="button" data-recovery-previous hidden>今の内容を保存して前の復元版を開く</button></details>';
+    main.querySelector('.sc-unified-composer').append(localRecoveryHost);
+    const updateRecovery = state => {
+      let stateMessage = state.message;
+      if(state.paused && state.phase!=='paused')stateMessage += ' 自動保存は停止中です。';
+      try { if(win.history.state?.pixieedConversionRecoveryPaused!==state.paused)win.history.replaceState({...win.history.state,pixieedConversionRecoveryPaused:state.paused},'',win.location.href); }
+      catch { stateMessage += ' 保存停止の設定を再読込後へ引き継げません。'; }
+      setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'), stateMessage);
+      const save = localRecoveryHost.querySelector('[data-recovery-save]'), cancel = localRecoveryHost.querySelector('[data-recovery-cancel]'), fork = localRecoveryHost.querySelector('[data-recovery-fork]');
+      setText(save, state.phase === 'error' ? '端末内保存を再試行' : state.paused ? '端末内保存を再開' : '端末内に保存'); setText(cancel, state.loading ? '復元を中止' : state.saving ? '今回の保存を取消' : '保存を停止');
+      const set = (node,key,value) => { if(node[key]!==value)node[key]=value; };
+      set(save,'disabled',state.loading||state.restoring||state.saving||(state.blocked&&state.phase!=='error'));set(cancel,'disabled',state.restoring||state.paused);
+      set(fork,'hidden',!state.blocked);set(fork,'disabled',state.saving||state.loading||state.restoring);
+      const previous=localRecoveryHost.querySelector('[data-recovery-previous]');set(previous,'hidden',!recoveryIdentity?.previous().length);set(previous,'disabled',state.saving||state.loading||state.restoring);
+      schedule();
+    };
+    try {
+      const identity = conversionRecoveryIdentity(win); recoveryIdentity=identity;
+      const workspaceRecovery = createConversionRecoveryWorkspace({main,text:main.textConversion,imports:unifiedImport,location:win.location,
+        captureSaveState:()=>({sizeDirty,fpsDirty,mediaDirty}),restoreSaveState:state=>{sizeDirty=state.sizeDirty;fpsDirty=state.fpsDirty;mediaDirty=state.mediaDirty;},
+        owner:()=>main.conversionMaterials ? {kind:'simple',api:main.conversionMaterials} : $('#output-layout')?.conversionActions ? {kind:'detailed',api:$('#output-layout').conversionActions} : {kind:'none',api:null}});
+      localRecovery = createConversionRecoveryController({store:createConversionRecoveryStore(createIndexedDbConversionRecoveryAdapter(win.indexedDB)),id:identity.id,adoptId:identity.adopt,
+        capture:workspaceRecovery.capture,apply:workspaceRecovery.apply,canSave:()=>!main.textConversion.snapshot().composing,onState:updateRecovery,initiallyPaused:Boolean(win.history.state?.pixieedConversionRecoveryPaused),
+        idFactory:()=>win.crypto.randomUUID(),setTimer:(fn,ms)=>win.setTimeout(fn,ms),clearTimer:id=>win.clearTimeout(id)});
+      localRecoveryHost.querySelector('[data-recovery-save]').addEventListener('click',()=>void localRecovery.resume());
+      localRecoveryHost.querySelector('[data-recovery-cancel]').addEventListener('click',()=>localRecovery.cancel());
+      localRecoveryHost.querySelector('[data-recovery-fork]').addEventListener('click',()=>void localRecovery.fork());
+      localRecoveryHost.querySelector('[data-recovery-previous]').addEventListener('click',async()=>{
+        const target=identity.previous().at(-1), before=localRecovery.snapshot();if(!target||before.loading||before.restoring||before.saving)return;
+        try{
+          const saved=before.blocked?await localRecovery.fork():localRecovery.dirty?await localRecovery.resume():true;
+          if(!saved||localRecovery.dirty||(!before.paused&&localRecovery.snapshot().paused))return;
+          identity.adopt(target);win.location.reload();
+        }catch(error){setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'),`保存版を開けませんでした。${error?.message||''} 現在の内容は保持しています。`);}
+      });
+      for(const event of ['input','change','pixieed:text-source','pixieed:materials'])main.addEventListener(event,recoveryChanged);
+      win.addEventListener('beforeunload',beforeRecoveryLeave);
+      void localRecovery.start();
+    } catch(error) { setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'), `端末内保存を開始できませんでした。${error?.message||''} 現在の素材は画面に残っています。`);for(const button of localRecoveryHost.querySelectorAll('button'))button.disabled=true; }
+  }
+  const onHide = event => { saveIntent.cancel(); unifiedImport?.cancel(); if (!event.persisted) destroy(); };
   const onShow = () => schedule();
   win.addEventListener('pagehide', onHide); win.addEventListener('pageshow', onShow);
   function destroy() {
     stopped = true; saveFocusGuard.destroy(); if (frame) win.cancelAnimationFrame(frame); observer.disconnect(); bodyObserver.disconnect(); navObserver?.disconnect();
-    workspace.destroy(); routeChoices?.destroy();
+    localRecovery?.dispose(); localRecoveryHost?.remove();
+    for(const event of ['input','change','pixieed:text-source','pixieed:materials'])main.removeEventListener(event,recoveryChanged);
+    win.removeEventListener('beforeunload',beforeRecoveryLeave);
+    unifiedImport?.cancel(); resultSurface?.destroy(); unified?.destroy(); workspace.destroy(); routeChoices?.destroy();
     main.removeEventListener('input', changed); main.removeEventListener('change', changed);
     main.removeEventListener('pixieed:text-preview', schedule);
+    main.removeEventListener('pixieed:text-source', textSourceChanged);
+    main.removeEventListener('pixieed:input-files', committedFiles);
+    main.removeEventListener('pixieed:use-generated-file', useGeneratedFile);
     main.removeEventListener('pixieed:materials', materialsChanged);
     win.removeEventListener('pagehide', onHide); win.removeEventListener('pageshow', onShow);
   }

@@ -1,7 +1,7 @@
 import { createConversionReturnController } from './conversion-return-controller.mjs?rev=20261104-controllers-2';
 import { createNativeReturnBridge } from './conversion-return-bridge.mjs?rev=20261104-controllers-2';
 import { workspaceAvailableHeight, conversionDockBottom } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionStage } from './conversion-stage.mjs?rev=20261104-controllers-2';
+import { mountConversionStage } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { createConversionPreviewController } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
 
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */

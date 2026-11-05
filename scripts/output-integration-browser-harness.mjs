@@ -49,6 +49,34 @@ async function selectMode(mode) {
   await page.waitForFunction(expected => document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode === expected, mode);
 }
 async function selectWorkspace(selector,value) {
+  const unified = page.locator('[data-sc-unified-purpose]');
+  if (await unified.count()) {
+    if (selector === '[data-sc-source]' || selector === '[data-sc-target]') {
+      await page.evaluate(({selector,value}) => {
+        const source=document.querySelector('[data-sc-source]'),target=document.querySelector('[data-sc-target]');
+        if(selector==='[data-sc-source]')source.value=value;else target.value=value;
+        const mode=source.value==='text'?'input':target.value==='text'?'output':'media';
+        document.querySelector('#main')?.textConversion?.setMode(mode);
+      },{selector,value});
+      await page.waitForFunction(({selector,value})=>document.querySelector(selector)?.value===value,{selector,value});
+      return;
+    }
+    if (selector === '[data-sc-format]') {
+      const expression=page.locator('[data-sc-unified-format]');
+      const sourceMode=await page.locator('#main').evaluate(node=>node.textConversion.snapshot().mode);
+      if(sourceMode==='input'){
+        await unified.selectOption(value==='text'?'text':'restore');
+        if(value!=='text')await expression.selectOption(value);
+      }else if(['ascii','block','braille','emoji','custom'].includes(value)){
+        await expression.selectOption('text-art');await page.locator('[data-sc-unified-art-style]').waitFor({state:'visible'});await page.locator('[data-sc-unified-art-style]').selectOption(value);
+      }else if(['encode','pixels','base64','dataurl'].includes(value)){
+        const tools=page.locator('.sc-unified-code-tools');if(!await tools.evaluate(node=>node.open))await tools.locator('summary').click();
+        const open=page.locator('[data-sc-unified-code-open]');if(await open.isVisible())await open.click();
+        await page.locator('[data-sc-unified-code-format]').waitFor({state:'visible'});await page.locator('[data-sc-unified-code-format]').selectOption(value);
+      }else await expression.selectOption(value);
+      return;
+    }
+  }
   const panel=page.locator('#sc-settings-panel');
   if (!(await panel.evaluate(node=>node.open))) await page.locator('[data-sc-settings-open]').click();
   const routeName = selector === '[data-sc-source]' ? 'sc-source-choice'
@@ -145,6 +173,7 @@ try {
   assert.match(code, /BEGIN PIXIEED RESTORE 1/);
   await selectMode('input');
   await page.locator('[data-tx-source]').fill('メモの前文\n' + code + '\nメモの後文');
+  await selectWorkspace('[data-sc-format]','restore');
   const restored = await run();
   assert.equal(restored.name, '原本.pxd'); assert.equal(hash(restored.bytes), hash(bytes));
   pass('Binary/PXD → TXT → restore preserves filename and every byte (SHA-256 match)');

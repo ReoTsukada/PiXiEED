@@ -2,6 +2,7 @@ import { AUDIO_PPQ, collectAudioEvents, createAudioPlayer } from './audio-core.m
 import { getAudioInstrument } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { createMusicVideoTimingPlan, sampleMusicVideoFrame } from './music-video-timing.mjs';
 import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
+import { validateVideoOutputSize, verifyEncodedVideoSize } from './video-output-size.mjs?rev=20261105-video-size-1';
 
 export { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
 
@@ -75,6 +76,8 @@ export async function renderAudioVideo(song, image, {
   frameImages = null,
   frameTicks = null,
   frameDurationsMs = null,
+  outputSize = null,
+  verifyVideoSize = verifyEncodedVideoSize,
   includeAudio = true,
   nowImpl = () => Date.now(),
   setTimeoutImpl = globalThis.setTimeout.bind(globalThis),
@@ -102,7 +105,9 @@ export async function renderAudioVideo(song, image, {
   if (!mime) throw new Error('このブラウザーは動画の保存に対応していません。PNGとWAVは引き続き保存できます。');
   if (signal?.aborted) throw abortError();
 
-  const frameSize = audioVideoFrameSize(image.width, image.height);
+  const explicitSize = validateVideoOutputSize(outputSize, { mimeType: mime.mimeType });
+  const frameSize = explicitSize || audioVideoFrameSize(image.width, image.height);
+  const sizeProbeController = explicitSize ? new AbortController() : null;
   const loopSeconds = song.loopTicks * 60 / song.tempo / AUDIO_PPQ;
   if (!Number.isSafeInteger(totalPlays) || totalPlays < 1 || totalPlays > 8) throw new RangeError('音楽の再生回数は1〜8回です。');
   const durationSeconds = visualTimingPlan ? visualTimingPlan.musicDurationMs / 1000 : loopSeconds * totalPlays;
@@ -118,13 +123,32 @@ export async function renderAudioVideo(song, image, {
   let resolveRecording; let rejectRecording;
   const recording = new Promise((resolve, reject) => { resolveRecording = resolve; rejectRecording = reject; });
   recording.catch(() => {});
-  const finishError = (error) => { if (settled) return; failure = error; settled = true; rejectRecording(error); };
+  const finishError = (error) => { if (settled) return; sizeProbeController?.abort(); failure = error; settled = true; rejectRecording(error); };
   const onRecorderStop = () => {
     if (settled) return;
     if (!chunks.length) { finishError(new Error('このブラウザーでは動画を記録できませんでした。PNGとWAVは引き続き保存できます。')); return; }
-    settled = true;
     const actualMime = recorder?.mimeType || mime.mimeType;
-    resolveRecording({ blob: new Blob(chunks, { type: actualMime }), mimeType: actualMime, extension: actualMime.includes('mp4') ? 'mp4' : 'webm', seconds: durationSeconds, totalPlays, hasAudio: includeAudio, ...(visualTimingPlan ? { recordLeadMs: 35 } : {}), width: frameSize.width, height: frameSize.height });
+    const blob = new Blob(chunks, { type: actualMime });
+    if (!explicitSize) {
+      settled = true;
+      resolveRecording({ blob, mimeType: actualMime, extension: actualMime.includes('mp4') ? 'mp4' : 'webm', seconds: durationSeconds, totalPlays, hasAudio: includeAudio, ...(visualTimingPlan ? { recordLeadMs: 35 } : {}), width: frameSize.width, height: frameSize.height });
+      return;
+    }
+    void (async () => {
+      if (actualMime.split(';', 1)[0] !== mime.mimeType.split(';', 1)[0]) throw new Error('動画の実際の形式が選択内容と一致しません。');
+      const signature = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+      const valid = mime.extension === 'mp4'
+        ? signature.length === 8 && String.fromCharCode(...signature.subarray(4, 8)) === 'ftyp'
+        : signature.length >= 4 && signature[0] === 0x1a && signature[1] === 0x45 && signature[2] === 0xdf && signature[3] === 0xa3;
+      if (!valid) throw new Error('作成した動画ファイルの識別情報が不正です。');
+      if (watchdogTimer !== null) { clearTimeoutImpl(watchdogTimer); watchdogTimer = null; }
+      const verifiedSize = explicitSize
+        ? await verifyVideoSize(blob, explicitSize, { signal: sizeProbeController.signal, documentRef })
+        : frameSize;
+      if (settled || signal?.aborted || sizeProbeController?.signal.aborted) throw abortError();
+      settled = true;
+      resolveRecording({ blob, mimeType: actualMime, extension: actualMime.includes('mp4') ? 'mp4' : 'webm', seconds: durationSeconds, totalPlays, hasAudio: includeAudio, ...(visualTimingPlan ? { recordLeadMs: 35 } : {}), width: verifiedSize.width, height: verifiedSize.height });
+    })().catch(finishError);
   };
   const listen = (target, type, callback) => {
     if (typeof target.addEventListener === 'function') target.addEventListener(type, callback);
@@ -249,6 +273,7 @@ export async function renderAudioVideo(song, image, {
     finishError(reported);
     throw reported;
   } finally {
+    sizeProbeController?.abort();
     if (completionTimer !== null) clearTimeoutImpl(completionTimer);
     for (const timer of scheduledTimers) clearTimeoutImpl(timer);
     scheduledTimers.clear();

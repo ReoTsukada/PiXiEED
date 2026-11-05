@@ -35,7 +35,8 @@ const targets = new Map([
   ['tool-help-data.mjs', 'rev=20261027-guide-constraints-1'],
   ['tool-help-bootstrap.mjs', 'rev=20261027-guide-constraints-1'],
   ['profile-likes-page.mjs', 'rev=20261024-intelligence-ui-1'],
-  ['output-page.mjs', 'rev=20261104-engine-boundaries-3'],
+  ['output-page.mjs', 'rev=20261105-video-size-1'],
+  ['output-receive.mjs', 'rev=20261105-video-size-1'],
   ['tool-output.css', 'rev=20261024-intelligence-ui-1'],
   ['tool-help.css', 'rev=20261024-intelligence-ui-1'],
   ['social-feed.css', 'rev=20261024-side-ad-layout-1'],
@@ -88,7 +89,7 @@ function normalize(source, file) {
     const owner = relative(root, file).replaceAll('\\', '/');
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(owner), path));
     if (!commonToolStartModules.has(target)) return whole;
-    const revision = target === 'js/creation/output-page.mjs' ? '20261104-engine-boundaries-3' : '20261024-common-tool-start-1';
+    const revision = target === 'js/creation/output-page.mjs' ? '20261105-video-size-1' : '20261024-common-tool-start-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });

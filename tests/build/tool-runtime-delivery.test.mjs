@@ -23,7 +23,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.runtimeGraph.modules.size, 107);
   assert.equal(plan.runtimeGraph.edges.length, 202);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 105);
+  assert.equal(plan.dynamicGraph.modules.size, 106);
   assert.equal(plan.externalUrls.size, 55);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
@@ -36,6 +36,11 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.runtimeGraph.edges.filter(edge => edge.from === metadataUrl).length, 0, 'Record validation must not pull codec, DOM or ad modules into shared startup.');
   assert(plan.externalUrls.has(metadataUrl));
   assert(plan.dynamicGraph.modules.has(metadataUrl));
+  const videoSizeUrl = '/js/creation/video-output-size.mjs?rev=20261105-video-size-1';
+  assert.deepEqual([...plan.dynamicGraph.modules.values()].filter(module => module.file === 'js/creation/video-output-size.mjs').map(module => module.url), [videoSizeUrl]);
+  assert.equal(plan.dynamicGraph.edges.filter(edge => edge.to === videoSizeUrl).length, 1, 'The additional lazy module comes from the shared audio-video size verifier.');
+  assert.equal(plan.dynamicGraph.edges.filter(edge => edge.from === videoSizeUrl).length, 0, 'Size verification must not import codecs, storage, or ad modules.');
+  assert(!plan.runtimeGraph.modules.has(videoSizeUrl), 'Video metadata verification stays outside initial editor startup.');
   assert(files.includes('js/ads/site-feature-access-v20261024.mjs'));
   const guideModules = [...plan.runtimeGraph.modules.values()].filter(module => module.file === 'js/output-guide-metrics.mjs');
   assert.deepEqual(guideModules.map(module => module.url), [guideMetricsUrl], 'Guide metrics must retain one canonical module identity.');
