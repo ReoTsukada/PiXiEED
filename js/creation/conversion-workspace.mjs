@@ -127,7 +127,11 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   views.querySelector('[data-sc-source-view]').addEventListener('click', () => applyPreviewState(previewController.selectInspect(false)));
   views.querySelector('[data-sc-result-view]').addEventListener('click', () => applyPreviewState(previewController.selectInspect(true)));
   function update({ media, loaded, ready, link, working = false, saveDisabled = false, status = '', progress, canCancel = false, saveLabel = '保存' }) {
-    open.disabled = false; panel.querySelector('[data-sc-settings-close]').disabled = false;
+    // Reflected boolean writes notify the workspace observer even when equal.
+    // A repeated enabled close button must not schedule another render forever.
+    if (open.disabled) open.disabled = false;
+    const close = panel.querySelector('[data-sc-settings-close]');
+    if (close.disabled) close.disabled = false;
     panelController.update(media);
     main.dataset.workspaceMedia = String(media);
     main.dataset.workspaceReady = String(media && ready);

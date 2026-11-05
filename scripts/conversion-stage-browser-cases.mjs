@@ -42,12 +42,14 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
       && !document.querySelector('#output-nav-export').disabled && img?.complete && img.naturalWidth>0;
   });
   const idleMutations = await page.evaluate(async () => {
-    let count = 0; const observer = new MutationObserver(records => { count += records.length; });
+    const changes = []; const observer = new MutationObserver(records => {
+      for(const record of records)changes.push({attribute:record.attributeName,tag:record.target.tagName,id:record.target.id,classes:record.target.className,hidden:record.target.hidden,disabled:record.target.disabled});
+    });
     observer.observe(document.querySelector('#main'), { subtree: true, attributes: true, attributeFilter: ['hidden','disabled'] });
     for (let i = 0; i < 8; i++) await new Promise(done => requestAnimationFrame(done));
-    observer.disconnect(); return count;
+    observer.disconnect(); return changes;
   });
-  assert.ok(idleMutations < 6, `idle rendering must settle: ${idleMutations} visibility/disabled mutations`);
+  assert.ok(idleMutations.length < 6, `idle rendering must settle: ${idleMutations.length} visibility/disabled mutations ${JSON.stringify(idleMutations)}`);
   assert.equal(await page.locator('#output-nav-export').innerText(), 'JPEGで保存');
   await page.evaluate(() => { window.__stageSurface = document.querySelector('.sc-material-surface'); });
   let opened = 0; const watchChooser = () => opened++;
