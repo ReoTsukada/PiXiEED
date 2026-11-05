@@ -83,8 +83,12 @@ if(server.listening){
   const png=await syntheticPng();const emptyChooser=page.waitForEvent('filechooser');await page.locator('[data-sc-unified-add]').click();await(await emptyChooser).setFiles({name:'synthetic-320x640.png',mimeType:'image/png',buffer:png});
   await page.locator('[data-sc-unified-format]').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('.convert-intent')?.dataset.state==='ready'&&document.querySelector('[data-format]')?.value==='jpeg'&&document.querySelector('[data-sc-unified-format]')?.value==='jpeg'&&document.querySelector('.sc-material-surface')?.dataset.loaded==='true');await stable();
   assert.equal(await page.locator('.convert-intent').isVisible(),true,'JPEG intent remains visible after PNG import');
-  const bounds=await page.evaluate(()=>{const rect=s=>document.querySelector(s)?.getBoundingClientRect();const preview=rect('.convert-preview'),surface=rect('.sc-material-surface'),main=rect('#main');return {previewBottom:preview?.bottom,surfaceBottom:surface?.bottom,mainBottom:main?.bottom};});
-  assert.ok(bounds.previewBottom<=bounds.surfaceBottom+1&&bounds.surfaceBottom<=bounds.mainBottom+1,`loaded preview is clipped: ${JSON.stringify(bounds)}`);
+  await page.locator('.sc-result-surface[data-current="true"] .sc-result-content img').waitFor({state:'visible'});
+  await page.waitForFunction(()=>{const img=document.querySelector('.sc-result-content img');return img?.complete&&img.naturalWidth>0;});
+  const bounds=await page.evaluate(()=>{const rect=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();const img=document.querySelector('.sc-result-content img');return {preview:rect('.sc-result-content img'),content:rect('.sc-result-content'),surface:rect('.sc-result-surface'),main:rect('#main'),natural:[img.naturalWidth,img.naturalHeight]};});
+  assert.deepEqual(bounds.natural,[320,640],'the central preview is decoded from the actual current image output');
+  assert.ok(bounds.preview.width>0&&bounds.preview.height>0&&bounds.preview.top>=bounds.content.top-1&&bounds.preview.bottom<=bounds.content.bottom+1&&bounds.preview.left>=bounds.content.left-1&&bounds.preview.right<=bounds.content.right+1&&bounds.preview.top>=bounds.surface.top-1&&bounds.preview.bottom<=bounds.surface.bottom+1,`actual result image is clipped: ${JSON.stringify(bounds)}`);
+  assert.ok(bounds.surface.top>=bounds.main.top-1&&bounds.surface.bottom<=bounds.main.bottom+1,`result surface exceeds workspace: ${JSON.stringify(bounds)}`);
   await page.locator('.convert-options > summary').click(); await page.locator('[data-width]').fill('20');
   const [jpegDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);
   assert.equal(await jpegDownload.failure(),null);const jpeg=await readFile(await jpegDownload.path());assert.equal(jpeg.subarray(0,2).toString('hex'),'ffd8');
