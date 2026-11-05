@@ -68,6 +68,21 @@ export function enhanceEmptyChooserButton(button, { title, category, instruction
   return button;
 }
 
+/** Keep the single native add control after every material card on each list rebuild. */
+export function renderMaterialList(list, cards, addSlot) {
+  list.replaceChildren(...cards, addSlot);
+}
+
+/** Unified input delegates additions to the shared chooser; fallback keeps native intent. */
+export function invokeMaterialAdd({ main, actions = {}, choose = () => {}, loaded = false } = {}) {
+  if (main?.dataset?.unifiedInput === 'true' && typeof actions.add === 'function') return actions.add();
+  return choose(loaded ? 'add' : 'replace');
+}
+
+export function isMaterialAddDisabled({ working = false, unified = false, canAdd = true } = {}) {
+  return Boolean(working || (!unified && canAdd === false));
+}
+
 const fields = {
   width: '[data-width],#output-width', height: '[data-height],#output-height',
   quality: '[data-quality],#output-jpeg-quality', rate: '[data-rate-input]', fps: '#output-fps', threshold: '[data-threshold]',
@@ -97,9 +112,14 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   const undo = doc.createElement('div'); undo.className = 'sc-material-undo'; undo.hidden = true;
   undo.setAttribute('aria-label', '素材の削除を元に戻す'); undo.innerHTML = '<span data-sc-undo-name role="status" aria-live="polite"></span><button type="button" data-sc-material-undo>元に戻す</button>';
   const header = doc.createElement('div'); header.className = 'sc-material-heading';
-  header.innerHTML = '<div><strong>素材</strong><span data-sc-material-count></span></div><button type="button" data-sc-material-add>＋ 素材を追加</button>';
+  header.innerHTML = '<div><strong>素材</strong><span data-sc-material-count></span></div>';
   const list = doc.createElement('div'); list.className = 'sc-material-strip';
   list.setAttribute('role', 'list'); list.setAttribute('aria-label', '入力素材。出力項目とは別です');
+  const addSlot = doc.createElement('div'); addSlot.className = 'sc-material-add-slot'; addSlot.setAttribute('role', 'listitem');
+  const addButton = doc.createElement('button'); addButton.type = 'button'; addButton.dataset.scMaterialAdd = ''; addButton.textContent = '＋ 素材を追加'; addSlot.append(addButton);
+  // Unified input mounts before the first update and must adopt this same slot.
+  // Deferring insertion until renderList would strand text-only input without add.
+  list.append(addSlot);
   const summary = doc.createElement('div'); summary.className = 'sc-preview-summary';
   summary.setAttribute('aria-label', '保存するファイル');
   summary.innerHTML = '<strong class="sc-output-group-title">保存するファイル</strong><div class="sc-size-control"><span>出力サイズ</span><button type="button" data-sc-size-edit aria-label="出力サイズを編集">サイズを編集</button><button type="button" data-size-reset data-setting-chip="size" data-reset-setting="true" hidden>元のサイズ</button></div><p data-sc-output-bytes>保存容量は生成後に確定</p><p data-sc-preview-kind></p><p id="sc-stage-warning" data-sc-stage-warning role="status" hidden></p>';
@@ -116,7 +136,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   surface.prepend(undo, summary, chips, feedback); surface.append(header, list, overlay, input);
   const formatRow = main.querySelector('[data-sc-format-row]');
   const anchor = doc.createComment('format settings position'); if (formatRow) formatRow.before(anchor);
-  const $ = selector => surface.querySelector(selector);
+  const $ = selector => surface.querySelector(selector) || main.querySelector(selector);
   const focusGuard = createDeferredFocusGuard({ doc, win });
   const hidden = (node, value) => { if (node && node.hidden !== value) node.hidden = value; };
   const disabled = (node, value) => { if (node.disabled !== value) node.disabled = value; };
@@ -139,7 +159,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
       list.scrollLeft = scrollLeft;
       const buttons = Array.from(list.querySelectorAll('[data-select-material]'));
       const target = buttons.find(button => button.dataset.assetId === id) || buttons.find(button => button.getAttribute('aria-pressed') === 'true');
-      (target || $('[data-sc-material-undo]') || $('[data-sc-material-add]'))?.focus({ preventScroll: true });
+      (target || $('[data-sc-material-undo]') || addButton)?.focus({ preventScroll: true });
       if (reveal && target) { const bounds = list.getBoundingClientRect(), item = target.closest('.sc-material-card').getBoundingClientRect(); if (item.left < bounds.left) list.scrollLeft += item.left - bounds.left; else if (item.right > bounds.right) list.scrollLeft += item.right - bounds.right; }
     }, succeeded);
   }
@@ -177,7 +197,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     } catch (error) { localError = error?.message || '素材を読み込めませんでした。素材と設定は保持しています。'; }
     actions.refresh?.();
   }
-  $('[data-sc-material-add]').addEventListener('click', () => choose(current.loaded ? 'add' : 'replace'));
+  addButton.addEventListener('click', () => { if (!current.working) invokeMaterialAdd({ main, actions, choose, loaded: current.loaded }); });
   $('[data-sc-material-undo]').addEventListener('click', async () => {
     if (current.working || !state.canUndo) return;
     const ticket = focusGuard.begin(doc.activeElement);
@@ -252,7 +272,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   function renderList() {
     const signature = JSON.stringify([state.assets.map(a => [a.id, a.name, a.kind, a.canRemove, a.removeReason, a.canReplace, pixelKey(a.firstFrame?.data)]), Boolean(state.canUndo), state.undoName, Boolean(state.busy)]);
     if (signature === listSignature) return;
-    listSignature = signature; list.replaceChildren();
+    listSignature = signature; const cards = [];
     for (const asset of state.assets) {
       const selected = asset.id === state.activeId || (!state.activeId && asset === state.assets[0]);
       const item = doc.createElement('article'); item.className = 'sc-material-card'; item.setAttribute('role', 'listitem');
@@ -295,8 +315,9 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
           move.setAttribute('aria-label', `${asset.name}を${label}移動`); controls.append(move);
         }
       }
-      item.append(controls); list.append(item);
+      item.append(controls); cards.push(item);
     }
+    renderMaterialList(list, cards, addSlot);
   }
   function update(next) {
     current = next; const nativeState = getState(); state = { ...nativeState, assets: nativeState.assets || [] };
@@ -316,7 +337,7 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
     replaced = false;
     text($('[data-sc-material-count]'), state.assets.length ? `${state.assets.length}${state.grouped ? '素材グループ' : '素材'}${state.frameCount > 1 ? ` · ${state.frameCount}コマ` : ''}` : '素材がありません');
     const selected = activeAsset();
-    const add = $('[data-sc-material-add]'); disabled(add, Boolean(next.working || state.canAdd === false));
+    disabled(addButton, isMaterialAddDisabled({ working: next.working, unified: main.dataset.unifiedInput === 'true', canAdd: state.canAdd }));
     const reason = !next.working && next.loaded ? (selected?.canReplace === false ? selected.replaceReason : '') : '';
     hidden(materialNote, !reason); text(materialNote, reason);
     renderList();

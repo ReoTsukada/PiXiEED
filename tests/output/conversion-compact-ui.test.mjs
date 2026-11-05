@@ -6,12 +6,12 @@ const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'ut
 const stage = read('js/creation/conversion-stage.mjs');
 const css = read('css/conversion-smart-ui.css');
 
-test('loaded materials have one persistent add action outside the scrolling list', () => {
-  assert.equal((stage.match(/<button type="button" data-sc-material-add>/g) || []).length, 1);
-  assert.doesNotMatch(stage, /add\.dataset\.scMaterialAdd|sc-material-add-tile/);
-  assert.match(stage, /surface\.append\(header, list, overlay, input\)/);
-  assert.match(stage, /\$\('\[data-sc-material-add\]'\)\.addEventListener\('click', \(\) => choose\(current\.loaded \? 'add' : 'replace'\)\)/);
-  assert.match(stage, /disabled\(add, Boolean\(next\.working \|\| state\.canAdd === false\)\)/);
+test('loaded materials have one persistent add action at the scrolling strip tail', () => {
+  assert.equal((stage.match(/addButton\.dataset\.scMaterialAdd = ''/g) || []).length, 1);
+  assert.match(stage, /addSlot\.setAttribute\('role', 'listitem'\)/);
+  assert.match(stage, /renderMaterialList\(list, cards, addSlot\)/);
+  assert.match(stage, /addButton\.addEventListener\('click'/);
+  assert.match(stage, /disabled\(addButton, isMaterialAddDisabled/);
   assert.match(stage, /list\.setAttribute\('role', 'list'\)/);
   assert.match(stage, /select\.setAttribute\('aria-pressed', String\(selected\)\)/);
   assert.match(stage, /remove\.setAttribute\('aria-label'/);
@@ -23,7 +23,7 @@ test('mobile toolbar allows an intrinsic-width action group and keeps touch targ
   assert.doesNotMatch(css, /\[data-workspace-media="true"\] \.sc-input-actions \{[^}]*width: 100%/);
   assert.match(mobile, /\.sc-input-actions button \{ min-height: 44px;/);
   assert.match(css, /\.sc-back \{[^}]*min-height: 44px;/);
-  assert.match(css, /\.sc-material-heading \[data-sc-material-add\] \{ min-height: 44px;/);
+  assert.match(css, /\.sc-material-add-slot button \{[^}]*min-height: 44px;/);
   assert.match(css, /\.sc-toolbar \{[^}]*flex-wrap: wrap/);
   assert.match(css, /\.sc-heading \{ min-width: 0; \}/);
   assert.match(css, /\.sc-material-heading > div:first-child \{ display: flex;[^}]*flex-wrap: wrap;/);
@@ -31,12 +31,12 @@ test('mobile toolbar allows an intrinsic-width action group and keeps touch targ
 
 test('the output entry refreshes the complete changed module and CSS chain', () => {
   for (const [file, dependencies, revision] of [
-    ['output/work/index.html', ['conversion-entry.mjs'], '20261104-engine-boundaries-3'],
-    ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261104-engine-boundaries-3'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-smart-ui.css'], '20261103-compact-workspace-2'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-stage.mjs'], '20261104-controllers-2'],
-    ['js/creation/conversion-smart-ui.mjs', ['conversion-workspace.mjs'], '20261104-engine-boundaries-3'],
-    ['js/creation/conversion-workspace.mjs', ['conversion-stage.mjs'], '20261104-controllers-2'],
+    ['output/work/index.html', ['conversion-entry.mjs'], '20261105-video-size-1'],
+    ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261105-video-size-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-smart-ui.css'], '20261105-video-size-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-stage.mjs'], '20261105-video-size-1'],
+    ['js/creation/conversion-smart-ui.mjs', ['conversion-workspace.mjs'], '20261105-video-size-1'],
+    ['js/creation/conversion-workspace.mjs', ['conversion-stage.mjs'], '20261105-video-size-1'],
   ]) for (const dependency of dependencies) assert.ok(read(file).includes(`${dependency}?rev=${revision}`), `${file}: ${dependency}`);
 });
 

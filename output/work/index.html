@@ -15,10 +15,11 @@
   <link rel="stylesheet" href="/css/output-side-ad.css?rev=20261020-side-ad-vertical-1">
   <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
   <link rel="stylesheet" href="/css/task-ui.css?rev=20261024-intelligence-ui-2">
-  <link rel="stylesheet" href="/css/conversion-startup.css?rev=20261104-startup-1">
-  <link rel="stylesheet" href="/css/conversion-smart-ui.css?rev=20261103-compact-workspace-2" data-smart-style="conversion">
+  <link rel="stylesheet" href="/css/conversion-startup.css?rev=20261105-video-size-1">
+  <link rel="stylesheet" href="/css/conversion-smart-ui.css?rev=20261105-video-size-1" data-smart-style="conversion">
   <link rel="stylesheet" href="/css/conversion-simple.css?rev=20261028-motion-1" data-conversion-style>
   <link rel="stylesheet" href="/css/text-tools.css?rev=20261028-text-1" data-text-style>
+  <link rel="stylesheet" href="/css/conversion-unified-input.css?rev=20261105-video-size-1" data-unified-input-style>
 </head>
 <body data-page="output">
   <a class="output-skip" href="#conversion-startup">本文へ移動</a>
@@ -30,7 +31,8 @@
   <section id="conversion-startup" class="sc-startup" tabindex="-1" aria-labelledby="conversion-startup-title" aria-busy="true">
     <header class="sc-heading" data-conversion-heading><div><h1 id="conversion-startup-title">変換・出力</h1></div><span>端末内で処理</span></header>
     <div class="sc-startup-preview"><p id="conversion-startup-status" role="status" aria-live="polite">素材を追加できるよう準備しています…</p><p>ファイルは端末内で処理します。</p></div>
-    <div class="sc-startup-recovery"><a href="" data-conversion-reload>再読み込み</a><a href="/output/">使い方・対応形式</a></div>
+    <div class="sc-startup-recovery"><button type="button" data-conversion-basic hidden>基本画面で続ける</button><a href="" data-conversion-reload>再読み込み</a><a href="/output/">使い方・対応形式</a></div>
+    <details class="sc-startup-technical" data-conversion-technical hidden><summary>技術情報</summary><pre data-conversion-error></pre></details>
     <div class="sc-startup-save"><button type="button" disabled>準備中 · 保存</button></div>
     <noscript><p>変換にはJavaScriptが必要です。ブラウザーの設定を確認して再読み込みしてください。</p></noscript>
   </section>
@@ -194,7 +196,7 @@
     <input id="output-audio-replacement-input" type="file" accept="audio/*" hidden>
     <input id="output-scale" type="hidden" value="1">
   </template>
-  <script type="module" src="/js/creation/conversion-entry.mjs?rev=20261104-engine-boundaries-3" onerror="document.getElementById('conversion-startup').setAttribute('aria-busy','false');document.getElementById('conversion-startup-status').setAttribute('role','alert');document.getElementById('conversion-startup-status').textContent='出力画面を読み込めませんでした。通信を確認して再読み込みしてください。'"></script>
+  <script type="module" src="/js/creation/conversion-entry.mjs?rev=20261105-video-size-1" onerror="document.getElementById('conversion-startup').setAttribute('aria-busy','false');document.getElementById('conversion-startup-status').setAttribute('role','alert');document.getElementById('conversion-startup-status').textContent='出力画面を読み込めませんでした。通信を確認して再読み込みしてください。'"></script>
   <script type="module" src="/js/ads/output-side-ad.mjs?rev=20261020-side-ad-vertical-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
 </body>

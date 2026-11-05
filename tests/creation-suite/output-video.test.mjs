@@ -266,3 +266,28 @@ test('replacement audio waits until an imported video can actually play', async 
     assert.ok(harness.tracks.every(track => track.stopped));
   } finally { harness.restore(); }
 });
+
+test('explicit-size video keeps original frame order, audio loops and playback pitch', async () => {
+  const harness = createMediaHarness({ audio: true, duration: 0.06, deterministicAudioClock: true });
+  const frames = [10, 20].map(value => ({ width: 32, height: 16, delayMs: 25, data: new Uint8Array(32 * 16 * 4).fill(value) }));
+  const originalPixels = frames.map(item => Buffer.from(item.data));
+  let verified;
+  try {
+    const result = await renderOutputVideo(frames, {
+      outputSize: { width: 64, height: 32 }, audioSource: harness.audioSource, audioTotalPlays: 2, playbackRate: 1.5,
+      verifyVideoSize: async (_blob, expected) => { verified = expected; return expected; },
+      mimeChoice: { mimeType: 'video/webm', extension: 'webm' }, MediaRecorderImpl: harness.Recorder,
+      AudioContextImpl: harness.AudioContext, MediaStreamImpl: harness.Stream, documentRef: harness.documentRef,
+      requestFrame: callback => setTimeout(() => { harness.advanceAudioClock(0.012); callback(performance.now()); }, 12), cancelFrame: clearTimeout
+    });
+    assert.deepEqual(verified, { width: 64, height: 32 });
+    assert.equal(result.seconds, 0.12); assert.equal(result.hasAudio, true);
+    assert.equal(harness.audioNodes[0].loop, true); assert.equal(harness.audioNodes[0].playbackRate.value, 1);
+    assert.equal(harness.audioNodes[0].stopTime - harness.audioNodes[0].startTime, 0.12);
+    const transitions = harness.paintedPixels.filter((value, index, items) => index === 0 || value !== items[index - 1]);
+    assert.deepEqual(transitions.slice(0, 2), [10, 20]);
+    frames.forEach((item, index) => assert.deepEqual(Buffer.from(item.data), originalPixels[index]));
+    assert.deepEqual(frames.map(item => item.delayMs), [25, 25]);
+    assert.ok(harness.tracks.every(track => track.stopped));
+  } finally { harness.restore(); }
+});

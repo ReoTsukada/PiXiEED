@@ -56,7 +56,11 @@ test('output workspace signals only a clean empty start after its start panel is
   assert.match(output, entryImport);
   assert.match(output, /showStart\(\);\s*notifyToolEntryReady\(getToolStartRoute\(location\.pathname\)\?\.id === 'convert' && isFreshToolStartRequest\(location\.href, history\.state\)\);\s*return;/);
   assert.match(output, /setError\('出力IDが複数あります[^;]+; notifyToolEntryReady\(false\); return;/);
-  assert.match(output, /notifyToolEntryReady\(false\);\s*\}\s*catch \(error\) \{ setError\([^;]+; notifyToolEntryReady\(false\); \}/);
+  const hydrate = output.slice(output.indexOf('async function hydrateOutputRecord('), output.indexOf('async function mount()'));
+  assert.match(hydrate, /renderAssets\(\); updateSequenceControls\(\);[\s\S]*notifyToolEntryReady\(false\);\s*return true;/);
+  const mount = output.slice(output.indexOf('async function mount()'), output.indexOf('startChoose.addEventListener'));
+  assert.match(mount, /await readToolOutput\(params.get\('id'\)\);\s*await hydrateOutputRecord\(nextRecord\)/);
+  assert.match(mount, /catch \(error\) \{ setError\([^;]+; notifyToolEntryReady\(false\); \}/);
 });
 
 test('privacy disclosure describes a general tool-start entry without implying a new user step', async () => {

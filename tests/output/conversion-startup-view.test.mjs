@@ -10,14 +10,16 @@ function fixture() {
     prepend(child) { if (child.parent) child.parent.children.splice(child.parent.children.indexOf(child), 1); this.children.unshift(child); child.parent = this; },
     set innerHTML(value) { assert.fail('Startup errors must never use HTML injection'); },
   });
-  const main = node(), startup = node(), heading = node(), status = node();
-  startup.prepend(heading); startup.querySelector = () => heading;
+  const main = node(), startup = node(), heading = node(), status = node(), basic = node(), technical = node(), technicalText = node(), skip = node();
   const elements = { main, 'conversion-startup': startup, 'conversion-startup-status': status };
-  const doc = { body: node(), getElementById: id => elements[id] };
-  return { main, startup, heading, status, doc, view: createConversionStartupView(doc) };
+  startup.prepend(heading); startup.querySelector = () => heading;
+  const doc = { body: node(), getElementById: id => elements[id],
+    querySelector: selector => ({'[data-conversion-basic]':basic,'[data-conversion-technical]':technical,'[data-conversion-error]':technicalText,'.output-skip':skip})[selector] || null,
+    createElement: tag => Object.assign(node(),{tag}), };
+  return { main, startup, heading, status, basic, technical, technicalText, skip, doc, view: createConversionStartupView(doc) };
 }
 
-test('the real failure view quarantines partially moved controls and returns the authored heading', async () => {
+test('a failed UI mount remains quarantined and exposes no basic fallback', async () => {
   const f = fixture(), originalControl = { value: 'edited', original: true };
   f.main.children.push(originalControl);
   const result = await runConversionStartup({
@@ -33,11 +35,38 @@ test('the real failure view quarantines partially moved controls and returns the
   assert.equal(result.status, 'error'); assert.equal(result.stage, 'ui-mount');
   assert.equal(f.main.hidden, true); assert.equal(f.main.inert, true);
   assert.equal(f.startup.hidden, false); assert.equal(f.status.attributes.role, 'alert');
-  assert.equal(f.status.textContent, '<img src=x onerror=alert(1)>');
+  assert.match(f.status.textContent, /保存操作をせず/);
   assert.equal(f.startup.children[0], f.heading);
+  assert.equal(f.basic.hidden,true);
   assert.equal(f.main.children[0], originalControl); assert.equal(originalControl.value, 'edited');
   assert.equal(f.main.dataset.smartConversion, 'true', 'no misleading rollback of an adapter with attached listeners');
 });
+
+test('only a UI import failure offers an explicit basic-screen continuation with readable Japanese guidance', async () => {
+  const g=fixtureWithEvents();g.view.begin();g.view.fail(new Error('chunk failed'),{stage:'ui-import'});
+  assert.equal(g.main.hidden,true);assert.equal(g.main.inert,true);assert.equal(g.basic.hidden,false);
+  assert.match(g.status.textContent,/操作パネル/);assert.match(g.status.textContent,/保存/);
+  assert.equal(g.technical.hidden,false);
+  assert.equal(g.technical.open,false,'technical details remain closed until requested');
+  assert.equal(g.technicalText.textContent,'chunk failed');
+  assert.equal(g.basic.click(),true);
+  assert.equal(g.main.hidden,false);assert.equal(g.main.inert,false);assert.equal(g.startup.hidden,true);
+  assert.equal(g.doc.body.dataset.conversionStartup,'basic');
+  assert.match(g.main.children[1].textContent,/必要なファイルを保存/);
+  assert.equal(g.basic.click(),false,'the continuation is one-shot');
+});
+
+function fixtureWithEvents(){
+  const node=()=>({hidden:false,inert:false,dataset:{},attributes:{},children:[],listeners:{},
+    setAttribute(k,v){this.attributes[k]=v;},addEventListener(k,fn){this.listeners[k]=fn;},click(){return this.listeners.click?.() ?? false;},
+    prepend(child){if(child.parent)child.parent.children.splice(child.parent.children.indexOf(child),1);this.children.unshift(child);child.parent=this;},
+    insertBefore(child,ref){const i=this.children.indexOf(ref);this.children.splice(i<0?this.children.length:i,0,child);child.parent=this;},append(child){this.children.push(child);child.parent=this;},
+    get firstChild(){return this.children[0]||null;},set innerHTML(_value){assert.fail('No HTML injection');}});
+  const main=node(),startup=node(),heading=node(),status=node(),basic=node(),technical=node(),technicalText=node(),skip=node();technical.open=false;startup.prepend(heading);startup.querySelector=()=>heading;
+  const ids={main,'conversion-startup':startup,'conversion-startup-status':status};
+  const doc={body:node(),getElementById:id=>ids[id],querySelector:s=>({'[data-conversion-basic]':basic,'[data-conversion-technical]':technical,'[data-conversion-error]':technicalText,'.output-skip':skip})[s]||null,createElement:tag=>Object.assign(node(),{tag})};
+  return {main,startup,heading,status,basic,technical,technicalText,skip,doc,view:createConversionStartupView(doc)};
+}
 
 test('the ready view reveals only a completed workspace; native views retain a heading', () => {
   const f = fixture(); f.view.begin();
@@ -77,4 +106,11 @@ test('critical presentation styles exist before the entry script, with recovery 
   assert.match(activeHtml, /data-conversion-reload/);
   assert.match(activeHtml, /<noscript>/);
   assert.match(activeHtml, /conversion-entry\.mjs[^>]+onerror=/);
+});
+
+
+test('explicit reload uses location.reload so history-based recovery identity is retained',()=>{
+  let click,reloads=0,prevented=0;const f=fixture();const original=f.doc.querySelector;
+  f.doc.querySelector=selector=>selector==='[data-conversion-reload]'?{addEventListener:(_type,fn)=>{click=fn;}}:original(selector);
+  f.doc.defaultView={location:{reload:()=>{reloads++;}}};createConversionStartupView(f.doc);click({preventDefault:()=>{prevented++;}});assert.equal(prevented,1);assert.equal(reloads,1);
 });

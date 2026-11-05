@@ -31,9 +31,14 @@ const page = await context.newPage(); page.setDefaultTimeout(20000);
 page.on('pageerror', error => report.errors.push(error.message)); page.on('dialog', dialog => dialog.accept());
 async function open(path) {
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-  if (path.startsWith('/output/work/')) await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
+  if (path.startsWith('/output/work/')) await waitForWorkspaceReady();
+}
+async function waitForWorkspaceReady() {
+  await page.waitForFunction(() => document.body.dataset.conversionStartup === 'ready'
+    && document.querySelector('#main')?.dataset.smartConversion === 'true');
 }
 async function download(selector = '[data-download]') {
+  await waitForWorkspaceReady();
   const link = page.locator(selector);
   const hidden = await link.evaluate(node => node.hidden || Boolean(node.closest('[hidden]')) || getComputedStyle(node).display === 'none');
   const action = hidden ? page.locator('#output-nav-export') : link;
@@ -42,6 +47,23 @@ async function download(selector = '[data-download]') {
   assert.equal(await file.failure(), null); return { name: file.suggestedFilename(), bytes: await readFile(await file.path()) };
 }
 async function selectWorkspace(selector, value) {
+  await waitForWorkspaceReady();
+  const unifiedFormat = page.locator('[data-sc-unified-purpose]');
+  if (selector === '[data-sc-format]' && await unifiedFormat.count()) {
+    const expression=page.locator('[data-sc-unified-format]');
+    const sourceMode=await page.locator('#main').evaluate(node=>node.textConversion.snapshot().mode);
+    if(sourceMode==='input'){
+      await unifiedFormat.selectOption(value==='text'?'text':'restore');
+      if(value!=='text')await expression.selectOption(value);
+    }else if(['ascii','block','braille','emoji','custom'].includes(value)){
+      await expression.selectOption('text-art');await page.locator('[data-sc-unified-art-style]').waitFor({state:'visible'});await page.locator('[data-sc-unified-art-style]').selectOption(value);
+    }else if(['encode','pixels','base64','dataurl'].includes(value)){
+      const tools=page.locator('.sc-unified-code-tools');if(!await tools.evaluate(node=>node.open))await tools.locator('summary').click();
+      const open=page.locator('[data-sc-unified-code-open]');if(await open.isVisible())await open.click();
+      await page.locator('[data-sc-unified-code-format]').waitFor({state:'visible'});await page.locator('[data-sc-unified-code-format]').selectOption(value);
+    }else await expression.selectOption(value);
+    return;
+  }
   const panel=page.locator('#sc-settings-panel');
   if (await panel.count() && !(await panel.evaluate(node=>node.open))) await page.locator('[data-sc-settings-open]').click();
   await page.locator(selector).selectOption(value);
@@ -143,7 +165,7 @@ try {
   const signature = { qoi: [0, 'qoif'], tiff: [0, 'II'], ico: null, tga: null, ppm: [0, 'P6'], bmp: [0, 'BM'], aiff: [8, 'AIFF'], au: [0, '.snd'] };
   for (const [slug, target] of Object.entries({ qoi:'qoi', tga:'tga', tiff:'tiff', ico:'ico', netpbm:'ppm', bmp:'bmp', aiff:'aiff', au:'au' })) {
     await open(`/output/formats/${slug}/`); await page.locator('.format-intro [data-output-start]').click();
-    await page.locator('.convert-intent').waitFor({ state: 'visible' });
+    await page.locator('.convert-intent').waitFor({ state: 'visible' });await waitForWorkspaceReady();
     const audio = ['aiff','au'].includes(target);
     await page.locator('[data-file]').setInputFiles({ name: audio ? 'sample.aiff' : 'sample.png', mimeType: audio ? 'audio/aiff' : 'image/png', buffer: audio ? aiff : png });
     await page.waitForFunction(target => document.querySelector('[data-format]')?.value === target, target);

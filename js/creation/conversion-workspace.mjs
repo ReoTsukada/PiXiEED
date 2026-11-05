@@ -1,7 +1,7 @@
 import { createConversionReturnController } from './conversion-return-controller.mjs?rev=20261104-controllers-2';
 import { createNativeReturnBridge } from './conversion-return-bridge.mjs?rev=20261104-controllers-2';
 import { workspaceAvailableHeight, conversionDockBottom } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionStage } from './conversion-stage.mjs?rev=20261104-controllers-2';
+import { mountConversionStage } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { createConversionPreviewController } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
 
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
@@ -127,7 +127,11 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   views.querySelector('[data-sc-source-view]').addEventListener('click', () => applyPreviewState(previewController.selectInspect(false)));
   views.querySelector('[data-sc-result-view]').addEventListener('click', () => applyPreviewState(previewController.selectInspect(true)));
   function update({ media, loaded, ready, link, working = false, saveDisabled = false, status = '', progress, canCancel = false, saveLabel = '保存' }) {
-    open.disabled = false; panel.querySelector('[data-sc-settings-close]').disabled = false;
+    // Reflected boolean writes notify the workspace observer even when equal.
+    // A repeated enabled close button must not schedule another render forever.
+    if (open.disabled) open.disabled = false;
+    const close = panel.querySelector('[data-sc-settings-close]');
+    if (close.disabled) close.disabled = false;
     panelController.update(media);
     main.dataset.workspaceMedia = String(media);
     main.dataset.workspaceReady = String(media && ready);

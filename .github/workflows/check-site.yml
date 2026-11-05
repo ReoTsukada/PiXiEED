@@ -36,14 +36,17 @@ jobs:
           PIXIEED_BROWSER_ROOT: /tmp/pixieed-site-check
           PIXIEED_BROWSER_ARTIFACTS: /tmp/pixieed-output-browser
         run: |
-          node scripts/output-integration-browser-harness.mjs
-          node scripts/conversion-discovery-browser-harness.mjs
-          PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-output-browser/workspace node scripts/conversion-workspace-browser-harness.mjs
+          status=0
+          node scripts/output-integration-browser-harness.mjs || status=1
+          node scripts/conversion-discovery-browser-harness.mjs || status=1
+          PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-output-browser/workspace node scripts/conversion-workspace-browser-harness.mjs || status=1
+          exit "$status"
       - name: Retain browser verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: output-browser-verification
-          path: /tmp/pixieed-output-browser
+          # Keep functional reports; preview/test screenshots must stay off uploads.
+          path: /tmp/pixieed-output-browser/**/*.json
           if-no-files-found: ignore
           retention-days: 7

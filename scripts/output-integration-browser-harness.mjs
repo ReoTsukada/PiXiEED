@@ -40,6 +40,8 @@ page.setDefaultTimeout(20000);
 async function open(query = '?mode=convert&text=input') {
   await page.goto(base + '/output/work/' + query, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-text-tools]').waitFor({ state: 'attached' });
+  await page.waitForFunction(() => document.body.dataset.conversionStartup === 'ready'
+    && document.querySelector('#main')?.dataset.smartConversion === 'true');
 }
 async function selectMode(mode) {
   const source = page.locator('[data-sc-source]'), target = page.locator('[data-sc-target]');
@@ -49,6 +51,34 @@ async function selectMode(mode) {
   await page.waitForFunction(expected => document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode === expected, mode);
 }
 async function selectWorkspace(selector,value) {
+  const unified = page.locator('[data-sc-unified-purpose]');
+  if (await unified.count()) {
+    if (selector === '[data-sc-source]' || selector === '[data-sc-target]') {
+      await page.evaluate(({selector,value}) => {
+        const source=document.querySelector('[data-sc-source]'),target=document.querySelector('[data-sc-target]');
+        if(selector==='[data-sc-source]')source.value=value;else target.value=value;
+        const mode=source.value==='text'?'input':target.value==='text'?'output':'media';
+        document.querySelector('#main')?.textConversion?.setMode(mode);
+      },{selector,value});
+      await page.waitForFunction(({selector,value})=>document.querySelector(selector)?.value===value,{selector,value});
+      return;
+    }
+    if (selector === '[data-sc-format]') {
+      const expression=page.locator('[data-sc-unified-format]');
+      const sourceMode=await page.locator('#main').evaluate(node=>node.textConversion.snapshot().mode);
+      if(sourceMode==='input'){
+        await unified.selectOption(value==='text'?'text':'restore');
+        if(value!=='text')await expression.selectOption(value);
+      }else if(['ascii','block','braille','emoji','custom'].includes(value)){
+        await expression.selectOption('text-art');await page.locator('[data-sc-unified-art-style]').waitFor({state:'visible'});await page.locator('[data-sc-unified-art-style]').selectOption(value);
+      }else if(['encode','pixels','base64','dataurl'].includes(value)){
+        const tools=page.locator('.sc-unified-code-tools');if(!await tools.evaluate(node=>node.open))await tools.locator('summary').click();
+        const open=page.locator('[data-sc-unified-code-open]');if(await open.isVisible())await open.click();
+        await page.locator('[data-sc-unified-code-format]').waitFor({state:'visible'});await page.locator('[data-sc-unified-code-format]').selectOption(value);
+      }else await expression.selectOption(value);
+      return;
+    }
+  }
   const panel=page.locator('#sc-settings-panel');
   if (!(await panel.evaluate(node=>node.open))) await page.locator('[data-sc-settings-open]').click();
   const routeName = selector === '[data-sc-source]' ? 'sc-source-choice'
@@ -78,21 +108,25 @@ async function run(success = true) {
     await page.waitForFunction(() => ['ready', 'error'].includes(document.querySelector('[data-text-tools]')?.dataset.txLiveState));
     const state = await page.locator('[data-text-tools]').getAttribute('data-tx-live-state');
     assert.equal(state, success ? 'ready' : 'error');
-    if (success) assert.match(await page.locator('[data-tx-status]').innerText(), /プレビューを更新しました/);
+    if (success) assert.match(await page.locator('[data-tx-status]').textContent(), /プレビューを更新しました/);
     return null;
   }
   if (success) {
-    const previousStatus = await page.locator('[data-tx-status]').innerText();
+    // Native controls/status live in collapsed settings; visible Save has its own status.
+    const previousStatus = await page.locator('[data-tx-status]').textContent();
     const pendingDownload = exportFromVisibleAction();
     await page.waitForFunction(previous => {
       const root = document.querySelector('[data-text-tools]');
-      const status = document.querySelector('[data-tx-status]')?.innerText;
+      const status = document.querySelector('[data-tx-status]')?.textContent;
       return root?.getAttribute('aria-busy') === 'true' || (status && status !== previous);
     }, previousStatus);
     await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false'
-      && /完了しました/.test(document.querySelector('[data-tx-status]')?.innerText || ''));
-    assert.match(await page.locator('[data-tx-status]').innerText(), /完了しました/);
-    return pendingDownload;
+      && /完了しました/.test(document.querySelector('[data-tx-status]')?.textContent || ''));
+    assert.match(await page.locator('[data-tx-status]').textContent(), /完了しました/);
+    const saved = await pendingDownload;
+    await page.waitForFunction(() => /ダウンロードを開始しました/.test(document.querySelector('.sc-export-message')?.textContent || ''));
+    assert.equal(await page.locator('.sc-export-message').isVisible(), true);
+    return saved;
   }
   await page.locator('#output-nav-export').click();
   await page.waitForFunction(() => document.querySelector('[data-text-tools]')?.getAttribute('aria-busy') === 'false');
@@ -145,6 +179,7 @@ try {
   assert.match(code, /BEGIN PIXIEED RESTORE 1/);
   await selectMode('input');
   await page.locator('[data-tx-source]').fill('メモの前文\n' + code + '\nメモの後文');
+  await selectWorkspace('[data-sc-format]','restore');
   const restored = await run();
   assert.equal(restored.name, '原本.pxd'); assert.equal(hash(restored.bytes), hash(bytes));
   pass('Binary/PXD → TXT → restore preserves filename and every byte (SHA-256 match)');
@@ -152,13 +187,13 @@ try {
   const damaged = code.replace('ACVK', 'ASVK');
   assert.notEqual(damaged, code);
   await page.locator('[data-tx-source]').fill(damaged); await run(false);
-  assert.match(await page.locator('[data-tx-status]').innerText(), /検査に失敗/);
+  assert.match(await page.locator('[data-tx-status]').textContent(), /検査に失敗/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Corruption is rejected without discarding the last successful download');
   await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'too-large.pxd', mimeType: 'application/octet-stream', buffer: Buffer.alloc(16 * 1024 * 1024 + 1) });
   await run(false);
-  assert.match(await page.locator('[data-tx-status]').innerText(), /16MB/);
+  assert.match(await page.locator('[data-tx-status]').textContent(), /16MB/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Oversize input fails before encoding and preserves the previous result');
   await selectMode('input');
@@ -167,7 +202,7 @@ try {
   await selectWorkspace('[data-sc-format]','text');
   await page.evaluate(() => { document.querySelector('#output-nav-export').click(); document.querySelector('[data-tx-cancel]').click(); });
   await page.waitForFunction(() => document.querySelector('[data-text-tools]').getAttribute('aria-busy') === 'false');
-  assert.match(await page.locator('[data-tx-status]').innerText(), /中止しました/);
+  assert.match(await page.locator('[data-tx-status]').textContent(), /中止しました/);
   assert.equal(await page.locator('[data-tx-source]').inputValue(), cancelText);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Cancellation preserves the input and prior successful result');
@@ -211,6 +246,30 @@ try {
 } catch (error) {
   report.failure = error.stack;
   console.error(error);
+  report.failureState = await page.evaluate(() => ({
+    mode: document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode,
+    startup: document.body.dataset.conversionStartup,
+    startupError: document.querySelector('[data-conversion-error]')?.textContent,
+    originalLinks: [...document.querySelectorAll('a.convert-primary[download]')].map(node => ({ name: node.download, blob: node.getAttribute('href')?.startsWith('blob:'), hidden: Boolean(node.closest('[hidden]')) })),
+    busy: document.querySelector('[data-text-tools]')?.getAttribute('aria-busy'),
+    textStatus: document.querySelector('[data-tx-status]')?.textContent,
+    nativeStatusVisibleText: document.querySelector('[data-tx-status]')?.innerText,
+    saveStatus: document.querySelector('.sc-export-message')?.textContent,
+    textLength: document.querySelector('[data-tx-source]')?.value.length,
+    action: document.querySelector('[data-tx-action]')?.value,
+    nativeRunDisabled: document.querySelector('[data-tx-run]')?.disabled,
+    saveDisabled: document.querySelector('#output-nav-export')?.disabled,
+    resultState: document.querySelector('.sc-result-surface')?.dataset.state,
+    resultCurrent: document.querySelector('.sc-result-surface')?.dataset.current,
+    resultLink: Boolean(document.querySelector('[data-tx-download]')?.getAttribute('href')?.startsWith('blob:')),
+    purpose: document.querySelector('[data-sc-unified-purpose]')?.value,
+    format: document.querySelector('[data-sc-unified-format]')?.value,
+    recoveryStatus: document.querySelector('[data-sc-local-recovery-status]')?.textContent,
+    invalidFields: [...document.querySelectorAll('[data-text-tools] input,[data-text-tools] select,[data-text-tools] textarea')]
+      .filter(node => node.willValidate && !node.checkValidity())
+      .map(node => ({ id: node.id, attributes: [...node.attributes].filter(attr => attr.name.startsWith('data-tx-')).map(attr => attr.name), value: node.value }))
+  })).catch(() => null);
+  console.error('FAILURE_STATE', JSON.stringify(report.failureState));
   await page.screenshot({ path: output + '/failure.png', fullPage: true }).catch(() => {});
   process.exitCode = 1;
 } finally {

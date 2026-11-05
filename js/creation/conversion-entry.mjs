@@ -1,4 +1,4 @@
-import { createConversionStartupView } from './conversion-startup-view.mjs?rev=20261104-startup-1';
+import { createConversionStartupView } from './conversion-startup-view.mjs?rev=20261105-video-size-1';
 
 /** Output startup owns visibility; conversion engines continue to own media and storage. */
 const query = new URLSearchParams(location.search);
@@ -8,7 +8,7 @@ const view = createConversionStartupView(document);
 try { window.__PIXIEED_OFFERWALL_ENTRY__?.retire?.(); } catch { /* Optional site policy. */ }
 let result;
 try {
-  const { runConversionStartup } = await import('./conversion-startup.mjs?rev=20261104-startup-1');
+  const { runConversionStartup } = await import('./conversion-startup.mjs?rev=20261105-video-size-1');
   result = await runConversionStartup({
     view,
     native: window.top !== window.self,
@@ -20,21 +20,21 @@ try {
       if (!template) throw new Error('出力画面の構成を確認できませんでした。再読み込みしてください。');
       main.replaceChildren(template.content.cloneNode(true)); template.remove();
       if (query.has('id') || query.has('file')) {
-        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261104-engine-boundaries-3');
+        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261105-video-size-1');
         await mountSharedOutput(sharedOutputRequest(location.search));
       } else if (query.get('mode') === 'convert') {
-        const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261104-startup-1');
+        const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261105-video-size-1');
         mountConversionPage();
       } else {
-        const { outputPageReady } = await import('./output-page.mjs?rev=20261104-engine-boundaries-3');
+        const { outputPageReady } = await import('./output-page.mjs?rev=20261105-video-size-1');
         await outputPageReady;
       }
       const failure = main.querySelector('[role="alert"]');
       if (failure) throw new Error(failure.textContent || '端末内の出力を開けませんでした。');
     },
-    loadText: () => import('./text-tools.mjs?rev=20261104-engine-boundaries-3'),
+    loadText: () => import('./text-tools.mjs?rev=20261105-video-size-1'),
     loadIntent: () => import('./conversion-intent.mjs?rev=20261028-discovery-1'),
-    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261104-engine-boundaries-3'),
+    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261105-video-size-1'),
     onWarning(error) { console.warn('Optional conversion module unavailable; media conversion remains available.', error); },
   });
 } catch (error) { view.fail(error); }
