@@ -34,6 +34,13 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
   const previewSpace=await page.locator('.sc-result-surface').boundingBox();
   assert.ok(previewSpace&&previewSpace.height>=180,'the unified result area is visible and usable');
   assert.equal(await page.locator('.sc-material-strip').isVisible(), true);
+  // Returning from source comparison can still encode the newly edited size.
+  // Measure idle rendering only after that real asynchronous work has finished.
+  await page.waitForFunction(() => {
+    const main=document.querySelector('#main'),surface=main.querySelector('.sc-result-surface'),img=surface?.querySelector('.sc-result-content img');
+    return main.getAttribute('aria-busy')!=='true' && surface?.dataset.state==='ready' && surface.dataset.current==='true'
+      && !document.querySelector('#output-nav-export').disabled && img?.complete && img.naturalWidth>0;
+  });
   const idleMutations = await page.evaluate(async () => {
     let count = 0; const observer = new MutationObserver(records => { count += records.length; });
     observer.observe(document.querySelector('#main'), { subtree: true, attributes: true, attributeFilter: ['hidden','disabled'] });
