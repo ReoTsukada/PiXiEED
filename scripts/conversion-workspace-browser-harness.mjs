@@ -157,7 +157,12 @@ if(server.listening){
   await page.locator('[data-sc-unified-add]').waitFor({state:'visible'});await checkEmptyArea('detailed empty');
   await page.locator('[data-tx-source]').fill('detailed draft retained');
   await page.evaluate(()=>{window.__unifiedTextNode=document.querySelector('[data-tx-source]');});
-  const firstDetailChooser=page.waitForEvent('filechooser');await page.locator('[data-sc-unified-add]').click();await(await firstDetailChooser).setFiles({name:'two.png',mimeType:'image/png',buffer:png});
+  // A retained draft is already a material: additions now belong to the strip,
+  // while the empty-state entry must disappear rather than duplicate it.
+  await page.locator('[data-sc-unified-add]').waitFor({state:'hidden'});
+  await page.locator('[data-sc-material-add]').waitFor({state:'visible'});
+  const [firstDetailChooser]=await Promise.all([page.waitForEvent('filechooser'),page.locator('[data-sc-material-add]').click()]);
+  await firstDetailChooser.setFiles({name:'two.png',mimeType:'image/png',buffer:png});
   await page.waitForURL(url=>url.searchParams.has('id')&&url.searchParams.get('view')==='advanced');
   assert.equal(await page.locator('[data-tx-source]').inputValue(),'detailed draft retained');
   assert.equal(await page.evaluate(()=>window.__unifiedTextNode===document.querySelector('[data-tx-source]')),true);
