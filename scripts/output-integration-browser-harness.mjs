@@ -240,6 +240,26 @@ try {
 } catch (error) {
   report.failure = error.stack;
   console.error(error);
+  report.failureState = await page.evaluate(() => ({
+    mode: document.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode,
+    busy: document.querySelector('[data-text-tools]')?.getAttribute('aria-busy'),
+    textStatus: document.querySelector('[data-tx-status]')?.textContent,
+    saveStatus: document.querySelector('.sc-export-message')?.textContent,
+    textLength: document.querySelector('[data-tx-source]')?.value.length,
+    action: document.querySelector('[data-tx-action]')?.value,
+    nativeRunDisabled: document.querySelector('[data-tx-run]')?.disabled,
+    saveDisabled: document.querySelector('#output-nav-export')?.disabled,
+    resultState: document.querySelector('.sc-result-surface')?.dataset.state,
+    resultCurrent: document.querySelector('.sc-result-surface')?.dataset.current,
+    resultLink: Boolean(document.querySelector('[data-tx-download]')?.getAttribute('href')?.startsWith('blob:')),
+    purpose: document.querySelector('[data-sc-unified-purpose]')?.value,
+    format: document.querySelector('[data-sc-unified-format]')?.value,
+    recoveryStatus: document.querySelector('[data-sc-local-recovery-status]')?.textContent,
+    invalidFields: [...document.querySelectorAll('[data-text-tools] input,[data-text-tools] select,[data-text-tools] textarea')]
+      .filter(node => node.willValidate && !node.checkValidity())
+      .map(node => ({ id: node.id, attributes: [...node.attributes].filter(attr => attr.name.startsWith('data-tx-')).map(attr => attr.name), value: node.value }))
+  })).catch(() => null);
+  console.error('FAILURE_STATE', JSON.stringify(report.failureState));
   await page.screenshot({ path: output + '/failure.png', fullPage: true }).catch(() => {});
   process.exitCode = 1;
 } finally {
