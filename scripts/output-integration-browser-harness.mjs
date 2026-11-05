@@ -185,13 +185,13 @@ try {
   const damaged = code.replace('ACVK', 'ASVK');
   assert.notEqual(damaged, code);
   await page.locator('[data-tx-source]').fill(damaged); await run(false);
-  assert.match(await page.locator('[data-tx-status]').innerText(), /検査に失敗/);
+  assert.match(await page.locator('[data-tx-status]').textContent(), /検査に失敗/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Corruption is rejected without discarding the last successful download');
   await selectMode('output');
   await page.locator('[data-tx-file]').setInputFiles({ name: 'too-large.pxd', mimeType: 'application/octet-stream', buffer: Buffer.alloc(16 * 1024 * 1024 + 1) });
   await run(false);
-  assert.match(await page.locator('[data-tx-status]').innerText(), /16MB/);
+  assert.match(await page.locator('[data-tx-status]').textContent(), /16MB/);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Oversize input fails before encoding and preserves the previous result');
   await selectMode('input');
@@ -200,7 +200,7 @@ try {
   await selectWorkspace('[data-sc-format]','text');
   await page.evaluate(() => { document.querySelector('#output-nav-export').click(); document.querySelector('[data-tx-cancel]').click(); });
   await page.waitForFunction(() => document.querySelector('[data-text-tools]').getAttribute('aria-busy') === 'false');
-  assert.match(await page.locator('[data-tx-status]').innerText(), /中止しました/);
+  assert.match(await page.locator('[data-tx-status]').textContent(), /中止しました/);
   assert.equal(await page.locator('[data-tx-source]').inputValue(), cancelText);
   assert.equal(await page.locator('[data-tx-download]').getAttribute('href'), previous);
   pass('Cancellation preserves the input and prior successful result');
