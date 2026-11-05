@@ -53,6 +53,7 @@ test('actual mount shares one host, readonly preview has no download, and destro
  let renders=0;const blob=new Blob(['png']);
  f.api.update({mode:'media',key:'a',loaded:true,ready:false,working:false,capability:{supported:true,automatic:true},api:{previewOutput:async()=>{renders++;return{blob,filename:'a.png'};}}});
  await f.tick();assert.equal(renders,1);assert.equal(actual.dataset.current,'true');assert.match(actual.querySelector('img').src,/^blob:/);
+ assert.equal(actual.querySelector('[data-result-refresh]').hidden,true,'a current automatic preview needs no extra refresh action');
  f.api.invalidate();assert.equal(actual.dataset.current,'false');assert.match(actual.querySelector('[data-result-state]').textContent,/中止|前回/);
  f.api.destroy();assert.equal(f.card.parentNode,f.layout);assert.equal(f.legacy.parentNode,f.main);assert.equal(f.summary.parentNode,f.surface);assert.ok(f.revoked.length>0);assert.equal(f.main.dataset.unifiedResult,undefined);
 });

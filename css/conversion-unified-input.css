@@ -31,6 +31,7 @@
   color: #263b30; font: 16px/1.5 system-ui,sans-serif; resize: vertical; overflow: auto;
 }
 .sc-unified-text .tx-input-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+[data-unified-input="true"] .sc-unified-composer[data-source="file"] .sc-unified-text:has(textarea:placeholder-shown) .tx-input-meta { display: none; }
 .sc-unified-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: end; gap: 8px; }
 .sc-unified-controls label { display: grid; min-width: 0; gap: 4px; font: 700 12px/1.4 system-ui,sans-serif; }
 .sc-unified-controls select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid #b4c5b6; border-radius: 10px; background: #fffefa; color: #263b30; font: 16px system-ui,sans-serif; }
@@ -164,6 +165,14 @@
 [data-unified-result="true"][data-result-source="false"] .sc-result-surface :is(.convert-workbench,.output-layout) { height: auto; min-height: 0; }
 [data-unified-result="true"] .sc-result-surface .sc-material-surface { height: auto; min-height: 0; }
 [data-unified-result="true"] .sc-result-surface > .sc-preview-summary { padding: 0; }
+[data-unified-result="true"] .sc-result-surface > .sc-preview-summary { order: 0; }
+[data-unified-result="true"] .sc-result-surface > .sc-result-operations { order: 1; }
+[data-unified-result="true"] .sc-result-surface > .sc-result-operations:not(:has(> button:not([hidden]))) { display: none; }
+[data-unified-result="true"] .sc-result-surface > .sc-result-content { order: 2; }
+[data-unified-result="true"] .sc-result-surface > header { order: 3; }
+[data-unified-result="true"] .sc-result-surface > [data-result-state] { order: 4; }
+[data-unified-result="true"] .sc-result-surface > .tx-result-card { order: 5; }
+[data-unified-result="true"] .sc-result-surface > .text-legacy { order: 6; }
 [data-unified-result="true"] .sc-result-surface .sc-setting-chips { flex: none; }
 [data-unified-result="true"][data-workspace-media="true"] { grid-template-rows: auto auto minmax(0,1fr); }
 [data-unified-result="true"][data-result-mode="media"][data-result-source="false"] .sc-result-surface[data-state="empty"] { min-height: 0; padding: 0; border: 0; background: transparent; }

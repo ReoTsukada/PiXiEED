@@ -75,6 +75,16 @@ export async function checkConversionMaterialStage({ page, png, pass }) {
   await page.waitForFunction(() => document.querySelector('#main').getAttribute('aria-busy') !== 'true');
   assert.deepEqual((await materialState()).assets.map(a => a.id), ids, 'invalid input preserves previous sources');
   assert.equal(await page.locator('[data-width]').inputValue(), '20');
+  if (unified) {
+    // Failed originals remain in the ordered input ledger until the user explicitly holds them.
+    const receipt=page.locator('.sc-input-receipts li').filter({has:page.locator('[data-receipt-name]',{hasText:'broken.bmp'})});
+    await receipt.locator('[data-receipt-hold]').waitFor({state:'visible'});
+    const originalHref=await receipt.locator('[data-receipt-original]').getAttribute('href');assert.ok(originalHref?.startsWith('blob:'));
+    await receipt.locator('[data-receipt-hold]').click();await receipt.locator('[data-receipt-hold]').waitFor({state:'hidden'});
+    assert.equal(await receipt.locator('[data-receipt-original]').getAttribute('href'),originalHref,'holding an invalid file retains its original bytes');
+    assert.deepEqual((await materialState()).assets.map(a=>a.id),ids,'holding a failed input leaves native materials untouched');
+    const receipts=page.locator('.sc-input-receipts');if(await receipts.evaluate(node=>node.open))await receipts.locator('summary').click();
+  }
   await choose(addSelector, file('retry.png')); await count(3);
   const beforeUnselectedRemoval = await materialState();
   assert.notEqual(beforeUnselectedRemoval.assets.at(-1).id, beforeUnselectedRemoval.activeId, 'remove a material other than the active preview');

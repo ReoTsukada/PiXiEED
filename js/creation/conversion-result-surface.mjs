@@ -121,7 +121,7 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
     if(current.capability?.notice&&(p.current||comparing))description+=' '+current.capability.notice;
     set(message,'textContent',p.state==='empty'?'素材を追加すると、選択した出力形式のプレビューをここに表示します。':description);
     const queueWorking = ['queued','rendering'].includes(q.state);
-    set(refresh,'hidden',!current.loaded || comparing || (current.mode==='media' ? !current.capability?.supported || (current.ready && !current.working) : current.working));
+    set(refresh,'hidden',!current.loaded || comparing || (current.mode==='media' ? !current.capability?.supported || (current.ready && !current.working) || (p.current && current.capability?.automatic) : current.working));
     set(refresh,'disabled',current.working || queueWorking);
     set(cancel,'hidden',comparing || (current.mode==='media'?!queueWorking:!current.working));
     for (const tag of ['audio','video']) if (content.hidden) content.querySelector(tag).pause?.();
