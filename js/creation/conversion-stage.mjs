@@ -117,6 +117,9 @@ export function mountConversionStage({ main, toolbar, panel, showSettings, doc =
   list.setAttribute('role', 'list'); list.setAttribute('aria-label', '入力素材。出力項目とは別です');
   const addSlot = doc.createElement('div'); addSlot.className = 'sc-material-add-slot'; addSlot.setAttribute('role', 'listitem');
   const addButton = doc.createElement('button'); addButton.type = 'button'; addButton.dataset.scMaterialAdd = ''; addButton.textContent = '＋ 素材を追加'; addSlot.append(addButton);
+  // Unified input mounts before the first update and must adopt this same slot.
+  // Deferring insertion until renderList would strand text-only input without add.
+  list.append(addSlot);
   const summary = doc.createElement('div'); summary.className = 'sc-preview-summary';
   summary.setAttribute('aria-label', '保存するファイル');
   summary.innerHTML = '<strong class="sc-output-group-title">保存するファイル</strong><div class="sc-size-control"><span>出力サイズ</span><button type="button" data-sc-size-edit aria-label="出力サイズを編集">サイズを編集</button><button type="button" data-size-reset data-setting-chip="size" data-reset-setting="true" hidden>元のサイズ</button></div><p data-sc-output-bytes>保存容量は生成後に確定</p><p data-sc-preview-kind></p><p id="sc-stage-warning" data-sc-stage-warning role="status" hidden></p>';
