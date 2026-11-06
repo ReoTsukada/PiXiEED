@@ -102,6 +102,21 @@ test('stroke tracker records sparse before/after edits, commits undo/redo, and c
   assert.throws(() => commitDrawStroke(document, history, cancelled), /tracker/);
 });
 
+test('animation toolbar uses centered SVG icons for known actions and keeps accessible names', () => {
+  const doc = new FakeDocument(); const host = doc.createElement('div'); host.id = 'draw-animation-controls'; const scope = fakeScope();
+  const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [{ id: 'l1', name: 'Layer 1', visible: true, locked: false }], frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false };
+  const ui = mountAnimationControls({ host, scope, getState: () => state, onAction() {} });
+  const root = host.children[0];
+  for (const [action, label] of [['previous-frame', '前のコマ'], ['next-frame', '次のコマ'], ['add-frame', 'コマを複製して追加'], ['toggle-duration', '選択コマのFPS'], ['toggle-layers', 'レイヤー'], ['play', '再生'], ['onion', 'オニオンスキン'], ['export-gif', 'GIFを書き出す']]) {
+    const control = root.querySelector(`[data-action="${action}"]`);
+    assert.ok(control, `${action} is present`);
+    assert.equal(control.children[0]?.tagName, 'SVG', `${action} uses an SVG icon`);
+    assert.equal(control.getAttribute('aria-label'), label, `${action} retains its accessible name`);
+    assert.equal(control.title, label, `${action} retains its tooltip`);
+  }
+  ui.dispose();
+});
+
 test('flood fill can reuse a validated-sized Uint32 queue', () => {
   const document = createDrawDocument(16); const queue = new Uint32Array(16 * 16);
   const changed = floodFill(document, 0, 0, 1, { queue });

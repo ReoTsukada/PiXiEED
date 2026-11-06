@@ -12,13 +12,13 @@ import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { audioHslToHex, replaceAudioSourceColor } from './audio-color-edit.mjs?rev=20261016-color-capability-1';
 import { createPxdProject } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261024-common-tool-start-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261106-button-icon-audit-1';
 import { pxdImageRoles, putPxdImage, readPxdImage, readPxdSharedImage, putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertPxdAudioPixelCompatibility, assignPxdAudioColor, audioCellLink, audioSongImage, detachPxdAudioImage, prepareSharedAudioImageImport, pxdImageToAudioDocument, readPxdAudioLink, readPxdAudioState, resizePxdAudioWorkingImage, setSharedAudioCell, validatePxdAudioBinding, writePxdAudioState } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, animationNeedsRgba, composeAnimationFrameRgba, createAnimationFromDraw, getAnimationCelDocument, getAnimationDrawRewardBonusColors, moveAnimationFrame, removeAnimationFrame, removeAnimationLayer, setAnimationPalette, setAnimationDrawRewardBonusColors, setLayerProperties, writeAnimationCel } from './animation-core.mjs?rev=20261016-color-capability-1';
 import { composeMusicProjectionFrame } from './draw-music-core.mjs?rev=20261016-tool-shell-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-draw-search-rail-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261106-button-icon-audit-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
 import { AUDIO_ANIMATION_LINK_VERSION, AUDIO_ANIMATION_MAX_COLORS, audioAnimationFrameTicks, audioAnimationCellTiming, audioAnimationSequenceColumn, createAudioAnimationLink, getAudioAnimationCellPitch, getAudioAnimationRowPitchMap, getAudioAnimationColorCount, prepareAudioAnimationImport, setAudioAnimationColorMapping, setAudioAnimationPixel, validateAudioAnimationBinding } from './audio-animation.mjs?rev=20261016-color-capability-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';

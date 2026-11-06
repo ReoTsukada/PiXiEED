@@ -54,9 +54,21 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     while (parent.children.length > desired.length) parent.removeChild(parent.children[parent.children.length - 1]);
   }
   const button = (label, glyph, action, className = '') => {
-    const element = node('button', `animation-controls__button ${className}`.trim(), glyph);
+    const element = node('button', `animation-controls__button ${className}`.trim());
     element.type = 'button'; element.title = label; element.setAttribute('aria-label', label);
     if (action) element.dataset.action = action;
+    const iconName = ({
+      'toggle-frames': 'frames', 'previous-frame': 'left', 'next-frame': 'right', 'add-frame': 'copy-add',
+      'toggle-duration': 'clock', 'toggle-layers': 'layers', play: 'play', onion: 'eye',
+      'export-gif': 'download', 'close-layers': 'close', 'selected-layer-settings': 'settings',
+      'add-layer': 'layer-add', 'close-duration': 'close', 'close-opacity-popover': 'close',
+      'close-animation': 'close', 'close-frame-menu': 'close', 'desktop-blank-frame': 'blank-frame',
+      'desktop-add-frame': 'copy-add', 'desktop-delete-frame': 'trash',
+      'desktop-move-frame-left': 'left', 'desktop-move-frame-right': 'right',
+      'move-layer-up': 'up', 'move-layer-down': 'down', 'delete-layer': 'trash', visibility: 'eye'
+    })[action];
+    if (iconName) { replaceButtonIcon(element, iconName); element.dataset.iconName = iconName; }
+    else if (glyph) element.textContent = glyph;
     return element;
   };
   const icon = (name) => {
@@ -87,6 +99,41 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       add('rect', { ...stroke, x: '13', y: '4', width: '7', height: '7', rx: '1' });
       add('rect', { ...stroke, x: '4', y: '13', width: '7', height: '7', rx: '1' });
       add('rect', { ...stroke, x: '13', y: '13', width: '7', height: '7', rx: '1' });
+    } else if (name === 'left' || name === 'right') {
+      add('path', { ...stroke, d: name === 'left' ? 'm14 6-6 6 6 6' : 'm10 6 6 6-6 6' });
+    } else if (name === 'up' || name === 'down') {
+      add('path', { ...stroke, d: name === 'up' ? 'm6 14 6-6 6 6' : 'm6 10 6 6 6-6' });
+    } else if (name === 'copy-add') {
+      add('rect', { ...stroke, x: '5', y: '5', width: '12', height: '14', rx: '2' });
+      add('path', { ...stroke, d: 'M9 3h9a2 2 0 0 1 2 2v11M11 12h6M14 9v6' });
+    } else if (name === 'clock') {
+      add('circle', { ...stroke, cx: '12', cy: '12', r: '8.5' });
+      add('path', { ...stroke, d: 'M12 7v5l3 2' });
+    } else if (name === 'layers') {
+      add('path', { ...stroke, d: 'm12 4 8 4-8 4-8-4 8-4ZM4 12l8 4 8-4M4 16l8 4 8-4' });
+    } else if (name === 'layer-add') {
+      add('path', { ...stroke, d: 'm12 4 8 4-8 4-8-4 8-4ZM4 12l8 4 8-4M12 13v8M8 17h8' });
+    } else if (name === 'download') {
+      add('path', { ...stroke, d: 'M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4' });
+    } else if (name === 'close') {
+      add('path', { ...stroke, d: 'm6 6 12 12M18 6 6 18' });
+    } else if (name === 'settings') {
+      add('circle', { ...stroke, cx: '12', cy: '12', r: '3' });
+      add('path', { ...stroke, d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.6 2.8-.2-.1a1.7 1.7 0 0 0-1.9.3l-.1.1h-3.2l-.1-.2a1.7 1.7 0 0 0-1.6-1.1 1.7 1.7 0 0 0-.8.2l-.2.1-2.8-1.6.1-.2a1.7 1.7 0 0 0-.3-1.9l-.1-.1v-3.2l.2-.1a1.7 1.7 0 0 0 1.1-1.6 1.7 1.7 0 0 0-.2-.8l-.1-.2 1.6-2.8.2.1a1.7 1.7 0 0 0 1.9-.3l.1-.1h3.2l.1.2a1.7 1.7 0 0 0 1.6 1.1 1.7 1.7 0 0 0 .8-.2l.2-.1 2.8 1.6-.1.2a1.7 1.7 0 0 0 .3 1.9l.1.1v3.2l-.2.1' });
+    } else if (name === 'blank-frame') {
+      add('rect', { ...stroke, x: '4', y: '4', width: '16', height: '16', rx: '2' });
+      add('path', { ...stroke, d: 'M8 9h8M8 12h8M8 15h5' });
+    } else if (name === 'trash') {
+      add('path', { ...stroke, d: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m3 3v7m6-7v7' });
+    } else if (name === 'eye') {
+      add('path', { ...stroke, d: 'M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z' });
+      add('circle', { ...stroke, cx: '12', cy: '12', r: '2.5' });
+    } else if (name === 'eye-hidden') {
+      add('path', { ...stroke, d: 'M3 3l18 18M10.6 6.2A10 10 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-3 3.6M6.2 6.2C3.8 7.7 2.5 12 2.5 12s3.5 6 9.5 6a9 9 0 0 0 3-.5' });
+      add('path', { ...stroke, d: 'M9.9 9.9a3 3 0 0 0 4.2 4.2' });
+    } else if (name === 'onion') {
+      add('circle', { ...stroke, cx: '12', cy: '12', r: '8' });
+      add('circle', { ...stroke, cx: '12', cy: '12', r: '4' });
     }
     return svg;
   };
@@ -673,7 +720,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         opacityPopoverInput.value = String(layerOpacity);
         setText(opacityPopoverValue, `${Math.round(layerOpacity * 100)}%`);
       }
-      const eyeLabel = layer.visible === false ? 'レイヤーを表示' : 'レイヤーを隠す'; setAttr(eye, 'aria-label', eyeLabel); setText(eye, layer.visible === false ? '○' : '◉'); setAttr(eye, 'aria-pressed', layer.visible !== false);
+      const eyeLabel = layer.visible === false ? 'レイヤーを表示' : 'レイヤーを隠す'; setAttr(eye, 'aria-label', eyeLabel); setAttr(eye, 'title', eyeLabel);
+      const eyeIcon = layer.visible === false ? 'eye-hidden' : 'eye'; if (eye.dataset.iconName !== eyeIcon) { replaceButtonIcon(eye, eyeIcon); eye.dataset.iconName = eyeIcon; }
+      setAttr(eye, 'aria-pressed', layer.visible !== false);
       const lockLabel = layer.locked ? 'レイヤーのロックを解除' : 'レイヤーをロック'; setAttr(lock, 'aria-label', lockLabel); const lockIcon = layer.locked ? 'locked' : 'unlocked'; if (lock.dataset.iconName !== lockIcon) { replaceButtonIcon(lock, lockIcon); lock.dataset.iconName = lockIcon; } setAttr(lock, 'aria-pressed', Boolean(layer.locked));
       setBoolean(rename, 'disabled', disabled || musicLayer || Boolean(layer.locked));
       setBoolean(opacity, 'disabled', disabled || musicLayer || Boolean(layer.locked));
@@ -925,6 +974,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     const add = (label, glyph, command, disabled = false) => {
       const control = button(label, glyph, 'frame-menu', 'animation-controls__context-action');
+      const iconName = ({ duplicate: 'copy-add', blank: 'blank-frame', left: 'left', right: 'right', duration: 'clock', onion: 'onion', delete: 'trash', visibility: 'eye', lock: 'locked', rename: 'check', 'delete-layer': 'trash' })[command];
+      if (iconName) { replaceButtonIcon(control, iconName); control.dataset.iconName = iconName; }
       control.dataset.frameMenuAction = command; control.disabled = disabled;
       control.append(node('span', 'animation-controls__context-label', label)); frameMenu.append(control); return control;
     };
@@ -944,7 +995,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const layer = state.layers.find((item) => item.id === id); if (!layer) return;
       frameMenu.setAttribute('aria-label', `${layer.name || 'レイヤー'}の操作`);
       const musicLayer = layer.role === 'music';
-      add(layer.visible === false ? '表示する' : '隠す', layer.visible === false ? '○' : '◉', 'visibility', state.readOnly || pending > 0);
+      const visibility = add(layer.visible === false ? '表示する' : '隠す', layer.visible === false ? '○' : '◉', 'visibility', state.readOnly || pending > 0);
+      replaceButtonIcon(visibility, layer.visible === false ? 'eye-hidden' : 'eye');
       const lock = add(layer.locked ? 'ロック解除' : 'ロック', '', 'lock', state.readOnly || pending > 0);
       replaceButtonIcon(lock, layer.locked ? 'unlocked' : 'locked');
       lock.append(node('span', 'animation-controls__context-label', layer.locked ? 'ロック解除' : 'ロック'));

@@ -11,7 +11,7 @@ import { ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame,
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261016-color-capability-1';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261019-draw-search-rail-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261106-button-icon-audit-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
@@ -19,7 +19,7 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261024-common-tool-start-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261106-button-icon-audit-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
@@ -33,7 +33,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261024-context-controls-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
@@ -44,7 +44,7 @@ import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=202
 import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261016-color-capability-1';
 import { resizeDrawView } from './draw-resize-view.mjs?rev=20261016-color-capability-1';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
-import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261016-tool-shell-1';
+import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261106-button-icon-audit-1';
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261017-layer-minimum-1';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
@@ -691,31 +691,42 @@ function renderPalette() {
 }
 function renderAudioPaletteIcon(button, index, color) {
   if (index < 0) {
-    button.classList.remove('draw-color--audio-assigned'); button.dataset.musicAssigned = 'false';
+    button.classList.remove('draw-color--audio-assigned');
+    if (button.dataset.musicAssigned !== 'false') button.dataset.musicAssigned = 'false';
     button.querySelector('.draw-audio-instrument-icon')?.remove();
-    button.setAttribute('aria-label', '透明色'); button.title = '透明色'; return;
+    if (button.getAttribute('aria-label') !== '透明色') button.setAttribute('aria-label', '透明色');
+    if (button.title !== '透明色') button.title = '透明色'; return;
   }
   const instrumentId = audioTimbreApi?.getAssignment?.(index, color) || null;
   button.classList.toggle('draw-color--audio-assigned', Boolean(instrumentId));
-  button.dataset.musicAssigned = String(Boolean(instrumentId));
+  const assigned = String(Boolean(instrumentId));
+  if (button.dataset.musicAssigned !== assigned) button.dataset.musicAssigned = assigned;
   const existing = button.querySelector('.draw-audio-instrument-icon');
   if (!instrumentId) {
     existing?.remove();
     if (audioTimbreApi) {
       const label = `色 ${index + 1}・未割当。音色タブで設定できます`;
-      button.setAttribute('aria-label', label); button.title = label;
+      if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label);
+      if (button.title !== label) button.title = label;
     } else {
-      button.setAttribute('aria-label', `色 ${index + 1}`); button.title = `色 ${index + 1}`;
+      const label = `色 ${index + 1}`;
+      if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label);
+      if (button.title !== label) button.title = label;
     }
     return;
   }
   const icon = getAudioInstrumentIcon(instrumentId);
   const image = existing || document.createElement('img');
-  image.className = 'draw-audio-instrument-icon'; image.src = icon.url; image.alt = ''; image.setAttribute('aria-hidden', 'true');
-  image.dataset.instrument = instrumentId;
-  image.style.filter = audioInstrumentIconFilter(String(color || '').slice(0, 7));
+  if (image.className !== 'draw-audio-instrument-icon') image.className = 'draw-audio-instrument-icon';
+  if (image.getAttribute('src') !== icon.url) image.setAttribute('src', icon.url);
+  if (image.alt !== '') image.alt = '';
+  if (image.getAttribute('aria-hidden') !== 'true') image.setAttribute('aria-hidden', 'true');
+  if (image.dataset.instrument !== instrumentId) image.dataset.instrument = instrumentId;
+  const filter = audioInstrumentIconFilter(String(color || '').slice(0, 7));
+  if (image.style.filter !== filter) image.style.filter = filter;
   const label = `色 ${index + 1}・${icon.name}`;
-  button.setAttribute('aria-label', label); button.title = label;
+  if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label);
+  if (button.title !== label) button.title = label;
   if (!existing) button.append(image);
 }
 // ---- changing a colour: hue / vividness / lightness sliders and a few quick colours; one undo step per edit ----
@@ -1989,6 +2000,20 @@ canvas.addEventListener('dblclick', (event) => { if (tool === 'picker' || tool =
 const drawClearButton = $('#draw-clear');
 drawClearButton.setAttribute('aria-haspopup', 'dialog');
 let drawClearDialog = null;
+function decorateDialogAction(button, name, label) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '20'); svg.setAttribute('height', '20'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  const specs = {
+    cancel: 'M6 6 18 18M18 6 6 18', confirm: 'm5 12 4 4L19 6', delete: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m3 3v7m6-7v7',
+    image: 'M4 5h16v14H4zM8 14l3-3 5 5m-3-2 2-2 3 3M8 9h.01', audio: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm12-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z', draw: 'm4 16 9-9 4 4-9 9H4zm8-8 4 4m1-8 1.5-1.5a2.1 2.1 0 0 1 3 3L20 7'
+  };
+  path.setAttribute('d', specs[name]); path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '2'); path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round'); svg.append(path);
+  const caption = document.createElement('span'); caption.textContent = label;
+  button.replaceChildren(svg, caption); button.setAttribute('aria-label', label); button.title = label;
+  button.style.display = 'inline-flex'; button.style.alignItems = 'center'; button.style.justifyContent = 'center'; button.style.gap = '7px';
+  svg.style.display = 'block'; svg.style.flexShrink = '0';
+}
 function openDrawClearConfirmation() {
   if (drawClearDialog?.open) return;
   if (!drawClearDialog) {
@@ -2006,12 +2031,12 @@ function openDrawClearConfirmation() {
     actions.className = 'project-sheet__actions';
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.textContent = 'キャンセル';
+    decorateDialogAction(cancel, 'cancel', 'キャンセル');
     cancel.autofocus = true;
     const confirm = document.createElement('button');
     confirm.type = 'button';
     confirm.id = 'draw-clear-confirm';
-    confirm.textContent = '消去する';
+    decorateDialogAction(confirm, 'delete', '消去する');
     actions.append(cancel, confirm);
     dialog.append(title, copy, actions);
     document.body.append(dialog);
@@ -2488,7 +2513,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261024-free-tools-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261106-button-icon-audit-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -2763,8 +2788,8 @@ async function chooseProjectRole(project, roles) {
     const finish = role => { if (settled) return; settled = true; dialog.close(); dialog.remove(); role ? resolve(role) : reject(new Error('画像の選択を取り消しました。作品は保持しています。')); };
     scope.add(() => finish(null));
     if (scope.disposed) return;
-    for (const role of roles) { const button = document.createElement('button'); button.type = 'button'; button.textContent = ({ main: '共通画像', audio: '音楽の画像', draw: '描画の画像' })[role] || role; button.dataset.imageRole = role; button.addEventListener('click', () => finish(role)); dialog.append(button); }
-    const cancel = document.createElement('button'); cancel.textContent = '取消'; cancel.addEventListener('click', () => finish(null)); dialog.append(cancel);
+    for (const role of roles) { const button = document.createElement('button'); button.type = 'button'; const label = ({ main: '共通画像', audio: '音楽の画像', draw: '描画の画像' })[role] || role; decorateDialogAction(button, role === 'audio' ? 'audio' : role === 'draw' ? 'draw' : 'image', label); button.dataset.imageRole = role; button.addEventListener('click', () => finish(role)); dialog.append(button); }
+    const cancel = document.createElement('button'); decorateDialogAction(cancel, 'cancel', '取消'); cancel.addEventListener('click', () => finish(null)); dialog.append(cancel);
     dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); }); document.body.append(dialog); dialog.showModal();
   });
 }

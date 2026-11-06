@@ -55,7 +55,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261024-context-controls-1&icon=20261102-numeric-transform-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261106-button-icon-audit-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
@@ -100,7 +100,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   <div class="draw-desktop-resizer" data-layout-separator="rightWidth" role="separator" tabindex="0" aria-label="色・レイヤー欄の幅を変更" aria-orientation="vertical" aria-controls="draw-desktop-dock"></div>
   <aside class="draw-desktop-dock" id="draw-desktop-dock" data-desktop-lane="dock"><section class="draw-desktop-palette-panel" id="draw-desktop-palette"><h2>色</h2><div class="draw-desktop-palette-host"></div></section><div class="draw-desktop-resizer draw-desktop-resizer--inside" data-layout-separator="paletteHeight" role="separator" tabindex="0" aria-label="パレットとレイヤーの高さを変更" aria-orientation="horizontal" aria-controls="draw-desktop-palette"></div><section class="draw-desktop-layers-panel"><h2>レイヤー</h2><div class="draw-desktop-layer-host"></div></section></aside>
   <div class="draw-desktop-resizer draw-desktop-resizer--frame" data-layout-separator="frameHeight" role="separator" tabindex="0" aria-label="コマ欄の高さを変更" aria-orientation="horizontal" aria-controls="draw-desktop-frames"></div>
-  <section class="draw-desktop-frame-panel" data-desktop-lane="frames"><div class="draw-desktop-frame-heading"><h2>コマ</h2><button type="button" data-layout-reset aria-label="PCレイアウトを初期値に戻す">初期レイアウト</button></div><div class="draw-desktop-frame-host" id="draw-desktop-frames"></div></section>`;
+  <section class="draw-desktop-frame-panel" data-desktop-lane="frames"><div class="draw-desktop-frame-heading"><h2>コマ</h2><button type="button" data-layout-reset aria-label="PCレイアウトを初期値に戻す" title="PCレイアウトを初期値に戻す"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7v5h5M5.5 11A7 7 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>初期レイアウト</span></button></div><div class="draw-desktop-frame-host" id="draw-desktop-frames"></div></section>`;
   root.append(shell);
   const $ = selector => shell.querySelector(selector);
   const modeNodes = new Map();

@@ -7,6 +7,14 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
   const root = new URL('../../', import.meta.url);
   const revisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
   const currentModeIcon = new Set(['js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
+  const modeClarity = new Set([...currentModeIcon, 'js/creation/creation-camera.mjs', 'css/creation-modes.css']);
+  const buttonIconAudit = new Set([
+    'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs', 'js/creation/animation-controls.mjs', 'js/creation/draw-page.mjs',
+    'js/creation/draw-desktop-ui.mjs', 'js/creation/draw-audio-timbre-panel.mjs', 'js/creation/draw-music.mjs',
+    'js/creation/project-workspace.mjs', 'js/creation/tool-project-import.mjs',
+    'css/creation-editor.css', 'css/creation-animation.css', 'css/draw-audio-timbre-panel.css', 'css/draw-desktop-ui.css', 'css/draw-tool-picker.css'
+  ]);
+  const paletteNoop = new Set(['js/creation/draw-page.mjs']);
   const contextualControls = new Set([
     'js/creation/draw-page.mjs', 'js/creation/draw-desktop-ui.mjs', 'js/creation/draw-brush-settings.mjs',
     'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs',
@@ -52,7 +60,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
     'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
   ]);
-  for (const target of allToolsOfferwall) assert.equal(revisions[target], target === 'js/creation/output-page.mjs' ? '20261101-direct-material-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
+  for (const target of allToolsOfferwall) assert.equal(revisions[target], buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261101-direct-material-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
@@ -97,7 +105,9 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (commonToolStart.has(target)) assert.equal(revisions[target], '20261024-common-tool-start-1', `${target} invalidates the common tool-start dependency closure`);
+      if (buttonIconAudit.has(target) || modeClarity.has(target)) assert.equal(revisions[target], '20261106-button-icon-audit-1', `${target} invalidates the icon audit dependency closure`);
+      else if (paletteNoop.has(target)) assert.equal(revisions[target], '20261106-audio-palette-noop-1', `${target} invalidates the guarded audio palette UI`);
+      else if (commonToolStart.has(target)) assert.equal(revisions[target], '20261024-common-tool-start-1', `${target} invalidates the common tool-start dependency closure`);
       else if (freeTools.has(target)) assert.equal(revisions[target], '20261024-free-tools-1', `${target} invalidates the free-tools behavior and every transitive importer`);
       else if (currentModeIcon.has(target)) assert.equal(revisions[target], '20261024-mode-icon-1', `${target} invalidates the current mode icon and entry chain`);
       else if (contextualControls.has(target)) assert.equal(revisions[target], '20261024-context-controls-1', `${target} invalidates contextual controls and their entry chain`);

@@ -65,7 +65,7 @@ const pixels = page => page.locator('#draw-canvas').evaluate(canvas => ({
   rgba: Array.from(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data)
 }));
 const projectSnapshot = page => page.evaluate(async () => {
-  const pointer = JSON.parse(localStorage.getItem('pixieed:pxd:last:creation') || localStorage.getItem('pixieed:pxd:last:draw') || 'null');
+  const pointer = JSON.parse(localStorage.getItem('pixieed:pxd:last:direct-workspace:v1') || localStorage.getItem('pixieed:pxd:last:creation') || localStorage.getItem('pixieed:pxd:last:draw') || 'null');
   if (!pointer) throw new Error('fixture PXD pointer was not created');
   const [{ createToolProjectStore }, { readPxdAnimation }, { getAnimationCelDocument }] = await Promise.all([
     import('/js/creation/tool-project-store.mjs'), import('/js/creation/pxd-animation.mjs'), import('/js/creation/animation-core.mjs')
@@ -101,10 +101,13 @@ async function importFixture(page) {
 async function mode(page, name) {
   const menu = page.locator('#creation-mode-menu');
   if (!await menu.evaluate(node => node.open)) await menu.locator(':scope > summary').click();
-  await menu.locator(`[data-creation-mode="${name}"]`).click();
+  await page.locator(`button[data-creation-mode="${name}"]`).click();
   await page.waitForFunction(value => document.body.dataset.creationMode === value
     && !document.body.hasAttribute('data-creation-transition') && !document.querySelector('#main')?.inert,
   name, { timeout: 30000 });
+  const labels = { draw:'描画', camera:'カメラ', audio:'音楽' };
+  assert.equal(await menu.locator('summary .app-tab-label').textContent(), labels[name], 'operation bar names the active mode');
+  assert.equal(await page.locator(`button[data-creation-mode="${name}"]`).getAttribute('aria-pressed'), 'true', 'mode menu marks the active choice');
   await frame(page);
 }
 
@@ -125,12 +128,7 @@ async function runViewport(viewport) {
   const context = await browser.newContext({ viewport, serviceWorkers: 'block' });
   await context.route('**/*', route => new URL(route.request().url()).origin === origin
     ? route.continue() : (report.externalRequests.push(route.request().url()), route.abort()));
-  await context.addInitScript(() => {
-    window.__modeClarityQA = { mediaCalls: 0 };
-    if (navigator.mediaDevices) Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
-      configurable: true, value: async () => { window.__modeClarityQA.mediaCalls++; throw new DOMException('QA uses imported images only', 'NotAllowedError'); }
-    });
-  });
+  await context.addInitScript(() => { window.__modeClarityQA = { mediaCalls: 0 }; });
   const page = await context.newPage(); page.setDefaultTimeout(12000);
   page.on('pageerror', error => report.pageErrors.push({ viewport, message: error.message }));
   const shot = async name => {
@@ -183,17 +181,27 @@ async function runViewport(viewport) {
     playPressed: document.querySelector('#draw-music-play')?.getAttribute('aria-pressed')
   }));
   try {
-    await page.goto(`${base}/draw/`, { waitUntil: 'domcontentloaded' }); await ready(page);
+    await page.goto(`${base}/tools/start/draw/?workspace=1`, { waitUntil: 'domcontentloaded' }); await ready(page);
     await importFixture(page);
     const originalCanvas = await pixels(page), originalProject = await projectSnapshot(page);
     assert.deepEqual(originalProject.palette, palette); assert.equal(originalProject.width, 16); assert.equal(originalProject.height, 16);
     await shot('draw-initial');
+    const modeMenu = page.locator('#creation-mode-menu');
+    await modeMenu.locator(':scope > summary').click();
+    const modeHelp = await page.locator('#creation-mode-panel').innerText();
+    assert.match(modeHelp, /撮影して作品に配置/); assert.match(modeHelp, /専用レイヤーで絵とは別の時間軸/);
+    assert.match(modeHelp, /ブラウザーに保存/); assert.match(modeHelp, /PXDは作品のバックアップ/);
+    await shot('mode-menu');
+    await modeMenu.locator(':scope > summary').click();
+    row.checks.push('mode descriptions identify shared project, camera placement, separate music timeline, and browser/PXD/export saving');
     row.checks.push('PXD fixture loads at 16×16 with the exact four-color shared palette');
 
-    // The central action stays a real camera shutter; import avoids any device permission request.
+    // Import a synthetic image without requesting physical camera access.
     await mode(page, 'camera');
     assert.equal(await page.locator('#capture').count(), 1);
     assert.equal(await page.locator('#creation-output-open').isDisabled(), true, 'no camera output before a captured image');
+    assert.equal(await page.locator('#capture').isEnabled(), true, 'camera start action is available');
+    assert.deepEqual(await pixels(page), originalCanvas, 'entering camera leaves the artwork unchanged');
     await uploadImage(palette);
     const cameraLooks = page.locator('#toolbarHome [data-tool="look"]');
     await cameraLooks.click();
@@ -278,6 +286,8 @@ async function runViewport(viewport) {
     if (optionValue) await instrument.selectOption(optionValue);
     await page.locator('#draw-music-tempo').fill('132');
     await page.locator('#draw-music-tempo').dispatchEvent('change');
+    await page.locator('#draw-music-tempo').press('Tab');
+    await page.waitForFunction(() => document.querySelector('#draw-music-tempo')?.value === '132');
     await page.keyboard.press('Escape');
     await frame(page);
     assert.equal(await page.locator('#creation-settings-open').evaluate(node => node === document.activeElement), true, 'closing music settings returns focus to settings footer control');
@@ -298,9 +308,16 @@ async function runViewport(viewport) {
     assert.equal(await page.locator('#creation-output-open').evaluate(node => node === document.activeElement), true, 'closing Output restores footer focus');
     row.checks.push('music settings expose loop-stop only in settings view and keep tempo, instrument, loop, and output choices');
 
+    // Clear the dismissible settings feedback before tapping a cell; at 568×320 it overlays the short canvas.
+    if (await page.locator('#draw-music-feedback').isVisible().catch(() => false)) await page.locator('#draw-music-feedback-dismiss').click();
     // Requesting stop-after-loop while the assigned square is playing exercises the real UI listener.
     const musicPixelsBefore = await pixels(page);
+    row.music.canvasTarget = await page.locator('#draw-canvas').evaluate(canvas => {
+      const rect = canvas.getBoundingClientRect(), x = rect.x + rect.width * 0.45, y = rect.y + rect.height * 0.45, hit = document.elementFromPoint(x, y);
+      return { rect:rect.toJSON(), display:getComputedStyle(canvas).display, pointerEvents:getComputedStyle(canvas).pointerEvents, hit:hit ? `${hit.tagName.toLowerCase()}#${hit.id}.${String(hit.className?.baseVal || hit.className || '').trim().replace(/\s+/g,'.')}` : null };
+    });
     const musicCanvas = await page.locator('#draw-canvas').boundingBox();
+    await shot('music-canvas');
     await page.mouse.click(musicCanvas.x + musicCanvas.width * 0.45, musicCanvas.y + musicCanvas.height * 0.45);
     await frame(page);
     const musicPixelsAfter = await pixels(page);
@@ -395,20 +412,57 @@ async function runViewport(viewport) {
 
     row.checks.push('retake starts a fresh unapplied result and rejected partial-alpha Apply preserves project pixels');
 
+    await mode(page, 'draw');
+    const beforeOutputPixels = await pixels(page);
+    const beforeOutputProject = await projectSnapshot(page);
+    await page.locator('#draw-output').evaluate(node => { node.open = true; });
+    await page.locator('#draw-output[open]').waitFor({ state:'attached' });
+    await shot('draw-output-menu');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.querySelector('#draw-output')?.open);
+    await frame(page);
+    assert.equal(await page.locator('#creation-output-open').evaluate(node => node === document.activeElement), true, 'closing Draw Output returns focus to its opener');
+    assert.deepEqual(await pixels(page), beforeOutputPixels, 'closing output keeps the drawing available');
+    assert.deepEqual(await projectSnapshot(page), beforeOutputProject, 'closing output leaves the saved project unchanged');
+    row.checks.push('opening and cancelling the shared save/export menu returns to editable drawing with the same project and pixels');
+
     const actualMediaCalls = await page.evaluate(() => window.__modeClarityQA.mediaCalls);
     row.mediaCalls = actualMediaCalls; report.cameraApiCalls += actualMediaCalls;
-    assert.equal(actualMediaCalls, 0, 'no real camera or microphone API was requested');
+    assert.equal(actualMediaCalls, 0, 'physical camera is not used');
     row.layout.nav = await page.evaluate(() => {
-      const nav = document.querySelector('.app-tabs'), capture = document.querySelector('#capture');
-      const navRect = nav.getBoundingClientRect(), buttonRect = capture.getBoundingClientRect();
-      return { nav: { x: navRect.x, y: navRect.y, width: navRect.width, height: navRect.height }, capture: { x: buttonRect.x, y: buttonRect.y, width: buttonRect.width, height: buttonRect.height }, slots: [...nav.querySelectorAll('[data-nav-slot]')].filter(node => node.checkVisibility()).map(node => node.dataset.navSlot) };
+      const nav = document.querySelector('.app-tabs'), mode = document.body.dataset.creationMode;
+      const primary = nav.querySelector(({ camera:'#capture', audio:'#draw-music-play', draw:'#draw-animation-play' })[mode]);
+      const navRect = nav.getBoundingClientRect(), buttonRect = primary.getBoundingClientRect();
+      return { nav: { x: navRect.x, y: navRect.y, width: navRect.width, height: navRect.height }, primary: { x: buttonRect.x, y: buttonRect.y, width: buttonRect.width, height: buttonRect.height, mode }, slots: [...nav.querySelectorAll('[data-nav-slot]')].filter(node => node.checkVisibility()).map(node => node.dataset.navSlot) };
     });
-    assert.ok(row.layout.nav.capture.width >= 44 && row.layout.nav.capture.height >= 44);
+    assert.ok(row.layout.nav.primary.width >= 44 && row.layout.nav.primary.height >= 44, `${row.layout.nav.primary.mode} primary action has a usable touch target`);
     assert.equal(new Set(row.layout.nav.slots).size, row.layout.nav.slots.length, 'mode checks do not add duplicate footer slots');
     assert.deepEqual(report.pageErrors.filter(item => item.viewport.width === viewport.width && item.viewport.height === viewport.height), []);
     row.passed = true; console.log(`PASS ${label}: ${row.checks.length} checks`);
   } catch (error) {
-    row.failures.push({ message: error.message, stack: error.stack }); row.passed = false;
+    row.failures.push({ message: error.message, stack: error.stack });
+    row.layout.failureParents = await page.evaluate(() => {
+      let node = document.querySelector('#useCameraImage'); const parents = [];
+      while (node && parents.length < 8) {
+        const rect = node.getBoundingClientRect(), style = getComputedStyle(node);
+        parents.push({ tag:node.tagName.toLowerCase(), id:node.id, className:String(node.className?.baseVal || node.className || '').trim(), rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height}, position:style.position, zIndex:style.zIndex, pointerEvents:style.pointerEvents, display:style.display });
+        node = node.parentElement;
+      }
+      return parents;
+    }).catch(() => null);
+    row.layout.failureTargets = await page.evaluate(() => {
+      const selectors = ['main', '.draw-viewport', '.draw-control-dock', '.creation-camera-controls', '#stage', '#view', '#pixelStudio', '.px-tool-result', '.px-tool-result__inner', '.px-tool-result__content', '.px-tool-result__action-group', '.px-tool-result__actions', '.lc-result', '#useCameraImage'];
+      return Object.fromEntries(selectors.map(selector => {
+        const node = document.querySelector(selector);
+        if (!node) return [selector, null];
+        const rect = node.getBoundingClientRect(), style = getComputedStyle(node);
+        const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+        const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+        const hit = document.elementFromPoint(x, y);
+        return [selector, { rect: { x:rect.x, y:rect.y, width:rect.width, height:rect.height }, display:style.display, position:style.position, zIndex:style.zIndex, pointerEvents:style.pointerEvents, overflow:style.overflow, scrollHeight:node.scrollHeight, clientHeight:node.clientHeight, hit:hit ? `${hit.tagName.toLowerCase()}#${hit.id}.${String(hit.className?.baseVal || hit.className || '').trim().replace(/\s+/g,'.')}` : null }];
+      }));
+    }).catch(() => null);
+    row.passed = false;
     console.error(`FAIL ${label}: ${error.message}`); await shot('failure').catch(() => {});
   } finally { await context.close(); }
 }

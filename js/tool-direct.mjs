@@ -115,7 +115,7 @@ export function installDirectToolShell({ section, mode, search }) {
       const href = new URL(source.getAttribute('href'), location.origin);
       if (href.origin === location.origin) addStartupHint('modulepreload', href.href);
     }
-    const modeStylesheet = new URL('/css/creation-modes.css?rev=20261017-editor-improvements-1', location.origin);
+    const modeStylesheet = new URL('/css/creation-modes.css?rev=20261106-button-icon-audit-1', location.origin);
     if (!existingStylesheets.has(modeStylesheet.href)) addStartupHint('preload', modeStylesheet.href, 'style');
   }
   function clearStartupHints() {
@@ -341,7 +341,7 @@ export function installDirectToolShell({ section, mode, search }) {
       prepareHost(template);
       // Start evaluating the already-required graph while the editor styles load.
       // The handled result is consumed only after CSS and restore-state checks.
-      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261024-common-tool-start-1'))()
+      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261106-button-icon-audit-1'))()
         .then(module => ({ module }), error => { reloadRequired = true; return { error }; });
       const cssLoads = [];
       const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));

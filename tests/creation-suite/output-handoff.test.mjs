@@ -291,8 +291,8 @@ test('PXD backups use unified file staging and never enter lossy media conversio
     'the PXD backup downloads the complete saved project snapshot');
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
   for (const [path, pattern] of [
-    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261024-common-tool-start-1/],
-    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261024-common-tool-start-1/],
+    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261106-button-icon-audit-1/],
+    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261106-button-icon-audit-1/],
     ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261024-common-tool-start-1/],
     ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261024-common-tool-start-1/],
     ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261024-common-tool-start-1/],

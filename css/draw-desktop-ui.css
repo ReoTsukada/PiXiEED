@@ -439,12 +439,7 @@ body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-f
   box-sizing: border-box; display: grid; place-items: center; flex: 0 0 44px !important; width: 44px !important; min-width: 44px !important;
   max-width: 44px; height: 44px !important; min-height: 44px !important; max-height: 44px; padding: 2px; overflow: hidden; font-size: 0;
 }
-body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-blank-frame"]::before { content: "空"; }
-body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-add-frame"]::before { content: "+"; }
-body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-delete-frame"]::before { content: "×"; }
-body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-move-frame-left"]::before { content: "←"; }
-body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions [data-action="desktop-move-frame-right"]::before { content: "→"; }
-body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions button::before { font: 700 17px/1 system-ui, sans-serif; }
+body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frame-actions button::before { content: none !important; }
 
 body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .animation-controls__layer-list { justify-items: center; }
 body.draw-desktop-active .draw-desktop-dock[data-compact="true"] .animation-controls__layer { box-sizing: border-box; }

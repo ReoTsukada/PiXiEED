@@ -1,6 +1,6 @@
 import { getToolStartRoute } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261024-common-tool-start-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261106-button-icon-audit-1';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
@@ -83,11 +83,27 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   style = document.createElement('style'); style.media = 'not all'; style.textContent = stylesheet;
   document.head.append(style);
   const scoped = scopedRules(style.sheet.cssRules);
+  // Add a small, explicit set of visual cues to the remaining text-first
+  // camera actions. Keep their words and accessible names: these actions can
+  // be unfamiliar on touch screens, so the glyph supplements the label.
+  const cameraActionIcons = `
+    body.creation-suite[data-creation-mode="camera"] :is(#cameraChooseImage,#cameraFallbackChoose)::before,
+    body.creation-suite[data-creation-mode="camera"] #useCameraImage::before { content:""; display:inline-block; flex:0 0 18px; width:18px; height:18px; margin-inline-end:6px; background:currentColor; vertical-align:middle; -webkit-mask:center/contain no-repeat; mask:center/contain no-repeat; }
+    body.creation-suite[data-creation-mode="camera"] :is(#cameraChooseImage,#cameraFallbackChoose)::before { -webkit-mask-image:url('/assets/icons/pixieed/artwork.svg'); mask-image:url('/assets/icons/pixieed/artwork.svg'); }
+    body.creation-suite[data-creation-mode="camera"] #useCameraImage::before { -webkit-mask-image:url('/assets/icons/pixieed/confirm.svg'); mask-image:url('/assets/icons/pixieed/confirm.svg'); }
+    body.creation-suite[data-creation-mode="camera"] :is(#paletteDone,#regionMergeUndo,#regionMergeCancel,#toolbarContextMore,#cameraSaveDialog form[method="dialog"] button) { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+    body.creation-suite[data-creation-mode="camera"] :is(#paletteDone,#regionMergeUndo,#regionMergeCancel,#toolbarContextMore,#cameraSaveDialog form[method="dialog"] button)::before { content:""; display:inline-block; flex:0 0 18px; width:18px; height:18px; background:currentColor; -webkit-mask:center/contain no-repeat; mask:center/contain no-repeat; }
+    body.creation-suite[data-creation-mode="camera"] #paletteDone::before { -webkit-mask-image:url('/assets/icons/pixieed/confirm.svg'); mask-image:url('/assets/icons/pixieed/confirm.svg'); }
+    body.creation-suite[data-creation-mode="camera"] #regionMergeUndo::before { -webkit-mask-image:url('/assets/icons/pixieed/undo.svg'); mask-image:url('/assets/icons/pixieed/undo.svg'); }
+    body.creation-suite[data-creation-mode="camera"] #regionMergeCancel::before,
+    body.creation-suite[data-creation-mode="camera"] #cameraSaveDialog form[method="dialog"] button::before { -webkit-mask-image:url('/assets/icons/pixieed/close.svg'); mask-image:url('/assets/icons/pixieed/close.svg'); }
+    body.creation-suite[data-creation-mode="camera"] #toolbarContextMore::before { -webkit-mask-image:url('/assets/icons/pixieed/menu.svg'); mask-image:url('/assets/icons/pixieed/menu.svg'); }
+  `;
   // These Draw controls are mounted lazily after mode ownership is recorded.
   // Scope their visibility to camera so retained Draw/Audio tools stay intact.
-  style.textContent = `${scoped}\nbody.creation-suite[data-creation-mode="camera"] :is(.draw-feature-actions, #main > .draw-size) { display:none !important; }`;
+  style.textContent = `${scoped}\n${cameraActionIcons}\nbody.creation-suite[data-creation-mode="camera"] :is(.draw-feature-actions, #main > .draw-size) { display:none !important; }`;
   style.media = 'all';
-  document.head.insertBefore(style, document.querySelector('link[href*="creation-modes.css"]'));
+  document.head.insertBefore(style, document.querySelector('link[href*="creation-modes.css?rev=20261106-button-icon-audit-1"]'));
   board.closest('#main').append(surface, template.querySelector('#cameraImageStatus'), template.querySelector('#cameraSaveDialog'));
   // Portal the original camera controls into the actual shared operation dock.
   // Retain .lc and mirror state attributes for its existing contextual selectors.
@@ -304,8 +320,14 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     clearApplyRecovery();
     const addAction = (label, handler) => {
       const button = document.createElement('button');
-      button.type = 'button'; button.textContent = label;
-      button.style.cssText = 'min-height:44px;max-width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.3);border-radius:10px;background:#263744;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;';
+      button.type = 'button'; button.setAttribute('aria-label', label); button.title = label;
+      button.style.cssText = 'display:inline-flex;align-items:center;justify-content:flex-start;gap:8px;min-height:44px;max-width:100%;padding:8px 12px;border:1px solid rgba(255,255,255,.3);border-radius:10px;background:#263744;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;';
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('width', '18'); icon.setAttribute('height', '18'); icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
+      const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const iconData = label.includes('固定') ? 'M12 3v18M5 8h14M7 8v8a5 5 0 0 0 10 0V8' : label.includes('設定') ? 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 12h2m12 0h2M12 4v2m0 12v2M6.3 6.3l1.4 1.4m8.6 8.6 1.4 1.4m0-11.4-1.4 1.4m-8.6 8.6-1.4 1.4' : label.includes('不透明') ? 'M4 5h16v14H4zM8 15l3-3 2 2 2-2 3 4' : 'M4 5h16v14H4zM8 14l3-3 5 5m-3-2 2-2 3 3M8 9h.01';
+      iconPath.setAttribute('d', iconData); iconPath.setAttribute('fill', 'none'); iconPath.setAttribute('stroke', 'currentColor'); iconPath.setAttribute('stroke-width', '2'); iconPath.setAttribute('stroke-linecap', 'round'); iconPath.setAttribute('stroke-linejoin', 'round'); icon.append(iconPath);
+      const caption = document.createElement('span'); caption.textContent = label; button.append(icon, caption);
       button.addEventListener('click', handler);
       recoveryActions.append(button);
     };

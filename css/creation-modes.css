@@ -27,10 +27,15 @@ body.creation-suite .draw-settings-picker .draw-settings-panel { left:12px !impo
 body.creation-suite #creation-mode-menu { position:relative; width:44px; min-width:44px; height:44px; align-self:center; }
 body.creation-suite #creation-mode-menu > summary { list-style:none; display:grid; place-items:center; width:44px; height:44px; cursor:pointer; border-radius:12px; color:inherit; }
 body.creation-suite #creation-mode-menu > summary::-webkit-details-marker { display:none; }
-body.creation-suite #creation-mode-menu > summary img { width:24px; height:24px; }
-body.creation-suite .creation-mode-menu__panel { position:fixed; left:8px; bottom:calc(var(--creation-editor-bottom) + 8px); width:min(300px,calc(100vw - 16px)); box-sizing:border-box; max-height:calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 16px); overflow:auto; display:grid; gap:8px; padding:12px; background:#202a33; color:#f4f0e4; border:1px solid #39454e; border-radius:16px; box-shadow:0 12px 32px #0008; z-index:50; }
-body.creation-suite .creation-mode-menu__panel button { width:100%; min-height:44px; border-radius:10px; padding:8px; font-size:13px; background:#eef2f4; color:#1b2429; }
+body.creation-suite #creation-mode-menu > summary img { display:block; width:24px; height:24px; object-fit:contain; }
+body.creation-suite .creation-mode-menu__panel { position:fixed; left:8px; bottom:calc(var(--creation-editor-bottom) + 8px); width:min(340px,calc(100vw - 16px)); box-sizing:border-box; max-height:calc(100dvh - var(--creation-editor-header) - var(--creation-editor-bottom) - 16px); overflow:auto; display:grid; gap:8px; padding:12px; background:#202a33; color:#f4f0e4; border:1px solid #39454e; border-radius:16px; box-shadow:0 12px 32px #0008; z-index:50; }
+body.creation-suite .creation-mode-menu__panel button { display:grid; justify-items:start; align-content:center; gap:2px; width:100%; min-height:52px; border-radius:10px; padding:7px 10px; text-align:left; background:#eef2f4; color:#1b2429; }
 body.creation-suite .creation-mode-menu__panel button[aria-pressed="true"] { background:#ffd35a; color:#18232b; }
+body.creation-suite .creation-mode-menu__name { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:750; line-height:1.3; }
+body.creation-suite .creation-mode-menu__name > svg { display:block; flex:0 0 22px; width:22px; height:22px; }
+body.creation-suite .creation-mode-menu__detail { font-size:11px; font-weight:500; line-height:1.35; opacity:.78; }
+body.creation-suite .creation-mode-menu__shared { padding:8px 9px; border:1px solid #46545e; border-radius:9px; background:#182229; line-height:1.5; }
+body.creation-suite .creation-mode-menu__save { color:#d5dde2; line-height:1.45; }
 body.creation-suite .creation-mode-menu__panel p { margin:0; font-size:11px; }
 body.creation-suite .creation-mode-menu__panel .creation-mode-error { border:0; color:#ffb6ac; font-size:12px; line-height:1.4; overflow-wrap:anywhere; }
 body.creation-suite #creation-mode-menu > summary:focus-visible,
@@ -38,6 +43,9 @@ body.creation-suite .creation-mode-menu__panel button:focus-visible { outline:3p
 body.creation-suite .draw-music-settings { position:relative; }
 body.creation-suite .draw-music-settings > summary { cursor:pointer; padding:8px; font-size:12px; list-style:none; }
 body.creation-suite .draw-music-panel { position:fixed; top:calc(var(--px-header-height,64px) + 8px); right:8px; width:min(300px,calc(100vw - 16px)); max-height:calc(100dvh - var(--creation-editor-bottom) - var(--px-header-height,64px) - 16px); overflow:auto; display:grid; gap:10px; padding:12px; border:1px solid #39454e; border-radius:14px; background:#202a33; color:#f4f0e4; z-index:60; box-shadow:0 12px 32px #0008; }
+body.creation-suite .draw-music-panel .draw-music-pages :is(#draw-music-page-before,#draw-music-page-after) { box-sizing:border-box; display:grid; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; }
+body.creation-suite #draw-music-page-before svg,
+body.creation-suite #draw-music-page-after svg { display:block; width:24px !important; height:24px !important; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 body.creation-suite .draw-music-panel label { display:grid; gap:4px; font-size:12px; }
 body.creation-suite .draw-music-panel :is(input,select,button) { min-height:40px; border:1px solid #52616c; border-radius:8px; padding:6px; font:inherit; color:#f4f0e4; background:#293742; }
 body.creation-suite .draw-music-panel p { margin:0; font-size:11px; line-height:1.6; }
@@ -58,8 +66,33 @@ body.creation-suite #creation-mode-menu { grid-column:2; grid-row:1; justify-sel
 body.creation-suite .app-tabs > [data-nav-slot="4"] { grid-column:4; grid-row:1; }
 body.creation-suite .app-tabs > [data-nav-slot="5"] { grid-column:5; grid-row:1; }
 body.creation-suite .app-tabs > [data-nav-primary] { grid-column:3; grid-row:1; justify-self:center; }
-body.creation-suite .app-tabs > .creation-nav-action .px-nav-icon { display:grid; width:24px; height:24px; place-items:center; flex:none; }
-body.creation-suite .app-tabs > .creation-nav-action .px-nav-icon img { display:block; width:24px; height:24px; object-fit:contain; }
+body.creation-suite .app-tabs > .creation-nav-action .px-nav-icon { display:grid; width:24px; height:24px; place-items:center; flex:none; overflow:visible; }
+body.creation-suite .app-tabs > .creation-nav-action .px-nav-icon :is(img,svg) { display:block; width:24px; height:24px; object-fit:contain; overflow:visible; }
+/* Normalize the visible artwork, not just its 24px box. These assets have
+   different path bounds inside their viewBoxes (music is the narrowest). */
+body.creation-suite .app-tabs .px-nav-icon :is(img,svg)[src$="artwork.svg"],
+body.creation-suite .app-tabs .px-nav-icon img[src$="tools.svg"] { transform:scale(1.1); }
+body.creation-suite .app-tabs .px-nav-icon img[src$="music.svg"] { transform:translateY(.5px) scale(1.18); }
+body.creation-suite #creation-mode-menu > summary img[src$="draw.svg"] { transform:scale(1.08); }
+body.creation-suite #creation-mode-menu > summary img[src$="camera.svg"] { transform:none; }
+body.creation-suite #creation-mode-menu > summary img[src$="music.svg"] { transform:translateY(.5px) scale(1.18); }
+/* Keep outline rectangles and ellipses close in visual weight to filled tools. */
+body.creation-suite [data-drawing-icon="rectangle"] > .drawing-tool-icon,
+body.creation-suite [data-drawing-icon="rectangle-fill"] > .drawing-tool-icon,
+body.creation-suite [data-drawing-icon="ellipse"] > .drawing-tool-icon,
+body.creation-suite [data-drawing-icon="ellipse-fill"] > .drawing-tool-icon,
+body.creation-suite .draw-desktop-button[data-desktop-command="tool.left.rectangle"] .drawing-tool-icon,
+body.creation-suite .draw-desktop-button[data-desktop-command="tool.left.rectangleFill"] .drawing-tool-icon,
+body.creation-suite .draw-desktop-button[data-desktop-command="tool.left.ellipse"] .drawing-tool-icon,
+body.creation-suite .draw-desktop-button[data-desktop-command="tool.left.ellipseFill"] .drawing-tool-icon {
+  transform:scale(1.1); transform-origin:center;
+}
+body.creation-suite :is(.project-bar,.project-sheet,.project-card-actions__controls) svg { width:22px; height:22px; }
+body.creation-suite .app-tabs #draw-music-play { display:grid; place-items:center; line-height:0; }
+body.creation-suite .app-tabs :is(#draw-animation-play,#draw-music-play) svg { width:36px !important; height:36px !important; overflow:visible; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+body.creation-suite .app-tabs #draw-music-play .draw-stop-icon { display:none; }
+body.creation-suite .app-tabs #draw-music-play:is([data-state="playing"],[data-state="starting"]) .draw-play-icon { display:none; }
+body.creation-suite .app-tabs #draw-music-play:is([data-state="playing"],[data-state="starting"]) .draw-stop-icon { display:block; }
 body.creation-suite .app-tabs .app-tab-label { display:block; max-width:100%; color:var(--pixieed-muted,#53616b); font-size:10px; font-weight:700; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 body.creation-suite #creation-mode-menu > summary { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
 body.creation-suite .app-tabs > .creation-nav-action:disabled { opacity:.55; cursor:not-allowed; }
@@ -69,7 +102,9 @@ body.creation-suite #creation-settings-status,
 body.creation-suite #creation-output-status { position:absolute !important; width:1px !important; height:1px !important; padding:0 !important; margin:-1px !important; overflow:hidden !important; clip:rect(0,0,0,0) !important; white-space:nowrap !important; border:0 !important; }
 body.creation-suite .creation-settings-panel { box-sizing:border-box; position:fixed; z-index:140; left:50%; bottom:calc(var(--creation-editor-bottom) + 8px); transform:translateX(-50%); display:grid; grid-template-columns:minmax(0,1fr); gap:8px; width:min(320px,calc(100vw - 16px)); padding:10px; border:1px solid #52616c; border-radius:14px; background:#202a33f5; color:#f4f0e4; box-shadow:0 12px 32px #0008; }
 body.creation-suite .creation-settings-panel[hidden] { display:none !important; }
-body.creation-suite .creation-settings-panel button { box-sizing:border-box; width:100%; min-height:44px; padding:8px 12px; border:1px solid #52616c; border-radius:10px; background:#293742; color:#f4f0e4; font:inherit; font-size:13px; font-weight:700; text-align:left; cursor:pointer; }
+body.creation-suite .creation-settings-panel button { box-sizing:border-box; display:flex; align-items:center; gap:8px; width:100%; min-height:44px; padding:8px 12px; border:1px solid #52616c; border-radius:10px; background:#293742; color:#f4f0e4; font:inherit; font-size:13px; font-weight:700; text-align:left; cursor:pointer; }
+body.creation-suite .creation-action-icon { display:block; flex:0 0 22px; width:22px; height:22px; }
+body.creation-suite .creation-file-image-actions button { display:inline-flex; align-items:center; justify-content:flex-start; gap:8px; min-height:44px; }
 body.creation-suite .creation-settings-panel button:focus-visible { outline:3px solid #2588bb; outline-offset:2px; }
 body.creation-suite .draw-music-panel[data-creation-audio-view="settings"] > #creation-music-output-section { display:none !important; }
 body.creation-suite .draw-music-panel[data-creation-audio-view="output"] > :not(#creation-music-output-section) { display:none !important; }
@@ -81,6 +116,12 @@ body.creation-suite .px-tool-result[data-tool-result-view="camera-result"] .px-t
 body.creation-suite .px-tool-result[data-tool-result-view="camera-result"] { background:#f7f8f6; color:#1b2025; }
 @media (orientation:landscape) and (max-height:480px) {
   body.creation-suite .px-tool-result[data-tool-result-view="camera-result"] .px-tool-result__action-group { box-sizing:border-box; height:100%; max-height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; align-content:start; }
+  /* Keep Apply over the bottom action zone: the shared camera controls otherwise
+     place it on the stage/dock boundary at 568×320 where the stage intercepts taps. */
+  body.creation-suite[data-creation-mode="camera"] #useCameraImage {
+    position:fixed; z-index:40; left:50%; bottom:calc(var(--creation-editor-bottom) + 24px);
+    transform:translateX(-50%);
+  }
 }
 body.creation-suite .px-tool-result[data-tool-result-view="camera-result"] #cameraPlacementResultOverlay { position:absolute; inset:0; z-index:1; width:100%; height:100%; object-fit:contain; pointer-events:none; }
 body.creation-suite .px-tool-result[data-tool-result-view="camera-result"] #cameraPlacementResultOverlay[hidden] { display:none !important; }
@@ -282,7 +323,7 @@ body.creation-suite .px-site-header :is(#creation-mode-menu > summary,#creation-
   width:44px !important; height:44px !important; padding:0; font-size:10px; line-height:1.1;
   border:1px solid #52606a; border-radius:10px; background:#26323b; color:var(--creation-ink,#edf2f3);
 }
-body.creation-suite .px-site-header #creation-settings-open img { display:block; width:24px; height:24px; }
+body.creation-suite .px-site-header #creation-settings-open img { display:block; width:24px; height:24px; object-fit:contain; }
 body.creation-suite .px-site-header :is(#creation-mode-menu > summary,#creation-settings-open) img { filter:brightness(0) invert(1); }
 body.creation-suite .px-site-header #creation-mode-menu .app-tab-label { font-size:10px; }
 body.creation-suite .creation-mode-menu__panel { top:calc(var(--creation-editor-header) + 8px); bottom:auto; }
