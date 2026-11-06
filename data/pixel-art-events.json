@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-05T00:03:57+00:00",
+  "updatedAt": "2026-11-06T00:06:18+00:00",
   "events": [
     {
       "id": "pixel-art-park-9",
@@ -213,7 +213,7 @@
       "startDate": "2026-11-05",
       "endDate": "2026-11-05",
       "dateLabel": "2026年11月5日 09:30–10:30（公式表示。タイムゾーン未記載）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://www.digitaljove.com/talleres",
       "description": "Denis Bernalteによる、ゲーム用のキャラクターやスプライトを描くピクセルアート入門。基礎説明と制作演習。イベント全体の日程ではなく、この講座の開催日を掲載。",
       "checkedAt": "2026-11-03T11:56:16+00:00",
@@ -2283,7 +2283,7 @@
       "startDate": "2026-11-05",
       "endDate": "2026-11-05",
       "dateLabel": "16:30〜18:00（現地時間）",
-      "status": "upcoming",
+      "status": "ended",
       "sourceUrl": "https://montreal.ca/evenements/mixlab-dessiner-un-personnage-et-le-faire-vivre-dans-un-jeu-video-119736",
       "description": "8〜12歳向け、無料のキャラクター制作ワークショップ。公式説明にピクセルアートでキャラクターを描き、GDevelopで動かす内容と記載。",
       "checkedAt": "2026-11-03T11:56:16+00:00",
@@ -3217,6 +3217,23 @@
       "checkedAt": "2026-11-05T00:03:57+00:00",
       "kind": "pixel-art",
       "sourceLabel": "くもん出版公式発表（PR TIMES）"
+    },
+    {
+      "id": "vitre-mois-multimedia-pixel-art-workshop-2026-11-14",
+      "name": "Le Mois du multimédia — Pixel Art・ゲームキャラクター制作（クロージング）",
+      "country": "フランス",
+      "city": "Vitré",
+      "area": "Vitré",
+      "venue": "Centre culturel Jacques Duhamel, 2 rue de Strasbourg, 35500 Vitré",
+      "startDate": "2026-11-14",
+      "endDate": "2026-11-14",
+      "dateLabel": "2026年11月14日 14:00〜18:00（現地時間、公式表示）",
+      "status": "upcoming",
+      "sourceUrl": "https://www.vitrecommunaute.org/actualites/le-mois-du-multimedia-un-festival-numerique-pour-toutes-et-tous/",
+      "description": "Vitré Communauté主催「Le Mois du multimédia」第18回のクロージング企画。公式案内は当日の内容に「pixel artでゲームキャラクターを作成」と明記。会場はCentre culturel Jacques Duhamel。無料・全対象。座標は設定していない。",
+      "checkedAt": "2026-11-06T00:06:18+00:00",
+      "kind": "pixel-art",
+      "sourceLabel": "Vitré Communauté公式"
     }
   ],
   "sources": [
@@ -5373,10 +5390,22 @@
       "lastCheckedAt": "2026-11-05T00:03:57+00:00",
       "result": "official-confirmed",
       "notes": "くもん出版公式発表で12/6北海道名寄市開催、立体ドット絵メーカー36個を使った共同制作を確認。会場名・住所・時間は公式発表に記載なし。"
+    },
+    {
+      "id": "vitre-mois-multimedia-pixel-art-workshop-2026-11-14",
+      "url": "https://www.vitrecommunaute.org/actualites/le-mois-du-multimedia-un-festival-numerique-pour-toutes-et-tous/",
+      "eventIds": [
+        "vitre-mois-multimedia-pixel-art-workshop-2026-11-14"
+      ],
+      "socialUrls": [],
+      "socialTags": [],
+      "lastCheckedAt": "2026-11-06T00:06:18+00:00",
+      "result": "official-confirmed",
+      "notes": "Vitré Communauté公式本文で11/14 14:00〜18:00、Centre culturel Jacques Duhamelのクロージング企画と「pixel artでゲームキャラクターを作成」を確認。無料・全対象。座標は未確認。"
     }
   ],
   "research": {
-    "checkedAt": "2026-11-05T00:03:57+00:00",
+    "checkedAt": "2026-11-06T00:06:18+00:00",
     "notes": "2026-10-18: 見送り候補を再調査し、pixel art制作またはpixel-art game制作が公式本文で確認できる英国Cheltenham/Chipping CampdenのGIF講座2回、スペイン・BilbaoのWhimtale/Bitsy 3D個別回（成人2回、子ども1回）、シンガポールGraphite Academyのゲーム制作キャンプ2件を追加。Singaporeは会場が複数拠点の選択式のため地図座標なし。開催場所と主催者住所を混同せず、開催地が公式に複数提示される場合は複数拠点と明記。韓国語検索では確定候補なし。香港M+は紙工作、インド候補は公式日付の矛盾、ImaJam/Monster BashはPixel Art非必須のため対象外。 2026-10-19: Pixelverse Jamの公式募集期間（2026-01-01 05:00 UTC〜2027-01-01 05:00 UTC）とPixel Art/retro gaming主題を確認し、オンライン開催として追加。韓国IGG-Kの第2回ALT+Gは10/9開催、現場のドット似顔絵ライブアートとドット絵ゲームGuidus One展示を公式本文で確認し、対象範囲を限定して過去記録に追加。終了日が10/18以前の8件をendedに更新。京都PAC-MANシール帳WSは作品がシール・コラージュでPixel Artとの関係を確認できず、既存のPAC-MANドット展示とは分けて追加せず。国内の新規確定候補なし。 2026-10-20: 東京都渋谷区の「PIXEL LAYERED 第三弾 hermippe『円環』」を株式会社thePIXELの公式告知で確認し追加。10月21日〜11月20日、MIYASHITA PARK全域58面のLEDビジョン。シドニー・Fortalezaの当日/近日講座、Pixxelpoint、締切間近のNRG/Segmentを再確認。アジア・欧州・米州の再調査で既存登録との重複または対象外を確認。 2026-10-21: 香港M+のPixel Monster（ビデオゲームのpixel monsterを紙彫刻で制作）、フランスMayenneのPixel Art家族講座、Brignaisの10/31・11/15 Pixel Art講座を公式本文で確認し追加。SydneyとFortalezaの10/20回は開催日経過としてendedに更新（現地での実施確認を意味しない）。JumpZip公式サイトは2026年10月予告のみで具体日程なし、公式Xは403で取得不能。NRG Pixel Art Awards締切10/21 23:59 CEST、Segment Pixel Jam締切10/24 17:00（公式表示、TZ不記載）を再確認。Mugron候補は公式詳細本文を取得できず保留。調査語: pixel art workshop/exhibition/deadline, atelier numérique pixel art, 픽셀 아트 전시, 像素藝術 工作坊。対象地域: 香港、フランス、豪州、ブラジル、韓国、欧州・北米・中南米・オンライン。 2026-10-22: 台湾・宜蘭の像素磚Pixel Art体験（10/24）、RETRO GAME SUMMIT Lv.6のドットアート出展（11/7）、フランスPeymeinadeの漫画祭内Pixel Art講座（10/24–25）、Sablé-sur-SartheのモザイクPixel Art講座（10/27）、Rezé CAVIARのPixel Artモザイク講座2回（12/19、2027/3/3）を公式本文で確認し追加。10/21開催の4件を終了扱いへ更新（予定日経過による整理で、現地実施を独立確認した意味ではない）。NRGは提出締切が経過したが大会本体は10/23–25のため upcoming 維持。Vila Geek、Montreal Mixlab、SPIEL、Pixel Layered、KAI高雄、PAC-MAN展示を再確認。アンジェの10/23・10/30 Pixel Artビーズ講座、CO-MAKER Lyon、パリのPixel Art講座は公式本文を直接取得できず登録保留。 2026-10-26: NRG公式compo/開催ページを再確認。Pixel Art各部門の提出締切は10/24 12:00 CEST（19:00 JST）で終了、NRG開催期間も10/25までで終了。10/22〜25のNRG、SPIEL/Moertel、KAI、Montreal Mixlab、Vila Geek、Whimtale、宜蘭Pixel Brick、Peymeinade、および10/24終了のSegment Pixel Jamを予定日経過でendedへ更新（開催実施の独立確認を意味しない）。10/26を期間に含む既存イベントはactiveに整理。新規追加なし。 2026-10-27: フランスのMoulinsで観光局公式に明示されたPixel Artアイロンビーズ講座6回（11/14〜12/19）、CO-MAKER Lyonの11/22 Pixel Artマイクロモザイク講座、Paris 5eの10/31 Pixel Artモザイク回を公式本文で確認・追加。ビーズ/モザイク素材の利用だけでは除外せず、Pixel Art制作が明示された個別講座のみ対象。La Bourboule 11/7は既存登録を再確認。韓国語・中国語圏の新規確認済み候補なし。 2026-10-28: トルコAkbank Sanatの11/14 YUNT講座は公式本文でPixel Artの絵をビーズで制作する内容・開催時刻・会場を確認し追加。フランスFestival ConnexionsのBesse 11/7 15:00–17:00 Pixel Artシルクスクリーン講座は、既存La Bourboule午前回と別会場のため独立回として追加。Retro Pixel Jamは公式本文でPixel Art推奨のレトロゲームジャムと確認、既存登録を再確認。Pixel Forge Mega JamはPixelが運営名でドット絵企画は確認できず除外。Portland Digital Dabblersの11/28講座は公式一覧と個別ページの日付矛盾で保留、MayenneのLego Pixel Art展は公式本文を取得できず保留。香港博物館節は公式本文で10/31–11/1、11:00–18:00のPixel貼紙参加型公共作品を再確認。 2026-10-29: 韓国H.I.Pの参加作紹介でCOLORFLYがpixel-art worldのゲームであること、10/31–11/1の一般公開時間と弘大Mijin Floorを確認し、当該ゲーム出展の範囲に限って追加。韓国Steam公式ストアと会場運営者ページで作品のPixel Art表記・住所を補強、座標なし。ルーマニアTimișoaraの市文化機関公式案内で11/3 17:00–18:00の子ども向けPixel Art講座を確認、会場Galeria 5の住所も公式会場ページで照合、座標なし。10/27–28終了日のオランダ/英国/フランス3件をendedへ整理（開催実施の独立確認を意味しない）。日本の11/1札幌・登別の開催案内を公式/作家ページで再確認。新宿の公式案内はタイムアウトのため現況保留。 2026-10-30: スイス・バーゼルのEPFL Coding Club for Girls公式本文で、11/7「Pixel Art」回（09:30–12:00または13:30–16:00）、11〜15歳向け、無料・要予約、Schule Brunnmattを確認して追加。公式イベントページのBing地図リンクに掲載された会場座標を使い、venue精度で記録。Brignais 10/31、Paris 5e 10/31、Mayenne 11/1の公式案内を再確認。日付を迎えた新宿展示とChipping Campden講座をactiveに整理。新宿公式ページはタイムアウト、Chipping Campden公式ページはCache missのため、過去の成功確認を保持し今回の取得失敗を台帳に記録。富里の11/3ビーズ候補は詳細公式ページ503でドット絵内容の確認保留。池袋Dot Coloringは数字に沿ってドット塗りする壁画でPixel Art記載なしのため対象外。 2026-11-01: Massachusetts州SalemのPixel Party木製ブロックPixel Art sculpture制作会（11/8）を会場公式本文で確認し追加。既存のPont-de-Beauvoisin講座は公式本文を再確認。10月30–31日終了の開催回をendedに、11月1日時点で開催期間中の予定をactiveに更新。日付経過は開催実施の証明を意味しない。日本、香港、韓国、フランス、米国の開催直近情報を再確認。香港イベントの天候警報による中止条件を保持。Moulinsのアイロンビーズ企画はビーズ制作のみのため除外。日本全国ドットFFは公式の企画内容を確認したが公式開催日を読めず保留。 2026-11-02: 佐川美術館の大カプコン展にタブレットでドット絵を作る「カプコンピクセルラボ」が明記されたため、活動範囲を限定して滋賀県・守山市の開催情報を追加。Festival Connexions La Bourbouleの11/7 10:00–12:00を主催自治体本文で確認し、Besse回と別会場・別時刻を維持。11/5 Montréal Mixlabの会場住所、Valencia Digital Joveの時刻・会場、Timișoara講座、M+ Pixel Monsterの週末時間を公式本文で再確認。11/1終了の5件をendedへ整理（開催実施の独立確認ではない）。検索: 日本語（佐川美術館・ドット絵・ピクセルラボ、埼玉・フラワーピクセルアート）、英語 (pixel art workshop, pixel monster)、仏語 (atelier pixel art, Festival Connexions)、スペイン語 (taller pixel art)、ルーマニア語 (atelier pixel art)。埼玉のcontestは開催年を公式本文で確定できず保留。HeroFestival作家ブース、Ingwiller個別URL、フランスAmbrières/Dieulouard/Annemasse、PixelJoint個別challengeは取得不能または本文未確認として保留し、成功確認済み情報は保持。 2026-11-03: 成安造形大学の12/13体験イベント内「動くドット絵キャラクターを描こう」と、ルクセンブルクRumelange・SPEKTRUMの11/14「Create Your Own Interactive Pixel Art Display」を公式アジェンダで確認し、個別企画として追加。SPEKTRUM詳細ページはCache missだが親アジェンダで企画名・日時・会場を確認し、詳細URLの取得不能を別記。既存のLyon Part-Dieu 11/7とLa Duchère 11/25の年齢・無料・申込開始日時・会場を再確認し、La Duchèreは11/4 09:00申込開始。Moulins、Brignais、EPFL Basel、RetroCon Saar、RETRO GAME SUMMIT、Couch Dog Salem、M+香港、GCMX、Syntax DemoParty、Montréal Mixlab、Digital Jove、Festival Connexions、Liquidy Jamの公式本文を再確認。HeroFestivalの個別作家紹介、Ingwiller個別URL、Beppu Art Month、Akbank Sanatの個別ページは取得不能として直近成功確認を保持。日本語（成安・ドット絵体験授業）、仏語（atelier pixel art）、独語（Pixel Art Workshop）、英語（interactive pixel art display / pixel art competition）、スペイン語（Pixel Art taller / agenda）、韓国語・中国語・ポルトガル語の語でも探索。対象外や日付未確定の新規候補は確認できず、網羅は主張しない。 2026-11-04: SQUARE ENIX公式告知で#日本全国ドットFF（10/29〜12/21、47都道府県の広告等にFF RESONANCEのドット絵56種を掲出しQRで参加）を確認し、企画を1件追加。itch.ioのKiri Pixel Art Jam #1（11/5〜30、イラスト・アニメ・スプライト等募集、TZ不記載）、hermippeの亀戸アートセンター個展（11/12〜24）、CCON StuttgartのPixelkünstlerin Moertel参加（11/28〜29）を追加。Pixel Deck Jam、LCCL、Festival FPS、Lyon、Ingwiller、Moertel VIECCを再確認。11/3終了の3開催回をendedに整理（開催実施の独立確認を意味しない）。Kiriと全国ドットFFの公式本文、thePIXEL告知、CCON Artistページで開催内容を照合。検索語: pixel art jam November 2026, atelier pixel art, ドットFF, hermippe 個展, Stuttgart Pixelkünstlerin. 調査範囲: 日本全国、オンライン、フランス、ドイツ、シンガポール、英語・仏語・西語・韓国語・中国語・ポルトガル語・ドイツ語。公式に日付を確定できないスペインのPixel Art workshopは保留。",
     "searchExamples": [
       "PIXEL DOT FIELD PAC-MAN Kyoto 2026",
@@ -5412,7 +5441,10 @@
       "Ateliers numériques Pixel art de bibliothèque Lyon 14 novembre 2026",
       "LCCL Game Design Camp From Pencil to Pixel 2026",
       "Festival FPS taller Pixel Art GONSTAR noviembre 2026",
-      "Pixel-Deck Jam #1 December 2026 itch.io"
+      "Pixel-Deck Jam #1 December 2026 itch.io",
+      "RETRO GAME SUMMIT Lv.6 11/7 pixel art event Japan official",
+      "Le Mois du multimédia Vitré pixel art personnage jeu vidéo 14 novembre 2026",
+      "pixel art workshop contest exhibition November 2026 official Korean Chinese Japanese"
     ],
     "scopeLanguages": [
       "ja",
@@ -5582,7 +5614,8 @@
       "https://www.comiccon.de/acts_kategorien/artists/",
       "https://bm-lyon.fr/agenda/ateliers-numeriques-pixel-art-de-bibliotheque",
       "https://www.festivalfps.com/pages/taller-02-videojuegos",
-      "https://www.festivalfps.com/event/-1"
+      "https://www.festivalfps.com/event/-1",
+      "https://www.vitrecommunaute.org/actualites/le-mois-du-multimedia-un-festival-numerique-pour-toutes-et-tous/"
     ],
     "regionalChecks": [
       {
@@ -6932,6 +6965,39 @@
           }
         ],
         "notes": "過去の実開催は開催予定日経過でendedへ整理し、開催実績を推定していない。11/5開催のDigital JoveとMontréal講座は現地時刻の開始前でupcomingを保持。新規候補は公式本文で日程とドット絵内容を照合。海外座標は未確認のまま設定せず、北海道は市のみ公式確認。網羅は主張しない。"
+      },
+      {
+        "checkedAt": "2026-11-06T00:06:18+00:00",
+        "regions": [
+          "日本・東京（RETRO GAME SUMMIT）",
+          "フランス・Vitré",
+          "韓国・台湾・中国・香港",
+          "既知イベント：スペイン・Valencia、カナダ・Montréal、ドイツ・Völklingen"
+        ],
+        "languages": [
+          "ja",
+          "fr",
+          "en",
+          "ko",
+          "zh"
+        ],
+        "queries": [
+          "RETRO GAME SUMMIT 2026 ドットアート 11月7日 公式",
+          "site:vitrecommunaute.org pixel art personnage jeu vidéo 14 novembre 2026",
+          "픽셀 아트 행사 2026 11월 공식 중국 像素藝術 工作坊 2026 11月"
+        ],
+        "addedIds": [
+          "vitre-mois-multimedia-pixel-art-workshop-2026-11-14"
+        ],
+        "recheckedIds": [],
+        "unconfirmed": [
+          {
+            "name": "デジゲー博2026でのGILDEN試遊内容",
+            "sourceUrl": "https://x.com/gridandpixels/status/2116908122568802397",
+            "reason": "X個別投稿を直接取得できず、公式参加一覧と開発者のゲーム情報で出展・Pixel Art RPGは確認したが、試遊内容は断定しない。"
+          }
+        ],
+        "notes": "11/5開催予定のDigital Jove（バレンシア）とMontréal Mixlabは日程経過のためendedに整理。開催実績を確認したものではない。RETRO GAME SUMMITは公式参加ガイドでドットアート出展を再確認。Vitré Communauté公式本文で11/14のPixel Artゲームキャラクター制作を確認し追加。海外座標は未確認のため設定せず。韓国・中華圏の今回検索では新規確認なし。"
       }
     ],
     "historyCollection": {
@@ -7058,7 +7124,10 @@
       "Del Píxel al Frame CITM Terrassa 13 novembre 2026 pixel art",
       "Dibujo Asistido por Ordenador CAD Huesca 21 noviembre 2026 Piskel pixeladas",
       "デジゲー博2026 grid&pixels GILDEN pixel-art RPG 11月8日",
-      "バリアフリーおもちゃ博 なよろ 立体ドット絵メーカー 2026年12月6日"
+      "バリアフリーおもちゃ博 なよろ 立体ドット絵メーカー 2026年12月6日",
+      "RETRO GAME SUMMIT 2026 ドットアート 11月7日 公式",
+      "site:vitrecommunaute.org pixel art personnage jeu vidéo 14 novembre 2026",
+      "픽셀 아트 행사 2026 11월 공식 중국 像素藝術 工作坊 2026 11月"
     ],
     "languages": [
       "ca",

@@ -355,7 +355,8 @@
         "pont-de-beauvoisin-pixel-art-geant-2026-11-25",
         "riedisheim-en-pixel-closing-2026",
         "sable-sur-sarthe-pixel-art-mosaic-workshop-2026-10-27",
-        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17"
+        "villeneuve-forum-des-sciences-pixel-art-lego-2026-10-17",
+        "vitre-mois-multimedia-pixel-art-workshop-2026-11-14"
       ],
       "areas": [
         "Besse-et-Saint-Anastaise",
@@ -380,6 +381,7 @@
         "Sablé-sur-Sarthe, Pays de la Loire",
         "Sérigné",
         "Villeneuve-d’Ascq, Hauts-de-France",
+        "Vitré",
         "リヨン・6区"
       ]
     },
@@ -1097,6 +1099,18 @@
       "area": "Paris 5e",
       "sourceUrls": [
         "https://www.atelierenfant.com/fr/paris/ateliers/ponctuels/atelier-pixel-art-5-99-ans-paris-5e-4032/"
+      ]
+    },
+    {
+      "id": "venue-53f28744b1ba9a3d",
+      "label": "Centre culturel Jacques Duhamel, 2 rue de Strasbourg, 35500 Vitré",
+      "eventIds": [
+        "vitre-mois-multimedia-pixel-art-workshop-2026-11-14"
+      ],
+      "region": "フランス",
+      "area": "Vitré",
+      "sourceUrls": [
+        "https://www.vitrecommunaute.org/actualites/le-mois-du-multimedia-un-festival-numerique-pour-toutes-et-tous/"
       ]
     },
     {
@@ -2038,6 +2052,31 @@
     }
   ],
   "sources": [
+    {
+      "id": "source-006a742fea446af2",
+      "label": "Le Mois du multimédia — Pixel Art・ゲームキャラクター制作（クロージング）",
+      "eventIds": [
+        "vitre-mois-multimedia-pixel-art-workshop-2026-11-14"
+      ],
+      "url": "https://www.vitrecommunaute.org/actualites/le-mois-du-multimedia-un-festival-numerique-pour-toutes-et-tous/",
+      "kind": "website",
+      "prefectures": [],
+      "countries": [
+        "フランス"
+      ],
+      "areas": [
+        "Vitré"
+      ],
+      "venues": [
+        "Centre culturel Jacques Duhamel, 2 rue de Strasbourg, 35500 Vitré"
+      ],
+      "lastKnownEventDate": "2026-11-14",
+      "check": {
+        "result": "official-confirmed",
+        "lastCheckedAt": "2026-11-06T00:06:18+00:00",
+        "notes": "イベントの出典本文を確認。次回開催確認は別途必要。"
+      }
+    },
     {
       "id": "source-0143d167663dfaf9",
       "label": "COMITIA158 — ジュウニ（ドット絵本・出展予定）",
@@ -7716,5 +7755,5 @@
       }
     }
   ],
-  "updatedAt": "2026-11-05T00:06:52+00:00"
+  "updatedAt": "2026-11-06T00:07:44+00:00"
 }
