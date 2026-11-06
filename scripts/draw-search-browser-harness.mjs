@@ -41,6 +41,18 @@ async function run(name, fn) {
 }
 const ready = page => page.waitForFunction(() => !!window.__PIXIEED_CREATION_HOST__?.runtime && !document.querySelector('#main')?.inert);
 const pixels = page => page.locator('#draw-canvas').evaluate(canvas => [...canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data]);
+// Editor exports now open the shared preview; only its explicit Save downloads.
+async function exportThroughPreview(page, action, path) {
+  await action();
+  await page.waitForURL(url => url.pathname === '/output/work/');
+  const save = page.locator('#output-nav-export');
+  await save.waitFor({ state: 'visible' });
+  await page.waitForFunction(() => !document.querySelector('#output-nav-export')?.disabled);
+  const [file] = await Promise.all([page.waitForEvent('download'), save.click()]);
+  await file.saveAs(path);
+  await page.locator('[data-sc-back]').click();
+  await ready(page);
+}
 try {
   for (const js of [false, true]) for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 1440, height: 900 }]) {
     await run(`initial HTML / JS ${js} ${viewport.width}`, async () => {
@@ -98,17 +110,19 @@ try {
       await page.reload(); await ready(page);
       assert.deepEqual(await pixels(page), before, 'reload restores saved pixels');
       assert.equal((await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.getState())).timeline.hash, beforeState.timeline.hash);
-      const [pngFile] = await Promise.all([page.waitForEvent('download'), page.locator('#creation-output-open').click()]); const pngPath = `${out}/synthetic-drawing.png`; await pngFile.saveAs(pngPath);
+      const pngPath = `${out}/synthetic-drawing.png`;
+      await exportThroughPreview(page, () => page.locator('#creation-output-open').click(), pngPath);
       const pngBytes = await readFile(pngPath), pngMeta = await sharp(pngBytes).metadata();
       assert.equal(pngMeta.format, 'png'); assert.equal(pngMeta.width, pngMeta.height); assert.equal(pngMeta.width % 16, 0);
       const pngRgba = await sharp(pngBytes).resize(16, 16, { kernel: 'nearest' }).ensureAlpha().raw().toBuffer();
       assert.deepEqual([...pngRgba], before, 'native PNG preserves every source cell at its integer scale');
-      await page.locator('.px-tool-result__return').click(); await ready(page); assert.deepEqual(await pixels(page), before);
+      assert.deepEqual(await pixels(page), before);
       await page.locator('[data-desktop-cell-launcher]').click();
       await page.screenshot({ path: `${out}/gif-controls-pc.png` });
       const gifControl = await page.locator('[data-action="export-gif"]').evaluateAll(ns => ns.map(n => ({ hidden: n.hidden, disabled: n.disabled, box: n.getBoundingClientRect().toJSON(), parent: n.parentElement.className })));
       assert.equal(gifControl.length, 1); assert.ok(gifControl[0].box.width >= 44 && gifControl[0].box.height >= 44);
-      const [gifFile] = await Promise.all([page.waitForEvent('download'), page.locator('[data-action="export-gif"]').click()]); const gifPath = `${out}/synthetic-animation.gif`; await gifFile.saveAs(gifPath);
+      const gifPath = `${out}/synthetic-animation.gif`;
+      await exportThroughPreview(page, () => page.locator('[data-action="export-gif"]').click(), gifPath);
       const gifBytes = await readFile(gifPath), gifMeta = await sharp(gifBytes, { animated: true }).metadata();
       assert.equal(gifMeta.format, 'gif'); assert.equal(gifMeta.pages, 2); assert.equal(gifBytes.subarray(0, 6).toString(), 'GIF89a');
       const frames = [];
@@ -122,18 +136,22 @@ try {
       assert.deepEqual(await pixels(page), before);
       const compactGif = [];
       for (const width of [320, 390]) {
-        await page.locator('[data-action="close-animation"]').click();
+        const close = page.locator('[data-action="close-animation"]');
+        if (await close.isVisible()) await close.click();
         await page.setViewportSize({ width, height: 844 });
         await page.locator('#draw-animation-controls [data-action="toggle-frames"]').click();
         const target = page.locator('[data-action="export-gif"]');
         const reachable = await target.evaluate(n => { const r = n.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return r.width >= 44 && r.height >= 44 && r.x >= 0 && r.right <= innerWidth && (hit === n || n.contains(hit)); });
         assert.equal(reachable, true, `GIF is reachable at ${width}px`);
-        const [download] = await Promise.all([page.waitForEvent('download'), target.click()]);
-        compactGif.push({ width, filename: download.suggestedFilename(), reachable });
+        const filename = `${out}/synthetic-animation-${width}.gif`;
+        await exportThroughPreview(page, () => target.click(), filename);
+        compactGif.push({ width, filename, reachable });
         assert.deepEqual(await pixels(page), before);
         await page.screenshot({ path: `${out}/gif-controls-${width}.png` });
       }
-      await page.locator('[data-action="close-animation"]').click(); await page.setViewportSize({ width: 1440, height: 900 });
+      const close = page.locator('[data-action="close-animation"]');
+      if (await close.isVisible()) await close.click();
+      await page.setViewportSize({ width: 1440, height: 900 });
       const png = { type: 'image/png', width: pngMeta.width, height: pngMeta.height, sourceCellsExact: true };
       const gif = { type: 'image/gif', width: gifMeta.width, height: gifMeta.pageHeight, bytes: gifBytes.length, frames };
       report.mediaRequests += await page.evaluate(() => window.__drawSearchMediaRequests); assert.deepEqual(errors, []);

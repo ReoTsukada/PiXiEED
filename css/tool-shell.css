@@ -6,6 +6,10 @@
 .tool-shell .site-nav { display: flex; align-items: center; gap: 1rem; }
 .tool-shell .site-nav a { color: #4d5962; font-size: .84rem; font-weight: 700; text-underline-offset: .2em; }
 .tool-shell .tool-intro__hero { padding-block: clamp(1.15rem, 2.1vw, 1.8rem); }
+.tool-shell--draw .tool-intro__hero-grid--single { grid-template-columns: minmax(0, 1fr) minmax(7rem, 9rem); align-items: center; gap: clamp(1rem, 4vw, 2.5rem); }
+.tool-shell--draw .draw-hero-example { width: 100%; max-width: 9rem; margin: 0; text-align: center; }
+.tool-shell--draw .draw-hero-example img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.tool-shell--draw .draw-hero-example figcaption { margin-top: .35rem; color: #4d5962; font-size: .75rem; font-weight: 700; }
 .tool-shell .tool-intro__copy h1 { margin-bottom: .4rem; font-size: clamp(1.8rem, 3.1vw, 2.65rem); }
 .tool-shell .tool-intro__lead { font-size: .96rem; }
 .tool-shell .tool-intro__hint { margin-top: .35rem; }
@@ -66,6 +70,9 @@
   .tool-shell .site-nav { gap: .7rem; }
   .tool-shell .site-nav a { font-size: .75rem; }
   .tool-shell .tool-intro__hero { padding-block: 1rem 1.1rem; }
+  .tool-shell--draw .tool-intro__hero-grid--single { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .tool-shell--draw .draw-hero-example { max-width: 5.5rem; }
+  .tool-shell--draw .draw-hero-example figcaption { font-size: .65rem; }
   .tool-shell .tool-intro__copy h1 { font-size: clamp(1.65rem, 7vw, 2.25rem); }
   .tool-shell .tool-intro__lead { font-size: .89rem; }
   .tool-shell__workspace { padding-block: .75rem; }

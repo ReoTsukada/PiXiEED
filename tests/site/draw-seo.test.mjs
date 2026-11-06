@@ -49,8 +49,11 @@ test('visible draw guidance explains frame duplication, onion skin, playback, an
   assert.match(main, /オニオンスキン/);
   assert.match(main, /再生ボタン/);
   assert.match(main, /［セル表］やフレーム操作の［GIFを書き出す］/);
-  assert.match(main, /画面下部の［出力］からPNG/);
-  assert.match(main, /共有シートに渡して保存/);
+  assert.match(main, /画面下部の［出力］/);
+  assert.match(main, /変換・出力画面/);
+  assert.match(main, /［PNGで保存］/);
+  assert.match(main, /［ファイル］.*［今の作品］.*［その他］.*［保存し直す］/);
+  assert.match(main, /保存済み/);
   assert.match(main, /20ms以上/);
   assert.match(main, /GIFは半透明を保存できません/);
   assert.match(main, /href="\/camera\/"/);

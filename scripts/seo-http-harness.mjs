@@ -10,9 +10,9 @@ import { stores as storeData } from '../data/site-data.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const eventCatalog = JSON.parse(await readFile(resolve(root, 'events/catalog.json'), 'utf8'));
 const eventRoutes = ['/events/', ...eventCatalog.ids.map(id => `/events/${id}/`)];
-const pages = ['/', '/output/', '/globe/', '/tools/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/', '/help/', '/glossary/', '/projects/pixfind/'];
+const pages = ['/', '/explore/', '/welcome/', '/output/', '/globe/', '/tools/', '/draw/', '/draw/about/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/game/', '/pixel-camera.html', '/pixiee-lens/', '/telescope/', '/about/', '/guide/', '/privacy/', '/terms/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html', '/collection/', '/help/', '/glossary/', '/projects/pixfind/'];
 const legacyRoutes = ['/pixiedraw/', '/pixiedraw2/', '/PiXiEEDraw/', '/studio/', '/projects/pixiedraw/'];
-const indexableRoutes = ['/', '/globe/', '/tools/', '/output/', '/draw/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/about/', '/guide/', '/privacy/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
+const indexableRoutes = ['/', '/explore/', '/welcome/', '/globe/', '/tools/', '/output/', '/draw/', '/camera/', '/audio/', '/jigsaw/', '/spot-difference/', '/hidden-object/', '/play/spot-difference/', '/play/hidden-object/', '/about/', '/guide/', '/privacy/', '/terms/', '/books/', '/stores/', '/stores/ecowashcafe-nakanoshima.html'];
 const nonIndexableLegacyRoutes = new Set(['/draw/about/', '/pixel-camera.html', '/pixiee-lens/']);
 const canonicalPathOverrides = new Map([
   ['/draw/about/', '/draw/'],
