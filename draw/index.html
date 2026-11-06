@@ -66,7 +66,7 @@
   <link rel="stylesheet" href="/css/tool-intro.css?rev=20261015-dedicated-start-2">
   <link rel="stylesheet" href="/css/tool-embed.css?rev=20261024-free-tools-1">
   <link rel="stylesheet" data-direct-shell-style href="/css/tool-direct.css?rev=20261024-free-tools-1">
-  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261021-header-layout-1">
+  <link rel="stylesheet" href="/css/tool-shell.css?rev=20261106-draw-entry-1">
 </head>
 <body class="tool-intro tool-shell tool-shell--draw" data-tool-shell>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -83,9 +83,10 @@
           <p class="tool-intro__eyebrow" data-shell-eyebrow>PIXIEEDRAW</p>
           <h1 id="tool-title" data-shell-title>ドット絵・ピクセルアートを描く</h1>
           <p class="tool-intro__lead" data-shell-lead>ピクセルアート（Pixel Art）でゲーム素材などの小さな絵を描き、コマをつないでGIFも作れます。</p>
-          <p class="tool-intro__hint">［作業を始める］で制作画面を開きます。レイヤーやコマの編集も利用できます。使用色は最大64色（透明・未使用色を除く）、パレット登録候補は最大128色です。</p>
+          <p class="tool-intro__hint">ブラウザーで描き、PNG画像やGIFアニメーションを書き出せます。［作業を始める］で制作画面を開きます。</p>
           <button class="tool-shell__start" type="button" data-embed-start data-embed-target="draw-tool">作業を始める</button>
         </div>
+        <figure class="draw-hero-example"><img src="/assets/samples/maou.png" width="16" height="16" alt="完成例：色鮮やかな魔王のドット絵" decoding="async"><figcaption>ドット絵の完成例</figcaption></figure>
       </div>
     </section>
 
@@ -106,9 +107,9 @@
     <section class="tool-intro__how-to container" id="draw-how-to" aria-labelledby="tool-how-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">HOW TO USE</p><h2 id="tool-how-title">使い方</h2></div>
       <ol class="tool-intro__steps">
-        <li><span>01</span><div><h3>色と道具を選ぶ</h3><p>パレットから色を選び、ペンや消しゴム、直線・図形などでキャンバスに描きます。</p></div></li>
-        <li><span>02</span><div><h3>コマを複製して動きをつける</h3><p>フレーム一覧でコマを複製し、少しずつ絵を変えて動きを作ります。前後のコマを薄く重ねるオニオンスキンで位置を合わせ、再生ボタンで動きを確認できます。</p></div></li>
-        <li><span>03</span><div><h3>作品を保存してPNG・GIFを書き出す</h3><p>編集を続けるプロジェクトは［作品を保存］でこのブラウザーに保存します。静止画は画面下部の［出力］からPNGを書き出します。アニメーションGIFは［セル表］やフレーム操作の［GIFを書き出す］を選びます。PCではダウンロード、対応するスマートフォンでは共有シートに渡して保存できます。GIFの各コマは20ms以上です。</p></div></li>
+        <li><span>01</span><div><h3>色と道具を選んで描く</h3><p>パレットから色を選び、ペンや消しゴム、直線・図形などでキャンバスに描きます。</p></div></li>
+        <li><span>02</span><div><h3>PNG画像を書き出す</h3><p>画面下部の［出力］を開き、変換・出力画面で［出力形式］をPNGにして［PNGで保存］を押します。［編集へ］で描画に戻れます。</p></div></li>
+        <li><span>03</span><div><h3>動かしたいときはGIFにする</h3><p>フレーム一覧でコマを複製し、少しずつ絵を変えて動きを作ります。オニオンスキンで位置を合わせ、再生ボタンで確認できます。［セル表］やフレーム操作の［GIFを書き出す］を選ぶと、共通の出力画面で保存できます。各コマは20ms以上です。GIFは半透明を保存できません。</p></div></li>
       </ol>
       <details class="tool-intro__screens">
         <summary>実際の編集画面を見る</summary>
@@ -121,20 +122,20 @@
 
     <section class="tool-intro__formats container" aria-labelledby="tool-features-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">PIXEL ART & ANIMATION</p><h2 id="tool-features-title">ドット絵から、動くアニメーションGIFまで</h2></div>
-      <p>PiXiEEDrawはブラウザーで使えるドット絵・ピクセルアート制作ツールです。ゲーム用の小さなキャラクターやアイコンを描きたいときにも使えます。レイヤーとフレームで絵を編集し、コマを複製して少しずつ変えると、動くアニメーションを作れます。PNGは画面下部の［出力］、GIFは［セル表］やフレーム操作の［GIFを書き出す］から書き出します。写真をドット絵に変換する<a href="/camera/">カメラツール</a>や、色を音に割り当てて曲を作る<a href="/audio/">音楽ツール</a>もあります。画像やGIFに音楽をつけた動画を作る場合は<a href="/output/">動画作成ツール</a>を利用できます。</p>
+      <p>PiXiEEDrawはブラウザーで使えるドット絵・ピクセルアート制作ツールです。ゲーム用の小さなキャラクターやアイコンを描きたいときにも使えます。レイヤーやフレームを編集でき、使用色は最大64色（透明・未使用色を除く）、パレット登録候補は最大128色です。コマを複製して少しずつ変えると、動くアニメーションを作れます。PNG・GIFは共通の出力画面で保存できます。写真をドット絵に変換する<a href="/camera/">カメラツール</a>や、色を音に割り当てて曲を作る<a href="/audio/">音楽ツール</a>もあります。画像やGIFに音楽をつけた動画を作る場合は<a href="/output/">動画作成ツール</a>を利用できます。</p>
       <p>画像を描き直さずPNGからJPEG・JPEGからPNGへ形式だけ変える場合は、<a href="/output/">画像・音声の変換ツール</a>を使えます。Drawの画像読込はPNG・WebPを制作キャンバスへ複製する機能で、サイズや色数が変わる場合があります。</p>
     </section>
 
     <section class="tool-intro__formats tool-shell__save container" id="draw-save" aria-labelledby="tool-save-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">SAVE & EXPORT</p><h2 id="tool-save-title">保存・出力</h2></div>
-      <p>［作品を保存］を選ぶと、編集を続けられるプロジェクトデータを利用中のブラウザーに保存できます。別の端末やブラウザーへの自動同期はありません。PNGは画面下部の［出力］、アニメーションGIFは［セル表］やフレーム操作の［GIFを書き出す］から書き出します。PCではダウンロード、対応するスマートフォンでは共有シートに渡して保存できます。保存やダウンロードだけで作品が公開されることはありません。</p>
+      <p>編集内容は同じブラウザーに自動保存されます。［保存済み］を確認してからページを閉じてください。必要なときは［ファイル］→［今の作品］→［その他］→［保存し直す］でプロジェクトを手動保存できます。PNG画像やGIFアニメーションのファイル出力とは別の保存で、別の端末やブラウザーへの自動同期はありません。ファイルを保存しても作品は公開されません。保存に失敗した表示が出たときは、このタブを開いたままにして、もう一度［保存し直す］を選んでください。</p>
     </section>
 
     <section class="tool-intro__faq container" id="draw-faq" aria-labelledby="tool-faq-title">
       <div class="tool-intro__section-head"><p class="tool-intro__eyebrow">FAQ</p><h2 id="tool-faq-title">よくある質問</h2></div>
-      <details><summary>作品データと画像はどこから保存できますか？</summary><p>［作品を保存］で編集用のプロジェクトデータを利用中のブラウザーに保存します。PNGは画面下部の［出力］から書き出します。PCではダウンロード、対応するスマートフォンでは共有シートに渡して保存できます。別の端末やブラウザーとの自動同期はありません。</p></details>
-      <details><summary>アニメーションGIFはどこから保存できますか？半透明も使えますか？</summary><p>フレームを複製して動きを作り、［セル表］やフレーム操作の［GIFを書き出す］を選びます。PCではダウンロード、対応するスマートフォンでは共有シートに渡して保存できます。各コマは20ms以上です。GIFは半透明を保存できません。半透明を保つ場合はPNGで保存するか、半透明をなくしてからGIFを書き出してください。</p></details>
-      <details><summary>説明を見ても編集中の作品は保持されますか？</summary><p>［説明を見る］と［作業に戻る］で同じ編集画面を行き来できます。このページ内では作品や編集履歴を保持します。再読み込みやページを離れる前には作品を保存してください。</p></details>
+      <details><summary>作品データと画像はどこから保存できますか？</summary><p>編集内容は同じブラウザーに自動保存されます。［保存済み］を確認してください。プロジェクトを手動保存するときは［ファイル］→［今の作品］→［その他］→［保存し直す］を選びます。PNGは画面下部の［出力］から共通の出力画面を開き、出力形式をPNGにして保存します。別の端末やブラウザーとの自動同期はありません。</p></details>
+      <details><summary>アニメーションGIFはどこから保存できますか？半透明も使えますか？</summary><p>フレームを複製して動きを作り、［セル表］やフレーム操作の［GIFを書き出す］を選びます。共通の出力画面で保存できます。各コマは20ms以上です。GIFは半透明を保存できません。半透明を保つ場合はPNGで保存するか、半透明をなくしてからGIFを書き出してください。</p></details>
+      <details><summary>説明を見ても編集中の作品は保持されますか？</summary><p>［説明を見る］と［作業に戻る］で同じ編集画面を行き来できます。このページ内では作品や編集履歴を保持し、編集内容は同じブラウザーに自動保存されます。ページを閉じる前に［保存済み］を確認してください。</p></details>
       <details><summary>作品を保存すると公開されますか？</summary><p>保存と公開は別の操作です。端末内への保存やファイルのダウンロードでは公開されません。公開作品を探すときは<a href="/globe/">世界地図</a>を開けます。</p></details>
       <details><summary>カメラはページを開くと起動しますか？</summary><p>自動では起動しません。撮影操作を選んだときにブラウザーがカメラの利用許可を確認します。画像ファイルからも始められます。</p></details>
       <details><summary>描画・カメラ・音楽の作品は共有されますか？</summary><p>3つのモードは同じ作品とキャンバスを使います。音楽は専用レイヤーで編集します。</p></details>
