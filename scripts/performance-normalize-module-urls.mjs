@@ -14,14 +14,15 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // Declare canonical cache revisions here; derive no versions from file contents.
 // Keep runtime-specific query values intact while normalizing module references.
 const targets = new Map([
+  ['creation-mode-motion.mjs', 'rev=20261107-mode-continuity-1'],
   ['tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
   ['audio-entry.mjs', 'rev=20261106-button-icon-audit-1'],
   ['audio-page.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['tool-direct.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['tool-shell.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['creation-runtime.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['creation-modes.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['creation-modes.css', 'rev=20261106-button-icon-audit-1'],
+  ['tool-direct.mjs', 'rev=20261107-mode-continuity-1'],
+  ['tool-shell.mjs', 'rev=20261107-mode-continuity-1'],
+  ['creation-runtime.mjs', 'rev=20261107-mode-continuity-1'],
+  ['creation-modes.mjs', 'rev=20261107-mode-continuity-1'],
+  ['creation-modes.css', 'rev=20261107-mode-continuity-1'],
   ['draw-music.mjs', 'rev=20261106-button-icon-audit-1'],
   ['draw-audio-timbre-panel.mjs', 'rev=20261106-button-icon-audit-1'],
   ['tool-project-import.mjs', 'rev=20261106-button-icon-audit-1'],
@@ -33,11 +34,11 @@ const targets = new Map([
   ['jigsaw-page.mjs', 'rev=20261024-common-tool-start-1'],
   ['spot-difference-page.mjs', 'rev=20261024-common-tool-start-1'],
   ['hidden-object-page.mjs', 'rev=20261024-common-tool-start-1'],
-  ['draw-page.mjs', 'rev=20261106-button-icon-audit-1'],
+  ['draw-page.mjs', 'rev=20261107-mode-continuity-1'],
   ['animation-controls.mjs', 'rev=20261106-button-icon-audit-1'],
   ['draw-desktop-ui.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['creation-runtime.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['creation-modes.mjs', 'rev=20261106-button-icon-audit-1'],
+  ['creation-runtime.mjs', 'rev=20261107-mode-continuity-1'],
+  ['creation-modes.mjs', 'rev=20261107-mode-continuity-1'],
   ['app.js', 'rev=20261024-common-tool-start-1'],
   ['site-header.mjs', 'rev=20261024-common-tool-start-1'],
   ['page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
@@ -106,7 +107,8 @@ function normalize(source, file) {
       'js/creation/draw-page.mjs', 'js/creation/project-workspace.mjs',
       'js/tool-direct.mjs', 'js/tool-shell.mjs'
     ]);
-    const revision = iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
+    const continuityTargets = new Set(["js/creation/creation-camera.mjs", "css/creation-modes.css", "js/creation/creation-mode-motion.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+    const revision = continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });

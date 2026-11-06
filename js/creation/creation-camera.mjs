@@ -103,7 +103,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   // Scope their visibility to camera so retained Draw/Audio tools stay intact.
   style.textContent = `${scoped}\n${cameraActionIcons}\nbody.creation-suite[data-creation-mode="camera"] :is(.draw-feature-actions, #main > .draw-size) { display:none !important; }`;
   style.media = 'all';
-  document.head.insertBefore(style, document.querySelector('link[href*="creation-modes.css?rev=20261106-button-icon-audit-1"]'));
+  document.head.insertBefore(style, document.querySelector('link[href*="/css/creation-modes.css?rev=20261107-mode-continuity-1"]'));
   board.closest('#main').append(surface, template.querySelector('#cameraImageStatus'), template.querySelector('#cameraSaveDialog'));
   // Portal the original camera controls into the actual shared operation dock.
   // Retain .lc and mirror state attributes for its existing contextual selectors.

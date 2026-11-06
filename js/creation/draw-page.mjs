@@ -899,6 +899,9 @@ function zoomAt(nextZoom, focusX, focusY, base = { zoom, panX, panY }) {
 }
 function resetView() { zoom = 1; panX = 0; panY = 0; updateCanvasView(); }
 function updateCanvasView() {
+  // FLIP moves the board in screen space; defer geometry-derived pan/overlays
+  // until mode resume so transformed bounds cannot be written as local sizes.
+  if ($('.draw-board').dataset.creationModeMotion === 'true') return;
   if (zoom > 1) clampPan();
   canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   $('#draw-zoom-label').textContent = `${Math.round(zoom * 100)}%`;
@@ -906,7 +909,7 @@ function updateCanvasView() {
   placeOverlays();
 }
 function placeOverlays() {
-  const board = $('.draw-board'); const grid = $('.draw-grid'); if (!board || !grid) return;
+  const board = $('.draw-board'); const grid = $('.draw-grid'); if (!board || !grid || board.dataset.creationModeMotion === 'true') return;
   const b = board.getBoundingClientRect(); const r = canvas.getBoundingClientRect();
   Object.assign(grid.style, { left: `${r.left - b.left - board.clientLeft}px`, top: `${r.top - b.top - board.clientTop}px`, width: `${r.width}px`, height: `${r.height}px` });
   grid.style.setProperty('--symmetry-length', `${2 * Math.max(r.width, r.height)}px`);
@@ -2761,7 +2764,7 @@ function disposeDrawMode() {
 }
 function clearToastTimer() { clearTimeout(toastTimer); }
 scope.add(disposeDrawMode);
-mountDrawDesktopUi({ scope, root: $('#main'), drawShortcuts, animationControls, assignDrawInput, cancelInput: cancelDrawingInput, onLayout: updateCanvasView });
+const desktopUi = mountDrawDesktopUi({ scope, root: $('#main'), drawShortcuts, animationControls, assignDrawInput, cancelInput: cancelDrawingInput, onLayout: updateCanvasView });
 await pxdBridge.ready;
 if (returnedCamera) {
   cameraOpening = true; freezeCameraEditor();
@@ -3022,6 +3025,7 @@ return {
     interactionEffects.clear();
     editorUi.closePanels(); animationControls?.close?.(); selectionPanel?.hide();
   },
+  refreshModeLayout() { desktopUi.layout(); updateCanvasView(); },
   resume() { setCanvasDimensions(); paint(); updateCanvasView(); updateControls(); },
   getImage() { if (readOnlyImage) return { width: readOnlyImage.width, height: readOnlyImage.height, rgba: new Uint8ClampedArray(readOnlyImage.rgba) }; const doc = animationSession.composite(documentData); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba(doc.rgba ? doc : { ...doc, pixels: Array.from(doc.pixels) })) }; },
   /** Narrow bridge used by the spot editor's isolated, memory-only Draw iframe. */
