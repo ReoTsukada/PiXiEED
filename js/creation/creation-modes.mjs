@@ -27,7 +27,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261017-editor-improvements-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261106-button-icon-audit-1';
   const styled = new Promise((resolve, reject) => {
     const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
     const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
@@ -51,7 +51,30 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   own(document.querySelector('#draw-animation-play'), 'draw');
   const launcher = nav.querySelector('[data-nav="camera"]');
   const menu = document.createElement('details'); menu.id = 'creation-mode-menu';
-  menu.innerHTML = `<summary aria-label="描画モード。制作モードを切り替え" title="描画モード。制作モードを切り替え"><img src="/assets/icons/pixieed/draw.svg" alt=""><span class="app-tab-label">モード</span><span class="visually-hidden">制作モード</span></summary><div class="creation-mode-menu__panel" role="group" aria-label="制作モード"><button type="button" data-creation-mode="draw" aria-pressed="true">描画</button><button type="button" data-creation-mode="camera" aria-pressed="false">カメラ</button><button type="button" data-creation-mode="audio" aria-pressed="false">音楽</button><p>同じ作品・キャンバス・パレットを使います。音楽は全コマ共通の専用レイヤーで編集します。</p><p>以前の独立作品は「作品を管理 → 取り込む」で選べます。元の作品を残したコピーとして開きます。</p><p class="creation-mode-error" role="status" aria-live="polite"></p></div>`;
+  menu.innerHTML = `<summary aria-label="描画モード。制作モードを切り替え" title="描画モード。制作モードを切り替え"><img src="/assets/icons/pixieed/draw.svg" alt=""><span class="app-tab-label">描画</span><span class="visually-hidden">制作モード</span></summary><div class="creation-mode-menu__panel" role="group" aria-label="制作モード"><button type="button" data-creation-mode="draw" aria-pressed="true"><span class="creation-mode-menu__name">描画</span><span class="creation-mode-menu__detail">絵・コマ・レイヤーを編集</span></button><button type="button" data-creation-mode="camera" aria-pressed="false"><span class="creation-mode-menu__name">カメラ</span><span class="creation-mode-menu__detail">撮影して作品に配置</span></button><button type="button" data-creation-mode="audio" aria-pressed="false"><span class="creation-mode-menu__name">音楽</span><span class="creation-mode-menu__detail">色に音を割り当てて曲を作成</span></button><p class="creation-mode-menu__shared">3つのモードは同じ作品を使います。撮影画像は配置を確定すると作品に入り、音楽は全コマ共通の専用レイヤーで絵とは別の時間軸を使います。</p><p>以前の独立作品は「作品を管理 → 取り込む」で選べます。元の作品を残したコピーとして開きます。</p><p class="creation-mode-menu__save">編集はこのブラウザーに保存。PXDは作品のバックアップ、出力はPNG・GIF・音声・動画などのファイル保存です。</p><p class="creation-mode-error" role="status" aria-live="polite"></p></div>`;
+  const createActionIcon = name => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
+    const add = (tag, d, attrs = {}) => { const shape = document.createElementNS('http://www.w3.org/2000/svg', tag); shape.setAttribute('d', d); shape.setAttribute('fill', 'none'); shape.setAttribute('stroke', 'currentColor'); shape.setAttribute('stroke-width', '1.8'); shape.setAttribute('stroke-linecap', 'round'); shape.setAttribute('stroke-linejoin', 'round'); for (const [key, value] of Object.entries(attrs)) shape.setAttribute(key, value); svg.append(shape); };
+    const specs = {
+      draw: [['path', 'm4 20 1.2-4.1L16.1 5a2.7 2.7 0 0 1 3.8 3.8L9 19.7 4 20Z'], ['path', 'm13.9 7.2 3.8 3.8m-12.5 5 3 3']],
+      camera: [['path', 'M4.5 7.5h3l1.6-2.2h5.8l1.6 2.2h3A1.5 1.5 0 0 1 21 9v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5V9a1.5 1.5 0 0 1 1.5-1.5Z'], ['circle', '', { cx: '12', cy: '13', r: '3.4' }]],
+      audio: [['path', 'M10 16V5.5L19 4v10.5'], ['path', 'M10 8.5 19 7'], ['ellipse', '', { cx: '7.5', cy: '17', rx: '2.5', ry: '1.8', transform: 'rotate(-18 7.5 17)' }], ['ellipse', '', { cx: '16.5', cy: '15.5', rx: '2.5', ry: '1.8', transform: 'rotate(-18 16.5 15.5)' }]],
+      artwork: [['rect', 'M4 4h16v16H4z', { rx: '2' }], ['path', 'M7 15l3-3 2 2 2-3 3 4M8 8h.01']],
+      export: [['path', 'M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4']],
+      copy: [['rect', 'M8 7h12v14H8z', { rx: '2' }], ['path', 'M16 7V4a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h3']],
+      resume: [['path', 'M20 11a8 8 0 0 0-14.8-3L3 11'], ['path', 'M3 5v6h6'], ['path', 'M12 8v4l3 2']],
+      manage: [['path', 'M3 7h7l2 2h9v10H3z'], ['path', 'M3 7V5h7l2 2']],
+      canvas: [['rect', 'M4 4h16v16H4z', { rx: '2' }], ['path', 'M8 8h8v8H8z']],
+      settings: [['path', 'M4 6h16M4 12h16M4 18h16'], ['circle', '', { cx: '9', cy: '6', r: '2' }], ['circle', '', { cx: '15', cy: '12', r: '2' }], ['circle', '', { cx: '10', cy: '18', r: '2' }]],
+      save: [['path', 'M5 3h12l4 4v14H3V3z'], ['path', 'M7 3v6h10V3M7 21v-8h10v8']]
+    };
+    for (const [tag, d, attrs] of specs[name] || specs.artwork) add(tag, d, attrs || {});
+    return svg;
+  };
+  const addActionIcon = (button, name) => { if (!button || button.querySelector('.creation-action-icon')) return; const svg = createActionIcon(name); svg.classList.add('creation-action-icon'); button.prepend(svg); };
+  for (const [modeName, iconName] of [['draw', 'draw'], ['camera', 'camera'], ['audio', 'audio']]) {
+    const choice = menu.querySelector(`[data-creation-mode="${modeName}"] .creation-mode-menu__name`); if (choice) { choice.prepend(createActionIcon(iconName)); choice.title = choice.textContent.trim(); }
+  }
   launcher.replaceWith(menu);
   const modeButtons = [...menu.querySelectorAll('[data-creation-mode]')];
   const errorNode = menu.querySelector('.creation-mode-error');
@@ -102,9 +125,13 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   settingsPanel.setAttribute('role', 'dialog'); settingsPanel.setAttribute('aria-labelledby', 'creation-settings-heading');
   const settingsHeading = document.createElement('h2'); settingsHeading.id = 'creation-settings-heading'; settingsHeading.className = 'visually-hidden'; settingsHeading.textContent = '設定を選ぶ';
   const canvasSettingsChoice = document.createElement('button'); canvasSettingsChoice.type = 'button';
-  canvasSettingsChoice.id = 'creation-canvas-settings-open'; canvasSettingsChoice.textContent = 'キャンバス・パレット';
+  canvasSettingsChoice.id = 'creation-canvas-settings-open';
+  const canvasSettingsLabel = document.createElement('span'); canvasSettingsLabel.textContent = 'キャンバス・パレット'; canvasSettingsChoice.append(canvasSettingsLabel);
   const modeSettingsChoice = document.createElement('button'); modeSettingsChoice.type = 'button';
-  modeSettingsChoice.id = 'creation-mode-settings-open'; modeSettingsChoice.textContent = '描画の設定';
+  modeSettingsChoice.id = 'creation-mode-settings-open';
+  const modeSettingsLabel = document.createElement('span'); modeSettingsLabel.textContent = '描画の設定'; modeSettingsChoice.append(modeSettingsLabel);
+  addActionIcon(canvasSettingsChoice, 'canvas'); addActionIcon(modeSettingsChoice, 'settings');
+  canvasSettingsChoice.title = canvasSettingsLabel.textContent; modeSettingsChoice.title = modeSettingsLabel.textContent;
   settingsPanel.append(settingsHeading, canvasSettingsChoice, modeSettingsChoice); document.body.append(settingsPanel);
   scope.add(() => settingsPanel.remove());
   const portalHeaderControl = (node, owner, portalScope = scope) => {
@@ -159,16 +186,27 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   productionHeader.append(headerSettingsSlot); headerSettingsSlot.append(settingsButton); own(headerSettingsSlot, 'shared');
   for (const slot of productionHeader.querySelectorAll('.px-tool-header-slot:has(#creation-mode-menu)')) own(slot, 'shared');
   const placeSettings = owner => {
-    if (owner === 'camera') nav.append(settingsButton);
-    else headerSettingsSlot.append(settingsButton);
+    const parent = owner === 'camera' ? nav : headerSettingsSlot;
+    if (settingsButton.parentElement !== parent) parent.append(settingsButton);
   };
   const projectDialog = document.querySelector('#pxd-panel');
   let restoreFileFocus = false;
   const currentProjectPane = projectDialog?.querySelector('#project-current-pane');
   const imageImportActions = document.createElement('div'); imageImportActions.className = 'project-sheet__actions creation-file-image-actions';
   const imageImportButton = document.createElement('button'); imageImportButton.type = 'button'; imageImportButton.id = 'creation-file-image-open'; imageImportButton.textContent = '画像を読み込む';
+  addActionIcon(imageImportButton, 'artwork'); imageImportButton.title = imageImportButton.textContent;
   imageImportButton.setAttribute('aria-label', '画像ファイルを読み込む'); imageImportActions.append(imageImportButton);
   currentProjectPane?.before(imageImportActions);
+  const outputActionIcons = new Map([
+    ['#draw-save', 'save'], ['#draw-export', 'export'], ['#draw-import-local', 'artwork'],
+    ['#draw-copy-last', 'copy'], ['#draw-resume', 'resume'], ['[data-output-project]', 'manage']
+  ]);
+  for (const [selector, iconName] of outputActionIcons) {
+    const action = document.querySelector(`#draw-output ${selector}`); const heading = action?.querySelector('strong');
+    if (!action || !heading) continue;
+    const titleRow = document.createElement('span'); titleRow.className = 'creation-output__card-title';
+    addActionIcon(titleRow, iconName); titleRow.append(heading); action.prepend(titleRow); action.title = heading.textContent.trim();
+  }
   scope.add(() => imageImportActions.remove());
   const projectNotes = document.createElement('div'); projectNotes.id = 'creation-project-save-scope'; projectNotes.className = 'creation-project-notes';
   const saveScopeNote = document.createElement('p'); saveScopeNote.className = 'creation-project-save-note';
@@ -323,16 +361,28 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   for (const type of ['pointerdown','click','keydown']) scope.listen(document, type, guardInput, { capture:true });
   function show(owner) {
     if (owner === 'draw') draw.selectArtLayer?.();
-    body.dataset.creationMode = owner; body.dataset.page = 'draw';
+    if (body.dataset.creationMode !== owner) body.dataset.creationMode = owner;
+    if (body.dataset.page !== 'draw') body.dataset.page = 'draw';
     body.classList.remove('audio-tool-body');
-    for (const [name, nodes] of owned) for (const node of nodes) node.inert = name === 'shared' ? false : name === 'editor' ? owner === 'camera' : name !== owner;
-    for (const button of modeButtons) button.setAttribute('aria-pressed', String(button.dataset.creationMode === owner));
+    for (const [name, nodes] of owned) for (const node of nodes) {
+      const inert = name === 'shared' ? false : name === 'editor' ? owner === 'camera' : name !== owner;
+      if (node.inert !== inert) node.inert = inert;
+    }
+    for (const button of modeButtons) {
+      const pressed = String(button.dataset.creationMode === owner);
+      if (button.getAttribute('aria-pressed') !== pressed) button.setAttribute('aria-pressed', pressed);
+    }
     const label = { draw:'描画', camera:'カメラ', audio:'音楽' }[owner];
-    modeSettingsChoice.textContent = `${label}の設定`;
+    const modeSettingsName = `${label}の設定`;
+    if (modeSettingsLabel.textContent !== modeSettingsName) modeSettingsLabel.textContent = modeSettingsName;
+    if (modeSettingsChoice.title !== modeSettingsName) modeSettingsChoice.title = modeSettingsName;
     const currentModeLabel = `${label}モード。制作モードを切り替え`;
-    menu.querySelector('summary').setAttribute('aria-label', currentModeLabel);
-    menu.querySelector('summary').title = currentModeLabel;
-    menu.querySelector('summary img').src = `/assets/icons/pixieed/${({ draw:'draw', camera:'camera', audio:'music' })[owner]}.svg`;
+    const summary = menu.querySelector('summary'), summaryLabel = summary.querySelector('.app-tab-label');
+    if (summary.getAttribute('aria-label') !== currentModeLabel) summary.setAttribute('aria-label', currentModeLabel);
+    if (summaryLabel.textContent !== label) summaryLabel.textContent = label;
+    if (summary.title !== currentModeLabel) summary.title = currentModeLabel;
+    const iconSrc = `/assets/icons/pixieed/${({ draw:'draw', camera:'camera', audio:'music' })[owner]}.svg`;
+    if (summary.querySelector('img').getAttribute('src') !== iconSrc) summary.querySelector('img').setAttribute('src', iconSrc);
     placeSettings(owner);
     updateCameraActionState();
   }
@@ -341,7 +391,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261024-free-tools-1&attempt=${audioLoadAttempt++}`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261106-button-icon-audit-1&attempt=${audioLoadAttempt++}`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => isActive() && mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -379,7 +429,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-    const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261024-common-tool-start-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261106-button-icon-audit-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }
@@ -424,14 +474,18 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
         // project, so an unsupported projection leaves the current mode intact.
         assertCreationModeCompatible(next, draw.getTimeline());
         stopCurrent();
-        switching = true; main.inert = true; body.dataset.creationTransition = 'true';
-        menu.setAttribute('aria-busy', 'true'); errorNode.textContent = ''; settings.close();
+        switching = true; if (!main.inert) main.inert = true;
+        if (body.dataset.creationTransition !== 'true') body.dataset.creationTransition = 'true';
+        if (menu.getAttribute('aria-busy') !== 'true') menu.setAttribute('aria-busy', 'true');
+        if (errorNode.textContent) errorNode.textContent = ''; settings.close();
         const skipStartupTransition = startupSwitchPending && previous === 'draw' && next === (startupMode || initialRequestedMode);
         const leaving = skipStartupTransition ? Promise.resolve() : motion.leave(previous);
         try {
           // The retained project was already restored by Draw startup. It has
           // no user edits to save before the first camera mode is shown.
-          if (!skipStartupTransition) await draw.workspace.save();
+          // Capture and persist edits before changing modes, but avoid the full
+          // project snapshot/conflict check when the retained workspace is clean.
+          if (!skipStartupTransition && draw.workspace?.dirty !== false) await draw.workspace.save();
           if (!currentRequest(version)) continue;
           if (next === 'audio') await ensureAudio(version);
           if (next === 'camera') { await ensureCamera(version); await camera.enter(previous === 'audio' ? 'audio' : 'draw'); }
@@ -450,8 +504,9 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
       }
     } catch (error) { requestedMode = mode; throw error; }
     finally {
-      motion.cancel(); main.inert = wasInert; delete body.dataset.creationTransition;
-      switching = false; menu.removeAttribute('aria-busy');
+      motion.cancel(); if (main.inert !== wasInert) main.inert = wasInert;
+      delete body.dataset.creationTransition;
+      switching = false; if (menu.hasAttribute('aria-busy')) menu.removeAttribute('aria-busy');
       resumeCurrent(); if (!scope.disposed && isActive()) draw.workspace.activate();
       if (focusModeAfterSwitch?.isConnected) focusModeAfterSwitch.focus({ preventScroll:true });
       focusModeAfterSwitch = null;
@@ -515,7 +570,9 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     if (outputStatus.textContent !== outputMessage) outputStatus.textContent = outputMessage;
   }
   function setSettingsMenu(open, { restoreFocus = false } = {}) {
-    canvasSettingsChoice.textContent = mode === 'camera' ? 'PX数・比率' : 'キャンバス・パレット';
+    const canvasSettingsName = mode === 'camera' ? 'PX数・比率' : 'キャンバス・パレット';
+    if (canvasSettingsLabel.textContent !== canvasSettingsName) canvasSettingsLabel.textContent = canvasSettingsName;
+    if (canvasSettingsChoice.title !== canvasSettingsName) canvasSettingsChoice.title = canvasSettingsName;
     settingsPanel.hidden = !open; settingsButton.setAttribute('aria-expanded', String(open));
     if (open) focusFirst(settingsPanel, modeSettingsChoice);
     else if (restoreFocus && settingsButton.isConnected) settingsButton.focus({ preventScroll:true });

@@ -2,7 +2,7 @@ import { routeEditorFile } from './output-router.mjs?rev=20261028-unified-output
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
 import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261024-free-tools-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261106-button-icon-audit-1';
 import { createProjectSession } from './project-session.mjs?rev=20261016-color-capability-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261016-color-capability-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';

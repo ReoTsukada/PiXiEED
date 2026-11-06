@@ -25,15 +25,15 @@ export function mountDrawAudioTimbrePanel({ scope, colorPanel, getPalette, getSe
   targetRow.className = 'datp-target-row';
   targetRow.innerHTML = `<button id="datp-target-color" class="datp-target-chip" type="button" aria-label="現在の色"></button>
     <div class="datp-assignment"><span class="datp-micro-label">適用中</span><span id="datp-current-instrument" class="datp-current-instrument">音なし</span></div>
-    <button id="datp-previous-color" class="datp-icon-button" type="button" aria-label="前の色">‹</button>
-    <button id="datp-next-color" class="datp-icon-button" type="button" aria-label="次の色">›</button>`;
+    <button id="datp-previous-color" class="datp-icon-button" type="button" aria-label="前の色"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button>
+    <button id="datp-next-color" class="datp-icon-button" type="button" aria-label="次の色"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button>`;
   const targetChip = targetRow.querySelector('#datp-target-color');
   const currentInstrument = targetRow.querySelector('#datp-current-instrument');
 
   const categoryRow = document.createElement('div');
   categoryRow.className = 'datp-category-row';
-  categoryRow.innerHTML = `<button id="datp-category-open" class="datp-category-trigger" type="button" aria-expanded="false"><span>カテゴリ</span><strong id="datp-category-name"></strong><span aria-hidden="true">⌄</span></button>
-    <div class="datp-category-back-row" hidden><button id="datp-category-back" class="datp-back" type="button"><span aria-hidden="true">‹</span> 音色一覧</button><strong id="datp-category-heading">全10カテゴリ</strong></div>`;
+  categoryRow.innerHTML = `<button id="datp-category-open" class="datp-category-trigger" type="button" aria-expanded="false"><span>カテゴリ</span><strong id="datp-category-name"></strong><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="datp-category-back-row" hidden><button id="datp-category-back" class="datp-back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg> 音色一覧</button><strong id="datp-category-heading">全10カテゴリ</strong></div>`;
   const categoryOpen = categoryRow.querySelector('#datp-category-open');
   const categoryBackRow = categoryRow.querySelector('.datp-category-back-row');
   const categoryName = categoryRow.querySelector('#datp-category-name');
@@ -49,9 +49,9 @@ export function mountDrawAudioTimbrePanel({ scope, colorPanel, getPalette, getSe
   const footer = document.createElement('div'); footer.className = 'datp-footer';
   const colorDone = colorActions.querySelector('#dce-done');
   const soundActions = document.createElement('div'); soundActions.className = 'datp-sound-actions';
-  soundActions.innerHTML = `<button id="datp-audition" class="datp-audition" type="button" aria-label="候補の音色を試聴">▷<span>試聴</span></button>
-    <button id="datp-mute" class="datp-mute" type="button">この色を鳴らさない</button>
-    <button id="datp-apply" class="datp-apply" type="button">この色に適用</button>`;
+  soundActions.innerHTML = `<button id="datp-audition" class="datp-audition" type="button" aria-label="候補の音色を試聴"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="datp-audition-play" d="m6.5 5 11 7-11 7Z"/><path class="datp-audition-stop" d="M8 5v14M16 5v14"/></svg><span>試聴</span></button>
+    <button id="datp-mute" class="datp-mute" type="button" aria-label="この色を鳴らさない" title="この色を鳴らさない"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM16 9l5 6m0-6-5 6"/></svg><span>この色を鳴らさない</span></button>
+    <button id="datp-apply" class="datp-apply" type="button" aria-label="この色に適用" title="この色に適用"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span>この色に適用</span></button>`;
   const status = document.createElement('div'); status.id = 'datp-status'; status.className = 'datp-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   footer.append(colorActions, soundActions, status);
   root.replaceChildren(header, targetRow, categoryRow, scroll, footer, scrollCue);
@@ -197,7 +197,8 @@ export function mountDrawAudioTimbrePanel({ scope, colorPanel, getPalette, getSe
     const assigned = audioApi?.getAssignment?.(targetIndex, getPalette()[targetIndex]) || null;
     const readOnly = !audioApi || Boolean(audioApi.isReadOnly?.(targetIndex));
     const auditionButton = soundActions.querySelector('#datp-audition');
-    auditionButton.innerHTML = previewing ? '■<span>停止</span>' : '▷<span>試聴</span>';
+    auditionButton.dataset.state = previewing ? 'playing' : 'idle';
+    auditionButton.querySelector('span').textContent = previewing ? '停止' : '試聴';
     auditionButton.setAttribute('aria-label', previewing ? '試聴を停止' : '候補の音色を試聴');
     auditionButton.disabled = screen === 'categories' || (!previewing && !candidateInstrument);
     soundActions.querySelector('#datp-mute').disabled = screen === 'categories' || !candidateInstrument;

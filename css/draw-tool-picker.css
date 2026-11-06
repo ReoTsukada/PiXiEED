@@ -276,11 +276,24 @@ body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .dr
   border-radius: 12px !important;
   background: #2b3742 !important;
   color: #f5f2e8 !important;
-  font: 700 12px/1 system-ui, sans-serif !important;
+  /* Keep the readable name in aria-label/title while showing the shared T glyph.
+     The late font shorthand used to reveal the literal "文字" text node over it. */
+  font-size: 0 !important;
+  line-height: 0 !important;
 }
 body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .draw-text-opener[aria-expanded="true"] {
   border-color: #ffd35a !important;
   box-shadow: inset 0 0 0 1px #ffd35a !important;
+}
+body.creation-suite .draw-music-panel :is(#draw-music-page-add,#draw-music-page-copy,#draw-music-page-delete,#draw-music-preview,#draw-music-stop-loop,#draw-music-wav,#draw-music-video) {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+}
+body.creation-suite .draw-music-panel .draw-music-action-icon {
+  display:block; flex:0 0 18px; width:18px; height:18px; fill:none; stroke:currentColor;
+  stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+}
+body.creation-suite .draw-music-feedback button {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
 }
 /* Three selection choices are peers, not a two-column subgrid with the third
    shifted to a second row opposite the eyedropper. */
