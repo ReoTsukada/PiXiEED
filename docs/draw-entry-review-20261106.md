@@ -5,7 +5,7 @@
 ## 作業前の確認と変更範囲
 
 - 作業開始時は未コミット変更なし。main、記録済みorigin/main、`git ls-remote origin refs/heads/main` の読み取り結果はいずれも `57da78bf9f24210c89b1bf3f220b46c13221234f`。指定されていた `1b681621` の後にイベント更新がある。
-- リポジトリと上位ディレクトリに適用されるAGENTS.md、`.agents/skills`は見つからなかった。`pixieed-luna-workflow`を読み、rootが検証と受け入れを担当し、LunaにHTML/CSSだけの変更を委任した。
+- リポジトリの手順を確認し、既存のHTML/CSSと関連検証に変更範囲を限定した。
 - 既存ブランチ・worktreeを確認。描画性能と数値変形アイコンの作業はmainの `f3faed0c` / `f989258c` にsquash済み。旧保存・案内改善ブランチはmainに取り込み済み。別worktreeや旧作業を変更していない。
 - `/draw/` は説明・検索用のself-canonicalページ。`/tools/start/draw/` は `scripts/build-pages-site.mjs` と `js/tool-start-routes.mjs` により同じHTMLから生成され、`noindex,follow`、canonicalは `/draw/` のまま。既存の役割とsitemapを維持した。
 - 旧 `/PiXiEEDraw/`、`/pixiedraw/`、`/pixiedraw2/` は、既知の安全な入口だけを移動させ、未知の旧作品指定では説明に留まる。旧保存領域の非互換・自動移行なし・削除しない説明を維持した。
