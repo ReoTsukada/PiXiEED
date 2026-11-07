@@ -92,9 +92,10 @@ test('draw and audio steps match the shared editor controls and distinguish savi
   assert.match(audio.notes.join(' '), /共通キャンバス・パレット.*専用レイヤー/);
 });
 
-test('camera guide keeps the explicit start action and browser permission step', () => {
+test('camera guide explains automatic preview on camera entry and explicit retry', () => {
   const camera = getToolGuide({ pathname: '/camera/' });
-  assert.match(camera.steps[0], /「カメラを開始」.*ブラウザーの利用許可/);
+  assert.match(camera.steps[0], /カメラモードを開くとブラウザーの利用許可.*プレビューを開始/);
+  assert.match(camera.steps[0], /「カメラを開始」で再試行/);
 });
 
 test('jigsaw startup guidance does not ask players to choose the hidden engine grid size', () => {

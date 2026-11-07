@@ -6,6 +6,7 @@ import { posix } from 'node:path';
 test('Draw rail, editor UI, and direct runtime changes invalidate every parent and editor entry', async () => {
   const root = new URL('../../', import.meta.url);
   const revisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
+  const brushCamera = new Set(["js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "css/draw-brush-settings.css", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/tool-direct.mjs", "js/tool-help-bootstrap.mjs", "js/tool-help-data.mjs", "js/tool-help.mjs", "js/tool-shell.mjs"]);
   const continuity = new Set(['js/creation/creation-camera.mjs', 'js/creation/creation-mode-motion.mjs', 'js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs', 'css/creation-modes.css']);
   const currentModeIcon = new Set(['js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
   const modeClarity = new Set([...currentModeIcon, 'js/creation/creation-camera.mjs', 'css/creation-modes.css']);
@@ -61,7 +62,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
     'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
   ]);
-  for (const target of allToolsOfferwall) assert.equal(revisions[target], continuity.has(target) ? '20261107-mode-continuity-1' : buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261101-direct-material-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
+  for (const target of allToolsOfferwall) assert.equal(revisions[target], brushCamera.has(target) ? '20261107-brush-camera-1' : continuity.has(target) ? '20261107-mode-continuity-1' : buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261101-direct-material-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
@@ -89,7 +90,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'draw/index.html': ['js/tool-shell.mjs'],
     'camera/index.html': ['js/tool-shell.mjs'],
     'audio/index.html': ['js/tool-shell.mjs'],
-    'draw/editor.html': ['js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/creation/project-workspace.mjs', 'css/creation-animation.css', 'css/draw-color-adjustment-panel.css'],
+    'draw/editor.html': ['js/creation/draw-entry.mjs', 'js/creation/draw-page.mjs', 'js/creation/project-workspace.mjs', 'css/creation-animation.css', 'css/draw-color-adjustment-panel.css', 'css/draw-brush-settings.css'],
     'audio/editor.html': ['js/creation/audio-entry.mjs', 'css/creation-animation.css'],
     'hidden-object/index.html': ['js/creation/hidden-object-page.mjs'],
     'jigsaw/index.html': ['js/creation/jigsaw-page.mjs'],
@@ -106,7 +107,8 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (continuity.has(target)) assert.equal(revisions[target], '20261107-mode-continuity-1', `${target} invalidates continuous mode motion`);
+      if (brushCamera.has(target)) assert.equal(revisions[target], '20261107-brush-camera-1', `${target} invalidates the brush and camera fixes`);
+      else if (continuity.has(target)) assert.equal(revisions[target], '20261107-mode-continuity-1', `${target} invalidates continuous mode motion`);
       else if (buttonIconAudit.has(target) || modeClarity.has(target)) assert.equal(revisions[target], '20261106-button-icon-audit-1', `${target} invalidates the icon audit dependency closure`);
       else if (paletteNoop.has(target)) assert.equal(revisions[target], '20261106-audio-palette-noop-1', `${target} invalidates the guarded audio palette UI`);
       else if (commonToolStart.has(target)) assert.equal(revisions[target], '20261024-common-tool-start-1', `${target} invalidates the common tool-start dependency closure`);
