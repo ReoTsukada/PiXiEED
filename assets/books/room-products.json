@@ -26,7 +26,17 @@
         "sourceUrl": "https://store.shopping.yahoo.co.jp/ebookjapan/b00162030316.html",
         "checkedDate": "2026-10-20"
       }
-    ]
+    ],
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-guide.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "電子書籍とドット絵の描画のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-pochipochi",
@@ -55,7 +65,17 @@
         "sourceUrl": "https://store.shopping.yahoo.co.jp/bookfan/bk-4295202517.html",
         "checkedDate": "2026-10-20"
       }
-    ]
+    ],
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-guide.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "電子書籍とドット絵の描画のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-background",
@@ -72,7 +92,17 @@
     "image": null,
     "sample": false,
     "workId": "ultimate-pixel-crew-report",
-    "metadataNote": "同じ作品の紙版（Kindle版も掲載）。"
+    "metadataNote": "同じ作品の紙版（Kindle版も掲載）。",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/paper-landscape.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "背景の描き方を学ぶ本のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-new-pixel-art",
@@ -87,7 +117,17 @@
     "sourceLabel": "ボーンデジタルの商品紹介",
     "sourceUrl": "https://www.borndigital.co.jp/book/31795/",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/paper-gallery.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵の作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-famicom",
@@ -101,7 +141,17 @@
     "sourceLabel": "出版社発表（PR TIMES）",
     "sourceUrl": "https://prtimes.jp/main/html/rd/p/000000636.000007785.html",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-games.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ゲームのドット絵を紹介する電子書籍のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-3d-dot",
@@ -132,7 +182,17 @@
         "sourceUrl": "https://store.shopping.yahoo.co.jp/irisplaza/7296660.html",
         "checkedDate": "2026-10-20"
       }
-    ]
+    ],
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/peg-toy.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "スティックを挿してつくるおもちゃのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-dot-notebook",
@@ -148,7 +208,17 @@
       "https://www.amazon.co.jp/dp/B0HJYV517H?tag=pixieed-22&linkCode=ll2"
     ],
     "author": "きろくノート工房",
-    "metadataNote": "商品名・著者・サイズ・ページ数は利用者提供情報（公式仕様は未確認）。"
+    "metadataNote": "商品名・著者・サイズ・ページ数は利用者提供情報（公式仕様は未確認）。",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/grid-notebook.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "マスを塗る方眼ノートのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-dot-final-fantasy",
@@ -160,7 +230,17 @@
     "category": "books",
     "metadataNote": "商品名は提供URL由来の暫定表記。形式は利用者提供情報（公式未確認）。",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-generic.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "電子書籍のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-background-kindle",
@@ -177,7 +257,17 @@
     "author": "APO+・モトクロス斉藤・せたも 著",
     "publisher": "ボーンデジタル",
     "sourceLabel": "出版社の作品紹介（紙版）",
-    "sourceUrl": "https://www.borndigital.co.jp/book/20926/"
+    "sourceUrl": "https://www.borndigital.co.jp/book/20926/",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-landscape.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "背景の描き方を学ぶ電子書籍のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-girls-collection-02",
@@ -189,7 +279,17 @@
     "category": "books",
     "metadataNote": "商品名・形式は利用者提供情報（公式未確認）。",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-gallery.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-pixel-girl-snaps",
@@ -204,7 +304,17 @@
     "sample": false,
     "author": "ななみ雪",
     "sourceLabel": "刊行記念展示の公式案内",
-    "sourceUrl": "https://wps-jp.fujifilm.com/nanamiyuki_202403/"
+    "sourceUrl": "https://wps-jp.fujifilm.com/nanamiyuki_202403/",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-gallery.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-dot-macrame",
@@ -217,7 +327,17 @@
     "metadataNote": "商品名・著者・形式は利用者提供情報（公式未確認）。",
     "image": null,
     "sample": false,
-    "author": "ZAPOTECO"
+    "author": "ZAPOTECO",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-textile.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "糸を結ぶ手芸の電子書籍のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-pixel-girl-magic",
@@ -230,7 +350,17 @@
     "metadataNote": "商品名・著者・形式は利用者提供情報（公式未確認）。",
     "image": null,
     "sample": false,
-    "author": "JumKujira"
+    "author": "JumKujira",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-gallery.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-rin-wooden-puzzle",
@@ -242,7 +372,17 @@
     "category": "toys",
     "metadataNote": "商品名・形式は利用者提供情報（公式未確認）。",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/wood-puzzle.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "形を組み合わせる木製パズルのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-dot-course",
@@ -255,7 +395,17 @@
     "metadataNote": "商品名・著者・形式は利用者提供情報（公式未確認）。",
     "image": null,
     "sample": false,
-    "author": "R研究所"
+    "author": "R研究所",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/paper-guide.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "本とドット絵の描画のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-dot-sticker-masterpieces",
@@ -285,7 +435,17 @@
         "sourceUrl": "https://store.shopping.yahoo.co.jp/tower/8175200.html",
         "checkedDate": "2026-10-20"
       }
-    ]
+    ],
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/paper-stickers.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "シールを並べるパズルブックのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-girls-collection-01",
@@ -297,7 +457,17 @@
     "category": "books",
     "metadataNote": "商品名・形式は利用者提供情報（公式未確認）。",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/ebook-gallery.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-divoom-pixoo-64",
@@ -309,7 +479,17 @@
     "category": "gadgets",
     "metadataNote": "商品名・形式は利用者提供情報。メーカーの現行ページはPixoo 64Ⅱを掲載しているため、指定ASINのモデル・仕様は公式未確認。",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/pixel-display.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵を表示するフレームのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-divoom-ditoo-pro-white",
@@ -349,7 +529,17 @@
         "sourceUrl": "https://store.shopping.yahoo.co.jp/itempost/1-tokotokoneko-387.html",
         "checkedDate": "2026-10-20"
       }
-    ]
+    ],
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/pixel-speaker.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵表示と音を楽しむ機器のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-divoom-timebox-evo-black",
@@ -368,6 +558,16 @@
       "sourceUrl": "https://www.amazon.co.jp/dp/B0GQYVXZJD",
       "checkedDate": "2026-10-10",
       "observedAsin": "B0GQYVXZJD"
+    },
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/pixel-speaker.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵表示と音を楽しむ機器のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
     }
   },
   {
@@ -387,6 +587,16 @@
       "sourceUrl": "https://www.amazon.co.jp/dp/B08D2Z2N87",
       "checkedDate": "2026-10-10",
       "observedAsin": "B08D2Z2N87"
+    },
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/pixel-display.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "ドット絵を表示するフレームのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
     }
   },
   {
@@ -401,7 +611,17 @@
     "image": null,
     "sample": false,
     "sourceLabel": "LEGOの製品紹介",
-    "sourceUrl": "https://www.lego.com/ja-jp/product/white-baseplate-11026"
+    "sourceUrl": "https://www.lego.com/ja-jp/product/white-baseplate-11026",
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/white-baseplate.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "白いブロック用の基礎板のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-wyswyg-building-blocks-1200",
@@ -413,7 +633,17 @@
     "category": "toys",
     "metadataNote": "商品名・ブランド・ピース数は利用者提供情報（公式未確認）。",
     "image": null,
-    "sample": false
+    "sample": false,
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/building-blocks.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "組み立て用ブロックのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
+    }
   },
   {
     "id": "product-block-baseplates-eight",
@@ -432,6 +662,16 @@
       "sourceUrl": "https://www.amazon.co.jp/dp/B0CFQH8QR5",
       "checkedDate": "2026-10-10",
       "observedAsin": "B0CFQH8QR5"
+    },
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/baseplate-set.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "複数のブロック用基礎板のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
     }
   },
   {
@@ -452,6 +692,16 @@
       "checkedDate": "2026-10-10",
       "observedAsin": "B0HDNWKD9Y",
       "variantStatus": "unconfirmed-conflicting-cat-breeds"
+    },
+    "shopThumbnail": {
+      "src": "/assets/books/illustrations/cat-blocks.png",
+      "width": 96,
+      "height": 96,
+      "kind": "illustration",
+      "alt": "猫を題材にしたブロックのイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用の独自制作",
+      "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
+      "source": "scripts/generate-shop-illustrations.mjs"
     }
   },
   {

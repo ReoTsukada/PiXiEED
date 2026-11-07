@@ -27,10 +27,10 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/css/home-portal.css?rev=20261029-portal-1">
+  <link rel="stylesheet" href="/css/home-portal.css?rev=20261107-home-scenes-1">
   <title>PiXiEED｜つくる・変換する・遊ぶ</title>
   <script>(()=>{const q=new URLSearchParams(location.search);if(q.has("art")||q.get("post")==="1")location.replace("/globe/"+location.search+location.hash);else if(q.has("view")||q.has("compose")||q.has("output")||q.has("q"))location.replace("/explore/"+location.search+location.hash);else if(location.pathname==="/index.html")location.replace("/"+location.search+location.hash)})();</script>
-  <script type="module" src="/js/home-portal.mjs?rev=20261029-portal-1"></script>
+  <script type="module" src="/js/home-portal.mjs?rev=20261107-home-scenes-1"></script>
   <script type="module" src="/js/site-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
 </head>
 <body class="home-portal">
@@ -64,46 +64,52 @@
     </section>
     <section class="portal-bento" aria-label="おすすめの入口">
       <a class="portal-card portal-draw" href="/tools/start/draw/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">CREATE / 01</span><strong>ドット絵を描く</strong><span class="portal-card-sub">レイヤー・アニメーション</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">CREATE / 01</span><strong>ドット絵を描く</strong><span class="portal-card-lead">小さな絵から、動くGIFまで。</span><span class="portal-card-sub">レイヤー・アニメーション</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-draw-scene" aria-hidden="true">
-          <span class="portal-palette"><i></i><i></i><i></i><i></i></span>
-          <span class="portal-grid-art">
-            <span class="portal-sky"></span><span class="portal-sun"></span><span class="portal-mount portal-mount-a"></span><span class="portal-mount portal-mount-b"></span><span class="portal-ground"></span>
-            <span class="portal-pixel-star portal-star-a"></span><span class="portal-pixel-star portal-star-b"></span>
-          </span>
-          <span class="portal-editor-dots"><i></i><i></i><i></i></span>
-        </span>
+        <img class="portal-card-art" src="/assets/home/draw.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async">
+        <span class="portal-card-cta">描く・動かす<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-convert" href="/tools/start/convert/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">CONVERT / 02</span><strong>ファイルを変換</strong><span class="portal-card-sub">画像・動画・音声・文字</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">CONVERT / 02</span><strong>ファイルを変換</strong><span class="portal-card-lead">使いたい形式に、変えて保存。</span><span class="portal-card-sub">画像・動画・音声・文字</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-convert-scene" aria-hidden="true"><span class="portal-file portal-file-a">PNG</span><span class="portal-convert-spark">✳</span><span class="portal-file portal-file-b">GIF</span></span>
+        <img class="portal-card-art" src="/assets/home/convert.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async">
+        <span class="portal-card-cta">形式を選んで変換<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-camera" href="/tools/start/camera/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">PHOTO</span><strong>カメラ・写真</strong><span class="portal-card-sub">ドット絵にする</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">PHOTO</span><strong>写真をドット絵に</strong><span class="portal-card-lead">写真が、レトロなピクセルに。</span><span class="portal-card-sub">粗さ・色数を調整</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-camera-art" aria-hidden="true"><span class="portal-camera-body"><span class="portal-camera-lens"></span></span></span>
+        <img class="portal-card-art" src="/assets/home/camera.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
+        <span class="portal-card-cta">写真を加工する<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-audio" href="/tools/start/audio/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">SOUND</span><strong>音をつくる</strong><span class="portal-card-sub">音楽・ループ</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">SOUND</span><strong>音をつくる</strong><span class="portal-card-lead">色を並べて、短いループ曲。</span><span class="portal-card-sub">マス目に音を置いて再生</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-audio-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <img class="portal-card-art" src="/assets/home/audio.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
+        <span class="portal-card-cta">音を並べてみる<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-play" href="/play/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">PLAY</span><strong>遊ぶ</strong><span class="portal-card-sub">パズル・探すゲーム</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">PLAY</span><strong>ゲームで遊ぶ</strong><span class="portal-card-lead">見比べて、探して、ひらめく。</span><span class="portal-card-sub">間違い探し・もの探し・パズル</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-play-art" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <img class="portal-card-art" src="/assets/home/play.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
+        <span class="portal-card-cta">ゲームを選ぶ<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-community" href="/explore/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">COMMUNITY</span><strong>みんなの作品</strong><span class="portal-card-sub">見る・探す・投稿する</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">COMMUNITY</span><strong>みんなの作品</strong><span class="portal-card-lead">好きな作品に出会い、自分の絵も。</span><span class="portal-card-sub">見る・探す・投稿する</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-community-art" aria-hidden="true"><span>✦</span><span>◆</span><span>✳</span></span>
+        <img class="portal-card-art" src="/assets/home/community.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
+        <span class="portal-card-cta">作品を見にいく<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-globe" href="/globe/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">DISCOVER</span><strong>ドットマップ</strong><span class="portal-card-sub">世界で作品を探す</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">DISCOVER</span><strong>ドットマップ</strong><span class="portal-card-lead">世界のどこに、どんな作品？</span><span class="portal-card-sub">地域の作品・イベントを探す</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
-        <span class="portal-globe-art" aria-hidden="true"><span class="portal-globe-core"></span><span class="portal-globe-orbit"></span></span>
+        <img class="portal-card-art" src="/assets/home/globe.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
+        <span class="portal-card-cta">地図をひらく<span aria-hidden="true"> →</span></span>
+      </a>
+      <a class="portal-card portal-shop" href="/books/">
+        <span class="portal-card-copy"><span class="portal-card-kicker">SHOP / EXTERNAL STORES</span><strong>ショップ</strong><span class="portal-card-lead">つくる時間が、もっと楽しく。</span><span class="portal-card-sub">本・おもちゃ・道具・ガジェット</span><span class="portal-shop-note">外部ショップの商品を紹介<br>価格・在庫・購入は販売先で</span></span>
+        <span class="portal-card-arrow" aria-hidden="true">↗</span>
+        <img class="portal-card-art" src="/assets/home/shop.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
+        <span class="portal-card-cta">紹介アイテムを見る<span aria-hidden="true"> →</span></span>
       </a>
     </section>
     <section class="portal-more" aria-label="そのほかのページ">

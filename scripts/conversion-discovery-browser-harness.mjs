@@ -76,7 +76,12 @@ try {
     await open('/');
     await page.locator('.portal-bento .portal-card').first().waitFor({ state: 'visible' });
     assert.equal(await page.locator('h1').count(), 1);
-    assert.equal(await page.locator('.portal-card').count(), 7);
+    assert.equal(await page.locator('.portal-card').count(), 8);
+    assert.equal(await page.locator('.portal-shop').getAttribute('href'), '/books/');
+    assert.equal(await page.locator('.portal-card-art').count(), 8);
+    await page.locator('.portal-shop').scrollIntoViewIfNeeded();
+    await page.waitForFunction(() => [...document.querySelectorAll('.portal-card-art')].every(image => image.complete && image.naturalWidth > 0));
+    await page.evaluate(() => scrollTo(0, 0));
     assert.equal(await page.locator('#socialApp').count(), 0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     pass('Home portal at '+width+'px: links, one heading, no overflow');
