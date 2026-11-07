@@ -288,9 +288,14 @@ body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .dr
 body.creation-suite .draw-music-panel :is(#draw-music-page-add,#draw-music-page-copy,#draw-music-page-delete,#draw-music-preview,#draw-music-stop-loop,#draw-music-wav,#draw-music-video) {
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
 }
-body.creation-suite .draw-music-panel .draw-music-action-icon {
+body.creation-suite :is(.draw-music-panel,.draw-music-feedback) .draw-music-action-icon {
   display:block; flex:0 0 18px; width:18px; height:18px; fill:none; stroke:currentColor;
   stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
+}
+/* Keep numeric music values readable beneath the host page's light defaults. */
+body.creation-suite .draw-music-panel :is(input[type=number],select) {
+  background:#293742 !important; color:#f4f0e4 !important;
+  -webkit-text-fill-color:currentColor; caret-color:currentColor; color-scheme:dark;
 }
 body.creation-suite .draw-music-feedback button {
   display:inline-flex; align-items:center; justify-content:center; gap:6px;

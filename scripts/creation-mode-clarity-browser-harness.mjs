@@ -200,6 +200,7 @@ async function runViewport(viewport) {
     await mode(page, 'camera');
     assert.equal(await page.locator('#capture').count(), 1);
     assert.equal(await page.locator('#creation-output-open').isDisabled(), true, 'no camera output before a captured image');
+    await page.waitForFunction(() => document.querySelector('#capture')?.disabled === false, null, { timeout: 15000 });
     assert.equal(await page.locator('#capture').isEnabled(), true, 'camera start action is available');
     assert.deepEqual(await pixels(page), originalCanvas, 'entering camera leaves the artwork unchanged');
     await uploadImage(palette);

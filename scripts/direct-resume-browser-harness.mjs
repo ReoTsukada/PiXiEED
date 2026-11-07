@@ -10,7 +10,7 @@ assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
 const output = process.env.PIXIEED_RESUME_OUTPUT || '/tmp/pixieed-resume-browser-20261107';
 const modulePath = process.env.PIXIEED_PLAYWRIGHT_MODULE || join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
 const { chromium } = await import(pathToFileURL(modulePath).href);
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.PIXIEED_CHROME_EXECUTABLE ? { executablePath: process.env.PIXIEED_CHROME_EXECUTABLE } : {}) });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 const report = { browser: browser.version(), base, assetMode: process.env.PIXIEED_RESUME_ASSET_MODE || 'production-build', cases: [], pageErrors: [], limitations: ['Local assets with isolated storage only; production user data, physical devices, and installed Safari were not tested.'] };
 const directKey = 'pixieed:pxd:last:direct-workspace:v1';
@@ -45,7 +45,7 @@ async function paint(page, x, y) {
 async function records(page) {
   return page.evaluate(async () => {
     if (!(await indexedDB.databases()).some(db => db.name === 'pixieed-pxd-v1')) return [];
-    const request = indexedDB.open('pixieed-pxd-v1', 1);
+    const request = indexedDB.open('pixieed-pxd-v1');
     const db = await new Promise((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
     try { return await new Promise((resolve, reject) => { const request = db.transaction('projects').objectStore('projects').getAll(); request.onsuccess = () => resolve(request.result.map(row => ({ id: row.projectId, head: row.history.at(-1)?.revisionId, history: row.history.length }))); request.onerror = () => reject(request.error); }); }
     finally { db.close(); }
@@ -137,7 +137,7 @@ try {
 
   await second.locator('#creation-file-open').click();
   await second.locator('#project-tab-library').click();
-  assert.equal(await second.locator('.project-list__row').count(), 2);
+  assert.equal(await second.locator('.project-gallery__tile').count(), 2);
   await second.screenshot({ path: join(output, 'two-works-after-explicit-copy.png'), fullPage: true });
   assert.deepEqual(report.pageErrors, []);
   report.result = 'PASS';

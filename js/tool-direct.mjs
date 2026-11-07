@@ -534,7 +534,7 @@ export function installDirectToolShell({ section, mode, search }) {
   for (const target of [window, window.visualViewport].filter(Boolean)) target.addEventListener('resize', viewport, { signal: lifecycle.signal, passive: true });
   window.visualViewport?.addEventListener('scroll', viewport, { signal: lifecycle.signal, passive: true });
   document.addEventListener('keydown', event => {
-    if (!open || event.defaultPrevented || event.key !== 'Escape' || document.querySelector('dialog[open],details[open]')) return;
+    if (!open || event.defaultPrevented || event.key !== 'Escape' || document.querySelector('dialog[open],details[open],#creation-settings-panel:not([hidden])')) return;
     event.preventDefault(); void hide(true);
   }, { signal: lifecycle.signal });
   window.addEventListener('pagehide', event => { if (!event.persisted) dispose(); }, { signal: lifecycle.signal });
