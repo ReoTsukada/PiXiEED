@@ -88,3 +88,28 @@ test('untagged legacy data remains raw-readable and is not adopted by an ordinar
   assert.deepEqual(await adapter.read('legacy-copy-source'), rawBefore);
   assert.equal((await draw.loadImportSource('legacy-copy-source')).revisionId, legacy.revisionId);
 });
+
+test('bulk permanent deletion verifies all actual owners before removing any project', async () => {
+  const adapter = createMemoryPxdAdapter(); const raw = createPxdStore({ adapter, idFactory: revisions('purge-owner') });
+  const draw = createToolProjectStore('draw', { rawStore: raw });
+  const own = await draw.save(sourceProject('own-purge'));
+  const foreign = await raw.save(sourceProject('foreign-purge', { toolProject: { tool: 'audio', schemaVersion: 1 } }));
+  await assert.rejects(draw.purgeProjects([
+    { projectId: own.projectId, expectedRevisionId: own.revisionId },
+    { projectId: foreign.projectId, expectedRevisionId: foreign.revisionId }
+  ]), { code: 'PXD_TOOL_PROJECT_FOREIGN' });
+  assert.ok(await raw.load(own.projectId)); assert.ok(await raw.load(foreign.projectId));
+  await draw.purgeProject(own.projectId, { expectedRevisionId: own.revisionId });
+  assert.equal(await raw.load(own.projectId), null); assert.ok(await raw.load(foreign.projectId));
+});
+
+test('tool catalog listing avoids loading and retaining full work payloads', async () => {
+  const adapter = createMemoryPxdAdapter(); const raw = createPxdStore({ adapter, idFactory: revisions('list-owner') });
+  const writer = createToolProjectStore('draw', { rawStore: raw });
+  const own = await writer.save(sourceProject('own-list'));
+  const reader = createToolProjectStore('draw', { rawStore: {
+    ...raw, async load() { throw new Error('Unexpected payload read during listing'); }
+  } });
+  assert.deepEqual((await reader.listProjects()).projects.map(item => item.projectId), [own.projectId]);
+  assert.deepEqual((await reader.listImportSources()).projects, []);
+});

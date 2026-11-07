@@ -17,29 +17,29 @@ const targets = new Map([
   ['draw-brush-settings.css', 'rev=20261107-brush-camera-1'],
   ['creation-mode-motion.mjs', 'rev=20261107-mode-continuity-1'],
   ['tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
-  ['audio-entry.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['audio-page.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['tool-direct.mjs', 'rev=20261107-resume-same-project-1'],
-  ['tool-shell.mjs', 'rev=20261107-resume-same-project-1'],
-  ['creation-runtime.mjs', 'rev=20261107-brush-camera-1'],
-  ['creation-modes.mjs', 'rev=20261107-brush-camera-1'],
+  ['audio-entry.mjs', 'rev=20261107-gallery-1'],
+  ['audio-page.mjs', 'rev=20261107-gallery-1'],
+  ['tool-direct.mjs', 'rev=20261107-gallery-1'],
+  ['tool-shell.mjs', 'rev=20261107-gallery-1'],
+  ['creation-runtime.mjs', 'rev=20261107-gallery-1'],
+  ['creation-modes.mjs', 'rev=20261107-gallery-1'],
   ['creation-modes.css', 'rev=20261107-mode-continuity-1'],
   ['draw-music.mjs', 'rev=20261106-button-icon-audit-1'],
   ['draw-audio-timbre-panel.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['tool-project-import.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['project-workspace.mjs', 'rev=20261106-button-icon-audit-1'],
+  ['tool-project-import.mjs', 'rev=20261107-gallery-1'],
+  ['project-workspace.mjs', 'rev=20261107-gallery-1'],
   ['tool-workspace-state.mjs', 'rev=20261024-common-tool-start-1'],
   ['tool-offerwall-entry.mjs', 'rev=20261024-common-tool-start-1'],
   ['public-navigation.mjs', 'rev=20261024-common-tool-start-1'],
   ['tool-entry-compat.js', 'rev=20261024-common-tool-start-1'],
-  ['jigsaw-page.mjs', 'rev=20261024-common-tool-start-1'],
-  ['spot-difference-page.mjs', 'rev=20261024-common-tool-start-1'],
-  ['hidden-object-page.mjs', 'rev=20261024-common-tool-start-1'],
-  ['draw-page.mjs', 'rev=20261107-mode-continuity-1'],
+  ['jigsaw-page.mjs', 'rev=20261107-gallery-1'],
+  ['spot-difference-page.mjs', 'rev=20261107-gallery-1'],
+  ['hidden-object-page.mjs', 'rev=20261107-gallery-1'],
+  ['draw-page.mjs', 'rev=20261107-gallery-1'],
   ['animation-controls.mjs', 'rev=20261106-button-icon-audit-1'],
   ['draw-desktop-ui.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['creation-runtime.mjs', 'rev=20261107-brush-camera-1'],
-  ['creation-modes.mjs', 'rev=20261107-brush-camera-1'],
+  ['creation-runtime.mjs', 'rev=20261107-gallery-1'],
+  ['creation-modes.mjs', 'rev=20261107-gallery-1'],
   ['app.js', 'rev=20261024-common-tool-start-1'],
   ['site-header.mjs', 'rev=20261024-common-tool-start-1'],
   ['page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
@@ -111,7 +111,8 @@ function normalize(source, file) {
     const continuityTargets = new Set(["js/creation/creation-camera.mjs", "css/creation-modes.css", "js/creation/creation-mode-motion.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
     const brushCameraTargets = new Set(["js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "css/draw-brush-settings.css", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/tool-direct.mjs", "js/tool-help-bootstrap.mjs", "js/tool-help-data.mjs", "js/tool-help.mjs", "js/tool-shell.mjs"]);
     const resumeTargets = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
-    const revision = resumeTargets.has(target) ? '20261107-resume-same-project-1' : brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
+    const galleryTargets = new Set(["js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-shell.mjs", "js/creation/creation-runtime.mjs", "js/tool-direct.mjs", "js/creation/tool-project-store.mjs", "js/creation/project-gallery.mjs", "js/creation/pxd-store.mjs", "css/project-workspace.css"]);
+    const revision = galleryTargets.has(target) ? '20261107-gallery-1' : resumeTargets.has(target) ? '20261107-resume-same-project-1' : brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });
