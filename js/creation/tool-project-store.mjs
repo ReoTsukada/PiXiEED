@@ -1,5 +1,5 @@
 import { decodePxd } from './pxd-codec.mjs';
-import { createPxdStore, PxdStoreError } from './pxd-store.mjs?rev=20261016-color-capability-1';
+import { createPxdStore, PxdStoreError } from './pxd-store.mjs?rev=20261107-gallery-1';
 import { forkProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
 
 const TOOLS = new Set(['draw', 'audio', 'camera', 'jigsaw', 'spot_difference', 'hidden_object']);
@@ -47,7 +47,7 @@ export function createToolProjectStore(tool, options = {}) {
   const rawStore = options.rawStore ?? options.store ?? createPxdStore(options);
   const adapter = options.adapter;
   const ownershipCache = new Map();
-  const remember = (project) => { if (owns(project, tool)) ownershipCache.set(project.projectId, structuredClone(project)); };
+  const remember = (project) => { if (owns(project, tool)) ownershipCache.set(project.projectId, { projectId: project.projectId, revisionId: project.revisionId, manifest: { toolProject: ownStamp(tool) } }); };
 
   async function readDeleted(projectId, revisionId) {
     if (typeof rawStore.inspectProject === 'function') {
@@ -82,6 +82,8 @@ export function createToolProjectStore(tool, options = {}) {
       const stamp = summaryStamp(item);
       if (stamp && stamp.schemaVersion === 1 && stamp.tool !== tool) continue;
       if (stamp && stamp.schemaVersion !== 1) continue;
+      if (stamp?.schemaVersion === 1 && stamp.tool === tool) { projects.push(item); continue; }
+      if (item.summary && Object.hasOwn(item.summary, 'toolProject') && stamp === null) continue;
       try { if (await inspectRecord(item)) projects.push(item); }
       catch (error) { errors.push({ projectId: item.projectId, revisionId: item.revisionId, code: error?.code || 'PXD_STORE_RECORD_INVALID' }); }
     }
@@ -113,6 +115,23 @@ export function createToolProjectStore(tool, options = {}) {
       const saved = await rawStore.save(prepared, { expectedRevisionId }); remember(saved); return saved;
     },
     async listProjects(options = {}) { return onlyOwned(options); },
+    async purgeProjects(items) {
+      if (!Array.isArray(items) || !items.length) throw toolError('PXD_STORE_DELETE_EMPTY');
+      if (typeof rawStore.purgeProjects !== 'function') throw toolError('PXD_STORE_DELETE_UNAVAILABLE');
+      // Validate the bytes, not the display catalog, before irreversible removal.
+      // The following atomic CAS also prevents a concurrent edit between checks and deletion.
+      for (const { projectId, expectedRevisionId } of items) {
+        const project = await rawStore.load(projectId, expectedRevisionId);
+        if (!project) throw toolError('PXD_PROJECT_NOT_FOUND', '作品が見つかりません。');
+        assertOwned(project, tool);
+      }
+      const result = await rawStore.purgeProjects(items);
+      for (const { projectId } of items) ownershipCache.delete(projectId);
+      return result;
+    },
+    async purgeProject(projectId, { expectedRevisionId } = {}) {
+      return this.purgeProjects([{ projectId, expectedRevisionId }]);
+    },
     async deleteProject(projectId, { expectedRevisionId } = {}) {
       const project = await rawStore.load(projectId, expectedRevisionId);
       if (!project) throw toolError('PXD_PROJECT_NOT_FOUND', '作品が見つかりません。');
@@ -132,6 +151,8 @@ export function createToolProjectStore(tool, options = {}) {
         const stamp = summaryStamp(item);
         if (stamp && stamp.schemaVersion === 1 && stamp.tool !== tool) { projects.push(item); continue; }
         if (stamp && stamp.schemaVersion !== 1) { projects.push(item); continue; }
+        if (stamp?.schemaVersion === 1 && stamp.tool === tool) continue;
+        if (item.summary && Object.hasOwn(item.summary, 'toolProject') && stamp === null) { projects.push(item); continue; }
         try { if (!(await inspectRecord(item))) projects.push(item); }
         catch (error) { errors.push({ projectId: item.projectId, revisionId: item.revisionId, code: error?.code || 'PXD_STORE_RECORD_INVALID' }); }
       }

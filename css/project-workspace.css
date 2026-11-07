@@ -261,3 +261,25 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-delete-dialog__header{position:sticky;top:-18px;z-index:2;display:flex;align-items:start;gap:10px;margin:-18px -18px 10px;padding:12px 18px 8px;background:#202f39;border-radius:17px 17px 0 0}
 .project-delete-dialog__header h2{flex:1;min-width:0;margin:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-align:left}
 .project-delete-dialog__header button{flex:none;min-width:44px;min-height:44px;font-size:22px}
+
+/* Image-only, windowed library. Only the visible rows own canvas elements. */
+.project-gallery-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.project-gallery-toolbar__count { flex: 1; min-width: 64px; font-size: 14px; font-weight: 700; color: #e9f6fa; }
+.project-gallery-toolbar button { padding-inline: 10px; }
+.project-gallery-toolbar [hidden], .project-gallery-actions[hidden], .project-gallery-toolbar[hidden] { display: none; }
+.project-gallery-help { margin: 4px 0 8px; color: #acbdc6; font-size: 11px; }
+.project-gallery.project-list { --gallery-columns: 4; display: block; position: relative; margin: 10px 0 16px; min-height: 48px; contain: layout style; }
+.project-sheet .project-gallery__tile.project-card { position: absolute; display: grid; place-items: center; min-height: 44px; padding: 0; border: 0; border-radius: 2px; overflow: hidden; background: #101923; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; transition: none; }
+.project-gallery .project-gallery__tile canvas { width: 100%; height: 100%; max-width: none; border: 0; border-radius: 0; object-fit: contain; pointer-events: none; }
+.project-gallery .project-gallery__tile[aria-current=true] { box-shadow: inset 0 0 0 2px #ffe08a; }
+.project-gallery .project-gallery__tile[aria-current=true]::after { content: ''; position: absolute; inset: 0; border: 2px solid #ffe08a; pointer-events: none; }
+.project-gallery .project-gallery__tile:focus-visible { outline-offset: -4px; outline: 3px solid #ffe07d; }
+.project-gallery__check { display: none; position: absolute; z-index: 1; top: 6px; left: 6px; box-sizing: border-box; width: 24px; height: 24px; border: 2px solid #f6fbff; border-radius: 50%; background: #17242b88; color: transparent; line-height: 20px; text-align: center; font-weight: 800; font-size: 16px; pointer-events: none; }
+.project-gallery[data-selecting=true] .project-gallery__check { display: block; }
+.project-gallery [data-selected=true] .project-gallery__check { border-color: #61cfed; background: #61cfed; color: #092632; }
+.project-gallery [data-selected=true] canvas { opacity: .65; }
+.project-gallery-actions { position: sticky; z-index: 4; bottom: 0; display: flex; justify-content: center; padding: 9px 0 max(9px, env(safe-area-inset-bottom, 0px)); background: #1b2a34f5; border-top: 1px solid #536d7a; }
+.project-gallery-actions button { min-width: 170px; border-color: #e7a397; color: #ffd2c9; font-weight: 700; }
+.project-gallery-actions button:disabled { border-color: #526979; color: #bcc9ce; }
+@media (min-width: 600px) { .project-gallery.project-list { --gallery-columns: 6; } }
+@media (max-width: 340px) { .project-gallery.project-list { --gallery-columns: 3; } .project-gallery-toolbar button { font-size: 12px; padding-inline: 7px; } }

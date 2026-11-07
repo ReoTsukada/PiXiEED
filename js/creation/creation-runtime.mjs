@@ -1,8 +1,8 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261107-mode-continuity-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261106-button-icon-audit-1';
-import { mountCreationModes } from './creation-modes.mjs?rev=20261107-brush-camera-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261107-gallery-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261107-gallery-1';
+import { mountCreationModes } from './creation-modes.mjs?rev=20261107-gallery-1';
 import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261018-direct-runtime-1';
 
 function lastWorkspacePointer(search, requestedMode, restoreLast) {
