@@ -76,49 +76,61 @@ test('missing store APIs and unavailable IndexedDB fail explicitly without creat
 });
 
 function fakeIndexedDb({ putFailure = null } = {}) {
-  const rows = new Map();
+  const rows = new Map(); const catalog = new Map();
   let nextPutFailure = putFailure;
   const database = {
     objectStoreNames: { contains: () => true },
     transaction(_name, mode) {
-      const tx = { error: null, objectStore() { return store; }, abort() { queueMicrotask(() => tx.onabort?.()); } };
-      const finish = () => queueMicrotask(() => tx.oncomplete?.());
-      const store = {
-        get(id) {
-          const request = { result: rows.get(id) };
-          queueMicrotask(() => { request.onsuccess?.(); if (mode === 'readonly') finish(); });
-          return request;
-        },
-        put(record) {
-          const failure = nextPutFailure;
-          nextPutFailure = null;
-          if (failure?.when === 'sync') throw failure.error;
-          const request = {};
-          if (failure?.when === 'async') {
+      let pending = 0; let aborted = false;
+      const writes = [];
+      const tx = { error: null, objectStore, abort() {
+        if (aborted) return; aborted = true;
+        queueMicrotask(() => tx.onabort?.());
+      } };
+      function done() {
+        pending--;
+        queueMicrotask(() => {
+          if (pending || aborted) return;
+          for (const write of writes.splice(0)) write();
+          tx.oncomplete?.();
+        });
+      }
+      function objectStore(name) {
+        const records = name === 'project-catalog' ? catalog : rows;
+        return {
+          get(id) {
+            const request = {}; pending++;
+            queueMicrotask(() => { request.result = structuredClone(records.get(id)); request.onsuccess?.(); done(); });
+            return request;
+          },
+          getAll() {
+            const request = {}; pending++;
+            queueMicrotask(() => { request.result = structuredClone([...records.values()]); request.onsuccess?.(); done(); });
+            return request;
+          },
+          put(record) {
+            const failure = nextPutFailure; nextPutFailure = null;
+            if (failure?.when === 'sync') throw failure.error;
+            const request = {}; pending++;
             queueMicrotask(() => {
-              request.error = failure.error;
-              tx.error = failure.transactionError ?? failure.error;
-              request.onerror?.();
-              tx.onerror?.();
-              tx.onabort?.();
+              if (failure) {
+                request.error = failure.error;
+                tx.error = failure.transactionError ?? failure.error;
+                if (failure.when !== 'abort-only') { request.onerror?.(); tx.onerror?.(); }
+                tx.abort();
+              } else writes.push(() => records.set(record.projectId, structuredClone(record)));
+              done();
             });
-          } else if (failure?.when === 'abort-only') {
-            queueMicrotask(() => {
-              tx.error = failure.error;
-              tx.onabort?.();
-            });
-          } else {
-            rows.set(record.projectId, structuredClone(record));
-            finish();
-          }
-          return request;
-        }
-      };
+            return request;
+          },
+          delete(id) { pending++; queueMicrotask(() => { writes.push(() => records.delete(id)); done(); }); return {}; }
+        };
+      }
       return tx;
     }
   };
   return {
-    rows,
+    rows, catalog,
     setPutFailure(failure) { nextPutFailure = failure; },
     open() {
       const request = { result: database };
@@ -176,4 +188,92 @@ test('IndexedDB save keeps nonquota errors generic and compare-and-swap conflict
     if (original === undefined) delete globalThis.indexedDB;
     else globalThis.indexedDB = original;
   }
+});
+
+test('permanent bulk removal is atomic, frees every selected revision, and preserves unrelated/deleted histories', async () => {
+  const adapter = createMemoryPxdAdapter(); const store = createPxdStore({ adapter, idFactory: sequence('purge') });
+  const first = await store.save(project());
+  const latest = await store.save(first, { expectedRevisionId: first.revisionId });
+  const second = await store.save({ ...project(), projectId: 'second-project' });
+  const trash = await store.save({ ...project(), projectId: 'old-trash' });
+  await store.deleteProject(trash.projectId, { expectedRevisionId: trash.revisionId });
+  await assert.rejects(store.purgeProjects([
+    { projectId: first.projectId, expectedRevisionId: first.revisionId },
+    { projectId: second.projectId, expectedRevisionId: second.revisionId }
+  ]), { code: 'PXD_STORE_CONFLICT' });
+  assert.equal((await store.load(second.projectId)).revisionId, second.revisionId);
+  assert.deepEqual(await adapter.listRevisionIds(first.projectId), [first.revisionId, latest.revisionId]);
+  await assert.rejects(store.purgeProjects([]), { code: 'PXD_STORE_DELETE_EMPTY' });
+  await assert.rejects(store.purgeProjects([
+    { projectId: latest.projectId, expectedRevisionId: latest.revisionId },
+    { projectId: latest.projectId, expectedRevisionId: latest.revisionId }
+  ]), { code: 'PXD_STORE_DELETE_DUPLICATE' });
+  await store.purgeProjects([
+    { projectId: latest.projectId, expectedRevisionId: latest.revisionId },
+    { projectId: second.projectId, expectedRevisionId: second.revisionId }
+  ]);
+  assert.deepEqual(await adapter.listRevisionIds(first.projectId), []);
+  assert.equal(await store.load(second.projectId), null);
+  assert.deepEqual(await adapter.listRevisionIds(trash.projectId), [trash.revisionId]);
+  await assert.rejects(store.save(latest, { expectedRevisionId: latest.revisionId }), { code: 'PXD_STORE_CONFLICT' });
+  assert.equal(await store.load(first.projectId), null);
+  await assert.rejects(store.save(latest, { expectedRevisionId: null }), { code: 'PXD_PROJECT_DELETED' });
+});
+
+test('IndexedDB catalog and payload are written and purged in one transaction', async () => {
+  const original = globalThis.indexedDB; const fake = fakeIndexedDb(); globalThis.indexedDB = fake;
+  try {
+    const store = createPxdStore({ idFactory: sequence('indexed-purge') });
+    const first = await store.save(project());
+    const second = await store.save({ ...project(), projectId: 'second-project' });
+    assert.equal(fake.catalog.get(first.projectId).revisionId, first.revisionId);
+    assert.equal(Object.hasOwn(fake.catalog.get(first.projectId), 'bytes'), false);
+    assert.equal(Object.hasOwn(fake.catalog.get(first.projectId), 'history'), false);
+    await assert.rejects(store.purgeProjects([
+      { projectId: first.projectId, expectedRevisionId: first.revisionId },
+      { projectId: second.projectId, expectedRevisionId: 'stale' }
+    ]), { code: 'PXD_STORE_CONFLICT' });
+    assert.equal(fake.rows.size, 2); assert.equal(fake.catalog.size, 2);
+    await store.purgeProject(first.projectId, { expectedRevisionId: first.revisionId });
+    assert.equal(fake.rows.has(first.projectId), false); assert.deepEqual(Object.keys(fake.catalog.get(first.projectId)).sort(), ['projectId', 'purgedAt']);
+    assert.equal((await store.load(second.projectId)).revisionId, second.revisionId);
+    await assert.rejects(store.save(first, { expectedRevisionId: null }), { code: 'PXD_PROJECT_DELETED' });
+    assert.deepEqual((await store.listProjects({ includeDeleted: true })).projects.map(item => item.projectId), [second.projectId]);
+  } finally { if (original === undefined) delete globalThis.indexedDB; else globalThis.indexedDB = original; }
+});
+
+test('a valid catalog lists without reading or decoding PXD payloads', async () => {
+  const memory = createMemoryPxdAdapter(); const writer = createPxdStore({ adapter: memory, idFactory: sequence('metadata') });
+  const saved = await writer.save(project());
+  const store = createPxdStore({ adapter: {
+    compareAndSwap: (...args) => memory.compareAndSwap(...args),
+    read() { throw new Error('Unexpected payload read'); },
+    listLatest() { throw new Error('Unexpected payload listing'); },
+    listCatalog: (...args) => memory.listCatalog(...args)
+  } });
+  assert.deepEqual((await store.listProjects()).projects.map(item => item.projectId), [saved.projectId]);
+});
+
+test('catalog cache never authorizes loading corrupt PXD bytes', async () => {
+  const memory = createMemoryPxdAdapter(); const store = createPxdStore({ adapter: memory, idFactory: sequence('corrupt') });
+  const saved = await store.save(project());
+  const record = await memory.read(saved.projectId);
+  await memory.compareAndSwap(saved.projectId, saved.revisionId, { ...record, revisionId: 'bad-version', bytes: new Uint8Array([1, 2]) });
+  assert.equal((await store.listProjects()).projects.length, 1);
+  await assert.rejects(store.load(saved.projectId), { code: 'PXD_MAGIC_INVALID' });
+});
+
+
+test('permanent deletion checks canonical head even when catalog metadata is stale', async () => {
+  const original = globalThis.indexedDB; const fake = fakeIndexedDb(); globalThis.indexedDB = fake;
+  try {
+    const store = createPxdStore({ idFactory: sequence('stale-catalog') });
+    const first = await store.save(project());
+    const oldMetadata = structuredClone(fake.catalog.get(first.projectId));
+    const latest = await store.save(first, { expectedRevisionId: first.revisionId });
+    fake.catalog.set(first.projectId, oldMetadata);
+    await assert.rejects(store.purgeProject(first.projectId, { expectedRevisionId: first.revisionId }), { code: 'PXD_STORE_CONFLICT' });
+    assert.equal((await store.load(first.projectId)).revisionId, latest.revisionId);
+    assert.equal(fake.rows.get(first.projectId).history.length, 2);
+  } finally { if (original === undefined) delete globalThis.indexedDB; else globalThis.indexedDB = original; }
 });

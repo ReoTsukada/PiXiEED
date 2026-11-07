@@ -1,14 +1,14 @@
 import { routeEditorFile } from './output-router.mjs?rev=20261028-unified-output-1';
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
-import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261016-color-capability-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261106-button-icon-audit-1';
+import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261107-gallery-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261107-gallery-1';
 import { createProjectSession } from './project-session.mjs?rev=20261016-color-capability-1';
 import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=20261016-color-capability-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261016-tool-shell-1';
-import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
+import { mountProjectGallery, drawProjectThumbnail } from './project-gallery.mjs?rev=20261107-gallery-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
 
@@ -42,10 +42,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let initialEntryFresh = false;
-  let listEpoch = 0; let cardContextCleanups = []; let modeSwitching = false; let ready;
+  let listEpoch = 0; let importEpoch = 0; let listLoaded = false; let modeSwitching = false; let ready;
   let activeCanvas = null;
   let transientNavigation = false;
-  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261006-header-controls-1';
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261107-gallery-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
@@ -133,8 +133,6 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   transferSection.append(transferTitle, transferNote, transferActions);
   const message = node('p', 'project-sheet__status'); message.id = 'pxd-file-status'; message.setAttribute('role', 'status');
   const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存した作品');
-  const trash = node('details', 'project-files project-trash'); const trashSummary = node('summary', '', '削除した作品');
-  const trashList = node('div', 'project-trash__list'); trash.append(trashSummary, trashList);
   const importSection = node('details', 'project-files project-imports');
   importSection.append(node('summary', '', '取り込む'));
   const importNote = node('p', 'project-sheet__note project-files__note', '別の作品のコピーやPXDファイルを取り込みます。');
@@ -147,7 +145,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const currentPane = node('section', 'project-pane'); currentPane.id = 'project-current-pane';
   const libraryPane = node('section', 'project-pane'); libraryPane.id = 'project-library-pane';
   const currentTab = button('今の作品', 'project-tab-current', () => selectPane('current'));
-  const libraryTab = button('保存した作品', 'project-tab-library', () => selectPane('library'));
+  const libraryTab = button('保存した作品', 'project-tab-library', () => { selectPane('library'); void refreshList(); });
   for (const [tab, pane] of [[libraryTab, libraryPane], [currentTab, currentPane]]) {
     tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', pane.id);
     pane.setAttribute('role', 'tabpanel'); pane.setAttribute('aria-labelledby', tab.id);
@@ -156,6 +154,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       event.preventDefault(); const other = tab === currentTab ? libraryTab : currentTab;
       selectPane(event.key === 'Home' ? 'library' : event.key === 'End' ? 'current' : other === currentTab ? 'current' : 'library');
       (currentPane.hidden ? libraryTab : currentTab).focus();
+      if (currentPane.hidden && !listLoaded) void refreshList();
     });
   }
   tabs.append(libraryTab, currentTab);
@@ -166,25 +165,41 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存した作品を作品名で探す');
   const count = node('p', 'project-library-count'); count.setAttribute('role', 'status');
   const noMatches = node('p', 'project-list__empty', 'この名前の作品は見つかりません。'); noMatches.hidden = true;
-  function filterList() {
-    const query = search.value.trim().normalize('NFKC').toLocaleLowerCase('ja-JP'); let visible = 0;
-    const rows = [...list.querySelectorAll('.project-list__row')];
-    for (const row of rows) { row.hidden = Boolean(query && !row.dataset.name.includes(query)); if (!row.hidden) visible++; }
-    noMatches.hidden = !rows.length || visible > 0;
-    count.textContent = rows.length ? `${query ? `${visible} / ${rows.length}` : rows.length}作品 · 最近保存した順` : '';
-    libraryPane.dataset.empty = String(rows.length === 0);
-    search.hidden = rows.length === 0; count.hidden = rows.length === 0;
-  }
-  search.addEventListener('input', filterList);
+  const selectionToolbar = node('div', 'project-gallery-toolbar'); selectionToolbar.hidden = true;
+  const selectionCount = node('span', 'project-gallery-toolbar__count'); selectionCount.setAttribute('role', 'status');
+  const selectButton = button('選択', 'project-select', () => gallery.setSelection(true));
+  const selectAll = button('すべて選択', 'project-select-all', () => gallery.selectAll());
+  const cancelSelection = button('キャンセル', 'project-select-cancel', () => gallery.setSelection(false));
+  selectAll.hidden = cancelSelection.hidden = true; selectionToolbar.append(selectionCount, selectButton, selectAll, cancelSelection);
+  const selectionActions = node('div', 'project-gallery-actions'); selectionActions.hidden = true;
+  const deleteSelected = button('削除', 'project-delete-selected', () => void deleteProjects(gallery.selection));
+  selectionActions.append(deleteSelected);
+  const help = node('p', 'project-gallery-help', 'タップで開く · 長押しで複数選択');
+  const retryList = button('もう一度読み込む', 'project-list-retry', () => void refreshList()); retryList.hidden = true;
+  const gallery = mountProjectGallery({ list, scroller: dialog, onOpen: openSavedProject,
+    onContext: (item, card) => showCardActions(item, card, () => openSavedProject(item)),
+    isLocked: () => locked, currentId: () => session.currentProject?.projectId,
+    onSelection({ selecting, selected, total, visible, all }) {
+      selectionToolbar.hidden = total === 0; selectionActions.hidden = !selecting;
+      selectButton.hidden = selecting; selectAll.hidden = cancelSelection.hidden = !selecting;
+      selectAll.textContent = all ? 'すべて解除' : search.value ? '検索結果を選択' : 'すべて選択';
+      selectionCount.textContent = selecting ? `${selected}件選択` : `${total}作品`;
+      deleteSelected.textContent = selected ? `${selected}件を削除` : '削除する作品を選択'; deleteSelected.disabled = !selected || locked;
+      noMatches.hidden = total === 0 || visible > 0;
+      count.textContent = total ? `${search.value ? `${visible} / ${total}作品 · ` : ''}最近保存した順` : '';
+      libraryPane.dataset.empty = String(total === 0); search.hidden = count.hidden = help.hidden = total === 0;
+    }
+  });
+  search.addEventListener('input', () => { gallery.filter(search.value); dialog.scrollTop = 0; });
   function selectPane(name) {
     const current = name === 'current'; currentPane.hidden = !current; libraryPane.hidden = current;
     currentTab.setAttribute('aria-selected', String(current)); libraryTab.setAttribute('aria-selected', String(!current));
     currentTab.tabIndex = current ? 0 : -1; libraryTab.tabIndex = current ? -1 : 0;
-    dialog.scrollTop = 0;
+    dialog.scrollTop = 0; gallery.refresh();
   }
   const header = node('div', 'project-sheet__header'); header.append(heading, toolbar);
   currentPane.append(identity, currentRow, moreActions, transferSection);
-  libraryPane.append(search, count, list, noMatches, trash, importSection);
+  libraryPane.append(search, selectionToolbar, count, help, list, noMatches, retryList, importSection, selectionActions);
   dialog.append(header, message, currentPane, libraryPane); selectPane('library'); document.body.append(dialog);
   // Retained editors share the shell, but each owns its project controls and route pointer.
   if (idPrefix) for (const container of [bar, dialog]) {
@@ -193,7 +208,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       for (const attr of ['for', 'aria-controls', 'aria-labelledby', 'aria-describedby']) if (el.hasAttribute(attr)) el.setAttribute(attr, el.getAttribute(attr).split(' ').map(id => idPrefix + id).join(' '));
     }
   }
-  dialog.addEventListener('close', () => { if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
+  dialog.addEventListener('cancel', (event) => { if (locked || gallery.selecting) { event.preventDefault(); if (!locked) gallery.setSelection(false); } });
+  dialog.addEventListener('close', () => { gallery.setSelection(false); ++listEpoch; ++importEpoch; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
     async capture(base) {
@@ -254,6 +270,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const canTransfer = Boolean(!getPublicSources().length && hasContent());
     transferSection.hidden = !canTransfer;
     for (const { el } of transferTargets) el.disabled = locked || !canTransfer;
+    for (const el of [selectButton, selectAll, cancelSelection, retryList]) el.disabled = locked;
+    deleteSelected.disabled = locked || !gallery.selection.length; gallery.refresh();
   }
   async function save() {
     clearTimeout(timer);
@@ -290,15 +308,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     catch (error) { if (session.dirty && session.currentProject?.entries.length) editedSinceOpen = true; operationError = error.message || '作品を開けませんでした。今の作品は保持しています。'; say(operationError); }
     finally { locked = false; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update(); scheduleAutoSave(); }
   }
-  async function refreshList() {
-    const version = ++listEpoch;
-    for (const cleanup of cardContextCleanups) cleanup(); cardContextCleanups = [];
-    list.replaceChildren(node('p', '', '作品を読み込んでいます…'));
-    try {
-      const { projects, errors } = await store.listProjects(); if (version !== listEpoch) return; list.replaceChildren();
-      if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
-      for (const item of projects) {
-        const openCard = () => void transact(async () => {
+  function openSavedProject(item) {
+    return transact(async () => {
           let keptCopy = false;
           if (!initialRestoreError && (session.persisted || editedSinceOpen)) {
             try { await save(); }
@@ -315,31 +326,21 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
           await session.adopt(project, { persisted: true, apply: true }); resetPointer(); remember(session.currentProject);
           initialSelectionPending = false; dialog.close();
           say(keptCopy ? 'このタブの編集は別の作品に保存し、選んだ作品を開きました。' : '作品を開きました。');
-        }, { close: false });
-        const card = button('', `project-${item.projectId}`, openCard);
-        card.className = 'project-card'; card.dataset.projectId = item.projectId; card.setAttribute('aria-current', String(item.projectId === session.currentProject?.projectId));
-        const sample = item.summary.thumbnail; const canvas = node('canvas'); canvas.width = sample?.width || 28; canvas.height = sample?.height || 28; canvas.setAttribute('aria-hidden', 'true');
-        if (sample) { const pixels = new Uint8ClampedArray(sample.width * sample.height * 4); for (let i = 0; i < sample.width * sample.height; i++) { pixels.set(sample.rgb.slice(i * 3, i * 3 + 3), i * 4); pixels[i * 4 + 3] = 255; } canvas.getContext('2d').putImageData(new ImageData(pixels, sample.width, sample.height), 0, 0); }
-        const info = node('span', 'project-card__info'); info.append(node('strong', '', item.summary.name || '無題の作品'));
-        if (item.summary.width && item.summary.height) info.append(node('span', '', `${item.summary.width} × ${item.summary.height}px`));
-        const date = item.updatedAt ? new Date(item.updatedAt) : null; info.append(node('time', '', date && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '保存した作品'));
-        const row = node('div', 'project-list__row'); row.dataset.name = (item.summary.name || '無題の作品').normalize('NFKC').toLocaleLowerCase('ja-JP');
-        const remove = button('', `project-delete-${item.projectId}`, () => void deleteProject(item, card));
-        remove.className = 'project-card__delete'; remove.setAttribute('aria-label', `${item.summary.name || '無題の作品'}を削除`);
-        remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>';
-        card.append(canvas, info); row.append(card, remove); list.append(row);
-        cardContextCleanups.push(bindContextAction(card, ({ source }) => {
-          if (source === 'hold') { void deleteProject(item, card, { fromHold: true }); return; }
-          return showCardActions(item, card, openCard);
-        }));
-        card.addEventListener('keydown', (event) => {
-          if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
-          event.preventDefault(); showCardActions(item, card, openCard);
-        });
-      }
-      filterList();
+    }, { close: false });
+  }
+  async function refreshList() {
+    const version = ++listEpoch;
+    retryList.hidden = true; list.setAttribute('aria-busy', 'true');
+    if (!listLoaded) { count.hidden = false; count.textContent = '作品を読み込んでいます…'; }
+    try {
+      const { projects, errors } = await store.listProjects(); if (version !== listEpoch) return;
+      listLoaded = true; list.querySelector('.project-list__empty')?.remove(); gallery.setItems(projects);
+      if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
       if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
-    } catch (error) { if (version !== listEpoch) return; list.replaceChildren(node('p', '', '作品一覧を読み出せませんでした。保存内容は変更していません。')); say(error.message); }
+    } catch (error) {
+      if (version !== listEpoch) return;
+      retryList.hidden = false; say(`作品一覧を読み出せませんでした。保存内容は変更していません。${error.message || ''}`);
+    } finally { if (version === listEpoch) list.setAttribute('aria-busy', 'false'); }
   }
   async function importCopy(source) {
     if (!initialRestoreError && (session.persisted || editedSinceOpen)) await save();
@@ -348,10 +349,12 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     resetPointer(); await save(); initialSelectionPending = false; dialog.close();
     say('新しい作品として取り込みました。元の作品は変わりません。');
   }
+  importSection.addEventListener('toggle', () => { if (importSection.open && dialog.open) void refreshImports(); });
   async function refreshImports() {
+    const version = ++importEpoch;
     importList.replaceChildren(node('p', '', '作品を読み込んでいます…'));
     try {
-      const { projects } = await store.listImportSources(); importList.replaceChildren();
+      const { projects } = await store.listImportSources(); if (version !== importEpoch) return; importList.replaceChildren();
       if (!projects.length) importList.append(node('p', 'project-list__empty', '取り込める作品はまだありません。'));
       for (const item of projects) {
         const label = modes.find(([target]) => target === item.summary.lastMode)?.[1] || '以前の作品';
@@ -365,49 +368,27 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         info.append(node('strong', '', item.summary.name || '無題の作品'), node('span', '', `${label} · コピーを取り込む`));
         card.append(info); importList.append(card);
       }
-    } catch (error) { importList.replaceChildren(node('p', '', '取り込み用の作品を読み出せませんでした。')); say(error.message); }
+    } catch (error) { if (version !== importEpoch) return; importList.replaceChildren(node('p', '', '取り込み用の作品を読み出せませんでした。閉じて開くと再試行できます。')); say(error.message); }
   }
-  async function confirmDelete(item, card = null, { fromHold = false } = {}) {
+  async function confirmDelete(items) {
     const confirmation = node('dialog', 'project-delete-dialog'); confirmation.setAttribute('aria-labelledby', 'project-delete-title');
-    const heading = node('h2', '', '作品を削除しますか？'); heading.id = 'project-delete-title';
-    const name = item.summary.name || '無題の作品';
+    const heading = node('h2', '', `${items.length}件の作品を完全に削除しますか？`); heading.id = 'project-delete-title';
     const preview = node('div', 'project-delete-dialog__preview'); preview.setAttribute('aria-hidden', 'true');
-    const source = card?.querySelector('canvas');
-    if (source) {
-      const canvas = node('canvas'); canvas.width = source.width; canvas.height = source.height;
-      canvas.getContext('2d').drawImage(source, 0, 0); preview.append(canvas);
-    } else if (item.summary.thumbnail) {
-      const sample = item.summary.thumbnail; const canvas = node('canvas'); canvas.width = sample.width; canvas.height = sample.height;
-      const pixels = new Uint8ClampedArray(sample.width * sample.height * 4);
-      for (let i = 0; i < sample.width * sample.height; i++) { pixels.set(sample.rgb.slice(i * 3, i * 3 + 3), i * 4); pixels[i * 4 + 3] = 255; }
-      canvas.getContext('2d').putImageData(new ImageData(pixels, sample.width, sample.height), 0, 0); preview.append(canvas);
-    }
-    const projectName = node('p', 'project-delete-dialog__name', name);
-    const text = node('p', '', '削除した作品から戻せます。他の作品や公開済みの投稿は残ります。'); text.id = 'project-delete-description';
+    if (items.length === 1) { const canvas = node('canvas'); drawProjectThumbnail(canvas, items[0].summary.thumbnail); preview.append(canvas); }
+    const names = items.slice(0, 3).map(item => item.summary.name || '無題の作品').join('、');
+    const projectName = node('p', 'project-delete-dialog__name', names + (items.length > 3 ? ` ほか${items.length - 3}件` : ''));
+    const text = node('p', '', 'この端末の作品と保存履歴を削除します。削除後は元に戻せません。他の作品・書き出したファイル・公開済みの投稿は残ります。'); text.id = 'project-delete-description';
     confirmation.setAttribute('aria-describedby', text.id);
     const controls = node('div', 'project-sheet__actions');
-    let cancel;
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       let finished = false;
-      // The initiating finger may release over a newly displayed button. Only
-      // a fresh press (or keyboard activation) may act on the confirmation.
-      let openingTouch = fromHold;
-      confirmation.addEventListener('pointerdown', () => { openingTouch = false; }, { capture: true });
-      confirmation.addEventListener('click', (event) => {
-        if (!openingTouch || event.detail === 0) return;
-        openingTouch = false; event.preventDefault(); event.stopImmediatePropagation();
-      }, { capture: true });
-      const finish = (value) => { if (finished) return; finished = true; confirmation.close(); confirmation.remove(); resolve(value); };
+      const finish = value => { if (finished) return; finished = true; confirmation.close(); confirmation.remove(); resolve(value); };
       const header = node('div', 'project-delete-dialog__header');
-      const dismiss = button('×', 'project-delete-dismiss', () => finish(false));
-      dismiss.setAttribute('aria-label', '削除をキャンセルして閉じる');
-      header.append(heading, dismiss);
-      cancel = button('キャンセル', 'project-delete-cancel', () => finish(false));
-      // Releasing the held touch can focus the dialog itself; keep dismissal safe.
-      confirmation.addEventListener('focus', () => cancel.focus({ preventScroll: true }));
-      controls.append(cancel, button('削除する', 'project-delete-confirm', () => finish(true)));
-      confirmation.append(header, preview, projectName, text, controls); document.body.append(confirmation);
-      confirmation.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); }); confirmation.showModal(); cancel.focus();
+      const dismiss = button('×', 'project-delete-dismiss', () => finish(false)); dismiss.setAttribute('aria-label', '削除をキャンセルして閉じる'); header.append(heading, dismiss);
+      const cancel = button('キャンセル', 'project-delete-cancel', () => finish(false));
+      controls.append(cancel, button(`${items.length}件を完全に削除`, 'project-delete-confirm', () => finish(true)));
+      confirmation.append(header, ...(items.length === 1 ? [preview] : []), projectName, text, controls); document.body.append(confirmation);
+      confirmation.addEventListener('cancel', event => { event.preventDefault(); finish(false); }); confirmation.showModal(); cancel.focus();
     });
   }
   function showCardActions(item, card, openCard) {
@@ -430,7 +411,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         await session.adopt(project, { persisted: false, apply: true }); resetPointer(); await save(); say('別の作品として複製しました。');
       });
     });
-    const remove = button('削除', 'project-card-actions-delete', () => { close(); void deleteProject(item); });
+    const remove = button('削除', 'project-card-actions-delete', () => { close(); void deleteProjects([item]); });
     remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>作品を削除</span>';
     controls.append(open, copy, remove, button('閉じる', 'project-card-actions-close', close));
     const header = node('div', 'project-delete-dialog__header');
@@ -440,35 +421,42 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     sheet.append(header, preview, controls); document.body.append(sheet);
     sheet.addEventListener('cancel', (event) => { event.preventDefault(); close(); }); sheet.showModal();
   }
-  async function deleteProject(item, card = null, options = {}) {
+  async function deleteProjects(items) {
+    if (!items.length) return;
     await transact(async () => {
-      if (!await confirmDelete(item, card, options)) return;
-      const current = item.projectId === session.currentProject?.projectId;
-      const selected = current ? await save() : item;
-      await store.deleteProject(item.projectId, { expectedRevisionId: selected.revisionId });
-      if (current) {
-        await session.adopt(blankProject(), { persisted: false, apply: true }); resetPointer(); initialSelectionPending = false;
+      if (!await confirmDelete(items)) return;
+      const removesCurrent = items.some(item => item.projectId === session.currentProject?.projectId);
+      const targets = items.map(item => ({ projectId: item.projectId, expectedRevisionId: item.revisionId }));
+      let previous = null;
+      if (removesCurrent) {
+        previous = await save();
+        targets.find(item => item.projectId === previous.projectId).expectedRevisionId = previous.revisionId;
+        // Validate and apply a new canvas before destroying the saved one. A
+        // failed deletion restores the saved editor and its compare-and-swap head.
+        await session.adopt(blankProject(), { persisted: false, apply: true });
       }
-      await Promise.all([refreshList(), refreshTrash()]); say('作品を削除しました。削除した作品から戻せます。');
+      try { await store.purgeProjects(targets); }
+      catch (error) {
+        if (previous) await session.adopt(previous, { persisted: true, apply: true });
+        throw error;
+      }
+      if (removesCurrent) { resetPointer(); initialSelectionPending = false; }
+      const deletedIds = new Set(targets.map(item => item.projectId));
+      for (const key of [rememberKey || `pixieed:pxd:last:${tool}`, ...(rememberShared ? ['pixieed:pxd:last:creation'] : [])]) {
+        try { if (deletedIds.has(JSON.parse(localStorage.getItem(key) || 'null')?.projectId)) localStorage.removeItem(key); } catch {}
+      }
+      gallery.setSelection(false); await refreshList(); say(`${items.length}件の作品を完全に削除しました。`);
     }, { close: false });
-  }
-  async function refreshTrash() {
-    const { projects } = await store.listProjects({ includeDeleted: true });
-    const deleted = projects.filter((item) => item.deletedAt); trash.hidden = !deleted.length; trashList.replaceChildren();
-    for (const item of deleted) {
-      const row = node('div', 'project-trash__row'); const label = node('span', '', item.summary.name || '無題の作品');
-      row.append(label, button('戻す', `project-restore-${item.projectId}`, () => void transact(async () => {
-        await store.restoreProject(item.projectId, { expectedRevisionId: item.revisionId });
-        await Promise.all([refreshList(), refreshTrash()]); say('作品を戻しました。カードから続きを開けます。');
-      }, { close: false }))); trashList.append(row);
-    }
   }
   async function showProjects({ pane, focusTransfer = false } = {}) {
     if (locked) return; for (const el of main.querySelectorAll('details[open]')) el.open = false;
     if (!dialog.open) { selectPane(pane || 'library'); dialog.showModal(); }
     else if (pane) selectPane(pane);
     update();
-    message.textContent = operationError || ''; await Promise.all([refreshList(), refreshImports(), refreshTrash()]);
+    message.textContent = operationError || '';
+    if (!currentPane.hidden) gallery.refresh();
+    else await refreshList();
+    if (importSection.open && !libraryPane.hidden) await refreshImports();
     if (focusTransfer) transferTargets.find(({ el }) => !el.hidden && !el.disabled)?.el.focus();
   }
   async function openRecovery() {
@@ -596,7 +584,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     return switching;
   }
   return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, activate: update,
-    dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); for (const cleanup of cardContextCleanups) cleanup(); dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
+    dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); gallery.dispose(); ++listEpoch; ++importEpoch; dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
     async importProject(project) { await ready; await transact(() => importCopy(project)); },
     async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
     async pauseForNavigation() {

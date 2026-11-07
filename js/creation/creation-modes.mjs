@@ -196,7 +196,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   const imageImportButton = document.createElement('button'); imageImportButton.type = 'button'; imageImportButton.id = 'creation-file-image-open'; imageImportButton.textContent = '画像を読み込む';
   addActionIcon(imageImportButton, 'artwork'); imageImportButton.title = imageImportButton.textContent;
   imageImportButton.setAttribute('aria-label', '画像ファイルを読み込む'); imageImportActions.append(imageImportButton);
-  currentProjectPane?.before(imageImportActions);
+  currentProjectPane?.prepend(imageImportActions);
   const outputActionIcons = new Map([
     ['#draw-save', 'save'], ['#draw-export', 'export'], ['#draw-import-local', 'artwork'],
     ['#draw-copy-last', 'copy'], ['#draw-resume', 'resume'], ['[data-output-project]', 'manage']
@@ -214,7 +214,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   const cameraProjectNote = document.createElement('p'); cameraProjectNote.id = 'creation-project-camera-note'; cameraProjectNote.className = 'creation-project-camera-note'; cameraProjectNote.setAttribute('role', 'status'); cameraProjectNote.setAttribute('aria-live', 'polite');
   const historyNote = document.createElement('p'); historyNote.className = 'creation-project-history-note';
   historyNote.textContent = '編集履歴で戻る対象：描画・音楽・適用した撮影画像・共通設定です。カメラの色味・ズームは対象外です。';
-  projectNotes.append(saveScopeNote, cameraProjectNote, historyNote); currentProjectPane?.before(projectNotes);
+  projectNotes.append(saveScopeNote, cameraProjectNote, historyNote); currentProjectPane?.append(projectNotes);
   scope.add(() => projectNotes.remove());
   scope.listen(fileButton, 'click', () => {
     restoreFileFocus = true;
@@ -429,7 +429,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261107-brush-camera-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261107-gallery-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

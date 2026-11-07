@@ -20,13 +20,14 @@ test('delivery plan preserves runtime identities and bounds minification to star
 
   // Metadata validation is now one shared dependency-free leaf, alongside
   // guide metrics. Keep exact graph counts and verify the added identity/edge.
-  assert.equal(plan.runtimeGraph.modules.size, 107);
-  assert.equal(plan.runtimeGraph.edges.length, 202);
+  assert.equal(plan.runtimeGraph.modules.size, 108);
+  assert.equal(plan.runtimeGraph.edges.length, 203);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 106);
-  assert.equal(plan.externalUrls.size, 55);
+  assert.equal(plan.dynamicGraph.modules.size, 107);
+  assert.equal(plan.externalUrls.size, 56);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
+  assert(files.includes('js/creation/project-gallery.mjs'), 'Windowed gallery accounts for one shared UI module and one import edge.');
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
   assert(files.includes('js/creation/draw-render-optimization.mjs'));
   assert(files.includes('js/creation/output-router.mjs'), 'editor exports use the unified staging module');
@@ -120,7 +121,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 55);
+    assert.equal(report.externalCount, 56);
     assert.equal(report.internalizedCount, 52);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
