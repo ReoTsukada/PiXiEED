@@ -54,6 +54,17 @@ for (const product of products) {
       || product.shopThumbnail.height !== product.shopThumbnail.width)) {
     throw new Error(`Shop thumbnail must be a local 32x32 or 96x96 image: ${product.id}`);
   }
+  if (product.shopThumbnail?.kind === 'illustration') {
+    const thumbnail = product.shopThumbnail;
+    if (!thumbnail.alt || !thumbnail.creator || !thumbnail.rights || !thumbnail.source) {
+      throw new Error(`Illustration requires alt text, creator, rights, and source: ${product.id}`);
+    }
+    const bytes = await readFile(path.join(root, thumbnail.src.slice(1)));
+    if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+        || bytes.readUInt32BE(16) !== thumbnail.width || bytes.readUInt32BE(20) !== thumbnail.height) {
+      throw new Error(`Illustration PNG dimensions do not match the manifest: ${product.id}`);
+    }
+  }
 }
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -66,7 +77,7 @@ function card(p) {
   const image = p.image
     ? `<div class="product-card__image"><img src="${esc(p.image.src)}" alt="${esc(p.image.alt || p.title)}" width="${Number(p.image.width) || 640}" height="${Number(p.image.height) || 480}" loading="lazy"></div>`
     : p.shopThumbnail
-      ? `<div class="product-card__image product-card__thumbnail" data-size="${p.shopThumbnail.width}"><img src="${esc(p.shopThumbnail.src)}" alt="" width="${p.shopThumbnail.width}" height="${p.shopThumbnail.height}" loading="lazy"></div>`
+      ? `<div class="product-card__image product-card__thumbnail${p.shopThumbnail.kind === 'illustration' ? ' product-card__illustration' : ''}" data-size="${p.shopThumbnail.width}"><img src="${esc(p.shopThumbnail.src)}" alt="${esc(p.shopThumbnail.alt || '')}" width="${p.shopThumbnail.width}" height="${p.shopThumbnail.height}" loading="lazy" decoding="async">${p.shopThumbnail.kind === 'illustration' ? '<span class="product-card__illustration-label">イメージイラスト</span>' : ''}</div>`
       : '';
   const relatedOffers = relatedOffersByProductId.get(p.id) || [];
   const related = relatedOffers.length ? `<section class="product-card__related-offers" data-related-offers data-section-label="${esc(relatedOffers[0].sectionLabel)}" hidden aria-label="Yahoo!ショッピングの販売先"><h4>${esc(relatedOffers[0].sectionLabel)}</h4>${relatedOffers.map(offer => `<a class="product-card__yahoo" data-yahoo-commerce-link data-offer-id="${esc(offer.offerId)}" data-offer-product-id="${esc(offer.productId)}" data-offer-href="${esc(offer.href)}" data-offer-title="${esc(offer.title)}" data-offer-merchant="${esc(offer.merchant)}" data-offer-label="${esc(offer.label)}" data-offer-note="${esc(offer.note)}" data-offer-source-url="${esc(offer.sourceUrl)}" data-offer-checked-date="${esc(offer.checkedDate)}" hidden href="#" target="_blank" rel="sponsored noopener noreferrer"><span data-offer-visible-label>${esc(offer.label)}</span> <span aria-hidden="true">↗</span><span class="sr-only">（外部販売先・新しいタブ）</span></a><p class="product-card__yahoo-note" data-offer-visible-note data-offer-note-id="${esc(offer.offerId)}" hidden>${esc(offer.note)}</p>`).join('')}</section>` : '';
@@ -92,13 +103,13 @@ function render(route) {
   <script>document.documentElement.classList.add('books-catalog-js');</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   ${robots}
-  <meta name="description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
+  <meta name="description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。種類がわかる独自イラストとともに、出典と販売先を分けて案内します。">
   <link rel="canonical" href="https://pixieed.jp/books/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
   <meta property="og:locale" content="ja_JP">
   <meta property="og:title" content="ドット絵の本と道具｜PiXiEED">
-  <meta property="og:description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
+  <meta property="og:description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。種類がわかる独自イラストとともに、出典と販売先を分けて案内します。">
   <meta property="og:url" content="https://pixieed.jp/books/">
   <meta property="og:image" content="https://pixieed.jp/assets/og/site.png">
   <meta property="og:image:type" content="image/png">
@@ -107,7 +118,7 @@ function render(route) {
   <meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="ドット絵の本と道具｜PiXiEED">
-  <meta name="twitter:description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。商品画像は未掲載で、出典と販売先を分けて案内します。">
+  <meta name="twitter:description" content="ドット絵の本、おもちゃ、制作道具、ガジェットを見つけるPiXiEEDのカタログ。種類がわかる独自イラストとともに、出典と販売先を分けて案内します。">
   <meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png">
   <meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
@@ -116,18 +127,19 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261020-yahoo-related-offers-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261107-shop-illustrations-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
 <body class="books-page">
   <a class="skip-link" href="#catalog">商品一覧へ</a>
-  <header class="catalog-header"><div class="catalog-header__inner"><a href="/" class="catalog-brand" aria-label="PiXiEED ホーム"><span aria-hidden="true">P</span> PiXiEED</a><p>PIXEL PLAY · CATALOG</p></div></header>
+  <header class="catalog-header"><div class="catalog-header__inner"><a href="/" class="catalog-brand" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" alt="" width="32" height="32"> PiXiEED</a><p>PIXEL PLAY · CATALOG</p></div></header>
   <main id="catalog">
     <section class="catalog-intro" aria-labelledby="page-title"><div class="catalog-wrap catalog-intro__inner">
       <h1 id="page-title">ドット絵の本と道具</h1>
       <p class="catalog-disclosure"><span>広告・PR</span> Amazon・Yahoo!の購入リンクを含みます</p>
+      <p class="catalog-illustration-note">イラストは種類のイメージです。実物は販売先でご確認ください。</p>
     </div></section>
     <section class="catalog-section catalog-wrap" aria-labelledby="page-title">
       <noscript><p class="catalog-noscript">商品一覧と商品情報は以下でご覧いただけます。絞り込み操作にはJavaScriptが必要です。</p></noscript>
@@ -157,7 +169,7 @@ ${listedProducts.map(card).join('\n')}
     </section>
     <section class="catalog-extra catalog-wrap" aria-labelledby="catalog-extra-title" hidden><div class="catalog-extra__copy"><p class="catalog-eyebrow">COMING LATER</p><h2 id="catalog-extra-title">PiXiEEDのグッズ</h2><p>準備ができたら、PiXiEEDのオリジナルグッズをこちらで紹介します。</p></div><div class="catalog-ad-slot" aria-label="広告掲載予定"><span>広告掲載予定</span></div></section>
   </main>
-  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure} Yahoo!ショッピングのアフィリエイトリンクを含みます。PiXiEEDは適格販売により収入を得る場合があります。価格・販売条件・版・仕様は販売先でご確認ください。</p><p class="catalog-image-note">商品画像は使用許諾未確認のため未掲載です。確認待ち情報は各商品の詳細をご覧ください。</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>
+  <footer class="catalog-footer"><div class="catalog-wrap"><p class="catalog-footer__notice" id="associate-status" aria-live="polite">${associateDisclosure} Yahoo!ショッピングのアフィリエイトリンクを含みます。PiXiEEDは適格販売により収入を得る場合があります。価格・販売条件・版・仕様は販売先でご確認ください。</p><p class="catalog-image-note">イラストは商品の種類を示すPiXiEED独自のイメージで、実物の表紙・色・形状・付属品を再現したものではありません。商品写真や販売サイトの画像は使用していません。価格・在庫・実際の仕様は販売先でご確認ください。確認待ち情報は各商品の詳細をご覧ください。</p><p>© PiXiEED</p><a href="/about/">PiXiEEDについて</a><a href="/guide/">利用ガイド</a><a href="/privacy/">プライバシー</a></div></footer>
   <dialog class="product-detail" id="product-detail" aria-labelledby="product-detail-title">
     <div class="product-detail__header"><span>商品詳細</span><button type="button" data-detail-close aria-label="詳細を閉じて一覧に戻る">一覧に戻る <span aria-hidden="true">×</span></button></div>
     <div class="product-detail__content" data-detail-body></div>

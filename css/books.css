@@ -422,12 +422,24 @@ html[data-pixieed-motion="reduced"] .books-page .product-card:hover { transform:
   .books-page .product-grid .product-card__details { min-height: 44px; }
 }
 
-@media (max-width: 479px) {
-  .books-page .product-grid { grid-template-columns: minmax(0, 1fr); }
-  .books-page .product-grid .product-card__description,
-  .books-page .product-grid .product-card__byline { display: block; }
-  .books-page .product-grid .product-card__body { min-height: 0; padding: 12px; }
-  .books-page .product-grid .product-card h3 { font-size: 1rem; }
-  .books-page .product-grid .product-card__description { font-size: .9rem; line-height: 1.6; }
-  .books-page .product-grid .product-card__byline { font-size: .78rem; }
+/* Original category illustrations use the existing local thumbnail mechanism. */
+.catalog-brand img { display: block; image-rendering: pixelated; }
+.catalog-illustration-note { margin: 7px 0 0; color: var(--catalog-muted); font-size: .75rem; line-height: 1.5; }
+.product-grid .product-card__illustration {
+  width: 100%; height: auto; min-height: 180px; flex: none; flex-direction: column;
+  gap: 4px; padding: 10px 8px 12px; border-radius: 0;
+  background: #edf3ee; border-bottom: 1px solid var(--catalog-line);
+}
+.product-grid .product-card__illustration img { width: 144px; height: 144px; object-fit: contain; }
+.product-card__illustration-label { color: #52645d; font-size: .67rem; line-height: 1.5; text-align: center; }
+.product-detail__content .product-card__illustration {
+  width: 160px; height: auto; min-height: 182px; flex: none; flex-direction: column; gap: 4px;
+  padding: 8px; background: #edf3ee; border: 1px solid var(--catalog-line); border-radius: 8px;
+}
+.product-detail__content .product-card__illustration[data-size] img { flex: none; width: 144px; height: 144px; object-fit: contain; }
+@media (max-width: 599px) {
+  .books-page .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .product-grid .product-card__illustration { min-height: 123px; margin-bottom: 9px; padding: 4px 2px 6px; border: 0; border-radius: 8px; }
+  .product-grid .product-card__illustration img { width: 96px; height: 96px; }
+  .product-card__illustration-label { font-size: .62rem; }
 }

@@ -30,7 +30,7 @@ export const HOME_DESTINATIONS = Object.freeze([
   { title:'地図で作品を見る', href:'/globe/', group:'見つける', terms:'地図 マップ 世界 ドットマップ globe map' },
   { title:'イベント', href:'/events/', group:'見つける', terms:'展示 出展 催し イベント event' },
   { title:'お店', href:'/stores/', group:'見つける', terms:'ショップ お店 店舗 カフェ store' },
-  { title:'本・グッズ', href:'/books/', group:'見つける', terms:'本 ブック 書籍 グッズ 商品 books' },
+  { title:'ショップ｜本・おもちゃ・道具・ガジェット', href:'/books/', group:'見つける', terms:'ショップ 買い物 本 ブック 書籍 グッズ 商品 おもちゃ 玩具 道具 ガジェット 外部 販売先 買う shop books gadgets Amazon Yahoo' },
   { title:'コレクション', href:'/collection/', group:'自分', terms:'qr 保存 記録 集める collection' },
   { title:'マイページ', href:'/profile/', group:'自分', terms:'自分 アカウント 投稿 履歴 プロフィール ログイン profile' },
   { title:'ツール一覧', href:'/tools/', group:'入口', terms:'全て 全部 一覧 ツール 道具 tools' },

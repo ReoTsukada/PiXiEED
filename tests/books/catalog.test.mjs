@@ -152,7 +152,7 @@ test('catalog generator is deterministic and emits all twenty-five static cards 
     assert.match(html, /data-product-count aria-live="polite">\d+件<\/p>\s*<div class="catalog-filter-status" hidden>[\s\S]*?<\/form>\s*<div class="product-grid"/);
     assert.match(html, /aria-label="おもちゃ 6件"/);
     assert.match(html, /data-category-count/);
-    assert.match(html, /class="catalog-image-note">商品画像は使用許諾未確認のため未掲載/);
+    assert.match(html, /class="catalog-image-note">イラストは商品の種類を示すPiXiEED独自のイメージ/);
     assert.ok(html.indexOf('class="catalog-image-note"') > html.indexOf('</main>'), 'image permissions note stays in the footer');
     assert.match(html, /canonical" href="https:\/\/pixieed\.jp\/books\//);
     assert.match(html, /class="catalog-disclosure"><span>広告・PR<\/span> Amazon・Yahoo!の購入リンクを含みます<\/p>/);

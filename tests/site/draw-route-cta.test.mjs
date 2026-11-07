@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildPagesSite } from '../../scripts/build-pages-site.mjs';
@@ -75,6 +75,7 @@ test('books generator emits the authored static Draw CTA without changing produc
       await mkdir(join(target, '..'), { recursive: true });
       await copyFile(new URL(`../../${name}`, import.meta.url), target);
     }
+    await cp(new URL('../../assets/books/illustrations/', import.meta.url), join(root, 'assets/books/illustrations'), { recursive: true });
     await mkdir(join(root, 'books'), { recursive: true });
     execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: root });
     const generated = await readFile(join(root, 'books/index.html'), 'utf8');

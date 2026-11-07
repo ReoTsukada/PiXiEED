@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync, existsSync } from 'node:fs';
 import { findHomeDestinations, normalizeHomeQuery, HOME_DESTINATIONS } from '../../js/home-portal.mjs';
 
 const home = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
@@ -53,4 +53,51 @@ test('visual cards are responsive with reduced-motion and keyboard focus', () =>
   assert.match(homeCss, /@media\(prefers-reduced-motion:reduce\)/);
   assert.match(homeCss, /:focus-visible/);
   assert.match(homeCss, /public-navigation\.css/);
+});
+
+test('shop card makes the external catalog and item categories clear', () => {
+  const card = home.match(/<a class="portal-card portal-shop"[\s\S]*?<\/a>/)?.[0];
+  assert.ok(card);
+  assert.match(card, /href="\/books\/"/);
+  for (const label of ['ショップ', '本・おもちゃ・道具・ガジェット', '外部ショップの商品を紹介', '価格・在庫・購入は販売先で']) assert.ok(card.includes(label));
+  assert.match(card, /src="\/assets\/home\/shop\.svg" alt="" aria-hidden="true"/);
+  assert.doesNotMatch(card, /<canvas|https?:|checkout|target=/);
+  assert.match(homeCss, /\.portal-shop\{grid-column:span 12/);
+  assert.match(home, /src="\/assets\/brand\/pixieed-logo-48\.png"/);
+  for (const query of ['ショップ', 'おもちゃ', '道具', 'books', 'shop', 'グッズ', 'ガジェット', '販売先']) {
+    assert.equal(findHomeDestinations(query)[0].href, '/books/', query);
+  }
+});
+
+test('all eight cards have original lightweight explanatory scenes and readable actions', () => {
+  const names = ['draw', 'convert', 'camera', 'audio', 'play', 'community', 'globe', 'shop'];
+  const evidence = ['動くGIF', '使いたい形式', '粗さ・色数', 'マス目に音', '間違い探し', '投稿する', 'イベント', '外部ショップ'];
+  let bytes = 0;
+  for (const [index, name] of names.entries()) {
+    const card = home.match(new RegExp(`<a class="portal-card portal-${name}"[\\s\\S]*?<\\/a>`))?.[0];
+    assert.ok(card, name);
+    assert.ok(card.includes(evidence[index]), name);
+    assert.match(card, /class="portal-card-cta"/);
+    assert.match(card, /width="480" height="240"/);
+    assert.match(card, /alt="" aria-hidden="true"/);
+    const path = new URL(`../../assets/home/${name}.svg`, import.meta.url);
+    const asset = readFileSync(path, 'utf8');
+    bytes += statSync(path).size;
+    assert.match(asset, /viewBox="0 0 480 240"/);
+    assert.match(asset, /<title>[^<]+<\/title>/);
+    assert.doesNotMatch(asset, /<script|<image|<foreignObject|<animate|href=|onload=|data:/);
+  }
+  assert.ok(bytes < 100_000, 'all eight SVG scenes total under 100KB before compression');
+  assert.equal((home.match(/class="portal-card portal-/g) || []).length, 8);
+  assert.doesNotMatch(home, /intro-pending|assets\/screenshots|portal-(camera-art|audio-art|play-art|community-art|globe-art|shop-art)/);
+});
+
+test('retired decorative markup and unreferenced drawing previews stay removed', () => {
+  for (const name of ['draw-scene', 'convert-scene', 'camera-art', 'audio-art', 'play-art', 'community-art', 'globe-art', 'shop-art']) {
+    assert.ok(!home.includes(`portal-${name}`), name);
+    assert.ok(!homeCss.includes(`.portal-${name}`), name);
+  }
+  for (const name of ['home-draw-empty.png', 'previews/home-draw-empty-480.webp', 'previews/home-draw-empty-960.webp']) {
+    assert.equal(existsSync(new URL(`../../assets/screenshots/${name}`, import.meta.url)), false, name);
+  }
 });
