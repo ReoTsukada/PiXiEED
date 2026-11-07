@@ -95,3 +95,14 @@ test('normal resume keeps stale-tab CAS protection and explicit duplication pres
   assert.equal((await store.load('explicit-copy')).entries[0].bytes[0], 3);
   assert.equal((await store.listProjects()).projects.length, 2);
 });
+
+test('the shell lets a visible shared settings menu consume Escape before leaving work', () => {
+  const handler = source.match(/document\.addEventListener\('keydown', event => \{([\s\S]*?)\n  \}, \{ signal: lifecycle.signal \}\);/)?.[1];
+  assert.ok(handler);
+  for (const overlay of ['dialog[open]', 'details[open]', '#creation-settings-panel:not([hidden])', null]) {
+    let hidden = 0;
+    const event = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    runInNewContext(`(() => {${handler}})()`, { open: true, event, document: { querySelector: selector => overlay && selector.split(',').includes(overlay) ? {} : null }, hide: () => hidden++ });
+    assert.equal(hidden, overlay ? 0 : 1, overlay || 'Escape outside panels may return to explanation');
+  }
+});

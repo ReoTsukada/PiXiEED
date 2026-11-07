@@ -25,7 +25,7 @@ test('compact tool menu keeps its paint, shapes and selection controls together'
   assert.match(textIcon, /<path d="M5 7V4h14v3M12 4v16M8 20h8"\/>/);
   assert.match(css, /\.draw-tool-group > \.draw-select-tool-modes\s*\{[\s\S]*?grid-column:\s*1 \/ -1 !important/);
   assert.match(css, /\.draw-select-tool-modes > button\s*\{[\s\S]*?grid-template-rows:\s*28px 16px !important/);
-  assert.match(html, /draw-tool-picker\.css\?rev=20261106-button-icon-audit-1/);
+  assert.match(html, /draw-tool-picker\.css\?rev=20261108-music-controls-1/);
 });
 
 test('live pointer input queues changed pixels and final stroke paint cancels old frame', () => {

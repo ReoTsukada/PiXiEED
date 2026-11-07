@@ -41,6 +41,23 @@ jobs:
           node scripts/conversion-discovery-browser-harness.mjs || status=1
           PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-output-browser/workspace node scripts/conversion-workspace-browser-harness.mjs || status=1
           exit "$status"
+      - name: Verify creation controls and saved-work entry
+        env:
+          PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
+          PIXIEED_BROWSER_BASE_URL: http://127.0.0.1:4189
+          PIXIEED_CONTROLS_OUTPUT: /tmp/pixieed-creation-browser/controls
+          PIXIEED_DRAW_ENTRY_OUTPUT: /tmp/pixieed-creation-browser/entry
+          PIXIEED_RESUME_OUTPUT: /tmp/pixieed-creation-browser/resume
+        run: |
+          python3 -m http.server 4189 --bind 127.0.0.1 --directory /tmp/pixieed-site-check > /tmp/pixieed-creation-http.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          node --input-type=module -e "for (let i = 0; i < 30; i++) { try { if ((await fetch('http://127.0.0.1:4189/draw/')).ok) process.exit(0); } catch {} await new Promise(r => setTimeout(r, 200)); } process.exit(1);"
+          status=0
+          node scripts/creation-controls-browser-harness.mjs || status=1
+          node scripts/draw-entry-browser-harness.mjs || status=1
+          node scripts/direct-resume-browser-harness.mjs || status=1
+          exit "$status"
       - name: Verify progressive social loading and actions
         env:
           PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
@@ -57,5 +74,6 @@ jobs:
           path: |
             /tmp/pixieed-output-browser/**/*.json
             /tmp/pixieed-social-browser/**/*.json
+            /tmp/pixieed-creation-browser/**/*.json
           if-no-files-found: ignore
           retention-days: 7

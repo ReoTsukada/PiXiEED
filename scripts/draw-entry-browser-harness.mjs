@@ -12,7 +12,7 @@ const out = process.env.PIXIEED_DRAW_ENTRY_OUTPUT || '/tmp/pixieed-draw-entry-br
 const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 const { chromium } = await import(pathToFileURL(runtime).href);
 await mkdir(out, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.PIXIEED_CHROME_EXECUTABLE ? { executablePath: process.env.PIXIEED_CHROME_EXECUTABLE } : {}) });
 const report = { browser: browser.version(), cases: [], failures: [], limitations: [
   'Chromium mobile viewport and touch emulation; physical mobile/Safari/OS sharing and OS download cancellation untested.',
   'Storage failure is an injected local IndexedDB write error, not a real full disk. Download proves browser file delivery, not a user-chosen folder.',
