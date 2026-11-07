@@ -156,9 +156,9 @@ try {
       assert.doesNotMatch(sitemap, /\/tools\/start\/draw\/|\/pixiedraw[2]?\/|\/PiXiEEDraw\//);
       for (const route of ['/PiXiEEDraw/', '/pixiedraw/', '/pixiedraw2/']) {
         await page.goto(origin + route + '?project=old&ref=a&ref=b#old');
-        await page.locator('[data-legacy-entry-status]').waitFor({ state: 'visible' });
+        await page.locator('[data-legacy-entry-status]').filter({ hasText: '元のURLはそのまま' }).waitFor({ state: 'visible' });
         assert.equal(new URL(page.url()).pathname, route, 'unknown old project stays protected');
-        assert.match(await page.locator('main').innerText(), /元のURLはそのまま|削除・変更/);
+        assert.match(await page.locator('[data-legacy-entry-status]').innerText(), /元のURLはそのまま/);
         assert.equal(new URL(page.url()).search, '?project=old&ref=a&ref=b');
         assert.equal(await page.evaluate(() => localStorage.getItem('pixieedraw-autosave')), 'old-draw-sentinel');
         await page.goto(origin + route + '?ref=a&ref=b');
