@@ -3,7 +3,7 @@ import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20
 import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261021-camera-canvas-2';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261024-free-tools-1';
-import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261012-screen-blackout-1';
+import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261107-mode-continuity-1';
 import { animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261016-color-capability-1';
 
 
@@ -27,7 +27,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261106-button-icon-audit-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261107-mode-continuity-1';
   const styled = new Promise((resolve, reject) => {
     const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
     const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
@@ -429,7 +429,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261106-button-icon-audit-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261107-mode-continuity-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }
@@ -479,7 +479,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
         if (menu.getAttribute('aria-busy') !== 'true') menu.setAttribute('aria-busy', 'true');
         if (errorNode.textContent) errorNode.textContent = ''; settings.close();
         const skipStartupTransition = startupSwitchPending && previous === 'draw' && next === (startupMode || initialRequestedMode);
-        const leaving = skipStartupTransition ? Promise.resolve() : motion.leave(previous);
+        const leaving = skipStartupTransition ? Promise.resolve() : motion.leave(previous, next);
         try {
           // The retained project was already restored by Draw startup. It has
           // no user edits to save before the first camera mode is shown.
@@ -491,7 +491,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
           if (next === 'camera') { await ensureCamera(version); await camera.enter(previous === 'audio' ? 'audio' : 'draw'); }
           await leaving;
           if (!currentRequest(version)) continue;
-          mode = next; startupSwitchPending = false; show(mode); setModeMenu(false);
+          mode = next; startupSwitchPending = false; show(mode); draw.refreshModeLayout?.(); setModeMenu(false);
           const params = new URLSearchParams(location.search); if (mode === 'draw') params.delete('mode'); else params.set('mode', mode);
           history.replaceState(history.state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
           // Keep editors stopped until the reveal finishes; no media start is simulated.
