@@ -370,7 +370,9 @@ export function installDirectToolShell({ section, mode, search }) {
           const direct = localStorage.getItem(DRAFT_KEY);
           const last = JSON.parse(direct !== null ? direct : localStorage.getItem('pixieed:pxd:last:creation') || localStorage.getItem('pixieed:pxd:last:draw') || 'null');
           if (last !== null && (typeof last?.projectId !== 'string' || !last.projectId || typeof last?.revisionId !== 'string' || !last.revisionId)) throw new Error('INVALID_DRAFT_POINTER');
-          if (last?.projectId && last?.revisionId) initialPointer = { ...last, fork: true };
+          // Resume the saved identity so autosave updates this work instead of creating
+          // another copy on every visit. The session keeps its revision/CAS protection.
+          if (last?.projectId && last?.revisionId) initialPointer = { projectId: last.projectId, revisionId: last.revisionId };
         } catch { initialRestoreError = '前回の作品の記録を確認できません。作品一覧から選び直してください。元の保存内容は保持しています。'; }
       }
       const importedRuntime = await runtimeImport;
