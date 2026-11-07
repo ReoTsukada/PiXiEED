@@ -1,6 +1,6 @@
 import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261024-posting-policy-1';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261024-posting-policy-1';
+import { createSocialApi } from './api.mjs?rev=20261108-sns-loading-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
 import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
@@ -91,6 +91,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   const startupReady = new Promise((resolve) => { releaseStartup = resolve; });
   const state = { posts: [], minePosts: null, mineMode: false, staged: [], readWarnings: [], mode: 'art', composerPane: 'content', attachment: null, localPuzzle:null, receipt: null, outputId: null, output: null, outputDetached: false, audioRecord: null, audioDetached: false, audioWarning: '', audioGeneration: 0, audioListLoaded: false, activeDraft: null, filter: 'all', query: '', bookmarks: new Set(), liked: new Map(), loading: false, feedFailed: false, busy: false, submitted: false, submissionCleared: false, draftReady: false, archiveSaved: false, pageHidden: false, fileGeneration: 0, detailId: null, lastDetailId: null, detailPane: 'work', detailPaneScroll: new Map(), unsentComments: new Map(), priorFocus: null, priorDraftId: null, composerUrl: null, detailHistory: false, audioUrl: null, detailAudioUrl: null, saveChain: Promise.resolve(), initialized: false, handoffToken: 0, composerGeneration: 0, detailGeneration: 0, pendingCleanup: new Set() };
 
+  const pendingLikes = new Set();
   const boundSearchInputs = new WeakSet();
   function bindSearch(input) {
     if (!input) return;
@@ -243,7 +244,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const actions = node('div', { class: 'post-actions' });
     if (post.likeable) {
       const liked = state.liked.get(post.id);
-      const like = node('button', { type: 'button', 'data-action': 'like', ...(typeof liked === 'boolean' ? { 'aria-pressed': String(liked) } : {}), 'aria-label': liked === true ? 'いいねを取り消す' : liked === false ? 'いいね' : 'いいね状態を確認して操作' });
+      const like = node('button', { type: 'button', 'data-action': 'like', disabled: pendingLikes.has(post.id), ...(typeof liked === 'boolean' ? { 'aria-pressed': String(liked) } : {}), 'aria-label': liked === true ? 'いいねを取り消す' : liked === false ? 'いいね' : 'いいね状態を確認して操作' });
       like.textContent = liked === true ? '♥ いいね済み' : liked === false ? '♡ いいね' : '♡ いいね状態を確認'; actions.append(like);
     }
     const saved = state.bookmarks.has(post.id);
@@ -257,6 +258,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
   }
   let publicFlow = [];
   const renderedPostCards = new Map();
+  const renderedPostStates = new WeakMap();
   const ordinaryAdCards = new Map();
   const renderedFeedInsertions = new Map();
   const retiredOrdinaryAds = new Set();
@@ -419,15 +421,20 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (entry.kind === 'post') {
       const id = String(entry.post?.id ?? '');
       const existing = renderedPostCards.get(id);
+      const previous = existing && renderedPostStates.get(existing);
+      const current = { post: entry.post, liked: state.liked.get(id), saved: state.bookmarks.has(id), liking: pendingLikes.has(id) };
+      if (previous && previous.post === current.post && previous.liked === current.liked && previous.saved === current.saved && previous.liking === current.liking) return existing;
       if (!existing || !id) {
         const fresh = renderPost(entry.post);
         if (id) renderedPostCards.set(id, fresh);
+        renderedPostStates.set(fresh, current);
         return fresh;
       }
       const fresh = renderPost(entry.post);
       for (const attribute of [...existing.attributes]) existing.removeAttribute(attribute.name);
       for (const attribute of [...fresh.attributes]) existing.setAttribute(attribute.name, attribute.value);
       existing.replaceChildren(...[...fresh.childNodes]);
+      renderedPostStates.set(existing, current);
       return existing;
     }
     if (entry.kind === 'ordinary-ad') {
@@ -492,7 +499,10 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (restore && prior !== view) windowRef.scrollTo({ top: saved?.scroll || 0, behavior: 'instant' });
   }
 
-  function render() {
+  function render({ preserveAnchor = false } = {}) {
+    const anchor = preserveAnchor && windowRef.scrollY > 0 && !feed.hidden
+      ? [...feed.querySelectorAll('[data-post-id]')].map(element => ({ element, top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom })).find(item => item.bottom > 0 && item.top < windowRef.innerHeight)
+      : null;
     updateFilters();
     const focused = documentRef.activeElement?.closest?.('[data-post-id] [data-action]');
     const restore = focused ? { id: focused.closest('[data-post-id]')?.dataset.postId, action: focused.dataset.action } : null;
@@ -504,6 +514,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       updateReadWarningDetails(false); statusText('下書きはこの端末に保存されています。'); return;
     }
     const posts = filteredPosts();
+    const pending = state.loading || (!state.initialized && !state.feedFailed);
     const showReadWarnings = state.filter !== 'saved';
     const eligible = !state.mineMode && state.filter === 'all' && !state.query;
     const feedAdEligible = ordinaryAdEligibility(feedAdContext(posts, eligible));
@@ -517,10 +528,12 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (eligible) publicFlow = flow;
     reconcileFeed(flow.map(renderFlowEntry).filter(Boolean));
     activateFeedAds(posts, eligible);
-    feed.setAttribute('aria-busy', 'false');
-    if (!posts.length) feed.append(renderEmptyState());
+    feed.setAttribute('aria-busy', String(pending));
+    if (!posts.length && !pending) feed.append(renderEmptyState());
     updateFeedGutter(posts, eligible);
-    if (showReadWarnings && state.readWarnings.length) {
+    if (pending) {
+      statusText(posts.length ? `${posts.length}件を表示中。残りの公開作品を読み込んでいます…` : '公開作品を読み込んでいます…');
+    } else if (showReadWarnings && state.readWarnings.length) {
       const range = posts.length ? `${posts.length}件を表示中。` : '取得できた範囲: 0件。';
       statusText(`${range}公開元の一部は未取得です。再試行できます。`);
     } else statusText(posts.length
@@ -533,7 +546,9 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
       const replacement = feed.querySelector(`[data-post-id="${CSS.escape(restore.id)}"] [data-action="${CSS.escape(restore.action)}"]`);
       replacement?.focus({ preventScroll: true });
       if (!replacement) $('#feedFilters [aria-pressed="true"]', app)?.focus({ preventScroll: true });
-      windowRef.scrollTo({ top: scrollY, behavior: 'instant' });
+      windowRef.scrollTo({ top: anchor?.element.isConnected ? windowRef.scrollY + anchor.element.getBoundingClientRect().top - anchor.top : scrollY, behavior: 'instant' });
+    } else if (anchor?.element.isConnected) {
+      windowRef.scrollTo({ top: windowRef.scrollY + anchor.element.getBoundingClientRect().top - anchor.top, behavior: 'instant' });
     }
   }
   function renderEmptyState() {
@@ -609,14 +624,18 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     updateReadWarningDetails(state.filter !== 'saved' && state.filter !== 'local');
     if (initial) { feed.setAttribute('aria-busy', 'true'); statusText('公開作品を読み込んでいます…'); }
     try {
-      const latest = await api.list({ limit: 30 });
+      const latest = await api.list({ limit: 30, onUpdate: (!state.initialized || initial) ? (posts) => {
+        if (state.pageHidden) return;
+        state.posts = posts;
+        render({ preserveAnchor: true });
+      } : undefined });
       state.readWarnings = typeof api.getReadWarnings === 'function' ? api.getReadWarnings() : [];
-      updateReadWarningDetails();
+      // Render warning height changes only after the visible scroll anchor is captured.
       // The successful response is ready before rendering. Otherwise the
       // initial feed permanently renders with ad eligibility still loading.
       state.loading = false;
       const oldIds = new Set(state.posts.map((post) => post.id));
-      if (!state.initialized || initial) { state.posts = latest; state.initialized = true; render(); }
+      if (!state.initialized || initial) { state.posts = latest; state.initialized = true; render({ preserveAnchor: true }); }
       else {
         state.staged = latest.filter((post) => !oldIds.has(post.id));
         if (state.staged.length) { $('#newPostsSlot', documentRef).hidden = false; $('#newPostsButton', documentRef).textContent = `↑ 新着 ${state.staged.length} 件を表示`; }
@@ -1220,12 +1239,15 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     if (name === 'tools') { deactivateFeedAds(); tools?.showModal(); return; }
     if (name === 'like') {
       const id = action.closest('[data-post-id]')?.dataset.postId;
+      if (!id || pendingLikes.has(id)) return;
+      pendingLikes.add(id);
       action.disabled = true;
       try {
         let liked = state.liked.get(id);
         if (typeof liked !== 'boolean') { toast('現在のいいね状態を確認しています。'); liked = await api.hasLiked(id); if (typeof liked !== 'boolean') throw new Error('いいね状態を確認できません。'); state.liked.set(id, liked); }
-        await api.setLike(id, !liked); state.liked.set(id, !liked); render(); toast(!liked ? 'いいねを保存しました。' : 'いいねを取り消しました。');
-      } catch (error) { toast(`いいね状態または保存を確認できませんでした。${niceError(error, '再試行してください。')}`); action.disabled = false; }
+        await api.setLike(id, !liked); state.liked.set(id, !liked); toast(!liked ? 'いいねを保存しました。' : 'いいねを取り消しました。');
+      } catch (error) { toast(`いいね状態または保存を確認できませんでした。${niceError(error, '再試行してください。')}`); }
+      finally { pendingLikes.delete(id); action.disabled = false; render(); }
       return;
     }
     if (name === 'bookmark') {

@@ -41,12 +41,21 @@ jobs:
           node scripts/conversion-discovery-browser-harness.mjs || status=1
           PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-output-browser/workspace node scripts/conversion-workspace-browser-harness.mjs || status=1
           exit "$status"
+      - name: Verify progressive social loading and actions
+        env:
+          PIXIEED_PLAYWRIGHT_MODULE: /tmp/pixieed-browser/node_modules/playwright/index.mjs
+          PIXIEED_SNS_AFTER: /tmp/pixieed-site-check
+          PIXIEED_SNS_SKIP_BENCH: '1'
+          PIXIEED_SNS_REPORT: /tmp/pixieed-social-browser
+        run: node scripts/social-loading-browser-harness.mjs
       - name: Retain browser verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: output-browser-verification
           # Keep functional reports; preview/test screenshots must stay off uploads.
-          path: /tmp/pixieed-output-browser/**/*.json
+          path: |
+            /tmp/pixieed-output-browser/**/*.json
+            /tmp/pixieed-social-browser/**/*.json
           if-no-files-found: ignore
           retention-days: 7

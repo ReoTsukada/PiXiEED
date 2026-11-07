@@ -24,7 +24,7 @@ test('search is mounted outside the filter disclosure and results have contextua
   for (const action of ['clear-search', "'data-view': 'feed'", "'data-type': 'all'", "'data-compose': ''"]) assert.ok(app.includes(action), action);
   assert.match(app, /searchLabel\.hidden = view !== 'feed'/);
   assert.match(app, /aria-pressed/);
-  assert.match(app, /if \(!posts\.length\) feed\.append\(renderEmptyState\(\)\)/);
+  assert.match(app, /if \(!posts\.length && !pending\) feed\.append\(renderEmptyState\(\)\)/);
   assert.match(app, /updateReadWarningDetails\(false\); statusText\('下書きはこの端末に保存されています。'\)/);
   assert.match(app, /const showReadWarnings = state\.filter !== 'saved'/);
   assert.match(app, /取得できた作品に一致するものはありません/);
@@ -34,7 +34,7 @@ test('search is mounted outside the filter disclosure and results have contextua
 test('partial-source warnings remain visible with retry and detailed causes', () => {
   const app = read('js/social/app.mjs');
   const css = read('css/social-feed.css');
-  assert.match(app, /updateReadWarningDetails\(\)/);
+  assert.match(app, /updateReadWarningDetails\(showReadWarnings\)/);
   assert.match(app, /retry\.hidden = !showReadWarnings \|\| !state\.readWarnings\.length/);
   assert.match(app, /公開元の一部は未取得です/);
   assert.match(css, /\.feed-warning-details summary/);
