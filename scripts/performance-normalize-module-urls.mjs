@@ -19,8 +19,8 @@ const targets = new Map([
   ['tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
   ['audio-entry.mjs', 'rev=20261106-button-icon-audit-1'],
   ['audio-page.mjs', 'rev=20261106-button-icon-audit-1'],
-  ['tool-direct.mjs', 'rev=20261107-brush-camera-1'],
-  ['tool-shell.mjs', 'rev=20261107-brush-camera-1'],
+  ['tool-direct.mjs', 'rev=20261107-resume-same-project-1'],
+  ['tool-shell.mjs', 'rev=20261107-resume-same-project-1'],
   ['creation-runtime.mjs', 'rev=20261107-brush-camera-1'],
   ['creation-modes.mjs', 'rev=20261107-brush-camera-1'],
   ['creation-modes.css', 'rev=20261107-mode-continuity-1'],
@@ -110,7 +110,8 @@ function normalize(source, file) {
     ]);
     const continuityTargets = new Set(["js/creation/creation-camera.mjs", "css/creation-modes.css", "js/creation/creation-mode-motion.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
     const brushCameraTargets = new Set(["js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "css/draw-brush-settings.css", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/tool-direct.mjs", "js/tool-help-bootstrap.mjs", "js/tool-help-data.mjs", "js/tool-help.mjs", "js/tool-shell.mjs"]);
-    const revision = brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
+    const resumeTargets = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
+    const revision = resumeTargets.has(target) ? '20261107-resume-same-project-1' : brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });
