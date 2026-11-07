@@ -304,7 +304,7 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     return fetchRows({ url, select: 'post_id,title,caption,public_image_path,published_at,globe_cell_id,map_space', optional: OPTIONAL_MAP_COLUMNS, fetchImpl, key: cfg.key, signal, timeoutMs });
   }
 
-  async function readShowcases({ limit, id, signal }) {
+  async function readShowcases({ limit, id, signal, onPosts }) {
     const cfg = project(config);
     const postsUrl = tableUrl(cfg.origin, 'social_posts');
     postsUrl.searchParams.set('select', 'id,title,caption,creator_display_name,media_object_path,published_at,status,post_kind,distribution_mode');
@@ -321,6 +321,8 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     const rows = await fetchRows({ url: postsUrl, select: 'id,title,caption,creator_display_name,media_object_path,published_at,status,post_kind,distribution_mode', fetchImpl, key: cfg.key, signal, timeoutMs });
     const posts = rows.map((row) => showcasePost(null, row, cfg)).filter(Boolean);
     if (!posts.length) return { posts, warnings: [] };
+    // Placement links are optional enrichment, never a barrier to showing artwork.
+    onPosts?.(posts);
 
     const ids = posts.map((post) => post.postId);
     const placementWarnings = [];
@@ -341,17 +343,42 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
       placementWarnings.push('地図配置リンクを確認できませんでした。作品はフィードで表示できます。');
     }
     return {
-      posts: posts.map((post) => showcasePost(placements.get(post.postId) || null, rows.find((row) => uuid(row?.id) === post.postId), cfg)).filter(Boolean),
+      posts: posts.map((post) => placements.has(post.postId)
+        ? Object.freeze({ ...post, mapHref: `/globe/?art=${encodeURIComponent(post.id)}` })
+        : post),
       warnings: placementWarnings
     };
   }
 
-  async function list({ signal, limit = 30, before } = {}) {
+  async function list({ signal, limit = 30, before, onUpdate } = {}) {
     const cfg = project(config);
     const bounded = boundedLimit(limit);
-    const [mapResult, showcaseResult] = await Promise.allSettled([
-      readMap({ limit: bounded, signal }),
-      readShowcases({ limit: bounded, signal })
+    let mapPosts = [], showcasePosts = [], snsPosts = [];
+    const snapshot = () => {
+      const merged = new Map();
+      for (const post of [...mapPosts, ...showcasePosts, ...snsPosts]) merged.set(post.id, post);
+      return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)).slice(0, bounded);
+    };
+    const publish = () => {
+      if (typeof onUpdate !== 'function' || signal?.aborted) return;
+      const posts = snapshot();
+      if (!posts.length) return;
+      // Rendering failures must not turn a successful public read into a source failure.
+      try { onUpdate(posts); } catch { /* The final result remains available to the caller. */ }
+    };
+    // These are independent public reads. In particular, a slow/missing placement
+    // table must not delay starting the text/music request or rendering other posts.
+    const [mapResult, showcaseResult, snsResult] = await Promise.allSettled([
+      readMap({ limit: bounded, signal }).then(rows => {
+        mapPosts = rows.map(row => mapPost(row, cfg)).filter(Boolean); publish(); return rows;
+      }),
+      readShowcases({ limit: bounded, signal, onPosts(posts) { showcasePosts = posts; publish(); } }).then(result => {
+        showcasePosts = result.posts; publish(); return result;
+      }),
+      readSns('list', { limit: bounded, ...(before ? { before } : {}) }, signal).then(result => {
+        if (Array.isArray(result?.posts)) { snsPosts = result.posts.map(row => mapSnsPost(row, cfg.origin)).filter(Boolean); publish(); }
+        return result;
+      })
     ]);
     const failureWarning = (label, error) => error?.code === 'timeout'
       ? `${label}の読み込みが時間切れになりました。再試行できます。`
@@ -359,13 +386,10 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
     const failures = [];
     if (mapResult.status === 'rejected') failures.push(failureWarning('地図の投稿', mapResult.reason));
     if (showcaseResult.status === 'rejected') failures.push(failureWarning('ショーケース', showcaseResult.reason));
-    const snsResult = await Promise.allSettled([readSns('list', { limit: bounded, ...(before ? { before } : {}) }, signal)]).then((results) => results[0]);
-    let snsPosts = [];
     let snsFailure = null;
     if (snsResult.status === 'fulfilled') {
       const rows = snsResult.value?.posts;
-      if (Array.isArray(rows)) snsPosts = rows.map((row) => mapSnsPost(row, cfg.origin)).filter(Boolean);
-      else {
+      if (!Array.isArray(rows)) {
         snsFailure = new SocialApiError('invalid_response', '文章・音楽の投稿一覧を読み取れませんでした。');
         snsFailure.warning = '文章・音楽の投稿を読み込めませんでした。再試行できます。';
       }
@@ -374,22 +398,19 @@ export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThi
       if (snsFailure?.code !== 'capability_unavailable') snsFailure.warning = '文章・音楽の投稿を読み込めませんでした。再試行できます。';
       else snsFailure.warning = '文章・音楽のサーバーフィードはまだ利用できません。';
     }
+    if (signal?.aborted) {
+      readWarnings = [];
+      throw new SocialApiError('aborted', '投稿一覧の読み込みを中止しました。');
+    }
     if (mapResult.status === 'rejected' && showcaseResult.status === 'rejected' && snsResult.status === 'rejected') {
       readWarnings = [...failures];
       if (mapResult.reason?.code === 'timeout') throw mapResult.reason;
       if (showcaseResult.reason?.code === 'timeout') throw showcaseResult.reason;
       throw new SocialApiError('feed_unavailable', '投稿を読み込めませんでした。再試行できます。');
     }
-    if (signal?.aborted) {
-      readWarnings = [];
-      throw new SocialApiError('aborted', '投稿一覧の読み込みを中止しました。');
-    }
-    const map = mapResult.status === 'fulfilled' ? mapResult.value.map((row) => mapPost(row, cfg)).filter(Boolean) : [];
     const showcaseData = showcaseResult.status === 'fulfilled' ? showcaseResult.value : { posts: [], warnings: [] };
     readWarnings = [...failures, ...showcaseData.warnings, ...(snsFailure && !(mapResult.status === 'rejected' && showcaseResult.status === 'rejected') ? [snsFailure.warning] : [])];
-    const merged = new Map();
-    for (const post of [...map, ...showcaseData.posts, ...snsPosts]) merged.set(post.id, post);
-    return [...merged.values()].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id)).slice(0, bounded);
+    return snapshot();
   }
 
   async function get(value, { signal, authenticated = false } = {}) {

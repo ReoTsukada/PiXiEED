@@ -13,6 +13,7 @@ import { addInformationAutoAds } from './information-auto-ads.mjs';
 import { addOfferwallEntryPolicy, OFFERWALL_TOOL_PATHS, OFFERWALL_ENTRY_POLICY_SCRIPT, OFFERWALL_ENTRY_LOADER_SCRIPT } from './offerwall-entry-policy.mjs';
 import { optimizeToolRuntimeDelivery } from './tool-runtime-delivery.mjs';
 import { optimizeSiteStartupDelivery } from './site-startup-delivery.mjs';
+import { prepareSocialStartupDelivery } from './social-startup-delivery.mjs';
 import { isSampleWork } from '../js/public-work-policy.mjs';
 import { TOOL_START_ROUTES, getToolStartRoute, toolStartHref } from '../js/tool-start-routes.mjs';
 
@@ -292,11 +293,14 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       } else await copyFile(sourcePath, outputPath);
     }
     await writeFile(join(destination, '.nojekyll'), '');
+    const finishSocialStartupDelivery = unique.includes('js/social/app.mjs')
+      ? await prepareSocialStartupDelivery({ root: destination, files: unique, esbuildPath }) : null;
     const runtimeDelivery = unique.includes('js/tool-direct.mjs')
       ? await optimizeToolRuntimeDelivery({ root: destination, esbuildPath }) : null;
     const siteStartupDelivery = unique.includes('js/app.js') && unique.includes('js/home-startup.mjs')
       ? await optimizeSiteStartupDelivery({ root: destination, files: unique, esbuildPath }) : null;
-    return { files: unique.length + 1 + (runtimeDelivery ? 1 : 0), puzzlePages, eventPages, output: destination, runtimeDelivery, siteStartupDelivery };
+    const socialStartupDelivery = finishSocialStartupDelivery ? await finishSocialStartupDelivery() : null;
+    return { files: unique.length + 1 + (runtimeDelivery ? 1 : 0), puzzlePages, eventPages, output: destination, runtimeDelivery, siteStartupDelivery, socialStartupDelivery };
   } catch (error) {
     if (created) await rm(destination, { recursive: true, force: true });
     throw error;
