@@ -119,6 +119,7 @@ let downloadGeneration = 0;
 let gifExportJob = null;
 let resumeOnVisible = autoStart && !hasOutputReturn;
 let pendingCameraRequest = null;
+let cameraStartNeedsRetry = false;
 let previewSessionStarted = 0;
 let previewCounter = 0;
 let startupWatchdog = null;
@@ -1290,6 +1291,7 @@ async function startCamera({ focus = true } = {}) {
     return;
   }
   if (audioCameraInvalid || !isActive()) return;
+  cameraStartNeedsRetry = false;
   imageSelectionSequence++;
   clearImportedSource();
   if (regionMergeSession) endRegionMerge({ restore: true, resume: false });
@@ -1310,6 +1312,7 @@ async function startCamera({ focus = true } = {}) {
   say('カメラを準備しています…');
   if (focus) focusVisible('#capture');
   if (!navigator.mediaDevices?.getUserMedia) {
+    cameraStartNeedsRetry = true;
     root.dataset.startupPhase = 'error';
     setMode('idle');
     say(cameraStartErrorMessage(null, { secureContext: window.isSecureContext !== false, supported: false }), { visible: true });
@@ -1338,6 +1341,7 @@ async function startCamera({ focus = true } = {}) {
     startupWatchdog = window.setTimeout(() => {
       if (token !== cameraSequence || previewReady) return;
       startupWatchdog = null;
+      cameraStartNeedsRetry = true;
       closeCamera({ message: 'カメラ映像を受信できませんでした。中央のボタンで再試行してください。', focus: true, visible: true });
     }, 12000);
     for (const track of stream.getVideoTracks()) {
@@ -1358,7 +1362,11 @@ async function startCamera({ focus = true } = {}) {
     root.dataset.startupPhase = 'processing';
     loop.start();
   } catch (error) {
+    // Permission can be denied after the user has already left camera mode.
+    // Remember that decision without letting the stale request mutate the UI.
+    if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') cameraStartNeedsRetry = true;
     if (token !== cameraSequence) return;
+    cameraStartNeedsRetry = true;
     closeCamera({ message: cameraStartErrorMessage(error, { secureContext: window.isSecureContext !== false }), focus: true, visible: true });
   }
 }
@@ -2706,8 +2714,13 @@ function startCameraFromWorkspaceEntry() {
   if (!isActive() || document.hidden || audioCameraInvalid || outputReturnPending) return false;
   // A retained capture or imported image belongs to the user. Entering the
   // shared camera mode must not replace it with a live preview.
-  if (state.mode === 'captured' || state.result || importedSource) return false;
+  // state.result also holds the last live frame after suspension; that frame
+  // must not prevent resuming a previously working camera on deliberate entry.
+  if (state.mode === 'captured' || importedSource) return false;
   if (state.mode === 'live' || state.mode === 'loading') return false;
+  // A denial or startup error requires the explicit retry control. Merely
+  // switching modes must not repeatedly prompt for permission.
+  if (cameraStartNeedsRetry) return false;
   if (pendingCameraRequest) {
     say('カメラの許可確認が続いています。完了後に中央のボタンから再試行できます。', { visible:true });
     return false;

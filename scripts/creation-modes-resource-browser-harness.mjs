@@ -124,12 +124,11 @@ try {
   assert.ok(drawBefore.rafOwnersPending.draw > 0, 'Draw animation playback must own an active RAF before switching');
   await switchMode('camera'); const cameraReady = await waitSettled();
   assert.equal(cameraReady.rafOwnersPending.draw, 0, 'Draw-owned animation RAF must be drained after switching to Camera');
-  assert.equal(cameraReady.media.requests, 0, 'camera mode entry must not request camera permission');
+  assert.equal(cameraReady.media.requests, 1, 'intentional camera mode entry starts exactly one synthetic media request');
   report.scenarios.push({ name: 'draw-animation-to-camera', passed: true, drawBefore, cameraAfterSettle: cameraReady,
-    assertions: ['Draw animation had an owned RAF before switch', 'Draw-owned pending RAF is zero after camera switch', 'camera engine lazy-loaded without requesting getUserMedia'] });
+    assertions: ['Draw animation had an owned RAF before switch', 'Draw-owned pending RAF is zero after camera switch', 'camera engine starts one video request on entry'] });
 
-  // Start synthetic preview; exiting camera must stop its stream, frame pump and all preview RAFs.
-  await page.locator('#capture').click();
+  // Entry starts synthetic preview; exiting camera must stop its stream, frame pump and all preview RAFs.
   await page.waitForFunction(() => document.querySelector('#pixelStudio').dataset.mode === 'live' && document.querySelector('#pixelStudio').dataset.ready === 'true');
   await page.waitForTimeout(650);
   const cameraBefore = await page.evaluate(() => ({ frame: { ...window.__resourceQA.frame }, raf: window.__resourceQA.rafPending.size,

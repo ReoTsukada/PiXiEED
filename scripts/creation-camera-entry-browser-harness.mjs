@@ -76,8 +76,14 @@ try {
    assert.deepEqual(documents,['/draw/'],'camera nav loads one integrated document');
    assert.equal(await page.locator('#pixelStudio').count(),1);assert.equal(await page.locator('iframe').count(),0);
    const initial=await page.evaluate(()=>({painted:window.__entryQA.paintedDraw,early:window.__entryQA.readyTooEarly,requests:window.__entryQA.requests}));
-   assert.deepEqual(initial.painted,[],'no drawing UI painted during camera startup');assert.equal(initial.early,0,'ready signal never precedes camera mode');assert.equal(initial.requests,0,'entry does not grant/request hardware permission');
-   assert.equal(await page.locator('#cameraChooseImage').isEnabled(),true);checks.push('one document; camera UI first; coherent readiness; no implicit camera permission; image fallback enabled');
+   assert.deepEqual(initial.painted,[],'no drawing UI painted during camera startup');assert.equal(initial.early,0,'ready signal never precedes camera mode');assert.equal(initial.requests,1,'intentional camera entry starts one synthetic media request');
+   assert.equal(await page.locator('#cameraChooseImage').isEnabled(),true);checks.push('one document; camera UI first; coherent readiness; automatic camera start; image fallback enabled');
+   if(scenario==='blank') {
+    await page.waitForFunction(()=>document.querySelector('#pixelStudio').dataset.mode==='live'&&document.querySelector('#pixelStudio').dataset.ready==='true');
+    await change(page,'draw');await page.waitForFunction(()=>window.__entryQA.tracks.every(t=>t.readyState==='ended'));
+    await change(page,'camera');await page.waitForFunction(()=>window.__entryQA.requests===2&&document.querySelector('#pixelStudio').dataset.mode==='live');
+    checks.push('live preview stops on exit and restarts on deliberate reentry despite the retained last frame');
+   }
    if(fixture) {
     const saved=await page.evaluate(async pointer=>{const stores=await import('/js/creation/tool-project-store.mjs'),codec=await import('/js/creation/pxd-codec.mjs'),pxd=await import('/js/creation/pxd-animation.mjs');const p=await stores.createToolProjectStore('draw').load(pointer.projectId,pointer.revisionId),t=await pxd.readPxdAnimation(p);return {signature:codec.canonicalPxdJson({projectId:p.projectId,revisionId:p.revisionId,manifest:p.manifest,entries:p.entries.map(e=>({path:e.path,bytes:Array.from(e.bytes)})).sort((a,b)=>a.path.localeCompare(b.path)),opaque:p.opaquePayloads.map(e=>Array.from(e.bytes))}),frames:t.frames.map(f=>f.id),layers:t.layers.map(l=>l.id),palette:t.palette};},fixture.pointer);
     assert.ok(saved.signature===fixture.signature,'stored manifest and payload bytes remain unchanged');assert.deepEqual(saved.frames,fixture.frames);assert.deepEqual(saved.layers,fixture.layers);assert.deepEqual(saved.palette,fixture.palette);
@@ -95,12 +101,18 @@ try {
     checks.push('restored live project saves every original frame/cel, layer name/lock, palette and unknown bytes after camera/draw reentry');
    }
    if(['pending','denied','missing'].includes(scenario)) {
-    await page.locator('#capture').click();await page.waitForFunction(()=>window.__entryQA.requests===1);
+    await page.waitForFunction(()=>window.__entryQA.requests===1);
     if(scenario==='pending') {
      assert.equal(await page.locator('#main').evaluate(n=>n.inert),false);assert.equal(await page.locator('#cameraChooseImage').isEnabled(),true);
-     await change(page,'draw');await page.evaluate(()=>window.__releaseCamera());await page.waitForFunction(()=>window.__entryQA.tracks.every(t=>t.readyState==='ended'));
-     await change(page,'camera');assert.equal(await page.evaluate(()=>window.__entryQA.requests),1,'reentry does not stack permission requests');checks.push('pending permission never locks mode menu; leaving stops delayed stream; reentry remains gesture driven');
-    } else {await page.waitForFunction(()=>document.querySelector('#pixelStudio').dataset.mode==='idle');assert.equal(await page.locator('#cameraFallbackChoose').isEnabled(),true);checks.push(`${scenario}: actionable camera error and image fallback`);}
+     await change(page,'draw');await change(page,'camera');assert.equal(await page.evaluate(()=>window.__entryQA.requests),1,'reentry does not stack unresolved permission requests');
+     await page.evaluate(()=>window.__releaseCamera());await page.waitForFunction(()=>window.__entryQA.tracks.length>0&&window.__entryQA.tracks.every(t=>t.readyState==='ended'));
+     assert.equal(await page.locator('#pixelStudio').getAttribute('data-mode'),'idle');checks.push('pending permission never locks mode menu; reentry does not stack requests; delayed old stream stops and leaves explicit retry available');
+    } else {
+     await page.waitForFunction(()=>document.querySelector('#pixelStudio').dataset.mode==='idle');assert.equal(await page.locator('#cameraFallbackChoose').isEnabled(),true);
+     await change(page,'draw');await change(page,'camera');assert.equal(await page.evaluate(()=>window.__entryQA.requests),1,'reentry after failure must not repeat permission requests');
+     await page.locator('#capture').click();await page.waitForFunction(()=>window.__entryQA.requests===2&&document.querySelector('#pixelStudio').dataset.mode==='idle');
+     checks.push(`${scenario}: actionable error and image fallback; reentry does not retry; explicit start retries once`);
+    }
     assert.equal(await page.evaluate(()=>window.__entryQA.maxPending),1);
    }
    await page.screenshot({path:`${output}/${label}.png`});
