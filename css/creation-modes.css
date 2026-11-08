@@ -289,8 +289,10 @@ body.creation-suite .draw-music-panel .draw-music-check { display:flex; justify-
 body.creation-suite .draw-music-panel .draw-music-check input { width:18px; min-height:18px; height:18px; }
 body.creation-suite .draw-music-output-preview { display:block; width:min(144px,100%); height:auto; max-height:144px; object-fit:contain; image-rendering:pixelated; background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/12px 12px; border:1px solid #ffffff30; }
 
-/* Short save-scope and history notes stay visible in the shared project dialog. */
-body.creation-suite .creation-project-notes { display:grid; gap:4px; margin:4px 0 8px; padding:7px 9px; border-left:2px solid #60717b; color:#c5d0d3; }
+/* Detailed save-scope notes are available without crowding the main actions. */
+body.creation-suite .creation-project-notes { margin:4px 0 0; padding:0; border-top:1px solid #425762; color:#c5d0d3; }
+body.creation-suite .creation-project-notes > summary { min-height:44px; padding:10px 2px; border:0; border-radius:0; background:none; color:#c5d0d3; font-size:12px; }
+body.creation-suite .creation-project-notes[open] > p { margin:0 0 8px; }
 body.creation-suite .creation-project-notes p { margin:0; font-size:11px; line-height:1.45; overflow-wrap:anywhere; }
 body.creation-suite .creation-project-notes [hidden] { display:none !important; }
 
@@ -328,3 +330,6 @@ body.creation-suite .creation-mode-menu__panel { top:calc(var(--creation-editor-
 body.creation-suite .creation-mode-menu__panel[hidden] { display:none !important; }
 body.creation-suite .creation-camera-project-status { box-sizing:border-box; width:100%; margin:0; padding:4px 7px; border-radius:7px; background:#111b22d9; color:#e0e8e8; font-size:11px; line-height:1.4; text-align:center; overflow-wrap:anywhere; }
 body.creation-suite .creation-camera-project-status[hidden] { display:none !important; }
+
+body.creation-suite .project-current-card > .creation-project-camera-note { margin:4px 0 0; padding:8px 0 0; border-top:1px solid #68736c; color:#f2d395; font-size:11px; line-height:1.5; }
+body.creation-suite .project-current-card > .creation-project-camera-note[hidden] { display:none; }

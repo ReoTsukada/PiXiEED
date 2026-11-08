@@ -313,3 +313,62 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 @media (max-width: 340px) {
   .project-start-picker { width: min(760px, calc(100vw - 4px)); padding-inline: 4px; }
 }
+
+/* Current work: one clear continuation action, with secondary operations below. */
+.project-sheet__toolbar #project-new { border-color:#687982; background:#263944; color:#f4f0e4; }
+.project-current-card { padding:12px; border:1px solid #667975; border-radius:15px; background:linear-gradient(135deg,#2c3e46,#15242d); }
+.project-current-card .project-sheet__identity { margin:0 0 12px; padding:0; gap:12px; border:0; background:none; }
+.project-sheet__preview { display:grid; place-items:center; flex:0 0 76px; width:76px; height:76px; overflow:hidden; border:1px solid #657681; border-radius:10px; background:repeating-conic-gradient(#34414b 0 25%,#29353e 0 50%) 0 0 / 12px 12px; }
+.project-sheet__preview canvas { display:block; max-width:100%; max-height:100%; width:100%; height:100%; image-rendering:pixelated; object-fit:contain; }
+.project-sheet__preview > svg { width:30px; height:30px; color:#e4cc7e; }
+.project-sheet__preview [hidden] { display:none; }
+.project-sheet__eyebrow { color:#adbdc4; font-size:10px; letter-spacing:.04em; }
+.project-current-card .project-sheet__identity strong { font-size:16px; white-space:normal; overflow-wrap:anywhere; }
+.project-current-card .project-sheet__identity small { margin-top:3px; font-size:11px; }
+.project-sheet .project-continue { width:100%; min-height:48px; border-color:#f2d27a; background:linear-gradient(145deg,#ffe28b,#f1c657); color:#202a33; font-size:15px; font-weight:750; }
+.project-rename-details { margin-top:5px; }
+.project-sheet .project-rename-details > summary { min-height:44px; padding:11px 1px; border:0; background:none; color:#c9d5d9; font-size:12px; }
+.project-current-card .project-sheet__current { margin:0; padding:0 0 4px; border:0; background:none; }
+.project-image-import { display:flex; align-items:center; gap:12px; margin:12px 0 0; padding:0 0 12px; border-bottom:1px solid #425762; }
+.project-image-import .project-sheet__actions { flex:none; margin:0; }
+.project-image-import .project-sheet__note { margin:0; color:#b6c7cf; font-size:11px; line-height:1.5; }
+.project-image-import + .project-transfer { margin-top:0; padding-top:12px; border-top:0; }
+.project-transfer__button span { display:grid; gap:3px; }
+.project-transfer__button strong { font-weight:650; }
+.project-transfer__button small { color:#aebfc8; font-size:10px; }
+.project-sheet .project-transfer__button { min-height:56px; }
+@media (max-width:340px) {
+  .project-current-card { padding:10px; }
+  .project-sheet__preview { flex-basis:64px; width:64px; height:64px; }
+  .project-image-import { gap:8px; }
+  .project-image-import .project-sheet__note { font-size:10px; }
+  .project-image-import button { padding-inline:8px; font-size:12px; }
+}
+
+/* Normal-flow manager banner, outside the thumbnails and all editing actions.
+   48px is this site's conservative interaction gap, not a Google safe-harbor. */
+.project-manager-ad { box-sizing:border-box; display:flex; flex-direction:column; align-items:center; width:100%; min-width:0; margin:48px 0; padding:0; }
+.project-manager-ad[hidden] { display:none; }
+.project-manager-ad__label { margin:0 0 4px; color:#c5d1d6; font-size:12px; line-height:16px; }
+.project-manager-ad__slot { display:flex; align-items:center; justify-content:center; flex:none; max-width:100%; }
+.project-manager-ad__slot ins { box-sizing:content-box; flex:none; max-width:100%; }
+
+/* Segmented project gallery. Break nodes stay in normal flow between virtualized tile groups. */
+.project-gallery--segmented { --gallery-hero-size: 192px; }
+.project-gallery--segmented .project-gallery__segment,
+.project-gallery--segmented .project-gallery__tiles { position: relative; display: block; width: 100%; min-width: 0; }
+.project-gallery--segmented .project-gallery__break { display: flow-root; width: 100%; min-width: 0; }
+.project-gallery.project-gallery--segmented .project-gallery__tile.project-card {
+  position: absolute; display: grid; place-items: center; min-height: 44px; padding: 0; border: 0; border-radius: 2px;
+  overflow: hidden; background: #101923; touch-action: pan-y; -webkit-touch-callout: none; user-select: none;
+  -webkit-user-select: none; transition: none;
+}
+.project-gallery--segmented .project-gallery__tile canvas {
+  width: 100%; height: 100%; max-width: none; border: 0; border-radius: 0; object-fit: contain; pointer-events: none;
+}
+@media (min-width: 600px) { .project-gallery--segmented { --gallery-hero-size: 240px; } }
+
+/* Keep chooser controls visible while the artwork feed scrolls on short phones. */
+.project-start-picker[open] { display:flex; flex-direction:column; overflow:hidden; }
+.project-start-picker > * { flex-shrink:0; }
+.project-start-picker .project-start-picker__scroller { flex:1 1 auto; min-height:0; }

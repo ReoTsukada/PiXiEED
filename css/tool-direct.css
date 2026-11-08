@@ -60,6 +60,8 @@ html[data-tool-direct='work'] .site-nav,
 html[data-tool-direct='work'] .display-ad,
 html[data-tool-direct='work'] [data-ad],
 html[data-tool-direct='work'] .adsbygoogle { display:none!important; }
+/* Only the state-gated saved-work gallery may host an ordinary banner. */
+html[data-tool-direct='work'] #pxd-panel[open] #project-library-pane:not([hidden]) .project-manager-ad:not([hidden]) > .project-manager-ad__slot > .adsbygoogle.project-manager-ad__unit { display:block!important; }
 html[data-tool-direct='work'] body.creation-editor .draw-music-panel {
   box-sizing:border-box;
   top:calc(var(--tool-direct-top,0px) + var(--tool-direct-bar) + 8px);

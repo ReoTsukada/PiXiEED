@@ -12,6 +12,18 @@ const VALID_CLIENT = /^ca-pub-\d{16}$/;
 const VALID_SLOT = /^\d{6,20}$/;
 const SAFE_QUERY_KEYS = new Set(['workspace', 'social']);
 const documents = new WeakMap();
+// One irreversible reservation per logical placement, shared across module copies.
+// Reopening, sorting, or rerendering never refreshes an existing placement.
+const REQUEST_OWNER = Symbol.for('pixieed.project-gallery-ad.placements.v2');
+export function hasProjectGalleryAdRequest(doc, key = 'chooser:legacy') { return Boolean(doc?.[REQUEST_OWNER]?.has(key)); }
+export function claimProjectGalleryAdRequest(doc, owner, key = 'chooser:legacy') {
+  if (!doc || !owner || typeof key !== 'string' || !key || hasProjectGalleryAdRequest(doc, key)) return false;
+  try {
+    if (!doc[REQUEST_OWNER]) Object.defineProperty(doc, REQUEST_OWNER, { value: new Map() });
+    doc[REQUEST_OWNER].set(key, owner); return true;
+  } catch { return false; }
+}
+
 
 export function resolveProjectGalleryAdUnit(config) {
   const unit = config?.unit;
@@ -344,6 +356,8 @@ export function mountProjectGalleryAd({ doc = globalThis.document, win = globalT
     ins.dataset.fullWidthResponsive = 'false'; state.ins = ins; slot.replaceChildren(ins);
   }
 
+  // Initial chooser and the saved-work manager share one request budget.
+  if (!claimProjectGalleryAdRequest(doc, host)) { retire('document-limit'); host.hidden = true; return { mounted: false, retired: true, reason: 'document-limit', host }; }
   // Request immediately only after the entire placement and primary controls are visible.
   state.attempted = true; host.dataset.adState = 'loading-sdk';
   try {

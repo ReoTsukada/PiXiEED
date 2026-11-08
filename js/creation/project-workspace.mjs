@@ -8,9 +8,11 @@ import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=202
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261016-tool-shell-1';
-import { mountProjectGallery, drawProjectThumbnail } from './project-gallery.mjs?rev=20261108-gallery-first-1';
+import { mountProjectGallery, drawProjectThumbnail } from './project-gallery.mjs?rev=20261108-inline-gallery-ad-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
+import { mountProjectGalleryAdSeries, hasManagerArtwork } from '../ads/project-manager-ad.mjs?rev=20261108-inline-gallery-ad-1';
+import { projectManagerAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-inline-gallery-ad-1';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',
@@ -36,7 +38,7 @@ export function isInitialProjectEntryFresh({ initialProject = null, pointer = nu
 }
 
 /** Each tool owns its projects. Imports are independent copies, never linked editors. */
-export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, initialRestoreError = '', root = null, idPrefix = '', routePointer = true, isActive = () => true, rememberKey = null, rememberShared = true, allowImplicitImport = true, initialEntryRequestFresh = null }) {
+export function mountProjectWorkspace({ tool, getProject, openProject, setStatus = () => {}, getPublicSources = () => [], getEditorState = () => ({}), getPreviewImage = () => null, restoreEditorState = () => {}, onNavigate = null, hasContent = () => true, initialProject = null, initialPointer = null, initialRestoreError = '', root = null, idPrefix = '', routePointer = true, isActive = () => true, rememberKey = null, rememberShared = true, allowImplicitImport = true, initialEntryRequestFresh = null }) {
   const store = createToolProjectStore(tool); let main = root || document.querySelector('#main') || document.querySelector('main');
   const lifecycle = new AbortController();
   main.inert = true; main.setAttribute('aria-busy', 'true');
@@ -53,8 +55,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function setModeTransitionActive(value) { modeTransitionActive = Boolean(value); syncInputLock(); }
   let listEpoch = 0; let importEpoch = 0; let listLoaded = false; let modeSwitching = false; let ready;
   let activeCanvas = null;
+  let managerAd = null, managerAdPrepared = false, managerAdFrame = 0, managerArtworkCount = 0;
+  const managerAdState = { settled: false, enoughArtwork: false, libraryVisible: false, searching: false, selecting: false,
+    importing: false, hasErrors: false, busy: true, restoring: false, dirty: false };
+  function retireManagerAd(reason) { managerAdPrepared = true; cancelAnimationFrame(managerAdFrame); managerAdFrame = 0; managerAd?.retire(reason); }
+  function closeManagerAd() { managerAd?.dispose(); managerAd = null; cancelAnimationFrame(managerAdFrame); managerAdFrame = 0; managerAdPrepared = false; }
+
   let transientNavigation = false;
-  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261108-gallery-first-ad-1';
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261108-inline-gallery-ad-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
@@ -79,6 +87,12 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const titleInput = node('input'); titleInput.id = 'project-title'; titleInput.maxLength = 60; titleInput.autocomplete = 'off';
   const rename = button('名前を保存', 'project-rename', () => { const name = titleInput.value; void transact(async () => { session.rename(name); await save(); await refreshList(); }, { close: false }); });
   currentRow.append(titleLabel, titleInput, rename);
+  const renameDetails = node('details', 'project-rename-details');
+  renameDetails.append(node('summary', '', '名前を変更'), currentRow);
+  const resumeButton = button('編集を続ける', 'project-continue', () => dialog.close());
+  resumeButton.className = 'project-continue';
+  const currentCard = node('section', 'project-current-card');
+  currentCard.setAttribute('aria-label', '今の作品');
   const actions = node('div', 'project-sheet__actions');
   const newButton = button('＋ 新規', 'project-new', () => void transact(async () => {
     if (!initialRestoreError && (session.persisted || editedSinceOpen)) await save();
@@ -123,8 +137,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   moreActions.append(node('summary', '', 'その他')); moreActions.append(actions);
   const transferSection = node('section', 'project-transfer');
   transferSection.setAttribute('aria-labelledby', 'project-transfer-title');
-  const transferTitle = node('h3', '', '他のツールへ送る'); transferTitle.id = 'project-transfer-title';
-  const transferNote = node('p', 'project-sheet__note', '内容をコピーして、新しい作品として開きます。元の作品はそのまま残ります。');
+  const transferTitle = node('h3', '', 'この作品を別のツールで開く'); transferTitle.id = 'project-transfer-title';
+  const transferNote = node('p', 'project-sheet__note', 'コピーを作って開きます。今の作品は残ります。');
   const transferActions = node('div', 'project-transfer__actions');
   const transferTargets = [['draw', '描く'], ['audio', '音楽'], ['jigsaw', 'ジグソー'], ['spot_difference', '間違い探し'], ['hidden_object', 'もの探し']]
     .filter(([target]) => target !== tool)
@@ -135,7 +149,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       }));
       el.className = 'project-transfer__button';
       el.dataset.projectTransfer = target;
-      el.innerHTML = `${icon(target)}<span>${label}</span>`;
+      el.innerHTML = `${icon(target)}<span><strong>${label}</strong><small>コピーして開く</small></span>`;
       transferActions.append(el);
       return { target, el };
     });
@@ -170,9 +184,29 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   tabs.append(libraryTab, currentTab);
   const identity = node('div', 'project-sheet__identity');
-  identity.innerHTML = `${icon(tool)}<span><strong></strong><small></small></span>`;
+  identity.innerHTML = `<span class="project-sheet__preview">${icon(tool)}<canvas hidden aria-label="今の作品のプレビュー" role="img"></canvas></span><span><span class="project-sheet__eyebrow">今の作品</span><strong></strong><small></small></span>`;
+  const previewCanvas = identity.querySelector('canvas');
+  const previewFallback = identity.querySelector('svg');
+  function refreshCurrentPreview() {
+    // Read only the current pixels. Opening the manager must never save, fork,
+    // or replace the session merely to render a thumbnail.
+    const image = getPreviewImage() || activeCanvas;
+    let source = null;
+    if (image?.rgba) {
+      source = document.createElement('canvas'); source.width = image.width; source.height = image.height;
+      source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0);
+    }
+    previewCanvas.hidden = !source; previewFallback.toggleAttribute('hidden', Boolean(source));
+    if (!source) return;
+    const scale = Math.min(1, 160 / Math.max(source.width, source.height));
+    previewCanvas.width = Math.max(1, Math.round(source.width * scale)); previewCanvas.height = Math.max(1, Math.round(source.height * scale));
+    const context = previewCanvas.getContext('2d'); context.imageSmoothingEnabled = false;
+    context.drawImage(source, 0, 0, previewCanvas.width, previewCanvas.height);
+    previewCanvas.setAttribute('aria-label', `今の作品のプレビュー、${source.width} × ${source.height}px`);
+    return { width: source.width, height: source.height };
+  }
   const identityName = identity.querySelector('strong'); const identityMeta = identity.querySelector('small');
-  const toolbar = node('div', 'project-sheet__toolbar'); newButton.textContent = '＋ 新規'; toolbar.append(tabs, newButton);
+  const toolbar = node('div', 'project-sheet__toolbar'); newButton.textContent = '＋ 新規作成'; toolbar.append(tabs, newButton);
   const search = node('input', 'project-search'); search.type = 'search'; search.id = 'project-search'; search.placeholder = '作品名で探す'; search.setAttribute('aria-label', '保存した作品を作品名で探す');
   const count = node('p', 'project-library-count'); count.setAttribute('role', 'status');
   const noMatches = node('p', 'project-list__empty', 'この名前の作品は見つかりません。'); noMatches.hidden = true;
@@ -188,9 +222,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const help = node('p', 'project-gallery-help', 'タップで開く · 長押しで複数選択');
   const retryList = button('もう一度読み込む', 'project-list-retry', () => void refreshList()); retryList.hidden = true;
   const gallery = mountProjectGallery({ list, scroller: dialog, onOpen: openSavedProject,
-    onContext: (item, card) => showCardActions(item, card, () => openSavedProject(item)),
+    onContext: (item, card) => { retireManagerAd('context-menu'); showCardActions(item, card, () => openSavedProject(item)); },
     isLocked: () => locked, currentId: () => session.currentProject?.projectId,
     onSelection({ selecting, selected, total, visible, all }) {
+      managerAdState.selecting = selecting; managerAdState.searching = Boolean(search.value);
+      if (selecting || search.value) retireManagerAd('selection-or-search');
       selectionToolbar.hidden = total === 0; selectionActions.hidden = !selecting;
       selectButton.hidden = selecting; selectAll.hidden = cancelSelection.hidden = !selecting;
       selectAll.textContent = all ? 'すべて解除' : search.value ? '検索結果を選択' : 'すべて選択';
@@ -203,13 +239,17 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   });
   search.addEventListener('input', () => { gallery.filter(search.value); dialog.scrollTop = 0; });
   function selectPane(name) {
+    if (dialog.open) retireManagerAd('pane-change');
     const current = name === 'current'; currentPane.hidden = !current; libraryPane.hidden = current;
+    managerAdState.libraryVisible = !current;
+    message.textContent = operationError || ''; // Do not carry old success messages into another pane.
     currentTab.setAttribute('aria-selected', String(current)); libraryTab.setAttribute('aria-selected', String(!current));
     currentTab.tabIndex = current ? 0 : -1; libraryTab.tabIndex = current ? -1 : 0;
     dialog.scrollTop = 0; gallery.refresh();
   }
   const header = node('div', 'project-sheet__header'); header.append(heading, toolbar);
-  currentPane.append(identity, currentRow, moreActions, transferSection);
+  currentCard.append(identity, resumeButton, renameDetails);
+  currentPane.append(currentCard, transferSection, moreActions);
   libraryPane.append(search, selectionToolbar, count, help, list, noMatches, retryList, importSection, selectionActions);
   dialog.append(header, recoveryDescription, message, currentPane, libraryPane); selectPane('library'); document.body.append(dialog);
   // Retained editors share the shell, but each owns its project controls and route pointer.
@@ -219,8 +259,27 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       for (const attr of ['for', 'aria-controls', 'aria-labelledby', 'aria-describedby']) if (el.hasAttribute(attr)) el.setAttribute(attr, el.getAttribute(attr).split(' ').map(id => idPrefix + id).join(' '));
     }
   }
+  const retireBeforeManagerControl = event => {
+    const control = event.target?.closest?.('button, input, select, textarea, summary, a[href], [tabindex]:not([tabindex="-1"])');
+    if (control?.classList.contains('project-gallery__tile') && (event.type === 'pointerdown' || ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab'].includes(event.key))) return;
+    if (control && dialog.contains(control) && !control.closest('.project-manager-ad')) retireManagerAd('interaction');
+  };
+  dialog.addEventListener('pointerdown', retireBeforeManagerControl, { capture: true, signal: lifecycle.signal });
+  dialog.addEventListener('keydown', retireBeforeManagerControl, { capture: true, signal: lifecycle.signal });
+  search.addEventListener('focus', () => retireManagerAd('search'), { signal: lifecycle.signal });
+  function prepareManagerAd() {
+    if (managerAdPrepared || !dialog.open || libraryPane.hidden) return;
+    managerAdPrepared = true;
+    managerAdFrame = requestAnimationFrame(() => {
+      managerAdFrame = 0;
+      if (!dialog.open || libraryPane.hidden) return;
+      try { managerAd = mountProjectGalleryAdSeries({ doc: document, win: window, dialog, pane: libraryPane, list, gallery,
+        artworkCount: managerArtworkCount, galleryState: managerAdState, config: projectManagerAdConfig }); }
+      catch { managerAd?.dispose(); gallery.clearBreaks(); }
+    });
+  }
   dialog.addEventListener('cancel', (event) => { if (locked || gallery.selecting) { event.preventDefault(); if (!locked) gallery.setSelection(false); } });
-  dialog.addEventListener('close', () => { gallery.setSelection(false); ++listEpoch; ++importEpoch; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
+  dialog.addEventListener('close', () => { closeManagerAd(); gallery.setSelection(false); ++listEpoch; ++importEpoch; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
     async capture(base) {
@@ -257,6 +316,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   function update() {
     const project = session?.currentProject;
+    managerAdState.busy = locked || session.busy; managerAdState.restoring = Boolean(initialRestoreError);
+    managerAdState.dirty = session.dirty && editedSinceOpen; managerAdState.hasErrors ||= failed || Boolean(operationError);
+    managerAdState.libraryVisible = !libraryPane.hidden; managerAdState.importing = importSection.open;
+    managerAd?.update();
     dialog.dataset.startup = String(initialSelectionPending);
     title.textContent = initialRestoreError ? '前回の作品を開けませんでした' : initialSelectionPending ? '作品を選ぶ' : '作品を管理';
     recoveryDescription.hidden = !initialRestoreError;
@@ -272,17 +335,26 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (isActive()) document.body.dataset.toolTransferReady = String(getPublicSources().length === 0 && hasContent());
     identity.querySelector('svg').innerHTML = icons[tool] || icons.folder;
     identityName.textContent = name;
-    const dimensions = activeCanvas?.width && activeCanvas?.height ? `${activeCanvas.width} × ${activeCanvas.height}px` : '';
+    let previewSize = activeCanvas;
+    // Preview failure must not interrupt a save, restore, or input unlock.
+    if (dialog.open) try { previewSize = refreshCurrentPreview() || activeCanvas; }
+    catch { previewCanvas.hidden = true; previewFallback.removeAttribute('hidden'); }
+    const dimensions = previewSize?.width && previewSize?.height ? `${previewSize.width} × ${previewSize.height}px` : '';
     identityMeta.textContent = [state, dimensions].filter(Boolean).join(' · ');
     identity.dataset.state = initialRestoreError || failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     for (const el of dialog.querySelectorAll('button')) el.disabled = locked;
-    for (const el of [rename, duplicate, saveButton, exportButton]) el.disabled = locked || Boolean(initialRestoreError);
+    for (const el of [resumeButton, rename, duplicate, saveButton, exportButton]) el.disabled = locked || Boolean(initialRestoreError);
     const backup = findPxdOriginalBackup(project);
     original.hidden = !backup; if (backup) original.textContent = backup.label;
     if (!titleInput.matches(':focus')) titleInput.value = name;
     const canTransfer = Boolean(!getPublicSources().length && hasContent());
     transferSection.hidden = !canTransfer;
-    for (const { el } of transferTargets) el.disabled = locked || !canTransfer;
+    const sharedModes = document.body.classList.contains('creation-suite');
+    transferNote.textContent = sharedModes ? '音楽は同じ作品で編集。ゲームはコピーを作って開きます。' : 'コピーを作って開きます。今の作品は残ります。';
+    for (const { target, el } of transferTargets) {
+      el.disabled = locked || !canTransfer;
+      el.querySelector('small').textContent = sharedModes && ['draw', 'audio'].includes(target) ? '同じ作品で編集' : 'コピーして開く';
+    }
     for (const el of [selectButton, selectAll, cancelSelection, retryList]) el.disabled = locked;
     deleteSelected.disabled = locked || !gallery.selection.length; gallery.refresh();
   }
@@ -315,6 +387,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function resetPointer() { if (initialRestoreError) restoreError(''); if (!routePointer) return; const params = new URLSearchParams(location.search); for (const key of ['pxd', 'pxdRevision', 'pxdImage']) params.delete(key); const state = { ...history.state }; delete state.projectWorkspaceSelection; history.replaceState(state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`); }
   async function transact(work, { close: closeSheet = true } = {}) {
     if (locked) return;
+    retireManagerAd('operation');
     locked = true; clearTimeout(timer); syncInputLock(); update();
     if (closeSheet) dialog.close();
     try { await work(); operationError = ''; }
@@ -343,20 +416,24 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   async function refreshList() {
     const version = ++listEpoch;
+    managerAdState.settled = false; managerAd?.update();
     retryList.hidden = true; list.setAttribute('aria-busy', 'true');
     if (!listLoaded) { count.hidden = false; count.textContent = '作品を読み込んでいます…'; }
     try {
       const { projects, errors } = await store.listProjects(); if (version !== listEpoch) return;
       if (listError && message.textContent === listError) say(operationError || '');
       listError = '';
+      managerArtworkCount = projects.length; managerAdState.enoughArtwork = hasManagerArtwork(projects, projectManagerAdConfig.minimumArtwork);
+      managerAdState.hasErrors = errors.length > 0 || failed || Boolean(operationError) || Boolean(initialRestoreError);
       listLoaded = true; list.querySelector('.project-list__empty')?.remove(); gallery.setItems(projects);
       if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
       if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
     } catch (error) {
       if (version !== listEpoch) return;
+      managerAdState.hasErrors = true; managerAdState.enoughArtwork = false;
       listError = `作品一覧を読み出せませんでした。保存内容は変更していません。${error.message || ''}`;
       retryList.hidden = false; say(listError);
-    } finally { if (version === listEpoch) list.setAttribute('aria-busy', 'false'); }
+    } finally { if (version === listEpoch) { list.setAttribute('aria-busy', 'false'); managerAdState.settled = true; if (!managerAdState.hasErrors && managerAdState.enoughArtwork) prepareManagerAd(); } }
   }
   async function importCopy(source) {
     if (!initialRestoreError && (session.persisted || editedSinceOpen)) await save();
@@ -365,7 +442,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     resetPointer(); await save(); initialSelectionPending = false; dialog.close();
     say('新しい作品として取り込みました。元の作品は変わりません。');
   }
-  importSection.addEventListener('toggle', () => { if (importSection.open && dialog.open) void refreshImports(); });
+  importSection.addEventListener('toggle', () => { managerAdState.importing = importSection.open; if (importSection.open) retireManagerAd('import'); if (importSection.open && dialog.open) void refreshImports(); });
   async function refreshImports() {
     const version = ++importEpoch;
     importList.replaceChildren(node('p', '', '作品を読み込んでいます…'));
@@ -577,6 +654,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       setStatus = typeof options.setStatus === 'function' ? options.setStatus : () => {};
       getPublicSources = typeof options.getPublicSources === 'function' ? options.getPublicSources : () => [];
       getEditorState = typeof options.getEditorState === 'function' ? options.getEditorState : () => ({});
+      getPreviewImage = typeof options.getPreviewImage === 'function' ? options.getPreviewImage : () => null;
       restoreEditorState = typeof options.restoreEditorState === 'function' ? options.restoreEditorState : () => {};
       if (Object.hasOwn(options, 'onNavigate')) onNavigate = options.onNavigate;
       main = nextMain;
@@ -600,7 +678,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     return switching;
   }
   return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, setModeTransitionActive, syncInputLock, activate: update,
-    dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); gallery.dispose(); ++listEpoch; ++importEpoch; dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
+    dispose() { closeManagerAd(); transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); gallery.dispose(); ++listEpoch; ++importEpoch; dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
     async importProject(project) { await ready; await transact(() => importCopy(project)); },
     async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
     async pauseForNavigation() {

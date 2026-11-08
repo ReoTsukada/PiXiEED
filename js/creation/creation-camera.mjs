@@ -1,5 +1,5 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261107-gallery-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261108-inline-gallery-ad-1';
 import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
@@ -60,7 +60,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   };
   const markupLoad = settle(readAsset('/pixel-camera.html', '撮影の操作を読み込めません。'));
   const stylesheetLoad = settle(readAsset('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', '撮影の表示を読み込めません。'));
-  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261107-gallery-1'));
+  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261108-inline-gallery-ad-1'));
   const markup = await prepared(markupLoad);
   const template = new DOMParser().parseFromString(markup, 'text/html');
   const surface = template.querySelector('#pixelStudio'), controls = surface?.querySelector('.lc-bottom'), shutter = template.querySelector('#capture');
@@ -102,7 +102,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   // Scope their visibility to camera so retained Draw/Audio tools stay intact.
   style.textContent = `${scoped}\n${cameraActionIcons}\nbody.creation-suite[data-creation-mode="camera"] :is(.draw-feature-actions, #main > .draw-size) { display:none !important; }`;
   style.media = 'all';
-  document.head.insertBefore(style, document.querySelector('link[href*="/css/creation-modes.css?rev=20261107-mode-continuity-1"]'));
+  document.head.insertBefore(style, document.querySelector('link[href*="/css/creation-modes.css?rev=20261108-inline-gallery-ad-1"]'));
   board.closest('#main').append(surface, template.querySelector('#cameraImageStatus'), template.querySelector('#cameraSaveDialog'));
   // Portal the original camera controls into the actual shared operation dock.
   // Retain .lc and mirror state attributes for its existing contextual selectors.

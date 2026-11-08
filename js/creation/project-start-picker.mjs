@@ -1,7 +1,7 @@
 import { createToolProjectStore } from './tool-project-store.mjs?rev=20261107-gallery-1';
-import { mountProjectGallery } from './project-gallery.mjs?rev=20261108-gallery-first-1';
-import { mountProjectGalleryAd } from '../ads/project-gallery-ad.mjs?rev=20261108-gallery-first-ad-1';
-import { projectGalleryAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-gallery-first-ad-1';
+import { mountProjectGallery } from './project-gallery.mjs?rev=20261108-inline-gallery-ad-1';
+import { mountProjectGalleryAdSeries } from '../ads/project-manager-ad.mjs?rev=20261108-inline-gallery-ad-1';
+import { projectGalleryAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-inline-gallery-ad-1';
 
 /** Require real display-ready RGB previews so blank placeholder canvases do not count as publisher content. */
 export function hasCompleteProjectArtwork(projects) {
@@ -61,19 +61,7 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
   fresh.id = 'project-start-new';
   fresh.textContent = '＋ 新規';
   actions.append(fresh);
-  const adRegion = document.createElement('section');
-  adRegion.className = 'project-start-picker__ad';
-  adRegion.setAttribute('aria-label', '広告');
-  adRegion.dataset.projectGalleryAd = 'chooser-v1';
-  adRegion.hidden = true;
-  const adLabel = document.createElement('p');
-  adLabel.className = 'project-start-picker__ad-label';
-  adLabel.textContent = '広告';
-  const adSlot = document.createElement('div');
-  adSlot.className = 'project-start-picker__ad-slot';
-  adSlot.dataset.projectGalleryAdSlot = '';
-  adRegion.append(adLabel, adSlot);
-  dialog.append(header, intro, search, status, count, retry, scroller, actions, adRegion);
+  dialog.append(header, intro, search, status, count, retry, scroller, actions);
   document.body.append(dialog);
 
   let disposed = false, busy = false, epoch = 0, gallery;
@@ -81,9 +69,9 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
   function retireGalleryAd(reason = 'hide') {
     galleryAdRetired = true;
     galleryAd?.retire?.(reason);
-    if (!dialog.open) adRegion.hidden = true;
+
   }
-  const cssHref = '/css/project-workspace.css?rev=20261108-gallery-first-ad-1';
+  const cssHref = '/css/project-workspace.css?rev=20261108-inline-gallery-ad-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === cssHref);
   const ownsCss = !css;
   let cssPromise = null, cssFailed = false, cancelCss = null;
@@ -108,10 +96,11 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
   search.addEventListener('input', () => { retireGalleryAd('search'); gallery.filter(search.value); scroller.scrollTop = 0; });
   fresh.addEventListener('click', () => void choose(null));
   function cancelPicker() { if (!active()) return; retireGalleryAd('cancel'); hide(); onCancel(); }
-  dialog.addEventListener('close', () => { retireGalleryAd('hide'); adRegion.hidden = true; });
+  dialog.addEventListener('close', () => { retireGalleryAd('hide'); galleryAd?.dispose(); });
   const retireOnControlStart = event => {
     const control = event.target?.closest?.('button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])');
-    if (control && dialog.contains(control) && !adRegion.contains(control)) retireGalleryAd('interaction');
+    if (control?.classList.contains('project-gallery__tile') && (event.type === 'pointerdown' || ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab'].includes(event.key))) return;
+    if (control && dialog.contains(control) && !control.closest('.project-manager-ad')) retireGalleryAd('interaction');
   };
   dialog.addEventListener('pointerdown', retireOnControlStart, true);
   dialog.addEventListener('keydown', retireOnControlStart, true);
@@ -155,7 +144,7 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
       status.textContent = errors?.length ? '一部の作品を確認できませんでした。ほかの作品は開けます。' : projects.length ? '続ける作品を選んでください。' : '保存済みの作品はまだありません。「＋ 新規」から始めてください。';
       retry.hidden = !errors?.length;
       const hasValidArtwork = hasCompleteProjectArtwork(projects);
-      if (!errors?.length && projects.length > 0 && hasValidArtwork) prepareGalleryAd();
+      if (!errors?.length && projects.length > 0 && hasValidArtwork) prepareGalleryAd(projects.length);
     } catch (error) {
       if (!active() || !dialog.open || version !== epoch) return;
       status.textContent = '作品一覧を読み込めませんでした。保存内容は変更していません。もう一度お試しください。';
@@ -163,21 +152,20 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
     } finally { if (active() && version === epoch) list.setAttribute('aria-busy', 'false'); }
   }
   retry.addEventListener('click', () => void refresh());
-  function prepareGalleryAd() {
+  function prepareGalleryAd(artworkCount) {
     if (galleryAdStarted || galleryAdRetired || !active() || !dialog.open) return;
     galleryAdStarted = true;
     // Let the gallery's already-scheduled frame add a tile before measuring.
     requestAnimationFrame(() => {
       if (galleryAdRetired || !active() || !dialog.open) return;
       try {
-        galleryAd = mountProjectGalleryAd({
-          doc: document, win: window, dialog, scroller, list, primaryAction: fresh,
-          host: adRegion, slot: adSlot, config: projectGalleryAdConfig,
+        galleryAd = mountProjectGalleryAdSeries({
+          doc: document, win: window, dialog, pane: scroller, scroller, list, gallery,
+          config: projectGalleryAdConfig, surface: 'chooser', artworkCount,
           // Only booleans cross the placement boundary. Project records stay in the chooser.
-          galleryState: { settled: true, hasVisibleItems: true, hasValidArtwork: true, searching: false, hasErrors: false, busy: false },
+          galleryState: { settled: true, libraryVisible: true, enoughArtwork: true, searching: false, hasErrors: false, busy: false },
         });
-        if (!galleryAd?.mounted) adRegion.hidden = true;
-      } catch { adRegion.hidden = true; }
+      } catch { galleryAd?.dispose(); gallery.clearBreaks(); }
     });
   }
   async function show() {
@@ -193,7 +181,7 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
   }
   function dispose() {
     if (disposed) return;
-    retireGalleryAd('dispose');
+    retireGalleryAd('dispose'); galleryAd?.dispose();
     disposed = true; epoch++;
     signal?.removeEventListener('abort', dispose);
     cancelCss?.();

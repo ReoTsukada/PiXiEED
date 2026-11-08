@@ -288,15 +288,15 @@ test('reopening a picker document cannot mount or request a second unit', () => 
 
 test('picker integration mounts only after settled nonempty success and retires before every control interaction', async () => {
   const source = await readFile(new URL('../../js/creation/project-start-picker.mjs', import.meta.url), 'utf8');
-  const prepareStart = source.indexOf('  function prepareGalleryAd()');
+  const prepareStart = source.indexOf('  function prepareGalleryAd(artworkCount)');
   const prepareEnd = source.indexOf('  async function show()', prepareStart);
   const prepare = source.slice(prepareStart, prepareEnd);
   const chooseStart = source.indexOf('  async function choose(value)');
   const chooseEnd = source.indexOf('  gallery = mountProjectGallery', chooseStart);
   const choose = source.slice(chooseStart, chooseEnd);
-  assert.match(source, /if \(!errors\?\.length && projects\.length > 0 && hasValidArtwork\) prepareGalleryAd\(\)/);
-  assert.match(source, /dialog\.append\(header, intro, search, status, count, retry, scroller, actions, adRegion\)/);
-  assert.match(prepare, /galleryState: \{ settled: true, hasVisibleItems: true, hasValidArtwork: true, searching: false, hasErrors: false, busy: false \}/);
+  assert.match(source, /if \(!errors\?\.length && projects\.length > 0 && hasValidArtwork\) prepareGalleryAd\(projects\.length\)/);
+  assert.match(source, /dialog\.append\(header, intro, search, status, count, retry, scroller, actions\)/);
+  assert.match(prepare, /galleryState: \{ settled: true, libraryVisible: true, enoughArtwork: true, searching: false, hasErrors: false, busy: false \}/);
   assert.doesNotMatch(prepare, /projectId|revisionId|thumbnail|summary|search\.value/);
   assert.ok(choose.indexOf("retireGalleryAd('selection')") < choose.indexOf('setBusy(true)'));
   assert.ok(choose.indexOf("retireGalleryAd('selection')") < choose.indexOf('await onChoose(value)'));

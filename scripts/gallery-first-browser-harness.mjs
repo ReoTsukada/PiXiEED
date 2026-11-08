@@ -76,7 +76,7 @@ async function newContext(target, galleryCssMode = 'normal') {
     try { ensureLocal(url); } catch { report.blockedExternalReads.push(`${req.method()} ${url}`); return route.abort(); }
     if (!['GET', 'HEAD'].includes(req.method())) { report.blockedWrites.push(`${req.method()} ${url}`); return route.abort(); }
     const parsed = new URL(url);
-    if (parsed.pathname === '/css/project-workspace.css' && parsed.searchParams.get('rev')?.includes('gallery-first')) {
+    if (parsed.pathname === '/css/project-workspace.css') {
       releaseCss();
       if (galleryCssMode === 'slow' && !cssSeen) { cssSeen = true; await heldCss; }
       if (galleryCssMode === 'fail-once' && !cssSeen) { cssSeen = true; return route.abort(); }
