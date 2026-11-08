@@ -63,7 +63,7 @@ import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-c
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
 const DRAW_REWARD_LIMITS = Object.freeze({ ...REWARD_LIMITS.draw });
 
-export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools, isActive = () => true, musicLayer = false } = {}) {
+export async function mountDrawMode({ scope, mountWorkspace = mountPxdTools, isActive = () => true, canShowProjectChoice = isActive, musicLayer = false } = {}) {
 if (!scope) throw new TypeError('Draw mode requires a lifecycle scope');
 const siteReward = await import('../ads/site-reward.mjs?rev=20261024-free-tools-1');
 const drawRewardPolicy = createSiteRewardDrawPolicy({
@@ -2783,6 +2783,7 @@ scope.listen(window, 'pageshow', async event => {
 });
 if (document.activeElement === document.body) canvas.focus({ preventScroll: true });
 async function chooseProjectRole(project, roles) {
+  if (!canShowProjectChoice()) throw new Error('画像の選択を取り消しました。作品は保持しています。');
   const dialog = document.createElement('dialog'); dialog.className = 'project-sheet'; dialog.id = 'creation-project-role';
   const title = document.createElement('h2'); title.textContent = '共有して編集する画像を選ぶ';
   const note = document.createElement('p'); note.textContent = 'このPXDには別々の画像があります。選んだ画像を全モードで編集します。他の画像は元PXDのバックアップと保存版に保持します。'; dialog.append(title, note);
@@ -2793,6 +2794,7 @@ async function chooseProjectRole(project, roles) {
     if (scope.disposed) return;
     for (const role of roles) { const button = document.createElement('button'); button.type = 'button'; const label = ({ main: '共通画像', audio: '音楽の画像', draw: '描画の画像' })[role] || role; decorateDialogAction(button, role === 'audio' ? 'audio' : role === 'draw' ? 'draw' : 'image', label); button.dataset.imageRole = role; button.addEventListener('click', () => finish(role)); dialog.append(button); }
     const cancel = document.createElement('button'); decorateDialogAction(cancel, 'cancel', '取消'); cancel.addEventListener('click', () => finish(null)); dialog.append(cancel);
+    dialog.addEventListener('close', () => finish(null));
     dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); }); document.body.append(dialog); dialog.showModal();
   });
 }

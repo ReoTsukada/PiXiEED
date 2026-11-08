@@ -69,6 +69,7 @@ export async function mountCreationRuntime({
   draw = await mountDrawMode({
     scope: gatedScope,
     musicLayer: true,
+    canShowProjectChoice: hostActive,
     isActive: () => hostActive() && (!mountedModes || mountedModes.mode !== 'camera'),
     mountWorkspace: options => {
       reportBootPhase('workspace');

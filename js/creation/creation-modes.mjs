@@ -326,10 +326,10 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   updateProjectCameraStatus();
   const syncHistory = () => { const timeline = draw.getTimeline(); settings.launcher.textContent = String(Math.max(timeline.width, timeline.height)); settings.launcher.setAttribute('aria-label', `キャンバス設定 ${timeline.width}×${timeline.height}px ${timeline.palette.length}色`); undo.disabled = !draw.canUndo; redo.disabled = !draw.canRedo; labelHistoryControls(); updateProjectCameraStatus(); };
   scope.add(draw.subscribe(syncHistory)); syncHistory();
-  const startupInert = main.inert; main.inert = true;
+  draw.workspace.setModeTransitionActive(true);
   let musicModel;
   try { musicModel = await mountDrawMusicModel({draw,scope}); }
-  finally { main.inert = startupInert; }
+  finally { draw.workspace.setModeTransitionActive(false); }
   const motion = mountCreationModeMotion({ board, main, scope });
   const interrupted = () => new DOMException('制作モードの切替が更新されました。', 'AbortError');
   const currentRequest = version => !scope.disposed && isActive() && requestVersion === version;
@@ -466,7 +466,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     return running;
   }
   async function runTransitions() {
-    const wasInert = main.inert;
+    draw.workspace.setModeTransitionActive(true);
     try {
       while (!scope.disposed && isActive() && requestedMode !== mode) {
         const version = requestVersion, next = requestedMode, previous = mode;
@@ -474,7 +474,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
         // project, so an unsupported projection leaves the current mode intact.
         assertCreationModeCompatible(next, draw.getTimeline());
         stopCurrent();
-        switching = true; if (!main.inert) main.inert = true;
+        switching = true;
         if (body.dataset.creationTransition !== 'true') body.dataset.creationTransition = 'true';
         if (menu.getAttribute('aria-busy') !== 'true') menu.setAttribute('aria-busy', 'true');
         if (errorNode.textContent) errorNode.textContent = ''; settings.close();
@@ -504,7 +504,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
       }
     } catch (error) { requestedMode = mode; throw error; }
     finally {
-      motion.cancel(); if (main.inert !== wasInert) main.inert = wasInert;
+      motion.cancel(); draw.workspace.setModeTransitionActive(false);
       delete body.dataset.creationTransition;
       switching = false; if (menu.hasAttribute('aria-busy')) menu.removeAttribute('aria-busy');
       resumeCurrent(); if (!scope.disposed && isActive()) draw.workspace.activate();
@@ -513,7 +513,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     }
   }
   scope.listen(document, 'visibilitychange', () => { if (document.hidden) { motion.cancel(); if (switching) stopCurrent(); } else if (!switching) resumeCurrent(); });
-  scope.add(() => { initializingScope?.dispose(); motion.cancel(); main.inert = false; delete body.dataset.creationTransition; });
+  scope.add(() => { initializingScope?.dispose(); motion.cancel(); draw.workspace.setModeTransitionActive(false); delete body.dataset.creationTransition; });
   async function navigate({ tool, project, url }) {
     if (!['draw', 'audio', 'camera'].includes(tool)) { location.assign(url); return; }
     await switchMode(tool);

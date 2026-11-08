@@ -42,6 +42,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let initialEntryFresh = false;
+  let modeTransitionActive = false;
+  // The workspace and mode loader own independent locks. Recompute instead of
+  // restoring a stale inert snapshot when asynchronous work finishes.
+  function syncInputLock() {
+    const blocked = locked || Boolean(initialRestoreError) || modeTransitionActive;
+    main.inert = blocked; main.setAttribute('aria-busy', String(locked || modeTransitionActive));
+  }
+  function setModeTransitionActive(value) { modeTransitionActive = Boolean(value); syncInputLock(); }
   let listEpoch = 0; let importEpoch = 0; let listLoaded = false; let modeSwitching = false; let ready;
   let activeCanvas = null;
   let transientNavigation = false;
@@ -302,11 +310,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function resetPointer() { if (initialRestoreError) restoreError(''); if (!routePointer) return; const params = new URLSearchParams(location.search); for (const key of ['pxd', 'pxdRevision', 'pxdImage']) params.delete(key); const state = { ...history.state }; delete state.projectWorkspaceSelection; history.replaceState(state, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`); }
   async function transact(work, { close: closeSheet = true } = {}) {
     if (locked) return;
-    locked = true; clearTimeout(timer); main.inert = true; main.setAttribute('aria-busy', 'true'); update();
+    locked = true; clearTimeout(timer); syncInputLock(); update();
     if (closeSheet) dialog.close();
     try { await work(); operationError = ''; }
     catch (error) { if (session.dirty && session.currentProject?.entries.length) editedSinceOpen = true; operationError = error.message || '作品を開けませんでした。今の作品は保持しています。'; say(operationError); }
-    finally { locked = false; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update(); scheduleAutoSave(); }
+    finally { locked = false; syncInputLock(); update(); scheduleAutoSave(); }
   }
   function openSavedProject(item) {
     return transact(async () => {
@@ -486,10 +494,10 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         if (editedSinceOpen) session.markDirty();
         await assertOwnPublicSources(getPxdPublicSources(initialProject.project));
       } catch (error) { operationError = error.message; say(operationError); failed = true; }
-      finally { locked = false; initialized = true; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update(); }
+      finally { locked = false; initialized = true; syncInputLock(); update(); }
       return session.persisted;
     }
-    await session.initialize(blankProject(), { persisted: false, apply: tool !== 'camera' }); main.inert = true;
+    await session.initialize(blankProject(), { persisted: false, apply: tool !== 'camera' }); syncInputLock();
     const params = new URLSearchParams(location.search); let pointer = null;
     try {
       if (initialRestoreError) throw new Error(initialRestoreError);
@@ -524,7 +532,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     } catch (error) { operationError = error.message; restoreError(operationError); say(operationError); }
     finally {
       initialSelectionPending = false;
-      locked = false; initialized = true; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update();
+      locked = false; initialized = true; syncInputLock(); update();
     }
     initialEntryFresh = isInitialProjectEntryFresh({ initialProject, pointer, hasQuery: !entryRequestClean && (params.size > 0 || Boolean(newStartRoute)), hash: location.hash, restoreError: initialRestoreError, operationError, failed });
     return session.persisted;
@@ -568,7 +576,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
 
       const ownsLock = !locked;
       if (ownsLock) locked = true;
-      main.inert = true; main.setAttribute('aria-busy', 'true'); update();
+      syncInputLock(); update();
       modeSwitching = true;
       try {
         const nextProject = project ?? session.currentProject;
@@ -576,14 +584,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         failed = false; operationError = '';
       } finally {
         modeSwitching = false;
-        if (ownsLock) { locked = false; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); }
+        if (ownsLock) { locked = false; syncInputLock(); }
         update();
       }
     })();
     ready = switching;
     return switching;
   }
-  return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, activate: update,
+  return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, setModeTransitionActive, syncInputLock, activate: update,
     dispose() { transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); gallery.dispose(); ++listEpoch; ++importEpoch; dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
     async importProject(project) { await ready; await transact(() => importCopy(project)); },
     async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
@@ -597,7 +605,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (tool !== 'camera') throw new TypeError('撮影用の新しい作品はカメラから作成してください。');
       await ready;
       if (locked) throw new Error('作品の処理中です。少し待ってから撮影してください。');
-      locked = true; main.inert = true; main.setAttribute('aria-busy', 'true'); update();
+      locked = true; syncInputLock(); update();
       try {
         clearTimeout(timer);
         await session.wait();
@@ -606,7 +614,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
         resetPointer();
         return session.currentProject;
       } finally {
-        locked = false; main.inert = Boolean(initialRestoreError); main.setAttribute('aria-busy', 'false'); update();
+        locked = false; syncInputLock(); update();
       }
     },
     async assertCanSave() { await assertOwnPublicSources([...getPxdPublicSources(session.currentProject), ...getPublicSources()]); return true; },

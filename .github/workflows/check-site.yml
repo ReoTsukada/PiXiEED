@@ -48,6 +48,7 @@ jobs:
           PIXIEED_CONTROLS_OUTPUT: /tmp/pixieed-creation-browser/controls
           PIXIEED_DRAW_ENTRY_OUTPUT: /tmp/pixieed-creation-browser/entry
           PIXIEED_RESUME_OUTPUT: /tmp/pixieed-creation-browser/resume
+          PIXIEED_TOUCH_OUTPUT: /tmp/pixieed-creation-browser/touch
         run: |
           python3 -m http.server 4189 --bind 127.0.0.1 --directory /tmp/pixieed-site-check > /tmp/pixieed-creation-http.log 2>&1 &
           server=$!
@@ -55,6 +56,8 @@ jobs:
           node --input-type=module -e "for (let i = 0; i < 30; i++) { try { if ((await fetch('http://127.0.0.1:4189/draw/')).ok) process.exit(0); } catch {} await new Promise(r => setTimeout(r, 200)); } process.exit(1);"
           status=0
           node scripts/creation-controls-browser-harness.mjs || status=1
+          node scripts/draw-touch-browser-harness.mjs || status=1
+          node scripts/draw-touch-lifecycle-browser-harness.mjs || status=1
           node scripts/draw-entry-browser-harness.mjs || status=1
           node scripts/direct-resume-browser-harness.mjs || status=1
           exit "$status"
