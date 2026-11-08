@@ -156,7 +156,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
     }
     // New shop and project-gallery ad sources are explicit opt-ins, never a directory crawl.
     for (const name of ['data/shop-ad-config.mjs', 'js/ads/shop-ad.mjs',
-      'data/project-gallery-ad-config.mjs', 'js/ads/project-gallery-ad.mjs']) {
+      'data/project-gallery-ad-config.mjs', 'js/ads/project-gallery-ad.mjs', 'js/ads/project-manager-ad.mjs']) {
       if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
     }
     let eventPages = 0;

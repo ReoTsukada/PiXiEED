@@ -43,7 +43,7 @@ test('phone recovery text wraps without an ellipsis and invalidates its styleshe
   const css = read('css/tool-direct.css');
   assert.match(css, /\.tool-direct__bar--recovery \.tool-direct__status \{[^}]*max-width:none;[^}]*white-space:normal;/);
   const revision = JSON.parse(read('tests/runtime-cache-revisions.json'))['css/tool-direct.css'];
-  assert.equal(revision, '20261108-touch-recovery-1');
+  assert.equal(revision, '20261108-inline-gallery-ad-1');
   for (const mode of ['draw','audio','camera']) assert.ok(read(`${mode}/index.html`).includes(`/css/tool-direct.css?rev=${revision}`));
 });
 

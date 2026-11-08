@@ -27,7 +27,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261107-mode-continuity-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261108-inline-gallery-ad-1';
   const styled = new Promise((resolve, reject) => {
     const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
     const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
@@ -196,7 +196,10 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   const imageImportButton = document.createElement('button'); imageImportButton.type = 'button'; imageImportButton.id = 'creation-file-image-open'; imageImportButton.textContent = '画像を読み込む';
   addActionIcon(imageImportButton, 'artwork'); imageImportButton.title = imageImportButton.textContent;
   imageImportButton.setAttribute('aria-label', '画像ファイルを読み込む'); imageImportActions.append(imageImportButton);
-  currentProjectPane?.prepend(imageImportActions);
+  const imageImportSection = document.createElement('section'); imageImportSection.className = 'project-image-import';
+  const imageImportNote = document.createElement('p'); imageImportNote.className = 'project-sheet__note'; imageImportNote.textContent = '端末にある画像から作成します。';
+  imageImportSection.append(imageImportActions, imageImportNote);
+  currentProjectPane?.querySelector('.project-current-card')?.after(imageImportSection);
   const outputActionIcons = new Map([
     ['#draw-save', 'save'], ['#draw-export', 'export'], ['#draw-import-local', 'artwork'],
     ['#draw-copy-last', 'copy'], ['#draw-resume', 'resume'], ['[data-output-project]', 'manage']
@@ -207,15 +210,19 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const titleRow = document.createElement('span'); titleRow.className = 'creation-output__card-title';
     addActionIcon(titleRow, iconName); titleRow.append(heading); action.prepend(titleRow); action.title = heading.textContent.trim();
   }
-  scope.add(() => imageImportActions.remove());
-  const projectNotes = document.createElement('div'); projectNotes.id = 'creation-project-save-scope'; projectNotes.className = 'creation-project-notes';
+  scope.add(() => imageImportSection.remove());
+  const projectNotes = document.createElement('details'); projectNotes.id = 'creation-project-save-scope'; projectNotes.className = 'creation-project-notes';
   const saveScopeNote = document.createElement('p'); saveScopeNote.className = 'creation-project-save-note';
   saveScopeNote.textContent = '作品保存は現在の絵・音楽・共通設定を保存します。カメラ出力は撮影画像だけを書き出します。';
   const cameraProjectNote = document.createElement('p'); cameraProjectNote.id = 'creation-project-camera-note'; cameraProjectNote.className = 'creation-project-camera-note'; cameraProjectNote.setAttribute('role', 'status'); cameraProjectNote.setAttribute('aria-live', 'polite');
   const historyNote = document.createElement('p'); historyNote.className = 'creation-project-history-note';
   historyNote.textContent = '編集履歴で戻る対象：描画・音楽・適用した撮影画像・共通設定です。カメラの色味・ズームは対象外です。';
-  projectNotes.append(saveScopeNote, cameraProjectNote, historyNote); currentProjectPane?.append(projectNotes);
-  scope.add(() => projectNotes.remove());
+  const projectNotesSummary = document.createElement('summary'); projectNotesSummary.textContent = '保存と編集履歴について';
+  projectNotes.append(projectNotesSummary, saveScopeNote, historyNote); currentProjectPane?.append(projectNotes);
+  // A pending camera capture may not be part of the saved work. Keep that
+  // changing warning visible even when the general help is collapsed.
+  currentProjectPane?.querySelector('.project-current-card')?.append(cameraProjectNote);
+  scope.add(() => { projectNotes.remove(); cameraProjectNote.remove(); });
   scope.listen(fileButton, 'click', () => {
     restoreFileFocus = true;
     void draw.workspace.showProjects();
@@ -429,7 +436,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261107-gallery-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261108-inline-gallery-ad-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

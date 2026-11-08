@@ -19,7 +19,7 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261107-gallery-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261108-inline-gallery-ad-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
@@ -2179,7 +2179,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261107-gallery-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261108-inline-gallery-ad-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2568,6 +2568,14 @@ const drawProjectOptions = {
       installAnimationDocument(image);
     }
     saved = true; paint(); await opened();
+  },
+  getPreviewImage() {
+    if (scope.disposed) return null;
+    if (readOnlyImage) return readOnlyImage;
+    const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
+    // Use the artwork poster in every mode, never the selected music cel.
+    const snapshot = composeOutputFrame(timeline, timeline.frames[0].id, { includeMusic: false });
+    return { width: snapshot.width, height: snapshot.height, rgba: documentRgba(snapshot) };
   },
   async getProject(project) {
     if (scope.disposed) return project;

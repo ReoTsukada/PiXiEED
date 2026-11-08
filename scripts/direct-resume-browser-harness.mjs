@@ -69,6 +69,7 @@ try {
   await paint(page, 2, 2); await save(page);
   await page.locator('#creation-file-open').click();
   await page.locator('#project-tab-current').click();
+  await page.locator('.project-rename-details > summary').click();
   await page.locator('#project-title').fill('再開テスト の続き');
   await page.locator('#project-rename').click();
   await page.waitForFunction(() => document.querySelector('.project-bar__name').textContent === '再開テスト の続き' && !window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.busy);
