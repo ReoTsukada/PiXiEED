@@ -28,14 +28,14 @@
       }
     ],
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-guide.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-guide.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "電子書籍とドット絵の描画のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -67,14 +67,14 @@
       }
     ],
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-guide.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-motifs.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "電子書籍とドット絵の描画のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "小さなモチーフを学ぶ電子書籍のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -94,14 +94,14 @@
     "workId": "ultimate-pixel-crew-report",
     "metadataNote": "同じ作品の紙版（Kindle版も掲載）。",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/paper-landscape.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/paper-landscape.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "背景の描き方を学ぶ本のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -119,14 +119,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/paper-gallery.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/paper-gallery.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "ドット絵の作品集のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -143,14 +143,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-games.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-games.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "ゲームのドット絵を紹介する電子書籍のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -184,14 +184,14 @@
       }
     ],
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/peg-toy.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/peg-toy.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "スティックを挿してつくるおもちゃのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -210,14 +210,14 @@
     "author": "きろくノート工房",
     "metadataNote": "商品名・著者・サイズ・ページ数は利用者提供情報（公式仕様は未確認）。",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/grid-notebook.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/grid-notebook.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "マスを塗る方眼ノートのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -232,14 +232,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-generic.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-fantasy.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "電子書籍のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "ファンタジーのドット絵を紹介する電子書籍のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -259,14 +259,14 @@
     "sourceLabel": "出版社の作品紹介（紙版）",
     "sourceUrl": "https://www.borndigital.co.jp/book/20926/",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-landscape.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-landscape.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "背景の描き方を学ぶ電子書籍のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -281,14 +281,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-gallery.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-characters.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "キャラクターのドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -306,14 +306,14 @@
     "sourceLabel": "刊行記念展示の公式案内",
     "sourceUrl": "https://wps-jp.fujifilm.com/nanamiyuki_202403/",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-gallery.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-characters.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "キャラクターのドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -329,14 +329,14 @@
     "sample": false,
     "author": "ZAPOTECO",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-textile.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-textile.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "糸を結ぶ手芸の電子書籍のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -352,14 +352,14 @@
     "sample": false,
     "author": "JumKujira",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-gallery.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-characters.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "キャラクターのドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -374,14 +374,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/wood-puzzle.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/wood-puzzle.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "形を組み合わせる木製パズルのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -397,14 +397,14 @@
     "sample": false,
     "author": "R研究所",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/paper-guide.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/paper-guide.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "本とドット絵の描画のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -437,14 +437,14 @@
       }
     ],
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/paper-stickers.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/paper-stickers.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "シールを並べるパズルブックのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -459,14 +459,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/ebook-gallery.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/ebook-characters.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "ドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "キャラクターのドット絵の電子作品集のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -481,14 +481,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/pixel-display.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/pixel-display.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "ドット絵を表示するフレームのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -531,14 +531,14 @@
       }
     ],
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/pixel-speaker.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/pixel-speaker-white.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
-      "alt": "ドット絵表示と音を楽しむ機器のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "alt": "明るい色のドット絵表示と音を楽しむ機器のイメージイラスト（実物の外観ではありません）",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -560,14 +560,14 @@
       "observedAsin": "B0GQYVXZJD"
     },
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/pixel-speaker.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/pixel-speaker.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "ドット絵表示と音を楽しむ機器のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -589,14 +589,14 @@
       "observedAsin": "B08D2Z2N87"
     },
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/pixel-display.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/pixel-display.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "ドット絵を表示するフレームのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -613,14 +613,14 @@
     "sourceLabel": "LEGOの製品紹介",
     "sourceUrl": "https://www.lego.com/ja-jp/product/white-baseplate-11026",
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/white-baseplate.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/white-baseplate.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "白いブロック用の基礎板のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -635,14 +635,14 @@
     "image": null,
     "sample": false,
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/building-blocks.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/building-blocks.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "組み立て用ブロックのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -664,14 +664,14 @@
       "observedAsin": "B0CFQH8QR5"
     },
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/baseplate-set.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/baseplate-set.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "複数のブロック用基礎板のイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {
@@ -694,14 +694,14 @@
       "variantStatus": "unconfirmed-conflicting-cat-breeds"
     },
     "shopThumbnail": {
-      "src": "/assets/books/illustrations/cat-blocks.png",
-      "width": 96,
-      "height": 96,
+      "src": "/assets/books/illustrations/cat-blocks.jpg",
+      "width": 640,
+      "height": 640,
       "kind": "illustration",
       "alt": "猫を題材にしたブロックのイメージイラスト（実物の外観ではありません）",
-      "creator": "PiXiEED用の独自制作",
+      "creator": "PiXiEED用にAI生成した独自イラスト",
       "rights": "商品写真・表紙・販売サイト素材・ブランドロゴは不使用。",
-      "source": "scripts/generate-shop-illustrations.mjs"
+      "source": "assets/books/illustrations-manifest.json"
     }
   },
   {

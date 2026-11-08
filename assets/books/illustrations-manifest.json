@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "method": "AI-generated category illustrations",
+  "provenance": {
+    "generator": "OpenAI built-in image_gen",
+    "description": "Newly generated conceptual category illustrations. These do not reproduce actual product appearances or book covers.",
+    "rights": "Original AI-generated artwork for PiXiEED. No third-party product photographs, seller images, brand logos, or readable cover text used.",
+    "style": "Smooth 3D editorial product illustration; warm ivory background; sage, coral, ochre and powder blue palette; no logos or readable text.",
+    "processing": "Resized and converted with sips to 640x640 JPEG, quality 84.",
+    "generatedDate": "2026-11-08"
+  },
+  "assets": [
+    {
+      "src": "/assets/books/illustrations/ebook-guide.jpg",
+      "subject": "電子書籍とドット絵の描画",
+      "width": 640,
+      "height": 640,
+      "sha256": "0f91a14a57f12c1798ee0071a127d559e25e4af8d32f5c2c5f2be1dcc7488047"
+    },
+    {
+      "src": "/assets/books/illustrations/ebook-motifs.jpg",
+      "subject": "小さなモチーフを学ぶ電子書籍",
+      "width": 640,
+      "height": 640,
+      "sha256": "e6f67ee85d38bd97ab96bf601dd2652364aed9daa3afcd5541d20bf7b08c9552"
+    },
+    {
+      "src": "/assets/books/illustrations/paper-landscape.jpg",
+      "subject": "背景の描き方を学ぶ本",
+      "width": 640,
+      "height": 640,
+      "sha256": "ef29607e6321f382dd3bbda2d46c96edaaeb5154c33dfbae4bfbca601ee4e77c"
+    },
+    {
+      "src": "/assets/books/illustrations/paper-gallery.jpg",
+      "subject": "ドット絵の作品集",
+      "width": 640,
+      "height": 640,
+      "sha256": "8cc768a7cc5aa7d2ee8b2ecff1c35a2271fb15d8ff8bf85f479e77178afe5eea"
+    },
+    {
+      "src": "/assets/books/illustrations/ebook-games.jpg",
+      "subject": "ゲームのドット絵を紹介する電子書籍",
+      "width": 640,
+      "height": 640,
+      "sha256": "7e862a018f2060ae750060929cdc6b25e74407da63f90afdfd8637b488b85747"
+    },
+    {
+      "src": "/assets/books/illustrations/peg-toy.jpg",
+      "subject": "スティックを挿してつくるおもちゃ",
+      "width": 640,
+      "height": 640,
+      "sha256": "115c402205519782ffd3add42d5b03fa922d25be638126ca27603689313c25ff"
+    },
+    {
+      "src": "/assets/books/illustrations/grid-notebook.jpg",
+      "subject": "マスを塗る方眼ノート",
+      "width": 640,
+      "height": 640,
+      "sha256": "9d16724a112b264cf9941980cf8e9605cfebab1eb61256cc2f48d1b2d4c28c42"
+    },
+    {
+      "src": "/assets/books/illustrations/ebook-fantasy.jpg",
+      "subject": "ファンタジーのドット絵を紹介する電子書籍",
+      "width": 640,
+      "height": 640,
+      "sha256": "49be7d48aafd0dc38e1e7c313e1fbf483afef6d326aabb6e72142ca0ec186f82"
+    },
+    {
+      "src": "/assets/books/illustrations/ebook-landscape.jpg",
+      "subject": "背景の描き方を学ぶ電子書籍",
+      "width": 640,
+      "height": 640,
+      "sha256": "20865ea3680d880b7facd57d76ff3d1cf0a0e89fb2c007edf5a3350f7d4b3465"
+    },
+    {
+      "src": "/assets/books/illustrations/ebook-characters.jpg",
+      "subject": "キャラクターのドット絵の電子作品集",
+      "width": 640,
+      "height": 640,
+      "sha256": "bca2998d096b32324d2d220031e84fabd8417c826250861dfbc700d530f0381d"
+    },
+    {
+      "src": "/assets/books/illustrations/ebook-textile.jpg",
+      "subject": "糸を結ぶ手芸の電子書籍",
+      "width": 640,
+      "height": 640,
+      "sha256": "f9886b3c4057d0a36870326b8861362d5ca54ad667f7531907febdd780bed1ae"
+    },
+    {
+      "src": "/assets/books/illustrations/wood-puzzle.jpg",
+      "subject": "形を組み合わせる木製パズル",
+      "width": 640,
+      "height": 640,
+      "sha256": "39e10275dd9ad57aeebc671efd5f89df324ea3fc321b90b3dd63bc6906c6ed64"
+    },
+    {
+      "src": "/assets/books/illustrations/paper-guide.jpg",
+      "subject": "本とドット絵の描画",
+      "width": 640,
+      "height": 640,
+      "sha256": "fc030a523f3186a650c5a421febb114b77bfcf08c3a094a672d64285331e949e"
+    },
+    {
+      "src": "/assets/books/illustrations/paper-stickers.jpg",
+      "subject": "シールを並べるパズルブック",
+      "width": 640,
+      "height": 640,
+      "sha256": "5c0395ad7a0efdf71649d309048b8523a08705ff84246b5c5b5b49e34a066a34"
+    },
+    {
+      "src": "/assets/books/illustrations/pixel-display.jpg",
+      "subject": "ドット絵を表示するフレーム",
+      "width": 640,
+      "height": 640,
+      "sha256": "1dc93921cb7b438b150b7f695a1feb9506932b5c2a40e3f960fbf597c279308b"
+    },
+    {
+      "src": "/assets/books/illustrations/pixel-speaker-white.jpg",
+      "subject": "明るい色のドット絵表示と音を楽しむ機器",
+      "width": 640,
+      "height": 640,
+      "sha256": "32b6f3b5334e0d08ccdffb90034ee4aafcd84d7aa8ca1099a27af54ae8166c2f"
+    },
+    {
+      "src": "/assets/books/illustrations/pixel-speaker.jpg",
+      "subject": "ドット絵表示と音を楽しむ機器",
+      "width": 640,
+      "height": 640,
+      "sha256": "a0793430a84b3447f7fa363f1ef9d11ada19cd1d8ffced2ef00e386fcc290111"
+    },
+    {
+      "src": "/assets/books/illustrations/white-baseplate.jpg",
+      "subject": "白いブロック用の基礎板",
+      "width": 640,
+      "height": 640,
+      "sha256": "30b24ea1fde96d7ad3369c448e599ade8040ec3165bdba09b522b06ace3dd825"
+    },
+    {
+      "src": "/assets/books/illustrations/building-blocks.jpg",
+      "subject": "組み立て用ブロック",
+      "width": 640,
+      "height": 640,
+      "sha256": "5eb6842d6ecd85294e9fd16de80ac0bd5cfedd8499eeb4566cfcc0af6c7a8a04"
+    },
+    {
+      "src": "/assets/books/illustrations/baseplate-set.jpg",
+      "subject": "複数のブロック用基礎板",
+      "width": 640,
+      "height": 640,
+      "sha256": "c315d587d901c9a3bcbe8402f00e1039c9f0dcf80110e7a3ae2f9a8f56f9da5a"
+    },
+    {
+      "src": "/assets/books/illustrations/cat-blocks.jpg",
+      "subject": "猫を題材にしたブロック",
+      "width": 640,
+      "height": 640,
+      "sha256": "2e6340ea38652b001ee4827a4e14a0403a17f26e9901c4f416e56ebd17ea9b64"
+    }
+  ]
+}
