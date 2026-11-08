@@ -183,6 +183,8 @@ test('shop thumbnails accept only local 32px and 96px squares and render registe
     await mkdir(path.join(repo, 'assets/books'), { recursive: true });
     await mkdir(path.join(repo, 'books'), { recursive: true });
     await copyFile(new URL('../../scripts/generate-books-catalog.mjs', import.meta.url), path.join(repo, 'scripts/generate-books-catalog.mjs'));
+    await copyFile(new URL('../../scripts/generate-shop-illustrations.mjs', import.meta.url), path.join(repo, 'scripts/generate-shop-illustrations.mjs'));
+    await copyFile(new URL('../../scripts/offerwall-entry-policy.mjs', import.meta.url), path.join(repo, 'scripts/offerwall-entry-policy.mjs'));
     await copyFile(new URL('../../js/books-room-catalog.mjs', import.meta.url), path.join(repo, 'js/books-room-catalog.mjs'));
     const source = JSON.parse(await readFile(new URL('../../assets/books/room-products.json', import.meta.url), 'utf8'))[0];
     for (const size of [32, 96]) {
@@ -194,8 +196,20 @@ test('shop thumbnails accept only local 32px and 96px squares and render registe
     }
     await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src: '/assets/books/thumb.png', width: 32, height: 96 } }]));
     assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo }), /Shop thumbnail must be a local 32x32 or 96x96 image/);
-    await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src: 'https://example.com/thumb.png', width: 32, height: 32 } }]));
-    assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo }), /Shop thumbnail must be a local 32x32 or 96x96 image/);
+    for (const src of ['https://example.com/thumb.png', '/assets/books/../thumb.png', '/assets/books/%2e%2e/thumb.png', '/assets/books/thumb.png?x=1', '/assets/books//thumb.png']) {
+      await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src, width: 32, height: 32 } }]));
+      assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo, stdio: 'pipe' }), /Shop thumbnail must be a local 32x32 or 96x96 image/);
+    }
+    for (const thumbnail of [
+      { src: '/assets/books/thumb.jpg', width: 640, height: 640 },
+      { src: '/assets/books/thumb.png', width: 640, height: 640, kind: 'illustration' },
+      { src: '/assets/books/thumb.jpg', width: 96, height: 96, kind: 'illustration' },
+    ]) {
+      await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: thumbnail }]));
+      assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo, stdio: 'pipe' }), /Shop thumbnail must be a local/);
+    }
+    await writeFile(path.join(repo, 'assets/books/room-products.json'), JSON.stringify([{ ...source, shopThumbnail: { src: '/assets/books/thumb.jpg', width: 640, height: 640, kind: 'illustration' } }]));
+    assert.throws(() => execFileSync(process.execPath, ['scripts/generate-books-catalog.mjs'], { cwd: repo, stdio: 'pipe' }), /Illustration requires alt text, creator, rights, and source/);
   } finally {
     await rm(temp, { recursive: true, force: true });
   }

@@ -1,6 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { jpegDimensions } from './generate-shop-illustrations.mjs';
+import { OFFERWALL_ENTRY_POLICY_SCRIPT } from './offerwall-entry-policy.mjs';
 import { normalizeProduct, normalizeYahooRelatedOffers, validAmazonUrl } from '../js/books-room-catalog.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -50,9 +52,9 @@ for (const product of products) {
   }
   if (product.image && (!Number.isSafeInteger(product.image.width) || product.image.width < 1 || !Number.isSafeInteger(product.image.height) || product.image.height < 1)) throw new Error(`Product image dimensions must be positive integers: ${product.id}`);
   if (product.shopThumbnail && (!isLocalImagePath(product.shopThumbnail.src)
-      || ![32, 96].includes(product.shopThumbnail.width)
+      || !(product.shopThumbnail.kind === 'illustration' ? product.shopThumbnail.width === 640 && /\.jpg$/.test(product.shopThumbnail.src) : [32, 96].includes(product.shopThumbnail.width))
       || product.shopThumbnail.height !== product.shopThumbnail.width)) {
-    throw new Error(`Shop thumbnail must be a local 32x32 or 96x96 image: ${product.id}`);
+    throw new Error(`Shop thumbnail must be a local 32x32 or 96x96 image, or a documented 640x640 JPEG illustration: ${product.id}`);
   }
   if (product.shopThumbnail?.kind === 'illustration') {
     const thumbnail = product.shopThumbnail;
@@ -60,9 +62,9 @@ for (const product of products) {
       throw new Error(`Illustration requires alt text, creator, rights, and source: ${product.id}`);
     }
     const bytes = await readFile(path.join(root, thumbnail.src.slice(1)));
-    if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-        || bytes.readUInt32BE(16) !== thumbnail.width || bytes.readUInt32BE(20) !== thumbnail.height) {
-      throw new Error(`Illustration PNG dimensions do not match the manifest: ${product.id}`);
+    const dimensions = jpegDimensions(bytes);
+    if (dimensions.width !== thumbnail.width || dimensions.height !== thumbnail.height) {
+      throw new Error(`Illustration JPEG dimensions do not match the manifest: ${product.id}`);
     }
   }
 }
@@ -96,6 +98,11 @@ function card(p) {
 function render(route) {
   const preview = route === 'preview';
   const robots = preview ? '<meta name="robots" content="noindex,follow">' : '';
+  const shopMarker = preview ? '' : ' data-shop-ad="catalog-v1"';
+  const shopAdMarkup = preview ? '' : '<aside class="shop-ad" data-shop-display-ad aria-label="広告" hidden><p class="shop-ad__label">広告</p><div class="shop-ad__slot" data-shop-ad-slot></div></aside>';
+  const catalogItems = listedProducts.map(card);
+  if (!preview) catalogItems.splice(8, 0, shopAdMarkup);
+  const shopAdScripts = preview ? '' : `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n  <script type="module" src="/js/ads/shop-ad.mjs?rev=20261108-shop-display-ad-1"></script>`;
   const intro = `<!doctype html>
 <html lang="ja">
 <head>
@@ -127,12 +134,12 @@ function render(route) {
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
   <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
-  <link rel="stylesheet" href="/css/books.css?rev=20261107-shop-illustrations-1">
+  <link rel="stylesheet" href="/css/books.css?rev=20261108-smooth-illustrations-shop-ad-1">
   <link rel="stylesheet" href="/css/site-draw-cta.css?rev=20261014-route-cta-1">
   <title>ドット絵の本と道具｜PiXiEED</title>
 <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
 </head>
-<body class="books-page">
+<body class="books-page"${shopMarker}>
   <a class="skip-link" href="#catalog">商品一覧へ</a>
   <header class="catalog-header"><div class="catalog-header__inner"><a href="/" class="catalog-brand" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" alt="" width="32" height="32"> PiXiEED</a><p>PIXEL PLAY · CATALOG</p></div></header>
   <main id="catalog">
@@ -162,7 +169,7 @@ function render(route) {
         <div class="catalog-filter-status" hidden><p data-filter-summary aria-live="polite"></p><button type="button" data-reset-filters hidden>条件を解除</button></div>
       </form>
       <div class="product-grid" data-product-grid>
-${listedProducts.map(card).join('\n')}
+${catalogItems.join('\n')}
       </div>
       <div class="catalog-empty" data-empty-state hidden><p>条件に合う商品はありません。</p></div>
       <aside class="books-editor-invite" aria-label="ドット絵をつくる"><a href="/draw/?workspace=1" data-draw-cta data-draw-context="books">本で見つけたドット絵を、エディターで試してみる →</a></aside>
@@ -176,9 +183,10 @@ ${listedProducts.map(card).join('\n')}
     <p class="product-detail__notice">購入手続きは外部販売先で行います。販売先のリンクは新しいタブで開きます。</p>
     <p class="product-detail__gate">商品リンクを確認できないため、購入リンクは利用できません。</p>
   </dialog>
-  <script type="module" src="/js/books-catalog.mjs?rev=20261020-yahoo-related-offers-1"></script>
+  <script type="module" src="/js/books-catalog.mjs?rev=20261108-shop-display-ad-1"></script>
   <script type="module" src="/js/books-commerce.mjs?rev=20261020-yahoo-related-offers-1"></script>
 <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
+${shopAdScripts}
 </body>
 </html>
 `;

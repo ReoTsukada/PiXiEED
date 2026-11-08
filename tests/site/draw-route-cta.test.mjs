@@ -70,7 +70,7 @@ test('SNS pages use their Create navigation without a second explanatory strip',
 test('books generator emits the authored static Draw CTA without changing product source logic', async () => {
   const root = await mkdtemp(join(tmpdir(), 'pixieed-books-cta-'));
   try {
-    for (const name of ['scripts/generate-books-catalog.mjs', 'js/books-room-catalog.mjs', 'assets/books/room-products.json']) {
+    for (const name of ['scripts/generate-books-catalog.mjs', 'scripts/generate-shop-illustrations.mjs', 'scripts/offerwall-entry-policy.mjs', 'js/books-room-catalog.mjs', 'assets/books/room-products.json']) {
       const target = join(root, name);
       await mkdir(join(target, '..'), { recursive: true });
       await copyFile(new URL(`../../${name}`, import.meta.url), target);

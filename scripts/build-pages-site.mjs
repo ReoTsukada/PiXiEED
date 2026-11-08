@@ -4,6 +4,7 @@ import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } fro
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { jpegDimensions } from './generate-shop-illustrations.mjs';
 import { isPuzzleShareId } from '../js/creation/puzzle-share-identity.mjs';
 import { generateEventPages } from './generate-event-pages.mjs?rev=20261018-direct-runtime-1';
 import { addSiteDrawCta } from './site-draw-cta.mjs';
@@ -113,10 +114,24 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
     for (const product of JSON.parse(booksManifest)) {
       if (!product || product.enabled === false || product.visible === false || product.sample === true) continue;
       const thumbnail = product.shopThumbnail;
-      if (thumbnail && [32, 96].includes(thumbnail.width) && thumbnail.height === thumbnail.width
-          && /^\/assets\/books\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|webp)$/i.test(thumbnail.src || '')) {
-        booksAssets.add(thumbnail.src.slice(1));
+      const legacyThumbnail = thumbnail && [32, 96].includes(thumbnail.width) && thumbnail.height === thumbnail.width
+        && /^\/assets\/books\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*\.(?:png|webp)$/i.test(thumbnail.src || '');
+      const illustration = thumbnail?.kind === 'illustration' && thumbnail.width === 640 && thumbnail.height === 640
+        && /^\/assets\/books\/illustrations\/[a-z-]+\.jpg$/.test(thumbnail.src || '')
+        && ['alt', 'creator', 'rights', 'source'].every(key => typeof thumbnail[key] === 'string' && thumbnail[key].trim());
+      if (illustration) {
+        const name = thumbnail.src.slice(1);
+        // Explicit catalog assets may be untracked during local review, but must
+        // never escape the checkout through a symlinked directory or image.
+        const parts = name.split('/');
+        for (let i = 1; i <= parts.length; i++) {
+          const state = await lstat(join(root, ...parts.slice(0, i)));
+          if (state.isSymbolicLink() || (i === parts.length ? !state.isFile() : !state.isDirectory())) throw new Error(`Illustration source is not a regular local file: ${name}`);
+        }
+        const dimensions = jpegDimensions(await readFile(join(root, name)));
+        if (dimensions.width !== 640 || dimensions.height !== 640) throw new Error(`Invalid illustration dimensions: ${name}`);
       }
+      if (legacyThumbnail || illustration) booksAssets.add(thumbnail.src.slice(1));
     }
     const files = names.filter(name => {
       const parts = name.split('/');
@@ -134,6 +149,15 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       if (/^(?:package(?:-lock)?|deno(?:\.lock)?)\.(?:json|jsonc)$/.test(parts.at(-1))) return false;
       return parts[0] === 'assets' || publicExtension.test(name) || name === 'CNAME';
     });
+    // Only manifest-selected thumbnails are added outside git's tracked list.
+    // Do not recursively collect the illustration directory or preview assets.
+    for (const name of booksAssets) {
+      if (!publishableBooksAssets.has(name) && !files.includes(name)) files.push(name);
+    }
+    // New shop runtime sources are explicit opt-ins, never a directory crawl.
+    for (const name of ['data/shop-ad-config.mjs', 'js/ads/shop-ad.mjs']) {
+      if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
+    }
     let eventPages = 0;
     const generatedEventRoutes = new Set();
     if (await lstat(join(root, 'data/pixel-art-events.json')).catch(error => {

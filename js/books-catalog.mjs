@@ -70,6 +70,7 @@ if (form && grid) {
   }
 
   function applyFilters({ updateUrl = true } = {}) {
+    window.dispatchEvent(new Event('books:catalog-will-change'));
     const terms = normalize(query.value.trim()).split(/\s+/u).filter(Boolean);
     const selectedFormat = format.value;
     const visible = cards.filter(card => {
@@ -109,6 +110,7 @@ if (form && grid) {
     }
     if (reset) reset.hidden = !active;
     if (updateUrl) writeLocation();
+    window.dispatchEvent(new Event('books:catalog-updated'));
   }
 
   const detailDialog = document.querySelector('#product-detail');
@@ -187,6 +189,7 @@ if (form && grid) {
     detailBody?.replaceChildren();
     activeDetailId = '';
     restorePage();
+    window.dispatchEvent(new Event('books:catalog-detail-closed'));
     const trigger = activeTrigger;
     activeTrigger = null;
     if (trigger?.isConnected) trigger.focus({ preventScroll: true });
@@ -209,6 +212,7 @@ if (form && grid) {
     }
     if (activeDetailId === id && detailDialog.open) { renderDetail(card); return; }
     if (detailDialog.open) detailDialog.close();
+    window.dispatchEvent(new Event('books:catalog-detail-open'));
     activeDetailId = id;
     activeTrigger = pendingTrigger?.dataset.productDetails === id ? pendingTrigger : document.querySelector(`[data-product-details="${CSS.escape(id)}"]`);
     pendingTrigger = null;
