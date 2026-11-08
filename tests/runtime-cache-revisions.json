@@ -129,5 +129,6 @@
   "js/creation/project-start-picker.mjs": "20261108-gallery-canvas-viewport-1",
   "js/ads/project-gallery-ad.mjs": "20261108-gallery-canvas-viewport-1",
   "data/project-gallery-ad-config.mjs": "20261108-gallery-canvas-viewport-1",
-  "js/ads/project-manager-ad.mjs": "20261108-gallery-canvas-viewport-1"
+  "js/ads/project-manager-ad.mjs": "20261108-gallery-canvas-viewport-1",
+  "css/draw-compact-controls.css": "20261108-palette-alignment-1"
 }
