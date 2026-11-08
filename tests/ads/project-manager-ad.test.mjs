@@ -57,8 +57,9 @@ test('manager placement leaves history, project storage and pixels outside the S
   assert.match(region, /margin:48px 0/); assert.doesNotMatch(region, /position:(fixed|sticky|absolute)/);
 });
 
-test('ad positions are after one artwork and then every six, with small fixed units', () => {
-  for (const [count, expected] of [[0,[]],[1,[1]],[6,[1]],[7,[1,7]],[12,[1,7]],[13,[1,7,13]]]) assert.deepEqual(projectGalleryAdPositions(count), expected);
+test('ad positions follow complete six-artwork groups, with small galleries left uninterrupted', () => {
+  for (const [count, expected] of [[0,[]],[1,[1]],[2,[2]],[3,[3]],[4,[4]],[5,[5]],[6,[6]],[7,[6]],[12,[6,12]],[13,[6,12]],
+    [-1,[]],[1.5,[]],[NaN,[]],[Infinity,[]]]) assert.deepEqual(projectGalleryAdPositions(count), expected);
   assert.deepEqual(getInlineGalleryAdLayout(356), {width:320,height:50});
   assert.deepEqual(getInlineGalleryAdLayout(286), {width:250,height:50});
   assert.deepEqual(getInlineGalleryAdLayout(722), {width:468,height:60});

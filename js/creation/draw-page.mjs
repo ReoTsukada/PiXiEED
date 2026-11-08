@@ -19,7 +19,7 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261108-inline-gallery-ad-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261108-gallery-canvas-viewport-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
@@ -46,7 +46,7 @@ import { resizeDrawView } from './draw-resize-view.mjs?rev=20261016-color-capabi
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261106-button-icon-audit-1';
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
-import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261017-layer-minimum-1';
+import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261108-gallery-canvas-viewport-1';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
@@ -386,6 +386,9 @@ let timelapse = createDrawTimelapse();
 let store;
 let pxdBridge = null; let pxdImageRole = 'main'; let loadingLegacy = false; let readOnlyImage = null;
 const activePointers = new Map(); let pinchStart = null; let zoom = 1; let panX = 0; let panY = 0;
+// Keep the transform that produced the current DOMRect so pending viewport
+// state can be clamped against precise, fractional layout dimensions.
+let renderedZoom = 1, renderedPanX = 0, renderedPanY = 0;
 let drawAdapter = null;
 try { drawAdapter = createIndexedDbDraftAdapter(); store = createLocalDraftStore(drawAdapter); } catch (error) { status.textContent = `端末内保存を使えません：${error.message}`; saveButton.disabled = true; }
 
@@ -885,16 +888,21 @@ function selectionHandleAtEvent(event, rect = null) {
 const ZOOM_MAX = 8;
 // The canvas scales about its own centre; keep the point under the fingers / cursor still while zooming
 // and never let the picture slide completely out of view.
-function layoutCenter() { const r = canvas.getBoundingClientRect(); return { x: r.left + r.width / 2 - panX, y: r.top + r.height / 2 - panY, w: r.width / zoom, h: r.height / zoom }; }
+function layoutCenter() {
+  const r = canvas.getBoundingClientRect();
+  return { x: r.left + r.width / 2 - renderedPanX, y: r.top + r.height / 2 - renderedPanY,
+    w: r.width / renderedZoom, h: r.height / renderedZoom };
+}
 function clampPan() {
   const board = $('.draw-board').getBoundingClientRect(); const c = layoutCenter();
   const limitX = Math.max(0, (c.w * zoom) / 2 + board.width / 2 - 48); const limitY = Math.max(0, (c.h * zoom) / 2 + board.height / 2 - 48);
   panX = Math.max(-limitX, Math.min(limitX, panX)); panY = Math.max(-limitY, Math.min(limitY, panY));
 }
-function zoomAt(nextZoom, focusX, focusY, base = { zoom, panX, panY }) {
+function zoomAt(nextZoom, focusX, focusY, base = { zoom, panX, panY }, panDelta = null) {
   const c = layoutCenter(); const z = Math.max(1, Math.min(ZOOM_MAX, nextZoom)); const k = z / base.zoom;
   zoom = z; panX = focusX - c.x - (focusX - c.x - base.panX) * k; panY = focusY - c.y - (focusY - c.y - base.panY) * k;
   if (zoom === 1) { panX = 0; panY = 0; }
+  if (panDelta) { panX += panDelta.x; panY += panDelta.y; }
   updateCanvasView();
 }
 function resetView() { zoom = 1; panX = 0; panY = 0; updateCanvasView(); }
@@ -904,6 +912,7 @@ function updateCanvasView() {
   if ($('.draw-board').dataset.creationModeMotion === 'true') return;
   if (zoom > 1) clampPan();
   canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  renderedZoom = zoom; renderedPanX = panX; renderedPanY = panY;
   $('#draw-zoom-label').textContent = `${Math.round(zoom * 100)}%`;
   $('#draw-zoom-label').classList.toggle('is-zoomed', zoom > 1.01);
   placeOverlays();
@@ -1556,7 +1565,7 @@ function handleCanvasPointerMove(event) {
     pinchStart.moved = Math.max(pinchStart.moved, Math.hypot(centerX - pinchStart.centerX, centerY - pinchStart.centerY), Math.abs(distance - pinchStart.distance));
     pinchStart.fingers = Math.max(pinchStart.fingers, activePointers.size);
     // zoom about the first centre, then follow the fingers as they move together
-    zoomAt(target, pinchStart.centerX, pinchStart.centerY, pinchStart); panX += centerX - pinchStart.centerX; panY += centerY - pinchStart.centerY; updateCanvasView(); return;
+    zoomAt(target, pinchStart.centerX, pinchStart.centerY, pinchStart, { x: centerX - pinchStart.centerX, y: centerY - pinchStart.centerY }); return;
   }
   if (pendingTap && event.pointerId === pendingTapPointerId && event.pointerType === 'mouse' && (event.buttons & (strokeBinding?.mask || pendingTapMask)) === 0) { releasePointer({ ...event, type: 'pointerup', pointerId: event.pointerId, pointerType: event.pointerType, clientX: event.clientX, clientY: event.clientY, buttons: event.buttons }); return; }
   if (drawing && event.pointerId !== drawingPointerId) return;
@@ -1730,8 +1739,8 @@ virtualCursor = mountDrawVirtualCursor({ scope, board: $('.draw-board'), canvas,
   onViewportGestureMove: gesture => {
     if (!virtualGestureBase) return;
     const base = virtualGestureBase;
-    zoomAt(base.zoom * gesture.distance / Math.max(1, base.distance), base.centerX, base.centerY, base);
-    panX += gesture.centerX - base.centerX; panY += gesture.centerY - base.centerY; clampPan(); updateCanvasView();
+    zoomAt(base.zoom * gesture.distance / Math.max(1, base.distance), base.centerX, base.centerY, base,
+      { x: gesture.centerX - base.centerX, y: gesture.centerY - base.centerY });
   },
   onViewportGestureEnd: () => { virtualGestureBase = null; },
   getStep: () => { const r = canvas.getBoundingClientRect(); return { x: r.width / documentData.width, y: r.height / documentData.height }; }
@@ -2179,7 +2188,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261108-inline-gallery-ad-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261108-gallery-canvas-viewport-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }

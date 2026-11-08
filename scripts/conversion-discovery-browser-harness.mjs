@@ -307,10 +307,19 @@ try {
     }, size);
     const panel = drawPage.locator('#creation-project-settings-panel');
     await panel.waitFor({ state: 'visible', timeout: 15000 });
-    await drawPage.locator('[data-project-action="preview"]').click();
-    await drawPage.waitForFunction(() => !document.querySelector('[data-project-action="apply"]')?.disabled, null, { timeout: 20000 });
-    await drawPage.locator('[data-project-action="apply"]').click();
-    await drawPage.waitForFunction(next => document.querySelector('#draw-canvas')?.width === next, size, { timeout: 20000 });
+    assert.equal(await panel.locator('canvas').count(), 1, 'canvas size change creates exactly one automatic preview');
+    assert.equal(await panel.locator('[data-project-action="preview"]').count(), 0, 'automatic preview has no Try action');
+    await drawPage.waitForFunction(next => {
+      const panel = document.querySelector('#creation-project-settings-panel');
+      const preview = panel?.querySelector('canvas');
+      const apply = panel?.querySelector('[data-project-action="apply"]');
+      return panel && !panel.hidden && preview?.width === next && preview?.height === next && apply && !apply.disabled;
+    }, size, { timeout: 20000 });
+    await panel.locator('[data-project-action="apply"]').click();
+    await drawPage.waitForFunction(next => {
+      const canvas = document.querySelector('#draw-canvas');
+      return canvas?.width === next && canvas?.height === next;
+    }, size, { timeout: 20000 });
     await panel.locator('.creation-project-settings__close').click();
     await panel.waitFor({ state: 'hidden' });
     const basePixels = await rgbaCount();

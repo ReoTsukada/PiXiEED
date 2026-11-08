@@ -1,0 +1,51 @@
+<!doctype html><meta charset="utf-8"><title>Draw viewport gesture regression</title>
+<style>body{font:14px system-ui;background:#17232d;color:white}button{padding:12px}iframe{width:min(980px,calc(100vw - 24px));height:740px;border:1px solid #aaa}pre{white-space:pre-wrap}</style>
+<h1>Draw viewport gesture regression</h1><p>Local app synthetic pointer and wheel events. Not a native multitouch device test.</p>
+<button id="run">Run gesture checks</button><pre id="result">Ready</pre><iframe id="editor" src="/draw/editor.html?mode=draw"></iframe>
+<script type="module">
+const iframe=document.querySelector('#editor'),result=document.querySelector('#result'),button=document.querySelector('#run');
+const baseline=new URLSearchParams(location.search).has('baseline');
+const tick=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+function assert(ok,message){if(!ok)throw new Error(message)}
+function hash(canvas){const bytes=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;let value=2166136261;for(const byte of bytes)value=Math.imul(value^byte,16777619);return value>>>0}
+button.onclick=async()=>{
+ button.disabled=true;result.textContent='Running...';let observer=null;
+ try{
+ const w=iframe.contentWindow,d=iframe.contentDocument;
+ const started=performance.now();while(d.querySelector('#main')?.inert||d.querySelector('#draw-canvas')?.dataset.tool!=='pen'){if(performance.now()-started>12000)throw new Error('editor not ready');await tick()}
+ const canvas=d.querySelector('#draw-canvas'),board=d.querySelector('.draw-board'),label=d.querySelector('#draw-zoom-label');
+ function pointer(type,id,x,y,pointerType='touch'){canvas.dispatchEvent(new w.PointerEvent(type,{bubbles:true,cancelable:true,pointerId:id,pointerType,isPrimary:id===11,clientX:x,clientY:y,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1}))}
+ const rect=canvas.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+ pointer('pointerdown',7,cx-20,cy-20,'mouse');pointer('pointerup',7,cx-20,cy-20,'mouse');await tick();
+ const original=hash(canvas);assert([...canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data].some((v,i)=>i%4===3&&v),'test artwork was not created');
+ const records=[];let operationStart=0;observer=new w.MutationObserver(batch=>records.push(...batch));observer.observe(board,{subtree:true,attributes:true,attributeFilter:['width','height']});observer.observe(label,{childList:true});
+ const checks=[];const updates=[];
+ function begin(){operationStart=performance.now();records.length=0;observer.takeRecords()}
+ function end(name){records.push(...observer.takeRecords());const result={name,cpuMs:performance.now()-operationStart,viewUpdates:records.filter(r=>r.target===label&&r.type==='childList').length,backingWrites:records.filter(r=>r.type==='attributes'&&r.target.matches('.draw-pixel-background,.draw-pixel-lines')).length};updates.push(result);return result}
+ function wheel(delta){board.dispatchEvent(new w.WheelEvent('wheel',{bubbles:true,cancelable:true,clientX:cx,clientY:cy,deltaY:delta,deltaMode:0}))}
+ begin();wheel(-100);let count=end('wheel zoom');assert(count.viewUpdates===1&&count.backingWrites===(baseline?4:0),'wheel must render once without buffer resize');checks.push('wheel zoom once');
+ const initial=new w.DOMMatrix(w.getComputedStyle(canvas).transform),beforeRect=canvas.getBoundingClientRect();const sourcePoint={x:(cx-beforeRect.left)/beforeRect.width,y:(cy-beforeRect.top)/beforeRect.height};
+ pointer('pointerdown',11,cx-50,cy);pointer('pointerdown',22,cx+50,cy);
+ begin();pointer('pointermove',11,cx-65,cy+8);count=end('first pinch contact');assert(count.viewUpdates===(baseline?2:1)&&count.backingWrites===(baseline?8:0),'first pinch move must render once');
+ begin();pointer('pointermove',22,cx+75,cy+8);count=end('second pinch contact');assert(count.viewUpdates===(baseline?2:1)&&count.backingWrites===(baseline?8:0),'second pinch move must render once');
+ const afterRect=canvas.getBoundingClientRect(),midpoint={x:cx+5,y:cy+8};
+ assert(Math.abs(afterRect.left+sourcePoint.x*afterRect.width-midpoint.x)<0.02,'pinch X anchor moved');
+ assert(Math.abs(afterRect.top+sourcePoint.y*afterRect.height-midpoint.y)<0.02,'pinch Y anchor moved');
+ pointer('pointerup',11,cx-65,cy+8);pointer('pointerup',22,cx+75,cy+8);checks.push('two contact pinch anchor and expected render count');
+ const afterPinch=hash(canvas);assert(afterPinch===original,'pinch changed artwork');
+ // Space+mouse pan uses the real input handlers.
+ canvas.dispatchEvent(new w.KeyboardEvent('keydown',{bubbles:true,key:' ',code:'Space'}));
+ pointer('pointerdown',31,cx,cy,'mouse');begin();pointer('pointermove',31,cx+19,cy-13,'mouse');count=end('mouse pan');assert(count.viewUpdates===1&&count.backingWrites===(baseline?4:0),'pan must render once');pointer('pointerup',31,cx+19,cy-13,'mouse');canvas.dispatchEvent(new w.KeyboardEvent('keyup',{bubbles:true,key:' ',code:'Space'}));checks.push('mouse space pan once');
+ // Cancellation never commits a touch mark.
+ pointer('pointerdown',11,cx-40,cy);pointer('pointerdown',22,cx+40,cy);pointer('pointermove',11,cx-55,cy);pointer('pointercancel',11,cx-55,cy);pointer('pointercancel',22,cx+40,cy);assert(hash(canvas)===original,'cancelled gesture changed artwork');checks.push('pointercancel preserves artwork');
+ // The lower zoom limit still allows the in-flight two-finger translation.
+ canvas.dispatchEvent(new w.KeyboardEvent('keydown',{bubbles:true,key:'0',code:'Digit0'}));canvas.dispatchEvent(new w.KeyboardEvent('keyup',{bubbles:true,key:'0',code:'Digit0'}));
+ pointer('pointerdown',11,cx-50,cy);pointer('pointerdown',22,cx+50,cy);
+ pointer('pointermove',11,cx-30,cy+15);pointer('pointermove',22,cx+70,cy+15);
+ const atOne=new w.DOMMatrix(w.getComputedStyle(canvas).transform);assert(Math.abs(atOne.a-1)<0.0001&&Math.abs(atOne.e-20)<0.02&&Math.abs(atOne.f-15)<0.02,'1x pinch translation regressed');
+ pointer('pointerup',11,cx-30,cy+15);pointer('pointerup',22,cx+70,cy+15);checks.push('1x pan preserved and releases');
+ assert(hash(canvas)===original,'viewport operations changed artwork');checks.push('artwork hash unchanged');
+ observer.disconnect();result.textContent=JSON.stringify({status:'PASS',variant:baseline?'baseline':'candidate',dpr:w.devicePixelRatio,checks,updates,artworkHashBefore:original,artworkHashAfter:hash(canvas)},null,2);
+ }catch(error){result.textContent=JSON.stringify({status:'FAIL',error:error.stack},null,2)}finally{observer?.disconnect();button.disabled=false}
+};
+</script>

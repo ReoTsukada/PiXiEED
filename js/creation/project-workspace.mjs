@@ -8,11 +8,11 @@ import { forkProject, sanitizeProjectTitle } from './project-catalog.mjs?rev=202
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261001-free-tools-1';
 import { componentImageRole, freezeProjectComponents } from './project-components.mjs?rev=20261016-tool-shell-1';
-import { mountProjectGallery, drawProjectThumbnail } from './project-gallery.mjs?rev=20261108-inline-gallery-ad-1';
+import { mountProjectGallery, drawProjectThumbnail } from './project-gallery.mjs?rev=20261108-gallery-canvas-viewport-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { findPxdOriginalBackup } from './pxd-original-backup.mjs';
-import { mountProjectGalleryAdSeries, hasManagerArtwork } from '../ads/project-manager-ad.mjs?rev=20261108-inline-gallery-ad-1';
-import { projectManagerAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-inline-gallery-ad-1';
+import { mountProjectGalleryAdSeries, hasManagerArtwork } from '../ads/project-manager-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
+import { projectManagerAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-gallery-canvas-viewport-1';
 
 const icons = {
   folder: '<path d="M3 7h7l2-3h9v16H3z"/>',
@@ -62,7 +62,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function closeManagerAd() { managerAd?.dispose(); managerAd = null; cancelAnimationFrame(managerAdFrame); managerAdFrame = 0; managerAdPrepared = false; }
 
   let transientNavigation = false;
-  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261108-inline-gallery-ad-1';
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261108-gallery-canvas-viewport-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
