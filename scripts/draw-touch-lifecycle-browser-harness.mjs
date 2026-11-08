@@ -72,7 +72,8 @@ try {
     await page.locator('[data-embed-start]').waitFor({ state: 'visible' });
     await verifyStored(page, original);
     await page.locator('[data-embed-start]').tap();
-    await page.getByRole('button', { name: '作品を選ぶ', exact: true }).tap();
+    await page.locator('#pxd-panel[open]').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#project-sheet-title').textContent(), /前回の作品/);
     await page.locator(`.project-gallery__tile[data-project-id="${original.id}"]`).tap();
     await page.locator('#creation-project-role [data-image-role=draw]').tap(); await ready(page);
     await verifyStored(page, original); await paint(page);
