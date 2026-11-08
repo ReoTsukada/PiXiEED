@@ -337,6 +337,7 @@ async function runNewBuildRegressions() {
     report.cases.push({ name: 'self-generated-project-url-reload-returns-to-chooser', pass: true });
 
     // Opening via an explicit saved tile then returning from the explanation shell keeps dirty work.
+    await waitSelector(page, `.project-gallery__tile[data-project-id="${env.saved.projectId}"]`);
     await (await findLocator(page, `.project-gallery__tile[data-project-id="${env.saved.projectId}"]`)).click();
     await runtimeReady(page);
     const before = await runtimeInfo(page);

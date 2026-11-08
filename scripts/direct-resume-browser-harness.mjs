@@ -153,6 +153,7 @@ try {
 
   await second.locator('#creation-file-open').click();
   await second.locator('#project-tab-library').click();
+  await second.locator('.project-gallery__tile').nth(1).waitFor({ state: 'visible' });
   assert.equal(await second.locator('.project-gallery__tile').count(), 2);
   await second.screenshot({ path: join(output, 'two-works-after-explicit-copy.png'), fullPage: true });
   assert.deepEqual(report.pageErrors, []);
