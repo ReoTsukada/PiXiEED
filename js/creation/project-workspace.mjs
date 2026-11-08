@@ -54,7 +54,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   let listEpoch = 0; let importEpoch = 0; let listLoaded = false; let modeSwitching = false; let ready;
   let activeCanvas = null;
   let transientNavigation = false;
-  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261108-gallery-first-1';
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261108-gallery-first-ad-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }

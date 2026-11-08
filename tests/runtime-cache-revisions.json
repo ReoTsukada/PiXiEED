@@ -50,7 +50,7 @@
   "js/site-header.mjs": "20261024-common-tool-start-1",
   "js/tool-header-controls.mjs": "20261018-direct-runtime-1",
   "js/tool-embed.mjs": "20261024-common-tool-start-1",
-  "js/tool-shell.mjs": "20261107-gallery-1",
+  "js/tool-shell.mjs": "20261108-gallery-first-ad-1",
   "css/creation-modes.css": "20261107-mode-continuity-1",
   "js/tool-operation-bar.mjs": "20261017-game-editor-1",
   "css/creation-spot-difference.css": "20261017-game-compat-1",
@@ -77,7 +77,7 @@
   "js/creation/legacy-lens-entry.mjs": "20261017-lens-retirement-1",
   "js/creation/creation-runtime.mjs": "20261107-gallery-1",
   "js/creation/creation-snapshot.mjs": "20261018-direct-runtime-1",
-  "js/tool-direct.mjs": "20261107-gallery-1",
+  "js/tool-direct.mjs": "20261108-gallery-first-ad-1",
   "css/tool-direct.css": "20261108-touch-recovery-1",
   "js/creation/editor-ui.mjs": "20261018-direct-runtime-2",
   "js/tool-entry-compat.js": "20261024-common-tool-start-1",
@@ -125,6 +125,8 @@
   "js/creation/tool-project-store.mjs": "20261107-gallery-1",
   "js/creation/project-gallery.mjs": "20261108-gallery-first-1",
   "js/creation/pxd-store.mjs": "20261107-gallery-1",
-  "css/project-workspace.css": "20261108-gallery-first-1",
-  "js/creation/project-start-picker.mjs": "20261108-gallery-first-1"
+  "css/project-workspace.css": "20261108-gallery-first-ad-1",
+  "js/creation/project-start-picker.mjs": "20261108-gallery-first-ad-1",
+  "js/ads/project-gallery-ad.mjs": "20261108-gallery-first-ad-1",
+  "data/project-gallery-ad-config.mjs": "20261108-gallery-first-ad-1"
 }

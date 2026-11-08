@@ -347,7 +347,7 @@ export function installDirectToolShell({ section, mode, search }) {
   }
   async function loadStartPicker() {
     if (picker) return picker;
-    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261108-gallery-first-1')
+    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261108-gallery-first-ad-1')
       .then(({ mountProjectStartPicker }) => {
         checkAlive();
         picker = mountProjectStartPicker({ signal: lifecycle.signal,

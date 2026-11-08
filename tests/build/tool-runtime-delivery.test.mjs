@@ -27,9 +27,13 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.externalUrls.size, 56);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261108-gallery-first-1'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261108-gallery-first-ad-1'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
+  assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261108-gallery-first-ad-1'));
+  assert(plan.pickerGraph.modules.has('/data/project-gallery-ad-config.mjs?rev=20261108-gallery-first-ad-1'));
+  assert(plan.physicalFiles.has('js/ads/project-gallery-ad.mjs'));
+  assert(plan.physicalFiles.has('data/project-gallery-ad-config.mjs'));
   assert(files.includes('js/creation/project-gallery.mjs'), 'Windowed gallery accounts for one shared UI module and one import edge.');
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
   assert(files.includes('js/creation/draw-render-optimization.mjs'));
