@@ -45,7 +45,9 @@ html[data-direct-loading]:not([data-direct-error]) .tool-direct__status { displa
 html[data-tool-direct='work'] body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button[aria-busy='true']::before { content:'読込'; font-size:12px; }
 html[data-tool-direct='work'] body.draw-desktop-active .draw-desktop-features .draw-feature-actions > button[aria-label$='（再試行）']::before { content:'再試行'; font-size:11px; }
 .tool-direct__bar--recovery { flex-wrap:wrap; }
-.tool-direct__bar--recovery .tool-direct__status { order:1; flex-basis:100%; line-height:1.5; }
+/* Recovery instructions must remain readable instead of looking like a frozen
+   canvas with an ellipsized error. Preserve the guarded workspace underneath. */
+.tool-direct__bar--recovery .tool-direct__status { order:1; flex:1 0 100%; width:100%; max-width:none; overflow:visible; white-space:normal; overflow-wrap:anywhere; line-height:1.5; }
 html[data-tool-direct='work'] [data-direct-description],
 html[data-tool-direct='explanation'] [data-direct-owned] { display:none!important; }
 html[data-tool-direct='work'] body.creation-editor { height:var(--tool-direct-height,100dvh); }

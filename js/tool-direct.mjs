@@ -81,13 +81,12 @@ export function installDirectToolShell({ section, mode, search }) {
     message.textContent = error ? `作品を開けませんでした。${error}` : '';
     status.textContent = error ? message.textContent : '編集を保持しています。';
     bar.classList.toggle('tool-direct__bar--recovery', Boolean(error));
-    const main = document.querySelector('#main');
-    if (open && main) main.inert = Boolean(error) || runtime.draw.workspace.busy;
+    if (open) runtime.draw.workspace.syncInputLock();
     viewport();
   }
   function own(node) {
     if (node === description || node === bar || node === bootCue || owned.has(node) || node.tagName === 'SCRIPT' || isSharedRewardRoot(node)) return;
-    owned.set(node, { hidden: node.hidden, inert: node.inert });
+    owned.set(node, { hidden: node.hidden, inert: node.inert, suppressed: !open });
     node.dataset.directOwned = '';
     if (!open) { node.hidden = true; node.inert = true; }
   }
@@ -166,14 +165,19 @@ export function installDirectToolShell({ section, mode, search }) {
     for (const header of description.querySelectorAll('.site-header')) { header.dataset.directShellHeader = ''; header.classList.remove('site-header'); }
     restoreAttributes(body, workAttributes);
     html.dataset.toolDirect = 'work';
-    for (const [node, state] of owned) { node.hidden = state.hidden; node.inert = state.inert; }
+    for (const [node, state] of owned) { node.hidden = state.hidden; node.inert = state.inert; state.suppressed = false; }
     for (const [node, disabled] of styles) node.disabled = disabled;
     bar.hidden = coreReady || !loadingCardVisible; bootCue.hidden = !loadingCardVisible; mergeEditorChrome(); viewport();
   }
   function useDescription({ restoreFocus = true } = {}) {
     if (!description) return;
     restoreBarNodes();
-    for (const [node, state] of owned) { state.hidden = node.hidden; state.inert = node.inert; node.hidden = true; node.inert = true; }
+    for (const [node, state] of owned) {
+      // Nodes added while startup is closing are already hidden by own(). Do
+      // not mistake those shell-imposed values for their normal editor state.
+      if (!state.suppressed) { state.hidden = node.hidden; state.inert = node.inert; }
+      node.hidden = true; node.inert = true; state.suppressed = true;
+    }
     for (const node of styles.keys()) node.disabled = true;
     workAttributes = attributes(body);
     restoreAttributes(body, shellAttributes);
@@ -476,7 +480,12 @@ export function installDirectToolShell({ section, mode, search }) {
     try {
       if (runtime) runtime.suspend();
       // Initialization owns document-wide selectors until it has finished.
-      if (mounting && !runtime) await mounting.catch(() => {});
+      if (mounting && !runtime) {
+        // A pending legacy image choice must not hold startup open behind the
+        // explanation. Later choices reject when their runtime is inactive.
+        document.querySelector('body > #creation-project-role[open]')?.close();
+        await mounting.catch(() => {});
+      }
       if (!runtime) clearStartupHints();
       if (runtime) runtime.suspend();
       if (pendingActivation) await pendingActivation.catch(() => {});
