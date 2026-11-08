@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const root = new URL('../../', import.meta.url);
-const stylesheet = '/css/project-workspace.css?rev=20261107-gallery-1';
+const stylesheet = '/css/project-workspace.css?rev=20261108-gallery-first-1';
 const workspaceRevision = '20261107-gallery-1';
 const consumers = [
   'jigsaw/index.html',

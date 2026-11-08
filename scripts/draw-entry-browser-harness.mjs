@@ -55,6 +55,16 @@ async function filePanel(page) {
   await page.locator('#project-tab-current').click();
   await page.locator('#pxd-panel .project-more > summary').click();
 }
+async function chooseNew(page) {
+  await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+  await page.locator('#project-start-new').click();
+  await ready(page);
+}
+async function chooseProject(page, id) {
+  await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+  await page.locator(`.project-gallery__tile[data-project-id="${id}"]`).click();
+  await ready(page);
+}
 try {
   for (const width of [320, 390, 1280]) await run(`first draw / save / return / retry ${width}`, async () => {
     const touch = width < 600;
@@ -70,7 +80,7 @@ try {
       assert.equal(await page.locator('.draw-hero-example img').evaluate(n => n.complete && n.naturalWidth > 0), true);
       await page.screenshot({ path: `${out}/landing-${width}.png` });
       if (touch) await page.locator('[data-embed-start]').tap(); else await page.locator('[data-embed-start]').click();
-      await ready(page);
+      await chooseNew(page);
       assert.equal(new URL(page.url()).pathname, '/tools/start/draw/');
       const initial = await state(page);
       const paint = async (x, y) => {
@@ -87,7 +97,8 @@ try {
       assert.equal(await page.locator('[data-embed-start]').innerText(), '作業に戻る');
       await page.locator('[data-embed-start]').click(); await ready(page);
       assert.deepEqual(await state(page), edited);
-      await page.reload(); await ready(page); assert.deepEqual((await state(page)).image, edited.image);
+      const savedProjectId = await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.currentProject.projectId);
+      await page.reload(); await chooseProject(page, savedProjectId); assert.deepEqual((await state(page)).image, edited.image);
       await page.locator('#creation-output-open').click(); await page.waitForURL(url => url.pathname === '/output/work/');
       await page.locator('#output-nav-export').waitFor({ state: 'visible' });
       assert.equal(downloads.length, 0, 'preview arrival does not automatically download');
@@ -105,7 +116,7 @@ try {
       await page.locator('[data-sc-back]').click(); await ready(page);
       assert.deepEqual((await state(page)).image, edited.image);
       await page.goBack(); await page.waitForURL(url => url.pathname === '/output/work/');
-      await page.goForward(); await ready(page);
+      await page.goForward(); await chooseProject(page, savedProjectId);
       assert.deepEqual((await state(page)).image, edited.image);
       // Inject only a local project-store failure and follow the documented retry UI.
       await page.evaluate(() => { window.__drawEntryFailSave = true; });
@@ -119,7 +130,7 @@ try {
       await page.locator('#pxd-save').click();
       await page.waitForFunction(() => document.querySelector('#project-open')?.dataset.state === 'saved');
       await page.locator('#project-close').click();
-      await page.reload(); await ready(page); assert.deepEqual((await state(page)).image, unsaved.image);
+      await page.reload(); await chooseProject(page, savedProjectId); assert.deepEqual((await state(page)).image, unsaved.image);
       await page.locator('#creation-file-open').click();
       await page.locator('#pxd-panel .project-imports > summary').click();
       const pending = page.waitForEvent('filechooser'); await page.locator('#pxd-open').click();
@@ -137,7 +148,8 @@ try {
       await page.goto(origin + source);
       const link = page.locator(source === '/' ? '.portal-draw' : '[data-static-tool="editor"]');
       assert.equal(await link.getAttribute('href'), '/tools/start/draw/');
-      await link.tap(); await ready(page);
+      await link.tap(); await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+      await page.locator('#project-start-new').tap(); await ready(page);
       assert.equal(new URL(page.url()).pathname, '/tools/start/draw/');
       return { startPath: '/tools/start/draw/', touchEmulation: true };
     } finally { await ctx.close(); }
@@ -158,7 +170,7 @@ try {
         await page.goto(origin + route + '?project=old&ref=a&ref=b#old');
         await page.locator('[data-legacy-entry-status]').filter({ hasText: '元のURLはそのまま' }).waitFor({ state: 'visible' });
         assert.equal(new URL(page.url()).pathname, route, 'unknown old project stays protected');
-        assert.match(await page.locator('[data-legacy-entry-status]').innerText(), /元のURLはそのまま/);
+        assert.match(await page.locator('[data-legacy-entry-status]').textContent(), /元のURLはそのまま/);
         assert.equal(new URL(page.url()).search, '?project=old&ref=a&ref=b');
         assert.equal(await page.evaluate(() => localStorage.getItem('pixieedraw-autosave')), 'old-draw-sentinel');
         await page.goto(origin + route + '?ref=a&ref=b');

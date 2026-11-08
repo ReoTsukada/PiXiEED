@@ -25,7 +25,7 @@ async function fixture(name, run) {
   await context.addInitScript(() => { if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Synthetic camera denial', 'NotAllowedError'); }; });
   const page = await context.newPage(), row = { name, errors: [] }; report.cases.push(row); page.setDefaultTimeout(15000);
   page.on('pageerror', e => row.errors.push(e.message));
-  try { await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`); await ready(page); await run(page, gate, row); assert.deepEqual(row.errors, []); row.result = 'PASS'; console.log('PASS', name); }
+  try { await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`); await page.locator('#project-start-new').tap(); await ready(page); await run(page, gate, row); assert.deepEqual(row.errors, []); row.result = 'PASS'; console.log('PASS', name); }
   catch (error) { row.result = 'FAIL'; row.error = error.stack; row.diagnostics = await page.evaluate(() => ({ text: document.body.innerText, html: document.querySelector('#pxd-panel')?.outerHTML, state: window.__PIXIEED_CREATION_HOST__?.runtime?.state })).catch(() => null); report.failures.push({ name, error: error.message }); console.error('FAIL', name, error.message); }
   finally { gate.release?.(); await context.close(); }
 }
@@ -63,7 +63,7 @@ try {
   for (const timing of ['before-choice', 'visible-choice']) await fixture(`hide-${timing}`, async (page, gate, row) => {
     const original = await seedRoles(page);
     if (timing === 'before-choice') gate.path = /\/creation-runtime(?:\.bundle)?\.mjs$/;
-    await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct&pxd=${original.id}&pxdRevision=${original.revision}`, { waitUntil: 'domcontentloaded' });
     if (timing === 'before-choice') await waitGate(gate); else await page.locator('#creation-project-role').waitFor({ state: 'visible' });
     await page.evaluate(() => { window.__hideDone = false; window.__PIXIEED_CREATION_HOST__.hide().finally(() => { window.__hideDone = true; }); });
     gate.release?.();

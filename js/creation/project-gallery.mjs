@@ -20,7 +20,7 @@ export function drawProjectThumbnail(canvas, sample) {
 }
 
 /** Keep decoded thumbnails, DOM and gesture listeners bounded by the viewport. */
-export function mountProjectGallery({ list, scroller, onOpen, onContext, onSelection, isLocked, currentId }) {
+export function mountProjectGallery({ list, scroller, onOpen, onContext = () => {}, onSelection = () => {}, isLocked = () => false, currentId = () => null, readOnly = false }) {
   const selected = new Set(); const cards = new Map();
   let items = [], filtered = [], indexes = new Map(), query = '', selecting = false, frame = 0, layout = null, pendingFocus = null, disposed = false, ignoreReleaseClick = false, scrollEpoch = 0, pressScrollEpoch = 0;
   list.classList.add('project-gallery'); list.setAttribute('role', 'group');
@@ -71,9 +71,9 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext, onSelec
   function toggle(item) { if (isLocked()) return; selecting = true; selected.has(item.projectId) ? selected.delete(item.projectId) : selected.add(item.projectId); list.dataset.selecting = 'true'; notify(); schedule(); }
   const onClick = event => {
     const item = findItem(event); if (!item || isLocked()) return;
-    if (selecting || event.ctrlKey || event.metaKey || event.shiftKey) toggle(item); else onOpen(item);
+    if (!readOnly && (selecting || event.ctrlKey || event.metaKey || event.shiftKey)) toggle(item); else onOpen(item);
   };
-  const unbind = bindContextAction(list, ({ event, source }) => {
+  const unbind = readOnly ? () => {} : bindContextAction(list, ({ event, source }) => {
     const item = findItem(event); if (!item || isLocked() || !scroller.open || !list.getClientRects().length || source === 'hold' && pressScrollEpoch !== scrollEpoch) return false;
     if (source === 'hold') { ignoreReleaseClick = true; if (!selected.has(item.projectId)) toggle(item); else setSelection(true); }
     else onContext(item, cards.get(item.projectId));
@@ -81,8 +81,8 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext, onSelec
   });
   const onKey = event => {
     const item = findItem(event); if (!item || isLocked()) return;
-    if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); onContext(item, cards.get(item.projectId)); return; }
-    if (event.key === ' ' && !selecting) { event.preventDefault(); toggle(item); return; }
+    if (!readOnly && (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10')) { event.preventDefault(); onContext(item, cards.get(item.projectId)); return; }
+    if (!readOnly && event.key === ' ' && !selecting) { event.preventDefault(); toggle(item); return; }
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
     const index = filtered.indexOf(item), cols = layout?.columns || 4;
@@ -95,7 +95,7 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext, onSelec
   };
   const freshPress = () => { ignoreReleaseClick = false; pressScrollEpoch = scrollEpoch; };
   const suppressRelease = event => { if (ignoreReleaseClick && event.detail !== 0) { ignoreReleaseClick = false; event.preventDefault(); event.stopImmediatePropagation(); } };
-  list.addEventListener('pointerdown', freshPress); list.addEventListener('click', suppressRelease, true);
+  if (!readOnly) { list.addEventListener('pointerdown', freshPress); list.addEventListener('click', suppressRelease, true); }
   list.addEventListener('click', onClick); list.addEventListener('keydown', onKey);
   const onScroll = () => { scrollEpoch++; schedule(); };
   scroller.addEventListener('scroll', onScroll, { passive: true });
@@ -119,6 +119,6 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext, onSelec
     setSelection, refresh: schedule,
     get selection() { return items.filter(item => selected.has(item.projectId)); },
     get selecting() { return selecting; },
-    dispose() { disposed = true; cancelAnimationFrame(frame); unbind(); observer.disconnect(); scroller.removeEventListener('scroll', onScroll); list.removeEventListener('click', onClick); list.removeEventListener('pointerdown', freshPress); list.removeEventListener('click', suppressRelease, true); list.removeEventListener('keydown', onKey); cards.clear(); items = []; filtered = []; selected.clear(); }
+    dispose() { disposed = true; cancelAnimationFrame(frame); unbind(); observer.disconnect(); scroller.removeEventListener('scroll', onScroll); list.removeEventListener('click', onClick); if (!readOnly) { list.removeEventListener('pointerdown', freshPress); list.removeEventListener('click', suppressRelease, true); } list.removeEventListener('keydown', onKey); cards.clear(); items = []; filtered = []; selected.clear(); }
   };
 }
