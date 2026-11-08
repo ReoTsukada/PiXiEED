@@ -22,6 +22,15 @@ body.project-workspace-ready.creation-editor[data-page="draw"] #draw-palette {
   overscroll-behavior-x: contain; touch-action: pan-x; scrollbar-width: none;
 }
 #draw-palette::-webkit-scrollbar { display: none; }
+/* The palette reserves 3px for its selection ring. Match its row origins and
+   50px row pitch on both action rails, without changing the 150px control area.
+   The embedded game editor keeps its separate two-row layout. */
+html:not([data-game-draw-runtime="true"]) body[data-page="draw"] .draw-controls > :is(.draw-fixed-left, .draw-fixed-right) {
+  box-sizing: border-box; height: 150px; padding-block: 3px; gap: 6px; align-content: start;
+}
+/* Selection stays visible through its border/ring, not a shifted hit target. */
+html:not([data-game-draw-runtime="true"]) body[data-page="draw"] .draw-controls #draw-palette .draw-color:is([aria-pressed="true"], :active) { transform: none !important; }
+
 body[data-page="draw"] .draw-fixed-left .draw-tool-menu { position: fixed !important; z-index: 80 !important; width: min(196px, calc(100vw - 24px)) !important; scroll-padding-block: 54px 8px; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-picker:not([open]) .draw-tool-menu { display: none !important; }
 body[data-page="draw"] .draw-fixed-left #draw-tool-picker[open] .draw-tool-menu { display: flex !important; flex-direction: column !important; }
