@@ -1,12 +1,20 @@
 import { bindContextAction } from '../site-interactions.mjs?rev=20261001-interactions-1';
 
-export function galleryWindow({ count, width, viewportHeight, offset = 0, columns = 4, gap = 3, overscan = 2 }) {
+export function galleryWindow({ count, width, viewportHeight, offset = 0, columns = 3, gap = 3, overscan = 2 }) {
   const size = Math.max(1, (width - gap * (columns - 1)) / columns);
   const stride = size + gap;
   const rows = Math.ceil(count / columns);
   const firstRow = Math.max(0, Math.min(rows, Math.floor(Math.max(0, offset) / stride) - overscan));
   const lastRow = Math.min(rows, Math.ceil((Math.max(0, offset) + viewportHeight) / stride) + overscan);
   return { size, stride, height: Math.max(0, rows * stride - gap), start: Math.min(count, firstRow * columns), end: Math.min(count, lastRow * columns) };
+}
+
+/** Shared square-card metrics for each uninterrupted segment of the gallery. */
+export function gallerySegmentLayout({ count, width, columns = 3, gap = 3 }) {
+  const size = Math.max(1, (width - gap * (columns - 1)) / columns);
+  const stride = size + gap;
+  const rows = Math.ceil(Math.max(0, count) / columns);
+  return { size, stride, height: Math.max(0, rows * stride - gap), columns };
 }
 
 /** Build the static item ranges around configured, parent-owned flow breaks. */
@@ -156,7 +164,7 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
     return ranges;
   }
   function renderFlat(width) {
-    const columns = Number(getComputedStyle(list).getPropertyValue('--gallery-columns')) || 4;
+    const columns = Number(getComputedStyle(list).getPropertyValue('--gallery-columns')) || 3;
     const offset = scroller.getBoundingClientRect().top - list.getBoundingClientRect().top;
     layout = { ...galleryWindow({ count: filtered.length, width, viewportHeight: scroller.clientHeight, offset, columns }), columns };
     list.style.height = `${layout.height}px`;
@@ -180,9 +188,7 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
     if (pendingFocus) { cards.get(pendingFocus)?.focus({ preventScroll: true }); pendingFocus = null; }
   }
   function renderSegmented(width) {
-    const columns = Number(getComputedStyle(list).getPropertyValue('--gallery-columns')) || 4;
-    const computed = getComputedStyle(list);
-    const heroConfigured = parseFloat(computed.getPropertyValue('--gallery-hero-size')) || (width >= 600 ? 240 : 192);
+    const columns = Number(getComputedStyle(list).getPropertyValue('--gallery-columns')) || 3;
     const gap = 3;
     const ranges = setSegmentRanges();
     const scrollerRect = scroller.getBoundingClientRect();
@@ -190,36 +196,29 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
     const viewportTop = scrollerRect.top;
     const viewportBottom = viewportTop + viewportHeight;
     const keep = new Set();
-    const heroSize = Math.min(heroConfigured, width);
-    layout = { columns, width, size: heroSize, segmented: true };
+    layout = { columns, width, size: gallerySegmentLayout({ count: 1, width, columns, gap }).size, segmented: true };
 
     // Write all flow heights before measuring any segment. This avoids a layout flush per group.
     const prepared = segments.map((segment, segmentIndex) => {
       const range = ranges[segmentIndex];
       const count = range.end - range.start;
-      const hero = breakSpecs[0]?.after === 1 && segmentIndex === 0 && count === 1;
-      const segmentWidth = width;
-      const dimensions = hero
-        ? { size: Math.min(heroSize, segmentWidth), stride: Math.min(heroSize, segmentWidth), height: Math.min(heroSize, segmentWidth), columns: 1 }
-        : { ...galleryWindow({ count, width: segmentWidth, viewportHeight: 0, columns, gap, overscan: 0 }), columns };
-      const galleryStart = String(range.start), galleryCount = String(count), galleryHero = String(hero), height = `${dimensions.height}px`;
+      const dimensions = gallerySegmentLayout({ count, width, columns, gap });
+      const galleryStart = String(range.start), galleryCount = String(count), height = `${dimensions.height}px`;
       if (segment.node.dataset.galleryStart !== galleryStart) segment.node.dataset.galleryStart = galleryStart;
       if (segment.node.dataset.galleryCount !== galleryCount) segment.node.dataset.galleryCount = galleryCount;
-      if (segment.node.dataset.galleryHero !== galleryHero) segment.node.dataset.galleryHero = galleryHero;
       if (segment.tiles.style.height !== height) segment.tiles.style.height = height;
-      return { segment, segmentIndex, range, count, hero, dimensions };
+      return { segment, segmentIndex, range, count, dimensions };
     });
     const measured = prepared.map(entry => ({ ...entry, tilesRect: entry.segment.tiles.getBoundingClientRect() }));
-    for (const { segment, segmentIndex, range, count, hero, dimensions, tilesRect } of measured) {
+    for (const { segment, segmentIndex, range, count, dimensions, tilesRect } of measured) {
       const rowOverscan = Math.max(dimensions.size, dimensions.stride * 2);
       const near = count > 0 && gallerySegmentNearViewport({ segmentTop: tilesRect.top, segmentBottom: tilesRect.bottom,
         viewportTop, viewportBottom, overscan: rowOverscan });
       const top = tilesRect.top - scrollerRect.top + scroller.scrollTop;
-      const localWindow = hero && near ? { start: 0, end: 1, size: dimensions.size, stride: dimensions.stride }
-        : near ? galleryWindow({ count, width, viewportHeight, offset: viewportTop - tilesRect.top, columns, gap, overscan: 2 })
-          : { start: 0, end: 0, size: dimensions.size, stride: dimensions.stride };
+      const localWindow = near ? galleryWindow({ count, width, viewportHeight, offset: viewportTop - tilesRect.top, columns, gap, overscan: 2 })
+        : { start: 0, end: 0, size: dimensions.size, stride: dimensions.stride };
       segmentLayouts[segmentIndex] = { start: range.start, end: range.end, count, columns: dimensions.columns, size: dimensions.size,
-        stride: dimensions.stride, hero, top, tilesRect };
+        stride: dimensions.stride, top, tilesRect };
       for (let localIndex = localWindow.start; localIndex < localWindow.end; localIndex++) keep.add(filtered[range.start + localIndex].projectId);
     }
     const focusedBeforeRender = document.activeElement;
@@ -233,8 +232,8 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
       const item = filtered[index], segment = segments[location.segmentIndex], metrics = segmentLayouts[location.segmentIndex];
       let card = cards.get(id);
       if (!card) card = makeCard(item, segment.tiles);
-      const row = metrics.hero ? 0 : Math.floor(location.localIndex / metrics.columns);
-      const column = metrics.hero ? 0 : location.localIndex % metrics.columns;
+      const row = Math.floor(location.localIndex / metrics.columns);
+      const column = location.localIndex % metrics.columns;
       card.style.width = card.style.height = `${metrics.size}px`;
       card.style.top = `${row * metrics.stride}px`; card.style.left = `${column * metrics.stride}px`;
       updateCard(card, item);
@@ -273,11 +272,11 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
     return true;
   });
   function nextVerticalIndex(index, direction) {
-    if (!isSegmented()) return Math.max(0, Math.min(filtered.length - 1, index + direction * (layout?.columns || 4)));
+    if (!isSegmented()) return Math.max(0, Math.min(filtered.length - 1, index + direction * (layout?.columns || 3)));
     const location = itemLocations.get(filtered[index]?.projectId);
     if (!location) return index;
-    const current = segmentLayouts[location.segmentIndex] || { start: segments[location.segmentIndex]?.start || 0, end: segments[location.segmentIndex]?.end || 0, columns: 4, hero: false };
-    const columns = current.hero ? 1 : current.columns || 4;
+    const current = segmentLayouts[location.segmentIndex] || { start: segments[location.segmentIndex]?.start || 0, end: segments[location.segmentIndex]?.end || 0, columns: 3 };
+    const columns = current.columns || 3;
     const desired = location.localIndex + direction * columns;
     const currentCount = current.end - current.start;
     if (desired >= 0 && desired < currentCount) return current.start + desired;
@@ -307,8 +306,8 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
     let top, itemSize = layout?.size || 100;
     if (isSegmented()) {
       const location = itemLocations.get(pendingFocus), group = location && segmentLayouts[location.segmentIndex];
-      if (group) { top = group.top + (group.hero ? 0 : Math.floor(location.localIndex / group.columns) * group.stride); itemSize = group.size; }
-    } else top = list.offsetTop + Math.floor(next / (layout?.columns || 4)) * (layout?.stride || 100);
+      if (group) { top = group.top + Math.floor(location.localIndex / group.columns) * group.stride; itemSize = group.size; }
+    } else top = list.offsetTop + Math.floor(next / (layout?.columns || 3)) * (layout?.stride || 100);
     const header = scroller.querySelector('.project-sheet__header')?.offsetHeight || 0;
     if (Number.isFinite(top) && (top < scroller.scrollTop + header || top + itemSize > scroller.scrollTop + scroller.clientHeight)) scroller.scrollTop = Math.max(0, top - header - 12);
     schedule();

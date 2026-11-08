@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Draw viewport repaint comparison</title>
+<style>
+body{font:14px system-ui;margin:20px;background:#17232d;color:#fff}button{padding:12px}pre{white-space:pre-wrap}.fixture{position:relative;display:flex;align-items:center;justify-content:center;width:868px;height:479px;overflow:hidden;border:1px solid #888;margin:8px 0}.source{width:479px;height:479px;flex:none;image-rendering:pixelated;z-index:1}.draw-pixel-background,.draw-pixel-lines{position:absolute;left:0;top:0;pointer-events:none}.draw-pixel-background{z-index:0}.draw-pixel-lines{z-index:2}
+</style>
+<h1>Draw viewport repaint comparison</h1>
+<p>Local-only microbenchmark: compares real Canvas 2D CPU work, output pixels, and source artwork. This is not an FPS or physical-touch test.</p>
+<button id="run" type="button">Run comparison</button>
+<pre id="result">Ready</pre>
+<div id="fixtures"></div>
+<script type="module">
+const result=document.querySelector('#result'), button=document.querySelector('#run'), host=document.querySelector('#fixtures');
+const baselineUrl=new URLSearchParams(location.search).get('baseline')||'/__baseline/js/creation/draw-viewport-overlays.mjs';
+const candidateUrl='/js/creation/draw-viewport-overlays.mjs';
+function assert(ok,message){if(!ok)throw new Error(message)}
+function makeFixture(mount,size){
+ const board=document.createElement('div');board.className='fixture';
+ const canvas=document.createElement('canvas');canvas.className='source';canvas.width=canvas.height=size;
+ board.append(canvas);host.append(board);
+ const ctx=canvas.getContext('2d');ctx.fillStyle='#ce5549';ctx.fillRect(size/4,size/4,size/2,size/2);ctx.clearRect(size/2,size/2,size/8,size/8);
+ const cleanup=[];const scope={add(fn){cleanup.push(fn)},listen(target,type,fn,options){target.addEventListener(type,fn,options);const remove=()=>target.removeEventListener(type,fn,options);cleanup.push(remove);return remove}};
+ const overlay=mount({board,canvas,scope});
+ return {board,canvas,overlay,cleanup(){cleanup.forEach(fn=>fn());board.remove()},options:{width:size,height:size,grid:true}};
+}
+function pixels(node){return node.getContext('2d').getImageData(0,0,node.width,node.height).data}
+function equal(a,b){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true}
+function overlays(f){return [...f.board.querySelectorAll('.draw-pixel-background,.draw-pixel-lines')]}
+function move(f,index){f.canvas.style.transform='translate('+((index%17)*0.25)+'px,'+((index%13)*-0.2)+'px) scale('+(1+(index%11)*0.015)+')';f.overlay.render(f.options)}
+function countMove(f){
+ move(f,1);const counts={dimensionWrites:0,backgroundFills:0,lineFills:0,clearCalls:0},undo=[];
+ for(const [index,node] of overlays(f).entries()){
+  for(const key of ['width','height']){const d=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,key);Object.defineProperty(node,key,{configurable:true,get(){return d.get.call(this)},set(v){counts.dimensionWrites++;d.set.call(this,v)}});undo.push(()=>delete node[key])}
+  const context=node.getContext('2d'),fill=context.fillRect,clear=context.clearRect;
+  context.fillRect=function(...args){counts[index?'lineFills':'backgroundFills']++;return fill.apply(this,args)};
+  context.clearRect=function(...args){counts.clearCalls++;return clear.apply(this,args)};
+  undo.push(()=>{context.fillRect=fill;context.clearRect=clear});
+ }
+ move(f,2);undo.forEach(fn=>fn());return counts;
+}
+function time(f,start){const values=[];for(let i=0;i<24;i++){const begin=performance.now();move(f,start+i);values.push(performance.now()-begin)}return values}
+function median(v){const a=[...v].sort((a,b)=>a-b);return a[Math.floor(a.length/2)]}
+button.onclick=async()=>{
+ button.disabled=true;result.textContent='Running...';host.replaceChildren();
+ try{
+ const [before,after]=await Promise.all([import(baselineUrl),import(candidateUrl)]);
+ const rows=[];
+ for(const size of [16,128,256]){
+  const a=makeFixture(before.mountDrawViewportOverlays,size),b=makeFixture(after.mountDrawViewportOverlays,size),art=pixels(a.canvas).slice();
+  const countsBefore=countMove(a),countsAfter=countMove(b),timingsBefore=[],timingsAfter=[];
+  for(let trial=0;trial<3;trial++){const first=trial%2?[b,a]:[a,b];for(const f of first){const values=time(f,10+trial*24);(f===a?timingsBefore:timingsAfter).push(...values)}}
+  const checks=[];
+  for(const step of [0,1,7,15,30]){
+   move(a,step);move(b,step);
+   assert(overlays(a).every((node,i)=>equal(pixels(node),pixels(overlays(b)[i]))),'overlay pixels differ at size '+size+', step '+step);
+  }checks.push('pan/zoom pixels match baseline');
+  for(const grid of [false,true]){a.options.grid=b.options.grid=grid;move(a,5);move(b,5);assert(overlays(a).every((node,i)=>equal(pixels(node),pixels(overlays(b)[i]))),'grid toggle differs')}checks.push('grid off/on pixels match');
+  for(const f of [a,b]){f.overlay.render({...f.options,readOnly:true});assert(overlays(f).every(n=>n.hidden),'readOnly must hide');f.overlay.render(f.options);assert(overlays(f).every(n=>!n.hidden),'return must show')}checks.push('readOnly hide/show');
+  for(const f of [a,b]){f.board.style.width='620px';f.board.style.height='360px';move(f,11)}
+  assert(overlays(a).every((node,i)=>equal(pixels(node),pixels(overlays(b)[i]))),'resize pixels differ');checks.push('resize pixels match');
+  assert(equal(art,pixels(a.canvas))&&equal(art,pixels(b.canvas)),'source artwork changed');checks.push('source artwork unchanged');
+  rows.push({size,dpr:devicePixelRatio,before:countsBefore,after:countsAfter,cpuMedianMsBefore:median(timingsBefore),cpuMedianMsAfter:median(timingsAfter),cpuTotalMsBefore:timingsBefore.reduce((x,y)=>x+y,0),cpuTotalMsAfter:timingsAfter.reduce((x,y)=>x+y,0),samples:timingsBefore.length,checks});
+  a.cleanup();b.cleanup();
+ }
+ result.textContent=JSON.stringify({status:'PASS',browser:navigator.userAgent,dpr:devicePixelRatio,rows},null,2);
+ }catch(error){result.textContent=JSON.stringify({status:'FAIL',error:error.stack},null,2)}
+ finally{button.disabled=false}
+};
+</script>

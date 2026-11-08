@@ -27,11 +27,20 @@ export function mountDrawViewportOverlays({ board, canvas, scope }) {
     previous = key;
     const x = i => Math.round((left + i * r.width / width) * dpr);
     const y = i => Math.round((top + i * r.height / height) * dpr);
+    const backingWidth = Math.ceil(vw * dpr), backingHeight = Math.ceil(vh * dpr);
     for (const node of [background, lines]) {
-      node.width = Math.ceil(vw * dpr); node.height = Math.ceil(vh * dpr);
-      node.style.width = `${vw}px`; node.style.height = `${vh}px`;
+      // Assigning either dimension clears a canvas and reallocates its backing
+      // store. Pan/zoom changes often need a repaint, but not a new bitmap.
+      if (node.width !== backingWidth) node.width = backingWidth;
+      if (node.height !== backingHeight) node.height = backingHeight;
+      if (node.style.width !== `${vw}px`) node.style.width = `${vw}px`;
+      if (node.style.height !== `${vh}px`) node.style.height = `${vh}px`;
     }
     const bg = background.getContext('2d'), ctx = lines.getContext('2d');
+    // A same-size canvas keeps its previous pixels, so clear before painting
+    // the new viewport geometry (including when the grid is switched off).
+    bg.clearRect(0, 0, backingWidth, backingHeight);
+    ctx.clearRect(0, 0, backingWidth, backingHeight);
     const firstX = Math.max(0, Math.floor(-left * width / r.width));
     const lastX = Math.min(width, Math.ceil((vw - left) * width / r.width));
     const firstY = Math.max(0, Math.floor(-top * height / r.height));

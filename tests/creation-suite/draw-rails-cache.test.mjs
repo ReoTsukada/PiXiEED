@@ -6,7 +6,7 @@ import { posix } from 'node:path';
 test('Draw rail, editor UI, and direct runtime changes invalidate every parent and editor entry', async () => {
   const root = new URL('../../', import.meta.url);
   const revisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
-  const manager = new Set(["js/creation/project-gallery.mjs", "css/creation-modes.css", "css/project-workspace.css", "css/tool-direct.css", "data/project-gallery-ad-config.mjs", "js/ads/project-gallery-ad.mjs", "js/ads/project-manager-ad.mjs", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+  const manager = new Set(["js/creation/project-gallery.mjs", "js/creation/shared-project-settings.mjs", "css/creation-modes.css", "css/project-workspace.css", "css/tool-direct.css", "data/project-gallery-ad-config.mjs", "js/ads/project-gallery-ad.mjs", "js/ads/project-manager-ad.mjs", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/draw-viewport-overlays.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
   const gallery = new Set(["css/project-workspace.css", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-gallery.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-store.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/creation/tool-project-store.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
   const resume = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
   const galleryAd = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
@@ -66,7 +66,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
     'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
   ]);
-  for (const target of allToolsOfferwall) assert.equal(revisions[target], manager.has(target) ? '20261108-inline-gallery-ad-1' : galleryAd.has(target) ? '20261108-gallery-first-ad-1' : gallery.has(target) ? '20261107-gallery-1' : resume.has(target) ? '20261107-resume-same-project-1' : brushCamera.has(target) ? '20261107-brush-camera-1' : continuity.has(target) ? '20261107-mode-continuity-1' : buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261101-direct-material-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
+  for (const target of allToolsOfferwall) assert.equal(revisions[target], manager.has(target) ? '20261108-gallery-canvas-viewport-1' : galleryAd.has(target) ? '20261108-gallery-first-ad-1' : gallery.has(target) ? '20261107-gallery-1' : resume.has(target) ? '20261107-resume-same-project-1' : brushCamera.has(target) ? '20261107-brush-camera-1' : continuity.has(target) ? '20261107-mode-continuity-1' : buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261101-direct-material-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
@@ -82,7 +82,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/creation/audio-entry.mjs': ['js/creation/audio-page.mjs'],
     'js/creation/pxd-ui.mjs': ['js/creation/project-workspace.mjs'],
     'js/creation/creation-camera.mjs': ['js/creation/project-workspace.mjs', 'js/pixel-lens/app.mjs'],
-    'js/creation/creation-modes.mjs': ['js/creation/creation-camera.mjs'],
+    'js/creation/creation-modes.mjs': ['js/creation/creation-camera.mjs', 'js/creation/shared-project-settings.mjs'],
     'js/creation/hidden-object-page.mjs': ['js/creation/pxd-ui.mjs', 'js/tool-offerwall-entry.mjs'],
     'js/creation/jigsaw-page.mjs': ['js/creation/pxd-ui.mjs', 'js/tool-offerwall-entry.mjs'],
     'js/creation/spot-difference-page.mjs': ['js/creation/pxd-ui.mjs', 'js/tool-offerwall-entry.mjs'],
@@ -111,7 +111,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (manager.has(target)) assert.equal(revisions[target], '20261108-inline-gallery-ad-1', `${target} invalidates the manager UI/ad dependency chain`);
+      if (manager.has(target)) assert.equal(revisions[target], '20261108-gallery-canvas-viewport-1', `${target} invalidates the manager UI/ad dependency chain`);
       else if (galleryAd.has(target)) assert.equal(revisions[target], '20261108-gallery-first-ad-1', `${target} invalidates the gallery-ad entry chain`);
       else if (gallery.has(target)) assert.equal(revisions[target], '20261107-gallery-1', `${target} invalidates the lightweight gallery dependency closure`);
       else if (resume.has(target)) assert.equal(revisions[target], '20261107-resume-same-project-1', `${target} invalidates the same-project resume entry`);

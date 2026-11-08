@@ -54,23 +54,15 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
   const form = el('form', { id: 'creation-project-settings-form', class: 'creation-project-settings__form', novalidate: '' });
   const body = el('div', { class: 'creation-project-settings__body' });
 
-  const compare = el('section', { class: 'creation-project-settings__compare', 'aria-label': '変更前と変更後の比較' });
-  const beforeFigure = el('figure', { class: 'creation-project-settings__comparison' });
-  const beforeTitle = el('figcaption', {}, '変更前');
-  const beforeStage = el('div', { class: 'creation-project-settings__stage' });
-  const beforeCanvas = el('canvas', { class: 'creation-project-settings__image', 'aria-label': '変更前の作品' });
-  beforeStage.append(beforeCanvas);
-  const beforeDimensions = el('span', { class: 'creation-project-settings__image-size' });
-  beforeFigure.append(beforeTitle, beforeStage, beforeDimensions);
-  const afterFigure = el('figure', { class: 'creation-project-settings__comparison' });
-  const afterTitle = el('figcaption', {}, '変更後');
+  const compare = el('section', { class: 'creation-project-settings__compare', 'aria-label': 'プレビュー' });
+  const previewFigure = el('figure', { class: 'creation-project-settings__comparison' });
+  const previewTitle = el('figcaption', {}, 'プレビュー');
+  const previewDimensions = el('span', { class: 'creation-project-settings__image-size' });
   const afterStage = el('div', { class: 'creation-project-settings__stage' });
-  const afterCanvas = el('canvas', { class: 'creation-project-settings__image', 'aria-label': '変更後の作品' });
+  const afterCanvas = el('canvas', { class: 'creation-project-settings__image', 'aria-label': '作品のプレビュー' });
   afterStage.append(afterCanvas);
-  const afterDimensions = el('span', { class: 'creation-project-settings__image-size' });
-  afterFigure.append(afterTitle, afterStage, afterDimensions);
-  compare.append(beforeFigure, afterFigure);
-  const status = el('p', { class: 'creation-project-settings__status', role: 'status', 'aria-live': 'polite' }, '入力すると変更前後を比較できます。');
+  previewFigure.append(previewTitle, afterStage, previewDimensions); compare.append(previewFigure);
+  const status = el('p', { class: 'creation-project-settings__status', role: 'status', 'aria-live': 'polite' }, '入力するとプレビューを更新します。');
   const impactDetails = el('details', { class: 'creation-project-settings__impact' });
   const impactSummary = el('summary', {}, '全コマ・音楽への影響');
   const impactText = el('p'); impactDetails.append(impactSummary, impactText);
@@ -154,9 +146,8 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
 
   const footer = el('footer', { class: 'creation-project-settings__footer' });
   const cancelButton = el('button', { type: 'button', 'data-project-action': 'cancel' }, '取消');
-  const testButton = el('button', { type: 'button', 'data-project-action': 'preview' }, '試す');
   const applyButton = el('button', { type: 'button', 'data-project-action': 'apply', disabled: '' }, '適用');
-  footer.append(cancelButton, testButton, applyButton);
+  footer.append(cancelButton, applyButton);
   panel.append(header, tabs, form, footer);
   root.append(launcher, panel);
 
@@ -200,7 +191,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     updateScaleWidth(); updateScaleWarning(); renderSwatches();
     for (const button of sizePresets.querySelectorAll('[data-long-side]')) button.setAttribute('aria-pressed', String(Number(button.dataset.longSide) === Math.max(animation.width, animation.height)));
     syncing = false;
-    clearDraftPreview('現在の作品を表示中です。変更を選び「試す」で確認してください。');
+    clearDraftPreview('現在の作品を表示中です。変更を選ぶとプレビューします。');
     renderBaseline();
   }
   function renderSwatches() {
@@ -233,24 +224,16 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     const frameId = animation.frames.some(frame => frame.id === preferredFrame) ? preferredFrame : animation.frames[0].id;
     return asImage(composeAnimationFrameRgba(animation, frameId));
   }
-  function renderBaseline(afterImage = null, afterSize = null) {
-    const animation = timeline(); const beforeImage = currentFrameImage(animation);
-    if (!beforeImage) return;
-    renderImage(beforeCanvas, beforeImage);
-    renderImage(afterCanvas, afterImage || beforeImage);
-    beforeDimensions.textContent = `${animation.width}×${animation.height} px`;
-    afterDimensions.textContent = `${afterSize?.width || beforeImage.width}×${afterSize?.height || beforeImage.height} px`;
-    const maxWidth = Math.max(beforeImage.width, afterImage?.width || beforeImage.width);
-    const maxHeight = Math.max(beforeImage.height, afterImage?.height || beforeImage.height);
+  function renderBaseline(afterImage = null) {
+    const image = afterImage || currentFrameImage();
+    if (!image) return;
+    renderImage(afterCanvas, image);
+    previewDimensions.textContent = `${image.width}×${image.height} px`;
     requestAnimationFrame(() => {
-      const beforeRect = beforeStage.getBoundingClientRect(); const afterRect = afterStage.getBoundingClientRect();
-      const stageWidth = Math.min(beforeRect.width || 126, afterRect.width || 126) - 8;
-      const stageHeight = Math.min(beforeRect.height || 74, afterRect.height || 74) - 8;
-      const pixelScale = Math.max(.01, Math.min(stageWidth / maxWidth, stageHeight / maxHeight));
-      for (const [canvas, image] of [[beforeCanvas, beforeImage], [afterCanvas, afterImage || beforeImage]]) {
-        canvas.style.width = `${Math.max(1, image.width * pixelScale)}px`;
-        canvas.style.height = `${Math.max(1, image.height * pixelScale)}px`;
-      }
+      const rect = afterStage.getBoundingClientRect();
+      const scale = Math.max(.01, Math.min(Math.max(1, rect.width - 12) / image.width, Math.max(1, rect.height - 12) / image.height));
+      afterCanvas.style.width = `${Math.max(1, image.width * scale)}px`;
+      afterCanvas.style.height = `${Math.max(1, image.height * scale)}px`;
     });
   }
   function currentSettings(kind = activeKind) {
@@ -283,14 +266,14 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     requestId++;
     if (previewTimer) { clearTimeout(previewTimer); previewTimer = 0; }
     revision++;
-    lastPreview = null; applyButton.disabled = true; testButton.disabled = false;
+    lastPreview = null; applyButton.disabled = true;
     impactDetails.hidden = true; impactText.textContent = '';
     status.textContent = message;
     renderBaseline();
   }
   function invalidate(message = '設定が変わりました。新しい内容をプレビューします。') {
     clearDraftPreview(message);
-    if (!panel.hidden && validateActive()) previewTimer = setTimeout(() => { previewTimer = 0; void makePreview({ arm: false, automatic: true }); }, 140);
+    if (!panel.hidden && validateActive()) previewTimer = setTimeout(() => { previewTimer = 0; void makePreview({ automatic: true }); }, 140);
   }
   function setActiveTab(kind, { focus = false, preview = true } = {}) {
     if (!tabPanels.has(kind)) return;
@@ -311,29 +294,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     if (kind === 'scale') return settings;
     return settings;
   }
-  function revealPreviewAndPrimaryField(kind) {
-    requestAnimationFrame(() => {
-      if (panel.hidden) return;
-      const bodyRect = body.getBoundingClientRect(); const current = body.scrollTop;
-      const primary = kind === 'area' ? width : kind === 'scale' ? scaleInput : palettePreset;
-      const primaryRect = primary.getBoundingClientRect(); const compareRect = compare.getBoundingClientRect(); const statusRect = status.getBoundingClientRect();
-      const contentTop = node => node.top - bodyRect.top + current;
-      const contentBottom = node => node.bottom - bodyRect.top + current;
-      const regionStart = Math.min(contentTop(primaryRect) - 18, contentTop(compareRect));
-      const regionEnd = Math.max(contentBottom(compareRect), contentBottom(statusRect));
-      const maxScroll = Math.max(0, body.scrollHeight - body.clientHeight);
-      if (regionEnd - regionStart <= body.clientHeight) {
-        const minScroll = Math.max(0, regionEnd - body.clientHeight);
-        const maxRegionScroll = Math.max(0, regionStart);
-        body.scrollTop = Math.max(minScroll, Math.min(maxRegionScroll, current, maxScroll));
-        return;
-      }
-      const compareStart = contentTop(compareRect); const compareEnd = Math.max(contentBottom(compareRect), contentBottom(statusRect));
-      const minCompareScroll = Math.max(0, compareEnd - body.clientHeight);
-      body.scrollTop = Math.max(minCompareScroll, Math.min(compareStart, current, maxScroll));
-    });
-  }
-  async function makePreview({ arm = false, automatic = false } = {}) {
+  async function makePreview({ automatic = false } = {}) {
     if (previewTimer) { clearTimeout(previewTimer); previewTimer = 0; }
     if (!validateActive()) {
       if (activeKind === 'palette') {
@@ -345,8 +306,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     }
     const kind = activeKind; const settings = buildSettings(kind); const owner = timeline(); const requestedRevision = revision; const request = ++requestId;
     if (!settings || !owner) return;
-    if (!automatic) status.textContent = '変更前後を確認しています…';
-    testButton.disabled = true;
+    if (!automatic) status.textContent = 'プレビューを更新しています…';
     try {
       let result;
       if (kind === 'scale') {
@@ -362,8 +322,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
       const changed = Boolean(result.changed);
       const previewRecord = { kind, owner, revision: requestedRevision, settings, changed, image, width: image.width, height: image.height, summary: result.summary || {} };
       lastPreview = previewRecord;
-      renderBaseline(image, { width: image.width, height: image.height });
-      if (arm) revealPreviewAndPrimaryField(kind);
+      renderBaseline(image);
       impactDetails.hidden = false;
       impactText.textContent = previewRecord.summary.musicImpact || (kind === 'scale' ? '倍率変更は全コマ・全レイヤーに適用されます。' : '変更は全コマに適用されます。');
       const summary = previewRecord.summary;
@@ -378,19 +337,13 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
         : kind === 'palette'
           ? `${image.width}×${image.height} px${compactSummary}`
           : `${dimensionsText}${compactSummary}`;
-      if (arm && changed) status.textContent += '・確認済み';
-      else if (automatic && changed) status.textContent += '・「試す」で適用確認';
       if (!changed) status.textContent += '・変更なし';
-      applyButton.disabled = !(arm && changed);
-      previewRecord.armed = Boolean(arm && changed);
-      if (arm && !changed) status.textContent = '変更はありません。';
+      applyButton.disabled = !changed;
     } catch (error) {
       if (request === requestId && requestedRevision === revision && kind === activeKind) {
         lastPreview = null; applyButton.disabled = true; status.textContent = error?.message || 'プレビューできませんでした。';
         if (kind === 'scale' && (error instanceof RangeError || error?.code)) setFieldError(scaleInput, scaleError, error?.message || 'この倍率は現在の作品に適用できません。');
       }
-    } finally {
-      if (request === requestId) testButton.disabled = false;
     }
   }
   function adjustRatio(event) {
@@ -423,6 +376,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     panel.hidden = false; launcher.setAttribute('aria-expanded', 'true');
     sync({ resetScale: true }); setActiveTab('area', { preview: false });
     validateActive(); renderBaseline(); positionPanel();
+    invalidate('余白のプレビューを更新しています。');
   }
   function keepFocusedFieldVisible() {
     if (focusedFieldScrollFrame) return;
@@ -502,15 +456,13 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
     renderSwatches(); validateActive(); invalidate('パレットのプレビューを更新しています。');
   });
   scope.listen(paletteCount, 'change', () => { validateActive(); invalidate('登録候補数のプレビューを更新しています。'); });
-  scope.listen(testButton, 'click', () => void makePreview({ arm: true }));
+
   scope.listen(applyButton, 'click', async () => {
     if (applying) return;
     const current = lastPreview; const kind = activeKind; const settings = buildSettings(kind);
-    if (!current?.armed || current.kind !== kind || !isProjectSettingsPreviewCurrent(current, { owner: timeline(), revision, settings }) || !current.changed) {
-      await makePreview({ arm: true }); return;
-    }
+    if (!current || current.kind !== kind || !isProjectSettingsPreviewCurrent(current, { owner: timeline(), revision, settings }) || !current.changed) return;
     const expectedOwner = current.owner;
-    applyButton.disabled = true; testButton.disabled = true; cancelButton.disabled = true; close.disabled = true; tabs.inert = true; applying = true; form.inert = true;
+    applyButton.disabled = true; cancelButton.disabled = true; close.disabled = true; tabs.inert = true; applying = true; form.inert = true;
     try {
       const changed = kind === 'scale'
         ? await draw.setSpriteScaleSettings(settings.percent, { expectedOwner })
@@ -526,16 +478,16 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
       clearDraftPreview(error?.message || '適用できませんでした。もう一度プレビューしてください。');
       renderBaseline();
     } finally {
-      form.inert = false; tabs.inert = false; close.disabled = false; cancelButton.disabled = false; applying = false; testButton.disabled = false; applyButton.disabled = true;
+      form.inert = false; tabs.inert = false; close.disabled = false; cancelButton.disabled = false; applying = false; applyButton.disabled = true;
     }
   });
   const unsubscribe = draw.subscribe(() => {
     if (applying) return;
-    clearDraftPreview('作品が変わりました。変更前後を更新しています。');
+    clearDraftPreview('作品が変わりました。プレビューを更新しています。');
     renderBaseline();
-    if (!panel.hidden && validateActive()) previewTimer = setTimeout(() => { previewTimer = 0; void makePreview({ arm: false, automatic: true }); }, 140);
+    if (!panel.hidden && validateActive()) previewTimer = setTimeout(() => { previewTimer = 0; void makePreview({ automatic: true }); }, 140);
   });
-  scope.add(() => { unsubscribe?.(); if (previewTimer) clearTimeout(previewTimer); });
+  scope.add(() => { requestId++; revision++; lastPreview = null; unsubscribe?.(); if (previewTimer) clearTimeout(previewTimer); });
 
   sync({ resetScale: true });
   setActiveTab('area', { preview: false });
@@ -545,7 +497,7 @@ export function mountSharedProjectSettings({ draw, scope } = {}) {
       openPanel(value);
       if (value.width) width.value = String(value.width);
       if (value.height) height.value = String(value.height);
-      if (value.width || value.height) { validateActive(); renderBaseline(); }
+      if (value.width || value.height) { validateActive(); renderBaseline(); invalidate('余白のプレビューを更新しています。'); }
     },
     sync() { sync(); },
     position: positionPanel,

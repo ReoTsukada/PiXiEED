@@ -1,7 +1,7 @@
-/** Ordinary inline Display units after artwork 1, then after each six artworks. */
+/** Ordinary inline Display units after complete six-artwork groups. */
 import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
 import { claimProjectGalleryAdRequest, hasProjectGalleryAdRequest,
-  PROJECT_GALLERY_AD_PATHS, PROJECT_GALLERY_AD_MIN_GAP, resolveProjectGalleryAdUnit } from './project-gallery-ad.mjs?rev=20261108-inline-gallery-ad-1';
+  PROJECT_GALLERY_AD_PATHS, PROJECT_GALLERY_AD_MIN_GAP, resolveProjectGalleryAdUnit } from './project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
 
 const origins = new Set(['https://pixieed.jp', 'https://www.pixieed.jp']);
 const allowedQuery = { workspace: ['1'], social: ['1'], runtime: ['direct'], mode: ['draw', 'audio', 'camera'] };
@@ -30,7 +30,8 @@ export function hasManagerArtwork(projects, minimum = 1) {
 }
 export function projectGalleryAdPositions(count) {
   if (!Number.isSafeInteger(count) || count < 1) return [];
-  return Array.from({ length: Math.ceil(count / 6) }, (_, i) => 1 + i * 6).filter(n => n <= count);
+  if (count < 6) return [count];
+  return Array.from({ length: Math.floor(count / 6) }, (_, i) => (i + 1) * 6);
 }
 export function getInlineGalleryAdLayout(width) {
   if (!Number.isFinite(width)) return null;

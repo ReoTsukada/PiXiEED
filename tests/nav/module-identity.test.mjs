@@ -10,8 +10,13 @@ const canonical = new Map([
   ['js/site-header.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/creation/output-page.mjs', 'rev=20261105-download-name-1'],
   ['js/creation/output-receive.mjs', 'rev=20261105-download-name-1'],
-  ['js/creation/project-workspace.mjs', 'rev=20261108-inline-gallery-ad-1'],
-  ['js/creation/pxd-ui.mjs', 'rev=20261108-inline-gallery-ad-1'],
+  ['js/creation/project-workspace.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['js/creation/draw-page.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['js/creation/draw-viewport-overlays.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['js/creation/creation-camera.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['js/creation/shared-project-settings.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['css/creation-modes.css', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['js/creation/pxd-ui.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
   ['js/tool-offerwall-entry.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/tool-start-routes.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/social/app.mjs', 'rev=20261108-sns-loading-1'],
@@ -62,9 +67,12 @@ test('all production and generated-template references use one URL per shared mo
       const target = targetFor(owner, value);
       if (!canonical.has(target)) continue;
       const query = value.split('?')[1] || '';
-      if (query.includes('attempt=')) continue;
       counts.set(target, counts.get(target) + 1);
-      assert.equal(query, canonical.get(target), `${owner} must use the canonical URL for ${target}`);
+      if (query.includes('attempt=')) {
+        const parsed = new URL(value, `https://local.invalid/${owner}`);
+        assert.equal(parsed.searchParams.get('rev'), canonical.get(target).split('&').find(part => part.startsWith('rev='))?.slice(4), `${owner} must use the canonical revision for retrying ${target}`);
+        assert.ok(parsed.searchParams.has('attempt'), `${owner} preserves the retry attempt parameter for ${target}`);
+      } else assert.equal(query, canonical.get(target), `${owner} must use the canonical URL for ${target}`);
     }
   }
   for (const [target, count] of counts) assert.ok(count > 0, `production source references ${target}`);
