@@ -154,8 +154,15 @@ try {
 
   await second.locator('#creation-file-open').click();
   await second.locator('#project-tab-library').click();
-  await second.locator('.project-gallery__tile').nth(1).waitFor({ state: 'visible' });
-  assert.equal(await second.locator('.project-gallery__tile').count(), 2);
+  // Gallery refreshes can replace tiles between separate visibility/count calls.
+  // Check both exact identities and visibility in one retryable DOM snapshot.
+  await second.waitForFunction(expectedIds => {
+    const tiles = [...document.querySelectorAll('.project-gallery__tile')];
+    const actualIds = tiles.map(tile => tile.dataset.projectId).sort();
+    return tiles.length === expectedIds.length
+      && tiles.every(tile => tile.checkVisibility())
+      && actualIds.every((id, index) => id === expectedIds[index]);
+  }, [original.projectId, duplicate.projectId].sort());
   await second.screenshot({ path: join(output, 'two-works-after-explicit-copy.png'), fullPage: true });
   assert.deepEqual(report.pageErrors, []);
   report.result = 'PASS';
