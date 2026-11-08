@@ -42,6 +42,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   main.inert = true; main.setAttribute('aria-busy', 'true');
   let locked = true; let initialized = false; let timer; let failed = false; let operationError = ''; let editedSinceOpen = false; let initialSelectionPending = false;
   let initialEntryFresh = false;
+  let listError = '';
   let modeTransitionActive = false;
   // The workspace and mode loader own independent locks. Recompute instead of
   // restoring a stale inert snapshot when asynchronous work finishes.
@@ -140,6 +141,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     });
   transferSection.append(transferTitle, transferNote, transferActions);
   const message = node('p', 'project-sheet__status'); message.id = 'pxd-file-status'; message.setAttribute('role', 'status');
+  const recoveryDescription = node('p', 'project-sheet__status', '保存済みの作品は変更していません。続ける作品を一覧から選んでください。「＋ 新規」から新しく描くこともできます。');
+  recoveryDescription.id = 'project-recovery-description'; recoveryDescription.hidden = true;
   const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存した作品');
   const importSection = node('details', 'project-files project-imports');
   importSection.append(node('summary', '', '取り込む'));
@@ -208,7 +211,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const header = node('div', 'project-sheet__header'); header.append(heading, toolbar);
   currentPane.append(identity, currentRow, moreActions, transferSection);
   libraryPane.append(search, selectionToolbar, count, help, list, noMatches, retryList, importSection, selectionActions);
-  dialog.append(header, message, currentPane, libraryPane); selectPane('library'); document.body.append(dialog);
+  dialog.append(header, recoveryDescription, message, currentPane, libraryPane); selectPane('library'); document.body.append(dialog);
   // Retained editors share the shell, but each owns its project controls and route pointer.
   if (idPrefix) for (const container of [bar, dialog]) {
     for (const el of [container, ...container.querySelectorAll('[id]')]) if (el.id) el.id = idPrefix + el.id;
@@ -255,21 +258,23 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function update() {
     const project = session?.currentProject;
     dialog.dataset.startup = String(initialSelectionPending);
-    title.textContent = initialSelectionPending ? '作品を選ぶ' : '作品を管理';
+    title.textContent = initialRestoreError ? '前回の作品を開けませんでした' : initialSelectionPending ? '作品を選ぶ' : '作品を管理';
+    recoveryDescription.hidden = !initialRestoreError;
+    if (initialRestoreError) dialog.setAttribute('aria-describedby', recoveryDescription.id); else dialog.removeAttribute('aria-describedby');
 
     bar.hidden = main.hidden || main.getAttribute('aria-hidden') === 'true' || getPublicSources().length > 0;
-    const name = initialized ? sanitizeProjectTitle(project?.manifest.title) : '開いています…';
+    const name = initialRestoreError ? '前回の作品を確認できません' : initialized ? sanitizeProjectTitle(project?.manifest.title) : '開いています…';
     launcher.disabled = locked;
     launcher.querySelector('.project-bar__name').textContent = name;
-    const state = failed ? '保存失敗' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
-    launcher.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
+    const state = initialRestoreError ? '復元待ち' : failed ? '保存失敗' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
+    launcher.dataset.state = initialRestoreError || failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     launcher.setAttribute('aria-label', `${name}・${state}。作品を開く`); launcher.title = `${name} · ${state}`;
     if (isActive()) document.body.dataset.toolTransferReady = String(getPublicSources().length === 0 && hasContent());
     identity.querySelector('svg').innerHTML = icons[tool] || icons.folder;
     identityName.textContent = name;
     const dimensions = activeCanvas?.width && activeCanvas?.height ? `${activeCanvas.width} × ${activeCanvas.height}px` : '';
     identityMeta.textContent = [state, dimensions].filter(Boolean).join(' · ');
-    identity.dataset.state = failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
+    identity.dataset.state = initialRestoreError || failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     for (const el of dialog.querySelectorAll('button')) el.disabled = locked;
     for (const el of [rename, duplicate, saveButton, exportButton]) el.disabled = locked || Boolean(initialRestoreError);
     const backup = findPxdOriginalBackup(project);
@@ -342,12 +347,15 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     if (!listLoaded) { count.hidden = false; count.textContent = '作品を読み込んでいます…'; }
     try {
       const { projects, errors } = await store.listProjects(); if (version !== listEpoch) return;
+      if (listError && message.textContent === listError) say(operationError || '');
+      listError = '';
       listLoaded = true; list.querySelector('.project-list__empty')?.remove(); gallery.setItems(projects);
       if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
       if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
     } catch (error) {
       if (version !== listEpoch) return;
-      retryList.hidden = false; say(`作品一覧を読み出せませんでした。保存内容は変更していません。${error.message || ''}`);
+      listError = `作品一覧を読み出せませんでした。保存内容は変更していません。${error.message || ''}`;
+      retryList.hidden = false; say(listError);
     } finally { if (version === listEpoch) list.setAttribute('aria-busy', 'false'); }
   }
   async function importCopy(source) {

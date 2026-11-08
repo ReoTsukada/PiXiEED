@@ -106,3 +106,29 @@ test('the shell lets a visible shared settings menu consume Escape before leavin
     assert.equal(hidden, overlay ? 0 : 1, overlay || 'Escape outside panels may return to explanation');
   }
 });
+
+
+test('definite restore failure opens the gallery once only after the active shell is ready', () => {
+  const start = source.indexOf('  function showRestoreState() {');
+  const end = source.indexOf('  function own(node)', start);
+  assert.ok(start >= 0 && end > start);
+  const body = source.slice(start, end);
+  for (const blocked of [{ coreReady: false }, { open: false }, { disposed: true }]) {
+    const calls = [];
+    runInNewContext(`${body}\nshowRestoreState();`, {
+      runtime: { draw: { workspace: { restoreError: 'test failure', syncInputLock() {}, showProjects(value) { calls.push(value); } } } },
+      disposed: false, coreReady: true, open: true, recoveryAutoOpened: false,
+      recovery: {}, message: {}, status: {}, bar: { classList: { toggle() {} } }, viewport() {}, ...blocked
+    });
+    assert.equal(calls.length, 0, JSON.stringify(blocked));
+  }
+  const calls = [], recovery = {}, message = {}, status = {};
+  const workspace = { restoreError: 'test failure', syncInputLock() {}, showProjects(value) { calls.push(value.pane); } };
+  runInNewContext(`${body}\nshowRestoreState(); showRestoreState();`, {
+    runtime: { draw: { workspace } }, disposed: false, coreReady: true, open: true, recoveryAutoOpened: false,
+    recovery, message, status, bar: { classList: { toggle() {} } }, viewport() {}
+  });
+  assert.deepEqual(calls, ['library'], 'repeat state updates respect a prior dismissal');
+  assert.equal(recovery.hidden, false);
+  assert.match(message.textContent, /作品を開けませんでした/);
+});
