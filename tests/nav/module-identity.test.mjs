@@ -6,12 +6,13 @@ import { spawnSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
+  ['js/creation/draw-tool-operations.mjs', 'rev=20261109-ellipse-geometry-1'],
   ['js/app.js', 'rev=20261024-common-tool-start-1'],
   ['js/site-header.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/creation/output-page.mjs', 'rev=20261105-download-name-1'],
   ['js/creation/output-receive.mjs', 'rev=20261105-download-name-1'],
   ['js/creation/project-workspace.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
-  ['js/creation/draw-page.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
+  ['js/creation/draw-page.mjs', 'rev=20261109-ellipse-geometry-1'],
   ['js/creation/draw-viewport-overlays.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
   ['js/creation/creation-camera.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
   ['js/creation/shared-project-settings.mjs', 'rev=20261108-gallery-canvas-viewport-1'],

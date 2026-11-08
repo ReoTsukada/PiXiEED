@@ -55,34 +55,41 @@ export function drawShapePixels(document, from, to, value, { shape = 'rectangle'
   if (left > right || top > bottom) return new Uint32Array(0);
   const width = maxX - minX + 1; const height = maxY - minY + 1;
   const centerX = (minX + maxX) / 2; const centerY = (minY + maxY) / 2;
-  const radiusX = (width - 1) / 2; const radiusY = (height - 1) / 2;
-  const ellipseRow = (y) => {
-    if (y < minY || y > maxY) return null;
-    if (width <= 2 || height <= 2) return { left: minX, right: maxX };
-    const vertical = (y - centerY) / radiusY;
-    const span = radiusX * Math.sqrt(Math.max(0, 1 - vertical * vertical));
-    return { left: Math.max(minX, Math.floor(centerX - span)), right: Math.min(maxX, Math.ceil(centerX + span)) };
+  const ellipseContains = (x, y, inset = 0) => {
+    const innerWidth = width - 2 * inset; const innerHeight = height - 2 * inset;
+    if (innerWidth < 1 || innerHeight < 1 || x < minX + inset || x > maxX - inset || y < minY + inset || y > maxY - inset) return false;
+    const dx = Math.abs(x - centerX); const dy = Math.abs(y - centerY);
+    // Sample pixel centers inside the ellipse's outer cell edges. Using the
+    // extreme pixel centers as radii collapses both poles into visible spikes.
+    // Keep the nearest center row/column for very thin ellipses so all four
+    // drag bounds remain connected. This rule is identical on both axes.
+    if (dx <= 0.5 || dy <= 0.5) return true;
+    return (2 * dx / innerWidth) ** 2 + (2 * dy / innerHeight) ** 2 <= 1;
   };
-  const innerEllipseRow = (y) => {
-    const innerLeft = minX + brushSize; const innerRight = maxX - brushSize;
-    const innerTop = minY + brushSize; const innerBottom = maxY - brushSize;
-    const innerWidth = innerRight - innerLeft + 1; const innerHeight = innerBottom - innerTop + 1;
-    if (innerWidth < 1 || innerHeight < 1 || y < innerTop || y > innerBottom) return null;
-    if (innerWidth <= 2 || innerHeight <= 2) return { left: innerLeft, right: innerRight };
-    const cx = (innerLeft + innerRight) / 2; const cy = (innerTop + innerBottom) / 2;
-    const rx = (innerWidth - 1) / 2; const ry = (innerHeight - 1) / 2;
-    const vertical = (y - cy) / ry; const span = rx * Math.sqrt(Math.max(0, 1 - vertical * vertical));
-    return { left: Math.max(innerLeft, Math.floor(cx - span)), right: Math.min(innerRight, Math.ceil(cx + span)) };
+  // Resolve each row once using the same containment rule, rather than
+  // rechecking four neighbors for every pixel in a large outline preview.
+  const ellipseRows = new Map();
+  const ellipseRow = (y, inset = 0) => {
+    const key = `${inset}:${y}`;
+    if (ellipseRows.has(key)) return ellipseRows.get(key);
+    if (width <= 2 * inset || height <= 2 * inset || y < minY + inset || y > maxY - inset) return null;
+    let low = minX + inset; let high = Math.floor(centerX);
+    while (low < high) {
+      const mid = Math.floor(low + (high - low) / 2);
+      if (ellipseContains(mid, y, inset)) high = mid; else low = mid + 1;
+    }
+    const row = { left: low, right: maxX - (low - minX) };
+    ellipseRows.set(key, row);
+    return row;
   };
   const cells = new Set();
   for (let y = top; y <= bottom; y += 1) {
     const row = shape === 'ellipse' ? ellipseRow(y) : { left: minX, right: maxX };
     if (!row) continue;
     const rowLeft = Math.max(left, row.left); const rowRight = Math.min(right, row.right);
-    if (rowLeft > rowRight) continue;
     const above = shape === 'ellipse' && !filled && brushSize === 1 ? ellipseRow(y - 1) : null;
     const below = shape === 'ellipse' && !filled && brushSize === 1 ? ellipseRow(y + 1) : null;
-    const inner = shape === 'ellipse' && !filled && brushSize > 1 ? innerEllipseRow(y) : null;
+    const inner = shape === 'ellipse' && !filled && brushSize > 1 ? ellipseRow(y, brushSize) : null;
     for (let x = rowLeft; x <= rowRight; x += 1) {
       let include;
       if (shape === 'rectangle') {

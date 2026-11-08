@@ -64,6 +64,8 @@ const targets = new Map([
   ['jigsaw-file.mjs', 'rev=20260929-claude-integration-1'],
 ]);
 
+const ellipseTargets = new Set(["js/creation/draw-tool-operations.mjs", "js/creation/draw-page.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+
 const managerTargets = new Set(["js/creation/project-gallery.mjs", "js/creation/shared-project-settings.mjs", "css/creation-modes.css", "css/project-workspace.css", "css/tool-direct.css", "data/project-gallery-ad-config.mjs", "js/ads/project-gallery-ad.mjs", "js/ads/project-manager-ad.mjs", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/draw-viewport-overlays.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
 for (const target of managerTargets) {
   if (target.endsWith('.css')) targets.set(posix.basename(target), 'rev=20261108-gallery-canvas-viewport-1');
@@ -105,7 +107,7 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const owner = relative(root, file).replaceAll('\\', '/');
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(owner), path));
-    if (!commonToolStartModules.has(target) && !managerTargets.has(target)) return whole;
+    if (!commonToolStartModules.has(target) && !managerTargets.has(target) && !ellipseTargets.has(target)) return whole;
     const iconAuditTargets = new Set([
       'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs',
       'js/creation/creation-camera.mjs', 'js/creation/creation-modes.mjs',
@@ -118,7 +120,7 @@ function normalize(source, file) {
     const resumeTargets = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
     const galleryAdTargets = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
     const galleryTargets = new Set(["js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-shell.mjs", "js/creation/creation-runtime.mjs", "js/tool-direct.mjs", "js/creation/tool-project-store.mjs", "js/creation/project-gallery.mjs", "js/creation/pxd-store.mjs", "css/project-workspace.css"]);
-    const revision = managerTargets.has(target) ? '20261108-gallery-canvas-viewport-1' : galleryAdTargets.has(target) ? '20261108-gallery-first-ad-1' : galleryTargets.has(target) ? '20261107-gallery-1' : resumeTargets.has(target) ? '20261107-resume-same-project-1' : brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
+    const revision = ellipseTargets.has(target) ? '20261109-ellipse-geometry-1' : managerTargets.has(target) ? '20261108-gallery-canvas-viewport-1' : galleryAdTargets.has(target) ? '20261108-gallery-first-ad-1' : galleryTargets.has(target) ? '20261107-gallery-1' : resumeTargets.has(target) ? '20261107-resume-same-project-1' : brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' ? '20261105-download-name-1' : '20261024-common-tool-start-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });

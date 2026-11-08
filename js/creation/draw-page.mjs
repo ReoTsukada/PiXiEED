@@ -29,7 +29,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-opera
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261016-color-capability-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261109-ellipse-geometry-1';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
