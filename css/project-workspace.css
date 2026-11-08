@@ -283,3 +283,14 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-gallery-actions button:disabled { border-color: #526979; color: #bcc9ce; }
 @media (min-width: 600px) { .project-gallery.project-list { --gallery-columns: 6; } }
 @media (max-width: 340px) { .project-gallery.project-list { --gallery-columns: 3; } .project-gallery-toolbar button { font-size: 12px; padding-inline: 7px; } }
+
+/* Lightweight saved-work chooser shown before the editor runtime is loaded. */
+.project-start-picker { z-index: 80; }
+.project-start-picker > p { margin: 10px 0; color: #e8e3d6; }
+.project-start-picker > input { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid #647987; border-radius: 10px; background: #101a22; color: #fff; }
+.project-start-picker__scroller { max-height: min(52dvh, 520px); overflow: auto; overscroll-behavior: contain; }
+.project-start-picker__list { position: relative; min-height: 1px; }
+.project-start-picker__list .project-gallery__tile { position: absolute; }
+.project-start-picker .project-sheet__actions { justify-content: center; }
+#project-start-new { min-height: 48px; font-size: 1.05rem; }
+.project-start-picker #project-start-search { background: #101a22 !important; color: #f4f0e4 !important; }

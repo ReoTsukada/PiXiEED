@@ -58,7 +58,7 @@ await mkdir(output, { recursive: true });
 try {
   for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) for (const mode of ['draw', 'audio']) {
     await check(`${mode}-touch`, viewport, async (page, ctx, row) => {
-      await page.goto(`${base}/tools/start/${mode}/?workspace=1&runtime=direct`); await ready(page);
+      await page.goto(`${base}/tools/start/${mode}/?workspace=1&runtime=direct`); await page.locator('#project-start-picker').waitFor({ state: 'visible' }); await page.locator('#project-start-new').tap(); await ready(page);
       await page.evaluate(() => {
         window.__touchEvidence = [];
         document.addEventListener('pointerdown', e => window.__touchEvidence.push({ pointerType: e.pointerType, trusted: e.isTrusted, target: e.target.id }), true);
@@ -88,64 +88,25 @@ try {
       row.checks = ['trusted tap', 'touch undo/redo', 'touch settings', 'two-finger canvas zoom without page zoom or stray pixels', 'draw after pinch', 'retained work and input after explanation'];
     });
   }
-  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) for (const failure of ['invalid-pointer', 'missing-revision', 'read-rejection']) {
-    await check(`restore-protection-recovery-${failure}`, viewport, async (page, ctx, row) => {
-      await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`); await ready(page); await touch(page);
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) for (const failure of ['invalid-pointer', 'missing-revision', 'valid-pointer']) {
+    await check(`remembered-pointer-ignored-${failure}`, viewport, async (page, ctx, row) => {
+      await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`); await page.locator('#project-start-new').tap(); await ready(page); await touch(page);
       const original = await page.evaluate(async () => {
         const ws = window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace; await ws.save();
         return { id: ws.currentProject.projectId, revision: ws.persistedProject.revisionId, hash: (await window.__PIXIEED_CREATION_HOST__.getState()).image.hash };
       });
       const originalRecords = await savedRecords(page);
-      // Damage only the disposable pointer, never the saved work. A separate
-      // fixture aborts one read transaction to exercise a real storage rejection.
-      if (failure !== 'read-rejection') await page.evaluate(({ failure, original }) => localStorage.setItem('pixieed:pxd:last:direct-workspace:v1', failure === 'invalid-pointer' ? '{}' : JSON.stringify({ projectId: original.id, revisionId: 'missing-revision' })), { failure, original });
-      else await ctx.addInitScript(id => {
-        const get = IDBObjectStore.prototype.get;
-        IDBObjectStore.prototype.get = function(key) {
-          const request = get.call(this, key);
-          if (this.name === 'projects' && key === id && !window.__restoreReadAborted) { window.__restoreReadAborted = true; this.transaction.abort(); }
-          return request;
-        };
-      }, original.id);
-      if (failure === 'invalid-pointer' && viewport.width === 320) await ctx.addInitScript(() => {
-        const getAll = IDBObjectStore.prototype.getAll;
-        IDBObjectStore.prototype.getAll = function(...args) {
-          const request = getAll.apply(this, args);
-          if (this.name === 'project-catalog' && !window.__restoreListAborted) { window.__restoreListAborted = true; this.transaction.abort(); }
-          return request;
-        };
-      });
+      // Exercise valid and malformed remembered pointers; all are deliberately ignored.
+      await page.evaluate(({ failure, original }) => {
+        const value = failure === 'invalid-pointer' ? '{}' : JSON.stringify({ projectId: original.id, revisionId: failure === 'missing-revision' ? 'missing-revision' : original.revision });
+        localStorage.setItem('pixieed:pxd:last:direct-workspace:v1', value);
+      }, { failure, original });
       await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`);
-      await page.waitForFunction(() => window.__PIXIEED_CREATION_HOST__?.runtime?.draw.workspace.restoreError && !document.documentElement.hasAttribute('data-direct-loading'));
-      assert.equal(await page.locator('#main').evaluate(n => n.inert), true, 'never unlock a blank replacement over unread work');
-      const status = await page.locator('.tool-direct__status').evaluate(n => ({ text: n.textContent, client: n.clientWidth, scroll: n.scrollWidth, height: n.clientHeight, scrollHeight: n.scrollHeight, style: getComputedStyle(n).whiteSpace }));
-      assert.match(status.text, /作品を開けませんでした/);
-      assert.equal(status.style, 'normal', 'the recovery explanation must wrap on phones');
-      assert.ok(status.client >= 250 && status.scroll <= status.client + 1 && status.scrollHeight <= status.height + 1, 'the complete recovery instruction is readable');
-      await page.locator('#pxd-panel[open]').waitFor({ state: 'visible' });
-      assert.match(await page.locator('#project-sheet-title').textContent(), /前回の作品/);
-      assert.match(await page.locator('#project-recovery-description').textContent(), /保存済みの作品は変更していません/);
-      assert.ok(await page.locator('#pxd-panel').evaluate(n => n.contains(document.activeElement)), 'automatic recovery owns keyboard focus, not the inert canvas');
-      if (failure === 'invalid-pointer' && viewport.width === 320) {
-        await page.locator('#project-list-retry').waitFor({ state: 'visible' });
-        await page.locator('#project-list-retry').tap();
-        row.listRetry = true;
-      }
-      await page.locator('.project-gallery__tile').waitFor({ state: 'visible' });
-      if (row.listRetry) assert.doesNotMatch(await page.locator('#pxd-file-status').textContent(), /作品一覧を読み出せませんでした/, 'successful list retry clears only the obsolete list failure');
-      assert.deepEqual(await savedRecords(page), originalRecords, 'failure and automatic recovery do not change any saved bytes/history');
-      if (failure === 'invalid-pointer') await page.screenshot({ path: join(output, `recovery-${viewport.width}.png`) });
-      await page.locator('#project-close').tap();
-      await page.waitForTimeout(120);
-      assert.equal(await page.locator('#pxd-panel').evaluate(n => n.open), false, 'dismissal must not reopen the gallery in a loop');
-      await page.locator('[data-shell-explanation]').tap();
-      await page.locator('[data-embed-start]').tap();
-      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-direct-loading'));
-      assert.equal(await page.locator('#main').evaluate(n => n.inert), true, 'explanation return preserves the protection');
-      assert.equal(await page.locator('#pxd-panel').evaluate(n => n.open), false, 'retained return respects the prior dismissal');
-      await page.getByRole('button', { name: '作品を選ぶ', exact: true }).tap();
-      await page.locator('.project-gallery__tile').waitFor({ state: 'visible' });
-      assert.equal(await page.locator('.project-gallery__tile').count(), 1, 'no automatic duplicate');
+      await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+      assert.equal(await page.evaluate(() => document.documentElement.dataset.toolDirect === 'work'), false, 'entry waits for an explicit work choice');
+      assert.equal(await page.evaluate(() => window.__PIXIEED_CREATION_HOST__?.runtime?.draw?.workspace?.restoreError || ''), '', 'remembered pointers are not attempted');
+      await page.locator(`.project-gallery__tile[data-project-id="${original.id}"]`).waitFor({ state: 'visible' });
+      assert.deepEqual(await savedRecords(page), originalRecords, 'picker and ignored pointers preserve every saved byte/history');
       await page.locator(`.project-gallery__tile[data-project-id="${original.id}"]`).tap(); await ready(page);
       const restored = await page.evaluate(async () => {
         const ws = window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace;
@@ -157,17 +118,17 @@ try {
       await pinch(page, ctx); assert.equal(await page.evaluate(() => visualViewport.scale), 1);
       await pinch(page, ctx, true); await touch(page, .65, .65);
       assert.notEqual((await snapshot(page)).image.hash, original.hash, 'touch drawing works after explicit recovery');
-      row.checks = ['automatic recovery gallery', 'guard remains until explicit selection', 'full explanation on phone', 'dismiss, explanation and explicit reopen', 'saved bytes/history/identity unchanged', 'canvas pinch and touch draw recover'];
+      row.checks = ['valid or malformed remembered pointers ignored', 'picker waits for explicit choice', 'saved bytes/history/identity unchanged', 'selected saved work remains touch-editable'];
     });
   }
   await check('restore-explicit-new-work', { width: 390, height: 844 }, async (page, ctx, row) => {
-    await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`); await ready(page); await touch(page);
+    await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`); await page.locator('#project-start-new').tap(); await ready(page); await touch(page);
     await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.save());
     const originalRecords = await savedRecords(page);
     await page.evaluate(() => localStorage.setItem('pixieed:pxd:last:direct-workspace:v1', '{}'));
     await page.goto(`${base}/tools/start/draw/?workspace=1&runtime=direct`);
-    await page.locator('#pxd-panel[open]').waitFor({ state: 'visible' });
-    await page.locator('#project-new').tap(); await ready(page);
+    await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+    await page.locator('#project-start-new').tap(); await ready(page);
     assert.deepEqual(await savedRecords(page), originalRecords, 'explicit new starts without writing over the unread saved project');
     await touch(page, .6, .6);
     await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.save());

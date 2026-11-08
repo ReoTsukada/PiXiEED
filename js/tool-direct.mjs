@@ -3,6 +3,14 @@ import { getToolStartRoute, toolStartHref, isFreshToolStartRequest } from './too
 import { notifyToolEntryReady } from './tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
 
 const DRAFT_KEY = 'pixieed:pxd:last:direct-workspace:v1';
+const PROJECT_ROUTE_KEYS = ['pxd', 'pxdRevision', 'pxdImage', 'modePxd', 'modePxdRevision', 'modePxdImage', 'modeProjectTool'];
+
+// A copied/deep-linked project URL is intentional. The editor's own remembered
+// history entry is not: a full reload starts at the library instead.
+export function shouldChooseProjectOnEntry(search, historyState) {
+  if (['drawCamera', 'audioCamera', 'drawRequest', 'audioRequest', 'standalone', 'to'].some(key => search.has(key))) return false;
+  return historyState?.projectWorkspaceSelection === true || (!search.has('pxd') && !search.has('modePxd'));
+}
 const attributes = node => [...node.attributes].map(a => [a.name, a.value]);
 // This existing global dialog can be mounted by the public header before the
 // editor. It belongs to both views, rather than the hidden introduction DOM.
@@ -22,6 +30,7 @@ export function installDirectToolShell({ section, mode, search }) {
   let pendingActivation = null, scroll = null, teardown = null, reloadRequired = false, barFrame = 0;
   let loadingCardTimer = 0, loadingCardVisible = false, coreReady = false, cameraPhaseObserver = null;
   let recoveryAutoOpened = false;
+  let entryChosen = !shouldChooseProjectOnEntry(search, history.state), chosenPointer = null, picker = null, pickerLoading = null;
   const owned = new Map(), styles = new Map(), startupHints = new Set();
   const styleStates = new WeakMap();
   const barObserver = window.ResizeObserver ? new ResizeObserver(() => {
@@ -64,7 +73,8 @@ export function installDirectToolShell({ section, mode, search }) {
     const url = new URL(location.href), workspace = runtime.draw.workspace;
     if (workspace.restoreError) return;
     // Browser history toggles visibility. A retained editor keeps its own latest
-    // project/revision and mode; reloading the resumed URL must restore that state.
+    // project/revision and mode; reentry in this document retains that state.
+    // A full reload of editor-written history returns to the project picker.
     for (const key of ['pxd','pxdRevision','pxdImage','modePxd','modePxdRevision','modePxdImage','modeProjectTool']) url.searchParams.delete(key);
     const project = workspace.persisted ? workspace.persistedProject : null;
     if (project?.projectId && project?.revisionId) {
@@ -335,6 +345,32 @@ export function installDirectToolShell({ section, mode, search }) {
     cameraPhaseObserver.observe(body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-startup-phase'] });
     updateCameraStatus();
   }
+  async function loadStartPicker() {
+    if (picker) return picker;
+    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261108-gallery-first-1')
+      .then(({ mountProjectStartPicker }) => {
+        checkAlive();
+        picker = mountProjectStartPicker({ signal: lifecycle.signal,
+          onCancel: () => hide(true),
+          onChoose: async selection => {
+            if (!open || disposed || entryChosen) return;
+            entryChosen = true;
+            const url = new URL(location.href), state = { ...history.state };
+            for (const key of PROJECT_ROUTE_KEYS) { search.delete(key); url.searchParams.delete(key); }
+            delete state.projectWorkspaceSelection;
+            // This is an owned saved-work choice, not an import-capable URL.
+            // Keep it separate until successful adoption writes the route.
+            chosenPointer = selection;
+            history.replaceState(state, '', `${url.pathname}${url.search}${url.hash}`);
+            // Remove the modal before prepareHost moves the introduction DOM.
+            picker?.dispose(); picker = null; pickerLoading = null;
+            await show(false);
+          }
+        });
+        return picker;
+      }).catch(error => { pickerLoading = null; reloadRequired = true; throw error; });
+    return pickerLoading;
+  }
   async function loadRuntime() {
     if (runtime) return runtime;
     if (mounting) return mounting;
@@ -373,17 +409,9 @@ export function installDirectToolShell({ section, mode, search }) {
       setLoadingStage('編集機能を読み込んでいます…');
       const adapted = new URL(location.href); adapted.search = search.toString(); if (open) adapted.searchParams.set('workspace', '1'); else adapted.searchParams.delete('workspace'); adapted.searchParams.set('runtime', 'direct');
       history.replaceState(history.state, '', `${adapted.pathname}${adapted.search}${adapted.hash}`);
-      let initialPointer, initialRestoreError = '';
-      if (!adapted.searchParams.has('pxd') && !adapted.searchParams.has('modePxd')) {
-        try {
-          const direct = localStorage.getItem(DRAFT_KEY);
-          const last = JSON.parse(direct !== null ? direct : localStorage.getItem('pixieed:pxd:last:creation') || localStorage.getItem('pixieed:pxd:last:draw') || 'null');
-          if (last !== null && (typeof last?.projectId !== 'string' || !last.projectId || typeof last?.revisionId !== 'string' || !last.revisionId)) throw new Error('INVALID_DRAFT_POINTER');
-          // Resume the saved identity so autosave updates this work instead of creating
-          // another copy on every visit. The session keeps its revision/CAS protection.
-          if (last?.projectId && last?.revisionId) initialPointer = { projectId: last.projectId, revisionId: last.revisionId };
-        } catch { initialRestoreError = '前回の作品の記録を確認できません。作品一覧から選び直してください。元の保存内容は保持しています。'; }
-      }
+      // Ordinary entry never reads last-project pointers. A saved work is loaded
+      // only from an explicit URL or the library choice made in this document.
+      const initialPointer = chosenPointer ?? undefined, initialRestoreError = '';
       const importedRuntime = await runtimeImport;
       if (importedRuntime.error) throw importedRuntime.error;
       const { mountCreationRuntime } = importedRuntime.module;
@@ -430,6 +458,23 @@ export function installDirectToolShell({ section, mode, search }) {
     if (description && workAttributes) useWork();
     setLoadingStage('制作画面を準備しています…');
     try {
+      if (!runtime && !entryChosen) {
+        setLoadingStage('作品一覧を読み込んでいます…');
+        const chooser = await loadStartPicker();
+        await waitForShellStyles();
+        if (generation !== token || !open || disposed) return;
+        // Keep the loading/back controls visible until the chooser has its CSS.
+        await chooser.show();
+        if (generation !== token || !open || disposed) return;
+        clearTimeout(loadingCardTimer); loadingCardTimer = 0;
+        bar.hidden = true; bootCue.hidden = true;
+        html.dataset.toolDirect = 'chooser';
+        delete html.dataset.directLoading; delete html.dataset.directBootstrap;
+        if (bootstrapBack) bootstrapBack.hidden = true;
+        start.setAttribute('aria-busy', 'false'); start.setAttribute('aria-disabled', 'false'); start.setAttribute('aria-expanded', 'true');
+        status.removeAttribute('aria-busy'); status.textContent = '続ける作品を選ぶか、新しく始めてください。';
+        return;
+      }
       const editor = await loadRuntime();
       if (generation !== token || !open || disposed) return;
       syncRetainedRoute();
@@ -478,6 +523,7 @@ export function installDirectToolShell({ section, mode, search }) {
     const focusBeforeWait = document.activeElement;
     const shellControlHadFocus = [start, explanation, bootCueBack].includes(focusBeforeWait);
     ++generation; open = false;
+    picker?.hide();
     coreReady = false; clearTimeout(loadingCardTimer); loadingCardTimer = 0;
     syncRetainedRoute();
     if (updateHistory) setIntent(false);
@@ -500,7 +546,8 @@ export function installDirectToolShell({ section, mode, search }) {
     }
     if (open || disposed) return;
     for (const [node] of owned) { if (node.matches('dialog[open]')) node.close(); for (const dialog of node.querySelectorAll('dialog[open]')) dialog.close(); }
-    if (description) useDescription({ restoreFocus: shellControlHadFocus && document.activeElement === focusBeforeWait }); else bar.hidden = true;
+    if (description) useDescription({ restoreFocus: shellControlHadFocus && document.activeElement === focusBeforeWait });
+    else { bar.hidden = true; html.dataset.toolDirect = 'explanation'; if (!runtime) start.focus({ preventScroll: true }); }
     bootCue.hidden = true;
     delete html.dataset.directLoading;
     delete html.dataset.directBootstrap;
@@ -511,6 +558,7 @@ export function installDirectToolShell({ section, mode, search }) {
   }
   function dispose() {
     if (disposed) return teardown; disposed = true; open = false; ++generation;
+    picker?.dispose(); picker = null;
     runtime?.dispose(); lifecycle.abort(); document.head.removeEventListener('load', recordStyleEvent, true); document.head.removeEventListener('error', recordStyleEvent, true); barObserver?.disconnect(); cameraPhaseObserver?.disconnect(); clearTimeout(loadingCardTimer); cancelAnimationFrame(barFrame);
     // Keep ownership observers until an in-flight mount has released its partial scope.
     teardown = Promise.allSettled([mounting, pendingActivation]).then(() => {

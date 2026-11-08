@@ -24,7 +24,9 @@ try {
     const active = () => page.evaluate(() => window.__PIXIEED_CREATION_HOST__?.active && document.documentElement.dataset.toolDirect === 'work');
     const snapshot = () => page.evaluate(() => window.__PIXIEED_CREATION_HOST__.getState());
     try {
-      await page.goto(`${base}/tools/start/${mode}/?workspace=1&runtime=direct`); await ready();
+      await page.goto(`${base}/tools/start/${mode}/?workspace=1&runtime=direct`);
+      await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+      await page.locator('#project-start-new').click(); await ready();
       row.checks.push('exact direct workspace route starts');
       for (let repeat = 0; repeat < 2; repeat++) {
         await page.locator('#creation-settings-open').click();

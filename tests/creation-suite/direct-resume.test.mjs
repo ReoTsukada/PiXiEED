@@ -12,37 +12,31 @@ const directKey = 'pixieed:pxd:last:direct-workspace:v1';
 const creationKey = 'pixieed:pxd:last:creation';
 const drawKey = 'pixieed:pxd:last:draw';
 const source = readFileSync(new URL('../../js/tool-direct.mjs', import.meta.url), 'utf8');
-const start = source.indexOf('      let initialPointer, initialRestoreError');
-const end = source.indexOf('      const importedRuntime =', start);
-assert.ok(start >= 0 && end > start, 'exercise the actual direct-entry pointer selection');
-function select(values = {}, search = '') {
-  const result = runInNewContext(`${source.slice(start, end)}\n({ initialPointer, initialRestoreError });`, {
-    DRAFT_KEY: directKey, adapted: new URL(`https://local.invalid/draw/${search}`),
-    localStorage: { getItem(key) { return values[key] ?? null; } }
+const policyStart = source.indexOf('export function shouldChooseProjectOnEntry(');
+const policyEnd = source.indexOf('\nconst attributes', policyStart);
+assert.ok(policyStart >= 0 && policyEnd > policyStart);
+function choose(search = '', historyState = null) {
+  return runInNewContext(`${source.slice(policyStart, policyEnd).replace('export ', '')}\nshouldChooseProjectOnEntry(search, historyState);`, {
+    search: new URLSearchParams(search), historyState
   });
-  return JSON.parse(JSON.stringify(result));
 }
 
-test('normal entry resumes the saved identity without forwarding a fork flag or adding a title', () => {
-  const pointer = { projectId: 'saved', revisionId: 'revision-1' };
-  for (const key of [directKey, creationKey, drawKey]) {
-    assert.deepEqual(select({ [key]: JSON.stringify({ ...pointer, fork: true, title: 'old title' }) }), {
-      initialPointer: pointer, initialRestoreError: ''
-    });
-  }
-  assert.deepEqual(select({ [directKey]: JSON.stringify(pointer), [creationKey]: JSON.stringify({ projectId: 'other', revisionId: 'other-1' }) }).initialPointer, pointer);
+test('ordinary entry always chooses a project and never reads remembered pointers', () => {
+  for (const search of ['', '?workspace=1', '?mode=audio', '?mode=camera&workspace=1']) assert.equal(choose(search), true);
+  const begin = source.indexOf('  async function loadRuntime() {');
+  const end = source.indexOf('  async function show(', begin);
+  assert.doesNotMatch(source.slice(begin, end), /localStorage\.getItem/);
+  assert.match(source.slice(begin, end), /restoreLast: false/);
 });
 
-test('explicit project routes, invalid pointers and no saved work retain their guarded behavior', () => {
-  const stored = { [directKey]: JSON.stringify({ projectId: 'saved', revisionId: 'revision-1' }) };
-  for (const query of ['?pxd=explicit&pxdRevision=explicit-1', '?modePxd=explicit&modePxdRevision=explicit-1']) {
-    assert.deepEqual(select(stored, query), { initialRestoreError: '' });
+test('intentional project links are honored but reload of editor-written history starts at the library', () => {
+  for (const query of ['?pxd=explicit&pxdRevision=revision-1', '?modePxd=explicit&modePxdRevision=revision-1']) {
+    assert.equal(choose(query), false);
+    assert.equal(choose(query, { pixieedWorkspace: true }), false);
+    assert.equal(choose(query, { projectWorkspaceSelection: true }), true);
   }
-  for (const value of ['{', '{}', '{"projectId":"saved"}', '{"projectId":"saved","revisionId":""}']) {
-    assert.match(select({ [directKey]: value }).initialRestoreError, /作品一覧から選び直して/);
-    assert.equal(select({ [directKey]: value }).initialPointer, undefined);
-  }
-  assert.deepEqual(select(), { initialRestoreError: '' });
+  assert.equal(choose('?pxd=bad'), false, 'malformed explicit links still fail closed in workspace validation');
+  for (const key of ['drawCamera', 'audioCamera', 'drawRequest', 'audioRequest', 'standalone', 'to']) assert.equal(choose(`?${key}=handoff`, { projectWorkspaceSelection: true }), false, 'intentional handoff must not be replaced with a new project choice');
 });
 
 function fixture() {
@@ -53,12 +47,12 @@ function fixture() {
   return { store, session, original };
 }
 
-test('repeated normal-entry edits save new revisions of the same work and retain earlier versions', async () => {
+test('repeated explicit gallery selections save new revisions of the same work and retain earlier versions', async () => {
   const { store, session, original } = fixture();
   let saved = await store.save(original);
   const first = saved;
   for (let index = 0; index < 3; index++) {
-    const selected = select({ [directKey]: JSON.stringify({ projectId: saved.projectId, revisionId: saved.revisionId }) }).initialPointer;
+    const selected = { projectId: saved.projectId, revisionId: saved.revisionId };
     const opened = await store.load(selected.projectId, selected.revisionId);
     const current = session();
     await current.adopt(opened, { persisted: true });

@@ -154,6 +154,14 @@ export async function deriveToolRuntimeDeliveryPlan({ root }) {
   const directRoot = directEntrypointFromShell(shellGraph);
   const nonShellRoots = htmlRoots.filter(url => !url.startsWith('/js/tool-shell.mjs?'));
   const hostGraph = await walkStaticGraph(root, [...new Set([shellRoot, directRoot, ...nonShellRoots])]);
+  // The project picker is an intentionally separate pre-editor lazy boundary.
+  // Include its static graph in delivery/fingerprinting without preloading the
+  // editor or duplicating storage/gallery module identities in the bundle.
+  const pickerRoots = literalDynamicRoots(hostGraph).filter(item => item.from === directRoot && item.specifier.startsWith('./creation/project-start-picker.mjs?'));
+  assert(pickerRoots.length === 1, 'Expected one lazy pre-editor project picker.');
+  const pickerGraph = await walkStaticGraph(root, pickerRoots.map(item => item.url));
+  for (const [url, module] of pickerGraph.modules) hostGraph.modules.set(url, module);
+  hostGraph.edges.push(...pickerGraph.edges);
 
   const combined = { modules: new Map([...runtimeGraph.modules, ...modeGraph.modules]) };
   const dynamicRoots = literalDynamicRoots(combined);
@@ -180,6 +188,7 @@ export async function deriveToolRuntimeDeliveryPlan({ root }) {
     runtimeUrls,
     modeGraph,
     hostGraph,
+    pickerGraph,
     dynamicGraph,
     dynamicRoots,
     externalUrls,

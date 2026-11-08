@@ -30,7 +30,7 @@ async function newContext(name) {
   const page=await ctx.newPage(); page.setDefaultTimeout(20000); page.on('pageerror',e=>row.errors.push(e.message));
   return {ctx,page,row};
 }
-async function blank(page, search='runtime=direct') { await page.goto(`${base}/draw/?${search}`); await page.locator('[data-embed-start]').waitFor({state:'visible'}); }
+async function blank(page, search='runtime=direct&workspace=1') { await page.goto(`${base}/draw/?${search}`); await page.locator('#project-start-picker').waitFor({state:'visible'}); await page.locator('#project-start-new').click(); await page.locator('[data-embed-start]').waitFor({state:'visible'}); }
 async function direct(page, route, mode='draw') {
   await page.goto(`${base}${route}`);
   await page.waitForFunction(expected=>document.documentElement.dataset.toolDirect==='work' && window.__PIXIEED_CREATION_HOST__?.active
@@ -180,15 +180,18 @@ await run('direct-legacy-mode-pointer-namespace',async({page,row})=>{
   check(row,'canonical mode route preserves duplicate opaque query values and hash while consuming legacy pointer keys');
 },{});
 
-await run('legacy-storage-draw-pointer-direct-resume-fork',async({page,row})=>{
+await run('legacy-storage-pointer-ignored-until-explicit-choice',async({page,row})=>{
   await blank(page);const legacy=await makeLegacyDrawPointerFixture(page,'Legacy remembered pointer');
   const sentinels={draw:{projectId:legacy.id,revisionId:legacy.revision},creation:{projectId:legacy.id,revisionId:legacy.revision},audio:{projectId:'legacy-audio-sentinel',revisionId:'legacy-audio-revision'}};
   await page.evaluate(values=>{localStorage.removeItem('pixieed:pxd:last:direct-workspace:v1');localStorage.setItem('pixieed:pxd:last:draw',JSON.stringify(values.draw));localStorage.setItem('pixieed:pxd:last:creation',JSON.stringify(values.creation));localStorage.setItem('pixieed:pxd:last:audio',JSON.stringify(values.audio));},sentinels);
   await page.goto(`${base}/draw/?runtime=direct&workspace=1`);
+  await page.locator('#project-start-picker').waitFor({state:'visible'});
+  assert.equal(await page.evaluate(()=>window.__PIXIEED_CREATION_HOST__?.runtime?.draw?.workspace?.restoreError||''),'');
+  await page.locator(`.project-gallery__tile[data-project-id="${legacy.id}"]`).click();
   await page.waitForFunction(()=>document.documentElement.dataset.toolDirect==='work'&&window.__PIXIEED_CREATION_HOST__?.active&&window.__PIXIEED_CREATION_HOST__.runtime?.state?.ready&&document.querySelector('[data-embed-start]')?.getAttribute('aria-busy')==='false');
   const runtime=await page.evaluateHandle(()=>window.__PIXIEED_CREATION_HOST__.runtime);
   const opened=await runtime.evaluate(rt=>({projectId:rt.draw.workspace.currentProject?.projectId,image:Array.from(rt.draw.getImage().rgba)}));
-  assert.ok(opened.projectId&&opened.projectId!==legacy.id,'valid legacy Draw pointer resumes as an independent direct-owned fork');
+  assert.equal(opened.projectId,legacy.id,'explicit tile choice opens the legacy project in place');
   assert.deepEqual(opened.image,legacy.main.rgba,'legacy Draw pointer restores the saved artwork');
   const afterOpen=await page.evaluate(()=>Object.fromEntries(['draw','creation','audio'].map(k=>[k,localStorage.getItem(`pixieed:pxd:last:${k}`)])));
   assert.deepEqual(afterOpen,Object.fromEntries(Object.entries(sentinels).map(([k,v])=>[k,JSON.stringify(v)])));
@@ -199,36 +202,26 @@ await run('legacy-storage-draw-pointer-direct-resume-fork',async({page,row})=>{
   const old=await inspectProject(page,legacy.id,legacy.revision);assert.equal(old.entriesHash,legacy.hash,'migration leaves original legacy revision byte-exact');
   const legacyAfter=await page.evaluate(()=>Object.fromEntries(['draw','creation','audio'].map(k=>[k,localStorage.getItem(`pixieed:pxd:last:${k}`)])));
   assert.deepEqual(legacyAfter,Object.fromEntries(Object.entries(sentinels).map(([k,v])=>[k,JSON.stringify(v)])),'direct operations do not rewrite legacy pointer slots');
-  check(row,'valid legacy last:creation/last:draw pointer opens as a separate direct fork with the saved pixels');
-  check(row,'saving the migrated copy preserves the original revision and all existing legacy pointer records');
+  check(row,'valid legacy last:creation/last:draw pointers are ignored until the matching gallery tile is explicitly selected');
+  check(row,'explicit legacy selection retains project identity and source revision bytes while writing only the new saved revision');
 },{});
 
-await run('legacy-foreign-pointer-fails-closed-and-recovers',async({page,row})=>{
+await run('legacy-foreign-pointer-ignored-by-picker',async({page,row})=>{
   await blank(page);const foreign=await makeLegacyFixture(page,'audio','Legacy foreign owner');
   const oldPointer={projectId:foreign.id,revisionId:foreign.revision};
   await page.evaluate(pointer=>{localStorage.removeItem('pixieed:pxd:last:direct-workspace:v1');localStorage.setItem('pixieed:pxd:last:creation',JSON.stringify(pointer));localStorage.removeItem('pixieed:pxd:last:draw');},oldPointer);
   await page.goto(`${base}/draw/?runtime=direct&workspace=1&keep=old&keep=route#foreign-legacy`);
-  await page.waitForFunction(()=>document.documentElement.dataset.toolDirect==='work'&&window.__PIXIEED_CREATION_HOST__?.active&&window.__PIXIEED_CREATION_HOST__.runtime?.state?.ready&&document.querySelector('[data-embed-start]')?.getAttribute('aria-busy')==='false');
-  const errorState=await page.evaluate(()=>({error:window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.restoreError,projectId:window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.currentProject?.projectId,image:Array.from(window.__PIXIEED_CREATION_HOST__.runtime.draw.getImage().rgba),main:document.querySelector('#main')?.inert,actions:['project-save','project-rename','project-duplicate','pxd-export'].map(id=>({id,disabled:document.getElementById(id)?.disabled}))}));
-  assert.match(errorState.error,/形式の確認/);assert.notEqual(errorState.projectId,foreign.id);assert.ok(errorState.image.every(v=>v===0),'failed implicit restore leaves the editor blank');assert.equal(errorState.main,true);
-  assert.ok(errorState.actions.every(item=>item.disabled!==false),`failed restore must disable unsafe actions: ${JSON.stringify(errorState.actions)}`);
+  await page.locator('#project-start-picker').waitFor({state:'visible'});
+  assert.equal(await page.evaluate(()=>window.__PIXIEED_CREATION_HOST__?.runtime||null),null,'remembered foreign pointers are not loaded');
   const originalRoute=await page.evaluate(()=>({search:location.search,hash:location.hash,creation:localStorage.getItem('pixieed:pxd:last:creation'),direct:localStorage.getItem('pixieed:pxd:last:direct-workspace:v1')}));
   assert.deepEqual(originalRoute,{search:'?runtime=direct&workspace=1&keep=old&keep=route',hash:'#foreign-legacy',creation:JSON.stringify(oldPointer),direct:null});
-  await page.locator('#pxd-panel[open]').waitFor({state:'visible'});
-  assert.equal(await page.locator('#main').evaluate(node=>node.inert),true,'opening recovery keeps the failed placeholder inert');
-  await page.locator('#project-close').click();await page.waitForFunction(()=>!document.querySelector('#pxd-panel')?.open);
-  assert.equal(await page.locator('#main').evaluate(node=>node.inert),true,'closing recovery does not unlock the failed placeholder');
-  await page.getByRole('button',{name:'作品を選ぶ'}).click();await page.locator('#pxd-panel').waitFor({state:'visible'});await page.locator('#project-new').click();
-  await page.waitForFunction(()=>window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.restoreError==='');
-  const routeAfterNew=await page.evaluate(()=>({search:location.search,hash:location.hash}));
-  assert.deepEqual(routeAfterNew,{search:'?runtime=direct&workspace=1&keep=old&keep=route&mode=draw',hash:'#foreign-legacy'});
+  await page.locator('#project-start-new').click();
+  await page.waitForFunction(()=>window.__PIXIEED_CREATION_HOST__?.runtime?.state?.ready&&document.documentElement.dataset.toolDirect==='work');
   assert.equal(await page.locator('#main').evaluate(node=>node.inert),false);
   await paint(page,1,1);await page.evaluate(()=>window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.save());
-  const recoveryPointer=await page.evaluate(()=>JSON.parse(localStorage.getItem('pixieed:pxd:last:direct-workspace:v1')||'null'));
-  assert.ok(recoveryPointer?.projectId&&recoveryPointer.projectId!==foreign.id,'explicit New selection creates a separate project');
-  assert.equal((await inspectProject(page,foreign.id,foreign.revision,'audio')).entriesHash,foreign.hash,'recovery leaves the foreign source unchanged');
-  check(row,'foreign implicit pointer shows a guarded recovery state while retaining URL, source, and old pointer');
-  check(row,'explicit New clears the failed selection, preserves duplicate query/hash, and permits a new save');
+  assert.equal((await inspectProject(page,foreign.id,foreign.revision,'audio')).entriesHash,foreign.hash,'explicit New leaves the foreign source unchanged');
+  check(row,'foreign implicit pointer is ignored while picker retains URL and stored pointer');
+  check(row,'explicit New opens a separate blank workspace without touching foreign saved bytes');
 },{});
 
 await run('legacy-foreign-pointer-explicit-url-import',async({page,row})=>{
@@ -270,7 +263,7 @@ await run('legacy-draw2-v1-v2-raw-container-fails-closed',async({page,row})=>{
 },{ });
 
 await run('retained-iframe-explicit-legacy-import-and-output',async({page,row})=>{
-  await blank(page,'runtime=direct');const source=await makeLegacyFixture(page,'audio','Legacy audio import source');
+  await blank(page,'runtime=direct&workspace=1');const source=await makeLegacyFixture(page,'audio','Legacy audio import source');
   await page.goto(`${base}/draw/?runtime=iframe&workspace=1&pxd=${source.id}&pxdRevision=${source.revision}&keep=iframe&keep=retained#legacy-iframe`);
   await page.waitForFunction(()=>document.body.classList.contains('tool-shell--workspace-open')&&document.querySelector('.tool-embed__frame'));
   const frame=page.frames().find(f=>new URL(f.url()).pathname==='/draw/editor.html');assert.ok(frame,'retained iframe candidate uses the real editor document');

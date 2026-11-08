@@ -49,6 +49,8 @@ jobs:
           PIXIEED_DRAW_ENTRY_OUTPUT: /tmp/pixieed-creation-browser/entry
           PIXIEED_RESUME_OUTPUT: /tmp/pixieed-creation-browser/resume
           PIXIEED_TOUCH_OUTPUT: /tmp/pixieed-creation-browser/touch
+          PIXIEED_GALLERY_BASE_URL: http://127.0.0.1:4189
+          PIXIEED_GALLERY_OUTPUT: /tmp/pixieed-creation-browser/gallery
         run: |
           python3 -m http.server 4189 --bind 127.0.0.1 --directory /tmp/pixieed-site-check > /tmp/pixieed-creation-http.log 2>&1 &
           server=$!
@@ -60,6 +62,7 @@ jobs:
           node scripts/draw-touch-lifecycle-browser-harness.mjs || status=1
           node scripts/draw-entry-browser-harness.mjs || status=1
           node scripts/direct-resume-browser-harness.mjs || status=1
+          node scripts/gallery-first-browser-harness.mjs || status=1
           exit "$status"
       - name: Verify progressive social loading and actions
         env:

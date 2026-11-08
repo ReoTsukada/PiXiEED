@@ -30,10 +30,22 @@ const state = page => page.evaluate(async () => {
   return { projectId: workspace.currentProject.projectId, revisionId: workspace.persistedProject?.revisionId, title: workspace.currentProject.manifest.title, persisted: workspace.persisted, dirty: workspace.dirty, image: (await rt.getState()).image.hash };
 });
 const ready = page => page.waitForFunction(() => window.__PIXIEED_CREATION_HOST__?.runtime?.state.ready && document.documentElement.dataset.toolDirect === 'work' && !document.querySelector('#main').inert);
-async function open(page, path = '/draw/') {
+async function showPicker(page, path = '/draw/') {
   await page.goto(base + path);
-  await page.waitForFunction(() => { const start = document.querySelector('[data-embed-start]'); return document.documentElement.dataset.toolDirect === 'work' || start?.checkVisibility() && start.getAttribute('aria-busy') !== 'true'; });
-  if (!await page.evaluate(() => document.documentElement.dataset.toolDirect === 'work')) await page.locator('[data-embed-start]').click();
+  await page.waitForFunction(() => document.querySelector('#project-start-picker')?.checkVisibility()
+    || document.documentElement.dataset.toolDirect === 'work'
+    || (document.querySelector('[data-embed-start]')?.checkVisibility() && document.querySelector('[data-embed-start]')?.getAttribute('aria-busy') !== 'true'));
+  if (await page.evaluate(() => document.documentElement.dataset.toolDirect !== 'work' && !document.querySelector('#project-start-picker')?.checkVisibility())) {
+    await page.locator('[data-embed-start]').click();
+  }
+  if (await page.evaluate(() => document.documentElement.dataset.toolDirect === 'work')) return false;
+  await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+  return true;
+}
+async function open(page, path = '/draw/', projectId = null) {
+  if (!await showPicker(page, path)) return await ready(page);
+  if (projectId) await page.locator(`.project-gallery__tile[data-project-id="${projectId}"]`).click();
+  else await page.locator('#project-start-new').click();
   await ready(page);
 }
 async function save(page) { await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.runtime.draw.workspace.save()); }
@@ -52,7 +64,7 @@ async function records(page) {
   });
 }
 try {
-  await open(page);
+  await open(page); // Explicitly choose New for the blank-start baseline.
   assert.equal((await records(page)).length, 0, 'fresh entry creates no stored work');
   await paint(page, 2, 2); await save(page);
   await page.locator('#creation-file-open').click();
@@ -64,7 +76,7 @@ try {
   const original = await state(page);
   let saved = original;
   for (const [index, path] of ['/draw/', '/tools/start/draw/', '/draw/', '/tools/start/draw/'].entries()) {
-    await open(page, path);
+    await open(page, path, original.projectId);
     const resumed = await state(page);
     assert.equal(resumed.projectId, original.projectId);
     assert.equal(resumed.title, original.title);
@@ -84,27 +96,31 @@ try {
     assert.equal((await records(page)).length, 1);
     report.cases.push({ name: `normal-resume-${index + 1}`, path, id: saved.projectId, title: saved.title });
   }
-  // Old shared and draw pointers are still accepted, but never fork the identity.
+  // Old remembered pointers are ignored; choosing the saved gallery tile opens its identity in place.
   for (const key of ['pixieed:pxd:last:creation', 'pixieed:pxd:last:draw']) {
     await page.evaluate(({ directKey, key, saved }) => {
       localStorage.removeItem(directKey); localStorage.removeItem('pixieed:pxd:last:creation'); localStorage.removeItem('pixieed:pxd:last:draw');
       localStorage.setItem(key, JSON.stringify({ projectId: saved.projectId, revisionId: saved.revisionId, fork: true }));
     }, { directKey, key, saved });
-    await open(page);
+    await showPicker(page, '/draw/');
+    await page.locator(`.project-gallery__tile[data-project-id="${saved.projectId}"]`).waitFor({ state: 'visible' });
+    assert.equal(await page.locator(`.project-gallery__tile[data-project-id="${saved.projectId}"]`).count(), 1, 'remembered legacy pointer does not auto-open');
+    await page.locator(`.project-gallery__tile[data-project-id="${saved.projectId}"]`).click(); await ready(page);
     assert.deepEqual(await state(page), saved);
     assert.equal((await records(page)).length, 1);
-    report.cases.push({ name: 'legacy-pointer-resume', key });
+    report.cases.push({ name: 'legacy-pointer-explicit-gallery-select', key });
   }
   // Explanation/return and a reload must retain the current project without duplication.
   await page.locator('[data-shell-explanation]').click();
   await page.locator('[data-embed-start]').click(); await ready(page);
   assert.deepEqual(await state(page), saved);
-  await page.reload(); await ready(page);
+  await page.reload(); await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+  await page.locator(`.project-gallery__tile[data-project-id="${saved.projectId}"]`).click(); await ready(page);
   assert.deepEqual(await state(page), saved);
   report.cases.push({ name: 'explanation-return-and-reload', projects: (await records(page)).length });
 
   // Two normal entries share the same saved identity. The stale tab must not overwrite it.
-  const second = await context.newPage(); await open(second);
+  const second = await context.newPage(); await open(second, '/draw/', original.projectId);
   assert.equal((await state(second)).projectId, original.projectId);
   await paint(page, 12, 12); await save(page);
   const winner = await state(page);
@@ -130,7 +146,7 @@ try {
   assert.equal((await records(page)).length, 2);
   assert.equal((await records(page)).find(row => row.id === original.projectId).head, winner.revisionId);
   report.cases.push({ name: 'explicit-duplicate-after-conflict', projects: 2, sourcePreserved: true });
-  await open(second);
+  await open(second, '/draw/', duplicate.projectId);
   assert.deepEqual(await state(second), duplicate, 'an explicitly duplicated work also resumes in place');
   assert.equal((await records(page)).length, 2);
   report.cases.push({ name: 'resume-explicit-copy', projects: 2 });

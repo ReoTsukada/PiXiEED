@@ -123,7 +123,8 @@
   "js/tool-help-data.mjs": "20261107-brush-camera-1",
   "js/tool-help-bootstrap.mjs": "20261107-brush-camera-1",
   "js/creation/tool-project-store.mjs": "20261107-gallery-1",
-  "js/creation/project-gallery.mjs": "20261107-gallery-1",
+  "js/creation/project-gallery.mjs": "20261108-gallery-first-1",
   "js/creation/pxd-store.mjs": "20261107-gallery-1",
-  "css/project-workspace.css": "20261107-gallery-1"
+  "css/project-workspace.css": "20261108-gallery-first-1",
+  "js/creation/project-start-picker.mjs": "20261108-gallery-first-1"
 }
