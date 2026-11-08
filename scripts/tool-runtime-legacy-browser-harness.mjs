@@ -214,7 +214,7 @@ await run('legacy-foreign-pointer-fails-closed-and-recovers',async({page,row})=>
   assert.ok(errorState.actions.every(item=>item.disabled!==false),`failed restore must disable unsafe actions: ${JSON.stringify(errorState.actions)}`);
   const originalRoute=await page.evaluate(()=>({search:location.search,hash:location.hash,creation:localStorage.getItem('pixieed:pxd:last:creation'),direct:localStorage.getItem('pixieed:pxd:last:direct-workspace:v1')}));
   assert.deepEqual(originalRoute,{search:'?runtime=direct&workspace=1&keep=old&keep=route',hash:'#foreign-legacy',creation:JSON.stringify(oldPointer),direct:null});
-  await page.getByRole('button',{name:'作品を選ぶ'}).click();await page.locator('#pxd-panel').waitFor({state:'visible'});
+  await page.locator('#pxd-panel[open]').waitFor({state:'visible'});
   assert.equal(await page.locator('#main').evaluate(node=>node.inert),true,'opening recovery keeps the failed placeholder inert');
   await page.locator('#project-close').click();await page.waitForFunction(()=>!document.querySelector('#pxd-panel')?.open);
   assert.equal(await page.locator('#main').evaluate(node=>node.inert),true,'closing recovery does not unlock the failed placeholder');

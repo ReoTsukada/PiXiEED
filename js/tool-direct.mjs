@@ -21,6 +21,7 @@ export function installDirectToolShell({ section, mode, search }) {
   let description = null, shellAttributes = null, workAttributes = null, bodyObserver = null, headObserver = null;
   let pendingActivation = null, scroll = null, teardown = null, reloadRequired = false, barFrame = 0;
   let loadingCardTimer = 0, loadingCardVisible = false, coreReady = false, cameraPhaseObserver = null;
+  let recoveryAutoOpened = false;
   const owned = new Map(), styles = new Map(), startupHints = new Set();
   const styleStates = new WeakMap();
   const barObserver = window.ResizeObserver ? new ResizeObserver(() => {
@@ -82,6 +83,10 @@ export function installDirectToolShell({ section, mode, search }) {
     status.textContent = error ? message.textContent : '編集を保持しています。';
     bar.classList.toggle('tool-direct__bar--recovery', Boolean(error));
     if (open) runtime.draw.workspace.syncInputLock();
+    if (error && coreReady && open && !recoveryAutoOpened) {
+      recoveryAutoOpened = true;
+      void runtime.draw.workspace.showProjects({ pane: 'library' });
+    }
     viewport();
   }
   function own(node) {
@@ -446,7 +451,7 @@ export function installDirectToolShell({ section, mode, search }) {
       if (bootstrapBack) bootstrapBack.hidden = true;
       updateCameraStatus();
       viewport(); window.dispatchEvent(new Event('resize'));
-      if (document.activeElement === start) document.querySelector('#draw-canvas')?.focus({ preventScroll: true });
+      if (document.activeElement === start && !runtime.draw.workspace.restoreError) document.querySelector('#draw-canvas')?.focus({ preventScroll: true });
     } catch (error) {
       if (startRoute) notifyToolEntryReady(false);
       if (disposed || generation !== token) return;
