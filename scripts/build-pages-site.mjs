@@ -154,8 +154,9 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
     for (const name of booksAssets) {
       if (!publishableBooksAssets.has(name) && !files.includes(name)) files.push(name);
     }
-    // New shop runtime sources are explicit opt-ins, never a directory crawl.
-    for (const name of ['data/shop-ad-config.mjs', 'js/ads/shop-ad.mjs']) {
+    // New shop and project-gallery ad sources are explicit opt-ins, never a directory crawl.
+    for (const name of ['data/shop-ad-config.mjs', 'js/ads/shop-ad.mjs',
+      'data/project-gallery-ad-config.mjs', 'js/ads/project-gallery-ad.mjs']) {
       if (await lstat(join(root, name)).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) files.push(name);
     }
     let eventPages = 0;

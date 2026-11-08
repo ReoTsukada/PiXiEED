@@ -37,14 +37,23 @@ test('build ships all 25 card references and 21 exact JPEGs even before artwork 
   const manifest = JSON.parse(await readFile(new URL('assets/books/illustrations-manifest.json', source), 'utf8'));
   const html = await readFile(new URL('books/index.html', source), 'utf8');
   const root = await fixture(t, products, html);
+  // Arbitrary local work created after the fixture's tracked source list stays out.
+  await mkdir(dirname(join(root, 'js/ads/arbitrary-untracked.mjs')), { recursive: true });
+  await writeFile(join(root, 'js/ads/arbitrary-untracked.mjs'), 'must remain excluded');
   for (const asset of manifest.assets) await copyFile(new URL(asset.src.slice(1), source), join(root, asset.src.slice(1)));
   for (const name of ['data/shop-ad-config.mjs', 'js/ads/shop-ad.mjs']) {
     await mkdir(dirname(join(root, name)), { recursive: true });
     await writeFile(join(root, name), 'export const reviewedShopSource = true;');
   }
+  for (const name of ['data/project-gallery-ad-config.mjs', 'js/ads/project-gallery-ad.mjs']) {
+    await mkdir(dirname(join(root, name)), { recursive: true });
+    await writeFile(join(root, name), 'export const reviewedProjectGallerySource = true;');
+  }
   const output = join(root, 'dist');
   await buildPagesSite({ root, output });
   for (const name of ['data/shop-ad-config.mjs', 'js/ads/shop-ad.mjs']) assert.equal(await readFile(join(output, name), 'utf8'), 'export const reviewedShopSource = true;');
+  for (const name of ['data/project-gallery-ad-config.mjs', 'js/ads/project-gallery-ad.mjs']) assert.equal(await readFile(join(output, name), 'utf8'), 'export const reviewedProjectGallerySource = true;');
+  await assert.rejects(readFile(join(output, 'js/ads/arbitrary-untracked.mjs')), { code: 'ENOENT' });
   const builtHtml = await readFile(join(output, 'books/index.html'), 'utf8');
   const references = [...builtHtml.matchAll(/<img\b[^>]*src="(\/assets\/books\/illustrations\/[^" ]+\.jpg)"/g)].map(match => match[1]);
   assert.equal(references.length, 25);

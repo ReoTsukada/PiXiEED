@@ -294,3 +294,22 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-start-picker .project-sheet__actions { justify-content: center; }
 #project-start-new { min-height: 48px; font-size: 1.05rem; }
 .project-start-picker #project-start-search { background: #101a22 !important; color: #f4f0e4 !important; }
+
+/* One fixed, labelled banner after the initial chooser controls. */
+.project-start-picker__ad {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  margin: 48px 0 0;
+  overflow: visible;
+}
+.project-start-picker__ad[hidden] { display: none; }
+.project-start-picker__ad-label { margin: 0 0 4px; color: #c5d1d6; font-size: 12px; line-height: 16px; }
+.project-start-picker__ad-slot { display: flex; flex: none; align-items: center; justify-content: center; max-width: 100%; overflow: visible; }
+.project-start-picker__ad-slot ins { box-sizing: content-box; flex: none; max-width: 100%; overflow: visible; }
+@media (max-width: 340px) {
+  .project-start-picker { width: min(760px, calc(100vw - 4px)); padding-inline: 4px; }
+}
