@@ -51,7 +51,7 @@ export function drawProjectThumbnail(canvas, sample) {
 }
 
 /** Keep decoded thumbnails, DOM and gesture listeners bounded by the viewport. */
-export function mountProjectGallery({ list, scroller, onOpen, onContext = () => {}, onSelection = () => {}, isLocked = () => false, currentId = () => null, readOnly = false }) {
+export function mountProjectGallery({ list, scroller, onOpen, onContext = () => {}, onSelection = () => {}, isLocked = () => false, currentId = () => null, readOnly = false, actionLabel = '続きを開く', getBadge = () => '' }) {
   const selected = new Set(); const cards = new Map();
   let items = [], filtered = [], indexes = new Map(), itemLocations = new Map(), query = '', selecting = false;
   let frame = 0, layout = null, pendingFocus = null, disposed = false, ignoreReleaseClick = false, scrollEpoch = 0, pressScrollEpoch = 0;
@@ -68,14 +68,17 @@ export function mountProjectGallery({ list, scroller, onOpen, onContext = () => 
     card.setAttribute('aria-pressed', String(chosen));
     card.setAttribute('aria-current', String(item.projectId === currentId()));
     card.dataset.selected = String(chosen);
-    card.setAttribute('aria-label', `${item.summary.name || '無題の作品'}${item.summary.width ? `、${item.summary.width} × ${item.summary.height}px` : ''}${selecting ? chosen ? '、選択済み' : '、未選択' : '、続きを開く'}`);
+    card.setAttribute('aria-label', `${item.summary.name || '無題の作品'}${item.summary.width ? `、${item.summary.width} × ${item.summary.height}px` : ''}${selecting ? chosen ? '、選択済み' : '、未選択' : `、${actionLabel}`}`);
     card.title = item.summary.name || '無題の作品'; card.disabled = isLocked();
   }
   function makeCard(item, parent) {
     const card = document.createElement('button'); card.type = 'button'; card.className = 'project-card project-gallery__tile'; card.dataset.projectId = item.projectId;
     const canvas = document.createElement('canvas'); canvas.setAttribute('aria-hidden', 'true'); drawProjectThumbnail(canvas, item.summary.thumbnail);
     const check = document.createElement('span'); check.className = 'project-gallery__check'; check.setAttribute('aria-hidden', 'true'); check.textContent = '✓';
-    card.append(canvas, check); parent.append(card); cards.set(item.projectId, card);
+    canvas.hidden = !item.summary.thumbnail;
+    const fallback = document.createElement('span'); fallback.className = 'project-gallery__fallback'; fallback.setAttribute('aria-hidden', 'true'); fallback.textContent = item.summary.hasAudio ? '♪' : '作品'; fallback.hidden = Boolean(item.summary.thumbnail);
+    const badge = document.createElement('span'); badge.className = 'project-gallery__badge'; badge.textContent = getBadge(item); badge.hidden = !badge.textContent;
+    card.append(canvas, fallback, badge, check); parent.append(card); cards.set(item.projectId, card);
     return card;
   }
   function removeCards() { for (const card of cards.values()) card.remove(); cards.clear(); }

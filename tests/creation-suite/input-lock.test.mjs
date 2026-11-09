@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 const read = path => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
 const workspace = read('js/creation/project-workspace.mjs');
-const functions = workspace.slice(workspace.indexOf('  function syncInputLock()'), workspace.indexOf('  let listEpoch'));
+const functions = workspace.slice(workspace.indexOf('  function syncInputLock()'), workspace.indexOf('  let listLoaded'));
 function fixture() {
   return runInNewContext(`let locked = true, initialRestoreError = '', modeTransitionActive = false;
     const main = { inert: true, setAttribute(name, value) { this[name] = value; } };

@@ -1,5 +1,5 @@
 import { decodePxd } from './pxd-codec.mjs';
-import { createPxdStore, PxdStoreError } from './pxd-store.mjs?rev=20261107-gallery-1';
+import { createPxdStore, PxdStoreError } from './pxd-store.mjs?rev=20261109-lazy-gallery-1';
 import { forkProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
 
 const TOOLS = new Set(['draw', 'audio', 'camera', 'jigsaw', 'spot_difference', 'hidden_object']);
@@ -76,7 +76,7 @@ export function createToolProjectStore(tool, options = {}) {
   }
 
   async function onlyOwned({ includeDeleted = false } = {}) {
-    const result = await rawStore.listProjects({ includeDeleted });
+    const result = await rawStore.listProjects({ includeDeleted, tool, source: 'owned' });
     const projects = []; const errors = [...(result.errors ?? [])];
     for (const item of result.projects ?? []) {
       const stamp = summaryStamp(item);
@@ -146,7 +146,7 @@ export function createToolProjectStore(tool, options = {}) {
       ownershipCache.set(projectId, { ...project, revisionId: restored.revisionId }); return restored;
     },
     async listImportSources() {
-      const result = await rawStore.listProjects(); const projects = []; const errors = [...(result.errors ?? [])];
+      const result = await rawStore.listProjects({ tool, source: 'imports' }); const projects = []; const errors = [...(result.errors ?? [])];
       for (const item of result.projects ?? []) {
         const stamp = summaryStamp(item);
         if (stamp && stamp.schemaVersion === 1 && stamp.tool !== tool) { projects.push(item); continue; }

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Regression checks for dragging a selection body without requiring Alt. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -130,8 +131,8 @@ try {
     };
     const loadFixture = async () => {
       await page.locator('#project-open').click(); await page.locator('#project-tab-library').click();
-      const imports = page.locator('.project-imports'); if (!await imports.evaluate(node => node.open)) await imports.locator(':scope > summary').click();
-      await page.locator('#pxd-file-input').setInputFiles(pxdPath);
+      await page.locator('#project-tab-import').click();
+      await importProjectFile(page, pxdPath);
       await page.waitForFunction(() => {
         const t = window.__bodyDraw.getTimeline();
         return t.frames.length === 2 && t.layers.filter(layer => layer.role !== 'music').length === 2;

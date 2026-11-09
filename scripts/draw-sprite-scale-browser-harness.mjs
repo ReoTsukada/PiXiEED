@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** PXD-backed browser regressions for Draw sprite scaling. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
@@ -96,8 +97,8 @@ try {
     const load = async name => {
       if (await page.locator('.draw-import').evaluate(node => node.open).catch(() => false)) await closeCanvasPanel();
       await page.locator('#project-open').click(); await page.locator('#project-tab-library').click();
-      const imports = page.locator('.project-imports'); if (!await imports.evaluate(node => node.open)) await imports.locator(':scope > summary').click();
-      await page.locator('#pxd-file-input').setInputFiles(`${output}/${name}.pxd`);
+      await page.locator('#project-tab-import').click();
+      await importProjectFile(page, `${output}/${name}.pxd`);
       const dimensions = name === 'odd' ? [17, 15] : name === 'limit' ? [32, 32] : [16, 16];
       await page.waitForFunction(([w, h]) => { const c = document.querySelector('#draw-canvas'); return c?.width === w && c?.height === h && !document.querySelector('#main')?.inert; }, dimensions);
       if (await page.locator('#pxd-panel').evaluate(node => node.open)) await page.locator('#project-close').click();

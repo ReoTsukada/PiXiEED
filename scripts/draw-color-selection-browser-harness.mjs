@@ -1,5 +1,6 @@
 /** Browser regression harness for Draw's non-rectangular same-color selection. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -93,8 +94,8 @@ for (const engineName of engines) {
       };
       const loadFixture = async () => {
         await page.locator('#project-open').click(); await page.locator('#project-tab-library').click();
-        const imports = page.locator('.project-imports'); if (!await imports.evaluate(node => node.open)) await imports.locator(':scope > summary').click();
-        await page.locator('#pxd-file-input').setInputFiles(`${output}/source.pxd`);
+        await page.locator('#project-tab-import').click();
+        await importProjectFile(page, `${output}/source.pxd`);
         await page.waitForFunction(() => !document.querySelector('#main')?.inert && document.querySelectorAll('#draw-palette [data-color-index]').length === 5);
         if (await page.locator('#pxd-panel').evaluate(node => node.open)) await page.locator('#project-close').click();
       };

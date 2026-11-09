@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Local-only project output and real beforeunload cancellation regression checks. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -44,9 +45,8 @@ async function loadFixture(page) {
   await page.waitForFunction(() => document.documentElement.dataset.creationModesReady==='true' && !document.body.hasAttribute('data-creation-transition'), null, {timeout:30000});
   await page.locator('#project-open').click();
   await page.locator('#project-tab-library').click();
-  const imports = page.locator('.project-imports');
-  if (!await imports.evaluate(n=>n.open)) await imports.locator(':scope > summary').click();
-  await page.locator('#pxd-file-input').setInputFiles({name:'navigation-regression.pxd',mimeType:'application/octet-stream',buffer:Buffer.from(fixture)});
+  await page.locator('#project-tab-import').click();
+  await importProjectFile(page, {name:'navigation-regression.pxd',mimeType:'application/octet-stream',buffer:Buffer.from(fixture)});
   await page.waitForFunction(() => !document.querySelector('#main')?.inert && document.querySelector('.project-bar__open')?.dataset.state==='saved', null, {timeout:30000});
   if (await page.locator('#pxd-panel').evaluate(n=>n.open)) await page.locator('#project-close').click();
   await page.waitForFunction(() => !document.querySelector('#main')?.inert && document.body.dataset.creationMode==='draw');

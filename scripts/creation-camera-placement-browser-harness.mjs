@@ -1,5 +1,6 @@
 /** Shared-shell camera target QA. All captures use uploaded synthetic PNGs. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -143,7 +144,7 @@ for (const viewport of viewports) {
   const loadPxd = async (file, size = [W, H]) => {
     const priorPointer = await currentPointer();
     await openProjects(); await page.locator('#project-tab-library').click();
-    await page.locator('#pxd-file-input').setInputFiles(file);
+    await importProjectFile(page, file);
     await page.waitForFunction(({ priorPointer, width, height }) => {
       const params = new URLSearchParams(location.search);
       let pointer = null;

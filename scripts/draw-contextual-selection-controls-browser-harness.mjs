@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Local-only acceptance for selection-dependent draw controls and layout. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -137,8 +138,8 @@ async function runViewport(viewport) {
     await page.screenshot({ path: baselinePath, fullPage: true }); row.screenshots.push(baselinePath); report.screenshots.push(baselinePath);
     await page.locator('#creation-file-open').click(); await page.locator('#pxd-panel').waitFor({ state: 'visible' });
     await page.locator('#project-tab-library').click();
-    const imports = page.locator('.project-imports'); if (!await imports.evaluate(node => node.open)) await imports.locator(':scope > summary').click();
-    await page.locator('#pxd-file-input').setInputFiles(fixturePath);
+    await page.locator('#project-tab-import').click();
+    await importProjectFile(page, fixturePath);
     await page.waitForFunction(() => document.querySelectorAll('#draw-palette [data-color-index]').length >= 4 && !document.querySelector('#main')?.inert, null, { timeout: 20000 });
     if (await page.locator('#pxd-panel').evaluate(dialog => dialog.open)) await page.locator('#project-close').click();
     await page.locator('#pxd-panel').waitFor({ state: 'hidden' });

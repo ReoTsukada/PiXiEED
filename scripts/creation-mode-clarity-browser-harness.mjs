@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Isolated localhost acceptance for creation-mode status, history, and controls. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -83,9 +84,8 @@ async function importFixture(page) {
   await page.locator('#creation-file-open').click();
   await page.locator('#pxd-panel').waitFor({ state: 'visible' });
   await page.locator('#project-tab-library').click();
-  const imports = page.locator('.project-imports');
-  if (!await imports.evaluate(node => node.open)) await imports.locator(':scope > summary').click();
-  await page.locator('#pxd-file-input').setInputFiles(fixturePath);
+  await page.locator('#project-tab-import').click();
+  await importProjectFile(page, fixturePath);
   await page.waitForFunction(() => {
     const canvas = document.querySelector('#draw-canvas');
     const status = document.querySelector('#draw-status')?.textContent || '';

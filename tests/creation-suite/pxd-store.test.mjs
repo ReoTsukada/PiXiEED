@@ -277,3 +277,42 @@ test('permanent deletion checks canonical head even when catalog metadata is sta
     assert.equal(fake.rows.get(first.projectId).history.length, 2);
   } finally { if (original === undefined) delete globalThis.indexedDB; else globalThis.indexedDB = original; }
 });
+
+test('scoped catalog filters known owners before fallback payload reads, preserves unscoped behavior, and retries', async () => {
+  const memory = createMemoryPxdAdapter(); const writer = createPxdStore({ adapter: memory, idFactory: sequence('scoped') });
+  for (const [id, tool] of [['owned', 'draw'], ['foreign', 'audio'], ['untagged', null]]) {
+    await writer.save(createPxdProject({ projectId: id, manifest: tool ? { toolProject: { tool, schemaVersion: 1 } } : {} }));
+  }
+  const records = await memory.listCatalog();
+  // Force thumbnail fallback while keeping ownership metadata available.
+  for (const row of records) row.summary = { toolProject: row.summary.toolProject };
+  const reads = []; const scopes = []; let fail = true;
+  const store = createPxdStore({ adapter: { ...memory,
+    async listCatalog(scope) { scopes.push(scope); if (fail) { fail = false; throw Error('temporary'); } return records; },
+    async readLatest(id) { reads.push(id); return memory.readLatest(id); }
+  } });
+  await assert.rejects(store.listProjects({ tool: 'draw', source: 'owned' }), /temporary/);
+  assert.deepEqual((await store.listProjects({ tool: 'draw', source: 'owned' })).projects.map(x => x.projectId), ['owned']);
+  assert.deepEqual(reads, ['owned']); reads.length = 0;
+  assert.deepEqual((await store.listProjects({ tool: 'draw', source: 'imports' })).projects.map(x => x.projectId).sort(), ['foreign', 'untagged']);
+  assert.deepEqual(reads.sort(), ['foreign', 'untagged']); reads.length = 0;
+  assert.equal((await store.listProjects()).projects.length, 3);
+  assert.deepEqual(reads.sort(), ['foreign', 'owned', 'untagged']);
+  assert.equal(scopes[0].source, 'owned');
+});
+
+test('unknown legacy ownership caches classification without generating a hidden summary, then lists on request', async () => {
+  const memory = createMemoryPxdAdapter(); const writer = createPxdStore({ adapter: memory, idFactory: sequence('legacy-scope') });
+  await writer.save(createPxdProject({ projectId: 'legacy-foreign', manifest: { toolProject: { tool: 'audio', schemaVersion: 1 } } }));
+  const [record] = await memory.listCatalog(); record.summary = null; record.galleryOwner = 'unknown';
+  const owners = []; const summaries = [];
+  const store = createPxdStore({ adapter: { ...memory, async listCatalog() { return [record]; },
+    async cacheOwner(id, revision, owner) { owners.push(owner); record.galleryOwner = owner; },
+    async cacheSummary(id, revision, summary) { summaries.push(summary); record.summary = summary; }
+  } });
+  assert.deepEqual((await store.listProjects({ tool: 'draw', source: 'owned' })).projects, []);
+  assert.deepEqual(owners, ['tool:audio']); assert.equal(summaries.length, 0);
+  assert.equal((await store.listProjects({ tool: 'draw', source: 'imports' })).projects.length, 1);
+  assert.equal(summaries.length, 1);
+  assert.equal((await memory.listRevisionIds('legacy-foreign')).length, 1);
+});

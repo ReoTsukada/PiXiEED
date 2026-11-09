@@ -112,18 +112,23 @@ try {
         await page.locator('[data-action="toggle-frames"]').click(); await page.keyboard.press('Escape'); assert.equal(await workspace.isVisible(),false);
         await page.locator('#project-open').click();
         await reachable('#project-close'); await page.locator('#project-tab-current').click();
-        const submenus=['.project-more','.project-imports','.project-trash'];
+        const submenus=['.project-more','.project-rename-details'];
         for(const selector of submenus){
-          if(selector!=='.project-more')await page.locator('#project-tab-library').click();
-          const d=page.locator(selector);if(selector==='.project-trash')await d.evaluate(n=>n.hidden=false);if(!await d.evaluate(n=>n.open))await d.locator(':scope > summary').click();assert.equal(await d.evaluate(n=>n.open),true);
+          const d=page.locator(selector);if(!await d.evaluate(n=>n.open))await d.locator(':scope > summary').click();assert.equal(await d.evaluate(n=>n.open),true);
           await page.locator('#pxd-panel').evaluate(n=>n.scrollTop=n.scrollHeight);
           await reachable(`${selector} .draw-panel-close`); await d.locator('.draw-panel-close').click();assert.equal(await d.evaluate(n=>n.open),false);
           await d.locator(':scope > summary').click(); await page.keyboard.press('Escape');assert.equal(await d.evaluate(n=>n.open),false);assert.equal(await page.locator('#pxd-panel').evaluate(n=>n.open),true);
         }
+        await page.locator('#project-tab-import').click();
+        assert.equal(await page.locator('#project-tab-import').getAttribute('aria-selected'),'true');
+        assert.equal(await page.locator('#project-import-pane').isVisible(),true);
+        assert.equal(await page.locator('#project-current-pane').isVisible(),false);
+        await page.keyboard.press('Escape');assert.equal(await page.locator('#pxd-panel').evaluate(n=>n.open),false,'Escape closes the import tab with its manager');
+        await page.locator('#project-open').click();
         await page.locator('#project-tab-current').click(); await page.locator('.project-more > summary').click();
         await reachable('#project-close'); await page.locator('#project-close').click();
         assert.equal(await page.locator('#pxd-panel').evaluate(n=>n.open),false);
-        checks.push(`${virtual?'ON':'OFF'}/${side}: color, shortcut, workspace, frame/layer menus, duration, project + 3 nested disclosures`);
+        checks.push(`${virtual?'ON':'OFF'}/${side}: color, shortcut, workspace, frame/layer menus, duration, project import tab + 2 nested disclosures`);
       }
     }
     // Native simultaneous contacts: touching UI cancels the held click/pad and
@@ -155,10 +160,10 @@ try {
       await conversion();await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__conversionResult),false);
       assert.equal(await canvas.evaluate(n=>n===document.activeElement),true);
       await page.locator('#project-open').click();await page.locator('#project-tab-current').click();if(!await page.locator('.project-more').evaluate(n=>n.open))await page.locator('.project-more > summary').click();await page.locator('#pxd-save').click();await page.waitForFunction(()=>!document.querySelector('#project-close').disabled);await page.locator('#project-tab-library').click();
-      if(!await page.locator('.project-imports').evaluate(n=>n.open))await page.locator('.project-imports > summary').click();
-      const remove=page.locator('.project-card__delete').first();await remove.click();await reachable('#project-delete-dismiss');await page.locator('#project-delete-dismiss').click();assert.equal(await page.locator('.project-delete-dialog').count(),0);
-      await remove.click();await page.keyboard.press('Escape');assert.equal(await page.locator('.project-delete-dialog').count(),0);assert.equal(await page.locator('.project-imports').evaluate(n=>n.open),true,'child modal owns Escape before underlying disclosures');
-      const card=page.locator('.project-card').first();await card.click({button:'right'});await reachable('#project-card-actions-dismiss');await page.locator('#project-card-actions-dismiss').click();assert.equal(await page.locator('.project-card-actions').count(),0);
+      await page.locator('#project-select').click();const card=page.locator('#project-library-pane .project-gallery__tile').first();await card.click();
+      const remove=page.locator('#project-delete-selected');await remove.click();await reachable('#project-delete-dismiss');await page.locator('#project-delete-dismiss').click();assert.equal(await page.locator('.project-delete-dialog').count(),0);
+      await remove.click();await page.keyboard.press('Escape');assert.equal(await page.locator('.project-delete-dialog').count(),0);assert.equal(await page.locator('#pxd-panel').evaluate(n=>n.open),true,'child modal owns Escape before the manager');assert.equal(await page.locator('#project-tab-library').getAttribute('aria-selected'),'true');assert.equal(await card.getAttribute('aria-pressed'),'true','cancel preserves the selected artwork');
+      await page.locator('#project-select-cancel').click();await card.click({button:'right'});await reachable('#project-card-actions-dismiss');await page.locator('#project-card-actions-dismiss').click();assert.equal(await page.locator('.project-card-actions').count(),0);
       await card.click({button:'right'});await page.keyboard.press('Escape');assert.equal(await page.locator('.project-card-actions').count(),0);
       await page.locator('#project-close').click();checks.push(`${virtual?'ON':'OFF'}: existing conversion cancel (fixture), project deletion cancel and card actions close/Escape; no deletion`);
     }

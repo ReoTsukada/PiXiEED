@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Isolated localhost acceptance for PXD puzzle editing and captured camera images. */
 import assert from 'node:assert/strict';
-import { saveCurrentProject } from './lib/project-panel-browser.mjs';
+import { importProjectFile, saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdBytes } from '../js/creation/pxd-codec.mjs';
@@ -34,7 +34,7 @@ async function newContext() {
 async function importFile(page, route, payload = bytes) {
   await page.goto(`${origin}${route}`, { waitUntil: 'domcontentloaded' });
   await page.locator('#pxd-file-input').waitFor({ state: 'attached' });
-  await page.locator('#pxd-file-input').setInputFiles({ name: 'owned-project.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(payload) });
+  await importProjectFile(page, { name: 'owned-project.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(payload) });
   await page.waitForFunction(() => document.querySelector('#pxd-file-status')?.textContent.includes('PXDの作品を開きました'), { timeout: 12000 });
 }
 async function openPanel(page) {

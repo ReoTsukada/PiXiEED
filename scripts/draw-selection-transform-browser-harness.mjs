@@ -1,5 +1,6 @@
 /** Selection transactions through real UI, mouse/keyboard and native virtual touch input. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createAnimation, writeAnimationCel } from '../js/creation/animation-core.mjs';
@@ -76,13 +77,13 @@ try {
     await p.locator('#draw-settings-summary').click(); await p.locator('#draw-shortcuts-open').click(); await p.locator(`[data-command-run="${id}"]`).click(); await p.waitForTimeout(40);
   };
   const load = async (name, count) => {
-   await p.locator('#project-open').click(); await p.locator('#project-tab-library').click(); await p.locator('.project-imports > summary').click(); await p.locator('#pxd-file-input').setInputFiles(`${output}/${name}.pxd`);
+   await p.locator('#project-open').click(); await p.locator('#project-tab-library').click(); await p.locator('#project-tab-import').click(); await importProjectFile(p, `${output}/${name}.pxd`);
    await p.waitForFunction(n => document.querySelectorAll('#draw-palette [data-color-index]').length === n && !document.querySelector('#main').inert, count + 1);
    if (await p.locator('#pxd-panel').evaluate(n => n.open)) await p.locator('#project-close').click();
   };
   try {
    await p.goto(`${base}/draw/`); await p.waitForFunction(() => !document.querySelector('#main').inert);
-   await p.locator('#project-open').click(); await p.locator('#project-tab-library').click(); await p.locator('.project-imports > summary').click(); await p.locator('#pxd-file-input').setInputFiles(`${output}/source.pxd`);
+   await p.locator('#project-open').click(); await p.locator('#project-tab-library').click(); await p.locator('#project-tab-import').click(); await importProjectFile(p, `${output}/source.pxd`);
    await p.waitForFunction(() => document.querySelectorAll('#draw-palette [data-color-index]').length === 4 && !document.querySelector('#main').inert);
    if (await p.locator('#pxd-panel').evaluate(n => n.open)) await p.locator('#project-close').click();
    const initial = await rgba(), rects = await p.locator('.draw-board, #draw-canvas, .draw-controls, #draw-virtual-controls').evaluateAll(ns => ns.map(n => { const r = n.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; }));

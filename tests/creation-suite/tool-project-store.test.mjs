@@ -113,3 +113,14 @@ test('tool catalog listing avoids loading and retaining full work payloads', asy
   assert.deepEqual((await reader.listProjects()).projects.map(item => item.projectId), [own.projectId]);
   assert.deepEqual((await reader.listImportSources()).projects, []);
 });
+
+
+test('tool wrapper requests only the selected source at the raw storage boundary', async () => {
+  const calls = [];
+  const store = createToolProjectStore('draw', { rawStore: {
+    async listProjects(scope) { calls.push(scope); return { projects: [], errors: [] }; }
+  } });
+  await store.listProjects({ includeDeleted: true });
+  await store.listImportSources();
+  assert.deepEqual(calls, [{ includeDeleted: true, tool: 'draw', source: 'owned' }, { tool: 'draw', source: 'imports' }]);
+});
