@@ -20,14 +20,15 @@ test('delivery plan preserves runtime identities and bounds minification to star
 
   // Manager ads add the guarded manager controller, shared chooser budget,
   // config, SDK loader and loader config to the previously bounded graph.
-  assert.equal(plan.runtimeGraph.modules.size, 113);
-  assert.equal(plan.runtimeGraph.edges.length, 209);
+  // Lazy gallery loading adds one small shared request/cache controller.
+  assert.equal(plan.runtimeGraph.modules.size, 114);
+  assert.equal(plan.runtimeGraph.edges.length, 210);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 110);
-  assert.equal(plan.externalUrls.size, 61);
+  assert.equal(plan.dynamicGraph.modules.size, 111);
+  assert.equal(plan.externalUrls.size, 62);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261109-import-preview-gallery-1'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261109-lazy-gallery-1'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
   assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1'));
@@ -37,6 +38,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert(files.includes('js/ads/project-manager-ad.mjs'));
   assert(files.includes('js/ads/project-gallery-ad.mjs'));
   assert(files.includes('data/project-gallery-ad-config.mjs'));
+  assert(files.includes('js/creation/project-gallery-data.mjs'), 'One small loader coordinates only visible gallery requests.');
   assert(files.includes('js/creation/project-gallery.mjs'), 'Windowed gallery accounts for one shared UI module and one import edge.');
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
   assert(files.includes('js/creation/draw-render-optimization.mjs'));
@@ -131,7 +133,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 61);
+    assert.equal(report.externalCount, 62);
     assert.equal(report.internalizedCount, 52);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);

@@ -347,7 +347,7 @@ export function installDirectToolShell({ section, mode, search }) {
   }
   async function loadStartPicker() {
     if (picker) return picker;
-    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261109-import-preview-gallery-1')
+    if (!pickerLoading) pickerLoading = import('./creation/project-start-picker.mjs?rev=20261109-lazy-gallery-1')
       .then(({ mountProjectStartPicker }) => {
         checkAlive();
         picker = mountProjectStartPicker({ signal: lifecycle.signal,
@@ -386,7 +386,7 @@ export function installDirectToolShell({ section, mode, search }) {
       prepareHost(template);
       // Start evaluating the already-required graph while the editor styles load.
       // The handled result is consumed only after CSS and restore-state checks.
-      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261109-import-preview-gallery-1'))()
+      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261109-lazy-gallery-1'))()
         .then(module => ({ module }), error => { reloadRequired = true; return { error }; });
       const cssLoads = [];
       const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));

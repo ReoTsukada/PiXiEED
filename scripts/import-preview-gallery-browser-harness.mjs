@@ -27,8 +27,8 @@ const waitFrame = p => p.evaluate(() => new Promise(r => requestAnimationFrame((
 const rows = p => p.evaluate(async () => (await __qa.raw.listProjects()).projects.map(p => ({ id: p.projectId, revision: p.revisionId, name: p.summary.name })));
 const state = p => p.evaluate(() => ({ id: __qa.ws.currentProject.projectId, revision: __qa.ws.currentProject.revisionId }));
 const openImport = async p => { await p.evaluate(() => __qa.ws.showProjects({ pane: 'import' })); await waitFrame(p); };
-async function seed(p, empty = false) {
-  await p.evaluate(async empty => {
+async function seed(p, empty = false, initialPane = 'library') {
+  await p.evaluate(async ({ empty, initialPane }) => {
     const { createPxdProject, encodePxd } = await import('/js/creation/pxd-codec.mjs');
     const { putPxdSharedImage } = await import('/js/creation/pxd-project.mjs');
     const { createPxdStore } = await import('/js/creation/pxd-store.mjs');
@@ -46,11 +46,28 @@ async function seed(p, empty = false) {
       await raw.save(await make('qa-audio', '音楽だけ', 'audio', 30, false), { expectedRevisionId: null });
       for (let i = 0; i < 10; i++) await raw.save(await make(`qa-other-${i}`, `以前の作品 ${i}`, i % 2 ? 'camera' : null, i * 20), { expectedRevisionId: null });
     }
+    const reads = { queries: 0, catalogIds: [], projectIds: [], thumbnailDraws: 0, currentPreviewReads: 0 };
+    for (const prototype of [IDBObjectStore.prototype, IDBIndex.prototype]) for (const method of ['getAll', 'getAllKeys', 'openCursor', 'openKeyCursor', 'get']) {
+      const original = prototype[method];
+      prototype[method] = function (...args) {
+        const storeName = this.objectStore?.name || this.name;
+        if (storeName === 'project-catalog') reads.queries++;
+        if (storeName === 'projects' && method === 'get') reads.projectIds.push(args[0]);
+        const request = original.apply(this, args);
+        if (storeName === 'project-catalog') request.addEventListener('success', () => {
+          const result = request.result, values = Array.isArray(result) ? result : result?.value ? [result.value] : result?.projectId ? [result] : [];
+          reads.catalogIds.push(...values.map(item => item.projectId).filter(id => typeof id === 'string'));
+        });
+        return request;
+      };
+    }
+    const putImageData = CanvasRenderingContext2D.prototype.putImageData;
+    CanvasRenderingContext2D.prototype.putImageData = function (...args) { reads.thumbnailDraws++; return putImageData.apply(this, args); };
     let applied = current;
-    const ws = mountProjectWorkspace({ tool: 'draw', initialProject: { project: current, persisted: true }, getProject: p => p, openProject: p => { applied = p; }, getPreviewImage: () => null, getEditorState: () => ({}), routePointer: false });
-    await ws.ready; window.__qa = { raw, ws, make, encodePxd, applied: () => applied };
-    await ws.showProjects({ pane: 'library' });
-  }, empty);
+    const ws = mountProjectWorkspace({ tool: 'draw', initialProject: { project: current, persisted: true }, getProject: p => p, openProject: p => { applied = p; }, getPreviewImage: () => { reads.currentPreviewReads++; return null; }, getEditorState: () => ({}), routePointer: false });
+    await ws.ready; window.__qa = { raw, ws, make, encodePxd, reads, applied: () => applied };
+    await ws.showProjects({ pane: initialPane });
+  }, { empty, initialPane });
   await waitFrame(p);
 }
 try {
@@ -141,6 +158,52 @@ try {
       console.log('PASS', width);
     } catch (error) { report.status = 'FAIL'; report.checks.push({ width, status: 'FAIL', error: error.stack, errors }); await p.screenshot({ path: `${out}/failure-${width}.png` }); console.error(error); }
     finally { await context.close(); }
+  }
+  // Measure actual reads and thumbnail draws, not just hidden elements.
+  for (const first of ['current', 'import']) {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const requests = []; await context.route('**/*', r => { requests.push({ url: r.request().url(), type: r.request().resourceType() }); return new URL(r.request().url()).origin === base ? r.continue() : r.abort(); });
+    const p = await context.newPage(); await p.goto(base + '/__qa'); await seed(p, false, first);
+    let reads = await p.evaluate(() => structuredClone(__qa.reads));
+    if (first === 'current') {
+      assert.equal(reads.queries, 0, 'current-work pane never scans either gallery');
+      assert.equal(reads.thumbnailDraws, 0);
+      await p.locator('#project-tab-library').evaluate(e => { for (let i = 0; i < 6; i++) e.click(); });
+      await p.waitForFunction(() => document.querySelector('#project-library-pane .project-gallery').getAttribute('aria-busy') === 'false');
+      await waitFrame(p); reads = await p.evaluate(() => structuredClone(__qa.reads));
+      assert.equal(reads.thumbnailDraws, 2, 'only the two visible saved-work thumbnails are drawn');
+      assert.ok(reads.queries > 0); assert.ok(reads.catalogIds.every(id => id === 'qa-current' || id === 'qa-normal-2'), JSON.stringify(reads));
+      assert.deepEqual(reads.projectIds, [], 'warm catalog avoids all full PXD reads');
+      assert.equal(await p.locator('#project-import-list canvas').count(), 0, 'unvisited imports never decode/draw thumbnails');
+      const beforeRevisit = structuredClone(reads), requestCount = requests.length;
+      await p.locator('#project-tab-current').click(); await p.locator('#project-tab-library').click(); await waitFrame(p);
+      const revisited = await p.evaluate(() => structuredClone(__qa.reads));
+      assert.equal(revisited.queries, beforeRevisit.queries, 'cached revisit never queries storage');
+      assert.equal(revisited.thumbnailDraws, beforeRevisit.thumbnailDraws, 'cached revisit never redraws thumbnails');
+      assert.equal(revisited.currentPreviewReads, beforeRevisit.currentPreviewReads + 1, 'only selecting the current-work pane reads its live preview');
+      assert.equal(requests.length, requestCount, 'cached revisit starts no network requests');
+      await p.locator('#project-tab-import').evaluate(e => { for (let i = 0; i < 6; i++) e.click(); });
+      await p.waitForFunction(() => document.querySelector('#project-import-list').getAttribute('aria-busy') === 'false'); await waitFrame(p);
+      const imported = await p.evaluate(() => structuredClone(__qa.reads));
+      assert.ok(imported.queries > reads.queries); assert.ok(imported.catalogIds.slice(reads.catalogIds.length).every(id => !['qa-current', 'qa-normal-2'].includes(id)));
+      const settledQueries = imported.queries;
+      await p.locator('#project-tab-library').click(); await p.locator('#project-tab-import').click(); await waitFrame(p);
+      assert.equal(await p.evaluate(() => __qa.reads.queries), settledQueries, 'both successful tabs reuse their own cached data');
+      await p.locator('#project-close').click();
+      await p.evaluate(async () => { await __qa.raw.save(await __qa.make('qa-later', '後から追加された作品', null, 120), { expectedRevisionId: null }); });
+      const beforeOpen = await p.evaluate(() => __qa.reads.queries);
+      await openImport(p);
+      assert.ok(await p.evaluate(() => __qa.reads.queries) > beforeOpen, 'reopening revalidates only the selected gallery');
+      await p.locator('#project-import-search').fill('後から追加された作品'); await waitFrame(p);
+      assert.equal(await p.locator('#project-import-list [data-project-id="qa-later"]').count(), 1);
+      report.checks.push({ lazyFirstCurrent: 'PASS', libraryQueries: beforeRevisit.queries, importQueries: imported.queries - beforeRevisit.queries, hiddenImportReads: 0, repeatRequests: 0 });
+    } else {
+      assert.equal(reads.currentPreviewReads, 0, 'hidden current-work preview stays lazy');
+      assert.ok(reads.queries > 0); assert.ok(reads.catalogIds.every(id => !['qa-current', 'qa-normal-2'].includes(id)), JSON.stringify(reads));
+      assert.equal(await p.locator('#project-library-pane canvas').count(), 0, 'imports-first never draws the saved gallery');
+      report.checks.push({ lazyFirstImport: 'PASS', hiddenSavedReads: 0, importQueries: reads.queries });
+    }
+    await context.close();
   }
   const context = await browser.newContext(); await context.route('**/*', r => new URL(r.request().url()).origin === base ? r.continue() : r.abort());
   const p = await context.newPage(); await p.goto(base + '/__qa'); await seed(p, true); await openImport(p);

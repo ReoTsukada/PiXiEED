@@ -1,5 +1,5 @@
 import { encodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { cloneAsToolProject } from './tool-project-store.mjs?rev=20261107-gallery-1';
+import { cloneAsToolProject } from './tool-project-store.mjs?rev=20261109-lazy-gallery-1';
 import { componentImageRole, replaceProjectComponentImage } from './project-components.mjs?rev=20261016-tool-shell-1';
 import { putPxdSharedImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';

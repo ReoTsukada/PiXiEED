@@ -1,4 +1,4 @@
-import { createToolProjectStore } from './tool-project-store.mjs?rev=20261107-gallery-1';
+import { createToolProjectStore } from './tool-project-store.mjs?rev=20261109-lazy-gallery-1';
 import { mountProjectGallery } from './project-gallery.mjs?rev=20261109-import-preview-gallery-1';
 import { mountProjectGalleryAdSeries } from '../ads/project-manager-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
 import { projectGalleryAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-gallery-canvas-viewport-1';

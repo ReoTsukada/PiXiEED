@@ -3,7 +3,7 @@ import { decodePxd, encodePxd } from './pxd-codec.mjs';
 import { sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
 
 const DATABASE_NAME = 'pixieed-pxd-v1';
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const STORE_NAME = 'projects';
 const CATALOG_NAME = 'project-catalog';
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
@@ -38,8 +38,19 @@ function catalogRecord(row) {
   const latest = row?.history?.at(-1);
   if (!latest) return null;
   return { projectId: row.projectId, revisionId: latest.revisionId,
-    updatedAt: latest.updatedAt ?? null, summary: latest.summary ?? null,
+    updatedAt: latest.updatedAt ?? null, summary: latest.summary ?? null, galleryOwner: summaryOwner(latest.summary),
     ...(Number.isFinite(row.deletedAt) ? { deletedAt: row.deletedAt } : {}) };
+}
+
+// Display routing only; mutations still validate original PXD bytes.
+function summaryOwner(summary) {
+  if (!summary || !Object.hasOwn(summary, 'toolProject')) return 'unknown';
+  const stamp = summary.toolProject;
+  return stamp?.schemaVersion === 1 && typeof stamp.tool === 'string' ? `tool:${stamp.tool}` : 'unowned';
+}
+function matchesScope(owner, { tool, source } = {}) {
+  if (!tool || !['owned', 'imports'].includes(source) || owner === 'unknown') return true;
+  return source === 'owned' ? owner === `tool:${tool}` : owner !== `tool:${tool}`;
 }
 
 function assertPurgeItems(items) {
@@ -92,10 +103,10 @@ export function createMemoryPxdAdapter({ failWrites = false } = {}) {
       if (revisionId === undefined) return copyRecord(row.history.at(-1));
       return copyRecord(row.history.find((record) => record.revisionId === revisionId));
     },
-    async listCatalog() {
+    async listCatalog(scope = {}) {
       return [...rows.entries()].flatMap(([projectId, row]) => {
         const item = catalogRecord({ ...row, projectId });
-        return item ? [structuredClone(item)] : [];
+        return item && matchesScope(item.galleryOwner, scope) ? [structuredClone(item)] : [];
       });
     },
     async readLatest(projectId) {
@@ -151,6 +162,7 @@ function openDatabase(indexedDB = globalThis.indexedDB) {
       if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME, { keyPath: 'projectId' });
       if (!database.objectStoreNames.contains(CATALOG_NAME)) {
         const catalog = database.createObjectStore(CATALOG_NAME, { keyPath: 'projectId' });
+        catalog.createIndex('gallery-owner', 'galleryOwner');
         // One cursor pass on upgrade, in the same atomic versionchange transaction.
         // Originals (including deleted works and every historical revision) stay intact.
         const cursor = request.transaction.objectStore(STORE_NAME).openCursor();
@@ -161,6 +173,19 @@ function openDatabase(indexedDB = globalThis.indexedDB) {
           if (metadata) catalog.put(metadata);
           current.continue();
         };
+      } else {
+        const catalog = request.transaction.objectStore(CATALOG_NAME);
+        if (!catalog.indexNames.contains('gallery-owner')) {
+          catalog.createIndex('gallery-owner', 'galleryOwner');
+          // One v2 display-metadata pass; never reads original bytes or decodes images.
+          const cursor = catalog.openCursor();
+          cursor.onsuccess = () => {
+            const current = cursor.result;
+            if (!current) return;
+            catalog.put({ ...current.value, galleryOwner: summaryOwner(current.value.summary) });
+            current.continue();
+          };
+        }
       }
     };
     request.onerror = () => reject(new PxdStoreError('PXD_IDB_OPEN_FAILED'));
@@ -217,14 +242,51 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
         transaction.onabort = () => reject(new PxdStoreError('PXD_IDB_READ_FAILED'));
       });
     },
-    async listCatalog() {
+    async listCatalog(scope = {}) {
       const database = await db();
       return new Promise((resolve, reject) => {
         const transaction = database.transaction(CATALOG_NAME, 'readonly');
-        const request = transaction.objectStore(CATALOG_NAME).getAll(); let result = [];
-        request.onsuccess = () => { result = request.result ?? []; };
+        const catalog = transaction.objectStore(CATALOG_NAME); let result = [];
+        if (scope.tool && ['owned', 'imports'].includes(scope.source)) {
+          // Batch keys rather than one cursor event per hidden work. No hidden
+          // summaries/thumbnails cross the IndexedDB boundary.
+          const index = catalog.index('gallery-owner');
+          const requests = [catalog.getAllKeys(), index.getAllKeys(),
+            index.getAllKeys(`tool:${scope.tool}`), index.getAllKeys('unknown')];
+          let pending = requests.length;
+          for (const request of requests) request.onsuccess = () => {
+            if (--pending) return;
+            const [allIds, indexedIds, ownedIds, unknownIds] = requests.map(item => item.result);
+            const indexed = new Set(indexedIds); const owned = new Set(ownedIds);
+            const selected = scope.source === 'owned'
+              ? new Set([...ownedIds, ...unknownIds])
+              : new Set(indexedIds.filter(id => !owned.has(id)));
+            // Missing/corrupt routing metadata must not silently hide a work.
+            for (const id of allIds) if (!indexed.has(id)) selected.add(id);
+            for (const id of selected) {
+              const read = catalog.get(id);
+              read.onsuccess = () => { if (read.result) result.push(read.result); };
+            }
+          };
+        } else {
+          const request = catalog.getAll();
+          request.onsuccess = () => { result = request.result ?? []; };
+        }
         transaction.oncomplete = () => resolve(result);
         transaction.onabort = () => reject(new PxdStoreError('PXD_IDB_READ_FAILED'));
+      });
+    },
+    async cacheOwner(projectId, revisionId, galleryOwner) {
+      const database = await db();
+      return new Promise((resolve, reject) => {
+        const transaction = database.transaction(CATALOG_NAME, 'readwrite');
+        const catalog = transaction.objectStore(CATALOG_NAME); const request = catalog.get(projectId);
+        request.onsuccess = () => {
+          const row = request.result;
+          if (row?.revisionId === revisionId) catalog.put({ ...row, galleryOwner });
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(new PxdStoreError('PXD_IDB_WRITE_FAILED'));
       });
     },
     async cacheSummary(projectId, revisionId, summary) {
@@ -235,7 +297,7 @@ function createIndexedDbAdapter(indexedDB = globalThis.indexedDB) {
         request.onsuccess = () => {
           const row = request.result;
           // A save/delete from another tab wins over this delayed legacy decode.
-          if (row?.revisionId === revisionId) catalog.put({ ...row, summary });
+          if (row?.revisionId === revisionId) catalog.put({ ...row, summary, galleryOwner: summaryOwner(summary) });
         };
         transaction.oncomplete = () => resolve();
         transaction.onabort = () => reject(new PxdStoreError('PXD_IDB_WRITE_FAILED'));
@@ -413,10 +475,10 @@ export function createPxdStore({ adapter, idFactory = randomRevisionId } = {}) {
       await persistence.setDeleted(projectId, expectedRevisionId, null, restoreRecord);
       return { projectId, revisionId };
     },
-    async listProjects({ includeDeleted = false } = {}) {
+    async listProjects({ includeDeleted = false, tool, source } = {}) {
       if (typeof persistence.listLatest !== 'function' && typeof persistence.listCatalog !== 'function') throw new PxdStoreError('PXD_STORE_LIST_UNAVAILABLE');
       const metadataOnly = typeof persistence.listCatalog === 'function';
-      const records = metadataOnly ? await persistence.listCatalog() : await persistence.listLatest();
+      const records = metadataOnly ? await persistence.listCatalog({ tool, source, includeDeleted }) : await persistence.listLatest();
       if (!Array.isArray(records)) throw new PxdStoreError('PXD_STORE_LIST_INVALID');
       const projects = []; const errors = [];
       for (const record of records) {
@@ -429,11 +491,17 @@ export function createPxdStore({ adapter, idFactory = randomRevisionId } = {}) {
           assertProjectId(record.revisionId);
           if (!includeDeleted && Number.isFinite(record.deletedAt)) continue;
           let summary = record.summary;
-          if (!metadataOnly || !validSummary(summary) || !Object.hasOwn(summary, 'toolProject')) {
+          let owner = record.galleryOwner ?? summaryOwner(summary);
+          if (!matchesScope(owner, { tool, source })) continue;
+          if (!metadataOnly || !validSummary(summary) || !Object.hasOwn(summary, 'toolProject') || owner === 'unknown') {
             const full = metadataOnly ? await persistence.readLatest(projectId) : record;
             if (!full || full.revisionId !== record.revisionId) continue; // changed while listing; next refresh picks it up
             const project = await decodePxd(full.bytes);
             if (project.projectId !== projectId || project.revisionId !== record.revisionId) throw new PxdStoreError('PXD_STORE_RECORD_INVALID');
+            owner = summaryOwner({ toolProject: project.manifest?.toolProject ?? null });
+            if (metadataOnly && typeof persistence.cacheOwner === 'function') await persistence.cacheOwner(projectId, record.revisionId, owner).catch(() => {});
+            // Classify legacy ownership before decoding hidden-gallery thumbnails.
+            if (!matchesScope(owner, { tool, source })) continue;
             summary = await summarizeProject(project);
             // Cache failure must not hide an otherwise readable work (e.g. disk full).
             if (metadataOnly && typeof persistence.cacheSummary === 'function') await persistence.cacheSummary(projectId, record.revisionId, summary).catch(() => {});

@@ -95,7 +95,7 @@ try {
     return { blocked, version: db.version, listed: list.projects.length, errors: list.errors, before, afterMigration, catalogHasBytes: catalog.some((r) => "bytes" in r || "history" in r), missingSummaryRepaired: catalog.find((r) => r.projectId === "qa-3")?.summary?.name };
   });
   assert.equal(result.blocked, "PXD_IDB_BLOCKED");
-  assert.equal(result.version, 2);
+  assert.equal(result.version, 3);
   assert.equal(result.listed, 4);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.before, result.afterMigration);
@@ -207,6 +207,82 @@ try {
   assert.equal(rollback.listed, 4);
   results.push("synthetic catalog migration write failure rolls back schema to v1 and preserves exact history bytes; same-store retry succeeds");
   await migrationContext.close();
+  const scopeContext = await browser.newContext();
+  const scopePage = await scopeContext.newPage();
+  await scopePage.goto(base + '/__qa');
+  const scoped = await scopePage.evaluate(async () => {
+    const { createPxdProject, encodePxd } = await import('/js/creation/pxd-codec.mjs');
+    const { summarizeProject } = await import('/js/creation/project-catalog.mjs');
+    const seed = [];
+    for (const [id, tool, legacy] of [['own', 'draw', false], ['foreign', 'audio', false], ['untagged', null, false], ['legacy', 'audio', true], ['deleted', 'draw', false]]) {
+      const project = createPxdProject({ projectId: id, revisionId: `${id}-r1`, manifest: tool ? { toolProject: { tool, schemaVersion: 1 } } : {} });
+      seed.push({ projectId: id, history: [{ projectId: id, revisionId: project.revisionId, bytes: await encodePxd(project), ...legacy ? {} : { summary: await summarizeProject(project) } }], ...id === 'deleted' ? { deletedAt: 10 } : {} });
+    }
+    let db = await new Promise((resolve, reject) => {
+      const r = indexedDB.open('pixieed-pxd-v1', 2);
+      r.onupgradeneeded = () => { r.result.createObjectStore('projects', { keyPath: 'projectId' }); r.result.createObjectStore('project-catalog', { keyPath: 'projectId' }); };
+      r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(['projects', 'project-catalog'], 'readwrite');
+      for (const row of seed) {
+        tx.objectStore('projects').put(row);
+        tx.objectStore('project-catalog').put({ projectId: row.projectId, revisionId: row.history[0].revisionId, summary: row.history[0].summary ?? null, ...row.deletedAt ? { deletedAt: row.deletedAt } : {} });
+      }
+      tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+    const { createPxdStore } = await import('/js/creation/pxd-store.mjs');
+    const store = createPxdStore();
+    const calls = [];
+    const get = IDBObjectStore.prototype.get, getAll = IDBObjectStore.prototype.getAll;
+    const keyCursor = IDBIndex.prototype.openKeyCursor;
+    const indexKeys = IDBIndex.prototype.getAllKeys;
+    IDBIndex.prototype.openKeyCursor = function() { throw Error('Scoped queries must batch keys, not walk hidden works'); };
+    IDBIndex.prototype.getAllKeys = function(...args) { calls.push(['gallery-owner', 'getAllKeys', args[0] ?? null]); return indexKeys.apply(this, args); };
+    IDBObjectStore.prototype.get = function(id) { calls.push([this.name, 'get', id]); return get.call(this, id); };
+    IDBObjectStore.prototype.getAll = function(...args) { calls.push([this.name, 'getAll']); return getAll.apply(this, args); };
+    let initial, again, imports, failure, retry;
+    try {
+      initial = await store.listProjects({ tool: 'draw', source: 'owned' });
+      const initialReads = calls.splice(0);
+      again = await store.listProjects({ tool: 'draw', source: 'owned' });
+      const againReads = calls.splice(0);
+      imports = await store.listProjects({ tool: 'draw', source: 'imports' });
+      const importReads = calls.splice(0);
+      const originalKeys = IDBIndex.prototype.getAllKeys;
+      IDBIndex.prototype.getAllKeys = function() { throw new DOMException('synthetic read failure', 'UnknownError'); };
+      try { await store.listProjects({ tool: 'draw', source: 'owned' }); } catch (e) { failure = e.name; }
+      finally { IDBIndex.prototype.getAllKeys = originalKeys; }
+      retry = await store.listProjects({ tool: 'draw', source: 'owned', includeDeleted: true });
+      db = await new Promise((resolve) => { const r = indexedDB.open('pixieed-pxd-v1'); r.onsuccess = () => resolve(r.result); });
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('project-catalog', 'readwrite');
+        const catalog = tx.objectStore('project-catalog'); const r = catalog.get('own');
+        r.onsuccess = () => { const row = r.result; delete row.galleryOwner; catalog.put(row); };
+        tx.oncomplete = resolve; tx.onabort = () => reject(tx.error);
+      });
+      const missingOwner = await store.listProjects({ tool: 'draw', source: 'owned' });
+      const after = await new Promise(resolve => { const r = db.transaction('projects').objectStore('projects').getAll(); r.onsuccess = () => resolve(r.result); });
+      const catalog = await new Promise(resolve => { const r = db.transaction('project-catalog').objectStore('project-catalog').getAll(); r.onsuccess = () => resolve(r.result); });
+      db.close();
+      return { missingOwner: missingOwner.projects.map(x => x.projectId), initial: initial.projects.map(x => x.projectId), again: again.projects.map(x => x.projectId), imports: imports.projects.map(x => x.projectId).sort(), retry: retry.projects.map(x => x.projectId).sort(), initialReads, againReads, importReads, failure, preserved: JSON.stringify(after.sort((a,b) => a.projectId.localeCompare(b.projectId))) === JSON.stringify(seed.sort((a,b) => a.projectId.localeCompare(b.projectId))), owners: catalog.map(x => [x.projectId, x.galleryOwner]) };
+    } finally { IDBObjectStore.prototype.get = get; IDBObjectStore.prototype.getAll = getAll; IDBIndex.prototype.openKeyCursor = keyCursor; IDBIndex.prototype.getAllKeys = indexKeys; }
+  });
+  assert.deepEqual(scoped.initial, ['own']);
+  assert.deepEqual(scoped.missingOwner, ['own']);
+  assert.deepEqual(scoped.again, ['own']);
+  assert.equal(scoped.againReads.filter(x => x[0] === 'gallery-owner' && x[1] === 'getAllKeys').length, 3);
+  assert.deepEqual(scoped.imports, ['foreign', 'legacy', 'untagged']);
+  assert.deepEqual(scoped.retry, ['deleted', 'own']);
+  assert.equal(scoped.failure, 'UnknownError');
+  assert.equal(scoped.preserved, true);
+  assert.equal(scoped.initialReads.some(x => x[2] === 'foreign' || x[2] === 'untagged' || x[1] === 'getAll'), false);
+  assert.deepEqual(scoped.initialReads.filter(x => x[0] === 'projects').map(x => x[2]), ['legacy']);
+  assert.equal(scoped.againReads.some(x => x[0] === 'projects' || x[2] === 'legacy' || x[2] === 'foreign' || x[2] === 'untagged'), false);
+  assert.equal(scoped.importReads.some(x => x[2] === 'own' || x[2] === 'deleted' || x[1] === 'getAll'), false);
+  results.push('v2 ownership migration preserves all bytes/history; owned/import queries read only selected catalog thumbnails; unknown legacy classified once without hidden summary generation; deleted scope and failed-query retry succeed');
+  await scopeContext.close();
   console.log(results);
   await writeFile(out + "/store-qa.json", JSON.stringify({ passed: true, browser: browser.version(), results }, null, 2));
 } finally {

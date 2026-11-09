@@ -1,8 +1,9 @@
+import { createLazyGalleryData } from './project-gallery-data.mjs?rev=20261109-lazy-gallery-1';
 import { routeEditorFile } from './output-router.mjs?rev=20261028-unified-output-1';
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
-import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261107-gallery-1';
-import { importToolProject } from './tool-project-import.mjs?rev=20261107-gallery-1';
+import { createToolProjectStore, cloneAsToolProject } from './tool-project-store.mjs?rev=20261109-lazy-gallery-1';
+import { importToolProject } from './tool-project-import.mjs?rev=20261109-lazy-gallery-1';
 import { createProjectSession } from './project-session.mjs?rev=20261016-color-capability-1';
 import { forkProject, sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
 import { pxdToolUrl, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
@@ -54,7 +55,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   function setModeTransitionActive(value) { modeTransitionActive = Boolean(value); syncInputLock(); }
   let importFileEpoch = 0; let importReading = false; let importSources = []; let stagedImport = null; let selectedImport = null;
-  let listEpoch = 0; let importEpoch = 0; let listLoaded = false; let modeSwitching = false; let ready;
+  let listLoaded = false; let modeSwitching = false; let ready;
   let activeCanvas = null;
   let managerAd = null, managerAdPrepared = false, managerAdFrame = 0, managerArtworkCount = 0;
   const managerAdState = { settled: false, enoughArtwork: false, libraryVisible: false, searching: false, selecting: false,
@@ -170,7 +171,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const importCount = node('p', 'project-library-count'); importCount.setAttribute('role', 'status');
   const importListStatus = node('p', 'project-sheet__status'); importListStatus.setAttribute('role', 'status');
   const importEmpty = node('p', 'project-list__empty');
-  const importRetry = button('もう一度読み込む', 'project-import-retry', () => void refreshImports()); importRetry.hidden = true;
+  const importRetry = button('もう一度読み込む', 'project-import-retry', () => void refreshImports({ force: true })); importRetry.hidden = true;
   const importList = node('div', 'project-list'); importList.id = 'project-import-list'; importList.setAttribute('aria-label', '取り込める作品');
   const importPreview = node('section', 'project-import-preview'); importPreview.hidden = true; importPreview.setAttribute('aria-labelledby', 'project-import-preview-title');
   const importPreviewCanvas = node('canvas'); importPreviewCanvas.setAttribute('aria-hidden', 'true');
@@ -209,7 +210,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       event.preventDefault(); const index = panes.findIndex(([key]) => key === name);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? panes.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + panes.length) % panes.length;
       const [target, targetTab] = panes[next]; selectPane(target); targetTab.focus();
-      if (target === 'library' && !listLoaded) void refreshList();
+      if (target === 'library') void refreshList();
       if (target === 'import') void refreshImports();
     });
   }
@@ -251,7 +252,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const deleteSelected = button('削除', 'project-delete-selected', () => void deleteProjects(gallery.selection));
   selectionActions.append(deleteSelected);
   const help = node('p', 'project-gallery-help', 'タップで開く · 長押しで複数選択');
-  const retryList = button('もう一度読み込む', 'project-list-retry', () => void refreshList()); retryList.hidden = true;
+  const retryList = button('もう一度読み込む', 'project-list-retry', () => void refreshList({ force: true })); retryList.hidden = true;
   const gallery = mountProjectGallery({ list, scroller: dialog, onOpen: openSavedProject,
     onContext: (item, card) => { retireManagerAd('context-menu'); showCardActions(item, card, () => openSavedProject(item)); },
     isLocked: () => locked, currentId: () => session.currentProject?.projectId,
@@ -278,6 +279,40 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       importEmpty.textContent = total ? 'この名前の作品は見つかりません。' : '以前の作品はまだありません。PXDバックアップは上のボタンから選べます。';
     }
   });
+  const libraryData = createLazyGalleryData({
+    load: () => store.listProjects(), isVisible: () => dialog.open && !libraryPane.hidden,
+    onBusy(value) {
+      managerAdState.settled = !value; list.setAttribute('aria-busy', String(value));
+      if (value) { retryList.hidden = true; if (!listLoaded) { count.hidden = false; count.textContent = '作品を読み込んでいます…'; } }
+      managerAd?.update();
+      if (!value && !managerAdState.hasErrors && managerAdState.enoughArtwork) prepareManagerAd();
+    },
+    onData({ projects, errors }) {
+      if (listError && message.textContent === listError) say(operationError || '');
+      listError = '';
+      managerArtworkCount = projects.length; managerAdState.enoughArtwork = hasManagerArtwork(projects, projectManagerAdConfig.minimumArtwork);
+      managerAdState.hasErrors = errors.length > 0 || failed || Boolean(operationError) || Boolean(initialRestoreError);
+      listLoaded = true; list.querySelector('.project-list__empty')?.remove(); gallery.setItems(projects);
+      if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
+      retryList.hidden = errors.length === 0;
+      if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
+    },
+    onError(error) {
+      managerAdState.hasErrors = true; managerAdState.enoughArtwork = false;
+      listError = `作品一覧を読み出せませんでした。保存内容は変更していません。${error.message || ''}`;
+      retryList.hidden = false; say(listError);
+    }
+  });
+  const importData = createLazyGalleryData({
+    load: () => store.listImportSources(), isVisible: () => dialog.open && !importSection.hidden,
+    onBusy(value) { importList.setAttribute('aria-busy', String(value)); if (value) importRetry.hidden = true; },
+    onData({ projects, errors }) {
+      importSources = projects; renderImportItems(); importListStatus.textContent = ''; importRetry.hidden = errors.length === 0;
+      if (selectedImport && selectedImport !== stagedImport && !projects.some(item => item.projectId === selectedImport.projectId && item.revisionId === selectedImport.revisionId)) selectImport(null);
+      if (errors.length) importListStatus.textContent = `${errors.length}件を読み出せませんでした。ほかの作品は取り込めます。`;
+    },
+    onError() { importListStatus.textContent = '取り込み用の作品を読み出せませんでした。元の作品は変更していません。'; importRetry.hidden = false; }
+  });
   search.addEventListener('input', () => { gallery.filter(search.value); dialog.scrollTop = 0; });
   importSearch.addEventListener('input', () => { importGallery.filter(importSearch.value); dialog.scrollTop = 0; });
   function selectPane(name) {
@@ -289,6 +324,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     managerAdState.libraryVisible = name === 'library'; managerAdState.importing = name === 'import';
     message.textContent = operationError || ''; // Do not carry old success messages into another pane.
     dialog.scrollTop = 0; gallery.refresh(); importGallery.refresh();
+    if (initialized) update();
   }
   const header = node('div', 'project-sheet__header'); header.append(heading, toolbar);
   currentCard.append(identity, resumeButton, renameDetails);
@@ -322,7 +358,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     });
   }
   dialog.addEventListener('cancel', (event) => { if (locked || gallery.selecting) { event.preventDefault(); if (!locked) gallery.setSelection(false); } });
-  dialog.addEventListener('close', () => { closeManagerAd(); gallery.setSelection(false); ++listEpoch; ++importEpoch; ++importFileEpoch; importReading = false; stagedImport = null; selectImport(null); renderImportItems(); importStatus.textContent = ''; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
+  dialog.addEventListener('close', () => { closeManagerAd(); gallery.setSelection(false); libraryData.invalidate(); importData.invalidate(); ++importFileEpoch; importReading = false; stagedImport = null; selectImport(null); renderImportItems(); importStatus.textContent = ''; if (initialSelectionPending && !locked) { initialSelectionPending = false; update(); } });
   dialog.addEventListener('click', (event) => { if (event.target === dialog && !locked) { const box = dialog.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close(); } });
   const session = createProjectSession({ store,
     async capture(base) {
@@ -380,7 +416,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     identityName.textContent = name;
     let previewSize = activeCanvas;
     // Preview failure must not interrupt a save, restore, or input unlock.
-    if (dialog.open) try { previewSize = refreshCurrentPreview() || activeCanvas; }
+    if (dialog.open && !currentPane.hidden) try { previewSize = refreshCurrentPreview() || activeCanvas; }
     catch { previewCanvas.hidden = true; previewFallback.removeAttribute('hidden'); }
     const dimensions = previewSize?.width && previewSize?.height ? `${previewSize.width} × ${previewSize.height}px` : '';
     identityMeta.textContent = [state, dimensions].filter(Boolean).join(' · ');
@@ -407,7 +443,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       if (initialRestoreError) throw new Error(initialRestoreError);
       const project = await session.save();
       if (project.projectId !== session.currentProject?.projectId) throw new Error('保存中に作品が切り替わりました。今の作品の保存先は変更していません。');
-      failed = false; remember(project); update(); return project;
+      libraryData.invalidate(); failed = false; remember(project); update(); return project;
     }
     catch (error) { failed = true; operationError = error.message || '保存できませんでした。編集内容は残っています。'; say(operationError); update(); throw error; }
   }
@@ -457,27 +493,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
           say(keptCopy ? 'このタブの編集は別の作品に保存し、選んだ作品を開きました。' : '作品を開きました。');
     }, { close: false });
   }
-  async function refreshList() {
-    const version = ++listEpoch;
-    managerAdState.settled = false; managerAd?.update();
-    retryList.hidden = true; list.setAttribute('aria-busy', 'true');
-    if (!listLoaded) { count.hidden = false; count.textContent = '作品を読み込んでいます…'; }
-    try {
-      const { projects, errors } = await store.listProjects(); if (version !== listEpoch) return;
-      if (listError && message.textContent === listError) say(operationError || '');
-      listError = '';
-      managerArtworkCount = projects.length; managerAdState.enoughArtwork = hasManagerArtwork(projects, projectManagerAdConfig.minimumArtwork);
-      managerAdState.hasErrors = errors.length > 0 || failed || Boolean(operationError) || Boolean(initialRestoreError);
-      listLoaded = true; list.querySelector('.project-list__empty')?.remove(); gallery.setItems(projects);
-      if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
-      if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
-    } catch (error) {
-      if (version !== listEpoch) return;
-      managerAdState.hasErrors = true; managerAdState.enoughArtwork = false;
-      listError = `作品一覧を読み出せませんでした。保存内容は変更していません。${error.message || ''}`;
-      retryList.hidden = false; say(listError);
-    } finally { if (version === listEpoch) { list.setAttribute('aria-busy', 'false'); managerAdState.settled = true; if (!managerAdState.hasErrors && managerAdState.enoughArtwork) prepareManagerAd(); } }
-  }
+  function refreshList(options) { return libraryData.ensure(options); }
   async function importCopy(source) {
     if (!initialRestoreError && (session.persisted || editedSinceOpen)) await save();
     const project = await importToolProject(source, tool);
@@ -503,19 +519,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     importGallery.refresh();
   }
   function renderImportItems() { importGallery.setItems(stagedImport ? [stagedImport, ...importSources] : importSources); }
-  async function refreshImports() {
-    const version = ++importEpoch;
-    importList.setAttribute('aria-busy', 'true'); importRetry.hidden = true;
-    try {
-      const { projects, errors } = await store.listImportSources(); if (version !== importEpoch) return;
-      importSources = projects; renderImportItems(); importListStatus.textContent = '';
-      if (selectedImport && selectedImport !== stagedImport && !projects.some(item => item.projectId === selectedImport.projectId && item.revisionId === selectedImport.revisionId)) selectImport(null);
-      if (errors.length) { importListStatus.textContent = `${errors.length}件を読み出せませんでした。ほかの作品は取り込めます。`; importRetry.hidden = false; }
-    } catch (error) {
-      if (version !== importEpoch) return;
-      importListStatus.textContent = '取り込み用の作品を読み出せませんでした。元の作品は変更していません。'; importRetry.hidden = false;
-    } finally { if (version === importEpoch) importList.setAttribute('aria-busy', 'false'); }
-  }
+  function refreshImports(options) { return importData.ensure(options); }
   async function confirmDelete(items) {
     const confirmation = node('dialog', 'project-delete-dialog'); confirmation.setAttribute('aria-labelledby', 'project-delete-title');
     const heading = node('h2', '', `${items.length}件の作品を完全に削除しますか？`); heading.id = 'project-delete-title';
@@ -591,7 +595,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       for (const key of [rememberKey || `pixieed:pxd:last:${tool}`, ...(rememberShared ? ['pixieed:pxd:last:creation'] : [])]) {
         try { if (deletedIds.has(JSON.parse(localStorage.getItem(key) || 'null')?.projectId)) localStorage.removeItem(key); } catch {}
       }
-      gallery.setSelection(false); await refreshList(); say(`${items.length}件の作品を完全に削除しました。`);
+      gallery.setSelection(false); libraryData.invalidate(); await refreshList(); say(`${items.length}件の作品を完全に削除しました。`);
     }, { close: false });
   }
   async function showProjects({ pane, focusTransfer = false } = {}) {
@@ -746,7 +750,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     return switching;
   }
   return Object.freeze({ get ready() { return ready; }, save, markDirty, showProjects, openRecovery, setModeAdapter, setModeTransitionActive, syncInputLock, activate: update,
-    dispose() { closeManagerAd(); transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); gallery.dispose(); importGallery.dispose(); ++listEpoch; ++importEpoch; ++importFileEpoch; stagedImport = selectedImport = null; importSources = []; dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
+    dispose() { closeManagerAd(); transientNavigation = true; clearTimeout(timer); timer = 0; lifecycle.abort(); observer.disconnect(); gallery.dispose(); importGallery.dispose(); libraryData.dispose(); importData.dispose(); ++importFileEpoch; stagedImport = selectedImport = null; importSources = []; dialog.close(); dialog.remove(); (bar.closest('.px-tool-header-slot') || bar).remove(); if (ownsCss) css?.remove(); },
     async importProject(project) { await ready; await transact(() => importCopy(project)); },
     async beforeReplace(work) { await ready; await transact(async () => { await save(); await work(); }); markDirty(); }, reset() { clearTimeout(timer); session.reset(); resetPointer(); update(); },
     async pauseForNavigation() {
