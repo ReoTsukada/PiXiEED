@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Static/JS Draw guidance and real PNG/GIF output, using only isolated local data. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -99,7 +100,7 @@ try {
     try {
       const page = await ctx.newPage(), errors = []; page.setDefaultTimeout(15000); page.on('pageerror', error => errors.push(error.message));
       await page.goto(base + '/draw/'); await page.locator('[data-embed-start]').click(); await ready(page);
-      await page.locator('#pxd-file-input').setInputFiles(fixture);
+      await importProjectFile(page, fixture);
       await page.waitForFunction(() => window.__PIXIEED_CREATION_HOST__?.runtime?.draw.getTimeline().width === 16 && window.__PIXIEED_CREATION_HOST__.runtime.draw.getTimeline().frames.length === 2 && !document.querySelector('#main').inert);
       if (await page.locator('#pxd-panel').evaluate(n => n.open)) await page.locator('#project-close').click();
       const before = await pixels(page), beforeState = await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.getState());

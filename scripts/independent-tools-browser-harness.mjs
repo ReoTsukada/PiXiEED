@@ -28,8 +28,10 @@ try {
     assert.equal(await audio.locator('.project-mode-picker, #audio-animation-sync').count(), 0);
     await audio.locator('#project-open').click(); await audio.locator('#project-tab-library').click();
     assert.equal(await audio.locator('.project-list__row').count(), 0);
-    await audio.locator('.project-imports > summary').click();
-    await audio.locator(`#project-import-${sourceId}`).click();
+    await audio.locator('#project-tab-import').click();
+    await audio.locator(`#project-import-list [data-project-id="${sourceId}"]`).click();
+    await audio.waitForFunction(() => document.querySelector('#project-import-copy')?.disabled === false);
+    await audio.locator('#project-import-copy').click();
     await audio.waitForFunction(() => !document.querySelector('#main').inert && !document.querySelector('#pxd-panel').open);
     await audio.waitForFunction((sourceId) => { const id = new URLSearchParams(location.search).get('pxd'); return id && id !== sourceId; }, sourceId);
     const audioId = new URL(audio.url()).searchParams.get('pxd');

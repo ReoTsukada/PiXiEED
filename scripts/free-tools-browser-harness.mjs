@@ -59,8 +59,10 @@ try {
     await page.waitForFunction(() => document.querySelector('#draw-status')?.textContent.includes('保存しました'));
     await page.goto(base + '/audio/', { waitUntil: 'domcontentloaded' });
     await page.locator('#project-open').click();
-    await page.locator('.project-imports > summary').click();
-    await page.locator('#project-import-list .project-card').first().click();
+    await page.locator('#project-tab-import').click();
+    await page.locator('#project-import-list .project-gallery__tile').first().click();
+    await page.waitForFunction(() => document.querySelector('#project-import-copy')?.disabled === false);
+    await page.locator('#project-import-copy').click();
     await page.waitForFunction(() => document.querySelector('#audio-pixel-canvas')?.width === 256);
     await page.locator('#audio-current').click();
     await page.locator('#audio-color-editor-panel [data-dce-view="sound"]').click();

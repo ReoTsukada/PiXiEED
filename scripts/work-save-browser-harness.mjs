@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Local ownership fixtures only; no requests reach live accounts or storage. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { supabaseConfig } from '../data/site-config.js';
@@ -67,7 +68,7 @@ async function panel(page) {
 }
 async function importFile(page, path, bytes) {
   await page.goto(`${base}${path}`, { waitUntil: 'domcontentloaded' });
-  await page.locator('#pxd-file-input').setInputFiles({ name: 'fixture.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(bytes) });
+  await importProjectFile(page, { name: 'fixture.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(bytes) });
 }
 function pass(name) { checks += 1; console.log(`PASS ${engine} ${name}`); }
 try {

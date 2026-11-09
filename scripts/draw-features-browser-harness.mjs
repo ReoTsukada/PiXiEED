@@ -1,5 +1,6 @@
 /** Browser evidence for the Draw selection, color adjustment, and text feature slice. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { addAnimationFrame, addAnimationLayer, createAnimation, getAnimationCelDocument, writeAnimationCel } from '../js/creation/animation-core.mjs';
@@ -114,7 +115,7 @@ try {
       await page.goto(`${base}/draw/`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.documentElement.dataset.drawReady === 'true' && !document.querySelector('#main')?.inert);
       await page.locator('#project-open').click(); await page.locator('#project-tab-library').click();
-      await page.locator('#pxd-file-input').setInputFiles(`${output}/source.pxd`);
+      await importProjectFile(page, `${output}/source.pxd`);
       await page.waitForFunction(() => !document.querySelector('#main')?.inert && document.querySelectorAll('#draw-palette [data-color-index]').length === 3);
       if (await page.locator('#pxd-panel').evaluate(n => n.open)) await page.locator('#project-close').click();
       await page.locator('.draw-feature-actions [data-selection-action="deselect"]').click();
@@ -147,7 +148,7 @@ try {
       assert.ok(actionBoxes.every(r => r.width >= 44 && r.height >= 44 && r.x >= 0 && r.y >= 0 && r.right <= viewport.width && r.bottom <= viewport.height), JSON.stringify(actionBoxes));
       await confirm.click(); assert.equal(await mask(), null);
       await page.locator('#project-open').click(); await page.locator('#project-tab-library').click();
-      await page.locator('#pxd-file-input').setInputFiles(`${output}/empty.pxd`);
+      await importProjectFile(page, `${output}/empty.pxd`);
       await page.waitForFunction(() => !document.querySelector('#main')?.inert && document.querySelectorAll('#draw-palette [data-color-index]').length === 3);
       if (await page.locator('#pxd-panel').evaluate(n => n.open)) await page.locator('#project-close').click();
       await setMode('rectangle');

@@ -132,9 +132,12 @@ try {
       await page.locator('#project-close').click();
       await page.reload(); await chooseProject(page, savedProjectId); assert.deepEqual((await state(page)).image, unsaved.image);
       await page.locator('#creation-file-open').click();
-      await page.locator('#pxd-panel .project-imports > summary').click();
+      await page.locator('#project-tab-import').click();
+      assert.equal(await page.locator('#project-import-copy').isVisible(), false, 'no import is staged before choosing a PXD');
       const pending = page.waitForEvent('filechooser'); await page.locator('#pxd-open').click();
-      await (await pending).setFiles([]); await page.locator('#project-close').click();
+      await (await pending).setFiles([]);
+      assert.equal(await page.locator('#project-import-copy').isVisible(), false, 'cancelling a PXD picker does not stage or copy anything');
+      await page.locator('#project-close').click();
       assert.deepEqual((await state(page)).image, unsaved.image);
       assert.equal(await page.evaluate(() => localStorage.getItem('pixieedraw-autosave')), 'old-draw-sentinel');
       assert.deepEqual(errors, []);

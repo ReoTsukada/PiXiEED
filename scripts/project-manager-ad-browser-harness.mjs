@@ -141,7 +141,7 @@ try {
   await start(p);await open(p);await p.waitForTimeout(120);assert.deepEqual(await counters(p),{loaders:0,pushes:0});await p.locator('#project-close').click();
   await seed(p,1);const url=p.url();await open(p);await p.waitForTimeout(150);assert.deepEqual(await counters(p),{loaders:0,pushes:0});assert.equal(p.url(),url);assert.equal(await p.locator('[data-ad-after]').count(),0);
  });
- for(const control of ['#project-select','.project-imports > summary'])await check('retire-'+control.replace(/[^a-z]/g,''),{width:390,height:844},async p=>{
+ for(const control of ['#project-select','#project-tab-import'])await check('retire-'+control.replace(/[^a-z]/g,''),{width:390,height:844},async p=>{
   await setup(p,'manager',1);await reveal(p,'manager');await p.locator(control).click();assert.equal(await p.locator('.project-manager-ad__unit').count(),0);assert.deepEqual(await counters(p),{loaders:1,pushes:1});
  });
  await check('delayed-sdk-cancel',{width:390,height:844},async(p,c)=>{

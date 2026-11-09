@@ -53,7 +53,7 @@ function installStorageReadProbe(context) {
         const db = this.transaction?.db?.name || '';
         const store = this.name || '';
         if (db === 'pixieed-pxd-v1' && store === 'projects') window.__galleryProjectReads.push({ method, store, at: performance.now() });
-        if (db === 'pixieed-pxd-v1' && store === 'project-catalog' && method === 'getAll' && localStorage.getItem('__galleryFailCatalogOnce') === '1') {
+        if (db === 'pixieed-pxd-v1' && store === 'project-catalog' && ['getAll', 'getAllKeys'].includes(method) && localStorage.getItem('__galleryFailCatalogOnce') === '1') {
           localStorage.removeItem('__galleryFailCatalogOnce');
           throw new DOMException('Synthetic one-shot catalog read failure', 'UnknownError');
         }
@@ -316,7 +316,9 @@ async function runNewBuildRegressions() {
     await page.evaluate(() => localStorage.setItem('__galleryFailCatalogOnce', '1'));
     await page.goto(base + '/tools/start/draw/', { waitUntil: 'domcontentloaded' });
     await page.locator('#project-start-picker').waitFor({ state: 'visible' });
-    await (await waitSelector(page, '#project-start-retry')).click();
+    const catalogRetry = await waitSelector(page, '#project-start-retry');
+    assert.equal(await page.evaluate(() => localStorage.getItem('__galleryFailCatalogOnce')), null, 'the one-shot catalog read failure was exercised');
+    await catalogRetry.click();
     await waitSelector(page, `.project-gallery__tile[data-project-id="${env.saved.projectId}"]`);
     report.cases.push({ name: 'catalog-read-error-can-retry-without-losing-chooser', pass: true });
     await (await findLocator(page, `.project-gallery__tile[data-project-id="${env.saved.projectId}"]`)).click();

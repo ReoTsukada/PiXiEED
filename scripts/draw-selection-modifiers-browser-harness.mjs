@@ -1,5 +1,6 @@
 /** Browser regressions for selection modifiers and outside-pointer transactions. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createAnimation, writeAnimationCel } from '../js/creation/animation-core.mjs';
@@ -50,8 +51,8 @@ try {
     };
     const loadFixture = async () => {
       await page.locator('#project-open').click(); await page.locator('#project-tab-library').click();
-      const imports = page.locator('.project-imports'); if (!await imports.evaluate(n => n.open)) await imports.locator(':scope > summary').click();
-      await page.locator('#pxd-file-input').setInputFiles(`${output}/source.pxd`);
+      await page.locator('#project-tab-import').click();
+      await importProjectFile(page, `${output}/source.pxd`);
       await page.waitForFunction(() => !document.querySelector('#main')?.inert && document.querySelectorAll('#draw-palette [data-color-index]').length === 3);
       if (await page.locator('#pxd-panel').evaluate(n => n.open)) await page.locator('#project-close').click();
     };

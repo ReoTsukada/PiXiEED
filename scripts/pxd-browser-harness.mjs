@@ -5,7 +5,7 @@
  * fixtures. Run with PIXIEED_PLAYWRIGHT_MODULE and PIXIEED_PXD_ENGINE.
  */
 import assert from 'node:assert/strict';
-import { saveCurrentProject } from './lib/project-panel-browser.mjs';
+import { importProjectFile, saveCurrentProject } from './lib/project-panel-browser.mjs';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { createPxdProject, decodePxd, encodePxd, getPxdJson, setPxdBytes, setPxdJson } from '../js/creation/pxd-codec.mjs';
@@ -164,7 +164,7 @@ async function checkDrawCase(context, page, fixture) {
   await page.goto(`${origin}/draw/`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#draw-canvas');
   await page.locator('#pxd-file-input').waitFor({ state: 'attached', timeout: 12000 });
-  await page.locator('#pxd-file-input').setInputFiles({ name: 'browser-fixture.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.bytes) });
+  await importProjectFile(page, { name: 'browser-fixture.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.bytes) });
   await page.waitForFunction(() => document.querySelector('#pxd-file-status')?.textContent.includes('PXDの作品を開きました'));
   await openPxdPanel(page, 'draw');
   check('PXD import in a fresh browser context');
@@ -280,7 +280,7 @@ async function checkAudioCase(context, fixture) {
   await page.goto(`${origin}/draw/`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#draw-canvas');
   await page.locator('#pxd-file-input').waitFor({ state: 'attached', timeout: 12000 });
-  await page.locator('#pxd-file-input').setInputFiles({ name: 'audio-fixture.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.bytes) });
+  await importProjectFile(page, { name: 'audio-fixture.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.bytes) });
   await page.waitForFunction(() => document.querySelector('#pxd-file-status')?.textContent.includes('PXDの作品を開きました'));
   await openPxdPanel(page, 'draw');
   await page.locator('#pxd-to-audio').click();
@@ -323,7 +323,7 @@ async function checkAudioImageCase(context, fixture) {
   await page.goto(`${origin}/draw/`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#draw-canvas');
   await page.locator('#pxd-file-input').waitFor({ state: 'attached', timeout: 12000 });
-  await page.locator('#pxd-file-input').setInputFiles({ name: 'main-image-only.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.bytes) });
+  await importProjectFile(page, { name: 'main-image-only.pxd', mimeType: 'application/octet-stream', buffer: Buffer.from(fixture.bytes) });
   await page.waitForFunction(() => document.querySelector('#pxd-file-status')?.textContent.includes('PXDの作品を開きました'));
   await openPxdPanel(page, 'draw');
   await page.locator('#pxd-to-audio').click();

@@ -1,5 +1,6 @@
 /** Synthetic legacy PXD compatibility checks for direct and retained-iframe runtimes. */
 import assert from 'node:assert/strict';
+import { importProjectFile } from './lib/project-panel-browser.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { homedir } from 'node:os';
@@ -249,7 +250,7 @@ await run('legacy-draw2-v1-v2-raw-container-fails-closed',async({page,row})=>{
     assert.deepEqual(fixture.roundTripOriginal,fixture.bytes,`v${version} encode/decode keeps exact original container bytes`);
     assert.deepEqual(fixture.roundTripEntry,fixture.entry,`v${version} encode/decode keeps extracted payload`);
     await writeFile(`${out}/synthetic-draw2-v${version}.pxd`,bytes);
-    await page.locator('#pxd-file-input').setInputFiles({name:`synthetic-draw2-v${version}.pxd`,mimeType:'application/octet-stream',buffer:bytes});
+    await importProjectFile(page, {name:`synthetic-draw2-v${version}.pxd`,mimeType:'application/octet-stream',buffer:bytes});
     await page.waitForFunction(()=>document.querySelector('#pxd-file-status')?.textContent.includes('このPXDには描画できる画像部品がありません。'));
     const after=await runtime.evaluate(rt=>({image:Array.from(rt.draw.getImage().rgba),projectId:rt.draw.workspace.currentProject.projectId,revisionId:rt.draw.workspace.currentProject.revisionId}));
     assert.deepEqual(after,before,`unsupported inner art v${version} fails closed without replacing the current work`);
