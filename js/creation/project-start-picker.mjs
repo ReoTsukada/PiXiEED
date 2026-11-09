@@ -1,5 +1,5 @@
 import { createToolProjectStore } from './tool-project-store.mjs?rev=20261107-gallery-1';
-import { mountProjectGallery } from './project-gallery.mjs?rev=20261108-gallery-canvas-viewport-1';
+import { mountProjectGallery } from './project-gallery.mjs?rev=20261109-import-preview-gallery-1';
 import { mountProjectGalleryAdSeries } from '../ads/project-manager-ad.mjs?rev=20261108-gallery-canvas-viewport-1';
 import { projectGalleryAdConfig } from '../../data/project-gallery-ad-config.mjs?rev=20261108-gallery-canvas-viewport-1';
 
@@ -71,7 +71,7 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
     galleryAd?.retire?.(reason);
 
   }
-  const cssHref = '/css/project-workspace.css?rev=20261108-gallery-canvas-viewport-1';
+  const cssHref = '/css/project-workspace.css?rev=20261109-import-preview-gallery-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === cssHref);
   const ownsCss = !css;
   let cssPromise = null, cssFailed = false, cancelCss = null;

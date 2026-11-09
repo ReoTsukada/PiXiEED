@@ -369,3 +369,17 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-start-picker[open] { display:flex; flex-direction:column; overflow:hidden; }
 .project-start-picker > * { flex-shrink:0; }
 .project-start-picker .project-start-picker__scroller { flex:1 1 auto; min-height:0; }
+
+/* Import candidates share the same bounded square gallery as saved works. */
+.project-import-pane .project-sheet__note { margin-block: 8px; }
+.project-import-preview { display: flex; align-items: center; gap: 10px; margin-block: 10px; padding: 10px; border: 1px solid #526b7a; border-radius: 10px; background: #14232e; }
+.project-import-preview[hidden], .project-import-preview [hidden], .project-gallery [hidden] { display: none; }
+.project-import-preview > canvas, .project-import-preview__fallback { flex: 0 0 72px; width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; background: #101923; }
+.project-import-preview__fallback { display: grid; place-items: center; font-size: 24px; }
+.project-import-preview__info { min-width: 0; flex: 1; }
+.project-import-preview h3 { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.project-import-preview .project-sheet__note { font-size: 11px; overflow-wrap: anywhere; }
+.project-import-preview .project-sheet__actions { flex-wrap: wrap; }
+.project-gallery__fallback { color: #c2cdd1; font-size: 24px; }
+.project-gallery__badge { position: absolute; left: 3px; bottom: 3px; max-width: calc(100% - 6px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 4px; border-radius: 3px; background: #101923e6; color: #fff0bf; font-size: 9px; pointer-events: none; }
+@media (max-width: 380px) { .project-import-preview { align-items: flex-start; } .project-import-preview > canvas, .project-import-preview__fallback { flex-basis: 48px; width: 48px; height: 48px; } }
