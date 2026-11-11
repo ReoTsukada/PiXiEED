@@ -1,6 +1,6 @@
 import { createWorkspaceHistoryEntry, isWorkspaceRequested } from './tool-workspace-state.mjs?rev=20261024-common-tool-start-1';
-import { getToolStartRoute, toolStartHref, isFreshToolStartRequest } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
-import { notifyToolEntryReady } from './tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
+import { getToolStartRoute, toolStartHref, isFreshToolStartRequest } from './tool-start-routes.mjs?rev=20261110-output-result-1';
+import { notifyToolEntryReady } from './tool-offerwall-entry.mjs?rev=20261110-output-result-1';
 
 const DRAFT_KEY = 'pixieed:pxd:last:direct-workspace:v1';
 const PROJECT_ROUTE_KEYS = ['pxd', 'pxdRevision', 'pxdImage', 'modePxd', 'modePxdRevision', 'modePxdImage', 'modeProjectTool'];

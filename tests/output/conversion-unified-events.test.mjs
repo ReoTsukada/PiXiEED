@@ -48,12 +48,12 @@ test('draft edit provenance distinguishes user input from a transactional file a
   const start=sourceText.indexOf("  root.addEventListener('input',event=>"),end=sourceText.indexOf('\n',start);
   assert.ok(start>=0&&end>start);
   let input,notifications=0;const editor={matches:()=>false};
-  const context={root:{addEventListener:(_,fn)=>{input=fn;}},source:editor,refresh:()=>{},mode:'input',$:()=>({hidden:true}),notifyTextSource:()=>{notifications++;},textEditRevision:0};
+  const context={root:{addEventListener:(_,fn)=>{input=fn;}},source:editor,refresh:()=>{},mode:'input',$:()=>({hidden:true}),notifyTextSource:()=>{notifications++;},textEditRevision:0,outputInputRevision:0};
   vm.runInNewContext(sourceText.slice(start,end),context);
-  input({target:editor});assert.equal(context.textEditRevision,1);
-  input({target:editor,pixieedTextFileAppend:true});assert.equal(context.textEditRevision,1);
-  input({target:editor,isComposing:true});assert.equal(context.textEditRevision,2);assert.equal(notifications,3);
-  assert.match(sourceText,/editRevision: textEditRevision/);assert.match(sourceText,/input.pixieedTextFileAppend = true/);
+  input({target:editor});assert.equal(context.textEditRevision,1);assert.equal(context.outputInputRevision,1);
+  input({target:editor,pixieedTextFileAppend:true});assert.equal(context.textEditRevision,1);assert.equal(context.outputInputRevision,2);
+  input({target:editor,isComposing:true});assert.equal(context.textEditRevision,2);assert.equal(context.outputInputRevision,3);assert.equal(notifications,3);
+  assert.match(sourceText,/editRevision: textEditRevision/);assert.match(sourceText,/const common = \[mode, outputInputRevision,/);assert.match(sourceText,/input.pixieedTextFileAppend = true/);
 });
 
 

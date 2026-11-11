@@ -1,9 +1,20 @@
 import { displayAdConfig } from '../../data/site-config.js?rev=20261008-map-detail-1';
 import { getAdsenseLoader } from '../display-ads.mjs?rev=20261030-event-inline-ads-1';
+import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 
 const mounted = new WeakMap();
 const paths = new Set(['/tools/start/convert/', '/output/work/']);
 const allowedQuery = new Map([['mode', new Set(['convert'])], ['text', new Set(['input', 'output'])]]);
+
+function outputAdReferrerSafe(referrer) {
+  const value = String(referrer || '');
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol)
+      && !url.search && !url.hash && !/[?#]/.test(value);
+  } catch { return false; }
+}
 
 /** Preserve Google's optimized empty unit without reporting it as a paid creative. */
 export function conversionAdDeliveryState(status) {
@@ -12,9 +23,10 @@ export function conversionAdDeliveryState(status) {
 const preservesUnit = unit => ['filled', 'unfill-optimized'].includes(conversionAdDeliveryState(unit?.dataset.adStatus));
 
 /** Private handoffs and arbitrary query data never become advertising URLs. */
-export function conversionAdEligible({ origin, pathname, search = '', hash = '', topLevel = false } = {}) {
+export function conversionAdEligible({ origin, pathname, search = '', hash = '', topLevel = false, referrer = '', entryHistoryState = null } = {}) {
   if (!topLevel || !['https://pixieed.jp', 'https://www.pixieed.jp'].includes(origin)
-      || !paths.has(pathname) || (hash && hash !== '#main')) return false;
+      || !paths.has(pathname) || (hash && hash !== '#main') || !outputAdReferrerSafe(referrer)
+      || hasConversionRecoveryHistory(entryHistoryState)) return false;
   const query = new URLSearchParams(search);
   for (const key of query.keys()) {
     if (query.getAll(key).length !== 1 || !allowedQuery.get(key)?.has(query.get(key))) return false;
@@ -47,11 +59,13 @@ const criticalLayout = `
  * No refresh, automatic advertising, overlay, export listener or consent override.
  */
 export function mountConversionDisplayAd({ doc = globalThis.document, win = globalThis.window,
+  entryHistoryState,
   config = displayAdConfig, load = getAdsenseLoader } = {}) {
   if (!doc || !win) return null;
+  const historyAtEntry = entryHistoryState === undefined ? win.history?.state : entryHistoryState;
   const eligible = () => conversionAdEligible({ origin: win.location.origin,
     pathname: win.location.pathname, search: win.location.search, hash: win.location.hash,
-    topLevel: win.top === win.self });
+    topLevel: win.top === win.self, referrer: doc.referrer, entryHistoryState: historyAtEntry });
   const main = doc.querySelector('main#main');
   const errorOnly = () => Boolean(main?.querySelector('[role="alert"]'))
     && !main.querySelector('#output-start,#output-layout,[data-editor]');

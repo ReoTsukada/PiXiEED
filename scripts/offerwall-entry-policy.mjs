@@ -1,4 +1,4 @@
-export const OFFERWALL_ENTRY_POLICY_VERSION = '20261024-common-tool-start-1';
+export const OFFERWALL_ENTRY_POLICY_VERSION = '20261110-output-result-1';
 export const OFFERWALL_TOOL_PATHS = Object.freeze([
   '/tools/start/draw/', '/tools/start/camera/', '/tools/start/audio/',
   '/tools/start/spot-difference/', '/tools/start/hidden-object/',

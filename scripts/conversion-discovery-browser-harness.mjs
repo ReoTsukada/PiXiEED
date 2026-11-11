@@ -196,7 +196,8 @@ try {
   assert.equal(await page.locator('[data-format]').inputValue(), 'png');
   pass('Incompatible audio target shows explanation and keeps a valid image output');
   await open('/output/work/?mode=convert&to=qoi&text=input');
-  await page.locator('[data-tx-source]').waitFor({ state: 'visible' }); assert.equal(await page.locator('.convert-intent').count(),0);
+  const textEdit=page.locator('[data-sc-edit-source]');await textEdit.waitFor({state:'visible'});assert.equal(await textEdit.getAttribute('aria-expanded'),'false');
+  await textEdit.click();await page.locator('[data-tx-source]').waitFor({state:'visible'});assert.equal(await textEdit.getAttribute('aria-expanded'),'true');assert.equal(await page.locator('.convert-intent').count(),0);
   pass('Text input mode takes precedence over a conversion intent');
   const staged = await page.evaluate(async bytes => {
     const { storeOutputFile } = await import('/js/creation/output-router.mjs?rev=20261028-unified-output-1');

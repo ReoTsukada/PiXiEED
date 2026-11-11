@@ -6,8 +6,9 @@ test('loaded media uses its strip tail while text/code keeps the same add slot i
  for(const mode of ['input','output'])assert.equal(unifiedMaterialPlacement({mode,loaded:true,hasMaterial:true}),'shared-strip');
  assert.equal(unifiedMaterialPlacement({mode:'media',loaded:false,hasMaterial:false}),'empty');
 });
-test('format controls share media preview space and follow an open modal without duplicated state',()=>{
- assert.equal(unifiedOutputLocation({mode:'media',loaded:true,modal:false}),'preview');assert.equal(unifiedOutputLocation({mode:'media',loaded:true,modal:true}),'panel');assert.equal(unifiedOutputLocation({mode:'input',loaded:true,modal:false}),'composer');
+test('format controls stay in the shared settings pane for every output engine without duplicated state',()=>{
+ for(const mode of ['media','input','output'])for(const loaded of [false,true])assert.equal(unifiedOutputLocation({mode,loaded,modal:false}),'settings');
+ assert.equal(unifiedOutputLocation({mode:'media',loaded:true,modal:true}),'settings');
 });
 test('original file choices retain exact File references and input order without duplicate current File',()=>{
  const a={name:'same.png'},b={name:'same.png'},c={name:'received.png'};const rows=availableUnifiedOriginalFiles(b,[{id:'a',file:a},{id:'b',file:b}]);assert.deepEqual(rows.map(row=>row.value),['a','b']);assert.equal(rows[1].file,b);

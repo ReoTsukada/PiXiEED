@@ -40,6 +40,8 @@ try {
  const originalHash=await evaluate(async()=>{const c=document.createElement('canvas');c.width=320;c.height=240;const ctx=c.getContext('2d');const im=ctx.createImageData(320,240);for(let y=0;y<240;y++)for(let x=0;x<320;x++){const a=Math.floor(x/10),b=Math.floor(y/10);im.data.set([(a*17+b*11)%256,(a*33+b*29)%256,(a*7+b*53)%256,255],(y*320+x)*4);}ctx.putImageData(im,0,0);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const bytes=await blob.arrayBuffer();const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].join(',');const d=new DataTransfer();d.items.add(new File([blob],'fixture-10x.png',{type:'image/png'}));const i=document.querySelector('[data-tx-file]');i.files=d.files;i.dispatchEvent(new Event('change',{bubbles:true}));return hash;});
  await change('[data-sc-format]','ascii');
  await ready();
+ if(!await evaluate(()=>document.querySelector('.sc-result-aux')?.open))await click('.sc-result-aux > summary');
+ await wait(()=>{const aux=document.querySelector('.sc-result-aux'),viewer=document.querySelector('[data-tx-art-viewport]');return aux?.open&&viewer?.getBoundingClientRect().width>0&&viewer.getBoundingClientRect().height>0;},'visible legacy text-art viewer');
  check('10x PNG read as 32x24',await evaluate(()=>document.querySelector('[data-tx-native-hint]').textContent.includes('読み込み 32 × 24px')));
  check('complete art equals output text',await text()===await evaluate(()=>document.querySelector('[data-tx-art-content]').textContent));
  for(const [width,height]of [[320,568],[390,844],[844,390],[1366,900]]){await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await delay(160);const g=await geometry();check(`fit at ${width}x${height}`,g.within&&!g.overflow);}

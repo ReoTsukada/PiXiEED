@@ -1,4 +1,4 @@
-import { getToolStartRoute, legacyToolPath, toolStartHref } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+import { getToolStartRoute, legacyToolPath, toolStartHref } from './tool-start-routes.mjs?rev=20261110-output-result-1';
 
 /** Public destinations only; editor actions and project modes have their own UI. */
 export const PAGE_DESTINATIONS = Object.freeze([

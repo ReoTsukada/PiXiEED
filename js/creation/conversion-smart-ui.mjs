@@ -1,10 +1,10 @@
-import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261105-video-size-1';
+import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261110-output-layout-7';
 import { textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryStore, createIndexedDbConversionRecoveryAdapter } from './conversion-recovery-store.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261105-video-size-1';
 import { activateRetainedConversionInput } from './conversion-input-receipts.mjs?rev=20261105-video-size-1';
-import { mountUnifiedConversionInput, writeUnifiedProperty } from './conversion-unified-input.mjs?rev=20261105-video-size-1';
+import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261110-output-layout-7';
 import { createUnifiedImportController, importUnifiedMediaFiles } from './conversion-unified-import.mjs?rev=20261105-video-size-1';
 import { createConversionSaveIntent } from './conversion-save-controller.mjs?rev=20261104-controllers-2';
 import { downloadConversionResult } from './conversion-save-bridge.mjs?rev=20261104-controllers-2';
@@ -13,7 +13,7 @@ import { createConversionFormatController } from './conversion-format-controller
 import { createNativeFormatBridge } from './conversion-format-bridge.mjs?rev=20261104-output-controller-1';
 import { mountConversionRouteChoices } from './conversion-route-choice.mjs?rev=20261101-route-choice-1';
 import { conversionSaveMessage, batchSaveActionLabel } from './conversion-clarity.mjs?rev=20261101-direct-material-1';
-import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261105-video-size-1';
+import { mountConversionWorkspace } from './conversion-workspace.mjs?rev=20261110-output-layout-7';
 import { saveActionLabel, materialChangeInvalidatesSave, createDeferredFocusGuard } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { mountPublicNavigation } from '../public-navigation.mjs?rev=20261024-common-tool-start-1';
 
@@ -30,6 +30,20 @@ export function settleTextGeneration({ generationHref, previousGenerationHref, w
 }
 export function textRenderSaveLabel({format,loaded,working}) {
   return working?'作成中…':!loaded?'文字を入力':format==='pxtxt'?'文章と設定を保存':`${format==='svg'?'SVG':'PNG'}で保存`;
+}
+export function conversionOutputSaveLabel({mode,action='text',renderFormat='png',format='',filename='',loaded,working,outputPreview=null}={}) {
+  if (working) return '作成中…';
+  if (!loaded) return mode === 'input' ? '文章を入力' : '素材を選ぶ';
+  let selected = '';
+  if (mode === 'input' && action === 'text') selected = renderFormat;
+  else if (mode === 'output') selected = 'txt';
+  else if (mode === 'input' && outputPreview?.generationMode === 'input' && outputPreview.action === action && outputPreview.matchesInput === true) selected = outputPreview.format;
+  else if (mode === 'media') selected = format;
+  if (!selected && mode !== 'input') selected = String(filename || '').split('.').pop();
+  selected = String(selected || '').replace(/^\./,'').toLowerCase();
+  if (selected === 'pxtxt') return 'PXT（文章と設定）を保存';
+  if (/^[a-z0-9]{1,8}$/.test(selected)) return `${selected.toUpperCase()}を保存`;
+  return 'ファイルを保存';
 }
 
 /** Presentation adapter only: all decoding, validation and saving stay in the existing engines. */
@@ -89,19 +103,39 @@ export function mountSmartConversion(doc = document, win = window) {
   }
   let unified = null;
   let unifiedImport = null;
+  const originalFilesByMaterialId = new Map();
+  const readMaterialState = () => main.conversionMaterials?.getState?.() || $('#output-layout')?.conversionActions?.getMaterialState?.() || null;
+  let knownMaterialAssetIds = (readMaterialState()?.assets || []).map(asset => asset.id).filter(Boolean);
+  const originalFileForAsset = id => originalFilesByMaterialId.get(id) || null;
+  const materialAssetIdForFile = file => {
+    if (!file) return null;
+    const state = readMaterialState(), assets = state?.assets || [];
+    const direct = assets.filter(asset => asset?.originalFile === file || asset?.file === file || asset?.sourceFile === file);
+    if (direct.length === 1) return direct[0].id || null;
+    const mapped = [...originalFilesByMaterialId].filter(([, candidate]) => candidate === file).map(([id]) => id);
+    return mapped.length === 1 ? mapped[0] : null;
+  };
+  const pruneOriginalFiles = () => {
+    const ids = new Set((readMaterialState()?.assets || []).map(asset => asset.id));
+    for (const id of originalFilesByMaterialId.keys()) if (!ids.has(id)) originalFilesByMaterialId.delete(id);
+  };
   let localRecovery = null, inputCount = 0;
   const workspace = mountConversionWorkspace(main, toolbar, doc, win);
   const button = doc.createElement('button'); button.type = 'button'; button.id = 'output-nav-export';
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg><span>出力</span>';
   const buttonLabel = button.querySelector('span');
   const dock = doc.createElement('div'); dock.className = 'sc-export-status sc-save-bar';
-  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite"></span></div><div class="sc-save-actions"><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
+  dock.innerHTML = '<progress data-sc-progress aria-label="出力作成の進行状況" hidden></progress><div class="sc-save-copy"><span class="sc-export-message" role="status" aria-live="polite" tabindex="0" aria-label="出力の状態" aria-description="長い状態メッセージはここでスクロールできます。"></span></div><div class="sc-save-actions"><button type="button" data-sc-batch hidden></button><button type="button" data-sc-cancel hidden>中止</button></div>';
   dock.querySelector('.sc-save-actions').prepend(button);
   const message = dock.querySelector('.sc-export-message'), cancel = dock.querySelector('[data-sc-cancel]'), batch = dock.querySelector('[data-sc-batch]');
   let nav = null, navObserver = null, frame = 0, revision = 0, lastMode = mode();
   let lastTextGenerationUrl = '', textResultMode = '', textDirty = true, lastMediaUrl = '', mediaDirty = false;
   let lastSaved = null, pendingDimensions = null, resultSurface = null;
   let sizeDirty = false, fpsDirty = false, stopped = false, controlSignature = '', saveError = '';
+  const setSaveError = value => {
+    saveError = String(value || '');
+    if (saveError) setText(message, saveError);
+  };
   const nativeFormat = () => mode() === 'input' ? $('[data-tx-action]') : mode() === 'output' ? $('[data-tx-style]') : find('[data-format],#output-format-select');
   const formatController = createConversionFormatController(createNativeFormatBridge({ getSelect: nativeFormat, getMode: mode, EventImpl: win.Event }));
   const result = () => {
@@ -191,7 +225,13 @@ export function mountSmartConversion(doc = document, win = window) {
     const nativeProgress = [...main.querySelectorAll('progress:not([data-sc-progress]):not([data-sc-panel-progress])')].find(available);
     const progress = dock.querySelector('progress'); writeUnifiedProperty(progress, 'hidden', !working);
     if (nativeProgress?.hasAttribute('value')) { progress.max = nativeProgress.max; progress.value = nativeProgress.value; } else progress.removeAttribute('value');
-    const label = currentMode==='input'&&$('[data-tx-action]')?.value==='text' ? textRenderSaveLabel({format:main.textConversion?.snapshot().renderFormat||'png',loaded:loaded(),working:working&&(!live||saveIntent.pending)}) : saveActionLabel({ loaded: loaded(), working: working && (!live || saveIntent.pending), mode: currentMode, format: formatController.snapshot().value, filename: link?.download });
+    const textState = main.textConversion?.snapshot?.() || {};
+    const outputPreview = main.textConversion?.outputPreview?.() || null;
+    const label = conversionOutputSaveLabel({
+      mode: currentMode, action: $('[data-tx-action]')?.value || 'text', renderFormat: textState.renderFormat || 'png',
+      format: currentMode === 'output' ? $('[data-tx-style]')?.value || '' : formatController.snapshot().value,
+      filename: link?.download || '', loaded: loaded(), working: working && (!live || saveIntent.pending), outputPreview,
+    });
     setText(buttonLabel, label);
     setAttr(button, 'aria-label', label);
     writeUnifiedProperty(cancel, 'hidden', !working || !cancelAction());
@@ -217,7 +257,14 @@ export function mountSmartConversion(doc = document, win = window) {
     unified?.update();
     const previewApi=main.conversionMaterials||$('#output-layout')?.conversionActions;
     const capability=previewApi?.previewCapability?.()||{supported:false,automatic:false,reason:'素材・形式を確認してください。生成できる状態になると保存前にプレビューを更新できます。'};
-    resultSurface?.update({mode:currentMode,loaded:loaded(),ready,working,key:`${currentMode}:${revision}:${Number(fpsDirty)}:${Number(sizeDirty)}`,pendingFps:fpsDirty,pendingSize:sizeDirty,api:previewApi,capability,link,originalFile:main.textConversion?.snapshot?.().file});
+    const materialSnapshot=previewApi?.getState?.()||previewApi?.getMaterialState?.()||{};
+    resultSurface?.update({
+      mode:currentMode,loaded:loaded(),ready,working,key:`${currentMode}:${revision}:${Number(fpsDirty)}:${Number(sizeDirty)}`,
+      pendingFps:fpsDirty,pendingSize:sizeDirty,api:previewApi,capability,link,
+      sources:currentMode==='media'?materialSnapshot.assets||[]:[],activeSourceId:currentMode==='media'?materialSnapshot.activeId||null:null,
+      sourceText:currentMode==='input'?textState.text||'':'',sourceRevision:currentMode==='input'?textState.editRevision??0:0,
+      outputPreview,originalFile:currentMode==='output'?textState.file:null,
+    });
     saveIntent.observe();
   }
 
@@ -257,7 +304,7 @@ export function mountSmartConversion(doc = document, win = window) {
       sizeDirty: currentMode === 'media' && sizeDirty && available($('#output-apply-settings')) };
   }
   const saveIntent = createConversionSaveIntent({ snapshot: saveSnapshot, save, settled: schedule,
-    choose() { if (mode() === 'input') $('[data-tx-source]')?.focus(); else choose(); },
+    choose() { if (mode() === 'input') { if (unified?.openTextEditor) unified.openTextEditor(); else $('[data-tx-source]')?.focus(); } else choose(); },
     stageComplete(stage) {
       if (stage === 'fps') {
         fpsDirty = false;
@@ -265,7 +312,7 @@ export function mountSmartConversion(doc = document, win = window) {
       }
       if (stage === 'size') sizeDirty = false;
     },
-    blocked(error) { saveError = error?.message || '設定の反映を確認してください。前回の結果は保存しません。'; setText(message, saveError); },
+    blocked(error) { setSaveError(error?.message || '設定の反映を確認してください。前回の結果は保存しません。'); },
     run(stage) {
       if (stage === 'live') {
         const live = liveText();
@@ -286,7 +333,7 @@ export function mountSmartConversion(doc = document, win = window) {
   });
   function beginExport() {
     if (busy() || main.textConversion?.snapshot?.().composing) return false;
-    saveError = '';
+    setSaveError('');
     saveFocusTicket = { guard: saveFocusGuard.begin(button), mode: mode(), revision };
     if (!saveIntent.pending) pendingDimensions = fpsDirty && sizeDirty ? { width: $('#output-width')?.value, height: $('#output-height')?.value } : null;
     saveIntent.request(); schedule();
@@ -297,7 +344,7 @@ export function mountSmartConversion(doc = document, win = window) {
     const element = event.target;
     if (!element.matches('input,textarea,select') || element.matches('[data-tx-text-result],[data-scrub],[data-sc-source],[data-sc-target]') || element.closest('[data-sc-route-choice]')) return;
     if (element.closest('#output-items')) { schedule(); return; }
-    saveError = ''; revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate();
+    setSaveError(''); revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate();
     if (element.closest('[data-text-tools]') || element.type === 'file') textDirty = true;
     if (element.matches('#output-width,#output-height,#output-aspect-lock')) sizeDirty = true;
     if (element.matches('#output-fps,#output-fps-preset')) fpsDirty = true;
@@ -306,8 +353,8 @@ export function mountSmartConversion(doc = document, win = window) {
   }
   function acceptFiles(files) {
     if (files?.length && main.textConversion?.snapshot?.().composing) {
-      saveError = '文字入力を確定してからファイルを追加してください。入力内容は保持しています。';
-      setText(message, saveError); schedule(); return false;
+      setSaveError('文字入力を確定してからファイルを追加してください。入力内容は保持しています。');
+      schedule(); return false;
     }
     if (unifiedImport) return unifiedImport.request(files);
     // Optional text-tool startup failure leaves the existing media engine usable.
@@ -320,7 +367,7 @@ export function mountSmartConversion(doc = document, win = window) {
   }
 
   function changeRoute(next) {
-    saveError = '';
+    setSaveError('');
     const focused = doc.activeElement, fromChoices = focused?.closest?.('[data-sc-route-choice]');
     selectMode(next); render();
     if (fromChoices) {
@@ -367,15 +414,23 @@ export function mountSmartConversion(doc = document, win = window) {
     }
   }, true);
   function textSourceChanged(event) {
-    saveError = '';
+    setSaveError('');
     revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate(); if(event?.detail?.kind!=='render-format')textDirty = true; lastSaved = null;
     schedule();
   }
   main.addEventListener('pixieed:text-source', textSourceChanged);
   function committedFiles(event) {
-    if (!unified || unifiedImport?.pending) return;
+    if (!unified) return;
     const files = Array.from(event.detail?.files || []);
-    if (files.length) main.textConversion?.selectFile(files.length === 1 ? files[0] : null);
+    if (files.length) {
+      const state = readMaterialState();
+      const association = associateCommittedMaterialFiles({ assets: state?.assets || [], files, previousAssetIds: knownMaterialAssetIds });
+      for (const id of association.invalidatedIds) originalFilesByMaterialId.delete(id);
+      for (const [id, file] of association.associations) originalFilesByMaterialId.set(id, file);
+      knownMaterialAssetIds = association.assetIds;
+      pruneOriginalFiles();
+      if (!unifiedImport?.pending) main.textConversion?.selectFile(files.length === 1 ? files[0] : null);
+    }
     schedule();
   }
   main.addEventListener('pixieed:input-files', committedFiles);
@@ -388,8 +443,13 @@ export function mountSmartConversion(doc = document, win = window) {
   main.addEventListener('input', changed); main.addEventListener('change', changed);
   main.addEventListener('pixieed:text-preview', schedule);
   function materialsChanged(event) {
+    if (event.detail?.mutation === 'import') {
+      const state = readMaterialState();
+      for (const asset of state?.assets || []) if (/^local-(images|audio|video)$/.test(String(asset.id || ''))) originalFilesByMaterialId.delete(asset.id);
+    }
+    pruneOriginalFiles();
     if (event.detail?.changed) {
-      saveError = '';
+      setSaveError('');
       if (materialChangeInvalidatesSave(event.detail)) { revision++; saveIntent.cancel(); saveFocusGuard.invalidate(); }
       mediaDirty = true; lastSaved = null;
     }
@@ -435,13 +495,14 @@ export function mountSmartConversion(doc = document, win = window) {
         if (!textApi.setMode('output')) return false;
         return formatController.choose('encode', { busy: false }) || formatController.snapshot().value === 'encode';
       },
-      report(text) { saveError = text; setText(message, text); schedule(); },
-      onInvalidate() { revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate(); saveError = ''; },
+      report(text) { setSaveError(text); schedule(); },
+      onInvalidate() { revision++; resultSurface?.invalidate(); saveIntent.cancel(); saveFocusGuard.invalidate(); setSaveError(''); },
       onEntriesChange(entries) { schedule(); const urgent = entries.length > inputCount; inputCount = entries.length; localRecovery?.changed({ urgent }); },
       onSettled: schedule,
     });
     unified = mountUnifiedConversionInput({ main, toolbar, doc, win, getMode: mode,
-      setMode: next => textApi.setMode(next), acceptFiles, choose, formatController, isBusy: busy, schedule,
+      setMode: next => textApi.setMode(next), acceptFiles, choose, formatController, isBusy: busy, isOutputReady: () => saveSnapshot().ready,
+      getOriginalFileForAsset: originalFileForAsset, getAssetIdForOriginalFile: materialAssetIdForFile, schedule,
       getInputs: () => unifiedImport.snapshotEntries(),
       retryInput: id => unifiedImport.retryEntry(id),
       holdInput: id => unifiedImport.holdEntry(id),
@@ -455,7 +516,7 @@ export function mountSmartConversion(doc = document, win = window) {
   const beforeRecoveryLeave = event => { if (localRecovery?.dirty || localRecovery?.snapshot().saving) { event.preventDefault(); event.returnValue = ''; } };
   if (unified && main.textConversion) {
     localRecoveryHost = doc.createElement('section'); localRecoveryHost.className = 'sc-local-recovery';
-    localRecoveryHost.innerHTML = '<details><summary><span data-sc-local-recovery-status role="status">端末内の保存を確認しています。</span></summary><p>このブラウザーの端末内だけに保存します。共有端末ではデータが残ります。保存停止や取消でも前回保存版は消しません。合計256MBまで。ブラウザーのデータ消去では失われます。</p><button type="button" data-recovery-save>端末内に保存</button><button type="button" data-recovery-cancel>保存を停止</button><button type="button" data-recovery-fork hidden>今の内容を別の復元版として保存</button><button type="button" data-recovery-previous hidden>今の内容を保存して前の復元版を開く</button></details>';
+    localRecoveryHost.innerHTML = '<details><summary><span data-sc-local-recovery-status role="status">保存内容を確認中</span></summary><p data-sc-local-recovery-message role="status" aria-live="polite"></p><p>このブラウザーの端末内だけに保存します。共有端末ではデータが残ります。保存停止や取消でも前回保存版は消しません。合計256MBまで。ブラウザーのデータ消去では失われます。</p><button type="button" data-recovery-save>端末内に保存</button><button type="button" data-recovery-cancel>保存を停止</button><button type="button" data-recovery-fork hidden>今の内容を別の復元版として保存</button><button type="button" data-recovery-previous hidden>今の内容を保存して前の復元版を開く</button></details>';
     main.querySelector('.sc-unified-composer').append(localRecoveryHost);
     const updateRecovery = state => {
       localRecoveryHost.dataset.phase = state.phase;
@@ -465,7 +526,11 @@ export function mountSmartConversion(doc = document, win = window) {
       if(state.paused && state.phase!=='paused')stateMessage += ' 自動保存は停止中です。';
       try { if(win.history.state?.pixieedConversionRecoveryPaused!==state.paused)win.history.replaceState({...win.history.state,pixieedConversionRecoveryPaused:state.paused},'',win.location.href); }
       catch { stateMessage += ' 保存停止の設定を再読込後へ引き継げません。'; }
-      setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'), stateMessage);
+      const details = localRecoveryHost.querySelector('details');
+      const summary = conversionRecoveryStatusLabel({ ...state, message: stateMessage });
+      setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'), summary);
+      setText(localRecoveryHost.querySelector('[data-sc-local-recovery-message]'), stateMessage);
+      if (['error', 'restore-error', 'restore-blocked', 'conflict'].includes(state.phase) || summary.includes('注意') || summary.includes('設定注意')) details.open = true;
       const save = localRecoveryHost.querySelector('[data-recovery-save]'), cancel = localRecoveryHost.querySelector('[data-recovery-cancel]'), fork = localRecoveryHost.querySelector('[data-recovery-fork]');
       setText(save, state.phase === 'error' ? '端末内保存を再試行' : state.paused ? '端末内保存を再開' : '端末内に保存'); setText(cancel, state.loading ? '復元を中止' : state.saving ? '今回の保存を取消' : '保存を停止');
       const set = (node,key,value) => { if(node[key]!==value)node[key]=value; };

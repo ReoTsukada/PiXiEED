@@ -4,7 +4,35 @@ import { installTextLivePreview } from './text-live-preview.mjs?rev=20261030-liv
 import { createTextArtViewer } from './text-art-viewer.mjs?rev=20261030-text-fit-1';
 import { textPixelOrigin } from './text-pixel-origin.mjs?rev=20261030-text-fit-1';
 import { createConversionTextDraftController, createTextDraftSwap, validateTextRecoverySnapshot } from './conversion-text-draft.mjs?rev=20261105-video-size-1';
-import { isTextRenderOutputFormat, textRenderOutputChoices } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
+import { isTextRenderOutputFormat, textRenderOutputChoices, textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
+
+/** Pure metadata selector used by the UI and focused tests; no encoder or DOM work. */
+export function selectGeneratedTextOutputPreview({ mode, generationMode, generatedKind, renderFormat = 'png', artifacts = new Map(), outputText = '', projectText = '', restoredFile = null, action = '', resultId = 0, sourceRevision = 0, sourceIdentity = null, signature = '', currentSignature = '' } = {}) {
+  if (!generatedKind || generatedKind === 'unknown') return { kind: 'unknown', format: '', filename: '', mimeType: '', blob: null, text: '', action, renderFormat, resultId, generationMode, sourceRevision, matchesInput: false };
+  let selector = '', format = '', kind = generatedKind, text = '';
+  if (generatedKind === 'text-render') {
+    format = renderFormat; selector = textRenderOutputSelector(format) || '';
+    kind = format === 'pxtxt' ? 'text' : 'image';
+    if (format === 'pxtxt') text = projectText;
+  } else if (generatedKind === 'text') {
+    format = 'txt'; selector = '[data-tx-txt]'; text = outputText;
+  } else {
+    const primary = artifacts.get('[data-tx-download]');
+    selector = primary ? '[data-tx-download]' : artifacts.keys().next().value || '';
+    const filename = artifacts.get(selector)?.name || restoredFile?.name || '';
+    format = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+    const mimeType = artifacts.get(selector)?.blob?.type || restoredFile?.type || '';
+    kind = /^image\//.test(mimeType) ? 'image' : 'file';
+  }
+  const artifact = artifacts.get(selector) || null;
+  return {
+    kind, format, filename: artifact?.name || restoredFile?.name || '',
+    mimeType: artifact?.blob?.type || restoredFile?.type || '', blob: artifact?.blob || restoredFile || null, text,
+    action, renderFormat, resultId, generationMode, sourceRevision,
+    sourceIdentity, signature, matchesInput: Boolean(signature && signature === currentSignature),
+    currentMode: mode,
+  };
+}
 
 /** An additive local workspace. Existing conversion state is kept, never rebuilt. */
 export async function installTextTools(doc = document, win = window) {
@@ -69,20 +97,30 @@ export async function installTextTools(doc = document, win = window) {
   source.maxLength = MAX_CODE_CHARS;
   const artViewer = createTextArtViewer(root, { document: doc, window: win });
   let mode = 'media', selected = null, outputText = '', artText = '', restoredFile = null, busy = false, aborter = null, dirtyResult = false, composing = false, renderFormat = 'png';
-  let textEditRevision = 0, restoringRecovery = false;
-  let frameCache = null, frameFile = null, originCache = null; const urls = new Map();
+  let textEditRevision = 0, outputInputRevision = 0, restoringRecovery = false;
+  let frameCache = null, frameFile = null, originCache = null; const urls = new Map(), generatedArtifacts = new Map();
+  let generatedOutputId = 0, generatedKind = 'unknown', generatedAction = '', generatedSignature = '', generatedProjectText = '';
+  const fileIds = new WeakMap(); let fileSequence = 0;
   const compositionWaiters = new Set();
   const status = message => { $('[data-tx-status]').textContent = message; };
+  function fileIdentity(file) { if (!file || typeof file !== 'object') return ''; if (!fileIds.has(file)) fileIds.set(file, ++fileSequence); return fileIds.get(file); }
+  function currentOutputSignature() {
+    // Keep transactional appends out of edit provenance, but still invalidate any
+    // generated preview whose input content changed.
+    const common = [mode, outputInputRevision, $('[data-tx-action]').value];
+    if (mode === 'output') return JSON.stringify([...common, fileIdentity(selected), $('[data-tx-style]').value, Number($('[data-tx-columns]').value), $('[data-tx-invert]').checked, $('[data-tx-characters]').value, $('[data-tx-attach]').checked, $('[data-tx-native-grid]').checked]);
+    return JSON.stringify([...common, options(), fileIdentity(selected)]);
+  }
   const options = () => ({ width: Number($('[data-tx-width]').value), fontSize: Number($('[data-tx-font-size]').value), padding: Number($('[data-tx-padding]').value), lineHeight: Number($('[data-tx-line-height]').value), font: $('[data-tx-font]').value, foreground: $('[data-tx-foreground]').value, background: $('[data-tx-background]').value, wrap: $('[data-tx-wrap]').checked });
   function applyOptions(value) { for (const [key, selector] of Object.entries({ width:'width',fontSize:'font-size',padding:'padding',lineHeight:'line-height',font:'font',foreground:'foreground',background:'background' })) if (value[key] !== undefined) $(`[data-tx-${selector}]`).value = value[key]; if (typeof value.wrap === 'boolean') $('[data-tx-wrap]').checked = value.wrap; }
   const draftSwap = createTextDraftSwap({ read: () => ({ text: source.value, options: options(), action: $('[data-tx-action]').value }), write: draft => { source.value = draft.text; applyOptions(draft.options || {}); $('[data-tx-action]').value = draft.action || 'text'; } });
-  function blobLink(selector, blob, name) { if (urls.has(selector)) win.URL.revokeObjectURL(urls.get(selector)); const url = win.URL.createObjectURL(blob); urls.set(selector, url); const link = $(selector); link.href = url; link.download = safeName(name); link.hidden = false; }
+  function blobLink(selector, blob, name) { if (urls.has(selector)) win.URL.revokeObjectURL(urls.get(selector)); const url = win.URL.createObjectURL(blob); urls.set(selector, url); generatedArtifacts.set(selector, { blob, name: safeName(name) }); const link = $(selector); link.href = url; link.download = safeName(name); link.hidden = false; }
   function resetResult() {
     artViewer.clear();
     for (const url of urls.values()) win.URL.revokeObjectURL(url); urls.clear();
     for (const el of root.querySelectorAll('[data-tx-result] button,[data-tx-result] a')) { el.hidden = true; el.removeAttribute('href'); }
     $('[data-tx-preview]').replaceChildren(); $('[data-tx-preview]').hidden = true; textResult.hidden = true; textResult.value = ''; $('[data-tx-preview-note]').hidden = true;
-    outputText = ''; artText = ''; restoredFile = null; $('[data-tx-empty]').hidden = true; $('[data-tx-result]').hidden = false;
+    outputText = ''; artText = ''; restoredFile = null; generatedArtifacts.clear(); generatedKind = 'unknown'; generatedAction = $('[data-tx-action]').value; generatedSignature = ''; generatedProjectText = ''; generatedOutputId++; $('[data-tx-empty]').hidden = true; $('[data-tx-result]').hidden = false;
     dirtyResult = true; root.dataset.txResultMode = mode;
   }
   function showText(text, note, art = '') {
@@ -90,17 +128,36 @@ export async function installTextTools(doc = document, win = window) {
     $('[data-tx-copy]').hidden = false; $('[data-tx-select]').hidden = false; $('[data-tx-art-image]').hidden = !art;
     $('[data-tx-result-note]').textContent = note; $('[data-tx-badge]').textContent = `${text.length.toLocaleString()}文字`;
     blobLink('[data-tx-txt]',new Blob([text],{type:'text/plain;charset=utf-8'}),`${safeName(selected?.name || 'pixieed')}.txt`);
+    generatedKind = 'text'; generatedSignature = currentOutputSignature();
     artViewer.show(art, { source: selected });
+  }
+  function updateTextRenderLabel(width, height) {
+    const labels = { png: 'PNG', svg: 'SVG', pxtxt: 'PXT' };
+    $('[data-tx-badge]').textContent = labels[renderFormat] || renderFormat.toUpperCase();
+    const size = `${Number(width || 0).toLocaleString()} × ${Number(height || 0).toLocaleString()}px`;
+    $('[data-tx-result-note]').textContent = renderFormat === 'pxtxt'
+      ? `${size}のレイアウト設定を含む文章プロジェクトを保存します。PXTは画像ではなく、元の文章と設定を再編集するデータです。`
+      : renderFormat === 'svg'
+        ? `${size}。SVGとして保存します。SVGの書体は表示環境によって変わります。`
+        : `${size}。保存されるPNG画像をプレビューしています。`;
+  }
+  function updateTextRenderFile() {
+    const selector = textRenderOutputSelector(renderFormat), artifact = generatedArtifacts.get(selector);
+    if (!artifact || renderFormat === 'pxtxt') { restoredFile = null; $('[data-tx-use]').hidden = true; return; }
+    const FileImpl = win.File || globalThis.File;
+    restoredFile = typeof FileImpl === 'function' ? new FileImpl([artifact.blob], artifact.name, { type: artifact.blob.type || '' }) : artifact.blob;
+    $('[data-tx-use]').hidden = false;
   }
   async function showTextImage(text, settings, signal) {
     await doc.fonts?.ready; if (signal.aborted) throw new DOMException('中止','AbortError');
     const rendered = renderText(text, settings, doc), png = await canvasBlob(rendered.canvas);
     if (signal.aborted) throw new DOMException('中止','AbortError');
     resetResult(); rendered.canvas.setAttribute('role','img'); rendered.canvas.setAttribute('aria-label','入力した文章を配置した画像'); $('[data-tx-preview]').append(rendered.canvas); $('[data-tx-preview]').hidden = false;
-    $('[data-tx-result-note]').textContent = `${rendered.canvas.width} × ${rendered.canvas.height}px。文章と設定を保存すると、貼り付けて再編集できます。SVGの書体は表示環境によって変わります。`;
-    $('[data-tx-badge]').textContent = 'PNG'; blobLink('[data-tx-download]',png,'pixieed-text.png'); blobLink('[data-tx-svg]',new Blob([rendered.svg],{type:'image/svg+xml'}),'pixieed-text.svg');
-    const project = encodeDocument(text,rendered.options); blobLink('[data-tx-project]',new Blob([project],{type:'text/plain;charset=utf-8'}),'pixieed-text.pxtxt');
-    restoredFile = new File([png],'pixieed-text.png',{type:'image/png'}); $('[data-tx-use]').hidden = false;
+    updateTextRenderLabel(rendered.canvas.width, rendered.canvas.height); blobLink('[data-tx-download]',png,'pixieed-text.png'); blobLink('[data-tx-svg]',new Blob([rendered.svg],{type:'image/svg+xml'}),'pixieed-text.svg');
+    const project = encodeDocument(text,rendered.options); generatedProjectText = project; blobLink('[data-tx-project]',new Blob([project],{type:'text/plain;charset=utf-8'}),'pixieed-text.pxtxt');
+    $('[data-tx-download]').textContent = 'PNGを保存'; $('[data-tx-svg]').textContent = 'SVGを保存'; $('[data-tx-project]').textContent = '文章と設定を保存';
+    generatedKind = 'text-render'; generatedSignature = currentOutputSignature();
+    updateTextRenderFile();
   }
   async function showPixels(frame, original, signal) {
     const canvas = doc.createElement('canvas'); canvas.width = frame.width; canvas.height = frame.height; canvas.getContext('2d').putImageData(new ImageData(frame.data,frame.width,frame.height),0,0);
@@ -108,11 +165,13 @@ export async function installTextTools(doc = document, win = window) {
     resetResult(); canvas.setAttribute('role','img'); canvas.setAttribute('aria-label','画素テキストから復元した画像'); $('[data-tx-preview]').append(canvas); $('[data-tx-preview]').hidden=false;
     $('[data-tx-badge]').textContent='画素データを復元'; $('[data-tx-result-note]').textContent='色・透明度・マス目を復元しました。PNG保存ではCanvasによる色の丸めが起こり得ます。厳密なRGBAは元の画素テキストを保管してください。';
     blobLink('[data-tx-download]',png,'restored-pixels.png'); blobLink('[data-tx-grid]',new Blob([original],{type:'text/plain;charset=utf-8'}),'restored-pixels.txt');
+    generatedKind = 'file'; generatedSignature = currentOutputSignature();
     restoredFile=new File([png],'restored-pixels.png',{type:'image/png'}); $('[data-tx-use]').hidden=false;
   }
   function showFile(result) {
     resetResult(); restoredFile = new File([result.bytes],safeName(result.name),{type:result.type});
     $('[data-tx-result-note]').textContent=`${restoredFile.name} · ${restoredFile.size.toLocaleString()} bytes。${result.verified ? '保存されたSHA-256と内容が一致しました。改ざん者の本人確認をする署名ではありません。' : '元の検査値がないため、元ファイルとの一致は未検証です。形式の誤りがある場合は元データを確認してください。'}`;
+    generatedKind = 'file'; generatedSignature = currentOutputSignature();
     $('[data-tx-badge]').textContent=result.verified?'復元・破損検査済み':'ファイルに復元'; blobLink('[data-tx-download]',restoredFile,restoredFile.name); $('[data-tx-use]').hidden=!/^(image|audio|video)\//.test(result.type);
   }
   function notifyTextSource(detail = {}) { if(!restoringRecovery)main.dispatchEvent(new win.CustomEvent('pixieed:text-source', { bubbles: true, detail })); }
@@ -214,7 +273,7 @@ export async function installTextTools(doc = document, win = window) {
     showFile(await worker(operation,text,{},signal));
   }
   nav.addEventListener('click',event=>{const button=event.target.closest('[data-text-mode]');if(button&&showMode(button.dataset.textMode))notifyTextSource();});
-  root.addEventListener('input',event=>{refresh();if(mode!=='output'&&!event.target.matches('[data-tx-text-result]')&&!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果';if(event.target===source){if(!event.pixieedTextFileAppend)textEditRevision++;notifyTextSource();}});
+  root.addEventListener('input',event=>{refresh();if(mode!=='output'&&!event.target.matches('[data-tx-text-result]')&&!$('[data-tx-result]').hidden)$('[data-tx-badge]').textContent='前回の結果';if(event.target===source){outputInputRevision++;if(!event.pixieedTextFileAppend)textEditRevision++;notifyTextSource();}});
   root.addEventListener('change',refresh);
   $('[data-tx-native-grid]').addEventListener('change',()=>root.textLivePreview?.invalidate());
   $('[data-tx-run]').addEventListener('click',()=>mode==='output'&&root.textLivePreview?root.textLivePreview.refresh():run(mode==='output'?createOutput:createInput));$('[data-tx-cancel]').addEventListener('click',()=>aborter?.abort());
@@ -233,6 +292,15 @@ export async function installTextTools(doc = document, win = window) {
   let draftController = createDraftController();
   const conversionApi = {
     snapshot: () => ({ mode, text: source.value, editRevision: textEditRevision, file: selected, busy: busy || main.getAttribute('aria-busy') === 'true', importing: draftController.importing, composing, detected: detectText(source.value), alternateTextAvailable: draftSwap.available, alternateTextLength: draftSwap.alternateLength, renderFormat }),
+    /** Read the exact generated file/string for previews; this accessor never runs an encoder. */
+    outputPreview() {
+      if ($('[data-tx-result]').hidden) return selectGeneratedTextOutputPreview({ mode, generatedKind: 'unknown', renderFormat, resultId: generatedOutputId, sourceRevision: textEditRevision });
+      return selectGeneratedTextOutputPreview({ mode, generationMode: root.dataset.txResultMode || '', generatedKind, renderFormat,
+        artifacts: generatedArtifacts, outputText, projectText: generatedProjectText, restoredFile, action: generatedAction,
+        resultId: generatedOutputId, sourceRevision: textEditRevision,
+        sourceIdentity: selected ? { name: selected.name || '', size: Number(selected.size) || 0, id: fileIdentity(selected) } : null,
+        signature: generatedSignature, currentSignature: currentOutputSignature() });
+    },
     captureRecovery() {
       return {
         schemaVersion: 1, text: source.value, mode,
@@ -289,7 +357,10 @@ export async function installTextTools(doc = document, win = window) {
     setRenderFormat(value) {
       if (!isTextRenderOutputFormat(value) || busy || composing || draftController.importing || main.getAttribute('aria-busy') === 'true') return false;
       if (renderFormat === value) return true;
-      renderFormat = value; notifyTextSource({ kind: 'render-format' }); return true;
+      renderFormat = value;
+      const canvas = $('[data-tx-preview]').querySelector('canvas');
+      if (generatedKind === 'text-render' && canvas) { updateTextRenderLabel(canvas.width, canvas.height); updateTextRenderFile(); }
+      notifyTextSource({ kind: 'render-format' }); return true;
     },
     selectFile(file, { deferPreview = false } = {}) {
       if (busy || main.getAttribute('aria-busy') === 'true') return false;

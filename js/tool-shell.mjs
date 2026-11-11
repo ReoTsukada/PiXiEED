@@ -1,5 +1,5 @@
 import { creationModeEntryUrl } from './creation/mode-entry.mjs?rev=20261016-tool-shell-1';
-import { legacyToolPath } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+import { legacyToolPath } from './tool-start-routes.mjs?rev=20261110-output-result-1';
 
 const section = document.querySelector('[data-tool-embed][data-tool-shell]');
 const shell = document.querySelector('body[data-tool-shell]');

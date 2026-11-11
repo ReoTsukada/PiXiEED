@@ -1,5 +1,5 @@
-import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
+import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';

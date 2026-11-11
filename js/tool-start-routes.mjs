@@ -22,6 +22,20 @@ export function isFreshStartSearch(params) {
   return true;
 }
 
+/** Conservative converter resume markers stored in history state, not the URL. */
+export function hasConversionRecoveryHistory(state) {
+  return ['pixieedConversionRecovery', 'pixieedConversionRecoveryPrevious', 'pixieedConversionRecoveryPaused']
+    .some(key => Object.prototype.hasOwnProperty.call(state || {}, key));
+}
+
+/** Google documents this exact pair for Offerwall look-and-feel previews. */
+export function isConverterOfferwallPreviewSearch(params) {
+  const keys = [...params.keys()];
+  return keys.length === 2
+    && params.getAll('fc').length === 1 && params.get('fc') === 'alwaysshow'
+    && params.getAll('fctype').length === 1 && params.get('fctype') === 'monetization';
+}
+
 /** Preserve pointers, shared play, fragments and unknown parameters verbatim. */
 export function toolStartHref(href) {
   let url;
@@ -37,7 +51,11 @@ export function toolStartHref(href) {
 export function isFreshToolStartRequest(href, historyState) {
   let url;
   try { url = new URL(href); } catch { return false; }
-  return Boolean(getToolStartRoute(url.pathname) && !url.hash && isFreshStartSearch(url.searchParams)
+  const route = getToolStartRoute(url.pathname);
+  const freshSearch = isFreshStartSearch(url.searchParams)
+    || (route?.id === 'convert' && isConverterOfferwallPreviewSearch(url.searchParams));
+  return Boolean(route && !url.hash && freshSearch
+    && !(route.id === 'convert' && hasConversionRecoveryHistory(historyState))
     && historyState?.pixieedWorkspace !== true && historyState?.projectWorkspaceSelection !== true
     && historyState?.toolStartActive !== true);
 }

@@ -63,6 +63,10 @@ try{
   await page.waitForFunction(()=>[...document.querySelector('[data-sc-unified-format]').options].some(option=>option.value==='text-art'&&!option.disabled));
   await art('ascii');assert.equal(await page.locator('.px-format-dialog').count(),0,'shipped workspace needs no test-injected picker');
   assert.match(await page.locator('[data-tx-native-hint]').textContent(),/読み込み 32 × 24px/);assert.equal(await page.locator('[data-sc-unified-format]').inputValue(),'text-art');
+  const aux=page.locator('.sc-result-aux');
+  if(!(await aux.evaluate(node=>node.open)))await page.locator('.sc-result-aux > summary').click();
+  const artViewport=page.locator('[data-tx-art-viewport]');await artViewport.waitFor({state:'visible'});
+  await page.waitForFunction(()=>{const v=document.querySelector('[data-tx-art-viewport]'),r=v?.getBoundingClientRect();return Boolean(v&&r&&r.width>0&&r.height>0);});
   pass('visible output format → text art → ASCII reaches the real engine without component injection');
   await page.locator('[data-tx-attach]').uncheck();await ready();assert.equal(await page.evaluate(async()=>await(await fetch(document.querySelector('[data-tx-txt]').href)).text()),await text());
   for(const [width,height]of [[320,568],[390,844],[844,390],[1366,900]]){await page.setViewportSize({width,height});await page.locator('[data-tx-view="fit"]').click();await checkFit(`current text-art result fits ${width}x${height}`);}
@@ -82,7 +86,8 @@ try{
   const [txtDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);assert.equal((await bytes(txtDownload)).toString('utf8'),saved);assert.equal(downloads,1);pass('one explicit Save downloads exactly the current full TXT output');
   await page.locator('[data-sc-unified-format]').selectOption('jpeg');await page.waitForFunction(()=>document.querySelector('[data-format]')?.value==='jpeg'&&document.querySelector('.sc-result-surface')?.dataset.current==='true');
   const [jpegDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);assert.equal((await bytes(jpegDownload)).subarray(0,3).toString('hex'),'ffd8ff');assert.equal(downloads,2);pass('visible output destination returns to JPEG and saves actual JPEG bytes');
-  await page.locator('[data-tx-source]').fill('Retained synthetic draft');await page.locator('[data-sc-unified-purpose]').selectOption('text');await page.locator('[data-sc-unified-format]').selectOption('svg');await page.locator('[data-sc-text-size-edit]').click();
+  await page.locator('[data-ui-source="text"]').click();await page.locator('[data-tx-source]').waitFor({state:'visible'});
+  await page.locator('[data-tx-source]').fill('Retained synthetic draft');await page.locator('[data-sc-unified-format]').selectOption('svg');await page.locator('[data-sc-text-size-edit]').click();
   assert.equal(await page.locator('[data-tx-width]').isVisible(),true);assert.equal(await page.locator('[data-sc-unified-format]').inputValue(),'svg');assert.equal(await page.locator('[data-tx-source]').inputValue(),'Retained synthetic draft');pass('text input keeps render formats, editable width and the draft');
   const advancedQuery=await page.evaluate(async()=>{
     const {stageToolOutput}=await import('/js/creation/output-handoff.mjs');const data=new Uint8ClampedArray(16*12*4);data.fill(255);

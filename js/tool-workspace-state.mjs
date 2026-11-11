@@ -1,4 +1,4 @@
-import { getToolStartRoute } from './tool-start-routes.mjs?rev=20261024-common-tool-start-1';
+import { getToolStartRoute } from './tool-start-routes.mjs?rev=20261110-output-result-1';
 export function createWorkspaceHistoryEntry(currentHref, currentState, open) {
   const url = new URL(currentHref);
   url.searchParams.delete('workspace');

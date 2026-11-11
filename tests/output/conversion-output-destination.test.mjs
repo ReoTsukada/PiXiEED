@@ -49,14 +49,18 @@ async function routingFixture() {
  const helpers=await import('../../js/creation/conversion-unified-input.mjs');
  const source=readFileSync(new URL('../../js/creation/conversion-unified-input.mjs',import.meta.url),'utf8');
  const extract=(start,end)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a);return source.slice(a,b);};
- let mode='media',busy=false;const media={value:'png'},style={value:'encode'},file={name:'source.png',type:'image/png',size:200},text={value:'retained draft'};
+ let mode='media',busy=false,activeAssetId='a',selectionAllowed=true;const media={value:'png'},style={value:'encode'},file={name:'source.png',type:'image/png',size:200},text={value:'retained draft'};
  const mediaOptions=['png','jpeg','gif','wav'].map(value=>({value,label:value}));
  const styles=['encode','ascii','block','braille','emoji','custom','pixels','base64','dataurl'].map(value=>({value,label:value}));
- const calls=[];const context={...helpers,sourceKind:'file',isBusy:()=>busy,api:{snapshot:()=>({file,composing:false}),setMode:next=>{calls.push(['mode',next]);mode=next;return true;},selectFile:()=>{throw Error('must keep original file');}},getInputs:()=>[{id:'a',file}],materialState:()=>({loaded:true}),acceptFiles:()=>{throw Error('must not re-import retained material');},classifyConversionFile:()=> 'media',currentNative:()=>({value:mode==='media'?media.value:style.value,options:mode==='media'?mediaOptions:styles}),formatController:{choose:value=>{const options=mode==='media'?mediaOptions:styles;if(!options.some(option=>option.value===value))return false;(mode==='media'?media:style).value=value;calls.push(['format',mode,value]);return true;}},settings:{open:false},purpose:{value:'media'},update:()=>{},schedule:()=>{},optionsFrom:()=>mediaOptions,main:{querySelector:()=>media}};
+ const calls=[];const materialState=()=>({loaded:true,activeId:activeAssetId,assets:[{id:'a',kind:'image',name:'source.png'},{id:'b',kind:'image',name:'other.png'}]});
+ const context={...helpers,sourceKind:'file',explicitOriginalFile:null,activeMode:()=>mode,isBusy:()=>busy,getOriginalFileForAsset:id=>id==='a'?file:null,getAssetIdForOriginalFile:candidate=>candidate===file?'a':null,
+  api:{snapshot:()=>({file,composing:false,mode}),setMode:next=>{calls.push(['mode',next]);mode=next;return true;},selectFile:()=>{throw Error('must keep original file');}},getInputs:()=>[{id:'a',file}],acceptFiles:()=>{throw Error('must not re-import retained material');},classifyConversionFile:()=> 'media',currentNative:()=>({value:mode==='media'?media.value:style.value,options:mode==='media'?mediaOptions:styles}),formatController:{choose:value=>{const options=mode==='media'?mediaOptions:styles;if(!options.some(option=>option.value===value))return false;(mode==='media'?media:style).value=value;calls.push(['format',mode,value]);return true;}},settings:{open:false},purpose:{value:'media'},update:()=>{},schedule:()=>{},optionsFrom:()=>mediaOptions,
+  main:{conversionMaterials:{getState:materialState,selectAsset:async id=>{calls.push(['asset',id]);if(!selectionAllowed)return false;activeAssetId=id;return true;}},querySelector:()=>media}};
  vm.createContext(context);
  vm.runInContext(extract('  async function setPurposeValue(value) {','  function materialState()'),context);
+ vm.runInContext(extract('  function materialState() {','  function hasMediaMaterial()'),context);
  vm.runInContext(extract('  async function chooseFileOutput(value) {','  const changeFileStyle='),context);
- return {context,media,style,file,text,calls,get mode(){return mode;},set busy(value){busy=value;}};
+ return {context,media,style,file,text,calls,get mode(){return mode;},set busy(value){busy=value;},set activeAssetId(value){activeAssetId=value;},set selectionAllowed(value){selectionAllowed=value;}};
 }
 
 test('the actual file output handler changes image → art → image without losing raw file, draft or art settings',async()=>{
@@ -86,4 +90,9 @@ test('accepted delayed import explicitly enters media mode before applying its o
 test('failed media import keeps text art mode and does not apply a mismatched image format',async()=>{
  const f=await routingFixture();await f.context.chooseFileOutput('text-art');f.context.materialState=()=>({loaded:false});f.context.acceptFiles=async()=>false;
  assert.equal(await f.context.chooseFileOutput('jpeg'),false);assert.equal(f.mode,'output');assert.equal(f.media.value,'png');assert.equal(f.style.value,'ascii');
+});
+
+test('returning to media waits for exact asynchronous native source selection',async()=>{
+ const f=await routingFixture();await f.context.chooseFileOutput('text-art');f.activeAssetId='b';f.selectionAllowed=false;
+ assert.equal(await f.context.chooseFileOutput('jpeg'),false);assert.equal(f.mode,'output');assert.equal(f.media.value,'png');assert.deepEqual(f.calls.at(-1),['asset','a']);
 });
