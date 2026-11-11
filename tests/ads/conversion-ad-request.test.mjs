@@ -11,6 +11,16 @@ test('known public modes remain eligible',()=>{
 test('private and arbitrary input is not exposed to advertising',()=>{
  for(const search of ['?id=private','?file=private','?foo=secret','?text=input&text=output','?mode=draw','?__proto__=secret']) assert.equal(conversionAdEligible({...base,search}),false);
 });
+test('query or hash referrers suppress converter ads on both existing output paths',()=>{
+ for(const referrer of ['https://pixieed.jp/output/work/?id=private','https://example.test/path?filename=secret','https://example.test/path#private','not a URL']) assert.equal(conversionAdEligible({...base,referrer}),false,referrer);
+ for(const referrer of ['', 'https://pixieed.jp', 'https://pixieed.jp/tools/', 'https://example.test/plain/path']) assert.equal(conversionAdEligible({...base,referrer}),true,referrer);
+ for(const referrer of ['https://pixieed.jp/output/work/?id=private','not a URL']) assert.equal(conversionAdEligible({...base,pathname:'/output/work/',referrer}),false,referrer);
+});
+test('initial conversion-recovery history suppresses the provider for resumed output only',()=>{
+ for(const key of ['pixieedConversionRecovery','pixieedConversionRecoveryPrevious','pixieedConversionRecoveryPaused']) assert.equal(conversionAdEligible({...base,entryHistoryState:{[key]:key==='pixieedConversionRecoveryPaused'?false:'saved'}}),false,key);
+ assert.equal(conversionAdEligible({...base,entryHistoryState:{}}),true,'a fresh entry stays eligible when its UI later assigns a new recovery id');
+ assert.equal(conversionAdEligible({...base,pathname:'/output/work/',entryHistoryState:{pixieedConversionRecovery:'saved'}}),false);
+});
 test('local files, frames, unrelated paths and private hashes stay excluded',()=>{
  for(const extra of [{origin:'http://localhost'},{origin:'https://example.com'},{topLevel:false},{pathname:'/draw/'},{hash:'#private'}]) assert.equal(conversionAdEligible({...base,...extra}),false);
 });

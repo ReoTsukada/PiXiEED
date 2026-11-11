@@ -13,7 +13,7 @@ test('native text execution refuses composing input before disabling the textare
 });
 test('the fixed save entry ignores composing input even when called programmatically',()=>{
  const src=readFileSync(new URL('conversion-smart-ui.mjs',root),'utf8');let requests=0,frames=0,composing=true;
- const context={busy:()=>false,main:{textConversion:{snapshot:()=>({composing})}},saveError:'',saveFocusTicket:null,saveFocusGuard:{begin:()=>({})},button:{},mode:()=> 'input',revision:1,saveIntent:{pending:false,request(){requests++;}},pendingDimensions:null,fpsDirty:false,sizeDirty:false,schedule(){frames++;}};
+ const context={busy:()=>false,main:{textConversion:{snapshot:()=>({composing})}},setSaveError(){},saveFocusTicket:null,saveFocusGuard:{begin:()=>({})},button:{},mode:()=> 'input',revision:1,saveIntent:{pending:false,request(){requests++;}},pendingDimensions:null,fpsDirty:false,sizeDirty:false,schedule(){frames++;}};
  vm.createContext(context);vm.runInContext(extract(src,'  function beginExport()','\n  workspace.bindActions'),context);
  assert.equal(context.beginExport(),false);assert.equal(requests,0);assert.equal(frames,0);
  composing=false;context.beginExport();assert.equal(requests,1);assert.equal(frames,1);

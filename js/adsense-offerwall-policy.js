@@ -13,22 +13,46 @@
   if (window.top !== window.self) return;
 
   const startPath = window.location?.pathname;
+  const isConverterStart = startPath === '/tools/start/convert/';
+  const converterReferrerSafe = () => {
+    if (!isConverterStart) return true;
+    const referrer = String(document.referrer || '');
+    if (!referrer) return true;
+    try {
+      const url = new URL(referrer);
+      return ['http:', 'https:'].includes(url.protocol)
+        && !url.search && !url.hash && !/[?#]/.test(referrer);
+    } catch { return false; }
+  };
+  const isGoogleOfferwallPreviewSearch = (params) => {
+    if (!isConverterStart) return false;
+    const keys = [...params.keys()];
+    return keys.length === 2
+      && params.getAll('fc').length === 1 && params.get('fc') === 'alwaysshow'
+      && params.getAll('fctype').length === 1 && params.get('fctype') === 'monetization';
+  };
   const freshInitialSearch = (search) => {
     const params = new URLSearchParams(search || '');
+    if (isGoogleOfferwallPreviewSearch(params)) return true;
     for (const key of params.keys()) {
       if (!['workspace', 'social'].includes(key) || params.getAll(key).length !== 1 || params.get(key) !== '1') return false;
     }
     return true;
   };
   const mode = MODE_BY_PATH[startPath] || null;
+  const hasConverterRecoveryHistory = () => isConverterStart && [
+    'pixieedConversionRecovery', 'pixieedConversionRecoveryPrevious', 'pixieedConversionRecoveryPaused'
+  ].some(key => Object.prototype.hasOwnProperty.call(window.history?.state || {}, key));
   const initialHistoryFresh = window.history?.state?.pixieedWorkspace !== true
     && window.history?.state?.projectWorkspaceSelection !== true
-    && window.history?.state?.toolStartActive !== true;
+    && window.history?.state?.toolStartActive !== true
+    && !hasConverterRecoveryHistory();
   const initialEntryFresh = window.location?.protocol === 'https:'
     && window.location?.origin === 'https://pixieed.jp'
     && START_PATHS.includes(startPath)
     && !window.location.hash
     && freshInitialSearch(window.location.search)
+    && converterReferrerSafe()
     && initialHistoryFresh;
 
   let retired = false;
@@ -63,6 +87,7 @@
     && window.location.pathname === startPath
     && START_PATHS.includes(startPath)
     && !window.location.hash
+    && converterReferrerSafe()
     && initialHistoryFresh;
   const isEligible = () => {
     if (retired || !setupReady) return false;

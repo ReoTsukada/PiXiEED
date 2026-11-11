@@ -2,8 +2,8 @@ import { validateDetailedRecovery } from './conversion-detailed-recovery.mjs?rev
 import { validateOutputDimensions } from './output-input-constraints.mjs?rev=20261104-engine-boundaries-3';
 import { createConversionReturnGate } from './conversion-return-controller.mjs?rev=20261104-controllers-2';
 import { outputDimensionGuidance } from './output-dimension-guidance.mjs?rev=20261104-output-controller-1';
-import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
+import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
 import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, removeToolOutputMaterial, restoreToolOutputMaterial, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261104-engine-boundaries-3';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
@@ -1846,7 +1846,9 @@ async function mount() {
   const params = new URLSearchParams(location.search);
   if (params.getAll('id').length === 0) {
     showStart();
-    notifyToolEntryReady(getToolStartRoute(location.pathname)?.id === 'convert' && isFreshToolStartRequest(location.href, history.state));
+    const freshConverterEntry = getToolStartRoute(location.pathname)?.id === 'convert'
+      && isFreshToolStartRequest(location.href, history.state);
+    if (!freshConverterEntry) notifyToolEntryReady(false);
     return;
   }
   if (params.getAll('id').length !== 1) { setError('出力IDが複数あります。ツール一覧から新しく開いてください。'); notifyToolEntryReady(false); return; }

@@ -1,6 +1,7 @@
 import { decodeGeneratedPreview, needsDecodedOutputPreview } from './conversion-preview-decoder.mjs?rev=20261105-video-size-1';
 import { createResultPreviewQueue } from './conversion-result-queue.mjs?rev=20261105-video-size-1';
 import { classifyConversionPreview } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
+import { mountConversionSourceInspector } from './conversion-source-inspector.mjs?rev=20261110-output-result-1';
 
 export function decodedPreviewLabel(filename,frame) {
   const limit=frame.firstPageOnly?'TIFFの先頭ページのみを復号しています。総ページ数と後続ページの内容は、この表示では確認できません。':frame.partial?`${frame.frameCount}コマ／ページのうち先頭のみ。アニメーション全体の表示ではありません。`:'元素材や近似画像ではありません。';
@@ -28,23 +29,46 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
   const card = root?.querySelector('.tx-result-card'), legacy = main.querySelector('.text-legacy');
   if (!root || !composer || !card || !legacy) return null;
   const summary = legacy.querySelector('.sc-preview-summary');
+  const settingsButton = main.querySelector('[data-sc-settings-open]');
   const oldCardHidden=card.hidden;
-  const positions = [card, legacy, summary].filter(Boolean).map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
+  const positions = [card, legacy, summary, settingsButton].filter(Boolean).map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
   const host = doc.createElement('section'); host.className = 'sc-result-surface'; host.setAttribute('aria-label', '選択した出力形式のプレビュー');
-  host.innerHTML = '<header><strong>出力プレビュー</strong><button type="button" data-result-source aria-pressed="false">元の素材と比較</button></header><p data-result-state role="status" aria-live="polite"></p><div class="sc-result-operations"><button type="button" data-result-refresh hidden>プレビューを更新</button><button type="button" data-result-cancel hidden>更新を中止</button></div><div class="sc-result-content"><img alt="生成した出力ファイルのプレビュー" hidden><audio controls hidden></audio><video controls playsinline hidden></video><p data-result-fallback hidden></p></div>';
+  host.innerHTML = '<div class="sc-preview-toolbar" data-sc-preview-toolbar><header><strong>出力プレビュー</strong><div class="sc-preview-header-actions"><button type="button" data-result-refresh aria-label="プレビューを更新" title="プレビューを更新" hidden>更新</button><button type="button" data-result-cancel hidden>更新を中止</button></div></header></div><div class="sc-result-body" data-sc-result-body><div class="sc-result-content"><img alt="生成した出力ファイルのプレビュー" hidden><audio controls hidden></audio><video controls playsinline hidden></video><p data-result-fallback hidden></p><label data-result-text-label hidden></label><textarea data-result-text readonly spellcheck="false" wrap="off" hidden></textarea><p data-result-text-note hidden></p></div><p data-result-state role="status" aria-live="polite"></p></div><details class="sc-result-aux" aria-label="素材とコピーなどの操作"><summary>素材・コピーなどの操作</summary><div class="sc-result-aux-content"></div></details>';
   composer.after(host);
-  if (summary) host.prepend(summary);
+  const body = host.querySelector('[data-sc-result-body]'), auxiliary = host.querySelector('.sc-result-aux'), auxiliaryContent = host.querySelector('.sc-result-aux-content');
   const content = host.querySelector('.sc-result-content'), message = host.querySelector('[data-result-state]');
-  const sourceButton = host.querySelector('[data-result-source]'), refresh = host.querySelector('[data-result-refresh]'), cancel = host.querySelector('[data-result-cancel]'), fallback = host.querySelector('[data-result-fallback]');
-  host.append(card, legacy);
+  const refresh = host.querySelector('[data-result-refresh]'), cancel = host.querySelector('[data-result-cancel]'), fallback = host.querySelector('[data-result-fallback]');
+  const resultText = host.querySelector('[data-result-text]'), resultTextLabel = host.querySelector('[data-result-text-label]'), resultTextNote = host.querySelector('[data-result-text-note]');
+  const sourceInspector = mountConversionSourceInspector({ doc, win });
+  const headerActions = host.querySelector('.sc-preview-header-actions');
+  headerActions.append(sourceInspector.element);
+  const sourceAndSettings = composer.querySelector('.sc-unified-head');
+  if (settingsButton && sourceAndSettings) sourceAndSettings.append(settingsButton);
+  let sourceStyle = doc.querySelector?.('link[data-source-preview-style]') || null, ownsSourceStyle = false;
+  if (!sourceStyle && doc.head) {
+    sourceStyle = doc.createElement('link'); sourceStyle.rel = 'stylesheet';
+    sourceStyle.href = '/css/conversion-source-preview.css?rev=20261110-output-layout-7'; sourceStyle.dataset.sourcePreviewStyle = '';
+    doc.head.append(sourceStyle); ownsSourceStyle = true;
+  }
+  if (summary) auxiliaryContent.append(summary);
+  auxiliaryContent.append(card, legacy);
+  // Native materials/actions belong to the bounded settings pane, never the preview viewport.
+  composer.append(auxiliary);
   main.dataset.unifiedResult = 'true';
   const decodedCanvas=doc.createElement('canvas');decodedCanvas.hidden=true;decodedCanvas.setAttribute('aria-label','生成済みファイルを復号した画素プレビュー');content.prepend(decodedCanvas);
   const decodeNote=doc.createElement('p');decodeNote.dataset.resultDecoded='';decodeNote.hidden=true;content.append(decodeNote);
   let decodeVersion=0,decodeKey='',decodeController=null;
-  let current = null, comparing = false, stopped = false, ownedBlob = null, ownedUrl = '', lastHref = '', lastType = null, decodeFailed = false, queue;
+  let current = null, stopped = false, ownedBlob = null, ownedUrl = '', lastHref = '', lastType = null, decodeFailed = false, queue;
+  let previousMode = null, previousTab = null, previousActiveSourceId = null, previousOriginalFile = null, previousLoaded = null, previousMaterialFeedbackVisible = false;
   const set = (node, key, value) => { if (node[key] !== value) node[key] = value; };
   const flag = (node, key, value) => { if (node.dataset[key] !== value) node.dataset[key] = value; };
   const clearUrl = () => { if (ownedUrl) win.URL.revokeObjectURL(ownedUrl); ownedUrl = ''; ownedBlob = null; };
+  function clearMediaNodes() {
+    clearDecode(); lastHref = ''; lastType = null; decodeFailed = false;
+    for (const tag of ['img','audio','video']) {
+      const node = content.querySelector(tag); node.pause?.(); node.onerror = null; node.removeAttribute('src'); set(node,'hidden',true);
+    }
+  }
   function clearDecode() {
     decodeVersion++;decodeController?.abort();decodeController=null;decodeKey='';set(decodedCanvas,'hidden',true);set(decodeNote,'hidden',true);decodedCanvas.width=decodedCanvas.height=1;
   }
@@ -88,25 +112,68 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
   }
   function draw() {
     if (stopped || !current) return;
-    const q = queue.snapshot, p = resultSurfacePresentation({ ...current, queue:q, compare:comparing });
-    flag(main,'resultSource',String(comparing && current.mode === 'media'));
+    const q = queue.snapshot;
+    const output = current.mode === 'media' ? null : current.outputPreview;
+    const outputMatches = Boolean(output && output.kind !== 'unknown' && output.matchesInput !== false && (!output.generationMode || output.generationMode === current.mode));
+    const presentation = { ...current, ready: Boolean(current.ready && (current.mode === 'media' || outputMatches)) };
+    const p = resultSurfacePresentation({ ...presentation, queue:q });
+    flag(main,'resultSource','false');
     flag(main,'resultMode',current.mode);
     flag(host,'state',p.state); flag(host,'current',String(p.current));
-    set(sourceButton,'disabled',!current.loaded || (!current.originalFile && current.mode !== 'media'));
-    if (sourceButton.getAttribute('aria-pressed') !== String(comparing)) sourceButton.setAttribute('aria-pressed',String(comparing));
-    set(sourceButton,'textContent',comparing?'出力プレビューへ戻る':'元の素材と比較');
-    const textVisible = current.mode !== 'media' && !comparing;
+    const sourceButton = sourceInspector.element.querySelector('[data-source-inspect-button]');
+    const inspectorSources = current.mode === 'media' ? current.sources || [] : [];
+    const inspectorActiveId = current.mode === 'media' ? current.activeSourceId || '' : '';
+    const inspectorFile = current.mode === 'output' ? current.originalFile || null : null;
+    const inspectorText = current.mode === 'input' ? current.sourceText || '' : '';
+    const inspectorRevision = current.mode === 'input' ? current.sourceRevision || 0 : 0;
+    const hasSources = Boolean(inspectorFile || inspectorText || (Array.isArray(inspectorSources) && inspectorSources.length));
+    sourceInspector.update(inspectorSources, inspectorActiveId, inspectorFile, inspectorText, inspectorRevision);
+    set(sourceButton,'disabled',!current.loaded || !hasSources);
     set(card,'hidden',current.mode==='media');
-    // The native text engine keeps all result, copy, encoding and restore controls.
-    set(content,'hidden',textVisible || p.state === 'empty' || (comparing && current.mode === 'media'));
-    let description;
-    if (comparing) {
-      description = '比較用の元の素材です。保存する出力結果ではありません。';
-      if (current.mode !== 'media' && current.originalFile) showBlob(current.originalFile,current.originalFile.name);
+    const actualText = current.mode !== 'media' && output?.kind === 'text' && typeof output.text === 'string';
+    const actualFile = current.mode !== 'media' && ['image','file'].includes(output?.kind) && output.blob;
+    const previewType = actualFile ? generatedPreviewKind(output.filename, output.mimeType) : null;
+    const actualMedia = Boolean(actualFile && previewType);
+    const showText = Boolean(actualText && p.state !== 'empty');
+    const showMedia = current.mode === 'media' ? p.state !== 'empty' : actualMedia && p.state !== 'empty';
+    const showMetadata = Boolean(current.mode !== 'media' && output && output.kind !== 'unknown' && !actualText && !actualMedia && p.state !== 'empty');
+    set(content,'hidden',!showText && !showMedia && !showMetadata);
+    set(resultTextLabel,'hidden',!showText); set(resultText,'hidden',!showText); set(resultTextNote,'hidden',true);
+    if (showText) {
+      clearUrl(); clearMediaNodes(); set(fallback,'hidden',true);
+      const project = output.format === 'pxtxt';
+      set(resultTextLabel,'textContent',project ? `文章と設定データ（PXT） · ${output.filename || 'pixieed-text.pxtxt'}` : `保存されるTXT · ${output.filename || '文字出力.txt'}`);
+      set(resultText,'value',output.text.slice(0,64000));
+      const length = output.text.length;
+      const truncated = length > 64000;
+      set(resultTextNote,'textContent',truncated
+        ? `表示は先頭64,000文字です。保存される${project ? 'PXT' : 'TXT'}には全文${length.toLocaleString()}文字${project ? 'の文章と設定' : '（添付された復元コードを含む）'}が含まれます。`
+        : project ? `画像ではなく、保存される文章と設定のプロジェクトデータです。全文${length.toLocaleString()}文字。` : `保存されるTXTの全文${length.toLocaleString()}文字です。添付された復元コードも含みます。`);
+      set(resultTextNote,'hidden',false);
+    } else if (showMedia && current.mode !== 'media') {
+      set(resultText,'value',''); set(resultTextNote,'hidden',true); set(resultTextLabel,'hidden',true);
+      set(fallback,'hidden',true);
+    } else if (showMetadata) {
+      clearUrl(); clearMediaNodes(); set(fallback,'hidden',false);
+      if (output && output.kind !== 'unknown') {
+        const size = Number(output.blob?.size || 0);
+        set(fallback,'textContent',`生成済みファイル ${output.filename || ''} · ${output.mimeType || '形式未指定'} · ${size.toLocaleString()} bytes。この形式の安全なインライン表示には対応していません。`);
+      }
+      set(resultText,'value',''); set(resultTextLabel,'hidden',true); set(resultTextNote,'hidden',true);
     } else if (current.mode !== 'media') {
-      clearUrl();media();
-      description = current.ready && !current.working ? '現在の設定で生成した出力です。文字列の保存は全文です。復元コードの添付内容は文字列表示で確認できます。' : current.working ? '出力を更新中です。残っている表示は前回の結果です。' : '現在の設定は未生成または未反映です。表示が残っていれば前回の結果です。「プレビューを更新」で保存前に最新の出力を生成できます。';
+      clearUrl(); clearMediaNodes(); set(fallback,'hidden',true);
+      set(resultText,'value',''); set(resultTextLabel,'hidden',true); set(resultTextNote,'hidden',true);
+    }
+    let description;
+    if (current.mode !== 'media') {
+      if (actualMedia && showMedia) showBlob(output.blob, output.filename);
+      if (!output || output.kind === 'unknown') description = current.working ? '更新中です。前回の出力があれば、その内容と形式を表示します。' : '現在の設定でまだ出力が生成されていません。';
+      else if (p.current) description = actualMedia || actualText
+        ? `現在の設定で生成した ${output.filename || output.format || '出力'} です。保存される内容をこの領域で確認できます。${output.format === 'svg' ? ' SVGの書体は表示環境によって変わることがあります。' : ''}`
+        : `現在の設定で生成した ${output.filename || output.format || 'ファイル'} です。形式 ${output.mimeType || '未確認'}、${Number(output.blob?.size || 0).toLocaleString()} bytes。インライン表示には対応していません。`;
+      else description = `${current.working ? '更新中です。' : '現在の設定には未反映です。'} 表示中は前回の ${output.filename || output.format || '出力'} です。`;
     } else if (p.owner === 'saved') {
+      if (ownedUrl && ownedUrl !== current.link.href) clearUrl();
       media(current.link.href,current.link.download,current.link.type||(q.result?.format===current.capability?.format?q.result?.blob?.type:'')||((/^audio\//.test(current.originalFile?.type||''))?'audio/*':''));
       description = `現在の設定で生成済み：${current.link.download}`;
     } else {
@@ -118,32 +185,48 @@ export function mountResultSurface({ main, doc = document, win = window, schedul
         : (current.capability?.reason || 'この形式の生成可否を確認してください。対応していれば保存前にプレビューを更新できます。')+(q.result?` 表示中は前回の${q.result.filename}です。現在の設定は未反映です。`:'');
     }
     if(p.current&&p.owner==='preview'&&q.result?.notice)description+=' '+q.result.notice;
-    if(current.capability?.notice&&(p.current||comparing))description+=' '+current.capability.notice;
-    set(message,'textContent',p.state==='empty'?'素材を追加すると、選択した出力形式のプレビューをここに表示します。':description);
+    if(current.capability?.notice&&p.current)description+=' '+current.capability.notice;
+    set(message,'textContent',p.state==='empty'?'入力すると、ここで仕上がりを確認できます。':description);
     const queueWorking = ['queued','rendering'].includes(q.state);
-    set(refresh,'hidden',!current.loaded || comparing || (current.mode==='media' ? !current.capability?.supported || (current.ready && !current.working) || (p.current && current.capability?.automatic) : current.working));
+    set(refresh,'hidden',!current.loaded || (current.mode==='media' ? !current.capability?.supported || (current.ready && !current.working) || (p.current && current.capability?.automatic) : current.working));
     set(refresh,'disabled',current.working || queueWorking);
-    set(cancel,'hidden',comparing || (current.mode==='media'?!queueWorking:!current.working));
+    set(cancel,'hidden',current.mode==='media'?!queueWorking:!current.working);
     for (const tag of ['audio','video']) if (content.hidden) content.querySelector(tag).pause?.();
   }
   queue = createResultPreviewQueue({ timers:win, render: (payload,{signal}) => payload.api.previewOutput({signal,pendingFps:payload.pendingFps,pendingSize:payload.pendingSize}), onState: () => { draw(); schedule(); } });
-  sourceButton.addEventListener('click',()=>{comparing=!comparing;draw();schedule();});
   refresh.addEventListener('click',()=>{if(current?.mode==='media')queue.refresh();else refreshText();draw();});
   cancel.addEventListener('click',()=>{if(current?.mode==='media')queue.pause();else cancelText();draw();});
   return {
     update(next) {
+      const tab = main.dataset.outputTab || '';
+      const activeSourceId = next.activeSourceId || null, originalFile = next.originalFile || null;
+      const identityChanged = previousMode === null || next.mode !== previousMode || tab !== previousTab
+        || activeSourceId !== previousActiveSourceId || originalFile !== previousOriginalFile;
+      if (identityChanged) body.scrollTop = 0;
+      const loaded = Boolean(next.loaded);
+      const mediaEmpty = next.mode === 'media' && !loaded;
+      if (previousLoaded === null || loaded !== previousLoaded || next.mode !== previousMode) {
+        if (mediaEmpty) auxiliary.open = true;
+        else if (previousLoaded === false && loaded) auxiliary.open = false;
+        else if (previousMode === 'media' && previousLoaded === false && next.mode !== 'media') auxiliary.open = false;
+      }
+      const materialFeedback = legacy.querySelector('.sc-material-feedback');
+      const feedbackVisible = Boolean(materialFeedback && !materialFeedback.hidden);
+      if (feedbackVisible && !previousMaterialFeedbackVisible) auxiliary.open = true;
+      previousMaterialFeedbackVisible = feedbackVisible;
+      previousMode = next.mode; previousTab = tab; previousActiveSourceId = activeSourceId;
+      previousOriginalFile = originalFile; previousLoaded = loaded;
       current=next;
-      if (!next.loaded) comparing=false;
       const allow=next.mode==='media' && next.loaded && !next.working && !next.ready;
       queue.request({key:next.key,hasSource:allow,supported:Boolean(next.capability?.supported),automatic:Boolean(next.capability?.automatic),payload:{api:next.api,pendingFps:Boolean(next.pendingFps),pendingSize:Boolean(next.pendingSize)}});
       draw();
     },
     invalidate() { if(current)current={...current,ready:false};queue.pause(); },
     destroy() {
-      stopped=true;queue.destroy();clearDecode();clearUrl();media();
+      stopped=true;queue.destroy();clearDecode();clearUrl();media();sourceInspector.destroy();
       // Restore the summary before its material surface is destroyed, then the legacy subtree.
       for (const item of positions.slice().reverse()) item.parent.insertBefore(item.node,item.next?.parentNode===item.parent?item.next:null);
-      card.hidden=oldCardHidden;host.remove();delete main.dataset.unifiedResult;delete main.dataset.resultSource;delete main.dataset.resultMode;
+      card.hidden=oldCardHidden;auxiliary.remove();host.remove();if(ownsSourceStyle)sourceStyle.remove();delete main.dataset.unifiedResult;delete main.dataset.resultSource;delete main.dataset.resultMode;
     },
   };
 }

@@ -1,5 +1,5 @@
-import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261024-common-tool-start-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
+import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
 import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';

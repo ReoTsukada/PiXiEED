@@ -4,6 +4,18 @@ import { workspaceAvailableHeight, conversionDockBottom } from './conversion-cla
 import { mountConversionStage } from './conversion-stage.mjs?rev=20261105-video-size-1';
 import { createConversionPreviewController } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
 
+/** Include every visible grid track before falling back to page scrolling. */
+export function conversionWorkspaceMinimumHeight({ unified = false, toolbarHeight = 0, footerHeight = 0, footerMargin = 0, viewportWidth = 0 } = {}) {
+  if (!unified) return 180;
+  const dimension = value => Number.isFinite(value) ? Math.max(0, value) : 0;
+  const desktop = dimension(viewportWidth) >= 960;
+  const settingsMinimum = desktop ? 320 : 200;
+  const previewMinimum = 240;
+  const gridGaps = desktop ? 16 : 24;
+  const footerSpace = dimension(footerHeight) > 0 ? dimension(footerHeight) + dimension(footerMargin) : 0;
+  return dimension(toolbarHeight) + (desktop ? Math.max(settingsMinimum, previewMinimum) : settingsMinimum + previewMinimum) + gridGaps + 8 + footerSpace;
+}
+
 /** Layout only: move existing controls, retaining their values, nodes and listeners. */
 export function mountConversionWorkspace(main, toolbar, doc = document, win = window) {
   const panel = doc.createElement('dialog'); panel.id = 'sc-settings-panel'; panel.className = 'sc-settings-panel';
@@ -51,7 +63,7 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
   });
   toolbar.querySelector('.sc-input-actions').prepend(back);
   const desktop = win.matchMedia('(min-width: 960px)');
-  const panelController = createWorkspacePanel({ panel, open, desktop, win });
+  const panelController = createWorkspacePanel({ panel, open, desktop, win, modalOnly: () => main.dataset.unifiedResult === 'true' });
   panel.querySelector('[data-sc-settings-close]').addEventListener('click', panelController.dismiss);
   panel.addEventListener('cancel', event => { event.preventDefault(); panelController.dismiss(); });
   panel.addEventListener('click', event => { if (event.target === panel) { const r = panel.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) panelController.dismiss(); } });
@@ -69,8 +81,14 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
     const navTop = nav?.getBoundingClientRect().top;
     doc.body.style.setProperty('--sc-save-bottom', `${conversionDockBottom({ layoutHeight: win.innerHeight, navTop })}px`);
     const available = workspaceAvailableHeight({ viewportHeight: height, offsetTop: viewport?.offsetTop || 0, headerBottom: top, dockTop: dock?.getBoundingClientRect().top, navTop, minHeight: 0 });
-    main.style.setProperty('--sc-space', `${Math.max(180, available)}px`);
-    doc.body.classList.toggle('sc-scroll-fallback', available < 180);
+    const toolbarHeight = main.querySelector('.sc-toolbar')?.getBoundingClientRect().height || 0;
+    const footer = main.querySelector('.tx-footer');
+    const footerHeight = footer?.getBoundingClientRect().height || 0;
+    const footerStyle = footerHeight > 0 ? win.getComputedStyle?.(footer) : null;
+    const footerMargin = (parseFloat(footerStyle?.marginTop) || 0) + (parseFloat(footerStyle?.marginBottom) || 0);
+    const minWorkspaceHeight = conversionWorkspaceMinimumHeight({ unified: main.dataset.unifiedResult === 'true', toolbarHeight, footerHeight, footerMargin, viewportWidth: win.innerWidth });
+    main.style.setProperty('--sc-space', `${Math.max(minWorkspaceHeight, available)}px`);
+    doc.body.classList.toggle('sc-scroll-fallback', available < minWorkspaceHeight);
     doc.body.style.setProperty('--sc-bottom-reserve', `${Math.max(0, height + (viewport?.offsetTop || 0) - (dock?.getBoundingClientRect().top || height))}px`);
   }
   let observedDock = null;
@@ -169,9 +187,13 @@ export function mountConversionWorkspace(main, toolbar, doc = document, win = wi
 }
 
 /** History owns a mobile sheet; closing never reloads or resets conversion controls. */
-export function createWorkspacePanel({ panel, open, desktop, win }) {
+export function createWorkspacePanel({ panel, open, desktop, win, modalOnly = () => false }) {
   const key = 'pixieedConversionSettings';
   let active = false, closing = false, reopen = false, destroyed = false;
+  const requiresModal = () => typeof modalOnly === 'function' ? Boolean(modalOnly()) : Boolean(modalOnly);
+  const staticDesktopPanel = () => desktop.matches && active && !requiresModal();
+  const layoutKey = () => `${desktop.matches}:${active}:${requiresModal()}`;
+  let currentLayout = layoutKey();
   function expanded() { const value = String(panel.open); if (open.getAttribute('aria-expanded') !== value) open.setAttribute('aria-expanded', value); }
   function clearHistoryMarker() {
     if (!win.history.state?.[key]) return;
@@ -181,7 +203,7 @@ export function createWorkspacePanel({ panel, open, desktop, win }) {
     if (destroyed) return;
     if (closing) { reopen = true; return; }
     if (panel.open) return;
-    if (desktop.matches && active) panel.show();
+    if (staticDesktopPanel()) panel.show();
     else { win.history.pushState({ ...win.history.state, [key]: true }, ''); panel.showModal(); }
     expanded();
   }
@@ -191,25 +213,30 @@ export function createWorkspacePanel({ panel, open, desktop, win }) {
     if (reopen) { reopen = false; show(); }
   }
   function dismiss() {
-    if ((desktop.matches && active) || !panel.open || closing) return;
+    if (staticDesktopPanel() || !panel.open || closing) return;
     if (win.history.state?.[key]) { closing = true; win.history.back(); }
     else finish();
   }
   function pop() {
     if (destroyed) return;
-    if (closing || (panel.open && !win.history.state?.[key] && !(desktop.matches && active))) finish();
+    if (closing || (panel.open && !win.history.state?.[key] && !staticDesktopPanel())) finish();
     else if (win.history.state?.[key] && !panel.open) { panel.showModal(); expanded(); }
   }
   function layout() {
     if (closing) return; // The pending popstate is the only owner of this close.
     clearHistoryMarker(); if (panel.open) panel.close();
-    if (desktop.matches && active) panel.show(); expanded();
+    if (staticDesktopPanel()) panel.show(); expanded(); currentLayout = layoutKey();
   }
-  open.addEventListener('click', show); win.addEventListener('popstate', pop); desktop.addEventListener('change', layout);
+  function desktopChanged() {
+    if (panel.open && requiresModal() && panel.matches?.(':modal')) { expanded(); currentLayout = layoutKey(); return; }
+    layout();
+  }
+  open.addEventListener('click', show); win.addEventListener('popstate', pop); desktop.addEventListener('change', desktopChanged);
   return { show, dismiss, update(next) {
-    if (active !== next) { active = next; layout(); }
-    else if (desktop.matches && active && !panel.open) { panel.show(); expanded(); }
-  }, destroy() { destroyed = true; clearHistoryMarker(); open.removeEventListener('click', show); win.removeEventListener('popstate', pop); desktop.removeEventListener('change', layout); } };
+    if (active !== next) active = next;
+    if (layoutKey() !== currentLayout) layout();
+    else if (staticDesktopPanel() && !panel.open) { panel.show(); expanded(); }
+  }, destroy() { destroyed = true; clearHistoryMarker(); open.removeEventListener('click', show); win.removeEventListener('popstate', pop); desktop.removeEventListener('change', desktopChanged); } };
 }
 
 // Compatibility export; save decisions live outside this DOM/layout module.

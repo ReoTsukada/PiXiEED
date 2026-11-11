@@ -54,7 +54,7 @@ function renderFile(record, doc, win) {
 export async function mountSharedOutput(request, doc = document, win = window) {
   const record = request.key === 'id' ? await readToolOutput(request.id) : await readOutputFile(request.id);
   if (request.key === 'id' && (request.advanced || needsDetailedOutput(record))) {
-    const { outputPageReady } = await import('./output-page.mjs?rev=20261105-download-name-1');
+    const { outputPageReady } = await import('./output-page.mjs?rev=20261110-output-result-1');
     await outputPageReady;
     return 'detailed';
   }

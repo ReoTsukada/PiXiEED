@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspacePanel } from '../../js/creation/conversion-workspace.mjs';
-function fixture(wide = false) {
+function fixture(wide = false, modalOnly = false) {
   const listeners = new Map(), mediaListeners = new Map(), attrs = new Map();
   let focus = 0, pushes = 0, backs = 0, modal = false;
-  const panel = { open: false, show() { this.open = true; modal = false; }, showModal() { this.open = true; modal = true; }, close() { this.open = false; modal = false; } };
+  const panel = { open: false, show() { this.open = true; modal = false; }, showModal() { this.open = true; modal = true; }, close() { this.open = false; modal = false; }, matches(selector) { return selector === ':modal' && modal; } };
   const open = { getAttribute: key => attrs.get(key), setAttribute: (key, value) => attrs.set(key, value), addEventListener() {}, removeEventListener() {}, focus() { focus++; } };
   const desktop = { matches: wide, addEventListener: (key, value) => mediaListeners.set(key, value), removeEventListener: key => mediaListeners.delete(key) };
   const stack = [{ preserved: 1 }]; let index = 0;
   const win = { history: { get state() { return stack[index]; }, pushState(value) { stack.splice(++index); stack[index] = value; pushes++; }, replaceState(value) { stack[index] = value; }, back() { backs++; } }, addEventListener: (key, value) => listeners.set(key, value), removeEventListener: key => listeners.delete(key) };
-  const api = createWorkspacePanel({ panel, open, desktop, win });
+  const api = createWorkspacePanel({ panel, open, desktop, win, modalOnly });
   return { api, panel, win, attrs, get modal() { return modal; }, get focus() { return focus; }, get pushes() { return pushes; }, get backs() { return backs; }, pop() { index = Math.max(0, index - 1); listeners.get('popstate')?.(); }, forward() { index = Math.min(index + 1, stack.length - 1); listeners.get('popstate')?.(); }, resize(wide) { desktop.matches = wide; mediaListeners.get('change')?.(); } };
 }
 test('mobile close waits for history, coalesces repeated close, restores focus and preserves state', () => {
@@ -32,6 +32,19 @@ test('desktop settings are nonmodal and do not add history; orientation clears s
   f.api.dismiss(); assert.equal(f.panel.open, true); f.resize(false); assert.equal(f.panel.open, false);
   f.api.show(); assert.equal(f.modal, true); f.resize(true); assert.equal(f.modal, false); assert.equal(f.win.history.state.pixieedConversionSettings, undefined);
   f.resize(false); assert.equal(f.panel.open, false); f.api.show(); f.api.dismiss(); f.pop(); assert.equal(f.panel.open, false);
+});
+test('unified desktop settings use a modal history sheet and retain focus/history behavior', () => {
+  const f = fixture(true, true); f.api.update(true);
+  assert.equal(f.panel.open, false); assert.equal(f.pushes, 0);
+  f.api.show(); assert.equal(f.panel.open, true); assert.equal(f.modal, true); assert.equal(f.pushes, 1);
+  assert.equal(f.win.history.state.preserved, 1); assert.equal(f.win.history.state.pixieedConversionSettings, true);
+  f.api.dismiss(); assert.equal(f.backs, 1); assert.equal(f.panel.open, true);
+  f.pop(); assert.equal(f.panel.open, false); assert.equal(f.focus, 1); assert.equal(f.win.history.state.preserved, 1);
+  f.forward(); assert.equal(f.panel.open, true); assert.equal(f.modal, true);
+  f.resize(false); assert.equal(f.panel.open, true); assert.equal(f.modal, true); assert.equal(f.win.history.state.pixieedConversionSettings, true);
+  f.resize(true); assert.equal(f.panel.open, true); assert.equal(f.modal, true);
+  f.api.update(false); assert.equal(f.panel.open, false); assert.equal(f.win.history.state.pixieedConversionSettings, undefined);
+  assert.equal(f.win.history.state.preserved, 1);
 });
 test('switching media/text releases dialog and retains unrelated history; destroy ignores late pop', () => {
   const f = fixture(); f.api.update(true); f.api.show(); f.api.update(false);

@@ -108,7 +108,7 @@ try {
       await page.locator('#creation-output-open').click(); await page.waitForURL(url => url.pathname === '/output/work/');
       const save = page.locator('#output-nav-export');
       await page.waitForFunction(() => !document.querySelector('#output-nav-export')?.disabled);
-      assert.match(await save.innerText(), /PNGで保存/);
+      assert.match(await save.innerText(), /PNGを保存/);
       const [download] = await Promise.all([page.waitForEvent('download'), touch ? save.tap() : save.click()]);
       const path = `${out}/first-drawing-${width}.png`; await download.saveAs(path);
       assert.equal((await readFile(path)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');

@@ -1,6 +1,6 @@
 import { FILE_ACCEPT, conversionChoices, outputNotice, safeConvertedName } from './conversion-service.mjs?rev=20261028-conversion-1';
 import { loadTimelineFiles, animationPlan, frameAt, setFrameSeconds, moveFrame, convertWithTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261024-common-tool-start-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
 import { addConversionMaterials, countConversionMaterialFrames, describeConversionMaterials, firstConversionAssetFrameIndex, moveConversionMaterial, preserveConversionFrameAfterRemoval, removeConversionMaterialWithTicket, restoreConversionMaterial, snapshotConversionMaterialSource, validateConversionMaterialFiles } from './conversion-materials.mjs?rev=20261101-direct-material-1';
 import { createConversionRecoverySnapshot, validateConversionRecovery } from './conversion-media-recovery.mjs?rev=20261105-audio-recovery-1';
 import { runReadonlyPreview, readonlyPreviewBounds } from './conversion-readonly-preview.mjs?rev=20261105-video-size-1';
