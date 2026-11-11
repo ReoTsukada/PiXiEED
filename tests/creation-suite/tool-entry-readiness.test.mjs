@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { isInitialProjectEntryFresh } from '../../js/creation/project-workspace.mjs?rev=20261024-common-tool-start-1';
+import { isInitialProjectEntryFresh } from '../../js/creation/project-workspace.mjs?rev=20261111-output-offerwall-1';
 
 const root = new URL('../../', import.meta.url);
 const source = (path) => readFile(new URL(path, root), 'utf8');
-const entryImport = /import \{ notifyToolEntryReady \} from ['"]\.\.\/tool-offerwall-entry\.mjs\?rev=20261110-output-result-1['"]/;
+const entryImport = /import \{ notifyToolEntryReady \} from ['"]\.\.\/tool-offerwall-entry\.mjs\?rev=(?:20261110-output-result-1|20261111-output-offerwall-1)['"]/;
 
 test('workspace freshness starts false and is granted only after a clean, successful first bootstrap', async () => {
   const workspace = await source('js/creation/project-workspace.mjs');
@@ -54,24 +54,27 @@ test('puzzle tool entries signal only after restoration bootstrap and reject res
 test('output workspace leaves a clean empty start pending for final converter readiness', async () => {
   const output = await source('js/creation/output-page.mjs');
   assert.match(output, entryImport);
-  assert.match(output, /showStart\(\);\s*const freshConverterEntry = getToolStartRoute\(location\.pathname\)\?\.id === 'convert'[\s\S]*?if \(!freshConverterEntry\) notifyToolEntryReady\(false\);\s*return;/);
+  assert.match(output, /showStart\(\);\s*const freshConverterEntry = getToolStartRoute\(location\.pathname\)\?\.id === 'convert'[\s\S]*?if \(!freshConverterEntry && !isOutputEntryPath\(location\.pathname\)\) notifyToolEntryReady\(false\);\s*return;/);
   assert.doesNotMatch(output, /notifyToolEntryReady\(getToolStartRoute\(location\.pathname\)/);
   assert.match(output, /setError\('出力IDが複数あります[^;]+; notifyToolEntryReady\(false\); return;/);
   const hydrate = output.slice(output.indexOf('async function hydrateOutputRecord('), output.indexOf('async function mount()'));
-  assert.match(hydrate, /renderAssets\(\); updateSequenceControls\(\);[\s\S]*notifyToolEntryReady\(false\);\s*return true;/);
+  assert.match(hydrate, /renderAssets\(\); updateSequenceControls\(\);[\s\S]*return true;/);
+  assert.doesNotMatch(hydrate, /notifyToolEntryReady/);
   const mount = output.slice(output.indexOf('async function mount()'), output.indexOf('startChoose.addEventListener'));
   assert.match(mount, /await readToolOutput\(params.get\('id'\)\);\s*await hydrateOutputRecord\(nextRecord\)/);
   assert.match(mount, /catch \(error\) \{ setError\([^;]+; notifyToolEntryReady\(false\); \}/);
 });
 
-test('converter entry retains Offerwall only for an exact fresh converter start', async () => {
+test('output readiness is granted by successful full startup, including restored entries', async () => {
   const entry = await source('js/creation/conversion-entry.mjs');
-  assert.match(entry, /import \{ isFreshToolStartRequest \} from ['"]\.\.\/tool-start-routes\.mjs\?rev=/);
-  assert.match(entry, /location\.pathname === ['"]\/tools\/start\/convert\/['"]\s*&&\s*isFreshToolStartRequest\(location\.href, entryHistoryState\)/);
-  assert.match(entry, /if \(!freshConverterEntry\)\s*\{\s*try \{ window\.__PIXIEED_OFFERWALL_ENTRY__\?\.retire\?\.\(\);/);
-  assert.ok(entry.includes("if (result?.status === 'ready')"));
-  assert.ok(entry.includes('notifyToolEntryReady(freshConverterEntry);'));
-  assert.match(entry, /conversion-display-ad/);
+  assert.match(entry, /prepareOutputEntry\(window\)/);
+  assert.match(entry, /const outputEntry = isOutputEntryPath\(location\.pathname\);/);
+  assert.doesNotMatch(entry, /if \(!freshConverterEntry\)/);
+  assert.match(entry, /await outputPageReady/);
+  assert.match(entry, /await mountSharedOutput/);
+  assert.match(entry, /if \(result\?\.status === 'ready'\) \{[\s\S]*?notifyToolEntryReady\(outputEntry && recoveryReady, \{ output: true \}\);/);
+  assert.equal((entry.match(/notifyToolEntryReady\(outputEntry/g) || []).length, 1, 'startup signals once, never per save');
+  assert.ok(entry.lastIndexOf('notifyToolEntryReady(outputEntry') > entry.indexOf('result = await runConversionStartup'));
   assert.match(entry, /mountConversionDisplayAd\(\{ entryHistoryState \}\)/);
   assert.match(entry, /\} else notifyToolEntryReady\(false\);/);
 });

@@ -6,12 +6,32 @@ import { posix } from 'node:path';
 test('Draw rail, editor UI, and direct runtime changes invalidate every parent and editor entry', async () => {
   const root = new URL('../../', import.meta.url);
   const revisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
+  const outputOfferwall = new Set([
+    'js/creation/conversion-startup.mjs', 'data/posting-policy.mjs', 'js/ads/conversion-display-ad.mjs',
+    'js/adsense-offerwall-policy.js', 'js/app.js', 'js/creation/audio-entry.mjs',
+    'js/creation/audio-page.mjs', 'js/creation/conversion-entry.mjs', 'js/creation/conversion-page.mjs',
+    'js/creation/conversion-recovery-workspace.mjs', 'js/creation/conversion-smart-ui.mjs', 'js/creation/creation-camera.mjs',
+    'js/creation/creation-modes.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
+    'js/creation/draw-music.mjs', 'js/creation/draw-page.mjs', 'js/creation/hidden-object-page.mjs',
+    'js/creation/jigsaw-page.mjs', 'js/creation/legacy-placement-page.mjs', 'js/creation/output-entry-context.mjs',
+    'js/creation/output-handoff-core.mjs', 'js/creation/output-handoff.mjs', 'js/creation/output-page.mjs',
+    'js/creation/output-receive.mjs', 'js/creation/output-router.mjs', 'js/creation/pixfind-play.mjs',
+    'js/creation/profile-likes-page.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
+    'js/creation/spot-difference-page.mjs', 'js/creation/text-tools.mjs', 'js/creation/tool-project-import.mjs',
+    'js/creation/work-save-policy.mjs', 'js/globe/post-supabase.mjs', 'js/globe/post-ui.mjs',
+    'js/globe/prototype.mjs', 'js/home-startup.mjs', 'js/pixel-export.mjs',
+    'js/pixel-lens/app.mjs', 'js/pixel-lens/entry.mjs', 'js/pixel-lens/file-save.mjs',
+    'js/pixel-studio/app.mjs', 'js/post-composer.js', 'js/posting-consent-ui.mjs',
+    'js/site-header.mjs', 'js/social/api.mjs', 'js/social/app.mjs',
+    'js/social/server-actions.mjs', 'js/social/tool-handoff.mjs', 'js/tool-direct.mjs',
+    'js/tool-header-controls.mjs', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
+  ]);
   const lazyGallery = new Set(["js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-gallery-data.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-store.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/creation/tool-project-store.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
-  for (const target of lazyGallery) assert.equal(revisions[target], '20261109-lazy-gallery-1');
+  for (const target of lazyGallery) assert.equal(revisions[target], outputOfferwall.has(target) ? '20261111-output-offerwall-1' : '20261109-lazy-gallery-1');
   const importPreview = new Set(["css/project-workspace.css", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-gallery.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
-  for (const target of importPreview) assert.equal(revisions[target], lazyGallery.has(target) ? '20261109-lazy-gallery-1' : '20261109-import-preview-gallery-1');
+  for (const target of importPreview) assert.equal(revisions[target], outputOfferwall.has(target) ? '20261111-output-offerwall-1' : lazyGallery.has(target) ? '20261109-lazy-gallery-1' : '20261109-import-preview-gallery-1');
   const ellipse = new Set(["js/creation/draw-tool-operations.mjs", "js/creation/draw-page.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
-  for (const target of ellipse) assert.equal(revisions[target], lazyGallery.has(target) ? '20261109-lazy-gallery-1' : importPreview.has(target) ? '20261109-import-preview-gallery-1' : '20261109-ellipse-geometry-1');
+  for (const target of ellipse) assert.equal(revisions[target], outputOfferwall.has(target) ? '20261111-output-offerwall-1' : lazyGallery.has(target) ? '20261109-lazy-gallery-1' : importPreview.has(target) ? '20261109-import-preview-gallery-1' : '20261109-ellipse-geometry-1');
   const manager = new Set(["js/creation/project-gallery.mjs", "js/creation/shared-project-settings.mjs", "css/creation-modes.css", "css/project-workspace.css", "css/tool-direct.css", "data/project-gallery-ad-config.mjs", "js/ads/project-gallery-ad.mjs", "js/ads/project-manager-ad.mjs", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/draw-viewport-overlays.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
   const gallery = new Set(["css/project-workspace.css", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-gallery.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-store.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/creation/tool-project-store.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
   const resume = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
@@ -72,7 +92,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
     'js/tool-entry-compat.js', 'js/tool-offerwall-entry.mjs', 'js/tool-shell.mjs',
     'js/tool-start-routes.mjs', 'js/tool-workspace-state.mjs'
   ]);
-  for (const target of allToolsOfferwall) assert.equal(revisions[target], lazyGallery.has(target) ? '20261109-lazy-gallery-1' : importPreview.has(target) ? '20261109-import-preview-gallery-1' : ellipse.has(target) ? '20261109-ellipse-geometry-1' : manager.has(target) ? '20261108-gallery-canvas-viewport-1' : galleryAd.has(target) ? '20261108-gallery-first-ad-1' : gallery.has(target) ? '20261107-gallery-1' : resume.has(target) ? '20261107-resume-same-project-1' : brushCamera.has(target) ? '20261107-brush-camera-1' : continuity.has(target) ? '20261107-mode-continuity-1' : buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' || target === 'js/tool-offerwall-entry.mjs' ? '20261110-output-result-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
+  for (const target of allToolsOfferwall) assert.equal(revisions[target], outputOfferwall.has(target) ? '20261111-output-offerwall-1' : lazyGallery.has(target) ? '20261109-lazy-gallery-1' : importPreview.has(target) ? '20261109-import-preview-gallery-1' : ellipse.has(target) ? '20261109-ellipse-geometry-1' : manager.has(target) ? '20261108-gallery-canvas-viewport-1' : galleryAd.has(target) ? '20261108-gallery-first-ad-1' : gallery.has(target) ? '20261107-gallery-1' : resume.has(target) ? '20261107-resume-same-project-1' : brushCamera.has(target) ? '20261107-brush-camera-1' : continuity.has(target) ? '20261107-mode-continuity-1' : buttonIconAudit.has(target) || modeClarity.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/output-page.mjs' || target === 'js/tool-offerwall-entry.mjs' ? '20261110-output-result-1' : paletteNoop.has(target) ? '20261106-audio-palette-noop-1' : '20261024-common-tool-start-1', `${target} invalidates the normalized tool-start dependency chain`);
   const changed = new Set([
     'js/creation/editor-ui.mjs', 'js/creation/draw-page.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',
     'js/creation/audio-page.mjs', 'js/creation/audio-entry.mjs', 'js/creation/project-workspace.mjs', 'js/creation/pxd-ui.mjs',
@@ -117,7 +137,8 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       });
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
-      if (lazyGallery.has(target)) assert.equal(revisions[target], '20261109-lazy-gallery-1', `${target} invalidates the lazy gallery dependency chain`);
+      if (outputOfferwall.has(target)) assert.equal(revisions[target], '20261111-output-offerwall-1', `${target} invalidates the output Offerwall dependency closure`);
+      else if (lazyGallery.has(target)) assert.equal(revisions[target], '20261109-lazy-gallery-1', `${target} invalidates the lazy gallery dependency chain`);
       else if (importPreview.has(target)) assert.equal(revisions[target], '20261109-import-preview-gallery-1', `${target} invalidates the import preview dependency chain`);
       else if (ellipse.has(target)) assert.equal(revisions[target], '20261109-ellipse-geometry-1', `${target} invalidates the ellipse geometry dependency chain`);
       else if (manager.has(target)) assert.equal(revisions[target], '20261108-gallery-canvas-viewport-1', `${target} invalidates the manager UI/ad dependency chain`);

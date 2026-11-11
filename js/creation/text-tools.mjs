@@ -1,3 +1,4 @@
+import { outputEntrySearch } from './output-entry-context.mjs?rev=20261111-output-offerwall-1';
 import { detectText, decodeTextFile, MAX_CODE_CHARS, MAX_FILE_BYTES, safeName, encodeDocument } from './text-codec.mjs?rev=20261028-text-1';
 import { renderText, canvasBlob } from './text-render.mjs?rev=20261028-text-1';
 import { installTextLivePreview } from './text-live-preview.mjs?rev=20261030-live-text-1';
@@ -407,14 +408,14 @@ export async function installTextTools(doc = document, win = window) {
   const leave=event=>{if(busy||dirtyResult){event.preventDefault();event.returnValue='';}};win.addEventListener('beforeunload',leave);
   win.addEventListener('pagehide',event=>{aborter?.abort();draftController.dispose();for(const resolve of compositionWaiters)resolve();compositionWaiters.clear();if(!event.persisted){for(const url of urls.values())win.URL.revokeObjectURL(url);win.removeEventListener('beforeunload',leave);}});
   win.addEventListener('pageshow',event=>{if(event.persisted){composing=false;draftController=createDraftController();notifyTextSource();}});
-  const params=new URLSearchParams(win.location.search);const initial=params.get('text');
+  const params=new URLSearchParams(outputEntrySearch(win.location, win.history));const initial=params.get('text');
   if(initial==='input'||initial==='output')showMode(initial);
   const key=params.has('id')?'id':params.has('file')?'file':null, id=key&&params.get(key);
   if(id&&params.getAll(key).length===1&&!(params.has('id')&&params.has('file'))&&/^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(id)){
     try {
       const record=key==='id'
-        ?await (await import('./output-handoff.mjs?rev=20261104-engine-boundaries-3')).readToolOutput(id)
-        :await (await import('./output-router.mjs?rev=20261028-unified-output-1')).readOutputFile(id);
+        ?await (await import('./output-handoff.mjs?rev=20261111-output-offerwall-1')).readToolOutput(id)
+        :await (await import('./output-router.mjs?rev=20261111-output-offerwall-1')).readOutputFile(id);
       if(record.blob)chooseFile(new File([record.blob],record.filename,{type:record.blob.type}));
     }catch{/* The existing receiver reports unavailable private files. */}
   }

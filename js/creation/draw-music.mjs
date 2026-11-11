@@ -8,9 +8,9 @@ import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
 import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
 import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { setPxdJson } from './pxd-codec.mjs';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
-import { saveFile } from '../pixel-export.mjs?rev=20261024-free-tools-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
+import { saveFile } from '../pixel-export.mjs?rev=20261111-output-offerwall-1';
 import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
 import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 

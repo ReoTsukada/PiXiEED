@@ -84,10 +84,10 @@ function shell({title,description,path,items,date,content,index=false}) {
     <p class="format-updated">対応内容の確認日：<time datetime="${e(date)}">${e(date)}</time> · 登録不要・無料保存。元のファイルは変更しません。</p>
   </main>
   <footer class="format-footer"><a href="/output/">ファイル変換</a><a href="/tools/">ツール一覧</a><a href="/privacy/">プライバシー</a><a href="/terms/">利用規約</a><span>© PiXiEED</span></footer>
-  <script type="module" src="/js/app.js?rev=20261024-common-tool-start-1"></script>
+  <script type="module" src="/js/app.js?rev=20261111-output-offerwall-1"></script>
   <script type="module" src="/js/ads/output-guide-ad.mjs?rev=20261028-discovery-1"></script>
   ${index ? '<script type="module" src="/js/conversion-guide-filter.mjs?rev=20261028-discovery-1"></script>' : ''}
-  <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
+  <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
 </body>
 </html>
 `;

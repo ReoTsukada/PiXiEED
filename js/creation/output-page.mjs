@@ -1,11 +1,12 @@
+import { outputEntrySearch, replaceOutputEntry, isOutputEntryPath } from './output-entry-context.mjs?rev=20261111-output-offerwall-1';
 import { validateDetailedRecovery } from './conversion-detailed-recovery.mjs?rev=20261105-video-size-1';
 import { validateOutputDimensions } from './output-input-constraints.mjs?rev=20261104-engine-boundaries-3';
 import { createConversionReturnGate } from './conversion-return-controller.mjs?rev=20261104-controllers-2';
 import { outputDimensionGuidance } from './output-dimension-guidance.mjs?rev=20261104-output-controller-1';
 import { getToolStartRoute, isFreshToolStartRequest } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1';
 import { listAudioOutputFormats } from './output-audio-capabilities.mjs?rev=20261020-format-conversion-1';
-import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, removeToolOutputMaterial, restoreToolOutputMaterial, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261104-engine-boundaries-3';
+import { readToolOutput, saveToolOutputItems, saveToolOutputMedia, removeToolOutputMaterial, restoreToolOutputMaterial, stageToolOutput, sanitizeOutputFilename, outputExportEventParams } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { inspectPixelPng } from '../pixel-png-metadata.mjs?rev=20260928-pixel-roundtrip-1';
 import { encodeOutput } from './output-encoders.mjs?rev=20261020-format-conversion-1';
 import { chooseAudioVideoMimeType } from './audio-video-capabilities.mjs?rev=20261017-output-lazy-1';
@@ -17,7 +18,7 @@ import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../
 import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatchDownload, OUTPUT_FREE_BATCH_LIMIT, OUTPUT_REWARD_BATCH_LIMIT } from './output-reward-policy.mjs?rev=20261016-color-capability-1';
 import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
-import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261021-jigsaw-public-1';
+import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261111-output-offerwall-1';
 import { describeOutputMaterialState, replaceOutputMaterialSource, outputMaterialSelectionAfterRemoval } from './output-material-state.mjs?rev=20261101-direct-material-1';
 import { runReadonlyPreview, readonlyPreviewBounds } from './conversion-readonly-preview.mjs?rev=20261105-video-size-1';
 import { validateVideoOutputSize } from './video-output-size.mjs?rev=20261105-video-size-1';
@@ -879,7 +880,7 @@ async function hydrateStagedOutputInPlace(staged, controller, targetStatus) {
     if (!hydrated || controller.signal.aborted || pageDisposed || importController !== controller) return false;
     const recovery = main.querySelector?.('[data-sc-unified-recovery]');
     if (recovery) { recovery.replaceChildren(); recovery.hidden = true; }
-    history.replaceState({ ...history.state }, '', stagedUrl.href);
+    replaceOutputEntry(stagedUrl.href);
     targetStatus.textContent = 'ファイルを読み込み、出力素材に追加しました。';
     main.dispatchEvent(new CustomEvent('pixieed:materials', { bubbles: true, detail: { changed: true, mutation: 'import', status: targetStatus.textContent } }));
     return true;
@@ -1838,17 +1839,17 @@ async function hydrateOutputRecord(nextRecord, { isCurrent = () => !pageDisposed
   setActiveItem(activeItem); fillSourceAndFormatControls({ preferredFormat: activeItem.extension }); renderOutputItems();
   renderAssets(); updateSequenceControls();
   filename.setAttribute('aria-label', `ファイル名（.${activeItem.extension}は固定）`);
-  notifyToolEntryReady(false);
+  // The outer startup signals readiness only after all output modules mount.
   return true;
 }
 
 async function mount() {
-  const params = new URLSearchParams(location.search);
+  const params = new URLSearchParams(outputEntrySearch());
   if (params.getAll('id').length === 0) {
     showStart();
     const freshConverterEntry = getToolStartRoute(location.pathname)?.id === 'convert'
       && isFreshToolStartRequest(location.href, history.state);
-    if (!freshConverterEntry) notifyToolEntryReady(false);
+    if (!freshConverterEntry && !isOutputEntryPath(location.pathname)) notifyToolEntryReady(false);
     return;
   }
   if (params.getAll('id').length !== 1) { setError('出力IDが複数あります。ツール一覧から新しく開いてください。'); notifyToolEntryReady(false); return; }

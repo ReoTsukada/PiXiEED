@@ -1,6 +1,6 @@
-import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261024-posting-policy-1';
+import { createPostingConsentUi } from '../posting-consent-ui.mjs?rev=20261111-output-offerwall-1';
 import { localPuzzlePlayPath, publicPuzzlePlayPath, savePuzzleForSelf, hasUncertainPuzzlePublication } from './puzzle-audience.mjs?rev=20261021-jigsaw-public-1';
-import { createSocialApi } from './api.mjs?rev=20261108-sns-loading-1';
+import { createSocialApi } from './api.mjs?rev=20261111-output-offerwall-1';
 import { createFeedDraftStore } from './drafts.mjs?rev=20261021-jigsaw-public-1';
 import { activateOrdinaryDisplayAd, createOrdinaryDisplayAdCard, createOrdinaryAdPageGate, ordinaryAdEligibility } from '../ads/ordinary-ad-placement.mjs?rev=20261024-ordinary-ad-1';
 import { ordinaryAdConfig } from '../../data/ordinary-ad-config.mjs?rev=20261024-ordinary-ad-config-1';
@@ -780,7 +780,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const generation = state.composerGeneration;
     if (state.busy || state.submitted) return;
     try {
-      const { loadSocialOutput } = await import('./tool-handoff.mjs?rev=20261021-jigsaw-public-1');
+      const { loadSocialOutput } = await import('./tool-handoff.mjs?rev=20261111-output-offerwall-1');
       const output = await loadSocialOutput(id);
       if (generation !== state.composerGeneration || state.pageHidden) return;
       if (!output || !output.mime.startsWith('audio/')) { tell('この音声出力を端末から読み込めません。元の制作ツールから開き直してください。'); return; }
@@ -798,7 +798,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
     const token = ++state.handoffToken;
     const generation = state.composerGeneration;
     try {
-      const { adoptSocialHandoff } = await import('./tool-handoff.mjs?rev=20261021-jigsaw-public-1');
+      const { adoptSocialHandoff } = await import('./tool-handoff.mjs?rev=20261111-output-offerwall-1');
       const handoff = await adoptSocialHandoff(kind);
       if (token !== state.handoffToken || generation !== state.composerGeneration || state.pageHidden || !composer.open || !handoff) { if (token === state.handoffToken && composer.open) tell('ツールの引き継ぎデータが見つかりません。元のツールからもう一度戻ってください。'); return; }
       const { inspectPixelImage } = await import('../globe/post-image.mjs');
@@ -932,7 +932,7 @@ function initSocialFeed({ api = createSocialApi(), drafts = createFeedDraftStore
         throw new Error('送信結果を確認できませんでした。下書きと送信番号を保持しています。');
       }
       if (state.receipt) {
-        try { const { consumeSocialHandoff } = await import('./tool-handoff.mjs?rev=20261021-jigsaw-public-1'); state.receiptConsumed = consumeSocialHandoff(state.receipt); }
+        try { const { consumeSocialHandoff } = await import('./tool-handoff.mjs?rev=20261111-output-offerwall-1'); state.receiptConsumed = consumeSocialHandoff(state.receipt); }
         catch { /* Receipt remains recoverable if the handoff store cannot be read. */ }
       }
       state.submitted = true; lockComposer(false); freezeComposer();

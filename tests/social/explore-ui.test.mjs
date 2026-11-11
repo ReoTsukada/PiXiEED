@@ -17,7 +17,7 @@ test('Explore is the community experience and matches the home visual language',
   assert.match(explore, /class="explore-maker-feature"/);
   assert.match(explore, /class="explore-world-feature"/);
   assert.match(explore, /css\/social-explore\.css\?rev=/);
-  assert.match(explore, /js\/social\/app\.mjs\?rev=20261108-sns-loading-1/);
+  assert.match(explore, /js\/social\/app\.mjs\?rev=20261111-output-offerwall-1/);
   assert.match(explore, /href="\/"/);
   assert.match(explore, /href="\/globe\/"/);
   assert.match(explore, /href="\/tools\/"/);

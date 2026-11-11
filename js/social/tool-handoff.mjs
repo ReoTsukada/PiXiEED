@@ -110,7 +110,7 @@ export function consumeSocialHandoff(receipt, windowRef = globalThis.window) {
 export async function loadSocialOutput(id, { readToolOutput = null, indexedDBRef = globalThis.indexedDB, now = Date.now } = {}) {
   let read = readToolOutput;
   if (!read) {
-    ({ readToolOutput: read } = await import('../creation/output-handoff.mjs?rev=20261020-format-conversion-1'));
+    ({ readToolOutput: read } = await import('../creation/output-handoff.mjs?rev=20261111-output-offerwall-1'));
   }
   const record = await read(id, { indexedDBRef, now });
   if (!record?.blob || typeof record.mime !== 'string') return null;

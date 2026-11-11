@@ -7,28 +7,28 @@ import { spawnSync } from 'node:child_process';
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
   ['js/creation/draw-tool-operations.mjs', 'rev=20261109-ellipse-geometry-1'],
-  ['js/app.js', 'rev=20261024-common-tool-start-1'],
-  ['js/adsense-offerwall-policy.js', 'rev=20261110-output-result-1'],
-  ['js/ads/conversion-display-ad.mjs', 'rev=20261110-output-result-1'],
-  ['js/creation/conversion-entry.mjs', 'rev=20261110-output-layout-7'],
-  ['js/site-header.mjs', 'rev=20261024-common-tool-start-1'],
-  ['js/creation/output-page.mjs', 'rev=20261110-output-result-1'],
-  ['js/creation/output-receive.mjs', 'rev=20261105-download-name-1'],
-  ['js/creation/project-workspace.mjs', 'rev=20261109-lazy-gallery-1'],
-  ['js/creation/draw-page.mjs', 'rev=20261109-lazy-gallery-1'],
+  ['js/app.js', 'rev=20261111-output-offerwall-1'],
+  ['js/adsense-offerwall-policy.js', 'rev=20261111-output-offerwall-1'],
+  ['js/ads/conversion-display-ad.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/creation/conversion-entry.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/site-header.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/creation/output-page.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/creation/output-receive.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/creation/project-workspace.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/creation/draw-page.mjs', 'rev=20261111-output-offerwall-1'],
   ['js/creation/draw-viewport-overlays.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
-  ['js/creation/creation-camera.mjs', 'rev=20261109-lazy-gallery-1'],
+  ['js/creation/creation-camera.mjs', 'rev=20261111-output-offerwall-1'],
   ['js/creation/shared-project-settings.mjs', 'rev=20261108-gallery-canvas-viewport-1'],
   ['css/creation-modes.css', 'rev=20261108-gallery-canvas-viewport-1'],
-  ['js/creation/pxd-ui.mjs', 'rev=20261109-lazy-gallery-1'],
-  ['js/tool-offerwall-entry.mjs', 'rev=20261110-output-result-1'],
+  ['js/creation/pxd-ui.mjs', 'rev=20261111-output-offerwall-1'],
+  ['js/tool-offerwall-entry.mjs', 'rev=20261111-output-offerwall-1'],
   ['js/tool-start-routes.mjs', 'rev=20261110-output-result-1'],
-  ['js/social/app.mjs', 'rev=20261108-sns-loading-1'],
+  ['js/social/app.mjs', 'rev=20261111-output-offerwall-1'],
   ['js/ads/ordinary-ad-entry.mjs', 'rev=20261024-side-ad-layout-2'],
   ['css/social-feed.css', 'rev=20261024-side-ad-layout-1'],
   ['js/page-navigation.mjs', 'rev=20261024-common-tool-start-1'],
   ['js/display-ads.mjs', 'rev=20261030-event-inline-ads-1'],
-  ['js/tool-header-controls.mjs', 'rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'],
+  ['js/tool-header-controls.mjs', 'rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1'],
   ['js/creation/draw-core.mjs', 'rev=20261011-tool-size-1'],
   ['js/creation/drawing-tool-icons.mjs', 'rev=20261004-canvas-settings-1'],
   ['js/pixel-png-metadata.mjs', 'rev=20260928-pixel-roundtrip-1'],
@@ -38,7 +38,7 @@ const canonical = new Map([
   ['js/tool-help-data.mjs', 'rev=20261107-brush-camera-1'],
   ['js/tool-help-bootstrap.mjs', 'rev=20261107-brush-camera-1'],
 ]);
-const templates = new Set(['scripts/generate-books-catalog.mjs', 'scripts/generate-event-pages.mjs']);
+const templates = new Set(['scripts/generate-books-catalog.mjs', 'scripts/generate-event-pages.mjs', 'scripts/generate-conversion-guides.mjs']);
 const skippedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'docs', 'tests', 'work', 'vendor', 'node_modules']);
 
 async function sourceFiles(directory = '', result = []) {

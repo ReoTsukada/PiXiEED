@@ -501,7 +501,8 @@ async function performToolOutput(options, dependencies) {
       addOutputIdToCurrentHistory(options.returnUrl, staged.id, locationRef, dependencies?.historyRef || globalThis.history);
     }
     if (typeof locationRef?.assign !== 'function') return { ok: false, reason: 'navigation_unavailable', staged };
-    locationRef.assign(staged.url);
+    if (typeof dependencies?.navigate === 'function') dependencies.navigate(staged.url);
+    else locationRef.assign(staged.url);
     return { ok: true, ...staged };
   } catch (error) {
     return { ok: false, error };

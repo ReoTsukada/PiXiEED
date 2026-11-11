@@ -1,10 +1,11 @@
-/** Site-owned freshness gate for Google's provider-controlled Offerwall. */
+/** Site-owned entry gate for Google's provider-controlled Offerwall. */
 (() => {
   const START_PATHS = [
     '/tools/start/draw/', '/tools/start/camera/', '/tools/start/audio/',
     '/tools/start/spot-difference/', '/tools/start/hidden-object/',
     '/tools/start/jigsaw/', '/tools/start/convert/',
   ];
+  const OUTPUT_PATHS = ['/tools/start/convert/', '/output/work/', '/output/work/index.html'];
   const MODE_BY_PATH = Object.freeze({
     '/tools/start/draw/': 'draw',
     '/tools/start/camera/': 'camera',
@@ -13,7 +14,7 @@
   if (window.top !== window.self) return;
 
   const startPath = window.location?.pathname;
-  const isConverterStart = startPath === '/tools/start/convert/';
+  const isConverterStart = OUTPUT_PATHS.includes(startPath);
   const converterReferrerSafe = () => {
     if (!isConverterStart) return true;
     const referrer = String(document.referrer || '');
@@ -34,6 +35,10 @@
   const freshInitialSearch = (search) => {
     const params = new URLSearchParams(search || '');
     if (isGoogleOfferwallPreviewSearch(params)) return true;
+    if (isConverterStart) {
+      const allowed = { workspace: ['1'], social: ['1'], entry: ['1'], mode: ['convert'], text: ['input', 'output'] };
+      return [...params.keys()].every(key => params.getAll(key).length === 1 && Array.isArray(allowed[key]) && allowed[key].includes(params.get(key)));
+    }
     for (const key of params.keys()) {
       if (!['workspace', 'social'].includes(key) || params.getAll(key).length !== 1 || params.get(key) !== '1') return false;
     }
@@ -43,13 +48,13 @@
   const hasConverterRecoveryHistory = () => isConverterStart && [
     'pixieedConversionRecovery', 'pixieedConversionRecoveryPrevious', 'pixieedConversionRecoveryPaused'
   ].some(key => Object.prototype.hasOwnProperty.call(window.history?.state || {}, key));
-  const initialHistoryFresh = window.history?.state?.pixieedWorkspace !== true
+  const initialHistoryFresh = isConverterStart || (window.history?.state?.pixieedWorkspace !== true
     && window.history?.state?.projectWorkspaceSelection !== true
     && window.history?.state?.toolStartActive !== true
-    && !hasConverterRecoveryHistory();
+    && !hasConverterRecoveryHistory());
   const initialEntryFresh = window.location?.protocol === 'https:'
     && window.location?.origin === 'https://pixieed.jp'
-    && START_PATHS.includes(startPath)
+    && (START_PATHS.includes(startPath) || isConverterStart)
     && !window.location.hash
     && freshInitialSearch(window.location.search)
     && converterReferrerSafe()
@@ -85,13 +90,14 @@
   const currentRouteSafe = () => window.location?.protocol === 'https:'
     && window.location?.origin === 'https://pixieed.jp'
     && window.location.pathname === startPath
-    && START_PATHS.includes(startPath)
+    && (START_PATHS.includes(startPath) || isConverterStart)
     && !window.location.hash
     && converterReferrerSafe()
     && initialHistoryFresh;
   const isEligible = () => {
     if (retired || !setupReady) return false;
-    if (!currentRouteSafe() || (window.location.search !== readySearch && !knownInternalSearch(window.location.search))) {
+    if (!currentRouteSafe() || (isConverterStart ? !freshInitialSearch(window.location.search)
+        : window.location.search !== readySearch && !knownInternalSearch(window.location.search))) {
       retire();
       return false;
     }
@@ -113,7 +119,7 @@
   };
   const ready = (options = {}) => {
     if (retired || state !== 'pending') return false;
-    if (options?.fresh !== true || !initialEntryFresh || !currentRouteSafe()
+    if ((options?.fresh !== true || (isConverterStart && options?.output !== true)) || !initialEntryFresh || !currentRouteSafe()
         || !(freshInitialSearch(window.location.search) || knownInternalSearch(window.location.search))) {
       retire();
       return false;
@@ -139,6 +145,7 @@
 
   if (initialEntryFresh) {
     const retireOnWork = (event) => {
+      if (isConverterStart) return; // One page-entry opportunity; settings/downloads do not rearm it.
       if (!setupReady && !['click', 'pointerdown', 'keydown', 'beforeinput', 'input', 'change', 'paste', 'drop'].includes(event.type)) return;
       const roots = 'main, .project-bar, header.site-header, #pxd-panel, .app-tabs, [data-direct-chrome], [data-tool-operation], #output-file-input, #output-audio-replacement-input';
       if (!event.target?.closest?.(roots)) return;

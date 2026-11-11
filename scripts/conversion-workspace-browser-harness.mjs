@@ -321,7 +321,7 @@ if(server.listening){
   await openResultAux();await page.locator('[data-sc-material-add]').waitFor({state:'visible'});
   const [firstDetailChooser]=await Promise.all([page.waitForEvent('filechooser'),page.locator('[data-sc-material-add]').click()]);
   await firstDetailChooser.setFiles({name:'two.png',mimeType:'image/png',buffer:png});
-  await page.waitForURL(url=>url.searchParams.has('id')&&url.searchParams.get('view')==='advanced');
+  await page.waitForFunction(()=>location.pathname==='/output/work/'&&!location.search&&history.state?.pixieedOutputRequest?.key==='id'&&history.state.pixieedOutputRequest.advanced===true&&/^[a-f\d-]{36}$/i.test(history.state.pixieedOutputRequest.id));
   assert.equal(await page.locator('[data-tx-source]').inputValue(),'detailed draft retained');
   assert.equal(await page.evaluate(()=>window.__unifiedTextNode===document.querySelector('[data-tx-source]')),true);
   await page.waitForFunction(()=>document.querySelector('#main')?.dataset.smartConversion==='true'&&document.querySelector('#output-layout')?.conversionActions);

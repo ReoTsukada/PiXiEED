@@ -39,6 +39,7 @@ jobs:
           status=0
           node scripts/output-integration-browser-harness.mjs || status=1
           node scripts/conversion-discovery-browser-harness.mjs || status=1
+          node scripts/output-offerwall-browser-harness.mjs "$PIXIEED_BROWSER_ROOT" "$PIXIEED_PLAYWRIGHT_MODULE" "$PIXIEED_CHROME_EXECUTABLE" "$PIXIEED_BROWSER_ARTIFACTS/offerwall.json" || status=1
           PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-output-browser/workspace node scripts/conversion-workspace-browser-harness.mjs || status=1
           exit "$status"
       - name: Verify creation controls and saved-work entry

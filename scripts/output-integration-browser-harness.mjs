@@ -320,7 +320,7 @@ try {
   for (const mode of ['draw', 'camera', 'audio', 'jigsaw', 'spot-difference', 'hidden-object']) {
     await open('?mode=convert');
     await Promise.all([
-      page.waitForURL(/\/output\/work\/\?file=/),
+      page.waitForFunction(() => location.pathname === '/output/work/' && !location.search && history.state?.pixieedOutputRequest?.key === 'file' && /^[a-f\d-]{36}$/i.test(history.state.pixieedOutputRequest.id)),
       page.evaluate(async ({ mode, bytes }) => {
         history.replaceState(null, '', `/${mode}/`);
         const { routeEditorFile } = await import('/js/creation/output-router.mjs?rev=20261028-unified-output-1');

@@ -93,7 +93,7 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   for (const path of expected.filter(path => path !== OFFERWALL_PAGE)) assert.doesNotMatch(await html(path), /adsbygoogle\.js|adsense-auto\.js/, path);
   const output = await html(OFFERWALL_PAGE);
   assert.doesNotMatch(output, /adsense-auto\.js|adsbygoogle\.js/, 'output work no longer loads an unconditional provider');
-  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261110-output-result-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261110-output-result-1"><\/script>/);
+  assert.match(output, /<script src="\/js\/adsense-offerwall-policy\.js\?rev=20261111-output-offerwall-1"><\/script>\s*<script type="module" src="\/js\/tool-offerwall-entry\.mjs\?rev=20261111-output-offerwall-1"><\/script>/);
   assert.doesNotMatch(await html('output/index.html'), /adsbygoogle\.js|adsense-auto\.js/);
 });
 
@@ -105,7 +105,10 @@ test('ads.txt seller and privacy disclosure agree with the installed publisher',
   assert.match(privacy, /すべての制作機能を無料で利用できます。リワードによる個別の機能解放や期限付き特典は設けません/);
   assert.match(privacy, /ツールの利用開始前の入口では、GoogleのOfferwallを表示する場合があります/);
   assert.match(privacy, /広告視聴とアクセス条件は、Offerwallの画面で案内します/);
-  assert.match(privacy, /作業の再開、制作・プレイの途中や保存時、保存済みの出力を確認する画面では、新たな表示を許可しない制御を行います/);
+  assert.match(privacy, /出力ツールでは、新規利用、保存済み作業の再開、Draw・カメラ・音楽からの新しい端末内受け渡しについて、実際に使う出力画面の準備ができた後に表示を許可する場合があります/);
+  assert.match(privacy, /出力ツールでは、設定の変更やダウンロード操作をきっかけに、Offerwallの新たな表示許可や再要求を行いません/);
+  assert.match(privacy, /その他のツールでは、作業の再開、制作・プレイの途中や保存時に、新たな表示を許可しない制御を行います/);
+  assert.match(privacy, /広告用スクリプトがページ内の作品情報や同じサイトのブラウザー内保存領域へ技術上アクセスできない構成ではありません/);
   assert.match(privacy, /配信元がすでに受け付けた案内の表示時点まではサイト側で保証できず/);
   assert.doesNotMatch(privacy, /期間限定で特典対象の全機能|開放期間中は、報酬型広告/);
   assert.doesNotMatch(privacy, /広告視聴で60分間のリワード記録を受け取れます/);

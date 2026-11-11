@@ -1,3 +1,4 @@
+import { navigateOutputEntry } from './output-entry-context.mjs?rev=20261111-output-offerwall-1';
 /** One local file-delivery destination. No media bytes or names leave this device. */
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 const EDITORS = /^\/(?:tools\/start\/(?:draw|camera|audio|jigsaw|spot-difference|hidden-object)(?:\/|$)|draw(?:\/|$)|camera(?:\/|$)|audio(?:\/|$)|jigsaw(?:\/|$)|spot-difference(?:\/|$)|hidden-object(?:\/|$)|play\/(?:spot-difference|hidden-object)(?:\/|$)|pixiee-lens(?:\/|$)|pixel-camera(?:-studio)?\.html$)/;
@@ -102,7 +103,7 @@ export function routeEditorFile(blob, filename, deps = {}) {
     await flushOutputWorkspace(context.win);
     const back = context.location.pathname + context.location.search + context.location.hash;
     const staged = await storeOutputFile(blob, filename, back, { ...deps, origin: context.location.origin });
-    context.location.assign(staged.url);
+    navigateOutputEntry(staged.url, context.win, context.location);
     return 'staged';
   })();
   pending.set(blob, promise);

@@ -12,6 +12,6 @@ if (sharedEntry) {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
   await import('./draw-camera-page.mjs?rev=20261016-color-capability-1');
 } else {
-  await import('./app.mjs?rev=20261109-lazy-gallery-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
+  await import('./app.mjs?rev=20261111-output-offerwall-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
 }
 }

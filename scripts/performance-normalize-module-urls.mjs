@@ -8,6 +8,7 @@ const checkOnly = process.argv.includes('--check');
 const generatedTemplates = new Set([
   'scripts/generate-books-catalog.mjs',
   'scripts/generate-event-pages.mjs',
+  'scripts/generate-conversion-guides.mjs',
 ]);
 const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'docs', 'tests', 'work', 'vendor', 'node_modules']);
 
@@ -81,6 +82,8 @@ for (const target of managerTargets) {
 
 const commonToolStartModules = new Set(["js/adsense-offerwall-policy.js", "js/ads/conversion-display-ad.mjs", "js/creation/conversion-entry.mjs", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/output-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-startup.mjs", "js/page-navigation.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/public-navigation.mjs", "js/site-header.mjs", "js/tool-direct.mjs", "js/tool-embed.mjs", "js/tool-entry-compat.js", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs", "js/tool-start-routes.mjs", "js/tool-workspace-state.mjs"]);
 
+const outputOfferwallTargets = new Set(["js/creation/conversion-startup.mjs", "data/posting-policy.mjs", "js/ads/conversion-display-ad.mjs", "js/adsense-offerwall-policy.js", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/conversion-entry.mjs", "js/creation/conversion-page.mjs", "js/creation/conversion-recovery-workspace.mjs", "js/creation/conversion-smart-ui.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-music.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/legacy-placement-page.mjs", "js/creation/output-entry-context.mjs", "js/creation/output-handoff-core.mjs", "js/creation/output-handoff.mjs", "js/creation/output-page.mjs", "js/creation/output-receive.mjs", "js/creation/output-router.mjs", "js/creation/pixfind-play.mjs", "js/creation/profile-likes-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/text-tools.mjs", "js/creation/tool-project-import.mjs", "js/creation/work-save-policy.mjs", "js/globe/post-supabase.mjs", "js/globe/post-ui.mjs", "js/globe/prototype.mjs", "js/home-startup.mjs", "js/pixel-export.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/pixel-lens/file-save.mjs", "js/pixel-studio/app.mjs", "js/post-composer.js", "js/posting-consent-ui.mjs", "js/site-header.mjs", "js/social/api.mjs", "js/social/app.mjs", "js/social/server-actions.mjs", "js/social/tool-handoff.mjs", "js/tool-direct.mjs", "js/tool-header-controls.mjs", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs"]);
+
 async function walk(directory, files = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
@@ -129,6 +132,14 @@ function normalize(source, file) {
     const galleryAdTargets = new Set(['js/tool-direct.mjs', 'js/tool-shell.mjs']);
     const galleryTargets = new Set(["js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-shell.mjs", "js/creation/creation-runtime.mjs", "js/tool-direct.mjs", "js/creation/tool-project-store.mjs", "js/creation/project-gallery.mjs", "js/creation/pxd-store.mjs", "css/project-workspace.css"]);
     const revision = lazyGalleryTargets.has(target) ? '20261109-lazy-gallery-1' : importPreviewTargets.has(target) ? '20261109-import-preview-gallery-1' : ellipseTargets.has(target) ? '20261109-ellipse-geometry-1' : managerTargets.has(target) ? '20261108-gallery-canvas-viewport-1' : galleryAdTargets.has(target) ? '20261108-gallery-first-ad-1' : galleryTargets.has(target) ? '20261107-gallery-1' : resumeTargets.has(target) ? '20261107-resume-same-project-1' : brushCameraTargets.has(target) ? '20261107-brush-camera-1' : continuityTargets.has(target) ? '20261107-mode-continuity-1' : iconAuditTargets.has(target) ? '20261106-button-icon-audit-1' : target === 'js/creation/conversion-entry.mjs' ? '20261110-output-layout-7' : ['js/adsense-offerwall-policy.js', 'js/ads/conversion-display-ad.mjs', 'js/creation/output-page.mjs', 'js/tool-offerwall-entry.mjs', 'js/tool-start-routes.mjs'].includes(target) ? '20261110-output-result-1' : '20261024-common-tool-start-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
+    return `${quote}${path}${next}${quote}`;
+  });
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (/^[a-z][a-z\d+.-]*:/i.test(path)) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!outputOfferwallTargets.has(target)) return whole;
+    const revision = '20261111-output-offerwall-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });
