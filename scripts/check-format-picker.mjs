@@ -147,4 +147,29 @@ try{
       invalid:[...document.querySelectorAll('input,select,textarea')].filter(node=>node.willValidate&&!node.checkValidity()).map(node=>({id:node.id,type:node.type,message:node.validationMessage}))}));
   }catch{} }
 }
-finally{if(browser)await browser.close();if(server.listening)server.close();await writeFile(output+'/report.json',JSON.stringify(report,null,2));}
+finally{
+  const assertionsStatus=report.status;
+  report.assertionsStatus=assertionsStatus;
+  report.status='CLEANUP_PENDING';
+  const cleanup=report.cleanup={status:'PENDING',startedAt:new Date().toISOString()};
+  console.log('CLEANUP_START browser.close');
+  const recordCleanupFailure=(step,error)=>{
+    cleanup.status='FAIL';
+    cleanup[`${step}Error`]=error?.stack||String(error);
+    process.exitCode=1;
+    console.error(`CLEANUP_FAILURE ${step}`,error);
+  };
+  try{await writeFile(output+'/report.json',JSON.stringify(report,null,2));}
+  catch(error){recordCleanupFailure('preCloseReport',error);}
+  try{if(browser)await browser.close();}
+  catch(error){recordCleanupFailure('browserClose',error);}
+  finally{
+    try{if(server.listening)server.close();}
+    catch(error){recordCleanupFailure('serverClose',error);}
+    cleanup.finishedAt=new Date().toISOString();
+    if(cleanup.status==='PENDING')cleanup.status='PASS';
+    report.status=cleanup.status==='PASS'?assertionsStatus:'FAIL';
+    console.log(`CLEANUP_FINISHED status=${cleanup.status}`);
+    await writeFile(output+'/report.json',JSON.stringify(report,null,2));
+  }
+}
