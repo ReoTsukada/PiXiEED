@@ -3,6 +3,7 @@
  * Search text stays in the browser. No API, account, upload or query analytics.
  */
 export const HOME_DESTINATIONS = Object.freeze([
+  { title:'保存した絵を開く', href:'/draw/?workspace=1', group:'このブラウザーの絵', terms:'続き 再開 保存した作品 作品一覧 制作中 編集 プロジェクト バックアップ PXD resume projects' },
   { title:'ドット絵を描く', href:'/tools/start/draw/', group:'制作', terms:'ドット ピクセル アニメ イラスト 絵を描く レイヤー えをかく drawing art pixel draw' },
   { title:'写真をドット絵にする', href:'/tools/start/camera/', group:'制作', terms:'カメラ 写真 撮影 加工 ピクセル化 pixel camera photo filter' },
   { title:'音楽をつくる', href:'/tools/start/audio/', group:'制作', terms:'音 音楽 効果音 BGM ループ 作曲 audio music sound' },

@@ -27,10 +27,10 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/css/home-portal.css?rev=20261107-home-scenes-1">
+  <link rel="stylesheet" href="/css/home-portal.css?rev=20261112-creation-guidance-1">
   <title>PiXiEED｜つくる・変換する・遊ぶ</title>
   <script>(()=>{const q=new URLSearchParams(location.search);if(q.has("art")||q.get("post")==="1")location.replace("/globe/"+location.search+location.hash);else if(q.has("view")||q.has("compose")||q.has("output")||q.has("q"))location.replace("/explore/"+location.search+location.hash);else if(location.pathname==="/index.html")location.replace("/"+location.search+location.hash)})();</script>
-  <script type="module" src="/js/home-portal.mjs?rev=20261107-home-scenes-1"></script>
+  <script type="module" src="/js/home-portal.mjs?rev=20261112-creation-guidance-1"></script>
   <script type="module" src="/js/site-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
 </head>
 <body class="home-portal">
@@ -62,7 +62,15 @@
         <div class="portal-search-results" id="portal-results" role="region" aria-label="行き先の候補" aria-live="polite" hidden></div>
       </div>
     </section>
-    <section class="portal-bento" aria-label="おすすめの入口">
+    <section class="portal-work-entry" aria-labelledby="portal-work-title">
+      <h2 id="portal-work-title">新しくつくる？ 続きから？</h2>
+      <div class="portal-work-actions">
+        <a href="#portal-create"><strong>新しくつくる</strong><span>下の道具を選び、作品一覧の［＋ 新規作成］へ</span></a>
+        <a href="/draw/?workspace=1"><strong>保存した絵を開く</strong><span>このブラウザーの絵の作品一覧から続きを選ぶ</span></a>
+      </div>
+      <p>制作は毎回、作品一覧から始まります。ゲームなどの続きは、<a href="/tools/">作成した道具</a>から開けます。<a href="/guide/#save-work">保存先とバックアップについて</a></p>
+    </section>
+    <section id="portal-create" class="portal-bento" aria-label="おすすめの入口">
       <a class="portal-card portal-draw" href="/tools/start/draw/">
         <span class="portal-card-copy"><span class="portal-card-kicker">CREATE / 01</span><strong>ドット絵を描く</strong><span class="portal-card-lead">小さな絵から、動くGIFまで。</span><span class="portal-card-sub">レイヤー・アニメーション</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
@@ -94,7 +102,7 @@
         <span class="portal-card-cta">ゲームを選ぶ<span aria-hidden="true"> →</span></span>
       </a>
       <a class="portal-card portal-community" href="/explore/">
-        <span class="portal-card-copy"><span class="portal-card-kicker">COMMUNITY</span><strong>みんなの作品</strong><span class="portal-card-lead">好きな作品に出会い、自分の絵も。</span><span class="portal-card-sub">見る・探す・投稿する</span></span>
+        <span class="portal-card-copy"><span class="portal-card-kicker">COMMUNITY</span><strong>みんなの作品</strong><span class="portal-card-lead">好きな作品に出会い、自分の絵も。</span><span class="portal-card-sub">公開された作品を見る・自分の作品を投稿する</span></span>
         <span class="portal-card-arrow" aria-hidden="true">↗</span>
         <img class="portal-card-art" src="/assets/home/community.svg" alt="" aria-hidden="true" width="480" height="240" decoding="async" loading="lazy">
         <span class="portal-card-cta">作品を見にいく<span aria-hidden="true"> →</span></span>

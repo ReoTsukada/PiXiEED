@@ -383,3 +383,18 @@ body.project-workspace-ready #draw-palette .draw-color { flex: none !important; 
 .project-gallery__fallback { color: #c2cdd1; font-size: 24px; }
 .project-gallery__badge { position: absolute; left: 3px; bottom: 3px; max-width: calc(100% - 6px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 4px; border-radius: 3px; background: #101923e6; color: #fff0bf; font-size: 9px; pointer-events: none; }
 @media (max-width: 380px) { .project-import-preview { align-items: flex-start; } .project-import-preview > canvas, .project-import-preview__fallback { flex-basis: 48px; width: 48px; height: 48px; } }
+
+/* Save destinations stay explicit without adding work to the gallery data path. */
+.project-storage-note { margin: 0 0 10px; color: #c3cfd0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.project-backup { margin-top: 14px; padding: 12px; border: 1px solid #526979; border-radius: 12px; background: #172630; }
+.project-backup h3 { margin: 0; color: #fff1bd; font-size: 14px; }
+.project-backup .project-sheet__note { margin: 7px 0; color: #c3cfd0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.project-backup button { width: 100%; margin-block: 4px; border-color: #a89356; color: #fff0bf; }
+.project-empty-state { grid-column: 1 / -1; padding: 12px 8px 18px; text-align: center; }
+.project-empty-state p { margin: 0 0 12px; }
+.project-sheet .project-empty-state button { min-height: 48px; max-width: 100%; border-color: #f2d27a; background: #f1d073; color: #202a33; font-weight: 750; }
+.project-start-picker__empty { margin-block: 8px; padding: 18px 10px; border: 1px solid #526979; border-radius: 12px; background: #172630; text-align: center; }
+.project-start-picker__empty[hidden] { display: none; }
+.project-start-picker__empty-title { margin: 0 0 8px; color: #fff1bd; font-size: 16px; }
+.project-start-picker__empty-copy { margin: 0 0 14px; color: #c3cfd0; font-size: 13px; line-height: 1.5; }
+.project-sheet .project-start-picker__empty-create { min-height: 48px; max-width: 100%; border-color: #f2d27a; background: #f1d073; color: #202a33; font-weight: 750; }

@@ -84,6 +84,8 @@ const commonToolStartModules = new Set(["js/adsense-offerwall-policy.js", "js/ad
 
 const outputOfferwallTargets = new Set(["js/creation/conversion-startup.mjs", "data/posting-policy.mjs", "js/ads/conversion-display-ad.mjs", "js/adsense-offerwall-policy.js", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/conversion-entry.mjs", "js/creation/conversion-page.mjs", "js/creation/conversion-recovery-workspace.mjs", "js/creation/conversion-smart-ui.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-music.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/legacy-placement-page.mjs", "js/creation/output-entry-context.mjs", "js/creation/output-handoff-core.mjs", "js/creation/output-handoff.mjs", "js/creation/output-page.mjs", "js/creation/output-receive.mjs", "js/creation/output-router.mjs", "js/creation/pixfind-play.mjs", "js/creation/profile-likes-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/text-tools.mjs", "js/creation/tool-project-import.mjs", "js/creation/work-save-policy.mjs", "js/globe/post-supabase.mjs", "js/globe/post-ui.mjs", "js/globe/prototype.mjs", "js/home-startup.mjs", "js/pixel-export.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/pixel-lens/file-save.mjs", "js/pixel-studio/app.mjs", "js/post-composer.js", "js/posting-consent-ui.mjs", "js/site-header.mjs", "js/social/api.mjs", "js/social/app.mjs", "js/social/server-actions.mjs", "js/social/tool-handoff.mjs", "js/tool-direct.mjs", "js/tool-header-controls.mjs", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs"]);
 
+const creationGuidanceTargets = new Set(["css/home-portal.css", "css/project-workspace.css", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-portal.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+
 async function walk(directory, files = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
@@ -140,6 +142,14 @@ function normalize(source, file) {
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!outputOfferwallTargets.has(target)) return whole;
     const revision = '20261111-output-offerwall-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
+    return `${quote}${path}${next}${quote}`;
+  });
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!creationGuidanceTargets.has(target)) return whole;
+    const revision = '20261112-creation-guidance-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });

@@ -28,7 +28,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.externalUrls.size, 63);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261109-lazy-gallery-1'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261112-creation-guidance-1'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
   assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1'));
