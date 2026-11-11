@@ -21,11 +21,11 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // Manager ads add the guarded manager controller, shared chooser budget,
   // config, SDK loader and loader config to the previously bounded graph.
   // Lazy gallery loading adds one small shared request/cache controller.
-  assert.equal(plan.runtimeGraph.modules.size, 114);
-  assert.equal(plan.runtimeGraph.edges.length, 210);
+  assert.equal(plan.runtimeGraph.modules.size, 115);
+  assert.equal(plan.runtimeGraph.edges.length, 212);
   assert.equal(plan.dynamicRoots.length, 23);
-  assert.equal(plan.dynamicGraph.modules.size, 111);
-  assert.equal(plan.externalUrls.size, 62);
+  assert.equal(plan.dynamicGraph.modules.size, 112);
+  assert.equal(plan.externalUrls.size, 63);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
   assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261109-lazy-gallery-1'));
@@ -42,6 +42,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert(files.includes('js/creation/project-gallery.mjs'), 'Windowed gallery accounts for one shared UI module and one import edge.');
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
   assert(files.includes('js/creation/draw-render-optimization.mjs'));
+  assert(files.includes('js/creation/output-entry-context.mjs'), 'The local-only handoff pointer module adds one shared external node and two import edges.');
   assert(files.includes('js/creation/output-router.mjs'), 'editor exports use the unified staging module');
   assert(files.includes('js/creation/output-handoff-core.mjs'), 'existing storage identity stays shared');
   assert.deepEqual([...plan.runtimeGraph.modules.values()].filter(module => module.file === 'js/creation/output-record-metadata.mjs').map(module => module.url), [metadataUrl]);
@@ -133,7 +134,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 62);
+    assert.equal(report.externalCount, 63);
     assert.equal(report.internalizedCount, 52);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);

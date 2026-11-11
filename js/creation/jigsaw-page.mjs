@@ -1,5 +1,5 @@
 import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1';
 import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
@@ -15,7 +15,7 @@ import {
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261109-lazy-gallery-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261111-output-offerwall-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';

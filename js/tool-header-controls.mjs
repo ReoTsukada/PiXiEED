@@ -1,5 +1,5 @@
 /** Move existing tool controls without importing the site's analytics or menus. */
-import { installEditorDownloadRouting } from './creation/output-router.mjs?rev=20261028-unified-output-1';
+import { installEditorDownloadRouting } from './creation/output-router.mjs?rev=20261111-output-offerwall-1';
 const movedControls = new WeakMap();
 const mountedDismissals = new WeakSet();
 

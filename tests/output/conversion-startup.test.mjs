@@ -123,3 +123,10 @@ test('native startup skips the UI loader and still reaches ready', async () => {
   assert.deepEqual(h.state.options, { native: true });
   assert.equal(h.state.adapter, undefined);
 });
+
+test('workspace visibility does not wait for recovery, while advertising receives its result', async () => {
+  let finish; const recovery = new Promise(resolve => { finish = resolve; }); let shown = false;
+  const result = await runConversionStartup({ view: { begin() {}, ready() { shown = true; }, fail() { assert.fail('unexpected startup failure'); } }, loadEngine: async () => {}, loadText: async () => null, loadIntent: async () => null, loadUI: async () => ({ mountSmartConversion: () => ({ entryRecoveryReady: recovery }) }) });
+  assert.equal(shown, true); assert.equal(result.entryRecoveryReady, recovery);
+  finish(false); assert.equal(await result.entryRecoveryReady, false);
+});

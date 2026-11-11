@@ -189,7 +189,12 @@ try {
       const settledQueries = imported.queries;
       await p.locator('#project-tab-library').click(); await p.locator('#project-tab-import').click(); await waitFrame(p);
       assert.equal(await p.evaluate(() => __qa.reads.queries), settledQueries, 'both successful tabs reuse their own cached data');
+      // close() queues its event; wait for the workspace's cache invalidation before reopening.
+      await p.evaluate(() => {
+        window.__qaGalleryClosed = new Promise(resolve => document.querySelector('#pxd-panel').addEventListener('close', resolve, { once: true }));
+      });
       await p.locator('#project-close').click();
+      await p.evaluate(() => window.__qaGalleryClosed);
       await p.evaluate(async () => { await __qa.raw.save(await __qa.make('qa-later', '後から追加された作品', null, 120), { expectedRevisionId: null }); });
       const beforeOpen = await p.evaluate(() => __qa.reads.queries);
       await openImport(p);
@@ -209,5 +214,6 @@ try {
   const p = await context.newPage(); await p.goto(base + '/__qa'); await seed(p, true); await openImport(p);
   assert.match(await p.locator('#project-import-pane .project-list__empty').textContent(), /以前の作品はまだありません/);
   assert.equal(await p.locator('#pxd-open').isEnabled(), true); await context.close(); report.checks.push({ emptySources: 'PASS' });
-} finally { await writeFile(`${out}/report.json`, JSON.stringify(report, null, 2)); await browser.close(); await new Promise(r => server.close(r)); }
+} catch (error) { report.status = 'FAIL'; report.failure = error.stack || String(error); throw error; }
+finally { await writeFile(`${out}/report.json`, JSON.stringify(report, null, 2)); await browser.close(); await new Promise(r => server.close(r)); }
 if (report.status !== 'PASS') process.exitCode = 1;

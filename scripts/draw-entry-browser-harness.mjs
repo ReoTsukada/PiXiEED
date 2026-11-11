@@ -6,8 +6,9 @@ import { pathToFileURL } from 'node:url';
 
 const base = process.env.PIXIEED_BROWSER_BASE_URL || 'http://127.0.0.1:4198';
 assert.ok(['localhost', '127.0.0.1'].includes(new URL(base).hostname));
-// Exercise canonical-origin URL guards while serving every byte from localhost.
-const origin = 'https://pixieed.jp';
+// Exercise editor UI on a fictional origin; every byte comes from localhost.
+// The tool route guard origin alone is mapped in fulfilled bytes; no live site is used.
+const origin = 'https://pixieed-offerwall.test';
 const out = process.env.PIXIEED_DRAW_ENTRY_OUTPUT || '/tmp/pixieed-draw-entry-browser';
 const runtime = process.env.PIXIEED_PLAYWRIGHT_MODULE || '/Users/tsukadareine/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
 const { chromium } = await import(pathToFileURL(runtime).href);
@@ -28,7 +29,10 @@ async function context(options = {}) {
     if (url.origin !== origin || !['GET', 'HEAD'].includes(request.method())) return route.abort();
     try {
       const response = await route.fetch({ url: `${base}${url.pathname}${url.search}` });
-      await route.fulfill({ response });
+      if (url.pathname === '/js/tool-start-routes.mjs') {
+        const body = (await response.text()).replaceAll('https://pixieed.jp', origin);
+        await route.fulfill({ response, body });
+      } else await route.fulfill({ response });
     } catch (error) {
       // Closing a context can dispose a harmless in-flight home-page fetch.
       if (!/disposed|closed/i.test(error.message)) throw error;

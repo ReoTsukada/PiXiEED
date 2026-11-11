@@ -11,7 +11,7 @@ import { addSiteDrawCta } from './site-draw-cta.mjs';
 import { addPageGutters } from './page-gutters.mjs';
 import { addEventArchiveAdSlots } from './event-archive-ad-slots.mjs';
 import { addInformationAutoAds } from './information-auto-ads.mjs';
-import { addOfferwallEntryPolicy, OFFERWALL_TOOL_PATHS, OFFERWALL_ENTRY_POLICY_SCRIPT, OFFERWALL_ENTRY_LOADER_SCRIPT } from './offerwall-entry-policy.mjs';
+import { addOfferwallEntryPolicy, OFFERWALL_TOOL_PATHS, OFFERWALL_OUTPUT_PATHS, OFFERWALL_ENTRY_POLICY_SCRIPT, OFFERWALL_ENTRY_LOADER_SCRIPT } from './offerwall-entry-policy.mjs';
 import { optimizeToolRuntimeDelivery } from './tool-runtime-delivery.mjs';
 import { optimizeSiteStartupDelivery } from './site-startup-delivery.mjs';
 import { prepareSocialStartupDelivery } from './social-startup-delivery.mjs';
@@ -54,7 +54,7 @@ export function addSiteHeaderBenefits(html, name = '') {
   const original = html;
   // Keep the established shared-header version normalization.
   html = html.replace(/(href="\/css\/site-header\.css)(?:\?rev=[^\"]*)?("?)/i, '$1?rev=20261024-free-tools-1$2');
-  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261024-common-tool-start-1$2');
+  html = html.replace(/(src="[^"<>]*\/js\/site-header\.mjs)(?:\?[^"<>]*)?("?)/gi, '$1?rev=20261111-output-offerwall-1$2');
   html = html.replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/site-header-benefits\.mjs(?:\?[^"']*)?\1)[^>]*>\s*<\/script>\s*/gi, '');
   const skipped = headerRewardRedirects.has(name) || /<body\b[^>]*\bdata-admin-page\b/i.test(html);
   return { html, added: false, removed: html !== original, skipped };
@@ -75,7 +75,7 @@ export function addToolOfferwallEntry(html, name = '') {
   const withoutLoaders = html
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/tool-offerwall-entry\.mjs(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '')
     .replace(/<script\b(?=[^>]*\bsrc\s*=\s*(["'])\/js\/adsense-auto\.js(?:\?[^"']*)?\1)[^>]*>\s*<\/script\s*>\s*/gi, '');
-  if (!OFFERWALL_TOOL_PATHS.includes(route)) return { html: withoutLoaders, added: false };
+  if (!OFFERWALL_TOOL_PATHS.includes(route) && !OFFERWALL_OUTPUT_PATHS.includes(route)) return { html: withoutLoaders, added: false };
   const policy = addOfferwallEntryPolicy(withoutLoaders);
   const output = policy.html.replace(OFFERWALL_ENTRY_POLICY_SCRIPT, `${OFFERWALL_ENTRY_POLICY_SCRIPT}\n${OFFERWALL_ENTRY_LOADER_SCRIPT}`);
   return { html: output, added: output !== html };

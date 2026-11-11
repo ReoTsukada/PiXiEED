@@ -1,5 +1,6 @@
+import { outputEntrySearch } from './output-entry-context.mjs?rev=20261111-output-offerwall-1';
 export function conversionRecoveryContext(location) {
-  const query=new URLSearchParams(location.search);
+  const query=new URLSearchParams(outputEntrySearch(location));
   return { path:location.pathname, id:query.get('id')||'', file:query.get('file')||'', mode:query.get('mode')||'' };
 }
 export function createConversionRecoveryWorkspace({main,text,imports,location,owner,captureSaveState=()=>({sizeDirty:false,fpsDirty:false,mediaDirty:false}),restoreSaveState=()=>{}}) {

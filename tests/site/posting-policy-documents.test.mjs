@@ -8,14 +8,14 @@ import { policyDigest, verifyPolicyDocuments } from '../../scripts/check-posting
 
 test('prepared privacy date is independent of the unchanged terms date and hashes', async () => {
   const documents = await verifyPolicyDocuments();
-  assert.equal(postingPolicy.effectiveCandidateDate, '2026-10-24');
+  assert.equal(postingPolicy.effectiveCandidateDate, '2026-11-11');
   assert.equal(postingPolicy.terms.version, 'terms-20261022-1');
   assert.equal(postingPolicy.terms.effectiveDate, '2026-10-22');
   assert.equal(postingPolicy.terms.sha256, '4ef3e799ee9828c3797b0fdb0dfc52528313f054eda54421f487d5bf13d436d3');
-  assert.equal(postingPolicy.privacy.version, 'privacy-20261024-1');
-  assert.equal(postingPolicy.privacy.effectiveDate, '2026-10-24');
+  assert.equal(postingPolicy.privacy.version, 'privacy-20261111-1');
+  assert.equal(postingPolicy.privacy.effectiveDate, '2026-11-11');
   assert.equal(documents.find(document => document.kind === 'terms')?.effectiveDate, '2026-10-22');
-  assert.equal(documents.find(document => document.kind === 'privacy')?.effectiveDate, '2026-10-24');
+  assert.equal(documents.find(document => document.kind === 'privacy')?.effectiveDate, '2026-11-11');
 });
 
 test('older policy metadata without document dates still falls back to the shared candidate date', async () => {

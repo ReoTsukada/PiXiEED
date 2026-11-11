@@ -26,7 +26,7 @@ const preservesUnit = unit => ['filled', 'unfill-optimized'].includes(conversion
 export function conversionAdEligible({ origin, pathname, search = '', hash = '', topLevel = false, referrer = '', entryHistoryState = null } = {}) {
   if (!topLevel || !['https://pixieed.jp', 'https://www.pixieed.jp'].includes(origin)
       || !paths.has(pathname) || (hash && hash !== '#main') || !outputAdReferrerSafe(referrer)
-      || hasConversionRecoveryHistory(entryHistoryState)) return false;
+      || entryHistoryState?.pixieedOutputRequest || hasConversionRecoveryHistory(entryHistoryState)) return false;
   const query = new URLSearchParams(search);
   for (const key of query.keys()) {
     if (query.getAll(key).length !== 1 || !allowedQuery.get(key)?.has(query.get(key))) return false;

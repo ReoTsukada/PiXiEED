@@ -346,7 +346,7 @@ test('generated production catalog has one labelled ad and preview has none', as
   assert.equal((catalog.match(/data-shop-display-ad/g) || []).length, 1);
   assert.match(catalog, /<aside class="shop-ad" data-shop-display-ad aria-label="広告" hidden>/);
   assert.ok(catalog.indexOf('data-shop-display-ad') > catalog.indexOf('data-product-id="product-famicom"'));
-  assert.match(catalog, /adsense-offerwall-policy\.js\?rev=20261110-output-result-1/);
+  assert.match(catalog, /adsense-offerwall-policy\.js\?rev=20261111-output-offerwall-1/);
   assert.match(catalog, /js\/ads\/shop-ad\.mjs\?rev=20261108-shop-display-ad-1/);
   assert.doesNotMatch(catalog, /<script[^>]*src="https:\/\/pagead2/);
   assert.doesNotMatch(preview, /data-shop-display-ad|data-shop-ad="catalog-v1"|js\/ads\/shop-ad\.mjs/);

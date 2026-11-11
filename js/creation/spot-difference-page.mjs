@@ -1,6 +1,6 @@
 import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
-import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261110-output-result-1';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
+import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { snapToWholePixels } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
@@ -13,7 +13,7 @@ import { createGameEditorHistory, retainDifferenceCandidates } from './game-edit
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { detectDifferenceCandidates, excludeDifferenceCandidate, mapClientPointToPixel, mergeDifferenceCandidates, resolveLocalDrawRevision, splitDifferenceCandidate, validateSpotDifferenceDraft, confirmDifferenceCandidates } from './spot-difference-core.mjs?rev=20260930-shared-canvas-5';
 import { openPuzzleHandoff } from './puzzle-handoff.mjs?rev=20261021-jigsaw-public-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261109-lazy-gallery-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261111-output-offerwall-1';
 import { requireSharedCanvasAccess } from './shared-canvas-access.mjs?rev=20261024-free-tools-1';
 import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';

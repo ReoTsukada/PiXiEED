@@ -53,7 +53,7 @@ export async function runConversionStartup({
 
     stage = 'ready';
     view.ready(adapter, { native });
-    return { status: 'ready', stage };
+    return { status: 'ready', stage, ...(adapter?.entryRecoveryReady ? { entryRecoveryReady: adapter.entryRecoveryReady } : {}) };
   } catch (error) {
     try { view.fail(error, { stage }); } catch { /* Preserve the startup failure result. */ }
     return { status: 'error', stage, error };

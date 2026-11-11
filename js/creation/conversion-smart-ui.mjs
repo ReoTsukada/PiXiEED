@@ -1,8 +1,9 @@
+import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261110-output-layout-7';
 import { textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryStore, createIndexedDbConversionRecoveryAdapter } from './conversion-recovery-store.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261105-video-size-1';
-import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261105-video-size-1';
+import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261111-output-offerwall-1';
 import { activateRetainedConversionInput } from './conversion-input-receipts.mjs?rev=20261105-video-size-1';
 import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261110-output-layout-7';
 import { createUnifiedImportController, importUnifiedMediaFiles } from './conversion-unified-import.mjs?rev=20261105-video-size-1';
@@ -512,6 +513,7 @@ export function mountSmartConversion(doc = document, win = window) {
   if(unified)resultSurface=mountResultSurface({main,doc,win,schedule,refreshText:()=>{if(busy())return;if(liveText())liveText().refresh();else $('[data-tx-run]')?.click();schedule();},cancelText:()=>{saveIntent.cancel();cancelAction()?.click();schedule();}});
   render();
   let localRecoveryHost = null, recoveryIdentity = null;
+  let entryRecoveryReady = Promise.resolve(!hasConversionRecoveryHistory(win.history?.state));
   const recoveryChanged = () => localRecovery?.changed();
   const beforeRecoveryLeave = event => { if (localRecovery?.dirty || localRecovery?.snapshot().saving) { event.preventDefault(); event.returnValue = ''; } };
   if (unified && main.textConversion) {
@@ -560,8 +562,8 @@ export function mountSmartConversion(doc = document, win = window) {
       });
       for(const event of ['input','change','pixieed:text-source','pixieed:materials'])main.addEventListener(event,recoveryChanged);
       win.addEventListener('beforeunload',beforeRecoveryLeave);
-      void localRecovery.start();
-    } catch(error) { setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'), `端末内保存を開始できませんでした。${error?.message||''} 現在の素材は画面に残っています。`);for(const button of localRecoveryHost.querySelectorAll('button'))button.disabled=true; }
+      entryRecoveryReady = localRecovery.start().then(ready => ready === true, () => false);
+    } catch(error) { entryRecoveryReady = Promise.resolve(false); setText(localRecoveryHost.querySelector('[data-sc-local-recovery-status]'), `端末内保存を開始できませんでした。${error?.message||''} 現在の素材は画面に残っています。`);for(const button of localRecoveryHost.querySelectorAll('button'))button.disabled=true; }
   }
   const onHide = event => { saveIntent.cancel(); unifiedImport?.cancel(); if (!event.persisted) destroy(); };
   const onShow = () => schedule();
@@ -580,5 +582,5 @@ export function mountSmartConversion(doc = document, win = window) {
     main.removeEventListener('pixieed:materials', materialsChanged);
     win.removeEventListener('pagehide', onHide); win.removeEventListener('pageshow', onShow);
   }
-  return { refresh: schedule, destroy };
+  return { refresh: schedule, destroy, entryRecoveryReady };
 }

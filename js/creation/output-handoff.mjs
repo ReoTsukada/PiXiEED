@@ -1,7 +1,8 @@
+import { navigateOutputEntry } from './output-entry-context.mjs?rev=20261111-output-offerwall-1';
 /** Public handoff API. Storage schema and existing record contracts are preserved. */
-export * from './output-handoff-core.mjs?rev=20261104-engine-boundaries-3';
-import { sendToolOutput as storedOutput } from './output-handoff-core.mjs?rev=20261104-engine-boundaries-3';
-import { navigationContext, flushOutputWorkspace, reportOutputError, outputReturnUrl } from './output-router.mjs?rev=20261028-unified-output-1';
+export * from './output-handoff-core.mjs?rev=20261111-output-offerwall-1';
+import { sendToolOutput as storedOutput } from './output-handoff-core.mjs?rev=20261111-output-offerwall-1';
+import { navigationContext, flushOutputWorkspace, reportOutputError, outputReturnUrl } from './output-router.mjs?rev=20261111-output-offerwall-1';
 
 // The storage implementation predates unified output and exempted direct/embedded editors.
 // Resolve and validate the host here, then use its ordinary top-level storage/navigation path.
@@ -16,6 +17,7 @@ async function performSharedOutput(options, dependencies = {}) {
       ? outputReturnUrl(context.location.pathname + context.location.search + context.location.hash, context.location.origin)
       : typeof options?.returnUrl === 'function' ? options.returnUrl() : options?.returnUrl };
     const result = await storedOutput(request, { ...dependencies, windowRef: storageWindow,
+      navigate: href => navigateOutputEntry(href, context.win, context.location),
       locationRef: context.location, historyRef: dependencies.historyRef || context.win?.history });
     if (!result.ok) reportOutputError(result.error, context.win?.document);
     return result;

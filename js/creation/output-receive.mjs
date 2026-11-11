@@ -1,9 +1,10 @@
+import { navigateOutputEntry } from './output-entry-context.mjs?rev=20261111-output-offerwall-1';
 /** Receive staged editor files without sending private IDs or media to analytics. */
-import { readToolOutput } from './output-handoff.mjs?rev=20261104-engine-boundaries-3';
-import { readOutputFile } from './output-router.mjs?rev=20261028-unified-output-1';
+import { readToolOutput } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
+import { readOutputFile } from './output-router.mjs?rev=20261111-output-offerwall-1';
 import { loadConversionFile } from './conversion-service.mjs?rev=20261028-conversion-1';
 import { validateTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
-import { mountConversionPage } from './conversion-page.mjs?rev=20261105-video-size-1';
+import { mountConversionPage } from './conversion-page.mjs?rev=20261111-output-offerwall-1';
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 export function sharedOutputRequest(search) {
   const query = new URLSearchParams(search);
@@ -35,7 +36,13 @@ function addOriginControls(record, doc, win, request) {
   details.append(summary, description, link); main.append(details);
   win.addEventListener('pagehide', () => win.URL.revokeObjectURL(url), { once: true });
   const advanced = main.querySelector('[data-advanced]');
-  if (advanced && request.key === 'id') advanced.href = `/output/work/?id=${encodeURIComponent(request.id)}&view=advanced`;
+  if (advanced && request.key === 'id') {
+    advanced.href = `/output/work/?id=${encodeURIComponent(request.id)}&view=advanced`;
+    advanced.addEventListener('click', event => {
+      event.preventDefault();
+      navigateOutputEntry(advanced.href, win);
+    });
+  }
 }
 function renderFile(record, doc, win) {
   const main = doc.getElementById('main'); main.replaceChildren(); main.className = 'conversion-main'; doc.body.classList.add('simple-conversion-page');
@@ -54,7 +61,7 @@ function renderFile(record, doc, win) {
 export async function mountSharedOutput(request, doc = document, win = window) {
   const record = request.key === 'id' ? await readToolOutput(request.id) : await readOutputFile(request.id);
   if (request.key === 'id' && (request.advanced || needsDetailedOutput(record))) {
-    const { outputPageReady } = await import('./output-page.mjs?rev=20261110-output-result-1');
+    const { outputPageReady } = await import('./output-page.mjs?rev=20261111-output-offerwall-1');
     await outputPageReady;
     return 'detailed';
   }

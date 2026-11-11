@@ -414,7 +414,8 @@ try {
   report.drawTouchAudit = { viewportWidth: 390, writtenPixels: touchEnd - touchStart, undoRestored: true, emulated: true };
   pass('Draw 390px emulated touch: tap, visible pigment and exact undo');
   await touchContext.close();
-  const staticContext = await browser.newContext({ javaScriptEnabled: false });
+  const staticContext = await browser.newContext({ javaScriptEnabled: false, serviceWorkers: 'block' });
+  await staticContext.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
   const staticPage = await staticContext.newPage(); await staticPage.goto(base+'/output/formats/tga/');
   assert.equal(await staticPage.locator('.format-route-start').count(),4); assert.ok(await staticPage.locator('h1').isVisible()); await staticContext.close();
   pass('Guide content and four conversion links work without JavaScript');

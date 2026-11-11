@@ -1,6 +1,6 @@
 import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261016-color-capability-1';
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
-import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1';
+import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
@@ -19,11 +19,11 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261109-lazy-gallery-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261111-output-offerwall-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261016-color-capability-1';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261016-color-capability-1';
-import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261024-free-tools-1';
+import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261111-output-offerwall-1';
 import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261007-draw-handoff-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
@@ -31,7 +31,7 @@ import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
 import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261109-ellipse-geometry-1';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261018-direct-runtime-1';
+import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261016-color-capability-1';
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
@@ -2188,7 +2188,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261109-lazy-gallery-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261111-output-offerwall-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2525,7 +2525,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261106-button-icon-audit-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261111-output-offerwall-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {

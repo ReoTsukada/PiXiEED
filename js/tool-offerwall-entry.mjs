@@ -3,11 +3,11 @@ import { displayAdConfig } from '../data/site-config.js?rev=20261008-map-detail-
 const PUBLISHER = displayAdConfig?.client;
 const SDK_URL = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${PUBLISHER}`;
 
-/** Ask the site policy to permit a fresh setup URL; this never represents restored work. */
-export function notifyToolEntryReady(fresh) {
+/** Other tools require a fresh setup; output explicitly signals a usable restored or new workspace. */
+export function notifyToolEntryReady(fresh, options = {}) {
   const policy = globalThis.window?.__PIXIEED_OFFERWALL_ENTRY__;
   if (!policy || typeof policy.ready !== 'function') return false;
-  return policy.ready({ fresh: fresh === true });
+  return policy.ready({ fresh: fresh === true, output: options.output === true });
 }
 
 export function subscribeToolEntry(listener) {
@@ -36,6 +36,7 @@ export function maybeLoadOfferwallSDK({ window: win = globalThis.window, documen
   const script = doc.createElement('script');
   script.async = true;
   script.crossOrigin = 'anonymous';
+  script.referrerPolicy = 'no-referrer';
   script.src = SDK_URL;
   sdkPromise = new Promise((resolve) => {
     script.addEventListener?.('load', () => resolve(true), { once: true });

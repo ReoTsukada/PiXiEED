@@ -1,9 +1,9 @@
 // Publish document versions together with matching HTML and server policy.
 // Keep consent explicit; never fill these from localStorage.
 export const postingPolicy = Object.freeze({
-  state: 'published', contactConfirmed: true, effectiveCandidateDate: '2026-10-24',
+  state: 'published', contactConfirmed: true, effectiveCandidateDate: '2026-11-11',
   terms: Object.freeze({ url: 'https://pixieed.jp/terms/', version: 'terms-20261022-1', effectiveDate: '2026-10-22', sha256: '4ef3e799ee9828c3797b0fdb0dfc52528313f054eda54421f487d5bf13d436d3' }),
-  privacy: Object.freeze({ url: 'https://pixieed.jp/privacy/', version: 'privacy-20261024-1', effectiveDate: '2026-10-24', sha256: '9c74ee2571f49756626825ff1658c6e280d0bc8161b3710394eb2270a4ecebe5' }),
+  privacy: Object.freeze({ url: 'https://pixieed.jp/privacy/', version: 'privacy-20261111-1', effectiveDate: '2026-11-11', sha256: '50c8ef0abc1896e32d9108fa98a84e265fed804227f3c834e44373f77e552994' }),
 });
 
 export class PostingConsentError extends Error {

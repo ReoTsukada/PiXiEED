@@ -1,3 +1,4 @@
+import { replaceOutputEntry } from '../../js/creation/output-entry-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -22,7 +23,7 @@ function fixture({ read = async id => ({ id, title: 'Imported', mediaSources: [{
   };
   const context = {
     main: { dataset: { unifiedInput: 'true' }, dispatchEvent(event) { state.events.push(event); } },
-    location: { href: 'https://local.test/output/work/?text=output', assign(url) { state.assigned.push(url); } },
+    location: { origin: 'https://local.test', pathname: '/output/work/', href: 'https://local.test/output/work/?text=output', assign(url) { state.assigned.push(url); } },
     history: { state: { existing: true }, replaceState(next, _title, url) { state.replaced.push({ next, url }); } },
     pageDisposed: false, record: null, status: targetStatus,
     importController: null,
@@ -32,23 +33,27 @@ function fixture({ read = async id => ({ id, title: 'Imported', mediaSources: [{
     CustomEvent: class { constructor(type, init) { this.type = type; Object.assign(this, init); } },
     URL,
   };
+  context.replaceOutputEntry = href => replaceOutputEntry(href, { location: context.location, history: context.history });
   vm.createContext(context);
   vm.runInContext(stagedImportCode, context);
   return { state, context, draft, targetStatus };
 }
 
-test('unified import hydrates staged record in place and replaces URL with advanced view', async () => {
+test('unified import hydrates staged record in place and keeps advanced pointer in history and cleans the URL', async () => {
   const { state, context, draft, targetStatus } = fixture();
   state.controller = { signal: { aborted: false } };
   context.importController = state.controller;
-  const staged = { id: 'staged-id-123', url: '/output/work/?id=staged-id-123' };
+  const staged = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', url: '/output/work/?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' };
   const committed = await vm.runInContext('(staged, controller, targetStatus) => completeStagedOutputImport(staged, controller, targetStatus)', context)(staged, state.controller, targetStatus);
   assert.equal(committed, true);
   assert.equal(state.readId, staged.id);
   assert.equal(state.hydrated[0].id, staged.id);
   assert.equal(state.assigned.length, 0);
   assert.equal(state.replaced.length, 1);
-  assert.equal(new URL(state.replaced[0].url).searchParams.get('view'), 'advanced');
+  assert.equal(state.replaced[0].url, '/output/work/');
+  assert.equal(state.replaced[0].next.pixieedOutputRequest.advanced, true);
+  assert.equal(state.replaced[0].next.pixieedOutputRequest.id, staged.id);
+  assert.equal(state.replaced[0].next.existing, true);
   assert.deepEqual(state.events.map(event => [event.type, event.detail.changed, event.detail.mutation]), [['pixieed:materials', true, 'import']]);
   assert.match(targetStatus.textContent, /追加しました/);
   assert.equal(draft.value, 'unsaved text draft');
