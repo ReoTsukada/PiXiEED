@@ -65,6 +65,9 @@ jobs:
           node scripts/direct-resume-browser-harness.mjs || status=1
           node scripts/gallery-first-browser-harness.mjs || status=1
           PIXIEED_BROWSER_ROOT=/tmp/pixieed-site-check PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-creation-browser/imports node scripts/import-preview-gallery-browser-harness.mjs || status=1
+          PIXIEED_BROWSER_ROOT=/tmp/pixieed-site-check PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-creation-browser/save-guidance node scripts/project-save-guidance-browser-harness.mjs || status=1
+          PIXIEED_BROWSER_ROOT=/tmp/pixieed-site-check PIXIEED_BROWSER_ARTIFACTS=/tmp/pixieed-creation-browser/empty-gallery node scripts/project-start-empty-browser-harness.mjs || status=1
+          PIXIEED_GUIDANCE_OUTPUT=/tmp/pixieed-creation-browser/home-guidance node scripts/home-creation-guidance-browser-harness.mjs || status=1
           exit "$status"
       - name: Verify progressive social loading and actions
         env:

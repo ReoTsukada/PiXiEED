@@ -53,13 +53,31 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
   scroller.className = 'project-start-picker__scroller';
   const list = document.createElement('div');
   list.className = 'project-start-picker__list project-list';
-  scroller.append(list);
+  // Keep the first-create action in the gallery without replacing its virtualized list.
+  const empty = document.createElement('section');
+  empty.className = 'project-start-picker__empty';
+  empty.hidden = true;
+  empty.setAttribute('aria-labelledby', 'project-start-empty-title');
+  const emptyTitle = document.createElement('h3');
+  emptyTitle.id = 'project-start-empty-title';
+  emptyTitle.className = 'project-start-picker__empty-title';
+  emptyTitle.textContent = '最初の作品を作ってみましょう';
+  const emptyCopy = document.createElement('p');
+  emptyCopy.className = 'project-start-picker__empty-copy';
+  emptyCopy.textContent = 'このブラウザーに保存した作品が、ここに並びます。';
+  const emptyCreate = document.createElement('button');
+  emptyCreate.type = 'button';
+  emptyCreate.id = 'project-start-empty-create';
+  emptyCreate.className = 'project-start-picker__empty-create';
+  emptyCreate.textContent = '最初の作品を作る';
+  empty.append(emptyTitle, emptyCopy, emptyCreate);
+  scroller.append(empty, list);
   const actions = document.createElement('div');
   actions.className = 'project-sheet__actions';
   const fresh = document.createElement('button');
   fresh.type = 'button';
   fresh.id = 'project-start-new';
-  fresh.textContent = '＋ 新規';
+  fresh.textContent = '＋ 新規作成';
   actions.append(fresh);
   dialog.append(header, intro, search, status, count, retry, scroller, actions);
   document.body.append(dialog);
@@ -71,13 +89,13 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
     galleryAd?.retire?.(reason);
 
   }
-  const cssHref = '/css/project-workspace.css?rev=20261109-import-preview-gallery-1';
+  const cssHref = '/css/project-workspace.css?rev=20261112-creation-guidance-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === cssHref);
   const ownsCss = !css;
   let cssPromise = null, cssFailed = false, cancelCss = null;
   const active = () => !disposed && !signal?.aborted;
   function hide() { retireGalleryAd('hide'); epoch++; if (dialog.open) dialog.close(); }
-  function setBusy(value) { busy = value; fresh.disabled = search.disabled = value; gallery.refresh(); }
+  function setBusy(value) { busy = value; fresh.disabled = emptyCreate.disabled = search.disabled = value; gallery.refresh(); }
   async function choose(value) {
     if (!active() || !dialog.open || busy) return;
     retireGalleryAd('selection'); // Retire before history changes, project loading, or a fresh start.
@@ -95,6 +113,7 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
   search.addEventListener('focus', () => retireGalleryAd('search'), { once: true });
   search.addEventListener('input', () => { retireGalleryAd('search'); gallery.filter(search.value); scroller.scrollTop = 0; });
   fresh.addEventListener('click', () => void choose(null));
+  emptyCreate.addEventListener('click', () => void choose(null));
   function cancelPicker() { if (!active()) return; retireGalleryAd('cancel'); hide(); onCancel(); }
   dialog.addEventListener('close', () => { retireGalleryAd('hide'); galleryAd?.dispose(); });
   const retireOnControlStart = event => {
@@ -135,13 +154,15 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
     if (!active() || !dialog.open) return;
     const version = ++epoch;
     retry.hidden = true;
+    empty.hidden = true;
     list.setAttribute('aria-busy', 'true');
     status.textContent = '保存済みの作品を読み込んでいます…';
     try {
       const { projects, errors } = await createToolProjectStore('draw').listProjects();
       if (!active() || !dialog.open || version !== epoch) return;
       gallery.setItems(projects);
-      status.textContent = errors?.length ? '一部の作品を確認できませんでした。ほかの作品は開けます。' : projects.length ? '続ける作品を選んでください。' : '保存済みの作品はまだありません。「＋ 新規」から始めてください。';
+      empty.hidden = projects.length > 0 || Boolean(errors?.length);
+      status.textContent = errors?.length ? '一部の作品を確認できませんでした。ほかの作品は開けます。' : projects.length ? '続ける作品を選んでください。' : '保存済みの作品はまだありません。新しい作品を始められます。';
       retry.hidden = !errors?.length;
       const hasValidArtwork = hasCompleteProjectArtwork(projects);
       if (!errors?.length && projects.length > 0 && hasValidArtwork) prepareGalleryAd(projects.length);

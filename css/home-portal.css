@@ -132,3 +132,15 @@ body.home-portal{min-width:320px;min-height:100vh;margin:0;color:var(--ink);back
  .portal-footer{min-height:76px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.portal-card,.portal-header-links a,.portal-more-plus,.portal-search-box{transition:none}.portal-card:hover{transform:none}}
+
+/* Keep returning creators one clear step away from the mandatory gallery. */
+.portal-work-entry{margin:0 0 24px;padding:20px;border:1px solid var(--border);border-radius:18px;background:#fff}
+.portal-work-entry h2{margin:0 0 14px;font-size:18px;line-height:1.5}
+.portal-work-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.portal-work-actions a{display:flex;min-height:76px;flex-direction:column;justify-content:center;gap:6px;padding:14px 16px;border:1px solid #b9d5c7;border-radius:12px;background:#edf6f0}
+.portal-work-actions a:hover{background:#deeee3}
+.portal-work-actions strong{font-size:16px;line-height:1.5}
+.portal-work-actions span,.portal-work-entry p{font-size:13px;line-height:1.7;color:#52685b}
+.portal-work-entry p{margin:14px 0 0}
+.portal-work-entry p a{text-decoration:underline;text-underline-offset:3px}
+#portal-create{scroll-margin-top:20px}

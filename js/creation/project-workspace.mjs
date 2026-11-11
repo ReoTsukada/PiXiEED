@@ -64,7 +64,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   function closeManagerAd() { managerAd?.dispose(); managerAd = null; cancelAnimationFrame(managerAdFrame); managerAdFrame = 0; managerAdPrepared = false; }
 
   let transientNavigation = false;
-  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261109-import-preview-gallery-1';
+  const projectWorkspaceCssHref = '/css/project-workspace.css?rev=20261112-creation-guidance-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === projectWorkspaceCssHref);
   const ownsCss = !css;
   if (ownsCss) { css = node('link'); css.rel = 'stylesheet'; css.href = projectWorkspaceCssHref; document.head.append(css); }
@@ -118,11 +118,11 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const saveButton = button('保存し直す', 'pxd-save', () => void transact(async () => {
     await save();
     say(session.dirty
-      ? '保存した版をこの端末に保存しました。保存中に加えた編集はまだ保存されていません。'
-      : 'この作品をこの端末に保存しました。');
+      ? '保存した版をこのブラウザーに保存しました。保存中に加えた編集はまだ保存されていません。'
+      : 'この作品をこのブラウザーに保存しました。');
     await refreshList();
   }, { close: false }));
-  const exportButton = button('作品全体をダウンロード（PXD）', 'pxd-export', () => void transact(async () => {
+  const exportButton = button('編集データをバックアップ（PXD）', 'pxd-export', () => void transact(async () => {
     const project = await save();
     const staged = await sendPxdBackup(await encodePxd(project), `pixieed-${project.projectId.slice(0, 8)}.pxd`);
     if (!staged) say('保存した作品全体のPXDバックアップのダウンロードを開始しました。');
@@ -134,7 +134,14 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const staged = await sendPxdBackup(backup.bytes, backup.filename);
     if (!staged) say(`${backup.label}：ダウンロードを開始しました。現在の作品は変更していません。`);
   }, { close: false }));
-  actions.append(duplicate, saveButton, exportButton, original);
+  const backupSection = node('section', 'project-backup');
+  backupSection.setAttribute('aria-labelledby', 'project-backup-title');
+  const backupTitle = node('h3', '', '編集データを手元に残す'); backupTitle.id = 'project-backup-title';
+  const backupNote = node('p', 'project-sheet__note', 'ブラウザーのデータ削除や端末変更に備え、PXDを保存してください。出力画面でダウンロードできます。');
+  backupNote.id = 'project-backup-note'; exportButton.setAttribute('aria-describedby', backupNote.id);
+  const restoreNote = node('p', 'project-sheet__note', 'PXDは続きを編集するためのファイルです。戻すときは［取り込む］から選びます。画像・音声の書き出しや公開投稿とは別です。');
+  backupSection.append(backupTitle, backupNote, exportButton, restoreNote);
+  actions.append(duplicate, saveButton, original);
   const moreActions = node('details', 'project-files project-more');
   moreActions.append(node('summary', '', 'その他')); moreActions.append(actions);
   const transferSection = node('section', 'project-transfer');
@@ -159,6 +166,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   const message = node('p', 'project-sheet__status'); message.id = 'pxd-file-status'; message.setAttribute('role', 'status');
   const recoveryDescription = node('p', 'project-sheet__status', '保存済みの作品は変更していません。続ける作品を一覧から選んでください。「＋ 新規」から新しく描くこともできます。');
   recoveryDescription.id = 'project-recovery-description'; recoveryDescription.hidden = true;
+  const storageNote = node('p', 'project-storage-note', '保存先：この端末のこのブラウザー。ここに保存しただけでは公開されません。');
   const list = node('div', 'project-list'); list.setAttribute('aria-label', '保存した作品');
   const importSection = node('section', 'project-pane project-import-pane'); importSection.id = 'project-import-pane';
   const importNote = node('p', 'project-sheet__note', '以前の作品やPXDバックアップを、元のデータを残したコピーとして取り込みます。');
@@ -293,7 +301,12 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
       managerArtworkCount = projects.length; managerAdState.enoughArtwork = hasManagerArtwork(projects, projectManagerAdConfig.minimumArtwork);
       managerAdState.hasErrors = errors.length > 0 || failed || Boolean(operationError) || Boolean(initialRestoreError);
       listLoaded = true; list.querySelector('.project-list__empty')?.remove(); gallery.setItems(projects);
-      if (!projects.length) list.append(node('p', 'project-list__empty', '最初の作品を描いてみましょう。'));
+      if (!projects.length && errors.length === 0) {
+        const empty = node('div', 'project-list__empty project-empty-state');
+        const emptyNew = button('＋ 最初の作品を作る', 'project-empty-new', () => newButton.click());
+        empty.append(node('p', '', '保存した作品はまだありません。'), emptyNew);
+        list.append(empty);
+      }
       retryList.hidden = errors.length === 0;
       if (errors.length) say(`${errors.length}件の保存内容を確認できませんでした。ほかの作品は開けます。`);
     },
@@ -328,8 +341,8 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
   }
   const header = node('div', 'project-sheet__header'); header.append(heading, toolbar);
   currentCard.append(identity, resumeButton, renameDetails);
-  currentPane.append(currentCard, transferSection, moreActions);
-  libraryPane.append(search, selectionToolbar, count, help, list, noMatches, retryList, selectionActions);
+  currentPane.append(currentCard, backupSection, transferSection, moreActions);
+  libraryPane.append(storageNote, search, selectionToolbar, count, help, list, noMatches, retryList, selectionActions);
   dialog.append(header, recoveryDescription, message, currentPane, libraryPane, importSection); selectPane('library'); document.body.append(dialog);
   // Retained editors share the shell, but each owns its project controls and route pointer.
   if (idPrefix) for (const container of [bar, dialog]) {
@@ -408,7 +421,7 @@ export function mountProjectWorkspace({ tool, getProject, openProject, setStatus
     const name = initialRestoreError ? '前回の作品を確認できません' : initialized ? sanitizeProjectTitle(project?.manifest.title) : '開いています…';
     launcher.disabled = locked;
     launcher.querySelector('.project-bar__name').textContent = name;
-    const state = initialRestoreError ? '復元待ち' : failed ? '保存失敗' : session.busy ? '保存中' : session.dirty || !session.persisted ? '編集中' : '保存済み';
+    const state = initialRestoreError ? '復元待ち' : failed ? '保存失敗' : session.busy ? 'ブラウザーに保存中' : session.dirty || !session.persisted ? '編集中' : 'このブラウザーに保存済み';
     launcher.dataset.state = initialRestoreError || failed ? 'error' : session.busy ? 'saving' : session.dirty || !session.persisted ? 'editing' : 'saved';
     launcher.setAttribute('aria-label', `${name}・${state}。作品を開く`); launcher.title = `${name} · ${state}`;
     if (isActive()) document.body.dataset.toolTransferReady = String(getPublicSources().length === 0 && hasContent());

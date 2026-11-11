@@ -42,7 +42,7 @@ test('intent search is local, ranked, handles width and Japanese inputs', () => 
   assert.ok(findHomeDestinations('________').length===0);
   assert.ok(HOME_DESTINATIONS.length >= 25);
   for(const entry of HOME_DESTINATIONS){
-    assert.match(entry.href,/^\/[a-z0-9/-]+\/$/);
+    assert.match(entry.href,/^\/[a-z0-9/-]+\/(?:\?workspace=1)?$/);
     assert.ok(entry.title && entry.group && entry.terms);
     assert.ok(!/^https?:/.test(entry.href));
   }
@@ -100,4 +100,24 @@ test('retired decorative markup and unreferenced drawing previews stay removed',
   for (const name of ['home-draw-empty.png', 'previews/home-draw-empty-480.webp', 'previews/home-draw-empty-960.webp']) {
     assert.equal(existsSync(new URL(`../../assets/screenshots/${name}`, import.meta.url)), false, name);
   }
+});
+
+const guide = readFileSync(new URL('../../guide/index.html', import.meta.url), 'utf8');
+test('home distinguishes a fresh creation from returning to local works without bypassing the gallery', () => {
+  assert.match(home, /href="#portal-create"><strong>新しくつくる/);
+  assert.match(home, /id="portal-create" class="portal-bento"/);
+  assert.match(home, /href="\/draw\/\?workspace=1"><strong>保存した絵を開く/);
+  assert.match(home, /制作は毎回、作品一覧から始まります/);
+  assert.match(home, /ゲームなどの続きは、<a href="\/tools\/">作成した道具/);
+  assert.match(guide, /道具ごとの作品は絵の作品一覧には表示されません/);
+  assert.match(home, /href="\/guide\/#save-work"/);
+  for (const query of ['続き', '再開', '保存した作品', '制作中', 'PXD']) assert.equal(findHomeDestinations(query)[0].href, '/draw/?workspace=1', query);
+});
+test('guide explains local, backup, export and public destinations using the actual composer', () => {
+  assert.doesNotMatch(guide, /ホームの［作品やことばを投稿する］|ホームで投稿を作成/);
+  assert.match(explore, /data-compose[^>]*>作品を投稿する/);
+  assert.match(guide, /href="\/explore\/">コミュニティで投稿を作成・作品を見る/);
+  for (const text of ['［掲載設定］', '地図の掲載先', '［下書きに保存］', '自動同期されません', 'ブラウザーデータの削除', '編集データをバックアップ（PXD）', '出力画面', '［取り込む］', '作品保存やファイル出力だけでは公開されません']) assert.ok(guide.includes(text), text);
+  assert.match(guide, /id="save-work"/);
+  assert.match(guide, /id="publish-work"/);
 });

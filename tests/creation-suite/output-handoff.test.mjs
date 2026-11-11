@@ -287,17 +287,17 @@ test('PXD backups use unified file staging and never enter lossy media conversio
   const workspace = readFileSync(new URL('../../js/creation/project-workspace.mjs', import.meta.url), 'utf8');
   const pxdUi = readFileSync(new URL('../../js/creation/pxd-ui.mjs', import.meta.url), 'utf8');
   assert.match(workspace, /const saveButton = button\('保存し直す'.*?await save\(\)/s);
-  assert.match(workspace, /const exportButton = button\('作品全体をダウンロード（PXD）'.*?const project = await save\(\).*?encodePxd\(project\).*?PXDバックアップのダウンロードを開始しました/s,
+  assert.match(workspace, /const exportButton = button\('編集データをバックアップ（PXD）'.*?const project = await save\(\).*?encodePxd\(project\).*?PXDバックアップのダウンロードを開始しました/s,
     'the PXD backup downloads the complete saved project snapshot');
   assert.match(pxdUi, /const saveButton = button\('プロジェクトを保存'.*?await save\(\)/s);
   for (const [path, pattern] of [
-    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261111-output-offerwall-1/],
-    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261111-output-offerwall-1/],
-    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261111-output-offerwall-1/],
-    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261111-output-offerwall-1/],
-    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261111-output-offerwall-1/],
-    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261111-output-offerwall-1/],
-    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261111-output-offerwall-1/]
+    ['../../js/creation/audio-page.mjs', /project-workspace\.mjs\?rev=20261112-creation-guidance-1/],
+    ['../../js/creation/draw-page.mjs', /project-workspace\.mjs\?rev=20261112-creation-guidance-1/],
+    ['../../js/creation/draw-page.mjs', /pxd-ui\.mjs\?rev=20261112-creation-guidance-1/],
+    ['../../js/creation/hidden-object-page.mjs', /pxd-ui\.mjs\?rev=20261112-creation-guidance-1/],
+    ['../../js/creation/jigsaw-page.mjs', /pxd-ui\.mjs\?rev=20261112-creation-guidance-1/],
+    ['../../js/creation/spot-difference-page.mjs', /pxd-ui\.mjs\?rev=20261112-creation-guidance-1/],
+    ['../../js/pixel-lens/app.mjs', /pxd-ui\.mjs\?rev=20261112-creation-guidance-1/]
   ]) assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), pattern, `${path} loads the direct-save PXD module revision`);
   const { OUTPUT_MIME_EXTENSIONS } = await import('../../js/creation/output-handoff.mjs');
   assert.equal(OUTPUT_MIME_EXTENSIONS['application/octet-stream'], undefined, 'PXD is not a generic shared output type');
