@@ -139,6 +139,11 @@ try{
       busy:document.querySelector('#main')?.getAttribute('aria-busy'),detailBusy:document.querySelector('#output-layout')?.conversionActions?.busy,
       download:document.querySelector('#output-download')?.download,saveDisabled:document.querySelector('#output-nav-export')?.disabled,
       resultState:document.querySelector('.sc-result-surface')?.dataset.state,current:document.querySelector('.sc-result-surface')?.dataset.current,
+      formatSelection:(()=>{const visible=document.querySelector('[data-sc-unified-format]'),native=document.querySelector('[data-format],#output-format-select');return{
+        purpose:document.querySelector('[data-sc-unified-purpose]')?.value,visibleOptions:[...(visible?.options||[])].map(option=>({value:option.value,disabled:option.disabled,selected:option.selected})),
+        nativeOptions:[...(native?.options||[])].map(option=>({value:option.value,disabled:option.disabled,selected:option.selected})),rejection:document.querySelector('[data-sc-unified-error]')?.textContent,
+        routeNotice:document.querySelector('[data-sc-tab-status]')?.textContent};})(),
+      previewDescription:document.querySelector('[data-result-state]')?.textContent,previewImageHidden:document.querySelector('.sc-result-surface img')?.hidden,
       invalid:[...document.querySelectorAll('input,select,textarea')].filter(node=>node.willValidate&&!node.checkValidity()).map(node=>({id:node.id,type:node.type,message:node.validationMessage}))}));
   }catch{} }
 }

@@ -143,7 +143,12 @@ if(server.listening){
   await page.locator('[data-sc-settings-close]').click();await closed();assert.equal(await launcher.evaluate(e=>e===document.activeElement),true,'desktop close restores focus');await noOverflow('desktop settings closed');
   const png=await syntheticPng();const emptyChooser=page.waitForEvent('filechooser');await page.locator('.sc-unified-empty-add').click();await(await emptyChooser).setFiles({name:'synthetic-320x640.png',mimeType:'image/png',buffer:png});
   await page.locator('[data-sc-unified-format]').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('.convert-intent')?.dataset.state==='ready'&&document.querySelector('[data-format]')?.value==='jpeg'&&document.querySelector('[data-sc-unified-format]')?.value==='jpeg'&&document.querySelector('.sc-material-surface')?.dataset.loaded==='true');await stable();
-  assert.equal(await page.locator('.convert-intent').isVisible(),true,'JPEG intent remains visible after PNG import');
+  // The intent notice moves into the collapsed material/copy disclosure with the
+  // legacy workspace. Keep its ready/native-format checks and verify the visible
+  // selected format and image-output tab that communicate the requested target.
+  const intent=page.locator('.convert-intent');assert.equal(await intent.getAttribute('data-state'),'ready','JPEG intent remains applied after PNG import');
+  const selectedFormat=page.locator('[data-sc-unified-format]');assert.equal(await selectedFormat.isVisible(),true,'the selected JPEG output control remains visible');assert.equal(await selectedFormat.inputValue(),'jpeg');assert.equal(await page.locator('[data-format]').inputValue(),'jpeg','native conversion format remains JPEG');
+  const imageOutputTab=page.locator('#sc-output-tab-image');assert.equal(await imageOutputTab.getAttribute('aria-selected'),'true','image output category is selected');assert.equal(await imageOutputTab.getAttribute('aria-label'),'画像の出力','image output tab remains labeled');assert.equal(await imageOutputTab.locator('[data-sc-output-nontext-label]').textContent(),'画像','image tab label remains visible');
   await page.locator('.sc-result-surface[data-current="true"] .sc-result-content img').waitFor({state:'visible'});
   await page.waitForFunction(()=>{const img=document.querySelector('.sc-result-content img');return img?.complete&&img.naturalWidth>0;});
   const bounds=await page.evaluate(()=>{const rect=s=>document.querySelector(s)?.getBoundingClientRect().toJSON();const img=document.querySelector('.sc-result-content img');return {preview:rect('.sc-result-content img'),content:rect('.sc-result-content'),surface:rect('.sc-result-surface'),main:rect('#main'),natural:[img.naturalWidth,img.naturalHeight]};});
@@ -288,8 +293,12 @@ if(server.listening){
   const materialAfter=await page.evaluate(()=>document.querySelector('#output-layout').conversionActions.getMaterialState());
   assert.equal(materialAfter.assets.length,1);assert.equal(materialAfter.frameCount,1);assert.equal(materialAfter.outputCount,1);assert.equal(materialAfter.activeId,materialBefore.activeId);
   pass('detailed replacement retains exactly one frame/source, pending dimensions and output references');
-  await page.locator('.sc-multiple > summary').click();await page.locator('#output-add-item').click();await page.waitForFunction(()=>document.querySelectorAll('#output-items [role="listitem"]').length>1);assert.equal(await page.locator('#output-batch-save').isVisible(),true);pass('detailed workspace imports in place, retains text and adds multiple outputs with batch save reachable');
-  const included=page.locator('#output-items input[type="checkbox"]');await included.nth(0).check();await included.nth(1).check();
+  await withVisibleControl('#output-add-item',async addItem=>{
+    await addItem.click();await page.waitForFunction(()=>document.querySelectorAll('#output-items [role="listitem"]').length>1);
+    assert.equal(await page.locator('#output-batch-save').isVisible(),true);
+    const included=page.locator('#output-items input[type="checkbox"]');await included.nth(0).check();await included.nth(1).check();
+  });
+  pass('detailed workspace imports in place, retains text and adds multiple outputs with batch save reachable');
   await page.locator('[data-sc-batch]').waitFor({state:'visible'});assert.equal(await page.locator('[data-sc-batch]').innerText(),'PNG 2件を保存');
   const batchDownloads=new Promise((resolve,reject)=>{const files=[];const timer=setTimeout(()=>{page.off('download',onDownload);reject(new Error(`expected two batch downloads, got ${files.length}`));},20000);const onDownload=file=>{files.push(file);if(files.length===2){clearTimeout(timer);page.off('download',onDownload);resolve(files);}};page.on('download',onDownload);});
   await page.locator('[data-sc-batch]').click();const savedBatch=await batchDownloads;

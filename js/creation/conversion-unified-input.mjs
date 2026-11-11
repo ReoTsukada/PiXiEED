@@ -856,10 +856,14 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     update(); schedule();
   });
   async function chooseFileOutput(value) {
+    if (isBusy() || api.snapshot().composing) return false;
     if(value==='text-art')return setPurposeValue('art');
     const mediaSelect=main.querySelector('[data-format],#output-format-select');
     if(!optionsFrom(mediaSelect).some(option=>option.value===value&&!option.disabled))return false;
-    if(!await setPurposeValue('media'))return false;
+    // The active media engine already owns its selected material. Changing its
+    // output format must not re-enter media mode and require a recoverable File.
+    // Transitions from output/text modes still use the exact-file guard above.
+    if(activeMode()!=='media'&&!await setPurposeValue('media'))return false;
     const current=currentNative();
     return current.value===value||Boolean(formatController?.choose?.(value,{busy:isBusy()}));
   }

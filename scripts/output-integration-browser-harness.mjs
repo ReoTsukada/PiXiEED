@@ -115,7 +115,12 @@ async function selectWorkspace(selector, value) {
       const expression = page.locator('[data-sc-unified-format]');
       const sourceMode = await page.locator('#main').evaluate(node => node.textConversion.snapshot().mode);
       if (sourceMode === 'input' && value === 'text') {
-        await withVisibleControl(page.locator('#sc-output-tab-image'), tab => tab.click());
+        // The output tab classifies the result; selecting an already-selected image tab
+        // intentionally keeps restore intent. Use the visible, explicit route action.
+        const action = page.locator('[data-tx-action]');
+        if (await action.inputValue() !== 'text') {
+          await withVisibleControl(page.locator('[data-sc-unified-text-image]'), button => button.click());
+        }
         await page.waitForFunction(() => document.querySelector('#sc-output-tab-image')?.getAttribute('aria-selected') === 'true'
           && document.querySelector('[data-tx-action]')?.value === 'text');
       } else if (sourceMode === 'input' && value === 'restore') {
