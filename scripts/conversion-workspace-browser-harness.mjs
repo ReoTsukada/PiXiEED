@@ -45,9 +45,9 @@ if(server.listening){
   };
   const syntheticPng=async()=>Buffer.from(await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=320;c.height=640;const x=c.getContext('2d');x.fillStyle='#e63';x.fillRect(0,0,320,640);x.fillStyle='#18a';x.fillRect(20,30,180,250);const b=await new Promise(r=>c.toBlob(r,'image/png'));return [...new Uint8Array(await b.arrayBuffer())];}));
   let downloads=0; page.on('download',()=>downloads++); page.on('dialog', d=>d.accept());
-  const openWorkspace=async path=>{
-    await page.goto(base+path,{waitUntil:'domcontentloaded'});
-    await page.waitForFunction(()=>{
+  const openWorkspace=async(path,targetPage=page)=>{
+    await targetPage.goto(base+path,{waitUntil:'domcontentloaded'});
+    await targetPage.waitForFunction(()=>{
       const main=document.querySelector('#main'),recovery=main?.querySelector('.sc-local-recovery');
       return document.body.dataset.conversionStartup==='ready'&&main?.dataset.smartConversion==='true'&&main.dataset.unifiedInput==='true'
         &&recovery?.getAttribute('aria-busy')==='false'&&['idle','saved'].includes(recovery.dataset.phase);
@@ -76,7 +76,7 @@ if(server.listening){
     if(!await auxiliary.evaluate(node=>node.open))await auxiliary.locator(':scope > summary').click();
     assert.equal(await auxiliary.evaluate(node=>node.open),true,'result controls open through their visible disclosure');return auxiliary;
   };
-  const installAudioImportDiagnostics=()=>page.evaluate(()=>{
+  const installAudioImportDiagnostics=(targetPage=page)=>targetPage.evaluate(()=>{
     const button=document.querySelector('.sc-unified-empty-add'),picker=document.querySelector('[data-sc-file]');
     const clicks={button:[],picker:[]},clickCounts={button:0,picker:0};
     const listen=(name,node)=>node?.addEventListener('click',event=>{
@@ -115,7 +115,7 @@ if(server.listening){
     }
     await source.waitFor({state:'visible'});await source.fill(value);
   };
-  const conversionMaterialCount=count=>page.waitForFunction(count=>{
+  const conversionMaterialCount=(count,targetPage=page)=>targetPage.waitForFunction(count=>{
     const main=document.querySelector('#main'),state=main?.conversionMaterials?.getState(),surface=document.querySelector('.sc-material-surface');
     const rendered=[...document.querySelectorAll('.sc-material-card [data-select-material]')].map(button=>button.dataset.assetId);
     return main?.getAttribute('aria-busy')!=='true'&&state?.assets?.length===count&&surface?.dataset.loaded===String(count>0)
@@ -298,7 +298,18 @@ if(server.listening){
   pass('hover delete and Undo preserve a non-first static frame within an animated input');
   // Synthetic 0.1-second PCM tone, no device or private media access.
   const wav=Buffer.alloc(44+1600);wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(1600,40);for(let i=0;i<800;i++)wav.writeInt16LE(Math.round(Math.sin(i/8000*440*Math.PI*2)*4000),44+i*2);
-  await openWorkspace('/output/work/?mode=convert');report.audioImport={preState:await installAudioImportDiagnostics()};await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));const visibleEmptyAdd=page.locator('.sc-unified-empty-add');const [audioChooser]=await Promise.all([page.waitForEvent('filechooser'),visibleEmptyAdd.click()]);await audioChooser.setFiles({name:'tone.wav',mimeType:'audio/wav',buffer:wav});await conversionMaterialCount(1);await page.waitForFunction(()=>document.querySelector('#main')?.conversionMaterials?.getState()?.assets?.some(asset=>asset.kind==='audio')&&[...document.querySelector('[data-sc-unified-format]').options].some(option=>option.value==='wav'&&!option.disabled));await page.locator('[data-sc-unified-format]').waitFor({state:'visible'});await page.locator('[data-sc-unified-format]').selectOption('wav');const beforeAudioDownloads=downloads;const beforeAudioHref=await page.locator('[data-download]').getAttribute('href');await page.locator('[data-result-refresh]').click();await page.waitForFunction(()=>document.querySelector('.sc-result-surface')?.dataset.current==='true');const previewAudio=await page.locator('.sc-result-content audio').getAttribute('src');assert.ok(previewAudio?.startsWith('blob:'));const previewAudioBytes=await page.evaluate(async href=>[...new Uint8Array(await(await fetch(href)).arrayBuffer())],previewAudio);assert.equal(Buffer.from(previewAudioBytes).subarray(0,4).toString(),'RIFF');assert.equal(downloads,beforeAudioDownloads);assert.equal(await page.locator('[data-download]').getAttribute('href'),beforeAudioHref);pass('WAV encoded bytes are available for playback before Save with no download or native result-link update');const [audioDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);const audioBytes=await readFile(await audioDownload.path());assert.equal(audioBytes.subarray(0,4).toString(),'RIFF');assert.equal(audioBytes.subarray(8,12).toString(),'WAVE');pass('synthetic audio imports and one-click saves WAV bytes');
+  const audioContext=await browser.newContext({viewport:{width:1365,height:900},acceptDownloads:true});
+  await audioContext.route('**/*',route=>{if(new URL(route.request().url()).origin===base)return route.continue();report.blockedRequests.push(route.request().url());return route.abort();});
+  const audioPage=await audioContext.newPage();audioPage.setDefaultTimeout(20000);audioPage.on('pageerror',e=>report.errors.push(e.message));audioPage.on('dialog',d=>d.accept());audioPage.on('download',()=>downloads++);
+  await openWorkspace('/output/work/?mode=convert',audioPage);report.audioImport={preState:await installAudioImportDiagnostics(audioPage)};await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));
+  assert.equal(report.audioImport.preState.materials.count,0,'fresh WAV context starts with no restored materials');
+  const visibleEmptyAdd=audioPage.locator('.sc-unified-empty-add');await visibleEmptyAdd.waitFor({state:'visible'});
+  assert.equal(report.audioImport.preState.button.hidden,false,'fresh WAV context exposes the empty-file chooser');
+  assert.equal(report.audioImport.preState.button.disabled,false,'fresh WAV context has an enabled empty-file chooser');
+  const audioEmptyBounds=await visibleEmptyAdd.boundingBox();assert.ok(audioEmptyBounds&&audioEmptyBounds.width>0&&audioEmptyBounds.height>0,'fresh WAV empty-file chooser has visible bounds');
+  assert.equal(await visibleEmptyAdd.isEnabled(),true,'fresh WAV empty-file chooser is enabled');
+  const [audioChooser]=await Promise.all([audioPage.waitForEvent('filechooser'),visibleEmptyAdd.click()]);
+  await audioChooser.setFiles({name:'tone.wav',mimeType:'audio/wav',buffer:wav});await conversionMaterialCount(1,audioPage);await audioPage.waitForFunction(()=>document.querySelector('#main')?.conversionMaterials?.getState()?.assets?.some(asset=>asset.kind==='audio')&&[...document.querySelector('[data-sc-unified-format]').options].some(option=>option.value==='wav'&&!option.disabled));await audioPage.locator('[data-sc-unified-format]').waitFor({state:'visible'});await audioPage.locator('[data-sc-unified-format]').selectOption('wav');const beforeAudioDownloads=downloads;const beforeAudioHref=await audioPage.locator('[data-download]').getAttribute('href');await audioPage.locator('[data-result-refresh]').click();await audioPage.waitForFunction(()=>document.querySelector('.sc-result-surface')?.dataset.current==='true');const previewAudio=await audioPage.locator('.sc-result-content audio').getAttribute('src');assert.ok(previewAudio?.startsWith('blob:'));const previewAudioBytes=await audioPage.evaluate(async href=>[...new Uint8Array(await(await fetch(href)).arrayBuffer())],previewAudio);assert.equal(Buffer.from(previewAudioBytes).subarray(0,4).toString(),'RIFF');assert.equal(downloads,beforeAudioDownloads);assert.equal(await audioPage.locator('[data-download]').getAttribute('href'),beforeAudioHref);pass('WAV encoded bytes are available for playback before Save with no download or native result-link update');const [audioDownload]=await Promise.all([audioPage.waitForEvent('download'),audioPage.locator('#output-nav-export').click()]);const audioBytes=await readFile(await audioDownload.path());assert.equal(audioBytes.subarray(0,4).toString(),'RIFF');assert.equal(audioBytes.subarray(8,12).toString(),'WAVE');report.audioImport.afterWav=await audioPage.evaluate(()=>window.__pixieedWavSnapshot?.()||null);await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));await audioContext.close();pass('synthetic audio imports and one-click saves WAV bytes');
   await openWorkspace('/output/work/');
   await page.waitForFunction(()=>document.querySelector('#output-layout')?.conversionActions&&document.querySelector('#main')?.dataset.smartConversion==='true');
   await page.locator('.sc-unified-empty-add').waitFor({state:'visible'});await checkEmptyArea('detailed empty');
@@ -388,7 +399,7 @@ if(server.listening){
   pass('detailed direct source preview, survivor selection, exact output preservation, pending-size Undo, empty reload and add');
   assert.deepEqual(report.errors,[],'uncaught page errors');report.status='PARTIAL';report.plannedUnrun=['UNRUN: real software keyboard, 200% browser zoom, OS save dialog, assistive technology and physical devices','UNRUN: cancellation/error during heavy conversion and mixed video+music output'];
  }catch(error){report.status='FAIL';report.failure=error.stack;console.error(error);
-  if(browser){try{const pages=browser.contexts().flatMap(c=>c.pages());const last=pages.at(-1);if(last){report.failureDom=await last.evaluate(()=>({url:location.href,panelOpen:document.querySelector('#sc-settings-panel')?.open,importStatus:document.querySelector('#output-import-status')?.textContent,status:document.querySelector('#output-status,[data-status]')?.textContent,materials:document.querySelector('#main')?.conversionMaterials?.getState?.()?.assets?.length,loaded:document.querySelector('.sc-material-surface')?.dataset.loaded,stripHidden:document.querySelector('.sc-material-strip')?.hidden,rows:document.querySelector('.sc-material-strip')?.childElementCount,audioImport:window.__pixieedWavSnapshot?.()||null}));if(report.audioImport){report.audioImport.failureState=report.failureDom.audioImport;await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));}await last.screenshot({path:output+'/failure.png',fullPage:true});}}catch{}}
+  if(browser){try{const pages=browser.contexts().flatMap(c=>c.pages());const last=pages.at(-1);if(last){report.failureDom=await last.evaluate(()=>({url:location.href,panelOpen:document.querySelector('#sc-settings-panel')?.open,importStatus:document.querySelector('#output-import-status')?.textContent,status:document.querySelector('#output-status,[data-status]')?.textContent,materials:document.querySelector('#main')?.conversionMaterials?.getState?.()?.assets?.length,loaded:document.querySelector('.sc-material-surface')?.dataset.loaded,stripHidden:document.querySelector('.sc-material-strip')?.hidden,rows:document.querySelector('.sc-material-strip')?.childElementCount,audioImport:window.__pixieedWavSnapshot?.()||null}));if(report.audioImport){if(report.failureDom.audioImport)report.audioImport.failureState=report.failureDom.audioImport;await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));}await last.screenshot({path:output+'/failure.png',fullPage:true});}}catch{}}
  }
  finally{if(browser)await browser.close();await persist();server.close();if(report.status==='FAIL')process.exitCode=1;}
 }
