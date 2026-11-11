@@ -330,7 +330,8 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-tx-file-name]')?.textContent === 'exact.pxd');
     const direct = await exportFromVisibleAction();
     assert.equal(hash(direct.bytes), hash(bytes));
-    await selectMode('output');
+    // PXD is not image text-art; use the explicit restoration-code route.
+    await selectWorkspace('[data-sc-format]', 'encode');
     await run();
     assert.match(await withVisibleControl(page.locator('[data-tx-text-result]'), control => control.inputValue()), /BEGIN PIXIEED RESTORE 1/);
     pass(`${mode}: real IndexedDB handoff → common output → byte-exact PXD download and text encoding`);

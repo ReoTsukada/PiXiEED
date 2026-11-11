@@ -76,6 +76,36 @@ if(server.listening){
     if(!await auxiliary.evaluate(node=>node.open))await auxiliary.locator(':scope > summary').click();
     assert.equal(await auxiliary.evaluate(node=>node.open),true,'result controls open through their visible disclosure');return auxiliary;
   };
+  const installAudioImportDiagnostics=()=>page.evaluate(()=>{
+    const button=document.querySelector('.sc-unified-empty-add'),picker=document.querySelector('[data-sc-file]');
+    const clicks={button:[],picker:[]},clickCounts={button:0,picker:0};
+    const listen=(name,node)=>node?.addEventListener('click',event=>{
+      clickCounts[name]++;
+      if(clicks[name].length<8)clicks[name].push({count:clickCounts[name],isTrusted:event.isTrusted,target:event.target?.tagName||null});
+    },true);
+    listen('button',button);listen('picker',picker);
+    const snapshot=()=>{
+      const main=document.querySelector('#main'),recovery=main?.querySelector('.sc-local-recovery');
+      const state=main?.textConversion?.snapshot?.()||{},materials=main?.conversionMaterials?.getState?.()
+        ||main?.querySelector('#output-layout')?.conversionActions?.getMaterialState?.()||{};
+      const rect=button?.getBoundingClientRect();
+      const dialogs=[...new Set(document.querySelectorAll('dialog[open],[aria-modal="true"],[role="dialog"][open],#sc-settings-panel[open]'))];
+      return {
+        startup:{ready:document.body.dataset.conversionStartup||null,recoveryId:history.state?.pixieedConversionRecovery||null,recoveryPreviousCount:Array.isArray(history.state?.pixieedConversionRecoveryPrevious)?history.state.pixieedConversionRecoveryPrevious.length:null,recoveryPaused:Boolean(history.state?.pixieedConversionRecoveryPaused),recoveryPhase:recovery?.dataset.phase||null,recoveryBusy:recovery?.getAttribute('aria-busy')||null},
+        mainBusy:main?.getAttribute('aria-busy')||null,
+        source:document.querySelector('.sc-unified-composer')?.dataset.source||null,
+        mode:main?.querySelector('.text-mode-nav [aria-pressed="true"]')?.dataset.textMode||state.mode||null,
+        composing:state.composing??null,importing:state.importing??null,
+        button:{connected:Boolean(button?.isConnected),hidden:Boolean(button?.hidden||button?.closest('[hidden]')),disabled:Boolean(button?.disabled),bounds:rect?{x:rect.x,y:rect.y,width:rect.width,height:rect.height}:null,inertAncestor:button?.closest('[inert]')?.tagName||null},
+        dialogs:dialogs.map(node=>({id:node.id||null,open:Boolean(node.open),modal:node.matches(':modal')})),
+        picker:{connected:Boolean(picker?.isConnected),disabled:Boolean(picker?.disabled),accept:picker?.accept||null},
+        materials:{count:materials.assets?.length??null,loaded:document.querySelector('.sc-material-surface')?.dataset.loaded||null},
+        clicks:{buttonCount:clickCounts.button,pickerCount:clickCounts.picker,button:[...clicks.button],picker:[...clicks.picker]},
+      };
+    };
+    window.__pixieedWavSnapshot=snapshot;
+    return snapshot();
+  });
   const fillTextSource=async value=>{
     const source=page.locator('[data-tx-source]');
     if(!await source.isVisible()){
@@ -268,7 +298,7 @@ if(server.listening){
   pass('hover delete and Undo preserve a non-first static frame within an animated input');
   // Synthetic 0.1-second PCM tone, no device or private media access.
   const wav=Buffer.alloc(44+1600);wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(1600,40);for(let i=0;i<800;i++)wav.writeInt16LE(Math.round(Math.sin(i/8000*440*Math.PI*2)*4000),44+i*2);
-  await openWorkspace('/output/work/?mode=convert');const audioChooser=page.waitForEvent('filechooser');await page.locator('.sc-unified-empty-add').click();await(await audioChooser).setFiles({name:'tone.wav',mimeType:'audio/wav',buffer:wav});await conversionMaterialCount(1);await page.waitForFunction(()=>document.querySelector('#main')?.conversionMaterials?.getState()?.assets?.some(asset=>asset.kind==='audio')&&[...document.querySelector('[data-sc-unified-format]').options].some(option=>option.value==='wav'&&!option.disabled));await page.locator('[data-sc-unified-format]').waitFor({state:'visible'});await page.locator('[data-sc-unified-format]').selectOption('wav');const beforeAudioDownloads=downloads;const beforeAudioHref=await page.locator('[data-download]').getAttribute('href');await page.locator('[data-result-refresh]').click();await page.waitForFunction(()=>document.querySelector('.sc-result-surface')?.dataset.current==='true');const previewAudio=await page.locator('.sc-result-content audio').getAttribute('src');assert.ok(previewAudio?.startsWith('blob:'));const previewAudioBytes=await page.evaluate(async href=>[...new Uint8Array(await(await fetch(href)).arrayBuffer())],previewAudio);assert.equal(Buffer.from(previewAudioBytes).subarray(0,4).toString(),'RIFF');assert.equal(downloads,beforeAudioDownloads);assert.equal(await page.locator('[data-download]').getAttribute('href'),beforeAudioHref);pass('WAV encoded bytes are available for playback before Save with no download or native result-link update');const [audioDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);const audioBytes=await readFile(await audioDownload.path());assert.equal(audioBytes.subarray(0,4).toString(),'RIFF');assert.equal(audioBytes.subarray(8,12).toString(),'WAVE');pass('synthetic audio imports and one-click saves WAV bytes');
+  await openWorkspace('/output/work/?mode=convert');report.audioImport={preState:await installAudioImportDiagnostics()};await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));const visibleEmptyAdd=page.locator('.sc-unified-empty-add');const [audioChooser]=await Promise.all([page.waitForEvent('filechooser'),visibleEmptyAdd.click()]);await audioChooser.setFiles({name:'tone.wav',mimeType:'audio/wav',buffer:wav});await conversionMaterialCount(1);await page.waitForFunction(()=>document.querySelector('#main')?.conversionMaterials?.getState()?.assets?.some(asset=>asset.kind==='audio')&&[...document.querySelector('[data-sc-unified-format]').options].some(option=>option.value==='wav'&&!option.disabled));await page.locator('[data-sc-unified-format]').waitFor({state:'visible'});await page.locator('[data-sc-unified-format]').selectOption('wav');const beforeAudioDownloads=downloads;const beforeAudioHref=await page.locator('[data-download]').getAttribute('href');await page.locator('[data-result-refresh]').click();await page.waitForFunction(()=>document.querySelector('.sc-result-surface')?.dataset.current==='true');const previewAudio=await page.locator('.sc-result-content audio').getAttribute('src');assert.ok(previewAudio?.startsWith('blob:'));const previewAudioBytes=await page.evaluate(async href=>[...new Uint8Array(await(await fetch(href)).arrayBuffer())],previewAudio);assert.equal(Buffer.from(previewAudioBytes).subarray(0,4).toString(),'RIFF');assert.equal(downloads,beforeAudioDownloads);assert.equal(await page.locator('[data-download]').getAttribute('href'),beforeAudioHref);pass('WAV encoded bytes are available for playback before Save with no download or native result-link update');const [audioDownload]=await Promise.all([page.waitForEvent('download'),page.locator('#output-nav-export').click()]);const audioBytes=await readFile(await audioDownload.path());assert.equal(audioBytes.subarray(0,4).toString(),'RIFF');assert.equal(audioBytes.subarray(8,12).toString(),'WAVE');pass('synthetic audio imports and one-click saves WAV bytes');
   await openWorkspace('/output/work/');
   await page.waitForFunction(()=>document.querySelector('#output-layout')?.conversionActions&&document.querySelector('#main')?.dataset.smartConversion==='true');
   await page.locator('.sc-unified-empty-add').waitFor({state:'visible'});await checkEmptyArea('detailed empty');
@@ -283,8 +313,10 @@ if(server.listening){
   await page.waitForURL(url=>url.searchParams.has('id')&&url.searchParams.get('view')==='advanced');
   assert.equal(await page.locator('[data-tx-source]').inputValue(),'detailed draft retained');
   assert.equal(await page.evaluate(()=>window.__unifiedTextNode===document.querySelector('[data-tx-source]')),true);
-  await page.locator('#output-layout').waitFor({state:'visible'});
   await page.waitForFunction(()=>document.querySelector('#main')?.dataset.smartConversion==='true'&&document.querySelector('#output-layout')?.conversionActions);
+  // The in-place empty-to-loaded material handoff closes result aux; reopen it before checking its preview subtree.
+  await openResultAux();
+  await page.locator('#output-layout').waitFor({state:'visible'});
   const materialBefore=await page.evaluate(()=>document.querySelector('#output-layout').conversionActions.getMaterialState());
   await page.locator('[data-sc-size-edit]').click();await page.locator('#output-width').fill('160');await page.keyboard.press('Escape');await closed();await openResultAux();
   await page.locator('.sc-material-card').first().hover();const detailChooser=page.waitForEvent('filechooser');await page.locator('[data-sc-material-replace]').click();await(await detailChooser).setFiles({name:'detail-replacement.png',mimeType:'image/png',buffer:png});
@@ -356,7 +388,7 @@ if(server.listening){
   pass('detailed direct source preview, survivor selection, exact output preservation, pending-size Undo, empty reload and add');
   assert.deepEqual(report.errors,[],'uncaught page errors');report.status='PARTIAL';report.plannedUnrun=['UNRUN: real software keyboard, 200% browser zoom, OS save dialog, assistive technology and physical devices','UNRUN: cancellation/error during heavy conversion and mixed video+music output'];
  }catch(error){report.status='FAIL';report.failure=error.stack;console.error(error);
-  if(browser){try{const pages=browser.contexts().flatMap(c=>c.pages());const last=pages.at(-1);if(last){report.failureDom=await last.evaluate(()=>({url:location.href,panelOpen:document.querySelector('#sc-settings-panel')?.open,importStatus:document.querySelector('#output-import-status')?.textContent,status:document.querySelector('#output-status,[data-status]')?.textContent,materials:document.querySelector('#main')?.conversionMaterials?.getState()?.assets?.length,loaded:document.querySelector('.sc-material-surface')?.dataset.loaded,stripHidden:document.querySelector('.sc-material-strip')?.hidden,rows:document.querySelector('.sc-material-strip')?.childElementCount}));await last.screenshot({path:output+'/failure.png',fullPage:true});}}catch{}}
+  if(browser){try{const pages=browser.contexts().flatMap(c=>c.pages());const last=pages.at(-1);if(last){report.failureDom=await last.evaluate(()=>({url:location.href,panelOpen:document.querySelector('#sc-settings-panel')?.open,importStatus:document.querySelector('#output-import-status')?.textContent,status:document.querySelector('#output-status,[data-status]')?.textContent,materials:document.querySelector('#main')?.conversionMaterials?.getState?.()?.assets?.length,loaded:document.querySelector('.sc-material-surface')?.dataset.loaded,stripHidden:document.querySelector('.sc-material-strip')?.hidden,rows:document.querySelector('.sc-material-strip')?.childElementCount,audioImport:window.__pixieedWavSnapshot?.()||null}));if(report.audioImport){report.audioImport.failureState=report.failureDom.audioImport;await writeFile(output+'/audio-import-diagnostic.json',JSON.stringify(report.audioImport,null,2));}await last.screenshot({path:output+'/failure.png',fullPage:true});}}catch{}}
  }
  finally{if(browser)await browser.close();await persist();server.close();if(report.status==='FAIL')process.exitCode=1;}
 }
