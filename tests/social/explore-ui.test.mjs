@@ -10,7 +10,8 @@ const script = read('js/social/app.mjs');
 const css = read('css/social-explore.css');
 
 test('Explore is the community experience and matches the home visual language', () => {
-  assert.match(home, /class="portal-bento"/);
+  assert.match(home, /class="doors"/);
+  assert.match(home, /class="door" href="\/explore\/"/);
   assert.match(explore, /data-social-page="explore"/);
   assert.match(explore, /class="explore-hero"/);
   assert.match(explore, /class="explore-hero-art"/);

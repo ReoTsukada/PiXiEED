@@ -1,4 +1,4 @@
-import './home-play.mjs?rev=20261015-real-screens-1';
+import './home-play.mjs?rev=20261113-home-world-1';
 
 /** Start the non-hero site code once the first paint has had an idle opportunity. */
 export function scheduleAppStartup({

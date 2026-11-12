@@ -47,49 +47,41 @@ test('intent search is local, ranked, handles width and Japanese inputs', () => 
     assert.ok(!/^https?:/.test(entry.href));
   }
 });
-test('visual cards are responsive with reduced-motion and keyboard focus', () => {
-  assert.match(homeCss, /grid-template-columns:repeat\(12/);
-  assert.match(homeCss, /@media\(max-width:530px\)/);
+test('whole-home layout retains three equal routes, responsive controls and keyboard focus', () => {
+  assert.match(homeCss, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(homeCss, /@media\(max-width:359px\)/);
   assert.match(homeCss, /@media\(prefers-reduced-motion:reduce\)/);
   assert.match(homeCss, /:focus-visible/);
   assert.match(homeCss, /public-navigation\.css/);
+  const doors = home.match(/<div class="doors">([\s\S]*?)<div class="return">/)?.[1];
+  assert.ok(doors);
+  assert.equal((doors.match(/class="door"/g) || []).length, 3);
+  for (const label of ['描く', '作品を見る', '遊ぶ']) assert.ok(doors.includes(`<strong>${label}</strong>`));
+  for (const href of ['/tools/start/draw/', '/explore/', '/play/']) assert.ok(doors.includes(`href="${href}"`));
+  assert.ok(home.indexOf('class="doors"') < home.indexOf('class="portal-work-entry"'));
 });
 
-test('shop card makes the external catalog and item categories clear', () => {
-  const card = home.match(/<a class="portal-card portal-shop"[\s\S]*?<\/a>/)?.[0];
-  assert.ok(card);
-  assert.match(card, /href="\/books\/"/);
-  for (const label of ['ショップ', '本・おもちゃ・道具・ガジェット', '外部ショップの商品を紹介', '価格・在庫・購入は販売先で']) assert.ok(card.includes(label));
-  assert.match(card, /src="\/assets\/home\/shop\.svg" alt="" aria-hidden="true"/);
-  assert.doesNotMatch(card, /<canvas|https?:|checkout|target=/);
-  assert.match(homeCss, /\.portal-shop\{grid-column:span 12/);
-  assert.match(home, /src="\/assets\/brand\/pixieed-logo-48\.png"/);
-  for (const query of ['ショップ', 'おもちゃ', '道具', 'books', 'shop', 'グッズ', 'ガジェット', '販売先']) {
-    assert.equal(findHomeDestinations(query)[0].href, '/books/', query);
-  }
+test('shop destination makes the external catalog and item categories clear', () => {
+  const link = home.match(/<a href="\/books\/">ショップ：[\s\S]*?<\/a>/)?.[0];
+  assert.ok(link);
+  for (const label of ['本・おもちゃ・道具・ガジェット', '外部ショップの商品を紹介', '価格・在庫・購入は販売先で']) assert.ok(link.includes(label));
+  assert.doesNotMatch(link, /<canvas|https?:|checkout|target=/);
+  for (const query of ['ショップ', 'おもちゃ', '道具', 'books', 'shop', 'グッズ', 'ガジェット', '販売先']) assert.equal(findHomeDestinations(query)[0].href, '/books/', query);
 });
 
-test('all eight cards have original lightweight explanatory scenes and readable actions', () => {
-  const names = ['draw', 'convert', 'camera', 'audio', 'play', 'community', 'globe', 'shop'];
-  const evidence = ['動くGIF', '使いたい形式', '粗さ・色数', 'マス目に音', '間違い探し', '投稿する', 'イベント', '外部ショップ'];
-  let bytes = 0;
-  for (const [index, name] of names.entries()) {
-    const card = home.match(new RegExp(`<a class="portal-card portal-${name}"[\\s\\S]*?<\\/a>`))?.[0];
-    assert.ok(card, name);
-    assert.ok(card.includes(evidence[index]), name);
-    assert.match(card, /class="portal-card-cta"/);
-    assert.match(card, /width="480" height="240"/);
-    assert.match(card, /alt="" aria-hidden="true"/);
-    const path = new URL(`../../assets/home/${name}.svg`, import.meta.url);
-    const asset = readFileSync(path, 'utf8');
-    bytes += statSync(path).size;
-    assert.match(asset, /viewBox="0 0 480 240"/);
-    assert.match(asset, /<title>[^<]+<\/title>/);
-    assert.doesNotMatch(asset, /<script|<image|<foreignObject|<animate|href=|onload=|data:/);
-  }
-  assert.ok(bytes < 100_000, 'all eight SVG scenes total under 100KB before compression');
-  assert.equal((home.match(/class="portal-card portal-/g) || []).length, 8);
-  assert.doesNotMatch(home, /intro-pending|assets\/screenshots|portal-(camera-art|audio-art|play-art|community-art|globe-art|shop-art)/);
+test('one connected playground keeps complete accessible controls, not separate toy widgets', () => {
+  for (const id of ['hpStage','hpCanvas','hpHint','hpColors','hpPalette','hpPaletteToggle','hpCurrentColor','hpStatus','hpScore','hpPlayback','hpPlaybackStatus','hpGyroStatus','hpSound','hpAnimation','hpUndo','hpClear','hpClearDialog','hpClearCancel','hpClearConfirm','hpKeyboardHelp']) assert.equal((home.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, id);
+  assert.equal((home.match(/<canvas/g) || []).length, 1);
+  assert.match(home, /aria-describedby="hpKeyboardHelp"/);
+  assert.match(home, /id="hpSound" aria-pressed="true"/);
+  assert.match(home, /id="hpAnimation" aria-pressed="true"/);
+  assert.match(home, /Spaceで描く／離す、Enterでタップ/);
+  assert.match(home, /<dialog id="hpClearDialog"/);
+  assert.match(home, /id="hpClearCancel" autofocus/);
+  assert.match(home, /src="\/js\/home-play\.mjs\?rev=20261113-home-world-1"/);
+  assert.doesNotMatch(home, /hpToys|data-toy=|home-gallery\.mjs|assets\/home\/community\.svg/);
+  assert.equal((home.match(/class="trip"/g) || []).length, 3);
+  assert.equal((home.match(/class="tool"/g) || []).length, 4);
 });
 
 test('retired decorative markup and unreferenced drawing previews stay removed', () => {
@@ -103,12 +95,12 @@ test('retired decorative markup and unreferenced drawing previews stay removed',
 });
 
 const guide = readFileSync(new URL('../../guide/index.html', import.meta.url), 'utf8');
-test('community-first home offers a plus entry and real saved thumbnails', () => {
-  assert.match(home, /ドット絵好きが、<br><em>集う場所。/);
+test('whole-home experience keeps a plus entry and real saved thumbnails', () => {
+  assert.match(home, /描く。見る。<em>遊ぶ。/);
   assert.doesNotMatch(home, /今日は、|なにする？|制作は毎回、作品一覧/);
   assert.match(home, /class="portal-new-project" href="#portal-create"/);
   assert.match(home, /class="portal-new-icon" aria-hidden="true">＋/);
-  assert.match(home, /id="portal-create" class="portal-bento"/);
+  assert.match(home, /class="tool-list" id="portal-create"/);
   assert.match(home, /id="portal-recent-list"/);
   assert.match(home, /id="portal-recent-status"[^>]+role="status"/);
   assert.match(home, /このブラウザーに保存した絵を表示/);
@@ -134,4 +126,9 @@ test('the home shelf defers its local preview reader until the shelf is visible'
   assert.match(homeModule, /rootMargin:'0px'/);
   assert.match(homeModule, /await import\('\.\/home-recent-projects\.mjs\?rev=20261112-home-community-1'\)/);
   assert.doesNotMatch(homeModule, /from .*pxd-store|from .*pxd-codec|from .*draw-page|cloneAsToolProject|forkProject/);
+});
+
+test("free drawing keeps vertical touch strokes inside the canvas", () => {
+  assert.match(homeCss, /\.hp-stage canvas\{[^}]*touch-action:none/);
+  assert.match(home, /ページのスクロールは、あそび場の外で/);
 });

@@ -3,7 +3,7 @@
  *
  * The contained mini canvas lets visitors draw and hear notes (a taste of the editor and sound tool).
  * Other tool cards run a tiny live version of that tool. Toys animate only
- * while on screen. Reduced motion caps shared animation updates at 30 FPS; the hero keeps its own playback.
+ * while on screen. Reduced motion renders a static hero until the visitor explicitly enables movement.
  */
 import { createVisibleAnimationScheduler } from './home-animation.mjs?rev=20261001-hero-rates-2';
 import { createToolToys, TOOL_TOY_SIZE } from './tool-toys.mjs?rev=20261015-real-screens-1';
@@ -177,6 +177,7 @@ function hero() {
   const stage = document.getElementById('hpStage'); const canvas = document.getElementById('hpCanvas');
   const hint = document.getElementById('hpHint');
   const gyroStatus = document.getElementById('hpGyroStatus');
+  if (!stage || !canvas || !hint || !document.getElementById('hpColors')) return;
   // (older markup has neither the score nor the new hint: supply them)
   let score = document.getElementById('hpScore');
   if (!score) { score = document.createElement('output'); score.className = 'hp-score'; score.id = 'hpScore'; score.hidden = true; stage.appendChild(score); }
@@ -190,40 +191,71 @@ function hero() {
   let history = []; let historyBusy = false;
   const status = document.getElementById('hpStatus');
   const say = (message) => { if (status) status.textContent = message; };
-  const audioStateText = { waiting: '最初のタップで音が出ます', playing: '演奏中', standby: 'タップすると音が出ます', stopped: '一時停止中', unavailable: '音を開始できません' };
-  homeAudio = createHomeAudio({ resumeOnVisible: true, onChange: (state) => {
-    const output = document.getElementById('hpAudioState'); if (output) output.textContent = audioStateText[state];
-  } });
-  const initialAudioState = document.getElementById('hpAudioState'); if (initialAudioState) initialAudioState.textContent = audioStateText[homeAudio.state];
+  const soundButton = document.getElementById('hpSound');
+  const animationButton = document.getElementById('hpAnimation');
+  const preferenceKey = 'pixieed-home-play-preferences-v1';
+  let preferences = {};
+  try { const saved = JSON.parse(localStorage.getItem(preferenceKey) || '{}'); if (saved && typeof saved === 'object' && !Array.isArray(saved)) preferences = saved; } catch { /* private mode */ }
+  let soundEnabled = !soundButton || preferences.sound !== false;
+  let motionEnabled = !reduced && preferences.motion !== false;
+  let playbackPaused = false;
+  const savePreferences = () => {
+    try { localStorage.setItem(preferenceKey, JSON.stringify({ sound: soundEnabled, ...(typeof preferences.motion === 'boolean' ? { motion: preferences.motion } : {}) })); } catch { /* optional */ }
+  };
+  const syncSound = (state) => {
+    const text = { waiting: '最初のタップで音が出ます', playing: '音が出ます', standby: 'タップすると音が出ます', stopped: '音はオフ', unavailable: '音を開始できません' };
+    const output = document.getElementById('hpAudioState');
+    if (output) output.textContent = playbackPaused ? '一時停止中' : text[state];
+    if (soundButton) {
+      soundButton.textContent = soundEnabled ? '音 ON' : '音 OFF';
+      soundButton.setAttribute('aria-pressed', String(soundEnabled));
+      soundButton.setAttribute('aria-label', soundEnabled ? '音をオフにする' : '音をオンにする');
+    }
+  };
+  homeAudio = createHomeAudio({ resumeOnVisible: true, initialOn: soundEnabled, onChange: syncSound });
+  syncSound(homeAudio.state);
   const playbackButton = document.getElementById('hpPlayback');
   const playbackStatus = document.getElementById('hpPlaybackStatus');
   const motionButton = document.getElementById('hpMotion');
-  let playbackPaused = false;
-  let audioBlockedUntilPlay = false;
-  const heroMotionEnabled = () => !playbackPaused;
+  const heroMotionEnabled = () => !playbackPaused && motionEnabled;
   const heroReducedMotion = () => !heroMotionEnabled();
-  function syncHeroPlayback({ resumeAudio = false, stopAudio = false, blockCanvasAudio = false } = {}) {
-    const playing = heroMotionEnabled();
+  const audioIsVisible = () => !playbackPaused && stageVisible && document.visibilityState !== 'hidden';
+  function syncHeroPlayback({ resumeAudio = false } = {}) {
+    const playing = !playbackPaused;
     if (playbackButton) {
       playbackButton.textContent = playing ? '一時停止' : '再生';
-      playbackButton.setAttribute('aria-label', playing ? 'あそび場の動きを一時停止' : 'あそび場の動きを再生');
+      playbackButton.setAttribute('aria-label', playing ? 'あそび場を一時停止' : 'あそび場を再生');
       playbackButton.setAttribute('aria-pressed', String(playing));
     }
-    if (playbackStatus) playbackStatus.textContent = playing ? 'あそび場を再生中です。' : '一時停止中。再生ボタンで再開できます。';
-    if (motionButton) motionButton.disabled = !playing;
+    if (animationButton) {
+      animationButton.textContent = motionEnabled ? '動き ON' : '動き OFF';
+      animationButton.setAttribute('aria-pressed', String(motionEnabled));
+      animationButton.setAttribute('aria-label', motionEnabled ? '動きをオフにする' : '動きをオンにする');
+    }
+    if (playbackStatus) playbackStatus.textContent = !playing ? '一時停止中。再生ボタンで再開できます。' : motionEnabled ? 'あそび場を再生中です。' : '動きを抑えています。描画と星のタップは使えます。';
+    if (motionButton) motionButton.disabled = !heroMotionEnabled();
     lastT = performance.now(); sandTick = 0; sandBudget = 0;
-    if (resumeAudio) { audioBlockedUntilPlay = false; void homeAudio.resumeByControl(); }
-    else if (stopAudio) { audioBlockedUntilPlay = blockCanvasAudio; homeAudio.stop(); }
-    homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
+    homeAudio.setVisible(audioIsVisible());
+    if (resumeAudio && soundEnabled) void homeAudio.resumeByControl();
     gyro?.setVisible();
-    if (gyro?.supported && gyroStatus) gyroStatus.textContent = !playing
-      ? '再生すると、端末の傾きを有効にできます。'
-      : (!gyro.state.enabled ? '「色・編集」の「端末を傾けて遊ぶ」で有効にできます。' : gyroStatus.textContent);
+    if (heroReducedMotion()) finishIntroDots();
+    syncHeroAnimation();
     redraw();
   }
-  playbackButton?.addEventListener('click', () => {
-    if (heroMotionEnabled()) { playbackPaused = true; syncHeroPlayback({ stopAudio: true, blockCanvasAudio: true }); }
-    else { playbackPaused = false; syncHeroPlayback({ resumeAudio: true }); }
+  playbackButton?.addEventListener('click', (event) => {
+    playbackPaused = !playbackPaused;
+    syncHeroPlayback({ resumeAudio: !playbackPaused && event.isTrusted });
+  });
+  soundButton?.addEventListener('click', (event) => {
+    soundEnabled = !soundEnabled;
+    if (!soundEnabled) homeAudio.stop();
+    else if (!playbackPaused && event.isTrusted) void homeAudio.resumeByControl();
+    // Enabling while paused changes intent only. Resume is still gesture gated.
+    savePreferences(); syncSound(homeAudio.state);
+  });
+  animationButton?.addEventListener('click', () => {
+    motionEnabled = !motionEnabled;
+    preferences.motion = motionEnabled; savePreferences(); syncHeroPlayback();
   });
   let img = null; let nightFrame = null; let ctx = null;
   let ink = new Map();            // dots being drawn right now (key -> {x,y,color,born})
@@ -299,7 +331,7 @@ function hero() {
     for (let i = 0; i < img.data.length; i += 4) { img.data[i] = NIGHT[0]; img.data[i + 1] = NIGHT[1]; img.data[i + 2] = NIGHT[2]; img.data[i + 3] = 255; }
     nightFrame = new Uint8ClampedArray(img.data);
     sand = new Uint8Array(W * H); pieces = []; flashes = []; beats = []; grains = 0; ink.clear();
-    const bar = document.querySelector('.hp-tools').getBoundingClientRect();
+    const bar = document.querySelector('.hp-tools')?.getBoundingClientRect() || { top: r.bottom };
     F = Math.max(12, Math.min(H, Math.floor((bar.top - r.top - 6) / cell)));
     if (saved) {
       const restored = restoreHomePlayState(saved, W, H, F);
@@ -404,7 +436,7 @@ function hero() {
     const motionVisibility = new IntersectionObserver(([entry]) => {
       stageVisible = Boolean(entry?.isIntersecting);
       lastT = performance.now(); sandTick = 0; sandBudget = 0;
-      homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
+      homeAudio.setVisible(audioIsVisible());
       gyro.setVisible();
     }, { threshold: 0 });
     motionVisibility.observe(stage);
@@ -413,7 +445,7 @@ function hero() {
       const r = stage.getBoundingClientRect();
       stageVisible = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight;
       lastT = performance.now(); sandTick = 0; sandBudget = 0;
-      homeAudio.setVisible(stageVisible && document.visibilityState !== 'hidden');
+      homeAudio.setVisible(audioIsVisible());
       gyro.setVisible();
     };
     syncStageVisibility();
@@ -584,8 +616,19 @@ function hero() {
     }
     ctx.putImageData(img, 0, 0);
   }
-  const redraw = animate(stage, draw, { fps: 60, throttleRedraw: true });
-  const settleReducedIntro = () => { if (heroReducedMotion()) { finishIntroDots(); redraw(); } };
+  let stopHeroAnimation = null;
+  function syncHeroAnimation() {
+    if (heroMotionEnabled() && !stopHeroAnimation) stopHeroAnimation = animationScheduler.add(stage, draw, { fps: 60, throttleRedraw: true });
+    else if (!heroMotionEnabled() && stopHeroAnimation) { stopHeroAnimation(); stopHeroAnimation = null; }
+  }
+  const redraw = () => {
+    if (stopHeroAnimation) animationScheduler.redraw(stage);
+    else if (document.visibilityState !== 'hidden') draw(performance.now());
+  };
+  const settleReducedIntro = () => {
+    motionEnabled = !reduced && preferences.motion !== false;
+    syncHeroPlayback();
+  };
   if (motionPreference.addEventListener) motionPreference.addEventListener('change', settleReducedIntro);
   else motionPreference.addListener?.(settleReducedIntro);
   new MutationObserver(settleReducedIntro).observe(document.documentElement, { attributes: true, attributeFilter: ['data-pixieed-motion'] });
@@ -618,8 +661,8 @@ function hero() {
   document.getElementById('hpClearCancel')?.addEventListener('click', () => clearDialog?.close());
   document.getElementById('hpClearConfirm')?.addEventListener('click', () => { clearDialog?.close(); performClear(); });
   window.addEventListener('pagehide', () => { persist(); homeAudio.setVisible(false); });
-  window.addEventListener('pageshow', () => { lastT = performance.now(); sandTick = 0; sandBudget = 0; homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible); });
-  document.addEventListener('visibilitychange', () => { homeAudio.setVisible(document.visibilityState !== 'hidden' && stageVisible); lastT = performance.now(); sandTick = 0; sandBudget = 0; });
+  window.addEventListener('pageshow', () => { lastT = performance.now(); sandTick = 0; sandBudget = 0; homeAudio.setVisible(audioIsVisible()); });
+  document.addEventListener('visibilitychange', () => { homeAudio.setVisible(audioIsVisible()); lastT = performance.now(); sandTick = 0; sandBudget = 0; });
 
   let lastInkNote = 0;
   function inkAt(x, y) {
@@ -647,7 +690,7 @@ function hero() {
   let press = null;
   let audioGestureFeedback = false;
   const activateCanvasAudio = () => {
-    if (audioBlockedUntilPlay) return;
+    if (playbackPaused || !soundEnabled) return;
     void homeAudio.activateFromGesture().then((started) => {
       if (started && !audioGestureFeedback) { audioGestureFeedback = true; note(7); }
     });
