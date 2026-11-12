@@ -122,10 +122,11 @@ test('home hero: a finer grid (letters about 4 dots thick), shooting star and pi
   const html = read('welcome/index.html');
   assert.match(html, /id="hpPlayback"[^>]*>一時停止<\/button>/, 'hero motion has a visible play/pause control');
   assert.match(html, /id="hpPlaybackStatus" aria-live="polite"/);
-  assert.match(source, /let playbackPaused = false;/, 'the hero starts automatically even when reduced motion is enabled');
-  assert.match(source, /const heroMotionEnabled = \(\) => !playbackPaused;/, 'only the explicit control pauses hero playback');
-  assert.match(source, /createHomeAudio\(\{ resumeOnVisible: true, onChange:/, 'audio resumes after visibility changes once activated by the visitor');
-  assert.doesNotMatch(source, /onHeroPreferenceChange|playbackOverride/, 'global motion preference changes do not pause or override the hero');
+  assert.match(source, /let playbackPaused = false;/, 'playback and reduced motion are independent');
+  assert.match(source, /let motionEnabled = !reduced && preferences.motion !== false;/, 'system reduced motion is respected on load');
+  assert.match(source, /const heroMotionEnabled = \(\) => !playbackPaused && motionEnabled;/, 'both user controls govern motion');
+  assert.match(source, /createHomeAudio\(\{ resumeOnVisible: true, initialOn: soundEnabled, onChange:/, 'audio resumes after visibility changes once activated by the visitor');
+  assert.match(source, /motionEnabled = !reduced && preferences.motion !== false;/, 'preference changes update hero movement');
   assert.match(html, /class="hp-gyro-status" id="hpGyroStatus" aria-live="polite"/, 'sensor status is visible below the controls');
   assert.match(source, /createHomeMotion\(\{ button: document.getElementById\('hpMotion'\), status: gyroStatus,/);
   assert.doesNotMatch(source, /gyroButton/);
@@ -164,7 +165,7 @@ test('home hero controls keep gesture-gated sound, guarded clear and undo with s
   assert.match(html, /id="hpClearDialog"/); assert.match(html, /id="hpStatus"[^>]*aria-live="polite"/);
   assert.match(source, /createHomeAudio/);
   assert.match(source, /homeAudio\.canPlay\(\)/);
-  assert.match(source, /hpClearConfirm/); assert.doesNotMatch(source, /hpFreeze|hpSound|HOME_SOUND_STOPPED_KEY|home-sound-stopped/); assert.doesNotMatch(source, /hpDrawMode/);
+  assert.match(source, /hpClearConfirm/); assert.doesNotMatch(source, /hpFreeze|HOME_SOUND_STOPPED_KEY|home-sound-stopped/); assert.doesNotMatch(source, /hpDrawMode/);
   assert.match(source, /ArrowRight.*ArrowDown/); assert.match(source, /b\.tabIndex = selected \? 0 : -1/);
   assert.match(source, /selectColor\(next\); colorBox\.children\[next\]\.focus\(\)/);
   assert.doesNotMatch(source.match(/colorBox\.addEventListener\('keydown'[\s\S]*?\n  \}\);/)[0], /\.click\(\)/);

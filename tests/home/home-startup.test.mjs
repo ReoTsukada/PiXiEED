@@ -92,7 +92,7 @@ test('welcome page mounts startup and gallery once across cache revisions', () =
 test('portal home links to Explore and keeps all five destinations', () => {
   const home = read('index.html');
   assert.match(home, /<body class="home-portal">/);
-  assert.match(home, /class="portal-bento"/);
+  assert.match(home, /class="doors"/);
   assert.doesNotMatch(home, /id="feed"|src="\/js\/social\/app\.mjs/);
   for (const href of ['/', '/explore/', '/tools/', '/globe/', '/profile/']) assert.ok(home.includes(`href="${href}"`), href);
   for (const label of ['ホーム', '探す', 'つくる', '地図', '自分']) assert.ok(home.includes(`>${label}</span></a>`), label);

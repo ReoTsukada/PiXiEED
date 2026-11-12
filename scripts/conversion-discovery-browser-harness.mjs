@@ -70,21 +70,25 @@ async function selectWorkspace(selector, value) {
   if (await panel.evaluate(node=>node.matches(':modal'))) { await page.keyboard.press('Escape'); await page.waitForFunction(()=>!document.querySelector('#sc-settings-panel')?.open); }
 }
 try {
-  // The homepage is a light navigation portal; social interactions stay on Explore.
+  // The homepage combines a connected playground with clear navigation; social interactions stay on Explore.
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 920 });
     await open('/');
-    await page.locator('.portal-bento .portal-card').first().waitFor({ state: 'visible' });
+    await page.locator('.doors .door').first().waitFor({ state: 'visible' });
     assert.equal(await page.locator('h1').count(), 1);
-    assert.equal(await page.locator('.portal-card').count(), 8);
-    assert.equal(await page.locator('.portal-shop').getAttribute('href'), '/books/');
-    assert.equal(await page.locator('.portal-card-art').count(), 8);
-    // Visit every card as a user would; jumping to the shop can skip lazy images.
-    for (const image of await page.locator('.portal-card-art').all()) {
+    assert.deepEqual(await page.locator('.door').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), ['/tools/start/draw/', '/explore/', '/play/']);
+    assert.equal(await page.locator('#portal-create .tool').count(), 4);
+    assert.equal(await page.locator('.trips .trip').count(), 3);
+    assert.equal(await page.locator('.endline a[href="/books/"]').count(), 1);
+    assert.ok((await page.locator('.endline').innerText()).includes('価格・在庫・購入は販売先で'));
+    // Decode actual visible navigation icons; reviewed artwork loading is covered separately with consent-aware fixtures.
+    const homeImages = page.locator('.brand img, .door img, .tool img');
+    assert.equal(await homeImages.count(), 8);
+    for (const image of await homeImages.all()) {
       await image.scrollIntoViewIfNeeded();
       await image.evaluate(element => element.decode());
     }
-    await page.waitForFunction(() => [...document.querySelectorAll('.portal-card-art')].every(image => image.complete && image.naturalWidth > 0));
+    assert.ok(await homeImages.evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0)));
     await page.evaluate(() => scrollTo(0, 0));
     assert.equal(await page.locator('#socialApp').count(), 0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

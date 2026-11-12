@@ -63,7 +63,7 @@ test('aborted, slow and unverified images never get object URLs',async()=>{
  await assert.rejects(()=>loadHomeArtworkImage(artwork,{cryptoImpl:webcrypto,timeoutMs:5,fetchImpl:async(_url,{signal})=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('aborted'))))}));await assert.rejects(()=>loadHomeArtworkImage({...artwork,imageSha256:'invalid'}));
 });
 test('home provides accessible navigation without a social runtime or timer rotation',()=>{
- const html=readFileSync(new URL('../../index.html',import.meta.url),'utf8');const source=readFileSync(new URL('../../js/home-artworks.mjs',import.meta.url),'utf8');assert.match(html,/id="portal-artwork-grid" hidden/);assert.match(html,/id="portal-artwork-status" role="status"/);assert.match(html,/はじめの一枚、何にする？/);assert.match(html,/href="\/guide\/#publish-work"/);
+ const html=readFileSync(new URL('../../index.html',import.meta.url),'utf8');const source=readFileSync(new URL('../../js/home-artworks.mjs',import.meta.url),'utf8');assert.match(html,/id="portal-artwork-grid" hidden/);assert.match(html,/id="portal-artwork-status" role="status"/);assert.match(html,/だれかの好きが、ひらめきに。/);assert.match(html,/href="\/guide\/#publish-work"/);
  for(const marker of['visibilitychange','pagehide','event.persisted','saveData','textContent','revokeObjectURL'])assert.ok(source.includes(marker),marker);assert.doesNotMatch(source,/innerHTML|localStorage|indexedDB|createClient|Authorization|setInterval/);
 });
 

@@ -36,7 +36,8 @@
   "js/globe/map-event-enhancements.mjs": "20261017-analytics-integrity-1",
   "js/globe/map-events.mjs": "20261017-analytics-integrity-1",
   "js/globe/prototype.mjs": "20261111-output-offerwall-1",
-  "js/home-startup.mjs": "20261111-output-offerwall-1",
+  "js/home-startup.mjs": "20261113-home-world-1",
+  "js/home-play.mjs": "20261113-home-world-1",
   "js/legacy-project-entry.mjs": "20261016-tool-shell-1",
   "js/page-navigation.mjs": "20261024-common-tool-start-1",
   "js/pixel-export.mjs": "20261111-output-offerwall-1",
@@ -136,6 +137,6 @@
   "js/creation/draw-tool-operations.mjs": "20261109-ellipse-geometry-1",
   "js/creation/project-gallery-data.mjs": "20261109-lazy-gallery-1",
   "js/home-portal.mjs": "20261112-posted-random-1",
-  "css/home-portal.css": "20261112-posted-random-1",
+  "css/home-portal.css": "20261113-home-world-1",
   "js/creation/legacy-placement-page.mjs": "20261112-profile-workspace-1"
 }
