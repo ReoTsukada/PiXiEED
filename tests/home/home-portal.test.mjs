@@ -103,12 +103,17 @@ test('retired decorative markup and unreferenced drawing previews stay removed',
 });
 
 const guide = readFileSync(new URL('../../guide/index.html', import.meta.url), 'utf8');
-test('home distinguishes a fresh creation from returning to local works without bypassing the gallery', () => {
-  assert.match(home, /href="#portal-create"><strong>新しくつくる/);
+test('community-first home offers a plus entry and real saved thumbnails', () => {
+  assert.match(home, /ドット絵好きが、<br><em>集う場所。/);
+  assert.doesNotMatch(home, /今日は、|なにする？|制作は毎回、作品一覧/);
+  assert.match(home, /class="portal-new-project" href="#portal-create"/);
+  assert.match(home, /class="portal-new-icon" aria-hidden="true">＋/);
   assert.match(home, /id="portal-create" class="portal-bento"/);
-  assert.match(home, /href="\/draw\/\?workspace=1"><strong>保存した絵を開く/);
-  assert.match(home, /制作は毎回、作品一覧から始まります/);
-  assert.match(home, /ゲームなどの続きは、<a href="\/tools\/">作成した道具/);
+  assert.match(home, /id="portal-recent-list"/);
+  assert.match(home, /id="portal-recent-status"[^>]+role="status"/);
+  assert.match(home, /このブラウザーに保存した絵を表示/);
+  assert.match(home, /href="\/draw\/\?workspace=1">絵の作品一覧/);
+  assert.match(home, /音・写真・ゲームの続きは<a href="\/tools\/">それぞれの道具/);
   assert.match(guide, /道具ごとの作品は絵の作品一覧には表示されません/);
   assert.match(home, /href="\/guide\/#save-work"/);
   for (const query of ['続き', '再開', '保存した作品', '制作中', 'PXD']) assert.equal(findHomeDestinations(query)[0].href, '/draw/?workspace=1', query);
@@ -120,4 +125,13 @@ test('guide explains local, backup, export and public destinations using the act
   for (const text of ['［掲載設定］', '地図の掲載先', '［下書きに保存］', '自動同期されません', 'ブラウザーデータの削除', '編集データをバックアップ（PXD）', '出力画面', '［取り込む］', '作品保存やファイル出力だけでは公開されません']) assert.ok(guide.includes(text), text);
   assert.match(guide, /id="save-work"/);
   assert.match(guide, /id="publish-work"/);
+});
+
+const homeModule = readFileSync(new URL('../../js/home-portal.mjs', import.meta.url), 'utf8');
+test('the home shelf defers its local preview reader until the shelf is visible', () => {
+  assert.match(homeModule, /IntersectionObserver/);
+  assert.match(homeModule, /entry.isIntersecting/);
+  assert.match(homeModule, /rootMargin:'0px'/);
+  assert.match(homeModule, /await import\('\.\/home-recent-projects\.mjs\?rev=20261112-home-community-1'\)/);
+  assert.doesNotMatch(homeModule, /from .*pxd-store|from .*pxd-codec|from .*draw-page|cloneAsToolProject|forkProject/);
 });

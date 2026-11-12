@@ -2,7 +2,7 @@ import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tool
 import { getCellById } from '../globe/geometry.mjs';
 import { publicImageUrl } from '../globe/legacy-showcase.mjs';
 import { cellFromPlaceInput, createLegacyPlacementApi, readOwnerAuthCallback } from './legacy-placement.mjs?rev=20261001-free-tools-1';
-import { createMyPostsApi } from '../globe/my-posts.mjs?rev=20261006-profile-artwork-1';
+import { createMyPostsApi } from '../globe/my-posts.mjs?rev=20261112-home-consent-1';
 
 const root = document.querySelector('#legacy-placement-root');
 if (root && new URLSearchParams(location.search).get('view') === 'posts') {
@@ -345,8 +345,8 @@ async function mountMyPosts() {
     const greeting = profileRoot?.querySelector('[data-profile-greeting]');
     if (greeting && viewer) {
       greeting.textContent = viewer.isAnonymous
-        ? 'この端末のゲスト記録と、見つけた絵を確認できます。'
-        : `${viewer.name || 'あなた'}の投稿した作品や、見つけた絵をまとめて確認できます。`;
+        ? 'この端末のゲスト'
+        : `${viewer.name || 'あなた'}のワークスペース`;
     }
   }
 

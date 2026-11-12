@@ -7,7 +7,9 @@ import { spawnSync } from 'node:child_process';
 const root = new URL('../../', import.meta.url);
 const canonical = new Map([
   ['js/creation/draw-tool-operations.mjs', 'rev=20261109-ellipse-geometry-1'],
-  ['js/app.js', 'rev=20261111-output-offerwall-1'],
+  ['js/app.js', 'rev=20261112-profile-workspace-1'],
+  ['js/creation/legacy-placement-page.mjs', 'rev=20261112-profile-workspace-1'],
+  ['js/globe/my-posts.mjs', 'rev=20261112-home-consent-1'],
   ['js/adsense-offerwall-policy.js', 'rev=20261111-output-offerwall-1'],
   ['js/ads/conversion-display-ad.mjs', 'rev=20261111-output-offerwall-1'],
   ['js/creation/conversion-entry.mjs', 'rev=20261111-output-offerwall-1'],

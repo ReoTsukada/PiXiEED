@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f5f7f2">
   <meta name="robots" content="index,follow">
-  <meta name="description" content="PiXiEEDでドット絵を描く、写真を加工する、音楽を作る、画像・音声・文字を変換する、ゲームで遊ぶ。目的からすぐ始められるホームです。">
+  <meta name="description" content="ドット絵好きが集う場所、PiXiEED。みんなの作品に出会い、保存した絵の続きを描く。写真・音・ゲームでも、小さなドットの楽しさが広がります。">
   <link rel="canonical" href="https://pixieed.jp/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
   <meta property="og:locale" content="ja_JP">
-  <meta property="og:title" content="PiXiEED｜つくる・変換する・遊ぶ">
-  <meta property="og:description" content="PiXiEEDでドット絵を描く、写真を加工する、音楽を作る、画像・音声・文字を変換する、ゲームで遊ぶ。目的からすぐ始められるホームです。">
+  <meta property="og:title" content="PiXiEED｜ドット絵好きが集う場所">
+  <meta property="og:description" content="ドット絵好きが集う場所、PiXiEED。みんなの作品に出会い、保存した絵の続きを描く。写真・音・ゲームでも、小さなドットの楽しさが広がります。">
   <meta property="og:url" content="https://pixieed.jp/">
   <meta property="og:image" content="https://pixieed.jp/assets/og/site.png">
   <meta property="og:image:type" content="image/png">
@@ -19,18 +19,18 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PiXiEED｜つくる・変換する・遊ぶ">
-  <meta name="twitter:description" content="PiXiEEDでドット絵を描く、写真を加工する、音楽を作る、画像・音声・文字を変換する、ゲームで遊ぶ。目的からすぐ始められるホームです。">
+  <meta name="twitter:title" content="PiXiEED｜ドット絵好きが集う場所">
+  <meta name="twitter:description" content="ドット絵好きが集う場所、PiXiEED。みんなの作品に出会い、保存した絵の続きを描く。写真・音・ゲームでも、小さなドットの楽しさが広がります。">
   <meta name="twitter:image" content="https://pixieed.jp/assets/og/site.png">
   <meta name="twitter:image:alt" content="PiXiEEDのロゴと「つくる・あそぶ・つながる」">
   <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/css/home-portal.css?rev=20261112-creation-guidance-1">
-  <title>PiXiEED｜つくる・変換する・遊ぶ</title>
+  <link rel="stylesheet" href="/css/home-portal.css?rev=20261112-posted-random-1">
+  <title>PiXiEED｜ドット絵好きが集う場所</title>
   <script>(()=>{const q=new URLSearchParams(location.search);if(q.has("art")||q.get("post")==="1")location.replace("/globe/"+location.search+location.hash);else if(q.has("view")||q.has("compose")||q.has("output")||q.has("q"))location.replace("/explore/"+location.search+location.hash);else if(location.pathname==="/index.html")location.replace("/"+location.search+location.hash)})();</script>
-  <script type="module" src="/js/home-portal.mjs?rev=20261112-creation-guidance-1"></script>
+  <script type="module" src="/js/home-portal.mjs?rev=20261112-posted-random-1"></script>
   <script type="module" src="/js/site-analytics.mjs?rev=20261017-analytics-integrity-1"></script>
 </head>
 <body class="home-portal">
@@ -48,28 +48,44 @@
   <main id="main" class="portal-main">
     <section class="portal-intro" aria-labelledby="portal-title">
       <div class="portal-intro-copy">
-        <p class="portal-overline">A PLACE TO MAKE &amp; PLAY</p>
-        <h1 id="portal-title">今日は、<em>なにする？</em></h1>
-        <p class="portal-intro-note">描く。変える。遊ぶ。好きなところから。</p>
+        <p class="portal-overline"><span aria-hidden="true">✦</span> PIXEL ART, PEOPLE &amp; PLAY</p>
+        <h1 id="portal-title">ドット絵好きが、<br><em>集う場所。</em></h1>
+        <p class="portal-intro-note">描く人も、眺める人も。<br>小さなドットから、好きが広がる。</p>
+        <div class="portal-hero-actions"><a class="portal-primary-action" href="/explore/">みんなの作品を見る <span aria-hidden="true">↗</span></a><a class="portal-quiet-action" href="#portal-work-title">自分もつくる <span aria-hidden="true">↓</span></a></div>
       </div>
+      <section class="portal-hero-gallery" id="portal-artworks" aria-label="みんなの公開作品">
+        <span class="portal-gallery-label" id="portal-artwork-label">ひとつひとつの「好き」が、つながる。</span>
+        <a class="portal-artwork-fallback" id="portal-artwork-fallback" href="/explore/" aria-label="みんなの作品を見にいく"><img src="/assets/home/community.svg" alt="ドット絵の作品を持ち寄るイメージ" width="480" height="240" fetchpriority="high" decoding="async"></a>
+        <div class="portal-artwork-grid" id="portal-artwork-grid" hidden></div>
+        <a class="portal-gallery-caption" href="/explore/"><span aria-hidden="true">✦</span> もっと作品を見つける <span aria-hidden="true">↗</span></a>
+        <p class="portal-sr-only" id="portal-artwork-status" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+    <section class="portal-work-entry" aria-labelledby="portal-work-title">
+      <div class="portal-section-heading"><div><p class="portal-eyebrow">YOUR LITTLE ATELIER</p><h2 id="portal-work-title">あなたの、つくる時間。</h2></div><a class="portal-all-works" href="/draw/?workspace=1">絵の作品一覧 <span aria-hidden="true">↗</span></a></div>
+      <p class="portal-work-hint">はじめからなら＋。続きからなら、作品をタップ。</p>
+      <div class="portal-work-shelf">
+        <a class="portal-new-project" href="#portal-create"><span class="portal-new-icon" aria-hidden="true">＋</span><strong>はじめから</strong><span>道具を選んでつくる</span></a>
+        <div class="portal-recent-area"><div id="portal-recent-list" class="portal-recent-list" aria-label="このブラウザーに保存した絵"></div><p id="portal-recent-status" class="portal-recent-status" role="status">保存した絵が、ここに並びます。</p><noscript><a href="/draw/?workspace=1">保存した絵の続きを開く</a></noscript></div>
+      </div>
+      <p class="portal-storage-note">このブラウザーに保存した絵を表示。音・写真・ゲームの続きは<a href="/tools/">それぞれの道具</a>から。<a href="/guide/#save-work">保存とバックアップ</a></p>
+    </section>
+    <section class="portal-first-step" aria-labelledby="portal-first-step-title">
+      <div><p class="portal-eyebrow">ONE SMALL IDEA</p><h2 id="portal-first-step-title">はじめの一枚、何にする？</h2><p>好きなものをひとつ。それだけで、もうはじまり。</p></div>
+      <div class="portal-idea-links"><a href="/tools/start/draw/"><span aria-hidden="true">✎</span><strong>好きなものを描く</strong><span>まっさらなキャンバスから ↗</span></a><a href="/tools/start/camera/"><span aria-hidden="true">▦</span><strong>写真から試してみる</strong><span>身近な景色をドット絵に ↗</span></a><a href="/guide/#publish-work"><span aria-hidden="true">✦</span><strong>できた絵を届ける</strong><span>保存・投稿の手順を見る ↗</span></a></div>
+    </section>
+    <div class="portal-create-heading" id="portal-create-heading">
+      <div><p class="portal-eyebrow">MAKE SOMETHING YOU LOVE</p><h2>ひらめきに、道具を。</h2><p>絵も、写真も、音も。好きな入口から。</p></div>
       <div class="portal-search-area">
-        <label for="portal-query" class="portal-search-label">やりたいことを探す</label>
+        <label for="portal-query" class="portal-search-label">やりたいことから探す</label>
         <div class="portal-search-box">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
-          <input id="portal-query" type="search" autocomplete="off" spellcheck="false" placeholder="例：GIF、ドット絵、QR…" aria-controls="portal-results" aria-expanded="false" aria-autocomplete="list">
+          <input id="portal-query" type="search" autocomplete="off" spellcheck="false" placeholder="GIF、写真、音楽…" aria-controls="portal-results" aria-expanded="false" aria-autocomplete="list">
           <kbd class="portal-search-key" aria-hidden="true">↵</kbd>
         </div>
         <div class="portal-search-results" id="portal-results" role="region" aria-label="行き先の候補" aria-live="polite" hidden></div>
       </div>
-    </section>
-    <section class="portal-work-entry" aria-labelledby="portal-work-title">
-      <h2 id="portal-work-title">新しくつくる？ 続きから？</h2>
-      <div class="portal-work-actions">
-        <a href="#portal-create"><strong>新しくつくる</strong><span>下の道具を選び、作品一覧の［＋ 新規作成］へ</span></a>
-        <a href="/draw/?workspace=1"><strong>保存した絵を開く</strong><span>このブラウザーの絵の作品一覧から続きを選ぶ</span></a>
-      </div>
-      <p>制作は毎回、作品一覧から始まります。ゲームなどの続きは、<a href="/tools/">作成した道具</a>から開けます。<a href="/guide/#save-work">保存先とバックアップについて</a></p>
-    </section>
+    </div>
     <section id="portal-create" class="portal-bento" aria-label="おすすめの入口">
       <a class="portal-card portal-draw" href="/tools/start/draw/">
         <span class="portal-card-copy"><span class="portal-card-kicker">CREATE / 01</span><strong>ドット絵を描く</strong><span class="portal-card-lead">小さな絵から、動くGIFまで。</span><span class="portal-card-sub">レイヤー・アニメーション</span></span>

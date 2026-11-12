@@ -1,6 +1,14 @@
 import { supabaseConfig } from '../data/site-config.js?rev=20261004-puzzle-share-1';
 
 const SESSION_KEY = 'PiXiEED:admin-supabase-session:v1';
+const sessionSubscribers = new Set();
+let currentSession = readSession();
+export function getAdminSession() { return currentSession; }
+export function subscribeAdminSession(listener) {
+  sessionSubscribers.add(listener); listener(currentSession);
+  return () => sessionSubscribers.delete(listener);
+}
+export function clearAdminSession() { storeSession(null); }
 
 function readSession() {
   try {
@@ -12,12 +20,14 @@ function readSession() {
 }
 
 function storeSession(session) {
+  currentSession = session?.access_token ? session : null;
   try {
     if (session?.access_token) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     else sessionStorage.removeItem(SESSION_KEY);
   } catch {
     // セッション保存が使えない環境でも、現在の画面は表示できる。
   }
+  for (const listener of sessionSubscribers) listener(currentSession);
 }
 
 function isConfigured() {
@@ -32,7 +42,7 @@ function headers(token = '') {
   const key = String(supabaseConfig.publishableKey || '').trim();
   return {
     apikey: key,
-    Authorization: `Bearer ${token || key}`,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     Accept: 'application/json',
     'Content-Type': 'application/json'
   };
@@ -70,13 +80,13 @@ function moderationErrorMessage(error) {
 async function signIn(email, password) {
   const response = await fetch(`${baseUrl()}/auth/v1/token?grant_type=password`, {
     method: 'POST',
+    cache: 'no-store',
     headers: headers(),
     body: JSON.stringify({ email, password })
   });
   if (!response.ok) throw new Error(await readError(response));
   const session = await response.json();
   if (!session?.access_token) throw new Error('管理者セッションを開始できませんでした。');
-  storeSession(session);
   return session;
 }
 
@@ -84,10 +94,14 @@ async function callModeration(session, body) {
   const functionName = encodeURIComponent(supabaseConfig.moderationFunction || 'moderate-post');
   const response = await fetch(`${baseUrl()}/functions/v1/${functionName}`, {
     method: 'POST',
+    cache: 'no-store',
     headers: headers(session.access_token),
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error(await readError(response));
+  if (!response.ok) {
+    if ([401, 403].includes(response.status) && getAdminSession()?.access_token === session.access_token) storeSession(null);
+    throw new Error(await readError(response));
+  }
   return response.json();
 }
 
@@ -95,9 +109,9 @@ function renderSetup(root) {
   root.innerHTML = `<div class="admin-moderation__empty"><strong>投稿審査の接続待ちです。</strong><p>SupabaseのURLとpublishable keyを設定すると、ここから審査できます。secret keyはこの画面へ置きません。</p></div>`;
 }
 
-function renderLogin(root, onLogin) {
+function renderLogin(root, onLogin, isCurrent = () => root.isConnected) {
   root.innerHTML = `
-    <div class="admin-section-heading"><div><span class="eyebrow">user posts</span><h2>投稿審査</h2></div><p>公開前の画像をここで確認し、セル位置を確定してから地図へ公開します。投稿審査だけ、追加の管理者確認を行います。</p></div>
+    <div class="admin-section-heading"><div><span class="eyebrow">user posts</span><h2>投稿審査</h2></div><p>公開前の画像をここで確認し、セル位置を確定してから地図へ公開します。投稿審査とホーム掲載で、共通の管理者確認を行います。</p></div>
     <form class="admin-moderation__login" data-moderation-login>
       <label><span>審査用管理者メール</span><input type="email" autocomplete="username" data-moderation-email required></label>
       <label><span>パスワード</span><input type="password" autocomplete="current-password" data-moderation-password required></label>
@@ -115,11 +129,16 @@ function renderLogin(root, onLogin) {
     if (status) status.textContent = 'ログインしています…';
     try {
       const session = await signIn(email, password);
+      if (!isCurrent()) return;
+      storeSession(session);
       await onLogin(session);
     } catch (error) {
+      if (!isCurrent()) return;
       storeSession(null);
-      if (status) status.textContent = error instanceof Error ? error.message : 'ログインできませんでした。';
-      submit.disabled = false;
+      const currentStatus = root.querySelector('[data-moderation-status]');
+      if (currentStatus) currentStatus.textContent = error instanceof Error ? error.message : 'ログインできませんでした。';
+      const currentSubmit = root.querySelector('button[type=submit]');
+      if (currentSubmit) currentSubmit.disabled = false;
     }
   });
 }
@@ -223,43 +242,51 @@ function renderPosts(root, posts, onAction) {
 
 export function bindModerationPanel(root) {
   if (!root) return;
-  const state = { session: readSession(), posts: [], busy: false };
+  const state = { session: getAdminSession(), posts: [], busy: false };
+  let generation = 0, disposed = false, paused = false;
 
   const render = () => {
     if (!isConfigured()) return renderSetup(root);
-    if (!state.session) return renderLogin(root, async (session) => { state.session = session; render(); await loadPosts(); });
+    if (!state.session) {
+      const current = generation;
+      return renderLogin(root, async () => {}, () => !disposed && !paused && root.isConnected && current === generation);
+    }
     root.innerHTML = `
       <div class="admin-section-heading"><div><span class="eyebrow">user posts</span><h2>投稿審査</h2></div><div class="admin-moderation__toolbar"><span>${escapeHtml(state.session.user?.email || '管理者セッション')}</span><button class="button button--quiet" type="button" data-moderation-refresh>再読み込み</button><button class="button button--light" type="button" data-moderation-logout>ログアウト</button></div></div>
       <p class="admin-status" data-moderation-status role="status">審査待ちを読み込んでいます。</p>
       <div data-moderation-list></div>`;
     root.querySelector('[data-moderation-refresh]')?.addEventListener('click', loadPosts);
-    root.querySelector('[data-moderation-logout]')?.addEventListener('click', () => { storeSession(null); state.session = null; render(); });
+    root.querySelector('[data-moderation-logout]')?.addEventListener('click', () => { storeSession(null); });
   };
 
   const loadPosts = async () => {
-    if (!state.session || state.busy) return;
+    if (!state.session || state.busy || disposed || paused) return;
     state.busy = true;
+    const current = generation;
     const status = root.querySelector('[data-moderation-status]');
     if (status) status.textContent = '審査待ちを読み込んでいます…';
     try {
       const result = await callModeration(state.session, { action: 'list' });
+      if (disposed || current !== generation || !root.isConnected) return;
       state.posts = Array.isArray(result.posts) ? result.posts : [];
       const list = root.querySelector('[data-moderation-list]');
       if (list) renderPosts(list, state.posts, moderate);
       if (status) status.textContent = `${state.posts.length}件の審査待ちです。`;
     } catch (error) {
+      if (disposed || current !== generation || !root.isConnected) return;
       if (/authentication|admin_access/.test(error instanceof Error ? error.message : '')) {
         storeSession(null);
         state.session = null;
         render();
       } else if (status) status.textContent = error instanceof Error ? error.message : '審査データを読み込めませんでした。';
     } finally {
-      state.busy = false;
+      if (current === generation) state.busy = false;
     }
   };
 
   const moderate = async (payload) => {
-    if (!state.session || state.busy) return;
+    if (!state.session || state.busy || disposed || paused) return;
+    const current = generation;
     const card = root.querySelector(`[data-moderation-post="${CSS.escape(payload.postId)}"]`);
     const buttons = [...(card?.querySelectorAll('button') || [])];
     buttons.forEach((button) => { button.disabled = true; });
@@ -267,8 +294,10 @@ export function bindModerationPanel(root) {
     if (status) status.textContent = payload.action === 'approve' ? '画像を公開領域へ移しています…' : '非公開として保存しています…';
     try {
       await callModeration(state.session, payload);
+      if (disposed || current !== generation || !root.isConnected) return;
       await loadPosts();
     } catch (error) {
+      if (disposed || current !== generation || !root.isConnected) return;
       const code = error instanceof Error ? error.message : '';
       if (!['post_not_pending', 'post_publish_failed', 'public_image_cleanup_failed', 'public_map_point_cleanup_failed'].includes(code)) {
         buttons.forEach((button) => { button.disabled = false; });
@@ -277,6 +306,14 @@ export function bindModerationPanel(root) {
     }
   };
 
-  render();
-  if (state.session && isConfigured()) void loadPosts();
+  const unsubscribe = subscribeAdminSession(session => {
+    ++generation; state.session = session; state.posts = []; state.busy = false;
+    if (disposed || paused || !root.isConnected) return;
+    render(); if (state.session && isConfigured()) void loadPosts();
+  });
+  const win = root.ownerDocument.defaultView;
+  const onHide = () => { paused = true; ++generation; state.busy = false; state.posts = []; root.replaceChildren(); };
+  const onShow = () => { if (!paused) return; paused = false; state.session = getAdminSession(); render(); if (state.session && isConfigured()) void loadPosts(); };
+  win.addEventListener('pagehide', onHide); win.addEventListener('pageshow', onShow);
+  return { dispose() { disposed = true; ++generation; unsubscribe(); win.removeEventListener('pagehide', onHide); win.removeEventListener('pageshow', onShow); root.replaceChildren(); } };
 }

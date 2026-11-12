@@ -117,4 +117,30 @@ export function initHomePortal(doc=globalThis.document, win=globalThis.window) {
   });
   return { render, getResults:()=>found };
 }
-if(typeof document!=='undefined')initHomePortal();
+/** Load only the small display catalog, and only when the work shelf is visible. */
+export function initHomeWorkShelf(doc=globalThis.document,win=globalThis.window){
+  const shelf=doc?.querySelector?.('.portal-recent-area');
+  if(!shelf||!win)return null;
+  let loading=false,controller=null,observer=null;
+  const start=async()=>{
+    if(loading||controller)return;
+    loading=true;observer?.disconnect();
+    try{
+      const {initHomeRecentProjects}=await import('./home-recent-projects.mjs?rev=20261112-home-community-1');
+      controller=initHomeRecentProjects({doc,win,max:4});
+    }catch{
+      const status=doc.getElementById('portal-recent-status');
+      if(status)status.textContent='絵の作品一覧から、保存した作品を開けます。';
+    }finally{loading=false;}
+  };
+  if(typeof win.IntersectionObserver==='function'){
+    observer=new win.IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))void start();},{rootMargin:'0px'});
+    observer.observe(shelf);
+  }else void start();
+  return {dispose(){observer?.disconnect();controller?.dispose?.();}};
+}
+export async function initHomeArtworkWelcome(doc=globalThis.document,win=globalThis.window){
+  if(!doc?.getElementById?.('portal-artworks'))return null;
+  try{const {initHomeArtworks}=await import('./home-artworks.mjs?rev=20261112-posted-random-1');return initHomeArtworks({doc,win});}catch{return null;}
+}
+if(typeof document!=='undefined'){initHomePortal();initHomeWorkShelf();void initHomeArtworkWelcome();}

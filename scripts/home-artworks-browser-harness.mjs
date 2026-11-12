@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+/** Local fixture server and synthetic responses only. Every outside request is blocked. */
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {readFile,writeFile,mkdir,stat} from 'node:fs/promises';
+import {resolve,extname,join} from 'node:path';
+import {homedir} from 'node:os';
+import {pathToFileURL,fileURLToPath} from 'node:url';
+import {deflateSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
+const root=resolve(process.env.PIXIEED_BROWSER_ROOT||fileURLToPath(new URL('..',import.meta.url)));
+const out=process.env.PIXIEED_BROWSER_ARTIFACTS||'/tmp/pixieed-posted-art-hero/browser';
+const {chromium}=await import(pathToFileURL(join(homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')).href);
+await mkdir(out,{recursive:true});
+const server=createServer(async(req,res)=>{try{let f=resolve(root,'.'+new URL(req.url,'http://localhost').pathname);if(f!==root&&!f.startsWith(root+'/'))throw Error();if((await stat(f)).isDirectory())f+='/index.html';res.setHeader('Content-Type',({'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.json':'application/json','.ttf':'font/ttf'})[extname(f)]||'application/octet-stream');res.end(await readFile(f));}catch{res.writeHead(404).end()}});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+const browser=await chromium.launch({headless:true});
+function png(n){const size=24;const bytes=Buffer.alloc(size*(1+size*4));for(let y=0;y<size;y++)for(let x=0;x<size;x++){let c=[[229,238,216],[234,225,239],[221,236,235]][n%3];if(n===0){if(y>7&&y<20&&x>=5+Math.max(0,y-16)&&x<=18-Math.max(0,y-16))c=(x+y)%5===0?[255,226,136]:[217,103,98];if(y>=4&&y<=9&&x>=9&&x<=14)c=[75,137,82];}if(n===1){if(x>=5&&x<=18&&y>=8&&y<=20||y>=4&&y<=9&&(x>=5&&x<=9||x>=14&&x<=18))c=[226,177,82];if(y===13&&(x===9||x===15))c=[54,71,57];if(y===16&&x===12)c=[190,100,105];}if(n===2){if(y>7&&Math.abs(x-8)<y-6||y>9&&Math.abs(x-17)<y-8)c=x<13?[92,149,118]:[51,110,91];if((x-18)**2+(y-4)**2<9)c=[246,210,110];}const i=y*(size*4+1)+1+x*4;bytes.set([...c,255],i);}function chunk(type,data){const name=Buffer.from(type),all=Buffer.concat([name,data]);let crc=0xffffffff;for(const b of all){crc^=b;for(let k=0;k<8;k++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}const head=Buffer.alloc(4),tail=Buffer.alloc(4);head.writeUInt32BE(data.length);tail.writeUInt32BE((crc^0xffffffff)>>>0);return Buffer.concat([head,all,tail]);}const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(size);ihdr.writeUInt32BE(size,4);ihdr[8]=8;ihdr[9]=6;return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(bytes)),chunk('IEND',Buffer.alloc(0))]);}
+const selection=['いちごの午後','ひなたのねこ','山のむこう'].map((title,n)=>({id:`map:a0000000-0000-4000-8000-00000000000${n+1}`,imagePath:`fixture/art-${n}.png`,title,authorName:['テスト作者 A','テスト作者 B','テスト作者 C'][n],rightsConfirmed:true,contentReviewed:true,stillImage:true,reviewedAt:'2026-11-11',imageBytes:png(n).length,imageSha256:createHash('sha256').update(png(n)).digest('hex')}));
+const rows=selection.map(s=>({id:s.id,title:s.title,authorName:s.authorName,imagePath:s.imagePath,imageBytes:s.imageBytes,imageSha256:s.imageSha256,publishedAt:'2026-11-10T12:00:00Z'}));
+const report={status:'PASS',cases:[],limitations:['Synthetic public posts only; no live network or account access. Local Chromium, no Safari or physical hardware. Real approved selection is replaced by synthetic rows only for this harness.']};
+async function setup(width,{mode='ready',saveData=false}={}){
+ const context=await browser.newContext({viewport:{width,height:900},hasTouch:width<600,serviceWorkers:'block'});const hits={api:[],images:[],outside:[]};let hide=false;
+ await context.addInitScript(()=>{Math.random=()=>.999;});
+ if(saveData)await context.addInitScript(()=>Object.defineProperty(navigator,'connection',{value:{saveData:true}}));
+ await context.route('**/*',async route=>{const req=route.request(),url=new URL(req.url());if(url.origin===base){return route.continue();}if(url.hostname==='kyyiuakrqomzlikfaire.supabase.co'){if(url.pathname==='/functions/v1/home-artworks'){hits.api.push({url:url.href,headers:req.headers()});if(mode==='error'||mode==='unconfigured')return route.fulfill({status:503,body:'unavailable'});const data=mode==='empty'||hide?[]:rows.slice(0,mode==='single'?1:3);return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,artworks:data})});}if(url.pathname.startsWith('/storage/')){hits.images.push(url.href);if(mode==='broken')return route.fulfill({status:404,body:''});if(mode==='changed-image')return route.fulfill({contentType:'image/png',body:png(2)});const n=Number(/art-(\d)/.exec(url.pathname)?.[1]||0);return route.fulfill({contentType:'image/png',body:png(n)});}}hits.outside.push(url.href);return route.abort();});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/');await page.locator('#portal-artworks').scrollIntoViewIfNeeded();
+ return{page,context,hits,errors,hide:()=>{hide=true;}};
+}
+try{
+ for(const width of[320,390,1280]){
+  const {page,context,hits,errors,hide}=await setup(width);await page.waitForFunction(()=>document.querySelector('#portal-artworks').dataset.state==='ready');const count=width<=760?2:3;await page.waitForFunction(n=>document.querySelectorAll('.portal-posted-card:not([hidden])').length===n,count);
+  assert.equal(hits.api.length,1);assert.equal(hits.images.length,count);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);assert.equal(await page.locator('.portal-posted-card').first().innerText(),'いちごの午後\nby テスト作者 A');assert.equal(await page.locator('.portal-posted-card img').first().evaluate(e=>getComputedStyle(e).objectFit),'contain');assert.equal(await page.locator('.portal-posted-card').first().getAttribute('href'),'/feed/?post=map%3Aa0000000-0000-4000-8000-000000000001');
+  assert.equal(await page.evaluate(async()=>(await indexedDB.databases()).length),0,'home must not create local project DB');assert.equal(await page.evaluate(()=>localStorage.length),0,'no artwork cache or session writes');assert.ok(hits.api.every(x=>!x.headers.authorization&&!x.headers.cookie));await page.locator('.portal-posted-card').first().focus();assert.equal(await page.evaluate(()=>document.activeElement.className),'portal-posted-card');
+  await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:join(out,`posted-art-${width}.png`),fullPage:true});
+  await page.locator('.portal-posted-card').first().click();assert.equal(new URL(page.url()).pathname,'/feed/');assert.equal(new URL(page.url()).searchParams.get('post'),selection[0].id);await page.goBack();await page.waitForFunction(()=>document.querySelector('#portal-artworks').dataset.state==='ready');
+  hide();await page.evaluate(width=>{if(width===390)dispatchEvent(new StorageEvent('storage',{key:'PiXiEED:home-artwork-preference:v1',newValue:'changed'}));else dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));},width);await page.waitForFunction(()=>document.querySelector('#portal-artworks').dataset.state==='empty');assert.equal(await page.locator('.portal-posted-card').count(),0);assert.equal(await page.locator('#portal-artwork-fallback').isVisible(),true,'withdrawn work disappears on return');
+  assert.deepEqual(errors,[]);report.cases.push({width,state:'ready → detail → Back → withdrawn',cards:count,overflow:false,errors});await context.close();
+ }
+ for(const [mode,state] of[['unconfigured','error'],['empty','empty'],['error','error'],['broken','image-error'],['changed-image','image-error'],['single','ready']]){
+  const {page,context,hits,errors}=await setup(390,{mode});await page.waitForFunction(state=>document.querySelector('#portal-artworks').dataset.state===state,state);if(mode==='unconfigured'){assert.equal(hits.api.length,1);assert.equal(hits.images.length,0);}if(mode!=='single')assert.equal(await page.locator('#portal-artwork-fallback').isVisible(),true);else assert.equal(await page.locator('.portal-posted-card:not([hidden])').count(),1);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);assert.deepEqual(errors,[]);report.cases.push({mode,state,apiRequests:hits.api.length,imageRequests:hits.images.length});await context.close();
+ }
+ {const {page,context,hits}=await setup(1280,{saveData:true});await page.waitForFunction(()=>document.querySelector('#portal-artworks').dataset.state==='ready');assert.equal(await page.locator('.portal-posted-card:not([hidden])').count(),1);assert.equal(hits.images.length,1);report.cases.push({saveData:true,cards:1});await context.close();}
+ console.log(JSON.stringify(report,null,2));
+}finally{await writeFile(join(out,'report.json'),JSON.stringify(report,null,2));await browser.close();await new Promise(r=>server.close(r));}

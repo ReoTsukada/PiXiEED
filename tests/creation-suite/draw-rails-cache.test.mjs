@@ -7,7 +7,8 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
   const root = new URL('../../', import.meta.url);
   const revisions = JSON.parse(await readFile(new URL('tests/runtime-cache-revisions.json', root), 'utf8'));
   const creationGuidance = new Set(["js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-shell.mjs", "js/creation/creation-runtime.mjs", "js/tool-direct.mjs", "css/project-workspace.css", "js/creation/project-start-picker.mjs", "js/home-portal.mjs", "css/home-portal.css"]);
-  for (const target of creationGuidance) assert.equal(revisions[target], '20261112-creation-guidance-1');
+  const homeCommunity = new Set(['js/home-portal.mjs', 'css/home-portal.css']);
+  for (const target of creationGuidance) assert.equal(revisions[target], homeCommunity.has(target) ? '20261112-posted-random-1' : '20261112-creation-guidance-1');
   const outputOfferwall = new Set([
     'js/creation/conversion-startup.mjs', 'data/posting-policy.mjs', 'js/ads/conversion-display-ad.mjs',
     'js/adsense-offerwall-policy.js', 'js/app.js', 'js/creation/audio-entry.mjs',
@@ -140,6 +141,7 @@ test('Draw rail, editor UI, and direct runtime changes invalidate every parent a
       assert.ok(urls.length, `${owner} references ${target}`);
       assert.ok(revisions[target], `${target} has a release revision`);
       if (creationGuidance.has(target)) assert.equal(revisions[target], '20261112-creation-guidance-1', `${target} invalidates the creation guidance dependency closure`);
+      else if (['js/app.js', 'js/creation/legacy-placement-page.mjs'].includes(target)) assert.equal(revisions[target], '20261112-profile-workspace-1', `${target} invalidates the profile workspace release`);
       else if (outputOfferwall.has(target)) assert.equal(revisions[target], '20261111-output-offerwall-1', `${target} invalidates the output Offerwall dependency closure`);
       else if (lazyGallery.has(target)) assert.equal(revisions[target], '20261109-lazy-gallery-1', `${target} invalidates the lazy gallery dependency chain`);
       else if (importPreview.has(target)) assert.equal(revisions[target], '20261109-import-preview-gallery-1', `${target} invalidates the import preview dependency chain`);

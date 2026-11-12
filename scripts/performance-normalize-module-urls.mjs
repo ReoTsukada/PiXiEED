@@ -15,6 +15,10 @@ const excludedDirectories = new Set(['.git', '.agents', '.codex', 'assets', 'doc
 // Declare canonical cache revisions here; derive no versions from file contents.
 // Keep runtime-specific query values intact while normalizing module references.
 const targets = new Map([
+  ['home-artworks.mjs', 'rev=20261112-posted-random-1'],
+  ['home-artwork-settings.mjs', 'rev=20261112-home-review-1'],
+  ['home-artwork-settings.css', 'rev=20261112-profile-workspace-1'],
+  ['profile-workspace.css', 'rev=20261112-profile-workspace-1'],
   ['draw-brush-settings.css', 'rev=20261107-brush-camera-1'],
   ['creation-mode-motion.mjs', 'rev=20261107-mode-continuity-1'],
   ['tool-start-routes.mjs', 'rev=20261110-output-result-1'],
@@ -84,7 +88,7 @@ const commonToolStartModules = new Set(["js/adsense-offerwall-policy.js", "js/ad
 
 const outputOfferwallTargets = new Set(["js/creation/conversion-startup.mjs", "data/posting-policy.mjs", "js/ads/conversion-display-ad.mjs", "js/adsense-offerwall-policy.js", "js/app.js", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/conversion-entry.mjs", "js/creation/conversion-page.mjs", "js/creation/conversion-recovery-workspace.mjs", "js/creation/conversion-smart-ui.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-music.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/legacy-placement-page.mjs", "js/creation/output-entry-context.mjs", "js/creation/output-handoff-core.mjs", "js/creation/output-handoff.mjs", "js/creation/output-page.mjs", "js/creation/output-receive.mjs", "js/creation/output-router.mjs", "js/creation/pixfind-play.mjs", "js/creation/profile-likes-page.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/creation/text-tools.mjs", "js/creation/tool-project-import.mjs", "js/creation/work-save-policy.mjs", "js/globe/post-supabase.mjs", "js/globe/post-ui.mjs", "js/globe/prototype.mjs", "js/home-startup.mjs", "js/pixel-export.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/pixel-lens/file-save.mjs", "js/pixel-studio/app.mjs", "js/post-composer.js", "js/posting-consent-ui.mjs", "js/site-header.mjs", "js/social/api.mjs", "js/social/app.mjs", "js/social/server-actions.mjs", "js/social/tool-handoff.mjs", "js/tool-direct.mjs", "js/tool-header-controls.mjs", "js/tool-offerwall-entry.mjs", "js/tool-shell.mjs"]);
 
-const creationGuidanceTargets = new Set(["css/home-portal.css", "css/project-workspace.css", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-portal.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+const creationGuidanceTargets = new Set(["css/home-portal.css", "css/project-workspace.css", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-page.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/spot-difference-page.mjs", "js/home-portal.mjs", "js/home-recent-projects.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
 
 async function walk(directory, files = []) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -149,7 +153,18 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!creationGuidanceTargets.has(target)) return whole;
-    const revision = '20261112-creation-guidance-1';
+    const revision = ['css/home-portal.css', 'js/home-portal.mjs', 'js/home-recent-projects.mjs'].includes(target)
+      ? (target === 'js/home-recent-projects.mjs' ? '20261112-home-community-1' : '20261112-posted-random-1') : '20261112-creation-guidance-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
+    return `${quote}${path}${next}${quote}`;
+  });
+  // Changed shared modules have one canonical URL across every entry.
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    const revision = ['js/app.js', 'js/creation/legacy-placement-page.mjs'].includes(target) ? '20261112-profile-workspace-1'
+      : target === 'js/globe/my-posts.mjs' ? '20261112-home-consent-1' : null;
+    if (!revision) return whole;
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });
