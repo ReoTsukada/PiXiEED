@@ -29,7 +29,7 @@ const EXCLUDED_PAGES = [
   ...SOCIAL_NO_AD_PAGES,
   'privacy/index.html', 'terms/index.html', 'profile/index.html', 'collection/index.html', 'admin/index.html',
   '404.html', 'shops/index.html', 'game/index.html', 'camera-media-test.html', 'pixel-camera-studio.html',
-  'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html',
+  'home/index.html', 'works/index.html', 'pixfind/index.html', 'telescope/index.html', 'play/index.html',
   'output/index.html', 'output/text/index.html', 'camera/index.html', 'draw/about/index.html',
   'works/sea-cat.html', 'works/rainy-window.html', 'works/night-lantern.html', 'pass/index.html',
   'stores/cafe-hoshi.html', 'stores/kaze-machi.html', 'stores/yoru-akari.html',
@@ -77,9 +77,9 @@ test('source HTML inventory has explicit loader decisions before route-scoped bu
   const categorized = [...new Set([...established, ...SOURCE_AUTO_AD_PAGES])];
   const expected = [...new Set([...categorized, ...COMPATIBILITY_PAGES, ...EVENT_NO_AD_PAGES, ...REFERENCE_NO_AD_PAGES, ...ISOLATED_TEST_PAGES])].sort();
   assert.deepEqual((await entries()).sort(), expected, 'new pages must opt into manual/result loading or explicit no-loader coverage');
-  assert.equal(established.length, 50);
-  assert.equal(categorized.length, 50);
-  assert.equal(expected.length, 50 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
+  assert.equal(established.length, 51);
+  assert.equal(categorized.length, 51);
+  assert.equal(expected.length, 51 + COMPATIBILITY_PAGES.length + EVENT_NO_AD_PAGES.length + REFERENCE_NO_AD_PAGES.length + ISOLATED_TEST_PAGES.length);
   for (const path of SOURCE_AUTO_AD_PAGES) {
     const source = await html(path);
     assert.doesNotMatch(source, /adsbygoogle|adsense-auto|display-ads|data-display-ad/, `${path}: source has no manual provider or slot`);
