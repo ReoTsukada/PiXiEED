@@ -2,10 +2,33 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, statSync, existsSync } from 'node:fs';
 import { findHomeDestinations, normalizeHomeQuery, HOME_DESTINATIONS } from '../../js/home-portal.mjs';
+import { getToolStartRoute } from '../../js/tool-start-routes.mjs';
 
 const home = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
 const explore = readFileSync(new URL('../../explore/index.html', import.meta.url), 'utf8');
 const homeCss = readFileSync(new URL('../../css/home-portal.css', import.meta.url), 'utf8');
+
+test('every primary home entrance has a real source document', () => {
+  const doors = home.match(/<div class="doors">([\s\S]*?)<div class="return">/)?.[1];
+  const hrefs = [...doors.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
+  assert.equal(hrefs.length, 3);
+  for (const href of hrefs) {
+    const path = getToolStartRoute(href)?.sourcePath || href.slice(1) + 'index.html';
+    assert.ok(existsSync(new URL('../../' + path, import.meta.url)), `${href} has a publishable source`);
+  }
+});
+
+test('play entrance lists real existing games without starting an editor or creating work', () => {
+  const play = readFileSync(new URL('../../play/index.html', import.meta.url), 'utf8');
+  assert.match(play, /href="https:\/\/pixieed\.jp\/play\/"/);
+  for (const href of ['/play/spot-difference/', '/play/hidden-object/', '/tools/start/jigsaw/']) {
+    assert.ok(play.includes(`href="${href}"`));
+    const path = getToolStartRoute(href)?.sourcePath || href.slice(1) + 'index.html';
+    assert.ok(existsSync(new URL('../../' + path, import.meta.url)), href);
+  }
+  assert.equal((play.match(/class="play-card"/g) || []).length, 3);
+  assert.doesNotMatch(play, /<script|<iframe|<canvas|assets\/screenshots/);
+});
 
 test('home is a navigation portal, not a second social timeline', () => {
   assert.match(home, /<main id="main" class="portal-main">/);
