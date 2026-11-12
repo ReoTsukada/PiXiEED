@@ -153,7 +153,7 @@ try {
     try {
       const page = await ctx.newPage();
       await page.goto(origin + source);
-      const link = page.locator(source === '/' ? '.portal-draw' : '[data-static-tool="editor"]');
+      const link = page.locator(source === '/' ? '.doors .door[href="/tools/start/draw/"]' : '[data-static-tool="editor"]');
       assert.equal(await link.getAttribute('href'), '/tools/start/draw/');
       await link.tap(); await page.locator('#project-start-picker').waitFor({ state: 'visible' });
       await page.locator('#project-start-new').tap(); await ready(page);
