@@ -18,22 +18,27 @@ for (const width of [320,390,1280]) {
  await context.route('**/*',route => new URL(route.request().url()).origin === new URL(base).origin && ['GET','HEAD'].includes(route.request().method()) ? route.continue() : route.abort());
  const page = await context.newPage();
  await page.goto(base+'/');
- const choices = page.locator('.portal-work-actions a');
- assert.equal(await choices.count(),2);
- assert.ok((await choices.nth(1).innerText()).includes('保存した絵を開く'));
- assert.ok((await page.locator('.portal-work-entry').innerText()).includes('ゲームなどの続きは'));
- assert.equal(await page.locator('.portal-work-entry p a[href="/tools/"]').count(),1);
- for(const a of await choices.all()) {await a.focus();assert.ok(await a.evaluate(n=>n===document.activeElement)); const box=await a.boundingBox();assert.ok(box.height>=44 && box.width>=44);}
+ const createChoice = page.locator('.portal-new-project');
+ const resumeChoice = page.locator('.portal-all-works');
+ assert.equal(await createChoice.count(),1);
+ assert.equal(await resumeChoice.count(),1);
+ assert.equal(await createChoice.getAttribute('href'),'#portal-create');
+ assert.equal(await resumeChoice.getAttribute('href'),'/tools/start/draw/');
+ assert.ok((await createChoice.innerText()).includes('はじめから'));
+ assert.ok((await resumeChoice.innerText()).includes('絵の作品一覧'));
+ assert.ok((await page.locator('.portal-storage-note').innerText()).includes('音・写真・ゲームの続きは'));
+ assert.equal(await page.locator('.portal-storage-note a[href="/tools/"]').count(),1);
+ for(const a of [createChoice,resumeChoice]) {await a.focus();assert.ok(await a.evaluate(n=>n===document.activeElement)); const box=await a.boundingBox();assert.ok(box.height>=44 && box.width>=44);}
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
  await page.screenshot({path:join(output,`home-${width}.png`),fullPage:true});
- await choices.first().click();
+ await createChoice.click();
  assert.equal(new URL(page.url()).hash,'#portal-create');
  await page.goBack();
  await page.locator('#portal-query').fill('続き');
  await page.locator('#portal-results a').first().waitFor();
  assert.equal(await page.locator('#portal-results a').first().getAttribute('href'),'/draw/?workspace=1');
  await page.locator('#portal-query').press('Escape');
- await choices.nth(1).click();
+ await resumeChoice.click();
  let found=false;
  for(let i=0;i<150&&!found;i++) {for(const frame of page.frames()) if(await frame.locator('#project-start-picker').isVisible().catch(()=>false)) found=true; if(!found)await page.waitForTimeout(100);}
  assert.ok(found,'resume entry must show the gallery, not launch an editor');

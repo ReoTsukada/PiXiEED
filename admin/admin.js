@@ -1,6 +1,8 @@
 import { adminConfig } from '../data/admin-config.js';
 
 const root = document.querySelector('[data-admin-root]');
+let reviewPanel = null, moderationPanel = null, dashboardGeneration = 0;
+
 const state = { accessToken: '', user: null, sheets: new Map(), analytics: [] };
 
 function escapeHtml(value = '') {
@@ -139,10 +141,12 @@ function getRows(values) {
 }
 
 function renderDashboard() {
+  reviewPanel?.dispose(); moderationPanel?.dispose();
+  const generation = ++dashboardGeneration;
   root.innerHTML = `
     <div class="admin-welcome"><div><span class="eyebrow">private workspace</span><h1>管理室</h1><p>${escapeHtml(state.user.email)} でログイン中</p></div><button class="button button--quiet" type="button" data-admin-refresh>再読み込み</button></div>
     <p class="admin-status" data-admin-status role="status"></p>
-    <section class="admin-card admin-access-card"><div class="admin-section-heading"><div><span class="eyebrow">access</span><h2>管理室の権限</h2></div><p>入口はこのGoogleログインに統一し、投稿審査だけ追加の権限確認を行います。</p></div><div class="admin-access-grid"><div><span>データ編集・公開</span><strong>Google</strong></div><div><span>ユーザー投稿の審査</span><strong>Supabase</strong></div></div></section>
+    <section class="admin-card admin-access-card"><div class="admin-section-heading"><div><span class="eyebrow">access</span><h2>管理室の権限</h2></div><p>入口はこのGoogleログインに統一し、投稿審査とホーム掲載は追加の権限確認を行います。</p></div><div class="admin-access-grid"><div><span>データ編集・公開</span><strong>Google</strong></div><div><span>投稿審査・ホーム掲載</span><strong>Supabase</strong></div></div></section>
     <section class="admin-metrics" data-admin-metrics><div class="admin-card admin-metric"><span>訪問者</span><strong>—</strong></div><div class="admin-card admin-metric"><span>ページ閲覧</span><strong>—</strong></div><div class="admin-card admin-metric"><span>QRスキャン</span><strong>—</strong></div><div class="admin-card admin-metric"><span>いいね</span><strong>—</strong></div></section>
     <section class="admin-card"><div class="admin-section-heading"><div><span class="eyebrow">insights</span><h2>役立つ情報</h2></div><p>日々の反応を、作品・店舗・QR単位で確認できます。</p></div><div class="admin-insights" data-admin-insights><p>読み込み中です。</p></div></section>
     <section class="admin-card"><div class="admin-section-heading"><div><span class="eyebrow">data editor</span><h2>データ編集</h2></div><a class="text-link" href="https://docs.google.com/spreadsheets/d/${encodeURIComponent(adminConfig.spreadsheetId)}/edit" target="_blank" rel="noopener">スプレッドシートを開く ↗</a></div><div class="admin-editor-toolbar"><label>編集する表<select data-sheet-selector><option value="${adminConfig.sheets.works}">作品</option><option value="${adminConfig.sheets.stores}">店舗</option><option value="${adminConfig.sheets.storeWorks}">店舗と作品</option><option value="${adminConfig.sheets.events}">イベント</option><option value="${adminConfig.sheets.eventSources}">イベント自動更新元</option></select></label><button class="button button--quiet" type="button" data-sheet-load>読み込む</button><button class="button button--quiet" type="button" data-row-add>行を追加</button><button class="button button--primary" type="button" data-sheet-save>保存</button><button class="button button--light" type="button" data-publish>公開する</button></div><div class="admin-table-wrap" data-editor-table><p>表を読み込んでください。</p></div></section>`;
@@ -152,9 +156,15 @@ function renderDashboard() {
   root.querySelector('[data-sheet-save]').addEventListener('click', saveEditorSheet);
   root.querySelector('[data-publish]').addEventListener('click', publishSheets);
   root.insertAdjacentHTML('beforeend', '<section class="admin-card admin-card--moderation" data-admin-moderation></section>');
-  void import('./moderation.js?rev=20261004-puzzle-share-1').then(({ bindModerationPanel }) => {
-    bindModerationPanel(root.querySelector('[data-admin-moderation]'));
+  root.querySelector('.admin-access-card').insertAdjacentHTML('afterend', '<section class="admin-card" data-admin-home-review></section>');
+  void Promise.all([import('./moderation.js?rev=20261112-home-review-1'), import('./home-artwork-review.mjs?rev=20261112-home-review-1')]).then(([{ bindModerationPanel }, { bindHomeArtworkReview }]) => {
+    if (generation !== dashboardGeneration) return;
+    moderationPanel = bindModerationPanel(root.querySelector('[data-admin-moderation]'));
+    reviewPanel = bindHomeArtworkReview(root.querySelector('[data-admin-home-review]'));
   }).catch(() => {
+    if (generation !== dashboardGeneration) return;
+    const review = root.querySelector('[data-admin-home-review]');
+    if (review) review.textContent = 'ホーム掲載の確認画面を読み込めませんでした。再読み込みしてください。';
     const moderation = root.querySelector('[data-admin-moderation]');
     if (moderation) moderation.innerHTML = '<p class="admin-status admin-status--error">投稿審査画面を読み込めませんでした。</p>';
   });

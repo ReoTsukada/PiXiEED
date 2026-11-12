@@ -1,0 +1,15 @@
+/* The disclosure owns the surface; consent and save behavior remain in the module. */
+[data-home-artwork-settings]{color:var(--pixieed-ink,#1b2025)}
+[data-home-artwork-settings] h2{margin:0 0 14px;font-size:18px;line-height:1.5}
+.profile-sharing [data-home-artwork-settings]>h2{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+[data-home-artwork-settings] form{padding:16px;margin-block:0 12px;border:1px solid #d7dfdb;border-radius:14px;background:#f7f9f6}
+[data-home-artwork-settings] form:last-child{margin-bottom:0}
+[data-home-artwork-settings] label{display:flex;align-items:center;gap:12px;min-height:44px;font-size:14px;font-weight:700;line-height:1.6;cursor:pointer}
+[data-home-artwork-settings] input[type=checkbox]{flex:none;width:24px;height:24px;margin:0;accent-color:#246549}
+[data-home-artwork-settings] p{margin:12px 0;font-size:13px;line-height:1.8;color:#53645b;overflow-wrap:anywhere}
+[data-home-artwork-settings] button{min-height:44px;padding:10px 16px;border:1px solid #206047;border-radius:10px;background:#246549;color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+[data-home-artwork-settings] button:disabled{opacity:.6;cursor:wait}
+[data-home-artwork-settings] input:focus-visible,[data-home-artwork-settings] button:focus-visible{outline:3px solid #187ac2;outline-offset:4px}
+[data-home-artwork-settings] [role=status]{margin-bottom:0;font-size:13px}
+[data-home-artwork-settings] [role=status]:empty{display:none}
+@media(max-width:530px){[data-home-artwork-settings] form{padding:12px}[data-home-artwork-settings] label{font-size:14px}}

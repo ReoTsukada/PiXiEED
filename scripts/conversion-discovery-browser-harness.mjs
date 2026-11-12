@@ -79,7 +79,11 @@ try {
     assert.equal(await page.locator('.portal-card').count(), 8);
     assert.equal(await page.locator('.portal-shop').getAttribute('href'), '/books/');
     assert.equal(await page.locator('.portal-card-art').count(), 8);
-    await page.locator('.portal-shop').scrollIntoViewIfNeeded();
+    // Visit every card as a user would; jumping to the shop can skip lazy images.
+    for (const image of await page.locator('.portal-card-art').all()) {
+      await image.scrollIntoViewIfNeeded();
+      await image.evaluate(element => element.decode());
+    }
     await page.waitForFunction(() => [...document.querySelectorAll('.portal-card-art')].every(image => image.complete && image.naturalWidth > 0));
     await page.evaluate(() => scrollTo(0, 0));
     assert.equal(await page.locator('#socialApp').count(), 0);

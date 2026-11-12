@@ -56,6 +56,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const origin = new URL(base).origin;
 const browser = await chromium.launch({ headless: true });
 const checks = [];
+const skipped = [];
 const errors = [];
 const accountRows = [
   { id: publishedId, author_id: ownerId, title: '横長の公開作品', caption: '地図から開けます', status: 'published', post_kind: 'pixel_art', created_at: '2026-10-05T03:00:00Z', image_width: 192, image_height: 96, image_path: `${ownerId}/published.png`, submission_puzzle_mode: null, deleted_at: null, delete_cleanup_completed_at: null },
@@ -109,6 +110,9 @@ async function setupPage(viewport, { account = false, device = false, failListOn
       return responseJson(route, { message: 'unauthorized' }, 401);
     }
     if (path === '/auth/v1/token') return responseJson(route, { access_token: isDevice ? 'device-token' : 'account-token', refresh_token: 'refresh', expires_at: 4102444800, user_id: isDevice ? guestId : ownerId });
+    if (path === '/functions/v1/home-artwork-preference') {
+      return responseJson(route, { ok: true, preference: { enabled: false, revision: 0, consentVersion: 'home-artwork-v1' } });
+    }
     if (path === '/rest/v1/social_posts') return responseJson(route, []);
     if (path === '/rest/v1/user_posts') {
       if (state.failListOnce) { state.failListOnce = false; return responseJson(route, { message: 'synthetic list failure' }, 503); }
@@ -173,6 +177,74 @@ const check = (name) => checks.push(name);
 const assertNoPageErrors = () => assert.deepEqual(errors.splice(0), [], 'no page errors');
 
 try {
+  // Artwork-first workspace. Closed settings never hide gallery content or change browser history.
+  for (const viewport of [{ width: 320, height: 700 }, { width: 390, height: 844 }, { width: 1280, height: 900 }]) {
+    const { context, page } = await setupPage(viewport, { account: true, device: true });
+    try {
+      await page.goto(`${base}/profile/`, { waitUntil: 'domcontentloaded' });
+      await page.locator('.profile-post-card').first().waitFor();
+      await page.getByText('テスト作者のワークスペース').waitFor();
+      await page.locator('[data-author-profiles-root]:not([hidden])').waitFor();
+      assert.equal(await page.locator('[data-author-scope="account"] input').isVisible(), false, 'author form is progressively disclosed');
+      assert.equal(await page.locator('[data-home-artwork-settings] form').first().isVisible(), false, 'consent form starts collapsed, not consented');
+      assert.equal(await page.locator('.profile-grid').count(), 0, 'no repeated gallery/map/like link block');
+      const layout = await page.evaluate(() => {
+        const cards = document.querySelector('.profile-post-card').getBoundingClientRect();
+        return { overflow: document.documentElement.scrollWidth > innerWidth, artworkTop: cards.top, text: document.querySelector('#main').innerText.length };
+      });
+      assert.equal(layout.overflow, false, `workspace fits ${viewport.width}px`);
+      assert.ok(layout.artworkTop < viewport.height - 80, `artwork is visible above the fold: ${JSON.stringify(layout)}`);
+      for (const box of await page.locator('.profile-tabs a, .profile-overview__actions a, .profile-disclosure > summary, .profile-shortcut').evaluateAll(nodes => nodes.filter(n => n.getClientRects().length).map(n => { const b = n.getBoundingClientRect(); return { width:b.width, height:b.height, text:n.textContent }; }))) {
+        assert.ok(box.height >= 44 && box.width >= 44, `44px targets: ${JSON.stringify(box)}`);
+      }
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.screenshot({ path: `/tmp/profile-workspace-${viewport.width}.png`, fullPage: true });
+      const sharing = page.locator('#profile-sharing');
+      const summary = sharing.locator('summary');
+      const before = await page.evaluate(() => ({ url:location.href, length:history.length }));
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await sharing.locator('form').first().waitFor();
+      assert.equal(await sharing.locator('input:checked').count(), 0, 'opening settings never enables consent');
+      assert.equal(await sharing.locator('form').count(), 2, 'account and guest remain separate');
+      for (const text of await sharing.locator('form > p:not([role])').allTextContents()) {
+        assert.match(text, /過去・今後の公開投稿/);
+        assert.match(text, /運営が確認した静止画像/);
+        assert.match(text, /作者名・作品名/);
+        assert.match(text, /すべての作品が掲載されるとは限りません/);
+        assert.match(text, /次回の読み込みから反映/);
+        assert.match(text, /投稿自体は削除されません/);
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'expanded settings fit');
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      assert.equal(await sharing.locator('form').first().isVisible(), false, 'keyboard collapse closes settings');
+      assert.deepEqual(await page.evaluate(() => ({ url:location.href, length:history.length })), before, 'disclosure does not add navigation');
+      const authorSummary = page.locator('[data-author-profiles-root] > summary');
+      await authorSummary.click();
+      const input = page.locator('[data-author-scope="account"] input');
+      await input.fill('作業中の名前');
+      await authorSummary.click();
+      await authorSummary.click();
+      assert.equal(await input.inputValue(), '作業中の名前', 'collapse preserves editing draft');
+      assert.equal(await input.evaluate(n => getComputedStyle(n).fontSize), '16px', 'input avoids mobile auto zoom');
+      await authorSummary.click();
+      const device = page.locator('#profile-device');
+      await device.locator('summary').click();
+      await device.getByRole('button', { name: '端末内作品の関連付けを確認' }).waitFor();
+      assert.equal(await device.locator('[data-local-work-status]').isVisible(), true, 'local-work status stays available');
+      await device.locator('summary').click();
+      await page.locator('.profile-tabs a[href="/profile/?view=posts"]').click();
+      await page.locator('[data-my-posts-view="all"] .profile-post-card').first().waitFor();
+      await page.goBack();
+      await page.locator('[data-my-posts-view="recent"] .profile-post-card').first().waitFor();
+      assert.equal(await page.locator('.profile-tabs [aria-current="page"]').textContent(), 'まとめ');
+      assertNoPageErrors();
+      check(`workspace ${viewport.width}px: artwork above fold, no overflow, 44px controls, keyboard disclosures, consent OFF, draft retained, navigation Back`);
+    } finally { await context.close(); }
+  }
+
+  if (process.env.PIXIEED_PROFILE_WORKSPACE_ONLY !== '1') {
   // Signed-out home and posts pages use the actual profile HTML and preserve a clear posting/login path.
   for (const [path, viewport] of [['/profile/', { width: 320, height: 568 }], ['/profile/?view=posts', { width: 390, height: 844 }]]) {
     const { context, page } = await setupPage(viewport);
@@ -193,7 +265,7 @@ try {
     try {
       await page.goto(`${base}/profile/`, { waitUntil: 'domcontentloaded' });
       await page.locator('.profile-post-card').first().waitFor();
-      await page.getByText('テスト作者の投稿した作品や、見つけた絵をまとめて確認できます。').waitFor();
+      await page.getByText('テスト作者のワークスペース').waitFor();
       assert.equal(await page.locator('[data-profile-post-count]').textContent(), '4');
       await page.waitForFunction(() => document.querySelector('[data-profile-like-count]')?.textContent === '1', null, { timeout: 10000 });
       assert.equal(await page.locator('[data-post-id="66666666-6666-4666-8666-666666666666"]').count(), 0);
@@ -317,26 +389,28 @@ try {
           content: '<aside class="sheet viewer" data-panel="sheet"><header class="sheet__head"><h2>作品シート</h2><button class="sheet__close" type="button" aria-label="閉じる" data-probe-close>×</button></header><div style="height:1800px;flex:none">合成スクロール本文</div></aside>',
         },
         {
-          panel: '.map-events-panel', close: '.map-events-panel__close',
-          content: '<aside class="map-events-panel" data-panel="events"><header class="map-events-panel__head"><h2>イベント一覧</h2><button class="map-events-panel__close" type="button" data-probe-close>×</button></header><div class="map-events-panel__list">' + '<article class="map-event-card">合成イベント</article>'.repeat(40) + '</div></aside>',
+          panel: '.map-events-panel', close: '.map-events-panel__close', scroll: '.map-events-panel__body',
+          content: '<aside class="map-events-panel" data-panel="events"><header class="map-events-panel__head"><h2>イベント一覧</h2><button class="map-events-panel__close" type="button" data-probe-close>×</button></header><div class="map-events-panel__body"><div class="map-events-panel__list">' + '<article class="map-event-card">合成イベント</article>'.repeat(40) + '</div></div></aside>',
         },
       ]) {
         await page.setContent(`<!doctype html><html lang="ja"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${base}/css/globe-prototype.css"></head><body><main class="globe-stage" style="height:100dvh;min-height:0;border:0;border-radius:0">${fixture.content}</main></body></html>`);
         await page.waitForFunction(() => [...document.styleSheets].some((sheet) => sheet.href?.includes('/css/globe-prototype.css')));
         const panel = page.locator(fixture.panel);
-        const maxScroll = await panel.evaluate((node) => node.scrollHeight - node.clientHeight);
+        const scrollArea = fixture.scroll ? panel.locator(fixture.scroll) : panel;
+        const maxScroll = await scrollArea.evaluate((node) => node.scrollHeight - node.clientHeight);
         assert.ok(maxScroll > 200, `${fixture.panel} has real scroll range at ${viewport.width}x${viewport.height}: ${maxScroll}`);
         for (const point of ['top', 'middle', 'bottom']) {
-          const stateAtPoint = await panel.evaluate((node, point) => {
-            const max = node.scrollHeight - node.clientHeight;
-            node.scrollTop = point === 'top' ? 0 : point === 'middle' ? max / 2 : max;
+          const stateAtPoint = await panel.evaluate((node, { point, selector }) => {
+            const scrollArea = selector ? node.querySelector(selector) : node;
+            const max = scrollArea.scrollHeight - scrollArea.clientHeight;
+            scrollArea.scrollTop = point === 'top' ? 0 : point === 'middle' ? max / 2 : max;
             const close = node.querySelector('[data-probe-close]');
             const rect = close.getBoundingClientRect();
             const panelRect = node.getBoundingClientRect();
             const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             const hit = document.elementFromPoint(center.x, center.y);
-            return { scrollTop: node.scrollTop, width: rect.width, height: rect.height, rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, panel: { left: panelRect.left, right: panelRect.right, top: panelRect.top, bottom: panelRect.bottom }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === close || close.contains(hit) };
-          }, point);
+            return { scrollTop: scrollArea.scrollTop, width: rect.width, height: rect.height, rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }, panel: { left: panelRect.left, right: panelRect.right, top: panelRect.top, bottom: panelRect.bottom }, viewport: { width: innerWidth, height: innerHeight }, hit: hit === close || close.contains(hit) };
+          }, { point, selector: fixture.scroll });
           assert.ok(stateAtPoint.width >= 44 && stateAtPoint.height >= 44, `${fixture.panel} close touch size ${point}: ${JSON.stringify(stateAtPoint)}`);
           assert.ok(stateAtPoint.rect.left >= 0 && stateAtPoint.rect.right <= viewport.width && stateAtPoint.rect.top >= 0 && stateAtPoint.rect.bottom <= viewport.height, `${fixture.panel} close is in viewport ${point}: ${JSON.stringify(stateAtPoint)}`);
           assert.ok(stateAtPoint.rect.left >= stateAtPoint.panel.left && stateAtPoint.rect.right <= stateAtPoint.panel.right && stateAtPoint.rect.top >= stateAtPoint.panel.top && stateAtPoint.rect.bottom <= stateAtPoint.panel.bottom, `${fixture.panel} close is in panel ${point}: ${JSON.stringify(stateAtPoint)}`);
@@ -352,6 +426,11 @@ try {
     } finally { await context.close(); }
   }
 
+  // Delivery intentionally excludes this local-only preview. Source FULL still verifies it.
+  if (process.env.PIXIEED_PROFILE_DELIVERY === '1') {
+    await assert.rejects(stat(join(process.cwd(), 'books/room-preview.html')), { code: 'ENOENT' });
+    skipped.push('books/room-preview.html (4 sizes): local-only preview explicitly excluded by build-pages-site.mjs; covered by source FULL');
+  } else {
   // The room preview presents the full catalog as ordinary scrollable product cards.
   for (const viewport of [
     { width: 320, height: 568 },
@@ -407,6 +486,8 @@ try {
     } finally { await context.close(); }
   }
 
+  }
+
   // Author names are stored by verified session scope and projected back onto existing artwork.
   {
     const { context, page } = await setupPage({ width: 390, height: 844 }, { account: true, device: true });
@@ -414,6 +495,7 @@ try {
       await page.goto(`${base}/profile/?view=posts`, { waitUntil: 'domcontentloaded' });
       const accountForm = page.locator('[data-author-scope="account"]');
       const deviceForm = page.locator('[data-author-scope="device"]');
+      await page.locator('[data-author-profiles-root]:not([hidden]) > summary').click();
       await accountForm.waitFor();
       await deviceForm.waitFor();
       await page.evaluate(() => {
@@ -537,7 +619,9 @@ try {
     } finally { state.releaseAccountList?.(); await context.close(); }
   }
 
-  console.log(JSON.stringify({ status: 'PASS', checks, screenshots: ['/tmp/profile-posts-mobile.png', '/tmp/profile-overview-mobile.png'], syntheticSupabase: true, production: 'UNTESTED' }, null, 2));
+  }
+
+  console.log(JSON.stringify({ status: 'PASS', checks, skipped, screenshots: ['/tmp/profile-workspace-320.png', '/tmp/profile-workspace-390.png', '/tmp/profile-workspace-1280.png', '/tmp/profile-posts-mobile.png', '/tmp/profile-overview-mobile.png'], syntheticSupabase: true, production: 'UNTESTED' }, null, 2));
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));

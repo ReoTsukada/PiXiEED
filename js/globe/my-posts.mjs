@@ -215,5 +215,37 @@ export function createMyPostsApi({ fetchImpl = globalThis.fetch, storage = globa
     return { ok: true, name };
   }
 
-  return { restore, listPosts, remove, listAuthorProfiles, saveAuthorName, get user() { return user; } };
+  const preferenceOwners = new Map();
+  async function preferenceRequest(session, body) {
+    if (!stillActive(session)) throw sessionError();
+    const response = await fetchImpl(`${base}/functions/v1/home-artwork-preference`, {
+      method: body ? 'POST' : 'GET', headers: headers(session.accessToken), cache: 'no-store',
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    const result = await response.json();
+    if (!stillActive(session)) throw sessionError();
+    if (!response.ok || result?.ok !== true || typeof result.preference?.enabled !== 'boolean' || !Number.isSafeInteger(result.preference.revision) || result.preference.consentVersion !== 'home-artwork-v1') throw new Error('ホーム掲載設定を確認できません。再読み込みしてください。');
+    return result.preference;
+  }
+  async function listHomeArtworkPreferences() {
+    await restore();
+    preferenceOwners.clear();
+    const result = [];
+    for (const session of sessions) {
+      const preference = await preferenceRequest(session);
+      preferenceOwners.set(session.scope, session.id);
+      result.push({ ...preference, sessionScope: session.scope });
+    }
+    return result;
+  }
+  async function saveHomeArtworkPreference(scope, enabled, revision) {
+    const expectedOwner = preferenceOwners.get(scope);
+    if (!expectedOwner || typeof enabled !== 'boolean') throw sessionError();
+    await restore();
+    const session = sessions.find((entry) => entry.scope === scope && entry.id === expectedOwner);
+    if (!session) throw sessionError();
+    return preferenceRequest(session, { enabled, revision, consentVersion: 'home-artwork-v1' });
+  }
+
+  return { restore, listPosts, remove, listAuthorProfiles, saveAuthorName, listHomeArtworkPreferences, saveHomeArtworkPreference, get user() { return user; } };
 }

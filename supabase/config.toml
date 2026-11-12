@@ -440,3 +440,18 @@ enabled = true
 # Public reads require no session; every write independently calls Auth.getUser.
 verify_jwt = false
 entrypoint = "./functions/social-feed/index.ts"
+
+[functions.home-artwork-preference]
+enabled = true
+verify_jwt = false # Auth.getUser verifies each read/write.
+entrypoint = "./functions/home-artwork-preference/index.ts"
+
+[functions.home-artworks]
+enabled = true
+verify_jwt = false # Public projection, with service-only SQL eligibility checks.
+entrypoint = "./functions/home-artworks/index.ts"
+
+[functions.home-artwork-review]
+enabled = true
+verify_jwt = false # requireAdmin verifies Auth.getUser and server-owned admin role/allowlist.
+entrypoint = "./functions/home-artwork-review/index.ts"

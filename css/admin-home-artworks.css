@@ -1,0 +1,35 @@
+/* Private home-selection review. Images are never cropped. */
+[data-admin-home-review] { min-width: 0; scroll-margin-top: 6rem; }
+[data-admin-home-review] [hidden] { display: none !important; }
+.home-review__note { padding: .8rem 1rem; border-radius: 10px; background: #eef5f1; color: #355749; font-size: .85rem; line-height: 1.7; }
+.home-review__toolbar, .home-review__tabs, .home-review__actions, .home-review__pagination { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.home-review__toolbar { justify-content: space-between; }
+.home-review__tabs [aria-pressed="true"] { color: #fff; background: #244f43; border-color: #244f43; }
+.home-review__status { min-height: 1.5em; margin: 1rem 0; color: #50625a; line-height: 1.7; }
+.home-review__card { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(1rem, 3vw, 2rem); padding: clamp(.75rem, 2vw, 1.5rem); border: 1px solid #dbe4dd; border-radius: 16px; background: #fbfcf8; }
+.home-review__image-stage { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 0; min-height: 320px; padding: 1rem; border-radius: 12px; background-color: #edf1e9; background-image: linear-gradient(45deg,#e1e8de 25%,transparent 25%),linear-gradient(-45deg,#e1e8de 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e1e8de 75%),linear-gradient(-45deg,transparent 75%,#e1e8de 75%); background-size: 24px 24px; background-position: 0 0,0 12px,12px -12px,-12px 0; }
+.home-review__image-stage img { display: block; width: 100%; max-height: 460px; min-height: 240px; object-fit: contain; image-rendering: pixelated; }
+.home-review__image-stage p { margin: .75rem 0 0; padding: .35rem .65rem; background: #fbfcf8; border-radius: 8px; font-size: .8rem; text-align: center; }
+.home-review__verified { color: #38634b; }
+.home-review__detail { align-self: center; min-width: 0; overflow-wrap: anywhere; }
+.home-review__badge { display: inline-block; padding: .3rem .6rem; color: #355749; background: #e4eee7; font-size: .75rem; border-radius: 6px; }
+.home-review__detail h3 { margin: .7rem 0 .4rem; font-size: clamp(1.35rem, 2.5vw, 2rem); }
+.home-review__author { margin: .3rem 0; color: #3e5148; }
+.home-review__date { color: #69776f; font-size: .75rem; }
+.home-review__checks { min-width: 0; margin: 1.1rem 0; padding: .8rem; border: 1px solid #d7e1d7; border-radius: 10px; }
+.home-review__checks legend { padding: 0 .3rem; font-size: .8rem; font-weight: 700; }
+.home-review__checks label { display: flex; align-items: start; gap: .6rem; padding: .5rem 0; font-size: .85rem; line-height: 1.6; cursor: pointer; }
+.home-review__checks input { flex: 0 0 auto; width: 1.15rem; height: 1.15rem; margin-top: .12rem; accent-color: #355e47; }
+.home-review__pagination { justify-content: center; margin-top: 1rem; }
+.home-review__pagination span { font-size: .8rem; color: #5e6c63; }
+[data-admin-home-review] .button { min-height: 44px; white-space: normal; }
+[data-admin-home-review] button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+[data-admin-home-review] .is-error { color: #9a382a; }
+.home-review__dialog { width: min(540px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 1.5rem; border: 1px solid #d5dfd5; border-radius: 16px; color: #20382c; background: #fcfdf8; overflow: auto; }
+.home-review__dialog::backdrop { background: #152f24a6; }
+.home-review__dialog h3 { font-size: 1.4rem; }
+.home-review__dialog p { line-height: 1.7; overflow-wrap: anywhere; }
+.home-review__target { padding: .75rem; background: #edf3e9; border-radius: 8px; font-weight: 700; }
+.home-review__dialog .home-review__actions { justify-content: end; margin-top: 1.2rem; }
+@media(max-width:760px) { .home-review__card { grid-template-columns: minmax(0,1fr); } .home-review__image-stage { min-height: 230px; } .home-review__image-stage img { min-height: 190px; max-height: 340px; } }
+@media(max-width:380px) { [data-admin-home-review] { padding: .85rem; } .home-review__tabs { gap: .3rem; } .home-review__tabs .button { padding-inline: .7rem; } .home-review__card { padding: .55rem; } .home-review__image-stage { padding: .6rem; } }
