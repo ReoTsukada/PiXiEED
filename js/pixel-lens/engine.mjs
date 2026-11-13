@@ -75,7 +75,7 @@ const MIX_PENALTY = 0.3;          // discourages mixing two far-apart colours wh
 function currentDitherPattern() { return DITHER_PATTERNS.find((p) => p.id === state.ditherPattern) ?? DITHER_PATTERNS[0]; }
 const scratch = { size: 0, pair: null, tone: null, solid: null };
 function ensureScratch(n) {
-  if (scratch.size >= n) return scratch;
+  if (scratch.size === n) return scratch;
   scratch.size = n; scratch.pair = new Uint16Array(n); scratch.tone = new Uint8Array(n); scratch.solid = new Uint8Array(n);
   return scratch;
 }
@@ -100,7 +100,7 @@ function removeStrayEdgePixels(data, width, height, solid) {
 let diffusionBuffer = null;
 function diffuse(data, width, height, kernel, edgeMap, pick) {
   const n = width * height;
-  if (!diffusionBuffer || diffusionBuffer.length < n * 3) diffusionBuffer = new Float32Array(n * 3);
+  if (!diffusionBuffer || diffusionBuffer.length !== n * 3) diffusionBuffer = new Float32Array(n * 3);
   const buf = diffusionBuffer;
   for (let p = 0; p < n; p++) { buf[p * 3] = data[p * 4]; buf[p * 3 + 1] = data[p * 4 + 1]; buf[p * 3 + 2] = data[p * 4 + 2]; }
   for (let y = 0; y < height; y++) {
@@ -974,6 +974,7 @@ export function setLensSettings(next = {}) {
   if (next.surfaceSimplify !== undefined) state.surfaceSimplify = Math.max(0, Math.min(100, Number(next.surfaceSimplify) || 0));
   if (next.cameraSettings) state.cameraSettings = { ...state.cameraSettings, ...next.cameraSettings };
   if (depthChanged || modeChanged) clearPaletteState();
+  releaseUnusedLensBuffers();
 }
 
 export function getLensSettings() { return { ...state, cameraSettings: { ...state.cameraSettings } }; }
@@ -1027,4 +1028,15 @@ export function lensFrameFilter() {
 }
 
 /** Run the PiXiEELENS colour pipeline on an ImageData already sampled at dot resolution (in place). */
-export function processLensFrame(imageData) { applyColorDepth(imageData); return imageData; }
+export function releaseUnusedLensBuffers() {
+  const diffusion=!['full','gray'].includes(state.colorDepth)&&state.gradientMode==='dither'&&currentDitherPattern().kind==='diffusion';
+  if(!diffusion)diffusionBuffer=null;
+  if(diffusion||state.colorDepth==='full'||state.colorDepth==='gray'||state.colorDepth==='256'){scratch.size=0;scratch.pair=scratch.tone=scratch.solid=null;}
+}
+export function lensMemoryPlan(width,height) {
+  releaseUnusedLensBuffers();
+  const diffusion=!['full','gray'].includes(state.colorDepth)&&state.gradientMode==='dither'&&currentDitherPattern().kind==='diffusion';
+  const scratchBytes=width*height*(diffusion?12:['full','gray','256'].includes(state.colorDepth)?0:4);
+  return {scratchBytes,retainedBytes:(diffusionBuffer?.byteLength||0)+(scratch.pair?.byteLength||0)+(scratch.tone?.byteLength||0)+(scratch.solid?.byteLength||0),paletteCacheBytes:1024*1024};
+}
+export function processLensFrame(imageData) { releaseUnusedLensBuffers();applyColorDepth(imageData); return imageData; }

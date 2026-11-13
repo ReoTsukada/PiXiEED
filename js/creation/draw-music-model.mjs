@@ -1,15 +1,18 @@
+import { estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 import {
   addDrawMusicPage, changeDrawMusicTempo, createDrawMusicState, createDrawMusicTrackState,
   describeDrawMusicProjection,
   getDrawMusicPageDocument, moveDrawMusicPage, projectDrawMusic, removeDrawMusicPage,
   selectDrawMusicPage, writeDrawMusicProject
-} from './draw-music-core.mjs?rev=20261016-tool-shell-1';
-import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261016-color-capability-1';
+} from './draw-music-core.mjs?rev=20261113-canvas1028-shared-2';
+import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261113-canvas1028-shared-2';
 import { setPxdJson } from './pxd-codec.mjs';
 import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
-import { preservesAudioRewardContent, preservesAudioRewardPaletteContent } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
+import { preservesAudioRewardContent, preservesAudioRewardPaletteContent } from './audio-reward-policy.mjs?rev=20261113-canvas1028-shared-2';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
+const largeCanvas = value => value?.width > 256 || value?.height > 256;
+const LARGE_CANVAS_MUSIC_NOTICE = '音楽は256px以下に対応しています。256pxを超える作品では音楽の編集を停止し、元の曲・音楽ページをそのまま保存します。Drawとカメラは引き続き使えます。';
 function json(value) {
   try { return JSON.stringify(value); } catch { return ''; }
 }
@@ -39,6 +42,35 @@ function preservesAudioRewardState(before, after) {
   return true;
 }
 
+const musicObjectByteCache = new WeakMap();
+// Conservative logical estimate, not a browser heap measurement. Avoid building
+// a large JSON string; immutable model values are measured once per identity.
+function estimatedMusicObjectBytes(value) {
+  if(musicObjectByteCache.has(value))return musicObjectByteCache.get(value);
+  const seen=new Set(),pending=[value];let bytes=0;
+  while(pending.length){const item=pending.pop();if(item===null||item===undefined)continue;
+    if(typeof item==='string'){bytes+=item.length*2+24;continue;}
+    if(typeof item!=='object'){bytes+=8;continue;}
+    if(seen.has(item))continue;seen.add(item);bytes+=64;
+    if(ArrayBuffer.isView(item)){bytes+=item.byteLength;continue;}
+    for(const key in item)if(Object.hasOwn(item,key)){bytes+=key.length*2+16;pending.push(item[key]);}
+    if(bytes>64*1024*1024){musicObjectByteCache.set(value,Infinity);return Infinity;}
+  }
+  musicObjectByteCache.set(value,bytes);return bytes;
+}
+
+/** Extra logical Music retention, excluding cells already charged to shared Art history. */
+export function estimateSharedMusicRetainedBytes({states=[],artTimelines=[],extraTimelines=[],project=null,signature=''}={}) {
+  const unique=[...new Set(states.filter(Boolean))],jsonObjects=new Set();let bytes=16*1024+signature.length*2;
+  for(const state of unique)for(const value of [state.song,state.link,state.originalSong,state.originalLink]) {
+    if(value&&!jsonObjects.has(value)){jsonObjects.add(value);bytes+=estimatedMusicObjectBytes(value);}
+  }
+  const music=unique.map(value=>value.musicAnimation).filter(Boolean);
+  bytes+=Math.max(0,estimateRetainedAnimationBytes([...new Set([...artTimelines,...extraTimelines,...music])])-estimateRetainedAnimationBytes([...new Set(artTimelines)]));
+  for(const entry of project?.entries||[])if(entry.path.startsWith('audio/')||entry.path.startsWith('animations/audio/')||entry.path.startsWith('images/audio/')||entry.path.startsWith('legacy/')||entry.path.startsWith('animations/legacy/')||entry.path.startsWith('animations/audio-legacy-editor/')||entry.path.startsWith('images/audio-legacy-editor/'))bytes+=(entry.bytes?.byteLength||0)+512;
+  return bytes+unique.length*1024;
+}
+
 /**
  * Keep audio data synchronized with Draw history without creating a player or UI.
  * Call this before mounting the lazy music editor so the initial page snapshot is
@@ -50,6 +82,8 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
   }
 
   let state = null;
+  let memoryReady=false,memoryCache=null;
+  let suspendedForLargeCanvas = false, priorReadOnlyReason = '', retainedProject = null, resumePromise = null;
   let readOnlyReason = '';
   let disposed = false;
   let projectUnsubscribe = null;
@@ -71,6 +105,7 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
   }
 
   function planMusicSettings(settings = {}) {
+    if (largeCanvas(settings) || largeCanvas(draw.getTimeline())) return { summary: { croppedPixels: 0, musicImpact: LARGE_CANVAS_MUSIC_NOTICE } };
     const current = refresh();
     if (!current) return null;
     if (readOnlyReason || !current.musicTrackMode || !current.musicAnimation) {
@@ -104,7 +139,7 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
   }
 
   function validateMusicTimeline({ before, after, rewardActive: operationLease } = {}) {
-    if (!after || !state) return true;
+    if (!after || !state || largeCanvas(after) || suspendedForLargeCanvas) return true;
     const lease = typeof operationLease === 'boolean' ? operationLease : rewardEntitled();
     if (!rewardEnabled()) return true;
     let candidate = snapshots.get(after);
@@ -143,6 +178,21 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
   }
 
   function resolveTimeline(timeline) {
+    if (largeCanvas(timeline)) {
+      if (!suspendedForLargeCanvas) { priorReadOnlyReason = readOnlyReason; suspendedForLargeCanvas = true; setReadOnly(LARGE_CANVAS_MUSIC_NOTICE); notify(true); }
+      // Retain the last supported music snapshot; never project 512px into it.
+      return state;
+    }
+    if (suspendedForLargeCanvas && timeline) {
+      suspendedForLargeCanvas = false; setReadOnly(priorReadOnlyReason);
+      if (!state && !resumePromise) {
+        resumePromise = onOpen(retainedProject, timeline, { requireCurrent: true }).finally(() => {
+          resumePromise = null;
+          if (!disposed && !state) { suspendedForLargeCanvas = true; setReadOnly(LARGE_CANVAS_MUSIC_NOTICE); }
+        });
+        return state;
+      }
+    }
     if (!state || !timeline || restoringDeniedTimeline) return state;
     if (timeline === lastTimeline) { leasedTimelines.delete(timeline); return state; }
     const beforeSignature = lastAudioSignature || audioSignature(state);
@@ -184,18 +234,23 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
     return state;
   }
 
-  async function onOpen(project, timeline) {
+  async function onOpen(project, timeline, { requireCurrent = false } = {}) {
     if (disposed || !timeline) return;
     const sequence = ++openSequence;
+    retainedProject = project;
+    suspendedForLargeCanvas = false; priorReadOnlyReason = '';
     const hadLoadedState = Boolean(state);
     state = null; lastTimeline = null; lastAudioSignature = ''; snapshots = new WeakMap(); leasedTimelines = new WeakSet(); lastAcceptedTimelineSnapshot = null;
     setReadOnly('');
     // A new project replaces the current playback source immediately. Views
     // can stop the old player while the new baseline is being prepared.
     if (hadLoadedState) notify(true);
+    if (largeCanvas(timeline)) {
+      suspendedForLargeCanvas = true; setReadOnly(LARGE_CANVAS_MUSIC_NOTICE); notify(false); return;
+    }
     try {
       const loaded = await createDrawMusicTrackState(project, timeline);
-      if (disposed || sequence !== openSequence) return;
+      if (disposed || sequence !== openSequence || (requireCurrent && draw.getTimeline() !== timeline)) return;
       if (typeof draw.applyMusicPage !== 'function') throw new TypeError('音楽ページを読み込む機能がありません。');
       const pageDocument = getDrawMusicPageDocument(loaded, loaded.musicPageId);
       let prepared = false;
@@ -226,6 +281,13 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
 
   async function onSave(project, timeline, { imageRole = 'main' } = {}) {
     const resolved = resolveTimeline(timeline);
+    if (suspendedForLargeCanvas || largeCanvas(timeline)) {
+      // Save pending supported-size music edits without projecting the large art.
+      const next = resolved?.musicTrackMode && !priorReadOnlyReason
+        ? await writeDrawMusicProject(project, resolved, { imageRole })
+        : resolved?.hasStoredAudio && priorReadOnlyReason ? setPxdJson(project, AUDIO_STATE_PATH, resolved.song) : project;
+      retainedProject = next; return next;
+    }
     if (!resolved) return project;
     if (readOnlyReason) {
       // Do not rewrite audio links, pages, images, or future fields when a
@@ -236,7 +298,21 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
     return writeDrawMusicProject(project, resolved, { imageRole });
   }
 
-  const hooks = { onOpen, onSave };
+  function retainedMemoryBytes() {
+    if (disposed) return null;
+    if (!memoryReady || resumePromise) return Infinity;
+    const history=draw.snapshotTimeline?.()?.session?.timeline;
+    const art=history?[...history.past,history.current,...history.future]:[draw.getTimeline()];
+    const accepted=lastAcceptedTimelineSnapshot?.session?.timeline;
+    const extra=[...(accepted?[...accepted.past,accepted.current,...accepted.future]:[]),state?.animation,lastTimeline].filter(Boolean);
+    const keys=[state,retainedProject,lastAudioSignature,lastTimeline,...art,...extra];
+    if(memoryCache&&keys.length===memoryCache.keys.length&&keys.every((value,index)=>value===memoryCache.keys[index]))return memoryCache.bytes;
+    const values=[state,...[...new Set([...art,...extra,lastTimeline])].filter(Boolean).map(timeline=>snapshots.get(timeline))];
+    const bytes=estimateSharedMusicRetainedBytes({states:values,artTimelines:art,extraTimelines:extra,project:retainedProject,signature:lastAudioSignature});
+    memoryCache={keys,bytes};return bytes;
+  }
+  const clearMemoryEstimator=draw.setMusicMemoryEstimator?.(retainedMemoryBytes);
+  const hooks = { async onOpen(...args) {memoryReady=false;memoryCache=null;await onOpen(...args);memoryReady=true;}, onSave };
   draw.setMusicSettingsPlanner?.(planMusicSettings);
   const clearTimelineValidator = draw.setMusicTimelineValidator?.(validateMusicTimeline);
   const unsubscribeDraw = draw.subscribe(() => resolveTimeline(draw.getTimeline()));
@@ -246,6 +322,7 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
     projectUnsubscribe?.();
     draw.setMusicSettingsPlanner?.(null);
     clearTimelineValidator?.();
+    clearMemoryEstimator?.();
     listeners.clear();
   });
 
@@ -255,6 +332,7 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
   }
 
   function change(transform) {
+    if (suspendedForLargeCanvas || largeCanvas(draw.getTimeline())) throw new Error(LARGE_CANVAS_MUSIC_NOTICE);
     if (typeof transform !== 'function') throw new TypeError('音楽の変更処理が必要です。');
     const timeline = draw.getTimeline();
     const current = resolveTimeline(timeline);
@@ -358,6 +436,6 @@ export async function mountDrawMusicModel({ draw, scope, rewardPolicy = null } =
     removePage,
     selectMusicLayer,
     refresh,
-    dispose() { disposed = true; unsubscribeDraw?.(); projectUnsubscribe?.(); draw.setMusicSettingsPlanner?.(null); clearTimelineValidator?.(); listeners.clear(); }
+    dispose() { disposed = true; unsubscribeDraw?.(); projectUnsubscribe?.(); draw.setMusicSettingsPlanner?.(null); clearTimelineValidator?.(); clearMemoryEstimator?.(); listeners.clear(); }
   };
 }

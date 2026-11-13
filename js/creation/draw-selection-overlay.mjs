@@ -1,4 +1,4 @@
-import { selectionAxes, selectionFrameCorners, selectionDefaultPivot, selectionWorldPoint, hitSelectionControls } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
+import { selectionAxes, selectionFrameCorners, selectionDefaultPivot, selectionWorldPoint, hitSelectionControls } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-shared-2';
 
 /** DOM-only controls: screen-sized marks are never drawn into a pixel surface. */
 export function mountDrawSelectionOverlay({ scope, board, canvas, getFrame }) {

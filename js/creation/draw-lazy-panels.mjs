@@ -2,11 +2,11 @@ import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-edito
 
 const defaultLoaders = Object.freeze({
   color: (attempt) => attempt === 0
-    ? import('./draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1')
-    : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261016-color-capability-1&attempt=${attempt}`),
+    ? import('./draw-color-adjustment-panel.mjs?rev=20261113-canvas1028-shared-2')
+    : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261113-canvas1028-shared-2&attempt=${attempt}`),
   text: (attempt) => attempt === 0
-    ? import('./draw-text-panel.mjs?rev=20261024-context-controls-1')
-    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261024-free-tools-1&attempt=${attempt}`)
+    ? import('./draw-text-panel.mjs?rev=20261113-canvas1028-shared-2')
+    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261113-canvas1028-shared-2&attempt=${attempt}`)
 });
 
 const importModule = (specifier) => import(specifier);

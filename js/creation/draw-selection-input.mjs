@@ -1,4 +1,5 @@
-import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261016-color-capability-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261113-canvas1028-shared-2';
 
 // Capture modifiers at down so changing keys during a drag cannot reinterpret it.
 export function selectionInputOperation(event) {
@@ -39,7 +40,7 @@ export function combineDrawLassoSelection(base, points, operation, width, height
 /** Rasterize a closed lasso at pixel centers. The returned mask includes
  * transparent cells and is clipped to the canvas, just like a rectangle. */
 export function lassoDrawSelection(points, width, height) {
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 512 || height > 512) {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > ANIMATION_MAX_DIMENSION || height > ANIMATION_MAX_DIMENSION) {
     throw new RangeError('選択マスクの寸法が不正です。');
   }
   if (!Array.isArray(points) || points.length < 3 || points.some(point => !Number.isFinite(point?.x) || !Number.isFinite(point?.y))) return null;

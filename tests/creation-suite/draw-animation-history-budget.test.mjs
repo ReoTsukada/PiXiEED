@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   addAnimationLayer, createAnimation, estimateRetainedAnimationBytes, setAnimationDrawRewardBonusColors, setAnimationFrameDuration, writeAnimationCel,
 } from '../../js/creation/animation-core.mjs';
-import { createRetainedAnimationBytesCounter } from '../../js/creation/animation-core-v20261016-color64.mjs';
+import { createRetainedAnimationBytesCounter } from '../../js/creation/animation-core.mjs';
 import { createDrawAnimationHistory } from '../../js/creation/draw-animation-history.mjs';
 
 const layerId = (animation) => animation.layers[0].id;

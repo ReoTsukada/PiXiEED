@@ -84,12 +84,18 @@ function validateEvents(source, { maxBytes, maxFrames }) {
 export function createDrawTimelapse({ maxBytes = DRAW_TIMELAPSE.maxStoredBytes, maxFrames = DRAW_TIMELAPSE.maxStoredFrames, keyframeInterval = DRAW_TIMELAPSE.keyframeInterval } = {}) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || !Number.isSafeInteger(maxFrames) || maxFrames < 2
       || !Number.isSafeInteger(keyframeInterval) || keyframeInterval < 1) throw new RangeError('Invalid Draw timelapse limits');
-  let events = []; let bytes = 0; let width = 0; let height = 0; let sinceKeyframe = 0;
+  let events = []; let bytes = 0; let width = 0; let height = 0; let sinceKeyframe = 0; let disabledReason = null;
 
   const replaceWithSnapshot = (document) => {
-    const frame = snapshot(document); events = [frame]; bytes = frame.bytes;
-    if (bytes > maxBytes) throw new RangeError('Draw timelapse snapshot exceeds its memory limit');
+    // Recording is auxiliary: a valid artwork must remain editable even when
+    // one full-resolution RGBA keyframe exceeds the recorder's fixed budget.
+    // Check before allocation, do not downsample the artwork or enlarge the cap.
     width = document.width; height = document.height; sinceKeyframe = 0;
+    if (document.pixels.length > Math.floor(maxBytes / 4)) {
+      events = []; bytes = 0; disabledReason = 'canvas-memory-limit'; return false;
+    }
+    const frame = snapshot(document); events = [frame]; bytes = frame.bytes;
+    disabledReason = null; return true;
   };
   const trim = () => {
     while ((bytes > maxBytes || events.length > maxFrames) && events.length > 1) {
@@ -101,7 +107,7 @@ export function createDrawTimelapse({ maxBytes = DRAW_TIMELAPSE.maxStoredBytes, 
   };
 
   return {
-    reset(document) { assertDocument(document); replaceWithSnapshot(document); },
+    reset(document) { assertDocument(document); return replaceWithSnapshot(document); },
     record(document, step = null) {
       assertDocument(document);
       if (!events.length || width !== document.width || height !== document.height) {
@@ -116,9 +122,11 @@ export function createDrawTimelapse({ maxBytes = DRAW_TIMELAPSE.maxStoredBytes, 
       if (bytes > maxBytes || events.length > maxFrames) replaceWithSnapshot(document);
     },
     restore(source) {
+      if (Array.isArray(source) && source.length === 0) { events = []; bytes = 0; sinceKeyframe = 0; return; }
       const restored = validateEvents(source, { maxBytes, maxFrames });
-      events = restored.events; bytes = restored.bytes; width = restored.width; height = restored.height; sinceKeyframe = restored.sinceKeyframe;
+      events = restored.events; bytes = restored.bytes; width = restored.width; height = restored.height; sinceKeyframe = restored.sinceKeyframe; disabledReason = null;
     },
+    get disabledReason() { return disabledReason; },
     get frameCount() { return events.length; },
     get storedBytes() { return bytes; },
     snapshot() { return events.slice(); }

@@ -3,7 +3,7 @@ import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-sh
 import { getCellById } from './geometry.mjs?v=20260921-grid11-1';
 import { projectLegacyShowcase } from './legacy-showcase.mjs';
 import { createLegacyPlacementApi } from '../creation/legacy-placement.mjs?rev=20261001-free-tools-1';
-import { isSafeJigsawPixfindOriginalUrl } from '../creation/jigsaw-core.mjs?rev=20261001-free-tools-1';
+import { isSafeJigsawPixfindOriginalUrl } from '../creation/jigsaw-core.mjs?rev=20261113-canvas1028-shared-2';
 
 const SESSION_KEY = 'PiXiEED:supabase-session:v1';
 const DELETION_KEY = 'PiXiEED:post-deletions:v1';

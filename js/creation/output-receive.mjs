@@ -61,7 +61,7 @@ function renderFile(record, doc, win) {
 export async function mountSharedOutput(request, doc = document, win = window) {
   const record = request.key === 'id' ? await readToolOutput(request.id) : await readOutputFile(request.id);
   if (request.key === 'id' && (request.advanced || needsDetailedOutput(record))) {
-    const { outputPageReady } = await import('./output-page.mjs?rev=20261111-output-offerwall-1');
+    const { outputPageReady } = await import('./output-page.mjs?rev=20261113-canvas1028-shared-2');
     await outputPageReady;
     return 'detailed';
   }

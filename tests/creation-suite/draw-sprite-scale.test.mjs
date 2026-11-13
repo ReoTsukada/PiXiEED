@@ -44,10 +44,10 @@ test('scale percentages round dimensions, enforce a one-pixel minimum, and repor
   assert.deepEqual([quarter.width, quarter.height, quarter.allowed], [1, 1, true]);
   const half = planSpriteScale(source, 50);
   assert.deepEqual([half.width, half.height], [2, 3]);
-  const tooLarge = planSpriteScale(createAnimation({ width: 256, height: 32 }), 200);
+  const tooLarge = planSpriteScale(createAnimation({ width: 1028, height: 32 }), 200);
   assert.equal(tooLarge.allowed, false);
-  assert.deepEqual([tooLarge.width, tooLarge.height, tooLarge.reasonCode], [512, 64, 'SPRITE_SCALE_DIMENSION_LIMIT']);
-  assert.throws(() => scaleSpriteAnimation(createAnimation({ width: 256, height: 32 }), 200), { code: 'SPRITE_SCALE_DIMENSION_LIMIT' });
+  assert.deepEqual([tooLarge.width, tooLarge.height, tooLarge.reasonCode], [2056, 64, 'SPRITE_SCALE_DIMENSION_LIMIT']);
+  assert.throws(() => scaleSpriteAnimation(createAnimation({ width: 1028, height: 32 }), 200), { code: 'SPRITE_SCALE_DIMENSION_LIMIT' });
   assert.equal(planSpriteScale(source, 0).reasonCode, 'SPRITE_SCALE_PERCENT_INVALID');
   assert.equal(planSpriteScale(source, Infinity).allowed, false);
 });

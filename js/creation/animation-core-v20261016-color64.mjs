@@ -15,7 +15,19 @@ export const ANIMATION_PIXEL_ENCODING = 'palette-index8';
 export const ANIMATION_PALETTE_ENCODING = 'rgba8';
 export const ANIMATION_COMPOSITING = 'source-over-srgb8-v1';
 export const ANIMATION_TILE_SIZE = 32;
-export const ANIMATION_MAX_DIMENSION = 256;
+export const ANIMATION_MAX_DIMENSION = 1028;
+// Large canvases are deliberately limited by the whole timeline, not the edge alone.
+// This is a deterministic allocation guard, not a browser/GPU heap measurement.
+export const ANIMATION_LARGE_CANVAS_PIXEL_BUDGET = 4 * 1024 * 1024;
+export const ANIMATION_LARGE_OPERATION_MEMORY_BUDGET = 64 * 1024 * 1024;
+export function validateLargeAnimationBudget(meta) {
+  if (meta.width <= 256 && meta.height <= 256) return;
+  const logicalPixels = meta.width * meta.height * meta.frames.length * meta.layers.length;
+  if (!Number.isSafeInteger(logicalPixels) || logicalPixels > ANIMATION_LARGE_CANVAS_PIXEL_BUDGET) {
+    const error = new RangeError('257〜1028pxの作品は、幅×高さ×全コマ×全レイヤーが4,194,304画素以内で利用できます。元の作品は変更していません。');
+    error.code = 'ANIMATION_LARGE_CANVAS_BUDGET'; throw error;
+  }
+}
 export const ANIMATION_MAX_LAYERS = 8;
 export const ANIMATION_MAX_LAYERS_WITH_MUSIC = ANIMATION_MAX_LAYERS + 1;
 export const ANIMATION_MAX_FRAMES = 128;
@@ -51,12 +63,13 @@ function schemaMetadata(meta) {
     paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING };
   return { ...meta, schemaVersion, pixelEncoding: ANIMATION_PIXEL_ENCODING, paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING };
 }
-function dimensions(width, height) { if (![width, height].every((value) => Number.isInteger(value) && value >= 1 && value <= ANIMATION_MAX_DIMENSION)) throw new RangeError('キャンバスは1〜256pxで指定してください。'); }
+function dimensions(width, height) { if (![width, height].every((value) => Number.isInteger(value) && value >= 1 && value <= ANIMATION_MAX_DIMENSION)) throw new RangeError('キャンバスは1〜1028pxで指定してください。'); }
 function assertPalette(palette) { if (!Array.isArray(palette) || palette.length < 1 || palette.length > ANIMATION_MAX_PALETTE_ENTRIES || palette.some((color) => !colorValid(color))) throw new TypeError(`パレットはRGBA色${ANIMATION_MAX_PALETTE_ENTRIES}色以内で指定してください。`); }
 function copyMetadata(value) { return structuredClone(value); }
 function freezeMetadata(value) { if (Object.isFrozen(value)) return value; for (const item of Object.values(value)) if (item && typeof item === 'object') freezeMetadata(item); return Object.freeze(value); }
 
 function makeAnimation(meta, celMaps, pool, { share = false, trusted = true } = {}) {
+  validateLargeAnimationBudget(meta);
   const state = { ...schemaMetadata(meta), width: meta.width, height: meta.height,
     palette: [...meta.palette], frames: meta.frames.map((frame) => ({ ...frame })), layers: meta.layers.map((layer) => ({ ...layer })) };
   const rewardColors = drawRewardBonusColorsByAnimation.get(meta) ?? (Array.isArray(meta.drawRewardBonusColors) ? meta.drawRewardBonusColors : null);
@@ -408,7 +421,21 @@ export function resizeAnimation(animation, width, height, options = {}) {
   const { resample, anchor = 'top-left' } = options;
   const offset = canvasResizeOffset(animation.width, animation.height, width, height, anchor);
   if (resample !== undefined && resample !== 'nearest') throw new TypeError('再標本化方式は nearest から選んでください。');
-  const resized = { ...animation, width, height }; const cels = new Map(); const pool = new Map(); const hashIndex = new Map();
+  const resized = { ...animation, width, height };
+  validateLargeAnimationBudget(resized);
+  if (Math.max(width, height, animation.width, animation.height) > 256) {
+    const targetPixels = width * height * animation.frames.length * animation.layers.length;
+    // Existing undo allowance + two target pools + map/reference overhead + source
+    // number-array rendering and target composition, all live at once in worst case.
+    const estimatedPeakBytes = estimateRetainedAnimationBytes([animation]) + 4 * 1024 * 1024
+      + targetPixels * 3 + animation.width * animation.height * 9 + width * height * 15
+      + 2 * ANIMATION_METADATA_BUDGET;
+    if (estimatedPeakBytes > ANIMATION_LARGE_OPERATION_MEMORY_BUDGET) {
+      const error = new RangeError('サイズ変更の一時メモリ見積もりが64MiBを超えます。元の作品は変更していません。');
+      error.code = 'ANIMATION_LARGE_OPERATION_MEMORY'; throw error;
+    }
+  }
+  const cels = new Map(); const pool = new Map(); const hashIndex = new Map();
   for (const frame of animation.frames) for (const layer of animation.layers) {
     if (layer.role === 'music' && frame.id !== animation.frames[0].id) continue;
     const doc = getAnimationCelDocument(animation, frame.id, layer.id); const pixels = new Uint8Array(width * height);

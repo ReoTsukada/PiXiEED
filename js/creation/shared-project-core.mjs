@@ -1,4 +1,4 @@
-import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized, ANIMATION_MAX_PALETTE_ENTRIES } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 
 const normalized = color => color.length === 7 ? `${color.toLowerCase()}ff` : color.toLowerCase();
 const rgb = color => [1, 3, 5, 7].map(at => parseInt(color.slice(at, at + 2), 16));
@@ -11,7 +11,12 @@ function nearest(color, palette) {
 export function planSharedProjectSettings(animation, settings = {}) {
   validateAnimation(animation);
   const width = settings.width ?? animation.width, height = settings.height ?? animation.height;
-  if (![width, height].every(value => Number.isInteger(value) && value >= 1 && value <= 256)) throw new RangeError('幅と高さは1〜256pxの整数で指定してください。');
+  if (![width, height].every(value => Number.isInteger(value) && value >= 1 && value <= ANIMATION_MAX_DIMENSION)) throw new RangeError(`幅と高さは1〜${ANIMATION_MAX_DIMENSION}pxの整数で指定してください。`);
+  if (Math.max(width, height, animation.width, animation.height) > 256
+    && estimateRetainedAnimationBytes([animation]) > 4 * 1024 * 1024) {
+    const error = new RangeError('大きいキャンバスの変更はUndo保持容量を超えます。元の作品は変更していません。');
+    error.code = 'SHARED_SETTINGS_HISTORY_LIMIT'; throw error;
+  }
   const requestedPalette = settings.palette || animation.palette;
   const preservePalette = settings.palette == null || (Array.isArray(settings.palette)
     && settings.palette.length === animation.palette.length
@@ -39,6 +44,11 @@ export function planSharedProjectSettings(animation, settings = {}) {
       return { ...tile, bytes: Uint8Array.from(tile.bytes || pooled.get(tile.tileId), value => value ? mapping[value - 1] + 1 : 0) };
     });
     next = createAnimationFromSerialized({ ...next, palette }, tiles);
+  }
+  if (Math.max(width, height, animation.width, animation.height) > 256
+    && estimateRetainedAnimationBytes([animation, next]) > 4 * 1024 * 1024) {
+    const error = new RangeError('大きいキャンバスの変更はUndo保持容量を超えます。元の作品は変更していません。');
+    error.code = 'SHARED_SETTINGS_HISTORY_LIMIT'; throw error;
   }
   const remappedColors = preservePalette ? 0 : animation.palette.filter((color, index) => !normalized(color).endsWith('00') && normalized(color) !== normalized(palette[mapping[index]])).length;
   const musicImpact = `全${animation.frames.length}コマ・${animation.layers.filter(layer=>layer.role!=='music').length}描画レイヤーに適用。${width !== animation.width ? '幅が変わるため列の時刻とコマ長に影響します（通常は1列120tick、旧作品は保存されたコマ時間を維持）。' : '列の時間は維持。'}${height !== animation.height ? '高さが変わるため行の音程対応を再計算します。' : '行の音程対応は維持。'}${remappedColors ? '減色・色統合では音の対応が変わるため、新色の割当を音楽設定で確認してください。' : '同じ色の音割当は並び順によらず維持。'}透明画素・コマ・レイヤー構成は保持し、1回のUndoで戻せます。`;

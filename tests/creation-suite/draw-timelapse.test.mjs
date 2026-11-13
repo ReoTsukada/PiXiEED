@@ -46,3 +46,17 @@ test('history stays within byte and event limits while edits continue', () => {
   }
   assert.ok(selectDrawTimelapseFrames(recorder.snapshot()).length > 0);
 });
+
+
+test('1028 recording pauses before allocation without blocking artwork reset or edits', () => {
+ const recorder=createDrawTimelapse();const large=document(1028,1028);large.pixels[large.pixels.length-1]=1;
+ assert.equal(recorder.reset(large),false);assert.equal(recorder.disabledReason,'canvas-memory-limit');
+ for(let i=0;i<3;i++)recorder.record(large,{indices:[1027,1028*1028-1],paletteChanged:true});
+ assert.equal(recorder.storedBytes,0);assert.deepEqual(recorder.snapshot(),[]);assert.equal(large.pixels.at(-1),1);
+ recorder.restore([]);assert.deepEqual(selectDrawTimelapseFrames(recorder.snapshot()),[]);
+ const small=document(256,256);assert.equal(recorder.reset(small),true);assert.equal(recorder.disabledReason,null);small.pixels[0]=0;recorder.record(small,{indices:[0]});assert.equal(recorder.frameCount,2);
+});
+test('recorder budget boundary is exact and existing 512 recording remains full resolution',()=>{
+ const recorder=createDrawTimelapse();const medium=document(512,512);assert.equal(recorder.reset(medium),true);medium.pixels[1023]=0;recorder.record(medium,{indices:[1023]});assert.equal(recorder.snapshot()[0].width,512);assert.equal(recorder.snapshot()[1].indices[0],1023);
+ const bounded=createDrawTimelapse({maxBytes:64});assert.equal(bounded.reset(document(4,4)),true);assert.equal(bounded.reset(document(5,4)),false);assert.equal(bounded.storedBytes,0);assert.equal(bounded.reset(document(4,4)),true);
+});

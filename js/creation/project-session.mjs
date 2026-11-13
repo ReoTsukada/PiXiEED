@@ -1,5 +1,5 @@
 import { canonicalPxdJson, createPxdProject } from './pxd-codec.mjs';
-import { sanitizeProjectTitle } from './project-catalog.mjs?rev=20261016-color-capability-1';
+import { sanitizeProjectTitle } from './project-catalog.mjs?rev=20261113-canvas1028-shared-2';
 
 function copyProject(project) {
   return {

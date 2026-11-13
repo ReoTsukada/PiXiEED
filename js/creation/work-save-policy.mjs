@@ -57,7 +57,7 @@ function saveForbidden() {
 
 async function defaultVerifier(source) {
   try {
-    const { verifyPublicWorkOwnership } = await import('../globe/post-supabase.mjs?rev=20261111-output-offerwall-1');
+    const { verifyPublicWorkOwnership } = await import('../globe/post-supabase.mjs?rev=20261113-canvas1028-shared-2');
     return await verifyPublicWorkOwnership(source);
   } catch { return false; }
 }

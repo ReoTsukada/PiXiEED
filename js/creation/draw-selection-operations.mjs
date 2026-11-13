@@ -1,5 +1,6 @@
-import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
-import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261006-selection-fix-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-shared-2';
 
 export const selectionColor = color => {
   if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) throw new TypeError('選択の色が不正です。');
@@ -29,7 +30,7 @@ export function selectDrawColorMask(doc, point) {
 }
 export const DRAW_SELECTION_FORMAT = 'PiXiEED_DRAW_SELECTION';
 const fail = message => { throw new RangeError(message); };
-const dimension = n => Number.isInteger(n) && n >= 1 && n <= 256;
+const dimension = n => Number.isInteger(n) && n >= 1 && n <= ANIMATION_MAX_DIMENSION;
 
 /** Tab-local clipboard: zero is a hole; positive bytes address its own palette. */
 export function captureDrawSelection(doc, bounds, { mask = null } = {}) {
@@ -101,7 +102,7 @@ export function clearDrawSelection(doc, clip, sourceBounds) {
 /** Sample the immutable original; quarter turns and flips are exact index permutations. */
 export function sampleDrawSelection(clip, { width, height, turns = 0, flipX = false, flipY = false }) {
   validateClipboard(clip);
-  if (!dimension(width) || !dimension(height) || !Number.isInteger(turns)) fail('選択の幅・高さは1〜256pxです。');
+  if (!dimension(width) || !dimension(height) || !Number.isInteger(turns)) fail(`選択の幅・高さは1〜${ANIMATION_MAX_DIMENSION}pxです。`);
   turns = ((turns % 4) + 4) % 4;
   const ow = turns % 2 ? clip.height : clip.width, oh = turns % 2 ? clip.width : clip.height;
   const result = new Uint8Array(width * height);
@@ -193,12 +194,12 @@ export function drawSelectionHandle(point, bounds, radiusX, radiusY) {
 
 export function resizeDrawSelectionFromHandle(bounds, handle, dx, dy, fixedRatio = true, aspectRatio = bounds.width / bounds.height) {
   const west = handle.includes('w'), north = handle.includes('n');
-  let width = Math.max(1, Math.min(256, bounds.width + (west ? -dx : dx)));
-  let height = Math.max(1, Math.min(256, bounds.height + (north ? -dy : dy)));
+  let width = Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, bounds.width + (west ? -dx : dx)));
+  let height = Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, bounds.height + (north ? -dy : dy)));
   if (fixedRatio) {
     if (Math.abs(width / bounds.width - 1) >= Math.abs(height / bounds.height - 1)) height = Math.round(width / aspectRatio);
     else width = Math.round(height * aspectRatio);
-    const factor = Math.min(1, 256 / Math.max(width, height));
+    const factor = Math.min(1, ANIMATION_MAX_DIMENSION / Math.max(width, height));
     width = Math.max(1, Math.round(width * factor)); height = Math.max(1, Math.round(height * factor));
   }
   return { ...bounds, x: west ? bounds.x + bounds.width - width : bounds.x, y: north ? bounds.y + bounds.height - height : bounds.y, width, height };

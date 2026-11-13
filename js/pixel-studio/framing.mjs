@@ -1,3 +1,4 @@
+import { ANIMATION_MAX_DIMENSION } from '../creation/animation-core.mjs?rev=20261113-canvas1028-shared-2';
 export const FRAME_RATIOS = Object.freeze([
   Object.freeze({ value: 'screen', label: '画面', ratio: null }),
   Object.freeze({ value: '1:1', label: '1:1', ratio: 1 }),
@@ -7,12 +8,12 @@ export const FRAME_RATIOS = Object.freeze([
   Object.freeze({ value: '16:9', label: '16:9', ratio: 16 / 9 })
 ]);
 
-export const OUTPUT_SIZES = Object.freeze([16, 32, 64, 96, 128, 160, 256, 512]);
+export const OUTPUT_SIZES = Object.freeze([16, 32, 64, 96, 128, 160, 256, 512, 1028]);
 export const DEFAULT_FRAME_RATIO = '1:1';
 
 /** New camera captures use the same long-edge allowance as the shared canvas. */
 export function sharedOutputSizes(passActive = false) {
-  const maxDimension = 256;
+  const maxDimension = ANIMATION_MAX_DIMENSION;
   return OUTPUT_SIZES.filter((size) => size <= maxDimension);
 }
 

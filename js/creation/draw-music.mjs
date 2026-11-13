@@ -1,17 +1,17 @@
 import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
-import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261016-tool-shell-1';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261016-color-capability-1';
-import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261016-color-capability-1';
-import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261016-color-capability-1';
-import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
-import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261016-color-capability-1';
-import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
+import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261113-canvas1028-shared-2';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261113-canvas1028-shared-2';
+import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261113-canvas1028-shared-2';
+import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261113-canvas1028-shared-2';
+import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-shared-2';
 import { setPxdJson } from './pxd-codec.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { saveFile } from '../pixel-export.mjs?rev=20261111-output-offerwall-1';
-import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261016-color-capability-1';
+import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261113-canvas1028-shared-2';
 import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 
 const preparedLegacyProjects = new WeakSet();
@@ -232,14 +232,16 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     } catch(error){say(error.message);}
   }
   for(const action of ['add','copy','before','after','delete']) scope.listen(settings.querySelector(`#draw-music-page-${action}`),'click',()=>void pageAction(action));
+  const artTimeline = () => draw.getArtTimeline?.() || draw.getTimeline();
+  const artOutputFrame = (id, options) => draw.getArtOutputFrame ? draw.getArtOutputFrame(id, options) : draw.getOutputFrame(id, options);
   let renderedPreview = null;
   function renderOutputPreview() {
-    const preview=settings.querySelector('#draw-music-output-preview'),timeline=draw.getTimeline();
+    const preview=settings.querySelector('#draw-music-output-preview'),timeline=artTimeline();
     if (!timeline || !draw.getOutputFrame) return;
     const preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
     const frameId = timeline.frames[0].id;
     if (renderedPreview?.timeline !== timeline || renderedPreview.frameId !== frameId || renderedPreview.includeMusic !== Boolean(preferences.includeMusic)) {
-      const doc=draw.getOutputFrame(frameId, { includeMusic: preferences.includeMusic }),context=preview.getContext('2d');
+      const doc=artOutputFrame(frameId, { includeMusic: preferences.includeMusic }),context=preview.getContext('2d');
       if (preview.width !== doc.width) preview.width=doc.width;
       if (preview.height !== doc.height) preview.height=doc.height;
       context.putImageData(new ImageData(new Uint8ClampedArray((doc.rgba || documentRgba({...doc,pixels:Array.from(doc.pixels)}))),doc.width,doc.height),0,0);
@@ -281,9 +283,9 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   async function output(kind) {
     if (exporting || !isActive()) return;
     draw.suspend(); player.stop(); state = projected();
-    const source = state, timeline = draw.getTimeline(), token = epoch, preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
+    const source = state, timeline = artTimeline(), token = epoch, preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
     const includeMusic = Boolean(preferences.includeMusic), includeAudio = Boolean(preferences.includeAudio), loops = preferences.loops;
-    const unchanged = () => isActive() && !scope.disposed && token === epoch && state === source && draw.getTimeline() === timeline
+    const unchanged = () => isActive() && !scope.disposed && token === epoch && state === source && artTimeline() === timeline
       && JSON.stringify(draw.getOutputPreferences?.() || preferences) === JSON.stringify(preferences);
     exporting = true; refresh();
     try {
@@ -293,7 +295,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
       if (kind === 'wav') { const { renderAudioWav } = await import('./audio-export.mjs?rev=20261024-free-tools-1'); if (!unchanged()) return; result = await renderAudioWav(source.song, { loops }); filename = `pixieed-dot-music-${Math.round(result.seconds)}s.wav`; }
       else {
         const { renderAudioVideo } = await import('./audio-video.mjs?rev=20261016-color-capability-1'); if (!unchanged()) return; videoController = new AbortController();
-        const frames = timeline.frames.map(frame => { const doc = draw.getOutputFrame(frame.id, { includeMusic }); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray((doc.rgba || documentRgba({ ...doc, pixels: Array.from(doc.pixels) }))) }; });
+        const frames = timeline.frames.map(frame => { const doc = artOutputFrame(frame.id, { includeMusic }); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray((doc.rgba || documentRgba({ ...doc, pixels: Array.from(doc.pixels) }))) }; });
         result = await renderAudioVideo(source.song, frames[0], { totalPlays: loops, frameImages: frames, frameDurationsMs: timeline.frames.map(frame=>frame.durationMs), includeAudio, signal: videoController.signal });
         filename = `pixieed-dot-music-${Math.round(result.seconds)}s.${result.extension}`;
       }

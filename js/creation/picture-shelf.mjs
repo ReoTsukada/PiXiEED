@@ -6,7 +6,7 @@
  */
 
 import { createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
+import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
 
 export const PICTURE_TOOLS = Object.freeze({
   draw: Object.freeze({ label: 'PiXiEEDraw', key: 'pixieed.simple-draw.last-draft.v1' }),

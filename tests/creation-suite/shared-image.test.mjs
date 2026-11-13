@@ -16,14 +16,15 @@ function image(width, height, colorCount = 1) {
 
 test('32 free / 64 reward canvases retain originals and distinguish entitlement from support', () => {
   assert.deepEqual(evaluateSharedCanvasPolicy({ width: 128, height: 128, colorCount: 16 }), {
-    supported: true, premiumContent: false, locked: false, reason: null, maxDimension: 256, maxColors: 32
+    supported: true, premiumContent: false, locked: false, reason: null, maxDimension: 1028, maxColors: 32
   });
   const premium = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 });
   assert.equal(premium.supported, true); assert.equal(premium.premiumContent, false); assert.equal(premium.locked, false); assert.equal(premium.reason, null);
   const unlocked = evaluateSharedCanvasPolicy({ width: 144, height: 256, colorCount: 32 }, { passActive: true, allowConversion: true });
   assert.equal(unlocked.supported, true); assert.equal(unlocked.locked, false); assert.equal(unlocked.maxColors, 64);
   const legacy = evaluateSharedCanvasPolicy({ width: 512, height: 512, colorCount: 128 }, { passActive: true, allowConversion: true });
-  assert.equal(legacy.supported, false); assert.equal(legacy.premiumContent, false); assert.equal(legacy.locked, false); assert.equal(legacy.reason, 'canvas-over-256px');
+  assert.equal(legacy.supported, false); assert.equal(legacy.premiumContent, false); assert.equal(legacy.locked, false); assert.equal(legacy.reason, 'colors-over-64');
+  assert.equal(evaluateSharedCanvasPolicy({ width: 1029, height: 128, colorCount: 1 }).reason, 'canvas-over-1028px');
   assert.equal(evaluateSharedCanvasPolicy({ width: 128, height: 128, colorCount: 65 }, { passActive: true }).supported, false);
 });
 
@@ -44,7 +45,8 @@ test('photo preparation preserves aspect ratio, quantizes only the requested cop
   const exactCanvas = prepareSharedCanvasImage(image(32, 20, 8), { passActive: true, width: 48, height: 40, allowConversion: true });
   assert.equal(exactCanvas.image.width, 48); assert.equal(exactCanvas.image.height, 40);
   assert.equal(prepareSharedCanvasImage(image(32, 20, 8), { width: 48, height: 40, allowConversion: true }).image.width, 48);
-  assert.throws(() => prepareSharedCanvasImage(source, { width: 257, height: 128 }), /各辺256pxまで/);
+  assert.throws(() => prepareSharedCanvasImage(source, { width: 1029, height: 128 }), /各辺1028pxまで/);
+  assert.equal(prepareSharedCanvasImage(image(512, 512, 8)).image.width, 512);
   const rectangle = { width: 2, height: 1, rgba: new Uint8Array([220, 20, 30, 255, 20, 40, 220, 255]) };
   const contained = prepareSharedCanvasImage(rectangle, { passActive: true, width: 4, height: 4, fit: 'contain', allowConversion: true }).image;
   assert.equal(contained.width, 4); assert.equal(contained.height, 4);

@@ -4,16 +4,17 @@ import { FRAME_RATIOS, OUTPUT_SIZES, normalizeOutputSize, resolveAspect, centerC
 
 test('frame choices and aspect fallback use the preview viewport', () => {
   assert.deepEqual(FRAME_RATIOS.map(({ value }) => value), ['screen', '1:1', '3:4', '9:16', '4:3', '16:9']);
-  assert.deepEqual(OUTPUT_SIZES, [16, 32, 64, 96, 128, 160, 256, 512]);
+  assert.deepEqual(OUTPUT_SIZES, [16, 32, 64, 96, 128, 160, 256, 512, 1028]);
   assert.equal(resolveAspect('screen', 1200, 800), 1.5);
   assert.equal(resolveAspect('unknown', 1200, 800), 1.5);
   assert.equal(resolveAspect('9:16', 1200, 800), 9 / 16);
 });
 
-test('camera size restoration maps removed presets onto the supported 256px ceiling', () => {
+test('camera size restoration maps removed presets onto the supported 1028px ceiling', () => {
   assert.equal(normalizeOutputSize(128), 128);
   assert.equal(normalizeOutputSize(256), 256);
-  for (const oldSize of [512, 1024, 2048]) assert.equal(normalizeOutputSize(oldSize), 256);
+  assert.equal(normalizeOutputSize(512),512);
+  for (const oldSize of [1024, 2048]) assert.equal(normalizeOutputSize(oldSize), 1028);
   assert.equal(normalizeOutputSize(undefined), 128);
   assert.equal(normalizeOutputSize(200, 128), 160, 'unsupported in-range values choose the nearest available size');
 });

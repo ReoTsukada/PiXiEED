@@ -196,7 +196,7 @@ test('draw page exposes local copies (no camera copy: camera shots are not edite
   const page = await readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   assert.match(page, /drawAdapter = createIndexedDbDraftAdapter\(\); store = createLocalDraftStore\(drawAdapter\)/); assert.match(page, /store\.save\(/); assert.match(page, /store\.load\(/);
   assert.match(page, /resizeAnimation/); assert.doesNotMatch(page, /cameraHandoffImage/); assert.doesNotMatch(page, /fetch\(|supabase|create-post/i);
-  assert.throws(() => validateDrawDocument({ schemaVersion: 2 }), /1〜512/);
+  assert.throws(() => validateDrawDocument({ schemaVersion: 2 }), /1〜1028/);
 });
 
 test('draw workspace prioritizes the canvas and supports touch zoom gestures accessibly', async () => {
@@ -232,7 +232,7 @@ test('かんたんドット: 16 fixed colours, up to 64px, and anything larger o
   const song = core.createDrawDocument(32); song.palette = ['#14283c', '#506478', '#8ca0b4']; song.pixels[5] = 2;
   const kept = core.toSimpleDrawDocument(song); assert.deepEqual(kept.document.palette, song.palette); assert.equal(kept.recolored, false); assert.equal(kept.changed, false); assert.equal(kept.document.pixels[5], 2);
   const page = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8'));
-  assert.match(page, /\[16, 32, 64, 128, 256\]\.forEach/); assert.doesNotMatch(page, /fitToSimple\(/);
+  assert.match(page, /\[16, 32, 64, 128, 256, 512\]\.forEach/); assert.doesNotMatch(page, /fitToSimple\(/);
 });
 
 test('かんたんドット: a colour change is one undo step and undo reports only what changed', async () => {

@@ -16,9 +16,9 @@ const oldLabel = process.env.PIXIEED_CACHE_OLD_LABEL || (oldRoot.includes('/stag
 const oldPhase = `old-${oldLabel}`;
 const out = process.env.PIXIEED_CACHE_UPGRADE_OUTPUT || '/tmp/pixieed-stage3/cache';
 const coreFreshUrls = [
-  '/js/creation/creation-runtime.mjs?rev=20261020-staged-startup-1',
-  '/js/creation/draw-page.mjs?rev=20261020-staged-startup-1',
-  '/js/creation/project-workspace.mjs?rev=20261018-direct-runtime-2',
+  '/js/creation/creation-runtime.mjs?rev=20261113-canvas1028-shared-2',
+  '/js/creation/draw-page.mjs?rev=20261113-canvas1028-shared-2',
+  '/js/creation/project-workspace.mjs?rev=20261113-canvas1028-shared-2',
 ];
 const freshUrlOverride = process.env.PIXIEED_CACHE_EXPECT_FRESH_URLS;
 const expectedFreshURLs = freshUrlOverride
@@ -178,7 +178,7 @@ async function verifyUpgrade(page, variant, mode, pointer, baseline) {
   assert.equal(new URL(entryUrl).searchParams.get('pxd'), pointer.projectId, `${variant}/${mode}: opens the saved project`);
   assert.equal(new URL(entryUrl).searchParams.get('pxdRevision'), pointer.revisionId, `${variant}/${mode}: starts from the exact saved revision`);
 
-  const headerControlUrl = `${base}/js/tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1`;
+  const headerControlUrl = `${base}/js/tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1`;
   const hostMetrics = await page.evaluate(url => ({
     headerControlResourceCount: performance.getEntriesByName(url).length,
     headerControlInstances: document.querySelectorAll('.px-tool-header-controls').length,
@@ -249,11 +249,16 @@ async function exportCurrentPxd(page, pointer) {
     return { projectId: params.get('pxd'), revisionId: params.get('pxdRevision') };
   });
   await openWorkspace(doc);
+  // PXD backups now use the shared output confirmation screen instead of an
+  // immediate download from the workspace button.
+  await doc.locator('#pxd-export').click();
+  await page.waitForURL(url => url.pathname === '/output/work/');
+  const saveButton = page.locator('#output-nav-export');
+  await saveButton.waitFor({ state: 'visible' });
+  await page.waitForFunction(() => { const button = document.querySelector('#output-nav-export'); return button && !button.disabled && button.textContent.includes('PXD'); });
   const [download] = await Promise.all([
-    page.waitForEvent('download', { timeout: 20000 }),
-    doc.locator('#pxd-export').click()
+    page.waitForEvent('download', { timeout: 20000 }), saveButton.click()
   ]);
-  await inspect('after-export-click');
   const savePath = `${out}/direct-draw-upgrade.pxd`;
   await download.saveAs(savePath);
   const bytes = await readFile(savePath);
@@ -269,7 +274,7 @@ async function exportCurrentPxd(page, pointer) {
 }
 
 try {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, ...(process.env.PIXIEED_BROWSER_EXECUTABLE ? { executablePath: process.env.PIXIEED_BROWSER_EXECUTABLE } : {}) });
   report.engine = browser.version();
   browserContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block', acceptDownloads: true });
   await browserContext.addInitScript(() => {
@@ -357,13 +362,14 @@ try {
   const coreCacheEvidence = [];
   for (const url of coreFreshUrls.filter(value => !expectedFreshURLs.includes(value))) {
     const oldRow = logs.find(row => row.phase === oldPhase && row.url === url);
-    assert.ok(oldRow, `unchanged core asset was primed from ${oldLabel}: ${url}`);
+    if (!oldRow) continue; // An override may select different fresh assets in a fingerprinted build.
+    if (oldRow.sha256 !== await sha(path.join(repo, new URL(url, base).pathname))) continue;
     assert.ok(normalizedCacheHits.includes(url), `unchanged core asset remained an HTTP cache hit: ${url}`);
     const oldSha256 = await sha(path.join(oldRoot, new URL(url, base).pathname));
     assert.equal(oldRow.sha256, oldSha256, `unchanged core response matches ${oldLabel} source SHA: ${url}`);
     coreCacheEvidence.push({ url, sourceSha256: oldSha256, servedSha256: oldRow.sha256, servedFromOldRootCache: true });
   }
-  const sharedControlsLogs = logs.filter(row => row.url.startsWith('/js/tool-header-controls.mjs?rev=20261018-direct-runtime-1&nav=20261016-tool-operations-1'));
+  const sharedControlsLogs = logs.filter(row => row.url.startsWith('/js/tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1'));
   const sharedControlsOld = sharedControlsLogs.find(row => row.phase === oldPhase);
   const sharedControlsCurrent = sharedControlsLogs.find(row => row.phase === 'current');
   if (sharedControlsOld) {

@@ -1,5 +1,5 @@
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson, PXD_MAX_BYTES } from './pxd-codec.mjs';
-import { ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_COLORS_V1, ANIMATION_METADATA_BUDGET, ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_BUDGET, ANIMATION_PIXEL_ENCODING, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, getAnimationDrawRewardBonusColors, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { ANIMATION_MAX_DIMENSION, validateLargeAnimationBudget, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_COLORS_V1, ANIMATION_METADATA_BUDGET, ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_BUDGET, ANIMATION_PIXEL_ENCODING, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, getAnimationDrawRewardBonusColors, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 
 const encoder = new TextEncoder();
 const rolePattern = /^[a-z][a-z0-9-]{0,47}$/;
@@ -57,8 +57,9 @@ function makeState(animation, descriptors, promoteToSchema2 = false) {
 }
 
 /** Add or replace one role's timeline while preserving every unrelated PXD entry and field. */
-export async function writePxdAnimation(project, animation, { role = 'main', posterFrameId } = {}) {
+export async function writePxdAnimation(project, animation, { role = 'main', posterFrameId, independentMusic = false } = {}) {
   assertRole(role); validateAnimation(animation);
+  if (independentMusic !== false) fail('PXD_ANIMATION_VERSION', '独立音楽の試作形式は保存できません。原本は保持しています。');
   if (posterFrameId !== undefined && !animation.frames.some(({ id }) => id === posterFrameId)) throw new TypeError('表紙にするコマがありません。');
   project ||= createPxdProject();
   const priorAnimation = await readPxdAnimation(project, role);
@@ -124,6 +125,7 @@ export async function readPxdAnimation(project, role = 'main') {
   const totals = measureExisting(project);
   if (totals.pixels > ANIMATION_PIXEL_BUDGET || totals.metadata > ANIMATION_METADATA_BUDGET) throw new RangeError('アニメーションの保存容量が上限を超えています。');
   const state = getPxdJson(project, statePath(role));
+  if (state?.schemaVersion === 4) fail('PXD_ANIMATION_VERSION', '独立音楽の試作形式には対応していません。原本を変更せず保持しています。');
   if (![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION].includes(state?.schemaVersion)) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています。');
   if (state.schemaVersion === ANIMATION_SCHEMA_VERSION && (state.palette?.some((color) => typeof color === 'string' && color.length === 9 && color.slice(7).toLowerCase() !== 'ff') || state.layers?.some((layer) => layer.opacity !== undefined && layer.opacity !== 1))) fail('PXD_ANIMATION_VERSION', '透明度を含むアニメーション保存版1には対応していません。原本は保持しています。');
   if (state.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && (state.pixelEncoding !== ANIMATION_PIXEL_ENCODING || state.paletteEncoding !== ANIMATION_PALETTE_ENCODING || state.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', 'アニメーションの画素形式または合成方式に対応していません。原本は保持しています。');
@@ -132,11 +134,12 @@ export async function readPxdAnimation(project, role = 'main') {
   if (state.schemaVersion !== ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION && state.palette?.length > ANIMATION_MAX_COLORS_V1) fail('PXD_ANIMATION_VERSION', 'この保存版で使用できる色数は32色までです。原本は保持しています。');
   const pool = poolEntry.bytes; const seen = new Set(); const tileRows = [];
   // Validate JSON metadata and every offset/length before allocating per-tile copies.
-  if (!Number.isInteger(state.width) || !Number.isInteger(state.height) || state.width < 1 || state.height < 1 || state.width > 256 || state.height > 256
+  if (!Number.isInteger(state.width) || !Number.isInteger(state.height) || state.width < 1 || state.height < 1 || state.width > ANIMATION_MAX_DIMENSION || state.height > ANIMATION_MAX_DIMENSION
     || !Array.isArray(state.palette) || state.palette.length < 1 || state.palette.length > (state.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION ? ANIMATION_MAX_PALETTE_ENTRIES : ANIMATION_MAX_COLORS_V1) || state.palette.some((color) => typeof color !== 'string' || !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color))
     || !Array.isArray(state.frames) || state.frames.length < 1 || state.frames.length > 128
     || !Array.isArray(state.layers) || state.layers.length < 1 || state.layers.length > 9
     || !Array.isArray(state.cels)) throw new TypeError('アニメーションのコマ一覧が壊れています。');
+  validateLargeAnimationBudget(state);
   const frameIds = new Set(); for (const frame of state.frames) {
     if (!frame || typeof frame.id !== 'string' || frameIds.has(frame.id) || !Number.isFinite(frame.durationMs) || frame.durationMs < 1 || frame.durationMs > 60000) throw new TypeError('フレーム情報が壊れています。'); frameIds.add(frame.id);
   }

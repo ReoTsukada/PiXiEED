@@ -1,5 +1,5 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
+import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
 
 /** Run the regular PiXiEEDraw editor in a private, in-memory spot-edit session. */
 export async function mountGameDrawRuntime({ mountDrawMode } = {}) {

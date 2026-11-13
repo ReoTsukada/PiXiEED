@@ -33,7 +33,7 @@ const localReviewSources = new Set(['camera-media-test.html', 'css/camera-media-
 
 /** Known retired samples and local comparison media stay on disk, outside Pages. */
 export function isLocalReviewSource(name) {
-  return localReviewSources.has(name) || name.startsWith('assets/pixel-studio/test-media/')
+  return /^js\/creation\/independent-music-(?:session|model)\.mjs$/.test(name) || name.startsWith('js/creation/experimental/') || localReviewSources.has(name) || name.startsWith('assets/pixel-studio/test-media/')
     || isSampleWork({ image: `/${name}` });
 }
 

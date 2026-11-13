@@ -1,7 +1,7 @@
 import { encodeDrawPng } from './draw-handoff.mjs';
 import { validateAsset } from './asset-contract.mjs';
-import { resolveLocalDrawRevision as resolveSpotRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
-import { resolveLocalDrawRevision as resolveHiddenRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs';
+import { resolveLocalDrawRevision as resolveSpotRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20261113-canvas1028-shared-2';
+import { resolveLocalDrawRevision as resolveHiddenRevision, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20261113-canvas1028-shared-2';
 import { inspectPixelImage } from '../globe/post-image.mjs';
 
 const LOCAL_OWNER = 'local-owner';
@@ -43,7 +43,7 @@ async function imageClaim(document, encodeImage, inspectImage, width, height) {
 
 export async function preparePuzzleUpload({ mode, draftId, store, adapter, encodeImage = encodeDrawPng, inspectImage = inspectPixelImage } = {}) {
   if (mode === 'jigsaw') {
-    const { prepareJigsawUpload } = await import('./jigsaw-publication.mjs?rev=20261021-jigsaw-public-1');
+    const { prepareJigsawUpload } = await import('./jigsaw-publication.mjs?rev=20261113-canvas1028-shared-2');
     return prepareJigsawUpload({mode,draftId,store,adapter,encodeImage,inspectImage});
   }
   if (mode !== 'spot_difference' && mode !== 'hidden_object') throw new TypeError('未対応のパズル形式です');

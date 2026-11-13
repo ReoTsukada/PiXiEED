@@ -12,7 +12,7 @@ import { lookupCell, projectGeoCopiesToScreen, mercatorY, inverseMercatorY } fro
 import { formatCoordinates, googleMapsUrl, parseLocationInput } from './geo-input.mjs?v=20260921-post-1';
 import { fitPixelImage, inspectPixelImage, PIXEL_LIMITS } from './post-image.mjs?v=20261004-post-size-256-1';
 import { createDemoAuth, createPostStore } from './post-store.mjs?v=20260921-post-1';
-import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?v=20260928-puzzle-handoff-1';
+import { PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?rev=20261113-canvas1028-shared-2&v=20260928-puzzle-handoff-1';
 
 const TITLE_MAX = 60;
 const CAPTION_MAX = 140;

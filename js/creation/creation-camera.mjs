@@ -1,6 +1,7 @@
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261112-creation-guidance-1';
-import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement } from './camera-placement-preview.mjs?rev=20261016-color-capability-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261113-canvas1028-shared-2';
+import { createCameraPlacementMapping, createCameraPlacementRenderer, drawCameraPlacementBoundary, sampleCameraFrameToPlacement, cameraPlacementOverlaySize, planCameraPlacementMemory } from './camera-placement-preview.mjs?rev=20261113-canvas1028-shared-2';
 
 // Scope the original camera styles rather than maintaining a second, reduced camera UI.
 function scopedRules(rules) {
@@ -60,7 +61,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   };
   const markupLoad = settle(readAsset('/pixel-camera.html', '撮影の操作を読み込めません。'));
   const stylesheetLoad = settle(readAsset('/css/pixel-lens-camera.css?rev=20261006-camera-upload-1', '撮影の表示を読み込めません。'));
-  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261112-creation-guidance-1'));
+  const appLoad = settle(import('../pixel-lens/app.mjs?rev=20261113-canvas1028-shared-2'));
   const markup = await prepared(markupLoad);
   const template = new DOMParser().parseFromString(markup, 'text/html');
   const surface = template.querySelector('#pixelStudio'), controls = surface?.querySelector('.lc-bottom'), shutter = template.querySelector('#capture');
@@ -102,7 +103,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   // Scope their visibility to camera so retained Draw/Audio tools stay intact.
   style.textContent = `${scoped}\n${cameraActionIcons}\nbody.creation-suite[data-creation-mode="camera"] :is(.draw-feature-actions, #main > .draw-size) { display:none !important; }`;
   style.media = 'all';
-  document.head.insertBefore(style, document.querySelector('link[href*="/css/creation-modes.css?rev=20261108-gallery-canvas-viewport-1"]'));
+  document.head.insertBefore(style, document.querySelector('link[href*="/css/creation-modes.css?rev=20261113-canvas1028-shared-2"]'));
   board.closest('#main').append(surface, template.querySelector('#cameraImageStatus'), template.querySelector('#cameraSaveDialog'));
   // Portal the original camera controls into the actual shared operation dock.
   // Retain .lc and mirror state attributes for its existing contextual selectors.
@@ -185,8 +186,15 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
     if (scope?.disposed) return;
     try {
       placementErrorMessage = '';
-      const snapshot = draw.cameraPlacementTarget();
-      if (snapshot.supported === false || snapshot.width > 256 || snapshot.height > 256) {
+      const owner=draw.getTimeline();
+      const memoryContext=instance?.getCameraFrameMemoryContext?.()||draw.getCameraMemoryContext?.();
+      if(!memoryContext)throw new Error('作品の使用メモリを確認できません。');
+      const budget=planCameraPlacementMemory({width:owner.width,height:owner.height,...memoryContext});
+      if(!budget.allowed)throw new RangeError('配置プレビューの作業メモリ上限を超えます。作品は保持しています。');
+      // Do not retain two full placement generations while rebuilding.
+      placementSnapshot=placementMapping=placementRenderer=null;
+      const snapshot = draw.cameraPlacementTarget(memoryContext);
+      if (snapshot.supported === false || snapshot.width > ANIMATION_MAX_DIMENSION || snapshot.height > ANIMATION_MAX_DIMENSION) {
         placementSnapshot = snapshot; placementMapping = placementRenderer = null;
         placementOverlay.width = placementOverlay.height = 1; placementOverlay.hidden = true;
         mirrorResultBoundary();
@@ -195,11 +203,12 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
         return;
       }
       const mapping = createCameraPlacementMapping({ sourceWidth:sourceWidth || snapshot.width, sourceHeight:sourceHeight || snapshot.height, width:snapshot.width, height:snapshot.height,
-        bounds:snapshot.bounds, cells:snapshot.cells, mask:snapshot.mask });
+        bounds:snapshot.bounds, cells:snapshot.cells, mask:snapshot.mask,memoryContext:snapshot.memoryContext });
       const renderer = createCameraPlacementRenderer(snapshot, mapping);
       placementSnapshot = snapshot; placementMapping = mapping; placementRenderer = renderer;
-      if (placementOverlay.width !== snapshot.width * 4 || placementOverlay.height !== snapshot.height * 4) {
-        placementOverlay.width = snapshot.width * 4; placementOverlay.height = snapshot.height * 4;
+      const overlaySize=mapping.mask?cameraPlacementOverlaySize(snapshot.width,snapshot.height):{width:1,height:1};
+      if (placementOverlay.width !== overlaySize.width || placementOverlay.height !== overlaySize.height) {
+        placementOverlay.width = overlaySize.width; placementOverlay.height = overlaySize.height;
       }
       drawCameraPlacementBoundary(placementOverlay.getContext('2d'), mapping);
       placementOverlay.hidden = !mapping.mask;
@@ -344,7 +353,7 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
   const updateTarget = async () => {
     const epoch = ++targetEpoch;
     try {
-      const snapshot = await draw.cameraTarget();
+      const snapshot = await draw.cameraTarget(instance?.getCameraFrameMemoryContext?.());
       if (epoch !== targetEpoch || scope?.disposed) return;
       clearApplyRecovery();
       applyButton.disabled = false;
@@ -381,16 +390,20 @@ export async function mountCreationCamera({ scope, board, dock, nav, draw, getAu
       let applied = false;
       try {
       // Resolve the active frame, layer, selection, and palette at apply time for every entry path.
-      const snapshot = await draw.cameraTarget();
+      // Retire live placement buffers before allocating the final apply snapshot.
+      clearPlacement('撮影画像を作品に適用しています。');
+      const snapshot = await draw.cameraTarget(instance?.getCameraFrameMemoryContext?.());
       const target = snapshot.target, size = target.bounds;
       const currentImage = draw.getImage();
       if (image.width !== currentImage.width || image.height !== currentImage.height) {
         throw new Error('描画設定が変わりました。カメラを撮り直してください。');
       }
       const mapping = createCameraPlacementMapping({ sourceWidth:image.width, sourceHeight:image.height, width:target.width, height:target.height,
-        bounds:size, cells:target.cells, mask:target.mask });
+        bounds:size, cells:target.cells, mask:target.mask, includeBoundary:false,memoryContext:target.memoryContext });
       const selected = sampleCameraFrameToPlacement(image, mapping);
-      await draw.applyCameraRgba(snapshot, selected, { paletteFixed: image.paletteFixed === true });
+      if(!isActive()||attemptEpoch!==captureEpoch)throw new Error('撮影状態が変わりました。画像は適用されていません。');
+      const outcome=await draw.applyCameraRgba(snapshot, selected, { paletteFixed: image.paletteFixed === true });
+      if(outcome?.applied===false)throw new Error('撮影画像を適用できませんでした。作品は変更していません。');
       applied = true;
       // Shared palette updates may retire the camera preview during the commit.
       // Keep the successful artwork application visible without attributing it

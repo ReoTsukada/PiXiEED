@@ -1,7 +1,8 @@
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { boundedPixelLine } from './draw-pointer-geometry.mjs';
 
-export const DRAW_SIZES = Object.freeze([16, 32, 64, 128, 256, 512]);
+export const DRAW_SIZES = Object.freeze([16, 32, 64, 128, 256, 512, ANIMATION_MAX_DIMENSION]);
 export const DRAW_SIZE = 16;
 // かんたんドット絵 draws with 16 fixed colours + transparent. The first seven keep their old slots so earlier
 // saves map onto the same colours; the other nine fill the gaps (grey, brown, skin, pink, orange, yellow, lime, sky, navy).
@@ -16,12 +17,12 @@ export const MAX_DRAW_COLORS = 128;
 export const DEFAULT_HISTORY_BYTES = 4 * 1024 * 1024;
 
 export function createDrawDocument(size = DRAW_SIZE) {
-  if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512px から選んでください');
+  if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512/1028px から選んでください');
   return { schemaVersion: DRAW_SCHEMA_VERSION, width: size, height: size, palette: [...DRAW_PALETTE], pixels: Array(size * size).fill(-1) };
 }
 
 export function validateDrawDocument(document) {
-  if (!document || document.schemaVersion !== DRAW_SCHEMA_VERSION || ![document.width, document.height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512)) throw new TypeError('1〜512px の編集データではありません');
+  if (!document || document.schemaVersion !== DRAW_SCHEMA_VERSION || ![document.width, document.height].every((side) => Number.isInteger(side) && side >= 1 && side <= ANIMATION_MAX_DIMENSION)) throw new TypeError('1〜1028px の編集データではありません');
   if (!Array.isArray(document.palette) || document.palette.length < 1 || document.palette.length > MAX_DRAW_COLORS || document.palette.some((color) => typeof color !== 'string' || !/^#[a-f\d]{6}(?:[a-f\d]{2})?$/i.test(color))) throw new TypeError('色パレットが壊れています');
   if (!Array.isArray(document.pixels) || document.pixels.length !== document.width * document.height || document.pixels.some((pixel) => !Number.isInteger(pixel) || pixel < -1 || pixel >= document.palette.length)) throw new TypeError('画素データが壊れています');
   return document;
@@ -29,13 +30,13 @@ export function validateDrawDocument(document) {
 
 export function resizeDrawDocument(document, size) {
   validateDrawDocument(document);
-  if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512px から選んでください');
+  if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512/1028px から選んでください');
   return resizeDrawRectangle(document, size, size);
 }
 
 export function resizeDrawRectangle(document, width, height) {
   validateDrawDocument(document);
-  if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512)) throw new RangeError('キャンバスは1〜512pxで指定してください');
+  if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= ANIMATION_MAX_DIMENSION)) throw new RangeError('キャンバスは1〜1028pxで指定してください');
   const pixels = Array(width * height).fill(-1); const oldWidth = document.width; const oldHeight = document.height;
   for (let y = 0; y < height; y += 1) {
     const sourceY = Math.min(oldHeight - 1, Math.floor((y + 0.5) * oldHeight / height));

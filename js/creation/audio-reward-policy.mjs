@@ -1,8 +1,8 @@
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import { AUDIO_PIXEL_TICKS, collectAudioEvents, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { AUDIO_INSTRUMENTS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
-import { getAnimationCelDocument, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261016-color-capability-1';
-import { getAudioAnimationUsedColorIds } from './audio-animation.mjs?rev=20261016-color-capability-1';
+import { getAnimationCelDocument, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { getAudioAnimationUsedColorIds } from './audio-animation.mjs?rev=20261113-canvas1028-shared-2';
 
 export const AUDIO_BASIC_INSTRUMENT_IDS = Object.freeze(['square', 'triangle', 'sawtooth', 'noise']);
 const basicInstruments = new Set(AUDIO_BASIC_INSTRUMENT_IDS);

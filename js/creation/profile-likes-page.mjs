@@ -73,7 +73,7 @@ if (new URLSearchParams(location.search).get('view') === 'likes') {
     if (loading) return;
     host.textContent = 'いいねした作品を確認しています…';
     loading = (async () => {
-      const { listMyPublishedLikes, loadPublishedMapPostsByIds } = await import('../globe/post-supabase.mjs?rev=20261111-output-offerwall-1');
+      const { listMyPublishedLikes, loadPublishedMapPostsByIds } = await import('../globe/post-supabase.mjs?rev=20261113-canvas1028-shared-2');
       const ids = await listMyPublishedLikes();
       return ids.length ? loadPublishedMapPostsByIds(ids) : [];
     })();

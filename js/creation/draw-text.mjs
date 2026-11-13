@@ -1,4 +1,5 @@
-import { validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
 
 export const DRAW_TEXT_FONTS = Object.freeze([
   { id: 'sans', label: 'ゴシック', css: 'sans-serif' },
@@ -69,7 +70,7 @@ export function rasterizeTextMask({ text, font = 'sans-serif', fontSize = 8, x =
   if (typeof font !== 'string' || !/^[\w\s,"'-]{1,96}$/.test(font)) throw new TypeError('フォントの指定が不正です。');
   if (!['left', 'center', 'right'].includes(align)) throw new TypeError('文字の配置が不正です。');
   if (!Number.isFinite(fontSize) || fontSize < 1 || fontSize > 128 || !Number.isFinite(x) || !Number.isFinite(y)) throw new RangeError('文字の大きさと位置を確認してください。');
-  if (!Number.isInteger(width) || width < 1 || width > 512 || !Number.isInteger(height) || height < 1 || height > 512) throw new RangeError('キャンバスの寸法が不正です。');
+  if (!Number.isInteger(width) || width < 1 || width > ANIMATION_MAX_DIMENSION || !Number.isInteger(height) || height < 1 || height > ANIMATION_MAX_DIMENSION) throw new RangeError('キャンバスの寸法が不正です。');
   if (!documentRef?.createElement) throw new TypeError('Canvas APIを利用できません。');
   const canvas = documentRef.createElement('canvas'); canvas.width = width; canvas.height = height;
   const context = canvas.getContext('2d', { willReadFrequently: true });

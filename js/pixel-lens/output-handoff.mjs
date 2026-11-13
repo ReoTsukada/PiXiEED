@@ -1,3 +1,4 @@
+import { OUTPUT_SIZES } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-shared-2';
 const MAX_FRAME_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16_000_000;
 const MAX_GIF_FRAMES = 600;
@@ -88,7 +89,7 @@ function validCameraSettings(metadata = {}) {
   const allowedRatios = new Set(['screen', '1:1', '3:4', '9:16', '4:3', '16:9']);
   const settings = {};
   if (allowedRatios.has(metadata.cameraRatio)) settings.ratio = metadata.cameraRatio;
-  if (Number.isSafeInteger(metadata.cameraSize) && [16, 32, 64, 96, 128, 160, 256].includes(metadata.cameraSize)) settings.size = metadata.cameraSize;
+  if (Number.isSafeInteger(metadata.cameraSize) && OUTPUT_SIZES.includes(metadata.cameraSize)) settings.size = metadata.cameraSize;
   if (allowedDepths.has(metadata.cameraColors)) settings.colorDepth = metadata.cameraColors;
   if (metadata.cameraPaletteMode === 'gameboy' || metadata.cameraPaletteMode === 'source') settings.paletteMode = metadata.cameraPaletteMode;
   if (metadata.cameraGradientMode === 'dither' || metadata.cameraGradientMode === 'none') settings.gradientMode = metadata.cameraGradientMode;

@@ -32,11 +32,11 @@ test('mobile toolbar allows an intrinsic-width action group and keeps touch targ
 
 test('the output entry refreshes the complete changed module and CSS chain', () => {
   for (const [file, dependencies, revision] of [
-    ['output/work/index.html', ['conversion-entry.mjs'], '20261111-output-offerwall-1'],
+    ['output/work/index.html', ['conversion-entry.mjs'], '20261113-canvas1028-shared-2'],
     ['output/work/index.html', ['conversion-unified-input.css'], '20261110-output-layout-7'],
-    ['js/creation/conversion-entry.mjs', ['output-page.mjs'], '20261111-output-offerwall-1'],
-    ['js/creation/conversion-entry.mjs', ['output-receive.mjs'], '20261111-output-offerwall-1'],
-    ['js/creation/output-receive.mjs', ['output-page.mjs'], '20261111-output-offerwall-1'],
+    ['js/creation/conversion-entry.mjs', ['output-page.mjs'], '20261113-canvas1028-shared-2'],
+    ['js/creation/conversion-entry.mjs', ['output-receive.mjs'], '20261113-canvas1028-shared-2'],
+    ['js/creation/output-receive.mjs', ['output-page.mjs'], '20261113-canvas1028-shared-2'],
     ['js/creation/conversion-entry.mjs', ['conversion-smart-ui.mjs'], '20261111-output-offerwall-1'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-unified-input.mjs'], '20261110-output-layout-7'],
     ['js/creation/conversion-smart-ui.mjs', ['conversion-result-surface.mjs'], '20261110-output-layout-7'],

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { posix } from 'node:path';
 import * as bare from '../../js/creation/animation-core.mjs';
-import * as versioned from '../../js/creation/animation-core.mjs?rev=20261016-color-capability-1';
+import * as versioned from '../../js/creation/animation-core.mjs?rev=20261113-canvas1028-shared-2';
 import * as secondFacade from '../../js/creation/animation-core.mjs?identity-test=another-facade';
 
 const root = new URL('../../', import.meta.url);
