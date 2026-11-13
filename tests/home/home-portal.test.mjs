@@ -104,7 +104,8 @@ test('one connected playground keeps complete accessible controls, not separate 
   assert.match(home, /src="\/js\/home-play\.mjs\?rev=20261113-home-world-1"/);
   assert.doesNotMatch(home, /hpToys|data-toy=|home-gallery\.mjs|assets\/home\/community\.svg/);
   assert.equal((home.match(/class="trip"/g) || []).length, 3);
-  assert.equal((home.match(/class="tool"/g) || []).length, 4);
+  assert.equal((home.match(/class="tool-preview-card"/g) || []).length, 3);
+  assert.equal((home.match(/class="tool-feature"/g) || []).length, 1);
 });
 
 test('retired decorative markup and unreferenced drawing previews stay removed', () => {
@@ -123,7 +124,7 @@ test('whole-home experience keeps a plus entry and real saved thumbnails', () =>
   assert.doesNotMatch(home, /今日は、|なにする？|制作は毎回、作品一覧/);
   assert.match(home, /class="portal-new-project" href="#portal-create"/);
   assert.match(home, /class="portal-new-icon" aria-hidden="true">＋/);
-  assert.match(home, /class="tool-list" id="portal-create"/);
+  assert.match(home, /class="section tool-showcase" id="portal-create"/);
   assert.match(home, /id="portal-recent-list"/);
   assert.match(home, /id="portal-recent-status"[^>]+role="status"/);
   assert.match(home, /このブラウザーに保存した絵を表示/);
@@ -154,4 +155,44 @@ test('the home shelf defers its local preview reader until the shelf is visible'
 test("free drawing keeps vertical touch strokes inside the canvas", () => {
   assert.match(homeCss, /\.hp-stage canvas\{[^}]*touch-action:none/);
   assert.match(home, /ページのスクロールは、あそび場の外で/);
+});
+
+test('real-screen tool showcase replaces decorative tool illustrations without duplicate entries', () => {
+  const showcase = home.match(/<section class="section tool-showcase"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(showcase);
+  assert.ok(home.indexOf('class="portal-work-entry"') < home.indexOf('class="section tool-showcase"'));
+  assert.ok(home.indexOf('class="section tool-showcase"') < home.indexOf('class="trips"'));
+  assert.equal((home.match(/id="portal-create"/g) || []).length, 1);
+  assert.match(showcase, /<picture><source media="\(max-width:760px\)" srcset="\/assets\/home\/tool-screens\/draw-mobile\.png" width="780" height="1688">/);
+  const images = [...showcase.matchAll(/<img[^>]+src="([^"]+tool-screens[^"]+)"[^>]*>/g)].map(match => match[0]);
+  assert.equal(images.length, 4);
+  for (const img of images) {
+    assert.match(img, /width="2560" height="1600"/);
+    assert.match(img, /loading="lazy" decoding="async"/);
+    assert.match(img, /alt="[^"]+"/);
+  }
+  for (const name of ['camera','audio','convert']) {
+    assert.match(showcase, new RegExp(`href="/assets/home/tool-screens/${name}-desktop.png" aria-label="[^"]+実画面を大きく見る"`));
+    assert.match(showcase, new RegExp(`href="/tools/start/${name}/">この道具を開く`));
+  }
+  assert.equal((showcase.match(/作例を使った実際の操作画面/g) || []).length, 4);
+  assert.doesNotMatch(home, /class="tool-list"|class="trip-art"|assets\/icons\/pixieed\/(?:camera|telescope)\.svg/);
+  assert.match(homeCss, /image-rendering:auto/);
+  assert.doesNotMatch(showcase, /<iframe|<canvas|autoplay|target=/);
+});
+
+test('home-only smooth icons leave shared site icons unchanged and artwork errors remain readable', () => {
+  for (const name of ['camera','search']) {
+    const icon = readFileSync(new URL(`../../assets/home/icons/${name}.svg`, import.meta.url), 'utf8');
+    assert.match(icon, /stroke-width="1.8"/);
+    assert.doesNotMatch(icon, /crispEdges|pixelated|<script|<image/);
+    assert.ok(home.includes(`/assets/home/icons/${name}.svg`));
+  }
+  const fallback = home.match(/<div class="portal-artwork-fallback"[\s\S]*?<\/div>/)?.[0];
+  assert.ok(fallback);
+  assert.doesNotMatch(fallback, /<svg|<img|<canvas/);
+  assert.match(fallback, /作品一覧/);
+  assert.match(homeCss, /data-state="error"/);
+  assert.match(homeCss, /data-state="image-error"/);
+  assert.match(homeCss, /#portal-artwork-status\{position:static/);
 });
