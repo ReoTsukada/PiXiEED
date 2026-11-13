@@ -77,18 +77,24 @@ try {
     await page.locator('.doors .door').first().waitFor({ state: 'visible' });
     assert.equal(await page.locator('h1').count(), 1);
     assert.deepEqual(await page.locator('.door').evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))), ['/tools/start/draw/', '/explore/', '/play/']);
-    assert.equal(await page.locator('#portal-create .tool').count(), 4);
+    assert.equal(await page.locator('#portal-create .tool-feature').count(), 1);
+    assert.equal(await page.locator('#portal-create .tool-preview-card').count(), 3);
+    assert.equal(await page.locator('#portal-create .tool-open').count(), 4);
+    assert.equal(await page.locator('#portal-create .tool-screen-link').count(), 3);
+    assert.equal(await page.locator('.trip-art, .tool-list').count(), 0);
     assert.equal(await page.locator('.trips .trip').count(), 3);
     assert.equal(await page.locator('.endline a[href="/books/"]').count(), 1);
     assert.ok((await page.locator('.endline').innerText()).includes('価格・在庫・購入は販売先で'));
-    // Decode actual visible navigation icons; reviewed artwork loading is covered separately with consent-aware fixtures.
-    const homeImages = page.locator('.brand img, .door img, .tool img');
-    assert.equal(await homeImages.count(), 8);
+    // Decode real-screen previews and navigation icons; reviewed artwork is covered separately with consent-aware fixtures.
+    const homeImages = page.locator('.brand img, .door img, #portal-create img');
+    assert.equal(await homeImages.count(), 11);
     for (const image of await homeImages.all()) {
       await image.scrollIntoViewIfNeeded();
       await image.evaluate(element => element.decode());
     }
     assert.ok(await homeImages.evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0)));
+    assert.ok((await page.locator('.tool-feature-figure img').evaluate(image => image.currentSrc)).endsWith(width <= 760 ? 'draw-mobile.png' : 'draw-desktop.png'));
+    assert.ok(await page.locator('.tool-feature-figure img, .tool-screen-link > img').evaluateAll(images => images.every(image => getComputedStyle(image).imageRendering === 'auto')));
     await page.evaluate(() => scrollTo(0, 0));
     assert.equal(await page.locator('#socialApp').count(), 0);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
