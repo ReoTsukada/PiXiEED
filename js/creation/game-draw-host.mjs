@@ -1,4 +1,4 @@
-import { mountSpotInlineDraw } from './spot-inline-draw.mjs?rev=20261004-drawing-tools-4';
+import { mountSpotInlineDraw } from './spot-inline-draw.mjs?rev=20261113-canvas1028-1';
 
 /** Host the full PiXiEEDraw editor as one persistent same-origin iframe. */
 export function mountGameDraw(options = {}) {

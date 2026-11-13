@@ -126,9 +126,9 @@ test('tool guide image formats, size limits, and import steps match implementati
   assert.match(draw, /PNG・WebP/);
   assert.ok(draw.includes(megabytes(MAX_IMPORT_FILE_BYTES)));
   assert.ok(draw.includes(approximatePixels(MAX_IMPORT_SOURCE_PIXELS)));
-  assert.match(draw, /最大256×256px/);
+  assert.match(draw, /最大1028×1028px/);
   const drawSource = readFileSync(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
-  assert.match(drawSource, /value > 256/);
+  assert.match(drawSource, /value > ANIMATION_MAX_DIMENSION/);
 
   const camera = noteText('camera');
   assert.match(camera, /PNG・JPEG・WebP/);

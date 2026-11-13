@@ -1,9 +1,11 @@
+import { ANIMATION_MAX_DIMENSION } from '../creation/animation-core.mjs?rev=20261113-canvas1028-1';
+import { planCameraPlacementMemory } from '../creation/camera-placement-preview.mjs?rev=20261113-canvas1028-1';
 import { createFrameLoop } from '../pixel-studio/frame-loop.mjs';
 import { createToolStartTracker, trackSiteEvent } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { encodeCameraPng, pngExportGeometry } from '../pixel-studio/png-export.mjs?rev=20261024-free-tools-1';
-import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261001-free-tools-1';
+import { DEFAULT_FRAME_RATIO, FRAME_RATIOS, normalizeOutputSize, sharedFrameRatios, sharedOutputSizes, resolveAspect, centerCrop, frameGeometry, fitFrame } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-1';
 import { cameraStartErrorMessage, deriveCameraPrimaryAction } from '../pixel-studio/camera-ui-state.mjs';
-import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?rev=20261019-camera-original-color-1';
+import { CAMERA_SETTING_DEFAULTS, DITHER_PATTERNS, lensFrameFilter, lensMemoryPlan, lensPalette, lensPaletteEdited, processLensFrame, resetLensPalette, resetLensPaletteEdits, setLensPalette, setLensPaletteColor, setLensSettings } from './engine.mjs?rev=20261113-canvas1028-1';
 import { attachZoomGestures, createCameraZoomController, formatZoom, getUserMediaWithZoomPreference, zoomRange, zoomStops } from './zoom.mjs?v=20261004-camera-tap-focus-1';
 import { GIF_FPS } from './gif.mjs?rev=20261015-alpha-opacity-1';
 import { animatedCapturePlan, downsampleAnimatedFrame, encodeAnimatedGif } from '../animated-export.mjs?rev=20261015-alpha-opacity-1';
@@ -14,17 +16,17 @@ import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-j
 import { createAudioSong } from '../creation/audio-core.mjs?rev=20261016-color-capability-1';
 import { audioCameraCancelUrl, beginAudioCamera, completeAudioCamera, readAudioCameraRequest } from '../creation/audio-camera-handoff.mjs?rev=20261016-color-capability-1';
 import { createPxdProject } from '../creation/pxd-codec.mjs';
-import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261016-color-capability-1';
-import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261016-color-capability-1';
-import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261016-color-capability-1';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261112-creation-guidance-1';
+import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261113-canvas1028-1';
+import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261113-canvas1028-1';
+import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261113-canvas1028-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261113-canvas1028-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261111-output-offerwall-1';
-import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261008-pixel-lens-output-3';
+import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261113-canvas1028-1';
 import { pickMergeSource, rankMergeTargets } from './merge-selection.mjs?rev=20261004-merge-selection-1';
 import { createLiveRegionMergeTracker } from './live-region-merge.mjs?rev=20261004-merge-selection-1';
 import { createCameraFocusController, mapPreviewPointToCameraFocus } from './focus.mjs?v=20261003-camera-focus-1';
-import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?v=20261005-miniature-1';
+import { createMiniatureProcessor, miniatureWorkSize } from './miniature.mjs?rev=20261113-canvas1028-1&v=20261005-miniature-1';
 import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import { STATIC_IMAGE_FREE_LONG_EDGE } from '../creation/static-output-policy.mjs?rev=20261024-free-tools-1';
@@ -67,7 +69,7 @@ cameraRewardNotice.id = 'camera-reward-note';
 cameraRewardNotice.style.cssText = 'margin:0 auto 8px;max-width:48rem;padding:8px 12px;color:#465a5e;font-size:12px;line-height:1.45;text-align:center';
 const renderCameraRewardNotice = () => {
   const gif = resolveCameraGifLimits();
-  cameraRewardNotice.textContent = `読み込んだ画像と原本を保ったままPNG出力できます（整数倍・長辺${STATIC_IMAGE_FREE_LONG_EDGE}px・約1,678万画素まで）。色調整は64色まで。共通プロジェクトの上限は256px・64色です。GIFは最大${gif.maxMs / 1000}秒・${gif.fps}FPSで、ジオラマ効果も利用できます。カメラ利用時はブラウザーの許可が必要です。`;
+  cameraRewardNotice.textContent = `読み込んだ画像と原本を保ったままPNG出力できます（整数倍・長辺${STATIC_IMAGE_FREE_LONG_EDGE}px・約1,678万画素まで）。色調整は64色まで。共通プロジェクトの上限は${ANIMATION_MAX_DIMENSION}px・64色です。GIFは最大${gif.maxMs / 1000}秒・${gif.fps}FPSで、ジオラマ効果も利用できます。カメラ利用時はブラウザーの許可が必要です。`;
 };
 renderCameraRewardNotice();
 $('#cameraSettingsPanel')?.prepend(cameraRewardNotice);
@@ -357,7 +359,7 @@ function updatePrimaryAction() {
   if (state.mode === 'live') {
     const dimensions = captureDimensions();
     const policy = integratedShared
-      ? { supported: dimensions.width <= 256 && dimensions.height <= 256, reason: dimensions.width > 256 || dimensions.height > 256 ? 'canvas-over-256px' : '' }
+      ? { supported: dimensions.width <= ANIMATION_MAX_DIMENSION && dimensions.height <= ANIMATION_MAX_DIMENSION, reason: dimensions.width > ANIMATION_MAX_DIMENSION || dimensions.height > ANIMATION_MAX_DIMENSION ? `canvas-over-${ANIMATION_MAX_DIMENSION}px` : '' }
       : evaluateSharedCanvasPolicy({
         width: dimensions.width,
         height: dimensions.height,
@@ -366,11 +368,11 @@ function updatePrimaryAction() {
     if (!policy.supported) {
       button.disabled = true;
       const colorLimit = sharedImageColorLimit(sharedPassActive());
-      policyNotice = policy.reason === 'canvas-over-256px'
-        ? 'この作品の画像サイズが上限を超えています。作品を256px以下に変更してください。'
+      policyNotice = policy.reason === `canvas-over-${ANIMATION_MAX_DIMENSION}px`
+        ? `この作品の画像サイズが上限を超えています。作品を${ANIMATION_MAX_DIMENSION}px以下に変更してください。`
         : policy.reason === 'colors-over-64'
           ? `この作品の色数が上限を超えています。作品を${colorLimit}色以下に変更してください。`
-          : `この作品は撮影できないサイズです。作品を256px以下・${colorLimit}色以下に変更してください。`;
+          : `この作品は撮影できないサイズです。作品を${ANIMATION_MAX_DIMENSION}px以下・${colorLimit}色以下に変更してください。`;
       button.title = policyNotice;
       button.setAttribute('aria-label', policyNotice);
       button.removeAttribute('aria-description');
@@ -435,7 +437,7 @@ function updateSharedCaptureControls() {
   }
   const dimensions = captureDimensions();
   const preliminary = integratedShared
-    ? { supported: dimensions.width <= 256 && dimensions.height <= 256, locked: false }
+    ? { supported: dimensions.width <= ANIMATION_MAX_DIMENSION && dimensions.height <= ANIMATION_MAX_DIMENSION, locked: false }
     : evaluateSharedCanvasPolicy({ width: dimensions.width, height: dimensions.height, colorCount: sharedImageTarget ? sharedImageColorCount : (Number(state.colorDepth) || 16) }, { passActive });
   const lockedTarget = Boolean(sharedProjectBound && sharedImageTarget && (!preliminary.supported || preliminary.locked));
   root.dataset.sharedCanvasLocked = String(lockedTarget);
@@ -671,6 +673,7 @@ async function requestCameraFocusAt(clientX, clientY, { silent = false } = {}) {
 
 function beginRegionMerge(clientX, clientY) {
   if (state.mode !== 'live' || gif.recording || captureInFlight || !state.result?.sourceData) return false;
+  if(state.result.width*state.result.height>256*256){sayToast('大きいキャンバスではライブ色追跡は利用できません。撮影・作品への適用はそのまま使えます。');return false;}
   const point = mergePointFromClient(clientX, clientY);
   if (!point) return false;
   const previousSession = regionMergeSession;
@@ -1112,6 +1115,14 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(stage);
 
+function getCameraFrameMemoryContext() {
+  const dims=captureDimensions();
+  const shared=draw?.getCameraMemoryContext?.();
+  if(integratedShared&&!shared)throw new Error('作品の使用メモリを確認できません。カメラ処理を停止します。');
+  const engine=lensMemoryPlan(dims.width,dims.height);
+  return {...(shared||{layerCount:1,retainedArtBytes:0,retainedMusicBytes:audioCameraRequest?16*1024*1024:0}),engineScratchBytes:Math.max(engine.scratchBytes,engine.retainedBytes),miniatureBytes:state.miniature?8*1024*1024:0};
+}
+let lastLargeFrameAt=0;
 function cameraFrame() {
   const isImage = Boolean(importedSource);
   const input = isImage ? importedSource.source : video;
@@ -1124,6 +1135,10 @@ function cameraFrame() {
   } else if (!activeStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !inputWidth || !inputHeight) return null;
   if (!input || !inputWidth || !inputHeight) return null;
   const output = captureDimensions();
+  const budget=planCameraPlacementMemory({width:output.width,height:output.height,...getCameraFrameMemoryContext()});
+  if(!budget.allowed)throw new RangeError('カメラの作業メモリ上限を超えます。作品は変更していません。');
+  // Keep exact pixels, but bound high-resolution live work rather than queue frames.
+  if(output.width*output.height>256*256&&!isImage){const now=performance.now();if(now-lastLargeFrameAt<100)return null;lastLargeFrameAt=now;}
   const aspect = output.width / output.height;
   const full = centerCrop(inputWidth, inputHeight, aspect);
   const zoom = zoomController.snapshot();
@@ -1133,6 +1148,7 @@ function cameraFrame() {
   const crop = { sw: full.sw / digital, sh: full.sh / digital, sx: full.sx + (full.sw - full.sw / digital) / 2, sy: full.sy + (full.sh - full.sh / digital) / 2 };
   const { width, height } = output;
   let sampleSource = input, sampleCrop = crop, miniatureMs = 0, miniatureSourceWidth = 0, miniatureSourceHeight = 0;
+  if(!state.miniature){applyMiniature(null,false);miniatureSource.width=miniatureSource.height=miniatureCanvas.width=miniatureCanvas.height=1;}
   if (state.miniature) {
     const started = performance.now();
     const work = miniatureWorkSize(crop.sw, crop.sh);
@@ -3007,6 +3023,6 @@ if (audioCameraInvalid) {
     invalidateCaptureDownload();
     clearImportedSource();
   }
-  return { suspend, resume, getImage, repaintPreview, closeResult, startCameraFromWorkspaceEntry, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
+  return { suspend, resume, getImage, getCameraFrameMemoryContext, repaintPreview, closeResult, startCameraFromWorkspaceEntry, dispose, workspace: integratedShared ? draw?.workspace ?? cameraPxd : cameraPxd,
     syncProjectSettings(settings) { syncSharedProjectSettings(settings); } };
 }

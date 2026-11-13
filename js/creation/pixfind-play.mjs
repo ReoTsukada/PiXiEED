@@ -1,12 +1,12 @@
 import { detectPixelScale, wholePixelFit } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261004-puzzle-share-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
-import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
+import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-1';
 import { createPuzzleHintController } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
 import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
-import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs';
-import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20260928-short-hitboxes-1';
+import { resolveLocalDrawRevision, validateSpotDifferenceDraft } from './spot-difference-core.mjs?rev=20261113-canvas1028-1';
+import { buildHiddenObjectHitBoxes, HIDDEN_OBJECT_MIN_PLAY_IMAGE_CSS_WIDTH, validateHiddenObjectDraft } from './hidden-object-core.mjs?rev=20261113-canvas1028-1';
 import { computeDifferenceRegions, computeHiddenObjectRegions, regionContainsPoint, resolvePuzzleFromLocation, validateHiddenObjectMarkers, validateLocalDifferenceGroups, validateStoredDifferenceRegions } from './pixfind-regions.mjs';
 import { selectPixfindHit } from './pixfind-hit-test.mjs';
 import { clampPixfindViewport, mapPixfindPoint, pinchPixfindViewport, pixfindViewportGeometry, pixfindWheelZoomFactor, zoomPixfindViewport } from './pixfind-viewport.mjs';

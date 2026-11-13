@@ -1,8 +1,8 @@
 import {
-  ANIMATION_MAX_DIMENSION, ANIMATION_METADATA_BUDGET, ANIMATION_PIXEL_BUDGET, estimateRetainedAnimationBytes,
+  ANIMATION_MAX_DIMENSION, ANIMATION_LARGE_CANVAS_PIXEL_BUDGET, ANIMATION_METADATA_BUDGET, ANIMATION_PIXEL_BUDGET, estimateRetainedAnimationBytes,
   resizeAnimation, validateAnimation,
-} from './animation-core.mjs?rev=20261016-color-capability-1';
-import { DRAW_ANIMATION_HISTORY_MAX_BYTES } from './draw-animation-history.mjs?rev=20261016-color-capability-1';
+} from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { DRAW_ANIMATION_HISTORY_MAX_BYTES } from './draw-animation-history.mjs?rev=20261113-canvas1028-1';
 
 export const DRAW_SPRITE_SCALE_MEMORY_MAX_BYTES = 64 * 1024 * 1024;
 const TILE_BYTES = 32 * 32;
@@ -39,9 +39,10 @@ export function planSpriteScale(animation, percent) {
   if (width > ANIMATION_MAX_DIMENSION || height > ANIMATION_MAX_DIMENSION) {
     return status(animation, percent, width, height, true, false, `変更後の寸法 ${width}×${height}px は上限の${ANIMATION_MAX_DIMENSION}pxを超えます。`, 'SPRITE_SCALE_DIMENSION_LIMIT', details);
   }
-  if (targetLogicalPixels > ANIMATION_PIXEL_BUDGET) {
+  const pixelBudget = Math.max(width, height) > 256 ? ANIMATION_LARGE_CANVAS_PIXEL_BUDGET : ANIMATION_PIXEL_BUDGET;
+  if (targetLogicalPixels > pixelBudget) {
     return status(animation, percent, width, height, true, false,
-      `全${animation.frames.length}コマ・${animation.layers.length}レイヤーの画素数 ${targetLogicalPixels.toLocaleString('ja-JP')} は上限 ${ANIMATION_PIXEL_BUDGET.toLocaleString('ja-JP')} を超えます。`,
+      `全${animation.frames.length}コマ・${animation.layers.length}レイヤーの画素数 ${targetLogicalPixels.toLocaleString('ja-JP')} は上限 ${pixelBudget.toLocaleString('ja-JP')} を超えます。`,
       'SPRITE_SCALE_PIXEL_BUDGET', details);
   }
   if (retainedSourceBytes > DRAW_ANIMATION_HISTORY_MAX_BYTES) {
@@ -81,7 +82,9 @@ export function scaleSpriteAnimation(animation, percent) {
   }
   if (!plan.changed) return animation;
   const scaled = resizeAnimation(animation, plan.width, plan.height, { resample: 'nearest' });
-  const targetRetainedBytes = estimateRetainedAnimationBytes([scaled]);
+  // Keep the previous snapshot as well: accepting each snapshot separately can
+  // silently evict the only Undo revision on large non-sharing transformations.
+  const targetRetainedBytes = estimateRetainedAnimationBytes([animation, scaled]);
   if (targetRetainedBytes > DRAW_ANIMATION_HISTORY_MAX_BYTES) {
     const reason = `倍率変更後のデータ ${targetRetainedBytes.toLocaleString('ja-JP')} bytes はUndo履歴上限 ${DRAW_ANIMATION_HISTORY_MAX_BYTES.toLocaleString('ja-JP')} bytesを超えます。元データと履歴は変更していません。`;
     const error = new RangeError(reason);

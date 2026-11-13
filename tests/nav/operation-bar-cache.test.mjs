@@ -52,7 +52,7 @@ test('operation bar revisions propagate through runtime parents and every public
  const affected=new Set(leaves);
  let growing=true;
  while(growing) {growing=false;for(const [path,refs] of edges)if(!affected.has(path)&&refs.some(ref=>affected.has(ref.target))){affected.add(path);growing=true;}}
- assert.equal(affected.size,19,'bounded runtime cache graph including camera-placement preview, editor lifecycle and shared direct runtime');
+ assert.equal(affected.size,22,'bounded runtime cache graph including camera-placement preview, editor lifecycle and shared direct runtime');
  const entries=await files('',path=>path.endsWith('.html')||/^scripts\/generate-.*\.mjs$/.test(path));
  let matchedEntries=0;
  for(const path of [...runtime,...entries])for(const value of references(await readFile(new URL(path,root),'utf8'))) {
@@ -65,7 +65,7 @@ test('operation bar revisions propagate through runtime parents and every public
 
 test('legacy animation implementation stays frozen while current facades share the reward-capable RGBA core',async()=>{
  const facade=await readFile(new URL('js/creation/animation-core.mjs',root),'utf8');
- assert.equal(facade.trim(),"export * from './animation-core-v20261016-color64.mjs';");
+ assert.equal(facade.trim(),"export * from './animation-core-v20261016-color64.mjs?rev=20261113-canvas1028-1';");
  const current = await import('../../js/creation/animation-core.mjs');
  const alpha = await import('../../js/creation/animation-core-v20261015-alpha.mjs');
  assert.equal(typeof current.createAnimation, 'function');

@@ -1,4 +1,5 @@
-const MAX_SIDE = 512;
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+const MAX_SIDE = ANIMATION_MAX_DIMENSION;
 const IDENTITY = [[1, 0], [0, 1]];
 const generators = {
   horizontal: [[-1, 0], [0, 1]],
@@ -68,7 +69,7 @@ function validateMatrix(matrix) {
 
 /** Apply a centered matrix once, rounding the final pixel coordinate without clipping. */
 export function symmetryPoint(point, width, height, matrix, origin = null) {
-  if (!dimensionsAreValid(width, height)) throw new RangeError('Canvas dimensions must be integers from 1 to 512');
+  if (!dimensionsAreValid(width, height)) throw new RangeError(`Canvas dimensions must be integers from 1 to ${ANIMATION_MAX_DIMENSION}`);
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError('Symmetry point must have finite coordinates');
   validateMatrix(matrix);
   if (origin !== null && (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y))) throw new TypeError('Symmetry origin must have finite coordinates');

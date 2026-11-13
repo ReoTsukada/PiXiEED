@@ -92,5 +92,5 @@ test('Draw routes guard transaction/history, camera, settings, and shared music 
   assert.match(source, /before\.width !== after\.width \|\| before\.height !== after\.height/);
   assert.match(source, /beforeLayers\.map\(layer => layer\.id\)/);
   assert.match(source, /beforeFrames\.map\(frame => frame\.id\)/);
-  assert.match(source, /imageIsReadOnly = image && \(image\.width > 256 \|\| image\.height > 256 \|\| countSharedImageColors/);
+  assert.match(source, /imageIsReadOnly = image && \(image\.width > ANIMATION_MAX_DIMENSION \|\| image\.height > ANIMATION_MAX_DIMENSION \|\| countSharedImageColors/);
 });

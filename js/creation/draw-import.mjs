@@ -1,4 +1,4 @@
-import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20261011-tool-size-1';
+import { createDrawDocument, DRAW_SIZES, MAX_DRAW_COLORS, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-1';
 import { downscalePixels, normalizePixelFile, readPixelImageDimensions, reductionScale } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 
 export const MAX_IMPORT_FILE_BYTES = 10 * 1024 * 1024;
@@ -154,7 +154,7 @@ export function createSpotDifferenceImagePair(beforeImage, afterImage, { maxDime
 
 export function createImportedDrawDocument(image, size = 128) {
   if (!image || !Number.isInteger(image.width) || !Number.isInteger(image.height) || image.width < 1 || image.height < 1 || image.width * image.height > MAX_IMPORT_SOURCE_PIXELS || !image.data || image.data.length !== image.width * image.height * 4) throw new TypeError('読み込んだ画像の大きさや画素データを確認できません。');
-  if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512px から選んでください');
+  if (!DRAW_SIZES.includes(size)) throw new RangeError('16/32/64/128/256/512/1028px から選んでください');
   const scale = Math.min(size / image.width, size / image.height);
   const width = Math.max(1, Math.min(size, Math.round(image.width * scale)));
   const height = Math.max(1, Math.min(size, Math.round(image.height * scale)));

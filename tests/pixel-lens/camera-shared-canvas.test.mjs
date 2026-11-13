@@ -7,10 +7,10 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), '
 
 test('new camera framing uses shared-canvas bounds and excludes viewport-dependent saved dimensions', () => {
   assert.equal(DEFAULT_FRAME_RATIO, '1:1');
-  assert.deepEqual(sharedOutputSizes(false), [16, 32, 64, 96, 128, 160, 256]);
-  assert.deepEqual(sharedOutputSizes(true), [16, 32, 64, 96, 128, 160, 256]);
-  assert.equal(sharedOutputSizes().includes(512), false);
-  assert.equal(normalizeOutputSize(512), 256);
+  assert.deepEqual(sharedOutputSizes(false), [16, 32, 64, 96, 128, 160, 256, 512, 1028]);
+  assert.deepEqual(sharedOutputSizes(true), [16, 32, 64, 96, 128, 160, 256, 512, 1028]);
+  assert.equal(sharedOutputSizes().includes(512), true);
+  assert.equal(normalizeOutputSize(512), 512);
   assert.equal(sharedFrameRatios().some(({ value }) => value === 'screen'), false);
 });
 

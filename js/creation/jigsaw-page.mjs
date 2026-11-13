@@ -1,23 +1,23 @@
 import { isFreshStartSearch } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1';
-import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20260928-picture-shelf-1';
+import { listOwnVersions, mountPictureShelf, pictureDraftId } from './picture-shelf.mjs?rev=20261113-canvas1028-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createIndexedDbDraftAdapter, createLocalDraftStore } from './local-drafts.mjs';
 import {
   chunkJigsawPuzzleIds, collectPagedRows, fingerprintBytes, firstPublishedPixfindReferences, isSafeJigsawPixfindOriginalUrl, resolveLocalDrawRevision, validateJigsawSource, JIGSAW_MAX_IMAGE_BYTES, JIGSAW_MAX_SOURCE_PIXELS
-} from './jigsaw-core.mjs?rev=20261001-free-tools-1';
-import { documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
+} from './jigsaw-core.mjs?rev=20261113-canvas1028-1';
+import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-1';
 import {
   createJigsawLayout, createJigsawWorkspace, migrateLegacyJigsawGame,
   moveJigsawGroup, rotateJigsawGroup, snapJigsawGroup, worldGroupBounds,
   pieceAtPoint, sliceJigsawPieces, isJigsawWorkspaceComplete, validateJigsawWorkspace
-} from './jigsaw-workspace.mjs?rev=20261001-free-tools-1';
+} from './jigsaw-workspace.mjs?rev=20261113-canvas1028-1';
 import { buildJigsawSelectionEdges } from './jigsaw-selection.mjs';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
-import { mountPxdTools } from './pxd-ui.mjs?rev=20261112-creation-guidance-1';
-import { putPxdSharedImage } from './pxd-project.mjs?rev=20261016-color-capability-1';
-import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261016-color-capability-1';
+import { mountPxdTools } from './pxd-ui.mjs?rev=20261113-canvas1028-1';
+import { putPxdSharedImage } from './pxd-project.mjs?rev=20261113-canvas1028-1';
+import { createPxdPuzzleFromMain, hasPxdPuzzle, readPxdPuzzle, materializePxdPuzzle, writePxdPuzzle } from './pxd-puzzles.mjs?rev=20261113-canvas1028-1';
 import { normalizeJigsawFile } from './jigsaw-file.mjs?rev=20260929-claude-integration-1';
 import { createPuzzleHintController, jigsawPuzzleHintKey } from './puzzle-hint.mjs?rev=20261016-color-capability-1';
 import { hasSiteReward, requireSiteReward, isSiteRewardPolicyEnabled, subscribeSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
@@ -25,7 +25,7 @@ import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-opera
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { createJigsawPreviewWindow } from './jigsaw-preview.mjs?rev=20261006-jigsaw-preview-1';
 import { createLevelTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
-import { preparePublicJigsaw } from './jigsaw-publication.mjs?rev=20261021-jigsaw-public-1';
+import { preparePublicJigsaw } from './jigsaw-publication.mjs?rev=20261113-canvas1028-1';
 
 const JIGSAW_LAST_DRAFT_KEY = 'pixieed:creation:jigsaw:last-draft:v1';
 const $ = (selector) => document.querySelector(selector);
@@ -862,7 +862,7 @@ async function prepareJigsawPost() {
   try {
     if (!await saveGame()) return;
     if (!game || game.gameId !== initialGameId || gameDraftId !== draftId || jigsawShareIdentity(game) !== initialIdentity) throw new Error('準備中に配置が変わりました。もう一度投稿するを選んでください');
-    const {openPuzzleHandoff} = await import('./puzzle-handoff.mjs?rev=20261021-jigsaw-public-1');
+    const {openPuzzleHandoff} = await import('./puzzle-handoff.mjs?rev=20261113-canvas1028-1');
     await openPuzzleHandoff({ mode: 'jigsaw', destination: 'feed', draftId, localDraftId: draftId, store: draftStore, adapter, isCurrent: () => !!game && game.gameId === initialGameId && gameDraftId === draftId && jigsawShareIdentity(game) === initialIdentity });
   } catch (error) { updateStatus(`投稿内容を準備できませんでした：${error.message}`); }
   finally { publishBusy = false; publishButton.disabled = false; }

@@ -48,7 +48,7 @@ class Element {
   }
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-function fixture({ delayPreview = () => 0, delayApply = 0, failPreview = false } = {}) {
+function fixture({ delayPreview = () => 0, delayApply = 0, failPreview = false, getMode = () => 'draw' } = {}) {
   const doc = { activeElement: null, listeners: new Map() };
   doc.body = new Element('body', doc); doc.createElement = tag => new Element(tag, doc);
   doc.querySelector = selector => doc.body.querySelectorAll(selector)[0] || null;
@@ -102,7 +102,7 @@ function fixture({ delayPreview = () => 0, delayApply = 0, failPreview = false }
       session.apply(scaleSpriteAnimation(session.animation, percent)); applies++; emit(); return true;
     }
   };
-  const settings = mountSharedProjectSettings({ draw, scope }); doc.body.append(settings.root);
+  const settings = mountSharedProjectSettings({ draw, scope, getMode }); doc.body.append(settings.root);
   const q = selector => doc.body.querySelectorAll(selector)[0];
   settings.open();
   return { settings, session, original, originalPool, doc, q, emit,
@@ -131,6 +131,24 @@ test('shared canvas live preview controller', async t => {
       assert.deepEqual(f.session.animation.layers, f.original.layers);
       f.session.undo(); assert.equal(f.session.animation, f.original);
       assert.deepEqual(serializeAnimationPool(f.session.animation), f.originalPool);
+    } finally { f.dispose(); }
+  });
+  await t.test('dimension controls are explicit and keep the draft preview when the panel is repositioned', async () => {
+    const f = fixture();
+    try {
+      assert.equal(f.q('.creation-project-settings__dimensions').querySelectorAll('.creation-project-settings__dimension-card').length, 2);
+      assert.equal(f.q('.creation-project-settings__shapes').querySelectorAll('[data-shape]').length, 8);
+      const minus = f.q('.creation-project-settings__dimensions').querySelectorAll('[data-dimension]').find(node => node.dataset.dimension === 'width' && node.dataset.delta === '-1');
+      await minus.fire('click'); await wait(175);
+      assert.equal(f.q('#creation-project-width').value, '15');
+      assert.equal(f.q('canvas').width, 15);
+      f.settings.position();
+      assert.equal(f.q('canvas').width, 15);
+      assert.equal(f.session.animation, f.original);
+      await f.q('[data-shape="3:2"]').fire('click'); await wait(175);
+      assert.equal(f.q('#creation-project-width').value, '24');
+      assert.equal(f.q('#creation-project-height').value, '16');
+      assert.equal(f.q('#creation-project-ratio').checked, true);
     } finally { f.dispose(); }
   });
   await t.test('cancel discards a pending preview and reopens unchanged', async () => {
@@ -206,4 +224,33 @@ test('shared canvas live preview controller', async t => {
       assert.equal(broken.session.animation, broken.original);
     } finally { broken.dispose(); }
   });
+  await t.test('Draw and camera accept 1028 draft; music retains its independent 256 limit', async () => {
+    for (const mode of ['draw', 'camera', 'audio']) {
+      const f = fixture({ getMode: () => mode });
+      try {
+        await f.input('creation-project-width', 1028); await wait(175);
+        assert.equal(f.q('[data-project-action=apply]').disabled, mode === 'audio');
+        if (mode === 'audio') assert.match(f.q('#creation-project-width-error').textContent, /256/);
+        else assert.equal(f.q('canvas').width, 1028);
+        assert.equal(f.session.animation, f.original, 'preview does not mutate any domain');
+      } finally { f.dispose(); }
+    }
+  });
+
+  await t.test('Music exposes only view area and a mode change invalidates the old preview', async()=>{
+    let mode='audio';const f=fixture({getMode:()=>mode});
+    try {
+      assert.equal(f.q('#creation-project-tab-scale').hidden,true);
+      assert.equal(f.q('#creation-project-tab-palette').hidden,true);
+      assert.equal(f.q('#creation-project-tab-area').textContent,'表示範囲');
+      assert.match(f.q('.creation-project-settings__help').textContent,/音程・開始時刻は変わりません/);
+      await f.q('#creation-project-tab-scale').fire('click');
+      assert.equal(f.q('#creation-project-panel-scale').hidden,true);
+      await f.input('creation-project-width',8);await wait(175);
+      assert.equal(f.q('[data-project-action=apply]').disabled,false);
+      mode='draw';await f.apply();assert.equal(f.applies,0);
+      f.emit();assert.equal(f.q('#creation-project-tab-scale').hidden,false);
+    } finally {f.dispose();}
+  });
+
 });

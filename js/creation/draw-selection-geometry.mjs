@@ -1,3 +1,4 @@
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
 const tidy = n => Math.round(n * 1e10) / 1e10;
 export const normalizeSelectionAngle = angle => tidy(((angle % 360) + 360) % 360);
 export function selectionAxes(angle = 0) {
@@ -49,12 +50,12 @@ export function rotateSelectionFrame(frame, angle) {
 export function resizeRotatedDrawSelection(frame, handle, dx, dy, fixedRatio = true, aspectRatio = frame.width / frame.height) {
   const { c, s } = selectionAxes(frame.angle), west = handle.includes('w'), north = handle.includes('n');
   const ux = c * dx + s * dy, uy = -s * dx + c * dy;
-  let width = Math.max(1, Math.min(256, frame.width + (west ? -ux : ux)));
-  let height = Math.max(1, Math.min(256, frame.height + (north ? -uy : uy)));
+  let width = Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, frame.width + (west ? -ux : ux)));
+  let height = Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, frame.height + (north ? -uy : uy)));
   if (fixedRatio) {
     if (Math.abs(width / frame.width - 1) >= Math.abs(height / frame.height - 1)) height = width / aspectRatio;
     else width = height * aspectRatio;
-    const factor = Math.min(1, 256 / Math.max(width, height));
+    const factor = Math.min(1, ANIMATION_MAX_DIMENSION / Math.max(width, height));
     width = Math.max(1, Math.round(width * factor)); height = Math.max(1, Math.round(height * factor));
   } else { width = Math.round(width); height = Math.round(height); }
   const anchor = selectionWorldPoint(frame, west ? frame.width : 0, north ? frame.height : 0);
@@ -83,8 +84,8 @@ export function transformSelectionFromCorner(frame, start, point, { angleDelta =
   const radius = Math.hypot(a.x, a.y), distance = Math.hypot(b.x, b.y);
   if (![radius, distance].every(Number.isFinite) || radius <= Math.max(minRadius, 1e-8) || distance <= minRadius) return null;
   const delta = angleDelta ?? Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y) * 180 / Math.PI;
-  const scale = Math.max(1 / Math.min(frame.width, frame.height), Math.min(256 / Math.max(frame.width, frame.height), distance / radius));
-  const width = Math.max(1, Math.min(256, Math.round(frame.width * scale))), height = Math.max(1, Math.min(256, Math.round(frame.height * scale)));
+  const scale = Math.max(1 / Math.min(frame.width, frame.height), Math.min(ANIMATION_MAX_DIMENSION / Math.max(frame.width, frame.height), distance / radius));
+  const width = Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, Math.round(frame.width * scale))), height = Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, Math.round(frame.height * scale)));
   const angle = snapSelectionAngle(frame.angle + delta, modifiers), localPivot = selectionLocalPoint(frame, pivot), { c, s } = selectionAxes(angle);
   const u = localPivot.x * width / frame.width, v = localPivot.y * height / frame.height;
   return { ...frame, x: tidy(pivot.x - c * u + s * v), y: tidy(pivot.y - s * u - c * v), width, height, angle, pivot: { ...pivot }, rotationOffset: undefined };

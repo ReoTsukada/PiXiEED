@@ -1,4 +1,4 @@
-import { adjustDrawColorAnimation, adjustDrawColorDocument, getAdjustedAnimationCel, DRAW_COLOR_DEFAULTS, normalizeDrawColorSettings } from './draw-color-adjustments.mjs?rev=20261016-color-capability-1';
+import { adjustDrawColorAnimation, adjustDrawColorDocument, getAdjustedAnimationCel, DRAW_COLOR_DEFAULTS, normalizeDrawColorSettings } from './draw-color-adjustments.mjs?rev=20261113-canvas1028-1';
 
 const NS = 'http://www.w3.org/2000/svg';
 const sliderSpec = [

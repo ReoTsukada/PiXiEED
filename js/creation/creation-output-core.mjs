@@ -1,4 +1,4 @@
-import { composeAnimationFrame, composeAnimationFrameRgba, setLayerProperties } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { composeAnimationFrame, composeAnimationFrameRgba, setLayerProperties } from './animation-core.mjs?rev=20261113-canvas1028-1';
 
 /** Compose an export image without changing the saved layer visibility. */
 export function composeOutputFrame(animation, frameId, { includeMusic = false } = {}) {

@@ -1,11 +1,44 @@
-import { centerCrop } from '../pixel-studio/framing.mjs';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { centerCrop } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-1';
 
 function positiveInteger(value, name) {
   if (!Number.isInteger(value) || value <= 0) throw new RangeError(`${name} must be a positive integer`);
 }
 
+export const CAMERA_PLACEMENT_MEMORY_LIMIT = 64 * 1024 * 1024;
+/** Conservative working-set estimate, not a browser heap measurement/hard cap. */
+export function planCameraPlacementMemory({width,height,sourceWidth=width,sourceHeight=height,selectedCells=width*height,layerCount=1,irregular=false,compositeRequired=false,retainedArtBytes=0,retainedMusicBytes=0,reservedBytes=0,engineScratchBytes=0,miniatureBytes=0,maxBytes=CAMERA_PLACEMENT_MEMORY_LIMIT}) {
+  for(const [value,name]of [[width,'width'],[height,'height'],[sourceWidth,'sourceWidth'],[sourceHeight,'sourceHeight']]) { positiveInteger(value,name); if(value>ANIMATION_MAX_DIMENSION)throw new RangeError('Camera placement exceeds shared canvas limit'); }
+  if(!Number.isSafeInteger(selectedCells)||selectedCells<0||selectedCells>width*height||!Number.isInteger(layerCount)||layerCount<1||layerCount>9||!Number.isSafeInteger(maxBytes)||maxBytes<1)throw new RangeError('Invalid camera memory plan');
+  for(const bytes of [retainedArtBytes,retainedMusicBytes,reservedBytes,engineScratchBytes,miniatureBytes])if(!Number.isSafeInteger(bytes)||bytes<0)throw new RangeError('Invalid retained camera bytes');
+  const overlay=irregular?cameraPlacementOverlaySize(width,height):{width:1,height:1};
+  // Byte-lifetime table (N = canvas pixels), exclusive operation phases:
+  // draw document+view caches:14N; current/next source/results:12N;
+  // source/display canvas backing:8N; transient edge/filter map:4N.
+  // apply: same draw14N + captured8N + canvas8N + target/plan/index12N.
+  // full single-layer preview directly uses the processed frame; other previews
+  // additionally retain source layers and composite caches. Engine scratch,
+  // miniature buffers, Art/Music/history and metadata are explicit, not hidden.
+  const n=width*height;
+  const mappingBytes=irregular?selectedCells*28+n:selectedCells*4;
+  const captureBytes=n*38+engineScratchBytes+miniatureBytes;
+  const applyBytes=n*42;
+  const compositeBytes=layerCount===1?(!irregular&&!compositeRequired?0:n*8):n*(layerCount*4+14);
+  const breakdown={captureBytes,applyBytes,compositeBytes,mappingBytes,overlayBytes:overlay.width*overlay.height*8,retainedArtBytes,retainedMusicBytes,reservedBytes,metadataAndPaletteBytes:2*1024*1024};
+  const estimatedPeakBytes=Math.max(captureBytes,applyBytes)+Math.max(0,sourceWidth*sourceHeight-n)*8+compositeBytes+mappingBytes+breakdown.overlayBytes+retainedArtBytes+retainedMusicBytes+reservedBytes+breakdown.metadataAndPaletteBytes;
+  return {allowed:estimatedPeakBytes<=maxBytes,estimatedPeakBytes,maxBytes,breakdown};
+}
+export function cameraPlacementOverlaySize(width,height) {
+  positiveInteger(width,'width');positiveInteger(height,'height');
+  const scale=Math.max(width,height)<=256?4:Math.min(4,512/Math.max(width,height));
+  return {width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale))};
+}
+function requireCameraPlacementBudget(options) {
+  const plan=planCameraPlacementMemory(options);if(!plan.allowed){const error=new RangeError('カメラ配置の作業メモリ上限を超えます。作品と撮影画像は変更していません。');error.code='camera-memory-budget';error.plan=plan;throw error;}return plan;
+}
+
 /** Cache nearest-neighbour source offsets for every selected target cell. */
-export function createCameraPlacementMapping({ sourceWidth, sourceHeight, width, height, bounds, cells, mask = null }) {
+export function createCameraPlacementMapping({ sourceWidth, sourceHeight, width, height, bounds, cells, mask = null, includeBoundary = true, memoryContext = {} }) {
   positiveInteger(sourceWidth, 'sourceWidth'); positiveInteger(sourceHeight, 'sourceHeight');
   positiveInteger(width, 'width'); positiveInteger(height, 'height');
   if (!bounds || !Number.isInteger(bounds.x) || !Number.isInteger(bounds.y) || !Number.isInteger(bounds.width) || !Number.isInteger(bounds.height)
@@ -13,8 +46,10 @@ export function createCameraPlacementMapping({ sourceWidth, sourceHeight, width,
     || bounds.x + bounds.width > width || bounds.y + bounds.height > height) throw new RangeError('Invalid target bounds');
   if (!cells || !Number.isInteger(cells.length)) throw new TypeError('Target cells are required');
   if (mask != null && (!(mask instanceof Uint8Array) || mask.length !== width * height)) throw new TypeError('Invalid target mask');
+  requireCameraPlacementBudget({width,height,sourceWidth,sourceHeight,selectedCells:cells.length,irregular:Boolean(mask),...memoryContext});
   const crop = centerCrop(sourceWidth, sourceHeight, bounds.width / bounds.height);
-  const sourceOffsets = new Uint32Array(cells.length);
+  const identity=!mask&&sourceWidth===width&&sourceHeight===height&&bounds.x===0&&bounds.y===0&&bounds.width===width&&bounds.height===height&&cells.length===width*height;
+  const sourceOffsets = identity?null:new Uint32Array(cells.length);
   const targetIndices = new Uint32Array(cells.length);
   for (let n = 0; n < cells.length; n++) {
     const targetIndex = Number(cells[n]);
@@ -24,25 +59,28 @@ export function createCameraPlacementMapping({ sourceWidth, sourceHeight, width,
     if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) throw new RangeError('Target cell is outside bounds');
     const sx = Math.min(sourceWidth - 1, Math.max(0, Math.floor(crop.sx + (x + 0.5) * crop.sw / bounds.width)));
     const sy = Math.min(sourceHeight - 1, Math.max(0, Math.floor(crop.sy + (y + 0.5) * crop.sh / bounds.height)));
-    sourceOffsets[n] = (sy * sourceWidth + sx) * 4;
+    if(identity&&targetIndex!==n)throw new RangeError('Full camera target must be row ordered');
+    if(sourceOffsets)sourceOffsets[n] = (sy * sourceWidth + sx) * 4;
     targetIndices[n] = targetIndex;
   }
-  const edges = [];
   const selectedAt = (x, y) => x >= 0 && y >= 0 && x < width && y < height && (mask ? mask[y * width + x] : x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width && y < bounds.y + bounds.height);
-  for (const index of targetIndices) {
-    const x = index % width, y = Math.floor(index / width);
-    if (!selectedAt(x, y - 1)) edges.push(index * 4);
-    if (!selectedAt(x + 1, y)) edges.push(index * 4 + 1);
-    if (!selectedAt(x, y + 1)) edges.push(index * 4 + 2);
-    if (!selectedAt(x - 1, y)) edges.push(index * 4 + 3);
-  }
-  return Object.freeze({ sourceWidth, sourceHeight, width, height, bounds:Object.freeze({ ...bounds }), sourceOffsets, targetIndices, edges:Uint32Array.from(edges), mask:mask ? new Uint8Array(mask) : null, sampled:new Uint8ClampedArray(cells.length * 4) });
+  const visitEdges = emit => {
+    if(!includeBoundary)return;
+    for(const index of targetIndices){const x=index%width,y=Math.floor(index/width);
+      if(!selectedAt(x,y-1))emit(index*4);if(!selectedAt(x+1,y))emit(index*4+1);
+      if(!selectedAt(x,y+1))emit(index*4+2);if(!selectedAt(x-1,y))emit(index*4+3);
+    }
+  };
+  let edgeCount=0;visitEdges(()=>edgeCount++);
+  const edges=new Uint32Array(edgeCount);let edgeCursor=0;visitEdges(edge=>{edges[edgeCursor++]=edge;});
+  return Object.freeze({ memoryContext:Object.freeze({...memoryContext}),sourceWidth, sourceHeight, width, height, bounds:Object.freeze({ ...bounds }), sourceOffsets, targetIndices, edges, mask:mask ? new Uint8Array(mask) : null, identity,sampled:identity?null:new Uint8ClampedArray(cells.length * 4) });
 }
 
 /** Sample a processed camera frame with the same mapping used by final apply. */
 export function sampleCameraFrameToPlacement(frame, mapping, output = mapping?.sampled) {
   if (!frame || frame.width !== mapping?.sourceWidth || frame.height !== mapping?.sourceHeight
     || !frame.data || frame.data.length !== frame.width * frame.height * 4) throw new TypeError('Camera frame does not match the placement mapping');
+  if(mapping.identity)return frame.data;
   if (!output || output.length !== mapping.sourceOffsets.length * 4) throw new TypeError('Invalid sampled frame buffer');
   for (let n = 0; n < mapping.sourceOffsets.length; n++) {
     const source = mapping.sourceOffsets[n], target = n * 4;
@@ -87,7 +125,8 @@ function createRgbaCameraPlacementRenderer(snapshot, mapping) {
   const fixedChoices = allowedIndices.map(index => ({ index, rgba:rgbaPaletteColor(palette, index) })).filter(choice => choice.rgba);
   if (!fixedChoices.length) throw new TypeError('RGBA replacement palette is empty');
   const fixedIndices = new Int16Array(mapping.targetIndices.length);
-  const sampled = mapping.sampled;
+  const fixedColorCache=new Map();
+  let sampled = mapping.sampled;
   const output = new Uint8ClampedArray(length * 4);
 
   function compositePixel(pixel, cameraPixel = -1, paletteFixed = false) {
@@ -132,18 +171,22 @@ function createRgbaCameraPlacementRenderer(snapshot, mapping) {
   return Object.freeze({
     mapping,
     render(frame, { paletteFixed = false } = {}) {
-      sampleCameraFrameToPlacement(frame, mapping, sampled);
+      sampled=sampleCameraFrameToPlacement(frame, mapping, sampled);
       output.set(baseRgba);
       if (!canPreview) return output;
       if (paletteFixed) {
         for (let n = 0; n < mapping.targetIndices.length; n += 1) {
-          const source = n * 4; let best = 0, distance = Infinity;
-          const sample = [sampled[source], sampled[source + 1], sampled[source + 2], sampled[source + 3]];
-          for (let choiceIndex = 0; choiceIndex < fixedChoices.length; choiceIndex += 1) {
-            const color = fixedChoices[choiceIndex].rgba;
-            const candidate = (sample[0] - color[0]) ** 2 + (sample[1] - color[1]) ** 2
-              + (sample[2] - color[2]) ** 2 + (sample[3] - color[3]) ** 2;
-            if (candidate < distance) { best = choiceIndex; distance = candidate; }
+          const source = n * 4;
+          const key=((sampled[source]<<24)|(sampled[source+1]<<16)|(sampled[source+2]<<8)|sampled[source+3])>>>0;
+          let best=fixedColorCache.get(key);
+          if(best===undefined){
+            best=0;let distance=Infinity;
+            for(let choiceIndex=0;choiceIndex<fixedChoices.length;choiceIndex++){
+              const color=fixedChoices[choiceIndex].rgba;
+              const candidate=(sampled[source]-color[0])**2+(sampled[source+1]-color[1])**2+(sampled[source+2]-color[2])**2+(sampled[source+3]-color[3])**2;
+              if(candidate<distance){best=choiceIndex;distance=candidate;}
+            }
+            if(fixedColorCache.size>=2048)fixedColorCache.clear();fixedColorCache.set(key,best);
           }
           fixedIndices[n] = best;
         }
@@ -157,23 +200,37 @@ function createRgbaCameraPlacementRenderer(snapshot, mapping) {
 /** Build a cached base composite and render camera pixels over the selected layer. */
 export function createCameraPlacementRenderer(snapshot, mapping) {
   if (!snapshot || !mapping || snapshot.width !== mapping.width || snapshot.height !== mapping.height) throw new TypeError('Placement snapshot does not match its mapping');
+  requireCameraPlacementBudget({width:snapshot.width,height:snapshot.height,sourceWidth:mapping.sourceWidth,sourceHeight:mapping.sourceHeight,selectedCells:mapping.targetIndices.length,layerCount:snapshot.rgbaLayers?.length||1,irregular:Boolean(mapping.mask),compositeRequired:!snapshot.fullSingleLayer,...mapping.memoryContext});
+  if(snapshot.fullSingleLayer&&mapping.identity||snapshot.singleLayer){
+    const choices=snapshot.allowedIndices.map(index=>rgbaPaletteColor(snapshot.palette,index));const cache=new Map();let output=null;
+    if(!mapping.identity){if(!snapshot.active||snapshot.active.length!==snapshot.width*snapshot.height)throw new TypeError('Single layer preview is incomplete');output=new Uint8ClampedArray(snapshot.width*snapshot.height*4);for(let i=0;i<snapshot.active.length;i++){const c=rgbaPaletteColor(snapshot.palette,snapshot.active[i]);if(c)output.set(c,i*4);}}
+    return Object.freeze({mapping,render(frame,{paletteFixed=false}={}){
+      const sampled=sampleCameraFrameToPlacement(frame,mapping);if(!paletteFixed&&mapping.identity)return sampled;
+      if(!output)output=new Uint8ClampedArray(sampled.length);
+      for(let o=0;o<sampled.length;o+=4){const dest=mapping.identity?o:mapping.targetIndices[o/4]*4;if(!sampled[o+3]){output.fill(0,dest,dest+4);continue;}if(!paletteFixed){output.set(sampled.subarray(o,o+4),dest);continue;}
+        const key=((sampled[o]<<24)|(sampled[o+1]<<16)|(sampled[o+2]<<8)|sampled[o+3])>>>0;let best=cache.get(key);
+        if(best===undefined){let distance=Infinity;best=0;for(let i=0;i<choices.length;i++){const c=choices[i];const d=(sampled[o]-c[0])**2+(sampled[o+1]-c[1])**2+(sampled[o+2]-c[2])**2+(sampled[o+3]-c[3])**2;if(d<distance){distance=d;best=i;}}if(cache.size>=2048)cache.clear();cache.set(key,best);}
+        output.set(choices[best],dest);
+      }return output;
+    }});
+  }
   if (Array.isArray(snapshot.rgbaLayers)) return createRgbaCameraPlacementRenderer(snapshot, mapping);
   const { width, height, palette, below, active, above, activeVisible = true, activeLocked = false, musicOnly = false, allowedIndices = [] } = snapshot;
   const length = width * height;
   for (const pixels of [below, active, above]) if (!pixels || pixels.length !== length) throw new TypeError('Placement layer pixels do not match canvas');
   if (!Array.isArray(palette)) throw new TypeError('Placement palette is required');
   const base = new Uint8ClampedArray(snapshot.baseRgba?.length === length * 4 ? snapshot.baseRgba : length * 4);
-  const under = new Uint8ClampedArray(length * 4);
+
   const output = new Uint8ClampedArray(length * 4);
   for (let i = 0; i < length; i++) {
     const offset = i * 4;
-    if (!musicOnly) paletteColor(palette, below[i], under, offset);
+
     if (!snapshot.baseRgba) {
       const baseIndex = musicOnly ? active[i] : above[i] >= 0 ? above[i] : activeVisible && active[i] >= 0 ? active[i] : below[i];
       paletteColor(palette, baseIndex, base, offset);
     }
   }
-  const sampled = mapping.sampled;
+  let sampled = mapping.sampled;
   const fixedIndices = new Int16Array(mapping.targetIndices.length);
   const fixedChoices = allowedIndices.map(index => {
     const color = palette[index];
@@ -210,7 +267,7 @@ export function createCameraPlacementRenderer(snapshot, mapping) {
   return Object.freeze({
     mapping,
     render(frame, { paletteFixed = false } = {}) {
-      sampleCameraFrameToPlacement(frame, mapping, sampled);
+      sampled=sampleCameraFrameToPlacement(frame, mapping, sampled);
       output.set(base);
       if (!canPreview) return output;
       if (paletteFixed) quantizeFixed();
@@ -222,8 +279,7 @@ export function createCameraPlacementRenderer(snapshot, mapping) {
         if (!musicOnly && above[index] >= 0) continue;
         const alpha = sampled[source + 3];
         if (alpha === 0) {
-          output[target] = under[target]; output[target + 1] = under[target + 1];
-          output[target + 2] = under[target + 2]; output[target + 3] = under[target + 3];
+          if(musicOnly)output.fill(0,target,target+4);else paletteColor(palette,below[index],output,target);
         } else if (alpha === 255) {
           if (paletteFixed) paletteColor(palette, fixedIndices[n], output, target);
           else {
@@ -242,8 +298,9 @@ export function createCameraPlacementRenderer(snapshot, mapping) {
 /** Paint a subtle boundary for the irregular selection without touching the preview canvas. */
 export function drawCameraPlacementBoundary(context, mapping) {
   const scale = context.canvas.width / mapping.width || 4;
+  const scaleY = context.canvas.height / mapping.height || scale;
   context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-  context.save(); context.scale(scale, scale);
+  context.save(); context.scale(scale, scaleY);
   context.strokeStyle = 'rgba(255, 226, 115, 0.95)'; context.lineWidth = 1 / scale;
   context.beginPath();
   for (const encoded of mapping.edges) {

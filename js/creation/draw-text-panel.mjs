@@ -1,4 +1,4 @@
-import { DRAW_TEXT_FONTS, applyTextMaskToDocument, loadDrawTextFont, rasterizeTextMask } from './draw-text.mjs';
+import { DRAW_TEXT_FONTS, applyTextMaskToDocument, loadDrawTextFont, rasterizeTextMask } from './draw-text.mjs?rev=20261113-canvas1028-1';
 
 const element = (tag, className, text = '') => { const node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node; };
 

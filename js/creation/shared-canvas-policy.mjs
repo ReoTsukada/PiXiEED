@@ -1,6 +1,6 @@
-export const SHARED_CANVAS_FREE_MAX_DIMENSION = 256;
+export const SHARED_CANVAS_FREE_MAX_DIMENSION = 1028;
 export const SHARED_CANVAS_FREE_MAX_COLORS = 32;
-export const SHARED_CANVAS_PREMIUM_MAX_DIMENSION = 256;
+export const SHARED_CANVAS_PREMIUM_MAX_DIMENSION = 1028;
 export const SHARED_CANVAS_PREMIUM_MAX_COLORS = 64;
 
 /** Technical support and current entitlement are separate: expired originals remain readable. */
@@ -14,7 +14,7 @@ export function evaluateSharedCanvasPolicy({ width, height, colorCount } = {}, {
   const locked = premiumContent && !passActive;
   let reason = null;
   if (!dimensionsValid || !colorsValid) reason = 'invalid-canvas';
-  else if (width > maxDimension || height > maxDimension) reason = 'canvas-over-256px';
+  else if (width > maxDimension || height > maxDimension) reason = 'canvas-over-1028px';
   else if (colorCount > SHARED_CANVAS_PREMIUM_MAX_COLORS) reason = 'colors-over-64';
   else if (locked) reason = 'premium-required';
   return { supported, premiumContent, locked, reason, maxDimension, maxColors };

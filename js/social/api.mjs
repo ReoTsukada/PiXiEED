@@ -230,7 +230,7 @@ function mapSnsComment(row) {
   return Object.freeze({ id, target: row.target, body, authorName: cleanText(row.authorName, { max: 40 }) || '', createdAt, updatedAt: dateValue(row.updatedAt) || createdAt, version: Number.isSafeInteger(row.version) && row.version > 0 ? row.version : 1, ...(row.owned === true ? { owned: true } : {}) });
 }
 
-export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThis.fetch, storage = globalThis.localStorage, loadActions = () => import('../globe/post-supabase.mjs?rev=20261111-output-offerwall-1'), loadServerActions = () => import(`./server-actions.mjs?rev=20261111-output-offerwall-1`), timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+export function createSocialApi({ config = supabaseConfig, fetchImpl = globalThis.fetch, storage = globalThis.localStorage, loadActions = () => import('../globe/post-supabase.mjs?rev=20261113-canvas1028-1'), loadServerActions = () => import(`./server-actions.mjs?rev=20261111-output-offerwall-1`), timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   let actionsPromise = null;
   let serverActionsPromise = null;
   let readWarnings = [];

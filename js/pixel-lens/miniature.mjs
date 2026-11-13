@@ -29,7 +29,7 @@ export function createMiniatureProcessor() {
   let cachedHeight = 0, kernels = [], horizontal = new Float32Array(0);
   return function applyMiniature(image, enabled = false) {
     // OFF is the exact original object: no allocation and no changed pixels.
-    if (!enabled) return image;
+    if (!enabled) { horizontal=new Float32Array(0);kernels=[];cachedHeight=0;return image; }
     const { width, height, data } = image;
     if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || data?.length !== width * height * 4) throw new TypeError('Invalid camera frame');
     if (height !== cachedHeight) {

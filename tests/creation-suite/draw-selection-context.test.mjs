@@ -19,7 +19,7 @@ test('one corner scales and rotates around an unchanged external pivot, from its
 test('corner transforms cap maximum dimensions, preserve positive minimum and reject zero baselines', () => {
  const f={x:0,y:0,width:4,height:2,angle:0,pivot:{x:2,y:1}},start={x:4,y:2};
  assert.equal(transformSelectionFromCorner(f,start,{x:2.001,y:1.001}).height,1);
- const big=transformSelectionFromCorner(f,start,{x:40000,y:20000});assert.equal(big.width,256);assert.equal(big.height,128);
+ const big=transformSelectionFromCorner(f,start,{x:40000,y:20000});assert.equal(big.width,1028);assert.equal(big.height,514);
  assert.equal(transformSelectionFromCorner(f,f.pivot,start),null);
  assert.equal(transformSelectionFromCorner(f,start,{x:2.01,y:1},{minRadius:.1}),null);
  assert.equal(transformSelectionFromCorner(f,start,{x:Infinity,y:1}),null);

@@ -1,14 +1,23 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
-import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261108-gallery-canvas-viewport-1';
-import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261021-camera-canvas-2';
+import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261113-canvas1028-1';
+import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261113-canvas1028-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261024-free-tools-1';
+import { mountIndependentMusicModel } from './independent-music-model.mjs?rev=20261113-canvas1028-1';
+import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261113-canvas1028-1';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261107-mode-continuity-1';
-import { animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261016-color-capability-1';
+import { ANIMATION_MAX_DIMENSION, animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261113-canvas1028-1';
 
 
 /** One shell, project, palette and history. Mode changes never copy artwork. */
-export function assertCreationModeCompatible(next, animation) {
+export function assertCreationModeCompatible(next, animation, { independentMusic = false } = {}) {
+  if (next === 'audio' && independentMusic) return true;
+  if (next === 'audio' && (animation?.width > 256 || animation?.height > 256)) {
+    const label = next === 'audio' ? '音楽' : 'カメラ';
+    const error = new RangeError(`${label}は256px以下の作品に対応しています。この作品はDrawで編集・保存できます。作品・音楽・編集履歴は変更していません。`);
+    error.code = `${next}-large-canvas-unsupported`;
+    throw error;
+  }
+  if (next === 'camera' && (animation?.width > ANIMATION_MAX_DIMENSION || animation?.height > ANIMATION_MAX_DIMENSION)) throw new RangeError(`カメラ配置は${ANIMATION_MAX_DIMENSION}px以下に対応しています。作品は変更していません。`);
   if (next !== 'audio' || !animationNeedsRgba(animation)) return true;
   const hasVisibleArt = animation.frames.some((frame) => animation.layers.some((layer) =>
     layer.role !== 'music' && layer.visible && layer.opacity !== 0 && hasAnimationCelContent(animation, frame.id, layer.id)));
@@ -27,7 +36,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261108-gallery-canvas-viewport-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261113-canvas1028-1';
   const styled = new Promise((resolve, reject) => {
     const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
     const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
@@ -239,7 +248,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     else document.querySelector('#draw-import-local')?.click();
   });
   const say = error => { errorNode.textContent = error?.message || String(error); setModeMenu(true); };
-  const settings = mountSharedProjectSettings({ draw, scope });
+  const settings = mountSharedProjectSettings({ draw, scope, getMode: () => mode });
   const cameraCanvasSettings = mountCameraCanvasSettings({ draw, scope, isActive: () => isActive() && mode === 'camera' });
   const cameraCanvasCss = document.createElement('link'); cameraCanvasCss.rel = 'stylesheet'; cameraCanvasCss.href = '/css/camera-canvas-settings.css?rev=20261021-camera-canvas-1';
   let cameraCanvasStylesFailed = false;
@@ -331,11 +340,20 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     updateProjectCameraStatus();
   }
   updateProjectCameraStatus();
-  const syncHistory = () => { const timeline = draw.getTimeline(); settings.launcher.textContent = String(Math.max(timeline.width, timeline.height)); settings.launcher.setAttribute('aria-label', `キャンバス設定 ${timeline.width}×${timeline.height}px ${timeline.palette.length}色`); undo.disabled = !draw.canUndo; redo.disabled = !draw.canRedo; labelHistoryControls(); updateProjectCameraStatus(); };
+  let musicModel;
+  let returningToDrawForLargeCanvas = false;
+  const syncHistory = () => { const timeline = draw.getTimeline();
+    if (mode === 'audio' && !musicModel?.independent && (timeline.width > 256 || timeline.height > 256) && !returningToDrawForLargeCanvas) {
+      audio?.suspend(); camera?.suspend(); returningToDrawForLargeCanvas = true;
+      queueMicrotask(() => { void switchMode('draw').then(() => say(new Error('大きい作品はDrawで編集します。音楽とカメラは256px以下に対応しています。'))).catch(say).finally(() => { returningToDrawForLargeCanvas = false; }); });
+    }
+ settings.launcher.textContent = String(Math.max(timeline.width, timeline.height)); settings.launcher.setAttribute('aria-label', `キャンバス設定 ${timeline.width}×${timeline.height}px ${timeline.palette.length}色`); undo.disabled = !draw.canUndo; redo.disabled = !draw.canRedo; labelHistoryControls(); updateProjectCameraStatus(); };
   scope.add(draw.subscribe(syncHistory)); syncHistory();
   draw.workspace.setModeTransitionActive(true);
-  let musicModel;
-  try { musicModel = await mountDrawMusicModel({draw,scope}); }
+  try {
+    try { musicModel = await mountIndependentMusicModel({draw,scope}); }
+    catch (error) { console.warn('Independent Music migration unavailable; retaining legacy safeguards.', error); musicModel = await mountDrawMusicModel({draw,scope}); }
+  }
   finally { draw.workspace.setModeTransitionActive(false); }
   const motion = mountCreationModeMotion({ board, main, scope });
   const interrupted = () => new DOMException('制作モードの切替が更新されました。', 'AbortError');
@@ -367,7 +385,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   };
   for (const type of ['pointerdown','click','keydown']) scope.listen(document, type, guardInput, { capture:true });
   function show(owner) {
-    if (owner === 'draw') draw.selectArtLayer?.();
+    if (owner !== 'audio') draw.selectArtLayer?.();
     if (body.dataset.creationMode !== owner) body.dataset.creationMode = owner;
     if (body.dataset.page !== 'draw') body.dataset.page = 'draw';
     body.classList.remove('audio-tool-body');
@@ -398,7 +416,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261111-output-offerwall-1&attempt=${audioLoadAttempt++}`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261113-canvas1028-1&attempt=${audioLoadAttempt++}`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => isActive() && mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -436,7 +454,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261112-creation-guidance-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261113-canvas1028-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }
@@ -479,7 +497,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
         const version = requestVersion, next = requestedMode, previous = mode;
         // Check the receiver before suspending a capture session or saving a
         // project, so an unsupported projection leaves the current mode intact.
-        assertCreationModeCompatible(next, draw.getTimeline());
+        assertCreationModeCompatible(next, draw.getArtTimeline?.() || draw.getTimeline(), {independentMusic:Boolean(musicModel?.independent)});
         stopCurrent();
         switching = true;
         if (body.dataset.creationTransition !== 'true') body.dataset.creationTransition = 'true';

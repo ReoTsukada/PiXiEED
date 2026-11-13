@@ -1,4 +1,4 @@
-import { mountDrawMode } from './draw-page.mjs?rev=20261112-creation-guidance-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261113-canvas1028-1';
 
 if (new URLSearchParams(location.search).get('gameEditor') === 'spot') {
   document.documentElement.dataset.gameDrawRuntime = 'true';
@@ -6,7 +6,7 @@ if (new URLSearchParams(location.search).get('gameEditor') === 'spot') {
   runtimeStyle.rel = 'stylesheet'; runtimeStyle.href = '/css/game-draw-runtime.css?rev=20261017-game-editor-1';
   document.head.append(runtimeStyle);
   try {
-    const { mountGameDrawRuntime } = await import('./game-draw-runtime.mjs?rev=20261017-game-editor-1');
+    const { mountGameDrawRuntime } = await import('./game-draw-runtime.mjs?rev=20261113-canvas1028-1');
     await mountGameDrawRuntime({ mountDrawMode });
   } catch (error) {
     document.documentElement.dataset.drawReady = 'true';
@@ -20,7 +20,7 @@ if (new URLSearchParams(location.search).get('gameEditor') === 'spot') {
 const startupMain = document.querySelector('#main');
 if (startupMain) startupMain.inert = true;
 try {
-  const { mountCreationRuntime } = await import('./creation-runtime.mjs?rev=20261112-creation-guidance-1');
+  const { mountCreationRuntime } = await import('./creation-runtime.mjs?rev=20261113-canvas1028-1');
   const params = new URLSearchParams(location.search);
   const requestedMode = params.get('mode');
   const runtime = await mountCreationRuntime({ requestedMode, search: location.search, role: requestedMode || 'draw' });
@@ -28,7 +28,7 @@ try {
   const boot = window.__PIXIEED_TOOL_EMBED__;
   if (boot && typeof boot.channel === 'string' && boot.channel.length > 0
       && ['draw', 'camera', 'audio'].includes(boot.role)) {
-    const { installToolEmbedBridge } = await import('./tool-embed-bridge.mjs?rev=20261017-analytics-integrity-1');
+    const { installToolEmbedBridge } = await import('./tool-embed-bridge.mjs?rev=20261113-canvas1028-1');
     installToolEmbedBridge({ draw: runtime.draw, modes: runtime.modes });
   }
 } catch (error) {

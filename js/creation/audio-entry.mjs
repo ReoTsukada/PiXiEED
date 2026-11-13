@@ -10,7 +10,7 @@ document.querySelector('#main')?.setAttribute('inert', '');
 const scope = createModeScope();
 scope.listen(window, 'pagehide', (event) => { if (!event.persisted) scope.dispose(); });
 try {
-  const { mountAudioMode } = await import('./audio-page.mjs?rev=20261112-creation-guidance-1');
+  const { mountAudioMode } = await import('./audio-page.mjs?rev=20261113-canvas1028-1');
   await mountAudioMode({ scope });
   document.documentElement.dataset.audioReady = 'true';
 } catch (error) {

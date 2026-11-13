@@ -1,6 +1,7 @@
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
 import { createPxdProject, getPxdJson, setPxdJson, setPxdBytes } from './pxd-codec.mjs';
-import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20261011-tool-size-1';
-import { countSharedImageColors as countUsedImageColors } from './shared-image.mjs?rev=20261016-color-capability-1';
+import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-1';
+import { countSharedImageColors as countUsedImageColors } from './shared-image.mjs?rev=20261113-canvas1028-1';
 
 // Existing image schema-2 metadata counts transparent tuples; preserve that wire contract.
 const countSharedImageColors = (image, stopAfter) => countUsedImageColors(image, stopAfter, { includeTransparent: true });
@@ -117,7 +118,7 @@ export async function readPxdSharedImage(project) {
 /** Exact conversion only. Unsupported images remain intact in the container. */
 export function imageToDrawDocument(image) {
   validImage(image);
-  if (![image.width, image.height].every((side) => Number.isInteger(side) && side >= 1 && side <= 512)) throw new RangeError('この原本は描画キャンバスの対応サイズ外です。PXD内の原本は保持しています。');
+  if (![image.width, image.height].every((side) => Number.isInteger(side) && side >= 1 && side <= ANIMATION_MAX_DIMENSION)) throw new RangeError('この原本は描画キャンバスの対応サイズ外です。PXD内の原本は保持しています。');
   const palette = []; const indices = new Map(); const pixels = new Array(image.width * image.height);
   for (let index = 0; index < pixels.length; index += 1) {
     const color = image.rgba.subarray(index * 4, index * 4 + 4); const key = hex(color);

@@ -1,4 +1,4 @@
-import { preparePuzzleUpload } from './puzzle-upload.mjs?rev=20261021-jigsaw-public-1';
+import { preparePuzzleUpload } from './puzzle-upload.mjs?rev=20261113-canvas1028-1';
 
 export const PUZZLE_HANDOFF_KEY = 'PiXiEED:puzzle-handoff:v1';
 export const PUZZLE_HANDOFF_META_KEY = 'PiXiEED:puzzle-handoff-meta:v1';

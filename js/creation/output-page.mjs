@@ -18,7 +18,7 @@ import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../
 import { isRewardedOutputFormat, resolveOutputBatchSelection, triggerOutputBatchDownload, OUTPUT_FREE_BATCH_LIMIT, OUTPUT_REWARD_BATCH_LIMIT } from './output-reward-policy.mjs?rev=20261016-color-capability-1';
 import { isIntegerStaticImageEnlargement, isRewardedStaticImageSize, resolveStaticImageMaxScale, STATIC_IMAGE_FREE_LONG_EDGE, STATIC_IMAGE_REWARD_LONG_EDGE } from './static-output-policy.mjs?rev=20261024-free-tools-1';
 import { isAutoDrawingFilename, resolveOutputFilename } from './output-filename.mjs?rev=20261016-auto-dimensions-2';
-import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261111-output-offerwall-1';
+import { socialOutputUrl } from '../social/tool-handoff.mjs?rev=20261113-canvas1028-1';
 import { describeOutputMaterialState, replaceOutputMaterialSource, outputMaterialSelectionAfterRemoval } from './output-material-state.mjs?rev=20261101-direct-material-1';
 import { runReadonlyPreview, readonlyPreviewBounds } from './conversion-readonly-preview.mjs?rev=20261105-video-size-1';
 import { validateVideoOutputSize } from './video-output-size.mjs?rev=20261105-video-size-1';

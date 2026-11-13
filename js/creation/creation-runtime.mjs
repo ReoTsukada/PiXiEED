@@ -1,9 +1,9 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261112-creation-guidance-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261112-creation-guidance-1';
-import { mountCreationModes } from './creation-modes.mjs?rev=20261112-creation-guidance-1';
-import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261018-direct-runtime-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261113-canvas1028-1';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261113-canvas1028-1';
+import { mountCreationModes } from './creation-modes.mjs?rev=20261113-canvas1028-1';
+import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261113-canvas1028-1';
 
 function lastWorkspacePointer(search, requestedMode, restoreLast) {
   const params = new URLSearchParams(search);

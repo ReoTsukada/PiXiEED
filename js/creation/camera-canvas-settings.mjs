@@ -1,3 +1,5 @@
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+
 /** Camera-only canvas sizing. Resizing changes bounds without scaling source pixels. */
 export function mountCameraCanvasSettings({ draw, scope, isActive = () => true } = {}) {
   if (!draw?.getTimeline || !draw?.setProjectSettings || !draw?.subscribe || !scope?.listen || !scope?.add) {
@@ -18,18 +20,18 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
   intro.textContent = '変更するとプレビューに反映されます。撮影元の画像は変わりません。作品の絵は拡大縮小せず、中央基準で余白を切り取り・追加します。切り取った絵は「戻す」で復元できます。';
   const current = document.createElement('p'); current.className = 'camera-canvas-settings__current'; current.setAttribute('aria-live', 'polite');
   const rangeLabel = document.createElement('label'); rangeLabel.className = 'camera-canvas-settings__range-label'; rangeLabel.textContent = '長辺';
-  const range = document.createElement('input'); range.type = 'range'; range.min = '1'; range.max = '256'; range.step = '1';
+  const range = document.createElement('input'); range.type = 'range'; range.min = '1'; range.max = String(ANIMATION_MAX_DIMENSION); range.step = '1';
   range.setAttribute('aria-label', 'キャンバスの長辺（px）'); rangeLabel.append(range);
   const presets = document.createElement('div'); presets.className = 'camera-canvas-settings__presets';
   presets.setAttribute('role', 'group'); presets.setAttribute('aria-label', '長辺のサイズ候補');
-  for (const px of [16, 32, 64, 128, 256]) {
+  for (const px of [16, 32, 64, 128, 256, ANIMATION_MAX_DIMENSION]) {
     const button = document.createElement('button'); button.type = 'button'; button.dataset.px = String(px); button.textContent = `${px}px`; presets.append(button);
   }
   const dimensions = document.createElement('div'); dimensions.className = 'camera-canvas-settings__dimensions';
   const makeNumber = (name, id) => {
     const label = document.createElement('label'); label.htmlFor = id; label.textContent = name;
     const wrap = document.createElement('span'); wrap.className = 'camera-canvas-settings__number';
-    const input = document.createElement('input'); input.type = 'number'; input.id = id; input.min = '1'; input.max = '256'; input.step = '1'; input.inputMode = 'numeric';
+    const input = document.createElement('input'); input.type = 'number'; input.id = id; input.min = '1'; input.max = String(ANIMATION_MAX_DIMENSION); input.step = '1'; input.inputMode = 'numeric';
     const unit = document.createElement('span'); unit.textContent = 'px'; unit.setAttribute('aria-hidden', 'true');
     wrap.append(input, unit); dimensions.append(label, wrap); return input;
   };
@@ -52,7 +54,8 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
   let trigger = null, timer = 0, applyPromise = null, queued = null, revision = 0, internalOperation = '', activeTarget = null;
   let draft = null, selectedAspect = 'free', baselineSnapshot = null, baselineOwner = null, ownedChanges = [];
   const timeline = () => draw.getTimeline();
-  const valid = value => Number.isInteger(value) && value >= 1 && value <= 256;
+  const supportsCurrent = () => { const value = timeline(); return value && value.width <= ANIMATION_MAX_DIMENSION && value.height <= ANIMATION_MAX_DIMENSION; };
+  const valid = value => Number.isInteger(value) && value >= 1 && value <= ANIMATION_MAX_DIMENSION;
   const snapshot = () => { try { return draw.snapshotTimeline?.() ?? null; } catch { return null; } };
   const gcd = (x, y) => y ? gcd(y, x % y) : x;
   const ratioLabelFor = (a, b) => {
@@ -74,6 +77,9 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
     for (const button of presets.querySelectorAll('button')) button.setAttribute('aria-pressed', String(Number(button.dataset.px) === Math.max(draft.width, draft.height)));
     for (const button of aspects.querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.ratio === selectedAspect));
     width.value = String(draft.width); height.value = String(draft.height);
+    const supported = supportsCurrent();
+    for (const control of [range, width, height, ...presets.querySelectorAll('button'), ...aspects.querySelectorAll('button')]) control.disabled = !supported;
+    if (!supported) status.textContent = `カメラ設定は${ANIMATION_MAX_DIMENSION}px以下に対応しています。大きい作品はDrawで編集してください。作品は変更していません。`;
     refreshActionButtons();
   }
   function refreshBaseline(value = timeline()) {
@@ -89,9 +95,10 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
     refreshActionButtons();
   }
   function setDraft(w, h, invalidInput = null) {
+    if (!supportsCurrent()) { cancelPending(); sync(timeline(), true); return false; }
     if (!valid(w) || !valid(h)) {
       cancelPending(); if (invalidInput) invalidInput.setAttribute('aria-invalid', 'true');
-      status.textContent = '幅と高さは1〜256 pxの整数で入力してください。'; return false;
+      status.textContent = `幅と高さは1〜${ANIMATION_MAX_DIMENSION} pxの整数で入力してください。`; return false;
     }
     width.removeAttribute('aria-invalid'); height.removeAttribute('aria-invalid');
     draft = { width: w, height: h }; width.value = String(w); height.value = String(h); range.value = String(Math.max(w, h));
@@ -109,7 +116,7 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
       return rw >= rh ? [long, Math.max(1, Math.round(long * rh / rw))] : [Math.max(1, Math.round(long * rw / rh)), long];
     }
     const w = draft?.width ?? timeline().width, h = draft?.height ?? timeline().height, ratio = w / h;
-    return w >= h ? [long, Math.max(1, Math.min(256, Math.round(long / ratio)))] : [Math.max(1, Math.min(256, Math.round(long * ratio))), long];
+    return w >= h ? [long, Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, Math.round(long / ratio)))] : [Math.max(1, Math.min(ANIMATION_MAX_DIMENSION, Math.round(long * ratio))), long];
   }
   function enqueue(size, version) {
     if (!isActive() || panel.hidden || version !== revision || !valid(size.width) || !valid(size.height)) return;
@@ -126,7 +133,7 @@ export function mountCameraCanvasSettings({ draw, scope, isActive = () => true }
     try {
       while (queued && !panel.hidden && isActive()) {
         const job = queued; queued = null; const owner = timeline(), jobBaseline = baselineOwner;
-        if (!owner || !isActive() || panel.hidden || job.version !== revision) break;
+        if (!owner || !supportsCurrent() || !isActive() || panel.hidden || job.version !== revision) break;
         if (owner.width === job.width && owner.height === job.height) { status.textContent = `適用済み：${owner.width}×${owner.height} px`; continue; }
         try {
           internalOperation = 'apply'; activeTarget = { width: job.width, height: job.height };

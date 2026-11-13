@@ -1,6 +1,6 @@
 import { scheduleLocalWorkSave } from './local-work-save-hook.mjs';
 import { decodePxd, encodePxd } from './pxd-codec.mjs';
-import { sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261016-color-capability-1';
+import { sanitizeProjectTitle, summarizeProject } from './project-catalog.mjs?rev=20261113-canvas1028-1';
 
 const DATABASE_NAME = 'pixieed-pxd-v1';
 const DATABASE_VERSION = 3;

@@ -1,5 +1,5 @@
 import { decodePngHandoff, DRAW_HANDOFF_KEY } from '../creation/draw-handoff.mjs';
-import { decodePuzzleHandoff, PUZZLE_HANDOFF_KEY, PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs';
+import { decodePuzzleHandoff, PUZZLE_HANDOFF_KEY, PUZZLE_HANDOFF_META_KEY } from '../creation/puzzle-handoff.mjs?rev=20261113-canvas1028-1';
 
 export const CAMERA_HANDOFF_KEY = 'PiXiEED:camera-handoff:v1';
 

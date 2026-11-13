@@ -9,6 +9,7 @@ test('Pages excludes known retired artwork samples and local comparison media wi
     'assets/pixel-studio/test-media/catalog.json', 'assets/pixel-studio/test-media/street.webm',
     'assets/pixel-studio/test-media/leaves.webm', 'assets/pixel-studio/test-media/README.md',
     'camera-media-test.html', 'css/camera-media-test.css', 'js/pixel-studio/media-test.mjs',
+    'js/creation/experimental/large-canvas-prototype.mjs',
   ]) assert.equal(isLocalReviewSource(name), true, name);
 });
 

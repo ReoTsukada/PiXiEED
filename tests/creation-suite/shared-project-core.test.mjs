@@ -26,7 +26,7 @@ test('palette reorder remaps indices and retains exact picture for every frame/l
 test('center pad/crop roundtrip preserves logical cells and validates before mutation',()=>{
  const a=fixture(),pad=planSharedProjectSettings(a,{width:7,height:9}).animation,back=planSharedProjectSettings(pad,{width:4,height:4}).animation;
  for(const f of a.frames) for(const l of a.layers)assert.deepEqual(getAnimationCelDocument(back,f.id,l.id),getAnimationCelDocument(a,f.id,l.id));
- for(const settings of [{width:0},{height:257},{palette:[]},{palette:[red,red]}])assert.throws(()=>planSharedProjectSettings(a,settings));
+ for(const settings of [{width:0},{height:1029},{palette:[]},{palette:[red,red]}])assert.throws(()=>planSharedProjectSettings(a,settings));
  assert.equal(planSharedProjectSettings(a,{}).animation,a);
 });
 
