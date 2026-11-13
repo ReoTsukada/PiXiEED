@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>四角いドットで、なぜ丸く見えるのか？ 16×16の円の描き方 | PiXiEED</title>
+  <meta name="description" content="16×16の円の比較図で、段差と対称性を解説。円弧を描く計算法の歴史を一次資料で紹介し、見本PNGとPiXiEEDrawで練習できます。">
+  <link rel="canonical" href="https://pixieed.jp/learn/pixel-circle/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:title" content="四角いドットで、なぜ丸く見えるのか？ 16×16の円の描き方">
+  <meta property="og:description" content="16×16の円の比較図で、段差と対称性を解説。円弧を描く計算法の歴史を一次資料で紹介し、見本PNGとPiXiEEDrawで練習できます。">
+  <meta property="og:url" content="https://pixieed.jp/learn/pixel-circle/">
+  <meta property="og:image" content="https://pixieed.jp/assets/og/site.png">
+  <meta property="og:image:alt" content="PiXiEED">
+  <meta property="og:locale" content="ja_JP">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="stylesheet" href="/css/design-tokens.css?rev=20261016-site-polish-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261024-intelligence-ui-1">
+  <link rel="stylesheet" href="/css/learn.css?rev=20261114-learn-1">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "四角いドットで、なぜ丸く見えるのか？ 16×16の円の描き方", "description": "16×16の円の比較図で、段差と対称性を解説。円弧を描く計算法の歴史を一次資料で紹介し、見本PNGとPiXiEEDrawで練習できます。", "inLanguage": "ja", "url": "https://pixieed.jp/learn/pixel-circle/", "author": {"@type": "Organization", "name": "PiXiEED", "url": "https://pixieed.jp/"}}</script>
+</head>
+<body class="learn-page" data-page="learn">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="header-inner"><a class="brand" href="/">PiXiEED</a></div></header>
+  <main id="main" class="learn-main">
+    <nav class="learn-crumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">/</span><a href="/learn/">ドット絵の読みもの</a><span aria-hidden="true">/</span><span>記事</span></nav>
+    <article class="learn-article">
+      <header><span class="learn-kicker">描き方・技術の歴史</span><h1>四角いドットで、<br>なぜ丸く見えるのか？</h1><p class="learn-deck">拡大すれば階段なのに、小さく見ると円になる。16×16のマス目で、その境目を見てみましょう。</p><p class="learn-meta">制作：PiXiEED · 図版・練習用PNGつき</p></header>
+      <div class="learn-compare">
+        <figure><img src="/assets/learn/circle-grid.svg" width="320" height="320" alt="上下左右が対称な16×16の円。上辺の長い横線から、斜め部分の短い段差へつながる"><figcaption><strong>同じ長さの段差ではない</strong>上辺は横に長く、斜めに向かうほど短く。1マスずつの並びで輪郭をつくります。</figcaption></figure>
+        <figure><img src="/assets/learn/circle-changed.svg" width="320" height="320" alt="同じ円の上辺から1マスだけ抜いた図。抜けた場所に赤枠がある"><figcaption><strong>上辺を1マスだけ抜くと</strong>線が途切れ、欠けたように見えます。小さな絵では1マスの役割が大きくなります。</figcaption></figure>
+      </div>
+      <nav class="learn-toc" aria-label="この記事の内容"><strong>この記事で分かること</strong><ol><li><a href="#shape">丸さをつくるのは、段差の並び</a></li><li><a href="#practice">16×16の円を描いてみる</a></li><li><a href="#history">コンピューターはどう円を描いてきた？</a></li></ol></nav>
+      <section id="shape"><h2>丸さをつくるのは、段差の並び</h2><p>ドット絵で円を描いても、輪郭そのものが曲線になるわけではありません。縦と横のマス目を選び、曲線に近い形を表します。離れて全体を見ると、個々の角よりも輪郭の流れを捉えやすくなります。</p><p>上の見本では、円の上側に横長の線があり、端に向かうにつれて短い段差へ切り替わります。同じ長さの段差を繰り返すと、まっすぐな斜め線に近づきます。円では場所に応じて段差を変えることがポイントです。</p><p>もう一つの手がかりが<strong>対称性</strong>。最初は左右と上下を見比べると、意図せず出たふくらみや欠けに気づきやすくなります。これは正面から見た円の練習方法です。斜め向きのコインや手描きの表情まで、すべて左右対称にする必要はありません。</p><aside class="learn-note">見本は描き方を考えるための一例です。大きさ、色、用途によって見やすい輪郭は変わります。「この配列だけが正しい円」というものではありません。</aside></section>
+      <section id="practice"><h2>16×16の円を描いてみる</h2><p>まずは輪郭だけで試します。下の見本PNGは16×16ピクセル、背景は透明です。拡大された図のマス目は、PNGには含まれません。</p><ol><li><strong>16×16の作品を用意する。</strong>見本を見ながら描くか、ダウンロードしたPNGを開いて練習します。</li><li><strong>上・下・左・右の端をそろえる。</strong>見本には外側に1マスの余白があります。端の位置を決めると、縦長や横長へのずれを見つけやすくなります。</li><li><strong>端の間を短い段差でつなぐ。</strong>一気にぐるりと描かず、まず右上を見本と比べてから、ほかの部分をそろえます。</li><li><strong>拡大表示と小さい表示を行き来する。</strong>大きくして配置を確認し、小さくして丸さを見る。1マス変えたら、全体も見直します。</li></ol><p>慣れたら輪郭の内側に色を置き、コインやボタンにしてみましょう。同じ輪郭でも、明るい色を置く場所で印象が変わります。</p>
+      <div class="learn-try"><h3>PiXiEEDrawで、この円から始める</h3><p>ブラウザーでドットを描けます。見本を取り込む場合は、先にPNGを保存してからツールで開いてください。リンクを押すだけで見本が自動挿入されるわけではありません。</p><div class="learn-actions"><a class="learn-button" href="/tools/start/draw/" data-learn-cta="draw">PiXiEEDrawで描く</a><a class="learn-button learn-button-secondary" href="/assets/learn/circle-16.png" download="pixieed-circle-16.png">16×16の円を保存</a></div><p class="learn-meta">この見本はPiXiEED制作。練習・改変・作品への利用ができます。</p></div></section>
+      <section id="history"><h2>コンピューターはどう円を描いてきた？</h2><p>「どのマスを選べば円に近づくか」は、手描きだけでなく、コンピューターグラフィックスの技術課題でもあります。</p><p>1977年、Jack Bresenhamは、円弧をドットや段差として描く計算法を発表しました。繰り返し処理で使うのは、主に加減算と符号の判定。毎回、三角関数を計算することなく、円に近い格子点を選びます。論文はCRT、デジタルプロッターなどを対象にしています。<a href="#source-circle">［1］</a></p><p>ただし、これは<strong>「ドットで円を描く表現が1977年に初めて生まれた」という意味ではありません</strong>。特定の計算法の発表年と、表現全体の起源は別です。このページの見本も、論文の計算法を再現した結果ではなく、描き方の比較用に制作したものです。</p><p>計算で近い位置を選ぶことと、絵として気持ちのよい輪郭に整えること。その両方を考えられるのが、ドット絵の面白さです。</p></section>
+      <section class="learn-related"><h2>描いた円を、くっきり保存するには</h2><p>できあがった絵が拡大後にぼやけたら、描き方ではなく拡大方法が原因かもしれません。<a href="/learn/pixel-art-blurry/">表示ズーム・整数倍拡大・PNGの違いを読む →</a></p><p>言葉を整理するなら、<a href="/glossary/#rendering">輪郭やアンチエイリアスの用語</a>も参考にしてください。</p></section>
+      <aside class="learn-try" aria-labelledby="circle-books"><h3 id="circle-books">作品例をもっと見ながら練習したい方へ</h3><p>PiXiEEDの本・道具の一覧では、ドット絵の入門書などを紹介しています。購入せずに、このページと無料ツールだけでも練習できます。</p><p class="learn-meta">PR：リンク先の一覧にはアフィリエイトリンクが含まれます。</p><a href="/books/" data-learn-cta="books">ドット絵の本を探す →</a></aside>
+      <section class="learn-sources"><h2>参考資料・図版について</h2><ol><li id="source-circle">Jack Bresenham, <a href="https://public.callutheran.edu/~reinhart/CSC505/Week1/BresenhamCircles.pdf">A Linear Algorithm for Incremental Digital Display of Circular Arcs（原論文PDF）</a>, Communications of the ACM, 20(2), 100–106, 1977. 計算法の目的・演算・対象機器を参照。</li></ol><p>資料確認：2026年11月14日。比較図と配布見本はPiXiEED制作です。論文の図の転載ではありません。</p></section>
+    </article>
+  </main>
+  <footer class="learn-footer"><nav aria-label="関連ページ"><a href="/learn/">読みもの一覧</a><a href="/glossary/">用語集</a><a href="/tools/">制作ツール</a><a href="/privacy/">プライバシー</a></nav><p>PiXiEED · 知る、描く、試してみる。</p></footer>
+  <script type="module" src="/js/site-header.mjs?rev=20261024-common-tool-start-1"></script>
+</body>
+</html>
