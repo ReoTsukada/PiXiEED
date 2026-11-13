@@ -1,9 +1,6 @@
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson, PXD_MAX_BYTES } from './pxd-codec.mjs';
-import { ANIMATION_MAX_DIMENSION, validateLargeAnimationBudget, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_COLORS_V1, ANIMATION_METADATA_BUDGET, ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_BUDGET, ANIMATION_PIXEL_ENCODING, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, getAnimationDrawRewardBonusColors, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION, validateLargeAnimationBudget, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_COLORS_V1, ANIMATION_METADATA_BUDGET, ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_BUDGET, ANIMATION_PIXEL_ENCODING, ANIMATION_SCHEMA_VERSION, createAnimationFromSerialized, getAnimationDrawRewardBonusColors, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 
-// Persisted capability boundary only. Runtime palette schemas remain 1/2/3.
-export const PXD_INDEPENDENT_MUSIC_SCHEMA_VERSION = 4;
-export const PXD_INDEPENDENT_MUSIC_CAPABILITY = 'independent-music-v1';
 const encoder = new TextEncoder();
 const rolePattern = /^[a-z][a-z0-9-]{0,47}$/;
 const statePath = (role) => `animations/${role}/state.json`;
@@ -62,7 +59,7 @@ function makeState(animation, descriptors, promoteToSchema2 = false) {
 /** Add or replace one role's timeline while preserving every unrelated PXD entry and field. */
 export async function writePxdAnimation(project, animation, { role = 'main', posterFrameId, independentMusic = false } = {}) {
   assertRole(role); validateAnimation(animation);
-  if (typeof independentMusic !== 'boolean' || independentMusic && role !== 'main') throw new TypeError('独立音楽の保存境界はmain作品にのみ指定できます。');
+  if (independentMusic !== false) fail('PXD_ANIMATION_VERSION', '独立音楽の試作形式は保存できません。原本は保持しています。');
   if (posterFrameId !== undefined && !animation.frames.some(({ id }) => id === posterFrameId)) throw new TypeError('表紙にするコマがありません。');
   project ||= createPxdProject();
   const priorAnimation = await readPxdAnimation(project, role);
@@ -92,12 +89,6 @@ export async function writePxdAnimation(project, animation, { role = 'main', pos
   }
   if (other.pixels + poolLength > ANIMATION_PIXEL_BUDGET) throw new RangeError('絵と音楽の画素プール合計が32MiBを超えます。');
   const state = makeState(animation, descriptors, promoteToSchema2);
-  const priorStoredState = priorStateForBudget ? getPxdJson(project, statePath(role)) : null;
-  if (independentMusic || priorStoredState?.schemaVersion === PXD_INDEPENDENT_MUSIC_SCHEMA_VERSION) {
-    state.baseSchemaVersion = state.schemaVersion;
-    state.schemaVersion = PXD_INDEPENDENT_MUSIC_SCHEMA_VERSION;
-    state.capabilities = [PXD_INDEPENDENT_MUSIC_CAPABILITY];
-  }
   if (posterFrameId !== undefined) state.posterFrameId = posterFrameId;
   const stateBytes = encoder.encode(JSON.stringify(state));
   if (other.metadata + stateBytes.byteLength > ANIMATION_METADATA_BUDGET) throw new RangeError('絵と音楽のアニメーション情報合計が1MiBを超えます。');
@@ -133,15 +124,8 @@ export async function readPxdAnimation(project, role = 'main') {
   if (!stateEntry || !poolEntry) fail('PXD_ANIMATION_CORRUPT', 'アニメーションの保存部品が揃っていません。原本は保持しています。');
   const totals = measureExisting(project);
   if (totals.pixels > ANIMATION_PIXEL_BUDGET || totals.metadata > ANIMATION_METADATA_BUDGET) throw new RangeError('アニメーションの保存容量が上限を超えています。');
-  let state = getPxdJson(project, statePath(role));
-  if (state?.schemaVersion === PXD_INDEPENDENT_MUSIC_SCHEMA_VERSION) {
-    if (role !== 'main' || ![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION].includes(state.baseSchemaVersion)
-      || !Array.isArray(state.capabilities) || state.capabilities.length !== 1 || state.capabilities[0] !== PXD_INDEPENDENT_MUSIC_CAPABILITY) {
-      fail('PXD_ANIMATION_VERSION', '独立音楽の保存形式に対応していません。原本は保持しています。');
-    }
-    state = { ...state, schemaVersion: state.baseSchemaVersion };
-    delete state.baseSchemaVersion; delete state.capabilities;
-  }
+  const state = getPxdJson(project, statePath(role));
+  if (state?.schemaVersion === 4) fail('PXD_ANIMATION_VERSION', '独立音楽の試作形式には対応していません。原本を変更せず保持しています。');
   if (![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION].includes(state?.schemaVersion)) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています。');
   if (state.schemaVersion === ANIMATION_SCHEMA_VERSION && (state.palette?.some((color) => typeof color === 'string' && color.length === 9 && color.slice(7).toLowerCase() !== 'ff') || state.layers?.some((layer) => layer.opacity !== undefined && layer.opacity !== 1))) fail('PXD_ANIMATION_VERSION', '透明度を含むアニメーション保存版1には対応していません。原本は保持しています。');
   if (state.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && (state.pixelEncoding !== ANIMATION_PIXEL_ENCODING || state.paletteEncoding !== ANIMATION_PALETTE_ENCODING || state.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', 'アニメーションの画素形式または合成方式に対応していません。原本は保持しています。');

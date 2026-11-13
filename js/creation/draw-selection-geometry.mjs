@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 const tidy = n => Math.round(n * 1e10) / 1e10;
 export const normalizeSelectionAngle = angle => tidy(((angle % 360) + 360) % 360);
 export function selectionAxes(angle = 0) {

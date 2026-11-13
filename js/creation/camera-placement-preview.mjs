@@ -1,5 +1,5 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { centerCrop } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { centerCrop } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-shared-2';
 
 function positiveInteger(value, name) {
   if (!Number.isInteger(value) || value <= 0) throw new RangeError(`${name} must be a positive integer`);

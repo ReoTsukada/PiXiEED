@@ -32,11 +32,15 @@ test('dense three-cel edits retain shared tiles but destructive transforms refus
  const pixels=Uint8Array.from(doc(s).pixels,v=>v+1);pixels[pixels.length-1]=pixels[pixels.length-1]===1?2:1;const next=writeAnimationCel(s,s.frames[0].id,s.layers[0].id,{width:1028,height:1028,pixels});assert.ok(estimateRetainedAnimationBytes([s,next])<4*1024*1024);const history=createDrawAnimationHistory(s);history.commit(next);assert.ok(history.undo());assert.equal(history.current,s);
  assert.throws(()=>planSharedProjectSettings(s,{width:1027,height:1028}),{code:'SHARED_SETTINGS_HISTORY_LIMIT'});assert.throws(()=>scaleSpriteAnimation(s,99),{code:'SPRITE_SCALE_TARGET_HISTORY_LIMIT'});assert.equal(s.width,1028);
 });
-test('independent music schema4 protects even small works; base1/2/3 and unrelated data survive resave',async()=>{
- for(const palette of [['#123456'],['#12345680'],Array.from({length:40},(_,i)=>`#${(i+1).toString(16).padStart(6,'0')}`)]){
-  const s=createAnimation({width:16,height:16,palette});let p=setPxdJson(createPxdProject(),'future/unknown.json',{keep:'exact'});p=await writePxdAnimation(p,s,{independentMusic:true});const state=getPxdJson(p,'animations/main/state.json');assert.equal(state.schemaVersion,4);assert.equal(state.baseSchemaVersion,s.schemaVersion);assert.deepEqual(state.capabilities,['independent-music-v1']);
-  const restored=await readPxdAnimation(p);assert.equal(restored.schemaVersion,s.schemaVersion);assert.deepEqual(doc(restored),doc(s));p=await writePxdAnimation(p,restored);assert.equal(getPxdJson(p,'animations/main/state.json').schemaVersion,4);assert.deepEqual(getPxdJson(p,'future/unknown.json'),{keep:'exact'});
-  for(const patch of [{baseSchemaVersion:99},{capabilities:['independent-music-v2']},{capabilities:[]},{schemaVersion:99}])await assert.rejects(()=>readPxdAnimation(setPxdJson(p,'animations/main/state.json',{...state,...patch})),{code:'PXD_ANIMATION_VERSION'});
- }
- await assert.rejects(()=>writePxdAnimation(createPxdProject(),createAnimation(),{role:'audio',independentMusic:true}),TypeError);
+test('unpublished schema4 is rejected without downgrade, flattening, or original-byte mutation',async()=>{
+ const art=createAnimation({width:16,height:16});let ordinary=await writePxdAnimation(createPxdProject(),art);ordinary=setPxdJson(ordinary,'future/unknown.json',{keep:'exact'});
+ assert.equal(getPxdJson(ordinary,'animations/main/state.json').schemaVersion,1);
+ const state=getPxdJson(ordinary,'animations/main/state.json');const prototype=setPxdJson(ordinary,'animations/main/state.json',{...state,schemaVersion:4,baseSchemaVersion:1,capabilities:['independent-music-v1']});
+ const before=prototype.entries.map(e=>({path:e.path,bytes:new Uint8Array(e.bytes)}));
+ await assert.rejects(()=>readPxdAnimation(prototype),{code:'PXD_ANIMATION_VERSION'});
+ await assert.rejects(()=>writePxdAnimation(prototype,art),{code:'PXD_ANIMATION_VERSION'});
+ await assert.rejects(()=>writePxdAnimation(ordinary,art,{independentMusic:true}),{code:'PXD_ANIMATION_VERSION'});
+ assert.deepEqual(prototype.entries.map(e=>({path:e.path,bytes:e.bytes})),before);
+ assert.equal(getPxdJson(prototype,'animations/main/state.json').schemaVersion,4);
+ assert.deepEqual(getPxdJson(prototype,'future/unknown.json'),{keep:'exact'});
 });

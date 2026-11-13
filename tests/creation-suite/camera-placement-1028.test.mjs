@@ -106,12 +106,12 @@ test('live camera memory getter counts compositor participants while retaining a
  const animation={layers:[{id:'music',visible:false,opacity:1},{id:'art',visible:true,opacity:1}]};
  const timeline={past:[{id:'old'}],current:animation,future:[{id:'redo'}]};
  let retainedInput;
- const make=callbacks=>Function('artSession','estimateRetainedAnimationBytes','independentMusicCallbacks',`return ({${method}})`)(()=>({animation,layerId:'art',snapshot:()=>({timeline})}),items=>{retainedInput=items;return 2048},callbacks);
- const api=make({retainedBytes:()=>128});
+ const make=(musicBytes=128)=>Function('animationSession','estimateRetainedAnimationBytes','retainedMusicBytes',`return ({${method}})`)({animation,layerId:'art',snapshot:()=>({timeline})},items=>{retainedInput=items;return 2048},()=>musicBytes);
+ const api=make();
  assert.equal(api.getCameraMemoryContext().layerCount,1);assert.deepEqual(retainedInput,[...timeline.past,animation,...timeline.future]);
  assert.equal(api.getCameraMemoryContext().retainedArtBytes,2048);assert.equal(api.getCameraMemoryContext().retainedMusicBytes,128);
  animation.layers[0].visible=true;assert.equal(api.getCameraMemoryContext().layerCount,2);
  animation.layers[0].opacity=0;assert.equal(api.getCameraMemoryContext().layerCount,1);
  animation.layers[1].visible=false;assert.equal(api.getCameraMemoryContext().layerCount,1,'hidden active still needs a buffer');
- assert.equal(make(null).getCameraMemoryContext().retainedMusicBytes,16*1024*1024,'unknown music remains conservatively reserved');
+ assert.equal(make(16*1024*1024).getCameraMemoryContext().retainedMusicBytes,16*1024*1024,'unknown music retains conservative fallback supplied by its estimator');
 });

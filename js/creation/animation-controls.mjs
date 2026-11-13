@@ -607,10 +607,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (addFrame.style.gridRow !== '1') addFrame.style.gridRow = '1'; if (addFrame.style.gridColumn !== String(frameList.length + 2)) addFrame.style.gridColumn = String(frameList.length + 2); desired.push(addFrame);
     const orderedLayers = state.layers.map((layer, modelIndex) => ({ layer, modelIndex })).reverse();
     orderedLayers.forEach(({ layer, modelIndex }, rowIndex) => {
-      const musicLayer = layer.role === 'music'; const layerLabel = musicLayer ? (state.musicReferenceOnly ? '旧音楽（参照専用）' : '音楽（全コマ共通）') : `レイヤー ${modelIndex + 1}`; const row = rowIndex + 2;
+      const musicLayer = layer.role === 'music'; const layerLabel = musicLayer ? '音楽（全コマ共通）' : `レイヤー ${modelIndex + 1}`; const row = rowIndex + 2;
       const header = take(`layer:${layer.id}`, () => button('', musicLayer ? '音楽' : '', 'select-layer', 'animation-controls__layer-number'));
       setAttr(header, 'aria-label', `${layerLabel}を選択`); setData(header, 'layerId', layer.id); setData(header, 'layerRole', musicLayer ? 'music' : '');
-      setText(header, musicLayer ? (state.musicReferenceOnly ? '旧音楽（参照専用）' : '音楽') : modelIndex + 1);
+      setText(header, musicLayer ? '音楽' : modelIndex + 1);
       setAttr(header, 'role', 'rowheader'); setAttr(header, 'aria-rowindex', row); setAttr(header, 'aria-colindex', '1');
       if (header.style.gridRow !== String(row)) header.style.gridRow = String(row); if (header.style.gridColumn !== '1') header.style.gridColumn = '1';
       setAttr(header, 'aria-pressed', layer.id === state.layerId); setClass(header, 'is-selected', layer.id === state.layerId);
@@ -665,7 +665,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     for (const { layer, modelIndex } of orderedLayers) {
       displayPosition += 1;
       const id = String(layer.id), musicLayer = layer.role === 'music';
-      const layerLabel = musicLayer ? (state.musicReferenceOnly ? '旧音楽（参照専用）' : '音楽（全コマ共通）') : layer.name || `レイヤー ${modelIndex + 1}`;
+      const layerLabel = musicLayer ? '音楽（全コマ共通）' : layer.name || `レイヤー ${modelIndex + 1}`;
       let row = old.get(id);
       if (!row) {
         controlsDirty = true;
@@ -835,7 +835,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         if (frameToggleBadge) setText(frameToggleBadge, `L1/F${frameIndex + 1}`);
       }
     }
-    const signature = [pendingDisabled, Boolean(state.readOnly), state.audioMode, state.musicReferenceOnly, state.frames.length,
+    const signature = [pendingDisabled, Boolean(state.readOnly), state.audioMode, state.frames.length,
       state.layers.filter(layer => layer.role !== 'music').length, workspaceOpen, !layers.hidden, frameOnly].join('|');
     const needsScan = controlsDirty || signature !== lastControlSignature || state.frames !== lastControlFrames || state.layers !== lastControlLayers;
     if (needsScan) {

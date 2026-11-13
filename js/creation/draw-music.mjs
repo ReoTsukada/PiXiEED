@@ -1,17 +1,17 @@
 import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
-import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261113-canvas1028-1';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261113-canvas1028-1';
-import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261113-canvas1028-1';
-import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-1';
-import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261113-canvas1028-1';
-import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-1';
+import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261113-canvas1028-shared-2';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261113-canvas1028-shared-2';
+import { composeAnimationFrameRgba } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { audioAnimationSequenceColumn } from './audio-animation.mjs?rev=20261113-canvas1028-shared-2';
+import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { audioSongImage, audioCellLink, readPxdAudioState, readPxdAudioLink, assertPxdAudioPixelCompatibility } from './pxd-draw-audio.mjs?rev=20261113-canvas1028-shared-2';
+import { pxdImageRoles, putPxdImage, readPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-shared-2';
 import { setPxdJson } from './pxd-codec.mjs';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { saveFile } from '../pixel-export.mjs?rev=20261111-output-offerwall-1';
-import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261113-canvas1028-1';
+import { AUDIO_BASIC_INSTRUMENT_IDS, AUDIO_FREE_COLORS, AUDIO_FREE_COLUMNS, AUDIO_REWARD_COLORS, AUDIO_REWARD_COLUMNS } from './audio-reward-policy.mjs?rev=20261113-canvas1028-shared-2';
 import { isSiteRewardPolicyEnabled } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 
 const preparedLegacyProjects = new WeakSet();
@@ -180,12 +180,11 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     const pageIndex=frames.findIndex(frame=>frame.id===state.musicPageId);
     for (const action of ['add','copy','before','after','delete']) setDisabled(settings.querySelector(`#draw-music-page-${action}`), musicModel.readOnly || exporting || (action==='delete'&&frames.length<2) || (action==='before'&&pageIndex<1) || (action==='after'&&pageIndex>=frames.length-1));
     const preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
-    setChecked(settings.querySelector('#draw-music-output-layer'), (musicModel.independent ? false : preferences.includeMusic));
+    setChecked(settings.querySelector('#draw-music-output-layer'), preferences.includeMusic);
     setChecked(settings.querySelector('#draw-music-output-audio'), preferences.includeAudio);
     setValue(settings.querySelector('#draw-music-loops'), preferences.loops);
     renderOutputPreview();
-    for(const id of ['#draw-music-output-layer','#draw-music-output-audio','#draw-music-loops']) setDisabled(settings.querySelector(id), exporting || (musicModel.independent && id === '#draw-music-output-layer'));
-    if(musicModel.independent) settings.querySelector('#draw-music-output-layer').title = '独立した音楽グリッドの画像合成は未対応です。音声は出力できます。';
+    for(const id of ['#draw-music-output-layer','#draw-music-output-audio','#draw-music-loops']) setDisabled(settings.querySelector(id), exporting);
     if (musicModel.error) say(`${musicModel.error} 原本と音楽データは保持しています。`, { recovery: true });
     const id = selectedColorId(), slot = id ? state.link?.colorToSlot?.[id] : null;
     setValue(instrument, slot ? getAudioColorInstrument(state.song, id, slot) : '');
@@ -241,15 +240,15 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     if (!timeline || !draw.getOutputFrame) return;
     const preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
     const frameId = timeline.frames[0].id;
-    if (renderedPreview?.timeline !== timeline || renderedPreview.frameId !== frameId || renderedPreview.includeMusic !== Boolean((musicModel.independent ? false : preferences.includeMusic))) {
-      const doc=artOutputFrame(frameId, { includeMusic: (musicModel.independent ? false : preferences.includeMusic) }),context=preview.getContext('2d');
+    if (renderedPreview?.timeline !== timeline || renderedPreview.frameId !== frameId || renderedPreview.includeMusic !== Boolean(preferences.includeMusic)) {
+      const doc=artOutputFrame(frameId, { includeMusic: preferences.includeMusic }),context=preview.getContext('2d');
       if (preview.width !== doc.width) preview.width=doc.width;
       if (preview.height !== doc.height) preview.height=doc.height;
       context.putImageData(new ImageData(new Uint8ClampedArray((doc.rgba || documentRgba({...doc,pixels:Array.from(doc.pixels)}))),doc.width,doc.height),0,0);
-      renderedPreview = { timeline, frameId, includeMusic:Boolean((musicModel.independent ? false : preferences.includeMusic)) };
+      renderedPreview = { timeline, frameId, includeMusic:Boolean(preferences.includeMusic) };
     }
     const loopSeconds = Number(state?.song?.loopTicks || 0) * 60 / Math.max(1, Number(state?.song?.tempo || 120)) / 480;
-    setText(settings.querySelector('#draw-music-export-summary'), `動画の出力：音楽レイヤー${(musicModel.independent ? false : preferences.includeMusic) ? 'あり' : 'なし'}・音声${preferences.includeAudio ? 'あり' : 'なし'}・${preferences.loops}回再生（約${(loopSeconds * preferences.loops).toFixed(1)}秒）。絵は設定したコマ時間で繰り返します。`);
+    setText(settings.querySelector('#draw-music-export-summary'), `動画の出力：音楽レイヤー${preferences.includeMusic ? 'あり' : 'なし'}・音声${preferences.includeAudio ? 'あり' : 'なし'}・${preferences.loops}回再生（約${(loopSeconds * preferences.loops).toFixed(1)}秒）。絵は設定したコマ時間で繰り返します。`);
   }
   scope.listen(settings.querySelector('#draw-music-output-layer'),'change',event=> { draw.setOutputPreferences?.({includeMusic:event.target.checked});renderOutputPreview(); });
   scope.listen(settings.querySelector('#draw-music-output-audio'),'change',event=> { draw.setOutputPreferences?.({includeAudio:event.target.checked});renderOutputPreview(); });
@@ -285,7 +284,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     if (exporting || !isActive()) return;
     draw.suspend(); player.stop(); state = projected();
     const source = state, timeline = artTimeline(), token = epoch, preferences = draw.getOutputPreferences?.() || { includeMusic: false, includeAudio: true, loops: 1 };
-    const includeMusic = Boolean((musicModel.independent ? false : preferences.includeMusic)), includeAudio = Boolean(preferences.includeAudio), loops = preferences.loops;
+    const includeMusic = Boolean(preferences.includeMusic), includeAudio = Boolean(preferences.includeAudio), loops = preferences.loops;
     const unchanged = () => isActive() && !scope.disposed && token === epoch && state === source && artTimeline() === timeline
       && JSON.stringify(draw.getOutputPreferences?.() || preferences) === JSON.stringify(preferences);
     exporting = true; refresh();

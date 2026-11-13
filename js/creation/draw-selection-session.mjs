@@ -1,5 +1,5 @@
-import { captureDrawSelection, cloneDrawSelection, projectDrawSelection, rasterDrawSelection, rasterSelectionMask } from './draw-selection-operations.mjs?rev=20261113-canvas1028-1';
-import { selectionFrameBounds, selectionDefaultPivot, selectionLocalPoint, selectionWorldPoint, rotateSelectionFrame, selectionAxes } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-1';
+import { captureDrawSelection, cloneDrawSelection, projectDrawSelection, rasterDrawSelection, rasterSelectionMask } from './draw-selection-operations.mjs?rev=20261113-canvas1028-shared-2';
+import { selectionFrameBounds, selectionDefaultPivot, selectionLocalPoint, selectionWorldPoint, rotateSelectionFrame, selectionAxes } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-shared-2';
 
 /** One floating transaction belongs to one immutable cel/animation revision. */
 export function createDrawSelectionTransform(document, bounds, { clipboard = null, owner = null, mask = null } = {}) {

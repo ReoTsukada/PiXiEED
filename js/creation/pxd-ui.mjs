@@ -1,10 +1,10 @@
 import { routeEditorFile } from './output-router.mjs?rev=20261111-output-offerwall-1';
 import { createPxdProject, decodePxd, encodePxd } from './pxd-codec.mjs';
-import { createPxdStore } from './pxd-store.mjs?rev=20261113-canvas1028-1';
-import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20261113-canvas1028-1';
-import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-1';
-import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261113-canvas1028-1';
-import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261113-canvas1028-1';
+import { createPxdStore } from './pxd-store.mjs?rev=20261113-canvas1028-shared-2';
+import { pxdImageRoles, pxdToolUrl, primaryPxdImageRole } from './pxd-project.mjs?rev=20261113-canvas1028-shared-2';
+import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { assertOwnPublicSources, getPxdPublicSources } from './work-save-policy.mjs?rev=20261113-canvas1028-shared-2';
+import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261113-canvas1028-shared-2';
 
 const labels = { draw: 'ドット絵', audio: 'ドットで音楽', jigsaw: 'ジグソー', spot_difference: '間違い探し', hidden_object: 'もの探し' };
 function errorMessage(error) {

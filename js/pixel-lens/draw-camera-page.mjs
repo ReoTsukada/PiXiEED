@@ -1,9 +1,9 @@
-import { readDrawCameraRequest, completeDrawCamera, drawCameraCancelUrl } from '../creation/draw-camera-handoff.mjs?rev=20261113-canvas1028-1';
-import { prepareCameraTarget, cameraPixels, replaceCameraPixels } from '../creation/draw-camera-core.mjs?rev=20261113-canvas1028-1';
-import { createDrawAnimationSession } from '../creation/draw-animation-session.mjs?rev=20261113-canvas1028-1';
-import { getAnimationCelDocument } from '../creation/animation-core.mjs?rev=20261113-canvas1028-1';
-import { documentRgba } from '../creation/draw-core.mjs?rev=20261113-canvas1028-1';
-import { centerCrop } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-1';
+import { readDrawCameraRequest, completeDrawCamera, drawCameraCancelUrl } from '../creation/draw-camera-handoff.mjs?rev=20261113-canvas1028-shared-2';
+import { prepareCameraTarget, cameraPixels, replaceCameraPixels } from '../creation/draw-camera-core.mjs?rev=20261113-canvas1028-shared-2';
+import { createDrawAnimationSession } from '../creation/draw-animation-session.mjs?rev=20261113-canvas1028-shared-2';
+import { getAnimationCelDocument } from '../creation/animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { documentRgba } from '../creation/draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { centerCrop } from '../pixel-studio/framing.mjs?rev=20261113-canvas1028-shared-2';
 import { cameraStartErrorMessage } from '../pixel-studio/camera-ui-state.mjs';
 
 const $ = selector => document.querySelector(selector);

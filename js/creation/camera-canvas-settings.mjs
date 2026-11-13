@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 
 /** Camera-only canvas sizing. Resizing changes bounds without scaling source pixels. */
 export function mountCameraCanvasSettings({ draw, scope, isActive = () => true } = {}) {

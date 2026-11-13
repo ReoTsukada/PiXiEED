@@ -1,17 +1,17 @@
-import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261113-canvas1028-1';
+import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261113-canvas1028-shared-2';
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
-import { mountPictureShelf } from './picture-shelf.mjs?rev=20261113-canvas1028-1';
+import { mountPictureShelf } from './picture-shelf.mjs?rev=20261113-canvas1028-shared-2';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba as indexedDocumentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-1';
-import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261113-canvas1028-1';
-import { ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes, ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, getAnimationCelDocument, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent, serializeAnimationPool, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261113-canvas1028-1';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba as indexedDocumentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { createDrawAnimationSession } from './draw-animation-session.mjs?rev=20261113-canvas1028-shared-2';
+import { ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes, ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, getAnimationCelDocument, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent, serializeAnimationPool, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261113-canvas1028-shared-2';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261113-canvas1028-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261113-canvas1028-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261113-canvas1028-shared-2';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261113-canvas1028-shared-2';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
@@ -19,30 +19,30 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261113-canvas1028-1';
-import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-1';
-import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261113-canvas1028-1';
-import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261113-canvas1028-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261113-canvas1028-shared-2';
+import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-shared-2';
+import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261113-canvas1028-shared-2';
+import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261113-canvas1028-shared-2';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261111-output-offerwall-1';
-import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261113-canvas1028-1';
+import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261113-canvas1028-shared-2';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261113-canvas1028-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261113-canvas1028-shared-2';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
-import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261113-canvas1028-1';
+import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261113-canvas1028-shared-2';
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
-import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261113-canvas1028-1';
+import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261113-canvas1028-shared-2';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261009-sprite-scale-1';
 import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=20261009-sprite-scale-1';
-import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261113-canvas1028-1';
-import { resizeDrawView } from './draw-resize-view.mjs?rev=20261113-canvas1028-1';
+import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261113-canvas1028-shared-2';
+import { resizeDrawView } from './draw-resize-view.mjs?rev=20261113-canvas1028-shared-2';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261106-button-icon-audit-1';
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
@@ -51,13 +51,13 @@ import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-p
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261015-draw-desktop-1';
-import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261113-canvas1028-1';
-import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261113-canvas1028-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261113-canvas1028-1';
-import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-1';
-import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261113-canvas1028-1';
-import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261113-canvas1028-1';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261113-canvas1028-1';
+import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261113-canvas1028-shared-2';
+import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261113-canvas1028-shared-2';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261113-canvas1028-shared-2';
+import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-shared-2';
+import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261113-canvas1028-shared-2';
+import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261113-canvas1028-shared-2';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261113-canvas1028-shared-2';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
@@ -76,7 +76,7 @@ let importedOriginal = null;
 let handoffApi = null, returnedCamera = null, initialCameraProject = null, cameraNavigationResume = null;
 const handoffParams = new URLSearchParams(location.search);
 if (handoffParams.has('drawCamera')) {
-  handoffApi = await import('./draw-camera-handoff.mjs?rev=20261113-canvas1028-1');
+  handoffApi = await import('./draw-camera-handoff.mjs?rev=20261113-canvas1028-shared-2');
   returnedCamera = handoffApi.takeDrawCameraReturn({ search: location.search, consume: false });
   if (!returnedCamera) throw new Error('撮影の受け渡しを確認できません。元の一時保存は変更していません。');
   if (returnedCamera.project?.pxdBase64) initialCameraProject = {
@@ -125,26 +125,16 @@ selectedColor = inputSettings.bindings.left.color; tool = inputSettings.bindings
 function effectiveTool() { return strokeBinding?.tool || tool; }
 function effectiveColor() { return strokeBinding?.color ?? selectedColor; }
 let animationSession = createDrawAnimationSession(documentData, { musicLayer }), animationControls = null, strokeTracker = null;
-// Active input target may be Music; the retained Art session always owns main/PXD/video.
-let retainedArtSession = null, independentMusicSession = null, independentMusicCallbacks = null;
-let retainedArtEditorState = null, retainedArtViewState = null;
-const artSession = () => retainedArtSession || animationSession;
-const independentMusicActive = () => Boolean(retainedArtSession);
-const LEGACY_MUSIC_REFERENCE_NOTICE = '旧音楽レイヤーは参照専用です。音楽モードで音楽グリッドを編集してください。';
-function legacyMusicReference(layerId = animationSession.layerId) {
-  return Boolean(independentMusicCallbacks && !independentMusicActive() && animationSession.animation.layers.find(layer => layer.id === layerId)?.role === 'music');
+let musicMemoryEstimator = null;
+function retainedMusicBytes() {
+  try {
+    const bytes=musicMemoryEstimator?.();
+    if(bytes==null)return 16*1024*1024;
+    if(Number.isSafeInteger(bytes)&&bytes>=0)return bytes;
+  }catch{}
+  // A failed/oversized estimate is not permission to use a smaller fallback.
+  return 64*1024*1024+1;
 }
-function assertEditableMusicReference(layerId = animationSession.layerId) {
-  if (legacyMusicReference(layerId)) throw new Error(LEGACY_MUSIC_REFERENCE_NOTICE);
-}
-function restoreArtSelectionFromMusicReference() {
-  if (!legacyMusicReference()) return false;
-  const layer = animationSession.animation.layers.findLast(item => item.role !== 'music');
-  if (!layer) throw new Error('旧音楽参照のみの作品はDrawで編集できません。元データは保持されています。');
-  documentData = animationSession.select(animationSession.frameId, layer.id);
-  toast(LEGACY_MUSIC_REFERENCE_NOTICE);return true;
-}
-
 
 const animationRenderCache = createAnimationFrameCache({ maxEntries: 8, maxBytes: 4 * 1024 * 1024 });
 const framePreviewCache = createAnimationFrameCache({ maxEntries: 6, maxBytes: 6 * 256 * 256 * 4 });
@@ -470,7 +460,7 @@ async function restoreCameraReturn(record) {
   if (record.history?.timelapse) timelapse.restore(record.history.timelapse.map(event => ({ ...event, data: decodeCameraBytes(event.data), ...(event.indices ? { indices: Uint32Array.from(event.indices) } : {}) })));
   if (record.indices) {
     const lease = drawRewardPolicy.capture('draw');
-    const { prepareCameraTarget, replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-1');
+    const { prepareCameraTarget, replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-shared-2');
     const target = prepareCameraTarget(documentData, record.mask, record.allowedIndices);
     const next = replaceCameraPixels(documentData, target, record.indices);
     const before = animationSession.animation;
@@ -507,7 +497,7 @@ scope.listen(window, 'pagehide', cancelCamera);
 scope.listen(document, 'visibilitychange', () => { if (document.hidden) cancelCamera(); });
 function updateControls() {
   const busy = drawingInputBusy() || Boolean(featureSession);
-  $('#draw-undo').disabled = busy || !selectionTransform && !(independentMusicActive() ? independentMusicCallbacks?.canUndo?.() : animationSession.canUndo); $('#draw-redo').disabled = busy || Boolean(selectionTransform) || !(independentMusicActive() ? independentMusicCallbacks?.canRedo?.() : animationSession.canRedo);
+  $('#draw-undo').disabled = busy || !selectionTransform && !(animationSession.canUndo); $('#draw-redo').disabled = busy || Boolean(selectionTransform) || !(animationSession.canRedo);
   $('#draw-undo').setAttribute('aria-disabled', String($('#draw-undo').disabled)); $('#draw-redo').setAttribute('aria-disabled', String($('#draw-redo').disabled));
   status.textContent = cameraFailureNotice && performance.now() < cameraFailureNotice.until ? cameraFailureNotice.message : saved ? '保存しました。' : '編集中です。保存すると端末に残ります。';
   syncPlaybackControl();
@@ -630,7 +620,7 @@ function paintOnion(display, changed = null) {
   else if (selection || selectionTransform) placeSelection();
 }
 function handleAnimationAction(action) {
-  if (action.layerId && legacyMusicReference(action.layerId)) { toast(LEGACY_MUSIC_REFERENCE_NOTICE);return false; }
+  if (musicReadOnlyReason && action.layerId && animationSession.animation.layers.find(layer=>layer.id===action.layerId)?.role==='music') { toast(musicReadOnlyReason);return false; }
   if (cameraOpening || spriteScaling || featureSession) return false;
   if (action.type === 'play') return toggleAnimation();
   if (action.type === 'onion') {
@@ -679,7 +669,7 @@ function handleAnimationAction(action) {
   installAnimationDocument(animationSession.apply(next, targetSelection)); pxdBridge?.markDirty();
 }
 animationControls = mountAnimationControls({ host: $('#draw-animation-controls'), scope,
-  getState: () => ({ ...animationSession.animation, musicReferenceOnly:Boolean(independentMusicCallbacks) && !independentMusicActive(), frameId: animationSession.frameId, layerId: animationSession.layerId, playing, playbackFrameId: playbackFrame, onion, readOnly: Boolean(readOnlyImage) }),
+  getState: () => ({ ...animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId, playing, playbackFrameId: playbackFrame, onion, readOnly: Boolean(readOnlyImage) }),
   onionControlExternal: true, dismissibleMenus: true,
   onAction: handleAnimationAction,
   getCelHasContent: (frameId, layerId) => hasAnimationCelContent(animationSession.animation, frameId, layerId),
@@ -854,7 +844,6 @@ function canEdit(value = documentData, { shared = false, allowMusicReadOnly = fa
   if (cameraOpening) return false;
   if (spriteScaling) { toast('倍率変更の確認が終わるまでお待ちください。'); return false; }
   if (playing) { toast('再生を止めると編集できます。'); return false; }
-  if (legacyMusicReference()) { toast(LEGACY_MUSIC_REFERENCE_NOTICE);return false; }
   if (!allowMusicReadOnly && musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') { toast(musicReadOnlyReason); return false; }
   if (readOnlyImage) { toast('原本を表示しています。編集するにはプロジェクトのキャンバス設定でサイズと色を合わせてください。'); return false; }
   const policy = evaluateSharedCanvasPolicy({ width: value.width, height: value.height, colorCount: 1 }, { passActive: true });
@@ -1793,7 +1782,6 @@ function resizeCanvas(width, height) {
   } catch (error) { status.textContent = `サイズを変更できませんでした：${error.message}`; return false; }
 }
 function spriteScaleBlockedReason() {
-  if (independentMusicActive()) return '音楽グリッドは表示範囲だけ変更できます。絵の拡縮はDrawで行ってください。';
   if (spriteScaling) return '保存容量を確認しています…';
   if (cameraOpening) return 'カメラの操作を終えてから倍率を変更できます。';
   if (readOnlyImage) return '原本を表示しています。編集できるサイズ・色数へ合わせてから倍率を変更できます。';
@@ -1989,7 +1977,6 @@ function afterHistoryStep() {
   if (step?.paletteChanged) { renderPalette(); showCurrentColor(); paint(); } else paint(step?.indices || null);
 }
 function undo(shared = false) {
-  if (independentMusicActive()) return independentMusicCallbacks?.undo?.() ?? false;
   if (featureSession || drawingInputBusy()) return false;
   if (selectionTransform) { cancelDrawingInput(); return cancelSelectionTransform(); }
   if (!canEdit(documentData, { shared, allowMusicReadOnly: true })) return false;
@@ -1999,7 +1986,6 @@ function undo(shared = false) {
   closeColorEditor(); const doc = animationSession.undo(); if (!doc) return false; installAnimationDocument(doc); pxdBridge?.markDirty(); setDrawRewardNotice(); return true;
 }
 function redo(shared = false) {
-  if (independentMusicActive()) return independentMusicCallbacks?.redo?.() ?? false;
   if (featureSession || selectionTransform || drawingInputBusy() || !canEdit(documentData, { shared, allowMusicReadOnly: true })) return false;
   const lease = drawRewardPolicy.capture('draw');
   const candidate = animationSession.snapshot().timeline.future.at(-1);
@@ -2201,7 +2187,7 @@ async function importImage(file, importSource) {
   const ticket = loadGate.begin();
   $('#draw-import-local').disabled = true; status.textContent = '画像を読み込んでいます…';
   try {
-    const { decodeDrawImageFile } = await import('./draw-import.mjs?rev=20261113-canvas1028-1');
+    const { decodeDrawImageFile } = await import('./draw-import.mjs?rev=20261113-canvas1028-shared-2');
     if (scope.disposed || !loadGate.isCurrent(ticket)) return;
     const image = await decodeDrawImageFile(file);
     if (scope.disposed || !loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
@@ -2214,7 +2200,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261113-canvas1028-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261113-canvas1028-shared-2');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2239,8 +2225,8 @@ $('#draw-output [data-output-project]')?.addEventListener('click', () => {
   void pxdBridge?.showProjects();
 });
 
-function composeCurrentOutputFrame(frameId = artSession().frameId, { includeMusic = outputPreferences.includeMusic } = {}) {
-  const animation = artSession().animation, withMusic = Boolean(!independentMusicCallbacks && musicLayer && includeMusic);
+function composeCurrentOutputFrame(frameId = animationSession.frameId, { includeMusic = outputPreferences.includeMusic } = {}) {
+  const animation = animationSession.animation, withMusic = Boolean(musicLayer && includeMusic);
   return cachedAnimationFrame(animation, `output:${frameId}:${withMusic}`, () => composeOutputFrame(animation, frameId, { includeMusic: withMusic }));
 }
 let outputPreviewImageData = null;
@@ -2249,7 +2235,6 @@ function updateOutputPreview() {
   const preview = $('#draw-output-music-preview');
   if (!preview || !musicLayer || !$('#draw-output')?.open) return;
   const checkbox = $('#draw-output-music-layer');
-  if (checkbox && independentMusicCallbacks) { checkbox.checked=false;checkbox.disabled=true;checkbox.title='独立した音楽グリッドの画像合成は未対応です。'; }
   const image = composeCurrentOutputFrame();
   const resized = preview.width !== image.width || preview.height !== image.height;
   if (preview.width !== image.width) preview.width = image.width;
@@ -2303,7 +2288,7 @@ $('#draw-export').addEventListener('click', async () => {
   const bridge = pxdBridge; let project = bridge?.currentProject; let held = bridge?.heldProject;
   const unchangedSource = () => !scope.disposed && isActive() && documentData === original && source === originalSource && pxdBridge === bridge
     && bridge?.currentProject?.projectId === project?.projectId && bridge?.heldProject?.projectId === held?.projectId;
-  const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: artSession().animation.width, height: artSession().animation.height, data: documentRgba(composeCurrentOutputFrame()) };
+  const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: animationSession.animation.width, height: animationSession.animation.height, data: documentRgba(composeCurrentOutputFrame()) };
   try {
     await bridge?.assertCanSave?.();
     if (!unchangedSource()) return;
@@ -2311,10 +2296,10 @@ $('#draw-export').addEventListener('click', async () => {
     if (!unchangedSource()) return;
     interactionEffects.exportImage({ from: canvas, to: $('#draw-export'), image: canvas });
     const mediaSources = [{ id: 'current-image', label: '現在のコマ', kind: 'rgba-frames', frames: [{ width: image.width, height: image.height, data: new Uint8Array(image.data) }] }];
-    const animation = artSession().animation;
+    const animation = animationSession.animation;
     if (!readOnlyImage && animation.frames.length > 1) {
       const animationFrames = animation.frames.map((frame) => {
-        const doc = composeOutputFrame(animation, frame.id, { includeMusic: !independentMusicCallbacks && musicLayer && outputPreferences.includeMusic });
+        const doc = composeOutputFrame(animation, frame.id, { includeMusic: musicLayer && outputPreferences.includeMusic });
         return { width: doc.width, height: doc.height, data: new Uint8Array(documentRgba(doc)), delayMs: Math.max(20, frame.durationMs) };
       });
       if (animationFrames[0].width * animationFrames[0].height * animationFrames.length <= 5_000_000) {
@@ -2378,7 +2363,7 @@ function recordedHistory(target) {
         if (beforeSelection) { selectionViewStates.set(beforeAnimation, { ...beforeSelection }); selectionViewStates.set(animationSession.animation, { ...beforeSelection }); }
         animationControls?.refresh();
         pxdBridge?.markDirty();
-        const editingMusic = independentMusicActive() || musicLayer && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music';
+        const editingMusic = musicLayer && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music';
         if (!editingMusic) {
           if (musicLayer) {
             const art = legacyTimelapseFrame(animationSession.animation, animationSession.frameId);
@@ -2401,7 +2386,7 @@ function recordedHistory(target) {
     if (key === 'undo' || key === 'redo') return (...args) => {
       const done = value.apply(object, args);
       if (done) {
-        const editingMusic = independentMusicActive() || musicLayer && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music';
+        const editingMusic = musicLayer && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music';
         if (!editingMusic) timelapse.record(musicLayer ? legacyTimelapseFrame(animationSession.animation, animationSession.frameId) : documentData, object.lastStep);
         pxdBridge?.markDirty();
       }
@@ -2483,14 +2468,14 @@ let animationExporting = false, animationExportController = null;
 async function exportAnimation() {
   if (animationExporting || readOnlyImage || scope.disposed) return;
   endStroke(); closeColorEditor(); stopAnimation(); editorUi.closePanels();
-  const timeline = artSession().animation; const exportDocument = documentData; const exportSource = source; const exportBridge = pxdBridge; animationExporting = true;
+  const timeline = animationSession.animation; const exportDocument = documentData; const exportSource = source; const exportBridge = pxdBridge; animationExporting = true;
   animationExportController = new AbortController(); const controller = animationExportController;
   try {
     await pxdBridge?.assertCanSave?.();
     const frames = [];
     for (const frame of timeline.frames) {
       if (scope.disposed || controller.signal.aborted) return;
-      const doc = composeOutputFrame(timeline, frame.id, { includeMusic: !independentMusicCallbacks && musicLayer && outputPreferences.includeMusic });
+      const doc = composeOutputFrame(timeline, frame.id, { includeMusic: musicLayer && outputPreferences.includeMusic });
       frames.push({ width: doc.width, height: doc.height, data: documentRgba(doc), delayMs: Math.max(20, frame.durationMs) });
     }
     const { encodeAnimatedGif } = await import('../animated-export.mjs?rev=20261015-alpha-opacity-1');
@@ -2499,8 +2484,8 @@ async function exportAnimation() {
     if (scope.disposed || controller.signal.aborted) return;
     const blob = new Blob([result.bytes], { type: 'image/gif' });
     const durationSeconds = frames.reduce((total, frame) => total + frame.delayMs, 0) / 1000;
-    if (scope.disposed || documentData !== exportDocument || source !== exportSource || pxdBridge !== exportBridge || artSession().animation !== timeline) return;
-    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-animation-${result.width}x${result.height}.gif`, returnUrl: currentToolReturnUrl, title: 'アニメーションを確認', source: 'PiXiEEDraw', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: result.scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, loopCount: 0 } }, exportBridge, () => !scope.disposed && documentData === exportDocument && source === exportSource && pxdBridge === exportBridge && artSession().animation === timeline);
+    if (scope.disposed || documentData !== exportDocument || source !== exportSource || pxdBridge !== exportBridge || animationSession.animation !== timeline) return;
+    const staged = await sendToolOutputAfterSaving({ blob, filename: `pixieed-animation-${result.width}x${result.height}.gif`, returnUrl: currentToolReturnUrl, title: 'アニメーションを確認', source: 'PiXiEEDraw', metadata: { width: frames[0].width, height: frames[0].height, defaultScale: result.scale, durationSeconds, frameCount: frames.length }, mediaSource: { kind: 'gif-frames', frames, loopCount: 0 } }, exportBridge, () => !scope.disposed && documentData === exportDocument && source === exportSource && pxdBridge === exportBridge && animationSession.animation === timeline);
     if (staged.ok) return;
     if (staged.reason === 'source_changed') return;
     const saved = await saveFile(blob, `pixieed-animation-${result.width}x${result.height}.gif`);
@@ -2520,7 +2505,6 @@ function restoreDrawEditorState(state) {
     if (state?.imageRole && state.imageRole !== (musicLayer ? 'main' : pxdImageRole)) state = {};
     if (!readOnlyImage) {
       documentData = animationSession.select(state?.frameId, state?.layerId);
-      restoreArtSelectionFromMusicReference();
       history = recordedHistory(createDrawHistory(documentData)); onion = state?.onion === true;
     }
     const previousPlacement = inputSettings.controlsSide;
@@ -2546,18 +2530,16 @@ const drawProjectOptions = {
   tool: 'draw',
   projectWorkspace: true,
   initialProject: initialCameraProject,
-  getEditorState: () => retainedArtEditorState || getDrawEditorState(),
+  getEditorState: () => getDrawEditorState(),
   restoreEditorState: restoreDrawEditorState,
   hasContent: () => Boolean(pxdBridge?.currentProject || pxdBridge?.heldProject || activeDraftId || documentData.pixels.some((pixel) => pixel >= 0)),
   setStatus: (message) => { status.textContent = message; },
   async openProject(project, { imageRole = null } = {}) {
     if (scope.disposed) return;
-    const permitsIndependentMusic = Boolean(independentMusicCallbacks);
-    leaveIndependentMusicEditor(); independentMusicSession = null; independentMusicCallbacks = null;
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261113-canvas1028-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261113-canvas1028-shared-2');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -2575,7 +2557,7 @@ const drawProjectOptions = {
     if (!imageRole && !requestedRole && !roles.includes(rememberedRole) && roles.length > 1) role = await chooseProjectRole(project, roles);
     // Validate the timeline before replacing the working document. Unknown versions fail closed.
     const storedAnimation = await readPxdAnimation(project, role || 'main');
-    if (!permitsIndependentMusic && document.body.dataset.creationMode === 'audio' && (storedAnimation?.width > 256 || storedAnimation?.height > 256)) throw new RangeError('256pxを超える作品はDrawモードで開いてください。現在の作品とモードは変更していません。');
+    if (document.body.dataset.creationMode === 'audio' && (storedAnimation?.width > 256 || storedAnimation?.height > 256)) throw new RangeError('256pxを超える作品はDrawモードで開いてください。現在の作品とモードは変更していません。');
     if (scope.disposed) return;
     let nextDocument;
     {
@@ -2600,7 +2582,7 @@ const drawProjectOptions = {
       }
     }
     if (!nextDocument) throw new Error('このPXDには描画できる画像部品がありません。別のPXDや保存版を選んでください。');
-    if (!permitsIndependentMusic && document.body.dataset.creationMode === 'audio' && (nextDocument.width > 256 || nextDocument.height > 256)) throw new RangeError('256pxを超える作品はDrawモードで開いてください。現在の作品とモードは変更していません。');
+    if (document.body.dataset.creationMode === 'audio' && (nextDocument.width > 256 || nextDocument.height > 256)) throw new RangeError('256pxを超える作品はDrawモードで開いてください。現在の作品とモードは変更していません。');
     validateDrawDocument(nextDocument);
     pxdImageRole = role || 'main';
     replaceDocument(structuredClone(nextDocument), { type: 'pxd_project_copy', assetId: null, revisionId: null, projectId: project.projectId, imageRole: pxdImageRole }, { fromPxd: true });
@@ -2615,7 +2597,7 @@ const drawProjectOptions = {
   getPreviewImage() {
     if (scope.disposed) return null;
     if (readOnlyImage) return readOnlyImage;
-    const timeline = !independentMusicActive() && colorEdit ? setAnimationPalette(artSession().animation, documentData.palette) : artSession().animation;
+    const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
     // Use the artwork poster in every mode, never the selected music cel.
     const snapshot = composeOutputFrame(timeline, timeline.frames[0].id, { includeMusic: false });
     return { width: snapshot.width, height: snapshot.height, rgba: documentRgba(snapshot) };
@@ -2625,7 +2607,7 @@ const drawProjectOptions = {
     if (readOnlyImage) return project;
     // Autosave can capture while another pointer is still drawing. Capture the
     // committed timeline; releasing the stroke commits it and schedules its save.
-    const timeline = !independentMusicActive() && colorEdit ? setAnimationPalette(artSession().animation, documentData.palette) : artSession().animation;
+    const timeline = colorEdit ? setAnimationPalette(animationSession.animation, documentData.palette) : animationSession.animation;
     const snapshot = composeOutputFrame(timeline, timeline.frames[0].id, { includeMusic: false }); const role = musicLayer ? 'main' : pxdImageRole;
     let next = project || createPxdProject();
     if (importedOriginal) next = setPxdBytes(next, `originals/imported-source.${importedOriginal.mime === 'image/webp' ? 'webp' : 'png'}`, importedOriginal.bytes, importedOriginal.mime);
@@ -2634,7 +2616,7 @@ const drawProjectOptions = {
     next = writeMusicOutputPreferences(next, outputPreferences);
     next = role === 'main' ? await putPxdSharedImage(next, { width: snapshot.width, height: snapshot.height, rgba: documentRgba(snapshot) }) : await putPxdImage(next, { width: snapshot.width, height: snapshot.height, rgba: documentRgba(snapshot) }, role);
     if (role !== 'main') next = { ...next, entries: next.entries.filter(entry => entry.path !== `images/${role}/draw.json`) };
-    next = await writePxdAnimation(next, timeline, { role, posterFrameId: timeline.frames[0].id, independentMusic: Boolean(independentMusicCallbacks) });
+    next = await writePxdAnimation(next, timeline, { role, posterFrameId: timeline.frames[0].id });
     for (const hook of projectHooks) if (hook.onSave) next = await hook.onSave(next, timeline, { imageRole: role });
     return next;
   }
@@ -2849,34 +2831,6 @@ async function chooseProjectRole(project, roles) {
     dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); }); document.body.append(dialog); dialog.showModal();
   });
 }
-function leaveIndependentMusicEditor() {
-  if (!retainedArtSession) return false;
-  cancelDrawingInput(); closeColorEditor(); independentMusicSession = animationSession;
-  animationSession = retainedArtSession; retainedArtSession = null;
-  const editor = retainedArtEditorState, view = retainedArtViewState;
-  retainedArtEditorState = retainedArtViewState = null;
-  installAnimationDocument(animationSession.document(), { preserveTimelapse: true });
-  if (editor) restoreDrawEditorState(editor);
-  if (view) { zoom=view.zoom;panX=view.panX;panY=view.panY;updateCanvasView(); }
-  return true;
-}
-function displayIndependentMusicDocument(doc, callbacks, { activate = false } = {}) {
-  validateDrawDocument(doc);
-  if (doc.width > 256 || doc.height > 256) throw new RangeError('音楽グリッドは256px以下です。');
-  independentMusicCallbacks = callbacks;
-  if (restoreArtSelectionFromMusicReference()) installAnimationDocument(documentData, {preserveTimelapse:true});
-  // A private display session uses the existing Draw input engine, never the Art history.
-  const next = createDrawAnimationSession(doc, { musicLayer: false });
-  if (activate && !retainedArtSession) {
-    retainedArtSession = animationSession; retainedArtEditorState = getDrawEditorState(); retainedArtViewState = {zoom,panX,panY};
-  }
-  independentMusicSession = next;
-  if (retainedArtSession) {
-    animationSession = next; selection=null;selectionTransform=null;zoom=1;panX=panY=0;
-    installAnimationDocument(next.document(), { preserveTimelapse: true });
-  }
-  return next.animation;
-}
 function settingsPlan(settings) {
   if (readOnlyImage) throw new Error('この原本は共有編集の対応範囲外です。原本とPXDは保持しています。');
   const plan = planSharedProjectSettings(animationSession.animation, settings);
@@ -2931,21 +2885,20 @@ function openAudioTimbre(index = selectedColor, sourceTrigger = null) {
 return {
   get workspace() { return pxdBridge; }, dispose: disposeDrawMode,
   get bank() { return 'shared'; },
-  displayIndependentMusicDocument(doc, callbacks, options) { return displayIndependentMusicDocument(doc, callbacks, options); },
-  leaveIndependentMusicEditor,
-  markIndependentMusicDirty() { saved = false; pxdBridge?.markDirty(); },
-  getRetainedMusicBytes() { return independentMusicCallbacks?.retainedBytes?.() ?? (16 * 1024 * 1024); },
+  setMusicMemoryEstimator(callback) {
+    if (typeof callback!=='function') throw new TypeError('音楽メモリ計測が不正です。');
+    musicMemoryEstimator=callback;return()=>{if(musicMemoryEstimator===callback)musicMemoryEstimator=null;};
+  },
+  getRetainedMusicBytes() { return retainedMusicBytes(); },
   getCameraMemoryContext() {
-    const retained = artSession().snapshot().timeline;
-    return {layerCount:artSession().animation.layers.filter(layer=>layer.id===artSession().layerId || layer.visible && (layer.opacity ?? 1)>0).length,retainedArtBytes:estimateRetainedAnimationBytes([...retained.past,retained.current,...retained.future]),retainedMusicBytes:independentMusicCallbacks?.retainedBytes?.() ?? (16 * 1024 * 1024)};
+    const retained = animationSession.snapshot().timeline;
+    return {layerCount:animationSession.animation.layers.filter(layer=>layer.id===animationSession.layerId || layer.visible && (layer.opacity ?? 1)>0).length,retainedArtBytes:estimateRetainedAnimationBytes([...retained.past,retained.current,...retained.future]),retainedMusicBytes:retainedMusicBytes()};
   },
   getTimeline() { return animationSession.animation; },
   getActiveTimeline() { return animationSession.animation; },
-  getArtTimeline() { return artSession().animation; },
-  get independentMusicActive() { return independentMusicActive(); },
-  getArtOutputFrame(frameId = artSession().frameId, options = {}) {
-    if (independentMusicCallbacks && options.includeMusic) throw new Error('異なるサイズの音楽グリッド合成は未対応です。音楽レイヤーを含めず出力してください。');
-    return composeOutputFrame(artSession().animation, frameId, { includeMusic: Boolean(options.includeMusic) });
+  getArtTimeline() { return animationSession.animation; },
+  getArtOutputFrame(frameId = animationSession.frameId, options = {}) {
+    return composeOutputFrame(animationSession.animation, frameId, { includeMusic: Boolean(options.includeMusic) });
   }, getImageRole() { return musicLayer ? 'main' : pxdImageRole; },
   getRestoreImageRole() { return pxdImageRole; },
   getTimelineHistoryPosition(timeline) {
@@ -2955,7 +2908,7 @@ return {
     if (history.future.includes(timeline)) return 'future';
     return 'missing';
   },
-  getEditorState: () => retainedArtEditorState || getDrawEditorState(),
+  getEditorState: () => getDrawEditorState(),
   setAudioTimbreApi(api) { audioTimbreApi = api || null; drawAudioTimbrePanel?.setEnabled(Boolean(audioTimbreApi)); drawAudioTimbrePanel?.setAudioApi(audioTimbreApi); for (const swatch of document.querySelectorAll('#draw-palette [data-color-index]')) renderAudioPaletteIcon(swatch, Number(swatch.dataset.colorIndex), documentData.palette[Number(swatch.dataset.colorIndex)]); },
   refreshAudioTimbrePanel() { for (const swatch of document.querySelectorAll('#draw-palette [data-color-index]')) renderAudioPaletteIcon(swatch, Number(swatch.dataset.colorIndex), documentData.palette[Number(swatch.dataset.colorIndex)]); drawAudioTimbrePanel?.refresh(); },
   openAudioTimbre,
@@ -2996,7 +2949,6 @@ return {
     return animationSession.animation;
   },
   previewProjectSettings(settings) {
-    if (independentMusicActive()) return independentMusicCallbacks.previewView(settings);
 
     const plan = settingsPlan(settings), doc = composeAnimationFrameRgba(plan.animation, animationSession.frameId);
     return { ...plan, image: { width: doc.width, height: doc.height, rgba: documentRgba(doc.rgba ? doc : { ...doc, pixels: Array.from(doc.pixels) }) } };
@@ -3034,13 +2986,9 @@ return {
   },
   setProjectSettings(settings, { expectedOwner = null } = {}) {
     if (expectedOwner && expectedOwner !== animationSession.animation) throw new Error('プレビュー後に作品が変わりました。もう一度確認してください。');
-    if (independentMusicActive()) {
-      if (featureSession || selectionTransform || drawingInputBusy() || colorEdit || playing) throw new Error('現在の編集・再生を終えてから音楽グリッドを変更してください。');
-      return independentMusicCallbacks.resizeView(settings);
-    }
 
     if (document.body.dataset.creationMode === 'audio' && (settings.width > 256 || settings.height > 256)) throw new RangeError('256pxを超える設定はDrawモードで行ってください。作品は変更していません。');
-    if (expectedOwner && expectedOwner !== animationSession.animation) throw new Error('プレビュー後に作品が変わりました。もう一度確認してください。');
+
     if (featureSession || selectionTransform || drawingInputBusy() || colorEdit || playing || !canEdit(documentData, { shared: true })) throw new Error('現在の編集・再生を終えてから共通設定を変更してください。');
     const plan = settingsPlan(settings); if (!plan.changed) return false;
     const lease = drawRewardPolicy.capture('draw');
@@ -3050,7 +2998,7 @@ return {
     installAnimationDocument(animationSession.apply(plan.animation)); sizeWasChosen = true; pxdBridge.markDirty(); return true;
   },
   undo: () => undo(true), redo: () => redo(true),
-  get canUndo() { return independentMusicActive() ? Boolean(independentMusicCallbacks?.canUndo?.()) : animationSession.canUndo; }, get canRedo() { return independentMusicActive() ? Boolean(independentMusicCallbacks?.canRedo?.()) : animationSession.canRedo; },
+  get canUndo() { return animationSession.canUndo; }, get canRedo() { return animationSession.canRedo; },
   openSpriteScale() { canvasPicker.open = true; canvasSettingsPanel.position(); },
   importImage(image) {
     const doc = imageToDrawDocument({ ...image, rgba: new Uint8Array(image.rgba) });
@@ -3062,10 +3010,9 @@ return {
     saved = false; pxdBridge?.markDirty();
   },
   applyMusicPage(doc, { record = true, select = false, prepareTimeline } = {}) {
-    if (independentMusicCallbacks) throw new Error(LEGACY_MUSIC_REFERENCE_NOTICE);
     if (!musicLayer) throw new Error('音楽レイヤーはこのDrawセッションでは有効ではありません。');
     if (typeof record !== 'boolean' || typeof select !== 'boolean' || prepareTimeline != null && typeof prepareTimeline !== 'function') throw new TypeError('音楽ページの適用オプションが不正です。');
-    if (musicReadOnlyReason && record) throw new Error(musicReadOnlyReason);
+    if (musicReadOnlyReason) throw new Error(musicReadOnlyReason);
     validateDrawDocument(doc);
     if (doc.width !== animationSession.animation.width || doc.height !== animationSession.animation.height) throw new RangeError('音楽グリッドは共通キャンバスと同じ大きさにしてください。');
     const original = animationSession.animation;
@@ -3088,7 +3035,7 @@ return {
     return next;
   },
   selectMusicLayer() {
-    if (independentMusicCallbacks) throw new Error(LEGACY_MUSIC_REFERENCE_NOTICE);
+    if (musicReadOnlyReason) throw new Error(musicReadOnlyReason);
     if (!musicLayer) throw new Error('音楽レイヤーはこのDrawセッションでは有効ではありません。');
     const id = animationSession.animation.layers.find(layer => layer.role === 'music')?.id;
     if (!id) throw new Error('共有音楽レイヤーが見つかりません。');
@@ -3099,7 +3046,6 @@ return {
     return true;
   },
   selectArtLayer(layerId = null) {
-    leaveIndependentMusicEditor();
     const layer = layerId ? animationSession.animation.layers.find(item => item.id === layerId && item.role !== 'music')
       : animationSession.animation.layers.find(item => item.id === lastArtLayerId && item.role !== 'music') || animationSession.animation.layers.findLast(item => item.role !== 'music');
     if (!layer) throw new Error('描画レイヤーが見つかりません。');
@@ -3115,8 +3061,7 @@ return {
   },
   getOutputPreferences() { return { ...outputPreferences, includeMusic: Boolean(musicLayer && outputPreferences.includeMusic) }; },
   setOutputPreferences(preferences = {}, options = {}) { return applyOutputPreferences(preferences, options); },
-  getOutputFrame(frameId = artSession().frameId, options = {}) {
-    if (independentMusicActive()) return this.getArtOutputFrame(frameId, options);
+  getOutputFrame(frameId = animationSession.frameId, options = {}) {
     return composeCurrentOutputFrame(frameId, options);
   },
   commitMetadata(prepare) {
@@ -3177,11 +3122,9 @@ return {
     return index;
   },
   async cameraTarget(memoryExtras={}) {
-    if (independentMusicActive()) throw new Error('撮影画像は音楽グリッドに配置できません。Drawまたはカメラモードに切り替えてください。');
-    assertEditableMusicReference();
     if (animationSession.animation.width > ANIMATION_MAX_DIMENSION || animationSession.animation.height > ANIMATION_MAX_DIMENSION) throw new RangeError(`カメラ配置は${ANIMATION_MAX_DIMENSION}px以下に対応しています。作品は変更していません。`);
     const lease = captureDrawOperation();
-    const { prepareCameraTarget } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-1');
+    const { prepareCameraTarget } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-shared-2');
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
     if (readOnlyImage) throw new Error('原本を表示しています。共通キャンバスの設定で編集可能なサイズと色数に合わせてから適用してください。');
     if (animationSession.locked) throw new Error('ロックを解除するか、編集可能なレイヤーを選んでから適用してください。');
@@ -3195,8 +3138,7 @@ return {
       description: `フレーム${frameNumber}・${layer.name}${layer.visible ? '' : '（非表示）'}・${area}` };
   },
   cameraPlacementTarget(memoryExtras={}) {
-    if (independentMusicActive()) throw new Error('撮影画像は音楽グリッドに配置できません。Drawまたはカメラモードに切り替えてください。');
-    assertEditableMusicReference();
+    if (musicReadOnlyReason && animationSession.animation.layers.find(layer=>layer.id===animationSession.layerId)?.role==='music') throw new Error(musicReadOnlyReason);
     const lease = captureDrawOperation();
     const image = readOnlyImage ? { width:readOnlyImage.width, height:readOnlyImage.height } : null;
     const animation = animationSession.animation;
@@ -3265,14 +3207,12 @@ return {
       mask:mask ? new Uint8Array(mask) : null, bounds:{ ...target.bounds }, cells:target.cells, description,
       applyReason:layer?.locked ? '選択レイヤーはロック中です。ロックを解除すると撮影画像を適用できます。' : musicReadOnly ? musicReadOnlyReason : '' };
   },
-  previewCamera(target, indices) { if (independentMusicActive()) throw new Error('撮影画像は音楽グリッドに配置できません。Drawまたはカメラモードに切り替えてください。'); assertEditableMusicReference(); return animationSession.composite({ ...target.document, pixels: Array.from(indices) }); },
+  previewCamera(target, indices) { if (musicReadOnlyReason && animationSession.animation.layers.find(layer=>layer.id===animationSession.layerId)?.role==='music') throw new Error(musicReadOnlyReason); return animationSession.composite({ ...target.document, pixels: Array.from(indices) }); },
   async applyCamera(snapshot, indices) {
-    if (independentMusicActive()) throw new Error('撮影画像は音楽グリッドに配置できません。Drawまたはカメラモードに切り替えてください。');
-    assertEditableMusicReference();
     const lease = snapshot.lease || drawRewardPolicy.capture('draw');
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
     if (animationSession.animation !== snapshot.owner || animationSession.frameId !== snapshot.frameId || animationSession.layerId !== snapshot.layerId) throw new Error('撮影対象が変更されました。撮り直してください。');
-    const { replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-1');
+    const { replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-shared-2');
     const next = replaceCameraPixels(documentData, snapshot.target, indices);
     if (!guardDrawDocumentTransition(documentData, next, { lease })) return false;
     const previousLease = drawOperationLease; drawOperationLease = lease;
@@ -3280,11 +3220,9 @@ return {
     finally { drawOperationLease = previousLease; }
   },
   async applyCameraRgba(snapshot, rgba, options) {
-    if (independentMusicActive()) throw new Error('撮影画像は音楽グリッドに配置できません。Drawまたはカメラモードに切り替えてください。');
-    assertEditableMusicReference();
     const lease = snapshot.lease || drawRewardPolicy.capture('draw');
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
-    const { planCameraReplacement } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-1');
+    const { planCameraReplacement } = await import('./draw-camera-core.mjs?rev=20261113-canvas1028-shared-2');
     if (animationSession.animation !== snapshot.owner || animationSession.frameId !== snapshot.frameId || animationSession.layerId !== snapshot.layerId) throw new Error('撮影対象が変更されました。撮り直してください。');
     const mask = selectionMask();
     if (Boolean(mask) !== Boolean(snapshot.target.mask) || mask && mask.some((value, index) => value !== snapshot.target.mask[index])) throw new Error('適用中に選択範囲が変わりました。対象を確認してもう一度適用してください。');

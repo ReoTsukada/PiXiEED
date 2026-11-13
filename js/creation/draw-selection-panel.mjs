@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 /** Selection transactions take priority over the currently used input's settings. */
 export function drawSelectionActionSlots(state, mode = 'select', binding = {}, side = 'left') {
   const action = (key, label, enabled) => ({ key, label, enabled: Boolean(enabled), kind: 'action' });

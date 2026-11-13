@@ -1,5 +1,5 @@
-import { composeAnimationFrameRgba, ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { getCanvasSettingsBounds, isProjectSettingsPreviewCurrent, validateCanvasSettingsFields, fitCanvasAspect } from './shared-project-settings-core.mjs?rev=20261113-canvas1028-1';
+import { composeAnimationFrameRgba, ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { getCanvasSettingsBounds, isProjectSettingsPreviewCurrent, validateCanvasSettingsFields, fitCanvasAspect } from './shared-project-settings-core.mjs?rev=20261113-canvas1028-shared-2';
 
 const SCALE_PRESETS = [25, 50, 100, 200, 300, 1000];
 const ASPECTS = [['free', '自由'], ['1:1', '正方形 1:1'], ['3:2', '横長 3:2'], ['2:3', '縦長 2:3'], ['3:4', '3:4'], ['9:16', '9:16'], ['4:3', '4:3'], ['16:9', '16:9']];
@@ -204,15 +204,7 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
     const animation = timeline(); if (!animation) return;
     syncing = true;
     width.max = height.max = String(maxDimension());
-    title.textContent = getMode() === 'audio' ? '音楽グリッド' : 'キャンバス設定';
-    for (const [kind,button] of tabButtons) { button.hidden = getMode()==='audio' && kind!=='area'; button.disabled=button.hidden; }
-    if (getMode()==='audio' && activeKind!=='area') setActiveTab('area',{preview:false});
-    const music = getMode()==='audio';
-    tabButtons.get('area').textContent = music ? '表示範囲' : TAB_LABELS.area;
-    areaHelp.textContent = music ? '表示範囲だけ変更。曲の音程・開始時刻は変わりません。範囲外の音符も保持します。' : '絵の大きさを保ち、中央に余白を追加・切り取り。';
-    anchorNote.textContent = music ? '基準：左上。幅は見える時間の列数、高さは見える音程の行数。' : '基準：中央';
-    widthLabel.textContent = music ? '時間の列数 ↔' : '幅 ↔';
-    heightLabel.textContent = music ? '音程の行数 ↕' : '高さ ↕';
+    title.textContent = '共通キャンバス設定';
     width.value = String(animation.width); height.value = String(animation.height);
     paletteText.value = animation.palette.join('\n'); palettePreset.value = 'current';
     paletteCount.value = String(COLOR_COUNTS.find(count => count >= animation.palette.length) || 128);
@@ -306,7 +298,7 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
     if (!panel.hidden && validateActive()) previewTimer = setTimeout(() => { previewTimer = 0; void makePreview({ automatic: true }); }, 140);
   }
   function setActiveTab(kind, { focus = false, preview = true } = {}) {
-    if (!tabPanels.has(kind) || getMode()==='audio' && kind!=='area') return;
+    if (!tabPanels.has(kind)) return;
     activeKind = kind;
     for (const [key, button] of tabButtons) {
       const selected = key === kind;
@@ -320,7 +312,6 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
     else renderBaseline();
   }
   function assertLargeCanvasMode(kind, settings, owner) {
-    if (getMode()==='audio' && kind!=='area') throw new Error('音楽ではグリッドの表示範囲だけ変更できます。');
     const targetWidth = kind === 'scale' ? Math.round(owner.width * settings.percent / 100) : settings.width;
     const targetHeight = kind === 'scale' ? Math.round(owner.height * settings.percent / 100) : settings.height;
     if (Math.max(targetWidth, targetHeight) > maxDimension()) throw new Error(`このモードでは${maxDimension()}pxまで設定できます。`);
@@ -364,7 +355,7 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
       impactText.textContent = previewRecord.summary.musicImpact || (kind === 'scale' ? '倍率変更は全コマ・全レイヤーに適用されます。' : '変更は全コマに適用されます。');
       const summary = previewRecord.summary;
       const dimensionsText = `${owner.width}×${owner.height} → ${image.width}×${image.height} px`;
-      const compactSummary = getMode()==='audio' ? '・表示範囲のみ' : kind === 'area' && Number.isFinite(summary.croppedPixels)
+      const compactSummary = kind === 'area' && Number.isFinite(summary.croppedPixels)
         ? `・切り取られる画素 ${summary.croppedPixels}`
         : kind === 'palette' && Number.isFinite(summary.remappedColors)
           ? `・置き換わる色 ${summary.remappedColors}・全コマ`
@@ -612,8 +603,6 @@ export function mountSharedProjectSettings({ draw, scope, getMode = () => 'draw'
   });
   const unsubscribe = draw.subscribe(() => {
     if (applying) return;
-    for (const [kind,button] of tabButtons) { button.hidden=getMode()==='audio' && kind!=='area'; button.disabled=button.hidden; }
-    if(getMode()==='audio' && activeKind!=='area') setActiveTab('area',{preview:false});
     clearDraftPreview('作品が変わりました。プレビューを更新しています。');
     renderBaseline();
     if (!panel.hidden && validateActive()) previewTimer = setTimeout(() => { previewTimer = 0; void makePreview({ automatic: true }); }, 140);

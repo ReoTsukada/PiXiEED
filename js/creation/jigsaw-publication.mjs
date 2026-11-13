@@ -1,6 +1,6 @@
 import { validateAsset } from './asset-contract.mjs';
-import { resolveLocalDrawRevision } from './jigsaw-core.mjs?rev=20261113-canvas1028-1';
-import { validateJigsawWorkspace } from './jigsaw-workspace.mjs?rev=20261113-canvas1028-1';
+import { resolveLocalDrawRevision } from './jigsaw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { validateJigsawWorkspace } from './jigsaw-workspace.mjs?rev=20261113-canvas1028-shared-2';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SEED = /^[A-Za-z0-9_-]{1,128}$/;

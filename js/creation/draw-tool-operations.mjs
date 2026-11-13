@@ -1,8 +1,8 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
-import { symmetryPoints } from './drawing-symmetry.mjs?rev=20261113-canvas1028-1';
-import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261113-canvas1028-1';
+import { symmetryPoints } from './drawing-symmetry.mjs?rev=20261113-canvas1028-shared-2';
+import { visitOpaqueDrawSelection } from './draw-selection-operations.mjs?rev=20261113-canvas1028-shared-2';
 import { boundedPixelLine } from './draw-pointer-geometry.mjs';
 
 const MAX_SIDE = ANIMATION_MAX_DIMENSION;

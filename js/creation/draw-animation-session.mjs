@@ -1,6 +1,6 @@
-import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261113-canvas1028-1';
-import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-1';
+import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261113-canvas1028-shared-2';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
 
 /** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */
 export function createDrawAnimationSession(document, { musicLayer: musicMode = false } = {}) {

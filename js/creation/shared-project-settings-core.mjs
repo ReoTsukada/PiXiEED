@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 const HEX_COLOR = /^#[\da-f]{6}(?:[\da-f]{2})?$/i;
 
 function dimensionError(value, maxDimension) {

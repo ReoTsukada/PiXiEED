@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { ANIMATION_MAX_DIMENSION } from '../../js/creation/animation-core.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from '../../js/creation/animation-core.mjs?rev=20261113-canvas1028-shared-2';
 
 // Contract check for the camera UI's shared dimension limit. Behavioral UI
 // coverage remains in camera-canvas-settings.test.mjs.

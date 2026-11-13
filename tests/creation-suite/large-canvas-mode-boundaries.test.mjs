@@ -62,30 +62,30 @@ import { readPxdAnimation, writePxdAnimation } from '../../js/creation/pxd-anima
 import { assertCreationModeCompatible } from '../../js/creation/creation-modes.mjs';
 import { evaluateSharedCanvasPolicy } from '../../js/creation/shared-canvas-policy.mjs';
 
-test('1028 shared canvas permits Camera and independent Music while legacy audio stays guarded',()=>{
+test('1028 shared canvas permits Camera while shared Music editing stays capped at 256',()=>{
  const animation=ensureAnimationMusicLayer(createAnimation({width:512,height:512}));
  assert.equal(evaluateSharedCanvasPolicy({width:512,height:512,colorCount:32}).supported,true);
  assert.equal(evaluateSharedCanvasPolicy({width:1029,height:512,colorCount:32}).supported,false);
  assert.equal(assertCreationModeCompatible('draw',animation),true);
  assert.throws(()=>assertCreationModeCompatible('audio',animation),error=>error.code==='audio-large-canvas-unsupported');
  assert.equal(assertCreationModeCompatible('camera',animation),true);
- assert.equal(assertCreationModeCompatible('audio',animation,{independentMusic:true}),true);
+ assert.throws(()=>assertCreationModeCompatible('audio',animation,{independentMusic:true}),/256px/);
  assert.throws(()=>assertCreationModeCompatible('camera',{width:1029,height:16}),/1028/);
 });
 
-test('256 to 512 freezes pending music, saves it without reprojection, and manual 256 return restores use',async()=>{
+test('256 to 1028 freezes pending music, saves it without reprojection, and manual 256 return restores use',async()=>{
  const app=harness(ensureAnimationMusicLayer(createAnimation({width:256,height:256,palette:['#000000']})));
  const model=await mountDrawMusicModel({draw:app.draw,scope:app.scope});
  model.change(current=>changeDrawMusicColor(current,{colorId:'rgba-000000ff',slotId:'square',instrument:'square'}));
  let before=app.timeline;const music=before.layers.find(layer=>layer.role==='music');const pixels=new Uint8Array(256*256);pixels[31*256+31]=1;
  app.draw.tryTimelineMutation(writeAnimationCel(before,before.frames[0].id,music.id,{width:256,height:256,pixels}));model.changeTempo(132);
  const song=structuredClone(model.getState().song),musicBefore=model.getState().musicAnimation;
- const large=resizeAnimation(app.timeline,512,512,{anchor:'center'});assert.equal(app.draw.tryTimelineMutation(large),true);
+ const large=resizeAnimation(app.timeline,1028,1028,{anchor:'center'});assert.equal(app.draw.tryTimelineMutation(large),true);
  assert.equal(model.readOnly,true);assert.deepEqual(model.getState().song,song);assert.equal(model.getState().musicAnimation,musicBefore);
  assert.throws(()=>model.changeTempo(140),/256px/);
  const withMain=await writePxdAnimation(createPxdProject(),large,{role:'main'});
  const saved=await app.hooks.onSave(withMain,large,{imageRole:'main'});assert.deepEqual(getPxdJson(saved,'audio/state.json'),song);
- const decoded=await decodePxd(await encodePxd(saved));const restoredMain=await readPxdAnimation(decoded,'main');assert.equal(restoredMain.width,512);
+ const decoded=await decodePxd(await encodePxd(saved));const restoredMain=await readPxdAnimation(decoded,'main');assert.equal(restoredMain.width,1028);
  const app2=harness(restoredMain,decoded),model2=await mountDrawMusicModel({draw:app2.draw,scope:app2.scope});assert.equal(model2.getState(),null);
  app2.draw.tryTimelineMutation(resizeAnimation(app2.timeline,256,256,{anchor:'center'}));await new Promise(resolve=>setTimeout(resolve,20));
  assert.deepEqual(model2.getState().song,song);assert.equal(model2.getState().musicAnimation.frames.length,musicBefore.frames.length);
@@ -93,6 +93,7 @@ test('256 to 512 freezes pending music, saves it without reprojection, and manua
  assert.deepEqual(getAnimationCelDocument(nextMusic,nextMusic.frames[0].id,nextMusic.layers[0].id).pixels,oldMusicDoc.pixels);app2.cleanup();
  const small=resizeAnimation(large,256,256,{anchor:'center'});app.draw.tryTimelineMutation(small);
  assert.equal(model.readOnly,false);assert.deepEqual(model.getState().song,song);
+ app.draw.tryTimelineMutation(large);assert.equal(model.readOnly,true);assert.deepEqual(model.getState().song,song);assert.throws(()=>assertCreationModeCompatible('audio',app.timeline),/256px/);
  app.cleanup();
 });
 

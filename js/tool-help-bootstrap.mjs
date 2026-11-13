@@ -1,5 +1,5 @@
-import { isToolsHubPath, mountToolHelp } from './tool-help.mjs?rev=20261113-canvas1028-1';
-import { getToolGuide } from './tool-help-data.mjs?rev=20261113-canvas1028-1';
+import { isToolsHubPath, mountToolHelp } from './tool-help.mjs?rev=20261113-canvas1028-shared-2';
+import { getToolGuide } from './tool-help-data.mjs?rev=20261113-canvas1028-shared-2';
 
 /** Attach help after the existing shared header mounts, without loading a second header. */
 export function installToolHelp({ document = globalThis.document, window = globalThis.window } = {}) {

@@ -1,4 +1,4 @@
-import { serializeAnimationPool } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { serializeAnimationPool } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 import { EMBED_TOOL_START_EVENT, EMBED_ANALYTICS_EVENT, isEmbeddedAnalyticsEvent, canRelayEmbeddedAnalytics } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 
 const PROTOCOL = 'pixieed-tool-embed';

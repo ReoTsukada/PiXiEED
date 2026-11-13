@@ -1,5 +1,5 @@
-import { planCameraPlacementMemory } from './camera-placement-preview.mjs?rev=20261113-canvas1028-1';
-import { ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
+import { planCameraPlacementMemory } from './camera-placement-preview.mjs?rev=20261113-canvas1028-shared-2';
+import { ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
 
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 

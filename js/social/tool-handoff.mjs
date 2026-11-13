@@ -56,7 +56,7 @@ export async function adoptSocialHandoff(kind, { windowRef = globalThis.window, 
     };
   }
 
-  const { decodePuzzleHandoff } = await import('../creation/puzzle-handoff.mjs?rev=20261113-canvas1028-1');
+  const { decodePuzzleHandoff } = await import('../creation/puzzle-handoff.mjs?rev=20261113-canvas1028-shared-2');
   const handoff = decodePuzzleHandoff(serialized, now);
   if (!handoff || handoff.mode !== spec.mode) return null;
   const bytes = base64ToBytes(handoff.payload.image.base64);

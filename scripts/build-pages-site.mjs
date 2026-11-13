@@ -33,7 +33,7 @@ const localReviewSources = new Set(['camera-media-test.html', 'css/camera-media-
 
 /** Known retired samples and local comparison media stay on disk, outside Pages. */
 export function isLocalReviewSource(name) {
-  return name.startsWith('js/creation/experimental/') || localReviewSources.has(name) || name.startsWith('assets/pixel-studio/test-media/')
+  return /^js\/creation\/independent-music-(?:session|model)\.mjs$/.test(name) || name.startsWith('js/creation/experimental/') || localReviewSources.has(name) || name.startsWith('assets/pixel-studio/test-media/')
     || isSampleWork({ image: `/${name}` });
 }
 
@@ -190,7 +190,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',
         'assets/icons/pixieed/selection.svg', 'assets/icons/pixieed/adjustments.svg',
         'draw/editor.html', 'audio/editor.html', 'js/tool-shell.mjs', 'js/tool-entry-compat.js', 'js/tool-direct.mjs', 'js/tool-workspace-state.mjs', 'css/tool-shell.css', 'css/tool-direct.css',
-        'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/independent-music-session.mjs', 'js/creation/independent-music-model.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/draw-render-optimization.mjs',
+        'js/creation/creation-runtime.mjs', 'js/creation/creation-snapshot.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/draw-render-optimization.mjs',
         'js/creation/audio-video-capabilities.mjs', 'js/draw-guide-entry.mjs', 'css/globe-navigation.css', 'js/globe/map-navigation-state.mjs',
         'js/globe/map-page-layout.mjs',
         // User-approved site introduction assets; local review captures remain excluded.

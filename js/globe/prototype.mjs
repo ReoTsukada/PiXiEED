@@ -92,9 +92,9 @@ retryMapLoad.addEventListener('click', () => {
 
 function loadPostUiModules() {
   return Promise.all([
-    importPostingModule('post-ui', './post-ui.mjs?rev=20261113-canvas1028-1&v=20261024-posting-policy-1'),
-    importPostingModule('post-supabase', './post-supabase.mjs?rev=20261113-canvas1028-1'),
-    importPostingModule('post-handoff', './post-handoff.mjs?rev=20261113-canvas1028-1&v=20261004-camera-location-1')
+    importPostingModule('post-ui', './post-ui.mjs?rev=20261113-canvas1028-shared-2&v=20261024-posting-policy-1'),
+    importPostingModule('post-supabase', './post-supabase.mjs?rev=20261113-canvas1028-shared-2'),
+    importPostingModule('post-handoff', './post-handoff.mjs?rev=20261113-canvas1028-shared-2&v=20261004-camera-location-1')
   ]).then(([postUiModule, supabaseModule, handoffModule]) => ({
     initPostUi: postUiModule.initPostUi,
     createSupabaseGlobeAuth: supabaseModule.createSupabaseGlobeAuth,

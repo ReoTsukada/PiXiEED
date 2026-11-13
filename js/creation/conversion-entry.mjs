@@ -26,13 +26,13 @@ try {
       if (!template) throw new Error('出力画面の構成を確認できませんでした。再読み込みしてください。');
       main.replaceChildren(template.content.cloneNode(true)); template.remove();
       if (query.has('id') || query.has('file')) {
-        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261113-canvas1028-1');
+        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261113-canvas1028-shared-2');
         await mountSharedOutput(sharedOutputRequest(outputEntrySearch()));
       } else if (query.get('mode') === 'convert') {
         const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261111-output-offerwall-1');
         mountConversionPage();
       } else {
-        const { outputPageReady } = await import('./output-page.mjs?rev=20261113-canvas1028-1');
+        const { outputPageReady } = await import('./output-page.mjs?rev=20261113-canvas1028-shared-2');
         await outputPageReady;
       }
       const failure = main.querySelector('[role="alert"]');

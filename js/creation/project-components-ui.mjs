@@ -1,5 +1,5 @@
-import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261113-canvas1028-1';
-import { readPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-1';
+import { COMPONENTS, componentImageRole, hasProjectComponent } from './project-components.mjs?rev=20261113-canvas1028-shared-2';
+import { readPxdImage } from './pxd-project.mjs?rev=20261113-canvas1028-shared-2';
 
 const shapes = {
   draw: '<path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/>',

@@ -21,14 +21,14 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // Manager ads add the guarded manager controller, shared chooser budget,
   // config, SDK loader and loader config to the previously bounded graph.
   // Lazy gallery loading adds one small shared request/cache controller.
-  assert.equal(plan.runtimeGraph.modules.size, 120);
-  assert.equal(plan.runtimeGraph.edges.length, 239);
+  assert.equal(plan.runtimeGraph.modules.size, 117);
+  assert.equal(plan.runtimeGraph.edges.length, 227);
   assert.equal(plan.dynamicRoots.length, 23);
   assert.equal(plan.dynamicGraph.modules.size, 112);
   assert.equal(plan.externalUrls.size, 65);
-  assert.equal(plan.internalizedUrls.length, 55);
+  assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261113-canvas1028-1'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261113-canvas1028-shared-2'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
   assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1'));
@@ -66,11 +66,11 @@ test('delivery plan preserves runtime identities and bounds minification to star
     assert(!files.some(file => file.endsWith('/' + retired)), `Retired advertising runtime must stay off the startup graph: ${retired}`);
   }
   assert(plan.externalUrls.has('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
-  assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261113-canvas1028-1'));
+  assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261113-canvas1028-shared-2'));
   assert([...plan.modeGraph.modules.keys()].some(url => url.startsWith('/js/pixel-lens/app.mjs?')));
   assert([...plan.dynamicGraph.modules.keys()].some(url => url.startsWith('/js/creation/audio-export.mjs?')));
   assert(plan.physicalFiles.has('js/creation/creation-runtime.mjs'));
-  const cameraSettings = '/js/creation/camera-canvas-settings.mjs?rev=20261113-canvas1028-1';
+  const cameraSettings = '/js/creation/camera-canvas-settings.mjs?rev=20261113-canvas1028-shared-2';
   assert(plan.runtimeGraph.modules.has(cameraSettings));
   assert(plan.internalizedUrls.includes(cameraSettings));
   assert(plan.physicalFiles.has('js/creation/camera-canvas-settings.mjs'));
@@ -135,7 +135,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
     assert.equal(report.externalCount, 65);
-    assert.equal(report.internalizedCount, 55);
+    assert.equal(report.internalizedCount, 52);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
 

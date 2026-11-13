@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const root = new URL('../../', import.meta.url);
 const stylesheet = '/css/project-workspace.css?rev=20261112-creation-guidance-1';
-const workspaceRevision = '20261113-canvas1028-1';
+const workspaceRevision = '20261113-canvas1028-shared-2';
 const consumers = [
   'jigsaw/index.html',
   'spot-difference/index.html',

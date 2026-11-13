@@ -1,6 +1,6 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-1';
-import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-1';
-import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-shared-2';
 
 export const selectionColor = color => {
   if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) throw new TypeError('選択の色が不正です。');

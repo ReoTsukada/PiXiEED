@@ -224,7 +224,7 @@ test('shared canvas live preview controller', async t => {
       assert.equal(broken.session.animation, broken.original);
     } finally { broken.dispose(); }
   });
-  await t.test('Draw and camera accept 1028 draft; music retains its independent 256 limit', async () => {
+  await t.test('Draw and camera accept 1028 draft; music retains its shared 256 limit', async () => {
     for (const mode of ['draw', 'camera', 'audio']) {
       const f = fixture({ getMode: () => mode });
       try {
@@ -237,15 +237,16 @@ test('shared canvas live preview controller', async t => {
     }
   });
 
-  await t.test('Music exposes only view area and a mode change invalidates the old preview', async()=>{
+  await t.test('Music keeps shared settings tabs and a mode change invalidates the old preview', async()=>{
     let mode='audio';const f=fixture({getMode:()=>mode});
     try {
-      assert.equal(f.q('#creation-project-tab-scale').hidden,true);
-      assert.equal(f.q('#creation-project-tab-palette').hidden,true);
-      assert.equal(f.q('#creation-project-tab-area').textContent,'表示範囲');
-      assert.match(f.q('.creation-project-settings__help').textContent,/音程・開始時刻は変わりません/);
+      assert.equal(f.q('#creation-project-tab-scale').hidden,false);
+      assert.equal(f.q('#creation-project-tab-palette').hidden,false);
+      assert.equal(f.q('#creation-project-tab-area').textContent,'キャンバス');
+      assert.match(f.q('.creation-project-settings__help').textContent,/中央に余白/);
       await f.q('#creation-project-tab-scale').fire('click');
-      assert.equal(f.q('#creation-project-panel-scale').hidden,true);
+      assert.equal(f.q('#creation-project-panel-scale').hidden,false);
+      await f.q('#creation-project-tab-area').fire('click');
       await f.input('creation-project-width',8);await wait(175);
       assert.equal(f.q('[data-project-action=apply]').disabled,false);
       mode='draw';await f.apply();assert.equal(f.applies,0);
