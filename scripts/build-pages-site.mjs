@@ -185,6 +185,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       // Explicit new public sources are also reviewable in a clean local build
       // before they are committed. Arbitrary untracked work stays excluded.
       for (const name of ['js/creation/conversion-source-inspector.mjs', 'css/conversion-source-preview.css', 'assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'js/event-archive-ad-policy.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
+        'ai/index.html', 'css/ai-connect.css', 'js/mcp/pixel-art-contract.mjs', 'js/mcp/receive-page.mjs', 'js/mcp/draw-import.mjs', 'js/mcp/connection-config.mjs', 'js/mcp/tool-catalog.mjs',
         'assets/icons/pixieed/color-adjust.svg', 'assets/icons/pixieed/text.svg', 'assets/icons/pixieed/draw.svg',
         'assets/icons/pixieed/copy.svg', 'assets/icons/pixieed/cut.svg', 'assets/icons/pixieed/paste.svg',
         'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',
