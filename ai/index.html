@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <meta name="robots" content="noindex,follow">
+  <title>AIからドット絵を受け取る｜PiXiEED</title>
+  <link rel="stylesheet" href="/css/ai-connect.css">
+</head>
+<body class="ai-receive">
+  <main class="ai-receive__wrap">
+    <a class="ai-receive__brand" href="/">PiXiEED</a>
+    <h1>AIからドット絵を受け取る</h1>
+    <p class="ai-receive__lead">ChatGPTで作ったドット絵を確認して、Drawで続きを描けます。最大64×64px・32色に対応しています。</p>
+    <p id="receive-status" class="ai-receive__status" role="status" aria-live="polite">受取リンクを開くか、ChatGPTでPiXiEEDを接続して依頼してください。</p>
+    <section id="preview-card" class="ai-receive__card" aria-labelledby="art-title" hidden>
+      <div class="ai-receive__preview"><canvas id="art-preview" width="1" height="1" aria-label="受け取ったドット絵のプレビュー"></canvas></div>
+      <div class="ai-receive__meta"><h2 id="art-title">プレビュー待ち</h2><p id="art-dimensions">—</p></div>
+      <div class="ai-receive__actions">
+        <button id="open-draw" type="button" disabled>Drawで編集する</button>
+        <button id="download-png" type="button" disabled>PNGを保存</button>
+        <a id="cancel-import" href="/tools/">ツール一覧へ戻る</a>
+      </div>
+      <p class="ai-receive__privacy">絵は新しい作品として、このブラウザーに保存されます。受取リンクを共有すると、絵も共有されます。</p>
+    </section>
+    <section id="manual-import" class="ai-receive__manual" aria-labelledby="manual-title">
+      <h2 id="manual-title">データを読み込む</h2>
+      <p>ChatGPTでドット絵を作り、受け取ったリンクからプレビューできます。ご自身のChatGPTの利用枠を使います。JSONを貼り付けるかファイルから読み込むこともできます。</p>
+      <section id="mcp-connection" aria-label="ChatGPTとの接続" hidden>
+        <h3>ChatGPTに接続する</h3>
+        <p id="mcp-connection-status"></p>
+        <ol>
+          <li><a href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">ChatGPTのプラグイン</a>を開き、「追加」から「カスタム MCP サーバーを追加」を選びます。</li>
+          <li>名前を「PiXiEED」、サーバーURLを以下の接続先、認証を「認証なし」にして作成・接続します。</li>
+          <li>接続後、「PiXiEEDを使って青い彼岸花のドット絵を作って」と依頼できます。</li>
+        </ol>
+        <code id="mcp-endpoint" hidden></code>
+        <button id="copy-mcp-endpoint" type="button" hidden>接続先をコピー</button>
+      </section>
+      <label for="art-json">生成データJSON</label>
+      <textarea id="art-json" spellcheck="false" autocomplete="off"></textarea>
+      <details>
+        <summary>JSON形式を見る</summary>
+        <pre>{"title":"小さな絵","width":2,"height":2,"palette":["#E75445"],"rows":["0.",".0"]}</pre>
+        <p>色記号は0〜9、A〜Vをパレット番号として使い、. は透明です。</p>
+      </details>
+      <button id="load-json" type="button">プレビューを作成</button>
+      <label for="art-file">JSONファイルを選ぶ</label>
+      <input id="art-file" type="file" accept="application/json,.json">
+    </section>
+  </main>
+  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261114-mcp-1"></script>
+</body>
+</html>
