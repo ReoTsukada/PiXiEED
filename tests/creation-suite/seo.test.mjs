@@ -25,7 +25,11 @@ const sitemapPages = pages
   .filter(([, path]) => !sitemapExcludedPaths.has(path));
 const eventIds = JSON.parse(readFileSync(resolve(root, 'events/catalog.json'), 'utf8')).ids;
 sitemapPages.splice(sitemapPages.findIndex(([, path]) => path === '/privacy/') + 1, 0, ['terms/index.html', '/terms/']);
-sitemapPages.push(['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'], ['projects/pixfind/index.html', '/projects/pixfind/']);
+sitemapPages.push(
+  ['help/index.html', '/help/'], ['glossary/index.html', '/glossary/'],
+  ['learn/index.html', '/learn/'], ['learn/pixel-circle/index.html', '/learn/pixel-circle/'],
+  ['learn/pixel-art-blurry/index.html', '/learn/pixel-art-blurry/'], ['projects/pixfind/index.html', '/projects/pixfind/']
+);
 sitemapPages.push(['events/index.html', '/events/'], ...eventIds.map(id => [`events/${id}/index.html`, `/events/${id}/`]));
 const artworkLabels = {
   site: 'つくる・あそぶ・つながる', tools: '制作ツール', draw: 'ドット絵を描く', audio: '音をつくる',
