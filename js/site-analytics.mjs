@@ -11,7 +11,9 @@ const ALLOWED_HOSTS = new Set(['pixieed.jp', 'www.pixieed.jp']);
 const EMBED_TOOL_STARTS = new Set(['draw', 'audio', 'pixel-camera']);
 const TOOLS = new Set([
   ...OUTPUT_GUIDE_SLUGS,
-  'home', 'about', 'guide', 'privacy', 'globe', 'shops', 'stores', 'works', 'collection',
+  'home', 'about', 'guide', 'privacy', 'globe', 'feed', 'explore', 'learn',
+  'learn-pixel-circle', 'learn-pixel-art-blurry', 'tools-start-draw',
+  'tools-start-convert', 'shops', 'stores', 'works', 'collection',
   'profile', 'pass', 'tools', 'draw', 'animation', 'audio', 'game', 'jigsaw', 'hidden-object',
   'spot-difference', 'pixfind', 'pixel-camera', 'pixel-camera-studio', 'pixiee-lens', 'telescope',
   'training', 'play', 'play-spot-difference', 'play-hidden-object', 'creation-suite', 'store', 'event',
@@ -23,15 +25,23 @@ const EVENTS = new Set([
   'pass_sheet_open', 'pass_ad_open', 'pass_granted', 'pass_no_ad',
   'tool_start', 'camera_capture', 'level_start', 'level_end', 'select_content',
   'event_outbound', 'share', 'link_copy',
-  'project_open', 'project_open_pixiee_lens', 'conversion_entry'
+  'project_open', 'project_open_pixiee_lens', 'conversion_entry', 'affiliate_outbound'
 ]);
 const GAME_TYPES = new Set(['spot_difference', 'hidden_object', 'jigsaw', 'walk']);
 const COMPLETION_KINDS = new Set(['solved', 'candidates_reviewed', 'goal']);
 const CONTENT_TYPES = new Set(['work', 'store', 'event', 'tool', 'game', 'project']);
 const DRAW_CTA_CONTENT_IDS = new Set(['draw_cta_event', 'draw_cta_creation', 'draw_cta_general', 'draw_cta_books']);
+const LEARN_CTA_CONTENT_IDS = new Set(['learn_cta_draw', 'learn_cta_convert', 'learn_cta_books']);
 const DRAW_CTA_CONTEXT_IDS = Object.freeze({
   event: 'draw_cta_event', creation: 'draw_cta_creation', general: 'draw_cta_general', books: 'draw_cta_books'
 });
+const LEARN_CTA_PATHS = new Set(['/learn/', '/learn/pixel-circle/', '/learn/pixel-art-blurry/']);
+const LEARN_CTA_DESTINATIONS = Object.freeze({
+  draw: Object.freeze({ href: '/tools/start/draw/', contentId: 'learn_cta_draw' }),
+  convert: Object.freeze({ href: '/tools/start/convert/', contentId: 'learn_cta_convert' }),
+  books: Object.freeze({ href: '/books/', contentId: 'learn_cta_books' })
+});
+const AFFILIATE_MERCHANTS = new Set(['amazon', 'yahoo']);
 const FILE_TYPES = new Set(['png', 'gif', 'jpg', 'jpeg', 'webp', 'svg', 'wav', 'mp3', 'mp4', 'webm', 'pxd', 'zip', 'other']);
 const METHODS = new Set(['downloaded', 'shared', 'native', 'clipboard', 'ad', 'free']);
 const LINK_KINDS = new Set(['official', 'ticket', 'related', 'social']);
@@ -122,9 +132,13 @@ function parametersFor(name, input = {}) {
     }
     case 'select_content':
       put('content_type', enumValue(input.content_type, CONTENT_TYPES));
-      put('content_id', enumValue(input.content_id, DRAW_CTA_CONTENT_IDS));
+      put('content_id', enumValue(input.content_id, new Set([...DRAW_CTA_CONTENT_IDS, ...LEARN_CTA_CONTENT_IDS])));
       break;
     case 'event_outbound': put('link_kind', enumValue(input.link_kind, LINK_KINDS)); break;
+    case 'affiliate_outbound':
+      out.tool = 'books';
+      put('merchant', enumValue(input.merchant, AFFILIATE_MERCHANTS));
+      break;
     case 'share': put('method', enumValue(input.method, new Set(['native']))); break;
     case 'link_copy': put('method', enumValue(input.method, new Set(['clipboard']))); break;
   }
@@ -299,6 +313,42 @@ export function startAnalytics() {
     const contentId = DRAW_CTA_CONTEXT_IDS[context];
     if (anchor && contentId && event.isTrusted === true && event.defaultPrevented !== true && event.button === 0) {
       emit('select_content', { content_type: 'tool', content_id: contentId });
+      return;
+    }
+    const learnAnchor = event.target?.closest?.('a[data-learn-cta]');
+    const learnPage = (window.location || globalThis.location)?.pathname;
+    const learnPath = LEARN_CTA_PATHS.has(learnPage);
+    const learnTool = learnPath ? pageSlug(learnPage) : null;
+    const learnKind = learnAnchor?.dataset?.learnCta;
+    const learnDestination = LEARN_CTA_DESTINATIONS[learnKind];
+    if (learnAnchor && learnDestination && learnPath && learnAnchor.getAttribute?.('href') === learnDestination.href
+        && event.isTrusted === true && event.defaultPrevented !== true && event.button === 0) {
+      setTimeout(() => {
+        if (event.defaultPrevented !== true) {
+          emit('select_content', { tool: learnTool, content_type: 'tool', content_id: learnDestination.contentId });
+        }
+      }, 0);
+      return;
+    }
+    const commerceLink = event.target?.closest?.('[data-commerce-link], [data-yahoo-commerce-link]');
+    if (commerceLink && event.isTrusted === true && event.defaultPrevented !== true && event.button === 0
+        && (window.location || globalThis.location)?.pathname === '/books/'
+        && !commerceLink.hidden && !commerceLink.closest?.('[data-books-product-id]')?.hidden) {
+      const amazon = commerceLink.matches?.('[data-commerce-link]') === true;
+      const yahoo = commerceLink.matches?.('[data-yahoo-commerce-link]') === true;
+      const href = commerceLink.getAttribute?.('href');
+      try {
+        const url = typeof href === 'string' && href.trim() ? new URL(href) : null;
+        const validHref = url && url.protocol === 'https:' && !url.username && !url.password && !url.port
+          && !url.hash && ((amazon && url.hostname === 'www.amazon.co.jp') || (yahoo && url.hostname === 'yahoo.jp'))
+          && url.pathname !== '/' && url.pathname !== '';
+        if (validHref) {
+          // Let target and bubble handlers finish cancelling before recording the outbound click.
+          setTimeout(() => {
+            if (event.defaultPrevented !== true) emit('affiliate_outbound', { tool: 'books', merchant: amazon ? 'amazon' : 'yahoo' });
+          }, 0);
+        }
+      } catch { /* a malformed commerce href is never measured */ }
       return;
     }
     const target = event.target?.closest?.('[data-analytics-event]');

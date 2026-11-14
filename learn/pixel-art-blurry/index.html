@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ドット絵が拡大するとぼやけるのはなぜ？ くっきり保存する方法 | PiXiEED</title>
+  <meta name="description" content="最近傍と双線形補間の比較図で、ドット絵がぼやける理由を解説。表示ズーム・整数倍拡大・PNG保存の違いをPiXiEEDで試せます。">
+  <link rel="canonical" href="https://pixieed.jp/learn/pixel-art-blurry/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:title" content="ドット絵が拡大するとぼやけるのはなぜ？ くっきり保存する方法">
+  <meta property="og:description" content="最近傍と双線形補間の比較図で、ドット絵がぼやける理由を解説。表示ズーム・整数倍拡大・PNG保存の違いをPiXiEEDで試せます。">
+  <meta property="og:url" content="https://pixieed.jp/learn/pixel-art-blurry/">
+  <meta property="og:image" content="https://pixieed.jp/assets/og/site.png">
+  <meta property="og:image:alt" content="PiXiEED">
+  <meta property="og:locale" content="ja_JP">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon-96.png" sizes="96x96" type="image/png">
+  <link rel="stylesheet" href="/css/design-tokens.css?rev=20261016-site-polish-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261024-intelligence-ui-1">
+  <link rel="stylesheet" href="/css/learn.css?rev=20261114-learn-1">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "ドット絵が拡大するとぼやけるのはなぜ？ くっきり保存する方法", "description": "最近傍と双線形補間の比較図で、ドット絵がぼやける理由を解説。表示ズーム・整数倍拡大・PNG保存の違いをPiXiEEDで試せます。", "inLanguage": "ja", "url": "https://pixieed.jp/learn/pixel-art-blurry/", "author": {"@type": "Organization", "name": "PiXiEED", "url": "https://pixieed.jp/"}}</script>
+</head>
+<body class="learn-page" data-page="learn">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="header-inner"><a class="brand" href="/">PiXiEED</a></div></header>
+  <main id="main" class="learn-main">
+    <nav class="learn-crumbs" aria-label="パンくず"><a href="/">ホーム</a><span aria-hidden="true">/</span><a href="/learn/">ドット絵の読みもの</a><span aria-hidden="true">/</span><span>記事</span></nav>
+    <article class="learn-article">
+      <header><span class="learn-kicker">保存・画像のしくみ</span><h1>ドット絵が拡大すると<br>ぼやけるのはなぜ？</h1><p class="learn-deck">元は同じ16×16のハート。下の2枚は、拡大するときの計算だけを変えています。</p><p class="learn-meta">制作：PiXiEED · 比較図・練習用PNGつき</p></header>
+      <div class="learn-compare"><figure><img src="/assets/learn/heart-nearest.png" width="256" height="256" alt="最近傍で256×256に拡大したハート。各ドットの境界がくっきりしている"><figcaption><strong>最近傍：元の色を複製</strong>1ピクセルを16×16の同色ブロックにして拡大しています。</figcaption></figure><figure><img src="/assets/learn/heart-smooth.png" width="256" height="256" alt="双線形補間で256×256に拡大した同じハート。色の境界に中間色がある"><figcaption><strong>双線形補間：間の色を計算</strong>周囲の色を混ぜてつなぐため、境界がなめらかに見えます。</figcaption></figure></div>
+      <nav class="learn-toc" aria-label="この記事の内容"><strong>この記事で分かること</strong><ol><li><a href="#reason">元の絵が壊れたとは限らない</a></li><li><a href="#scale">くっきり拡大する方法</a></li><li><a href="#save">PiXiEEDでPNGに保存する</a></li><li><a href="#questions">よくある疑問</a></li></ol></nav>
+      <section id="reason"><h2>元の絵が壊れたとは限らない</h2><p>小さな画像を大きく表示するとき、ソフトは足りない部分をどう埋めるか決めます。周囲の色から中間の色をつくると、境界がなめらかになります。写真では役立つ処理でも、ドットの色をはっきり分けたいときには、にじみに見えることがあります。</p><p>画面上の拡大表示だけで、この処理が行われる場合もあります。たとえばブラウザーのCanvasには拡大時の平滑化設定があり、既定では有効です。<a href="#source-mdn">［1］</a> 画面でぼやけて見えるだけなのか、保存した画像の画素まで変わっているのかを、分けて考えましょう。</p><aside class="learn-note">上の比較は、同じ16×16の見本を256×256へ計算し直したものです。2枚目は双線形補間の一例で、すべてのアプリが同じ拡大方法を使うわけではありません。</aside></section>
+      <section id="scale"><h2>くっきり拡大するなら「最近傍」</h2><p><strong>ニアレストネイバー（最近傍）</strong>は、近くの元画素の色をそのまま使う拡大方法です。Adobeの資料でも、画素を複製し、硬い輪郭を保つ方法として説明されています。<a href="#source-adobe-size">［2］</a></p><p>さらに、幅と高さを<strong>2倍・4倍などの整数倍</strong>にすると、元の1ピクセルを同じ大きさのブロックで並べられます。たとえば16×16を4倍にすると64×64になり、1ピクセルが4×4のブロックになります。絵の情報が増えるわけではなく、元の並びを大きく見せる方法です。</p><div class="learn-table-wrap"><table><caption>似ているけれど、変わるものが違う操作</caption><thead><tr><th scope="col">操作</th><th scope="col">変わるもの</th></tr></thead><tbody><tr><th scope="row">表示のズーム</th><td>画面での見える大きさ。保存する画素数とは別です。</td></tr><tr><th scope="row">画像の拡大</th><td>画像ファイルの幅と高さ。拡大方法で画素の色や並び方が変わります。</td></tr><tr><th scope="row">PNGで保存</th><td>保存形式。拡大方法や表示倍率を決める操作ではありません。</td></tr></tbody></table></div></section>
+      <section id="save"><h2>PiXiEEDでPNGに保存してみる</h2><p>描いた作品はPiXiEEDrawの<strong>［出力］</strong>から共通の出力画面へ進めます。手持ちの画像で試す場合は、変換・出力の入口からファイルを読み込みます。</p><ol><li><strong>元の作品や小さな画像を残す。</strong>試しに使うなら、下の16×16の見本PNGを保存してください。</li><li><strong>出力形式でPNGを選ぶ。</strong>静止画像として保存する設定にします。</li><li><strong>画像サイズを確認する。</strong>［出力サイズを編集］から画像サイズの設定を開き、元サイズ、2倍、4倍など、選べる整数倍の寸法を使います。選択できる範囲は画像の大きさなどで変わります。</li><li><strong>［PNGを保存］で書き出す。</strong>画面上の表示ズームは見え方の調整です。保存する幅と高さは、画像サイズの設定で確認します。</li></ol><p>PiXiEEDの静止画出力では、整数倍の拡大で元の画素を複製します。閲覧アプリや投稿先でさらに拡大・再圧縮される場合があるので、保存したPNGと投稿後の表示は別々に確認してください。</p>
+      <div class="learn-try"><h3>同じ見本で、拡大を試す</h3><p>16×16のハートを保存し、変換・出力画面で読み込んでください。原寸のPNGと拡大後のPNGを残すと、違いを確かめやすくなります。</p><div class="learn-actions"><a class="learn-button" href="/tools/start/convert/" data-learn-cta="convert">PiXiEEDで変換・出力する</a><a class="learn-button learn-button-secondary" href="/assets/learn/heart-16.png" download="pixieed-heart-16.png">16×16のハートを保存</a></div><p><a href="/tools/start/draw/" data-learn-cta="draw">自分のドット絵を描いて試す →</a></p><p class="learn-meta">この見本はPiXiEED制作。練習・改変・作品への利用ができます。</p></div></section>
+      <section id="questions"><h2>よくある疑問</h2><details open><summary>PNGなら、ぼやけることはない？</summary><p>PNGは可逆圧縮形式です。<a href="#source-png">［3］</a> ただし、保存前にぼかして拡大した画素を元に戻す機能ではありません。PNGにした後も、表示するアプリの拡大方法でぼやけて見える場合があります。</p></details><details><summary>JPEGを避けた方がよいのはなぜ？</summary><p>JPEGは画像の細部を一部取り除く非可逆圧縮です。<a href="#source-jpeg">［4］</a> 小さなドット絵では、くっきりした色の境界に変化が出ることがあります。制作中の元データを残し、輪郭や透過を保ちたい書き出しにはPNGを使うと扱いやすくなります。</p></details><details><summary>ぼやけた絵を最近傍で拡大し直せば戻る？</summary><p>すでに混ざった色を、そのまま大きなブロックにするだけの場合があります。元の輪郭や色が失われていれば、必ず復元できるわけではありません。残っている最小サイズの原本や編集データから、拡大し直しましょう。</p></details></section>
+      <section class="learn-related"><h2>輪郭そのものを整えたいときは</h2><p>くっきり表示できたら、次はドットの置き方へ。<a href="/learn/pixel-circle/">四角いドットで、なぜ丸く見えるのか？ →</a></p><p><a href="/glossary/#size">解像度や画像サイズの用語</a>も確認できます。</p></section>
+      <aside class="learn-try" aria-labelledby="blur-books"><h3 id="blur-books">保存の次は、描き方を学ぶ</h3><p>色づかいや輪郭づくりも練習したい方には、本の作例を見比べる方法もあります。PiXiEEDの本・道具の一覧から探せます。</p><p class="learn-meta">PR：リンク先の一覧にはアフィリエイトリンクが含まれます。この記事の練習に購入は必要ありません。</p><a href="/books/" data-learn-cta="books">ドット絵の本を探す →</a></aside>
+      <section class="learn-sources"><h2>参考資料・図版について</h2><ol><li id="source-mdn"><a href="https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingEnabled">MDN：CanvasのimageSmoothingEnabled</a> — ブラウザーで画像を拡大するときの平滑化設定。</li><li id="source-adobe-size"><a href="https://helpx.adobe.com/photoshop/ipad/transform-and-add-objects/edit-image-size-ipad.html">Adobe：Edit your image size</a> — 最近傍法の説明。</li><li id="source-png"><a href="https://www.w3.org/TR/png/">W3C：PNG仕様 第3版</a> — PNGが可逆圧縮形式であること。</li><li id="source-jpeg"><a href="https://helpx.adobe.com/photoshop/desktop/save-and-export/export-files-to-different-formats/file-compression-in-photoshop.html">Adobe：Compare image compression types</a> — JPEGの非可逆圧縮。</li></ol><p>資料確認：2026年11月14日。比較図と配布見本はPiXiEED制作です。整数倍の寸法例は元画像から算出しています。</p></section>
+    </article>
+  </main>
+  <footer class="learn-footer"><nav aria-label="関連ページ"><a href="/learn/">読みもの一覧</a><a href="/glossary/">用語集</a><a href="/tools/">制作ツール</a><a href="/privacy/">プライバシー</a></nav><p>PiXiEED · 知る、描く、試してみる。</p></footer>
+  <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
+</body>
+</html>
