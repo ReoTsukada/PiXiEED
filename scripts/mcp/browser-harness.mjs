@@ -16,7 +16,7 @@ await mkdir(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const report = {
   browser: browser.version(), cases: [], failures: [],
-  limitations: ['Chromium viewport/touch emulation only; physical devices and Safari are not covered.', 'All page and worker module requests target the local preview server; production is not contacted.']
+  limitations: ['Chromium viewport/touch emulation only; physical devices and Safari are not covered.', 'All browser page requests target the local preview server; the Worker is invoked in-process and production is not contacted.']
 };
 const validArt = {
   title: 'MCP preview 🌱', width: 4, height: 3,
@@ -110,6 +110,7 @@ async function checkNoOverlap(page) {
 }
 
 async function run(name, fn) {
+  if (process.env.PIXIEED_MCP_BROWSER_CASE && !name.includes(process.env.PIXIEED_MCP_BROWSER_CASE)) return;
   try {
     report.cases.push({ name, passed: true, ...await fn() });
     console.log('PASS', name);
@@ -173,6 +174,10 @@ try {
     const ctx = await makeContext();
     try {
       const page = await ctx.newPage();
+      const browserEvents = [];
+      page.on('console', message => { if (message.type() === 'error') browserEvents.push(`console: ${message.text()}`); });
+      page.on('pageerror', error => browserEvents.push(`pageerror: ${error.stack || error.message}`));
+      page.on('requestfailed', request => browserEvents.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ''}`));
       await openWorkerPreview(page, validArt);
       const box = await page.locator('#open-draw').boundingBox();
       assert.ok(box && box.width > 0 && box.height > 0);
@@ -184,7 +189,8 @@ try {
       assert.deepEqual(initial, expectedRgba(validArt));
       const projectId = new URL(savedUrl).searchParams.get('pxd');
       for (let attempt = 0; attempt < 100 && !ctx.__mcpPxdWrites.includes(projectId); attempt += 1) await new Promise(resolve => setTimeout(resolve, 10));
-      assert.equal(ctx.__mcpPxdWrites.filter(id => id === projectId).length, 1, 'apply should write exactly one new PXD');
+      const createdProjectIds = [...new Set(ctx.__mcpPxdWrites)];
+      assert.deepEqual(createdProjectIds, [projectId], `apply should create exactly one new PXD: ${JSON.stringify(ctx.__mcpPxdWrites)}`);
 
       await page.evaluate(() => window.__PIXIEED_CREATION_HOST__.runtime.draw.importImage({ width: 1, height: 1, rgba: new Uint8ClampedArray([9, 8, 7, 255]) }));
       const changed = await runtimeImage(page);
@@ -198,11 +204,28 @@ try {
 
       await saveProjectInWorkspace(page);
       await page.reload();
-      await awaitDraw(page);
+      await page.locator('#project-start-picker').waitFor({ state: 'visible' });
+      await page.locator(`#project-start-picker [data-project-id="${projectId}"]`).click();
+      try {
+        await awaitDraw(page);
+      } catch (error) {
+        const diagnostics = await page.evaluate(() => ({
+          url: location.href,
+          mainInert: document.querySelector('#main')?.inert ?? null,
+          mainState: document.querySelector('#main')?.dataset.state ?? null,
+          drawRuntimePresent: Boolean(window.__PIXIEED_CREATION_HOST__?.runtime?.draw),
+          hostPresent: Boolean(window.__PIXIEED_CREATION_HOST__),
+          currentRevision: document.querySelector('#project-open')?.dataset.state ?? null,
+          bodyText: document.body.innerText.slice(0, 1000)
+        }));
+        await page.screenshot({ path: `${out}/draw-reload-timeout.png`, fullPage: true });
+        await writeFile(`${out}/draw-reload-timeout.json`, JSON.stringify({ error: error.message, savedUrl, projectId, diagnostics, writes: ctx.__mcpPxdWrites, browserEvents }, null, 2));
+        throw error;
+      }
       assert.deepEqual(await runtimeImage(page), initial);
       assert.equal(new URL(page.url()).searchParams.get('pxd'), new URL(savedUrl).searchParams.get('pxd'));
       await page.screenshot({ path: `${out}/draw-loaded.png` });
-      return { dimensions: [initial.width, initial.height], oneProjectWrite: true, undoRedo: true, reloadMatches: true };
+      return { dimensions: [initial.width, initial.height], createdProjectIds, sameProjectWrites: ctx.__mcpPxdWrites.filter(id => id === projectId).length, undoRedo: true, reloadMatches: true };
     } finally { await ctx.close(); }
   });
 
