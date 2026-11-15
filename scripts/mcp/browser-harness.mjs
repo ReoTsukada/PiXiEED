@@ -41,6 +41,11 @@ const expectedRgba = art => {
   return { width: art.width, height: art.height, rgba: data };
 };
 
+async function openJsonFallback(page) {
+  const details = page.locator('#json-import-details');
+  if (await details.count()) await details.locator(':scope > summary').click();
+}
+
 async function makeContext(options = {}) {
   const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 }, ...options });
   const pxdWrites = [];
@@ -103,6 +108,8 @@ async function checkNoOverlap(page) {
     const overlaps = [];
     for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) {
       const a = boxes[i], b = boxes[j];
+      const elementA = document.querySelector(a.selector), elementB = document.querySelector(b.selector);
+      if (elementA.contains(elementB) || elementB.contains(elementA)) continue;
       if (a.box.x < b.box.right - 1 && a.box.right > b.box.x + 1 && a.box.y < b.box.bottom - 1 && a.box.bottom > b.box.y + 1) overlaps.push([a.selector, b.selector]);
     }
     return { width: innerWidth, scrollWidth: document.documentElement.scrollWidth, overlaps };
@@ -130,7 +137,7 @@ async function saveProjectInWorkspace(page) {
 }
 
 try {
-  for (const viewport of [{ width: 390, height: 844, isMobile: true, hasTouch: true }, { width: 1280, height: 900 }]) {
+  for (const viewport of [{ width: 320, height: 800, isMobile: true, hasTouch: true }, { width: 390, height: 844, isMobile: true, hasTouch: true }, { width: 1280, height: 900 }]) {
     await run(`worker preview, exact RGBA, and responsive layout ${viewport.width}`, async () => {
       const { width, height, isMobile = false, hasTouch = false } = viewport;
       const ctx = await makeContext({ viewport: { width, height }, isMobile, hasTouch });
@@ -144,6 +151,7 @@ try {
           return { width: canvas.width, height: canvas.height, rgba: Array.from(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data) };
         }), expectedRgba(validArt));
         assert.equal(await page.locator('#mcp-connection-status').count(), 1);
+        assert.equal(await page.locator('#manual-import').isHidden(), true, 'valid link preview should hide onboarding');
         assert.equal(ctx.__mcpPxdWrites.length, 0, 'preview must not save to PXD');
         const layout = await checkNoOverlap(page);
         assert.ok(layout.scrollWidth <= layout.width + 1, `horizontal overflow: ${JSON.stringify(layout)}`);
@@ -165,10 +173,101 @@ try {
         const layout = await checkNoOverlap(page);
         assert.ok(layout.scrollWidth <= layout.width + 1, `horizontal overflow: ${JSON.stringify(layout)}`);
         assert.deepEqual(layout.overlaps, [], `overlapping controls: ${JSON.stringify(layout.overlaps)}`);
-        return { layout, manualImportVisible: true };
+        const endpointBox = await page.locator('#mcp-endpoint').boundingBox();
+        assert.ok(endpointBox && endpointBox.height >= 48 && endpointBox.height <= 64, `endpoint field height should stay compact: ${JSON.stringify(endpointBox)}`);
+        assert.equal(await page.locator('#json-import-details').evaluate(element => element.open), false, 'JSON fallback instructions should start collapsed');
+        for (const selector of ['#copy-mcp-endpoint', '#copy-prompt', '#chatgpt-settings-link', '#chatgpt-home-link']) {
+          const target = page.locator(selector);
+          if (await target.isVisible()) {
+            const box = await target.boundingBox();
+            assert.ok(box && box.width >= 44 && box.height >= 44, `${selector} should be a 44px interaction target`);
+          }
+        }
+        await page.screenshot({ path: `${out}/onboarding-${viewport.width}.png`, fullPage: true });
+        return { layout, manualImportVisible: true, jsonFallbackInitiallyCollapsed: true };
       } finally { await ctx.close(); }
     });
   }
+
+  await run('tools page exposes the ChatGPT entry at mobile and desktop widths', async () => {
+    const results = [];
+    for (const viewport of [{ width: 320, height: 800, isMobile: true, hasTouch: true }, { width: 1280, height: 900 }]) {
+      const ctx = await makeContext({ viewport: { width: viewport.width, height: viewport.height }, isMobile: viewport.isMobile, hasTouch: viewport.hasTouch });
+      try {
+        const page = await ctx.newPage();
+        await page.goto(`${origin}/tools/`);
+        const entry = page.locator('.hp-toy[data-static-tool="ai"]');
+        assert.equal((await entry.locator('.hp-toy-name').innerText()).trim(), 'ChatGPTと連携');
+        const layout = await entry.evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          return { opacity: getComputedStyle(element).opacity, x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height, viewportWidth: innerWidth, documentHeight: document.documentElement.scrollHeight, scrollWidth: document.documentElement.scrollWidth };
+        });
+        assert.equal(layout.opacity, '1', 'the ChatGPT entry must not be transparent');
+        assert.ok(layout.width > 44 && layout.height > 44, `entry should have a practical hit area: ${JSON.stringify(layout)}`);
+        assert.ok(layout.x >= 0 && layout.right <= layout.viewportWidth + 1 && layout.y >= 0 && layout.bottom <= layout.documentHeight + 1, `entry should remain within the page: ${JSON.stringify(layout)}`);
+        assert.ok(layout.scrollWidth <= layout.viewportWidth + 1, `tools page horizontal overflow: ${JSON.stringify(layout)}`);
+        await page.screenshot({ path: `${out}/tools-${viewport.width}.png`, fullPage: true });
+        await Promise.all([page.waitForURL(url => url.pathname === '/ai/'), entry.click()]);
+        await page.getByRole('heading', { name: 'ChatGPTと連携', exact: true }).waitFor({ state: 'visible' });
+        results.push({ width: viewport.width, opacity: layout.opacity, hitArea: [layout.width, layout.height], navigatedToAi: true });
+      } finally { await ctx.close(); }
+    }
+    return { viewports: results };
+  });
+
+  await run('ChatGPT onboarding links and copy controls report clipboard outcomes', async () => {
+    const ctx = await makeContext();
+    try {
+      const page = await ctx.newPage();
+      await page.addInitScript(() => {
+        window.__clipboardWrites = [];
+        window.__clipboardReject = false;
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+          writeText: async value => {
+            if (window.__clipboardReject) throw new Error('Synthetic clipboard rejection');
+            window.__clipboardWrites.push(String(value));
+          }
+        } });
+      });
+      await page.goto(`${origin}/ai/`);
+      const settings = page.locator('#chatgpt-settings-link');
+      const home = page.locator('#chatgpt-home-link');
+      assert.equal(await settings.getAttribute('href'), 'https://chatgpt.com/plugins');
+      assert.equal(await home.getAttribute('href'), 'https://chatgpt.com/');
+      for (const link of [settings, home]) {
+        assert.equal(await link.getAttribute('target'), '_blank');
+        const rel = (await link.getAttribute('rel') || '').split(/\s+/);
+        assert.ok(rel.includes('noopener') && rel.includes('noreferrer'));
+      }
+      const endpoint = page.locator('#mcp-endpoint');
+      assert.equal(await endpoint.getAttribute('readonly'), '');
+      assert.match(await endpoint.inputValue(), /^https:\/\/[^\s]+\/mcp$/);
+      const prompt = page.locator('#sample-prompt');
+      if (!await prompt.isVisible()) await prompt.locator('xpath=ancestor::details[1]').locator('summary').click();
+      assert.equal(await prompt.getAttribute('readonly'), '');
+      const endpointText = await endpoint.inputValue();
+      const promptText = await prompt.inputValue();
+      await page.locator('#copy-mcp-endpoint').click();
+      await page.waitForFunction(() => /コピーしました/.test(document.querySelector('#connection-feedback')?.textContent || ''));
+      await page.locator('#copy-prompt').click();
+      await page.waitForFunction(() => /コピーしました/.test(document.querySelector('#prompt-feedback')?.textContent || ''));
+      assert.deepEqual(await page.evaluate(() => window.__clipboardWrites), [endpointText, promptText]);
+
+      const urlBeforeRejection = page.url();
+      await page.evaluate(() => { window.__clipboardReject = true; });
+      await page.locator('#copy-mcp-endpoint').click();
+      await page.waitForFunction(() => /コピーできません/.test(document.querySelector('#connection-feedback')?.textContent || ''));
+      assert.doesNotMatch(await page.locator('#connection-feedback').innerText(), /コピーしました/);
+      assert.equal(page.url(), urlBeforeRejection, 'failed clipboard write must not navigate');
+      await page.locator('#copy-prompt').click();
+      await page.waitForFunction(() => /コピーできません/.test(document.querySelector('#prompt-feedback')?.textContent || ''));
+      assert.doesNotMatch(await page.locator('#prompt-feedback').innerText(), /コピーしました/);
+      assert.deepEqual(await page.evaluate(() => window.__clipboardWrites), [endpointText, promptText]);
+      assert.equal(ctx.__mcpPxdWrites.length, 0, 'onboarding copy actions must not write to PXD');
+      assert.equal(page.url(), urlBeforeRejection, 'failed prompt copy must not navigate');
+      return { copiedExactEndpoint: true, copiedExactPrompt: true, rejectedWritesReportFailure: true, linksAnchored: true };
+    } finally { await ctx.close(); }
+  });
 
   await run('worker data applies once, opens Draw, supports undo/redo, and survives reload', async () => {
     const ctx = await makeContext();
@@ -240,6 +339,7 @@ try {
         assert.equal(await page.locator('#open-draw').isDisabled(), true);
       }
       assert.equal(ctx.__mcpPxdWrites.length, 0);
+      await openJsonFallback(page);
       await page.locator('#art-json').fill(JSON.stringify(validArt));
       await page.locator('#load-json').click();
       await page.locator('#receive-status[data-state="ready"]').waitFor();
@@ -274,6 +374,7 @@ try {
       const page = await ctx.newPage();
       await page.goto(`${origin}/ai/`);
       const title = '<img src=x onerror=alert(1)> & sprite';
+      await openJsonFallback(page);
       await page.locator('#art-json').fill(JSON.stringify({ ...validArt, title }));
       await page.locator('#load-json').click();
       await page.locator('#receive-status[data-state="ready"]').waitFor();

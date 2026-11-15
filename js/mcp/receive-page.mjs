@@ -15,6 +15,8 @@ const jsonInput = $('#art-json');
 const fileInput = $('#art-file');
 const loadButton = $('#load-json');
 const fallback = $('#manual-import');
+const connectionFeedback = $('#connection-feedback');
+const promptFeedback = $('#prompt-feedback');
 let current = null;
 let controller = null;
 let saving = false;
@@ -58,7 +60,7 @@ function render(decoded, { token = null, persistForRefresh = false } = {}) {
     }
   });
   card.hidden = false;
-  fallback.hidden = Boolean(token);
+  fallback.hidden = Boolean(current);
   let stageWarning = false;
   if (persistForRefresh && token) {
     try { stageDrawImportToken(sessionStorageRef(), token); }
@@ -137,18 +139,37 @@ $('#cancel-import').addEventListener('click', (event) => {
 
 const endpoint = verifiedMcpEndpoint();
 $('#mcp-connection').hidden = false;
+const setupSteps = $('.ai-receive__setup-steps');
+const connectedUseDetails = $('#connected-use-details');
 if (endpoint) {
-  $('#mcp-connection-status').textContent = 'ChatGPTのカスタムMCPに接続先URLを登録してください。';
-  $('#mcp-endpoint').textContent = endpoint;
-  $('#mcp-endpoint').hidden = false;
-  const copyButton = $('#copy-mcp-endpoint');
-  copyButton.hidden = false;
-  copyButton.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(endpoint); status.textContent = '接続先をコピーしました。'; }
-    catch { status.textContent = 'コピーできませんでした。接続先を選択してコピーしてください。'; }
+  $('#mcp-connection-status').textContent = '初回のみ、ChatGPTの設定でPiXiEEDを追加します。';
+  $('#mcp-endpoint').value = endpoint;
+  setupSteps.hidden = false;
+  connectedUseDetails.hidden = false;
+  $('#copy-mcp-endpoint').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(endpoint);
+      connectionFeedback.textContent = '接続先をコピーしました。';
+      connectionFeedback.dataset.state = 'success';
+    } catch {
+      connectionFeedback.textContent = 'コピーできませんでした。上のURL欄を選択してコピーしてください。';
+      connectionFeedback.dataset.state = 'error';
+    }
+  });
+  $('#copy-prompt').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('#sample-prompt').value);
+      promptFeedback.textContent = '依頼文をコピーしました。新しいチャットで貼り付けてください。';
+      promptFeedback.dataset.state = 'success';
+    } catch {
+      promptFeedback.textContent = 'コピーできませんでした。依頼文を選択してコピーしてください。';
+      promptFeedback.dataset.state = 'error';
+    }
   });
 } else {
-  $('#mcp-connection-status').textContent = 'ChatGPTとの接続は準備中です。JSONからの受け取りは利用できます。';
+  $('#mcp-connection-status').textContent = 'PiXiEEDの接続先を表示できません。接続が使えない場合は、下のJSONから読み込めます。';
+  setupSteps.hidden = true;
+  connectedUseDetails.hidden = true;
 }
 
 let fragment = location.hash;

@@ -30,7 +30,7 @@
   "js/mcp/connection-config.mjs": "20261114-mcp-1",
   "js/mcp/draw-import.mjs": "20261114-mcp-1",
   "js/mcp/pixel-art-contract.mjs": "20261114-mcp-1",
-  "js/mcp/receive-page.mjs": "20261114-mcp-1",
+  "js/mcp/receive-page.mjs": "20261115-chatgpt-entry-1",
   "js/mcp/tool-catalog.mjs": "20261114-mcp-1",
   "js/creation/spot-difference-page.mjs": "20261113-canvas1028-shared-2",
   "js/creation/tool-embed-bridge.mjs": "20261113-canvas1028-shared-2",

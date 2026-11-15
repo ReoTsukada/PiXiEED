@@ -5,14 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
   <meta name="robots" content="noindex,follow">
-  <title>AIからドット絵を受け取る｜PiXiEED</title>
-  <link rel="stylesheet" href="/css/ai-connect.css">
+  <title>ChatGPTと連携｜PiXiEED</title>
+  <link rel="stylesheet" href="/css/ai-connect.css?rev=20261115-chatgpt-entry-1">
 </head>
 <body class="ai-receive">
   <main class="ai-receive__wrap">
     <a class="ai-receive__brand" href="/">PiXiEED</a>
-    <h1>AIからドット絵を受け取る</h1>
-    <p class="ai-receive__lead">ChatGPTで作ったドット絵を確認して、Drawで続きを描けます。最大64×64px・32色に対応しています。</p>
+    <h1>ChatGPTと連携</h1>
+    <p class="ai-receive__lead">ChatGPTに言葉でドット絵を頼み、受け取った絵を確認してからDrawで仕上げられます。</p>
+    <p class="ai-receive__limit">初版は最大64×64px・32色です。</p>
+    <p class="ai-receive__usage-note">ご自身のChatGPTの利用枠を使います。</p>
     <p id="receive-status" class="ai-receive__status" role="status" aria-live="polite">受取リンクを開くか、ChatGPTでPiXiEEDを接続して依頼してください。</p>
     <section id="preview-card" class="ai-receive__card" aria-labelledby="art-title" hidden>
       <div class="ai-receive__preview"><canvas id="art-preview" width="1" height="1" aria-label="受け取ったドット絵のプレビュー"></canvas></div>
@@ -25,31 +27,73 @@
       <p class="ai-receive__privacy">絵は新しい作品として、このブラウザーに保存されます。受取リンクを共有すると、絵も共有されます。</p>
     </section>
     <section id="manual-import" class="ai-receive__manual" aria-labelledby="manual-title">
-      <h2 id="manual-title">データを読み込む</h2>
-      <p>ChatGPTでドット絵を作り、受け取ったリンクからプレビューできます。ご自身のChatGPTの利用枠を使います。JSONを貼り付けるかファイルから読み込むこともできます。</p>
-      <section id="mcp-connection" aria-label="ChatGPTとの接続" hidden>
-        <h3>ChatGPTに接続する</h3>
-        <p id="mcp-connection-status"></p>
-        <ol>
-          <li><a href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">ChatGPTのプラグイン</a>を開き、「追加」から「カスタム MCP サーバーを追加」を選びます。</li>
-          <li>名前を「PiXiEED」、サーバーURLを以下の接続先、認証を「認証なし」にして作成・接続します。</li>
-          <li>接続後、「PiXiEEDを使って青い彼岸花のドット絵を作って」と依頼できます。</li>
-        </ol>
-        <code id="mcp-endpoint" hidden></code>
-        <button id="copy-mcp-endpoint" type="button" hidden>接続先をコピー</button>
-      </section>
-      <label for="art-json">生成データJSON</label>
-      <textarea id="art-json" spellcheck="false" autocomplete="off"></textarea>
-      <details>
-        <summary>JSON形式を見る</summary>
-        <pre>{"title":"小さな絵","width":2,"height":2,"palette":["#E75445"],"rows":["0.",".0"]}</pre>
-        <p>色記号は0〜9、A〜Vをパレット番号として使い、. は透明です。</p>
+      <h2 id="manual-title" class="visually-hidden">ChatGPTと連携する</h2>
+      <details id="connected-use-details" class="ai-receive__connected-details" hidden>
+        <summary>接続済みの方はこちら</summary>
+        <section id="connected-use" class="ai-receive__connected" aria-labelledby="connected-title">
+          <h2 id="connected-title">依頼文を使う</h2>
+          <p>新しいチャットで「@PiXiEED」を選び、下の依頼文を貼り付けてください。送信前に内容を編集できます。</p>
+          <label class="visually-hidden" for="sample-prompt">依頼文の例</label>
+          <textarea id="sample-prompt" rows="3" readonly spellcheck="false">PiXiEEDを使って、青い彼岸花のドット絵を32×32px・背景透明で作って。Drawで確認できるリンクをください。</textarea>
+          <div class="ai-receive__copy-row ai-receive__copy-row--prompt">
+            <button id="copy-prompt" type="button">依頼文をコピー</button>
+            <a id="chatgpt-home-link" class="ai-receive__secondary-link" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPTで描く</a>
+          </div>
+          <p id="prompt-feedback" class="ai-receive__feedback" role="status" aria-live="polite"></p>
+        </section>
       </details>
-      <button id="load-json" type="button">プレビューを作成</button>
-      <label for="art-file">JSONファイルを選ぶ</label>
-      <input id="art-file" type="file" accept="application/json,.json">
+      <section id="mcp-connection" class="ai-receive__connection" aria-labelledby="setup-title" hidden>
+        <h2 id="setup-title">はじめて使うとき</h2>
+        <p id="mcp-connection-status" class="ai-receive__setup-intro"></p>
+        <ol class="ai-receive__setup-steps">
+          <li>
+            <h3>接続先をコピーする</h3>
+            <label class="visually-hidden" for="mcp-endpoint">PiXiEEDの接続先URL</label>
+            <div class="ai-receive__copy-row">
+              <input id="mcp-endpoint" type="url" readonly spellcheck="false" autocomplete="off" aria-label="PiXiEEDの接続先URL">
+              <button id="copy-mcp-endpoint" type="button">URLをコピー</button>
+            </div>
+            <p id="connection-feedback" class="ai-receive__feedback" role="status" aria-live="polite"></p>
+          </li>
+          <li>
+            <h3>ChatGPTでPiXiEEDを追加する</h3>
+            <a id="chatgpt-settings-link" class="ai-receive__primary-link" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">ChatGPTの設定を開く</a>
+            <p>設定画面で「＋」から「カスタム MCP サーバーを追加」を選びます。</p>
+            <ul>
+              <li>名前：PiXiEED</li>
+              <li>サーバーURL：コピーした接続先</li>
+              <li>認証：なし</li>
+            </ul>
+            <p>作成後、「インストール」または「接続」を選び、表示される確認を読んで同意してください。これは初回だけ必要です。</p>
+          </li>
+          <li>
+            <h3>新しいチャットで使う</h3>
+            <p>新しいチャットを開き、「@PiXiEED」を選んで絵を頼みます。</p>
+          </li>
+        </ol>
+        <details class="ai-receive__help">
+          <summary>設定項目が見つからない場合</summary>
+          <p>カスタムMCPの利用可否や設定場所は、ChatGPTのアカウント・ワークスペースの権限によって異なる場合があります。表示されないときは、ワークスペースの管理者に確認してください。</p>
+        </details>
+      </section>
+      <details id="json-import-details" class="ai-receive__json-import">
+        <summary>JSONから読み込む</summary>
+        <div class="ai-receive__json-fields">
+          <p>ChatGPTとの接続が使えない場合は、ドット絵データを貼り付けるかファイルから読み込めます。</p>
+          <label for="art-json">生成データJSON</label>
+          <textarea id="art-json" spellcheck="false" autocomplete="off"></textarea>
+          <details>
+            <summary>JSON形式を見る</summary>
+            <pre>{"title":"小さな絵","width":2,"height":2,"palette":["#E75445"],"rows":["0.",".0"]}</pre>
+            <p>色記号は0〜9、A〜Vをパレット番号として使い、. は透明です。</p>
+          </details>
+          <button id="load-json" type="button">プレビューを作成</button>
+          <label for="art-file">JSONファイルを選ぶ</label>
+          <input id="art-file" type="file" accept="application/json,.json">
+        </div>
+      </details>
     </section>
   </main>
-  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261114-mcp-1"></script>
+  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261115-chatgpt-entry-1"></script>
 </body>
 </html>
