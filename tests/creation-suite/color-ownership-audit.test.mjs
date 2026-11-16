@@ -106,7 +106,7 @@ function guardHarness(animation, { entitled = false, enabled = true } = {}) {
     drawRewardPolicy: rewardPolicy.createSiteRewardDrawPolicy({ enabled: () => enabled, hasReward: () => entitled }),
     drawOperationLease: null, animationSession: session,
     documentData: getAnimationCelDocument(animation, session.frameId, session.layerId),
-    selectedColor: 0, musicLayer: false, toast() {}
+    selectedColor: 0, musicLayer: false, editingNormalLayer: () => false, toast() {}
   };
   const source = readFileSync(new URL('../../js/creation/draw-page.mjs', import.meta.url), 'utf8');
   vm.createContext(context);

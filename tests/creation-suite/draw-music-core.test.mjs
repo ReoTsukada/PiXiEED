@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnimation, getAnimationCelDocument, addAnimationFrame, addAnimationLayer, moveAnimationFrame, removeAnimationFrame, serializeAnimationPool, setAnimationPalette, writeAnimationCel, composeAnimationFrame } from '../../js/creation/animation-core.mjs';
+import { ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_MAX_PALETTE_ENTRIES, createAnimation, ensureAnimationMusicLayer, ensureAnimationNormalLayer, getAnimationCelDocument, addAnimationFrame, addAnimationLayer, moveAnimationFrame, removeAnimationFrame, serializeAnimationPool, setAnimationPalette, writeAnimationCel, composeAnimationFrame } from '../../js/creation/animation-core.mjs';
 import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, getAudioAnimationCellPitch, audioAnimationCellTiming, audioAnimationSequenceColumn, validateAudioAnimationBinding } from '../../js/creation/audio-animation.mjs';
 import { AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, createAudioSong, setAudioColorInstrument, setAudioPixel, collectAudioEvents } from '../../js/creation/audio-core.mjs';
 import { createPxdProject, getPxdJson, setPxdBytes, setPxdJson } from '../../js/creation/pxd-codec.mjs';
 import { audioCellLink, audioSongImage, prepareSharedAudioImageImport, projectLegacySharedAudioImage, readPxdAudioLink, readPxdAudioState, writePxdAudioState } from '../../js/creation/pxd-draw-audio.mjs';
 import { putPxdSharedImage, readPxdImage, readPxdSharedImage } from '../../js/creation/pxd-project.mjs';
 import { readPxdAnimation } from '../../js/creation/pxd-animation.mjs';
-import { changeDrawMusicColor, changeDrawMusicTempo, createDrawMusicState, describeDrawMusicProjection, projectDrawMusic, writeDrawMusicProject } from '../../js/creation/draw-music-core.mjs';
+import { changeDrawMusicColor, changeDrawMusicTempo, createDrawMusicState, createDrawMusicTrackState, describeDrawMusicProjection, projectDrawMusic, writeDrawMusicProject } from '../../js/creation/draw-music-core.mjs';
 import { documentRgba } from '../../js/creation/draw-core.mjs';
+import { planSharedProjectSettings } from '../../js/creation/shared-project-core.mjs';
 
 const GREEN = '#49643c';
 const BLUE = '#4c82c3';
@@ -32,6 +33,21 @@ test('music projection preview reports actual Draw dimensions, pitch range and t
   const state = createDrawMusicState(null, animation);
   assert.match(describeDrawMusicProjection(state), /24×12px・1コマ・横1ドット＝16分音符/);
   assert.match(describeDrawMusicProjection(state), /音高/);
+});
+
+test('normal-map art derives a standard extended-color music page without normal metadata', async () => {
+  let art = createAnimation({ width: 2, height: 1, palette: ['#ff0000', '#0000ff'] });
+  art = ensureAnimationNormalLayer(art);
+  art = ensureAnimationMusicLayer(art);
+  const state = await createDrawMusicTrackState(null, art);
+  const changedArt = planSharedProjectSettings(art, { palette: ['#0000ff', '#ff0000'] }).animation;
+
+  const next = projectDrawMusic(state, changedArt);
+
+  assert.equal(next.musicAnimation.schemaVersion, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION);
+  assert.equal(next.musicAnimation.colorCapacity, ANIMATION_MAX_PALETTE_ENTRIES);
+  assert.equal(Object.hasOwn(next.musicAnimation, 'normalEncoding'), false);
+  assert.equal(next.musicAnimation.layers.some(layer => layer.role === 'normal'), false);
 });
 
 function paint(animation, frameId, layerId, indices) {

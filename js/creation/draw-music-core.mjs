@@ -1,17 +1,17 @@
-import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport } from './audio-animation.mjs?rev=20261113-canvas1028-shared-2';
+import { AUDIO_ANIMATION_LINK_VERSION, createAudioAnimationLink, prepareAudioAnimationImport } from './audio-animation.mjs?rev=20261116-normal-release-1';
 import {
   AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_PITCHES, AUDIO_PIXEL_TICKS, createAudioRowPitchMap, createAudioSong,
   setAudioColorInstrument, setAudioTempo, validateAudioSong
 } from './audio-core.mjs?rev=20261016-color-capability-1';
-import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261113-canvas1028-shared-2';
-import { documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { readPxdAudioLink, readPxdAudioState, writePxdAudioState, projectLegacySharedAudioImage } from './pxd-draw-audio.mjs?rev=20261116-normal-release-1';
+import { documentRgba } from './draw-core.mjs?rev=20261116-normal-release-1';
 import { getPxdJson, setPxdJson } from './pxd-codec.mjs';
-import { readPxdImage, readPxdSharedImage } from './pxd-project.mjs?rev=20261113-canvas1028-shared-2';
-import { ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION,
+import { readPxdImage, readPxdSharedImage } from './pxd-project.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_COMPOSITING, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_NORMAL_SCHEMA_VERSION,
   ANIMATION_PALETTE_ENCODING, ANIMATION_PIXEL_ENCODING, addAnimationFrame, animationNeedsRgba, composeAnimationFrame, composeAnimationFrameRgba, createAnimation, createAnimationFromSerialized,
   getAnimationCelDocument, getAnimationDrawRewardBonusColors, moveAnimationFrame, removeAnimationFrame, serializeAnimationPool, setAnimationDrawRewardBonusColors,
-  resizeAnimation, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261113-canvas1028-shared-2';
+  resizeAnimation, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-1';
 
 const colorId = (color) => `rgba-${color.slice(1).padEnd(8, 'f').toLowerCase()}`;
 const clone = (value) => structuredClone(value);
@@ -144,7 +144,10 @@ function syncMusicCanvas(state, art) {
   // The music page shares Draw's palette and must inherit its schema
   // capability. A schema-1 shell made harmless edits to 33–64-color artwork
   // look like lossy legacy conversions to the shared-audio reward guard.
-  const paletteSchema = art.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION
+  const paletteSchema = art.schemaVersion === ANIMATION_NORMAL_SCHEMA_VERSION
+    ? { schemaVersion: ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, colorCapacity: art.colorCapacity,
+      pixelEncoding: ANIMATION_PIXEL_ENCODING, paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING }
+    : art.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION
     ? { schemaVersion: ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, colorCapacity: art.colorCapacity,
       pixelEncoding: art.pixelEncoding, paletteEncoding: art.paletteEncoding, compositing: art.compositing }
     : art.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION

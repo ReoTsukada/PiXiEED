@@ -50,7 +50,7 @@ class FakeNode {
   remove() { this.parentElement?.removeChild(this); }
 }
 
-function fixture({ loaders, active = () => true } = {}) {
+function fixture({ loaders, active = () => true, normalCallbacks = null } = {}) {
   const doc = {
     hidden: false,
     createElement(tag) { return new FakeNode(doc, tag); },
@@ -66,7 +66,7 @@ function fixture({ loaders, active = () => true } = {}) {
     add(cleanup) { cleanups.push(cleanup); },
     dispose() { this.disposed = true; for (const cleanup of cleanups.reverse()) cleanup(); }
   };
-  const panels = mountLazyDrawFeaturePanels({ scope, host, doc, isActive: active, callbacks: {}, loaders });
+  const panels = mountLazyDrawFeaturePanels({ scope, host, doc, isActive: active, callbacks: {}, normalCallbacks, loaders });
   return { doc, toolbar, host, scope, panels };
 }
 
@@ -192,4 +192,44 @@ test('a panel that resolves while hidden or disposed does not mount or open stal
   assert.equal(await disposedPending, false);
   assert.equal(counters.mounts.color, 1, 'disposed load does not mount');
   assert.equal(disposedFixture.panels.color.opener.isConnected, false);
+});
+
+
+test('normal-map tools open on the first activation from a layer-panel entry and receive a snapshot provider', async () => {
+  assert.equal(fixture().panels.normal, undefined);
+  let loads = 0, reads = 0, mounted;
+  const snapshot = () => { reads += 1; return { width: 16, height: 16 }; };
+  const f = fixture({ normalCallbacks: { getSource: snapshot }, loaders: {
+    color: async () => ({}), text: async () => ({}),
+    normal: async () => {
+      loads += 1;
+      return { mountDrawNormalMapPanel(options) {
+        mounted = options;
+        const opener = f.doc.createElement('button');
+        const panel = f.doc.createElement('dialog');
+        f.host.append(panel);
+        let open = false;
+        options.scope.add(() => { opener.remove(); panel.remove(); });
+        return { opener, panel, open() { options.getSource(); open = true; }, close() { open = false; }, get isOpen() { return open; } };
+      } };
+    }
+  } });
+  assert.equal(loads, 0);
+  assert.equal(reads, 0);
+  assert.equal(f.panels.normal.opener.getAttribute('aria-label'), 'ノーマルマップを作成');
+  const layerPanelEntry = f.doc.createElement('button');
+  f.host.append(layerPanelEntry);
+  f.doc.activeElement = layerPanelEntry;
+  assert.equal(await f.panels.normal.open(), true, 'the alternate entry opens the panel without requiring a second click');
+  assert.equal(f.panels.normal.isOpen, true);
+  assert.equal(loads, 1);
+  assert.equal(reads, 1);
+  assert.equal(mounted.getSource, snapshot);
+  assert.equal(mounted.onApply, undefined, 'the normal map does not receive art mutation callbacks');
+  f.panels.normal.close();
+  await f.panels.normal.open();
+  assert.equal(loads, 1);
+  assert.equal(reads, 2, 'each activation reads the current frame');
+  f.scope.dispose();
+  assert.equal(f.panels.normal.opener.isConnected, false);
 });

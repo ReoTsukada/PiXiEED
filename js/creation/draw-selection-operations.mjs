@@ -1,11 +1,20 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
-import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
-import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261113-canvas1028-shared-2';
+import { ANIMATION_MAX_DIMENSION, getAnimationUsedColorIndices } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-1';
+import { selectionAxes, selectionFrameBounds } from './draw-selection-geometry.mjs?rev=20261116-normal-release-1';
 
 export const selectionColor = color => {
   if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(color)) throw new TypeError('選択の色が不正です。');
   return color.length === 7 ? `${color.toLowerCase()}ff` : color.toLowerCase();
 };
+
+
+/** Selection color budgets belong to the selected layer's palette domain. */
+export function getDrawSelectionOtherColors(animation, { frameId, layerId } = {}) {
+  // Normal cels use their independent fixed palette, never the artwork palette.
+  if (animation.layers.find(layer => layer.id === layerId)?.role === 'normal') return [];
+  return Array.from(getAnimationUsedColorIndices(animation, { excludeFrameId: frameId, excludeLayerId: layerId }),
+    index => index < 0 ? '#00000000' : animation.palette[index]);
+}
 
 /** Build a detached full-canvas mask for all cells with the clicked visible RGBA color. */
 export function selectDrawColorMask(doc, point) {

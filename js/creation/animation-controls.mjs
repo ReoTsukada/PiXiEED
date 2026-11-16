@@ -18,9 +18,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   let draggedLayerId = null;
   let pointerHold = null;
   let liftedHeader = null;
-  let root; let frames; let frameMenu; let layers; let timing; let workspacePanel = null; let workspaceSelection = null; let celToolbar = null;
+  let root; let frames; let frameMenu; let layers; let normalLayerNote; let timing; let workspacePanel = null; let workspaceSelection = null; let celToolbar = null;
   let status; let frameToggle; let frameToggleBadge = null; let layerToggle; let timingToggle; let workspaceOpen = false;
-  let playButton = null;
+  let playButton = null; let workspaceNormalTools = null;
   let lastCelFrames = null; let lastCelLayers = null; let celContentCache = new Map();
   let lastPreviewFrames = null; let lastPreviewSelection = undefined;
   let refreshQueued = false; let refreshFrame = 0; let requestedPlaybackFrameId = null; let appliedPlaybackFrameId = null; let playbackDirty = true; let workspaceDirty = true; let layerListDirty = true;
@@ -104,15 +104,17 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     } else if (name === 'up' || name === 'down') {
       add('path', { ...stroke, d: name === 'up' ? 'm6 14 6-6 6 6' : 'm6 10 6 6 6-6' });
     } else if (name === 'copy-add') {
-      add('rect', { ...stroke, x: '5', y: '5', width: '12', height: '14', rx: '2' });
-      add('path', { ...stroke, d: 'M9 3h9a2 2 0 0 1 2 2v11M11 12h6M14 9v6' });
+      add('rect', { ...stroke, x: '4', y: '7', width: '13', height: '13', rx: '2' });
+      add('path', { ...stroke, d: 'M7 7V6a2 2 0 0 1 2-2h4M20 11v4a2 2 0 0 1-2 2h-1' });
+      add('path', { ...stroke, d: 'M19 1v6M16 4h6' });
     } else if (name === 'clock') {
       add('circle', { ...stroke, cx: '12', cy: '12', r: '8.5' });
       add('path', { ...stroke, d: 'M12 7v5l3 2' });
     } else if (name === 'layers') {
       add('path', { ...stroke, d: 'm12 4 8 4-8 4-8-4 8-4ZM4 12l8 4 8-4M4 16l8 4 8-4' });
     } else if (name === 'layer-add') {
-      add('path', { ...stroke, d: 'm12 4 8 4-8 4-8-4 8-4ZM4 12l8 4 8-4M12 13v8M8 17h8' });
+      add('path', { ...stroke, d: 'm12 6 8 4-8 4-8-4 8-4ZM4 14l8 4 8-4' });
+      add('path', { ...stroke, d: 'M19 1v6M16 4h6' });
     } else if (name === 'download') {
       add('path', { ...stroke, d: 'M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4' });
     } else if (name === 'close') {
@@ -121,8 +123,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       add('circle', { ...stroke, cx: '12', cy: '12', r: '3' });
       add('path', { ...stroke, d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.6 2.8-.2-.1a1.7 1.7 0 0 0-1.9.3l-.1.1h-3.2l-.1-.2a1.7 1.7 0 0 0-1.6-1.1 1.7 1.7 0 0 0-.8.2l-.2.1-2.8-1.6.1-.2a1.7 1.7 0 0 0-.3-1.9l-.1-.1v-3.2l.2-.1a1.7 1.7 0 0 0 1.1-1.6 1.7 1.7 0 0 0-.2-.8l-.1-.2 1.6-2.8.2.1a1.7 1.7 0 0 0 1.9-.3l.1-.1h3.2l.1.2a1.7 1.7 0 0 0 1.6 1.1 1.7 1.7 0 0 0 .8-.2l.2-.1 2.8 1.6-.1.2a1.7 1.7 0 0 0 .3 1.9l.1.1v3.2l-.2.1' });
     } else if (name === 'blank-frame') {
-      add('rect', { ...stroke, x: '4', y: '4', width: '16', height: '16', rx: '2' });
-      add('path', { ...stroke, d: 'M8 9h8M8 12h8M8 15h5' });
+      add('path', { ...stroke, d: 'M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7' });
+      add('path', { ...stroke, d: 'M19 1v6M16 4h6' });
     } else if (name === 'trash') {
       add('path', { ...stroke, d: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m3 3v7m6-7v7' });
     } else if (name === 'eye') {
@@ -176,11 +178,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     layers = node('div', 'animation-controls__layers'); layers.hidden = true; layers.setAttribute('role', 'group'); layers.setAttribute('aria-label', 'レイヤー操作');
     const layerHeading = node('div', 'animation-controls__panel-heading', 'レイヤー');
     layerHeading.append(button('レイヤーパネルを閉じる', '×', 'close-layers'));
+    const normalTools = button('ノーマルマップを作成・編集', 'ノーマルマップを作成・編集', 'normal-map', 'animation-controls__wide-button');
+    normalTools.hidden = true;
     const selectedLayerSettings = button('選択中レイヤーの設定', '⚙', 'selected-layer-settings', 'animation-controls__layer-settings');
     selectedLayerSettings.setAttribute('aria-haspopup', 'dialog'); selectedLayerSettings.setAttribute('aria-expanded', 'false'); selectedLayerSettings.setAttribute('aria-controls', frameMenu.id);
     const layerList = node('div', 'animation-controls__layer-list'); layerList.dataset.layerList = 'true';
+    normalLayerNote = node('p', 'animation-controls__normal-layer-note', '法線パレットは独立しており、通常の色には混ざりません。通常の画像書き出しにも含まれません。');
+    normalLayerNote.hidden = true;
     const addLayer = button('レイヤーを追加', '+', 'add-layer', 'animation-controls__wide-button');
-    layers.append(layerHeading, selectedLayerSettings, layerList, addLayer);
+    layers.append(layerHeading, normalTools, selectedLayerSettings, layerList, normalLayerNote, addLayer);
 
     timing = node('div', 'animation-controls__timing'); timing.hidden = true; timing.setAttribute('role', 'group'); timing.setAttribute('aria-label', 'コマのFPS');
     const timingHeading = node('div', 'animation-controls__panel-heading', '選択コマのFPS');
@@ -230,7 +236,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       heading.append(workspaceSelection, closeWorkspace);
       celToolbar = toolbar; celToolbar.hidden = !frameOnly;
       root.append(frameToggle);
-      workspacePanel.append(heading, toolbar, frames, status);
+      if (!frameOnly) {
+        workspaceNormalTools = button('ノーマルマップを作成・編集', 'ノーマルマップを作成・編集', 'normal-map', 'animation-controls__wide-button');
+        workspaceNormalTools.hidden = true;
+        workspacePanel.append(heading, workspaceNormalTools, toolbar, frames, status);
+      } else {
+        workspacePanel.append(heading, toolbar, frames, status);
+      }
     } else root.append(toolbar, frames, status);
     host.replaceChildren(root);
     (document.body || host).append(...(workspacePanel ? [workspacePanel, frameMenu, ...(!frameOnly ? [layers, timing] : []), opacityPopover] : [frameMenu, layers, timing, opacityPopover]));
@@ -283,7 +295,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
   function openOpacityPopover(trigger) {
     const state = stateNow();
     const layer = state.layers.find(item => String(item.id) === String(trigger.dataset.layerId));
-    if (!layer || layer.role === 'music' || layer.locked || state.readOnly || pending > 0 || state.audioMode) return;
+    if (!layer || layer.role === 'music' || layer.role === 'normal' || layer.locked || state.readOnly || pending > 0 || state.audioMode) return;
     if (opacityPopoverState?.layerId === String(layer.id)) { closeOpacityPopover({ returnFocus: true }); return; }
     closeOpacityPopover();
     opacityPopoverState = { layerId: String(layer.id), frameId: String(state.frameId), selectedLayerId: String(state.layerId), trigger };
@@ -308,17 +320,22 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const view = document.defaultView;
     const viewportWidth = view?.innerWidth || 320; const viewportHeight = view?.innerHeight || 568;
     const rect = board?.getBoundingClientRect?.() || { left: 8, right: viewportWidth - 8, top: 8, bottom: viewportHeight - 8, width: viewportWidth - 16, height: viewportHeight - 16 };
-    const headerBottom = document.querySelector('.site-header')?.getBoundingClientRect?.().bottom || 0;
+    // Direct-work mode hides the legacy header and uses its own visible bar.
+    const headerBottom = Math.max(
+      document.querySelector('.site-header')?.getBoundingClientRect?.().bottom || 0,
+      document.querySelector('.tool-direct__bar')?.getBoundingClientRect?.().bottom || 0
+    );
     const width = Math.max(44, Math.min(560, rect.width - 16, viewportWidth - 16));
     const left = Math.max(8, Math.min(viewportWidth - width - 8, rect.right - width - 8));
     const bottom = Math.max(8, Math.min(viewportHeight - 8, viewportHeight - rect.bottom + 8));
     const topLimit = Math.max(8, headerBottom + 8);
     const available = Math.max(0, viewportHeight - bottom - topLimit);
-    const contentHeight = 64 + (stateNow().layers.length + 2) * 44;
+    const normalToolsHeight = workspaceNormalTools && stateNow().normalMapAvailable ? 48 : 0;
+    const contentHeight = 64 + normalToolsHeight + (stateNow().layers.length + 2) * 44;
     const panelHeight = Math.min(360, available, contentHeight);
     workspacePanel.style.left = `${left}px`; workspacePanel.style.bottom = `${bottom}px`;
     workspacePanel.style.width = `${width}px`; workspacePanel.style.maxHeight = `${panelHeight}px`;
-    workspacePanel.style.setProperty('--animation-workspace-grid-height', `${Math.max(88, panelHeight - 64)}px`);
+    workspacePanel.style.setProperty('--animation-workspace-grid-height', `${Math.max(normalToolsHeight ? 44 : 88, panelHeight - 64 - normalToolsHeight)}px`);
   }
 
   function setWorkspaceOpen(open, { returnFocus = false } = {}) {
@@ -607,10 +624,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (addFrame.style.gridRow !== '1') addFrame.style.gridRow = '1'; if (addFrame.style.gridColumn !== String(frameList.length + 2)) addFrame.style.gridColumn = String(frameList.length + 2); desired.push(addFrame);
     const orderedLayers = state.layers.map((layer, modelIndex) => ({ layer, modelIndex })).reverse();
     orderedLayers.forEach(({ layer, modelIndex }, rowIndex) => {
-      const musicLayer = layer.role === 'music'; const layerLabel = musicLayer ? '音楽（全コマ共通）' : `レイヤー ${modelIndex + 1}`; const row = rowIndex + 2;
+      const musicLayer = layer.role === 'music', normalLayer = layer.role === 'normal';
+      const layerLabel = musicLayer ? '音楽（全コマ共通）' : normalLayer ? 'ノーマルマップ' : `レイヤー ${modelIndex + 1}`; const row = rowIndex + 2;
       const header = take(`layer:${layer.id}`, () => button('', musicLayer ? '音楽' : '', 'select-layer', 'animation-controls__layer-number'));
-      setAttr(header, 'aria-label', `${layerLabel}を選択`); setData(header, 'layerId', layer.id); setData(header, 'layerRole', musicLayer ? 'music' : '');
-      setText(header, musicLayer ? '音楽' : modelIndex + 1);
+      setAttr(header, 'aria-label', `${layerLabel}を選択`); setData(header, 'layerId', layer.id); setData(header, 'layerRole', layer.role || '');
+      setText(header, musicLayer ? '音楽' : normalLayer ? '法線' : modelIndex + 1);
       setAttr(header, 'role', 'rowheader'); setAttr(header, 'aria-rowindex', row); setAttr(header, 'aria-colindex', '1');
       if (header.style.gridRow !== String(row)) header.style.gridRow = String(row); if (header.style.gridColumn !== '1') header.style.gridColumn = '1';
       setAttr(header, 'aria-pressed', layer.id === state.layerId); setClass(header, 'is-selected', layer.id === state.layerId);
@@ -658,14 +676,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const list = layers.querySelector('[data-layer-list]');
     const orderedLayers = state.layers.map((layer, modelIndex) => ({ layer, modelIndex })).reverse();
     const hasMusicLayer = state.layers.some((layer) => layer.role === 'music');
+    normalLayerNote.hidden = !state.layers.some((layer) => layer.role === 'normal');
     const normalLayerCount = state.layers.filter((layer) => layer.role !== 'music').length;
     const old = new Map([...list.children].filter(row => row.dataset.layerId).map(row => [row.dataset.layerId, row]));
     const desired = [];
     let displayPosition = 0;
     for (const { layer, modelIndex } of orderedLayers) {
       displayPosition += 1;
-      const id = String(layer.id), musicLayer = layer.role === 'music';
-      const layerLabel = musicLayer ? '音楽（全コマ共通）' : layer.name || `レイヤー ${modelIndex + 1}`;
+      const id = String(layer.id), musicLayer = layer.role === 'music', normalLayer = layer.role === 'normal';
+      const layerLabel = musicLayer ? '音楽（全コマ共通）' : normalLayer ? `${layer.name || 'ノーマルマップ'} · 法線` : layer.name || `レイヤー ${modelIndex + 1}`;
       let row = old.get(id);
       if (!row) {
         controlsDirty = true;
@@ -694,6 +713,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const [select, rename, opacityLabel, eye, lock, up, down, remove] = row.children;
       const opacity = opacityLabel.querySelector('[data-layer-opacity]');
       setClass(row, 'is-selected', layer.id === state.layerId);
+      setClass(row, 'is-normal-layer', normalLayer);
+      setData(select, 'layerRole', layer.role || '');
       setText(select, layerLabel);
       const visibilityDescription = layer.visible === false ? '非表示' : '表示';
       const lockDescription = layer.locked ? 'ロック中' : 'ロックなし';
@@ -715,7 +736,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       setText(opacityTrigger, `${Math.round(layerOpacity * 100)}%`);
       setAttr(opacityTrigger, 'aria-label', `${layerLabel}の不透明度を調整（${Math.round(layerOpacity * 100)}%）`);
       setAttr(opacityTrigger, 'title', `${layerLabel}の不透明度 ${Math.round(layerOpacity * 100)}%`);
-      setBoolean(opacityTrigger, 'disabled', disabled || musicLayer || Boolean(layer.locked));
+      setBoolean(opacityTrigger, 'disabled', disabled || musicLayer || normalLayer || Boolean(layer.locked));
       if (opacityPopoverState?.layerId === id) {
         opacityPopoverInput.value = String(layerOpacity);
         setText(opacityPopoverValue, `${Math.round(layerOpacity * 100)}%`);
@@ -725,7 +746,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       setAttr(eye, 'aria-pressed', layer.visible !== false);
       const lockLabel = layer.locked ? 'レイヤーのロックを解除' : 'レイヤーをロック'; setAttr(lock, 'aria-label', lockLabel); const lockIcon = layer.locked ? 'locked' : 'unlocked'; if (lock.dataset.iconName !== lockIcon) { replaceButtonIcon(lock, lockIcon); lock.dataset.iconName = lockIcon; } setAttr(lock, 'aria-pressed', Boolean(layer.locked));
       setBoolean(rename, 'disabled', disabled || musicLayer || Boolean(layer.locked));
-      setBoolean(opacity, 'disabled', disabled || musicLayer || Boolean(layer.locked));
+      setBoolean(opacity, 'disabled', disabled || musicLayer || normalLayer || Boolean(layer.locked));
       setBoolean(eye, 'disabled', disabled); setBoolean(lock, 'disabled', disabled);
       setBoolean(up, 'disabled', disabled || Boolean(layer.locked) || modelIndex === state.layers.length - 1 || musicLayer);
       setBoolean(down, 'disabled', disabled || Boolean(layer.locked) || modelIndex === (hasMusicLayer ? 1 : 0) || musicLayer);
@@ -734,13 +755,15 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     placeChildren(list, desired);
     for (const row of old.values()) if (row.parentElement === list) list.removeChild(row);
+    const normalTools = layers.querySelector('[data-action="normal-map"]');
+    setBoolean(normalTools, 'hidden', !state.normalMapAvailable); setBoolean(normalTools, 'disabled', pending > 0);
     const add = layers.querySelector('[data-action="add-layer"]'); setBoolean(add, 'disabled', Boolean(state.readOnly) || pending > 0 || normalLayerCount >= 8);
     const selectedLayer = state.layers.find(layer => String(layer.id) === String(state.layerId));
     const settings = layers.querySelector('[data-action="selected-layer-settings"]');
     if (settings) {
       setBoolean(settings, 'hidden', !desktopMinimal || !selectedLayer);
       if (selectedLayer) {
-        const label = `設定：${selectedLayer.name || (selectedLayer.role === 'music' ? '音楽' : 'レイヤー')}`;
+        const label = `設定：${selectedLayer.role === 'normal' ? `${selectedLayer.name || 'ノーマルマップ'} · 法線` : selectedLayer.name || (selectedLayer.role === 'music' ? '音楽' : 'レイヤー')}`;
         setAttr(settings, 'aria-label', label); setAttr(settings, 'title', label); setData(settings, 'layerId', selectedLayer.id);
       } else if (settings.dataset.layerId) delete settings.dataset.layerId;
     }
@@ -844,7 +867,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const action = control.dataset.action;
       if (action === 'play' || action === 'onion' || action === 'export-gif' || action === 'toggle-frames' || action === 'toggle-layers' || action === 'toggle-duration' || action === 'close-frame-menu' || action === 'close-animation' || action === 'close-layers' || action === 'close-duration' || action === 'desktop-fold-frames') continue;
       let disabled;
-      if (layers.contains(control) && action !== 'add-layer') {
+      if (action === 'normal-map') disabled = !state.normalMapAvailable || pendingDisabled;
+      else if (layers.contains(control) && action !== 'add-layer') {
         const layerId = control.dataset.layerId || control.dataset.renameLayer;
         const index = state.layers.findIndex(layer => String(layer.id) === String(layerId));
         const layer = index >= 0 ? state.layers[index] : null;
@@ -853,7 +877,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
         if (!layer) disabled = true;
         else if (action === 'select-layer') disabled = pendingDisabled;
         else if (control.dataset.renameLayer) disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer;
-        else if (control.dataset.opacityPopoverTrigger) disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer;
+        else if (control.dataset.opacityPopoverTrigger) disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer || layer?.role === 'normal';
         else if (action === 'visibility' || action === 'lock') disabled = Boolean(state.readOnly) || pendingDisabled;
         else if (action === 'move-layer-up') disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer || index === state.layers.length - 1;
         else if (action === 'move-layer-down') disabled = Boolean(state.readOnly) || pendingDisabled || locked || musicLayer || index === (state.layers.some(item => item.role === 'music') ? 1 : 0);
@@ -883,10 +907,11 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
 
   function renderRefresh(state) {
     if (disposed || scope.disposed) return;
+    if (workspaceNormalTools) { setBoolean(workspaceNormalTools, 'hidden', !state.normalMapAvailable); setBoolean(workspaceNormalTools, 'disabled', pending > 0); }
     if (opacityPopoverState) {
       const popoverLayer = state.layers.find(layer => String(layer.id) === opacityPopoverState.layerId);
       const selectionChanged = String(state.frameId) !== opacityPopoverState.frameId || String(state.layerId) !== opacityPopoverState.selectedLayerId;
-      const protectedState = !popoverLayer || popoverLayer.role === 'music' || popoverLayer.locked || state.readOnly || state.audioMode || pending > 0;
+      const protectedState = !popoverLayer || popoverLayer.role === 'music' || popoverLayer.role === 'normal' || popoverLayer.locked || state.readOnly || state.audioMode || pending > 0;
       const canReturnFocus = Boolean(popoverLayer) && popoverLayer.role !== 'music' && !popoverLayer.locked && !state.readOnly && !state.audioMode;
       if (protectedState || selectionChanged) closeOpacityPopover({ returnFocus: canReturnFocus });
     }
@@ -994,7 +1019,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     } else {
       const layer = state.layers.find((item) => item.id === id); if (!layer) return;
       frameMenu.setAttribute('aria-label', `${layer.name || 'レイヤー'}の操作`);
-      const musicLayer = layer.role === 'music';
+      const musicLayer = layer.role === 'music', normalLayer = layer.role === 'normal';
       const visibility = add(layer.visible === false ? '表示する' : '隠す', layer.visible === false ? '○' : '◉', 'visibility', state.readOnly || pending > 0);
       replaceButtonIcon(visibility, layer.visible === false ? 'eye-hidden' : 'eye');
       const lock = add(layer.locked ? 'ロック解除' : 'ロック', '', 'lock', state.readOnly || pending > 0);
@@ -1005,7 +1030,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       const opacityValue = node('output', 'animation-controls__layer-opacity-value', `${Math.round((Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1) * 100)}%`);
       const opacity = node('input', 'animation-controls__layer-opacity-input'); opacity.type = 'range'; opacity.min = '0'; opacity.max = '1'; opacity.step = '0.01'; opacity.value = String(Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1);
       opacity.dataset.layerOpacity = String(layer.id); opacity.setAttribute('aria-label', `${layer.name || 'レイヤー'}の不透明度（全コマ共通）`);
-      opacity.disabled = musicLayer || state.readOnly || pending > 0 || Boolean(layer.locked);
+      opacity.disabled = musicLayer || normalLayer || state.readOnly || pending > 0 || Boolean(layer.locked);
       opacityLabel.append(opacityHeading, opacityValue, opacity); frameMenu.append(opacityLabel);
       const rename = node('input', 'animation-controls__context-rename'); rename.type = 'text'; rename.value = String(layer.name || ''); rename.maxLength = 80;
       rename.dataset.contextRename = String(layer.id); rename.setAttribute('aria-label', 'レイヤー名'); rename.disabled = musicLayer || state.readOnly || pending > 0 || Boolean(layer.locked); rename.placeholder = 'レイヤー名'; frameMenu.append(rename);
@@ -1110,6 +1135,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       if (index >= 0) request({ type: 'move-layer', layerId: target.dataset.layerId, index: to }); return;
     }
     if (action === 'delete-layer') { request({ type: 'delete-layer', layerId: target.dataset.layerId }); return; }
+    if (action === 'normal-map' && state.normalMapAvailable) { request({ type: 'normal-map' }); return; }
     if (action === 'add-layer') { request({ type: 'add-layer' }); return; }
     if (action === 'play') { request({ type: 'play', playing: !state.playing }); return; }
     if (action === 'onion') { request({ type: 'onion', enabled: !state.onion }); return; }
@@ -1130,7 +1156,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     if (target.matches('[data-layer-opacity]')) {
       const layerId = target.dataset.layerOpacity;
       const state = stateNow(); const layer = state.layers.find(item => String(item.id) === String(layerId));
-      if (!layer || layer.role === 'music' || layer.locked || state.readOnly || pending > 0) { refresh(); return; }
+      if (!layer || layer.role === 'music' || layer.role === 'normal' || layer.locked || state.readOnly || pending > 0) { refresh(); return; }
       const value = Number(target.value);
       if (Number.isFinite(value)) {
         if (minimalLayerMenu) closeCellMenu({ returnFocus: true });

@@ -179,6 +179,25 @@ function normalize(source, file) {
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261113-canvas1028-shared-2') : query + (query ? '&' : '?') + 'rev=20261113-canvas1028-shared-2';
     return `${quote}${path}${next}${quote}`;
   });
+  // Schema 5 changes the shared animation contract and the Draw normal-map
+  // rail. Normalize the full reverse dependency closure after older releases.
+  const normalLayerTargets = new Set([
+    ...canvas1028Targets,
+    'css/draw-normal-map.css',
+    'css/draw-selection-features.css',
+    'js/creation/draw-normal-map.mjs',
+    'js/creation/draw-normal-map-settings.mjs',
+    'js/creation/draw-normal-map-panel.mjs',
+    'js/mcp/draw-import.mjs',
+    'js/mcp/receive-page.mjs',
+  ]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!normalLayerTargets.has(target)) return whole;
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261116-normal-release-1') : query + (query ? '&' : '?') + 'rev=20261116-normal-release-1';
+    return `${quote}${path}${next}${quote}`;
+  });
   return changed;
 }
 

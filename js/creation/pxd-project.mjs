@@ -1,7 +1,7 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-1';
 import { createPxdProject, getPxdJson, setPxdJson, setPxdBytes } from './pxd-codec.mjs';
-import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
-import { countSharedImageColors as countUsedImageColors } from './shared-image.mjs?rev=20261113-canvas1028-shared-2';
+import { MAX_DRAW_COLORS, validateDrawDocument, documentRgba } from './draw-core.mjs?rev=20261116-normal-release-1';
+import { countSharedImageColors as countUsedImageColors } from './shared-image.mjs?rev=20261116-normal-release-1';
 
 // Existing image schema-2 metadata counts transparent tuples; preserve that wire contract.
 const countSharedImageColors = (image, stopAfter) => countUsedImageColors(image, stopAfter, { includeTransparent: true });

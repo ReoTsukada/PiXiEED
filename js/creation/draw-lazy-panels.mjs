@@ -2,40 +2,46 @@ import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-edito
 
 const defaultLoaders = Object.freeze({
   color: (attempt) => attempt === 0
-    ? import('./draw-color-adjustment-panel.mjs?rev=20261113-canvas1028-shared-2')
-    : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261113-canvas1028-shared-2&attempt=${attempt}`),
+    ? import('./draw-color-adjustment-panel.mjs?rev=20261116-normal-release-1')
+    : importModule(`/js/creation/draw-color-adjustment-panel.mjs?rev=20261116-normal-release-1&attempt=${attempt}`),
+  normal: (attempt) => attempt === 0
+    ? import('./draw-normal-map-panel.mjs?rev=20261116-normal-release-1')
+    : importModule(`/js/creation/draw-normal-map-panel.mjs?rev=20261116-normal-release-1&attempt=${attempt}`),
   text: (attempt) => attempt === 0
-    ? import('./draw-text-panel.mjs?rev=20261113-canvas1028-shared-2')
-    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261113-canvas1028-shared-2&attempt=${attempt}`)
+    ? import('./draw-text-panel.mjs?rev=20261116-normal-release-1')
+    : importModule(`/js/creation/draw-text-panel.mjs?rev=20261116-normal-release-1&attempt=${attempt}`)
 });
 
 const importModule = (specifier) => import(specifier);
 
 const labels = Object.freeze({
+  normal: { button: '凹凸', aria: 'ノーマルマップを作成', loading: 'ノーマルマップを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' },
   color: { button: '色調', loading: '色調パネルを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' },
   text: { button: '文字', loading: '文字パネルを読み込み中です。', error: '読み込みに失敗しました。もう一度押して再試行してください。', ready: '準備できました。もう一度押すと開きます。' }
 });
 
 /** Create stable toolbar buttons that mount their feature panel only after activation. */
-export function mountLazyDrawFeaturePanels({ scope, host, callbacks, isActive = () => true, loaders = defaultLoaders, doc = host?.ownerDocument || globalThis.document } = {}) {
+export function mountLazyDrawFeaturePanels({ scope, host, callbacks, normalCallbacks = null, isActive = () => true, loaders = defaultLoaders, doc = host?.ownerDocument || globalThis.document } = {}) {
   if (!scope?.listen || !scope?.add || typeof scope.disposed !== 'boolean') throw new TypeError('Lazy draw panels require a lifecycle scope');
   if (!host || !callbacks || !doc) throw new TypeError('Lazy draw panels require a host, callbacks, and document');
 
   const color = mountLazyPanel({ kind: 'color', scope, host, callbacks, isActive, loader: loaders.color, doc });
   const text = mountLazyPanel({ kind: 'text', scope, host, callbacks, isActive, loader: loaders.text, doc });
-  return { color, text };
+  const normal = normalCallbacks ? mountLazyPanel({ kind: 'normal', scope, host, callbacks: normalCallbacks, isActive, loader: loaders.normal, doc }) : null;
+  return { color, text, ...(normal ? { normal } : {}) };
 }
 
 function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc }) {
   if (typeof loader !== 'function') throw new TypeError(`Missing ${kind} panel loader`);
   const spec = labels[kind];
+  const ariaLabel = kind === 'normal' ? spec.aria : kind === 'color' ? '色調を調整' : '文字を入力';
   const opener = doc.createElement('button');
   opener.type = 'button';
-  opener.className = kind === 'color' ? 'draw-color-adjustment-open' : 'draw-text-opener';
-  opener.setAttribute('aria-label', kind === 'color' ? '色調を調整' : '文字を入力');
+  opener.className = kind === 'normal' ? 'draw-normal-map-open' : kind === 'color' ? 'draw-color-adjustment-open' : 'draw-text-opener';
+  opener.setAttribute('aria-label', ariaLabel);
   opener.setAttribute('aria-haspopup', 'dialog');
   opener.setAttribute('aria-expanded', 'false');
-  opener.title = kind === 'color' ? '色調を調整' : '文字を入力';
+  opener.title = ariaLabel;
   const labelNode = doc.createTextNode(spec.button);
   const status = doc.createElement('span');
   status.className = 'visually-hidden';
@@ -43,7 +49,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
   status.setAttribute('aria-live', 'polite');
   opener.append(labelNode, status);
 
-  const toolbar = kind === 'color'
+  const toolbar = kind !== 'text'
     ? host.querySelector?.('.draw-fixed-left, .draw-fixed-toolbar') || host
     : host.querySelector?.('.draw-fixed-left') || host.querySelector?.('.draw-controls');
   if (toolbar) toolbar.append(opener);
@@ -62,7 +68,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
   };
   const mount = () => {
     if (mounted || !available() || doc.hidden) return false;
-    const mountPanel = kind === 'color' ? loadedModule?.mountDrawColorAdjustmentPanel : loadedModule?.mountDrawTextPanel;
+    const mountPanel = kind === 'normal' ? loadedModule?.mountDrawNormalMapPanel : kind === 'color' ? loadedModule?.mountDrawColorAdjustmentPanel : loadedModule?.mountDrawTextPanel;
     if (typeof mountPanel !== 'function') throw new TypeError(`Loaded ${kind} panel has no mount function`);
     const panelScope = createModeScope(doc.defaultView || globalThis);
     const hostChildren = new Set(host.children || []);
@@ -89,6 +95,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
   };
 
   async function activate() {
+    const activationFocus = doc.activeElement;
     if (!available()) return false;
     if (mounted) { mounted.open(); return true; }
     if (pending) return pending;
@@ -102,7 +109,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
         setStatus(spec.error);
         labelNode.textContent = '再試行';
         opener.title = spec.error;
-        opener.setAttribute('aria-label', kind === 'color' ? '色調を調整（再試行）' : '文字を入力（再試行）');
+        opener.setAttribute('aria-label', `${ariaLabel}（再試行）`);
         return false;
       }
     }
@@ -122,10 +129,11 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
         labelNode.textContent = spec.button;
         opener.title = opener.getAttribute('aria-label') || spec.button;
         if (!available() || doc.hidden) { setStatus(spec.ready); return false; }
-        // A disabled loading button can lose focus to body. Respect any real
-        // focus move made while waiting, instead of opening over the next task.
+        // Toolbar and layer-panel entries can activate the same lazy panel.
+        // Keep an unchanged initiating focus valid, but respect a move to another
+        // task while loading. A disabled opener can also lose focus to body.
         const focus = doc.activeElement;
-        const shouldOpen = !focus || focus === opener || focus === doc.body;
+        const shouldOpen = !focus || focus === activationFocus || focus === opener || focus === doc.body;
         if (!shouldOpen) { setStatus(spec.ready); return false; }
         if (!mount()) { setStatus(spec.ready); return false; }
         mounted.open();
@@ -139,7 +147,7 @@ function mountLazyPanel({ kind, scope, host, callbacks, isActive, loader, doc })
           setStatus(spec.error);
           labelNode.textContent = '再試行';
           opener.title = spec.error;
-          opener.setAttribute('aria-label', kind === 'color' ? '色調を調整（再試行）' : '文字を入力（再試行）');
+          opener.setAttribute('aria-label', `${ariaLabel}（再試行）`);
         }
         return false;
       } finally {

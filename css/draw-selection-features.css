@@ -76,7 +76,7 @@ body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener) {
 }
 body[data-page="draw"] .draw-tool-menu .draw-text-opener { width:100%; min-height:52px; background:#2b3742; }
 body[data-page="draw"] .draw-color-adjustment-open { --draw-action-icon:url('/assets/icons/pixieed/color-adjust.svg'); }
-body[data-page="draw"] .draw-text-opener { --draw-action-icon:url('/assets/icons/pixieed/text.svg'); }
+body[data-page="draw"] .draw-text-opener { --draw-action-icon:url('/assets/icons/pixieed/text.svg'); position:relative; }
 body[data-page="draw"] .draw-brush-size-open { --draw-action-icon:url('/assets/icons/pixieed/adjustments.svg'); }
 body[data-page="draw"] [data-selection-action="copy"] { --draw-action-icon:url('/assets/icons/pixieed/copy.svg'); }
 body[data-page="draw"] [data-selection-action="cut"] { --draw-action-icon:url('/assets/icons/pixieed/cut.svg'); }
@@ -91,6 +91,8 @@ body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener,.draw-b
   content:''!important; display:block; width:24px; height:24px; background-color:currentColor;
   -webkit-mask:var(--draw-action-icon) center / contain no-repeat; mask:var(--draw-action-icon) center / contain no-repeat;
 }
+/* Keep the T centered independently of the hidden text grid item. */
+body[data-page="draw"] .draw-text-opener::before { position:absolute; inset:0; margin:auto; }
 body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener)[aria-expanded="true"] { border-color:#ffd35a; color:#ffd35a; }
 body[data-page="draw"] :is(.draw-color-adjustment-open,.draw-text-opener)[aria-busy="true"]::before {
   width:20px; height:20px; box-sizing:border-box; background:none; mask:none; -webkit-mask:none;

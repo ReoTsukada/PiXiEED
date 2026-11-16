@@ -18,7 +18,7 @@ test('mobile layer context menu exposes the shared opacity action with protected
   assert.notEqual(menuStart, -1, 'mobile layer context menu creates an opacity slider');
   const menu = source.slice(menuStart, source.indexOf("const rename = node('input', 'animation-controls__context-rename')", menuStart));
   assert.match(menu, /opacity\.dataset\.layerOpacity = String\(layer\.id\)/);
-  assert.match(menu, /opacity\.disabled = musicLayer \|\| state\.readOnly \|\| pending > 0 \|\| Boolean\(layer\.locked\)/);
+  assert.match(menu, /opacity\.disabled = musicLayer \|\| normalLayer \|\| state\.readOnly \|\| pending > 0 \|\| Boolean\(layer\.locked\)/);
   assert.match(menu, /不透明度（全コマ共通）/);
   assert.match(source, /listen\(frameMenu, 'change', onChange\)/);
   assert.match(source, /listen\(frameMenu, 'input', onInput\)/);

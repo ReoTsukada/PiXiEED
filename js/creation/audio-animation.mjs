@@ -1,4 +1,4 @@
-import { getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261116-normal-release-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import {
   AUDIO_PPQ, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_TICKS, AUDIO_SHARED_IMAGE_MAX_DIMENSION,
@@ -41,6 +41,9 @@ export function getAudioAnimationUsedColorIds(animation) {
   validateAnimation(animation);
   const usedIndices = new Set();
   for (const frame of animation.frames) for (const layer of animation.layers) {
+    // Normal-map indices address their fixed vector palette, not Draw's art
+    // palette, and therefore must not count toward audio color assignments.
+    if (layer.role === 'normal') continue;
     const document = getAnimationCelDocument(animation, frame.id, layer.id);
     for (const index of document.pixels) {
       if (index < 0) continue;

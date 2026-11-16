@@ -5,6 +5,23 @@ export const ANIMATION_ALPHA_SCHEMA_VERSION = 2;
 // Readers that only understand the 32-color contracts (schemas 1 and 2) must
 // reject it rather than interpreting a wider palette under an old contract.
 export const ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION = 3;
+// Schema 5 reserves an independent fixed palette for a single normal-map layer.
+// Schema 4 remains reserved for a rejected prototype.
+export const ANIMATION_NORMAL_SCHEMA_VERSION = 5;
+export const NORMAL_MAP_ENCODING = 'tangent-rgb8-17swatch-v1';
+const normalSwatches = [
+  { color: '#8080ff', label: '正面' },
+  { color: '#bf80ee', label: '右 30°' }, { color: '#adadee', label: '右上 30°' },
+  { color: '#80bfee', label: '上 30°' }, { color: '#52adee', label: '左上 30°' },
+  { color: '#4080ee', label: '左 30°' }, { color: '#5252ee', label: '左下 30°' },
+  { color: '#7f40ee', label: '下 30°' }, { color: '#ad52ee', label: '右下 30°' },
+  { color: '#ee80bf', label: '右 60°' }, { color: '#cecebf', label: '右上 60°' },
+  { color: '#80eebf', label: '上 60°' }, { color: '#31cebf', label: '左上 60°' },
+  { color: '#1180bf', label: '左 60°' }, { color: '#3131bf', label: '左下 60°' },
+  { color: '#7f11bf', label: '下 60°' }, { color: '#ce31bf', label: '右下 60°' }
+];
+export const NORMAL_MAP_SWATCHES = Object.freeze(normalSwatches.map((entry) => Object.freeze({ ...entry })));
+export const NORMAL_MAP_PALETTE = Object.freeze(NORMAL_MAP_SWATCHES.map(({ color }) => color));
 export const ANIMATION_MAX_COLORS_V1 = 32;
 export const ANIMATION_MAX_COLORS = 64;
 export const ANIMATION_MAX_USED_COLORS = ANIMATION_MAX_COLORS;
@@ -52,6 +69,7 @@ const colorValid = (value) => typeof value === 'string' && /^#[\da-f]{6}(?:[\da-
 const colorAlpha = (value) => value.length === 9 ? Number.parseInt(value.slice(7), 16) : 255;
 const layerOpacity = (layer) => layer.opacity === undefined ? 1 : layer.opacity;
 function schemaFor(meta) {
+  if (meta.schemaVersion === ANIMATION_NORMAL_SCHEMA_VERSION || meta.layers?.some((layer) => layer.role === 'normal')) return ANIMATION_NORMAL_SCHEMA_VERSION;
   if (meta.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION || meta.palette?.length > ANIMATION_MAX_COLORS_V1) return ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION;
   return meta.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION || meta.palette?.some((color) => colorAlpha(color) !== 255) || meta.layers?.some((layer) => layer.opacity !== undefined && layer.opacity !== 1) ? ANIMATION_ALPHA_SCHEMA_VERSION : ANIMATION_SCHEMA_VERSION;
 }
@@ -61,6 +79,10 @@ function schemaMetadata(meta) {
   if (schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION) return { ...meta, schemaVersion,
     colorCapacity: ANIMATION_MAX_PALETTE_ENTRIES, pixelEncoding: ANIMATION_PIXEL_ENCODING,
     paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING };
+  if (schemaVersion === ANIMATION_NORMAL_SCHEMA_VERSION) return { ...meta, schemaVersion,
+    colorCapacity: ANIMATION_MAX_PALETTE_ENTRIES, pixelEncoding: ANIMATION_PIXEL_ENCODING,
+    paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING,
+    normalEncoding: NORMAL_MAP_ENCODING };
   return { ...meta, schemaVersion, pixelEncoding: ANIMATION_PIXEL_ENCODING, paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING };
 }
 function dimensions(width, height) { if (![width, height].every((value) => Number.isInteger(value) && value >= 1 && value <= ANIMATION_MAX_DIMENSION)) throw new RangeError('キャンバスは1〜1028pxで指定してください。'); }
@@ -95,6 +117,12 @@ function ensureCell(animation, frameId, layerId) {
   if (!animation.layers.some((item) => item.id === layerId)) throw new TypeError('指定したレイヤーがありません。');
 }
 function musicLayer(animation) { return animation.layers.find((layer) => layer.role === 'music') ?? null; }
+function normalLayer(animation) { return animation.layers.find((layer) => layer.role === 'normal') ?? null; }
+function paletteForLayer(animation, layerId) {
+  const layer = animation.layers.find((item) => item.id === layerId);
+  if (!layer) throw new TypeError('指定したレイヤーがありません。');
+  return layer.role === 'normal' ? NORMAL_MAP_PALETTE : animation.palette;
+}
 function canonicalFrameId(animation, frameId, layerId) { return musicLayer(animation)?.id === layerId ? animation.frames[0].id : frameId; }
 function validateMusicLayers(layers) {
   const indices = [];
@@ -103,6 +131,7 @@ function validateMusicLayers(layers) {
     if (layer.role === 'music') indices.push(index);
   });
   if (indices.length > 1 || indices.length === 1 && indices[0] !== 0) throw new TypeError('音楽レイヤーは最下段に1枚だけ配置できます。');
+  if (layers.filter((layer) => layer.role === 'normal').length > 1) throw new TypeError('ノーマルマップレイヤーは1枚だけ使えます。');
   if (layers.length > ANIMATION_MAX_LAYERS + (indices.length ? 1 : 0)) throw new RangeError('レイヤーは通常8枚と音楽1枚までです。');
 }
 function dimensionsFor(animation, tx, ty) { const x = tx * ANIMATION_TILE_SIZE; const y = ty * ANIMATION_TILE_SIZE; return { x, y, width: Math.min(ANIMATION_TILE_SIZE, animation.width - x), height: Math.min(ANIMATION_TILE_SIZE, animation.height - y) }; }
@@ -121,10 +150,11 @@ function internTile(pool, hashIndex, bytes) {
   for (const id of hashIndex.get(hash) ?? []) { const entry = pool.get(id); if (entry && bytesEqual(entry.bytes, bytes)) return id; }
   const id = newId('tile'); pool.set(id, { hash, bytes: new Uint8Array(bytes) }); const ids = hashIndex.get(hash) ?? []; ids.push(id); hashIndex.set(hash, ids); return id;
 }
-function normalizedPixels(animation, source) {
+function normalizedPixels(animation, layerId, source) {
   if (!source || typeof source.length !== 'number' || source.length !== animation.width * animation.height) throw new TypeError('画素数がキャンバスの大きさと一致しません。');
+  const paletteLength = paletteForLayer(animation, layerId).length;
   const pixels = new Uint8Array(source.length);
-  for (let index = 0; index < source.length; index += 1) { const value = source[index]; if (!Number.isInteger(value) || value < 0 || value > animation.palette.length) throw new RangeError('画素に未対応の色番号があります。'); pixels[index] = value; }
+  for (let index = 0; index < source.length; index += 1) { const value = source[index]; if (!Number.isInteger(value) || value < 0 || value > paletteLength) throw new RangeError('画素に未対応の色番号があります。'); pixels[index] = value; }
   return pixels;
 }
 function tileFromPixels(animation, pixels, tx, ty) {
@@ -134,7 +164,7 @@ function tileFromPixels(animation, pixels, tx, ty) {
 }
 function writeCelMaps(animation, cels, pool, hashIndex, frameId, layerId, source) {
   ensureCell(animation, frameId, layerId);
-  const pixels = normalizedPixels(animation, source); const key = keyOf(frameId, layerId); const tiles = new Map();
+  const pixels = normalizedPixels(animation, layerId, source); const key = keyOf(frameId, layerId); const tiles = new Map();
   const columns = Math.ceil(animation.width / ANIMATION_TILE_SIZE); const rows = Math.ceil(animation.height / ANIMATION_TILE_SIZE);
   for (let ty = 0; ty < rows; ty += 1) for (let tx = 0; tx < columns; tx += 1) {
     const bytes = tileFromPixels(animation, pixels, tx, ty); const id = internTile(pool, hashIndex, bytes); if (id) tiles.set(tileKey(tx, ty), id);
@@ -145,11 +175,12 @@ function writeCelMaps(animation, cels, pool, hashIndex, frameId, layerId, source
 function renderPixels(animation, frameId, layerId, { visibleOnly = false, composition = null } = {}) {
   ensureCell(animation, frameId, layerId); frameId = canonicalFrameId(animation, frameId, layerId); const pixels = new Uint8Array(animation.width * animation.height); const data = internal(animation);
   const tiles = data.cels.get(keyOf(frameId, layerId)) ?? new Map();
+  const maxValue = paletteForLayer(animation, layerId).length;
   for (const [key, id] of tiles) {
     const [tx, ty] = key.split(',').map(Number); const { x, y, width, height } = dimensionsFor(animation, tx, ty); const bytes = data.pool.get(id)?.bytes;
     if (!bytes || bytes.length !== width * height) fail('PXD_ANIMATION_CORRUPT', 'アニメーションのタイルが壊れています。');
     for (let row = 0; row < height; row += 1) for (let column = 0; column < width; column += 1) {
-      const value = bytes[row * width + column]; if (value > animation.palette.length) fail('PXD_ANIMATION_CORRUPT', 'アニメーションの色番号が壊れています.');
+      const value = bytes[row * width + column]; if (value > maxValue) fail('PXD_ANIMATION_CORRUPT', 'アニメーションの色番号が壊れています.');
       if (composition) { if (value) pixels[(y + row) * animation.width + x + column] = value; }
       else pixels[(y + row) * animation.width + x + column] = value;
     }
@@ -167,7 +198,7 @@ function renderPixel(animation, frameId, layerId, pixel, data = internal(animati
   const width = Math.min(ANIMATION_TILE_SIZE, animation.width - Math.floor(x / ANIMATION_TILE_SIZE) * ANIMATION_TILE_SIZE);
   return bytes[(y % ANIMATION_TILE_SIZE) * width + (x % ANIMATION_TILE_SIZE)];
 }
-function docFromPixels(animation, pixels) { return { schemaVersion: 1, width: animation.width, height: animation.height, palette: [...animation.palette], pixels: Array.from(pixels, (value) => value - 1) }; }
+function docFromPixels(animation, pixels, palette = animation.palette) { return { schemaVersion: 1, width: animation.width, height: animation.height, palette: [...palette], pixels: Array.from(pixels, (value) => value - 1) }; }
 
 export function createAnimation({ width = 16, height = 16, palette = ['#000000'] } = {}) {
   dimensions(width, height); assertPalette(palette);
@@ -185,8 +216,12 @@ export function createAnimationFromDraw(document) {
 export function cloneAnimation(animation) { return cloneState(animation); }
 export function validateAnimation(animation) {
   if (validatedSnapshots.has(animation)) return animation;
-  if (!animation || ![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION].includes(animation.schemaVersion) || !Number.isInteger(animation.width) || !Number.isInteger(animation.height)) throw new TypeError('アニメーション形式に対応していません。');
+  if (!animation || ![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_NORMAL_SCHEMA_VERSION].includes(animation.schemaVersion) || !Number.isInteger(animation.width) || !Number.isInteger(animation.height)) throw new TypeError('アニメーション形式に対応していません。');
   dimensions(animation.width, animation.height); assertPalette(animation.palette);
+  const hasNormalLayer = animation.layers?.some((layer) => layer.role === 'normal');
+  if (hasNormalLayer && animation.schemaVersion !== ANIMATION_NORMAL_SCHEMA_VERSION) fail('PXD_ANIMATION_VERSION', 'ノーマルマップレイヤーには保存版5が必要です。原本は保持しています。');
+  if (animation.schemaVersion === ANIMATION_NORMAL_SCHEMA_VERSION && animation.normalEncoding !== NORMAL_MAP_ENCODING) fail('PXD_ANIMATION_VERSION', 'ノーマルマップ形式に対応していません。原本は保持しています。');
+  if (hasNormalLayer && !animation.layers.some((layer) => layer.role !== 'normal' && layer.role !== 'music')) throw new TypeError('ノーマルマップを使うには通常レイヤーが必要です。');
   if (animation.drawRewardBonusColors !== undefined && (!Array.isArray(animation.drawRewardBonusColors)
       || animation.drawRewardBonusColors.length > ANIMATION_MAX_PALETTE_ENTRIES
       || animation.drawRewardBonusColors.some((color) => !colorValid(color) || color.length !== 9 || color.slice(7).toLowerCase() === '00')
@@ -195,17 +230,29 @@ export function validateAnimation(animation) {
   }
   if (animation.schemaVersion === ANIMATION_SCHEMA_VERSION && (animation.palette.some((color) => colorAlpha(color) !== 255) || animation.layers?.some((layer) => layer.opacity !== undefined && layer.opacity !== 1))) fail('PXD_ANIMATION_VERSION', '透明度を含むアニメーションは保存版2が必要です。原本は保持しています。');
   if (animation.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && (animation.pixelEncoding !== ANIMATION_PIXEL_ENCODING || animation.paletteEncoding !== ANIMATION_PALETTE_ENCODING || animation.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', 'アニメーションの画素形式または合成方式に対応していません。原本は保持しています。');
-  if (animation.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION
+  if ([ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_NORMAL_SCHEMA_VERSION].includes(animation.schemaVersion)
       && (animation.colorCapacity !== ANIMATION_MAX_PALETTE_ENTRIES || animation.pixelEncoding !== ANIMATION_PIXEL_ENCODING || animation.paletteEncoding !== ANIMATION_PALETTE_ENCODING || animation.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', '拡張パレット対応を明示したアニメーション保存版ではありません。原本は保持しています。');
-  if (animation.schemaVersion !== ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION && animation.palette.length > ANIMATION_MAX_COLORS_V1) fail('PXD_ANIMATION_VERSION', '32色を超えるパレットには新しい保存版が必要です。原本は保持しています。');
+  if (![ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_NORMAL_SCHEMA_VERSION].includes(animation.schemaVersion) && animation.palette.length > ANIMATION_MAX_COLORS_V1) fail('PXD_ANIMATION_VERSION', '32色を超えるパレットには新しい保存版が必要です。原本は保持しています。');
   if (!Array.isArray(animation.frames) || animation.frames.length < 1 || animation.frames.length > ANIMATION_MAX_FRAMES || !Array.isArray(animation.layers) || animation.layers.length < 1 || animation.layers.length > ANIMATION_MAX_LAYERS_WITH_MUSIC) throw new RangeError('コマまたはレイヤーの上限を超えています。');
   validateMusicLayers(animation.layers);
   const ids = new Set();
   for (const frame of animation.frames) { if (!frame || typeof frame.id !== 'string' || ids.has(frame.id) || !Number.isFinite(frame.durationMs) || frame.durationMs < 1 || frame.durationMs > 60000) throw new TypeError('フレーム情報が不正です。'); ids.add(frame.id); }
-  ids.clear(); for (const layer of animation.layers) { if (!layer || typeof layer.id !== 'string' || ids.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean' || layer.opacity !== undefined && (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1)) throw new TypeError('レイヤー情報が不正です。'); ids.add(layer.id); }
+  ids.clear(); for (const layer of animation.layers) {
+    if (!layer || typeof layer.id !== 'string' || ids.has(layer.id) || typeof layer.name !== 'string' || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean' || layer.opacity !== undefined && (!Number.isFinite(layer.opacity) || layer.opacity < 0 || layer.opacity > 1)) throw new TypeError('レイヤー情報が不正です。');
+    if (layer.role === 'normal' && layer.opacity !== 1) throw new TypeError('ノーマルマップレイヤーの不透明度は変更できません。');
+    ids.add(layer.id);
+  }
   const data = internals.get(animation); if (!data) throw new TypeError('このアニメーションは内部状態を持ちません。');
-  for (const [key, tiles] of data.cels) { const [frameId, layerId] = key.split('\u0000'); ensureCell(animation, frameId, layerId); if (musicLayer(animation)?.id === layerId && frameId !== animation.frames[0].id) fail('PXD_ANIMATION_MUSIC_CEL', '音楽レイヤーに非共有コマがあります。'); if (!(tiles instanceof Map)) throw new TypeError('アニメーションの参照表が壊れています。'); for (const [position, id] of tiles) { const [tx, ty] = position.split(',').map(Number); const { width, height } = dimensionsFor(animation, tx, ty); const entry = data.pool.get(id); if (!Number.isInteger(tx) || !Number.isInteger(ty) || tx < 0 || ty < 0 || tx * ANIMATION_TILE_SIZE >= animation.width || ty * ANIMATION_TILE_SIZE >= animation.height || !entry || entry.bytes.length !== width * height) throw new TypeError('アニメーションのタイル参照が壊れています。'); } }
-  for (const entry of data.pool.values()) if (containsOutOfRangeValue(entry.bytes, animation.palette.length)) throw new TypeError('アニメーションのタイル参照が壊れています。');
+  for (const [key, tiles] of data.cels) {
+    const [frameId, layerId] = key.split('\u0000'); ensureCell(animation, frameId, layerId);
+    if (musicLayer(animation)?.id === layerId && frameId !== animation.frames[0].id) fail('PXD_ANIMATION_MUSIC_CEL', '音楽レイヤーに非共有コマがあります。');
+    if (!(tiles instanceof Map)) throw new TypeError('アニメーションの参照表が壊れています。');
+    const maxValue = paletteForLayer(animation, layerId).length;
+    for (const [position, id] of tiles) {
+      const [tx, ty] = position.split(',').map(Number); const { width, height } = dimensionsFor(animation, tx, ty); const entry = data.pool.get(id);
+      if (!Number.isInteger(tx) || !Number.isInteger(ty) || tx < 0 || ty < 0 || tx * ANIMATION_TILE_SIZE >= animation.width || ty * ANIMATION_TILE_SIZE >= animation.height || !entry || entry.bytes.length !== width * height || containsOutOfRangeValue(entry.bytes, maxValue)) throw new TypeError('アニメーションのタイル参照が壊れています。');
+    }
+  }
   if (payloadSize(data.pool) > ANIMATION_PIXEL_BUDGET) throw new RangeError('アニメーション画素の保存上限を超えています。');
   validatedSnapshots.add(animation);
   return animation;
@@ -227,7 +274,11 @@ export function setAnimationDrawRewardBonusColors(animation, colors) {
   drawRewardBonusColorsByAnimation.set(animation, [...colors]);
   return animation;
 }
-export function getAnimationCelDocument(animation, frameId, layerId) { return docFromPixels(animation, renderPixels(animation, frameId, layerId)); }
+export function getAnimationLayerPalette(animation, layerId) { validateAnimation(animation); return [...paletteForLayer(animation, layerId)]; }
+export function getAnimationCelDocument(animation, frameId, layerId) {
+  validateAnimation(animation);
+  return docFromPixels(animation, renderPixels(animation, frameId, layerId), paletteForLayer(animation, layerId));
+}
 /** Return whether a cel has any non-transparent sparse tiles without materializing its pixel array. */
 export function hasAnimationCelContent(animation, frameId, layerId) {
   ensureCell(animation, frameId, layerId);
@@ -244,7 +295,7 @@ export function getAnimationUsedColorIndices(animation, { excludeFrameId, exclud
   const used = new Set(); const checkedTiles = new Set(); const data = internal(animation);
   const expectedTileCount = Math.ceil(animation.width / ANIMATION_TILE_SIZE) * Math.ceil(animation.height / ANIMATION_TILE_SIZE);
   for (const frame of animation.frames) for (const layer of animation.layers) {
-    if ((layer.id === excludeLayerId && layer.role === 'music') || (frame.id === excludeFrameId && layer.id === excludeLayerId)) continue;
+    if (layer.role === 'normal' || (layer.id === excludeLayerId && layer.role === 'music') || (frame.id === excludeFrameId && layer.id === excludeLayerId)) continue;
     const tiles = data.cels.get(keyOf(canonicalFrameId(animation, frame.id, layer.id), layer.id));
     if (!tiles?.size || tiles.size < expectedTileCount) used.add(-1);
     for (const id of tiles?.values() ?? []) {
@@ -268,7 +319,7 @@ export function composeAnimationFrame(animation, frameId, { layerIds, excludeMus
   const pixels = new Uint8Array(animation.width * animation.height);
   const selected = layerIds === undefined ? null : new Set(layerIds);
   if (selected && [...selected].some((id) => !animation.layers.some((layer) => layer.id === id))) throw new TypeError('合成するレイヤーを確認してください。');
-  for (const layer of animation.layers) if ((!excludeMusic || layer.role !== 'music') && layer.visible && (!selected || selected.has(layer.id))) { const next = renderPixels(animation, frameId, layer.id); for (let i = 0; i < pixels.length; i += 1) if (next[i]) pixels[i] = next[i]; }
+  for (const layer of animation.layers) if (layer.role !== 'normal' && (!excludeMusic || layer.role !== 'music') && layer.visible && (!selected || selected.has(layer.id))) { const next = renderPixels(animation, frameId, layer.id); for (let i = 0; i < pixels.length; i += 1) if (next[i]) pixels[i] = next[i]; }
   return docFromPixels(animation, pixels);
 }
 /** True when indexed composition would discard palette alpha or a layer opacity multiplier. */
@@ -299,7 +350,7 @@ export function composeAnimationFrameRgba(animation, frameId, { layerIds, exclud
   const overridePixels = override ? override.document.pixels : null;
   const overridePalette = override?.document.palette ?? animation.palette;
   const animationData = internal(animation);
-  const visibleLayers = animation.layers.filter((layer) => layer.visible && !(excludeMusic && layer.role === 'music') && (!selected || selected.has(layer.id)));
+  const visibleLayers = animation.layers.filter((layer) => layer.role !== 'normal' && layer.visible && !(excludeMusic && layer.role === 'music') && (!selected || selected.has(layer.id)));
   const opaqueFastPath = animation.layers.every((layer) => layerOpacity(layer) === 1) && animation.palette.every((color) => colorAlpha(color) === 255) && overridePalette.every((color) => colorAlpha(color) === 255);
   const layerPixels = new Map();
   if (!indices) for (const layer of visibleLayers) if (layer.id !== overrideLayer?.id) layerPixels.set(layer.id, renderPixels(animation, frameId, layer.id));
@@ -385,23 +436,36 @@ export function ensureAnimationMusicLayer(animation) {
   const layer = { id: newId('layer'), name: 'Music', visible: false, locked: false, role: 'music' };
   return makeAnimation({ ...animation, layers: [layer, ...animation.layers] }, internal(animation).cels, internal(animation).pool, { share: true });
 }
+export function ensureAnimationNormalLayer(animation) {
+  validateAnimation(animation);
+  if (normalLayer(animation)) return animation;
+  if (animation.layers.filter((layer) => layer.role !== 'music').length >= ANIMATION_MAX_LAYERS) throw new RangeError('通常レイヤーは8枚までです。');
+  const layer = { id: newId('layer'), name: 'ノーマルマップ', visible: true, locked: false, opacity: 1, role: 'normal' };
+  return makeAnimation({ ...animation, schemaVersion: ANIMATION_NORMAL_SCHEMA_VERSION, normalEncoding: NORMAL_MAP_ENCODING,
+    colorCapacity: ANIMATION_MAX_PALETTE_ENTRIES, pixelEncoding: ANIMATION_PIXEL_ENCODING, paletteEncoding: ANIMATION_PALETTE_ENCODING, compositing: ANIMATION_COMPOSITING,
+    layers: [...animation.layers, layer] }, internal(animation).cels, internal(animation).pool, { share: true });
+}
 export function removeAnimationLayer(animation, layerId) {
   validateAnimation(animation); if (animation.layers.length <= 1) throw new RangeError('最後のレイヤーは削除できません。'); if (!animation.layers.some(({ id }) => id === layerId)) throw new TypeError('指定したレイヤーがありません。');
   if (animation.layers.find(({ id }) => id === layerId)?.role === 'music') throw new TypeError('音楽レイヤーは削除できません。');
+  const removingLayer = animation.layers.find(({ id }) => id === layerId);
+  if (normalLayer(animation) && removingLayer.role !== 'normal' && animation.layers.filter((layer) => layer.role !== 'normal' && layer.role !== 'music' && layer.id !== layerId).length === 0) throw new TypeError('ノーマルマップを使うには通常レイヤーが必要です。');
   const result = cloneState(animation); const data = internals.get(result); for (const frame of result.frames) data.cels.delete(keyOf(frame.id, layerId)); gc(data.pool, data.hashIndex, data.cels); return makeAnimation({ ...result, layers: result.layers.filter(({ id }) => id !== layerId) }, data.cels, data.pool, { share: true });
 }
 export function moveAnimationLayer(animation, layerId, index) { validateAnimation(animation); const layers = [...animation.layers]; const from = layers.findIndex(({ id }) => id === layerId); if (from < 0 || !Number.isInteger(index) || index < 0 || index >= layers.length) throw new RangeError('レイヤーの順序を確認してください。'); const layer = layers[from]; if (layer.role === 'music' && index !== 0 || layer.role !== 'music' && index === 0 && musicLayer(animation)) throw new TypeError('音楽レイヤーは最下段に固定されています。'); layers.splice(index, 0, layers.splice(from, 1)[0]); validateMusicLayers(layers); return makeAnimation({ ...animation, layers }, internal(animation).cels, internal(animation).pool, { share: true }); }
 export function setLayerProperties(animation, layerId, properties = {}) {
   validateAnimation(animation); const layer = animation.layers.find(({ id }) => id === layerId); if (!layer) throw new TypeError('指定したレイヤーがありません。');
   if (layer.role === 'music' && Object.hasOwn(properties, 'role') && properties.role !== 'music' || layer.role !== 'music' && properties.role === 'music') throw new TypeError('音楽レイヤーの役割は変更できません。');
+  if ((layer.role === 'normal' && Object.hasOwn(properties, 'role') && properties.role !== 'normal') || (layer.role !== 'normal' && properties.role === 'normal')) throw new TypeError('ノーマルマップレイヤーの役割は変更できません。');
   const updated = { ...layer, ...properties, id: layer.id }; if (typeof updated.name !== 'string' || typeof updated.visible !== 'boolean' || typeof updated.locked !== 'boolean' || updated.opacity !== undefined && (!Number.isFinite(updated.opacity) || updated.opacity < 0 || updated.opacity > 1)) throw new TypeError('レイヤー情報が不正です。');
+  if (updated.role === 'normal' && updated.opacity !== 1) throw new TypeError('ノーマルマップレイヤーの不透明度は1に固定です。');
   validateMusicLayers(animation.layers.map((item) => item.id === layerId ? updated : item));
   return makeAnimation({ ...animation, layers: animation.layers.map((item) => item.id === layerId ? updated : item) }, internal(animation).cels, internal(animation).pool, { share: true });
 }
 export function setAnimationPalette(animation, palette) {
   validateAnimation(animation); assertPalette(palette);
-  let maxUsed = 0; const data = internal(animation);
-  for (const entry of data.pool.values()) for (const value of entry.bytes) if (value > maxUsed) maxUsed = value;
+  let maxUsed = 0; const data = internal(animation); const checked = new Set();
+  for (const layer of animation.layers) { if (layer.role === 'normal') continue; for (const frame of animation.frames) for (const id of data.cels.get(keyOf(canonicalFrameId(animation, frame.id, layer.id), layer.id))?.values() ?? []) { if (checked.has(id)) continue; checked.add(id); for (const value of data.pool.get(id)?.bytes ?? []) if (value > maxUsed) maxUsed = value; } }
   if (palette.length < maxUsed) throw new RangeError('使用中の色があるためパレットを短くできません。');
   return makeAnimation({ ...animation, palette: [...palette] }, data.cels, data.pool, { share: true });
 }
@@ -472,12 +536,14 @@ export function serializeAnimationPool(animation) {
 }
 /** Hydrate validated state and copied bytes from the PXD adapter. */
 export function createAnimationFromSerialized(meta, serializedTiles) {
-  if (!meta || ![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION].includes(meta.schemaVersion)) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています.');
+  if (!meta || ![ANIMATION_SCHEMA_VERSION, ANIMATION_ALPHA_SCHEMA_VERSION, ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_NORMAL_SCHEMA_VERSION].includes(meta.schemaVersion)) fail('PXD_ANIMATION_VERSION', 'このアニメーション保存版には対応していません。原本は保持しています.');
   if (meta.schemaVersion === ANIMATION_SCHEMA_VERSION && (meta.palette?.some((color) => colorValid(color) && colorAlpha(color) !== 255) || meta.layers?.some((layer) => layer.opacity !== undefined && layer.opacity !== 1))) fail('PXD_ANIMATION_VERSION', '透明度を含むアニメーション保存版1には対応していません。原本は保持しています。');
   if (meta.schemaVersion === ANIMATION_ALPHA_SCHEMA_VERSION && (meta.pixelEncoding !== ANIMATION_PIXEL_ENCODING || meta.paletteEncoding !== ANIMATION_PALETTE_ENCODING || meta.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', 'アニメーションの画素形式または合成方式に対応していません。原本は保持しています。');
-  if (meta.schemaVersion === ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION
+  if ([ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION, ANIMATION_NORMAL_SCHEMA_VERSION].includes(meta.schemaVersion)
       && (meta.colorCapacity !== ANIMATION_MAX_PALETTE_ENTRIES || meta.pixelEncoding !== ANIMATION_PIXEL_ENCODING || meta.paletteEncoding !== ANIMATION_PALETTE_ENCODING || meta.compositing !== ANIMATION_COMPOSITING)) fail('PXD_ANIMATION_VERSION', '拡張パレット対応を明示したアニメーション保存版ではありません。原本は保持しています。');
-  if (meta.schemaVersion !== ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION && meta.palette?.length > ANIMATION_MAX_COLORS_V1) fail('PXD_ANIMATION_VERSION', '32色を超えるパレットには新しい保存版が必要です。原本は保持しています。');
+  if (meta.schemaVersion === ANIMATION_NORMAL_SCHEMA_VERSION && meta.normalEncoding !== NORMAL_MAP_ENCODING) fail('PXD_ANIMATION_VERSION', 'ノーマルマップ形式に対応していません。原本は保持しています。');
+  if (meta.schemaVersion !== ANIMATION_EXTENDED_COLOR_SCHEMA_VERSION && meta.schemaVersion !== ANIMATION_NORMAL_SCHEMA_VERSION && meta.palette?.length > ANIMATION_MAX_COLORS_V1) fail('PXD_ANIMATION_VERSION', '32色を超えるパレットには新しい保存版が必要です。原本は保持しています。');
+  if (meta.schemaVersion !== ANIMATION_NORMAL_SCHEMA_VERSION && meta.layers?.some((layer) => layer.role === 'normal')) fail('PXD_ANIMATION_VERSION', 'ノーマルマップレイヤーには保存版5が必要です。原本は保持しています。');
   dimensions(meta.width, meta.height); assertPalette(meta.palette);
   meta = structuredClone(meta);
   validateMusicLayers(meta.layers);
@@ -487,7 +553,7 @@ export function createAnimationFromSerialized(meta, serializedTiles) {
   const cels = new Map(); const pool = new Map(); const hashIndex = new Map();
   for (const tile of serializedTiles) {
     ensureCell(animation, tile.frameId, tile.layerId); if (!(tile.bytes instanceof Uint8Array)) throw new TypeError('タイル画素が不正です。');
-    const { x, y, width, height } = tile; if (![x, y, width, height].every(Number.isInteger) || x < 0 || y < 0 || width < 1 || height < 1 || x % ANIMATION_TILE_SIZE || y % ANIMATION_TILE_SIZE || width !== Math.min(ANIMATION_TILE_SIZE, animation.width - x) || height !== Math.min(ANIMATION_TILE_SIZE, animation.height - y) || tile.bytes.length !== width * height || !tile.bytes.some(Boolean) || [...tile.bytes].some((value) => value > animation.palette.length)) throw new TypeError('タイル範囲または色番号が不正です。');
+    const { x, y, width, height } = tile; const maxValue = paletteForLayer(animation, tile.layerId).length; if (![x, y, width, height].every(Number.isInteger) || x < 0 || y < 0 || width < 1 || height < 1 || x % ANIMATION_TILE_SIZE || y % ANIMATION_TILE_SIZE || width !== Math.min(ANIMATION_TILE_SIZE, animation.width - x) || height !== Math.min(ANIMATION_TILE_SIZE, animation.height - y) || tile.bytes.length !== width * height || !tile.bytes.some(Boolean) || [...tile.bytes].some((value) => value > maxValue)) throw new TypeError('タイル範囲または色番号が不正です。');
     const tx = x / ANIMATION_TILE_SIZE; const ty = y / ANIMATION_TILE_SIZE; const key = keyOf(tile.frameId, tile.layerId); const map = cels.get(key) ?? new Map(); const pos = tileKey(tx, ty); if (map.has(pos)) throw new TypeError('同じ位置に複数のタイルがあります。');
     const id = internTile(pool, hashIndex, tile.bytes); if (!id) throw new TypeError('空タイルは保存できません。'); map.set(pos, id); cels.set(key, map);
   }
