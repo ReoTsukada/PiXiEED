@@ -6,12 +6,13 @@ import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contrac
 import { mountPictureShelf } from './picture-shelf.mjs?rev=20261116-normal-release-2';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
 import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba as indexedDocumentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-2';
-import { createDrawAnimationSession, prepareDrawNormalLayer } from './draw-animation-session.mjs?rev=20261116-normal-release-2';
+import { createDrawAnimationSession, prepareDrawNormalLayer } from './draw-animation-session.mjs?rev=20261117-normal-apply-1';
+import { createNormalLightingFrameCache, prepareNormalMapApplication } from './draw-normal-apply.mjs?rev=20261117-normal-apply-1';
 import { NORMAL_MAP_PALETTE, NORMAL_MAP_SWATCHES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes, ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, getAnimationCelDocument, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent, serializeAnimationPool, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261116-normal-release-2';
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261116-normal-release-2';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-2';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261116-normal-release-2';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261117-normal-apply-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
@@ -57,10 +58,10 @@ import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-2';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-2';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261116-normal-release-2';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-normal-apply-1';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
-import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261116-normal-release-2';
+import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261117-normal-apply-1';
 
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
 const DRAW_REWARD_LIMITS = Object.freeze({ ...REWARD_LIMITS.draw });
@@ -139,8 +140,9 @@ function retainedMusicBytes() {
 }
 
 const animationRenderCache = createAnimationFrameCache({ maxEntries: 8, maxBytes: 4 * 1024 * 1024 });
+const normalLightingCache = createNormalLightingFrameCache();
 const framePreviewCache = createAnimationFrameCache({ maxEntries: 6, maxBytes: 6 * 256 * 256 * 4 });
-scope.add(() => { animationRenderCache.clear(); framePreviewCache.clear(); });
+scope.add(() => { animationRenderCache.clear(); framePreviewCache.clear(); normalLightingCache.clear(); });
 function cachedAnimationFrame(animation, key, render) {
   const cached = animationRenderCache.get(animation, key);
   if (cached !== undefined) return cached;
@@ -149,6 +151,7 @@ function cachedAnimationFrame(animation, key, render) {
   const bytes = rendered.rgba?.byteLength ?? rendered.pixels.length * 8;
   return animationRenderCache.set(animation, key, rendered, bytes);
 }
+
 const outputPreviewBatch = createFrameBatcher({
   requestFrame: callback => scope.frame(callback), cancelFrame: id => scope.cancelFrame(id),
   callback: () => { if ($('#draw-output')?.open) updateOutputPreview(); }
@@ -376,7 +379,7 @@ function applyNormalMapSettings(value, { persist = true, repaint = true } = {}) 
   normalMapSettings = next;
   animationSession.setNormalOverlayOpacity(next.overlayOpacity);
   if (persist && changed) pxdBridge?.markDirty();
-  if (repaint && changed && editingNormalLayer()) paint();
+  if (repaint && changed) paint();
   return { ...normalMapSettings };
 }
 // Every creation mode edits this one immutable timeline and history.
@@ -560,11 +563,19 @@ function paint(changed = null) {
   if (!canvasPrepared || canvas.width !== documentData.width || canvas.height !== documentData.height) setCanvasDimensions();
   if (selectionTransform) changed = null;
   const displayFrameId = playbackFrame || animationSession.frameId;
-  const display = playing ? (editingNormalLayer()
+  let display = playing ? (editingNormalLayer()
     ? cachedAnimationFrame(animationSession.animation, `normal-display:${displayFrameId}:${animationSession.layerId}:${normalMapSettings.overlayOpacity}`, () => animationSession.previewFrame(displayFrameId))
     : composeDisplayFrame(animationSession.animation, displayFrameId))
     : featurePreviewAnimation ? composeDisplayFrame(featurePreviewAnimation, animationSession.frameId)
       : animationSession.composite(selectionPreview || documentData, changed);
+  if (!editingNormalLayer() && normalMapSettings.previewLighting && !readOnlyImage && !featurePreviewAnimation) {
+    const normalLayer = animationSession.animation.layers.find(layer => layer.role === 'normal');
+    display = normalLightingCache.render(animationSession.animation, displayFrameId, normalLayer, display, {
+      azimuth: normalMapSettings.azimuth, elevation: normalMapSettings.elevation, ambient: normalMapSettings.ambient,
+      intensity: normalMapSettings.intensity, lightColor: normalMapSettings.lightColor, specular: normalMapSettings.specular,
+      roughness: normalMapSettings.roughness, shadeUnpainted: normalMapSettings.shadeUnpainted
+    }, playing ? null : changed);
+  } else if (!normalMapSettings.previewLighting) normalLightingCache.clear();
   if (display.rgba) pixelSurface.paintRgba(display.rgba, playing ? null : changed); else pixelSurface.paint(display.pixels, display.palette, playing ? null : changed);
   paintOnion(display, changed);
   if (musicLayer && $('#draw-output')?.open) outputPreviewBatch.schedule();
@@ -1262,6 +1273,32 @@ const lazyFeaturePanels = mountLazyDrawFeaturePanels({ scope, host: $('#main'), 
     isActive,
     getSettings: () => ({ ...normalMapSettings }),
     onSettingsChange: settings => applyNormalMapSettings(settings),
+    onApplyNormal({ settings = normalMapSettings, normal } = {}) {
+      if (readOnlyImage) throw new Error('原本表示ではレイヤーを変更できません。編集可能な作品を開いてください。');
+      if (!isActive() || scope.disposed || pxdBridge?.busy || pxdBridge?.restoreError) throw new Error('作品の読み込みや保存が終わってから適用してください。');
+      if (featureSession || selectionTransform || spriteScaling || drawingInputBusy()) throw new Error('進行中の編集を確定または取り消してから適用してください。');
+      const animation = animationSession.animation;
+      const artLayer = animation.layers.find(layer => layer.id === lastArtLayerId && layer.role !== 'normal' && layer.role !== 'music')
+        || animation.layers.findLast(layer => layer.role !== 'normal' && layer.role !== 'music');
+      if (!artLayer) throw new Error('表示先の描画レイヤーがありません。作品は変更していません。');
+      if (settings.method === 'painted') {
+        const doc = animationSession.select(animationSession.frameId, artLayer.id);
+        applyNormalMapSettings({ ...settings, method: 'painted' }, { repaint: false });
+        installAnimationDocument(doc, { preserveTimelapse: true });
+        toast('描いたノーマルマップを保ったまま、照明設定を適用しました。');
+        return true;
+      }
+      const prepared = prepareNormalMapApplication(animation, animationSession.frameId, normal);
+      if (prepared.animation !== animation && !guardDrawTransition(prepared.animation, { lease: drawRewardPolicy.capture('draw') })) {
+        throw new Error('現在のレイヤー・コマ上限では適用できません。作品は変更していません。');
+      }
+      const doc = animationSession.apply(prepared.animation, { frameId: prepared.frameId, layerId: artLayer.id });
+      applyNormalMapSettings({ ...settings, method: 'painted' }, { repaint: false });
+      installAnimationDocument(doc, { preserveTimelapse: true });
+      pxdBridge?.markDirty();
+      toast('凹凸と照明を適用しました。元の絵は保たれ、「戻す」で凹凸を戻せます。');
+      return true;
+    },
     onSavePng: (blob, filename) => saveFile(blob, filename),
     getPaintedNormal() {
       if (readOnlyImage) return null;
@@ -1270,15 +1307,15 @@ const lazyFeaturePanels = mountLazyDrawFeaturePanels({ scope, host: $('#main'), 
       const doc = getAnimationCelDocument(animation, animationSession.frameId, layer.id);
       return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(indexedDocumentRgba(doc)), format: 'opengl' };
     },
-    onEditNormal({ initialFill = normalMapSettings.initialFill } = {}) {
+    onEditNormal({ initialFill = normalMapSettings.initialFill, settings = normalMapSettings } = {}) {
       if (readOnlyImage || pxdBridge?.busy || pxdBridge?.restoreError) throw new Error('作品の読み込みが完了してから使ってください。');
       const animation = animationSession.animation;
       const next = prepareDrawNormalLayer(animation, animationSession.frameId, { initialFill });
       const layer = next.layers.find(item => item.role === 'normal');
       if (next !== animation && !guardDrawTransition(next, { lease: drawRewardPolicy.capture('draw') })) return false;
-      applyNormalMapSettings({ ...normalMapSettings, method: 'painted', initialFill }, { repaint: false });
       const chosen = { frameId: animationSession.frameId, layerId: layer.id };
       const doc = next === animation ? animationSession.select(chosen.frameId, chosen.layerId) : animationSession.apply(next, chosen);
+      applyNormalMapSettings({ ...settings, method: 'painted', initialFill }, { repaint: false });
       installAnimationDocument(doc, { preserveTimelapse: true });
       if (next !== animation) pxdBridge?.markDirty();
       toast('ノーマルマップレイヤーです。方向を選び、ペンや塗りつぶしで描けます。');
@@ -1295,7 +1332,7 @@ const lazyFeaturePanels = mountLazyDrawFeaturePanels({ scope, host: $('#main'), 
     getSource() {
       if (!isActive() || scope.disposed) throw new Error('Drawで作品を開いてください。');
       if (pxdBridge?.busy || pxdBridge?.restoreError) throw new Error('作品の読み込みや保存が終わってから使ってください。');
-      const image = readOnlyImage || composeCurrentOutputFrame(animationSession.frameId, { includeMusic: false });
+      const image = readOnlyImage || composeCurrentOutputFrame(animationSession.frameId, { includeMusic: false, includeLighting: false });
       return { width: image.width, height: image.height, rgba: new Uint8ClampedArray(documentRgba(image)) };
     }
   },
@@ -2342,9 +2379,17 @@ $('#draw-output [data-output-project]')?.addEventListener('click', () => {
   void pxdBridge?.showProjects();
 });
 
-function composeCurrentOutputFrame(frameId = animationSession.frameId, { includeMusic = outputPreferences.includeMusic } = {}) {
-  const animation = animationSession.animation, withMusic = Boolean(musicLayer && includeMusic);
-  return cachedAnimationFrame(animation, `output:${frameId}:${withMusic}`, () => composeOutputFrame(animation, frameId, { includeMusic: withMusic }));
+function composeDrawOutputFrame(animation, frameId, { includeMusic = outputPreferences.includeMusic, includeLighting = normalMapSettings.previewLighting } = {}) {
+  const withMusic = Boolean(musicLayer && includeMusic);
+  const source = cachedAnimationFrame(animation, `output:${frameId}:${withMusic}`, () => composeOutputFrame(animation, frameId, { includeMusic: withMusic }));
+  if (!includeLighting) return source;
+  const layer = animation.layers.find(item => item.role === 'normal');
+  if (!layer?.visible) return source;
+  // Export owns its buffers. Never share a mutable display cache with an encoder.
+  return createNormalLightingFrameCache().render(animation, frameId, layer, source, normalMapSettings);
+}
+function composeCurrentOutputFrame(frameId = animationSession.frameId, options = {}) {
+  return composeDrawOutputFrame(animationSession.animation, frameId, options);
 }
 let outputPreviewImageData = null;
 function updateOutputPreview() {
@@ -2412,7 +2457,7 @@ $('#draw-export').addEventListener('click', async () => {
   const bridge = pxdBridge; let project = bridge?.currentProject; let held = bridge?.heldProject;
   const unchangedSource = () => !scope.disposed && isActive() && documentData === original && source === originalSource && pxdBridge === bridge
     && bridge?.currentProject?.projectId === project?.projectId && bridge?.heldProject?.projectId === held?.projectId;
-  const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: animationSession.animation.width, height: animationSession.animation.height, data: documentRgba(composeCurrentOutputFrame()) };
+  const image = readOnlyImage ? { width: readOnlyImage.width, height: readOnlyImage.height, data: new Uint8Array(readOnlyImage.rgba) } : { width: animationSession.animation.width, height: animationSession.animation.height, data: new Uint8Array(documentRgba(composeCurrentOutputFrame())) };
   try {
     await bridge?.assertCanSave?.();
     if (!unchangedSource()) return;
@@ -2424,7 +2469,7 @@ $('#draw-export').addEventListener('click', async () => {
     const animation = animationSession.animation;
     if (!readOnlyImage && animation.frames.length > 1) {
       const animationFrames = animation.frames.map((frame) => {
-        const doc = composeOutputFrame(animation, frame.id, { includeMusic: musicLayer && outputPreferences.includeMusic });
+        const doc = composeDrawOutputFrame(animation, frame.id);
         return { width: doc.width, height: doc.height, data: new Uint8Array(documentRgba(doc)), delayMs: Math.max(20, frame.durationMs) };
       });
       if (animationFrames[0].width * animationFrames[0].height * animationFrames.length <= 5_000_000) {
@@ -2601,7 +2646,7 @@ async function exportAnimation() {
     const frames = [];
     for (const frame of timeline.frames) {
       if (scope.disposed || controller.signal.aborted) return;
-      const doc = composeOutputFrame(timeline, frame.id, { includeMusic: musicLayer && outputPreferences.includeMusic });
+      const doc = composeDrawOutputFrame(timeline, frame.id);
       frames.push({ width: doc.width, height: doc.height, data: documentRgba(doc), delayMs: Math.max(20, frame.durationMs) });
     }
     const { encodeAnimatedGif } = await import('../animated-export.mjs?rev=20261015-alpha-opacity-1');
@@ -3214,7 +3259,7 @@ return {
   },
   refreshModeLayout() { desktopUi.layout(); updateCanvasView(); },
   resume() { setCanvasDimensions(); paint(); updateCanvasView(); updateControls(); },
-  getImage() { if (readOnlyImage) return { width: readOnlyImage.width, height: readOnlyImage.height, rgba: new Uint8ClampedArray(readOnlyImage.rgba) }; const doc = editingNormalLayer() ? composeCurrentOutputFrame(animationSession.frameId, { includeMusic: false }) : animationSession.composite(documentData); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba(doc.rgba ? doc : { ...doc, pixels: Array.from(doc.pixels) })) }; },
+  getImage() { if (readOnlyImage) return { width: readOnlyImage.width, height: readOnlyImage.height, rgba: new Uint8ClampedArray(readOnlyImage.rgba) }; const doc = editingNormalLayer() ? composeCurrentOutputFrame(animationSession.frameId, { includeMusic: false, includeLighting: false }) : animationSession.composite(documentData); return { width: doc.width, height: doc.height, rgba: new Uint8ClampedArray(documentRgba(doc.rgba ? doc : { ...doc, pixels: Array.from(doc.pixels) })) }; },
   /** Narrow bridge used by the spot editor's isolated, memory-only Draw iframe. */
   getDocument() {
     const doc = animationSession.document();

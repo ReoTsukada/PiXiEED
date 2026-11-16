@@ -10,7 +10,7 @@ if (sharedEntry) {
   location.replace(`${destination.pathname}${destination.search}${destination.hash}`);
 } else {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
-  await import('./draw-camera-page.mjs?rev=20261116-normal-release-2');
+  await import('./draw-camera-page.mjs?rev=20261117-normal-apply-1');
 } else {
   await import('./app.mjs?rev=20261116-normal-release-2').then(({ mountPixelLensMode }) => mountPixelLensMode());
 }

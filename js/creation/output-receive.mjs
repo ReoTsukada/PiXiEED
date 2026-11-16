@@ -2,10 +2,18 @@ import { navigateOutputEntry } from './output-entry-context.mjs?rev=20261111-out
 /** Receive staged editor files without sending private IDs or media to analytics. */
 import { readToolOutput } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { readOutputFile } from './output-router.mjs?rev=20261111-output-offerwall-1';
-import { loadConversionFile } from './conversion-service.mjs?rev=20261028-conversion-1';
-import { validateTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
-import { mountConversionPage } from './conversion-page.mjs?rev=20261111-output-offerwall-1';
+import { loadConversionFile } from './conversion-service.mjs?rev=20261117-normal-apply-1';
+import { validateTimeline } from './conversion-timeline.mjs?rev=20261117-normal-apply-1';
+import { mountConversionPage } from './conversion-page.mjs?rev=20261117-normal-apply-1';
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
+export function receivedOutputDimensions(metadata = {}, fallback = {}) {
+  const baseWidth = Number(metadata.width), baseHeight = Number(metadata.height);
+  const scale = Number(metadata.defaultScale);
+  const width = Number(metadata.outputWidth) || (baseWidth > 0 && scale > 0 ? baseWidth * scale : Number(fallback.width));
+  const height = Number(metadata.outputHeight) || (baseHeight > 0 && scale > 0 ? baseHeight * scale : Number(fallback.height));
+  return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096
+    ? { width, height } : { width: Number(fallback.width) || 0, height: Number(fallback.height) || 0 };
+}
 export function sharedOutputRequest(search) {
   const query = new URLSearchParams(search);
   if (query.has('id') && query.has('file')) throw new Error('出力の指定が重複しています。');
@@ -61,7 +69,7 @@ function renderFile(record, doc, win) {
 export async function mountSharedOutput(request, doc = document, win = window) {
   const record = request.key === 'id' ? await readToolOutput(request.id) : await readOutputFile(request.id);
   if (request.key === 'id' && (request.advanced || needsDetailedOutput(record))) {
-    const { outputPageReady } = await import('./output-page.mjs?rev=20261116-normal-release-2');
+    const { outputPageReady } = await import('./output-page.mjs?rev=20261117-normal-apply-1');
     await outputPageReady;
     return 'detailed';
   }
@@ -77,8 +85,14 @@ export async function mountSharedOutput(request, doc = document, win = window) {
     renderFile(record, doc, win);
     return 'original';
   }
+  try { if (/^\/draw\//.test(new URL(record.returnUrl, win.location.origin).pathname) && source.kind === 'image') source.pixelArt = true; } catch {}
+  const originalDimensions = receivedOutputDimensions(record.metadata, { width: source.frames?.[0]?.width, height: source.frames?.[0]?.height });
+  const main = doc.getElementById('main');
+  let editorHandoff = false;
+  try { editorHandoff = /^\/(?:draw|audio|camera)\//.test(new URL(record.returnUrl, win.location.origin).pathname); } catch {}
+  if (main) main.dataset.editorHandoff = String(editorHandoff);
   const ui = mountConversionPage(doc, win);
-  ui.setSource(source, { playbackRate: record.mediaSettings?.playbackRate, format: record.extension });
+  ui.setSource(source, { playbackRate: record.mediaSettings?.playbackRate, format: record.extension, ...originalDimensions });
   ui.offerOriginal(record.blob, record.filename);
   addOriginControls(record, doc, win, request);
   return 'conversion';

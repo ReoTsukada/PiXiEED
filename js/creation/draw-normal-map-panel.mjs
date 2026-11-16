@@ -4,16 +4,17 @@ import {
   encodeNormalMapPng,
   normalizeNormalMapSettings,
   renderNormalMapLighting
-} from './draw-normal-map.mjs?rev=20261116-normal-release-2';
+} from './draw-normal-map.mjs?rev=20261117-normal-apply-1';
+import { quantizeNormalMapForAnimation } from './draw-normal-apply.mjs?rev=20261117-normal-apply-1';
 
 const controlFields = {
   method: 'method', strength: 'strength', radius: 'radius', invertHeight: 'invert', format: 'format',
   azimuth: 'azimuth', elevation: 'elevation', ambient: 'ambient', intensity: 'intensity',
   lightColor: 'light-color', specular: 'specular', roughness: 'roughness',
-  shadeUnpainted: 'shade-unpainted', initialFill: 'initial-fill', overlayOpacity: 'overlay-opacity'
+  shadeUnpainted: 'shade-unpainted', initialFill: 'initial-fill', overlayOpacity: 'overlay-opacity', previewLighting: 'preview-lighting'
 };
 const numericFields = new Set(['strength', 'radius', 'azimuth', 'elevation', 'ambient', 'intensity', 'specular', 'roughness', 'overlayOpacity']);
-const booleanFields = new Set(['invertHeight', 'shadeUnpainted']);
+const booleanFields = new Set(['invertHeight', 'shadeUnpainted', 'previewLighting']);
 const rebuildFields = new Set(['method', 'strength', 'radius', 'invert', 'format']);
 const lightPresets = {
   'upper-left': { azimuth: 225, elevation: 45 }, 'upper-right': { azimuth: 315, elevation: 45 },
@@ -22,7 +23,7 @@ const lightPresets = {
 
 /** Normal preview/settings are separate from the artwork and exact normal PNG. */
 export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNormal = () => null, onEditNormal = null,
-  getSettings = () => null, onSettingsChange = () => {}, onSavePng = null, beforeOpen = () => {}, isActive = () => true } = {}) {
+  getSettings = () => null, onSettingsChange = () => {}, onApplyNormal = null, onSavePng = null, beforeOpen = () => {}, isActive = () => true } = {}) {
   if (!scope?.listen || !scope?.add || typeof scope.disposed !== 'boolean') throw new TypeError('Normal map panel requires a lifecycle scope');
   if (!host || typeof getSource !== 'function') throw new TypeError('Normal map panel requires a host and image source');
 
@@ -37,55 +38,68 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
   dialog.innerHTML = `
     <header class="draw-normal-map__header">
       <div><h2 id="draw-normal-map-title">ノーマルマップ</h2><p data-frame-size>現在のコマ</p></div>
-      <button type="button" class="draw-normal-map__close" data-close aria-label="閉じる">閉じる</button>
+      <button type="button" class="draw-normal-map__close" data-close aria-label="キャンセルして閉じる">閉じる</button>
     </header>
-    <p class="draw-normal-map__note" data-note></p>
-    <div class="draw-normal-map__source-row"><button type="button" data-refresh>現在の絵を読み直す</button><span data-refresh-status role="status" aria-live="polite"></span></div>
     <div class="draw-normal-map__previews">
       <figure><figcaption>元の絵</figcaption><div class="draw-normal-map__canvas-wrap"><canvas data-source aria-label="元の絵"></canvas></div></figure>
       <figure><figcaption>法線</figcaption><div class="draw-normal-map__canvas-wrap"><canvas data-normal aria-label="生成したノーマルマップ"></canvas></div></figure>
       <figure><figcaption>照明</figcaption><div class="draw-normal-map__canvas-wrap"><canvas data-lit aria-label="ノーマルマップのライティング表示"></canvas></div></figure>
     </div>
-    <section class="draw-normal-map__controls" aria-label="ノーマルマップ設定">
-      <label class="draw-normal-map__field"><span>マップの作り方</span><select data-method><option value="silhouette">輪郭から丸みをつける</option><option value="luminance">明るさを高さとして使う</option><option data-painted-option value="painted" disabled>描いたノーマルマップレイヤー</option></select></label>
-      <label class="draw-normal-map__field" data-strength-field><span>凹凸の強さ <output data-strength-value>2</output></span><input data-strength aria-label="凹凸の強さ" type="range" min="0" max="8" step="0.1" value="2"></label>
-      <label class="draw-normal-map__field" data-radius-field><span>丸みの半径 <output data-radius-value>3</output></span><input data-radius aria-label="丸みの半径" type="range" min="1" max="32" step="1" value="3"></label>
-      <label class="draw-normal-map__check" data-invert-field><input data-invert type="checkbox">高さを反転</label>
-      <label class="draw-normal-map__field"><span>Y方向</span><select data-format><option value="opengl">OpenGL（Y+）</option><option value="directx">DirectX（Y−）</option></select></label>
-    </section>
-    <section class="draw-normal-map__controls" aria-label="光の設定">
-      <label class="draw-normal-map__field"><span>光のプリセット</span><select data-light-preset><option value="custom">自由に調整</option><option value="upper-left">左上</option><option value="upper-right">右上</option><option value="front">正面</option><option value="left">左</option><option value="right">右</option></select></label>
-      <label class="draw-normal-map__field"><span>光の向き（左右） <output data-azimuth-value>315°</output></span><input data-azimuth aria-label="光の向き（左右）" type="range" min="0" max="360" step="1" value="315"></label>
-      <label class="draw-normal-map__field"><span>光の向き（上下） <output data-elevation-value>45°</output></span><input data-elevation aria-label="光の向き（上下）" type="range" min="0" max="90" step="1" value="45"></label>
-      <label class="draw-normal-map__check" data-shade-unpainted-field><input data-shade-unpainted type="checkbox">法線を描いていない部分にも光を当てる</label>
-    </section>
-    <details class="draw-normal-map__material"><summary>艶と光を調整</summary><div class="draw-normal-map__controls">
-      <label class="draw-normal-map__field"><span>艶の強さ <output data-specular-value>25%</output></span><input data-specular aria-label="艶の強さ" type="range" min="0" max="1" step="0.01" value="0.25"></label>
-      <label class="draw-normal-map__field"><span>表面の粗さ <output data-roughness-value>50%</output></span><input data-roughness aria-label="表面の粗さ" type="range" min="0.05" max="1" step="0.01" value="0.5"></label>
-      <label class="draw-normal-map__field"><span>環境光 <output data-ambient-value>25%</output></span><input data-ambient aria-label="環境光" type="range" min="0" max="1" step="0.01" value="0.25"></label>
-      <label class="draw-normal-map__field"><span>光の強さ <output data-intensity-value>100%</output></span><input data-intensity aria-label="光の強さ" type="range" min="0" max="2" step="0.01" value="1"></label>
-      <label class="draw-normal-map__field"><span>光の色</span><input data-light-color aria-label="光の色" type="color" value="#ffffff"></label>
-    </div></details>
-    <div class="draw-normal-map__edit" data-edit-section>
-      <label class="draw-normal-map__field" data-initial-fill-field><span>専用レイヤーの作り方</span><select data-initial-fill><option value="transparent">透明から描き始める</option><option value="flat">元の絵の範囲を平面色で埋める</option></select></label>
-      <label class="draw-normal-map__field"><span>編集画面の重ね表示 <output data-overlay-opacity-value>100%</output></span><input data-overlay-opacity aria-label="編集画面の重ね表示の濃度" type="range" min="0" max="1" step="0.01" value="1"></label>
-      <p>重ね表示の濃度は編集画面だけに反映します。保存する法線色や元の絵は変わりません。</p>
-      <button type="button" data-edit-normal>専用レイヤーで描く</button>
+    <div class="draw-normal-map__body">
+      <p class="draw-normal-map__note" data-note></p>
+      <section class="draw-normal-map__controls" aria-label="基本設定">
+        <label class="draw-normal-map__field"><span>マップの作り方</span><select data-method><option value="silhouette">輪郭から丸みをつける</option><option value="luminance">明るさを高さとして使う</option><option data-painted-option value="painted" disabled>描いたノーマルマップレイヤー</option></select></label>
+        <label class="draw-normal-map__field" data-strength-field><span>凹凸の強さ <output data-strength-value>2</output></span><input data-strength aria-label="凹凸の強さ" type="range" min="0" max="8" step="0.1" value="2"></label>
+        <label class="draw-normal-map__field"><span>光のプリセット</span><select data-light-preset><option value="custom">自由に調整</option><option value="upper-left">左上</option><option value="upper-right">右上</option><option value="front">正面</option><option value="left">左</option><option value="right">右</option></select></label>
+        <label class="draw-normal-map__check"><input data-preview-lighting type="checkbox">Drawで照明を表示する</label>
+      </section>
+      <details class="draw-normal-map__details"><summary>凹凸・形式の詳細</summary><div class="draw-normal-map__controls">
+        <label class="draw-normal-map__field" data-radius-field><span>丸みの半径 <output data-radius-value>3</output></span><input data-radius aria-label="丸みの半径" type="range" min="1" max="32" step="1" value="3"></label>
+        <label class="draw-normal-map__check" data-invert-field><input data-invert type="checkbox">高さを反転</label>
+        <label class="draw-normal-map__field"><span>法線のY方向</span><select data-format><option value="opengl">OpenGL（Y+）</option><option value="directx">DirectX（Y−）</option></select></label>
+      </div></details>
+      <details class="draw-normal-map__details draw-normal-map__material"><summary>照明の詳細</summary><div class="draw-normal-map__controls">
+        <label class="draw-normal-map__field"><span>光の向き（左右） <output data-azimuth-value>315°</output></span><input data-azimuth aria-label="光の向き（左右）" type="range" min="0" max="360" step="1" value="315"></label>
+        <label class="draw-normal-map__field"><span>光の向き（上下） <output data-elevation-value>45°</output></span><input data-elevation aria-label="光の向き（上下）" type="range" min="0" max="90" step="1" value="45"></label>
+        <label class="draw-normal-map__field"><span>艶の強さ <output data-specular-value>25%</output></span><input data-specular aria-label="艶の強さ" type="range" min="0" max="1" step="0.01" value="0.25"></label>
+        <label class="draw-normal-map__field"><span>表面の粗さ <output data-roughness-value>50%</output></span><input data-roughness aria-label="表面の粗さ" type="range" min="0.05" max="1" step="0.01" value="0.5"></label>
+        <label class="draw-normal-map__field"><span>環境光 <output data-ambient-value>25%</output></span><input data-ambient aria-label="環境光" type="range" min="0" max="1" step="0.01" value="0.25"></label>
+        <label class="draw-normal-map__field"><span>光の強さ <output data-intensity-value>100%</output></span><input data-intensity aria-label="光の強さ" type="range" min="0" max="2" step="0.01" value="1"></label>
+        <label class="draw-normal-map__field"><span>光の色</span><input data-light-color aria-label="光の色" type="color" value="#ffffff"></label>
+        <label class="draw-normal-map__check" data-shade-unpainted-field><input data-shade-unpainted type="checkbox">法線を描いていない部分にも光を当てる</label>
+      </div></details>
+      <label class="draw-normal-map__field draw-normal-map__overlay"><span>編集中の重ね濃度 <output data-overlay-opacity-value>100%</output></span><input data-overlay-opacity aria-label="編集画面の重ね表示の濃度" type="range" min="0" max="1" step="0.01" value="1"></label>
+      <details class="draw-normal-map__details" data-edit-section><summary>専用レイヤーで描く</summary><div class="draw-normal-map__edit">
+        <label class="draw-normal-map__field" data-initial-fill-field><span>描き始めの状態</span><select data-initial-fill><option value="transparent">透明から描き始める</option><option value="flat">元の絵の範囲を平面色で埋める</option></select></label>
+        <p>生成結果は使わず、専用パレットで描きます。既存レイヤーの絵は残ります。</p>
+        <button type="button" data-edit-normal>専用レイヤーで描く</button>
+      </div></details>
+      <details class="draw-normal-map__details draw-normal-map__export" data-export-section><summary>PNGを書き出す</summary>
+        <p class="draw-normal-map__note">プレビューをPNGにします。作品には適用しません。</p>
+        <div class="draw-normal-map__exports"><button type="button" data-save>ノーマルマップPNG</button><button type="button" data-save-lit>照明済みPNG</button></div>
+        <a class="draw-normal-map__download" data-download download hidden>PNGをもう一度ダウンロード</a>
+      </details>
+      <div class="draw-normal-map__source-row"><button type="button" data-refresh>現在の絵を読み直す</button><span data-refresh-status role="status" aria-live="polite"></span></div>
     </div>
-    <p class="draw-normal-map__error" data-error role="alert" hidden></p>
-    <footer class="draw-normal-map__footer"><button type="button" class="draw-normal-map__save" data-save>ノーマルマップPNGを保存</button><button type="button" class="draw-normal-map__save" data-save-lit>照明済みPNGを保存</button></footer>
-    <a class="draw-normal-map__download" data-download download hidden>PNGをもう一度ダウンロード</a>`;
+    <footer class="draw-normal-map__footer">
+      <p class="draw-normal-map__error" data-error role="alert" hidden></p>
+      <p class="draw-normal-map__apply-note" data-apply-note>適用すると現在のコマの凹凸レイヤーと照明表示に反映します。元の絵は変更しません。</p>
+      <div class="draw-normal-map__actions"><button type="button" data-cancel>キャンセル</button><button type="button" class="draw-normal-map__save" data-apply>適用してDrawへ</button></div>
+    </footer>`;
   (doc.body || host).append(dialog);
   const $ = selector => dialog.querySelector(selector);
   const sourceCanvas = $('[data-source]'), normalCanvas = $('[data-normal]'), litCanvas = $('[data-lit]');
-  const refreshStatus = $('[data-refresh-status]'), error = $('[data-error]'), save = $('[data-save]'), saveLit = $('[data-save-lit]'), download = $('[data-download]');
+  const refreshStatus = $('[data-refresh-status]'), error = $('[data-error]'), save = $('[data-save]'), saveLit = $('[data-save-lit]'), apply = $('[data-apply]'), download = $('[data-download]');
   let settings = normalizeNormalMapSettings(null), settingsRestored = false;
   let source = null, paintedNormal = null, normal = null, lit = null, pending = false, disposed = false, open = false;
   let renderFrame = 0, renderToken = 0, viewToken = 0, pendingRebuild = false, downloadUrl = null;
   setSaveDisabled(true);
   $('[data-edit-section]').hidden = typeof onEditNormal !== 'function';
 
-  function setSaveDisabled(disabled) { save.disabled = disabled; saveLit.disabled = disabled; }
+  function setSaveDisabled(disabled) {
+    save.disabled = disabled; saveLit.disabled = disabled; apply.disabled = disabled;
+    $('[data-edit-normal]').disabled = disabled;
+  }
   function setBusy(value) {
     pending = value;
     for (const name of Object.values(controlFields)) $(`[data-${name}]`).disabled = value;
@@ -140,7 +154,8 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
       try {
         const options = currentOptions();
         if (pendingRebuild || !normal) {
-          normal = options.method === 'painted' ? convertPaintedNormalMap(paintedNormal, { format: options.format }) : createNormalMap(source, options);
+          normal = options.method === 'painted' ? convertPaintedNormalMap(paintedNormal, { format: options.format })
+            : convertPaintedNormalMap(quantizeNormalMapForAnimation(createNormalMap(source, options)), { format: options.format });
           pendingRebuild = false;
         }
         lit = renderNormalMapLighting(source, normal, options);
@@ -160,6 +175,7 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
       $('[data-painted-option]').disabled = !paintedNormal;
       $('[data-initial-fill-field]').hidden = Boolean(paintedNormal);
       if (paintedNormal && !explicit && !settingsRestored) $('[data-method]').value = 'painted';
+      if (!paintedNormal && !explicit) $('[data-preview-lighting]').checked = true;
       if (!paintedNormal && $('[data-method]').value === 'painted') $('[data-method]').value = 'silhouette';
       normal = lit = null; pendingRebuild = true; setSaveDisabled(true);
       $('[data-frame-size]').textContent = `現在のコマ · ${source.width} × ${source.height} px`;
@@ -176,8 +192,9 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
     if (event && pending) return;
     const options = currentOptions(), method = options.method;
     $('[data-note]').textContent = method === 'painted'
-      ? '描いた方向をそのまま使います。法線を描いていない部分は、下の設定で光を当てるか選べます。光の調整は元の絵や法線を変更しません。'
-      : '開いた時点のコマを使い、輪郭や明るさから凹凸を推定します。元の絵は変更しません。';
+      ? '描いた方向を使って照明を調整します。法線の絵はそのまま残ります。'
+      : paintedNormal ? '適用すると、このコマの既存の凹凸を生成結果に置き換えます。「元に戻す」で戻せます。'
+        : '輪郭や明るさから凹凸を作り、編集用パレットの色に揃えます。適用すると専用レイヤーに追加します。';
     $('[data-strength-field]').hidden = method === 'painted'; $('[data-invert-field]').hidden = method === 'painted';
     $('[data-radius-field]').hidden = method !== 'silhouette'; $('[data-shade-unpainted-field]').hidden = method !== 'painted';
     $('[data-strength-value]').value = options.strength.toFixed(1).replace(/\.0$/, '');
@@ -188,12 +205,12 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
     }
     $('[data-light-preset]').value = Object.entries(lightPresets).find(([, preset]) => preset.azimuth === options.azimuth && preset.elevation === options.elevation)?.[0] || 'custom';
     if (event) {
-      try { onSettingsChange(options); settings = options; }
-      catch (cause) { normal = lit = null; setSaveDisabled(true); clearDownload(); refreshStatus.textContent = ''; setError(cause?.message || '設定を保存できませんでした。'); return; }
+      // Controls are a local draft. Only Apply or the explicit edit handoff commits it.
+      setError();
       // A retry link must never silently refer to a different preview.
       clearDownload(); refreshStatus.textContent = '';
       const changed = Object.entries(controlFields).find(([, name]) => event.target === $(`[data-${name}]`))?.[1];
-      if (changed === 'overlay-opacity' || changed === 'initial-fill') return;
+      if (changed === 'overlay-opacity' || changed === 'initial-fill' || changed === 'preview-lighting') return;
       render({ rebuildNormal: rebuildFields.has(changed) });
     }
   }
@@ -222,6 +239,26 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
     } catch (cause) { return showOpenError(cause?.message || 'Drawの設定を読み込めませんでした。'); }
     if (!dialog.open) { try { dialog.showModal(); } catch { return false; } }
     setOpenState(true); clearDownload(); setError(); readSource(); return true;
+  }
+  async function applyDraft({ edit = false } = {}) {
+    if (!open || disposed || scope.disposed || !source || !normal || !lit || pending || renderFrame || pendingRebuild || !isActive()) return;
+    if (edit && typeof onEditNormal !== 'function') return;
+    const token = viewToken, originalSource = source, options = currentOptions();
+    const isCurrent = () => !disposed && !scope.disposed && open && isActive() && viewToken === token && source === originalSource;
+    const snapshot = { width: normal.width, height: normal.height, rgba: new Uint8ClampedArray(normal.rgba), format: normal.format };
+    setBusy(true); setError();
+    try {
+      // The editor callback owns the complete transaction; never save settings
+      // first and then leave a partial commit when layer preparation is rejected.
+      let result = edit ? onEditNormal({ initialFill: options.initialFill, settings: options })
+        : typeof onApplyNormal === 'function' ? onApplyNormal({ settings: options, normal: snapshot }) : onSettingsChange(options);
+      if (result && typeof result.then === 'function') result = await result;
+      if (!isCurrent()) return;
+      if (result === false) throw new Error(edit ? '専用レイヤーを開けませんでした。設定を確認して、もう一度お試しください。' : '設定を適用できませんでした。もう一度お試しください。');
+      settings = options; close();
+    } catch (cause) {
+      if (isCurrent()) setError(cause?.message || '設定を適用できませんでした。');
+    } finally { if (!disposed && !scope.disposed) setBusy(false); else pending = false; }
   }
   async function savePng(kind) {
     if (!open || disposed || scope.disposed || !source || !normal || !lit || pending || renderFrame || pendingRebuild || !isActive()) return;
@@ -261,13 +298,10 @@ export function mountDrawNormalMapPanel({ scope, host, getSource, getPaintedNorm
   }
   writeControls(settings);
   scope.listen(opener, 'click', () => { show(); }); scope.listen($('[data-close]'), 'click', close);
+  scope.listen($('[data-cancel]'), 'click', close); scope.listen(apply, 'click', () => { void applyDraft(); });
   scope.listen($('[data-refresh]'), 'click', () => { if (pending) return; clearDownload(); readSource({ explicit: true }); });
   scope.listen(save, 'click', () => { void savePng('normal'); }); scope.listen(saveLit, 'click', () => { void savePng('lit'); });
-  scope.listen($('[data-edit-normal]'), 'click', () => {
-    if (pending || typeof onEditNormal !== 'function' || !isActive()) return;
-    try { if (onEditNormal({ initialFill: currentOptions().initialFill }) !== false) close(); }
-    catch (cause) { setError(cause?.message || 'ノーマルマップレイヤーを開けませんでした。'); }
-  });
+  scope.listen($('[data-edit-normal]'), 'click', () => { void applyDraft({ edit: true }); });
   scope.listen($('[data-light-preset]'), 'change', () => {
     if (pending) return;
     const preset = lightPresets[$('[data-light-preset]').value]; if (!preset) return;

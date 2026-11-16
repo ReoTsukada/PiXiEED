@@ -26,21 +26,21 @@ try {
       if (!template) throw new Error('出力画面の構成を確認できませんでした。再読み込みしてください。');
       main.replaceChildren(template.content.cloneNode(true)); template.remove();
       if (query.has('id') || query.has('file')) {
-        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261116-normal-release-2');
+        const { sharedOutputRequest, mountSharedOutput } = await import('./output-receive.mjs?rev=20261117-normal-apply-1');
         await mountSharedOutput(sharedOutputRequest(outputEntrySearch()));
       } else if (query.get('mode') === 'convert') {
-        const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261111-output-offerwall-1');
+        const { mountConversionPage } = await import('./conversion-page.mjs?rev=20261117-normal-apply-1');
         mountConversionPage();
       } else {
-        const { outputPageReady } = await import('./output-page.mjs?rev=20261116-normal-release-2');
+        const { outputPageReady } = await import('./output-page.mjs?rev=20261117-normal-apply-1');
         await outputPageReady;
       }
       const failure = main.querySelector('[role="alert"]');
       if (failure) throw new Error(failure.textContent || '端末内の出力を開けませんでした。');
     },
-    loadText: () => import('./text-tools.mjs?rev=20261111-output-offerwall-1'),
+    loadText: () => import('./text-tools.mjs?rev=20261117-normal-apply-1'),
     loadIntent: () => import('./conversion-intent.mjs?rev=20261028-discovery-1'),
-    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261111-output-offerwall-1'),
+    loadUI: () => import('./conversion-smart-ui.mjs?rev=20261117-normal-apply-1'),
     onWarning(error) { console.warn('Optional conversion module unavailable; media conversion remains available.', error); },
   });
 } catch (error) { view.fail(error); }

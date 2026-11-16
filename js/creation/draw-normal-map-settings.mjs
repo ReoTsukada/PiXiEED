@@ -3,7 +3,7 @@ export const DEFAULT_NORMAL_MAP_SETTINGS = Object.freeze({
   method: 'silhouette', strength: 2, radius: 3, invertHeight: false, format: 'opengl',
   azimuth: 315, elevation: 45, ambient: 0.25, intensity: 1, lightColor: '#ffffff',
   specular: 0.25, roughness: 0.5, shadeUnpainted: false,
-  initialFill: 'transparent', overlayOpacity: 1
+  initialFill: 'transparent', overlayOpacity: 1, previewLighting: false
 });
 
 /** Sanitize persisted panel preferences without keeping unknown keys or references. */
@@ -23,7 +23,7 @@ export function normalizeNormalMapSettings(value) {
     lightColor: typeof color === 'string' && /^#[\da-f]{6}$/i.test(color) ? color.toLowerCase() : DEFAULT_NORMAL_MAP_SETTINGS.lightColor,
     specular: number('specular', 0, 1), roughness: number('roughness', 0.05, 1),
     shadeUnpainted: boolean('shadeUnpainted'), initialFill: choice('initialFill', ['transparent', 'flat']),
-    overlayOpacity: number('overlayOpacity', 0, 1)
+    overlayOpacity: number('overlayOpacity', 0, 1), previewLighting: boolean('previewLighting')
   };
 }
 

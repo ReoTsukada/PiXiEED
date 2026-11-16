@@ -23,6 +23,9 @@ const AUDIO_OUTPUT_FORMATS = new Set(['wav', 'mp3', 'aif', 'aiff', 'aifc', 'au',
 const VIDEO_OUTPUT_FORMATS = new Set(['mp4', 'webm']);
 const TEXT_OUTPUT_FORMATS = new Set(['txt', 'text', 'pxtxt', 'md', 'json', 'csv', 'tsv', 'log', 'xml', 'yaml', 'yml', 'ini', 'toml']);
 
+/** Explicit hydration context marks a file returned from an editor tool. */
+export function isReceivedToolOutput(value = '') { return value === 'true'; }
+
 function extensionOfOutput(value = '') {
   const leaf = String(value || '').split(/[\\/]/).pop();
   const dot = leaf.lastIndexOf('.');
@@ -355,7 +358,38 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   const legacy = main.querySelector('.text-legacy');
   const nativeSizeControl = main.querySelector('.sc-preview-summary > .sc-size-control');
   const oldNativeSizeControlHidden = nativeSizeControl?.hidden ?? false;
-  const originalPositions = [root, source, label, meta, layout.querySelector('.tx-input-card'), textFilePick, nativeSizeControl].filter(Boolean).map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
+  const receivedToolOutput = isReceivedToolOutput(main.dataset.editorHandoff)
+    || isReceivedToolOutput(main.querySelector('#output-layout')?.dataset.editorHandoff || '');
+  const nativeOutputSettings = receivedToolOutput && main.querySelector('#output-layout') ? {
+    filenameLabel: main.querySelector('label[for="output-filename"]'),
+    filenameRow: main.querySelector('.output-filename'),
+    formatPicker: main.querySelector('#output-format-picker'),
+    scale: main.querySelector('#output-scale-settings'),
+    animation: main.querySelector('#output-animation-settings'),
+    audio: main.querySelector('#output-audio-settings'),
+    fileSettings: main.querySelector('#output-file-settings'),
+    multiple: main.querySelector('.sc-multiple'),
+    settingsButton: toolbar.querySelector('[data-sc-settings-open]'),
+  } : null;
+  const simpleHandoffSettings = receivedToolOutput && !main.querySelector('#output-layout') ? {
+    sourceRow: main.querySelector('.convert-file'),
+    actions: main.querySelector('.convert-actions'),
+    options: main.querySelector('.convert-options'),
+    motion: main.querySelector('.convert-motion'),
+    notice: main.querySelector('.convert-notice'),
+    support: main.querySelector('.convert-support'),
+    filename: main.querySelector('[data-sc-result-name]'),
+    settingsButton: toolbar.querySelector('[data-sc-settings-open]'),
+  } : null;
+  const oldFileSettingsHidden = nativeOutputSettings?.fileSettings?.hidden ?? false;
+  const oldSettingsButtonHidden = (nativeOutputSettings || simpleHandoffSettings)?.settingsButton?.hidden ?? false;
+  const originalPositions = [root, source, label, meta, layout.querySelector('.tx-input-card'), textFilePick, nativeSizeControl,
+    ...(receivedToolOutput ? [main.querySelector('.tx-footer')] : []),
+    ...(nativeOutputSettings ? [nativeOutputSettings.filenameLabel, nativeOutputSettings.filenameRow, nativeOutputSettings.formatPicker,
+      nativeOutputSettings.scale, nativeOutputSettings.animation, nativeOutputSettings.audio, nativeOutputSettings.multiple] : []),
+    ...(simpleHandoffSettings ? [simpleHandoffSettings.sourceRow, simpleHandoffSettings.actions, simpleHandoffSettings.options,
+      simpleHandoffSettings.motion, simpleHandoffSettings.notice, simpleHandoffSettings.support] : [])]
+    .filter(Boolean).map(node => ({ node, parent: node.parentNode, next: node.nextSibling }));
   const oldUnifiedFlag = main.getAttribute('data-unified-input');
   const oldRootFlag = root.getAttribute('data-unified-input');
   const oldOutputTab = main.getAttribute('data-output-tab'), oldOutputCategory = main.getAttribute('data-output-category');
@@ -369,10 +403,11 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   let ownsStyle = false;
   if (legacy && root.parentNode === main) main.insertBefore(root, legacy);
   if (!doc.querySelector('link[data-unified-input-style]')) {
-    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/conversion-unified-input.css?rev=20261110-output-layout-7'; sheet.dataset.unifiedInputStyle = ''; doc.head.append(sheet);
+    const sheet = doc.createElement('link'); sheet.rel = 'stylesheet'; sheet.href = '/css/conversion-unified-input.css?rev=20261117-normal-apply-1'; sheet.dataset.unifiedInputStyle = ''; doc.head.append(sheet);
     ownsStyle = true;
   }
   const composer = doc.createElement('section'); composer.className = 'sc-unified-composer'; composer.setAttribute('aria-label', '出力の種類と素材・設定');
+  if (receivedToolOutput) composer.dataset.editorHandoff = 'true';
   composer.innerHTML = `<div class="sc-output-control"><span class="sc-output-control-label">出力</span><div class="sc-output-tabs" role="tablist" aria-label="出力の種類"><button type="button" id="sc-output-tab-image" role="tab" title="画像・音声・動画・ファイルの出力"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9" r="1.5"></circle><path d="m21 15-5-5L5 19"></path></svg><span data-sc-output-nontext-label>画像</span></button><button type="button" id="sc-output-tab-text" role="tab" title="テキスト形式の出力"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h9l4 4v14H6z"></path><path d="M14 3v5h5M9 12h7M9 16h7"></path></svg><span>テキスト</span></button></div></div><div class="sc-unified-controls">
       <label><span>作るもの</span><select data-sc-unified-purpose></select></label>
       <label data-sc-unified-format-row><span data-sc-unified-format-label>表現</span><select data-sc-unified-format></select></label>
@@ -412,6 +447,113 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   const expressionRow = composer.querySelector('[data-sc-unified-format-row]'), expressionLabel = composer.querySelector('[data-sc-unified-format-label]');
   const outputTabs = composer.querySelector('[role="tablist"]'), outputControl = outputTabs.parentElement, tabButtons = Object.fromEntries(OUTPUT_TABS.map(tab => [tab, composer.querySelector(`#sc-output-tab-${tab}`)]));
   toolbar.insertBefore(outputControl, toolbar.querySelector('.sc-route') || null);
+
+  let handoffSettings = null, handoffAux = null, handoffSummary = null, handoffSummaryObserver = null,
+    handoffLateObserver = null, handoffReadyStatusObserver = null, handoffSummaryUpdateListener = null, handoffSummaryRefresh = null;
+  if (nativeOutputSettings) {
+    const fileRow = doc.createElement('section'); fileRow.className = 'sc-handoff-file';
+    fileRow.setAttribute('aria-label', '保存するファイル');
+    handoffSettings = doc.createElement('details'); handoffSettings.className = 'sc-handoff-settings';
+    handoffSettings.innerHTML = '<summary><span>出力設定</span><span data-handoff-settings-summary></span></summary>';
+    handoffSummary = handoffSettings.querySelector('[data-handoff-settings-summary]');
+    handoffAux = doc.createElement('details'); handoffAux.className = 'sc-handoff-aux';
+    handoffAux.innerHTML = '<summary>素材・その他の操作</summary><div class="sc-handoff-aux-content"></div>';
+    const auxContent = handoffAux.querySelector('.sc-handoff-aux-content');
+    if (nativeOutputSettings.filenameLabel) fileRow.append(nativeOutputSettings.filenameLabel);
+    if (nativeOutputSettings.filenameRow) fileRow.append(nativeOutputSettings.filenameRow);
+    if (nativeOutputSettings.formatPicker) handoffSettings.append(nativeOutputSettings.formatPicker);
+    handoffSettings.append(controls);
+    for (const node of [nativeOutputSettings.scale, nativeOutputSettings.animation, nativeOutputSettings.audio]) if (node) handoffSettings.append(node);
+    auxContent.append(outputControl, composer.querySelector('.sc-unified-head'), composer.querySelector('[data-sc-unified-help]'),
+      composer.querySelector('[data-sc-tab-status]'), composer.querySelector('[data-sc-unified-guide]'),
+      composer.querySelector('[data-sc-unified-error]'), composer.querySelector('[data-sc-unified-recovery]'),
+      composer.querySelector('[data-sc-input-receipts]'), codeTools);
+    if (nativeOutputSettings.multiple) auxContent.append(nativeOutputSettings.multiple);
+    composer.insertBefore(fileRow, composer.firstChild);
+    composer.insertBefore(handoffSettings, fileRow.nextSibling);
+    composer.append(handoffAux);
+    if (nativeOutputSettings.fileSettings) nativeOutputSettings.fileSettings.hidden = true;
+    if (nativeOutputSettings.settingsButton) nativeOutputSettings.settingsButton.hidden = true;
+    const updateHandoffSummary = () => {
+      const formatText = nativeOutputSettings.filenameRow?.querySelector('#output-extension')?.textContent?.replace(/[⌄\s]/g, '').trim()
+        || nativeOutputSettings.formatPicker?.querySelector('#output-format-select')?.value?.toUpperCase() || '';
+      const sizeText = nativeOutputSettings.scale?.querySelector('#output-scale-summary')?.textContent?.trim() || '';
+      handoffSummary.textContent = [formatText, sizeText].filter(value => value && !/設定を確認/.test(value)).join(' · ');
+    };
+    updateHandoffSummary();
+    const Observer = win.MutationObserver || globalThis.MutationObserver;
+    handoffSummaryObserver = Observer ? new Observer(updateHandoffSummary) : null;
+    for (const node of [nativeOutputSettings.filenameRow?.querySelector('#output-extension'), nativeOutputSettings.scale?.querySelector('#output-scale-summary')]) {
+      if (node) handoffSummaryObserver.observe(node, { childList: true, characterData: true, subtree: true });
+    }
+  } else if (simpleHandoffSettings) {
+    const fileRow = doc.createElement('section'); fileRow.className = 'sc-handoff-file';
+    fileRow.setAttribute('aria-label', '保存するファイル');
+    const filenameLabel = doc.createElement('span'); filenameLabel.className = 'sc-handoff-filename-label'; filenameLabel.textContent = 'ファイル名';
+    const filenameValue = doc.createElement('strong'); filenameValue.className = 'sc-handoff-filename-value';
+    fileRow.append(filenameLabel, filenameValue);
+    handoffSettings = doc.createElement('details'); handoffSettings.className = 'sc-handoff-settings';
+    handoffSettings.innerHTML = '<summary><span>出力設定</span><span data-handoff-settings-summary></span></summary>';
+    handoffSummary = handoffSettings.querySelector('[data-handoff-settings-summary]');
+    handoffAux = doc.createElement('details'); handoffAux.className = 'sc-handoff-aux';
+    handoffAux.innerHTML = '<summary>素材・その他の操作</summary><div class="sc-handoff-aux-content"></div>';
+    const auxContent = handoffAux.querySelector('.sc-handoff-aux-content');
+    handoffSettings.append(controls);
+    for (const node of [simpleHandoffSettings.options, simpleHandoffSettings.motion, simpleHandoffSettings.notice]) if (node) handoffSettings.append(node);
+    if (simpleHandoffSettings.actions) fileRow.append(simpleHandoffSettings.actions);
+    auxContent.append(outputControl, composer.querySelector('.sc-unified-head'), composer.querySelector('[data-sc-unified-help]'),
+      composer.querySelector('[data-sc-tab-status]'), composer.querySelector('[data-sc-unified-guide]'),
+      composer.querySelector('[data-sc-unified-error]'), composer.querySelector('[data-sc-unified-recovery]'),
+      composer.querySelector('[data-sc-input-receipts]'), codeTools);
+    if (simpleHandoffSettings.sourceRow) auxContent.append(simpleHandoffSettings.sourceRow);
+    if (simpleHandoffSettings.support) auxContent.append(simpleHandoffSettings.support);
+    composer.insertBefore(fileRow, composer.firstChild);
+    composer.insertBefore(handoffSettings, fileRow.nextSibling);
+    composer.append(handoffAux);
+    if (simpleHandoffSettings.settingsButton) simpleHandoffSettings.settingsButton.hidden = true;
+    const updateHandoffSummary = () => {
+      const formatValue = expression.value || main.querySelector('[data-format]')?.value || '';
+      const formatOption = [...expression.options].find(option => option.value === formatValue);
+      const width = Number(main.querySelector('[data-width]')?.value), height = Number(main.querySelector('[data-height]')?.value);
+      const dimensions = width > 0 && height > 0 ? `${width} × ${height}px` : '';
+      handoffSummary.textContent = [formatOption?.textContent?.trim() || String(formatValue).toUpperCase(), dimensions].filter(Boolean).join(' · ');
+      const savedName = main.querySelector('[data-download]')?.download || simpleHandoffSettings.filename?.textContent?.trim()
+        || simpleHandoffSettings.sourceRow?.querySelector('[data-name]')?.textContent?.trim() || '';
+      filenameValue.textContent = savedName;
+      filenameValue.hidden = !savedName;
+    };
+    handoffSummaryRefresh = updateHandoffSummary;
+    updateHandoffSummary();
+    const Observer = win.MutationObserver || globalThis.MutationObserver;
+    handoffSummaryObserver = Observer ? new Observer(updateHandoffSummary) : null;
+    for (const node of [simpleHandoffSettings.filename, main.querySelector('[data-download]'), simpleHandoffSettings.sourceRow?.querySelector('[data-name]')]) {
+      if (node) handoffSummaryObserver?.observe(node, { childList: true, characterData: true, attributes: true, subtree: true, attributeFilter: ['download'] });
+    }
+    handoffSummaryUpdateListener = () => updateHandoffSummary();
+    main.addEventListener('input', handoffSummaryUpdateListener, true); main.addEventListener('change', handoffSummaryUpdateListener, true);
+    handoffLateObserver = Observer ? new Observer(() => {
+      const resultAux = composer.querySelector('.sc-result-aux');
+      const auxContent = handoffAux.querySelector('.sc-handoff-aux-content');
+      if (resultAux && auxContent && resultAux.closest('.sc-handoff-aux') !== handoffAux) auxContent.append(resultAux);
+      const recovery = composer.querySelector('.sc-local-recovery');
+      if (recovery && auxContent && recovery.closest('.sc-handoff-aux') !== handoffAux) {
+        auxContent.append(recovery);
+        if (recovery.querySelector('details[open]')) handoffAux.open = true;
+      }
+    }) : null;
+    handoffLateObserver?.observe(composer, { childList: true });
+  }
+  if (receivedToolOutput) {
+    const textFooter = main.querySelector('.tx-footer');
+    const auxContent = handoffAux?.querySelector('.sc-handoff-aux-content');
+    if (textFooter && auxContent) auxContent.append(textFooter);
+    const saveMessage = doc.querySelector('.sc-save-bar .sc-export-message');
+    const Observer = win.MutationObserver || globalThis.MutationObserver;
+    const updateReadyMessage = () => saveMessage?.toggleAttribute('data-editor-handoff-ready', saveMessage.textContent.trim() === '選んだ形式・サイズで保存します。');
+    updateReadyMessage();
+    handoffReadyStatusObserver = Observer && saveMessage ? new Observer(updateReadyMessage) : null;
+    handoffReadyStatusObserver?.observe(saveMessage, { childList: true, characterData: true, subtree: true });
+  }
   const fileButton = composer.querySelector('[data-ui-source="file"]'), textButton = composer.querySelector('[data-ui-source="text"]');
   const sourceEdit = composer.querySelector('[data-sc-edit-source]');
   const nativeAction = root.querySelector('[data-tx-action]'), nativeStyle = root.querySelector('[data-tx-style]');
@@ -650,7 +792,8 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
       if (controls) writeUnifiedAttribute(button, 'aria-controls', controls); else button.removeAttribute('aria-controls');
     }
     const location = unifiedOutputLocation({mode,loaded:Boolean(mat?.loaded),modal:main.querySelector('#sc-settings-panel')?.matches(':modal')});
-    const controlsTarget = location === 'settings' ? composer : main.querySelector('[data-sc-result-control-band]');
+    const controlsTarget = receivedToolOutput && handoffSettings ? handoffSettings
+      : location === 'settings' ? composer : main.querySelector('[data-sc-result-control-band]');
     if (controlsTarget && controls.parentNode !== controlsTarget) {
       const focused = controls.contains(doc.activeElement) ? doc.activeElement : null;
       if (controlsTarget === composer) composer.insertBefore(controls, controlsHome.nextSibling); else controlsTarget.prepend(controls);
@@ -762,15 +905,20 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
     const contextualNotice = sourceKind === 'file' && ['art', 'restore'].includes(purpose.value);
     const routineHelp = sourceKind === 'text' ? guideText : 'ファイルの形式や変換方法を選べます。';
     writeUnifiedProperty(helpText, 'textContent', routineHelp);
-    writeUnifiedProperty(help, 'hidden', !routineHelp);
+    const receivedImageMode = receivedToolOutput && sourceKind === 'file' && mode === 'media';
+    writeUnifiedProperty(settings, 'hidden', receivedImageMode);
+    writeUnifiedProperty(help, 'hidden', !routineHelp || receivedImageMode);
     writeUnifiedProperty(guide, 'textContent', contextualNotice ? guideText : '');
     writeUnifiedProperty(guide, 'hidden', !localError && !contextualNotice);
+    if (!localError && receivedImageMode) writeUnifiedProperty(guide, 'hidden', true);
     writeUnifiedProperty(error, 'textContent', localError);
     writeUnifiedProperty(error, 'hidden', !localError);
     const tabStatus = composer.querySelector('[data-sc-tab-status]');
     writeUnifiedProperty(tabStatus, 'textContent', routeNotice);
     writeUnifiedProperty(tabStatus, 'hidden', !routeNotice);
+    if (handoffAux && (localError || (receivedToolOutput && sourceKind === 'file' && mode !== 'media'))) handoffAux.open = true;
     updateReceipts();
+    handoffSummaryRefresh?.();
     priorMode = mode; priorOutputTab = visibility.tab; priorSource = sourceKind;
   }
   api.enableUnified();
@@ -916,6 +1064,15 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   });
   listen(emptyAdd, 'click', () => { if (!isBusy() && !api.snapshot().composing) choose?.(); });
   listen(composer.querySelector('[data-sc-text-alternate]'), 'click', () => { if (!isBusy() && !api.snapshot().composing) { api.swapDraft?.(); schedule(); } });
+  if (receivedToolOutput) listen(main, 'click', event => {
+    const editSize = event.target.closest?.('[data-sc-size-edit]');
+    if (!editSize) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    if (handoffSettings) handoffSettings.open = true;
+    const sizeOptions = editSize.closest('.sc-handoff-settings')?.querySelector('.convert-options');
+    if (sizeOptions) sizeOptions.open = true;
+    main.querySelector('[data-width]')?.focus({ preventScroll: true });
+  }, true);
   listen(main, 'click', event => {
     const settingsButton = event.target.closest('[data-sc-settings-open]');
     if (!settingsButton || activeMode() === 'media') return;
@@ -925,6 +1082,15 @@ export function mountUnifiedConversionInput({ main, toolbar, doc = document, win
   update();
   return { update, selectOutputTab, openTextEditor: activateText, outputTabState: () => outputTabController.snapshot(), destroy() {
     destroyed = true; for (const cleanup of cleanups.splice(0)) cleanup();
+    handoffSummaryObserver?.disconnect();
+    handoffLateObserver?.disconnect();
+    handoffReadyStatusObserver?.disconnect();
+    if (handoffSummaryUpdateListener) {
+      main.removeEventListener('input', handoffSummaryUpdateListener, true);
+      main.removeEventListener('change', handoffSummaryUpdateListener, true);
+    }
+    if (nativeOutputSettings?.fileSettings) nativeOutputSettings.fileSettings.hidden = oldFileSettingsHidden;
+    if (nativeOutputSettings?.settingsButton) nativeOutputSettings.settingsButton.hidden = oldSettingsButtonHidden;
     if(addSlot&&addHome){if(addSlot.parentNode!==addHome)addHome.append(addSlot);addSlot.setAttribute('role','listitem');addSlot.hidden=oldAddSlotHidden;}
     if(textFilePick)textFilePick.hidden=oldPickHidden;
     restoreUnifiedNodePositions(originalPositions);

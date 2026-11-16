@@ -1,7 +1,7 @@
 /** Shared timing for preview and file output; never mutates the imported frames. */
 import { getOutputTiming } from './output-timing.mjs?rev=20261009-fps-1';
 import { fitOutputFrames } from './output-import.mjs?rev=20261020-format-conversion-1';
-import { loadConversionFile, convertLocal } from './conversion-service.mjs?rev=20261028-conversion-1';
+import { loadConversionFile, convertLocal } from './conversion-service.mjs?rev=20261117-normal-apply-1';
 
 export const TIMELINE_LIMITS = Object.freeze({ files: 8, bytes: 128 * 1024 * 1024, frames: 600, pixels: 8_000_000 });
 const abort = signal => { if (signal?.aborted) throw new DOMException('処理を中止しました。', 'AbortError'); };

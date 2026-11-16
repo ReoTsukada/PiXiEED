@@ -45,7 +45,7 @@ export async function decodeGeneratedPreview(
   }
   if (typeof FileImpl !== 'function') throw new TypeError('File is unavailable for local preview decoding.');
   const loader = loadFile || (async (...args) => {
-    const { loadConversionFile } = await import('./conversion-service.mjs?rev=20261028-conversion-1');
+    const { loadConversionFile } = await import('./conversion-service.mjs?rev=20261117-normal-apply-1');
     return loadConversionFile(...args);
   });
   if (typeof loader !== 'function') throw new TypeError('loadFile must be a function.');

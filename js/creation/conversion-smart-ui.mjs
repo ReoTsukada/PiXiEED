@@ -1,11 +1,11 @@
 import { hasConversionRecoveryHistory } from '../tool-start-routes.mjs?rev=20261110-output-result-1';
-import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261110-output-layout-7';
+import { mountResultSurface } from './conversion-result-surface.mjs?rev=20261117-normal-apply-1';
 import { textRenderOutputSelector } from './conversion-text-output-choice.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryStore, createIndexedDbConversionRecoveryAdapter } from './conversion-recovery-store.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryController, conversionRecoveryIdentity } from './conversion-recovery-controller.mjs?rev=20261105-video-size-1';
 import { createConversionRecoveryWorkspace } from './conversion-recovery-workspace.mjs?rev=20261111-output-offerwall-1';
 import { activateRetainedConversionInput } from './conversion-input-receipts.mjs?rev=20261105-video-size-1';
-import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261110-output-layout-7';
+import { mountUnifiedConversionInput, writeUnifiedProperty, conversionRecoveryStatusLabel, associateCommittedMaterialFiles } from './conversion-unified-input.mjs?rev=20261117-normal-apply-1';
 import { createUnifiedImportController, importUnifiedMediaFiles } from './conversion-unified-import.mjs?rev=20261105-video-size-1';
 import { createConversionSaveIntent } from './conversion-save-controller.mjs?rev=20261104-controllers-2';
 import { downloadConversionResult } from './conversion-save-bridge.mjs?rev=20261104-controllers-2';

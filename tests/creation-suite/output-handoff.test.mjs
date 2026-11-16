@@ -5,6 +5,13 @@ import { clearToolOutputReturnId, readToolOutput, sanitizeOutputFilename, saveTo
 import { shareOutputFile } from '../../js/creation/output-share.mjs';
 import { resizeRgbaNearest, shouldAutoSelectPixelOrigin } from '../../js/creation/output-render.mjs';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from '../../js/pixel-lens/output-handoff.mjs';
+import { receivedOutputDimensions } from '../../js/creation/output-receive.mjs';
+
+test('received output dimensions match the exported rendition before optional reconversion', () => {
+  assert.deepEqual(receivedOutputDimensions({ width: 16, height: 12, defaultScale: 256 }, { width: 16, height: 12 }), { width: 4096, height: 3072 });
+  assert.deepEqual(receivedOutputDimensions({ outputWidth: 512, outputHeight: 256, width: 16, height: 8, defaultScale: 16 }), { width: 512, height: 256 });
+  assert.deepEqual(receivedOutputDimensions({ width: 16, height: 12, defaultScale: 512 }, { width: 16, height: 12 }), { width: 16, height: 12 });
+});
 
 class FakeTransaction {
   error = null;

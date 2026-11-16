@@ -248,3 +248,49 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
     }
   };
 }
+
+/** Update a cached lit RGBA frame, optionally touching only known changed pixels. */
+export function updateNormalLightingPixels(source, normal, options = {}, target = new Uint8ClampedArray(source?.rgba?.length ?? 0), changed = null) {
+  if (!source || !normal || !Number.isSafeInteger(source.width) || !Number.isSafeInteger(source.height)
+      || source.width < 1 || source.height < 1 || normal.width !== source.width || normal.height !== source.height
+      || !(source.rgba instanceof Uint8ClampedArray) || !(normal.rgba instanceof Uint8ClampedArray)
+      || source.rgba.length !== source.width * source.height * 4 || normal.rgba.length !== source.rgba.length
+      || !(target instanceof Uint8ClampedArray) || target.length !== source.rgba.length) {
+    throw new TypeError('normal lighting images must be matching RGBA buffers');
+  }
+  const { azimuth = 315, elevation = 45, ambient = 0.25, intensity = 1, lightColor = '#ffffff',
+    specular = 0, roughness = 0.5, shadeUnpainted = true } = options;
+  if (![azimuth, elevation, ambient, intensity, specular, roughness].every(Number.isFinite)
+      || elevation < 0 || elevation > 90 || ambient < 0 || ambient > 1 || intensity < 0 || intensity > 2
+      || specular < 0 || specular > 1 || roughness < 0.05 || roughness > 1
+      || typeof lightColor !== 'string' || !/^#[\da-f]{6}$/i.test(lightColor)
+      || typeof shadeUnpainted !== 'boolean') throw new TypeError('normal lighting settings are invalid');
+  const az = azimuth * Math.PI / 180, el = elevation * Math.PI / 180;
+  const lx = Math.cos(az) * Math.cos(el), ly = -Math.sin(az) * Math.cos(el), lz = Math.sin(el);
+  const halfLength = Math.hypot(lx, ly, lz + 1);
+  const hx = lx / halfLength, hy = ly / halfLength, hz = (lz + 1) / halfLength;
+  const exponent = Math.max(1, 2 / (roughness * roughness) - 2);
+  const light = [1, 3, 5].map(offset => Number.parseInt(lightColor.slice(offset, offset + 2), 16) / 255);
+  const put = index => {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= source.width * source.height) throw new RangeError('changed pixel is outside the image');
+    const offset = index * 4, unpainted = normal.rgba[offset + 3] === 0;
+    if (unpainted && !shadeUnpainted) { target.set(source.rgba.subarray(offset, offset + 4), offset); return; }
+    const alpha = source.rgba[offset + 3]; target[offset + 3] = alpha;
+    if (!alpha) { target[offset] = target[offset + 1] = target[offset + 2] = 0; return; }
+    let nx = unpainted ? 0 : normal.rgba[offset] / 127.5 - 1;
+    let ny = unpainted ? 0 : normal.rgba[offset + 1] / 127.5 - 1;
+    if (normal.format === 'directx') ny = -ny;
+    let nz = unpainted ? 1 : normal.rgba[offset + 2] / 127.5 - 1;
+    const length = Math.hypot(nx, ny, nz) || 1; nx /= length; ny /= length; nz /= length;
+    const diffuse = Math.max(0, nx * lx + ny * ly + nz * lz);
+    const direct = (1 - ambient) * diffuse * intensity;
+    const highlight = specular && diffuse > 0 && nz > 0
+      ? 255 * specular * intensity * Math.pow(Math.max(0, Math.min(1, nx * hx + ny * hy + nz * hz)), exponent) : 0;
+    for (let channel = 0; channel < 3; channel += 1) {
+      target[offset + channel] = Math.round(source.rgba[offset + channel] * (ambient + direct * light[channel]) + highlight * light[channel]);
+    }
+  };
+  if (changed) for (const index of changed) put(index);
+  else for (let index = 0; index < source.width * source.height; index += 1) put(index);
+  return { width: source.width, height: source.height, rgba: target };
+}
