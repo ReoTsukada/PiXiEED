@@ -38,6 +38,11 @@ try{
     const main=document.querySelector('#main'),recovery=main?.querySelector('.sc-local-recovery');
     return document.body.dataset.conversionStartup==='ready'&&main?.dataset.unifiedInput==='true'&&recovery?.getAttribute('aria-busy')==='false'&&['idle','saved'].includes(recovery.dataset.phase);
   });};
+  const selectOutputFormat=async value=>{
+    const handoffSettings=page.locator('.sc-handoff-settings');
+    if(await handoffSettings.count()&&!(await handoffSettings.evaluate(node=>node.open)))await handoffSettings.locator(':scope > summary').click();
+    const select=page.locator('[data-sc-unified-format]');await select.waitFor({state:'visible'});await select.selectOption(value);
+  };
   const ready=()=>page.waitForFunction(()=>document.querySelector('[data-text-tools]')?.dataset.txLiveState==='ready');
   const text=()=>page.locator('[data-tx-art-content]').textContent();
   const bytes=async download=>{assert.equal(await download.failure(),null);return readFile(await download.path());};
@@ -96,7 +101,7 @@ try{
     const staged=await stageToolOutput({blob,filename:'picker-fixture.png',title:'Synthetic picker fixture',returnUrl:'/draw/',metadata:{width:16,height:12},mediaSources:[{id:'fixture',label:'Synthetic',kind:'rgba-frames',mediaSource:{kind:'rgba-frames',frames:[{width:16,height:12,data,delayMs:100}],totalPlays:1}}],mediaSettings:{playbackRate:1,totalPlays:1,musicTotalPlays:1}});
     const url=new URL(staged.url,location.origin);url.searchParams.set('view','advanced');return url.search;
   });
-  await open(advancedQuery);await page.locator('[data-sc-unified-format]').selectOption('jpeg');
+  await open(advancedQuery);await selectOutputFormat('jpeg');
   await page.waitForFunction(()=>{
     const main=document.querySelector('#main'),layout=document.querySelector('#output-layout'),link=document.querySelector('#output-download');
     return document.querySelector('#output-format-select')?.value==='jpeg'&&document.querySelector('[data-sc-format]')?.value==='jpeg'
