@@ -1831,6 +1831,10 @@ async function hydrateOutputRecord(nextRecord, { isCurrent = () => !pageDisposed
   if (!nextActiveItem.sourceId && !nextRecord.materialInputState) nextActiveItem.sourceId = nextMediaSources[0]?.id || '';
   if (!isCurrent()) return false;
   record = nextRecord; mediaSources = nextMediaSources; mediaSettings = nextMediaSettings; outputItems = nextOutputItems; activeItem = nextActiveItem;
+  // Preserve an explicit editor handoff context independently of translated UI copy.
+  let editorHandoff = false;
+  try { editorHandoff = /^\/(?:draw|audio|camera)\//.test(new URL(record.returnUrl, location.origin).pathname); } catch {}
+  outputLayout.dataset.editorHandoff = String(editorHandoff);
   outputStart.hidden = true; outputLayout.hidden = false;
   pageTitle.textContent = record.title || '出力を確認';
   intro.textContent = record.source ? `${record.source}からのファイルです。プレビューを確認して端末へ保存できます。` : 'プレビューを確認して、ファイル名を決めて端末へ保存できます。';

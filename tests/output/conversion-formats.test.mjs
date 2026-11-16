@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {encodeRaster,decodeRaster,sniffRaster,RASTER_MIME} from '../../js/creation/conversion-raster.mjs';
 import {encodePcm,decodePcm,sniffPcm} from '../../js/creation/conversion-pcm.mjs';
-import {safeConvertedName,shouldUseSimpleConversion,conversionChoices} from '../../js/creation/conversion-service.mjs';
+import {safeConvertedName,shouldUseSimpleConversion,conversionChoices,resizeConversionFrame} from '../../js/creation/conversion-service.mjs';
 const sample={width:3,height:2,data:new Uint8ClampedArray([255,0,0,255,0,255,0,127,0,0,255,0,30,40,50,255,1,2,3,200,10,20,30,255])};
 const bytes=async blob=>new Uint8Array(await blob.arrayBuffer());
 for(const format of Object.keys(RASTER_MIME))test(`${format}: valid signature, dimensions, pixels and alpha`,async()=>{
@@ -29,3 +29,15 @@ test('source and persisted handoff routes cannot be hijacked',()=>{for(const sea
 test('download filename strips path and control characters',()=>{assert.equal(safeConvertedName('../../secret.png','qoi'),'secret.qoi');assert.equal(safeConvertedName('<script>\u0000.png','tiff'),'-script--.tiff');assert.throws(()=>safeConvertedName('file','html'));});
 test('capabilities exclude unsupported MP3/FLAC and conditional image codecs',()=>{const audio=conversionChoices({kind:'audio'},{MediaRecorderImpl:null});assert.deepEqual(audio.map(x=>x.value),['wav','aiff','au']);const images=conversionChoices({kind:'image',frames:[sample]},{webp:false});assert.ok(!images.some(x=>['apng','webp'].includes(x.value)));assert.ok(images.some(x=>x.value==='qoi'));});
 test('public guide remains separate from local file handling and advertisements',async()=>{const root=new URL('../../',import.meta.url),html=await readFile(new URL('output/index.html',root),'utf8'),work=await readFile(new URL('output/work/index.html',root),'utf8');assert.match(html,/\/output\/work\/\?mode=convert/);assert.doesNotMatch(html,/<input[^>]+type="file"/);assert.equal((html.match(/data-output-guide-ad aria/g)||[]).length,1);assert.match(work,/conversion-entry\.mjs/);const code=await readFile(new URL('js/creation/conversion-page.mjs',root),'utf8');assert.doesNotMatch(code,/\b(fetch|XMLHttpRequest|adsbygoogle|localStorage|sessionStorage)\s*[.(]/);});
+
+
+test('Draw resizing keeps exact colors and partial/zero alpha without blending adjacent pixels',()=>{
+ const before=sample.data.slice(), scaled=resizeConversionFrame(sample,6,4,true);
+ for(let y=0;y<4;y++)for(let x=0;x<6;x++){
+  const i=(Math.floor(y/2)*3+Math.floor(x/2))*4,j=(y*6+x)*4;
+  assert.deepEqual(scaled.data.slice(j,j+4),sample.data.slice(i,i+4));
+ }
+ assert.deepEqual(resizeConversionFrame(scaled,3,2,true).data,sample.data);
+ assert.deepEqual(sample.data,before);
+ assert.equal(resizeConversionFrame(sample,3,2,true),sample);
+});

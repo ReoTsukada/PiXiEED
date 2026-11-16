@@ -198,6 +198,28 @@ function normalize(source, file) {
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261116-normal-release-2') : query + (query ? '&' : '?') + 'rev=20261116-normal-release-2';
     return `${quote}${path}${next}${quote}`;
   });
+  // The 2026-11-17 normal lighting and output handoff update changes this
+  // shared URL graph without changing any of the module behaviors here.
+  const normalApplyCacheTargets = new Set([
+    'audio/editor.html', 'audio/index.html', 'camera/index.html', 'draw/editor.html', 'draw/index.html', 'pixel-camera.html', 'output/work/index.html',
+    'css/conversion-unified-input.css', 'css/draw-normal-map.css',
+    'js/creation/animation-controls.mjs', 'js/creation/audio-entry.mjs', 'js/creation/audio-page.mjs',
+    'js/creation/conversion-entry.mjs', 'js/creation/conversion-page.mjs', 'js/creation/conversion-service.mjs',
+    'js/creation/conversion-smart-ui.mjs', 'js/creation/conversion-unified-input.mjs', 'js/creation/conversion-timeline.mjs',
+    'js/creation/conversion-materials.mjs', 'js/creation/conversion-media-recovery.mjs', 'js/creation/conversion-preview-decoder.mjs',
+    'js/creation/conversion-result-surface.mjs', 'js/creation/creation-runtime.mjs',
+    'js/creation/draw-animation-session.mjs', 'js/creation/draw-camera-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-lazy-panels.mjs',
+    'js/creation/draw-normal-apply.mjs', 'js/creation/draw-normal-map.mjs', 'js/creation/draw-normal-map-panel.mjs',
+    'js/creation/draw-normal-map-settings.mjs', 'js/creation/draw-page.mjs', 'js/creation/output-page.mjs', 'js/creation/output-receive.mjs',
+    'js/creation/text-tools.mjs', 'js/pixel-lens/draw-camera-page.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs'
+  ]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!normalApplyCacheTargets.has(target)) return whole;
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-normal-apply-1') : query + (query ? '&' : '?') + 'rev=20261117-normal-apply-1';
+    return `${quote}${path}${next}${quote}`;
+  });
   return changed;
 }
 

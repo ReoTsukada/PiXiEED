@@ -141,14 +141,14 @@ test('normal-map settings reset malformed values, clamp numbers, and return only
   const normalized = normalizeNormalMapSettings(raw);
   assert.deepEqual(normalized, { method: 'painted', strength: 8, radius: 3, invertHeight: true, format: 'directx',
     azimuth: 0, elevation: 90, ambient: 0, intensity: 2, lightColor: '#aabbcc',
-    specular: 1, roughness: 0.05, shadeUnpainted: true, initialFill: 'flat', overlayOpacity: 1 });
+    specular: 1, roughness: 0.05, shadeUnpainted: true, initialFill: 'flat', overlayOpacity: 1, previewLighting: false });
   assert.equal(Object.getPrototypeOf(normalized), Object.prototype);
   assert.deepEqual(raw, snapshot, 'normalizing preferences does not mutate the caller');
   assert.deepEqual(normalizeNormalMapSettings(Object.create(raw)), DEFAULT_NORMAL_MAP_SETTINGS, 'inherited preferences are ignored');
   assert.deepEqual(normalizeNormalMapSettings({ strength: -1, radius: 99, azimuth: 400, elevation: -1, ambient: 2,
     intensity: -1, specular: -1, roughness: 2, overlayOpacity: -1 }), {
     ...DEFAULT_NORMAL_MAP_SETTINGS, strength: 0, radius: 32, azimuth: 360, elevation: 0, ambient: 1,
-    intensity: 0, specular: 0, roughness: 1, overlayOpacity: 0
+    intensity: 0, specular: 0, roughness: 1, overlayOpacity: 0, previewLighting: false
   });
   normalized.lightColor = '#000000';
   assert.equal(DEFAULT_NORMAL_MAP_SETTINGS.lightColor, '#ffffff');

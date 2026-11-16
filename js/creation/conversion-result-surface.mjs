@@ -1,4 +1,4 @@
-import { decodeGeneratedPreview, needsDecodedOutputPreview } from './conversion-preview-decoder.mjs?rev=20261105-video-size-1';
+import { decodeGeneratedPreview, needsDecodedOutputPreview } from './conversion-preview-decoder.mjs?rev=20261117-normal-apply-1';
 import { createResultPreviewQueue } from './conversion-result-queue.mjs?rev=20261105-video-size-1';
 import { classifyConversionPreview } from './conversion-preview-controller.mjs?rev=20261104-engine-boundaries-3';
 import { mountConversionSourceInspector } from './conversion-source-inspector.mjs?rev=20261110-output-result-1';

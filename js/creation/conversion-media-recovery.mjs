@@ -1,4 +1,4 @@
-import { TIMELINE_LIMITS, validateTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
+import { TIMELINE_LIMITS, validateTimeline } from './conversion-timeline.mjs?rev=20261117-normal-apply-1';
 
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 

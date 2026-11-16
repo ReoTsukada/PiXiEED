@@ -54,6 +54,7 @@ class FakeElement {
   set innerHTML(_html) {
     const kinds = {
       '[data-note]': 'p', '[data-frame-size]': 'p', '[data-close]': 'button', '[data-refresh]': 'button',
+      '[data-export-section]': 'details', '[data-apply]': 'button', '[data-cancel]': 'button', '[data-preview-lighting]': 'input', '[data-apply-note]': 'p',
       '[data-refresh-status]': 'span', '[data-source]': 'canvas', '[data-normal]': 'canvas', '[data-lit]': 'canvas',
       '[data-method]': 'select', '[data-strength-value]': 'output', '[data-strength]': 'input',
       '[data-radius-field]': 'div', '[data-radius-value]': 'output', '[data-radius]': 'input',
@@ -70,6 +71,7 @@ class FakeElement {
     for (const [selector, tag] of Object.entries(kinds)) {
       const element = new FakeElement(this.ownerDocument, tag); this.selectors.set(selector, element); this.append(element);
     }
+    this.selectors.get('[data-export-section]').append(this.selectors.get('[data-download]'));
     this.selectors.get('[data-method]').value = 'silhouette';
     this.selectors.get('[data-strength]').value = '2';
     this.selectors.get('[data-radius]').value = '3';
@@ -112,7 +114,7 @@ function sourceFixture() {
   return { width: 5, height: 5, rgba };
 }
 
-function fixture({ beforeOpen = () => {}, getSource = sourceFixture, getPaintedNormal = () => null, onEditNormal = null, getSettings = () => null, onSettingsChange = () => {}, onSavePng = null } = {}) {
+function fixture({ beforeOpen = () => {}, getSource = sourceFixture, getPaintedNormal = () => null, onEditNormal = null, getSettings = () => null, onSettingsChange = () => {}, onApplyNormal = null, onSavePng = null } = {}) {
   let nextFrame = 1;
   const frames = new Map(), blobs = new Map(), revoked = [];
   let nextUrl = 1;
@@ -136,7 +138,7 @@ function fixture({ beforeOpen = () => {}, getSource = sourceFixture, getPaintedN
   const host = new FakeElement(doc, 'main');
   const scope = createModeScope(win);
   let sourceReads = 0;
-  const panel = mountDrawNormalMapPanel({ scope, host, getSource: () => { sourceReads += 1; return getSource(); }, beforeOpen, getPaintedNormal, onEditNormal, getSettings, onSettingsChange, onSavePng });
+  const panel = mountDrawNormalMapPanel({ scope, host, getSource: () => { sourceReads += 1; return getSource(); }, beforeOpen, getPaintedNormal, onEditNormal, getSettings, onSettingsChange, onApplyNormal, onSavePng });
   host.append(panel.opener);
   const flushFrames = () => {
     const pending = [...frames.values()];
@@ -180,6 +182,7 @@ test('beforeOpen false and errors show a clear empty-dialog message without read
     assert.equal(ui.panel.isOpen, true, 'the explanation is shown in a modal dialog');
     assert.match(ui.panel.panel.querySelector('[data-error]').textContent, expected);
     assert.equal(ui.panel.panel.querySelector('[data-save]').disabled, true);
+    assert.equal(ui.panel.panel.querySelector('[data-apply]').disabled, true);
     assert.equal(ui.panel.panel.querySelector('[data-normal]').lastImage, null);
     ui.scope.dispose();
   }
@@ -244,7 +247,7 @@ test('hand-painted layer previews exact directions and opens editing without ove
 });
 
 
-test('lighting settings survive close and remount and are restored without emitting a write', () => {
+test('draft settings write exactly once on Apply, survive remount, and restore without a write', () => {
   let stored = { azimuth: 225, elevation: 68, format: 'directx', ambient: 0.4, specular: 0.6, initialFill: 'flat', overlayOpacity: 0.4 };
   let writes = 0;
   const options = { getSettings: () => stored, onSettingsChange: value => { stored = value; writes++; } };
@@ -256,8 +259,13 @@ test('lighting settings survive close and remount and are restored without emitt
   assert.equal(ui.panel.panel.querySelector('[data-overlay-opacity]').value, '0.4');
   assert.equal(writes, 0, 'reading a project never dirties its settings');
   const elevation = ui.panel.panel.querySelector('[data-elevation]'); elevation.value = '60'; elevation.fire('input');
+  assert.equal(stored.elevation, 68); assert.equal(writes, 0, 'input only changes the local draft');
+  assert.equal(ui.panel.panel.querySelector('[data-apply]').disabled, true);
+  ui.flushFrames(); ui.panel.panel.querySelector('[data-apply]').fire('click');
   assert.equal(stored.elevation, 60); assert.equal(stored.azimuth, 225); assert.equal(writes, 1);
-  ui.panel.close(); ui.panel.open(); ui.flushFrames();
+  assert.equal(ui.panel.isOpen, false);
+  ui.panel.panel.querySelector('[data-apply]').fire('click'); assert.equal(writes, 1, 'closed panels cannot apply twice');
+  ui.panel.open(); ui.flushFrames();
   assert.equal(ui.panel.panel.querySelector('[data-elevation]').value, '60');
   ui.scope.dispose();
   ui = fixture(options); ui.panel.open(); ui.flushFrames();
@@ -269,18 +277,22 @@ test('lighting settings survive close and remount and are restored without emitt
   ui.scope.dispose();
 });
 
-test('light preset and view-only opacity changes persist without rebuilding normal bytes', () => {
+test('light preset and view-only opacity stay in the draft without rebuilding normal bytes', () => {
   let stored;
   const ui = fixture({ onSettingsChange: value => { stored = value; } });
   ui.panel.open(); ui.flushFrames();
   const originalNormal = new Uint8ClampedArray(ui.panel.panel.querySelector('[data-normal]').lastImage.data);
   const preset = ui.panel.panel.querySelector('[data-light-preset]'); preset.value = 'upper-left'; preset.fire('change');
-  assert.equal(stored.azimuth, 225); assert.equal(stored.elevation, 45);
+  assert.equal(stored, undefined);
+  assert.equal(ui.panel.panel.querySelector('[data-azimuth]').value, '225');
+  assert.equal(ui.panel.panel.querySelector('[data-elevation]').value, '45');
   ui.flushFrames();
   assert.deepEqual(ui.panel.panel.querySelector('[data-normal]').lastImage.data, originalNormal);
   const opacity = ui.panel.panel.querySelector('[data-overlay-opacity]'); opacity.value = '0.2'; opacity.fire('input');
-  assert.equal(stored.overlayOpacity, 0.2); assert.equal(ui.frames.size, 0, 'edit overlay opacity does not affect either exported image');
+  assert.equal(stored, undefined); assert.equal(ui.frames.size, 0, 'edit overlay opacity does not affect either exported image');
   assert.deepEqual(ui.panel.panel.querySelector('[data-normal]').lastImage.data, originalNormal);
+  ui.panel.panel.querySelector('[data-apply]').fire('click');
+  assert.equal(stored.overlayOpacity, 0.2); assert.equal(stored.azimuth, 225);
   ui.scope.dispose();
 });
 
@@ -294,7 +306,9 @@ test('new normal layer can start transparent or flat; existing layer hides initi
     assert.equal(initial.value, 'transparent', 'new layers default to seeing the underlay');
     initial.value = initialFill; initial.fire('change');
     ui.panel.panel.querySelector('[data-edit-normal]').fire('click');
-    assert.deepEqual(requested, { initialFill }); ui.scope.dispose();
+    assert.equal(requested.initialFill, initialFill);
+    assert.equal(requested.settings.initialFill, initialFill);
+    assert.equal(requested.settings.azimuth, 315); ui.scope.dispose();
   }
   const ui = fixture({ getPaintedNormal: sourceFixture, onEditNormal() {} });
   ui.panel.open(); ui.flushFrames();
@@ -329,7 +343,8 @@ test('normal and lit PNG use exact current snapshots and a persistent download l
   panel.querySelector('[data-save]').fire('click');
   assert.equal(ui.doc.downloads.length, 1);
   const first = ui.doc.downloads[0];
-  assert.equal(first.parent, panel, 'download activation stays inside the active modal instead of the inert page body');
+  assert.equal(first.parent, panel.querySelector('[data-export-section]'));
+  assert.equal(first.parent.parentElement, panel, 'download activation stays inside the active modal instead of the inert page body');
   assert.match(first.filename, /normal-map-5x5-opengl/);
   const decodedNormal = await decodePng(ui.blobs.get(first.href));
   assert.equal(decodedNormal.width, 5); assert.equal(decodedNormal.height, 5); assert.deepEqual(decodedNormal.pixels, expectedNormal);
@@ -408,4 +423,136 @@ test('editor PNG handoff failure is visible but a closed or disposed panel recei
       if (end !== 'dispose') next.scope.dispose();
     }
   }
+});
+
+
+test('cancel, header close, Escape, close and dispose discard changes without saving settings', () => {
+  for (const exit of ['cancel', 'header', 'escape', 'close', 'dispose']) {
+    let writes = 0;
+    const ui = fixture({ getSettings: () => ({ azimuth: 90, overlayOpacity: 0.7 }), onSettingsChange: () => { writes++; } });
+    ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+    panel.querySelector('[data-azimuth]').value = '180'; panel.querySelector('[data-azimuth]').fire('input');
+    panel.querySelector('[data-overlay-opacity]').value = '0.2'; panel.querySelector('[data-overlay-opacity]').fire('change');
+    if (exit === 'cancel') panel.querySelector('[data-cancel]').fire('click');
+    else if (exit === 'header') panel.querySelector('[data-close]').fire('click');
+    else if (exit === 'escape') { panel.fire('cancel'); panel.close(); }
+    else if (exit === 'dispose') ui.scope.dispose();
+    else ui.panel.close();
+    assert.equal(writes, 0, `${exit} does not commit the draft`);
+    assert.equal(ui.frames.size, 0);
+    if (exit !== 'dispose') {
+      ui.panel.open(); ui.flushFrames();
+      assert.equal(panel.querySelector('[data-azimuth]').value, '90');
+      assert.equal(panel.querySelector('[data-overlay-opacity]').value, '0.7'); ui.scope.dispose();
+    }
+  }
+  const standalone = fixture(); standalone.panel.open(); standalone.flushFrames();
+  const field = standalone.panel.panel.querySelector('[data-elevation]'); field.value = '10'; field.fire('input');
+  standalone.panel.close(); standalone.panel.open(); standalone.flushFrames();
+  assert.equal(field.value, '45', 'even a standalone panel discards unsaved drafts'); standalone.scope.dispose();
+});
+
+test('PNG export uses draft lighting without applying settings or a layer', async () => {
+  let writes = 0, applies = 0, delivered;
+  const ui = fixture({ getSettings: () => ({ elevation: 45 }), onSettingsChange: () => { writes++; },
+    onApplyNormal: () => { applies++; }, onSavePng: (blob) => { delivered = blob; return 'staged'; } });
+  ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+  panel.querySelector('[data-elevation]').value = '5'; panel.querySelector('[data-elevation]').fire('input'); ui.flushFrames();
+  const expected = new Uint8ClampedArray(panel.querySelector('[data-lit]').lastImage.data);
+  panel.querySelector('[data-save-lit]').fire('click'); await Promise.resolve();
+  assert.deepEqual((await decodePng(delivered)).pixels, expected);
+  assert.equal(writes, 0); assert.equal(applies, 0); assert.equal(ui.panel.isOpen, true);
+  panel.querySelector('[data-cancel]').fire('click'); ui.panel.open(); ui.flushFrames();
+  assert.equal(panel.querySelector('[data-elevation]').value, '45'); ui.scope.dispose();
+});
+
+test('Apply hands off an exact detached snapshot with format and never invokes a separate settings write', () => {
+  let applied, writes = 0;
+  const ui = fixture({ onApplyNormal: value => { applied = value; return true; }, onSettingsChange: () => { writes++; } });
+  ui.panel.open(); const panel = ui.panel.panel;
+  panel.querySelector('[data-apply]').fire('click'); assert.equal(applied, undefined, 'a pending first render cannot apply');
+  ui.flushFrames(); panel.querySelector('[data-format]').value = 'directx'; panel.querySelector('[data-format]').fire('change');
+  assert.equal(panel.querySelector('[data-apply]').disabled, true); ui.flushFrames();
+  const expected = new Uint8ClampedArray(panel.querySelector('[data-normal]').lastImage.data);
+  panel.querySelector('[data-apply]').fire('click');
+  assert.equal(ui.panel.isOpen, false); assert.equal(writes, 0);
+  assert.equal(applied.normal.format, 'directx'); assert.equal(applied.settings.format, 'directx');
+  assert.equal(applied.normal.width, 5); assert.equal(applied.normal.height, 5); assert.deepEqual(applied.normal.rgba, expected);
+  assert.equal(applied.settings.previewLighting, true, 'a newly generated layer previews lighting by default');
+  applied.normal.rgba.fill(0);
+  ui.panel.open(); ui.flushFrames(); assert.deepEqual(panel.querySelector('[data-normal]').lastImage.data, expected);
+  ui.scope.dispose();
+});
+
+test('failed Apply retains the local draft and allows a successful retry without partial settings callbacks', () => {
+  for (const failure of ['false', 'throw']) {
+    let fail = true, attempts = 0, writes = 0;
+    const ui = fixture({ getSettings: () => ({ elevation: 45 }), onSettingsChange: () => { writes++; },
+      onApplyNormal: () => { attempts++; if (fail) { if (failure === 'throw') throw new Error('レイヤーを適用できません'); return false; } return true; } });
+    ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+    panel.querySelector('[data-elevation]').value = '60'; panel.querySelector('[data-elevation]').fire('input'); ui.flushFrames();
+    panel.querySelector('[data-apply]').fire('click');
+    assert.equal(ui.panel.isOpen, true); assert.equal(panel.querySelector('[data-elevation]').value, '60');
+    assert.equal(panel.querySelector('[data-error]').hidden, false); assert.equal(panel.querySelector('[data-apply]').disabled, false);
+    assert.equal(writes, 0); fail = false; panel.querySelector('[data-apply]').fire('click');
+    assert.equal(attempts, 2); assert.equal(ui.panel.isOpen, false); ui.scope.dispose();
+  }
+});
+
+test('dedicated editing carries the whole draft in one transaction; a rejection never writes settings first', () => {
+  for (const failure of ['false', 'throw']) {
+    let requested, writes = 0;
+    const ui = fixture({ onSettingsChange: () => { writes++; }, onEditNormal: value => {
+      requested = value; if (failure === 'throw') throw new Error('編集を開始できません'); return false;
+    } });
+    ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+    panel.querySelector('[data-overlay-opacity]').value = '0.35'; panel.querySelector('[data-overlay-opacity]').fire('input');
+    panel.querySelector('[data-edit-normal]').fire('click');
+    assert.equal(writes, 0); assert.equal(requested.settings.overlayOpacity, 0.35);
+    assert.equal(ui.panel.isOpen, true); assert.equal(panel.querySelector('[data-error]').hidden, false);
+    assert.equal(panel.querySelector('[data-overlay-opacity]').value, '0.35'); ui.scope.dispose();
+  }
+});
+
+test('pending Apply disables duplicate actions and ignores stale completion after closing or disposal', async () => {
+  for (const ending of ['close', 'dispose', 'reopen']) {
+    let finish, calls = 0;
+    const ui = fixture({ onApplyNormal: () => { calls++; return new Promise(resolve => { finish = resolve; }); } });
+    ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+    panel.querySelector('[data-apply]').fire('click'); panel.querySelector('[data-apply]').fire('click');
+    assert.equal(calls, 1); assert.equal(panel.querySelector('[data-save]').disabled, true);
+    if (ending === 'dispose') ui.scope.dispose();
+    else { ui.panel.close(); if (ending === 'reopen') { ui.panel.open(); ui.flushFrames(); } }
+    finish(false); await Promise.resolve();
+    assert.equal(panel.querySelector('[data-error]').hidden, true, 'stale completion cannot add an error to another view');
+    if (ending === 'reopen') {
+      assert.equal(ui.panel.isOpen, true, 'old Apply does not close the new view');
+      assert.equal(panel.querySelector('[data-apply]').disabled, false, 'the new valid preview recovers after the old operation settles');
+      assert.equal(panel.querySelector('[data-elevation]').disabled, false);
+    }
+    if (ending !== 'dispose') ui.scope.dispose();
+  }
+});
+
+test('existing painted layers restore the saved lighting visibility and explain an explicit replacement', () => {
+  const ui = fixture({ getPaintedNormal: sourceFixture, getSettings: () => ({ method: 'painted', previewLighting: false }) });
+  ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+  assert.equal(panel.querySelector('[data-preview-lighting]').checked, false);
+  assert.doesNotMatch(panel.querySelector('[data-note]').textContent, /置き換え/);
+  panel.querySelector('[data-method]').value = 'silhouette'; panel.querySelector('[data-method]').fire('change');
+  assert.match(panel.querySelector('[data-note]').textContent, /既存の凹凸を生成結果に置き換え/);
+  assert.match(panel.querySelector('[data-note]').textContent, /元に戻す/); ui.scope.dispose();
+});
+
+
+test('a rejected compatibility settings callback keeps the draft open for retry', () => {
+  let reject = true, writes = 0;
+  const ui = fixture({ onSettingsChange: () => { writes++; if (reject) throw new Error('設定を保存できません'); } });
+  ui.panel.open(); ui.flushFrames(); const panel = ui.panel.panel;
+  panel.querySelector('[data-elevation]').value = '55'; panel.querySelector('[data-elevation]').fire('input'); ui.flushFrames();
+  panel.querySelector('[data-apply]').fire('click');
+  assert.equal(writes, 1); assert.equal(ui.panel.isOpen, true); assert.equal(panel.querySelector('[data-elevation]').value, '55');
+  assert.match(panel.querySelector('[data-error]').textContent, /設定を保存できません/);
+  reject = false; panel.querySelector('[data-apply]').fire('click');
+  assert.equal(writes, 2); assert.equal(ui.panel.isOpen, false); ui.scope.dispose();
 });

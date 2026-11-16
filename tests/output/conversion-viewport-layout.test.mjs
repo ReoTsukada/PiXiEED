@@ -56,13 +56,16 @@ test('all output engines share the settings pane and preserve node ownership whe
   assert.match(resultSurface, /positions\.slice\(\)\.reverse\(\)[\s\S]*auxiliary\.remove\(\);host\.remove\(\)/);
   assert.doesNotMatch(resultSurface, /oldNativePreviewState|data-tx-text-result[^;]*hidden/);
   assert.match(input, /listen\(main, 'click',[\s\S]*?settingsButton = event\.target\.closest\('\[data-sc-settings-open\]'\)/);
-  assert.match(input, /const controlsTarget = location === 'settings' \? composer/);
+  assert.match(input, /const controlsTarget = receivedToolOutput && handoffSettings \? handoffSettings\s*: location === 'settings' \? composer/);
+  assert.match(input, /if \(receivedToolOutput\) listen\(main, 'click', event => \{\s*const editSize = event\.target\.closest\?\.\('\[data-sc-size-edit\]'\);[\s\S]*?event\.stopImmediatePropagation\(\);[\s\S]*?sizeOptions\.open = true/);
+  assert.match(input, /\.\.\.\(receivedToolOutput \? \[main\.querySelector\('\.tx-footer'\)\] : \[\]\)/);
+  assert.match(input, /restoreUnifiedNodePositions\(originalPositions\)/);
   assert.match(unifiedCss, /\.sc-unified-controls > \.sc-unified-text-size:not\(\[hidden\]\) \{\s*grid-column: 2;/);
   assert.match(unifiedCss, /data-state="empty"\] \.sc-preview-toolbar > header > strong/);
   assert.doesNotMatch(unifiedCss, /data-state="empty"\] > :is\(\.sc-preview-toolbar,/);
   assert.match(input, /const nativeSizeControl = main\.querySelector\('\.sc-preview-summary > \.sc-size-control'\)/);
   assert.match(input, /controls\.append\(nativeSizeControl\)/);
-  assert.match(input, /textFilePick, nativeSizeControl\]/);
+  assert.match(input, /textFilePick, nativeSizeControl,[\s\S]*?\.\.\.\(receivedToolOutput \? \[main\.querySelector\('\.tx-footer'\)\] : \[\]\)/);
   assert.match(input, /restoreUnifiedNodePositions\(originalPositions\);[\s\S]*nativeSizeControl\.hidden = oldNativeSizeControlHidden/);
   assert.match(input, /settings\.append\(inputCard\); composer\.append\(settings\)/);
   assert.match(unifiedCss, /\.sc-unified-controls\[data-source="file"\]:has\(> \.sc-size-control:not\(\[hidden\]\)\) > \[data-sc-unified-format-row\] \{ grid-column: 1; \}/);

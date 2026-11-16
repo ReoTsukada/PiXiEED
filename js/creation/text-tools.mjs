@@ -229,7 +229,7 @@ export async function installTextTools(doc = document, win = window) {
     }
     let frame = frameFile===file ? frameCache : null;
     if(!frame){
-      const {loadConversionFile}=await import('./conversion-service.mjs?rev=20261028-conversion-1');check();
+      const {loadConversionFile}=await import('./conversion-service.mjs?rev=20261117-normal-apply-1');check();
       const loaded=await loadConversionFile(file,{signal});check();
       if(loaded.kind!=='image'||!loaded.frames?.length)throw new Error('文字アート・画素テキストには画像を選んでください。');
       frame=loaded.frames[0];

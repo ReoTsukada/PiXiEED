@@ -1,4 +1,4 @@
-import { TIMELINE_LIMITS, validateTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
+import { TIMELINE_LIMITS, validateTimeline } from './conversion-timeline.mjs?rev=20261117-normal-apply-1';
 import { fitOutputFrames } from './output-import.mjs?rev=20261020-format-conversion-1';
 
 const rawFrames = asset => asset.rawFrames || asset.frames || [];

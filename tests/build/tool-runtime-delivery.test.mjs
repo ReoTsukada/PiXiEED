@@ -22,12 +22,13 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // config, SDK loader and loader config to the previously bounded graph.
   // Lazy gallery loading adds one small shared request/cache controller.
   // Project-scoped normal settings add one small shared module; rendering stays lazy.
-  assert.equal(plan.runtimeGraph.modules.size, 118);
-  assert.equal(plan.runtimeGraph.edges.length, 228);
+  // Applied lighting adds one small shared renderer and its three dependency edges.
+  assert.equal(plan.runtimeGraph.modules.size, 119);
+  assert.equal(plan.runtimeGraph.edges.length, 231);
   assert.equal(plan.dynamicRoots.length, 24);
-  assert.equal(plan.dynamicGraph.modules.size, 115);
-  assert.equal(plan.externalUrls.size, 66);
-  assert.equal(plan.internalizedUrls.length, 52);
+  assert.equal(plan.dynamicGraph.modules.size, 118);
+  assert.equal(plan.externalUrls.size, 69);
+  assert.equal(plan.internalizedUrls.length, 50);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
   assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261116-normal-release-2'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
@@ -43,6 +44,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert(files.includes('js/creation/project-gallery.mjs'), 'Windowed gallery accounts for one shared UI module and one import edge.');
   assert(files.includes('js/tool-start-routes.mjs'), 'the stateless route registry explains the additional module and dependency edge');
   assert(files.includes('js/creation/draw-render-optimization.mjs'));
+  assert(files.includes('js/creation/draw-normal-apply.mjs'), 'Canvas lighting shares the bounded renderer while PNG generation remains lazy.');
   assert(files.includes('js/creation/draw-normal-map-settings.mjs'), 'Small project settings load without eagerly loading the lighting or PNG codec.');
   assert(files.includes('js/creation/output-entry-context.mjs'), 'The local-only handoff pointer module adds one shared external node and two import edges.');
   assert(files.includes('js/creation/output-router.mjs'), 'editor exports use the unified staging module');
@@ -139,8 +141,8 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 66);
-    assert.equal(report.internalizedCount, 52);
+    assert.equal(report.externalCount, 69);
+    assert.equal(report.internalizedCount, 50);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
 

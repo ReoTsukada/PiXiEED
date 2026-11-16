@@ -1,8 +1,8 @@
-import { FILE_ACCEPT, conversionChoices, outputNotice, safeConvertedName } from './conversion-service.mjs?rev=20261028-conversion-1';
-import { loadTimelineFiles, animationPlan, frameAt, setFrameSeconds, moveFrame, convertWithTimeline } from './conversion-timeline.mjs?rev=20261031-material-stage-1';
+import { FILE_ACCEPT, conversionChoices, outputNotice, safeConvertedName } from './conversion-service.mjs?rev=20261117-normal-apply-1';
+import { loadTimelineFiles, animationPlan, frameAt, setFrameSeconds, moveFrame, convertWithTimeline } from './conversion-timeline.mjs?rev=20261117-normal-apply-1';
 import { notifyToolEntryReady } from '../tool-offerwall-entry.mjs?rev=20261111-output-offerwall-1';
-import { addConversionMaterials, countConversionMaterialFrames, describeConversionMaterials, firstConversionAssetFrameIndex, moveConversionMaterial, preserveConversionFrameAfterRemoval, removeConversionMaterialWithTicket, restoreConversionMaterial, snapshotConversionMaterialSource, validateConversionMaterialFiles } from './conversion-materials.mjs?rev=20261101-direct-material-1';
-import { createConversionRecoverySnapshot, validateConversionRecovery } from './conversion-media-recovery.mjs?rev=20261105-audio-recovery-1';
+import { addConversionMaterials, countConversionMaterialFrames, describeConversionMaterials, firstConversionAssetFrameIndex, moveConversionMaterial, preserveConversionFrameAfterRemoval, removeConversionMaterialWithTicket, restoreConversionMaterial, snapshotConversionMaterialSource, validateConversionMaterialFiles } from './conversion-materials.mjs?rev=20261117-normal-apply-1';
+import { createConversionRecoverySnapshot, validateConversionRecovery } from './conversion-media-recovery.mjs?rev=20261117-normal-apply-1';
 import { runReadonlyPreview, readonlyPreviewBounds } from './conversion-readonly-preview.mjs?rev=20261105-video-size-1';
 
 /** Contextual, local-only conversion. Media, names and settings are never sent to analytics. */
@@ -478,6 +478,12 @@ export function mountConversionPage(doc = document, win = window) {
       acceptSource(next);
       if (Number.isFinite(settings.playbackRate) && settings.playbackRate >= .25 && settings.playbackRate <= 4) rate = settings.playbackRate;
       if ([...format.options].some(option => option.value === settings.format)) format.value = settings.format;
+      if (next.kind === 'image') {
+        for (const [key, selector] of [['width', '[data-width]'], ['height', '[data-height]']]) {
+          const dimension = Number(settings[key]);
+          if (Number.isSafeInteger(dimension) && dimension > 0 && dimension <= 4096) $(selector).value = String(dimension);
+        }
+      }
       refresh(); renderFrames();
     },
     offerOriginal(blob, filename) {

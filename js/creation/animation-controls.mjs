@@ -183,7 +183,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     const selectedLayerSettings = button('選択中レイヤーの設定', '⚙', 'selected-layer-settings', 'animation-controls__layer-settings');
     selectedLayerSettings.setAttribute('aria-haspopup', 'dialog'); selectedLayerSettings.setAttribute('aria-expanded', 'false'); selectedLayerSettings.setAttribute('aria-controls', frameMenu.id);
     const layerList = node('div', 'animation-controls__layer-list'); layerList.dataset.layerList = 'true';
-    normalLayerNote = node('p', 'animation-controls__normal-layer-note', '法線パレットは独立しており、通常の色には混ざりません。通常の画像書き出しにも含まれません。');
+    normalLayerNote = node('p', 'animation-controls__normal-layer-note', '法線の色は元の絵に混ざりません。照明表示中は、光を反映した画像を書き出せます。');
     normalLayerNote.hidden = true;
     const addLayer = button('レイヤーを追加', '+', 'add-layer', 'animation-controls__wide-button');
     layers.append(layerHeading, normalTools, selectedLayerSettings, layerList, normalLayerNote, addLayer);
