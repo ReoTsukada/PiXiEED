@@ -8,7 +8,7 @@ test('shared editor state, history, and PXD use one session without independent 
  const importAt=source.indexOf('const storedAnimation = await readPxdAnimation');const fallbackAt=source.indexOf('let nextDocument;',importAt);assert.ok(importAt>0&&fallbackAt>importAt);assert.doesNotMatch(source.slice(importAt,fallbackAt),/catch/);
 });
 test('frozen shared music rejects direct layer selection and edits; normal art remains editable',()=>{
- const body=source.match(/function handleAnimationAction\(action\) \{\s*(if \(musicReadOnlyReason[^\n]+)/)[1];
+ const body=source.match(/function handleAnimationAction\(action\) \{\s*(?:if \(action\.type === 'normal-map'\)[^\n]+\n\s*)?(if \(musicReadOnlyReason[^\n]+)/)[1];
  const command=new Function('action','animationSession','musicReadOnlyReason','toast',`${body};return true;`);
  const session={animation:{layers:[{id:'music',role:'music'},{id:'art'}]}};
  for(const type of ['select-layer','delete-layer','visibility','layer-opacity']){
@@ -17,6 +17,6 @@ test('frozen shared music rejects direct layer selection and edits; normal art r
  }
  assert.equal(command({type:'select-layer',layerId:'music'},session,'',()=>{}),true);
  assert.match(source,/selectMusicLayer\(\) \{\s*if \(musicReadOnlyReason\) throw/);
- assert.match(source,/cameraPlacementTarget\(memoryExtras=\{\}\) \{\s*if \(musicReadOnlyReason/);
+ assert.match(source,/cameraPlacementTarget\(memoryExtras=\{\}\) \{\s*if \(editingNormalLayer\(\)\) throw new Error\('写真の配置は描画レイヤーを選んで使ってください。'\);\s*if \(musicReadOnlyReason/);
  assert.match(source,/if \(musicReadOnlyReason\) throw new Error\(musicReadOnlyReason\);/);
 });

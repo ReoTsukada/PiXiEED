@@ -1,5 +1,5 @@
 import { hashCanonical, validateAsset } from './asset-contract.mjs';
-import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { documentRgba, validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-1';
 import { supabaseConfig } from '../../data/site-config.js?rev=20261001-free-tools-1';
 
 export const JIGSAW_SCHEMA_VERSION = 1;

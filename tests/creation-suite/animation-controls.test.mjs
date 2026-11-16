@@ -440,11 +440,13 @@ test('Draw cel grid exposes add cells, contextual editing, and long-press header
   } });
   const root = host.children[0]; root.querySelector('[data-action="toggle-frames"]').fire('click');
   const panel = doc.body.children.find((child) => child.getAttribute('role') === 'dialog');
-  const grid = panel.children[2];
-  assert.equal(panel.children[1].hidden, true, 'Draw hides the row of permanent controls');
-  const gif = panel.children[0].querySelector('[data-action="export-gif"]');
+  const grid = panel.querySelector('[data-frame-strip]');
+  const toolbar = panel.children.find(child => child.querySelector('[data-action="previous-frame"]'));
+  const heading = panel.children.find(child => child.querySelector('[data-action="export-gif"]'));
+  assert.equal(toolbar.hidden, true, 'Draw hides the row of permanent controls');
+  const gif = heading.querySelector('[data-action="export-gif"]');
   assert.ok(gif, 'GIF export stays in the visible workspace heading');
-  assert.equal(panel.children[1].querySelector('[data-action="export-gif"]'), null, 'the hidden legacy toolbar cannot trap GIF export');
+  assert.equal(toolbar.querySelector('[data-action="export-gif"]'), null, 'the hidden legacy toolbar cannot trap GIF export');
   gif.fire('click');
   assert.deepEqual(actions.at(-1), { type: 'export-gif' });
   state.readOnly = true; ui.refresh();
@@ -593,7 +595,7 @@ test('hidden cel workspace defers its grid, restores latest state on open, and r
   const ui = mountAnimationControls({ host, scope, getState: () => state,
     getCelHasContent(frameId, layerId) { contentCalls += 1; return filled && frameId === 'f2' && layerId === 'l2'; }, onAction() {} });
   const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
-  const grid = panel.children[2];
+  const grid = panel.querySelector('[data-frame-strip]');
   assert.equal(grid.children.length, 0, 'the cel matrix is not built while its workspace is hidden');
   ui.refresh(); ui.refresh(); assert.equal(contentCalls, 0);
   filled = true; state.frameId = 'f2';
@@ -698,7 +700,7 @@ test('playback updates only the previous and current keyed columns and hidden pl
   const state = { frames: [{ id: 'f1', durationMs: 100 }, { id: 'f2', durationMs: 100 }, { id: 'f3', durationMs: 100 }],
     layers: [{ id: 'l1', name: 'Ink' }], frameId: 'f1', layerId: 'l1', playing: true, playbackFrameId: 'f1', readOnly: false };
   const ui = mountAnimationControls({ host, scope, getState: () => state, onAction() {}, getCelHasContent: () => false });
-  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog'); const grid = panel.children[2];
+  const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog'); const grid = panel.querySelector('[data-frame-strip]');
   host.querySelector('[data-action="toggle-frames"]').fire('click');
   const cells = grid.querySelectorAll('[data-action="select-cel"]');
   assert.ok(cells.filter(cell => cell.dataset.frameId === 'f1').every(cell => cell.classList.contains('is-playing')));
@@ -752,7 +754,7 @@ test('desktop layout attaches the shared inspector and lazy keyed frame strip, t
     }
   });
   const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
-  const grid = panel.children[2];
+  const grid = panel.querySelector('[data-frame-strip]');
   const layerList = doc.body.querySelector('[data-layer-list]').parentElement;
   assert.equal(grid.children.length, 0, 'the matrix remains lazy while its original launcher is closed');
 
@@ -830,4 +832,28 @@ test('desktop layout attaches the shared inspector and lazy keyed frame strip, t
   assert.equal(frameHost.dataset.desktopLayout, undefined);
   assert.equal(frameHost.children.length, 0);
   ui.dispose();
+});
+
+
+test('compact workspace stays below the visible header when direct-work hides the legacy header', () => {
+  for (const [legacyBottom, directBottom, expectedHeight] of [[0, 57, 203], [64, 0, 196], [110, 57, 150]]) {
+    const doc = new FakeDocument(); doc.defaultView.innerWidth = 320; doc.defaultView.innerHeight = 568;
+    const board = { getBoundingClientRect: () => ({ left: 6, right: 314, top: 65, bottom: 276, width: 308, height: 211 }) };
+    const legacyHeader = { getBoundingClientRect: () => ({ bottom: legacyBottom }) };
+    const directHeader = { getBoundingClientRect: () => ({ bottom: directBottom }) };
+    doc.querySelector = selector => ({ '.draw-board': board, '.site-header': legacyHeader, '.tool-direct__bar': directHeader })[selector] || null;
+    const host = doc.createElement('div'); host.id = 'draw-animation-controls';
+    const state = { frames: [{ id: 'f1', durationMs: 100 }], layers: [{ id: 'l1', name: 'Layer 1', visible: true, locked: false }, { id: 'n1', name: 'Normal', role: 'normal', visible: true, locked: false }], frameId: 'f1', layerId: 'l1', playing: false, onion: false, readOnly: false, audioMode: false, normalMapAvailable: true };
+    const ui = mountAnimationControls({ host, scope: fakeScope(), getState: () => state, getCelHasContent: () => false, onAction() {} });
+    host.querySelector('[data-action="toggle-frames"]').fire('click');
+    const panel = doc.body.children.find(child => child.getAttribute('role') === 'dialog');
+    assert.equal(panel.style.bottom, '300px', 'the panel retains its canvas-bottom anchor');
+    assert.equal(panel.style.maxHeight, `${expectedHeight}px`, 'the visible header reserves space above the panel');
+    const panelTop = doc.defaultView.innerHeight - parseFloat(panel.style.bottom) - parseFloat(panel.style.maxHeight);
+    assert.equal(panelTop, Math.max(legacyBottom, directBottom) + 8);
+    assert.equal(panel.style['--animation-workspace-grid-height'], `${Math.max(44, expectedHeight - 112)}px`, 'the existing grid scroll area shrinks with the available panel height');
+    panel.querySelector('[data-action="close-animation"]').fire('click');
+    assert.equal(panel.hidden, true);
+    ui.dispose();
+  }
 });

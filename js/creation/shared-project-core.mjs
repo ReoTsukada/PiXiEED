@@ -1,4 +1,4 @@
-import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261116-normal-release-1';
 
 const normalized = color => color.length === 7 ? `${color.toLowerCase()}ff` : color.toLowerCase();
 const rgb = color => [1, 3, 5, 7].map(at => parseInt(color.slice(at, at + 2), 16));
@@ -38,10 +38,18 @@ export function planSharedProjectSettings(animation, settings = {}) {
   const sizeChanged = width !== animation.width || height !== animation.height;
   let next = sizeChanged ? resizeAnimation(animation, width, height, { anchor: 'center' }) : animation;
   if (paletteChanged) {
-    const pooled = new Map();
+    const sourceTiles = new Map();
+    const layers = new Map(next.layers.map(layer => [layer.id, layer]));
     const tiles = serializeAnimationPool(next).map(tile => {
-      if (tile.bytes) pooled.set(tile.tileId, tile.bytes);
-      return { ...tile, bytes: Uint8Array.from(tile.bytes || pooled.get(tile.tileId), value => value ? mapping[value - 1] + 1 : 0) };
+      if (tile.bytes) sourceTiles.set(tile.tileId, tile.bytes);
+      const source = tile.bytes || sourceTiles.get(tile.tileId);
+      if (!source) throw new TypeError('共有パレット変更時の画素タイルが見つかりません。');
+      // A normal-map cel uses the same compact index bytes but resolves them
+      // through its own fixed palette. Only remap cels using the art palette.
+      const bytes = layers.get(tile.layerId)?.role === 'normal'
+        ? new Uint8Array(source)
+        : Uint8Array.from(source, value => value ? mapping[value - 1] + 1 : 0);
+      return { ...tile, bytes };
     });
     next = createAnimationFromSerialized({ ...next, palette }, tiles);
   }

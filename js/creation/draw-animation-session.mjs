@@ -1,21 +1,68 @@
-import { createAnimationFromDraw, ensureAnimationMusicLayer, getAnimationCelDocument, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
-import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261113-canvas1028-shared-2';
-import { validateDrawDocument } from './draw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { createAnimationFromDraw, ensureAnimationMusicLayer, ensureAnimationNormalLayer, getAnimationCelDocument, getAnimationLayerPalette, NORMAL_MAP_PALETTE, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261116-normal-release-1';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-1';
 
-/** Only the active cel and two flattened neighbouring layer caches use full canvas buffers. */
+const normalRgba = NORMAL_MAP_PALETTE.map(color => [
+  Number.parseInt(color.slice(1, 3), 16), Number.parseInt(color.slice(3, 5), 16), Number.parseInt(color.slice(5, 7), 16), 255
+]);
+
+// Editor display only: normal colors sit above all art, independently of layer order.
+// Transparent/erased normal pixels restore the exact art RGBA, including its alpha.
+function overlayNormalCel(doc, background, target, visible, opacity = 1, changed = null) {
+  const put = index => {
+    const offset = index * 4, color = visible && normalRgba[doc.pixels[index]];
+    if (!color || opacity === 0) {
+      for (let channel = 0; channel < 4; channel++) target[offset + channel] = background[offset + channel];
+      return;
+    }
+    const behindAlpha = background[offset + 3] / 255 * (1 - opacity), alpha = opacity + behindAlpha;
+    for (let channel = 0; channel < 3; channel++) target[offset + channel] = Math.round((color[channel] * opacity + background[offset + channel] * behindAlpha) / alpha);
+    target[offset + 3] = Math.round(alpha * 255);
+  };
+  if (changed) { for (const index of changed) put(index); }
+  else for (let index = 0; index < doc.pixels.length; index++) put(index);
+  return { width: doc.width, height: doc.height, rgba: target };
+}
+
+/** Prepare a new normal layer without changing an existing normal cel or any artwork. */
+export function prepareDrawNormalLayer(animation, frameId, { initialFill = 'transparent' } = {}) {
+  if (!['transparent', 'flat'].includes(initialFill)) throw new TypeError('ノーマルマップの作成方法を確認してください。');
+  if (!animation.frames.some(frame => frame.id === frameId)) throw new TypeError('指定したフレームがありません。');
+  if (animation.layers.some(layer => layer.role === 'normal')) return animation;
+  let next = ensureAnimationNormalLayer(animation);
+  if (initialFill === 'flat') {
+    const source = composeAnimationFrameRgba(animation, frameId, { excludeMusic: true });
+    const layer = next.layers.find(layer => layer.role === 'normal');
+    const pixels = Uint8Array.from({ length: source.width * source.height }, (_, index) => source.rgba[index * 4 + 3] ? 1 : 0);
+    next = writeAnimationCel(next, frameId, layer.id, { width: source.width, height: source.height, pixels });
+  }
+  return next;
+}
+
+/** Only the active cel and flattened display caches use full canvas buffers. */
 export function createDrawAnimationSession(document, { musicLayer: musicMode = false } = {}) {
   let animation = createAnimationFromDraw(document);
   if (musicMode) animation = ensureAnimationMusicLayer(animation);
   let frameId = animation.frames[0].id, layerId = musicMode ? animation.layers.find((layer) => layer.role === 'music').id : animation.layers[0].id;
-  let history = createDrawAnimationHistory(animation), below, above, composed, rgba, cacheRgba = null;
+  let history = createDrawAnimationHistory(animation), below, above, composed, rgba, normalBackground = null, cacheRgba = null;
   let selectionPast = [], selectionFuture = [];
+  let normalOverlayOpacity = 1, normalOverlayDirty = true;
   let currentSelection = { frameId, layerId };
   // Keep the selection attached to the current history entry separate from
   // the user's temporary frame/layer selection. Redo must restore the layer
   // that was active when its timeline snapshot was committed.
   let historySelection = { ...currentSelection };
+  function selectedLayer() { return animation.layers.find((layer) => layer.id === layerId); }
+  function isNormalLayer() { return selectedLayer()?.role === 'normal'; }
   function rebuild() {
     cacheRgba = animationNeedsRgba(animation);
+    normalBackground = null; normalOverlayDirty = true;
+    if (isNormalLayer()) {
+      below = above = composed = null;
+      normalBackground = composeAnimationFrameRgba(animation, frameId).rgba;
+      rgba = new Uint8ClampedArray(normalBackground);
+      return;
+    }
     if (cacheRgba) { below = above = composed = null; rgba = new Uint8ClampedArray(animation.width * animation.height * 4); return; }
     rgba = null;
     const index = animation.layers.findIndex((layer) => layer.id === layerId);
@@ -47,7 +94,16 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
     validateDrawDocument(doc);
     const original = animation, originalFrame = frameId, originalLayer = layerId;
     let next = animation;
-    if (doc.palette.some((color, index) => color !== next.palette[index]) || doc.palette.length !== next.palette.length) next = setAnimationPalette(next, doc.palette);
+    if (isNormalLayer()) {
+      const layerPalette = getAnimationLayerPalette(next, originalLayer);
+      if (doc.palette.length !== NORMAL_MAP_PALETTE.length
+          || doc.palette.some((color, index) => color !== NORMAL_MAP_PALETTE[index])
+          || layerPalette.some((color, index) => color !== NORMAL_MAP_PALETTE[index])) {
+        throw new TypeError('ノーマルマップの固定パレットを変更できません。');
+      }
+    } else if (doc.palette.some((color, index) => color !== next.palette[index]) || doc.palette.length !== next.palette.length) {
+      next = setAnimationPalette(next, doc.palette);
+    }
     next = writeAnimationCel(next, frameId, layerId, { width: doc.width, height: doc.height, pixels: Uint8Array.from(doc.pixels, value => value + 1) });
     // Palette, indices and tile budgets have passed without changing either history.
     const commit = () => {
@@ -161,7 +217,24 @@ export function createDrawAnimationSession(document, { musicLayer: musicMode = f
       animation = next; remember(); rebuild();
       return getAnimationCelDocument(animation, frameId, musicId);
     },
+    /** View-only opacity never changes layer opacity, pixels, history, or exported normals. */
+    setNormalOverlayOpacity(value) {
+      if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError('重ね表示の濃度は0〜1で指定してください。');
+      if (normalOverlayOpacity !== value) { normalOverlayOpacity = value; normalOverlayDirty = true; }
+    },
+    /** Playback preview follows the current edit domain without changing selection. */
+    previewFrame(frame) {
+      if (!isNormalLayer()) return animationNeedsRgba(animation) ? composeAnimationFrameRgba(animation, frame) : composeAnimationFrame(animation, frame);
+      const doc = getAnimationCelDocument(animation, frame, layerId);
+      const background = composeAnimationFrameRgba(animation, frame).rgba;
+      return overlayNormalCel(doc, background, new Uint8ClampedArray(background), selectedLayer()?.visible !== false, normalOverlayOpacity);
+    },
     composite(doc, changed = null) {
+      if (isNormalLayer()) {
+        if (normalOverlayDirty) changed = null;
+        normalOverlayDirty = false;
+        return overlayNormalCel(doc, normalBackground, rgba, selectedLayer()?.visible !== false, normalOverlayOpacity, changed);
+      }
       if (cacheRgba !== animationNeedsRgba(animation)) { rebuild(); changed = null; }
       if (animationNeedsRgba(animation) || doc.palette.some(color => color.length === 9 && color.slice(7).toLowerCase() !== 'ff')) {
         if (!rgba || rgba.length !== doc.width * doc.height * 4) { rgba = new Uint8ClampedArray(doc.width * doc.height * 4); changed = null; }

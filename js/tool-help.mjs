@@ -1,4 +1,4 @@
-import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261113-canvas1028-shared-2';
+import { getToolGuide, TOOL_GUIDES } from './tool-help-data.mjs?rev=20261116-normal-release-1';
 
 const mountedDocuments = new WeakMap();
 const HELP_CSS_ID = 'px-tool-help-styles';

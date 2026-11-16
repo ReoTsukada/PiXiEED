@@ -1,4 +1,4 @@
-import { validateJigsawSource, validateJigsawGame, JIGSAW_MAX_SOURCE_PIXELS } from './jigsaw-core.mjs?rev=20261113-canvas1028-shared-2';
+import { validateJigsawSource, validateJigsawGame, JIGSAW_MAX_SOURCE_PIXELS } from './jigsaw-core.mjs?rev=20261116-normal-release-1';
 
 const MAX_PIECES = 4096;
 const MAX_POSE = 1e7;

@@ -1,0 +1,190 @@
+.draw-normal-map-open {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  border: 1px solid var(--draw-border, #b9b8b2);
+  border-radius: .65rem;
+  background: var(--draw-panel, #fff);
+  color: #242424;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.draw-normal-map-open:focus-visible,
+.draw-normal-map button:focus-visible,
+.draw-normal-map select:focus-visible,
+.draw-normal-map input:focus-visible {
+  outline: 3px solid #315fbb;
+  outline-offset: 2px;
+}
+
+.draw-normal-map {
+  box-sizing: border-box;
+  width: min(760px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  padding: clamp(1rem, 3vw, 1.5rem);
+  overflow: auto;
+  color: #242424;
+  background: #fff;
+  border: 1px solid #c6c6c2;
+  border-radius: 1rem;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 24%);
+}
+
+.draw-normal-map::backdrop { background: rgb(18 20 24 / 55%); }
+.draw-normal-map[open] { display: grid; gap: .9rem; }
+.draw-normal-map * { box-sizing: border-box; }
+.draw-normal-map h2 { margin: 0; font-size: 1.2rem; }
+.draw-normal-map p { margin: 0; }
+.draw-normal-map button,
+.draw-normal-map select { min-height: 2.6rem; font: inherit; }
+.draw-normal-map button { padding: .45rem .8rem; border: 1px solid #aaa; border-radius: .6rem; background: #f8f8f6; color: inherit; cursor: pointer; }
+.draw-normal-map button:disabled { opacity: .6; cursor: wait; }
+
+.draw-normal-map__header,
+.draw-normal-map__source-row,
+.draw-normal-map__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.draw-normal-map__header p { margin-top: .2rem; color: #5b5b5b; font-size: .9rem; }
+.draw-normal-map__close { flex: 0 0 auto; }
+.draw-normal-map__note { color: #484848; font-size: .9rem; line-height: 1.5; }
+.draw-normal-map__source-row { justify-content: flex-start; flex-wrap: wrap; }
+.draw-normal-map__source-row span { min-width: 0; color: #4b4b4b; font-size: .85rem; }
+
+.draw-normal-map__previews {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+}
+.draw-normal-map__previews figure { min-width: 0; margin: 0; }
+.draw-normal-map__previews figcaption { margin-bottom: .35rem; font-size: .9rem; font-weight: 650; }
+.draw-normal-map__canvas-wrap {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  max-height: min(30dvh, 240px);
+  padding: .5rem;
+  overflow: hidden;
+  background-color: #ededeb;
+  background-image: linear-gradient(45deg, #d9d9d6 25%, transparent 25%), linear-gradient(-45deg, #d9d9d6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d9d6 75%), linear-gradient(-45deg, transparent 75%, #d9d9d6 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  border: 1px solid #c7c7c3;
+  border-radius: .55rem;
+}
+.draw-normal-map__canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: min(28dvh, 224px);
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.draw-normal-map__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem 1rem;
+  padding-top: .2rem;
+}
+.draw-normal-map__field { display: grid; min-width: 0; gap: .3rem; align-content: start; font-size: .9rem; }
+.draw-normal-map__field[hidden] { display: none; }
+.draw-normal-map__field > span { display: flex; align-items: baseline; justify-content: space-between; gap: .4rem; }
+.draw-normal-map__field output { font-variant-numeric: tabular-nums; }
+.draw-normal-map__field select { width: 100%; max-width: 100%; padding: .35rem .55rem; }
+.draw-normal-map__field input[type="range"] { width: 100%; margin: .4rem 0; accent-color: #315fbb; }
+.draw-normal-map__check { display: flex; align-items: center; gap: .55rem; min-height: 2.6rem; font-size: .9rem; }
+.draw-normal-map__check input { width: 1.15rem; height: 1.15rem; margin: 0; }
+.draw-normal-map__error { padding: .7rem; color: #7c1f1f; background: #fff0ee; border-radius: .5rem; line-height: 1.45; }
+.draw-normal-map__error[hidden] { display: none; }
+.draw-normal-map__footer { justify-content: flex-end; flex-wrap: wrap; padding-top: .15rem; }
+.draw-normal-map__footer > button { flex: 1 1 220px; }
+.draw-normal-map__material { min-width: 0; border-top: 1px solid #d5d5d0; padding-top: .6rem; }
+.draw-normal-map__material summary { min-height: 44px; cursor: pointer; font-weight: 650; }
+.draw-normal-map__field input[type="color"] { width: 100%; min-height: 44px; padding: 4px; border: 1px solid #aaa; border-radius: .5rem; background: #fff; }
+.draw-normal-map__download { display: block; padding: .6rem; min-height: 44px; color: #263b69; overflow-wrap: anywhere; }
+.draw-normal-map__save { min-height: 2.8rem !important; color: #fff !important; background: #263b69 !important; border-color: #263b69 !important; font-weight: 650 !important; }
+
+@media (max-width: 480px) {
+  .draw-normal-map { padding: 1rem; }
+  .draw-normal-map__previews { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+  .draw-normal-map__canvas-wrap { min-height: 72px; padding: .3rem; }
+  .draw-normal-map__canvas-wrap canvas { max-height: min(24dvh, 180px); }
+  .draw-normal-map__controls { grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+  .draw-normal-map__footer { padding: .7rem 0 0; background: #fff; }
+  .draw-normal-map__save { width: 100%; }
+}
+
+.draw-normal-map [hidden] { display: none !important; }
+.draw-normal-map__edit { display: grid; gap: .4rem; }
+.draw-normal-map__edit p { color: #484848; font-size: .85rem; line-height: 1.5; }
+/* Desktop compasses use the existing palette host and its scrolling bounds. */
+body.draw-normal-layer-active.draw-desktop-active.project-workspace-ready.creation-editor[data-page="draw"] #draw-palette.draw-palette--normal {
+  position: relative; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-auto-flow: row !important; grid-auto-columns: auto !important; grid-template-rows: auto auto !important;
+  gap: 8px !important; height: auto !important; min-height: 0 !important; max-height: none !important;
+  overflow: visible !important; justify-items: stretch; touch-action: manipulation; padding: 3px !important;
+}
+.draw-normal-compass { min-width: 0; }
+.draw-normal-compass__title { margin: 0 0 6px; font: 600 11px/16px system-ui; color: #e6edf2; text-align: center; white-space: nowrap; }
+.draw-normal-compass__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+body.draw-normal-layer-active.project-workspace-ready.creation-editor[data-page="draw"] #draw-palette.draw-palette--normal .draw-color {
+  position: relative; display: grid; place-items: center; box-sizing: border-box; padding: 0; transform: none !important;
+}
+body.draw-normal-layer-active.draw-desktop-active.project-workspace-ready.creation-editor[data-page="draw"] #draw-palette.draw-palette--normal .draw-color {
+  width: 100% !important; min-width: 0 !important; max-width: none !important; height: 38px !important; min-height: 38px !important;
+}
+body.draw-normal-layer-active.draw-desktop-active.project-workspace-ready.creation-editor[data-page="draw"] #draw-palette.draw-palette--normal > .draw-color--transparent { grid-column: 1 / -1; width: 44px !important; height: 38px !important; }
+.draw-normal-swatch-label { color: #14202c; text-shadow: 0 1px 1px #ffffff90; font: 700 15px/1.2 system-ui; pointer-events: none; }
+.draw-color[data-color-index="0"] .draw-normal-swatch-label,
+.draw-color--transparent .draw-normal-swatch-label { font-size: 10px; }
+.draw-normal-swatch-angle { display: none; }
+
+/* Mobile retains the existing side rails, 158px controls and canvas geometry.
+   Only the content inside the usual 150px, horizontally scrolling palette changes. */
+html:not([data-game-draw-runtime="true"]) body[data-page="draw"]:not(.draw-desktop-active) .draw-color-adjustment-slot .draw-normal-map-open { display: none; }
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active.project-workspace-ready.creation-editor[data-page="draw"]:not(.draw-desktop-active) #draw-palette.draw-palette--normal {
+  display: grid !important; grid-auto-flow: column !important; grid-template-rows: repeat(3, 44px) !important;
+  grid-template-columns: none !important; grid-auto-columns: 44px !important; gap: 6px !important;
+  width: 100%; height: 150px !important; min-height: 150px !important; max-height: 150px !important;
+  box-sizing: border-box; padding: 3px !important; overflow-x: auto !important; overflow-y: hidden !important;
+  justify-items: stretch; align-content: start; overscroll-behavior-x: contain; touch-action: pan-x; scrollbar-width: none;
+}
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active[data-page="draw"]:not(.draw-desktop-active) .draw-normal-compass {
+  position: relative; grid-row: 1 / span 3; grid-column: span 3; align-self: stretch;
+}
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active[data-page="draw"]:not(.draw-desktop-active) .draw-normal-compass__title {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active[data-page="draw"]:not(.draw-desktop-active) .draw-normal-compass__grid {
+  grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 6px;
+}
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active.project-workspace-ready.creation-editor[data-page="draw"]:not(.draw-desktop-active) #draw-palette.draw-palette--normal .draw-color {
+  width: 44px !important; min-width: 44px !important; max-width: 44px !important; height: 44px !important; min-height: 44px !important;
+}
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active.project-workspace-ready.creation-editor[data-page="draw"]:not(.draw-desktop-active) #draw-palette.draw-palette--normal > .draw-color--transparent { grid-column: 1; grid-row: 1; }
+html:not([data-game-draw-runtime="true"]) body.draw-normal-layer-active[data-page="draw"]:not(.draw-desktop-active) .draw-normal-swatch-angle {
+  display: block; position: absolute; right: 2px; bottom: 1px; color: #14202c; text-shadow: 0 1px 1px #ffffff90;
+  font: 600 9px/10px system-ui; pointer-events: none;
+}
+
+body[data-page="draw"] .animation-controls__workspace-panel:has(> [data-action="normal-map"]:not([hidden])) { grid-template-rows: 44px 44px minmax(44px, 1fr); }
+
+/* This entry is text, unlike the compact + layer button sharing its base class. */
+body[data-page="draw"].draw-desktop-active .draw-desktop-dock .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"] {
+  position: sticky; top: 0; z-index: 2;
+  width: 100% !important; min-width: 0 !important; max-width: none !important;
+  height: auto !important; min-height: 44px !important; max-height: none !important;
+  justify-self: stretch; margin: 0; padding: 8px; font-size: 12px; line-height: 1.3;
+  white-space: normal; background: #26323b;
+}
+body[data-page="draw"].draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"] { font-size: 0; }
+body[data-page="draw"].draw-desktop-active .draw-desktop-dock[data-compact="true"] .draw-desktop-layer-host > .animation-controls__desktop-layers > .animation-controls__wide-button[data-action="normal-map"]::before { content: '凹凸'; font-size: 12px; }
+body[data-page="draw"] .animation-controls__workspace-panel > [data-action="normal-map"] { margin: 0; }

@@ -2,7 +2,7 @@ import {
   clearStagedDrawImport, createDrawImportController, decodeDrawImportToken,
   parseDrawImportJson, readStagedDrawImport, saveDrawImportAsNewProject,
   stageDrawImportToken
-} from './draw-import.mjs?rev=20261114-mcp-1';
+} from './draw-import.mjs?rev=20261116-normal-release-1';
 import { verifiedMcpEndpoint } from './connection-config.mjs?rev=20261114-mcp-1';
 
 const $ = (selector) => document.querySelector(selector);

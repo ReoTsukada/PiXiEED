@@ -1,4 +1,4 @@
-import { serializeAnimationPool } from './animation-core.mjs?rev=20261113-canvas1028-shared-2';
+import { serializeAnimationPool } from './animation-core.mjs?rev=20261116-normal-release-1';
 
 function fnv1a(bytes) {
   let hash = 0x811c9dc5;
