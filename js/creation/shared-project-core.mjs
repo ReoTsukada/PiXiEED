@@ -1,4 +1,4 @@
-import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { validateAnimation, resizeAnimation, canvasResizeOffset, getAnimationCelDocument, serializeAnimationPool, createAnimationFromSerialized, ANIMATION_MAX_PALETTE_ENTRIES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261116-normal-release-2';
 
 const normalized = color => color.length === 7 ? `${color.toLowerCase()}ff` : color.toLowerCase();
 const rgb = color => [1, 3, 5, 7].map(at => parseInt(color.slice(at, at + 2), 16));

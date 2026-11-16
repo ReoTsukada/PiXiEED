@@ -195,7 +195,7 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!normalLayerTargets.has(target)) return whole;
-    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261116-normal-release-1') : query + (query ? '&' : '?') + 'rev=20261116-normal-release-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261116-normal-release-2') : query + (query ? '&' : '?') + 'rev=20261116-normal-release-2';
     return `${quote}${path}${next}${quote}`;
   });
   return changed;

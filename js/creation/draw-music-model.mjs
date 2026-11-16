@@ -1,14 +1,14 @@
-import { estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { estimateRetainedAnimationBytes } from './animation-core.mjs?rev=20261116-normal-release-2';
 import {
   addDrawMusicPage, changeDrawMusicTempo, createDrawMusicState, createDrawMusicTrackState,
   describeDrawMusicProjection,
   getDrawMusicPageDocument, moveDrawMusicPage, projectDrawMusic, removeDrawMusicPage,
   selectDrawMusicPage, writeDrawMusicProject
-} from './draw-music-core.mjs?rev=20261116-normal-release-1';
-import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261116-normal-release-1';
+} from './draw-music-core.mjs?rev=20261116-normal-release-2';
+import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261116-normal-release-2';
 import { setPxdJson } from './pxd-codec.mjs';
 import { hasSiteReward, isSiteRewardPolicyEnabled, requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
-import { preservesAudioRewardContent, preservesAudioRewardPaletteContent } from './audio-reward-policy.mjs?rev=20261116-normal-release-1';
+import { preservesAudioRewardContent, preservesAudioRewardPaletteContent } from './audio-reward-policy.mjs?rev=20261116-normal-release-2';
 
 const AUDIO_STATE_PATH = 'audio/state.json';
 const largeCanvas = value => value?.width > 256 || value?.height > 256;

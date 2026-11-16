@@ -1,5 +1,5 @@
 import { createPxdProject } from './pxd-codec.mjs';
-import { pxdImageRoles, primaryPxdImageRole, readPxdImage } from './pxd-project.mjs?rev=20261116-normal-release-1';
+import { pxdImageRoles, primaryPxdImageRole, readPxdImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
 
 const THUMBNAIL_EDGE = 28;
 const MAX_TITLE_LENGTH = 60;

@@ -1,4 +1,4 @@
-import { frameGeometry, centerCrop } from './framing.mjs?rev=20261116-normal-release-1';
+import { frameGeometry, centerCrop } from './framing.mjs?rev=20261116-normal-release-2';
 import { grayLight } from './global-tones.mjs';
 
 const $ = (id) => document.getElementById(id);

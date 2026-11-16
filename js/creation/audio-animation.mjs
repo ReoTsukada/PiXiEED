@@ -1,4 +1,4 @@
-import { getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { getAnimationCelDocument, validateAnimation, writeAnimationCel } from './animation-core.mjs?rev=20261116-normal-release-2';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import {
   AUDIO_PPQ, AUDIO_PIXEL_PALETTE, AUDIO_PIXEL_TICKS, AUDIO_SHARED_IMAGE_MAX_DIMENSION,

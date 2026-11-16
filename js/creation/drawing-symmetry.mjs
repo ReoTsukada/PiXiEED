@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-2';
 const MAX_SIDE = ANIMATION_MAX_DIMENSION;
 const IDENTITY = [[1, 0], [0, 1]];
 const generators = {

@@ -76,7 +76,7 @@ if (forwarded) {
 if ((isAudioRoute || isCameraRoute) && !forwarded.has('mode')) forwarded.append('mode', mode);
 
 if (directCandidate) {
-  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261116-normal-release-1');
+  const { installDirectToolShell } = await import('./tool-direct.mjs?rev=20261116-normal-release-2');
   installDirectToolShell({ section, mode, search: forwarded });
 } else {
 

@@ -1,7 +1,7 @@
 import { PIXEL_ART_LIMITS, normalizePixelArt, decodePixelArt, pixelArtToRgba, toDrawDocument, encodePixelArt } from './pixel-art-contract.mjs?rev=20261114-mcp-1';
 import { createPxdProject } from '../creation/pxd-codec.mjs';
-import { putPxdDrawDocument, pxdToolUrl } from '../creation/pxd-project.mjs?rev=20261116-normal-release-1';
-import { createToolProjectStore } from '../creation/tool-project-store.mjs?rev=20261116-normal-release-1';
+import { putPxdDrawDocument, pxdToolUrl } from '../creation/pxd-project.mjs?rev=20261116-normal-release-2';
+import { createToolProjectStore } from '../creation/tool-project-store.mjs?rev=20261116-normal-release-2';
 
 export const DRAW_IMPORT_TOKEN_MAX = PIXEL_ART_LIMITS.maxTokenLength;
 export const DRAW_IMPORT_JSON_MAX = 64 * 1024;

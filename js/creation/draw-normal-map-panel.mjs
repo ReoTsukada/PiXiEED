@@ -4,7 +4,7 @@ import {
   encodeNormalMapPng,
   normalizeNormalMapSettings,
   renderNormalMapLighting
-} from './draw-normal-map.mjs?rev=20261116-normal-release-1';
+} from './draw-normal-map.mjs?rev=20261116-normal-release-2';
 
 const controlFields = {
   method: 'method', strength: 'strength', radius: 'radius', invertHeight: 'invert', format: 'format',

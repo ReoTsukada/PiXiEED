@@ -1,4 +1,4 @@
-import { OUTPUT_SIZES } from '../pixel-studio/framing.mjs?rev=20261116-normal-release-1';
+import { OUTPUT_SIZES } from '../pixel-studio/framing.mjs?rev=20261116-normal-release-2';
 const MAX_FRAME_EDGE = 4096;
 const MAX_IMAGE_PIXELS = 16_000_000;
 const MAX_GIF_FRAMES = 600;

@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-2';
 import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { boundedPixelLine } from './draw-pointer-geometry.mjs';
 

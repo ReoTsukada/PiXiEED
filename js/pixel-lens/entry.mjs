@@ -10,8 +10,8 @@ if (sharedEntry) {
   location.replace(`${destination.pathname}${destination.search}${destination.hash}`);
 } else {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
-  await import('./draw-camera-page.mjs?rev=20261116-normal-release-1');
+  await import('./draw-camera-page.mjs?rev=20261116-normal-release-2');
 } else {
-  await import('./app.mjs?rev=20261116-normal-release-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
+  await import('./app.mjs?rev=20261116-normal-release-2').then(({ mountPixelLensMode }) => mountPixelLensMode());
 }
 }

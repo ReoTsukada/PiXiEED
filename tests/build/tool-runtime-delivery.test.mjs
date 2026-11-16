@@ -29,7 +29,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.externalUrls.size, 66);
   assert.equal(plan.internalizedUrls.length, 52);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
-  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261116-normal-release-1'));
+  assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261116-normal-release-2'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
   assert(plan.pickerGraph.modules.has('/js/ads/project-gallery-ad.mjs?rev=20261108-gallery-canvas-viewport-1'));
@@ -68,11 +68,11 @@ test('delivery plan preserves runtime identities and bounds minification to star
     assert(!files.some(file => file.endsWith('/' + retired)), `Retired advertising runtime must stay off the startup graph: ${retired}`);
   }
   assert(plan.externalUrls.has('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
-  assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261116-normal-release-1'));
+  assert(plan.externalUrls.has('/js/creation/animation-core.mjs?rev=20261116-normal-release-2'));
   assert([...plan.modeGraph.modules.keys()].some(url => url.startsWith('/js/pixel-lens/app.mjs?')));
   assert([...plan.dynamicGraph.modules.keys()].some(url => url.startsWith('/js/creation/audio-export.mjs?')));
   assert(plan.physicalFiles.has('js/creation/creation-runtime.mjs'));
-  const cameraSettings = '/js/creation/camera-canvas-settings.mjs?rev=20261116-normal-release-1';
+  const cameraSettings = '/js/creation/camera-canvas-settings.mjs?rev=20261116-normal-release-2';
   assert(plan.runtimeGraph.modules.has(cameraSettings));
   assert(plan.internalizedUrls.includes(cameraSettings));
   assert(plan.physicalFiles.has('js/creation/camera-canvas-settings.mjs'));
@@ -150,6 +150,10 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert(!bundle.includes(tempBase), 'Compiler leaked its private temporary path into public output.');
     const direct = await readFile(path.join(buildRoot, 'js/tool-direct.mjs'), 'utf8');
     assert(direct.includes(`./creation/creation-runtime.bundle.mjs?rev=${report.revision}`));
+    assert(direct.includes('/draw/editor.html?rev=20261116-normal-release-2'), 'Minification must preserve the editor HTML cache version.');
+    assert.match(direct, /cache:["']no-cache["']/, 'The optimized loader must still revalidate editor HTML.');
+    const builtShell = await readFile(shellPath, 'utf8');
+    assert(builtShell.includes(`./tool-direct.mjs?rev=${report.revision}`), 'The caller must invalidate the changed template loader.');
     assert(direct.includes('/js/creation/pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1'));
     assert(direct.includes(guideMetricsUrl), 'Public-guide metrics must keep its shared canonical URL in the optimized delivery.');
     for (const route of plan.htmlRoutes) {

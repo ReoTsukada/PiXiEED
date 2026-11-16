@@ -126,3 +126,21 @@ test('definite restore failure opens the gallery once only after the active shel
   assert.equal(recovery.hidden, false);
   assert.match(message.textContent, /作品を開けませんでした/);
 });
+
+
+test('direct runtime revalidates a versioned editor template without losing credentials or cancellation', async () => {
+  const begin = source.indexOf('  async function loadRuntime() {');
+  const end = source.indexOf('  async function show(', begin);
+  assert.ok(begin >= 0 && end > begin);
+  const controller = new AbortController(), stop = new Error('request captured');
+  let request;
+  const pending = runInNewContext(`${source.slice(begin, end)}\nloadRuntime();`, {
+    runtime: null, mounting: null, lifecycle: controller, setLoadingStage() {},
+    fetch(url, options) { request = { url, options }; throw stop; }
+  });
+  await assert.rejects(pending, error => error === stop);
+  assert.equal(request.url, '/draw/editor.html?rev=20261116-normal-release-2', 'the previous unversioned HTML cache cannot supply a stale stylesheet list');
+  assert.equal(request.options.cache, 'no-cache', 'even the versioned template is revalidated');
+  assert.equal(request.options.credentials, 'same-origin');
+  assert.equal(request.options.signal, controller.signal, 'closing the editor still aborts its pending template request');
+});

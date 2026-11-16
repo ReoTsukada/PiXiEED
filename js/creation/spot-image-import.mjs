@@ -1,4 +1,4 @@
-import { createSpotDifferenceImagePair, decodeDrawImageFile } from './draw-import.mjs?rev=20261116-normal-release-1';
+import { createSpotDifferenceImagePair, decodeDrawImageFile } from './draw-import.mjs?rev=20261116-normal-release-2';
 
 export async function decodeSpotImagePair(beforeFile, afterFile, options = {}) {
   if (!beforeFile || !afterFile) throw new TypeError('元の絵と変更後の絵を選んでください。');

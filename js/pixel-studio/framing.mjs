@@ -1,4 +1,4 @@
-import { ANIMATION_MAX_DIMENSION } from '../creation/animation-core.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_MAX_DIMENSION } from '../creation/animation-core.mjs?rev=20261116-normal-release-2';
 export const FRAME_RATIOS = Object.freeze([
   Object.freeze({ value: 'screen', label: '画面', ratio: null }),
   Object.freeze({ value: '1:1', label: '1:1', ratio: 1 }),

@@ -1,6 +1,6 @@
-import { createAnimationFromDraw, ensureAnimationMusicLayer, ensureAnimationNormalLayer, getAnimationCelDocument, getAnimationLayerPalette, NORMAL_MAP_PALETTE, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261116-normal-release-1';
-import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261116-normal-release-1';
-import { validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-1';
+import { createAnimationFromDraw, ensureAnimationMusicLayer, ensureAnimationNormalLayer, getAnimationCelDocument, getAnimationLayerPalette, NORMAL_MAP_PALETTE, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, writeAnimationCel, setAnimationPalette } from './animation-core.mjs?rev=20261116-normal-release-2';
+import { createDrawAnimationHistory } from './draw-animation-history.mjs?rev=20261116-normal-release-2';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-2';
 
 const normalRgba = NORMAL_MAP_PALETTE.map(color => [
   Number.parseInt(color.slice(1, 3), 16), Number.parseInt(color.slice(3, 5), 16), Number.parseInt(color.slice(5, 7), 16), 255

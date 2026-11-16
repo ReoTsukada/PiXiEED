@@ -1,5 +1,5 @@
-import { createAnimationFromSerialized, getAnimationCelDocument, getAnimationUsedColorIndices, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261116-normal-release-1';
-import { chooseCameraPalette } from './draw-camera-core.mjs?rev=20261116-normal-release-1';
+import { createAnimationFromSerialized, getAnimationCelDocument, getAnimationUsedColorIndices, serializeAnimationPool, validateAnimation } from './animation-core.mjs?rev=20261116-normal-release-2';
+import { chooseCameraPalette } from './draw-camera-core.mjs?rev=20261116-normal-release-2';
 
 export const DRAW_CAMERA_HANDOFF_TTL = 15 * 60 * 1000;
 export const DRAW_CAMERA_HANDOFF_PREFIX = 'pixieed:draw-camera:v1:';

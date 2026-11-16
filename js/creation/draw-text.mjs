@@ -1,5 +1,5 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-1';
-import { validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-2';
+import { validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-2';
 
 export const DRAW_TEXT_FONTS = Object.freeze([
   { id: 'sans', label: 'ゴシック', css: 'sans-serif' },

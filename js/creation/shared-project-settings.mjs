@@ -1,5 +1,5 @@
-import { composeAnimationFrameRgba, ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-1';
-import { getCanvasSettingsBounds, isProjectSettingsPreviewCurrent, validateCanvasSettingsFields, fitCanvasAspect } from './shared-project-settings-core.mjs?rev=20261116-normal-release-1';
+import { composeAnimationFrameRgba, ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-2';
+import { getCanvasSettingsBounds, isProjectSettingsPreviewCurrent, validateCanvasSettingsFields, fitCanvasAspect } from './shared-project-settings-core.mjs?rev=20261116-normal-release-2';
 
 const SCALE_PRESETS = [25, 50, 100, 200, 300, 1000];
 const ASPECTS = [['free', '自由'], ['1:1', '正方形 1:1'], ['3:2', '横長 3:2'], ['2:3', '縦長 2:3'], ['3:4', '3:4'], ['9:16', '9:16'], ['4:3', '4:3'], ['16:9', '16:9']];

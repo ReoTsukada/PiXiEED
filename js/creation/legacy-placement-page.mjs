@@ -656,7 +656,7 @@ async function mountMyPosts() {
     const generation = ++likeGeneration;
     count.textContent = '—';
     try {
-      const { listMyPublishedLikes } = await import('../globe/post-supabase.mjs?rev=20261116-normal-release-1');
+      const { listMyPublishedLikes } = await import('../globe/post-supabase.mjs?rev=20261116-normal-release-2');
       const ids = await listMyPublishedLikes();
       if (generation === likeGeneration && count.isConnected) {
         count.textContent = String(Number(count.dataset.localLikes) + new Set(ids).size);

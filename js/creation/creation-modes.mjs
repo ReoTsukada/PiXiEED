@@ -1,10 +1,10 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
-import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261116-normal-release-1';
-import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261116-normal-release-1';
+import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261116-normal-release-2';
+import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261116-normal-release-2';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
-import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261116-normal-release-1';
+import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261116-normal-release-2';
 import { mountCreationModeMotion } from './creation-mode-motion.mjs?rev=20261107-mode-continuity-1';
-import { ANIMATION_MAX_DIMENSION, animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_MAX_DIMENSION, animationNeedsRgba, hasAnimationCelContent } from './animation-core.mjs?rev=20261116-normal-release-2';
 
 
 /** One shell, project, palette and history. Mode changes never copy artwork. */
@@ -34,7 +34,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261116-normal-release-1';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261116-normal-release-2';
   const styled = new Promise((resolve, reject) => {
     const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
     const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
@@ -413,7 +413,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261116-normal-release-1&attempt=${audioLoadAttempt++}`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261116-normal-release-2&attempt=${audioLoadAttempt++}`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => isActive() && mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -451,7 +451,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261116-normal-release-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261116-normal-release-2&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

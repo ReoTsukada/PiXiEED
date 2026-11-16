@@ -1,17 +1,17 @@
-import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261116-normal-release-1';
+import { planSharedProjectSettings } from './shared-project-core.mjs?rev=20261116-normal-release-2';
 import { readPxdAudioLink } from './pxd-audio-link.mjs?rev=20261006-draw-startup-1';
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
 import { scaleNotice } from '../pixel-scale.mjs?rev=20260929-claude-integration-1';
 import { createLatestGate } from './pixel-contract.mjs?rev=20260928-data-contract-1';
-import { mountPictureShelf } from './picture-shelf.mjs?rev=20261116-normal-release-1';
+import { mountPictureShelf } from './picture-shelf.mjs?rev=20261116-normal-release-2';
 import { createLocalDraftStore, createIndexedDbDraftAdapter } from './local-drafts.mjs';
-import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba as indexedDocumentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-1';
-import { createDrawAnimationSession, prepareDrawNormalLayer } from './draw-animation-session.mjs?rev=20261116-normal-release-1';
-import { NORMAL_MAP_PALETTE, NORMAL_MAP_SWATCHES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes, ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, getAnimationCelDocument, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent, serializeAnimationPool, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261116-normal-release-1';
-import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261116-normal-release-1';
+import { createDrawDocument, createDrawHistory, DRAW_PALETTE, DRAW_PALETTE_ORDER, DRAW_SIZE, documentRgba as indexedDocumentRgba, beginDrawStroke, commitDrawStroke, cancelDrawStroke, floodFill, strokePixels, validateDrawDocument } from './draw-core.mjs?rev=20261116-normal-release-2';
+import { createDrawAnimationSession, prepareDrawNormalLayer } from './draw-animation-session.mjs?rev=20261116-normal-release-2';
+import { NORMAL_MAP_PALETTE, NORMAL_MAP_SWATCHES, ANIMATION_MAX_DIMENSION, estimateRetainedAnimationBytes, ANIMATION_MAX_COLORS, ANIMATION_MAX_PALETTE_ENTRIES, addAnimationFrame, removeAnimationFrame, moveAnimationFrame, addAnimationLayer, removeAnimationLayer, moveAnimationLayer, setLayerProperties, setAnimationFrameDuration, setAnimationPalette, writeAnimationCel, composeAnimationFrame, composeAnimationFrameRgba, animationNeedsRgba, getAnimationCelDocument, resizeAnimation, getAnimationUsedColorIndices, hasAnimationCelContent, serializeAnimationPool, getAnimationDrawRewardBonusColors, setAnimationDrawRewardBonusColors } from './animation-core.mjs?rev=20261116-normal-release-2';
+import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261116-normal-release-2';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
-import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-1';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261116-normal-release-1';
+import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-2';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261116-normal-release-2';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
@@ -19,30 +19,30 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261116-normal-release-1';
-import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261116-normal-release-1';
-import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261116-normal-release-1';
-import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261116-normal-release-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261116-normal-release-2';
+import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
+import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261116-normal-release-2';
+import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261116-normal-release-2';
 import { enlargedPng, saveFile } from '../pixel-export.mjs?rev=20261111-output-offerwall-1';
-import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261116-normal-release-1';
+import { createDrawTimelapse, selectDrawTimelapseFrames } from './draw-timelapse.mjs?rev=20261116-normal-release-2';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261012-operation-bar-1';
 import { mountCreationEditorUi } from './editor-ui.mjs?rev=20261018-direct-runtime-2';
 import { wheelZoomFactor } from './viewport-wheel.mjs';
 import { applyDrawingToolIcons, createDrawingToolIcon } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261116-normal-release-1';
+import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } from './draw-tool-operations.mjs?rev=20261116-normal-release-2';
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
-import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261116-normal-release-1';
+import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261116-normal-release-2';
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 
-import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261116-normal-release-1';
+import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261116-normal-release-2';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261009-sprite-scale-1';
 import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=20261009-sprite-scale-1';
-import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261116-normal-release-1';
-import { resizeDrawView } from './draw-resize-view.mjs?rev=20261116-normal-release-1';
+import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261116-normal-release-2';
+import { resizeDrawView } from './draw-resize-view.mjs?rev=20261116-normal-release-2';
 import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261106-button-icon-audit-1';
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
@@ -51,16 +51,16 @@ import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-p
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
 import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261015-draw-desktop-1';
-import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, getDrawSelectionOtherColors, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261116-normal-release-1';
-import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261116-normal-release-1';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116-normal-release-1';
-import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-1';
-import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-1';
-import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-1';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261116-normal-release-1';
+import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, getDrawSelectionOtherColors, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261116-normal-release-2';
+import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261116-normal-release-2';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116-normal-release-2';
+import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-2';
+import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-2';
+import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261116-normal-release-2';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
-import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261116-normal-release-1';
+import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261116-normal-release-2';
 
 const documentRgba = image => image.rgba || indexedDocumentRgba(image);
 const DRAW_REWARD_LIMITS = Object.freeze({ ...REWARD_LIMITS.draw });
@@ -78,7 +78,7 @@ let importedOriginal = null;
 let handoffApi = null, returnedCamera = null, initialCameraProject = null, cameraNavigationResume = null;
 const handoffParams = new URLSearchParams(location.search);
 if (handoffParams.has('drawCamera')) {
-  handoffApi = await import('./draw-camera-handoff.mjs?rev=20261116-normal-release-1');
+  handoffApi = await import('./draw-camera-handoff.mjs?rev=20261116-normal-release-2');
   returnedCamera = handoffApi.takeDrawCameraReturn({ search: location.search, consume: false });
   if (!returnedCamera) throw new Error('撮影の受け渡しを確認できません。元の一時保存は変更していません。');
   if (returnedCamera.project?.pxdBase64) initialCameraProject = {
@@ -492,7 +492,7 @@ async function restoreCameraReturn(record) {
   if (record.history?.timelapse) timelapse.restore(record.history.timelapse.map(event => ({ ...event, data: decodeCameraBytes(event.data), ...(event.indices ? { indices: Uint32Array.from(event.indices) } : {}) })));
   if (record.indices) {
     const lease = drawRewardPolicy.capture('draw');
-    const { prepareCameraTarget, replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-1');
+    const { prepareCameraTarget, replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-2');
     const target = prepareCameraTarget(documentData, record.mask, record.allowedIndices);
     const next = replaceCameraPixels(documentData, target, record.indices);
     const before = animationSession.animation;
@@ -2304,7 +2304,7 @@ async function importImage(file, importSource) {
   const ticket = loadGate.begin();
   $('#draw-import-local').disabled = true; status.textContent = '画像を読み込んでいます…';
   try {
-    const { decodeDrawImageFile } = await import('./draw-import.mjs?rev=20261116-normal-release-1');
+    const { decodeDrawImageFile } = await import('./draw-import.mjs?rev=20261116-normal-release-2');
     if (scope.disposed || !loadGate.isCurrent(ticket)) return;
     const image = await decodeDrawImageFile(file);
     if (scope.disposed || !loadGate.isCurrent(ticket)) return; // a newer open or import has replaced this one
@@ -2317,7 +2317,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261116-normal-release-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261116-normal-release-2');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2666,7 +2666,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261116-normal-release-1');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261116-normal-release-2');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {
@@ -3259,7 +3259,7 @@ return {
     if (editingNormalLayer()) throw new Error('写真の配置は描画レイヤーを選んで使ってください。');
     if (animationSession.animation.width > ANIMATION_MAX_DIMENSION || animationSession.animation.height > ANIMATION_MAX_DIMENSION) throw new RangeError(`カメラ配置は${ANIMATION_MAX_DIMENSION}px以下に対応しています。作品は変更していません。`);
     const lease = captureDrawOperation();
-    const { prepareCameraTarget } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-1');
+    const { prepareCameraTarget } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-2');
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
     if (readOnlyImage) throw new Error('原本を表示しています。共通キャンバスの設定で編集可能なサイズと色数に合わせてから適用してください。');
     if (animationSession.locked) throw new Error('ロックを解除するか、編集可能なレイヤーを選んでから適用してください。');
@@ -3348,7 +3348,7 @@ return {
     const lease = snapshot.lease || drawRewardPolicy.capture('draw');
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
     if (animationSession.animation !== snapshot.owner || animationSession.frameId !== snapshot.frameId || animationSession.layerId !== snapshot.layerId) throw new Error('撮影対象が変更されました。撮り直してください。');
-    const { replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-1');
+    const { replaceCameraPixels } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-2');
     const next = replaceCameraPixels(documentData, snapshot.target, indices);
     if (!guardDrawDocumentTransition(documentData, next, { lease })) return false;
     const previousLease = drawOperationLease; drawOperationLease = lease;
@@ -3358,7 +3358,7 @@ return {
   async applyCameraRgba(snapshot, rgba, options) {
     const lease = snapshot.lease || drawRewardPolicy.capture('draw');
     if (musicLayer && musicReadOnlyReason && animationSession.animation.layers.find(layer => layer.id === animationSession.layerId)?.role === 'music') throw new Error(musicReadOnlyReason);
-    const { planCameraReplacement } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-1');
+    const { planCameraReplacement } = await import('./draw-camera-core.mjs?rev=20261116-normal-release-2');
     if (animationSession.animation !== snapshot.owner || animationSession.frameId !== snapshot.frameId || animationSession.layerId !== snapshot.layerId) throw new Error('撮影対象が変更されました。撮り直してください。');
     const mask = selectionMask();
     if (Boolean(mask) !== Boolean(snapshot.target.mask) || mask && mask.some((value, index) => value !== snapshot.target.mask[index])) throw new Error('適用中に選択範囲が変わりました。対象を確認してもう一度適用してください。');

@@ -1,5 +1,5 @@
-import { evaluateSharedCanvasPolicy, SHARED_CANVAS_FREE_MAX_COLORS } from './shared-canvas-policy.mjs?rev=20261116-normal-release-1';
-import { countSharedImageColors } from './shared-image.mjs?rev=20261116-normal-release-1';
+import { evaluateSharedCanvasPolicy, SHARED_CANVAS_FREE_MAX_COLORS } from './shared-canvas-policy.mjs?rev=20261116-normal-release-2';
+import { countSharedImageColors } from './shared-image.mjs?rev=20261116-normal-release-2';
 import { getPxdJson } from './pxd-codec.mjs';
 import { requireSiteReward } from '../ads/site-reward.mjs?rev=20261024-free-tools-1';
 

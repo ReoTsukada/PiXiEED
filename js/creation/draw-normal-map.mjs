@@ -1,4 +1,4 @@
-export { DEFAULT_NORMAL_MAP_SETTINGS, normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261116-normal-release-1';
+export { DEFAULT_NORMAL_MAP_SETTINGS, normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261116-normal-release-2';
 
 const MAX_SIDE = 1028;
 const SQRT2 = Math.SQRT2;

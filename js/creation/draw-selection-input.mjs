@@ -1,5 +1,5 @@
-import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-1';
-import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261116-normal-release-1';
+import { ANIMATION_MAX_DIMENSION } from './animation-core.mjs?rev=20261116-normal-release-2';
+import { drawSelectionMask, drawSelectionMaskBounds } from './draw-selection-operations.mjs?rev=20261116-normal-release-2';
 
 // Capture modifiers at down so changing keys during a drag cannot reinterpret it.
 export function selectionInputOperation(event) {

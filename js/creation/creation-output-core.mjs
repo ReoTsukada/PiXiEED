@@ -1,4 +1,4 @@
-import { composeAnimationFrame, composeAnimationFrameRgba, setLayerProperties } from './animation-core.mjs?rev=20261116-normal-release-1';
+import { composeAnimationFrame, composeAnimationFrameRgba, setLayerProperties } from './animation-core.mjs?rev=20261116-normal-release-2';
 
 /** Compose an export image without changing the saved layer visibility. */
 export function composeOutputFrame(animation, frameId, { includeMusic = false } = {}) {
