@@ -522,7 +522,7 @@ export function initHomeRecentProjects({
   }
 
   function handlePageShow() {
-    if (disposed) return;
+    if (disposed || !paused) return;
     paused = false;
     void refresh();
   }

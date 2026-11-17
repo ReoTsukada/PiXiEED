@@ -148,7 +148,7 @@ test('the home shelf defers its local preview reader until the shelf is visible'
   assert.match(homeModule, /IntersectionObserver/);
   assert.match(homeModule, /entry.isIntersecting/);
   assert.match(homeModule, /rootMargin:'0px'/);
-  assert.match(homeModule, /await import\('\.\/home-recent-projects\.mjs\?rev=20261112-home-community-1'\)/);
+  assert.match(homeModule, /await import\('\.\/home-recent-projects\.mjs\?rev=20261117-home-pageshow-1'\)/);
   assert.doesNotMatch(homeModule, /from .*pxd-store|from .*pxd-codec|from .*draw-page|cloneAsToolProject|forkProject/);
 });
 

@@ -37,6 +37,7 @@ import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261116-normal-
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
+import { applyDrawAgentPixelChanges, assertDrawAgentPrecondition, normalizeDrawAgentBinding, normalizeDrawAgentOperation, prepareDrawAgentColorAdjustment } from './draw-agent-operations.mjs?rev=20261117-live-agent-2';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261116-normal-release-2';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
@@ -58,7 +59,7 @@ import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-2';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-2';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-normal-apply-1';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-live-draw-2';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
 import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261117-normal-apply-1';
@@ -387,7 +388,30 @@ const editorListeners = new Set(), projectHooks = new Set();
 let currentOpenedProject = null, projectSettingsRequest = null, creationNavigationRequest = null, musicSettingsPlanner = null;
 let musicTimelineValidator = null;
 let notifiedAnimation = null;
+let drawAgentRevision = 0;
+let drawAgentOpenCounter = 0;
+const drawAgentToken = () => globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+let drawAgentOpenEpoch = drawAgentToken();
+let drawAgentObservedAnimation = animationSession.animation;
+let drawAgentObservedFrameId = animationSession.frameId;
+let drawAgentObservedLayerId = animationSession.layerId;
+let drawAgentOperationPending = false;
+function advanceDrawAgentOpenEpoch() {
+  drawAgentOpenCounter += 1;
+  drawAgentOpenEpoch = `${drawAgentOpenCounter}-${drawAgentToken()}`;
+}
+function syncDrawAgentRevision() {
+  if (drawAgentObservedAnimation !== animationSession.animation
+      || drawAgentObservedFrameId !== animationSession.frameId
+      || drawAgentObservedLayerId !== animationSession.layerId) {
+    drawAgentRevision += 1;
+    drawAgentObservedAnimation = animationSession.animation;
+    drawAgentObservedFrameId = animationSession.frameId;
+    drawAgentObservedLayerId = animationSession.layerId;
+  }
+}
 function notifyEditorChange() {
+  syncDrawAgentRevision();
   if (!editorListeners.size || notifiedAnimation === animationSession.animation) return;
   notifiedAnimation = animationSession.animation;
   for (const listener of editorListeners) listener();
@@ -2708,6 +2732,8 @@ const drawProjectOptions = {
   setStatus: (message) => { status.textContent = message; },
   async openProject(project, { imageRole = null } = {}) {
     if (scope.disposed) return;
+    // Invalidate remote bindings immediately, including same-project reopen attempts.
+    advanceDrawAgentOpenEpoch();
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
@@ -3059,6 +3085,230 @@ function openAudioTimbre(index = selectedColor, sourceTrigger = null) {
   });
   return true;
 }
+function drawAgentIsBusy({ includePending = true } = {}) {
+  return Boolean(readOnlyImage || pxdBridge?.busy || (includePending && drawAgentOperationPending) || featureSession
+    || selectionTransform || spriteScaling || colorEdit || cameraOpening || playing || drawingInputBusy()
+    || $('#draw-output')?.open);
+}
+function drawAgentHasUncommittedDraft() {
+  return Boolean(featureSession || selectionTransform || spriteScaling || colorEdit || cameraOpening || drawingInputBusy());
+}
+function drawAgentProjectBinding() {
+  const projectId = pxdBridge?.currentProject?.projectId || `unsaved:${drawAgentOpenEpoch}`;
+  return { projectId, openEpoch: drawAgentOpenEpoch };
+}
+function getDrawAgentState({ frameId = animationSession.frameId, layerId = animationSession.layerId } = {}) {
+  syncDrawAgentRevision();
+  const animation = animationSession.animation;
+  if (!animation.frames.some(item => item.id === frameId)) throw new TypeError('Requested frame does not exist');
+  if (!animation.layers.some(item => item.id === layerId)) throw new TypeError('Requested layer does not exist');
+  const celDocument = getAnimationCelDocument(animation, frameId, layerId);
+  const persistedRevisionId = pxdBridge?.persistedProject?.revisionId || null;
+  const workspaceSaved = Boolean(pxdBridge?.persisted && !pxdBridge?.dirty && !drawAgentHasUncommittedDraft());
+  return {
+    revision: drawAgentRevision,
+    projectBinding: drawAgentProjectBinding(),
+    projectPersisted: Boolean(pxdBridge?.persisted),
+    savedRevisionId: persistedRevisionId,
+    saved: workspaceSaved,
+    dirty: Boolean(!workspaceSaved || pxdBridge?.dirty || drawAgentHasUncommittedDraft()),
+    busy: drawAgentIsBusy(),
+    width: animation.width,
+    height: animation.height,
+    palette: [...animation.palette],
+    active: { frameId: animationSession.frameId, layerId: animationSession.layerId },
+    frames: animation.frames.map(item => ({ id: item.id, durationMs: item.durationMs })),
+    layers: animation.layers.map(item => ({ id: item.id, name: item.name, visible: item.visible, locked: item.locked,
+      opacity: item.opacity ?? 1, role: item.role || 'art' })),
+    cel: { frameId, layerId, pixels: Array.from(celDocument.pixels, value => Number(value)) },
+    canUndo: Boolean(animationSession.canUndo),
+    canRedo: Boolean(animationSession.canRedo),
+  };
+}
+function drawAgentEnsureAuthorized(isAuthorized, expectedBinding, { allowProjectIdChange = false } = {}) {
+  if (scope.disposed || !isActive() || (typeof isAuthorized === 'function' && isAuthorized() !== true)) {
+    const error = new Error('The Draw agent session is no longer authorized'); error.code = 'DRAW_AGENT_SESSION_CLOSED'; throw error;
+  }
+  const current = drawAgentProjectBinding();
+  if ((!allowProjectIdChange && current.projectId !== expectedBinding.projectId) || current.openEpoch !== expectedBinding.openEpoch) {
+    const error = new Error('The open Draw project changed'); error.code = 'DRAW_AGENT_STALE_PROJECT'; throw error;
+  }
+}
+function drawAgentCommitAnimation(next, selection = null, target = {}) {
+  const lease = drawRewardPolicy.capture('draw');
+  if (!guardDrawTransition(next, { lease, target: drawRewardTarget(next, target.frameId || animationSession.frameId,
+    target.layerId || animationSession.layerId, target.colorIndex ?? selectedColor), mutation: 'edit' })) {
+    const error = new Error('Draw rejected this change under its current editing limits'); error.code = 'DRAW_AGENT_CHANGE_REJECTED'; throw error;
+  }
+  const chosen = selection || { frameId: animationSession.frameId, layerId: animationSession.layerId };
+  const doc = animationSession.apply(next, chosen);
+  pxdBridge?.markDirty();
+  installAnimationDocument(doc);
+  return true;
+}
+async function executeDrawAgentOperation(envelope, { isAuthorized } = {}) {
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) throw new TypeError('Operation envelope is invalid');
+  if (isAuthorized !== undefined && typeof isAuthorized !== 'function') throw new TypeError('isAuthorized must be a function');
+  for (const key of Object.keys(envelope)) if (!['expectedRevision', 'projectBinding', 'operation'].includes(key)) throw new TypeError(`Unsupported operation envelope field: ${key}`);
+  const precondition = { expectedRevision: envelope.expectedRevision, projectBinding: normalizeDrawAgentBinding(envelope.projectBinding) };
+  const current = getDrawAgentState();
+  assertDrawAgentPrecondition(precondition, current);
+  drawAgentEnsureAuthorized(isAuthorized, current.projectBinding);
+  if (drawAgentIsBusy()) { const error = new Error('Draw is busy; finish the current edit or preview first'); error.code = 'DRAW_AGENT_BUSY'; throw error; }
+  if (drawAgentOperationPending) { const error = new Error('Another Draw agent operation is already running'); error.code = 'DRAW_AGENT_BUSY'; throw error; }
+  drawAgentOperationPending = true;
+  const beforeAnimation = animationSession.animation;
+  const beforeFrameId = animationSession.frameId, beforeLayerId = animationSession.layerId;
+  const beforePersistedRevisionId = current.savedRevisionId;
+  let persistenceCompleted = false, completedSavedRevisionId = null;
+  try {
+    const animation = animationSession.animation;
+    const context = { width: animation.width, height: animation.height, paletteLength: animation.palette.length,
+      frames: animation.frames, layers: animation.layers, active: { frameId: animationSession.frameId, layerId: animationSession.layerId } };
+    const operation = normalizeDrawAgentOperation(envelope.operation, context);
+    const ensureFresh = () => {
+      drawAgentEnsureAuthorized(isAuthorized, current.projectBinding);
+      assertDrawAgentPrecondition(precondition, getDrawAgentState());
+      if (drawAgentIsBusy({ includePending: false })) { const error = new Error('Draw became busy'); error.code = 'DRAW_AGENT_BUSY'; throw error; }
+    };
+    const result = { changed: false };
+    if (operation.type === 'save') {
+      if (!pxdBridge?.save) throw new Error('The browser-local project workspace is unavailable');
+      if (readOnlyImage || featureSession || selectionTransform || spriteScaling || colorEdit || cameraOpening || playing || drawingInputBusy()) {
+        const error = new Error('Finish the current edit before saving'); error.code = 'DRAW_AGENT_BUSY'; throw error;
+      }
+      await pxdBridge.assertCanSave?.();
+      ensureFresh();
+      const savedAtRevision = current.revision;
+      let project;
+      try { project = await pxdBridge.save(); }
+      catch (error) {
+        if (pxdBridge?.persistedProject?.revisionId !== beforePersistedRevisionId) error.applied = 'unknown';
+        throw error;
+      }
+      persistenceCompleted = true;
+      completedSavedRevisionId = project?.revisionId || null;
+      try { drawAgentEnsureAuthorized(isAuthorized, current.projectBinding, { allowProjectIdChange: !current.projectPersisted }); }
+      catch (error) { error.applied = 'unknown'; error.savedRevisionId = project?.revisionId || null; throw error; }
+      let after;
+      try { after = getDrawAgentState(); }
+      catch (error) { error.applied = 'unknown'; error.savedRevisionId = project?.revisionId || null; throw error; }
+      if (after.projectBinding.openEpoch !== current.projectBinding.openEpoch
+          || current.projectPersisted && after.projectBinding.projectId !== current.projectBinding.projectId
+          || after.projectBinding.projectId !== project.projectId) {
+        const error = new Error('The project changed while it was being saved'); error.code = 'DRAW_AGENT_STALE_PROJECT'; error.applied = 'unknown'; error.savedRevisionId = project?.revisionId || null; throw error;
+      }
+      if (!project?.projectId || !project?.revisionId || !pxdBridge.persisted) throw new Error('The workspace did not confirm a browser-local save');
+      if (after.revision === savedAtRevision && !drawAgentHasUncommittedDraft() && !pxdBridge.dirty) {
+        saved = true;
+        status.textContent = '作品をこのブラウザーに保存しました。';
+      }
+      return { changed: false, revision: after.revision, projectBinding: after.projectBinding, state: { ...after, busy: drawAgentIsBusy({ includePending: false }) },
+        savedRevisionId: project.revisionId, savedEditorRevision: after.revision === savedAtRevision && !after.dirty ? savedAtRevision : null,
+        dirtyAfter: Boolean(after.dirty || pxdBridge.dirty || after.revision !== savedAtRevision), storage: 'browser_local' };
+    }
+    if (operation.type === 'undo' || operation.type === 'redo') {
+      ensureFresh();
+      const available = operation.type === 'undo' ? animationSession.canUndo : animationSession.canRedo;
+      if (!available) throw new Error(operation.type === 'undo' ? 'There is no Draw edit to undo' : 'There is no Draw edit to redo');
+      const changed = operation.type === 'undo' ? undo(true) : redo(true);
+      if (!changed) throw new Error(`Draw ${operation.type} was rejected`);
+      result.changed = true;
+    } else if (operation.type === 'pixel.set' || operation.type === 'pixels.set') {
+      ensureFresh();
+      const changes = operation.type === 'pixel.set' ? [{ x: operation.x, y: operation.y, colorIndex: operation.colorIndex }] : operation.pixels;
+      const cel = getAnimationCelDocument(animationSession.animation, operation.frameId, operation.layerId);
+      const applied = applyDrawAgentPixelChanges(cel, changes);
+      if (applied.changed) {
+        const next = writeAnimationCel(animationSession.animation, operation.frameId, operation.layerId, {
+          width: cel.width, height: cel.height, pixels: Uint8Array.from(applied.document.pixels, value => value + 1) });
+        ensureFresh(); drawAgentCommitAnimation(next, null, { frameId: operation.frameId, layerId: operation.layerId,
+          colorIndex: changes.find(change => change.colorIndex !== null)?.colorIndex ?? selectedColor });
+        result.changed = true; result.changedCount = applied.changedCount;
+      }
+    } else if (operation.type === 'palette.add') {
+      if (animationSession.animation.layers.some(layer => layer.role === 'normal')) throw new Error('ノーマルマップでは方向パレットを変更できません。');
+      const existing = animationSession.animation.palette.findIndex(color => color.toLowerCase() === operation.color);
+      if (existing >= 0) { result.index = existing; result.added = false; }
+      else {
+        const palette = [...animationSession.animation.palette, operation.color];
+        if (palette.length > ANIMATION_MAX_PALETTE_ENTRIES) throw new RangeError(`Draw palette capacity is ${ANIMATION_MAX_PALETTE_ENTRIES}`);
+        const next = setAnimationPalette(animationSession.animation, palette);
+        ensureFresh(); drawAgentCommitAnimation(next); result.changed = true; result.index = palette.length - 1; result.added = true;
+      }
+    } else if (operation.type === 'color.adjust') {
+      const before = animationSession.animation;
+      const targetLayer = animationSession.animation.layers.find(layer => layer.id === operation.layerId);
+      if (targetLayer?.role === 'normal' || operation.scope === 'whole' && animationSession.animation.layers.some(layer => layer.role === 'normal')) throw new Error('ノーマルマップのパレットは色調整できません。');
+      const next = await prepareDrawAgentColorAdjustment(before, operation, { maxPalette: ANIMATION_MAX_PALETTE_ENTRIES });
+      ensureFresh();
+      if (next !== before) { drawAgentCommitAnimation(next, null, { frameId: operation.frameId, layerId: operation.layerId }); result.changed = true; }
+    } else if (operation.type === 'layer.select') {
+      const layer = animationSession.animation.layers.find(item => item.id === operation.layerId);
+      if (layer.role === 'music') throw new Error('Music layers cannot be selected for drawing operations');
+      if (animationSession.layerId !== operation.layerId) {
+        ensureFresh(); installAnimationDocument(animationSession.select(animationSession.frameId, operation.layerId)); result.changed = true;
+      }
+    } else if (operation.type.startsWith('layer.')) {
+      const before = animationSession.animation;
+      let next = before, chosen = { frameId: animationSession.frameId, layerId: animationSession.layerId };
+      if (operation.type === 'layer.add') {
+        next = addAnimationLayer(before, { name: operation.name || `レイヤー ${before.layers.length + 1}`,
+          visible: operation.visible ?? true, locked: operation.locked ?? false });
+        chosen = { frameId: animationSession.frameId, layerId: next.layers.at(-1).id };
+        result.layerId = next.layers.at(-1).id;
+      } else {
+        const layer = before.layers.find(item => item.id === operation.layerId);
+        if (layer.role === 'music') throw new Error('Music layers are outside the Draw agent editing scope');
+        if (layer.locked && operation.type !== 'layer.lock') throw new Error('Unlock the target layer before changing it');
+        switch (operation.type) {
+          case 'layer.rename': next = setLayerProperties(before, layer.id, { name: operation.name }); break;
+          case 'layer.visibility': next = setLayerProperties(before, layer.id, { visible: operation.visible }); break;
+          case 'layer.opacity': next = setLayerProperties(before, layer.id, { opacity: operation.opacity }); break;
+          case 'layer.lock': next = setLayerProperties(before, layer.id, { locked: operation.locked }); break;
+          case 'layer.move': next = moveAnimationLayer(before, layer.id, operation.index); break;
+          case 'layer.remove':
+            next = removeAnimationLayer(before, layer.id);
+            if (layer.id === animationSession.layerId) chosen = { frameId: animationSession.frameId, layerId: next.layers.findLast(item => item.role !== 'music').id };
+            break;
+          default: throw new TypeError(`Unsupported layer operation: ${operation.type}`);
+        }
+      }
+      if (next !== before) { ensureFresh(); drawAgentCommitAnimation(next, chosen); result.changed = true; }
+    } else if (operation.type.startsWith('frame.')) {
+      const before = animationSession.animation;
+      if (['frame.add', 'frame.remove', 'frame.move', 'frame.duration'].includes(operation.type)
+          && before.layers.some(layer => layer.locked)) throw new Error('Unlock all layers before changing frames');
+      let next = before, chosen = { frameId: animationSession.frameId, layerId: animationSession.layerId };
+      switch (operation.type) {
+        case 'frame.select':
+          if (animationSession.frameId !== operation.frameId) { ensureFresh(); installAnimationDocument(animationSession.select(operation.frameId, animationSession.layerId)); result.changed = true; }
+          break;
+        case 'frame.add':
+          next = addAnimationFrame(before, { sourceFrameId: operation.sourceFrameId, copy: operation.copy });
+          chosen = { frameId: next.frames.at(-1).id, layerId: animationSession.layerId }; result.frameId = chosen.frameId; break;
+        case 'frame.duration': next = setAnimationFrameDuration(before, operation.frameId, operation.durationMs); break;
+        case 'frame.move': next = moveAnimationFrame(before, operation.frameId, operation.index); break;
+        case 'frame.remove':
+          next = removeAnimationFrame(before, operation.frameId);
+          if (operation.frameId === animationSession.frameId) chosen = { frameId: next.frames[0].id, layerId: animationSession.layerId };
+          break;
+        default: throw new TypeError(`Unsupported frame operation: ${operation.type}`);
+      }
+      if (next !== before) { ensureFresh(); drawAgentCommitAnimation(next, chosen); result.changed = true; }
+    } else throw new TypeError(`Unsupported Draw operation: ${operation.type}`);
+    const state = getDrawAgentState();
+    return { ...result, revision: state.revision, projectBinding: state.projectBinding,
+      state: { ...state, busy: drawAgentIsBusy({ includePending: false }) } };
+  } catch (error) {
+    if (animationSession.animation !== beforeAnimation || animationSession.frameId !== beforeFrameId || animationSession.layerId !== beforeLayerId) {
+      if (error.applied === undefined) error.applied = true;
+    }
+    if (pxdBridge?.persistedProject?.revisionId !== beforePersistedRevisionId && error.applied === undefined) error.applied = 'unknown';
+    if (persistenceCompleted && error.applied === undefined) { error.applied = 'unknown'; error.savedRevisionId = completedSavedRevisionId; }
+    throw error;
+  } finally { drawAgentOperationPending = false; }
+}
 return {
   get workspace() { return pxdBridge; }, dispose: disposeDrawMode,
   get bank() { return 'shared'; },
@@ -3086,6 +3336,8 @@ return {
     return 'missing';
   },
   getEditorState: () => getDrawEditorState(),
+  getAgentState: getDrawAgentState,
+  executeAgentOperation: executeDrawAgentOperation,
   setAudioTimbreApi(api) { audioTimbreApi = api || null; drawAudioTimbrePanel?.setEnabled(Boolean(audioTimbreApi)); drawAudioTimbrePanel?.setAudioApi(audioTimbreApi); for (const swatch of document.querySelectorAll('#draw-palette [data-color-index]')) renderAudioPaletteIcon(swatch, Number(swatch.dataset.colorIndex), documentData.palette[Number(swatch.dataset.colorIndex)]); },
   refreshAudioTimbrePanel() { for (const swatch of document.querySelectorAll('#draw-palette [data-color-index]')) renderAudioPaletteIcon(swatch, Number(swatch.dataset.colorIndex), documentData.palette[Number(swatch.dataset.colorIndex)]); drawAudioTimbrePanel?.refresh(); },
   openAudioTimbre,

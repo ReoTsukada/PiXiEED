@@ -283,6 +283,33 @@ test('initializer renders safe text anchors, caps mobile cards, and paints thumb
   mounted.dispose();
 });
 
+test('initial pageshow does not repeat the read, while restoring after pagehide refreshes', async () => {
+  const { doc } = fakeDocument();
+  const { win, listeners } = fakeWindow(390);
+  let reads = 0;
+  const pending = [];
+  const mounted = initHomeRecentProjects({
+    doc,
+    win,
+    readProjects: () => {
+      reads++;
+      return new Promise(resolve => pending.push(resolve));
+    }
+  });
+
+  assert.equal(reads, 1, 'mount starts one initial read');
+  listeners.get('pageshow')({ persisted: false });
+  assert.equal(reads, 1, 'the initial pageshow does not start a duplicate read');
+  listeners.get('pagehide')();
+  listeners.get('pageshow')({ persisted: true });
+  assert.equal(reads, 2, 'pageshow after pagehide refreshes the restored page');
+
+  for (const resolve of pending) resolve([]);
+  await Promise.resolve();
+  await Promise.resolve();
+  mounted.dispose();
+});
+
 test('initializer gives empty and unavailable states without fabricating a work', async () => {
   const emptyFixture = fakeDocument();
   const emptyWin = fakeWindow(1280);
