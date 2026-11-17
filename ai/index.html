@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <meta name="robots" content="noindex,follow">
   <title>ChatGPTと連携｜PiXiEED</title>
-  <link rel="stylesheet" href="/css/ai-connect.css?rev=20261115-chatgpt-entry-1">
+  <link rel="stylesheet" href="/css/ai-connect.css?rev=20261117-store-onboarding-1">
 </head>
 <body class="ai-receive">
   <main class="ai-receive__wrap">
@@ -14,7 +14,16 @@
     <h1>ChatGPTと連携</h1>
     <p class="ai-receive__lead">ChatGPTに言葉でドット絵を頼み、受け取った絵を確認してからDrawで仕上げられます。</p>
     <p class="ai-receive__limit">初版は最大64×64px・32色です。</p>
-    <p class="ai-receive__usage-note">このページでは受け取った絵をプレビューし、新しい作品として取り込みます。開いている作品を直接編集する場合は、<a href="/tools/start/draw/">Drawを開いて「GPT連携」から接続</a>してください。ご自身のChatGPTの利用枠を使います。</p>
+    <p class="ai-receive__usage-note">このページでは受け取った絵をプレビューし、新しい作品として取り込みます。開いている作品を直接編集する場合は、<a href="/tools/start/draw/">Drawを開いて「ChatGPTとつなぐ」から接続</a>してください。ご自身のChatGPTの利用枠を使います。</p>
+    <section class="ai-receive__onboarding" aria-labelledby="onboarding-title">
+      <h2 id="onboarding-title">Drawの作品をChatGPTと編集</h2>
+      <ol>
+        <li><strong>PiXiEEDをChatGPTに追加</strong><span id="plugin-publication-status" role="status">ストア公開準備中です。</span><a id="plugin-store-link" class="ai-receive__primary-link" hidden target="_blank" rel="noopener noreferrer">ChatGPTに追加</a></li>
+        <li><strong>Drawから接続コードを発行</strong><span>Drawで「ChatGPTとつなぐ」から接続コードを発行します。コードはチャット本文やMCPの入力欄に貼らないでください。</span></li>
+        <li><strong>許可画面で作品を確認</strong><span>ChatGPTが開くPiXiEEDの接続許可画面だけにコードを入力します。接続先、作品名・ID、読み取り・編集の権限を確認し、「この作品への接続を許可」を押してください。</span></li>
+      </ol>
+      <p>コードは2分間有効な1回限りのコードで、接続は最長15分です。Drawと許可画面が別のブラウザーでもコードを転記できますが、それだけで同じ人・端末の所有者とは確認できません。許可画面に表示された作品を確かめてください。ストア公開前の手動接続情報は、従来の個別設定用 `/mcp` との互換案内です。ストア版OAuthではコードを許可画面にだけ入力し、会話やMCPツールには渡しません。</p>
+    </section>
     <p id="receive-status" class="ai-receive__status" role="status" aria-live="polite">受取リンクを開くか、ChatGPTでPiXiEEDを接続して依頼してください。</p>
     <section id="preview-card" class="ai-receive__card" aria-labelledby="art-title" hidden>
       <div class="ai-receive__preview"><canvas id="art-preview" width="1" height="1" aria-label="受け取ったドット絵のプレビュー"></canvas></div>
@@ -42,9 +51,12 @@
           <p id="prompt-feedback" class="ai-receive__feedback" role="status" aria-live="polite"></p>
         </section>
       </details>
-      <section id="mcp-connection" class="ai-receive__connection" aria-labelledby="setup-title" hidden>
-        <h2 id="setup-title">はじめて使うとき</h2>
+      <details id="manual-mcp-details" class="ai-receive__manual-mcp">
+       <summary>カスタムMCPで手動接続する</summary>
+       <section id="mcp-connection" class="ai-receive__connection" aria-labelledby="setup-title" hidden>
+        <h2 id="setup-title">ストア公開前の手動接続</h2>
         <p id="mcp-connection-status" class="ai-receive__setup-intro"></p>
+        <p class="ai-receive__setup-intro">以下は既存の個別設定用 `/mcp` の手動接続情報です。カスタムMCPの設定項目や利用可否は、アカウント・プラン・ワークスペースの権限によって異なります。設定に項目がない場合は管理者に確認してください。ストア版はOAuthを使う `/mcp/store` で、まだ公開・申請していません。ストア版の接続コードはChatGPTが開く許可画面にだけ入力し、チャットやMCPツールには貼らないでください。</p>
         <ol class="ai-receive__setup-steps">
           <li>
             <h3>接続先をコピーする</h3>
@@ -56,26 +68,22 @@
             <p id="connection-feedback" class="ai-receive__feedback" role="status" aria-live="polite"></p>
           </li>
           <li>
-            <h3>ChatGPTでPiXiEEDを追加する</h3>
-            <a id="chatgpt-settings-link" class="ai-receive__primary-link" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">ChatGPTの設定を開く</a>
-            <p>設定画面で「＋」から「カスタム MCP サーバーを追加」を選びます。</p>
+            <h3>利用できる場合にChatGPTへ登録する</h3>
+            <p>ChatGPTの設定にカスタムMCPサーバーの追加項目が表示される場合は、その画面から登録します。設定場所はアカウントやワークスペースにより異なります。</p>
             <ul>
               <li>名前：PiXiEED</li>
               <li>サーバーURL：コピーした接続先</li>
               <li>認証：なし</li>
             </ul>
-            <p>作成後、「インストール」または「接続」を選び、表示される確認を読んで同意してください。これは初回だけ必要です。</p>
+            <p>登録後、「インストール」または「接続」を選び、表示される確認を読んで同意してください。これは初回だけ必要です。</p>
           </li>
           <li>
             <h3>新しいチャットで使う</h3>
             <p>新しいチャットを開き、「@PiXiEED」を選んで絵を頼みます。</p>
           </li>
         </ol>
-        <details class="ai-receive__help">
-          <summary>設定項目が見つからない場合</summary>
-          <p>カスタムMCPの利用可否や設定場所は、ChatGPTのアカウント・ワークスペースの権限によって異なる場合があります。表示されないときは、ワークスペースの管理者に確認してください。</p>
-        </details>
       </section>
+      </details>
       <details id="json-import-details" class="ai-receive__json-import">
         <summary>JSONから読み込む</summary>
         <div class="ai-receive__json-fields">
@@ -94,6 +102,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261116-normal-release-2"></script>
+  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261117-store-onboarding-1"></script>
 </body>
 </html>

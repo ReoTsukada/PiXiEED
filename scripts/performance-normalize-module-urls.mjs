@@ -214,12 +214,23 @@ function normalize(source, file) {
     'js/creation/text-tools.mjs', 'js/pixel-lens/draw-camera-page.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs'
   ]);
   const liveDrawCacheTargets = new Set(['js/creation/draw-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/creation-runtime.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
+  const storeOAuthCacheTargets = new Set(['audio/index.html', 'camera/index.html', 'draw/editor.html', 'draw/index.html', 'js/creation/draw-live-session.mjs', 'js/creation/draw-entry.mjs', 'js/creation/creation-runtime.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
   changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!normalApplyCacheTargets.has(target)) return whole;
-    const revision = liveDrawCacheTargets.has(target) ? '20261117-live-draw-2' : '20261117-normal-apply-1';
+    const revision = storeOAuthCacheTargets.has(target) ? '20261117-store-oauth-1' : liveDrawCacheTargets.has(target) ? '20261117-live-draw-2' : '20261117-normal-apply-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
+    return `${quote}${path}${next}${quote}`;
+  });
+  // The store onboarding modules keep their dedicated release identity after
+  // older layer normalizers have rewritten shared MCP references.
+  const storeOnboardingTargets = new Set(['js/mcp/connection-config.mjs', 'js/mcp/receive-page.mjs']);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!storeOnboardingTargets.has(target)) return whole;
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-store-onboarding-1') : query + (query ? '&' : '?') + 'rev=20261117-store-onboarding-1';
     return `${quote}${path}${next}${quote}`;
   });
   return changed;

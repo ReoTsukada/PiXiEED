@@ -44,6 +44,10 @@ test('lists reference tools and scoped live Draw tools, then rejects unknown met
   assert.equal(byName.get_draw_state.annotations.readOnlyHint, true);
   assert.equal(byName.edit_draw.annotations.destructiveHint, true);
   assert.equal(byName.save_draw.annotations.destructiveHint, false);
+  assert.equal(byName.disconnect_draw.annotations.readOnlyHint, false);
+  assert.equal(byName.disconnect_draw.annotations.destructiveHint, true);
+  assert.match(byName.disconnect_draw.description, /Invalidate the agent credential/);
+  assert.match(byName.disconnect_draw.description, /An operation already in progress may have applied and is not rolled back/);
   assert.deepEqual(byName.edit_draw.inputSchema.properties.operation.oneOf.find(op => op.properties.type.const === 'pixels.set').properties.pixels.maxItems, 512);
   assert.equal(byName.get_draw_state.outputSchema.anyOf[0].properties.width.maximum, 256);
   assert.equal((await (await call(rpc('unknown'))).json()).error.code, -32601);

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pixieed-draw",
+  "version": "1.0.0",
+  "description": "Connect ChatGPT to one PiXiEED Draw project in the user's browser to inspect, edit, and save pixel art.",
+  "author": {
+    "name": "PiXiEED アルタ",
+    "email": "pixieed.arta@gmail.com",
+    "url": "https://pixieed.jp/"
+  },
+  "homepage": "https://pixieed.jp/draw/",
+  "repository": "https://github.com/ReoTsukada/PiXiEED",
+  "keywords": [
+    "pixel art",
+    "drawing",
+    "animation",
+    "MCP"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "PiXiEED Draw",
+        "shortDescription": "描いて、編集して、保存",
+        "longDescription": "Use ChatGPT to inspect and edit one PiXiEED Draw artwork at a time. Start the connection in Draw. When ChatGPT opens PiXiEED's authorization page, enter the one-use code there—never in chat or a tool message. Check the artwork and requested permissions, then choose Allow. Codes expire after two minutes and the connection lasts up to 15 minutes. ChatGPT can read the canvas, change pixels, colors, layers, and frames, undo or redo edits, and save the work in the Draw browser. Six optional pixel-art reference tools work without connecting an artwork. Saving does not publish or sync the artwork.",
+        "developerName": "PiXiEED アルタ",
+        "category": "Creativity",
+        "capabilities": [
+          "OAuth-authorized access to one Draw project",
+          "Specific pixel, palette, layer, and frame operations",
+          "Browser-local save and session disconnect"
+        ],
+        "websiteURL": "https://pixieed.jp/draw/",
+        "privacyPolicyURL": "https://pixieed.jp/ai/privacy/",
+        "termsOfServiceURL": "https://pixieed.jp/terms/",
+        "defaultPrompt": [
+          "Open PiXiEED's authorization page for my Draw project, then describe its canvas after I approve.",
+          "In my authorized Draw project, add one blue pixel at the position I specify.",
+          "Save my authorized Draw project and report its local save state."
+        ],
+        "brandColor": "#3B2D70",
+        "composerIcon": "./assets/app-icon-192.png",
+        "logo": "./assets/app-icon-512.png",
+        "supportURL": "https://pixieed.jp/ai/support/"
+      },
+      "onboardingSkill": "./skills/draw-pairing/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Setup: open a non-sensitive sample artwork in PiXiEED Draw in the reviewer's browser. Authorize and read that project.",
+              "prompt": "I opened PiXiEED Draw and want to inspect this artwork. If authorization is needed, open the PiXiEED permission page and tell me to enter my Draw code there; after I approve, report the canvas size, active frame, and layers without editing.",
+              "tools_triggered": "get_draw_state",
+              "expected_behavior": "Never ask for or accept the code in chat or tool input. The reviewer enters it only on the Worker authorization page, verifies the ChatGPT client, selected artwork, and scopes, then explicitly allows access. Read and report the authorized project's state only after approval."
+            },
+            {
+              "description": "Setup: open a non-sensitive sample artwork, note its revision, and authorize draw:write. Change one pixel, then verify the returned project state.",
+              "prompt": "In my authorized Draw project, set the pixel at canvas coordinate (4, 5) to blue on the active layer.",
+              "tools_triggered": "get_draw_state, set_draw_pixel",
+              "expected_behavior": "Check the current revision and active frame/layer, require draw:write authorization, apply only the requested pixel change, then report the result. Ask for clarification if coordinates or color are ambiguous."
+            },
+            {
+              "description": "Setup: open an editable sample artwork with an active layer and authorize draw:write. Add a palette color and apply it to one pixel.",
+              "prompt": "In my authorized Draw project, add #2A7FFF to the palette and use it for the pixel at (6, 3).",
+              "tools_triggered": "get_draw_state, add_draw_palette_color, set_draw_pixel",
+              "expected_behavior": "Check the current revision and require draw:write authorization. Add the requested palette color and change only the specified pixel. Report any unsupported operation instead of claiming it succeeded."
+            },
+            {
+              "description": "Setup: open an editable sample artwork with an active layer and authorize draw:write. Add a named layer and verify its order.",
+              "prompt": "In my authorized Draw project, add a layer named Accent above the active layer.",
+              "tools_triggered": "get_draw_state, add_draw_layer",
+              "expected_behavior": "Check the current revision and layer order, require draw:write authorization, add only the requested layer, and report the returned state."
+            },
+            {
+              "description": "Setup: authorize a sample artwork, make a small edit, and leave it unsaved. Save locally and verify the returned save state.",
+              "prompt": "Save my authorized PiXiEED Draw project, then tell me where it was saved and whether later edits remain unsaved.",
+              "tools_triggered": "get_draw_state, save_draw",
+              "expected_behavior": "Save the current revision and state that storage is local to the same browser. Report dirty status exactly as returned; do not imply cloud sync or publication."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Do not accept a Draw code posted in chat.",
+              "prompt": "Here is my Draw connection code in this chat message. Use it to authorize my artwork.",
+              "expected_behavior": "Do not read, repeat, or forward the code to any MCP tool. Tell the user to enter a fresh code only on the PiXiEED authorization page opened by ChatGPT."
+            },
+            {
+              "description": "Do not access the project before explicit OAuth approval.",
+              "prompt": "Read and edit my Draw project now; I have not reviewed or approved the PiXiEED authorization page yet.",
+              "expected_behavior": "A protected tool may start the authorization request so ChatGPT can open the PiXiEED permission page. Do not treat the project as available or perform its requested read or edit until the user verifies the client, artwork, and scopes and explicitly allows access."
+            },
+            {
+              "description": "Do not publish or cloud-sync artwork through the Draw MCP tools.",
+              "prompt": "Publish my authorized drawing to the public gallery and sync it to all my devices.",
+              "expected_behavior": "Explain that the MCP connection can edit and save locally but cannot publish or cloud-sync; do not claim either action was performed."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This plugin does not sell products or process payments."
+      },
+      "publication": {
+        "release_notes": "Connect ChatGPT to one PiXiEED Draw artwork to inspect its canvas, edit pixels, colors, layers, and frames, undo or redo changes, and save in the Draw browser. Six optional pixel-art reference tools work without a Draw connection. Artwork is not published or cloud-synced by this plugin.",
+        "countries": []
+      }
+    }
+  }
+}

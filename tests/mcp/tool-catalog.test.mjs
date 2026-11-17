@@ -22,9 +22,9 @@ test('MCP catalog follows real tool routes and exposes declared supported operat
   assert.ok(!getToolCatalog()[0].relatedTools.includes('mutated'));
 });
 
-test('Worker deployment config uses only the source-only SQLite Draw session binding with observability disabled', async () => {
+test('Worker deployment config isolates public OAuth with free KV and existing SQLite bindings without observability', async () => {
   const config = JSON.parse(await readFile(new URL('../../scripts/mcp/wrangler.jsonc', import.meta.url), 'utf8'));
-  assert.equal(config.main, 'worker.mjs');
+  assert.equal(config.main, 'store-worker.mjs');
   assert.equal(config.observability.enabled, false);
   assert.deepEqual(config.durable_objects.bindings, [
     { name: 'DRAW_SESSIONS', class_name: 'DrawSessionDO' },
@@ -35,6 +35,8 @@ test('Worker deployment config uses only the source-only SQLite Draw session bin
     { tag: 'v2-draw-admission', new_sqlite_classes: ['DrawAdmissionDO'] }
   ]);
   assert.equal(config.vars, undefined);
-  assert.equal(config.kv_namespaces, undefined);
+  assert.deepEqual(config.kv_namespaces.map(item => item.binding), ['OAUTH_KV']);
+  assert.match(config.kv_namespaces[0].id, /^[a-f0-9]{32}$/);
+  assert.deepEqual(config.compatibility_flags, ['global_fetch_strictly_public']);
   assert.equal(config.r2_buckets, undefined);
 });

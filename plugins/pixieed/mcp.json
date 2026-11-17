@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "pixieed": {
+      "type": "streamable-http",
+      "url": "https://pixieed-mcp.rgaydm03.workers.dev/mcp/store",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {
+              "mode": "cimd"
+            },
+            "resource": "https://pixieed-mcp.rgaydm03.workers.dev/mcp/store"
+          }
+        }
+      }
+    }
+  }
+}

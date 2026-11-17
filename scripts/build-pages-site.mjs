@@ -19,7 +19,7 @@ import { isSampleWork } from '../js/public-work-policy.mjs';
 import { TOOL_START_ROUTES, getToolStartRoute, toolStartHref } from '../js/tool-start-routes.mjs';
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const excluded = new Set(['work', 'docs', 'tests', 'scripts', 'supabase', 'node_modules', 'admanager-rewarded-test']);
+const excluded = new Set(['work', 'docs', 'tests', 'scripts', 'supabase', 'node_modules', 'plugins', 'admanager-rewarded-test']);
 const retiredPublicPages = new Set(['shops/index.html']);
 const publishableBooksPages = new Set(['books/index.html']);
 const publishableBooksAssets = new Set(['assets/books/room-products.json', 'assets/books/room-commerce.json']);
@@ -186,7 +186,7 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
       // before they are committed. Arbitrary untracked work stays excluded.
       for (const name of ['js/creation/conversion-source-inspector.mjs', 'css/conversion-source-preview.css', 'assets/icons/pixieed/back.svg', 'css/task-ui.css', 'css/help-center.css', 'explore/index.html', 'welcome/index.html', 'js/public-navigation.mjs', 'css/public-navigation.css', 'js/creation/output-audio-capabilities.mjs', 'js/creation/output-audio-encode.mjs', 'css/output-side-ad.css', 'js/ads/output-side-ad.mjs', 'css/page-gutters.css', 'js/information-auto-ads.mjs', 'js/event-archive-ad-policy.mjs', 'css/draw-audio-timbre-panel.css', 'js/creation/draw-audio-timbre-panel.mjs',
         'js/creation/draw-normal-map.mjs', 'js/creation/draw-normal-map-settings.mjs', 'js/creation/draw-normal-map-panel.mjs', 'css/draw-normal-map.css',
-        'ai/index.html', 'css/ai-connect.css', 'js/mcp/pixel-art-contract.mjs', 'js/mcp/receive-page.mjs', 'js/mcp/draw-import.mjs', 'js/mcp/connection-config.mjs', 'js/mcp/tool-catalog.mjs',
+        'ai/index.html', 'ai/privacy/index.html', 'ai/support/index.html', 'css/ai-connect.css', 'js/mcp/pixel-art-contract.mjs', 'js/mcp/receive-page.mjs', 'js/mcp/draw-import.mjs', 'js/mcp/connection-config.mjs', 'js/mcp/tool-catalog.mjs',
         'assets/icons/pixieed/color-adjust.svg', 'assets/icons/pixieed/text.svg', 'assets/icons/pixieed/draw.svg',
         'assets/icons/pixieed/copy.svg', 'assets/icons/pixieed/cut.svg', 'assets/icons/pixieed/paste.svg',
         'assets/icons/pixieed/confirm.svg', 'assets/icons/pixieed/deselect.svg',

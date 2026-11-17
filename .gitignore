@@ -28,3 +28,7 @@ Claude outputs/
 /docs/workspace-runtime-20261018/
 /docs/workspace-runtime-20261018-stage3/
 /docs/workspace-runtime-20261018-stage4/
+
+# Local Cloudflare state and generated plugin submission archives.
+/scripts/mcp/.wrangler/
+/plugins/*/*.zip

@@ -99,7 +99,7 @@ export async function mountCreationRuntime({
   }
 
   try {
-    const { mountDrawLiveSessionPanel } = await import('./draw-live-session-panel.mjs?rev=20261117-live-draw-2');
+    const { mountDrawLiveSessionPanel } = await import('./draw-live-session-panel.mjs?rev=20261117-store-onboarding-1');
     mountDrawLiveSessionPanel({ draw, scope, isActive: () => hostActive() && mountedModes.mode === 'draw' && !mountedModes.switching });
   } catch { /* The optional remote link must not stop local Draw. */ }
 
