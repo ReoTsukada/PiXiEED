@@ -24,7 +24,7 @@ async function create(env) {
 test('consent escapes metadata, blocks framing, and binds code claim to browser and origin',async()=>{
   const setupValue=setup(),start=await begin(setupValue),s=await create(setupValue.env);
   assert.equal(start.referrerPolicy,'same-origin');
-  assert.match(start.csp,/form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect/);
+  assert.match(start.csp,/form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect https:\/\/platform\.openai\.com/);
   assert.doesNotMatch(start.csp,/\*/);
   for(const directive of ["default-src 'none'","style-src 'unsafe-inline'","base-uri 'none'","frame-ancestors 'none'"])assert.ok(start.csp.includes(directive),`CSP retains ${directive}`);
   assert.ok(start.html.includes('ChatGPT &#60;script&#62;'));assert.ok(!start.html.includes('ChatGPT <script>'));
