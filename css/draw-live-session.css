@@ -10,6 +10,21 @@ body:not([data-creation-mode="draw"]) .draw-gpt-slot { display:none; }
 .draw-live-dialog .draw-live-status { font-weight:600; color:#ffdc82; min-height:1.65em; }
 .draw-live-install-state { padding:12px; border:1px solid #647783; border-radius:12px; background:#17232a; }
 .draw-live-install-state a { color:#ffe28f; font-weight:700; text-underline-offset:3px; }
+.draw-live-usage { display:grid; gap:8px; margin:12px 0; }
+.draw-live-gauge { min-width:0; padding:10px 12px; border:1px solid #52616b; border-radius:12px; background:#17232a; }
+.draw-live-gauge-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:2px 10px; }
+.draw-live-gauge-heading strong { font-size:13px; }
+.draw-live-gauge-heading [data-daily-value], .draw-live-gauge-heading [data-session-value] { font-size:14px; font-weight:750; font-variant-numeric:tabular-nums; }
+.draw-live-gauge[data-low="true"] .draw-live-gauge-heading [data-daily-value], .draw-live-gauge[data-low="true"] .draw-live-gauge-heading [data-session-value] { color:#ffd17d; }
+.draw-live-gauge progress { display:block; width:100%; height:8px; margin:7px 0 5px; overflow:hidden; border:0; border-radius:999px; background:#33424c; appearance:none; }
+.draw-live-gauge progress[hidden] { display:none; }
+.draw-live-gauge progress::-webkit-progress-bar { border-radius:999px; background:#33424c; }
+.draw-live-gauge progress::-webkit-progress-value { border-radius:999px; background:#80c6a2; }
+.draw-live-gauge[data-low="true"] progress::-webkit-progress-value { background:#e4aa4f; }
+.draw-live-gauge progress::-moz-progress-bar { border-radius:999px; background:#80c6a2; }
+.draw-live-gauge[data-low="true"] progress::-moz-progress-bar { background:#e4aa4f; }
+.draw-live-gauge-foot { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 12px; color:#c2cbd1; font-size:11px; line-height:1.45; }
+.draw-live-gauge-foot span { min-width:0; overflow-wrap:anywhere; }
 .draw-live-install-help { margin:10px 0; border-block:1px solid #52616b; }
 .draw-live-install-help summary { min-height:44px; padding:10px 0; cursor:pointer; font-weight:700; }
 .draw-live-install-help p { margin:0 0 12px; color:#d2d9dd; }

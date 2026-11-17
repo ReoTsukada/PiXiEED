@@ -6,6 +6,13 @@ export const STORE_MCP_ENDPOINT = `${new URL(LEGACY_MCP_ENDPOINT).origin}/mcp/st
 
 // Store listing is intentionally unavailable until the public listing has been verified.
 export const PLUGIN_PUBLICATION = Object.freeze({ status: 'not_published', publicPluginUrl: null });
+export const PLUGIN_REVIEW = Object.freeze({ version: '1.1.0', status: 'in_review', estimatedCompletion: '2026-12-01' });
+
+export function isPluginReviewEstimateCurrent(now = new Date()) {
+  const timestamp = Number(now);
+  const endOfEstimate = Date.parse(`${PLUGIN_REVIEW.estimatedCompletion}T23:59:59.999+09:00`);
+  return Number.isFinite(timestamp) && timestamp <= endOfEstimate;
+}
 
 export function verifiedPublicPluginUrl(config = PLUGIN_PUBLICATION) {
   if (config?.status !== 'published' || typeof config.publicPluginUrl !== 'string') return null;

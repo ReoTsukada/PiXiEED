@@ -219,7 +219,7 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!normalApplyCacheTargets.has(target)) return whole;
-    const revision = liveDrawCacheTargets.has(target) ? '20261117-fast-store-draw-1' : '20261117-normal-apply-1';
+    const revision = liveDrawCacheTargets.has(target) ? '20261117-live-usage-1' : '20261117-normal-apply-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
     return `${quote}${path}${next}${quote}`;
   });
@@ -230,7 +230,7 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!storeOnboardingTargets.has(target)) return whole;
-    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-store-onboarding-1') : query + (query ? '&' : '?') + 'rev=20261117-store-onboarding-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-launch-preview-1') : query + (query ? '&' : '?') + 'rev=20261117-launch-preview-1';
     return `${quote}${path}${next}${quote}`;
   });
   return changed;

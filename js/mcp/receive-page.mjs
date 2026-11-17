@@ -3,11 +3,12 @@ import {
   parseDrawImportJson, readStagedDrawImport, saveDrawImportAsNewProject,
   stageDrawImportToken
 } from './draw-import.mjs?rev=20261116-normal-release-2';
-import { PLUGIN_PUBLICATION, verifiedMcpEndpoint, verifiedPublicPluginUrl } from './connection-config.mjs?rev=20261117-store-onboarding-1';
+import { PLUGIN_PUBLICATION, isPluginReviewEstimateCurrent, verifiedMcpEndpoint, verifiedPublicPluginUrl } from './connection-config.mjs?rev=20261117-launch-preview-1';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#art-preview');
 const card = $('#preview-card');
+const connectionIntro = $('#connection-intro');
 const status = $('#receive-status');
 const applyButton = $('#open-draw');
 const downloadButton = $('#download-png');
@@ -38,6 +39,7 @@ function showError(error) {
   status.textContent = error?.message || 'データを読み込めませんでした。';
   status.dataset.state = 'error';
   card.hidden = true;
+  connectionIntro.hidden = false;
   fallback.hidden = false;
   syncDisabled();
 }
@@ -60,6 +62,7 @@ function render(decoded, { token = null, persistForRefresh = false } = {}) {
     }
   });
   card.hidden = false;
+  connectionIntro.hidden = true;
   fallback.hidden = Boolean(current);
   let stageWarning = false;
   if (persistForRefresh && token) {
@@ -140,6 +143,11 @@ $('#cancel-import').addEventListener('click', (event) => {
 const endpoint = verifiedMcpEndpoint();
 $('#mcp-connection').hidden = false;
 const storeUrl = verifiedPublicPluginUrl(PLUGIN_PUBLICATION);
+$('.ai-receive__release').hidden = Boolean(storeUrl);
+const reviewEstimate = $('#review-estimate');
+if (!isPluginReviewEstimateCurrent()) {
+  reviewEstimate.textContent = '審査が続いています。一般公開日は未定です。';
+}
 const storeStatus = $('#plugin-publication-status');
 const storeLink = $('#plugin-store-link');
 if (storeUrl) {
@@ -147,7 +155,7 @@ if (storeUrl) {
   storeLink.href = storeUrl;
   storeLink.hidden = false;
 } else {
-  storeStatus.textContent = 'ストア審査中です。一般公開後に、このページから追加できます。';
+  storeStatus.textContent = 'ChatGPT連携は現在審査中です。一般公開：審査承認後。';
   storeLink.hidden = true;
 }
 const setupSteps = $('.ai-receive__setup-steps');
@@ -207,6 +215,7 @@ if (fragment) {
     status.textContent = '受取リンクを開くか、ChatGPTでPiXiEEDを接続して依頼してください。';
     status.dataset.state = 'ready';
     card.hidden = true;
+    connectionIntro.hidden = false;
     fallback.hidden = false;
     syncDisabled();
   }

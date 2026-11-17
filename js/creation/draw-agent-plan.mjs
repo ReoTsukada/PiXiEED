@@ -10,7 +10,7 @@ import { pixelLineCells } from './pixel-input.mjs?rev=20261001-connected-editor-
 import { captureDrawSelection, projectDrawSelection } from './draw-selection-operations.mjs?rev=20261116-normal-release-2';
 import { lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
 import { getAnimationLayerPalette } from './animation-core.mjs?rev=20261116-normal-release-2';
-import { normalizeDrawAgentOperation, prepareDrawAgentColorAdjustment } from './draw-agent-operations.mjs?rev=20261117-fast-store-draw-1';
+import { normalizeDrawAgentOperation, prepareDrawAgentColorAdjustment } from './draw-agent-operations.mjs?rev=20261117-live-usage-1';
 
 export const DRAW_AGENT_MAX_BATCH_OPERATIONS = 32;
 export const DRAW_AGENT_MAX_PLANNED_PIXELS = 8_000_000;

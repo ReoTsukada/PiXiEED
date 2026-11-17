@@ -6,14 +6,57 @@ export function createDrawLiveSession({
 } = {}) {
   const base = new URL(endpoint); base.pathname = base.pathname.replace(/\/mcp(?:\/store)?\/?$/, ''); base.search = ''; base.hash = '';
   let generation = 0, session = null, timer = null, expiryTimer = null, controller = null;
-  let view = { phase: 'idle', mode: 'legacy', pairingCode: '', expiresAt: null, message: '' };
+  let usageRequest = null, usageReceivedAt = null, usageController = null, usageTimer = null;
+  let view = { phase: 'idle', mode: 'legacy', pairingCode: '', expiresAt: null, sessionDurationMs: null,
+    message: '', usage: null, usageStatus: 'idle', usageMessage: '利用状況をまだ取得していません。' };
   let pendingAck = null;
   const completed = new Map();
-  const publish = update => { view = { ...view, ...update }; onChange({ ...view }); };
+  const publish = update => { view = { ...view, ...update }; onChange({ ...view, usage: view.usage ? { ...view.usage } : null }); };
   const sameBinding = (a, b) => !!a && !!b && a.projectId === b.projectId && a.openEpoch === b.openEpoch;
   const expires = value => typeof value === 'number' ? value : Date.parse(value);
   const endpointUrl = path => `${base.href.replace(/\/$/, '')}${path}`;
   const error = (code, message) => Object.assign(new Error(message), { code });
+  const validUsage = value => value && Number.isFinite(value.dailyLimit) && value.dailyLimit >= 0 &&
+    Number.isFinite(value.dailyUsed) && value.dailyUsed >= 0 && Number.isFinite(value.dailyRemaining) && value.dailyRemaining >= 0 &&
+    Number.isFinite(value.resetsAt) && Number.isFinite(value.serverNow) && Number.isFinite(value.sessionDurationMs) && value.sessionDurationMs > 0;
+  async function refreshUsage({ force = false } = {}) {
+    if (usageRequest?.generation === generation) return usageRequest.promise;
+    // force bypasses a fresh cached snapshot; concurrent reads still share one request.
+    if (!force && usageReceivedAt !== null && now() - usageReceivedAt < 30_000 && view.usage) return view.usage;
+    const ticket = generation;
+    publish({ usageStatus: 'loading', usageMessage: '利用状況を確認しています。' });
+    const pending = { generation: ticket, promise: null };
+    const abortController = new AbortController();
+    usageRequest = pending;
+    usageController = abortController;
+    usageTimer = schedule(() => {
+      if (usageRequest !== pending) return;
+      usageController = null; usageRequest = null; usageTimer = null;
+      abortController.abort();
+      publish({ usage: null, usageStatus: 'error', usageMessage: '利用状況を取得できませんでした。' });
+    }, 10_000);
+    pending.promise = (async () => {
+      try {
+        const result = await request('/draw-usage', { signal: abortController.signal });
+        if (ticket !== generation || usageRequest !== pending) return null;
+        if (!validUsage(result)) throw new Error('Invalid Draw usage response');
+        const receivedAt = now();
+        const snapshot = { dailyLimit: result.dailyLimit, dailyUsed: result.dailyUsed,
+          dailyRemaining: result.dailyRemaining, resetsAt: result.resetsAt, serverNow: result.serverNow,
+          sessionDurationMs: result.sessionDurationMs, receivedAt, clockOffsetMs: result.serverNow - receivedAt };
+        usageReceivedAt = receivedAt;
+        publish({ usage: snapshot, usageStatus: 'ready', usageMessage: '', sessionDurationMs: snapshot.sessionDurationMs });
+        return snapshot;
+      } catch {
+        if (ticket === generation && usageRequest === pending) publish({ usage: null, usageStatus: 'error', usageMessage: '利用状況を取得できませんでした。' });
+        return null;
+      } finally {
+        if (usageTimer != null && usageRequest === pending) cancel(usageTimer);
+        if (usageRequest === pending) { usageRequest = null; usageController = null; usageTimer = null; }
+      }
+    })();
+    return pending.promise;
+  }
   const current = (ticket, bound = session) => ticket === generation && bound === session && !!session && now() < expires(session.expiresAt);
   const authorized = ticket => current(ticket) && isActive() && sameBinding(draw.getAgentState({ includePixels: false }).projectBinding, session.projectBinding);
   async function request(path, { method = 'GET', body, token, signal, keepalive = false } = {}) {
@@ -44,8 +87,12 @@ export function createDrawLiveSession({
   }
   function stop(message = '接続を終了しました。') {
     const old = session; generation += 1; session = null; pendingAck = null; completed.clear();
+    usageController?.abort(); usageController = null;
+    if (usageTimer != null) cancel(usageTimer); usageTimer = null;
+    usageRequest = null;
     if (timer != null) cancel(timer); if (expiryTimer != null) cancel(expiryTimer); timer = null; expiryTimer = null; controller?.abort(); controller = null;
-    publish({ phase: 'idle', mode: 'legacy', pairingCode: '', expiresAt: null, message });
+    publish({ phase: 'idle', mode: 'legacy', pairingCode: '', expiresAt: null, message,
+      usageStatus: view.usage ? 'ready' : 'idle', usageMessage: view.usage ? '' : '利用状況をまだ取得していません。' });
     return revoke(old);
   }
   function fail(message) { void stop(message); publish({ phase: 'error', message }); }
@@ -138,9 +185,16 @@ export function createDrawLiveSession({
       expiryTimer = schedule(() => { if (ticket === generation) void stop('接続の有効期限が切れました。'); }, Math.max(0, expires(opened.expiresAt) - now()));
       publish({ phase: 'waiting', mode, pairingCode: opened.pairingCode, expiresAt: opened.expiresAt,
         message: mode === 'oauth' ? 'ChatGPTが開く接続許可画面に入力してください。チャット本文には貼りません。' : 'ChatGPTで接続コードを使用してください。' });
+      void refreshUsage({ force: true });
       void poll(ticket);
       return { ...view };
-    } catch (cause) { if (ticket === generation) fail(cause?.message || '接続できませんでした。'); throw cause; }
+    } catch (cause) {
+      if (ticket === generation) {
+        fail(cause?.message || '接続できませんでした。');
+        if (cause?.code === 'DRAW_ADMISSION_LIMIT') void refreshUsage({ force: true });
+      }
+      throw cause;
+    }
   }
-  return { start, stop, getState: () => ({ ...view }), get connected() { return view.phase === 'connected'; } };
+  return { start, stop, refreshUsage, getState: () => ({ ...view, usage: view.usage ? { ...view.usage } : null }), get connected() { return view.phase === 'connected'; } };
 }
