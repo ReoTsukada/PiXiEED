@@ -4,7 +4,7 @@ import { authorizeDraw, storeSessionCreation, readStrictForm, revocationEnvironm
 import { LocalDrawSessionRelay, relayFetch, relayJsonRequest } from '../../scripts/mcp/draw-session-relay.mjs';
 import { LocalDrawAdmission } from '../../scripts/mcp/draw-session-admission.mjs';
 const bodyFields = text => Object.fromEntries([...text.matchAll(/<input type="hidden" name="([^"]+)" value="([^"]*)">/g)].map(m=>[m[1],m[2]]));
-const post=(values,cookie,origin=STORE_ISSUER)=>new Request(`${STORE_ISSUER}/authorize`,{method:'POST',headers:{origin,'content-type':'application/x-www-form-urlencoded',...(cookie?{cookie}:{})},body:new URLSearchParams(values)});
+const post=(values,cookie,origin=STORE_ISSUER,fetchSite)=>new Request(`${STORE_ISSUER}/authorize`,{method:'POST',headers:{...(origin !== undefined ? {origin}:{}),'content-type':'application/x-www-form-urlencoded',...(cookie?{cookie}:{}),...(fetchSite !== undefined ? {'sec-fetch-site':fetchSite}:{})},body:new URLSearchParams(values)});
 function setup() {
   const records=new Map(), calls=[];
   const env={OAUTH_KV:{async get(k){return structuredClone(records.get(k)||null)},async put(k,v){records.set(k,JSON.parse(v))},async delete(k){calls.push(['delete',k]);records.delete(k)}},LOCAL_DRAW_RELAY:new LocalDrawSessionRelay(),LOCAL_DRAW_ADMISSION:new LocalDrawAdmission(),LOCAL_DRAW_IP:'127.0.0.1',ALLOW_LOCAL_ORIGIN:'1',DRAW_ADMISSION_SECRET:'local-test-secret-long-enough-for-testing-only',SITE_ORIGIN:'https://pixieed.jp'};
@@ -15,7 +15,7 @@ function setup() {
 async function begin({env,oauth}) {
   const response=await authorizeDraw(new Request(`${STORE_ISSUER}/authorize?client_id=https%3A%2F%2Fchatgpt.com%2Foauth%2Fclient.json`),env,oauth);
   assert.equal(response.status,200);const html=await response.text();
-  return {fields:bodyFields(html),html,cookie:response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ')};
+  return {fields:bodyFields(html),html,cookie:response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; '),referrerPolicy:response.headers.get('referrer-policy'),csp:response.headers.get('content-security-policy')};
 }
 async function create(env) {
   const r=await storeSessionCreation(new Request(`${STORE_ISSUER}/draw-store-sessions`,{method:'POST',headers:{origin:'https://pixieed.jp','content-type':'application/json'},body:JSON.stringify({projectBinding:{projectId:'p-test',openEpoch:'e-test'},projectName:'Test <apple>'})}),env);
@@ -23,8 +23,21 @@ async function create(env) {
 }
 test('consent escapes metadata, blocks framing, and binds code claim to browser and origin',async()=>{
   const setupValue=setup(),start=await begin(setupValue),s=await create(setupValue.env);
+  assert.equal(start.referrerPolicy,'same-origin');
+  assert.match(start.csp,/form-action 'self' https:\/\/chatgpt\.com\/connector_platform_oauth_redirect/);
+  assert.doesNotMatch(start.csp,/\*/);
+  for(const directive of ["default-src 'none'","style-src 'unsafe-inline'","base-uri 'none'","frame-ancestors 'none'"])assert.ok(start.csp.includes(directive),`CSP retains ${directive}`);
   assert.ok(start.html.includes('ChatGPT &#60;script&#62;'));assert.ok(!start.html.includes('ChatGPT <script>'));
   for(const [cookie,origin] of [[undefined,STORE_ISSUER],[start.cookie,'https://attacker.test']])assert.equal((await authorizeDraw(post({...start.fields,code:s.pairingCode,decision:'claim'},cookie,origin),setupValue.env,setupValue.oauth)).status,403);
+});
+test('authorization POST still rejects null/foreign Origin and cross-site Fetch Metadata',async()=>{
+  const fixture=setup(),start=await begin(fixture),s=await create(fixture.env),fields={...start.fields,code:s.pairingCode,decision:'claim'};
+  for(const request of [
+    post(fields,start.cookie,'null','same-origin'),
+    post(fields,start.cookie,'https://attacker.test','same-origin'),
+    post(fields,start.cookie,STORE_ISSUER,'cross-site')
+  ]) assert.equal((await authorizeDraw(request,fixture.env,fixture.oauth)).status,403);
+  assert.equal(fixture.calls.some(call=>call[0]==='approve'),false);
 });
 test('claim is inactive; final approval and server-only grant props activate exactly once',async()=>{
   const fixture=setup(),start=await begin(fixture),s=await create(fixture.env);

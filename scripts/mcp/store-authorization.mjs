@@ -19,10 +19,12 @@ const cookieValue = (request, name) => {
 };
 const failure = (message, status = 400) => Object.assign(new Error(message), { status });
 const safetyHeaders = () => new Headers({
-  'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer',
+  'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'Referrer-Policy':'same-origin',
   'X-Content-Type-Options':'nosniff', 'X-Frame-Options':'DENY',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://chatgpt.com/connector_platform_oauth_redirect; base-uri 'none'; frame-ancestors 'none'"
 });
+// For POST form navigations, Referrer-Policy: no-referrer makes browsers serialize Origin as "null".
+// same-origin keeps the exact Origin check usable without weakening the authorization guard.
 function page(title, content, headers = safetyHeaders()) {
   for (const [key,value] of safetyHeaders()) headers.set(key,value);
   return new Response(`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} | PiXiEED</title><style>html{font-family:system-ui,sans-serif;background:#f4f3ef;color:#202522}body{max-width:520px;margin:0 auto;padding:32px 20px;line-height:1.65;overflow-wrap:anywhere}main{background:white;border:1px solid #dddcd5;border-radius:20px;padding:24px}h1{font-size:24px;line-height:1.4;margin-top:0}label{display:block;font-weight:600}input{box-sizing:border-box;width:100%;min-height:48px;padding:12px;margin:8px 0 16px;font:inherit;border:1px solid #727870;border-radius:10px}button{font:inherit;min-height:48px;border:0;border-radius:12px;padding:12px 18px;cursor:pointer;background:#234b3a;color:white;margin:8px 8px 0 0}.secondary{background:#eceee9;color:#26312b}small{color:#59645c}dt{font-weight:650}dd{margin:0 0 12px}a{color:#265843}ul{padding-left:22px}@media(max-width:390px){main{padding:18px}body{padding:20px 12px}h1{font-size:22px}}</style><main><p>PiXiEED Draw</p><h1>${escape(title)}</h1>${content}</main><p><a href="https://pixieed.jp/ai/privacy/" target="_blank" rel="noopener">プライバシー</a> · <a href="https://pixieed.jp/ai/support/" target="_blank" rel="noopener">サポート</a></p></html>`, { headers });
