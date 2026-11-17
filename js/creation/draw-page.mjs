@@ -12,7 +12,7 @@ import { NORMAL_MAP_PALETTE, NORMAL_MAP_SWATCHES, ANIMATION_MAX_DIMENSION, estim
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261116-normal-release-2';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-2';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261117-normal-apply-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261117-chat-connect-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
@@ -34,12 +34,12 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261116-normal-release-2';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261117-chat-connect-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
-import { assertDrawAgentPrecondition, normalizeDrawAgentBinding, normalizeDrawAgentOperation } from './draw-agent-operations.mjs?rev=20261117-free-quota-1';
-import { prepareDrawAgentPlan } from './draw-agent-plan.mjs?rev=20261117-free-quota-1';
-import { normalizeDrawAgentPreferences } from './draw-agent-preferences.mjs?rev=20261117-free-quota-1';
+import { assertDrawAgentPrecondition, normalizeDrawAgentBinding, normalizeDrawAgentOperation } from './draw-agent-operations.mjs?rev=20261117-chat-connect-1';
+import { prepareDrawAgentPlan } from './draw-agent-plan.mjs?rev=20261117-chat-connect-1';
+import { normalizeDrawAgentPreferences } from './draw-agent-preferences.mjs?rev=20261117-chat-connect-1';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261116-normal-release-2';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
@@ -61,7 +61,7 @@ import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-2';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-2';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-free-quota-1';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-chat-connect-1';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
 import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261117-normal-apply-1';
@@ -3233,7 +3233,7 @@ async function executeDrawAgentOperation(envelope, { isAuthorized } = {}) {
     } else {
       const prepared = await prepareDrawAgentPlan(beforeAnimation, { frameId: beforeFrameId, layerId: beforeLayerId }, operation,
         { checkFresh: ensureFresh, prepareExtraOperation: async (...args) => {
-          const { prepareDrawAgentExtraOperation } = await import('./draw-agent-extras.mjs?rev=20261117-free-quota-1');
+          const { prepareDrawAgentExtraOperation } = await import('./draw-agent-extras.mjs?rev=20261117-chat-connect-1');
           return prepareDrawAgentExtraOperation(...args);
         } });
       ensureFresh();

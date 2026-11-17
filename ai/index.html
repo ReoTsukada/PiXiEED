@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f2ec">
   <meta name="robots" content="noindex,follow">
   <title>ChatGPTと連携｜PiXiEED</title>
-  <link rel="stylesheet" href="/css/ai-connect.css?rev=20261117-launch-preview-1">
+  <link rel="stylesheet" href="/css/ai-connect.css?rev=20261117-chat-connect-1">
 </head>
 <body class="ai-receive">
   <main class="ai-receive__wrap">
@@ -35,12 +35,25 @@
       <p class="ai-receive__usage-note">このページでは受け取った絵をプレビューし、新しい作品として取り込みます。開いている作品を直接編集する場合は、<a href="/tools/start/draw/">Drawを開いて「ChatGPTとつなぐ」から接続</a>してください。ご自身のChatGPTの利用枠を使います。</p>
       <section class="ai-receive__onboarding" aria-labelledby="onboarding-title">
         <h2 id="onboarding-title">Drawの作品をChatGPTと編集</h2>
+        <section class="ai-receive__connected ai-receive__connect-prompt" aria-labelledby="connect-prompt-title">
+          <h3 id="connect-prompt-title">接続開始用の依頼文</h3>
+          <p>PiXiEEDをChatGPTで使える状態にしてから、ChatGPTでPiXiEEDを選び、この依頼文を送信してください。初回はPiXiEEDの追加と接続許可が必要です。</p>
+          <label class="visually-hidden" for="draw-connect-prompt">既存Draw作品の接続を始める依頼文</label>
+          <textarea id="draw-connect-prompt" rows="3" readonly spellcheck="false"></textarea>
+          <div class="ai-receive__copy-row ai-receive__copy-row--prompt">
+            <button id="copy-draw-connect-prompt" type="button">依頼文をコピー</button>
+            <a id="chatgpt-connect-link" class="ai-receive__secondary-link" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPTを開く</a>
+          </div>
+          <p id="draw-connect-prompt-feedback" class="ai-receive__feedback" role="status" aria-live="polite"></p>
+          <p id="draw-connect-prompt-availability" class="ai-receive__setup-intro">ストア版は現在審査中です。この依頼文は接続許可画面を使うPiXiEEDを設定済みの方、または一般公開後に利用できます。</p>
+        </section>
         <ol>
-          <li><strong>PiXiEEDをChatGPTに追加</strong><span id="plugin-publication-status" role="status">ストア審査中です。一般公開後に追加できます。</span><a id="plugin-store-link" class="ai-receive__primary-link" hidden target="_blank" rel="noopener noreferrer">ChatGPTに追加</a></li>
-          <li><strong>Drawから接続コードを発行</strong><span>Drawで「ChatGPTとつなぐ」から接続コードを発行します。コードはチャット本文やMCPの入力欄に貼らないでください。</span></li>
-          <li><strong>許可画面で作品を確認</strong><span>ChatGPTが開くPiXiEEDの接続許可画面だけにコードを入力します。接続先、作品名・ID、読み取り・編集の権限を確認し、「この作品への接続を許可」を押してください。</span></li>
+          <li><strong>ChatGPTでPiXiEEDを選んで依頼文を送信</strong><span>初回はChatGPTにPiXiEEDを追加してください。接続許可画面が開いたらそのままにします。</span><span id="plugin-publication-status" role="status">ストア審査中です。一般公開後に追加できます。</span><a id="plugin-store-link" class="ai-receive__primary-link" hidden target="_blank" rel="noopener noreferrer">ChatGPTに追加</a></li>
+          <li><strong>Drawから接続コードを発行</strong><span>許可画面が開いたら、対象の作品をDrawで開き「ChatGPTとつなぐ」→「接続コードを発行」を押します。作品の選択はDraw側で行います。</span></li>
+          <li><strong>許可画面でコードと作品を確認</strong><span>発行したコードはPiXiEEDの接続許可画面だけに入力します。チャット本文やMCPの入力欄には貼らないでください。作品名・ID、読み取り・編集の権限を確認し、「この作品への接続を許可」を押します。</span></li>
+          <li><strong>ChatGPTに戻って編集を依頼</strong><span>「この棒人間を忍者にして」「この部分を青くして」など、作品をどう変えたいか伝えます。</span></li>
         </ol>
-        <p>コードは2分間有効な1回限りのコードで、無料接続は最長5分です。Drawと許可画面が別のブラウザーでもコードを転記できますが、それだけで同じ人・端末の所有者とは確認できません。許可画面に表示された作品を確かめてください。ストア公開前の手動接続情報は、従来の個別設定用 `/mcp` との互換案内です。ストア版OAuthではコードを許可画面にだけ入力し、会話やMCPツールには渡しません。</p>
+        <p>コードは2分間有効な1回限りのコードで、無料接続は最長5分です。期限切れ後は新しいコードで再度許可します。接続許可と作品選択は別の画面で行います。許可画面に表示された作品を確かめてください。ストア公開前の手動接続情報は、従来の個別設定用 `/mcp` との互換案内です。ストア版OAuthではコードを許可画面にだけ入力し、会話やMCPツールには渡しません。</p>
       </section>
     </section>
     <p id="receive-status" class="ai-receive__status" role="status" aria-live="polite">受取リンクを開くか、ChatGPTでPiXiEEDを接続して依頼してください。</p>
@@ -121,6 +134,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261117-launch-preview-1"></script>
+  <script type="module" src="/js/mcp/receive-page.mjs?rev=20261117-chat-connect-1"></script>
 </body>
 </html>

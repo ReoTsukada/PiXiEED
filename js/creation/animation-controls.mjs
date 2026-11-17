@@ -104,9 +104,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     } else if (name === 'up' || name === 'down') {
       add('path', { ...stroke, d: name === 'up' ? 'm6 14 6-6 6 6' : 'm6 10 6 6 6-6' });
     } else if (name === 'copy-add') {
-      add('rect', { ...stroke, x: '4', y: '7', width: '13', height: '13', rx: '2' });
-      add('path', { ...stroke, d: 'M7 7V6a2 2 0 0 1 2-2h4M20 11v4a2 2 0 0 1-2 2h-1' });
-      add('path', { ...stroke, d: 'M19 1v6M16 4h6' });
+      add('path', { ...stroke, d: 'M3 15V5a2 2 0 0 1 2-2h9' });
+      add('path', { ...stroke, d: 'M14 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6' });
+      add('path', { ...stroke, d: 'M20 1.5v5M17.5 4h5' });
     } else if (name === 'clock') {
       add('circle', { ...stroke, cx: '12', cy: '12', r: '8.5' });
       add('path', { ...stroke, d: 'M12 7v5l3 2' });
@@ -114,7 +114,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       add('path', { ...stroke, d: 'm12 4 8 4-8 4-8-4 8-4ZM4 12l8 4 8-4M4 16l8 4 8-4' });
     } else if (name === 'layer-add') {
       add('path', { ...stroke, d: 'm12 6 8 4-8 4-8-4 8-4ZM4 14l8 4 8-4' });
-      add('path', { ...stroke, d: 'M19 1v6M16 4h6' });
+      add('path', { ...stroke, d: 'M20 1.5v5M17.5 4h5' });
     } else if (name === 'download') {
       add('path', { ...stroke, d: 'M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4' });
     } else if (name === 'close') {
@@ -123,8 +123,8 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       add('circle', { ...stroke, cx: '12', cy: '12', r: '3' });
       add('path', { ...stroke, d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.6 2.8-.2-.1a1.7 1.7 0 0 0-1.9.3l-.1.1h-3.2l-.1-.2a1.7 1.7 0 0 0-1.6-1.1 1.7 1.7 0 0 0-.8.2l-.2.1-2.8-1.6.1-.2a1.7 1.7 0 0 0-.3-1.9l-.1-.1v-3.2l.2-.1a1.7 1.7 0 0 0 1.1-1.6 1.7 1.7 0 0 0-.2-.8l-.1-.2 1.6-2.8.2.1a1.7 1.7 0 0 0 1.9-.3l.1-.1h3.2l.1.2a1.7 1.7 0 0 0 1.6 1.1 1.7 1.7 0 0 0 .8-.2l.2-.1 2.8 1.6-.1.2a1.7 1.7 0 0 0 .3 1.9l.1.1v3.2l-.2.1' });
     } else if (name === 'blank-frame') {
-      add('path', { ...stroke, d: 'M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7' });
-      add('path', { ...stroke, d: 'M19 1v6M16 4h6' });
+      add('path', { ...stroke, d: 'M14 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6' });
+      add('path', { ...stroke, d: 'M20 1.5v5M17.5 4h5' });
     } else if (name === 'trash') {
       add('path', { ...stroke, d: 'M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m3 3v7m6-7v7' });
     } else if (name === 'eye') {
