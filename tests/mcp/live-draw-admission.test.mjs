@@ -36,7 +36,7 @@ test('concurrent admissions enforce rolling IP limit and preserve it after recon
 
 test('global UTC daily admission is strict across concurrent clients; midnight does not reset rolling IP limit', async () => {
   let now = Date.UTC(2026, 10, 17, 23, 59); const store = storage(); const room = new DrawAdmissionRoom(store, { now: () => now });
-  const results = await Promise.all(Array.from({ length: 30 }, (_, i) => room.admit(client(i + 1))));
+  const results = await Promise.all(Array.from({ length: 50 }, (_, i) => room.admit(client(i + 1))));
   assert.equal(results.filter(r => r.status === 200).length, DRAW_ADMISSION_DAILY_LIMIT);
   const first = await results[0].json();
   assert.equal((await room.admit(client(99))).status, 429);
@@ -51,17 +51,17 @@ test('global UTC daily admission is strict across concurrent clients; midnight d
 test('usage is a read-only UTC quota snapshot for empty, active, exhausted, and rolled-over days', async () => {
   let now = Date.UTC(2026, 10, 17, 12); const store = storage(); const room = new DrawAdmissionRoom(store, { now: () => now });
   const before = await room.fetch(new Request('https://admission.test/usage', { method: 'POST', body: '{}' }));
-  assert.deepEqual(await before.json(), { dailyLimit: 20, dailyUsed: 0, dailyRemaining: 20, resetsAt: Date.UTC(2026, 10, 18), serverNow: now, sessionDurationMs: 900000 });
+  assert.deepEqual(await before.json(), { dailyLimit: 40, dailyUsed: 0, dailyRemaining: 40, resetsAt: Date.UTC(2026, 10, 18), serverNow: now, sessionDurationMs: 300000 });
   assert.equal(store.values.size, 0, 'reading usage does not initialize or persist counters');
   for (let i = 0; i < DRAW_ADMISSION_DAILY_LIMIT; i++) await room.admit(client(i + 1));
   const exhausted = await room.usage();
-  assert.deepEqual(await exhausted.json(), { dailyLimit: 20, dailyUsed: 20, dailyRemaining: 0, resetsAt: Date.UTC(2026, 10, 18), serverNow: now, sessionDurationMs: 900000 });
+  assert.deepEqual(await exhausted.json(), { dailyLimit: 40, dailyUsed: 40, dailyRemaining: 0, resetsAt: Date.UTC(2026, 10, 18), serverNow: now, sessionDurationMs: 300000 });
   const persistedBeforeReads = structuredClone(await store.get('admission'));
   for (let i = 0; i < 3; i++) await room.usage();
   assert.deepEqual(await store.get('admission'), persistedBeforeReads, 'repeated usage reads do not reserve or alter session state');
   now = Date.UTC(2026, 10, 18);
   const rolled = await room.usage();
-  assert.deepEqual(await rolled.json(), { dailyLimit: 20, dailyUsed: 0, dailyRemaining: 20, resetsAt: Date.UTC(2026, 10, 19), serverNow: now, sessionDurationMs: 900000 });
+  assert.deepEqual(await rolled.json(), { dailyLimit: 40, dailyUsed: 0, dailyRemaining: 40, resetsAt: Date.UTC(2026, 10, 19), serverNow: now, sessionDurationMs: 300000 });
   assert.deepEqual(await store.get('admission'), persistedBeforeReads, 'displaying rollover does not write or touch TTLs');
 });
 

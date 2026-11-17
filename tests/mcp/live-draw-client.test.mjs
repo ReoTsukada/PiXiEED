@@ -12,7 +12,7 @@ function rig(extra = {}) {
     calls.push({ url, ...options });
     if (extra.fetch) { const value = await extra.fetch(url, options); if (value) return value; }
     if (options.method === 'DELETE') return Response.json({ revoked: true });
-    if (url.endsWith('/draw-usage')) return Response.json({ dailyLimit: 20, dailyUsed: 3, dailyRemaining: 17, resetsAt: 86401000, serverNow: time, sessionDurationMs: 900000 });
+    if (url.endsWith('/draw-usage')) return Response.json({ dailyLimit: 40, dailyUsed: 3, dailyRemaining: 37, resetsAt: 86401000, serverNow: time, sessionDurationMs: 300000 });
     if (url.endsWith('/draw-sessions') || url.endsWith('/draw-store-sessions')) return Response.json({ sessionId: 'session', browserToken: 'browser-secret', pairingCode: 'code', expiresAt: 11000 });
     if (url.endsWith('/result')) { acknowledgements.push(JSON.parse(options.body)); return Response.json({ accepted: true }); }
     return Response.json({ connected: true, commands: queue.splice(0), expiresAt: 11000 });
@@ -131,12 +131,12 @@ test('usage refresh coalesces concurrent reads and publishes a timestamped snaps
   const r = rig({ fetch: url => { if (url.endsWith('/draw-usage')) { reads++; return response.promise; } } });
   const a = r.client.refreshUsage(); const b = r.client.refreshUsage({ force: true });
   assert.equal(reads, 1);
-  response.resolve(Response.json({ dailyLimit: 20, dailyUsed: 4, dailyRemaining: 16, resetsAt: 90000, serverNow: 1200, sessionDurationMs: 900000 }));
+  response.resolve(Response.json({ dailyLimit: 40, dailyUsed: 4, dailyRemaining: 36, resetsAt: 90000, serverNow: 1200, sessionDurationMs: 300000 }));
   const [first, second] = await Promise.all([a, b]);
   assert.deepEqual(first, second);
   assert.equal(r.client.getState().usageStatus, 'ready');
   assert.equal(first.receivedAt, 1000); assert.equal(first.clockOffsetMs, 200);
-  assert.equal(r.client.getState().sessionDurationMs, 900000);
+  assert.equal(r.client.getState().sessionDurationMs, 300000);
   assert.equal('browserToken' in r.client.getState(), false);
 });
 
@@ -171,7 +171,7 @@ test('usage failures clear unavailable values rather than inventing quota', asyn
 test('stale usage response cannot publish after stop starts a new generation', async () => {
   const pending = defer(); const r = rig({ fetch: url => url.endsWith('/draw-usage') ? pending.promise : null });
   const refresh = r.client.refreshUsage(); await r.client.stop();
-  pending.resolve(Response.json({ dailyLimit: 20, dailyUsed: 0, dailyRemaining: 20, resetsAt: 90000, serverNow: 1000, sessionDurationMs: 900000 }));
+  pending.resolve(Response.json({ dailyLimit: 40, dailyUsed: 0, dailyRemaining: 40, resetsAt: 90000, serverNow: 1000, sessionDurationMs: 300000 }));
   await refresh;
   assert.equal(r.client.getState().usage, null); assert.equal(r.client.getState().usageStatus, 'idle');
 });
@@ -188,7 +188,7 @@ test('usage timeout clears the hung request and permits a fresh retry', async ()
   assert.equal(r.client.getState().usage, null);
   await r.client.refreshUsage({ force: true });
   assert.equal(reads, 2); assert.equal(r.client.getState().usageStatus, 'ready');
-  pending.resolve(Response.json({ dailyLimit: 20, dailyUsed: 19, dailyRemaining: 1, resetsAt: 90000, serverNow: 1000, sessionDurationMs: 900000 }));
+  pending.resolve(Response.json({ dailyLimit: 40, dailyUsed: 39, dailyRemaining: 1, resetsAt: 90000, serverNow: 1000, sessionDurationMs: 300000 }));
   await first;
   assert.equal(r.client.getState().usage.dailyUsed, 3, 'timed-out response must not overwrite the retry');
 });

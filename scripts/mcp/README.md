@@ -42,7 +42,7 @@ Draw作業の方法はユーザーとGPTの会話で決めます。固定の制�
 - `save_draw` — IndexedDBへの書き込み完了を待ち、保存版ID・保存時の編集版・その後の未保存変更を返します。`responseMode:'summary'`で画素配列を省略できます。
 - `disconnect_draw` — 一時接続を終了します。
 
-Drawの接続コードは2分、接続自体は15分で期限切れになります。コードは一度だけ交換でき、ブラウザー用とGPT用の資格情報は別です。URLや端末ストレージへ資格情報を保存しません。作品の切り替え、同じ作品の開き直し、ページを離れる操作でも接続を終了します。
+Drawの接続コードは2分、無料接続自体は5分で期限切れになります。コードは一度だけ交換でき、ブラウザー用とGPT用の資格情報は別です。URLや端末ストレージへ資格情報を保存しません。作品の切り替え、同じ作品の開き直し、ページを離れる操作でも接続を終了します。
 
 最初の状態取得で`capabilities.fastEdits:true`を確認してから、新しいbatch/高速操作を使います。項目がなければDrawタブが古いため、未保存作品を自動再読み込みせずユーザーへ更新を案内します。関連する編集は`batch`にまとめ、適用結果で返ったrevisionを次の操作に使います。成功確認のためだけに状態を毎回読み直す必要はありません。revision conflict時は最新の状態を読み直して編集を組み直してください。`pending`なら同じ引数とrequestIdで同じ編集/保存ツールを再度呼び、キャッシュされた結果を確認できます。`unknown`なら先に状態を読み、適用済みかを確認してください。
 
@@ -56,7 +56,7 @@ PORT=4290 SITE_ORIGIN=http://127.0.0.1:4289 node scripts/mcp/dev-server.mjs
 
 DrawのローカルURLに `mcpEndpoint=http%3A%2F%2F127.0.0.1%3A4290%2Fmcp` を付けるとローカルMCPを使います。この上書きはループバックのページだけで有効で、同じホスト名に限定します。本番は `js/mcp/connection-config.mjs` の固定接続先を使います。
 
-本番用には `DrawSessionDO` と `DrawAdmissionDO` のSQLite Durable Object binding/migrationがあります。15分の接続時間を上限としてセッションIDを登録し、未登録または期限切れのIDはセッションDOへ到達する前に拒否します。ライブ接続は全体でUTC日あたり20件、同一IPあたりrolling 10分に3件までです（日次枠は日本時間09:00に更新）。接続作成が失敗した場合や応答が失われた場合も枠は返却しません。IPアドレスはサーバー秘密鍵によるHMAC-SHA256の仮名キーに変換してからAdmission DOへ渡し、IP平文はDOに保存しません。`DRAW_ADMISSION_SECRET`（32文字以上）が未設定、binding不備、Cloudflareの接続元IPが得られない場合はライブ接続だけ503で停止し、stateless preview MCPは継続します。Origin検査のみで利用量を制限しているわけではありません。公開前にWorker secret、両DO binding、migration、利用上限を本番環境で確認してください。
+本番用には `DrawSessionDO` と `DrawAdmissionDO` のSQLite Durable Object binding/migrationがあります。5分の接続時間を上限としてセッションIDを登録し、未登録または期限切れのIDはセッションDOへ到達する前に拒否します。無料ライブ接続は全体でUTC日あたり40件、同一IPあたりrolling 10分に3件までです（日次枠は日本時間09:00に更新）。接続作成が失敗した場合や応答が失われた場合も枠は返却しません。IPアドレスはサーバー秘密鍵によるHMAC-SHA256の仮名キーに変換してからAdmission DOへ渡し、IP平文はDOに保存しません。`DRAW_ADMISSION_SECRET`（32文字以上）が未設定、binding不備、Cloudflareの接続元IPが得られない場合はライブ接続だけ503で停止し、stateless preview MCPは継続します。Origin検査のみで利用量を制限しているわけではありません。公開前にWorker secret、両DO binding、migration、利用上限を本番環境で確認してください。
 
 ローカルの実動作・テスト・公開後確認は、それぞれのリリース記録で分けて管理してください。テスト通過だけで本番動作やChatGPTコネクター接続を確認したことにはなりません。
 

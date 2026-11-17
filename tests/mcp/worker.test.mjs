@@ -302,7 +302,7 @@ test('GET /draw-usage exposes only the shared read-only quota snapshot to the Dr
   assert.equal(response.headers.get('access-control-allow-origin'), 'https://pixieed.jp');
   const body = await response.json();
   assert.deepEqual(Object.keys(body).sort(), ['dailyLimit', 'dailyUsed', 'dailyRemaining', 'resetsAt', 'serverNow', 'sessionDurationMs'].sort());
-  assert.deepEqual([body.dailyLimit, body.dailyUsed, body.dailyRemaining, body.sessionDurationMs], [20, 1, 19, 900000]);
+  assert.deepEqual([body.dailyLimit, body.dailyUsed, body.dailyRemaining, body.sessionDurationMs], [40, 1, 39, 300000]);
   assert.equal(body.resetsAt, (Math.floor(body.serverNow / 86400000) + 1) * 86400000);
   assert.doesNotMatch(JSON.stringify(body), /clientKey|sessionId|secret|192\.0\.2\./i);
 });

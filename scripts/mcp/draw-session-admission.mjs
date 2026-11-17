@@ -1,8 +1,8 @@
 /** Global admission and issued-session registry. Never persists raw IP addresses. */
-export const DRAW_ADMISSION_DAILY_LIMIT = 20;
+export const DRAW_ADMISSION_DAILY_LIMIT = 40;
 export const DRAW_ADMISSION_IP_LIMIT = 3;
 export const DRAW_ADMISSION_IP_WINDOW_MS = 10 * 60 * 1000;
-export const DRAW_ADMISSION_SESSION_TTL_MS = 15 * 60 * 1000;
+export const DRAW_ADMISSION_SESSION_TTL_MS = 5 * 60 * 1000;
 const DAY_MS = 86400000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const HASH = /^[0-9a-f]{64}$/;
