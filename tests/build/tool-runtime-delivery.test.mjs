@@ -23,13 +23,22 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // Lazy gallery loading adds one small shared request/cache controller.
   // Project-scoped normal settings add one small shared module; rendering stays lazy.
   // Applied lighting adds one small shared renderer and its three dependency edges.
-  assert.equal(plan.runtimeGraph.modules.size, 119);
-  assert.equal(plan.runtimeGraph.edges.length, 231);
-  assert.equal(plan.dynamicRoots.length, 24);
-  assert.equal(plan.dynamicGraph.modules.size, 118);
-  assert.equal(plan.externalUrls.size, 69);
-  assert.equal(plan.internalizedUrls.length, 50);
+  // Live Draw adds two graph modules and four edges: editor→adapter, adapter→color/animation, and color→animation.
+  // The adapter is bundled; color adjustment stays external as the canonical module also used by its lazy panel.
+  assert.equal(plan.runtimeGraph.modules.size, 121);
+  assert.equal(plan.runtimeGraph.edges.length, 235);
+  assert.equal(plan.dynamicRoots.length, 25);
+  assert.equal(plan.dynamicGraph.modules.size, 121);
+  assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261117-live-draw-2'), 'Live-session UI is loaded only on demand.');
+  assert.equal(plan.externalUrls.size, 70);
+  assert.equal(plan.internalizedUrls.length, 51);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
+  assert(files.includes('js/creation/draw-agent-operations.mjs'), 'Live Draw adds the allowlisted operation adapter to editor startup.');
+  const drawColorAdjustmentsUrl = '/js/creation/draw-color-adjustments.mjs?rev=20261116-normal-release-2';
+  assert(files.includes('js/creation/draw-color-adjustments.mjs'), 'The operation adapter reuses the editor color-adjustment implementation.');
+  assert(plan.externalUrls.has(drawColorAdjustmentsUrl), 'Color adjustment remains one canonical external module shared with its lazy panel.');
+  assert(plan.internalizedUrls.includes('/js/creation/draw-agent-operations.mjs?rev=20261117-live-agent-2'), 'Only the small allowlisted adapter is bundled into startup.');
+  assert(!files.some(file => /js\/mcp\/(?:pixel-art-(?:guide|cases|case-index|techniques|settings|expression|review)|guide-page|examples-page|settings-page)\.mjs$/.test(file)), 'Optional guide, case, and settings modules stay outside Draw startup.');
   assert(plan.pickerGraph.modules.has('/js/creation/project-start-picker.mjs?rev=20261116-normal-release-2'));
   assert(![...plan.pickerGraph.modules.values()].some(module => /(?:creation-runtime|draw-page|creation-modes|draw-music)\.mjs$/.test(module.file)), 'Choosing a work must not import editor or mode runtimes');
   assert(plan.physicalFiles.has('js/creation/project-start-picker.mjs'));
@@ -141,8 +150,8 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.revision, expectedRevision);
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
-    assert.equal(report.externalCount, 69);
-    assert.equal(report.internalizedCount, 50);
+    assert.equal(report.externalCount, 70);
+    assert.equal(report.internalizedCount, 51);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
 

@@ -1,0 +1,18 @@
+.draw-gpt-slot { flex:0 0 auto; }
+body .px-site-header .draw-gpt-connect, .draw-gpt-connect { position:static; width:auto; min-width:68px; height:44px; padding:8px 10px; border:1px solid #52606a; border-radius:12px; background:#26323b; color:#f6f5ee; font:inherit; font-size:12px; font-weight:700; white-space:nowrap; }
+.draw-gpt-connect[data-connected="true"] { border-color:#91d6b8; color:#baf1d3; }
+body:not([data-creation-mode="draw"]) .draw-gpt-slot { display:none; }
+.draw-live-dialog { box-sizing:border-box; width:min(460px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); overflow:auto; padding:24px; border:1px solid #54616b; border-radius:20px; background:#202b33; color:#f3f2ed; box-shadow:0 20px 70px #0008; }
+.draw-live-dialog::backdrop { background:#08111ab3; }
+.draw-live-dialog h2 { margin:0 0 12px; font-size:20px; }
+.draw-live-dialog p { line-height:1.65; font-size:14px; margin:12px 0; }
+.draw-live-dialog .draw-live-scope { font-size:12px; color:#c2cbd1; }
+.draw-live-dialog .draw-live-status { font-weight:600; color:#ffdc82; min-height:1.65em; }
+.draw-live-dialog textarea { box-sizing:border-box; display:block; width:100%; resize:none; margin:8px 0; border:1px solid #7d8e9a; border-radius:8px; background:#111b22; color:#fff; padding:10px; font:13px/1.5 monospace; overflow-wrap:anywhere; }
+.draw-live-dialog button { min-height:44px; border:1px solid #7a8a96; border-radius:10px; background:#34434e; color:#fff; padding:10px 14px; font:inherit; font-size:14px; }
+.draw-live-dialog button:disabled { opacity:.6; }
+.draw-live-dialog [data-live-start] { background:#f2ce72; color:#202b33; border-color:#f2ce72; }
+.draw-live-dialog :focus-visible, .draw-gpt-connect:focus-visible { outline:3px solid #ffdc82; outline-offset:3px; }
+.draw-live-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:20px; }
+.draw-live-dialog [hidden] { display:none; }
+@media(max-width:480px) { .draw-live-dialog { padding:18px; } }

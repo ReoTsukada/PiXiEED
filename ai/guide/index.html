@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <meta name="robots" content="noindex,follow">
+  <title>ドット絵の制作ガイド｜PiXiEED</title>
+  <link rel="stylesheet" href="/css/ai-connect.css">
+  <link rel="stylesheet" href="/css/ai-guide.css">
+</head>
+<body class="ai-guide">
+  <main class="ai-guide__wrap">
+    <a class="ai-guide__brand" href="/">PiXiEED</a>
+    <header class="ai-guide__header">
+      <p class="ai-guide__eyebrow">PIXEL ART GUIDE</p>
+      <h1>ドット絵の制作ガイド</h1>
+      <p class="ai-guide__lead">ユーザーが必要とする場合に参照できる任意資料です。作画やDrawの操作方法を限定するものではありません。</p>
+      <p class="ai-guide__hint">参考画像を使うときは、AIのチャットに添付し、色合いや光、輪郭の特徴を指定できます。</p>
+    </header>
+
+    <form id="guide-form" class="ai-guide__form">
+      <div class="ai-guide__field">
+        <label for="guide-subject">描くもの</label>
+        <select id="guide-subject" name="subject" required>
+          <option value="character">キャラクター</option>
+          <option value="food">食べ物</option>
+          <option value="object">道具・もの</option>
+          <option value="scene">風景</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+
+      <div class="ai-guide__field">
+        <label for="guide-style">画風</label>
+        <select id="guide-style" name="style" required>
+          <option value="neutral">指定なし</option>
+          <option value="modern">モダン</option>
+          <option value="haikara">ハイカラ</option>
+          <option value="nostalgic_rpg">ノスタルジックなRPG</option>
+        </select>
+      </div>
+
+      <fieldset class="ai-guide__size">
+        <legend>キャンバスサイズ</legend>
+        <div class="ai-guide__dimensions">
+          <label for="guide-width">幅</label>
+          <input id="guide-width" name="width" type="number" inputmode="numeric" min="1" max="64" step="1" value="16" required>
+          <span aria-hidden="true">×</span>
+          <label for="guide-height">高さ</label>
+          <input id="guide-height" name="height" type="number" inputmode="numeric" min="1" max="64" step="1" value="16" required>
+          <span>px</span>
+        </div>
+        <div class="ai-guide__presets" role="group" aria-label="サイズのプリセット">
+          <button type="button" data-size="16" aria-pressed="true">16 × 16</button>
+          <button type="button" data-size="32" aria-pressed="false">32 × 32</button>
+          <button type="button" data-size="64" aria-pressed="false">64 × 64</button>
+        </div>
+        <p class="ai-guide__hint">幅・高さは1〜64pxで指定できます。</p>
+      </fieldset>
+
+      <details class="ai-guide__advanced">
+        <summary>追加の条件</summary>
+        <div class="ai-guide__toggles">
+          <fieldset class="ai-guide__materials">
+            <legend>扱う素材 <span class="ai-guide__optional">任意・4種類まで</span></legend>
+            <div class="ai-guide__material-options">
+              <label><input type="checkbox" name="materials" value="cloth"> 布</label>
+              <label><input type="checkbox" name="materials" value="metal"> 金属</label>
+              <label><input type="checkbox" name="materials" value="glass"> ガラス</label>
+              <label><input type="checkbox" name="materials" value="organic"> 植物・食材など</label>
+              <label><input type="checkbox" name="materials" value="stone"> 石</label>
+            </div>
+          </fieldset>
+          <label><input type="checkbox" name="animated"> アニメーション用に描く</label>
+          <label><input type="checkbox" name="normalMap"> 法線マップの考え方も読む</label>
+        </div>
+      </details>
+
+      <button class="ai-guide__submit" type="submit">ガイドを表示</button>
+    </form>
+
+    <p id="guide-status" class="ai-guide__status" role="status" aria-live="polite">16 × 16pxのキャラクター向けガイドを表示しています。</p>
+    <section id="guide-result" class="ai-guide__result" aria-label="制作ガイド" aria-live="polite"></section>
+
+    <noscript>
+      <section class="ai-guide__noscript" aria-labelledby="noscript-title">
+        <h2 id="noscript-title">基本の進め方</h2>
+        <p>JavaScriptを有効にすると、描くものやサイズに合わせたガイドを選べます。</p>
+        <ol>
+          <li>描くものの大きな形と、形や向きの関係を確かめる。</li>
+          <li>目的に合う色面と明暗で、形や素材の違いを伝える。</li>
+          <li>実際の表示サイズで読みやすさを見直す。</li>
+        </ol>
+      </section>
+    </noscript>
+
+    <footer class="ai-guide__footer">
+      <p>ガイド版 <span id="guide-version">—</span></p>
+      <nav aria-label="関連ページ">
+        <a href="/ai/examples/">制作例の検証状況</a>
+        <a href="/tools/start/draw/">Drawへ戻る</a>
+        <a href="/ai/">プレビュー受取ページ</a>
+        <a href="/tools/start/draw/">Drawを開く</a>
+      </nav>
+    </footer>
+  </main>
+  <script type="module" src="/js/mcp/guide-page.mjs"></script>
+</body>
+</html>
