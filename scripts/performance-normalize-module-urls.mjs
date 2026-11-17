@@ -219,18 +219,18 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!normalApplyCacheTargets.has(target)) return whole;
-    const revision = liveDrawCacheTargets.has(target) ? '20261117-free-quota-1' : '20261117-normal-apply-1';
+    const revision = liveDrawCacheTargets.has(target) ? '20261117-chat-connect-1' : '20261117-normal-apply-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
     return `${quote}${path}${next}${quote}`;
   });
   // The store onboarding modules keep their dedicated release identity after
   // older layer normalizers have rewritten shared MCP references.
-  const storeOnboardingTargets = new Set(['js/mcp/connection-config.mjs', 'js/mcp/receive-page.mjs']);
-  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+  const storeOnboardingTargets = new Set(["js/mcp/connection-config.mjs", "js/mcp/receive-page.mjs", "css/draw-live-session.css", "css/ai-connect.css", "js/creation/animation-controls.mjs", "js/creation/draw-desktop-ui.mjs", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "css/draw-desktop-ui.css"]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!storeOnboardingTargets.has(target)) return whole;
-    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-launch-preview-1') : query + (query ? '&' : '?') + 'rev=20261117-launch-preview-1';
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261117-chat-connect-1') : query + (query ? '&' : '?') + 'rev=20261117-chat-connect-1';
     return `${quote}${path}${next}${quote}`;
   });
   return changed;

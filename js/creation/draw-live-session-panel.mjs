@@ -1,5 +1,5 @@
-import { createDrawLiveSession } from './draw-live-session.mjs?rev=20261117-free-quota-1';
-import { STORE_MCP_ENDPOINT, isPluginReviewEstimateCurrent, verifiedPublicPluginUrl } from '../mcp/connection-config.mjs?rev=20261117-launch-preview-1';
+import { createDrawLiveSession } from './draw-live-session.mjs?rev=20261117-chat-connect-1';
+import { CHATGPT_CONNECT_PROMPT, STORE_MCP_ENDPOINT, isPluginReviewEstimateCurrent, verifiedPublicPluginUrl } from '../mcp/connection-config.mjs?rev=20261117-chat-connect-1';
 
 /** Small opt-in connection control; artistic instructions stay in the user's chat. */
 export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
@@ -13,9 +13,11 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     } catch { /* Ignore malformed local development overrides. */ }
   }
   const stylesheet = document.createElement('link'); stylesheet.rel = 'stylesheet';
-  stylesheet.href = '/css/draw-live-session.css?rev=20261117-launch-preview-1'; document.head.append(stylesheet);
+  stylesheet.href = '/css/draw-live-session.css?rev=20261117-chat-connect-1'; document.head.append(stylesheet);
   const button = document.createElement('button'); button.type = 'button'; button.id = 'draw-gpt-connect';
-  button.className = 'draw-gpt-connect'; button.textContent = 'ChatGPTとつなぐ';
+  button.className = 'draw-gpt-connect';
+  button.innerHTML = '<span class="draw-gpt-icon" aria-hidden="true"></span>';
+  button.setAttribute('aria-label', 'ChatGPTとつなぐ'); button.title = 'ChatGPTとつなぐ';
   button.setAttribute('aria-haspopup', 'dialog');
   const slot = document.createElement('div'); slot.className = 'px-tool-header-slot draw-gpt-slot'; slot.append(button);
   document.querySelector('.px-tool-header-controls')?.append(slot);
@@ -25,6 +27,17 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
   const estimateHtml = isPluginReviewEstimateCurrent() ? '審査完了の目安：<time datetime="2026-12-01">2026年12月1日</time>。審査状況により前後します。' : '審査が続いています。一般公開日は未定です。';
   dialog.innerHTML = `<h2 id="draw-live-title">ChatGPTにこの作品の編集を頼む</h2>
     <p class="draw-live-install-state"><span data-live-publication>ChatGPT連携は現在審査中です。一般公開：審査承認後。${estimateHtml} 以前の手動接続は下の詳細から利用できます。</span><a data-live-store-link hidden target="_blank" rel="noopener noreferrer">ChatGPTにPiXiEEDを追加</a> <a href="/ai/#features">できることを見る</a></p>
+    <details class="draw-live-connect-guide" data-live-connect-guide open>
+      <summary id="draw-live-connect-title">ChatGPTに送る接続依頼文</summary>
+      <p>接続許可画面を使うPiXiEEDを設定済みの方・一般公開後の手順です。</p>
+      <label for="draw-live-connect-prompt">接続依頼文（コードは含まれません）</label>
+      <textarea id="draw-live-connect-prompt" data-live-connect-prompt readonly rows="5" spellcheck="false"></textarea>
+      <div class="draw-live-prompt-actions"><button type="button" data-live-copy-connect-prompt>依頼文をコピー</button><a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">ChatGPTを開く</a></div>
+      <p class="draw-live-prompt-feedback" data-live-prompt-feedback role="status" aria-live="polite"></p>
+      <ol><li>ChatGPTでPiXiEEDを選び、依頼文を送ります。</li><li>許可画面が開いたら、下の「接続コードを発行」。コードはその許可画面だけに入力します。</li><li>ChatGPTに戻り、描きたい内容を伝えます。</li></ol>
+      <p>期限切れ後は新しいコードで再度許可します。</p>
+    </details>
+    <p class="draw-live-quick-note">Drawは接続中も開いたままにしてください。接続コードは許可画面だけに入力し、チャットには貼りません。無料接続は最長5分、サービス全体の上限は1日40回です。</p>
     <section class="draw-live-usage" aria-label="接続枠と残り時間">
       <div class="draw-live-gauge" data-daily-gauge>
         <div class="draw-live-gauge-heading"><strong>今日の接続枠（全員共通）</strong><span data-daily-value>利用状況は不明です</span></div>
@@ -38,14 +51,13 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
       </div>
     </section>
     <details class="draw-live-install-help"><summary>以前の手動接続を使う方</summary><p>以前にカスタムMCPとしてPiXiEEDを追加し、手動接続を設定済みの方は、互換用の接続方法を引き続き利用できます。</p><button type="button" data-live-start-legacy>手動接続を開始</button></details>
-    <p>接続すると、この作品の内容をChatGPTが確認し、描画・色補正・レイヤー・コマの編集・端末への保存を操作できます。Drawは接続中も開いたままにしてください。</p>
-    <p>作品データと操作結果はCloudflareの中継サーバーで一時処理・保存されます。無料接続は最長5分で終了し、期限切れ後のサーバー側の削除処理で消去されます。削除は期限到達と同時とは限りません。ChatGPT側の会話履歴は同サービスの設定に従います。</p>
+    <details class="draw-live-data-help"><summary>接続で許可すること・データの扱い</summary><p>接続すると、この作品の内容をChatGPTが確認し、描画・色補正・レイヤー・コマの編集・端末への保存を操作できます。</p><p>作品データと操作結果はCloudflareの中継サーバーで一時処理・保存されます。期限切れ後のサーバー側の削除処理で消去されます。削除は期限到達と同時とは限りません。ChatGPT側の会話履歴は同サービスの設定に従います。</p></details>
     <p class="draw-live-status" role="status"></p>
-    <div class="draw-live-pair" hidden><label for="draw-live-code">接続コード</label><textarea id="draw-live-code" readonly rows="3" spellcheck="false"></textarea>
+    <div class="draw-live-pair" hidden><label for="draw-live-code" data-live-code-label>接続許可画面に入力するコード</label><textarea id="draw-live-code" readonly rows="3" spellcheck="false"></textarea>
     <p data-live-code-instructions>ChatGPTが開く接続許可画面にコードを入力してください。チャット本文には貼らないでください。コードは一度だけ使えます。</p><button type="button" data-live-copy-code>コードをコピー</button>
-    <div data-live-legacy-prompt hidden><label for="draw-live-prompt">ChatGPTへの依頼文</label><textarea id="draw-live-prompt" readonly rows="3" spellcheck="false"></textarea><button type="button" data-live-copy-prompt>依頼文をコピー</button></div></div>
-    <p class="draw-live-scope">このタブの作品だけが対象です。無料接続は最長5分です。ライブ接続の上限はPiXiEEDサービス全体で1日40回です。作品の切り替え・タブを閉じると接続は終了します。作品の保存先はこの端末です。</p>
-    <div class="draw-live-actions"><button type="button" data-live-start>この作品を接続</button><button type="button" data-live-stop hidden>接続を終了</button><button type="button" data-live-close>閉じる</button></div>`;
+    <div data-live-legacy-prompt hidden><label for="draw-live-prompt">手動接続の依頼文（旧方式用・コードを含みます）</label><textarea id="draw-live-prompt" readonly rows="3" spellcheck="false"></textarea><button type="button" data-live-copy-prompt>旧方式の依頼文をコピー</button></div></div>
+    <p class="draw-live-scope">このタブの作品だけを操作します。作品の切り替え・タブを閉じると接続は終了します。保存先はこの端末です。</p>
+    <div class="draw-live-actions"><button type="button" data-live-start>接続コードを発行</button><button type="button" data-live-stop hidden>接続を終了</button><button type="button" data-live-close>閉じる</button></div>`;
   document.body.append(dialog);
   if (publicPluginUrl) {
     const storeLink = dialog.querySelector('[data-live-store-link]');
@@ -53,8 +65,13 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     dialog.querySelector('[data-live-publication]').textContent = 'ChatGPTにPiXiEEDを追加してから、接続を始めてください。';
   }
   const status = dialog.querySelector('.draw-live-status'), pair = dialog.querySelector('.draw-live-pair'), code = dialog.querySelector('#draw-live-code');
+  const connectPrompt = dialog.querySelector('[data-live-connect-prompt]');
+  const promptFeedback = dialog.querySelector('[data-live-prompt-feedback]');
+  connectPrompt.value = CHATGPT_CONNECT_PROMPT;
   const prompt = dialog.querySelector('#draw-live-prompt');
   const codeInstructions = dialog.querySelector('[data-live-code-instructions]');
+  const codeLabel = dialog.querySelector('[data-live-code-label]');
+  const quickNote = dialog.querySelector('.draw-live-quick-note');
   const legacyPrompt = dialog.querySelector('[data-live-legacy-prompt]');
   const start = dialog.querySelector('[data-live-start]'), legacyStart = dialog.querySelector('[data-live-start-legacy]'), stop = dialog.querySelector('[data-live-stop]');
   const dailyValue = dialog.querySelector('[data-daily-value]');
@@ -66,6 +83,7 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
   const sessionMeter = dialog.querySelector('[data-session-meter]');
   const sessionNote = dialog.querySelector('[data-session-note]');
   const sessionGauge = dialog.querySelector('[data-session-gauge]');
+  const connectGuide = dialog.querySelector('[data-live-connect-guide]');
   const pad = value => String(value).padStart(2, '0');
   const formatDuration = milliseconds => {
     const seconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -163,16 +181,22 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
   }
   const clientView = createDrawLiveSession({ draw, endpoint, isActive, onChange(state) {
     updateGauges(state);
+    if (['waiting', 'connected'].includes(state.phase)) connectGuide.open = false;
     status.textContent = state.message; code.value = state.pairingCode;
     prompt.value = state.pairingCode && state.mode === 'legacy' ? `PiXiEEDで接続コード ${state.pairingCode} を使い、このDraw作品を編集してください。Drawは開いたままにします。` : '';
     codeInstructions.textContent = state.mode === 'oauth'
       ? 'ChatGPTが開く接続許可画面にコードを入力してください。チャット本文には貼らないでください。コードは一度だけ使えます。'
       : 'PiXiEEDを選んだChatGPTに接続コードを入力して接続します。コードは一度だけ使えます。';
+    codeLabel.textContent = state.mode === 'legacy' ? '旧手動方式の一時接続コード' : '接続許可画面に入力するコード';
+    quickNote.textContent = state.mode === 'legacy' && ['starting', 'waiting', 'connected'].includes(state.phase)
+      ? '旧手動方式を利用中です。設定済みのPiXiEEDとの会話にだけ、下の旧方式用の依頼文を送ります。Drawは開いたままにしてください。無料接続は最長5分、全体1日40回です。'
+      : 'Drawは接続中も開いたままにしてください。接続コードは許可画面だけに入力し、チャットには貼りません。無料接続は最長5分、サービス全体の上限は1日40回です。';
     legacyPrompt.hidden = state.mode !== 'legacy';
     pair.hidden = !state.pairingCode; start.hidden = ['waiting', 'connected'].includes(state.phase);
     legacyStart.disabled = state.phase === 'starting'; legacyStart.hidden = ['waiting', 'connected'].includes(state.phase);
     start.disabled = state.phase === 'starting'; stop.hidden = !['starting', 'waiting', 'connected'].includes(state.phase);
-    button.textContent = state.phase === 'connected' ? 'ChatGPT接続中' : 'ChatGPTとつなぐ';
+    const connectionLabel = state.phase === 'connected' ? 'ChatGPT接続中' : 'ChatGPTとつなぐ';
+    button.setAttribute('aria-label', connectionLabel); button.title = connectionLabel;
     button.dataset.connected = String(state.phase === 'connected');
   }});
   client = clientView;
@@ -189,6 +213,10 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
   scope.listen(dialog.querySelector('[data-live-copy-code]'), 'click', async () => {
     try { await navigator.clipboard.writeText(code.value); status.textContent = '接続コードをコピーしました。'; }
     catch { code.select(); status.textContent = '接続コードを選択しました。コピーしてお使いください。'; }
+  });
+  scope.listen(dialog.querySelector('[data-live-copy-connect-prompt]'), 'click', async () => {
+    try { await navigator.clipboard.writeText(connectPrompt.value); promptFeedback.textContent = '接続依頼文をコピーしました。'; }
+    catch { connectPrompt.select(); promptFeedback.textContent = '接続依頼文を選択しました。コピーしてお使いください。'; }
   });
   scope.listen(dialog.querySelector('[data-live-copy-prompt]'), 'click', async () => {
     try { await navigator.clipboard.writeText(prompt.value); status.textContent = '依頼文をコピーしました。'; }

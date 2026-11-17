@@ -78,6 +78,7 @@ body.ai-receive { margin:0; min-height:100svh; background:#f4f2ec; color:#25231f
 .ai-receive__help summary, .ai-receive__json-import > summary, .ai-receive__json-import details summary { min-height:48px; padding-block:12px; cursor:pointer; font-weight:650; }
 .ai-receive__help p { margin:0 0 4px; color:#514d45; }
 .ai-receive__connected { padding:clamp(16px,4vw,20px); }
+.ai-receive__connect-prompt { margin:0 0 16px; box-shadow:none; }
 .ai-receive__connected-details[hidden] { display:none!important; }
 .ai-receive__connected-details > summary { min-height:48px; padding-block:12px; cursor:pointer; font-weight:700; }
 .ai-receive__connected-details[open] > summary { margin-bottom:8px; }

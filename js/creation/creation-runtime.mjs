@@ -1,6 +1,6 @@
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261117-free-quota-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261117-chat-connect-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261116-normal-release-2';
 import { mountCreationModes } from './creation-modes.mjs?rev=20261116-normal-release-2';
 import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261116-normal-release-2';
@@ -99,7 +99,7 @@ export async function mountCreationRuntime({
   }
 
   try {
-    const { mountDrawLiveSessionPanel } = await import('./draw-live-session-panel.mjs?rev=20261117-free-quota-1');
+    const { mountDrawLiveSessionPanel } = await import('./draw-live-session-panel.mjs?rev=20261117-chat-connect-1');
     mountDrawLiveSessionPanel({ draw, scope, isActive: () => hostActive() && mountedModes.mode === 'draw' && !mountedModes.switching });
   } catch { /* The optional remote link must not stop local Draw. */ }
 

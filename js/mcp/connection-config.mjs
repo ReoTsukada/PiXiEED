@@ -3,6 +3,7 @@
 export const LEGACY_MCP_ENDPOINT = 'https://pixieed-mcp.rgaydm03.workers.dev/mcp';
 export const MCP_ENDPOINT = LEGACY_MCP_ENDPOINT;
 export const STORE_MCP_ENDPOINT = `${new URL(LEGACY_MCP_ENDPOINT).origin}/mcp/store`;
+export const CHATGPT_CONNECT_PROMPT = 'PiXiEEDで、Drawに開いている作品を編集したいです。接続が必要なら接続の許可画面へ案内してください。接続コードをこの会話に要求せず、許可画面で入力するよう案内してください。接続できたら作品の状態を確認し、編集内容を私に聞いてください。';
 
 // Store listing is intentionally unavailable until the public listing has been verified.
 export const PLUGIN_PUBLICATION = Object.freeze({ status: 'not_published', publicPluginUrl: null });

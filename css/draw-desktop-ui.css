@@ -311,6 +311,7 @@ body.draw-desktop-active .draw-desktop-cell-launcher {
   box-sizing: border-box;
   display: grid;
   place-items: center;
+  place-content: center;
   flex: 0 0 44px;
   width: 44px;
   min-width: 44px;
@@ -357,8 +358,8 @@ body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers > summary::
   width: 24px;
   height: 24px;
   background-color: currentColor;
-  -webkit-mask: url("/assets/icons/pixieed/selection-transform.svg") center / contain no-repeat;
-  mask: url("/assets/icons/pixieed/selection-transform.svg") center / contain no-repeat;
+  -webkit-mask: url("/assets/icons/pixieed/selection-transform.svg?rev=20261117-chat-connect-1") center / contain no-repeat;
+  mask: url("/assets/icons/pixieed/selection-transform.svg?rev=20261117-chat-connect-1") center / contain no-repeat;
 }
 body.draw-desktop-active .draw-desktop-shell .draw-selection-numbers[open] > summary {
   border-color: var(--desktop-accent);
@@ -429,7 +430,8 @@ body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset] {
   box-sizing: border-box; display: grid; place-items: center; flex: 0 0 24px; width: 24px; min-width: 24px; max-width: 24px;
   height: 24px; min-height: 24px; max-height: 24px; padding: 2px; overflow: hidden; font-size: 0;
 }
-body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset]::before { content: "↺"; font: 700 18px/1 system-ui, sans-serif; }
+body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset]::before { content: none; }
+body.draw-desktop-active .draw-desktop-frame-heading [data-layout-reset] > svg { display: block; flex: 0 0 18px; width: 18px; height: 18px; }
 body.draw-desktop-active .draw-desktop-frame-host .animation-controls__desktop-frames { grid-template-rows: 44px minmax(0, 1fr); }
 /* A short PC workspace scrolls the frame actions and cards together. The cards
    retain their full hit area instead of being clipped below the action row. */

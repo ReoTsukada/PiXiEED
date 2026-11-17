@@ -3,7 +3,7 @@ import {
   parseDrawImportJson, readStagedDrawImport, saveDrawImportAsNewProject,
   stageDrawImportToken
 } from './draw-import.mjs?rev=20261116-normal-release-2';
-import { PLUGIN_PUBLICATION, isPluginReviewEstimateCurrent, verifiedMcpEndpoint, verifiedPublicPluginUrl } from './connection-config.mjs?rev=20261117-launch-preview-1';
+import { CHATGPT_CONNECT_PROMPT, PLUGIN_PUBLICATION, isPluginReviewEstimateCurrent, verifiedMcpEndpoint, verifiedPublicPluginUrl } from './connection-config.mjs?rev=20261117-chat-connect-1';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#art-preview');
@@ -18,6 +18,8 @@ const loadButton = $('#load-json');
 const fallback = $('#manual-import');
 const connectionFeedback = $('#connection-feedback');
 const promptFeedback = $('#prompt-feedback');
+const drawConnectPrompt = $('#draw-connect-prompt');
+const drawConnectPromptFeedback = $('#draw-connect-prompt-feedback');
 let current = null;
 let controller = null;
 let saving = false;
@@ -150,13 +152,28 @@ if (!isPluginReviewEstimateCurrent()) {
 }
 const storeStatus = $('#plugin-publication-status');
 const storeLink = $('#plugin-store-link');
+const connectPromptAvailability = $('#draw-connect-prompt-availability');
+drawConnectPrompt.value = CHATGPT_CONNECT_PROMPT;
+$('#copy-draw-connect-prompt').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(CHATGPT_CONNECT_PROMPT);
+    drawConnectPromptFeedback.textContent = '接続開始用の依頼文をコピーしました。ChatGPTでPiXiEEDを選んで送信してください。';
+    drawConnectPromptFeedback.dataset.state = 'success';
+  } catch {
+    drawConnectPrompt.select();
+    drawConnectPromptFeedback.textContent = 'コピーできませんでした。依頼文を選択してコピーしてください。';
+    drawConnectPromptFeedback.dataset.state = 'error';
+  }
+});
 if (storeUrl) {
   storeStatus.textContent = 'ストアで公開されています。';
   storeLink.href = storeUrl;
   storeLink.hidden = false;
+  connectPromptAvailability.textContent = '初回はChatGPTにPiXiEEDを追加し、表示される確認と接続許可を完了してください。';
 } else {
   storeStatus.textContent = 'ChatGPT連携は現在審査中です。一般公開：審査承認後。';
   storeLink.hidden = true;
+  connectPromptAvailability.textContent = 'ストア版は現在審査中です。この依頼文は接続許可画面を使うPiXiEEDを設定済みの方、または一般公開後に利用できます。';
 }
 const setupSteps = $('.ai-receive__setup-steps');
 const connectedUseDetails = $('#connected-use-details');
@@ -192,11 +209,16 @@ if (endpoint) {
 }
 
 let fragment = location.hash;
-if (fragment) history.replaceState(null, '', `${location.pathname}${location.search}`);
-if (fragment) {
+let anchorId = '';
+if (fragment.startsWith('#') && fragment.length > 1) {
+  try { anchorId = decodeURIComponent(fragment.slice(1)); } catch {}
+}
+const isPageAnchor = Boolean(anchorId && document.getElementById(anchorId));
+const isArtLink = fragment.startsWith('#art=');
+if (isArtLink) history.replaceState(null, '', `${location.pathname}${location.search}`);
+if (isArtLink) {
   fallback.hidden = false;
   const match = fragment.match(/^#art=([A-Za-z0-9_-]+)$/);
-  fragment = '';
   if (!match) {
     clearStagedDrawImport(sessionStorageRef());
     showError(new Error('受取リンクの形式を確認できません。JSONを読み込むか、リンクを作り直してください。'));
@@ -207,10 +229,10 @@ if (fragment) {
       render(decoded, { token: match[1], persistForRefresh: true });
     } catch (error) { clearStagedDrawImport(sessionStorageRef()); showError(error); }
   }
-} else {
-  const staged = readStagedDrawImport(sessionStorageRef());
+} else if (isPageAnchor || !fragment) {
+  const staged = isPageAnchor ? null : readStagedDrawImport(sessionStorageRef());
   if (staged) render(staged, { token: staged.token });
-  else {
+  else if (!isPageAnchor) {
     clearStagedDrawImport(sessionStorageRef());
     status.textContent = '受取リンクを開くか、ChatGPTでPiXiEEDを接続して依頼してください。';
     status.dataset.state = 'ready';
@@ -219,4 +241,8 @@ if (fragment) {
     fallback.hidden = false;
     syncDisabled();
   }
+} else {
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  clearStagedDrawImport(sessionStorageRef());
+  showError(new Error('受取リンクの形式を確認できません。JSONを読み込むか、リンクを作り直してください。'));
 }

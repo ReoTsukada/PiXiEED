@@ -4,7 +4,7 @@ import { desktopToolIcon, dispatchDesktopToggle, findDesktopToggleSource, syncDe
 
 test('desktop selection modes have distinct rail glyphs', () => {
   const icons = ['rectangle', 'lasso', 'color'].map(mode => desktopToolIcon('select', mode));
-  assert.deepEqual(icons, ['rectangle', '∿', '◉']);
+  assert.deepEqual(icons, ['rectangle', 'selection-lasso', 'selection-color']);
   assert.equal(new Set(icons).size, 3);
 });
 
