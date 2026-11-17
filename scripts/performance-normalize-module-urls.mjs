@@ -155,7 +155,7 @@ function normalize(source, file) {
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!creationGuidanceTargets.has(target)) return whole;
     const revision = ['css/home-portal.css', 'js/home-portal.mjs', 'js/home-recent-projects.mjs'].includes(target)
-      ? (target === 'js/home-recent-projects.mjs' ? '20261112-home-community-1' : target === 'css/home-portal.css' ? '20261113-home-world-1' : '20261112-posted-random-1') : '20261112-creation-guidance-1';
+      ? (target === 'js/home-recent-projects.mjs' ? '20261117-home-pageshow-1' : target === 'css/home-portal.css' ? '20261113-home-world-1' : '20261117-home-pageshow-1') : '20261112-creation-guidance-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=' + revision) : query + (query ? '&' : '?') + 'rev=' + revision;
     return `${quote}${path}${next}${quote}`;
   });

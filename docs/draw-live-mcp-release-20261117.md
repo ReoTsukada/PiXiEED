@@ -35,3 +35,9 @@ Supported live operations: read state, set pixels, add palette colors, color cor
 - Physical iOS/Android/Safari tests are not complete. Viewport emulation is not a physical-device result.
 
 Do not describe this record alone as proof of production publication. The deployed commit, Worker version, Pages run and production findings must be recorded separately when those steps complete.
+
+## Additional release checks
+
+- Local Wrangler Durable Objects execution passed 11 checks: admission, pairing, one-use code rejection, pending state delivery, bound command polling, revocation and rejection of old credentials, and same-IP quota. Temporary local credentials were removed and the test server was stopped. This is not production verification.
+- GitHub's first run stopped in an unchanged pixel-lens wall-clock timing test. The isolated 13-test file passed; rerunning without changing its threshold passed the full 3,706-test suite, build, output checks, and Draw/creation browser checks.
+- The next gate exposed an existing home-shelf lifecycle race: initialization before the first pageshow could read the catalog twice. Initial pageshow now leaves the initial request alone; pagehide followed by pageshow still refreshes. A deterministic regression test covers both paths. The browser read-count assertion and its display cap remain unchanged. A fresh complete CI run is required for this follow-up.

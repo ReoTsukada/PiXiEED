@@ -126,7 +126,7 @@ export function initHomeWorkShelf(doc=globalThis.document,win=globalThis.window)
     if(loading||controller)return;
     loading=true;observer?.disconnect();
     try{
-      const {initHomeRecentProjects}=await import('./home-recent-projects.mjs?rev=20261112-home-community-1');
+      const {initHomeRecentProjects}=await import('./home-recent-projects.mjs?rev=20261117-home-pageshow-1');
       controller=initHomeRecentProjects({doc,win,max:4});
     }catch{
       const status=doc.getElementById('portal-recent-status');
