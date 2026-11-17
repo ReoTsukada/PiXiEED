@@ -34,7 +34,8 @@ test('Worker deployment config isolates public OAuth with free KV and existing S
     { tag: 'v1-draw-sessions', new_sqlite_classes: ['DrawSessionDO'] },
     { tag: 'v2-draw-admission', new_sqlite_classes: ['DrawAdmissionDO'] }
   ]);
-  assert.equal(config.vars, undefined);
+  assert.deepEqual(Object.keys(config.vars), ['OPENAI_APPS_CHALLENGE']);
+  assert.match(config.vars.OPENAI_APPS_CHALLENGE, /^[A-Za-z0-9._-]{1,512}$/);
   assert.deepEqual(config.kv_namespaces.map(item => item.binding), ['OAUTH_KV']);
   assert.match(config.kv_namespaces[0].id, /^[a-f0-9]{32}$/);
   assert.deepEqual(config.compatibility_flags, ['global_fetch_strictly_public']);

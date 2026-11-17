@@ -25,7 +25,7 @@
   <main id="main">
     <section class="page-hero"><div class="container page-hero__inner"><div><p class="eyebrow">CHATGPT CONNECT</p><h1>連携時のプライバシー</h1></div><p>Drawの作品をChatGPTから編集するときに、一時的にやり取りする情報と保持期間を説明します。</p></div></section>
     <section class="section"><div class="container narrow ai-policy">
-      <p class="lead">この通知は、OAuthを使ってPiXiEED Drawの開いている作品をChatGPTから読み取り・編集する公開ストア版に適用します。ストア版はまだ公開・申請していません。既存の個別設定用 `/mcp` とは認証手順が異なります。</p>
+      <p class="lead">この通知は、OAuthを使ってPiXiEED Drawの開いている作品をChatGPTから読み取り・編集する公開ストア版に適用します。ストア版は審査中で、まだ一般公開されていません。既存の個別設定用 `/mcp` とは認証手順が異なります。</p>
       <h2>接続を開始する操作</h2>
       <p>利用者がDrawの通常の「ChatGPTとつなぐ」ボタンからOAuth用の接続コードを発行します。ChatGPTがPiXiEED Workerの認可ページを開いたら、コードはそのページにだけ入力します。コードをチャット本文、MCPツールの入力、URL、メールに入れないでください。認可ページでChatGPTの接続元・redirect先、対象作品名とID、要求された権限を確認し、利用者が「この作品への接続を許可」を押した後にだけ接続します。接続コードは2分間有効な1回限りで、作品セッションは作成から最長15分です。</p>
       <p>コードはDrawを開いているブラウザーから別のブラウザーの認可ページへコピーして入力することもできます。認可ページのCookieは、その認可ページを開いたブラウザー内で同意手順を束縛しますが、Drawを開いたブラウザーの所有者までは証明しません。許可前に認可ページに表示される作品を利用者が確認します。OAuth認可ページの一時的な同意状態とCookieは最長10分です。</p>
@@ -47,7 +47,7 @@
       <h2>ChatGPT側の取り扱い</h2>
       <p>ChatGPTは、利用者の設定や契約、サービス条件に従って、依頼文、ツールへの入力と応答、会話履歴などを処理する場合があります。ChatGPT側の保存・学習・削除方法はPiXiEEDが決めたり保証したりできません。ChatGPTのデータ設定と<a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener noreferrer">OpenAIのプライバシーポリシー</a>をご確認ください。PiXiEEDの中継データの削除は、ChatGPTの会話履歴削除とは別です。</p>
       <h2>公開前の更新</h2>
-      <p class="ai-policy__notice">ChatGPT向けストア版は未公開・未申請です。公開前に本番のOAuth接続、認可画面、保存期間、公開URLを確認し、この通知を更新します。</p>
+      <p class="ai-policy__notice">ChatGPT向けストア版は審査中で、まだ一般公開されていません。本番のOAuth接続、認可画面、保存期間、公開URLは確認済みです。一般公開は審査承認後にご案内します。</p>
       <p>お問い合わせは<a href="mailto:pixieed.arta@gmail.com">pixieed.arta@gmail.com</a>へ。接続の切断や作品の保存については<a href="/ai/support/">サポートページ</a>をご覧ください。</p>
       <p class="lead">最終更新：2026年11月17日</p>
     </div></section>

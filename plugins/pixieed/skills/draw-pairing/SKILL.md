@@ -1,5 +1,5 @@
 ---
-name: pixieed-draw-oauth-connection
+name: draw-pairing
 description: Guide the user through PiXiEED Draw OAuth authorization and safe, efficient use of one authorized project.
 ---
 

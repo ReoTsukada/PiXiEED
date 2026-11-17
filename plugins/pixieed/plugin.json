@@ -55,28 +55,16 @@
               "expected_behavior": "Never ask for or accept the code in chat or tool input. The reviewer enters it only on the Worker authorization page, verifies the ChatGPT client, selected artwork, and scopes, then explicitly allows access. Read and report the authorized project's state only after approval."
             },
             {
-              "description": "Setup: open a non-sensitive sample artwork, note its revision, and authorize draw:write. Change one pixel, then verify the returned project state.",
-              "prompt": "In my authorized Draw project, set the pixel at canvas coordinate (4, 5) to blue on the active layer.",
+              "description": "Setup: prepare a sample artwork with red pixels at (4,5) and (8,8) sharing one palette entry and blue already available. Authorize draw:write.",
+              "prompt": "In my authorized Draw project, change only the red pixel at (4, 5) to the existing blue palette color. Keep the distant red pixel at (8, 8) red, then verify both pixels.",
               "tools_triggered": "get_draw_state, set_draw_pixel",
-              "expected_behavior": "Check the current revision and active frame/layer, require draw:write authorization, apply only the requested pixel change, then report the result. Ask for clarification if coordinates or color are ambiguous."
+              "expected_behavior": "Check the current revision and only the needed pixel data. Apply set_draw_pixel at (4,5), not replace_draw_palette_color, which would change every pixel sharing that entry. Verify the target changed and the distant pixel stayed red."
             },
             {
-              "description": "Setup: open an editable sample artwork with an active layer and authorize draw:write. Add a palette color and apply it to one pixel.",
-              "prompt": "In my authorized Draw project, add #2A7FFF to the palette and use it for the pixel at (6, 3).",
-              "tools_triggered": "get_draw_state, add_draw_palette_color, set_draw_pixel",
-              "expected_behavior": "Check the current revision and require draw:write authorization. Add the requested palette color and change only the specified pixel. Report any unsupported operation instead of claiming it succeeded."
-            },
-            {
-              "description": "Setup: open an editable sample artwork with an active layer and authorize draw:write. Add a named layer and verify its order.",
-              "prompt": "In my authorized Draw project, add a layer named Accent above the active layer.",
-              "tools_triggered": "get_draw_state, add_draw_layer",
-              "expected_behavior": "Check the current revision and layer order, require draw:write authorization, add only the requested layer, and report the returned state."
-            },
-            {
-              "description": "Setup: authorize a sample artwork, make a small edit, and leave it unsaved. Save locally and verify the returned save state.",
-              "prompt": "Save my authorized PiXiEED Draw project, then tell me where it was saved and whether later edits remain unsaved.",
-              "tools_triggered": "get_draw_state, save_draw",
-              "expected_behavior": "Save the current revision and state that storage is local to the same browser. Report dirty status exactly as returned; do not imply cloud sync or publication."
+              "description": "Setup: open an editable sample artwork with an active layer and authorize draw:write. Add a color and layer, then use both in one pixel edit.",
+              "prompt": "In my authorized Draw project, add #2A7FFF to the palette and add a layer named Accent above the active layer. On Accent, set pixel (6, 3) to the new color, then verify the layer order and pixel.",
+              "tools_triggered": "get_draw_state, add_draw_palette_color, add_draw_layer, set_draw_pixel",
+              "expected_behavior": "Check the current revision and layer order. Add the requested palette entry and Accent layer, then change only pixel (6,3) on Accent. Report unsupported operations or mismatched returned state instead of claiming success."
             },
             {
               "description": "Batch a natural drawing, movement, and local save in one authorized test project.",
@@ -85,10 +73,10 @@
               "expected_behavior": "Use the existing authorized project and verify capabilities.fastEdits before using the batch route. If available, make the related drawing and selection transform one batch and request save:true. Use the current revision and summary result. If the tab is old or fastEdits is unavailable, do not reload automatically; tell the user how to refresh safely. If the result is pending or unknown, check get_draw_operation_status with the same requestId; do not repeat the edits. If saving fails after edits were applied, report the applied edit and do not redraw it."
             },
             {
-              "description": "Change one of two distant pixels that share a color without changing the other.",
-              "prompt": "Change only the red pixel at (4, 5) to the existing blue palette color. The distant red pixel at (8, 8) must stay red.",
-              "tools_triggered": "get_draw_state, set_draw_pixel",
-              "expected_behavior": "Set up a test artwork where red at (4,5) and (8,8) shares one palette entry and blue already exists in the palette. Read metadata and only the needed pixel data. Use set_draw_pixel for (4,5). Do not use replace_draw_palette_color, because that changes every pixel in every cel that uses the palette index. Verify (8,8) is unchanged; report if the specified target or color does not match the setup."
+              "description": "Setup: authorize an edited sample project with unsaved changes. Save locally and verify its save/dirty state.",
+              "prompt": "Save my authorized PiXiEED Draw project, then tell me where it was saved and whether later edits remain unsaved.",
+              "tools_triggered": "get_draw_state, save_draw",
+              "expected_behavior": "Save the current revision and state that storage is local to the same browser. Report dirty status exactly as returned; do not imply cloud sync or publication."
             }
           ],
           "negative": [
@@ -109,6 +97,7 @@
             }
           ]
         },
+        "demo_recording_url": "https://github.com/ReoTsukada/PiXiEED/releases/download/pixieed-draw-review-demo-20261117/pixieed-draw-demo-2026-11-17T05-58-00-492Z.webm",
         "commerce": false,
         "commerce_description": "This plugin does not sell products or process payments."
       },

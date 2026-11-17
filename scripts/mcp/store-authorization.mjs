@@ -21,7 +21,7 @@ const failure = (message, status = 400) => Object.assign(new Error(message), { s
 const safetyHeaders = () => new Headers({
   'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store', 'Referrer-Policy':'same-origin',
   'X-Content-Type-Options':'nosniff', 'X-Frame-Options':'DENY',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://chatgpt.com/connector_platform_oauth_redirect; base-uri 'none'; frame-ancestors 'none'"
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://chatgpt.com/connector_platform_oauth_redirect https://platform.openai.com; base-uri 'none'; frame-ancestors 'none'"
 });
 // For POST form navigations, Referrer-Policy: no-referrer makes browsers serialize Origin as "null".
 // same-origin keeps the exact Origin check usable without weakening the authorization guard.
