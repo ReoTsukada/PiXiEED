@@ -147,7 +147,7 @@ if (storeUrl) {
   storeLink.href = storeUrl;
   storeLink.hidden = false;
 } else {
-  storeStatus.textContent = 'ストア公開準備中です。公開確認後に、このページから追加できるようになります。';
+  storeStatus.textContent = 'ストア審査中です。一般公開後に、このページから追加できます。';
   storeLink.hidden = true;
 }
 const setupSteps = $('.ai-receive__setup-steps');
