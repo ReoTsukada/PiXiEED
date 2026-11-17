@@ -91,6 +91,88 @@ test('browser session creation enforces exact Origin and returns independent one
   assert.equal(browserCannotIssue.status, 401);
 });
 
+test('OAuth Draw sessions require a private claim then one-use activation, while legacy pairing remains isolated', async () => {
+  let now = 1_800_000_000_000;
+  const room = new DrawSessionRoom(undefined, { now: () => now });
+  const roomFetch = (path, { method = 'GET', token, body } = {}) => room.route(new Request(`https://room.test${path}`, {
+    method,
+    headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {})
+  }));
+  const sessionId = '00000000-0000-4000-8000-000000000091';
+  const created = await roomFetch('/_relay/create', { method: 'POST', body: { sessionId, projectBinding: binding, mode: 'oauth', projectName: '星空のドット絵' } });
+  assert.equal(created.status, 200);
+  const session = await created.json();
+  assert.match(session.pairingCode, /^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/);
+  assert.equal(session.projectName, undefined, 'project metadata is not disclosed to the browser create response');
+
+  const secret = session.pairingCode.split('.')[1];
+  const legacyExchange = await roomFetch('/_relay/connect', { method: 'POST', body: { secret } });
+  assert.equal(legacyExchange.status, 403, 'the legacy endpoint cannot activate an OAuth session');
+  const claimBinding = 'C'.repeat(43);
+  const authFingerprint = 'a'.repeat(64);
+  const claimedResponse = await roomFetch('/_relay/store-claim', { method: 'POST', body: { secret, claimBinding, authFingerprint } });
+  assert.equal(claimedResponse.status, 200);
+  const claim = await claimedResponse.json();
+  assert.deepEqual(claim, { projectBinding: binding, projectName: '星空のドット絵', claimExpiresAt: now + 2 * 60_000, expiresAt: now + 15 * 60_000 });
+  assert.equal(Object.hasOwn(claim, 'accessToken'), false);
+  const claimedState = await room.load();
+  assert.equal(claimedState.authFingerprint, authFingerprint);
+  assert.notEqual(claimedState.claimBindingHash, claimBinding);
+  assert.equal((await roomFetch('/_relay/store-claim', { method: 'POST', body: { secret, claimBinding: 'D'.repeat(43), authFingerprint } })).status, 403, 'pairing code is one use');
+  assert.equal((await roomFetch('/_relay/store-activate', { method: 'POST', body: { claimBinding: 'D'.repeat(43), authFingerprint } })).status, 403, 'a different claim binding cannot activate');
+  assert.equal((await roomFetch('/_relay/store-activate', { method: 'POST', body: { claimBinding, authFingerprint: 'b'.repeat(64) } })).status, 403, 'a different OAuth request fingerprint cannot activate');
+
+  const activatedResponse = await roomFetch('/_relay/store-activate', { method: 'POST', body: { claimBinding, authFingerprint } });
+  assert.equal(activatedResponse.status, 200);
+  const agent = await activatedResponse.json();
+  assert.equal(agent.connectionId, sessionId);
+  assert.deepEqual(agent.projectBinding, binding);
+  assert.equal(agent.expiresAt, claim.expiresAt);
+  assert.match(agent.accessToken, /^[A-Za-z0-9_-]{43}$/);
+  assert.equal((await roomFetch('/_relay/store-activate', { method: 'POST', body: { claimBinding, authFingerprint } })).status, 403, 'claim activation is one use');
+  assert.equal((await room.load()).authFingerprint, null, 'successful activation consumes the stored OAuth fingerprint');
+
+  const statusResponse = await roomFetch('/_relay/status', { token: agent.accessToken });
+  assert.equal(statusResponse.status, 200);
+  const status = await statusResponse.json();
+  assert.deepEqual(status, { connectionId: sessionId, projectBinding: binding, expiresAt: agent.expiresAt, active: true });
+  assert.equal(Object.hasOwn(status, 'accessToken'), false);
+  assert.equal((await roomFetch('/_relay/status', { token: session.browserToken })).status, 401);
+  const revoked = await roomFetch('/_relay/revoke', { method: 'POST', token: agent.accessToken, body: {} });
+  assert.equal(revoked.status, 200);
+  assert.equal((await roomFetch('/_relay/status', { token: agent.accessToken })).status, 401);
+
+  const legacyId = '00000000-0000-4000-8000-000000000092';
+  const legacyRoom = new DrawSessionRoom(undefined, { now: () => now });
+  const legacyFetch = (path, { method = 'GET', body } = {}) => legacyRoom.route(new Request(`https://legacy-room.test${path}`, {
+    method, ...(body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {})
+  }));
+  assert.equal((await legacyFetch('/_relay/create', { method: 'POST', body: { sessionId: legacyId, projectBinding: binding, projectName: 'must reject' } })).status, 400);
+  const legacy = await legacyFetch('/_relay/create', { method: 'POST', body: { sessionId: legacyId, projectBinding: binding } });
+  const legacySession = await legacy.json();
+  assert.equal((await legacyFetch('/_relay/store-claim', { method: 'POST', body: { secret: legacySession.pairingCode.split('.')[1], claimBinding, authFingerprint } })).status, 403);
+  assert.equal((await legacyFetch('/_relay/connect', { method: 'POST', body: { secret: legacySession.pairingCode.split('.')[1] } })).status, 200);
+  assert.notEqual((await worker.fetch(new Request(`${apiOrigin}/draw-sessions/${sessionId}/store-claim`, { method: 'POST' }), env)).status, 200, 'internal Store claim route is not exposed through the public worker routes');
+});
+
+test('OAuth claim expires within two minutes and requires a valid request fingerprint', async () => {
+  let now = 1_800_000_100_000;
+  const room = new DrawSessionRoom(undefined, { now: () => now });
+  const roomFetch = (path, body) => room.route(new Request(`https://room-expiry.test${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  }));
+  const created = await roomFetch('/_relay/create', { sessionId: '00000000-0000-4000-8000-000000000093', projectBinding: binding, mode: 'oauth' });
+  const session = await created.json();
+  const [ , secret ] = session.pairingCode.split('.');
+  assert.equal((await roomFetch('/_relay/store-claim', { secret, claimBinding: 'E'.repeat(43), authFingerprint: 'invalid' })).status, 400);
+  const claimBinding = 'F'.repeat(43), authFingerprint = 'c'.repeat(64);
+  assert.equal((await roomFetch('/_relay/store-claim', { secret, claimBinding, authFingerprint })).status, 200);
+  now += 2 * 60_000;
+  assert.equal((await roomFetch('/_relay/store-activate', { claimBinding, authFingerprint })).status, 403);
+});
+
 test('live state, edit, and save relay once, use the project binding, and replay only cached acknowledgements', async () => {
   const created = await createSession();
   const session = await created.json();

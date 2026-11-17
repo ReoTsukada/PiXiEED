@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <meta name="description" content="PiXiEED ChatGPT連携の接続、操作、保存に関するサポート情報です。">
+  <link rel="canonical" href="https://pixieed.jp/ai/support/">
+  <title>ChatGPT連携のサポート｜PiXiEED</title>
+  <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+  <style>
+    .ai-support { max-width: 54rem; margin-inline: auto; }
+    .ai-support h2 { margin-top: 2.5rem; font-size: clamp(1.35rem, 4vw, 1.8rem); line-height: 1.35; }
+    .ai-support p, .ai-support li { line-height: 1.85; overflow-wrap: anywhere; }
+    .ai-support li + li { margin-top: .5rem; }
+    .ai-support a { text-decoration: underline; text-underline-offset: .18em; }
+  </style>
+</head>
+<body data-page="ai-support" class="app-page">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span></a></div></header>
+  <main id="main">
+    <section class="page-hero"><div class="container page-hero__inner"><div><p class="eyebrow">SUPPORT</p><h1>ChatGPT連携のサポート</h1></div><p>Drawの接続、操作、端末内保存に困ったときはこちらをご確認ください。</p></div></section>
+    <section class="section"><div class="container narrow ai-support">
+      <p class="lead">ChatGPT向けストア版は準備中で、まだ公開・申請していません。ストア版はOAuthで一つのDraw作品だけを許可します。既存の個別設定用 `/mcp` の手順は下記の互換案内をご覧ください。</p>
+      <h2>接続が切れた</h2>
+      <ul>
+        <li>Drawのタブを開いたままにし、ブラウザーがバックグラウンドで休止していないか確認してください。OAuth接続は最長15分で期限切れになります。期限切れや切断の後はDrawの「ChatGPTとつなぐ」から新しい接続コードを発行してください。</li>
+        <li>接続コードは2分間有効な1回限りです。コードをチャットやMCPツールへ送らず、ChatGPTが開くPiXiEED認可ページだけに入力してください。認可ページの同意状態は10分で期限切れになります。</li>
+        <li>認可ページで接続元アプリ、redirect先、対象作品名・ID、要求された読み取り・編集scopeを確認し、「この作品への接続を許可」を選びます。許可前に不明なscopeや違う作品が表示された場合は、キャンセルしてください。</li>
+        <li>コードはDrawとは別のブラウザーで開いた認可ページにも入力できます。ただし、同ブラウザーCookieが証明するのは認可ページで同意操作を続けていることだけです。Drawブラウザーの所有者までは確認できないため、表示された対象作品を必ず確かめてください。</li>
+        <li>端末やブラウザーのネットワーク接続を確認し、ページを再読み込みした後、開いている作品と保存状態を確認してください。未完了の編集は実行されたか不明になる場合があります。状態を確認せずに同じ依頼を繰り返さないでください。</li>
+      </ul>
+      <h2>操作が保留中のまま</h2>
+      <p>ChatGPTが「保留中」と表示した場合は、同じ操作をすぐに繰り返さず、ChatGPTにその依頼の状態確認を続けるよう伝えてください。Drawの現在の状態も確認します。操作がDrawに届いた後で応答が途切れると、実行結果を確定できない場合があります。状態が分からないまま同じ編集を再送すると、変更が重複するおそれがあります。接続が期限切れになった場合は、新しく接続してから状態を確認します。</p>
+      <h2>利用上限が表示される</h2>
+      <p>現在の受付上限は全体でUTC日付ごとに20件、接続元から生成した受付キーごとに10分間で3件です。上限に達した場合は、エラーに示される待ち時間の後に再試行してください。</p>
+      <h2>作品を保存・切断する</h2>
+      <p>ChatGPT連携の保存操作は、接続したブラウザーで開いているDrawを通じて行います。作品はPiXiEEDの中継サーバーに恒久保存されず、通常のDrawと同じブラウザー内の保存領域へ保存されます。公開投稿やクラウド同期は行いません。ブラウザーの保存領域は端末変更やデータ消去に備えたバックアップではありません。大切な作品はDrawの書き出し機能でも保存してください。作品が保存されたか迷う場合は、切断前にDrawの保存状態を確認します。Draw側の接続終了、作品切替、または `disconnect_draw` で接続を終了できます。</p>
+      <p>OAuth access tokenはDrawセッションの残り時間を超えず、refresh tokenは発行しません。接続後にコードを再送したり、別のコードをチャットへ貼り直したりしないでください。</p>
+      <h2>従来の個別設定について</h2>
+      <p>すでにカスタムMCPとして個別設定した `/mcp` は後方互換のため残ります。これはストア版のOAuth endpoint `/mcp/store` とは別の接続方式です。新しいストア版コードはチャットやMCPに送らず、PiXiEED認可ページだけで入力してください。</p>
+      <h2>お問い合わせ</h2>
+      <p>上記で解決しない場合は<a href="mailto:pixieed.arta@gmail.com">pixieed.arta@gmail.com</a>へご連絡ください。発生した操作、表示されたエラー、利用ブラウザーと端末の種類、発生時刻を、分かる範囲でお知らせください。</p>
+      <p>パスワード、Draw接続コード、OAuth/access token、確認コード、秘密鍵、ログイン情報をメールやチャットで送らないでください。サポートのために私的な作品や作品データ一式を送る必要はありません。必要な場合も、まずメールで安全な確認方法をご案内します。</p>
+      <p>接続時に扱う情報は<a href="/ai/privacy/">連携専用プライバシー通知</a>をご覧ください。</p>
+    </div></section>
+  </main>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/ai/privacy/">プライバシー</a><a href="/privacy/">サイト全体のプライバシー</a></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
+  <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
+</body>
+</html>

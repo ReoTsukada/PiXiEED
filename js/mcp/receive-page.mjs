@@ -3,7 +3,7 @@ import {
   parseDrawImportJson, readStagedDrawImport, saveDrawImportAsNewProject,
   stageDrawImportToken
 } from './draw-import.mjs?rev=20261116-normal-release-2';
-import { verifiedMcpEndpoint } from './connection-config.mjs?rev=20261114-mcp-1';
+import { PLUGIN_PUBLICATION, verifiedMcpEndpoint, verifiedPublicPluginUrl } from './connection-config.mjs?rev=20261117-store-onboarding-1';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#art-preview');
@@ -139,6 +139,17 @@ $('#cancel-import').addEventListener('click', (event) => {
 
 const endpoint = verifiedMcpEndpoint();
 $('#mcp-connection').hidden = false;
+const storeUrl = verifiedPublicPluginUrl(PLUGIN_PUBLICATION);
+const storeStatus = $('#plugin-publication-status');
+const storeLink = $('#plugin-store-link');
+if (storeUrl) {
+  storeStatus.textContent = 'ストアで公開されています。';
+  storeLink.href = storeUrl;
+  storeLink.hidden = false;
+} else {
+  storeStatus.textContent = 'ストア公開準備中です。公開確認後に、このページから追加できるようになります。';
+  storeLink.hidden = true;
+}
 const setupSteps = $('.ai-receive__setup-steps');
 const connectedUseDetails = $('#connected-use-details');
 if (endpoint) {

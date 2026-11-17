@@ -21,7 +21,7 @@ const COMPATIBILITY_PAGES = ['PiXiEEDraw/index.html', 'pixiedraw/index.html', 'p
 const REFERENCE_NO_AD_PAGES = [
   'help/index.html', 'projects/pixiedraw/index.html', 'projects/pixfind/index.html', 'output/gif-speed/index.html',
   'learn/index.html', 'learn/pixel-circle/index.html', 'learn/pixel-art-blurry/index.html',
-  'ai/guide/index.html', 'ai/examples/index.html', 'ai/settings/index.html'
+  'ai/guide/index.html', 'ai/examples/index.html', 'ai/settings/index.html', 'ai/privacy/index.html', 'ai/support/index.html'
 ];
 const ISOLATED_TEST_PAGES = ['admanager-rewarded-test/index.html'];
 // These are source templates. The Pages build injects the informational loader

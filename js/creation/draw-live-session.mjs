@@ -4,9 +4,9 @@ export function createDrawLiveSession({
   fetchImpl = (...args) => fetch(...args), now = () => Date.now(),
   schedule = (callback, delay) => setTimeout(callback, delay), cancel = handle => clearTimeout(handle),
 } = {}) {
-  const base = new URL(endpoint); base.pathname = base.pathname.replace(/\/mcp\/?$/, ''); base.search = ''; base.hash = '';
+  const base = new URL(endpoint); base.pathname = base.pathname.replace(/\/mcp(?:\/store)?\/?$/, ''); base.search = ''; base.hash = '';
   let generation = 0, session = null, timer = null, expiryTimer = null, controller = null;
-  let view = { phase: 'idle', pairingCode: '', expiresAt: null, message: '' };
+  let view = { phase: 'idle', mode: 'legacy', pairingCode: '', expiresAt: null, message: '' };
   let pendingAck = null;
   const completed = new Map();
   const publish = update => { view = { ...view, ...update }; onChange({ ...view }); };
@@ -45,7 +45,7 @@ export function createDrawLiveSession({
   function stop(message = '接続を終了しました。') {
     const old = session; generation += 1; session = null; pendingAck = null; completed.clear();
     if (timer != null) cancel(timer); if (expiryTimer != null) cancel(expiryTimer); timer = null; expiryTimer = null; controller?.abort(); controller = null;
-    publish({ phase: 'idle', pairingCode: '', expiresAt: null, message });
+    publish({ phase: 'idle', mode: 'legacy', pairingCode: '', expiresAt: null, message });
     return revoke(old);
   }
   function fail(message) { void stop(message); publish({ phase: 'error', message }); }
@@ -114,9 +114,10 @@ export function createDrawLiveSession({
     }
     if (current(ticket)) timer = schedule(() => { void poll(ticket); }, 500);
   }
-  async function start() {
+  async function start({ mode = 'legacy' } = {}) {
+    if (!['legacy', 'oauth'].includes(mode)) throw new TypeError('Draw connection mode must be legacy or oauth');
     void stop(''); const ticket = generation;
-    publish({ phase: 'starting', message: '接続を準備しています。' });
+    publish({ phase: 'starting', mode, message: '接続を準備しています。' });
     try {
       await draw.workspace?.ready;
       if (ticket !== generation) return;
@@ -127,12 +128,15 @@ export function createDrawLiveSession({
       if (ticket !== generation || !isActive()) return;
       const binding = state.projectBinding;
       controller = new AbortController();
-      const opened = await request('/draw-sessions', { method: 'POST', body: { projectBinding: binding }, signal: controller.signal });
+      const createPath = mode === 'oauth' ? '/draw-store-sessions' : '/draw-sessions';
+      // getAgentState has no project title, so omit projectName rather than guessing one.
+      const opened = await request(createPath, { method: 'POST', body: { projectBinding: binding }, signal: controller.signal });
       if (ticket !== generation || !sameBinding(draw.getAgentState().projectBinding, binding)) { await revoke(opened); return; }
       session = { ...opened, projectBinding: binding };
       if (!Number.isFinite(expires(opened.expiresAt)) || now() >= expires(opened.expiresAt)) throw error('INVALID_EXPIRY', '有効な接続を作成できませんでした。');
       expiryTimer = schedule(() => { if (ticket === generation) void stop('接続の有効期限が切れました。'); }, Math.max(0, expires(opened.expiresAt) - now()));
-      publish({ phase: 'waiting', pairingCode: opened.pairingCode, expiresAt: opened.expiresAt, message: 'ChatGPTで接続コードを使用してください。' });
+      publish({ phase: 'waiting', mode, pairingCode: opened.pairingCode, expiresAt: opened.expiresAt,
+        message: mode === 'oauth' ? 'ChatGPTが開く接続許可画面に入力してください。チャット本文には貼りません。' : 'ChatGPTで接続コードを使用してください。' });
       void poll(ticket);
       return { ...view };
     } catch (cause) { if (ticket === generation) fail(cause?.message || '接続できませんでした。'); throw cause; }

@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pixieed-mcp",
-  "main": "worker.mjs",
+  "main": "store-worker.mjs",
   "compatibility_date": "2026-11-14",
   "workers_dev": true,
   "observability": {
@@ -31,6 +31,15 @@
       "new_sqlite_classes": [
         "DrawAdmissionDO"
       ]
+    }
+  ],
+  "compatibility_flags": [
+    "global_fetch_strictly_public"
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "ec149d644c0347e89b4ae9b4a350a0d0"
     }
   ]
 }

@@ -46,7 +46,7 @@ test("AI pages describe the existing receive flow and keep guides optional", () 
   assert.match(receive, /id="open-draw"/);
   assert.match(receive, /新しい作品として、このブラウザーに保存/);
   assert.match(receive, /開いている作品を直接編集する場合は/);
-  assert.match(receive, /href="\/tools\/start\/draw\/"[^>]*>Drawを開いて「GPT連携」から接続/);
+  assert.match(receive, /href="\/tools\/start\/draw\/"[^>]*>Drawを開いて「ChatGPTとつなぐ」から接続/);
   assert.match(receive, /id="sample-prompt"/);
   assert.match(receive, /id="copy-prompt"/);
   assert.match(receive + receiverScript, /sample-prompt|copy-prompt/);

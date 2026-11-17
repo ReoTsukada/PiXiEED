@@ -8,6 +8,11 @@ body:not([data-creation-mode="draw"]) .draw-gpt-slot { display:none; }
 .draw-live-dialog p { line-height:1.65; font-size:14px; margin:12px 0; }
 .draw-live-dialog .draw-live-scope { font-size:12px; color:#c2cbd1; }
 .draw-live-dialog .draw-live-status { font-weight:600; color:#ffdc82; min-height:1.65em; }
+.draw-live-install-state { padding:12px; border:1px solid #647783; border-radius:12px; background:#17232a; }
+.draw-live-install-state a { color:#ffe28f; font-weight:700; text-underline-offset:3px; }
+.draw-live-install-help { margin:10px 0; border-block:1px solid #52616b; }
+.draw-live-install-help summary { min-height:44px; padding:10px 0; cursor:pointer; font-weight:700; }
+.draw-live-install-help p { margin:0 0 12px; color:#d2d9dd; }
 .draw-live-dialog textarea { box-sizing:border-box; display:block; width:100%; resize:none; margin:8px 0; border:1px solid #7d8e9a; border-radius:8px; background:#111b22; color:#fff; padding:10px; font:13px/1.5 monospace; overflow-wrap:anywhere; }
 .draw-live-dialog button { min-height:44px; border:1px solid #7a8a96; border-radius:10px; background:#34434e; color:#fff; padding:10px 14px; font:inherit; font-size:14px; }
 .draw-live-dialog button:disabled { opacity:.6; }

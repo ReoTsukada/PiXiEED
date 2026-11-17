@@ -252,6 +252,9 @@ export class DrawSessionRoom {
     try {
       if (url.pathname === '/_relay/create' && request.method === 'POST') return await this.create(await readJson(request));
       if (url.pathname === '/_relay/connect' && request.method === 'POST') return await this.connect(await readJson(request));
+      if (url.pathname === '/_relay/store-claim' && request.method === 'POST') return await this.storeClaim(await readJson(request));
+      if (url.pathname === '/_relay/store-activate' && request.method === 'POST') return await this.storeActivate(await readJson(request));
+      if (url.pathname === '/_relay/status' && request.method === 'GET') return await this.status(request);
       if (url.pathname === '/_relay/command' && request.method === 'POST') return await this.enqueue(request, await readJson(request));
       if (url.pathname.startsWith('/_relay/command/') && request.method === 'GET') return await this.getRequest(request, decodeURIComponent(url.pathname.slice('/_relay/command/'.length)));
       if (url.pathname === '/_relay/disconnect' && request.method === 'POST') return await this.disconnect(request);
@@ -269,17 +272,22 @@ export class DrawSessionRoom {
 
   async create(body) {
     return this.exclusive(async () => {
-      if (!exactKeys(body, ['sessionId', 'projectBinding'], ['sessionId', 'projectBinding']) || typeof body.sessionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.sessionId) || !validProjectBinding(body.projectBinding)) return errorResponse('Invalid session request.', 400);
+      if (!exactKeys(body, ['sessionId', 'projectBinding', 'mode', 'projectName'], ['sessionId', 'projectBinding']) || typeof body.sessionId !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.sessionId) || !validProjectBinding(body.projectBinding) || (body.mode !== undefined && !['legacy', 'oauth'].includes(body.mode)) || (body.mode !== 'oauth' && Object.hasOwn(body, 'projectName')) || (body.projectName !== undefined && (typeof body.projectName !== 'string' || !body.projectName.trim() || body.projectName.trim().length > 120))) return errorResponse('Invalid session request.', 400);
       if (await this.load()) return errorResponse('Session already exists.', 409);
       const now = this.now();
       const browserToken = randomToken();
       const pairingSecret = randomToken();
       const state = {
         sessionId: body.sessionId,
+        mode: body.mode || 'legacy',
+        ...(body.projectName !== undefined ? { projectName: body.projectName.trim() } : {}),
         projectBinding: body.projectBinding,
         browserTokenHash: await hashToken(browserToken),
         pairingHash: await hashToken(pairingSecret),
         pairExpiresAt: now + DRAW_PAIRING_TTL_MS,
+        claimBindingHash: null,
+        claimExpiresAt: null,
+        authFingerprint: null,
         agentTokenHash: null,
         expiresAt: now + DRAW_SESSION_TTL_MS,
         revoked: false,
@@ -293,9 +301,48 @@ export class DrawSessionRoom {
   }
 
   async connect(body) {
+    return this.connectByMode(body, 'legacy');
+  }
+
+  async storeClaim(body) {
     return this.exclusive(async () => {
       const state = await this.load();
       if (!state || state.revoked || this.now() >= state.expiresAt) return errorResponse('Session expired or revoked.', 410);
+      if ((state.mode || 'legacy') !== 'oauth') return errorResponse('Session mode does not permit this claim flow.', 403);
+      if (!exactKeys(body, ['secret', 'claimBinding', 'authFingerprint'], ['secret', 'claimBinding', 'authFingerprint']) || typeof body.secret !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.secret) || typeof body.claimBinding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.claimBinding) || typeof body.authFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(body.authFingerprint)) return errorResponse('Invalid Store claim.', 400);
+      if (!state.pairingHash || this.now() >= state.pairExpiresAt || !constantTimeEqual(await hashToken(body.secret), state.pairingHash)) return errorResponse('Pairing code is invalid, expired, or already used.', 403);
+      const now = this.now();
+      state.pairingHash = null;
+      state.claimBindingHash = await hashToken(body.claimBinding);
+      state.authFingerprint = body.authFingerprint;
+      state.claimExpiresAt = Math.min(now + DRAW_PAIRING_TTL_MS, state.expiresAt);
+      await this.save(state);
+      return response({ projectBinding: state.projectBinding, projectName: state.projectName || '', claimExpiresAt: state.claimExpiresAt, expiresAt: state.expiresAt });
+    });
+  }
+
+  async storeActivate(body) {
+    return this.exclusive(async () => {
+      const state = await this.load();
+      if (!state || state.revoked || this.now() >= state.expiresAt) return errorResponse('Session expired or revoked.', 410);
+      if ((state.mode || 'legacy') !== 'oauth') return errorResponse('Session mode does not permit this activation flow.', 403);
+      if (!exactKeys(body, ['claimBinding', 'authFingerprint'], ['claimBinding', 'authFingerprint']) || typeof body.claimBinding !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.claimBinding) || typeof body.authFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(body.authFingerprint)) return errorResponse('Invalid Store activation.', 400);
+      if (!state.claimBindingHash || !Number.isFinite(state.claimExpiresAt) || this.now() >= state.claimExpiresAt || !constantTimeEqual(await hashToken(body.claimBinding), state.claimBindingHash) || !constantTimeEqual(state.authFingerprint, body.authFingerprint) || state.agentTokenHash) return errorResponse('Store claim is invalid, expired, or already used.', 403);
+      const accessToken = randomToken();
+      state.claimBindingHash = null;
+      state.claimExpiresAt = null;
+      state.authFingerprint = null;
+      state.agentTokenHash = await hashToken(accessToken);
+      await this.save(state);
+      return response({ connectionId: state.sessionId, accessToken, projectBinding: state.projectBinding, expiresAt: state.expiresAt });
+    });
+  }
+
+  async connectByMode(body, requiredMode) {
+    return this.exclusive(async () => {
+      const state = await this.load();
+      if (!state || state.revoked || this.now() >= state.expiresAt) return errorResponse('Session expired or revoked.', 410);
+      if ((state.mode || 'legacy') !== requiredMode) return errorResponse('Session mode does not permit this connection flow.', 403);
       if (!exactKeys(body, ['secret'], ['secret']) || typeof body.secret !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.secret)) return errorResponse('Invalid pairing code.', 400);
       if (!state.pairingHash || this.now() >= state.pairExpiresAt || !constantTimeEqual(await hashToken(body.secret), state.pairingHash)) return errorResponse('Pairing code is invalid, expired, or already used.', 403);
       const accessToken = randomToken();
@@ -303,6 +350,14 @@ export class DrawSessionRoom {
       state.agentTokenHash = await hashToken(accessToken);
       await this.save(state);
       return response({ connectionId: state.sessionId, accessToken, projectBinding: state.projectBinding, expiresAt: state.expiresAt });
+    });
+  }
+
+  async status(request) {
+    return this.exclusive(async () => {
+      const state = await this.load();
+      if (!await this.authorized(state, request, 'agent')) return errorResponse('Invalid or expired agent credential.', 401);
+      return response({ connectionId: state.sessionId, projectBinding: state.projectBinding, expiresAt: state.expiresAt, active: true });
     });
   }
 
@@ -485,6 +540,9 @@ export class DrawSessionRoom {
     state.revoked = true;
     state.agentTokenHash = null;
     state.pairingHash = null;
+    state.claimBindingHash = null;
+    state.claimExpiresAt = null;
+    state.authFingerprint = null;
     for (const requestId of state.queue) {
       const record = state.requests[requestId];
       if (record?.status === 'queued') {

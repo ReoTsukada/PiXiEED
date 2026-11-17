@@ -29,7 +29,7 @@ test('delivery plan preserves runtime identities and bounds minification to star
   assert.equal(plan.runtimeGraph.edges.length, 235);
   assert.equal(plan.dynamicRoots.length, 25);
   assert.equal(plan.dynamicGraph.modules.size, 121);
-  assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261117-live-draw-2'), 'Live-session UI is loaded only on demand.');
+  assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261117-store-onboarding-1'), 'Live-session UI is loaded only on demand.');
   assert.equal(plan.externalUrls.size, 70);
   assert.equal(plan.internalizedUrls.length, 51);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);

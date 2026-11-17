@@ -12,7 +12,7 @@ function rig(extra = {}) {
     calls.push({ url, ...options });
     if (extra.fetch) { const value = await extra.fetch(url, options); if (value) return value; }
     if (options.method === 'DELETE') return Response.json({ revoked: true });
-    if (url.endsWith('/draw-sessions')) return Response.json({ sessionId: 'session', browserToken: 'browser-secret', pairingCode: 'code', expiresAt: 11000 });
+    if (url.endsWith('/draw-sessions') || url.endsWith('/draw-store-sessions')) return Response.json({ sessionId: 'session', browserToken: 'browser-secret', pairingCode: 'code', expiresAt: 11000 });
     if (url.endsWith('/result')) { acknowledgements.push(JSON.parse(options.body)); return Response.json({ accepted: true }); }
     return Response.json({ connected: true, commands: queue.splice(0), expiresAt: 11000 });
   };
@@ -26,6 +26,27 @@ test('explicit stop during workspace readiness cannot later save or create a ses
   const r = rig({ draw: { workspace: { ready: ready.promise, save: async () => { saves++; } } } });
   const started = r.client.start(); await r.client.stop(); ready.resolve(); await started;
   assert.equal(r.client.getState().phase, 'idle'); assert.equal(saves, 0); assert.equal(r.calls.length, 0);
+});
+test('OAuth mode creates a store session with only the selected project binding and keeps chat instructions code-free', async () => {
+  const r = rig({ draw: { getAgentState: () => ({ projectBinding: { projectId: 'test-project', openEpoch: 1 }, revision: 1, busy: false, projectName: 'not an agent-state field' }) } });
+  await r.client.start({ mode: 'oauth' });
+  await tick();
+  const create = r.calls.find(call => call.method === 'POST' && call.url.endsWith('/draw-store-sessions'));
+  assert.ok(create, 'OAuth mode should use the store session endpoint');
+  assert.deepEqual(JSON.parse(create.body), { projectBinding: { projectId: 'test-project', openEpoch: 1 } });
+  const waiting = r.views.find(state => state.phase === 'waiting' && state.mode === 'oauth');
+  assert.ok(waiting); assert.equal(waiting.pairingCode, 'code');
+  assert.match(waiting.message, /接続許可画面/);
+  assert.match(waiting.message, /チャット本文には貼りません/);
+  assert.doesNotMatch(waiting.message, /code|secret/i);
+  await r.client.stop();
+});
+test('default start remains the legacy session flow', async () => {
+  const r = rig();
+  await r.client.start();
+  assert.ok(r.calls.some(call => call.method === 'POST' && call.url.endsWith('/draw-sessions')));
+  assert.equal(r.calls.some(call => call.url.endsWith('/draw-store-sessions')), false);
+  await r.client.stop();
 });
 test('stop while obsolete revoke hangs does not resurrect a connection', async () => {
   const deletion = defer(); const r = rig({ fetch: (url, opts) => opts.method === 'DELETE' ? deletion.promise : null });

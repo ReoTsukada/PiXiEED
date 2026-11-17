@@ -280,7 +280,7 @@ function toolDefinitions() {
     description: 'Invalidate the agent credential and prevent further commands for this Draw session. An operation already in progress may have applied and is not rolled back.',
     inputSchema: DRAW_AGENT_AUTH_SCHEMA,
     outputSchema: { type: 'object', additionalProperties: false, required: ['disconnected'], properties: { disconnected: { const: true } } },
-    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true }
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true }
   };
   return [list, guide, techniques, prepare, review, example, connect, state, edit, save, disconnect];
 }
@@ -610,3 +610,6 @@ export default {
     }
   }
 };
+
+// Shared transport helpers for the separately authenticated public endpoint.
+export { toolDefinitions, handleCall, jsonResponse, httpError, rpcError, isRecord, validId, allowedOrigin, siteOrigin, readJson, protocolFor, drawCorsHeaders, drawBrowserOriginAllowed, withCorsHeaders };

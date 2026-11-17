@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <meta name="description" content="PiXiEED DrawとChatGPTをOAuthで接続するときの作品データ、認証情報、保存期間について説明します。">
+  <link rel="canonical" href="https://pixieed.jp/ai/privacy/">
+  <title>ChatGPT連携のプライバシー｜PiXiEED</title>
+  <link rel="stylesheet" href="/css/site.css?rev=20261019-site-gothic-1">
+  <link rel="stylesheet" href="/css/pixieed-design-system.css?rev=20261012-nav-polish-1">
+  <link rel="stylesheet" href="/css/site-header.css?rev=20261012-nav-polish-1">
+  <style>
+    .ai-policy { max-width: 54rem; margin-inline: auto; }
+    .ai-policy h2 { margin-top: 2.5rem; font-size: clamp(1.35rem, 4vw, 1.8rem); line-height: 1.35; }
+    .ai-policy p, .ai-policy li { line-height: 1.85; overflow-wrap: anywhere; }
+    .ai-policy li + li { margin-top: .5rem; }
+    .ai-policy a { text-decoration: underline; text-underline-offset: .18em; }
+    .ai-policy__notice { padding: 1rem 1.2rem; border-left: .25rem solid var(--coral); background: var(--paper-deep); }
+  </style>
+</head>
+<body data-page="ai-privacy" class="app-page">
+  <a class="skip-link" href="#main">本文へ移動</a>
+  <header class="site-header"><div class="container header-inner"><a class="brand" href="/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span></a></div></header>
+  <main id="main">
+    <section class="page-hero"><div class="container page-hero__inner"><div><p class="eyebrow">CHATGPT CONNECT</p><h1>連携時のプライバシー</h1></div><p>Drawの作品をChatGPTから編集するときに、一時的にやり取りする情報と保持期間を説明します。</p></div></section>
+    <section class="section"><div class="container narrow ai-policy">
+      <p class="lead">この通知は、OAuthを使ってPiXiEED Drawの開いている作品をChatGPTから読み取り・編集する公開ストア版に適用します。ストア版はまだ公開・申請していません。既存の個別設定用 `/mcp` とは認証手順が異なります。</p>
+      <h2>接続を開始する操作</h2>
+      <p>利用者がDrawの通常の「ChatGPTとつなぐ」ボタンからOAuth用の接続コードを発行します。ChatGPTがPiXiEED Workerの認可ページを開いたら、コードはそのページにだけ入力します。コードをチャット本文、MCPツールの入力、URL、メールに入れないでください。認可ページでChatGPTの接続元・redirect先、対象作品名とID、要求された権限を確認し、利用者が「この作品への接続を許可」を押した後にだけ接続します。接続コードは2分間有効な1回限りで、作品セッションは作成から最長15分です。</p>
+      <p>コードはDrawを開いているブラウザーから別のブラウザーの認可ページへコピーして入力することもできます。認可ページのCookieは、その認可ページを開いたブラウザー内で同意手順を束縛しますが、Drawを開いたブラウザーの所有者までは証明しません。許可前に認可ページに表示される作品を利用者が確認します。OAuth認可ページの一時的な同意状態とCookieは最長10分です。</p>
+      <p>OAuthクライアントはCIMDとPKCEを使います。scopeは `draw:read`（作品状態の読み取り）と `draw:write`（編集・端末内保存）です。6つの公開参考ツールはDraw認可なしで使えますが、接続中の作品にはアクセスしません。</p>
+      <h2>中継する情報</h2>
+      <p>連携処理に必要な範囲で、次の情報を扱います。</p>
+      <ul>
+        <li>利用者が選択して接続した作品の画素・色パレット、レイヤーとフレームの構成、作品IDおよび接続中の作品識別子</li>
+        <li>依頼された編集操作、その操作に必要な座標・色・設定・レイヤー名などの値</li>
+        <li>状態確認や編集操作の処理結果、リビジョン、保存状態、エラー情報</li>
+        <li>OAuth認可の接続元・redirect先、要求scope、同意手続きの短期状態、Cookieに対応するCSRF値のハッシュ</li>
+        <li>接続と認証に使うランダムなセッション識別子、OAuth tokenのハッシュ、暗号化されたgrant properties、有効期限、操作のrequest IDと重複確認用ハッシュ</li>
+      </ul>
+      <p>この機能は、OAuthで一度だけ許可された一つの作品の状態を読み取り、許可された操作を渡します。ツール入力に認証credentialやsession selectorはなく、サーバー側で認証済み作品に束縛します。Drawブラウザー側のrelay tokenはメモリーにだけ置き、WorkerへのAuthorization headerに使います。チャット、URL、永続ストレージ、BroadcastChannelには入れません。接続していない作品を検索せず、作品を自動公開したり投稿したりもしません。保存は開いているDrawブラウザーの通常の端末内保存です。</p>
+      <h2>一時中継と削除時期</h2>
+      <p>接続情報、やり取り中の操作、処理結果はCloudflareの一時中継（Durable Objects）とOAuth用KVに保存されます。OAuth同意レコードは最長10分、Draw接続コードのclaimは2分、作品セッションは最長15分です。access tokenは残存Drawセッションを超えない短い期間だけ有効で、refresh tokenは発行しません。認可ページのSecure・HttpOnly・SameSite=Lax Cookieは同意手順を最大10分束縛し、追跡Cookieには使いません。</p>
+      <p>切断時はDrawセッションを停止してからOAuth grantの失効情報を更新します。Cloudflare KVの反映とTTL後のcleanupは即時とは限らず、特定時刻の完全削除やKV反映の即時性は保証しません。作品セッションの有効期限後も、残ったKVレコードはcleanup処理で削除されます。操作がDrawに届いた後で応答が途切れると、結果が不明な場合があります。</p>
+      <p>接続開始の不正利用を防ぐため、接続受付件数と、接続元から生成した受付キーごとの受付時刻を扱います。上限は全体でUTC日付ごとに20件、同じ受付キーで10分間に3件です。受付記録はUTC日付の更新後、未期限切れの接続がなくなった後のクリーンアップ処理で削除されます。処理は期限時刻ぴったりとは限りません。生のIPアドレスはPiXiEEDの受付記録に保存しません。Cloudflareは通信に伴いIPアドレスを処理する場合があります。ChatGPTなど他サービスのログやバックアップの削除をPiXiEEDが保証するものではありません。</p>
+      <h2>ChatGPT側の取り扱い</h2>
+      <p>ChatGPTは、利用者の設定や契約、サービス条件に従って、依頼文、ツールへの入力と応答、会話履歴などを処理する場合があります。ChatGPT側の保存・学習・削除方法はPiXiEEDが決めたり保証したりできません。ChatGPTのデータ設定と<a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener noreferrer">OpenAIのプライバシーポリシー</a>をご確認ください。PiXiEEDの中継データの削除は、ChatGPTの会話履歴削除とは別です。</p>
+      <h2>公開前の更新</h2>
+      <p class="ai-policy__notice">ChatGPT向けストア版は未公開・未申請です。公開前に本番のOAuth接続、認可画面、保存期間、公開URLを確認し、この通知を更新します。</p>
+      <p>お問い合わせは<a href="mailto:pixieed.arta@gmail.com">pixieed.arta@gmail.com</a>へ。接続の切断や作品の保存については<a href="/ai/support/">サポートページ</a>をご覧ください。</p>
+      <p class="lead">最終更新：2026年11月17日</p>
+    </div></section>
+  </main>
+  <footer class="site-footer"><div class="container footer-inner"><div><a class="brand" href="/" aria-label="PiXiEED ホーム"><img src="/assets/brand/pixieed-logo-48.png" width="40" height="40" alt=""><span>PiXiEED</span></a><p>街角で、絵に会おう。</p></div><nav class="footer-links" aria-label="フッターナビゲーション"><a href="/ai/support/">サポート</a><a href="/privacy/">プライバシー</a></nav></div><div class="container footer-meta">© PiXiEED</div></footer>
+  <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
+</body>
+</html>
