@@ -10,6 +10,9 @@ const fullAuth = {
 };
 const names = [
   'set_draw_pixel', 'set_draw_pixels', 'add_draw_palette_color', 'adjust_draw_color',
+  'paint_draw_stroke', 'draw_shape', 'fill_draw_area', 'spray_draw_pixels', 'clear_draw_cel', 'replace_draw_palette_color',
+  'transform_draw_selection', 'resize_draw_canvas', 'scale_draw_canvas', 'draw_text_in_draw', 'generate_draw_normal_map',
+  'configure_draw_normal_settings', 'configure_draw_view', 'batch_draw_edits',
   'select_draw_layer', 'add_draw_layer', 'rename_draw_layer', 'set_draw_layer_visibility',
   'set_draw_layer_opacity', 'set_draw_layer_lock', 'move_draw_layer', 'remove_draw_layer',
   'select_draw_frame', 'add_draw_frame', 'set_draw_frame_duration', 'move_draw_frame',
@@ -23,7 +26,7 @@ const legacyTools = [
 test('public catalog exposes each Draw operation as a separate strict tool and no credential fields', () => {
   const tools = storeToolDefinitions({ legacyTools });
   const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
-  assert.equal(tools.length, 6 + 19 + 4);
+  assert.equal(tools.length, 6 + names.length + 4);
   assert.ok(names.every((name) => byName[name]));
   assert.ok(['save_draw', 'get_draw_state', 'get_draw_operation_status', 'disconnect_draw'].every((name) => byName[name]));
   assert.equal(byName.edit_draw, undefined);
@@ -35,6 +38,14 @@ test('public catalog exposes each Draw operation as a separate strict tool and n
     for (const key of ['connectionId', 'accessToken', 'projectBinding', 'operation']) assert.equal(Object.hasOwn(tool.inputSchema.properties || {}, key), false, `${name} hides ${key}`);
   }
   assert.equal(names.length, DRAW_OPERATION_SCHEMA.oneOf.length - 1);
+  assert.equal(byName.batch_draw_edits.inputSchema.properties.operations.maxItems, 32);
+  assert.match(byName.batch_draw_edits.description, /32.*one Draw history entry.*save:true.*this device.*saving fails/);
+  assert.equal(byName.paint_draw_stroke.inputSchema.properties.points.maxItems, 1024);
+  assert.equal(byName.batch_draw_edits.annotations.destructiveHint, true);
+  assert.equal(byName.configure_draw_view.annotations.destructiveHint, false);
+  assert.equal(byName.configure_draw_normal_settings.annotations.destructiveHint, false);
+  assert.equal(byName.set_draw_pixel.inputSchema.properties.responseMode.default, 'summary');
+  assert.equal(byName.save_draw.inputSchema.properties.responseMode.default, 'summary');
   assert.ok(byName.get_pixel_art_guide.annotations.readOnlyHint, 'art-method references remain available as optional read-only tools');
   assert.equal(byName.get_draw_state.outputSchema.anyOf.length, 2, 'state reads also admit a pending command receipt');
   assert.deepEqual(byName.get_draw_state.outputSchema.anyOf[1].required, ['requestId', 'status', 'revision']);
@@ -42,12 +53,61 @@ test('public catalog exposes each Draw operation as a separate strict tool and n
 
 test('an explicitly named pixel operation maps to the server-held connection and fixed operation type', () => {
   const mapped = mapStoreToolCall('set_draw_pixel', { frameId: 'frame-1', layerId: 'layer-1', x: 4, y: 7, colorIndex: 2, expectedRevision: 9, requestId: 'pixel_edit_01' }, fullAuth);
+  assert.equal(mapped.arguments.responseMode, 'summary');
   assert.deepEqual(mapped, {
     kind: 'legacy', name: 'edit_draw', arguments: {
       connectionId: fullAuth.connectionId, accessToken: fullAuth.accessToken, expectedRevision: 9, requestId: 'pixel_edit_01',
-      operation: { type: 'pixel.set', frameId: 'frame-1', layerId: 'layer-1', x: 4, y: 7, colorIndex: 2 }
+      operation: { type: 'pixel.set', frameId: 'frame-1', layerId: 'layer-1', x: 4, y: 7, colorIndex: 2 }, responseMode: 'summary'
     }
   });
+  assert.equal(mapStoreToolCall('set_draw_pixel', { frameId: 'frame-1', layerId: 'layer-1', x: 4, y: 7, colorIndex: 2, expectedRevision: 9, requestId: 'pixel_edit_02', responseMode: 'full' }, fullAuth).arguments.responseMode, 'full');
+  for (const responseMode of [null, false, '', 0]) {
+    assert.throws(() => mapStoreToolCall('set_draw_pixel', { frameId: 'frame-1', layerId: 'layer-1', x: 4, y: 7, colorIndex: 2, expectedRevision: 9, requestId: 'pixel_edit_03', responseMode }, fullAuth), /Invalid operation payload/);
+  }
+});
+
+test('each fast action name maps only to its strict allowlisted operation', () => {
+  const actions = [
+    ['paint_draw_stroke', { frameId: '$active', layerId: '$active', points: [{ x: 0.5, y: 1 }], colorIndex: 1 }],
+    ['draw_shape', { frameId: '$active', layerId: '$active', shape: 'line', from: { x: 0, y: 1 }, to: { x: 4, y: 5 }, colorIndex: 1 }],
+    ['fill_draw_area', { frameId: '$active', layerId: '$active', x: 1, y: 2, colorIndex: 1 }],
+    ['spray_draw_pixels', { frameId: '$active', layerId: '$active', x: 10, y: 12, colorIndex: null, passes: 2, seed: 7 }],
+    ['clear_draw_cel', { frameId: '$active', layerId: '$active' }],
+    ['replace_draw_palette_color', { index: 1, color: '#123456' }],
+    ['transform_draw_selection', { frameId: '$active', layerId: '$active', bounds: { x: 0, y: 0, width: 2, height: 2 }, x: 1, y: 2, polygon: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 2 }] }],
+    ['resize_draw_canvas', { width: 64, height: 48, anchor: 'center' }],
+    ['scale_draw_canvas', { percent: 200 }],
+    ['draw_text_in_draw', { frameId: '$active', layerId: '$active', text: 'Pi', x: 0, y: 0, colorIndex: 1 }],
+    ['generate_draw_normal_map', { frameId: '$active', method: 'luminance' }],
+    ['configure_draw_normal_settings', { settings: { ambient: 0.5 } }],
+    ['configure_draw_view', { zoom: 2 }]
+  ];
+  const expectedTypes = {
+    paint_draw_stroke: 'stroke', draw_shape: 'shape', fill_draw_area: 'fill', spray_draw_pixels: 'spray', clear_draw_cel: 'cel.clear',
+    replace_draw_palette_color: 'palette.replace', transform_draw_selection: 'selection.transform', resize_draw_canvas: 'canvas.resize',
+    scale_draw_canvas: 'canvas.scale', draw_text_in_draw: 'text.draw', generate_draw_normal_map: 'normal.generate',
+    configure_draw_normal_settings: 'normal.configure', configure_draw_view: 'view.configure'
+  };
+  for (const [name, fields] of actions) {
+    const mapped = mapStoreToolCall(name, { ...fields, expectedRevision: 12, requestId: `fast_${name}_01` }, fullAuth);
+    assert.equal(mapped.arguments.operation.type, expectedTypes[name], name);
+    assert.deepEqual(Object.fromEntries(Object.entries(mapped.arguments.operation).filter(([key]) => key !== 'type')), fields, name);
+  }
+});
+
+test('batch is bounded, rejects control operations, and requires write scope', () => {
+  const operations = [
+    { type: 'stroke', frameId: '$active', layerId: '$active', points: [{ x: 1, y: 2 }, { x: 3, y: 4 }], colorIndex: 0 },
+    { type: 'fill', frameId: '$active', layerId: '$active', x: 3, y: 4, colorIndex: 1 }
+  ];
+  const args = { operations, expectedRevision: 12, requestId: 'batch_draw_01' };
+  const mapped = mapStoreToolCall('batch_draw_edits', args, fullAuth);
+  assert.deepEqual(mapped.arguments.operation, { type: 'batch', operations });
+  assert.equal(mapped.arguments.responseMode, 'summary');
+  for (const invalid of [[], Array(33).fill(operations[0]), [{ type: 'batch', operations }], [{ type: 'undo' }], [{ type: 'save' }], [{ type: 'normal.configure', settings: { ambient: 0.5 } }], [{ type: 'view.configure', zoom: 2 }]]) {
+    assert.throws(() => mapStoreToolCall('batch_draw_edits', { ...args, operations: invalid }, fullAuth), /Invalid input|Invalid operation payload/);
+  }
+  assert.throws(() => mapStoreToolCall('batch_draw_edits', args, { ...fullAuth, scope: ['draw:read'] }), /Invalid Draw connection/);
 });
 
 test('public inputs cannot override secrets, binding, or the fixed operation type', () => {
@@ -72,8 +132,24 @@ test('Draw scopes separate reading from writing and expired connections cannot b
   assert.deepEqual(mapStoreToolCall('get_pixel_art_guide', {}, undefined), { kind: 'legacy', name: 'get_pixel_art_guide', arguments: {} });
 });
 
+test('state reads forward metadata-only and bounded region requests while enforcing read scope', () => {
+  const metadata = mapStoreToolCall('get_draw_state', { includePixels: false }, fullAuth);
+  assert.equal(metadata.arguments.includePixels, false);
+  const region = { x: 10, y: 20, width: 256, height: 256 };
+  assert.deepEqual(mapStoreToolCall('get_draw_state', { region }, fullAuth).arguments.region, region);
+  assert.throws(() => mapStoreToolCall('get_draw_state', { region: { ...region, width: 257 } }, fullAuth), /Invalid Draw state/);
+  assert.throws(() => mapStoreToolCall('get_draw_state', { includePixels: false, region }, fullAuth), /Invalid Draw state/);
+  assert.throws(() => mapStoreToolCall('get_draw_state', { includePixels: true }, { ...fullAuth, scope: ['draw:write'] }), /Invalid Draw state/);
+});
+
 test('save, disconnect, and operation status map to distinct non-resubmitting actions', () => {
-  assert.equal(mapStoreToolCall('save_draw', { expectedRevision: 7, requestId: 'save_edit_02' }, fullAuth).name, 'save_draw');
+  const defaultSave = mapStoreToolCall('save_draw', { expectedRevision: 6, requestId: 'save_edit_00' }, fullAuth);
+  assert.equal(defaultSave.name, 'save_draw');
+  assert.equal(defaultSave.arguments.responseMode, 'summary');
+  assert.equal(mapStoreToolCall('save_draw', { expectedRevision: 7, requestId: 'save_edit_02', responseMode: 'full' }, fullAuth).arguments.responseMode, 'full');
+  for (const responseMode of ['compact', null, false, '', 0]) {
+    assert.throws(() => mapStoreToolCall('save_draw', { expectedRevision: 7, requestId: 'save_edit_03', responseMode }, fullAuth), /Invalid Draw save/);
+  }
   const disconnect = mapStoreToolCall('disconnect_draw', {}, fullAuth);
   assert.equal(disconnect.kind, 'relay'); assert.equal(disconnect.path, '/_relay/revoke');
   const status = mapStoreToolCall('get_draw_operation_status', { requestId: 'pixel_edit_05' }, fullAuth);

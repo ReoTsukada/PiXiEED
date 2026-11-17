@@ -20,7 +20,7 @@ const DEFAULT_ORIGIN = 'https://pixieed.jp';
 const DEFAULT_PROTOCOL = '2025-03-26';
 const SUPPORTED_PROTOCOLS = new Set(['2025-03-26', '2025-06-18']);
 const MAX_BODY_BYTES = 32 * 1024;
-const SERVER_INSTRUCTIONS = PIXEL_ART_INTELLIGENCE;
+const SERVER_INSTRUCTIONS = `${PIXEL_ART_INTELLIGENCE}\n\nDrawライブ操作では、最初にget_draw_stateのcapabilities.fastEditsがtrueか確認してください。falseまたは項目がない場合は、古いDrawタブのため新しいbatchや高速操作は使えません。未保存作品を自動で再読み込みせず、ユーザーにタブ更新を案内してください。capabilities.fastEditsがtrueなら関連する編集をedit_drawのbatchへまとめ、適用結果のrevisionを次の操作に使ってください。成功確認のためだけに毎回状態を読み直す必要はありません。revision conflict時は状態を読み直して編集を組み直してください。pendingなら同じrequestId・同じ引数で同じedit_drawまたはsave_drawを呼び直して結果を確認してください。同じrequestIdの再照会は実行済み操作を再適用せず保存済み結果を返します。unknownなら先に状態を読み、適用済みかを確認してから次を決めてください。includePixelsを省略すると65,536画素以内のcelは全画素を返し、それより大きいcelは画素配列を省略します。regionで読む場合も65,536画素以内にしてください。`;
 const DRAW_OPERATION_WAIT_MS = 8_000;
 const DRAW_OPERATION_POLL_MS = 500;
 
@@ -252,25 +252,25 @@ function toolDefinitions() {
   const authProperties = { ...DRAW_AGENT_AUTH_SCHEMA.properties };
   const state = {
     name: 'get_draw_state', title: 'Read the active Draw state',
-    description: 'Read the paired Draw project state, active frame/layer, palette, and selected cel pixels through the connected browser. This reads the live project and does not change or save it.',
+    description: 'Read the paired Draw project state, active frame/layer, palette, and optionally cel pixels through the connected browser. Set includePixels:false for metadata or use region to read only part of a cel. This does not change or save the project.',
     inputSchema: { type: 'object', additionalProperties: false, required: ['connectionId', 'accessToken'], properties: { ...authProperties, ...DRAW_STATE_REQUEST_SCHEMA.properties } },
     outputSchema: { anyOf: [DRAW_STATE_SCHEMA, drawResult] },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }
   };
   const edit = {
     name: 'edit_draw', title: 'Apply an operation in Draw',
-    description: 'Apply one allowlisted pixel, palette, layer, frame, undo, or redo operation to the paired live project. Requires the current editor revision and a unique requestId. A pending or unknown result is not a rejection; read state before deciding whether to try another operation.',
+    description: 'Apply an allowlisted drawing, palette, selection, canvas, layer, frame, lighting, or view operation to the paired live project. Batch up to 32 related edits when they should share one history step. Requires the current editor revision and a unique requestId. responseMode summary returns a compact result. For a pending result, repeat this call with the same requestId and arguments to receive the cached result without applying the operation again. Read state when the result is unknown.',
     inputSchema: { type: 'object', additionalProperties: false, required: ['connectionId', 'accessToken', 'expectedRevision', 'requestId', 'operation'], properties: {
-      ...authProperties, expectedRevision: { type: 'integer', minimum: 0 }, requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' }, operation: DRAW_OPERATION_SCHEMA
+      ...authProperties, expectedRevision: { type: 'integer', minimum: 0 }, requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' }, operation: DRAW_OPERATION_SCHEMA, responseMode: { enum: ['full', 'summary'] }
     } },
     outputSchema: drawResult,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true }
   };
   const save = {
     name: 'save_draw', title: 'Save the active Draw project',
-    description: 'Save the paired project revision in browser-local Draw storage. Requires the current editor revision and unique requestId. Reports the saved project/revision and whether later edits remain dirty; it does not claim cloud sync or publication.',
+    description: 'Save the paired project revision in browser-local Draw storage. Requires the current editor revision and unique requestId. responseMode summary returns a compact result. For a pending result, repeat this call with the same requestId and arguments to receive the cached result without saving again. Read state when the result is unknown. Reports the saved project/revision and whether later edits remain dirty; it does not claim cloud sync or publication.',
     inputSchema: { type: 'object', additionalProperties: false, required: ['connectionId', 'accessToken', 'expectedRevision', 'requestId'], properties: {
-      ...authProperties, expectedRevision: { type: 'integer', minimum: 0 }, requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' }
+      ...authProperties, expectedRevision: { type: 'integer', minimum: 0 }, requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' }, responseMode: { enum: ['full', 'summary'] }
     } },
     outputSchema: drawResult,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true }
@@ -318,23 +318,29 @@ async function handleCall(params, env) {
       } catch { return { isError: true, content: [{ type: 'text', text: 'Draw接続を終了できませんでした。' }] }; }
     }
     if (params.name === 'get_draw_state') {
-      if (Object.keys(args).some(key => !['connectionId', 'accessToken', 'frameId', 'layerId'].includes(key)) || (args.frameId !== undefined && typeof args.frameId !== 'string') || (args.layerId !== undefined && typeof args.layerId !== 'string')) return { isError: true, content: [{ type: 'text', text: 'Draw状態の取得範囲を確認してください。' }] };
+      if (Object.keys(args).some(key => !['connectionId', 'accessToken', 'frameId', 'layerId', 'includePixels', 'region'].includes(key)) ||
+        (args.frameId !== undefined && typeof args.frameId !== 'string') || (args.layerId !== undefined && typeof args.layerId !== 'string') ||
+        (args.includePixels !== undefined && typeof args.includePixels !== 'boolean') ||
+        (args.region !== undefined && (!isRecord(args.region) || Object.keys(args.region).some(key => !['x', 'y', 'width', 'height'].includes(key)) ||
+          !Number.isInteger(args.region.x) || args.region.x < 0 || args.region.x > 1027 || !Number.isInteger(args.region.y) || args.region.y < 0 || args.region.y > 1027 ||
+          !Number.isInteger(args.region.width) || args.region.width < 1 || args.region.width > 1028 - args.region.x || !Number.isInteger(args.region.height) || args.region.height < 1 || args.region.height > 1028 - args.region.y || args.region.width * args.region.height > 65536 || args.includePixels === false))) return { isError: true, content: [{ type: 'text', text: 'Draw状態の取得範囲を確認してください。' }] };
       const requestId = crypto.randomUUID().replaceAll('-', '_');
-      const result = await runDrawCommand(env, args.connectionId, args.accessToken, requestId, { kind: 'state.get', stateRequest: { ...(args.frameId ? { frameId: args.frameId } : {}), ...(args.layerId ? { layerId: args.layerId } : {}) } });
+      const result = await runDrawCommand(env, args.connectionId, args.accessToken, requestId, { kind: 'state.get', stateRequest: { ...(args.frameId ? { frameId: args.frameId } : {}), ...(args.layerId ? { layerId: args.layerId } : {}), ...(args.includePixels !== undefined ? { includePixels: args.includePixels } : {}), ...(args.region ? { region: args.region } : {}) } });
       if (typeof result.error === 'string') return { isError: true, content: [{ type: 'text', text: result.error }] };
       if (result.status === 'applied') return mcpResult(result.result?.state ?? result.result, JSON.stringify(result.result?.state ?? result.result));
       return mcpResult(result, `Draw状態の取得は${result.status === 'pending' ? '処理中' : '結果不明'}です。現時点で未完了として扱い、必要なら改めて状態を読み取ってください。`);
     }
     const isEdit = params.name === 'edit_draw';
-    const allowed = isEdit ? ['connectionId', 'accessToken', 'expectedRevision', 'requestId', 'operation'] : ['connectionId', 'accessToken', 'expectedRevision', 'requestId'];
+    const allowed = isEdit ? ['connectionId', 'accessToken', 'expectedRevision', 'requestId', 'operation', 'responseMode'] : ['connectionId', 'accessToken', 'expectedRevision', 'requestId', 'responseMode'];
     if (Object.keys(args).some(key => !allowed.includes(key)) || !Number.isSafeInteger(args.expectedRevision) || args.expectedRevision < 0 || typeof args.requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(args.requestId)) return { isError: true, content: [{ type: 'text', text: '現在の編集revisionと一意のrequestIdを指定してください。' }] };
     const operation = isEdit ? args.operation : { type: 'save' };
-    const command = { kind: 'operation', expectedRevision: args.expectedRevision, operation };
+    if (args.responseMode !== undefined && !['full', 'summary'].includes(args.responseMode)) return { isError: true, content: [{ type: 'text', text: 'responseModeはfullまたはsummaryを指定してください。' }] };
+    const command = { kind: 'operation', expectedRevision: args.expectedRevision, operation, ...(args.responseMode ? { responseMode: args.responseMode } : {}) };
     const result = await runDrawCommand(env, args.connectionId, args.accessToken, args.requestId, command);
     if (typeof result.error === 'string') return { isError: true, content: [{ type: 'text', text: result.error }] };
     const text = result.status === 'applied'
       ? (params.name === 'save_draw' ? 'Drawの保存結果です。保存先はブラウザー内ローカルストレージです。' : 'Draw操作が完了しました。')
-      : result.status === 'pending' ? 'Draw操作は処理中です。操作を再送せず、同じrequestIdで状態を確認してください。'
+      : result.status === 'pending' ? `Draw${params.name === 'save_draw' ? 'の保存' : '操作'}は処理中です。同じ引数とrequestIdで同じツールを呼び直して結果を確認してください。`
         : 'Draw操作の結果が不確定です。失敗したとは限らないため、現在のDraw状態を確認してから次を決めてください。';
     return mcpResult(result, text);
   }
@@ -487,7 +493,7 @@ async function dispatch(message, request, env, protocol) {
     if (!isRecord(params) || typeof params.protocolVersion !== 'string') return rpcError(id, -32602, 'Invalid params');
     const requested = params.protocolVersion;
     const version = SUPPORTED_PROTOCOLS.has(requested) ? requested : '2025-06-18';
-    return { jsonrpc: '2.0', id, result: { protocolVersion: version, capabilities: { tools: {} }, serverInfo: { name: 'PiXiEED', version: '0.4.0' }, instructions: SERVER_INSTRUCTIONS } };
+    return { jsonrpc: '2.0', id, result: { protocolVersion: version, capabilities: { tools: {} }, serverInfo: { name: 'PiXiEED', version: '0.6.0' }, instructions: SERVER_INSTRUCTIONS } };
   }
   if (message.method === 'ping') return { jsonrpc: '2.0', id, result: {} };
   if (message.method === 'tools/list') return { jsonrpc: '2.0', id, result: { tools: toolDefinitions() } };

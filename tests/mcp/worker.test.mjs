@@ -49,7 +49,14 @@ test('lists reference tools and scoped live Draw tools, then rejects unknown met
   assert.match(byName.disconnect_draw.description, /Invalidate the agent credential/);
   assert.match(byName.disconnect_draw.description, /An operation already in progress may have applied and is not rolled back/);
   assert.deepEqual(byName.edit_draw.inputSchema.properties.operation.oneOf.find(op => op.properties.type.const === 'pixels.set').properties.pixels.maxItems, 512);
-  assert.equal(byName.get_draw_state.outputSchema.anyOf[0].properties.width.maximum, 256);
+  assert.equal(byName.get_draw_state.outputSchema.anyOf[0].properties.width.maximum, 1028);
+  assert.equal(byName.get_draw_state.outputSchema.anyOf[0].properties.capabilities.properties.maxReadPixels.const, 65536);
+  assert.equal(byName.get_draw_state.inputSchema.properties.includePixels.type, 'boolean');
+  assert.ok(byName.get_draw_state.inputSchema.properties.region.properties.width);
+  assert.equal(byName.edit_draw.inputSchema.properties.responseMode.enum[1], 'summary');
+  assert.equal(byName.save_draw.inputSchema.properties.responseMode.enum[1], 'summary');
+  const editTypes = byName.edit_draw.inputSchema.properties.operation.oneOf.map(operation => operation.properties.type.const);
+  for (const type of ['stroke', 'shape', 'fill', 'spray', 'cel.clear', 'palette.replace', 'selection.transform', 'canvas.resize', 'canvas.scale', 'batch', 'normal.configure', 'normal.generate', 'text.draw', 'view.configure']) assert.ok(editTypes.includes(type), type);
   assert.equal((await (await call(rpc('unknown'))).json()).error.code, -32601);
   const missing = await call(rpc('tools/call', { name: 'unknown_tool', arguments: {} }));
   assert.equal((await missing.json()).error.code, -32602);
@@ -186,10 +193,13 @@ test('prepare returns real PNGs with exact dimensions and never certifies visual
 
 test('initial instructions distinguish browser Draw operations from remote MCP and keep references optional', async () => {
   const result = (await (await call(rpc('initialize', { protocolVersion: '2025-06-18' }))).json()).result;
-  assert.equal(result.serverInfo.version, '0.4.0');
+  assert.equal(result.serverInfo.version, '0.6.0');
   for (const term of ['get_pixel_art_guide', 'prepare_pixel_art', 'connect_draw', 'edit_draw', 'Draw画面で利用者が一時接続', '任意の参考情報', 'preview_only']) {
     assert.ok(result.instructions.includes(term), term);
   }
+  assert.match(result.instructions, /batch/);
+  assert.match(result.instructions, /capabilities\.fastEdits/);
+  assert.match(result.instructions, /同じrequestId/);
 });
 
 test('style and reference observations reach the guide but private descriptions stay out of URLs', async () => {

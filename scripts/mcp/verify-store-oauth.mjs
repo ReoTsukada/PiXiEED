@@ -57,6 +57,14 @@ async function grant(session,scope='draw:read draw:write') {
 }
 const mcp=(name,args={},token)=>fetch('/mcp/store',{method:'POST',headers:{'content-type':'application/json',accept:'application/json, text/event-stream',...(token?{authorization:`Bearer ${token}`}:{})},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}})});
 const poll=s=>fetch(`/draw-sessions/${s.sessionId}/commands`,{headers:{origin:'https://pixieed.jp',authorization:`Bearer ${s.browserToken}`}});
+async function nextCommand(s) {
+  for(let i=0;i<30;i++) { const value=await (await poll(s)).json(); if(value.commands.length)return value.commands[0]; await new Promise(r=>setTimeout(r,20)); }
+  throw new Error('Browser command was not delivered.');
+}
+async function browserAck(s,command,{revision,result,status='applied'}={}) {
+  const response=await fetch(`/draw-sessions/${s.sessionId}/commands/${command.commandId}/result`,{method:'POST',headers:{origin:'https://pixieed.jp','content-type':'application/json',authorization:`Bearer ${s.browserToken}`},body:JSON.stringify({commandId:command.commandId,requestId:command.requestId,status,projectBinding:s.projectBinding,revision,result})});
+  assert.equal(response.status,200,'Browser acknowledgement');
+}
 async function check(name,work) { await work(); passed++; console.log(`PASS ${name}`); }
 try {
   await check('discovery publishes PKCE and no refresh grant',async()=>{
@@ -104,6 +112,39 @@ try {
     const status=await (await mcp('get_draw_operation_status',{requestId:'runtime_pixel_1'},writeGrant.token)).json();assert.equal(status.result.structuredContent.status,'applied');
     assert.equal((await (await poll(writable)).json()).commands.length,0);
   });
+  await check('OAuth forwards summary-default batch/save and metadata/region reads through the legacy Worker and Draw session',async()=>{
+    const batchArgs={expectedRevision:1,requestId:'runtime_batch_save_1',save:true,operations:[{type:'stroke',frameId:'$active',layerId:'$active',points:[{x:1,y:1},{x:2,y:2}],colorIndex:0}]};
+    const batchPending=mcp('batch_draw_edits',batchArgs,writeGrant.token);
+    const batch=await nextCommand(writable);
+    assert.equal(batch.kind,'operation');assert.equal(batch.expectedRevision,1);assert.equal(batch.responseMode,'summary');
+    assert.deepEqual(batch.operation,{type:'batch',operations:batchArgs.operations,save:true});
+    const saveReceipt={saved:true,savedRevisionId:'local-r2',dirtyAfter:false,storage:'browser_local'};
+    await browserAck(writable,batch,{revision:2,result:{changed:true,revision:2,save:saveReceipt}});
+    const batchResult=await (await batchPending).json();
+    assert.equal(batchResult.result.structuredContent.status,'applied');
+    assert.deepEqual(batchResult.result.structuredContent.result.save,saveReceipt,'The browser save receipt survives OAuth result normalization.');
+    const repeated=await (await mcp('batch_draw_edits',batchArgs,writeGrant.token)).json();
+    assert.equal(repeated.result.structuredContent.status,'applied','The same requestId returns its cached applied result.');
+    assert.equal((await (await poll(writable)).json()).commands.length,0,'Re-querying the requestId does not enqueue the batch again.');
+
+    const metadataPending=mcp('get_draw_state',{includePixels:false},writeGrant.token);
+    const metadataCommand=await nextCommand(writable);
+    assert.equal(metadataCommand.kind,'state.get');assert.deepEqual(metadataCommand.stateRequest,{includePixels:false});
+    const metadataState={revision:2,projectBinding:writable.projectBinding,projectPersisted:true,savedRevisionId:'local-r2',dirty:false,width:2,height:2,palette:['#ffffff'],active:{frameId:'f1',layerId:'l1'},frames:[],layers:[],cel:{frameId:'f1',layerId:'l1'},canUndo:true,canRedo:false,busy:false,saved:true};
+    await browserAck(writable,metadataCommand,{revision:2,result:{state:metadataState}});
+    const metadataResult=await (await metadataPending).json();
+    assert.deepEqual(metadataResult.result.structuredContent.cel,metadataState.cel,'Metadata-only state stays pixel-free after normalization.');
+
+    const region={x:0,y:0,width:2,height:2};
+    const regionPending=mcp('get_draw_state',{region},writeGrant.token);
+    const regionCommand=await nextCommand(writable);
+    assert.equal(regionCommand.kind,'state.get');assert.deepEqual(regionCommand.stateRequest,{region});
+    const regionState={...metadataState,cel:{frameId:'f1',layerId:'l1',region,pixels:[0,0,0,0]}};
+    await browserAck(writable,regionCommand,{revision:2,result:{state:regionState}});
+    const regionResult=await (await regionPending).json();
+    assert.deepEqual(regionResult.result.structuredContent.cel.region,region);
+    assert.deepEqual(regionResult.result.structuredContent.cel.pixels,[0,0,0,0]);
+  });
   await check('invalid private_key_jwt revoke cannot stop the Draw session',async()=>{
     const r=await fetch('/oauth/token',form({client_id:client,token:writeGrant.token,client_assertion_type:'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',client_assertion:'invalid.jwt.value'}));assert.notEqual(r.status,200);assert.equal((await (await poll(writable)).json()).connected,true);
   });
@@ -112,7 +153,7 @@ try {
   });
   const readSession=await session(), readGrant=await grant(readSession,'draw:read');
   await check('read-only grant refuses write, save, selection, undo, and redo',async()=>{
-    for(const name of ['set_draw_pixel','save_draw','select_draw_layer','undo_draw_edit','redo_draw_edit'])assert.equal((await mcp(name,{},readGrant.token)).status,403);
+    for(const name of ['set_draw_pixel','batch_draw_edits','save_draw','select_draw_layer','undo_draw_edit','redo_draw_edit'])assert.equal((await mcp(name,{},readGrant.token)).status,403);
     assert.equal((await (await poll(readSession)).json()).commands.length,0);
   });
   await check('disconnect withdraws only its own grant',async()=>{

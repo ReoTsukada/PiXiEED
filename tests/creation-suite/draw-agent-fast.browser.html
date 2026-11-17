@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>Draw 高速編集の確認</title>
+<style>body{margin:0;background:#18252e;color:#fff;font:14px system-ui}header{padding:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select{font:inherit;min-height:40px;padding:6px 12px}pre{white-space:pre-wrap;padding:12px;margin:0}iframe{border:0;background:white;width:1280px;height:720px;display:block;max-width:100%}</style>
+<header><b>Draw 高速編集・ローカル検証</b><button id="run">一括編集と安全性を確認</button><button id="live">MCP通信を比較</button><label>画面幅 <select id="size"><option value="1280,720">PC</option><option value="390,844">モバイル390px</option><option value="320,568">モバイル320px</option></select></label></header>
+<pre id="result">確認待ち（検証用の作品だけを操作します）</pre><iframe id="editor" src="/tools/start/draw/?workspace=1&runtime=direct&mode=draw" title="検証用Draw"></iframe>
+<script type="module">
+const frame=document.querySelector('#editor'),out=document.querySelector('#result');
+const assert=(value,message)=>{if(!value)throw Error(message)};
+document.querySelector('#size').onchange=e=>{const [w,h]=e.target.value.split(',');frame.style.width=w+'px';frame.style.height=h+'px'};
+document.querySelector('#run').onclick=async()=>{
+ const button=document.querySelector('#run');button.disabled=true;const checks=[];out.textContent='実行中…';
+ try {
+ const draw=frame.contentWindow.__PIXIEED_CREATION_HOST__?.runtime?.draw;
+ assert(draw,'Drawの起動を待ってから実行してください');
+ await draw.workspace.ready;
+ await draw.importImage({width:16,height:16,rgba:new Uint8ClampedArray(16*16*4)});
+ const state=options=>draw.getAgentState(options);
+ const run=async operation=>{const before=state({includePixels:false});return draw.executeAgentOperation({expectedRevision:before.revision,projectBinding:before.projectBinding,operation,responseMode:'summary'},{isAuthorized:()=>true})};
+ const first=state();const index=first.palette.length;
+ const start=performance.now();
+ const batch=await run({type:'batch',save:true,operations:[
+  {type:'palette.add',color:'#284870'},
+  {type:'layer.add',name:'高速編集テスト'},
+  {type:'shape',frameId:'$active',layerId:'$active',shape:'rect',from:{x:2,y:2},to:{x:9,y:12},filled:true,colorIndex:index},
+  {type:'stroke',frameId:'$active',layerId:'$active',points:[{x:4,y:10},{x:7,y:10}],colorIndex:null},
+ ]});
+ const batchMs=performance.now()-start;
+ assert(batch.changed && batch.results.length===4 && batch.state.saved && !batch.dirtyAfter,'一括編集と保存');
+ assert(!Object.hasOwn(batch.state.cel,'pixels'),'簡潔な結果に不要な画素がない');
+ assert(batch.revision===first.revision+1,'まとめて1回の履歴更新');
+ const painted=state();assert(painted.cel.pixels[2*16+2]===index && painted.cel.pixels[10*16+4]===-1,'描画・消去の画素');
+ checks.push({name:'色追加・レイヤー追加・図形・消去・保存を1回で実行',ms:Math.round(batchMs*10)/10});
+ await run({type:'undo'});assert(state().layers.length===first.layers.length,'1回のUndoでレイヤー追加も戻る');
+ await run({type:'redo'});assert(JSON.stringify(state().cel.pixels)===JSON.stringify(painted.cel.pixels),'Redoで画素が一致');checks.push({name:'Undo / Redoの完全復元'});
+ const beforeFail=JSON.stringify(state());
+ let rejected=false;try{await run({type:'batch',operations:[{type:'layer.add',name:'失敗用'},{type:'pixel.set',frameId:'$active',layerId:'$active',x:999,y:0,colorIndex:0}]})}catch{rejected=true}
+ assert(rejected && JSON.stringify(state())===beforeFail,'失敗した一括編集が作品を変更しない');checks.push({name:'一括編集の失敗で作品を保持'});
+ let stale=false;try{await draw.executeAgentOperation({expectedRevision:first.revision,projectBinding:state().projectBinding,operation:{type:'cel.clear',frameId:'$active',layerId:'$active'}},{isAuthorized:()=>true})}catch(e){stale=e.code==='DRAW_AGENT_STALE_REVISION'}
+ assert(stale && JSON.stringify(state())===beforeFail,'古い操作が現在の作品を上書きしない');
+ await run({type:'palette.replace',index,color:'#315d91'});
+ await run({type:'selection.transform',frameId:'$active',layerId:'$active',bounds:{x:2,y:2,width:8,height:11},x:4,y:2,flipX:true});
+ assert(state().cel.pixels[2*16+2]===-1,'移動元を消去');
+ await run({type:'spray',frameId:'$active',layerId:'$active',x:1,y:1,colorIndex:0,radius:2,passes:2,seed:7});
+ await run({type:'text.draw',frameId:'$active',layerId:'$active',text:'N',x:0,y:0,colorIndex:0,font:'pressstart',fontSize:8});
+ checks.push({name:'色変更・切り貼り移動・文字描画'});
+ const region=state({region:{x:0,y:0,width:4,height:4}});assert(region.cel.pixels.length===16,'範囲読み取り');
+ await run({type:'normal.generate',frameId:'$active',method:'silhouette',strength:2,radius:3});
+ const normalId=state().layers.find(x=>x.role==='normal').id;
+ const normalBefore=state({layerId:normalId});
+ await run({type:'palette.replace',index,color:'#326293'});
+ assert(JSON.stringify(state({layerId:normalId}).cel)===JSON.stringify(normalBefore.cel),'通常色の編集で法線方向を保持');
+ await run({type:'pixel.set',frameId:'$active',layerId:normalId,x:0,y:0,colorIndex:16});
+ assert(state({layerId:normalId}).cel.palette.length===17 && state({layerId:normalId}).cel.pixels[0]===16,'ノーマル方向パレット');
+ await run({type:'selection.transform',frameId:'$active',layerId:normalId,bounds:{x:0,y:0,width:1,height:1},x:1,y:0});
+ assert(state({layerId:normalId}).cel.pixels[1]===16,'ノーマル移動で消えない');
+ await run({type:'normal.configure',settings:{previewLighting:true,azimuth:225,overlayOpacity:0.5}});
+ await run({type:'view.configure',showGrid:true,onion:false,zoom:1});
+ await run({type:'save'});assert(state().saved && state().normalSettings.azimuth===225,'照明保存');
+ checks.push({name:'ノーマル生成・方向描画・移動・照明・保存'});
+ await run({type:'canvas.resize',width:1028,height:768});
+ assert(!Object.hasOwn(state().cel,'pixels'),'大きな作品の既定取得は軽量');
+ assert(state({region:{x:0,y:0,width:16,height:16}}).cel.pixels.length===256,'大きな作品の部分取得');
+ await run({type:'undo'});assert(state().width===16,'拡張を取り消す');
+ await run({type:'save'});checks.push({name:'1028pxキャンバス・部分読み取り・復元'});
+ out.textContent=JSON.stringify({status:'PASS',checks,notes:'実ブラウザー内の処理時間。ChatGPTの思考時間や本番通信時間は含みません。'},null,2);
+ }catch(error){out.textContent=JSON.stringify({status:'FAIL',checks,error:error.stack},null,2)}finally{button.disabled=false}
+};
+document.querySelector('#live').onclick=async()=>{
+ const button=document.querySelector('#live');button.disabled=true;let session;
+ try{
+  if(!['127.0.0.1','localhost'].includes(location.hostname))throw Error('Local test only');
+  const draw=frame.contentWindow.__PIXIEED_CREATION_HOST__.runtime.draw;
+  const {createDrawLiveSession}=await import('/js/creation/draw-live-session.mjs?rev=20261117-fast-draw-1');
+  session=createDrawLiveSession({draw,endpoint:location.origin+'/mcp'});
+  const opened=await session.start();let rpcId=0;
+  const rpc=async(name,args)=>{
+   const response=await fetch('/mcp',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:++rpcId,method:'tools/call',params:{name,arguments:args}})});
+   const value=await response.json();assert(!value.error && !value.result?.isError,JSON.stringify(value.error||value.result?.content));return value.result.structuredContent;
+  };
+  const connected=await rpc('connect_draw',{pairingCode:opened.pairingCode});
+  const auth={connectionId:connected.connectionId,accessToken:connected.accessToken};
+  let current=await rpc('get_draw_state',{...auth,includePixels:false});
+  assert(current.capabilities.fastEdits,'高速操作の能力応答');
+  const edit=async(operation)=>{const args={...auth,expectedRevision:current.revision,requestId:crypto.randomUUID().replaceAll('-','_'),operation,responseMode:'summary'};const result=await rpc('edit_draw',args);assert(result.status==='applied','operation must apply: '+JSON.stringify(result.error));current=result.result.state;return {result,args}};
+  const operations=[{type:'layer.add',name:'通信確認用'},{type:'shape',frameId:'$active',layerId:'$active',shape:'rect',from:{x:2,y:2},to:{x:5,y:5},filled:true,colorIndex:0},{type:'layer.opacity',layerId:'$active',opacity:0.8},{type:'layer.rename',layerId:'$active',name:'通信確認済み'}];
+  let at=performance.now();for(const operation of operations)await edit(operation);const separateMs=performance.now()-at;
+  at=performance.now();const batch=await edit({type:'batch',operations,save:true});const batchMs=performance.now()-at;
+  const revision=current.revision;const replay=await rpc('edit_draw',batch.args);assert(replay.result.revision===revision && draw.getAgentState({includePixels:false}).revision===revision,'同じ依頼を再適用しない');
+  assert(batch.result.result.state.saved,'batch saved');
+  await rpc('disconnect_draw',auth);
+  out.textContent=JSON.stringify({status:'PASS',transport:'ローカルHTTP → MCP Worker → relay → 実Draw',separateCommands:4,separateMs:Math.round(separateMs),batchCommands:1,batchWithSaveMs:Math.round(batchMs),replay:'重複適用なし',notes:'本番ネットワークとChatGPTの思考時間は含みません。'},null,2);
+ }catch(error){out.textContent=JSON.stringify({status:'FAIL',error:error.stack},null,2)}finally{await session?.stop();button.disabled=false}
+};
+</script></html>

@@ -87,7 +87,13 @@ export function normalizeDrawAgentOperation(raw, context = {}) {
   const fields = {
     'pixel.set': ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex'],
     'pixels.set': ['type', 'frameId', 'layerId', 'pixels'],
+    stroke: ['type', 'frameId', 'layerId', 'points', 'colorIndex', 'brushSize'],
+    spray: ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex', 'radius', 'passes', 'seed'],
+    shape: ['type', 'frameId', 'layerId', 'shape', 'from', 'to', 'filled', 'colorIndex'],
+    fill: ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex', 'contiguous'],
+    'cel.clear': ['type', 'frameId', 'layerId'],
     'palette.add': ['type', 'color'],
+    'palette.replace': ['type', 'index', 'color'],
     'color.adjust': ['type', 'scope', 'frameId', 'layerId', 'settings'],
     'layer.select': ['type', 'layerId'],
     'layer.add': ['type', 'name', 'visible', 'locked'],
@@ -102,17 +108,29 @@ export function normalizeDrawAgentOperation(raw, context = {}) {
     'frame.duration': ['type', 'frameId', 'durationMs'],
     'frame.move': ['type', 'frameId', 'index'],
     'frame.remove': ['type', 'frameId'],
+    'selection.transform': ['type', 'frameId', 'layerId', 'bounds', 'x', 'y', 'width', 'height', 'turns', 'angle', 'polygon', 'flipX', 'flipY', 'copy'],
+    'canvas.resize': ['type', 'width', 'height', 'anchor'],
+    'canvas.scale': ['type', 'percent'],
     undo: ['type'], redo: ['type'], save: ['type'],
   };
   const allowed = fields[type];
   if (!allowed) throw new TypeError(`Unsupported Draw operation: ${type}`);
   ownKeysOnly(raw, new Set(allowed), `operation ${type}`);
-  const frameId = (value = raw.frameId) => { requireExisting(value, frames, 'frameId'); return value; };
-  const layerId = (value = raw.layerId) => { requireExisting(value, layers, 'layerId'); return value; };
+  const frameId = (value = raw.frameId) => { if (value === '$active') value = context.active?.frameId; requireExisting(value, frames, 'frameId'); return value; };
+  const layerId = (value = raw.layerId) => { if (value === '$active') value = context.active?.layerId; requireExisting(value, layers, 'layerId'); return value; };
   const assertWritableLayer = id => {
     const layer = layers.find(item => item.id === id);
     if (layer?.role === 'music') throw new TypeError('Music layers cannot be changed by pixel operations');
     if (layer?.locked) throw new Error('The target layer is locked');
+  };
+  const colorIndex = value => {
+    if (value !== null) requireInt(value, 'colorIndex', 0, paletteLength - 1);
+    return value;
+  };
+  const point = (value, label) => {
+    ownKeysOnly(value, new Set(['x', 'y']), label);
+    if (!Number.isFinite(value.x) || !Number.isFinite(value.y) || Math.abs(value.x) > 4096 || Math.abs(value.y) > 4096) throw new RangeError(`${label} is out of range`);
+    return { x: value.x, y: value.y };
   };
   switch (type) {
     case 'pixel.set': {
@@ -128,13 +146,52 @@ export function normalizeDrawAgentOperation(raw, context = {}) {
       const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
       return { type, frameId: frameId(), layerId: targetLayerId, pixels: cells };
     }
+    case 'stroke': {
+      if (!Array.isArray(raw.points) || raw.points.length < 1 || raw.points.length > 1024) throw new RangeError('points must contain 1-1024 points');
+      const points = raw.points.map((entry, index) => point(entry, `points[${index}]`));
+      const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      const brushSize = raw.brushSize === undefined ? 1 : requireInt(raw.brushSize, 'brushSize', 1, 16);
+      return { type, frameId: frameId(), layerId: targetLayerId, points, colorIndex: colorIndex(raw.colorIndex), brushSize };
+    }
+    case 'spray': {
+      requireInt(raw.x, 'x', 0, width - 1); requireInt(raw.y, 'y', 0, height - 1);
+      const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      return { type, frameId: frameId(), layerId: targetLayerId, x: raw.x, y: raw.y, colorIndex: colorIndex(raw.colorIndex),
+        radius: raw.radius === undefined ? 2 : requireInt(raw.radius, 'radius', 0, 16),
+        passes: raw.passes === undefined ? 1 : requireInt(raw.passes, 'passes', 1, 32),
+        seed: raw.seed === undefined ? 0 : requireInt(raw.seed, 'seed', 0, 0xffffffff) };
+    }
+    case 'shape': {
+      if (!['line', 'rect', 'ellipse'].includes(raw.shape)) throw new TypeError('shape must be line, rect, or ellipse');
+      const from = point(raw.from, 'from'), to = point(raw.to, 'to');
+      if (raw.filled !== undefined && typeof raw.filled !== 'boolean') throw new TypeError('filled must be boolean');
+      const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      return { type, frameId: frameId(), layerId: targetLayerId, shape: raw.shape, from, to, ...(raw.filled === undefined ? {} : { filled: raw.filled }), colorIndex: colorIndex(raw.colorIndex) };
+    }
+    case 'fill': {
+      requireInt(raw.x, 'x', 0, width - 1); requireInt(raw.y, 'y', 0, height - 1);
+      if (raw.contiguous !== undefined && typeof raw.contiguous !== 'boolean') throw new TypeError('contiguous must be boolean');
+      const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      return { type, frameId: frameId(), layerId: targetLayerId, x: raw.x, y: raw.y, colorIndex: colorIndex(raw.colorIndex), contiguous: raw.contiguous ?? true };
+    }
+    case 'cel.clear': {
+      const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      return { type, frameId: frameId(), layerId: targetLayerId };
+    }
     case 'palette.add':
       if (typeof raw.color !== 'string' || !COLOR_HEX.test(raw.color)) throw new TypeError('color must be #RRGGBB or #RRGGBBAA');
       return { type, color: raw.color.toLowerCase() };
+    case 'palette.replace':
+      requireInt(raw.index, 'index', 0, paletteLength - 1);
+      if (typeof raw.color !== 'string' || !COLOR_HEX.test(raw.color)) throw new TypeError('color must be #RRGGBB or #RRGGBBAA');
+      return { type, index: raw.index, color: raw.color.toLowerCase() };
     case 'color.adjust':
       if (!['cel', 'whole'].includes(raw.scope)) throw new TypeError('scope must be cel or whole');
-      if (raw.scope === 'whole' && layers.some(layer => layer.locked)) throw new Error('All layers must be unlocked for whole-animation color adjustment');
-      const targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      if (raw.scope === 'whole' && layers.some(layer => layer.locked && layer.role !== 'normal')) throw new Error('All artwork layers must be unlocked for whole-animation color adjustment');
+      const targetLayerId = layerId();
+      const targetLayer = layers.find(layer => layer.id === targetLayerId);
+      if (targetLayer?.role === 'music') throw new TypeError('Music layers cannot be changed by color operations');
+      if (raw.scope === 'cel') assertWritableLayer(targetLayerId);
       return { type, scope: raw.scope, frameId: frameId(), layerId: targetLayerId, settings: normalizeDrawAgentColorSettings(raw.settings) };
     case 'layer.select': return { type, layerId: layerId() };
     case 'layer.add': {
@@ -165,6 +222,35 @@ export function normalizeDrawAgentOperation(raw, context = {}) {
       return { type, frameId: frameId(), durationMs: raw.durationMs };
     case 'frame.move': return { type, frameId: frameId(), index: requireInt(raw.index, 'index', 0, frames.length - 1) };
     case 'frame.remove': return { type, frameId: frameId() };
+    case 'selection.transform': {
+      const targetFrameId = frameId(), targetLayerId = layerId(); assertWritableLayer(targetLayerId);
+      ownKeysOnly(raw.bounds, new Set(['x', 'y', 'width', 'height']), 'bounds');
+      const bounds = { x: requireInt(raw.bounds.x, 'bounds.x', 0, width - 1), y: requireInt(raw.bounds.y, 'bounds.y', 0, height - 1),
+        width: requireInt(raw.bounds.width, 'bounds.width', 1, width), height: requireInt(raw.bounds.height, 'bounds.height', 1, height) };
+      if (bounds.x + bounds.width > width || bounds.y + bounds.height > height) throw new RangeError('Selection bounds exceed the canvas');
+      requireInt(raw.x, 'x', -4096, 4096); requireInt(raw.y, 'y', -4096, 4096);
+      const result = { type, frameId: targetFrameId, layerId: targetLayerId, bounds, x: raw.x, y: raw.y };
+      for (const key of ['width', 'height']) if (raw[key] !== undefined) result[key] = requireInt(raw[key], key, 1, 1028);
+      if (raw.turns !== undefined) result.turns = requireInt(raw.turns, 'turns', 0, 3);
+      if (raw.angle !== undefined) {
+        if (typeof raw.angle !== 'number' || !Number.isFinite(raw.angle) || raw.angle < -360 || raw.angle > 360) throw new RangeError('angle must be finite degrees from -360 to 360');
+        if (raw.turns !== undefined) throw new TypeError('angle and turns cannot both be specified');
+        result.angle = raw.angle;
+      }
+      if (raw.polygon !== undefined) {
+        if (!Array.isArray(raw.polygon) || raw.polygon.length < 3 || raw.polygon.length > 256) throw new RangeError('polygon must contain 3-256 points');
+        result.polygon = raw.polygon.map((entry, index) => point(entry, `polygon[${index}]`));
+      }
+      for (const key of ['flipX', 'flipY', 'copy']) if (raw[key] !== undefined) { if (typeof raw[key] !== 'boolean') throw new TypeError(`${key} must be boolean`); result[key] = raw[key]; }
+      return result;
+    }
+    case 'canvas.resize':
+      requireInt(raw.width, 'width', 1, 1028); requireInt(raw.height, 'height', 1, 1028);
+      if (raw.anchor !== undefined && !['top-left', 'center'].includes(raw.anchor)) throw new TypeError('anchor must be top-left or center');
+      return { type, width: raw.width, height: raw.height, anchor: raw.anchor ?? 'top-left' };
+    case 'canvas.scale':
+      if (typeof raw.percent !== 'number' || !Number.isFinite(raw.percent) || raw.percent < 1 || raw.percent > 800) throw new RangeError('percent must be from 1 to 800');
+      return { type, percent: raw.percent };
     case 'undo': case 'redo': case 'save': return { type };
     default: throw new TypeError(`Unsupported Draw operation: ${type}`);
   }

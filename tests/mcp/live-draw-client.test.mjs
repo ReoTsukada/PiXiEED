@@ -109,3 +109,18 @@ test('agent disconnect stops an already connected browser session', async () => 
   await r.client.start(); await tick(); assert.equal(r.client.getState().phase, 'connected');
   connected = false; await r.runPoll(); assert.equal(r.client.getState().phase, 'idle');
 });
+
+test('routine connection checks omit pixels and forward one compact batch unchanged', async () => {
+  const r = rig(); const reads = []; let received;
+  const read = r.draw.getAgentState;
+  r.draw.getAgentState = options => { reads.push(options); return read(); };
+  r.draw.executeAgentOperation = async envelope => { received = envelope; return { changed: true, results: [{changed:true}] }; };
+  const batch = { type:'batch', operations:[{type:'layer.add',name:'Test'}], save:true };
+  r.queue.push({...command(r.binding),operation:batch,responseMode:'summary'});
+  await r.client.start(); await tick();
+  assert.deepEqual(received.operation,batch);
+  assert.equal(received.responseMode,'summary');
+  assert.ok(reads.length > 0 && reads.every(options=>options?.includePixels === false));
+  assert.equal(r.acknowledgements.length,1);
+  await r.client.stop();
+});

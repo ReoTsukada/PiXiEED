@@ -15,7 +15,7 @@ export function createDrawLiveSession({
   const endpointUrl = path => `${base.href.replace(/\/$/, '')}${path}`;
   const error = (code, message) => Object.assign(new Error(message), { code });
   const current = (ticket, bound = session) => ticket === generation && bound === session && !!session && now() < expires(session.expiresAt);
-  const authorized = ticket => current(ticket) && isActive() && sameBinding(draw.getAgentState().projectBinding, session.projectBinding);
+  const authorized = ticket => current(ticket) && isActive() && sameBinding(draw.getAgentState({ includePixels: false }).projectBinding, session.projectBinding);
   async function request(path, { method = 'GET', body, token, signal, keepalive = false } = {}) {
     const response = await fetchImpl(endpointUrl(path), {
       method, signal, keepalive, credentials: 'omit', cache: 'no-store',
@@ -68,7 +68,7 @@ export function createDrawLiveSession({
     }
     if (completed.size >= 512) throw error('SESSION_LIMIT', '接続の操作数の上限です。接続し直してください。');
     let body, operationCompleted = false;
-    const before = draw.getAgentState();
+    const before = draw.getAgentState({ includePixels: false });
     try {
       if (!commandAuthorized() || !sameBinding(command.projectBinding, session.projectBinding)) throw error('SESSION_CHANGED', '作品または接続が変更されています。');
       let result;
@@ -76,14 +76,15 @@ export function createDrawLiveSession({
       else if (command.kind === 'operation') result = await draw.executeAgentOperation({
         expectedRevision: command.expectedRevision, projectBinding: command.projectBinding,
         operation: command.operation,
+        ...(command.responseMode !== undefined ? { responseMode: command.responseMode } : {}),
       }, { isAuthorized: commandAuthorized });
       else throw error('UNSUPPORTED_COMMAND', '未対応の操作です。');
       operationCompleted = true;
-      const after = draw.getAgentState();
+      const after = draw.getAgentState({ includePixels: false });
       body = { commandId: command.commandId, requestId: command.requestId, status: 'applied', projectBinding: command.projectBinding, revision: after.revision, result };
     } catch (cause) {
       let revision = before.revision;
-      try { revision = draw.getAgentState()?.revision ?? revision; } catch { /* Applied result remains unknown when its snapshot cannot be read. */ }
+      try { revision = draw.getAgentState({ includePixels: false })?.revision ?? revision; } catch { /* Applied result remains unknown when its snapshot cannot be read. */ }
       body = { commandId: command.commandId, requestId: command.requestId,
         status: operationCompleted || cause?.status === 'unknown' || cause?.applied ? 'unknown' : 'not_applied',
         projectBinding: command.projectBinding, revision,
@@ -95,7 +96,7 @@ export function createDrawLiveSession({
   async function poll(ticket) {
     if (!current(ticket)) { if (ticket === generation && session) void stop('接続の有効期限が切れました。'); return; }
     if (!isActive()) { void stop('描画モードを離れたため接続を終了しました。'); return; }
-    if (!sameBinding(draw.getAgentState().projectBinding, session.projectBinding)) { void stop('作品が切り替わったため接続を終了しました。'); return; }
+    if (!sameBinding(draw.getAgentState({ includePixels: false }).projectBinding, session.projectBinding)) { void stop('作品が切り替わったため接続を終了しました。'); return; }
     try {
       if (pendingAck) await acknowledge(ticket);
       if (!current(ticket)) return;
@@ -121,9 +122,9 @@ export function createDrawLiveSession({
     try {
       await draw.workspace?.ready;
       if (ticket !== generation) return;
-      let state = draw.getAgentState();
+      let state = draw.getAgentState({ includePixels: false });
       if (!isActive() || state.busy) throw error('DRAW_BUSY', '描画やプレビューを終えてから接続してください。');
-      if (!state.projectBinding || state.projectPersisted === false) { await draw.workspace.save(); state = draw.getAgentState(); }
+      if (!state.projectBinding || state.projectPersisted === false) { await draw.workspace.save(); state = draw.getAgentState({ includePixels: false }); }
       if (!state.projectBinding) throw error('NO_PROJECT', '先に作品を保存してください。');
       if (ticket !== generation || !isActive()) return;
       const binding = state.projectBinding;
@@ -131,7 +132,7 @@ export function createDrawLiveSession({
       const createPath = mode === 'oauth' ? '/draw-store-sessions' : '/draw-sessions';
       // getAgentState has no project title, so omit projectName rather than guessing one.
       const opened = await request(createPath, { method: 'POST', body: { projectBinding: binding }, signal: controller.signal });
-      if (ticket !== generation || !sameBinding(draw.getAgentState().projectBinding, binding)) { await revoke(opened); return; }
+      if (ticket !== generation || !sameBinding(draw.getAgentState({ includePixels: false }).projectBinding, binding)) { await revoke(opened); return; }
       session = { ...opened, projectBinding: binding };
       if (!Number.isFinite(expires(opened.expiresAt)) || now() >= expires(opened.expiresAt)) throw error('INVALID_EXPIRY', '有効な接続を作成できませんでした。');
       expiryTimer = schedule(() => { if (ticket === generation) void stop('接続の有効期限が切れました。'); }, Math.max(0, expires(opened.expiresAt) - now()));
