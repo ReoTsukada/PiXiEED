@@ -219,7 +219,7 @@ function normalize(source, file) {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!normalApplyCacheTargets.has(target)) return whole;
-    const revision = liveDrawCacheTargets.has(target) ? '20261117-live-usage-1' : '20261117-normal-apply-1';
+    const revision = liveDrawCacheTargets.has(target) ? '20261117-free-quota-1' : '20261117-normal-apply-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
     return `${quote}${path}${next}${quote}`;
   });

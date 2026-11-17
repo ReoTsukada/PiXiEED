@@ -153,7 +153,7 @@ test('OAuth Draw sessions require a private claim then one-use activation, while
   const claimedResponse = await roomFetch('/_relay/store-claim', { method: 'POST', body: { secret, claimBinding, authFingerprint } });
   assert.equal(claimedResponse.status, 200);
   const claim = await claimedResponse.json();
-  assert.deepEqual(claim, { projectBinding: binding, projectName: '星空のドット絵', claimExpiresAt: now + 2 * 60_000, expiresAt: now + 15 * 60_000 });
+  assert.deepEqual(claim, { projectBinding: binding, projectName: '星空のドット絵', claimExpiresAt: now + 2 * 60_000, expiresAt: now + 5 * 60_000 });
   assert.equal(Object.hasOwn(claim, 'accessToken'), false);
   const claimedState = await room.load();
   assert.equal(claimedState.authFingerprint, authFingerprint);

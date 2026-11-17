@@ -37,9 +37,9 @@ import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261116-normal-
 import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261106-button-icon-audit-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
-import { assertDrawAgentPrecondition, normalizeDrawAgentBinding, normalizeDrawAgentOperation } from './draw-agent-operations.mjs?rev=20261117-live-usage-1';
-import { prepareDrawAgentPlan } from './draw-agent-plan.mjs?rev=20261117-live-usage-1';
-import { normalizeDrawAgentPreferences } from './draw-agent-preferences.mjs?rev=20261117-live-usage-1';
+import { assertDrawAgentPrecondition, normalizeDrawAgentBinding, normalizeDrawAgentOperation } from './draw-agent-operations.mjs?rev=20261117-free-quota-1';
+import { prepareDrawAgentPlan } from './draw-agent-plan.mjs?rev=20261117-free-quota-1';
+import { normalizeDrawAgentPreferences } from './draw-agent-preferences.mjs?rev=20261117-free-quota-1';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261116-normal-release-2';
 import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
@@ -61,7 +61,7 @@ import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-2';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-2';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-live-usage-1';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-free-quota-1';
 import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
 
 import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261117-normal-apply-1';
@@ -3233,7 +3233,7 @@ async function executeDrawAgentOperation(envelope, { isAuthorized } = {}) {
     } else {
       const prepared = await prepareDrawAgentPlan(beforeAnimation, { frameId: beforeFrameId, layerId: beforeLayerId }, operation,
         { checkFresh: ensureFresh, prepareExtraOperation: async (...args) => {
-          const { prepareDrawAgentExtraOperation } = await import('./draw-agent-extras.mjs?rev=20261117-live-usage-1');
+          const { prepareDrawAgentExtraOperation } = await import('./draw-agent-extras.mjs?rev=20261117-free-quota-1');
           return prepareDrawAgentExtraOperation(...args);
         } });
       ensureFresh();

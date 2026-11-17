@@ -1,4 +1,4 @@
-import { createDrawLiveSession } from './draw-live-session.mjs?rev=20261117-live-usage-1';
+import { createDrawLiveSession } from './draw-live-session.mjs?rev=20261117-free-quota-1';
 import { STORE_MCP_ENDPOINT, isPluginReviewEstimateCurrent, verifiedPublicPluginUrl } from '../mcp/connection-config.mjs?rev=20261117-launch-preview-1';
 
 /** Small opt-in connection control; artistic instructions stay in the user's chat. */
@@ -28,23 +28,23 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     <section class="draw-live-usage" aria-label="接続枠と残り時間">
       <div class="draw-live-gauge" data-daily-gauge>
         <div class="draw-live-gauge-heading"><strong>今日の接続枠（全員共通）</strong><span data-daily-value>利用状況は不明です</span></div>
-        <progress data-daily-meter max="20" value="0" aria-label="今日の残り接続枠" hidden></progress>
+        <progress data-daily-meter max="40" value="0" aria-label="今日の残り接続枠" hidden></progress>
         <div class="draw-live-gauge-foot"><span data-daily-status>利用状況をまだ取得していません。</span><span data-daily-reset></span></div>
       </div>
       <div class="draw-live-gauge" data-session-gauge>
         <div class="draw-live-gauge-heading"><strong>この接続の残り時間</strong><span data-session-value>未接続</span></div>
-        <progress data-session-meter max="900000" value="0" aria-label="この接続の残り時間" hidden></progress>
-        <div class="draw-live-gauge-foot"><span data-session-note>未接続・1回最長15分</span></div>
+        <progress data-session-meter max="300000" value="0" aria-label="この接続の残り時間" hidden></progress>
+        <div class="draw-live-gauge-foot"><span data-session-note>未接続・1回最長5分</span></div>
       </div>
     </section>
     <details class="draw-live-install-help"><summary>以前の手動接続を使う方</summary><p>以前にカスタムMCPとしてPiXiEEDを追加し、手動接続を設定済みの方は、互換用の接続方法を引き続き利用できます。</p><button type="button" data-live-start-legacy>手動接続を開始</button></details>
     <p>接続すると、この作品の内容をChatGPTが確認し、描画・色補正・レイヤー・コマの編集・端末への保存を操作できます。Drawは接続中も開いたままにしてください。</p>
-    <p>作品データと操作結果はCloudflareの中継サーバーで一時処理・保存されます。接続は最長15分で終了し、期限切れ後のサーバー側の削除処理で消去されます。削除は期限到達と同時とは限りません。ChatGPT側の会話履歴は同サービスの設定に従います。</p>
+    <p>作品データと操作結果はCloudflareの中継サーバーで一時処理・保存されます。無料接続は最長5分で終了し、期限切れ後のサーバー側の削除処理で消去されます。削除は期限到達と同時とは限りません。ChatGPT側の会話履歴は同サービスの設定に従います。</p>
     <p class="draw-live-status" role="status"></p>
     <div class="draw-live-pair" hidden><label for="draw-live-code">接続コード</label><textarea id="draw-live-code" readonly rows="3" spellcheck="false"></textarea>
     <p data-live-code-instructions>ChatGPTが開く接続許可画面にコードを入力してください。チャット本文には貼らないでください。コードは一度だけ使えます。</p><button type="button" data-live-copy-code>コードをコピー</button>
     <div data-live-legacy-prompt hidden><label for="draw-live-prompt">ChatGPTへの依頼文</label><textarea id="draw-live-prompt" readonly rows="3" spellcheck="false"></textarea><button type="button" data-live-copy-prompt>依頼文をコピー</button></div></div>
-    <p class="draw-live-scope">このタブの作品だけが対象です。接続は最長15分です。ライブ接続の上限はPiXiEEDサービス全体で1日20回です。作品の切り替え・タブを閉じると接続は終了します。作品の保存先はこの端末です。</p>
+    <p class="draw-live-scope">このタブの作品だけが対象です。無料接続は最長5分です。ライブ接続の上限はPiXiEEDサービス全体で1日40回です。作品の切り替え・タブを閉じると接続は終了します。作品の保存先はこの端末です。</p>
     <div class="draw-live-actions"><button type="button" data-live-start>この作品を接続</button><button type="button" data-live-stop hidden>接続を終了</button><button type="button" data-live-close>閉じる</button></div>`;
   document.body.append(dialog);
   if (publicPluginUrl) {
@@ -127,12 +127,12 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     if (!active) {
       sessionValue.textContent = '未接続';
       sessionMeter.hidden = true;
-      sessionNote.textContent = '未接続・1回最長15分';
+      sessionNote.textContent = '未接続・1回最長5分';
       delete sessionGauge.dataset.low;
     } else if (!Number.isFinite(expiresAt)) {
       sessionValue.textContent = '残り時間を確認中';
       sessionMeter.hidden = true;
-      sessionNote.textContent = '接続準備中・1回最長15分';
+      sessionNote.textContent = '接続準備中・1回最長5分';
       delete sessionGauge.dataset.low;
     } else if (!Number.isFinite(duration) || duration <= 0) {
       sessionValue.textContent = '残り時間は不明です';
