@@ -35,9 +35,9 @@
         "privacyPolicyURL": "https://pixieed.jp/ai/privacy/",
         "termsOfServiceURL": "https://pixieed.jp/terms/",
         "defaultPrompt": [
-          "In my authorized Draw project, report the canvas size, active frame and layer, and palette. Read pixels only if needed to answer.",
-          "On the active layer, draw a blue filled rectangle from (2, 2) to (7, 5), then move only that rectangle two pixels right. Save the result in this browser.",
-          "Change only the pixel at (4, 5) to blue; leave other pixels using its current palette color unchanged, then save locally."
+          "In my authorized Draw project, report canvas size, active frame/layer, and palette. Read pixels only if needed.",
+          "In my authorized Draw project, draw a blue rectangle from (2,2) to (7,5), move it 2px right, and save locally.",
+          "Change only (4,5) to blue; keep other pixels of its color unchanged, then save locally."
         ],
         "brandColor": "#3B2D70",
         "composerIcon": "./assets/app-icon-192.png",
