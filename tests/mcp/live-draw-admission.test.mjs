@@ -48,6 +48,23 @@ test('global UTC daily admission is strict across concurrent clients; midnight d
   assert.equal((await store.get('admission')).count, 2);
 });
 
+test('usage is a read-only UTC quota snapshot for empty, active, exhausted, and rolled-over days', async () => {
+  let now = Date.UTC(2026, 10, 17, 12); const store = storage(); const room = new DrawAdmissionRoom(store, { now: () => now });
+  const before = await room.fetch(new Request('https://admission.test/usage', { method: 'POST', body: '{}' }));
+  assert.deepEqual(await before.json(), { dailyLimit: 20, dailyUsed: 0, dailyRemaining: 20, resetsAt: Date.UTC(2026, 10, 18), serverNow: now, sessionDurationMs: 900000 });
+  assert.equal(store.values.size, 0, 'reading usage does not initialize or persist counters');
+  for (let i = 0; i < DRAW_ADMISSION_DAILY_LIMIT; i++) await room.admit(client(i + 1));
+  const exhausted = await room.usage();
+  assert.deepEqual(await exhausted.json(), { dailyLimit: 20, dailyUsed: 20, dailyRemaining: 0, resetsAt: Date.UTC(2026, 10, 18), serverNow: now, sessionDurationMs: 900000 });
+  const persistedBeforeReads = structuredClone(await store.get('admission'));
+  for (let i = 0; i < 3; i++) await room.usage();
+  assert.deepEqual(await store.get('admission'), persistedBeforeReads, 'repeated usage reads do not reserve or alter session state');
+  now = Date.UTC(2026, 10, 18);
+  const rolled = await room.usage();
+  assert.deepEqual(await rolled.json(), { dailyLimit: 20, dailyUsed: 0, dailyRemaining: 20, resetsAt: Date.UTC(2026, 10, 19), serverNow: now, sessionDurationMs: 900000 });
+  assert.deepEqual(await store.get('admission'), persistedBeforeReads, 'displaying rollover does not write or touch TTLs');
+});
+
 test('plain IP is HMACed before admission transport and never appears in persisted state', async () => {
   const store = storage(); const room = new DrawAdmissionRoom(store); const prod = production(room);
   const sent = [];

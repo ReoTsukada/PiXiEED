@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../../scripts/mcp/worker.mjs';
+import { DrawAdmissionRoom } from '../../scripts/mcp/draw-session-admission.mjs';
 import { GUIDE_VERSION } from '../../js/mcp/pixel-art-guide.mjs';
 import { decodePixelArt } from '../../js/mcp/pixel-art-contract.mjs';
 
@@ -285,4 +286,51 @@ test('unconfigured or unavailable live admission fails closed while stateless pr
   const preview = await call(rpc('tools/call', { name: 'prepare_pixel_art', arguments: { width: 1, height: 1, palette: ['#000000'], rows: ['0'] } }), {}, env);
   assert.equal(preview.status, 200);
   assert.equal((await preview.json()).result.structuredContent.status, 'preview_only');
+});
+
+test('GET /draw-usage exposes only the shared read-only quota snapshot to the Draw site origin', async () => {
+  const room = new DrawAdmissionRoom();
+  await room.admit('1'.repeat(64));
+  const env = {
+    DRAW_ADMISSION_SECRET: 'test-admission-secret-only-not-for-production',
+    DRAW_SESSIONS: {},
+    DRAW_ADMISSION: { idFromName: name => name, get: () => room }
+  };
+  const response = await worker.fetch(new Request('https://worker.test/draw-usage', { headers: { origin: 'https://pixieed.jp' } }), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://pixieed.jp');
+  const body = await response.json();
+  assert.deepEqual(Object.keys(body).sort(), ['dailyLimit', 'dailyUsed', 'dailyRemaining', 'resetsAt', 'serverNow', 'sessionDurationMs'].sort());
+  assert.deepEqual([body.dailyLimit, body.dailyUsed, body.dailyRemaining, body.sessionDurationMs], [20, 1, 19, 900000]);
+  assert.equal(body.resetsAt, (Math.floor(body.serverNow / 86400000) + 1) * 86400000);
+  assert.doesNotMatch(JSON.stringify(body), /clientKey|sessionId|secret|192\.0\.2\./i);
+});
+
+test('draw usage rejects untrusted origins, query input, unsupported methods, and missing admission configuration', async () => {
+  const origin = 'https://pixieed.jp';
+  const cross = await worker.fetch(new Request('https://worker.test/draw-usage', { headers: { origin: 'https://attacker.test' } }), {});
+  assert.equal(cross.status, 403);
+  const query = await worker.fetch(new Request('https://worker.test/draw-usage?debug=1', { headers: { origin } }), {});
+  assert.equal(query.status, 400);
+  assert.equal(query.headers.get('access-control-allow-origin'), origin);
+  assert.equal(query.headers.get('cache-control'), 'no-store');
+  const method = await worker.fetch(new Request('https://worker.test/draw-usage', { method: 'POST', headers: { origin } }), {});
+  assert.equal(method.status, 405);
+  assert.equal(method.headers.get('access-control-allow-origin'), origin);
+  const preflight = await worker.fetch(new Request('https://worker.test/draw-usage', {
+    method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST' }
+  }), {});
+  assert.equal(preflight.status, 403);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
+  const missing = await worker.fetch(new Request('https://worker.test/draw-usage', { headers: { origin } }), {
+    DRAW_ADMISSION_SECRET: 'test-admission-secret-only-not-for-production', DRAW_SESSIONS: {}
+  });
+  assert.equal(missing.status, 503);
+  assert.equal(missing.headers.get('access-control-allow-origin'), origin);
+  const invalidSecret = await worker.fetch(new Request('https://worker.test/draw-usage', { headers: { origin } }), {
+    DRAW_ADMISSION_SECRET: 'short', DRAW_SESSIONS: {}, DRAW_ADMISSION: { idFromName: () => 'x', get: () => ({ fetch: async () => Response.json({}) }) }
+  });
+  assert.equal(invalidSecret.status, 503);
+  assert.equal(invalidSecret.headers.get('access-control-allow-origin'), origin);
 });

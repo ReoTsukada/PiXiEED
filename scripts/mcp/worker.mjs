@@ -1,4 +1,4 @@
-import { reserveDrawSession } from './draw-session-admission.mjs';
+import { reserveDrawSession, readDrawUsage } from './draw-session-admission.mjs';
 export { DrawAdmissionDO } from './draw-session-admission.mjs';
 export { DrawSessionDO } from './draw-session-relay.mjs';
 import { getToolCatalog } from '../../js/mcp/tool-catalog.mjs';
@@ -536,16 +536,27 @@ async function handleDrawSessionRequest(request, env) {
   const url = new URL(request.url);
   const origin = request.headers.get('origin');
   const expected = siteOrigin(env);
+  const usageRoute = url.pathname === '/draw-usage';
   if (request.method === 'OPTIONS') {
     if (!origin || origin !== expected) return httpError('Origin not allowed.', 403);
+    if (usageRoute && url.search) return withCorsHeaders(httpError('Query parameters are not allowed.', 400), origin);
     const requestedMethod = request.headers.get('access-control-request-method');
     const requestedHeaders = (request.headers.get('access-control-request-headers') || '').toLowerCase().split(',').map(value => value.trim()).filter(Boolean);
-    if (!['GET', 'POST', 'DELETE'].includes(requestedMethod) || requestedHeaders.some(value => !['authorization', 'content-type'].includes(value))) return httpError('Preflight request not allowed.', 403);
+    const allowedMethods = usageRoute ? ['GET'] : ['GET', 'POST', 'DELETE'];
+    const allowedHeaders = usageRoute ? [] : ['authorization', 'content-type'];
+    if (!allowedMethods.includes(requestedMethod) || requestedHeaders.some(value => !allowedHeaders.includes(value))) return withCorsHeaders(httpError('Preflight request not allowed.', 403), origin);
+    if (usageRoute) return new Response(null, { status: 204, headers: { ...drawCorsHeaders(origin), 'Access-Control-Allow-Methods': 'GET' } });
     return new Response(null, { status: 204, headers: drawCorsHeaders(origin) });
   }
   if (!drawBrowserOriginAllowed(request, env, request.method === 'GET')) return httpError('Origin not allowed.', 403);
   const corsOrigin = origin || expected;
   let result;
+  if (usageRoute) {
+    if (url.search) return withCorsHeaders(httpError('Query parameters are not allowed.', 400), corsOrigin);
+    if (request.method !== 'GET') return withCorsHeaders(httpError('Method not allowed.', 405, { Allow: 'GET, OPTIONS' }), corsOrigin);
+    result = await readDrawUsage(env);
+    return withCorsHeaders(result, corsOrigin);
+  }
   if (url.pathname === '/draw-sessions' && request.method === 'POST') {
     if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') return withCorsHeaders(httpError('Content-Type must be application/json.', 415), corsOrigin);
     try {
@@ -587,7 +598,7 @@ export default {
   async fetch(request, env = {}) {
     const url = new URL(request.url);
     if (url.pathname === '/health' && request.method === 'GET') return jsonResponse({ ok: true, service: 'pixieed-mcp' });
-    if (url.pathname === '/draw-sessions' || url.pathname.startsWith('/draw-sessions/')) return handleDrawSessionRequest(request, env);
+    if (url.pathname === '/draw-usage' || url.pathname === '/draw-sessions' || url.pathname.startsWith('/draw-sessions/')) return handleDrawSessionRequest(request, env);
     if (url.pathname !== '/mcp') return httpError('Not found.', 404);
     if (!['POST'].includes(request.method)) return httpError('Method not allowed.', 405, { Allow: 'POST' });
 

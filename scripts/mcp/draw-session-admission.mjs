@@ -53,6 +53,24 @@ export class DrawAdmissionRoom {
       return json({ sessionId, expiresAt });
     });
   }
+  async usage() {
+    return this.exclusive(async () => {
+      const serverNow = this.now(), day = Math.floor(serverNow / DAY_MS);
+      const state = await this.storage.get('admission');
+      // A previous day's record is treated as zero for display. Do not persist the
+      // rollover here: admission itself remains the only operation that reserves quota.
+      const dailyUsed = state?.day === day && Number.isInteger(state.count) && state.count >= 0
+        ? Math.min(state.count, DRAW_ADMISSION_DAILY_LIMIT) : 0;
+      return json({
+        dailyLimit: DRAW_ADMISSION_DAILY_LIMIT,
+        dailyUsed,
+        dailyRemaining: DRAW_ADMISSION_DAILY_LIMIT - dailyUsed,
+        resetsAt: (day + 1) * DAY_MS,
+        serverNow,
+        sessionDurationMs: DRAW_ADMISSION_SESSION_TTL_MS
+      });
+    });
+  }
   async exists(sessionId) {
     if (typeof sessionId !== 'string' || !UUID.test(sessionId)) return json({ error: 'Draw session not found.' }, 404);
     return this.exclusive(async () => {
@@ -77,9 +95,14 @@ export class DrawAdmissionRoom {
       const body = JSON.parse(text), path = new URL(request.url).pathname;
       if (path === '/admit' && exact(body, 'clientKey')) return await this.admit(body.clientKey);
       if (path === '/exists' && exact(body, 'sessionId')) return await this.exists(body.sessionId);
+      if (path === '/usage' && isEmptyRecord(body)) return await this.usage();
       return json({ error: 'Invalid admission request.' }, 400);
     } catch { return unavailable(); }
   }
+}
+
+function isEmptyRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
 }
 
 export class DrawAdmissionDO {
@@ -111,6 +134,23 @@ export async function reserveDrawSession(request, env) {
     const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(address));
     const clientKey = [...new Uint8Array(signature)].map(byte => byte.toString(16).padStart(2, '0')).join('');
     return await admissionFetch(env, '/admit', { clientKey });
+  } catch { return unavailable(); }
+}
+
+export async function readDrawUsage(env) {
+  // Keep public usage fail-closed when the same server-side admission configuration
+  // needed to enforce the quota is unavailable.
+  if (typeof env?.DRAW_ADMISSION_SECRET !== 'string' || env.DRAW_ADMISSION_SECRET.length < 32) return unavailable();
+  const result = await admissionFetch(env, '/usage', {});
+  if (!result.ok) return unavailable();
+  try {
+    const value = await result.clone().json();
+    const fields = ['dailyLimit', 'dailyUsed', 'dailyRemaining', 'resetsAt', 'serverNow', 'sessionDurationMs'];
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== fields.length || fields.some(field => !Object.hasOwn(value, field)) ||
+      value.dailyLimit !== DRAW_ADMISSION_DAILY_LIMIT || !Number.isInteger(value.dailyUsed) || value.dailyUsed < 0 || value.dailyUsed > value.dailyLimit ||
+      value.dailyRemaining !== value.dailyLimit - value.dailyUsed || !Number.isFinite(value.resetsAt) || !Number.isFinite(value.serverNow) ||
+      value.sessionDurationMs !== DRAW_ADMISSION_SESSION_TTL_MS) return unavailable();
+    return json(value);
   } catch { return unavailable(); }
 }
 
