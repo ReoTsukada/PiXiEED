@@ -99,7 +99,8 @@
         "commerce_description": "This plugin does not sell products or process payments."
       },
       "publication": {
-        "release_notes": "Connect ChatGPT to one PiXiEED Draw artwork to inspect its canvas, edit pixels, colors, layers, and frames, undo or redo changes, and save in the Draw browser. Six optional pixel-art reference tools work without a Draw connection. Artwork is not published or cloud-synced by this plugin."
+        "release_notes": "Connect ChatGPT to one PiXiEED Draw artwork to inspect its canvas, edit pixels, colors, layers, and frames, undo or redo changes, and save in the Draw browser. Six optional pixel-art reference tools work without a Draw connection. Artwork is not published or cloud-synced by this plugin.",
+        "countries": []
       }
     }
   }
