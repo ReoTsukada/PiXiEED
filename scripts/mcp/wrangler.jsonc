@@ -2,6 +2,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pixieed-mcp",
   "main": "store-worker.mjs",
+  "vars": {
+    "OPENAI_APPS_CHALLENGE": "B-DG7SQSXieJq38EX4z1uUZ-jeQoD43_IUACwmKX9oI"
+  },
   "compatibility_date": "2026-11-14",
   "workers_dev": true,
   "observability": {
