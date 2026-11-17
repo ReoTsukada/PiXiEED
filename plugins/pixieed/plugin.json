@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "pixieed-draw",
-  "version": "1.0.0",
-  "description": "Connect ChatGPT to one PiXiEED Draw project in the user's browser to inspect, edit, and save pixel art.",
+  "version": "1.1.0",
+  "description": "Connect ChatGPT to one PiXiEED Draw project in the user’s browser to inspect, batch-edit, and save pixel art.",
   "author": {
     "name": "PiXiEED アルタ",
     "email": "pixieed.arta@gmail.com",
@@ -21,21 +21,23 @@
       "interface": {
         "displayName": "PiXiEED Draw",
         "shortDescription": "描いて、編集して、保存",
-        "longDescription": "Use ChatGPT to inspect and edit one PiXiEED Draw artwork at a time. Start the connection in Draw. When ChatGPT opens PiXiEED's authorization page, enter the one-use code there—never in chat or a tool message. Check the artwork and requested permissions, then choose Allow. Codes expire after two minutes and the connection lasts up to 15 minutes. ChatGPT can read the canvas, change pixels, colors, layers, and frames, undo or redo edits, and save the work in the Draw browser. Six optional pixel-art reference tools work without connecting an artwork. Saving does not publish or sync the artwork.",
+        "longDescription": "Connect ChatGPT to one PiXiEED Draw project after reviewing and approving the OAuth page. Never share the one-use Draw code in chat; enter it only on PiXiEED’s authorization page. With the granted read/write scopes, ChatGPT can inspect metadata or selected pixel regions, edit pixels, colors, shapes, text, selections, layers and frames, batch up to 32 related edits, check operation status, undo or redo, and save in this browser. Edits and saves default to compact summaries. Six optional pixel-art reference tools do not access the connected project. The connection is limited to the authorized project and expires within 15 minutes. Saving does not publish or sync artwork.",
         "developerName": "PiXiEED アルタ",
         "category": "Creativity",
         "capabilities": [
-          "OAuth-authorized access to one Draw project",
-          "Specific pixel, palette, layer, and frame operations",
-          "Browser-local save and session disconnect"
+          "OAuth read/write access to one explicitly authorized Draw project",
+          "33 allowlisted Draw operations, including batches of up to 32 related edits",
+          "Metadata and bounded region reads, compact edit/save receipts, and operation status checks",
+          "Browser-local save, undo/redo, and session revocation",
+          "Six optional pixel-art reference tools that do not access Draw projects"
         ],
         "websiteURL": "https://pixieed.jp/draw/",
         "privacyPolicyURL": "https://pixieed.jp/ai/privacy/",
         "termsOfServiceURL": "https://pixieed.jp/terms/",
         "defaultPrompt": [
-          "Open PiXiEED's authorization page for my Draw project, then describe its canvas after I approve.",
-          "In my authorized Draw project, add one blue pixel at the position I specify.",
-          "Save my authorized Draw project and report its local save state."
+          "In my authorized Draw project, report canvas size, active frame/layer, and palette. Read pixels only if needed.",
+          "In my authorized Draw project, draw a blue rectangle from (2,2) to (7,5), move it 2px right, and save locally.",
+          "Change only (4,5) to blue; keep other pixels of its color unchanged, then save locally."
         ],
         "brandColor": "#3B2D70",
         "composerIcon": "./assets/app-icon-192.png",
@@ -75,6 +77,18 @@
               "prompt": "Save my authorized PiXiEED Draw project, then tell me where it was saved and whether later edits remain unsaved.",
               "tools_triggered": "get_draw_state, save_draw",
               "expected_behavior": "Save the current revision and state that storage is local to the same browser. Report dirty status exactly as returned; do not imply cloud sync or publication."
+            },
+            {
+              "description": "Batch a natural drawing, movement, and local save in one authorized test project.",
+              "prompt": "In my authorized test artwork, draw a blue filled rectangle from (2, 2) to (7, 5) on the active layer, move only that rectangle two pixels right, and save it in this browser.",
+              "tools_triggered": "get_draw_state, batch_draw_edits",
+              "expected_behavior": "Use the existing authorized project and verify capabilities.fastEdits before using the batch route. If available, make the related drawing and selection transform one batch and request save:true. Use the current revision and summary result. If the tab is old or fastEdits is unavailable, do not reload automatically; tell the user how to refresh safely. If the result is pending or unknown, check get_draw_operation_status with the same requestId; do not repeat the edits. If saving fails after edits were applied, report the applied edit and do not redraw it."
+            },
+            {
+              "description": "Change one of two distant pixels that share a color without changing the other.",
+              "prompt": "Change only the red pixel at (4, 5) to the existing blue palette color. The distant red pixel at (8, 8) must stay red.",
+              "tools_triggered": "get_draw_state, set_draw_pixel",
+              "expected_behavior": "Set up a test artwork where red at (4,5) and (8,8) shares one palette entry and blue already exists in the palette. Read metadata and only the needed pixel data. Use set_draw_pixel for (4,5). Do not use replace_draw_palette_color, because that changes every pixel in every cel that uses the palette index. Verify (8,8) is unchanged; report if the specified target or color does not match the setup."
             }
           ],
           "negative": [
@@ -99,7 +113,7 @@
         "commerce_description": "This plugin does not sell products or process payments."
       },
       "publication": {
-        "release_notes": "Connect ChatGPT to one PiXiEED Draw artwork to inspect its canvas, edit pixels, colors, layers, and frames, undo or redo changes, and save in the Draw browser. Six optional pixel-art reference tools work without a Draw connection. Artwork is not published or cloud-synced by this plugin.",
+        "release_notes": "Version 1.1.0 adds fast Draw workflows: 33 allowlisted project operations, including 32-operation batches, bounded pixel-region reads, compact edit/save summaries, and request-status checks. Use them only after reviewing OAuth scopes for the selected artwork. A connection is limited to one project and expires within 15 minutes. Six optional pixel-art references remain separate. Saves stay in the same browser; the plugin does not publish or cloud-sync artwork.",
         "countries": []
       }
     }

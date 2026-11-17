@@ -1,4 +1,4 @@
-import { createDrawLiveSession } from './draw-live-session.mjs?rev=20261117-store-oauth-1';
+import { createDrawLiveSession } from './draw-live-session.mjs?rev=20261117-fast-store-draw-1';
 import { STORE_MCP_ENDPOINT, verifiedPublicPluginUrl } from '../mcp/connection-config.mjs?rev=20261117-store-onboarding-1';
 
 /** Small opt-in connection control; artistic instructions stay in the user's chat. */
@@ -13,7 +13,7 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     } catch { /* Ignore malformed local development overrides. */ }
   }
   const stylesheet = document.createElement('link'); stylesheet.rel = 'stylesheet';
-  stylesheet.href = new URL('../../css/draw-live-session.css?rev=20261117-store-onboarding-1', import.meta.url).href; document.head.append(stylesheet);
+  stylesheet.href = '/css/draw-live-session.css?rev=20261117-store-onboarding-1'; document.head.append(stylesheet);
   const button = document.createElement('button'); button.type = 'button'; button.id = 'draw-gpt-connect';
   button.className = 'draw-gpt-connect'; button.textContent = 'ChatGPTとつなぐ';
   button.setAttribute('aria-haspopup', 'dialog');

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { INTELLIGENCE_VERSION, PIXEL_ART_INTELLIGENCE } from "../../js/mcp/pixel-art-intelligence.mjs";
 
 test("shared instructions follow the user-GPT conversation without a prescribed art workflow", () => {
-  assert.equal(INTELLIGENCE_VERSION, "0.4.0");
+  assert.equal(INTELLIGENCE_VERSION, "0.6.0");
   for (const tool of ["list_pixieed_tools", "get_pixel_art_guide", "get_pixel_art_techniques", "prepare_pixel_art", "review_pixel_art", "get_pixel_art_case", "connect_draw", "get_draw_state", "edit_draw", "save_draw", "disconnect_draw"]) {
     assert.ok(PIXEL_ART_INTELLIGENCE.includes(tool), tool);
   }

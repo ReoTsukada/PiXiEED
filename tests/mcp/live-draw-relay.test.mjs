@@ -2,7 +2,7 @@ import { LocalDrawAdmission } from '../../scripts/mcp/draw-session-admission.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../../scripts/mcp/worker.mjs';
-import { DrawSessionRoom, LocalDrawSessionRelay } from '../../scripts/mcp/draw-session-relay.mjs';
+import { DrawSessionRoom, LocalDrawSessionRelay, validDrawSessionCommand } from '../../scripts/mcp/draw-session-relay.mjs';
 
 const siteOrigin = 'http://127.0.0.1:4198';
 const apiOrigin = 'http://127.0.0.1:4199';
@@ -10,6 +10,45 @@ const env = { ALLOW_LOCAL_ORIGIN: '1', SITE_ORIGIN: siteOrigin, LOCAL_DRAW_RELAY
 const binding = { projectId: 'project-local-1', openEpoch: 'open-epoch-1' };
 const authHeaders = { accept: 'application/json, text/event-stream', 'content-type': 'application/json' };
 const rpc = (name, args) => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
+
+test('relay command schemas allow bounded fast Draw operations and reject unsafe batches', () => {
+  const base = { kind: 'operation', projectBinding: binding, expectedRevision: 3 };
+  const command = operation => ({ ...base, operation });
+  const activeStroke = { type: 'stroke', frameId: '$active', layerId: '$active', points: [{ x: 0, y: 1 }, { x: 2, y: 3 }], colorIndex: null, brushSize: 4 };
+  assert.equal(validDrawSessionCommand(command(activeStroke)), true);
+  assert.equal(validDrawSessionCommand(command({ ...activeStroke, points: [{ x: -4096, y: 4096.5 }] })), false);
+  assert.equal(validDrawSessionCommand(command({ ...activeStroke, points: [{ x: -0.5, y: 1.25 }] })), true);
+  assert.equal(validDrawSessionCommand(command({ ...activeStroke, points: [{ x: -4096, y: 4096 }] })), true);
+  assert.equal(validDrawSessionCommand({ ...command(activeStroke), responseMode: 'summary' }), true);
+  assert.equal(validDrawSessionCommand({ ...command(activeStroke), responseMode: 'compact' }), false);
+  assert.equal(validDrawSessionCommand(command({ ...activeStroke, unknown: true })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'batch', operations: [activeStroke, { type: 'fill', frameId: '$active', layerId: '$active', x: 1, y: 1, colorIndex: 2 }], save: true })), true);
+  assert.equal(validDrawSessionCommand(command({ type: 'batch', operations: [{ type: 'spray', frameId: '$active', layerId: '$active', x: 1027, y: 0, colorIndex: null, radius: 16, passes: 32, seed: 4294967295 }] })), true);
+  assert.equal(validDrawSessionCommand(command({ type: 'spray', frameId: '$active', layerId: '$active', x: 1028, y: 0, colorIndex: 0 })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'spray', frameId: '$active', layerId: '$active', x: 1, y: 0, colorIndex: 0, seed: 4294967296 })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'batch', operations: Array(33).fill(activeStroke) })), false);
+  for (const child of [{ type: 'batch', operations: [activeStroke] }, { type: 'undo' }, { type: 'redo' }, { type: 'save' }, { type: 'normal.configure', settings: { ambient: 0.4 } }, { type: 'view.configure', zoom: 2 }]) {
+    assert.equal(validDrawSessionCommand(command({ type: 'batch', operations: [child] })), false, child.type);
+  }
+  assert.equal(validDrawSessionCommand(command({ type: 'selection.transform', frameId: '$active', layerId: '$active', bounds: { x: 0, y: 0, width: 3, height: 4 }, x: -1, y: 2, turns: 3 })), true);
+  assert.equal(validDrawSessionCommand(command({ type: 'selection.transform', frameId: '$active', layerId: '$active', bounds: { x: 0, y: 0, width: 3, height: 4 }, x: 0, y: 0, angle: 22.5, polygon: [{ x: -1.5, y: 0 }, { x: 0, y: 2 }, { x: 2, y: 0 }] })), true);
+  assert.equal(validDrawSessionCommand(command({ type: 'selection.transform', frameId: '$active', layerId: '$active', bounds: { x: 0, y: 0, width: 3, height: 4 }, x: 0, y: 0, angle: 22, turns: 1 })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'selection.transform', frameId: '$active', layerId: '$active', bounds: { x: 0, y: 0, width: 3, height: 4 }, x: -4097, y: 2 })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'text.draw', frameId: '$active', layerId: '$active', text: '', x: 1, y: 2, colorIndex: 0 })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'normal.configure', settings: { roughness: 0.04 } })), false);
+  assert.equal(validDrawSessionCommand(command({ type: 'text.draw', frameId: '$active', layerId: '$active', text: 'abc', x: 1, y: 2, colorIndex: 0, font: 'unknown' })), false);
+});
+
+test('state relay commands support metadata-only and bounded regional pixel reads', () => {
+  const projectBinding = binding;
+  const state = stateRequest => validDrawSessionCommand({ kind: 'state.get', projectBinding, stateRequest });
+  assert.equal(state({ includePixels: false }), true);
+  assert.equal(state({ frameId: 'frame-1', layerId: '$active', region: { x: 1000, y: 1000, width: 28, height: 28 } }), false);
+  assert.equal(state({ frameId: 'frame-1', layerId: 'layer-1', region: { x: 1000, y: 1000, width: 28, height: 28 } }), true);
+  assert.equal(state({ frameId: 'frame-1', layerId: 'layer-1', region: { x: 0, y: 0, width: 257, height: 257 } }), false);
+  assert.equal(state({ includePixels: false, region: { x: 0, y: 0, width: 1, height: 1 } }), false);
+  assert.equal(state({ includePixels: false, extra: true }), false);
+});
 
 async function mcp(name, args) {
   const response = await worker.fetch(new Request('https://mcp.test/mcp', {
@@ -185,6 +224,7 @@ test('live state, edit, and save relay once, use the project binding, and replay
   assert.ok(Number.isFinite(stateCommand.deadlineAt));
   const state = {
     revision: 4, projectBinding: binding, projectPersisted: true, savedRevisionId: 'revision-local-4', dirty: false,
+    capabilities: { fastEdits: true, maxBatchOperations: 32, maxPixelBatch: 512, maxStrokePoints: 1024, maxReadPixels: 65536, maxCommandBytes: 32768 },
     width: 256, height: 256, palette: ['#E75445'], active: { frameId: 'frame-1', layerId: 'layer-1' },
     frames: [{ id: 'frame-1', durationMs: 100 }], layers: [{ id: 'layer-1', name: 'Art', visible: true, locked: false, opacity: 1, role: 'art' }],
     cel: { frameId: 'frame-1', layerId: 'layer-1', pixels: Array(256 * 256).fill(-1) },
@@ -196,11 +236,20 @@ test('live state, edit, and save relay once, use the project binding, and replay
   assert.equal(stateReply.body.result.structuredContent.width, 256);
   assert.equal(stateReply.body.result.structuredContent.cel.pixels.length, 256 * 256);
 
+  const metadataPromise = mcp('get_draw_state', { connectionId: connection.connectionId, accessToken: connection.accessToken, includePixels: false });
+  const metadataCommand = await waitForCommand(session, session.browserToken);
+  assert.deepEqual(metadataCommand.stateRequest, { includePixels: false });
+  const metadataState = { ...state, cel: { frameId: 'frame-1', layerId: 'layer-1' } };
+  assert.equal((await acknowledge(session, session.browserToken, metadataCommand, metadataState)).status, 200);
+  const metadataReply = await metadataPromise;
+  assert.equal(metadataReply.body.result.structuredContent.cel.pixels, undefined);
+
   const operation = { type: 'pixels.set', frameId: 'frame-1', layerId: 'layer-1', pixels: [{ x: 255, y: 255, colorIndex: 0 }] };
-  const input = { connectionId: connection.connectionId, accessToken: connection.accessToken, expectedRevision: 4, requestId: 'pixel_edit_test_1', operation };
+  const input = { connectionId: connection.connectionId, accessToken: connection.accessToken, expectedRevision: 4, requestId: 'pixel_edit_test_1', operation, responseMode: 'summary' };
   const editPromise = mcp('edit_draw', input);
   const editCommand = await waitForCommand(session, session.browserToken);
   assert.deepEqual(editCommand.operation, operation);
+  assert.equal(editCommand.responseMode, 'summary');
   assert.equal(editCommand.expectedRevision, 4);
   assert.deepEqual(editCommand.projectBinding, binding);
   const editResult = { changed: true, revision: 5, projectBinding: binding, state: { ...state, revision: 5, dirty: true, saved: false } };
@@ -219,15 +268,17 @@ test('live state, edit, and save relay once, use the project binding, and replay
   assert.equal(conflict.body.result.isError, true);
   assert.match(conflict.body.result.content[0].text, /different command/);
 
-  const saveInput = { connectionId: connection.connectionId, accessToken: connection.accessToken, expectedRevision: 5, requestId: 'save_test_001' };
+  const saveInput = { connectionId: connection.connectionId, accessToken: connection.accessToken, expectedRevision: 5, requestId: 'save_test_001', responseMode: 'summary' };
   const savePromise = mcp('save_draw', saveInput);
   const saveCommand = await waitForCommand(session, session.browserToken);
   assert.deepEqual(saveCommand.operation, { type: 'save' });
+  assert.equal(saveCommand.responseMode, 'summary');
   const saveResult = { changed: false, revision: 5, projectBinding: binding, state: { ...state, revision: 5 }, savedRevisionId: 'revision-local-5', savedEditorRevision: 5, dirtyAfter: false, storage: 'browser_local' };
   assert.equal((await acknowledge(session, session.browserToken, saveCommand, saveResult)).status, 200);
   const saveReply = await savePromise;
   assert.equal(saveReply.body.result.structuredContent.status, 'applied');
   assert.equal(saveReply.body.result.structuredContent.result.storage, 'browser_local');
+  assert.deepEqual((await mcp('save_draw', saveInput)).body.result.structuredContent, saveReply.body.result.structuredContent);
 });
 
 test('browser command polling reports connected state and refuses foreign-origin poll or bad acknowledgement', async () => {

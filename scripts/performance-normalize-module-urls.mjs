@@ -209,17 +209,17 @@ function normalize(source, file) {
     'js/creation/conversion-materials.mjs', 'js/creation/conversion-media-recovery.mjs', 'js/creation/conversion-preview-decoder.mjs',
     'js/creation/conversion-result-surface.mjs', 'js/creation/creation-runtime.mjs',
     'js/creation/draw-animation-session.mjs', 'js/creation/draw-camera-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-lazy-panels.mjs',
+    'js/creation/draw-live-session.mjs', 'js/creation/draw-live-session-panel.mjs', 'js/creation/draw-agent-operations.mjs', 'js/creation/draw-agent-plan.mjs', 'js/creation/draw-agent-extras.mjs', 'js/creation/draw-agent-preferences.mjs',
     'js/creation/draw-normal-apply.mjs', 'js/creation/draw-normal-map.mjs', 'js/creation/draw-normal-map-panel.mjs',
     'js/creation/draw-normal-map-settings.mjs', 'js/creation/draw-page.mjs', 'js/creation/output-page.mjs', 'js/creation/output-receive.mjs',
     'js/creation/text-tools.mjs', 'js/pixel-lens/draw-camera-page.mjs', 'js/pixel-lens/entry.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs'
   ]);
-  const liveDrawCacheTargets = new Set(['js/creation/draw-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/creation-runtime.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
-  const storeOAuthCacheTargets = new Set(['audio/index.html', 'camera/index.html', 'draw/editor.html', 'draw/index.html', 'js/creation/draw-live-session.mjs', 'js/creation/draw-entry.mjs', 'js/creation/creation-runtime.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
+  const liveDrawCacheTargets = new Set(['audio/index.html', 'camera/index.html', 'draw/editor.html', 'draw/index.html', 'js/creation/draw-page.mjs', 'js/creation/draw-entry.mjs', 'js/creation/draw-lazy-panels.mjs', 'js/creation/creation-runtime.mjs', 'js/creation/draw-live-session.mjs', 'js/creation/draw-live-session-panel.mjs', 'js/creation/draw-agent-operations.mjs', 'js/creation/draw-agent-plan.mjs', 'js/creation/draw-agent-extras.mjs', 'js/creation/draw-agent-preferences.mjs', 'js/tool-direct.mjs', 'js/tool-shell.mjs']);
   changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
     if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
     const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
     if (!normalApplyCacheTargets.has(target)) return whole;
-    const revision = storeOAuthCacheTargets.has(target) ? '20261117-store-oauth-1' : liveDrawCacheTargets.has(target) ? '20261117-live-draw-2' : '20261117-normal-apply-1';
+    const revision = liveDrawCacheTargets.has(target) ? '20261117-fast-store-draw-1' : '20261117-normal-apply-1';
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, `$1rev=${revision}`) : query + (query ? '&' : '?') + `rev=${revision}`;
     return `${quote}${path}${next}${quote}`;
   });

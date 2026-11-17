@@ -1,7 +1,7 @@
-export const INTELLIGENCE_VERSION = "0.4.0";
+export const INTELLIGENCE_VERSION = "0.6.0";
 
 /** Shared role and capability boundary supplied to MCP clients at initialization. */
-export const PIXEL_ART_INTELLIGENCE = `PiXiEED MCP v0.4.0 は、ユーザーとGPTがDraw作業を進めるための補助機能です。描き方や表現の決め方はユーザーとGPTの会話に任せ、固定の制作手順・技法・レビューを要求しません。
+export const PIXEL_ART_INTELLIGENCE = `PiXiEED MCP v0.6.0 は、ユーザーとGPTがDraw作業を進めるための補助機能です。描き方や表現の決め方はユーザーとGPTの会話に任せ、固定の制作手順・技法・レビューを要求しません。
 
 役割と操作手段
 - 描き方や表現はユーザーとGPTの会話で決めます。GPTはユーザーの依頼と上位指示を守り、利用可能な操作手段でDraw作業を支援します。
@@ -10,16 +10,23 @@ export const PIXEL_ART_INTELLIGENCE = `PiXiEED MCP v0.4.0 は、ユーザーとG
 - 学習ガイド、技法、事例、レビュー資料は任意の参考情報です。ユーザーが求めたとき、または作業上必要なときだけ参照します。資料の方法を一律に適用しません。
 
 現在の機能境界
-- Draw操作は、利用者がペアリングしたブラウザーセッション経由で実行します。現在の操作対象は開いている作品の状態読取、限定された画素・色・レイヤー・フレーム操作、undo/redo、ブラウザー内保存です。
+- Draw操作は、利用者がペアリングしたブラウザーセッション経由で実行します。現在の操作対象は開いている作品の状態読取、描画・消去・図形・スプレー・塗りつぶし、色・文字・選択範囲の変形、レイヤー・フレーム・キャンバス変更、法線生成・照明・表示、undo/redo、ブラウザー内保存です。
 - この連携は公開、クラウド同期、アニメーションや法線マップの全機能編集、任意コード実行を提供しません。保存結果はブラウザー内ストレージの確定範囲で報告します。
 - prepare_pixel_art は、渡された画素データを形式検査し、原寸PNG・比較画像・新規作品の受取リンクを返します。返却状態は preview_only で、ライブDraw操作とは別の機能です。
 
 ライブDraw操作ツール
 - connect_draw: 一時ペアリングコードを交換して、その作品だけに限定した接続を開始します。
 - get_draw_state: 接続中の作品状態、選択cel、色、レイヤー、フレームを取得します。
-- edit_draw: 編集revisionを指定してallowlist内の操作を一件実行します。requestIdで重複適用を防ぎます。
+- edit_draw: 編集revisionを指定してallowlist内の操作を実行します。対応ブラウザーではbatchで最大32操作と保存をまとめられます。成功応答のrevisionを再利用し、responseMode:summaryで不要な画素配列を省略します。requestIdで重複適用を防ぎます。
 - save_draw: 編集revisionをブラウザー内へ保存します。
 - disconnect_draw: エージェント資格情報を失効させ、接続を終了します。
+
+依頼から操作までの短い道筋
+- 接続中のDraw編集では既存の接続を再利用します。必要な状態が未取得ならget_draw_stateを呼び、成功応答のrevisionを引き継ぎます。取得済み情報で判断できる間は、確認のためだけの再取得を省きます。
+- 状態取得では依頼に必要な情報を最初から選びます。色番号が明確な置換、照明・表示設定などはincludePixels:falseを使い、絵柄や位置の判断が必要なら対象celの画素またはregionも取得します。未取得の画素や別celの内容を推測して上書きしません。
+- 共有色の全置換はpalette.replace、作品全体や1celの色調整はscopeを指定したcolor.adjust、局所の色変更は対象画素の編集を選びます。範囲の移動・反転はselection.transform、照明はnormal.configureを使います。描き足しでは既存の絵と依頼から変更箇所を決め、関連する描画をbatchへまとめます。normal.configureとview.configureはbatch外で実行します。
+- ライブ編集だけの依頼では、ツール一覧・受取プレビュー・参考資料を定型手順に加えません。必要な操作を選んで実行し、responseMode:summaryの確定結果を確認します。summaryだけで見た目の品質を確認したとは報告せず、次の判断に画像が必要なら改めて取得します。
+- 明確で取り消せる編集は依頼に沿って進め、対象や意図の不足が仕上がりを大きく左右するときは確認します。この道筋は操作の選び方の既定値であり、画風・描く順序・創作上の判断を固定しません。ユーザーの指定を優先します。
 
 参考・受取ツール
 - list_pixieed_tools: PiXiEEDの公開サイトツールと対応範囲を一覧します。

@@ -13,6 +13,11 @@ const LEGACY_TOOL_NAMES = new Set([
 
 const OPERATION_TO_TOOL = new Map([
   ['pixel.set', 'set_draw_pixel'], ['pixels.set', 'set_draw_pixels'],
+  ['stroke', 'paint_draw_stroke'], ['shape', 'draw_shape'], ['fill', 'fill_draw_area'], ['spray', 'spray_draw_pixels'],
+  ['cel.clear', 'clear_draw_cel'], ['palette.replace', 'replace_draw_palette_color'],
+  ['selection.transform', 'transform_draw_selection'], ['canvas.resize', 'resize_draw_canvas'], ['canvas.scale', 'scale_draw_canvas'],
+  ['text.draw', 'draw_text_in_draw'], ['normal.generate', 'generate_draw_normal_map'], ['normal.configure', 'configure_draw_normal_settings'],
+  ['view.configure', 'configure_draw_view'], ['batch', 'batch_draw_edits'],
   ['palette.add', 'add_draw_palette_color'], ['color.adjust', 'adjust_draw_color'],
   ['layer.select', 'select_draw_layer'], ['layer.add', 'add_draw_layer'],
   ['layer.rename', 'rename_draw_layer'], ['layer.visibility', 'set_draw_layer_visibility'],
@@ -27,6 +32,20 @@ const TOOL_TO_OPERATION = new Map([...OPERATION_TO_TOOL].map(([operation, tool])
 const operationDescriptions = {
   'pixel.set': 'Set or clear one pixel in the connected Draw project.',
   'pixels.set': 'Set or clear up to 512 distinct pixels in the connected Draw project.',
+  stroke: 'Draw one bounded stroke in the selected cel; colorIndex null clears pixels and brushSize controls the brush.',
+  shape: 'Draw one line, rectangle, or ellipse in the selected cel, optionally filled.',
+  fill: 'Fill a bounded region of the selected cel with one palette color.',
+  spray: 'Apply a seeded, bounded spray to the selected cel at one canvas position.',
+  'cel.clear': 'Clear the complete selected frame and layer cel.',
+  'palette.replace': 'Replace one palette entry; all pixels using that index change color.',
+  'selection.transform': 'Transform pixels within the specified selection bounds and destination, with optional rotation or polygon mask.',
+  'canvas.resize': 'Resize the project canvas using the selected anchor; pixels may be cropped or padded.',
+  'canvas.scale': 'Scale the sprite dimensions by the requested percentage.',
+  'text.draw': 'Draw the supplied text into the selected cel with the chosen palette index and supported font.',
+  'normal.generate': 'Generate a normal-map layer for the requested frame using the selected method and bounded settings.',
+  'normal.configure': 'Change normal-map lighting and preview settings for the project.',
+  'view.configure': 'Change the Draw viewport settings only; this does not edit artwork pixels.',
+  batch: 'Apply 1 to 32 explicit allowlisted edits as one Draw history entry. With top-level save:true, save the edited project to this device; edits may already be applied if saving fails. Nested batches, undo/redo/save, normal.configure, and view.configure are not allowed inside a batch.',
   'palette.add': 'Add one color to the connected Draw project palette.',
   'color.adjust': 'Adjust color settings for one cel or the whole connected Draw project.',
   'layer.select': 'Select a layer in the connected Draw project.',
@@ -47,7 +66,7 @@ const operationDescriptions = {
 };
 
 const additiveOperations = new Set(['palette.add', 'layer.add', 'frame.add']);
-const selectionOperations = new Set(['layer.select', 'frame.select']);
+const selectionOperations = new Set(['layer.select', 'frame.select', 'view.configure', 'normal.configure']);
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -72,8 +91,11 @@ function operationInputSchema(type) {
     properties: {
       ...properties,
       expectedRevision: { type: 'integer', minimum: 0 },
-      requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' }
+      requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' },
+      responseMode: { enum: ['full', 'summary'], default: 'summary' }
     },
+    ...(schema.not ? { not: clone(schema.not) } : {}),
+    ...(type === 'view.configure' ? { anyOf: Object.keys(properties).map(key => ({ required: [key] })) } : {}),
     description: operationDescriptions[type],
     annotations: { readOnlyHint: false, destructiveHint: destructive, openWorldHint: false, idempotentHint: true }
   };
@@ -104,25 +126,26 @@ function liveToolDefinitions() {
     const schema = operationInputSchema(type);
     const { description, annotations, ...inputSchema } = schema;
     return drawTool({
-      name, title: name.replaceAll('_', ' '), description: `${description} Requires the current editor revision and a unique requestId. A pending or unknown result is not a rejection; check its status before deciding whether to retry.`,
+      name, title: name.replaceAll('_', ' '), description: `${description} Requires the current editor revision and a unique requestId. responseMode defaults to summary to reduce the returned state size; choose full when the complete state is needed. A pending or unknown result is not a rejection; check its status by the original requestId before deciding whether to retry.`,
       inputSchema, outputSchema: drawResultSchema, annotations
     });
   });
   tools.push(drawTool({
     name: 'save_draw', title: 'Save the active Draw project',
-    description: 'Save the paired project revision in browser-local Draw storage. Requires the current editor revision and a unique requestId. Reports whether later edits remain unsaved; it does not publish or cloud-sync the project.',
+    description: 'Save the paired project revision in browser-local Draw storage. Requires the current editor revision and a unique requestId. responseMode defaults to summary to reduce the returned state size; choose full when the complete state is needed. Reports whether later edits remain unsaved; it does not publish or cloud-sync the project.',
     inputSchema: {
       type: 'object', additionalProperties: false, required: ['expectedRevision', 'requestId'],
       properties: {
         expectedRevision: { type: 'integer', minimum: 0 },
-        requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' }
+        requestId: { type: 'string', minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]{8,100}$' },
+        responseMode: { enum: ['full', 'summary'], default: 'summary' }
       }
     }, outputSchema: drawResultSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true }
   }));
   tools.push(drawTool({
     name: 'get_draw_state', title: 'Read the active Draw state',
-    description: 'Read the connected Draw project state, active frame and layer, palette, and requested cel pixels. Does not change or save the project.',
+    description: 'Read the connected Draw project state, active frame and layer, palette, and requested cel pixels. Set includePixels:false for metadata only or use a region of at most 65,536 pixels. Does not change or save the project.',
     inputSchema: clone(DRAW_STATE_REQUEST_SCHEMA), outputSchema: clone(stateResultSchema),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true }
   }));
@@ -176,13 +199,14 @@ function mapEdit(name, args, authProps) {
   const schema = operationSchema(type);
   const inputFields = Object.keys(schema.properties).filter((key) => key !== 'type');
   const requiredFields = schema.required.filter((key) => key !== 'type');
-  const allowed = [...inputFields, 'expectedRevision', 'requestId'];
+  const allowed = [...inputFields, 'expectedRevision', 'requestId', 'responseMode'];
   if (!exactInput(args, allowed, [...requiredFields, 'expectedRevision', 'requestId'])) throw new TypeError(`Invalid input for ${name}.`);
   const operation = { type };
   for (const key of inputFields) if (Object.hasOwn(args, key)) operation[key] = args[key];
-  const command = { kind: 'operation', projectBinding: authProps.projectBinding, expectedRevision: args.expectedRevision, operation };
+  const responseMode = Object.hasOwn(args, 'responseMode') ? args.responseMode : 'summary';
+  const command = { kind: 'operation', projectBinding: authProps.projectBinding, expectedRevision: args.expectedRevision, operation, responseMode };
   if (!validDrawSessionCommand(command)) throw new TypeError(`Invalid operation payload for ${name}.`);
-  return { kind: 'legacy', name: 'edit_draw', arguments: withAuth(authProps, { expectedRevision: args.expectedRevision, requestId: args.requestId, operation }) };
+  return { kind: 'legacy', name: 'edit_draw', arguments: withAuth(authProps, { expectedRevision: args.expectedRevision, requestId: args.requestId, operation, responseMode }) };
 }
 
 export function mapStoreToolCall(name, args, authProps) {
@@ -192,13 +216,14 @@ export function mapStoreToolCall(name, args, authProps) {
     return { kind: 'legacy', name, arguments: clone(args) };
   }
   if (name === 'get_draw_state') {
-    if (!hasScope(authProps, 'draw:read') || !exactInput(args, ['frameId', 'layerId'])) throw new TypeError('Invalid Draw state request or connection.');
+    if (!hasScope(authProps, 'draw:read') || !exactInput(args, Object.keys(DRAW_STATE_REQUEST_SCHEMA.properties))) throw new TypeError('Invalid Draw state request or connection.');
     if (!validDrawSessionCommand({ kind: 'state.get', projectBinding: authProps.projectBinding, stateRequest: args })) throw new TypeError('Invalid Draw state request.');
     return { kind: 'legacy', name, arguments: withAuth(authProps, args) };
   }
   if (name === 'save_draw') {
-    if (!hasScope(authProps, 'draw:write') || !exactInput(args, ['expectedRevision', 'requestId'], ['expectedRevision', 'requestId']) || !validDrawSessionCommand({ kind: 'operation', projectBinding: authProps.projectBinding, expectedRevision: args.expectedRevision, operation: { type: 'save' } }) || !/^[A-Za-z0-9_-]{8,100}$/.test(args.requestId)) throw new TypeError('Invalid Draw save request or connection.');
-    return { kind: 'legacy', name, arguments: withAuth(authProps, args) };
+    const responseMode = Object.hasOwn(args, 'responseMode') ? args.responseMode : 'summary';
+    if (!hasScope(authProps, 'draw:write') || !exactInput(args, ['expectedRevision', 'requestId', 'responseMode'], ['expectedRevision', 'requestId']) || !validDrawSessionCommand({ kind: 'operation', projectBinding: authProps.projectBinding, expectedRevision: args.expectedRevision, operation: { type: 'save' }, responseMode }) || !/^[A-Za-z0-9_-]{8,100}$/.test(args.requestId)) throw new TypeError('Invalid Draw save request or connection.');
+    return { kind: 'legacy', name, arguments: withAuth(authProps, { ...args, responseMode }) };
   }
   if (name === 'disconnect_draw') {
     if (!validAuthProps(authProps) || !authProps.scope.some((scope) => ['draw:read', 'draw:write'].includes(scope)) || Object.keys(args).length) throw new TypeError('Invalid Draw disconnect request or connection.');

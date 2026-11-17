@@ -38,6 +38,10 @@ function validOpaqueId(value) {
   return typeof value === 'string' && value.length <= 128 && idPattern.test(value);
 }
 
+function validOperationId(value) {
+  return value === '$active' || validOpaqueId(value);
+}
+
 export function validProjectBinding(value) {
   return exactKeys(value, ['projectId', 'openEpoch'], ['projectId', 'openEpoch']) &&
     validOpaqueId(value.projectId) && validOpaqueId(value.openEpoch);
@@ -57,9 +61,11 @@ function validColorAdjustSettings(settings) {
   return Object.keys(settings).length > 0;
 }
 
-function validOperation(operation) {
+function validOperation(operation, { inBatch = false } = {}) {
   if (!isRecord(operation) || typeof operation.type !== 'string') return false;
-  const ids = (...values) => values.every(validOpaqueId);
+  const ids = (...values) => values.every(validOperationId);
+  const point = value => exactKeys(value, ['x', 'y'], ['x', 'y']) && Number.isFinite(value.x) && value.x >= -4096 && value.x <= 4096 && Number.isFinite(value.y) && value.y >= -4096 && value.y <= 4096;
+  if (inBatch && ['batch', 'undo', 'redo', 'save', 'normal.configure', 'view.configure'].includes(operation.type)) return false;
   switch (operation.type) {
     case 'pixel.set':
       return exactKeys(operation, ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex'], ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex']) &&
@@ -76,6 +82,66 @@ function validOperation(operation) {
       }
       return true;
     }
+    case 'stroke':
+      return exactKeys(operation, ['type', 'frameId', 'layerId', 'points', 'colorIndex', 'brushSize'], ['type', 'frameId', 'layerId', 'points', 'colorIndex']) &&
+        ids(operation.frameId, operation.layerId) && Array.isArray(operation.points) && operation.points.length >= 1 && operation.points.length <= 1024 && operation.points.every(point) &&
+        (operation.colorIndex === null || validInt(operation.colorIndex, 0, 127)) && (operation.brushSize === undefined || validInt(operation.brushSize, 1, 16));
+    case 'shape':
+      return exactKeys(operation, ['type', 'frameId', 'layerId', 'shape', 'from', 'to', 'filled', 'colorIndex'], ['type', 'frameId', 'layerId', 'shape', 'from', 'to', 'colorIndex']) &&
+        ids(operation.frameId, operation.layerId) && ['line', 'rect', 'ellipse'].includes(operation.shape) && point(operation.from) && point(operation.to) &&
+        (operation.filled === undefined || typeof operation.filled === 'boolean') && validInt(operation.colorIndex, 0, 127);
+    case 'fill':
+      return exactKeys(operation, ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex', 'contiguous'], ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex']) &&
+        ids(operation.frameId, operation.layerId) && validInt(operation.x, 0, 65535) && validInt(operation.y, 0, 65535) && validInt(operation.colorIndex, 0, 127) &&
+        (operation.contiguous === undefined || typeof operation.contiguous === 'boolean');
+    case 'spray':
+      return exactKeys(operation, ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex', 'radius', 'passes', 'seed'], ['type', 'frameId', 'layerId', 'x', 'y', 'colorIndex']) && ids(operation.frameId, operation.layerId) &&
+        validInt(operation.x, 0, 1027) && validInt(operation.y, 0, 1027) && (operation.colorIndex === null || validInt(operation.colorIndex, 0, 127)) &&
+        (operation.radius === undefined || validInt(operation.radius, 0, 16)) && (operation.passes === undefined || validInt(operation.passes, 1, 32)) && (operation.seed === undefined || validInt(operation.seed, 0, 0xffffffff));
+    case 'cel.clear':
+      return exactKeys(operation, ['type', 'frameId', 'layerId'], ['type', 'frameId', 'layerId']) && ids(operation.frameId, operation.layerId);
+    case 'normal.generate':
+      return exactKeys(operation, ['type', 'frameId', 'method', 'strength', 'radius', 'invertHeight'], ['type', 'frameId']) && ids(operation.frameId) &&
+        (operation.method === undefined || ['silhouette', 'luminance'].includes(operation.method)) && (operation.strength === undefined || (typeof operation.strength === 'number' && Number.isFinite(operation.strength) && operation.strength >= 0 && operation.strength <= 8)) &&
+        (operation.radius === undefined || validInt(operation.radius, 1, 32)) && (operation.invertHeight === undefined || typeof operation.invertHeight === 'boolean');
+    case 'text.draw':
+      return exactKeys(operation, ['type', 'frameId', 'layerId', 'text', 'x', 'y', 'colorIndex', 'font', 'fontSize'], ['type', 'frameId', 'layerId', 'text', 'x', 'y', 'colorIndex']) && ids(operation.frameId, operation.layerId) &&
+        typeof operation.text === 'string' && operation.text.length >= 1 && operation.text.length <= 256 && Number.isInteger(operation.x) && operation.x >= -65535 && operation.x <= 65535 && Number.isInteger(operation.y) && operation.y >= -65535 && operation.y <= 65535 &&
+        validInt(operation.colorIndex, 0, 127) && (operation.font === undefined || ['sans', 'serif', 'mono', 'dotgothic', 'pressstart'].includes(operation.font)) && (operation.fontSize === undefined || validInt(operation.fontSize, 1, 128));
+    case 'palette.replace':
+      return exactKeys(operation, ['type', 'index', 'color'], ['type', 'index', 'color']) && validInt(operation.index, 0, 127) && typeof operation.color === 'string' && hexColorPattern.test(operation.color);
+    case 'selection.transform':
+      return exactKeys(operation, ['type', 'frameId', 'layerId', 'bounds', 'x', 'y', 'width', 'height', 'turns', 'angle', 'polygon', 'flipX', 'flipY', 'copy'], ['type', 'frameId', 'layerId', 'bounds', 'x', 'y']) &&
+        ids(operation.frameId, operation.layerId) && exactKeys(operation.bounds, ['x', 'y', 'width', 'height'], ['x', 'y', 'width', 'height']) &&
+        validInt(operation.bounds.x, 0, 65535) && validInt(operation.bounds.y, 0, 65535) && validInt(operation.bounds.width, 1, 65536) && validInt(operation.bounds.height, 1, 65536) &&
+        Number.isInteger(operation.x) && operation.x >= -4096 && operation.x <= 4096 && Number.isInteger(operation.y) && operation.y >= -4096 && operation.y <= 4096 &&
+        (operation.width === undefined || validInt(operation.width, 1, 65536)) && (operation.height === undefined || validInt(operation.height, 1, 65536)) &&
+        (operation.turns === undefined || validInt(operation.turns, 0, 3)) && (operation.angle === undefined || (typeof operation.angle === 'number' && Number.isFinite(operation.angle) && operation.angle >= -360 && operation.angle <= 360)) &&
+        !(Object.hasOwn(operation, 'angle') && Object.hasOwn(operation, 'turns')) && (operation.polygon === undefined || (Array.isArray(operation.polygon) && operation.polygon.length >= 3 && operation.polygon.length <= 256 && operation.polygon.every(point))) &&
+        ['flipX', 'flipY', 'copy'].every(key => operation[key] === undefined || typeof operation[key] === 'boolean');
+    case 'canvas.resize':
+      return exactKeys(operation, ['type', 'width', 'height', 'anchor'], ['type', 'width', 'height']) && validInt(operation.width, 1, 1028) && validInt(operation.height, 1, 1028) &&
+        (operation.anchor === undefined || ['top-left', 'center'].includes(operation.anchor));
+    case 'canvas.scale':
+      return exactKeys(operation, ['type', 'percent'], ['type', 'percent']) && validInt(operation.percent, 1, 1600);
+    case 'normal.configure': {
+      const settings = operation.settings;
+      if (!exactKeys(operation, ['type', 'settings'], ['type', 'settings']) || !isRecord(settings) || Object.keys(settings).length === 0 ||
+        Object.keys(settings).some(key => !['azimuth', 'elevation', 'ambient', 'intensity', 'lightColor', 'specular', 'roughness', 'shadeUnpainted', 'overlayOpacity', 'previewLighting'].includes(key))) return false;
+      const numeric = (key, min, max) => !Object.hasOwn(settings, key) || (typeof settings[key] === 'number' && Number.isFinite(settings[key]) && settings[key] >= min && settings[key] <= max);
+      return numeric('azimuth', 0, 360) && numeric('elevation', 0, 90) && numeric('ambient', 0, 1) && numeric('intensity', 0, 2) &&
+        (!Object.hasOwn(settings, 'lightColor') || (typeof settings.lightColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(settings.lightColor))) &&
+        numeric('specular', 0, 1) && numeric('roughness', 0.05, 1) && numeric('overlayOpacity', 0, 1) &&
+        ['shadeUnpainted', 'previewLighting'].every(key => !Object.hasOwn(settings, key) || typeof settings[key] === 'boolean');
+    }
+    case 'view.configure':
+      return exactKeys(operation, ['type', 'zoom', 'panX', 'panY', 'showGrid', 'onion'], ['type']) && Object.keys(operation).length > 1 &&
+        (!Object.hasOwn(operation, 'zoom') || (typeof operation.zoom === 'number' && Number.isFinite(operation.zoom) && operation.zoom >= 1 && operation.zoom <= 8)) &&
+        ['panX', 'panY'].every(key => !Object.hasOwn(operation, key) || (typeof operation[key] === 'number' && Number.isFinite(operation[key]) && operation[key] >= -100000 && operation[key] <= 100000)) &&
+        ['showGrid', 'onion'].every(key => !Object.hasOwn(operation, key) || typeof operation[key] === 'boolean');
+    case 'batch':
+      return !inBatch && exactKeys(operation, ['type', 'operations', 'save'], ['type', 'operations']) && Array.isArray(operation.operations) && operation.operations.length >= 1 && operation.operations.length <= 32 &&
+        operation.operations.every(child => validOperation(child, { inBatch: true })) && (operation.save === undefined || typeof operation.save === 'boolean');
     case 'palette.add':
       return exactKeys(operation, ['type', 'color'], ['type', 'color']) && typeof operation.color === 'string' && hexColorPattern.test(operation.color);
     case 'color.adjust':
@@ -115,13 +181,18 @@ export function validDrawSessionCommand(command) {
   if (!isRecord(command) || typeof command.kind !== 'string' || !validProjectBinding(command.projectBinding)) return false;
   if (command.kind === 'state.get') {
     return exactKeys(command, ['kind', 'projectBinding', 'stateRequest'], ['kind', 'projectBinding']) &&
-      (command.stateRequest === undefined || (exactKeys(command.stateRequest, ['frameId', 'layerId']) &&
+      (command.stateRequest === undefined || (exactKeys(command.stateRequest, ['frameId', 'layerId', 'includePixels', 'region']) &&
         (command.stateRequest.frameId === undefined || validOpaqueId(command.stateRequest.frameId)) &&
-        (command.stateRequest.layerId === undefined || validOpaqueId(command.stateRequest.layerId))));
+        (command.stateRequest.layerId === undefined || validOpaqueId(command.stateRequest.layerId)) &&
+        (command.stateRequest.includePixels === undefined || typeof command.stateRequest.includePixels === 'boolean') &&
+        (command.stateRequest.region === undefined || (exactKeys(command.stateRequest.region, ['x', 'y', 'width', 'height'], ['x', 'y', 'width', 'height']) &&
+          validInt(command.stateRequest.region.x, 0, 1027) && validInt(command.stateRequest.region.y, 0, 1027) && validInt(command.stateRequest.region.width, 1, 1028 - command.stateRequest.region.x) && validInt(command.stateRequest.region.height, 1, 1028 - command.stateRequest.region.y) && command.stateRequest.region.width * command.stateRequest.region.height <= 65536)) &&
+        (command.stateRequest.region === undefined || command.stateRequest.includePixels !== false)));
   }
   return command.kind === 'operation' &&
-    exactKeys(command, ['kind', 'projectBinding', 'expectedRevision', 'operation'], ['kind', 'projectBinding', 'expectedRevision', 'operation']) &&
-    validInt(command.expectedRevision, 0, Number.MAX_SAFE_INTEGER) && validOperation(command.operation);
+    exactKeys(command, ['kind', 'projectBinding', 'expectedRevision', 'operation', 'responseMode'], ['kind', 'projectBinding', 'expectedRevision', 'operation']) &&
+    validInt(command.expectedRevision, 0, Number.MAX_SAFE_INTEGER) &&
+    (command.responseMode === undefined || ['full', 'summary'].includes(command.responseMode)) && validOperation(command.operation);
 }
 
 function bindCommandToSession(command, projectBinding) {
@@ -637,36 +708,64 @@ export const DRAW_PROJECT_BINDING_SCHEMA = {
 };
 
 const idSchema = { type: 'string', minLength: 1, maxLength: 128 };
+const operationIdSchema = { anyOf: [idSchema, { const: '$active' }] };
 const colorIndexSchema = { anyOf: [{ type: 'integer', minimum: 0, maximum: 127 }, { type: 'null' }] };
 const simpleOperation = (type, properties = {}, required = []) => ({
   type: 'object', additionalProperties: false, required: ['type', ...required],
   properties: { type: { const: type }, ...properties }
 });
+const pointSchema = { type: 'object', additionalProperties: false, required: ['x', 'y'], properties: { x: { type: 'number', minimum: -4096, maximum: 4096 }, y: { type: 'number', minimum: -4096, maximum: 4096 } } };
+const operationFrameLayer = { frameId: operationIdSchema, layerId: operationIdSchema };
+const numericSetting = (minimum, maximum) => ({ type: 'number', minimum, maximum });
 
-export const DRAW_OPERATION_SCHEMA = { oneOf: [
-  simpleOperation('pixel.set', { frameId: idSchema, layerId: idSchema, x: { type: 'integer', minimum: 0, maximum: 65535 }, y: { type: 'integer', minimum: 0, maximum: 65535 }, colorIndex: colorIndexSchema }, ['frameId', 'layerId', 'x', 'y', 'colorIndex']),
-  simpleOperation('pixels.set', { frameId: idSchema, layerId: idSchema, pixels: { type: 'array', minItems: 1, maxItems: 512, items: { type: 'object', additionalProperties: false, required: ['x', 'y', 'colorIndex'], properties: { x: { type: 'integer', minimum: 0, maximum: 65535 }, y: { type: 'integer', minimum: 0, maximum: 65535 }, colorIndex: colorIndexSchema } } } }, ['frameId', 'layerId', 'pixels']),
+const drawOperationBranches = [
+  simpleOperation('pixel.set', { ...operationFrameLayer, x: pointSchema.properties.x, y: pointSchema.properties.y, colorIndex: colorIndexSchema }, ['frameId', 'layerId', 'x', 'y', 'colorIndex']),
+  simpleOperation('pixels.set', { ...operationFrameLayer, pixels: { type: 'array', minItems: 1, maxItems: 512, items: { type: 'object', additionalProperties: false, required: ['x', 'y', 'colorIndex'], properties: { x: pointSchema.properties.x, y: pointSchema.properties.y, colorIndex: colorIndexSchema } } } }, ['frameId', 'layerId', 'pixels']),
+  simpleOperation('stroke', { ...operationFrameLayer, points: { type: 'array', minItems: 1, maxItems: 1024, items: pointSchema }, colorIndex: colorIndexSchema, brushSize: { type: 'integer', minimum: 1, maximum: 16 } }, ['frameId', 'layerId', 'points', 'colorIndex']),
+  simpleOperation('shape', { ...operationFrameLayer, shape: { enum: ['line', 'rect', 'ellipse'] }, from: pointSchema, to: pointSchema, filled: { type: 'boolean' }, colorIndex: { type: 'integer', minimum: 0, maximum: 127 } }, ['frameId', 'layerId', 'shape', 'from', 'to', 'colorIndex']),
+  simpleOperation('fill', { ...operationFrameLayer, x: pointSchema.properties.x, y: pointSchema.properties.y, colorIndex: { type: 'integer', minimum: 0, maximum: 127 }, contiguous: { type: 'boolean' } }, ['frameId', 'layerId', 'x', 'y', 'colorIndex']),
+  simpleOperation('spray', { ...operationFrameLayer, x: { type: 'integer', minimum: 0, maximum: 1027 }, y: { type: 'integer', minimum: 0, maximum: 1027 }, colorIndex: colorIndexSchema, radius: { type: 'integer', minimum: 0, maximum: 16 }, passes: { type: 'integer', minimum: 1, maximum: 32 }, seed: { type: 'integer', minimum: 0, maximum: 4294967295 } }, ['frameId', 'layerId', 'x', 'y', 'colorIndex']),
+  simpleOperation('cel.clear', operationFrameLayer, ['frameId', 'layerId']),
+  simpleOperation('normal.generate', { frameId: operationIdSchema, method: { enum: ['silhouette', 'luminance'] }, strength: numericSetting(0, 8), radius: { type: 'integer', minimum: 1, maximum: 32 }, invertHeight: { type: 'boolean' } }, ['frameId']),
+  simpleOperation('text.draw', { ...operationFrameLayer, text: { type: 'string', maxLength: 256 }, x: { type: 'integer', minimum: -65535, maximum: 65535 }, y: { type: 'integer', minimum: -65535, maximum: 65535 }, colorIndex: { type: 'integer', minimum: 0, maximum: 127 }, font: { enum: ['sans', 'serif', 'mono', 'dotgothic', 'pressstart'] }, fontSize: { type: 'integer', minimum: 1, maximum: 128 } }, ['frameId', 'layerId', 'text', 'x', 'y', 'colorIndex']),
   simpleOperation('palette.add', { color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$' } }, ['color']),
-  simpleOperation('color.adjust', { scope: { enum: ['cel', 'whole'] }, frameId: idSchema, layerId: idSchema, settings: { type: 'object', additionalProperties: false, minProperties: 1, properties: { brightness: { type: 'integer', minimum: -100, maximum: 100 }, contrast: { type: 'integer', minimum: -100, maximum: 100 }, saturation: { type: 'integer', minimum: 0, maximum: 200 }, curve: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'integer', minimum: 0, maximum: 255 } }, paletteMode: { enum: ['exact', 'nearest'] } } } }, ['scope', 'frameId', 'layerId', 'settings']),
-  simpleOperation('layer.select', { layerId: idSchema }, ['layerId']),
+  simpleOperation('palette.replace', { index: { type: 'integer', minimum: 0, maximum: 127 }, color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$' } }, ['index', 'color']),
+  { ...simpleOperation('selection.transform', { ...operationFrameLayer, bounds: { type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'], properties: { x: { type: 'integer', minimum: 0, maximum: 65535 }, y: { type: 'integer', minimum: 0, maximum: 65535 }, width: { type: 'integer', minimum: 1, maximum: 65536 }, height: { type: 'integer', minimum: 1, maximum: 65536 } } }, x: { type: 'integer', minimum: -4096, maximum: 4096 }, y: { type: 'integer', minimum: -4096, maximum: 4096 }, width: { type: 'integer', minimum: 1, maximum: 65536 }, height: { type: 'integer', minimum: 1, maximum: 65536 }, turns: { type: 'integer', minimum: 0, maximum: 3 }, angle: { type: 'number', minimum: -360, maximum: 360 }, polygon: { type: 'array', minItems: 3, maxItems: 256, items: pointSchema }, flipX: { type: 'boolean' }, flipY: { type: 'boolean' }, copy: { type: 'boolean' } }, ['frameId', 'layerId', 'bounds', 'x', 'y']), not: { required: ['angle', 'turns'] } },
+  simpleOperation('canvas.resize', { width: { type: 'integer', minimum: 1, maximum: 1028 }, height: { type: 'integer', minimum: 1, maximum: 1028 }, anchor: { enum: ['top-left', 'center'] } }, ['width', 'height']),
+  simpleOperation('canvas.scale', { percent: { type: 'integer', minimum: 1, maximum: 1600 } }, ['percent']),
+  simpleOperation('color.adjust', { scope: { enum: ['cel', 'whole'] }, ...operationFrameLayer, settings: { type: 'object', additionalProperties: false, minProperties: 1, properties: { brightness: { type: 'integer', minimum: -100, maximum: 100 }, contrast: { type: 'integer', minimum: -100, maximum: 100 }, saturation: { type: 'integer', minimum: 0, maximum: 200 }, curve: { type: 'array', minItems: 5, maxItems: 5, items: { type: 'integer', minimum: 0, maximum: 255 } }, paletteMode: { enum: ['exact', 'nearest'] } } } }, ['scope', 'frameId', 'layerId', 'settings']),
+  simpleOperation('layer.select', { layerId: operationIdSchema }, ['layerId']),
   simpleOperation('layer.add', { name: { type: 'string', maxLength: 80 }, visible: { type: 'boolean' }, locked: { type: 'boolean' } }),
-  simpleOperation('layer.rename', { layerId: idSchema, name: { type: 'string', maxLength: 80 } }, ['layerId', 'name']),
-  simpleOperation('layer.visibility', { layerId: idSchema, visible: { type: 'boolean' } }, ['layerId', 'visible']),
-  simpleOperation('layer.opacity', { layerId: idSchema, opacity: { type: 'number', minimum: 0, maximum: 1 } }, ['layerId', 'opacity']),
-  simpleOperation('layer.lock', { layerId: idSchema, locked: { type: 'boolean' } }, ['layerId', 'locked']),
-  simpleOperation('layer.move', { layerId: idSchema, index: { type: 'integer', minimum: 0, maximum: 127 } }, ['layerId', 'index']),
-  simpleOperation('layer.remove', { layerId: idSchema }, ['layerId']),
-  simpleOperation('frame.select', { frameId: idSchema }, ['frameId']),
-  simpleOperation('frame.add', { sourceFrameId: idSchema, copy: { type: 'boolean' } }),
-  simpleOperation('frame.duration', { frameId: idSchema, durationMs: { type: 'integer', minimum: 1, maximum: 60000 } }, ['frameId', 'durationMs']),
-  simpleOperation('frame.move', { frameId: idSchema, index: { type: 'integer', minimum: 0, maximum: 127 } }, ['frameId', 'index']),
-  simpleOperation('frame.remove', { frameId: idSchema }, ['frameId']),
+  simpleOperation('layer.rename', { layerId: operationIdSchema, name: { type: 'string', maxLength: 80 } }, ['layerId', 'name']),
+  simpleOperation('layer.visibility', { layerId: operationIdSchema, visible: { type: 'boolean' } }, ['layerId', 'visible']),
+  simpleOperation('layer.opacity', { layerId: operationIdSchema, opacity: { type: 'number', minimum: 0, maximum: 1 } }, ['layerId', 'opacity']),
+  simpleOperation('layer.lock', { layerId: operationIdSchema, locked: { type: 'boolean' } }, ['layerId', 'locked']),
+  simpleOperation('layer.move', { layerId: operationIdSchema, index: { type: 'integer', minimum: 0, maximum: 127 } }, ['layerId', 'index']),
+  simpleOperation('layer.remove', { layerId: operationIdSchema }, ['layerId']),
+  simpleOperation('frame.select', { frameId: operationIdSchema }, ['frameId']),
+  simpleOperation('frame.add', { sourceFrameId: operationIdSchema, copy: { type: 'boolean' } }),
+  simpleOperation('frame.duration', { frameId: operationIdSchema, durationMs: { type: 'integer', minimum: 1, maximum: 60000 } }, ['frameId', 'durationMs']),
+  simpleOperation('frame.move', { frameId: operationIdSchema, index: { type: 'integer', minimum: 0, maximum: 127 } }, ['frameId', 'index']),
+  simpleOperation('frame.remove', { frameId: operationIdSchema }, ['frameId']),
+  simpleOperation('normal.configure', { settings: { type: 'object', additionalProperties: false, minProperties: 1, properties: { azimuth: numericSetting(0, 360), elevation: numericSetting(0, 90), ambient: numericSetting(0, 1), intensity: numericSetting(0, 2), lightColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' }, specular: numericSetting(0, 1), roughness: numericSetting(0.05, 1), shadeUnpainted: { type: 'boolean' }, overlayOpacity: numericSetting(0, 1), previewLighting: { type: 'boolean' } } } }, ['settings']),
+  { ...simpleOperation('view.configure', { zoom: numericSetting(1, 8), panX: numericSetting(-100000, 100000), panY: numericSetting(-100000, 100000), showGrid: { type: 'boolean' }, onion: { type: 'boolean' } }), minProperties: 2 },
   simpleOperation('undo'), simpleOperation('redo'), simpleOperation('save')
+];
+const batchChildSchema = { oneOf: drawOperationBranches.filter(operation => !['undo', 'redo', 'save', 'normal.configure', 'view.configure'].includes(operation.properties.type.const)) };
+export const DRAW_OPERATION_SCHEMA = { oneOf: [
+  ...drawOperationBranches,
+  simpleOperation('batch', { operations: { type: 'array', minItems: 1, maxItems: 32, items: batchChildSchema }, save: { type: 'boolean' } }, ['operations'])
 ] };
 
 export const DRAW_STATE_REQUEST_SCHEMA = {
   type: 'object', additionalProperties: false,
-  properties: { frameId: idSchema, layerId: idSchema }
+  properties: {
+    frameId: idSchema, layerId: idSchema, includePixels: { type: 'boolean' },
+    region: { type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'], properties: {
+      x: { type: 'integer', minimum: 0, maximum: 1027 }, y: { type: 'integer', minimum: 0, maximum: 1027 },
+      width: { type: 'integer', minimum: 1, maximum: 1028 }, height: { type: 'integer', minimum: 1, maximum: 1028 }
+    } }
+  }
 };
 
 export const DRAW_STATE_SCHEMA = {
@@ -674,11 +773,14 @@ export const DRAW_STATE_SCHEMA = {
     required: ['revision', 'projectBinding', 'projectPersisted', 'savedRevisionId', 'dirty', 'width', 'height', 'palette', 'active', 'frames', 'layers', 'cel', 'canUndo', 'canRedo', 'busy', 'saved'],
   properties: {
     revision: { type: 'integer', minimum: 0 }, projectBinding: { anyOf: [DRAW_PROJECT_BINDING_SCHEMA, { type: 'null' }] },
-    projectPersisted: { type: 'boolean' }, dirty: { type: 'boolean' }, savedRevisionId: { anyOf: [{ type: 'string' }, { type: 'null' }] }, width: { type: 'integer', minimum: 1, maximum: 256 }, height: { type: 'integer', minimum: 1, maximum: 256 },
+    projectPersisted: { type: 'boolean' }, dirty: { type: 'boolean' }, savedRevisionId: { anyOf: [{ type: 'string' }, { type: 'null' }] }, width: { type: 'integer', minimum: 1, maximum: 1028 }, height: { type: 'integer', minimum: 1, maximum: 1028 },
     palette: { type: 'array', maxItems: 128, items: { type: 'string' } }, active: { type: 'object', required: ['frameId', 'layerId'], properties: { frameId: idSchema, layerId: idSchema } },
     frames: { type: 'array', maxItems: 128, items: { type: 'object', required: ['id', 'durationMs'], properties: { id: idSchema, durationMs: { type: 'integer' } } } },
     layers: { type: 'array', maxItems: 128, items: { type: 'object', required: ['id', 'name', 'visible', 'locked', 'opacity', 'role'], properties: { id: idSchema, name: { type: 'string' }, visible: { type: 'boolean' }, locked: { type: 'boolean' }, opacity: { type: 'number' }, role: { type: 'string' } } } },
-    cel: { type: 'object', required: ['frameId', 'layerId', 'pixels'], properties: { frameId: idSchema, layerId: idSchema, pixels: { type: 'array', maxItems: 65536, items: { type: 'integer', minimum: -1, maximum: 127 } } } },
+    cel: { type: 'object', required: ['frameId', 'layerId'], properties: { frameId: idSchema, layerId: idSchema, region: { type: 'object', required: ['x', 'y', 'width', 'height'], properties: { x: { type: 'integer' }, y: { type: 'integer' }, width: { type: 'integer' }, height: { type: 'integer' } } }, palette: { type: 'array', maxItems: 128, items: { type: 'string' } }, pixels: { type: 'array', maxItems: 65536, items: { type: 'integer', minimum: -1, maximum: 127 } } } },
+    view: { type: 'object', additionalProperties: false, properties: { zoom: { type: 'number', minimum: 1, maximum: 8 }, panX: { type: 'number', minimum: -100000, maximum: 100000 }, panY: { type: 'number', minimum: -100000, maximum: 100000 }, showGrid: { type: 'boolean' }, onion: { type: 'boolean' } } },
+    normalSettings: { type: 'object', additionalProperties: false, properties: { azimuth: { type: 'number', minimum: 0, maximum: 360 }, elevation: { type: 'number', minimum: 0, maximum: 90 }, ambient: { type: 'number', minimum: 0, maximum: 1 }, intensity: { type: 'number', minimum: 0, maximum: 2 }, lightColor: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' }, specular: { type: 'number', minimum: 0, maximum: 1 }, roughness: { type: 'number', minimum: 0.05, maximum: 1 }, shadeUnpainted: { type: 'boolean' }, overlayOpacity: { type: 'number', minimum: 0, maximum: 1 }, previewLighting: { type: 'boolean' } } },
+    capabilities: { type: 'object', additionalProperties: false, required: ['fastEdits', 'maxBatchOperations', 'maxPixelBatch', 'maxStrokePoints', 'maxReadPixels', 'maxCommandBytes'], properties: { fastEdits: { type: 'boolean' }, maxBatchOperations: { const: 32 }, maxPixelBatch: { const: 512 }, maxStrokePoints: { const: 1024 }, maxReadPixels: { const: 65536 }, maxCommandBytes: { const: 32768 } } },
     canUndo: { type: 'boolean' }, canRedo: { type: 'boolean' }, busy: { type: 'boolean' }, saved: { type: 'boolean' }
   }
 };
