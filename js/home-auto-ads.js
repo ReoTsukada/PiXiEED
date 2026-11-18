@@ -4,7 +4,7 @@
   try { if (window.top !== window.self) return; } catch { return; }
   if (loc?.origin !== 'https://pixieed.jp' || !['/', '/index.html'].includes(loc.pathname)
       || loc.search || loc.hash || !document.head) return;
-  // The existing synchronous policy excludes Offerwall and optional recovery,
+  // The existing earlier deferred policy excludes Offerwall and optional recovery,
   // while allowing Google's required consent messages to proceed normally.
   if (typeof window.googlefc?.controlledMessagingFunction !== 'function'
       || window.__PIXIEED_OFFERWALL_ENTRY__?.isEligible?.() !== false) return;

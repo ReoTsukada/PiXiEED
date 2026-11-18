@@ -315,7 +315,9 @@ export async function buildPagesSite({ root = sourceRoot, output, esbuildPath } 
         const withOrdinaryStyle = addOrdinaryAdStyle(withInformationAutoAds.html, name);
         const needsOfferwallPolicy = OFFERWALL_TOOL_PATHS.includes(`/${name.replace(/index\.html$/, '')}`)
           || /\bsrc=["']\/js\/adsense-offerwall-policy\.js[?"']/.test(withOrdinaryStyle.html);
-        const withOfferwallPolicy = needsOfferwallPolicy ? addOfferwallEntryPolicy(withOrdinaryStyle.html) : withOrdinaryStyle;
+        // The public home declares its policy and loader as ordered deferred scripts.
+        // Keep their non-blocking head order; tool entries retain the synchronous gate.
+        const withOfferwallPolicy = needsOfferwallPolicy && name !== 'index.html' ? addOfferwallEntryPolicy(withOrdinaryStyle.html) : withOrdinaryStyle;
         const withToolOfferwallEntry = addToolOfferwallEntry(withOfferwallPolicy.html, name);
         const navigationSurface = ['index.html', 'feed/index.html', 'explore/index.html', 'tools/index.html'].includes(name);
         await writeFile(outputPath, normalizeFreshToolLinks(withToolOfferwallEntry.html, { onlyExplicit: !navigationSurface }));

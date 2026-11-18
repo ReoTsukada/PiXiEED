@@ -48,12 +48,14 @@ test('private URLs, non-production pages and frames never request a provider', (
     assert.equal(ctx.scripts.length,0,`${path} ${JSON.stringify(override)} frame=${framed}`);
   }
 });
-test('only the public portal includes the guarded async entry after the policy',async()=>{
+test('only the public portal includes the guarded deferred entry after the policy',async()=>{
   const html=await readFile(new URL('index.html',root),'utf8');
   const head=html.match(/<head>[\s\S]*?<\/head>/)[0];
   assert.equal((head.match(/name="google-adsense-account"/g)||[]).length,1);
   assert.equal((head.match(/src="\/js\/home-auto-ads.js/g)||[]).length,1);
-  assert.match(head,/<script src="\/js\/adsense-offerwall-policy[^>]+><\/script>\s*<script async src="\/js\/home-auto-ads/);
+  assert.match(head,/<script defer src="\/js\/adsense-offerwall-policy[^>]+><\/script>\s*<script defer src="\/js\/home-auto-ads/);
+  assert.ok(head.indexOf('meta charset=') < head.indexOf('google-adsense-account'));
+  assert.ok(head.indexOf('name="viewport"') < head.indexOf('google-adsense-account'));
   for(const path of ['draw/editor.html','audio/editor.html','feed/index.html','explore/index.html','privacy/index.html']) {
     assert.doesNotMatch(await readFile(new URL(path,root),'utf8'),/home-auto-ads/);
   }
