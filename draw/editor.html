@@ -41,7 +41,7 @@
   <link rel="stylesheet" href="/css/draw-audio-timbre-panel.css?rev=20261106-button-icon-audit-1">
   <link rel="stylesheet" href="/css/draw-palette-instruments.css?rev=20261017-editor-improvements-1">
   <link rel="stylesheet" href="/css/creation-camera-idle.css?rev=20261017-editor-improvements-1">
-  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261108-music-controls-1">
+  <link rel="stylesheet" href="/css/draw-tool-picker.css?rev=20261118-draw-tool-panel-1">
   <link rel="stylesheet" href="/css/draw-canvas-panel.css?rev=20261009-sprite-scale-1">
   <link rel="stylesheet" href="/css/draw-viewport.css?rev=20261118-draw-button-label-1">
   <link rel="stylesheet" href="/css/draw-compact-controls.css?rev=20261118-draw-button-label-1">
@@ -98,16 +98,17 @@
                 <h2 id="draw-tool-group-paint" class="draw-tool-group__heading">塗る</h2>
                 <button type="button" data-draw-tool="pen" data-drawing-icon="pen" aria-pressed="true" aria-label="ペン" title="ペン"><span data-tool-label>ペン</span><small data-tool-description>点や線を描く</small></button>
                 <button type="button" data-draw-tool="eraser" data-drawing-icon="eraser" aria-pressed="false" aria-label="消しゴム" title="消しゴム"><span data-tool-label>消しゴム</span><small data-tool-description>透明に戻す</small></button>
-                <button type="button" data-draw-tool="fill" data-drawing-icon="fill" aria-pressed="false" aria-label="塗りつぶし" title="塗りつぶし：囲まれた場所を塗る"><span data-tool-label>塗りつぶし</span><small data-tool-description>囲まれた場所を塗る</small></button>
+                <button type="button" data-draw-tool="fill" data-drawing-icon="fill" aria-pressed="false" aria-label="塗りつぶし" title="塗りつぶし：囲まれた場所を塗る"><span data-tool-label>塗る</span><small data-tool-description>囲まれた場所を塗る</small></button>
+                <button type="button" data-draw-tool="picker" data-drawing-icon="picker" aria-pressed="false" aria-label="スポイト" title="スポイト：絵から色をとる"><span data-tool-label>スポイト</span><small data-tool-description>絵から色をとる</small></button>
                 <button type="button" data-draw-tool="spray" data-drawing-icon="spray" aria-pressed="false" aria-label="スプレー" title="スプレー：点を散らして描く"><span data-tool-label>スプレー</span><small data-tool-description>点を散らして描く</small></button>
               </section>
               <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-shapes">
                 <h2 id="draw-tool-group-shapes" class="draw-tool-group__heading">図形</h2>
                 <button type="button" data-draw-tool="line" data-drawing-icon="line" aria-pressed="false" aria-label="直線" title="直線：2点を結ぶ"><span data-tool-label>直線</span><small data-tool-description>2点を結ぶ</small></button>
                 <button type="button" data-draw-tool="rectangle" data-drawing-icon="rectangle" aria-pressed="false" aria-label="四角形" title="四角形：輪郭を描く"><span data-tool-label>四角形</span><small data-tool-description>輪郭を描く</small></button>
-                <button type="button" data-draw-tool="rectangle-fill" data-drawing-icon="rectangle-fill" aria-pressed="false" aria-label="塗り四角形" title="塗り四角形：中まで塗る"><span data-tool-label>塗り四角形</span><small data-tool-description>中まで塗る</small></button>
+                <button type="button" data-draw-tool="rectangle-fill" data-drawing-icon="rectangle-fill" aria-pressed="false" aria-label="塗り四角形" title="塗り四角形：中まで塗る"><span data-tool-label>四角塗り</span><small data-tool-description>中まで塗る</small></button>
                 <button type="button" data-draw-tool="ellipse" data-drawing-icon="ellipse" aria-pressed="false" aria-label="楕円" title="楕円：輪郭を描く"><span data-tool-label>楕円</span><small data-tool-description>輪郭を描く</small></button>
-                <button type="button" data-draw-tool="ellipse-fill" data-drawing-icon="ellipse-fill" aria-pressed="false" aria-label="塗り楕円" title="塗り楕円：中まで塗る"><span data-tool-label>塗り楕円</span><small data-tool-description>中まで塗る</small></button>
+                <button type="button" data-draw-tool="ellipse-fill" data-drawing-icon="ellipse-fill" aria-pressed="false" aria-label="塗り楕円" title="塗り楕円：中まで塗る"><span data-tool-label>楕円塗り</span><small data-tool-description>中まで塗る</small></button>
               </section>
               <section class="draw-tool-group" role="group" aria-labelledby="draw-tool-group-select">
                 <h2 id="draw-tool-group-select" class="draw-tool-group__heading">選ぶ</h2>
@@ -116,7 +117,6 @@
                   <button type="button" data-draw-tool="select" data-selection-mode="lasso" data-drawing-icon="select" aria-pressed="false" aria-label="投げ縄選択" title="投げ縄選択：ドラッグで囲んだ形を選ぶ"><span data-tool-label>投げ縄</span><small data-tool-description>自由な形で囲む</small></button>
                   <button type="button" data-draw-tool="select" data-selection-mode="color" data-drawing-icon="select" aria-pressed="false" aria-label="同じ色を選択" title="同じ色を選択：クリックした色をすべて選ぶ"><span data-tool-label>同じ色</span><small data-tool-description>色をクリック</small></button>
                 </div>
-                <button type="button" data-draw-tool="picker" data-drawing-icon="picker" aria-pressed="false" aria-label="スポイト" title="スポイト：絵から色をとる"><span data-tool-label>スポイト</span><small data-tool-description>絵から色をとる</small></button>
               </section>
             </div>
           </details>
@@ -165,7 +165,7 @@
   </main>
   <footer class="site-footer"><div class="container"><p>PiXiEED</p></div></footer>
   <nav class="app-tabs" aria-label="アプリナビゲーション"><a data-nav="map" href="/globe/" aria-label="世界地図"><img src="/assets/icons/pixieed/globe.svg" alt=""></a><a data-nav="camera" href="/camera/" aria-label="撮影"><img src="/assets/icons/pixieed/shoot.svg" alt=""></a><button id="draw-animation-play" type="button" aria-pressed="false" aria-label="アニメーションを再生" title="再生"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="draw-play-icon" d="m6.5 5 11 7-11 7Z"/><path class="draw-stop-icon" d="M8 5v14M16 5v14"/></svg><span class="draw-button-label" aria-hidden="true">再生</span></button><a data-nav="tools" href="/tools/" aria-label="ツール"><img src="/assets/icons/pixieed/tools.svg" alt=""></a><a data-nav="profile" href="/profile/" aria-label="マイページ"><img src="/assets/icons/pixieed/profile.svg" alt=""></a></nav>
-  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261118-draw-button-label-1&nav=20261016-tool-operations-1"></script>
+  <script type="module" src="/js/creation/draw-entry.mjs?rev=20261118-draw-tool-panel-1&nav=20261016-tool-operations-1"></script>
   <script type="module" src="/js/site-header.mjs?rev=20261111-output-offerwall-1"></script>
   <script type="module" src="/js/tool-help-bootstrap.mjs?rev=20261116-normal-release-2"></script>
 </body>
