@@ -344,7 +344,8 @@ body.creation-suite .creation-project-notes [hidden] { display:none !important; 
 
 /* Only the dedicated creation toolbar: four equal targets and the retained
    larger play/shutter. Page navigation belongs to the outer page header. */
-html body.creation-suite .app-tabs.app-tabs--tool-operations { grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:44px; }
+/* Fit the complete 58px primary circle inside the bar, including compact screens. */
+html body.creation-suite .app-tabs.app-tabs--tool-operations { grid-template-columns:repeat(5,minmax(0,1fr)); grid-template-rows:58px; padding-block:2px !important; }
 html[data-tool-embed] body.creation-suite { min-width:0; }
 html body.creation-suite .app-tabs.app-tabs--tool-operations > [data-nav-slot]:not([data-nav-primary]) {
   position:static !important; inset:auto !important; transform:none !important; margin:0 !important;

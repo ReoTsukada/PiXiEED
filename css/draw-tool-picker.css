@@ -323,3 +323,25 @@ body[data-page="draw"] .draw-controls .draw-tool-menu .draw-select-tool-modes > 
   align-content: center !important;
   justify-items: center !important;
 }
+
+/* Every tool keeps its existing caption below its glyph in the compact menu. */
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-tool-group > button[data-draw-tool] {
+  grid-template-rows:28px 16px !important; align-content:center !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu [data-tool-label] {
+  position:static !important; width:auto !important; height:auto !important; max-width:100%;
+  margin:0 !important; overflow:visible !important; clip:auto !important; clip-path:none !important;
+  font:600 10px/16px system-ui,sans-serif; letter-spacing:0; white-space:nowrap !important;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .draw-text-opener {
+  grid-template-rows:28px 16px !important; align-content:center !important; gap:0;
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-opener[data-draw-button-content] > .draw-button-icon {
+  width:26px; height:26px; filter:brightness(0) saturate(100%) invert(85%) sepia(71%) saturate(645%) hue-rotate(335deg) brightness(104%) contrast(101%);
+}
+body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-opener > .draw-button-label { font:600 10px/16px system-ui,sans-serif; }
+/* Cover the scrolling content all the way to the panel's inner top edge. */
+body[data-page="draw"] .draw-controls .draw-tool-menu > .draw-panel-header {
+  top:-10px; margin:-10px -10px 0; padding:10px; min-height:64px;
+  border-radius:15px 15px 0 0;
+}

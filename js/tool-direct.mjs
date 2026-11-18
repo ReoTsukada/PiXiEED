@@ -129,7 +129,7 @@ export function installDirectToolShell({ section, mode, search }) {
       const href = new URL(source.getAttribute('href'), location.origin);
       if (href.origin === location.origin) addStartupHint('modulepreload', href.href);
     }
-    const modeStylesheet = new URL('/css/creation-modes.css?rev=20261118-draw-button-label-1', location.origin);
+    const modeStylesheet = new URL('/css/creation-modes.css?rev=20261118-draw-tool-panel-1', location.origin);
     if (!existingStylesheets.has(modeStylesheet.href)) addStartupHint('preload', modeStylesheet.href, 'style');
   }
   function clearStartupHints() {
@@ -376,7 +376,7 @@ export function installDirectToolShell({ section, mode, search }) {
     if (mounting) return mounting;
     mounting = (async () => {
       setLoadingStage('編集画面を取得しています…');
-      const response = await fetch('/draw/editor.html?rev=20261118-draw-button-label-1', { cache: 'no-cache', credentials: 'same-origin', signal: lifecycle.signal });
+      const response = await fetch('/draw/editor.html?rev=20261118-draw-tool-panel-1', { cache: 'no-cache', credentials: 'same-origin', signal: lifecycle.signal });
       if (!response.ok) throw new Error('編集画面を読み込めませんでした。');
       const template = new DOMParser().parseFromString(await response.text(), 'text/html');
       checkAlive();
@@ -386,7 +386,7 @@ export function installDirectToolShell({ section, mode, search }) {
       prepareHost(template);
       // Start evaluating the already-required graph while the editor styles load.
       // The handled result is consumed only after CSS and restore-state checks.
-      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261118-draw-button-label-1'))()
+      const runtimeImport = (async () => await import('./creation/creation-runtime.mjs?rev=20261118-draw-tool-panel-1'))()
         .then(module => ({ module }), error => { reloadRequired = true; return { error }; });
       const cssLoads = [];
       const existing = new Set([...document.querySelectorAll('link[rel="stylesheet"]')].map(n => n.href));
