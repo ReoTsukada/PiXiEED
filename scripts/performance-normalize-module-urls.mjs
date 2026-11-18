@@ -241,6 +241,7 @@ function normalize(source, file) {
     'js/tool-direct.mjs', 'js/tool-shell.mjs'
   ]);
   const drawDisplayAdReferenceOwners = new Set([
+    'index.html',
     'about/index.html', 'audio/editor.html', 'audio/index.html', 'books/index.html', 'camera/index.html',
     'draw/editor.html', 'draw/index.html', 'globe-prototype.html', 'globe/index.html', 'guide/index.html',
     'hidden-object/index.html', 'jigsaw/index.html', 'js/creation/creation-runtime.mjs', 'js/creation/draw-entry.mjs',

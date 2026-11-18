@@ -185,7 +185,8 @@ test('Pages review build copies the runtime and injects only eligible generated 
   await mkdir(join(root, 'privacy'), { recursive: true });
   await mkdir(join(root, 'js'), { recursive: true });
   execFileSync('git', ['init', '-q', root]);
-  await writeFile(join(root, 'index.html'), sourceHtml);
+  const homeEntries = (await readFile(new URL('../../index.html', import.meta.url), 'utf8')).match(/  <meta name="google-adsense-account"[^>]*>\n  <script defer src="\/js\/adsense-offerwall-policy[^>]*><\/script>\n  <script defer src="\/js\/home-auto-ads[^>]*><\/script>/)[0];
+  await writeFile(join(root, 'index.html'), sourceHtml.replace('<head>', '<head>\n' + homeEntries));
   await writeFile(join(root, 'privacy/index.html'), sourceHtml.replace('/about/', '/privacy/'));
   await writeFile(join(root, 'sitemap.xml'), '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://pixieed.jp/</loc></url></urlset>');
   const event = { id: 'eligible-pixel-event', name: 'Eligible Pixel Event', startDate: '2027-05-01', endDate: '2027-05-01', status: 'upcoming', sourceUrl: 'https://example.test/event', checkedAt: '2026-10-20', description: 'Confirmed event summary.' };
@@ -198,7 +199,9 @@ test('Pages review build copies the runtime and injects only eligible generated 
 
   const result = await buildPagesSite({ root, output });
   const builtHome = await readFile(join(result.output, 'index.html'), 'utf8');
-  assert.doesNotMatch(builtHome, /data-information-auto-ads|information-auto-ads\.mjs|adsense-offerwall-policy/);
+  assert.doesNotMatch(builtHome, /data-information-auto-ads|information-auto-ads\.mjs/);
+  assert.ok(builtHome.includes(homeEntries), 'build preserves the ordered non-blocking home policy and loader');
+  assert.equal((builtHome.match(/adsense-offerwall-policy\.js/g) || []).length, 1);
   assert.match(await readFile(join(result.output, 'events/index.html'), 'utf8'), /data-information-auto-ads="\/events\/"/);
   assert.match(await readFile(join(result.output, 'events/eligible-pixel-event/index.html'), 'utf8'), /data-information-auto-ads="\/events\/eligible-pixel-event\/"/);
   await assert.rejects(readFile(join(result.output, 'events/watch-pixel-event/index.html')));
