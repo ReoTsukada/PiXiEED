@@ -337,7 +337,7 @@ body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-tool-slot > .dr
   grid-template-rows:28px 16px !important; align-content:center !important; gap:0;
 }
 body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-opener[data-draw-button-content] > .draw-button-icon {
-  width:26px; height:26px; filter:brightness(0) saturate(100%) invert(85%) sepia(71%) saturate(645%) hue-rotate(335deg) brightness(104%) contrast(101%);
+  width:26px; height:26px; color:#ffd35a;
 }
 body[data-page="draw"] .draw-controls .draw-tool-menu .draw-text-opener > .draw-button-label { font:600 10px/16px system-ui,sans-serif; }
 /* Cover the scrolling content all the way to the panel's inner top edge. */
@@ -361,6 +361,8 @@ body.draw-desktop-active [data-desktop-drawing] .draw-text-opener[aria-expanded=
 body.draw-desktop-active [data-desktop-drawing] .draw-text-opener[data-draw-button-content] > .draw-button-icon {
   width: 20px;
   height: 20px;
+}
+body[data-page="draw"] :is(.draw-controls .draw-tool-menu, [data-desktop-drawing]) .draw-text-opener[data-draw-button-content] > .draw-button-icon {
   content: linear-gradient(currentColor, currentColor);
   -webkit-mask: var(--draw-action-icon) center / contain no-repeat;
   mask: var(--draw-action-icon) center / contain no-repeat;
