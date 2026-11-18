@@ -1,3 +1,4 @@
+import { createDrawButtonContent } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 import { createAudioPlayer, AUDIO_INSTRUMENTS, AUDIO_PIXEL_TICKS, getAudioColorInstrument } from './audio-core.mjs?rev=20261016-color-capability-1';
 import { AUDIO_INSTRUMENT_GROUPS } from './audio-timbres.mjs?rev=20261005-audio-drums-1';
 import { changeDrawMusicColor, changeDrawMusicTempo, describeDrawMusicProjection, usesLegacyMusicTiming, LEGACY_MUSIC_EDITOR_ROLE } from './draw-music-core.mjs?rev=20261116-normal-release-2';
@@ -53,7 +54,7 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
   const settings = document.createElement('details'); settings.id = 'draw-music-settings'; settings.className = 'draw-music-settings';
   settings.innerHTML = `<summary>音楽</summary><div class="draw-music-panel" role="group" aria-label="音楽の設定">
     <label>曲のページ <select id="draw-music-page"></select></label>
-    <div class="draw-music-pages"><button type="button" id="draw-music-page-add" aria-label="音楽ページを追加" title="音楽ページを追加">${musicActionIcon('<path d="M12 5v14M5 12h14"/>')}<span>追加</span></button><button type="button" id="draw-music-page-copy" aria-label="音楽ページを複製" title="音楽ページを複製">${musicActionIcon('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>')}<span>複製</span></button><button type="button" id="draw-music-page-before" aria-label="音楽ページを前へ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><button type="button" id="draw-music-page-after" aria-label="音楽ページを後へ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button><button type="button" id="draw-music-page-delete" aria-label="音楽ページを削除" title="音楽ページを削除">${musicActionIcon('<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>')}<span>削除</span></button></div>
+    <div class="draw-music-pages"><button type="button" id="draw-music-page-add" aria-label="音楽ページを追加" title="音楽ページを追加">${musicActionIcon('<path d="M12 5v14M5 12h14"/>')}<span>追加</span></button><button type="button" id="draw-music-page-copy" aria-label="音楽ページを複製" title="音楽ページを複製">${musicActionIcon('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>')}<span>複製</span></button><button type="button" id="draw-music-page-before" aria-label="音楽ページを前へ" title="前へ"></button><button type="button" id="draw-music-page-after" aria-label="音楽ページを後へ" title="次へ"></button><button type="button" id="draw-music-page-delete" aria-label="音楽ページを削除" title="音楽ページを削除">${musicActionIcon('<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>')}<span>削除</span></button></div>
     <label>BPM（音楽テンポ） <input id="draw-music-tempo" type="number" min="60" max="180" value="120"></label>
     <p id="draw-music-reward-limits" aria-live="polite"></p>
     <label>描く色の音 <select id="draw-music-instrument"><option value="">無音（未割当）</option></select></label>
@@ -67,6 +68,8 @@ export async function mountDrawMusic({ draw, scope, nav, isActive, musicModel })
     <button type="button" id="draw-music-wav" aria-label="音を保存（WAV）" title="音を保存（WAV）">${musicActionIcon('<path d="M9 18V5l12-2v13M9 18c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2zm12-2c0 1.1-1.3 2-3 2s-3-.9-3-2 1.3-2 3-2 3 .9 3 2zM12 21v-5"/>')}<span>音を保存（WAV）</span></button><button type="button" id="draw-music-video" aria-label="動画を保存" title="動画を保存">${musicActionIcon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/>')}<span>動画を保存</span></button>
     <p id="draw-music-timing">音楽レイヤーのページを順に演奏します。絵のコマとBPMは独立しています。透明は無音。</p>
     <p id="draw-music-color" aria-live="polite"></p><p id="draw-music-status" role="status" aria-live="polite"></p></div>`;
+  createDrawButtonContent(settings.querySelector('#draw-music-page-before'), { icon: 'back', label: '前へ', doc: document });
+  createDrawButtonContent(settings.querySelector('#draw-music-page-after'), { icon: 'forward', label: '次へ', doc: document });
   document.querySelector('#main').append(settings);
   mountToolHeaderControls(document, { scope, selectors: ['#draw-music-settings'] });
   const musicSlot = settings.closest('.px-tool-header-slot'), drawSettingsSlot = document.querySelector('#draw-settings-picker')?.closest('.px-tool-header-slot');

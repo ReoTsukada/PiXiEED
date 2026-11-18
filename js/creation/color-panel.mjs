@@ -26,6 +26,13 @@ function anchorRect(anchor) {
   return null;
 }
 
+function labelColorAction(button, name, label) {
+  const image = document.createElement('img'); image.className = 'dce-button-icon';
+  image.src = `/assets/icons/pixieed/${name}.svg`; image.alt = ''; image.setAttribute('aria-hidden', 'true'); image.width = image.height = 20;
+  const caption = document.createElement('span'); caption.className = 'draw-button-label'; caption.textContent = label;
+  button.replaceChildren(image, caption);
+}
+
 export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'draw-color-editor', inputIds = { h: 'dce-h', s: 'dce-s', l: 'dce-l' }, viewTabs = null, allowAlpha = false } = {}) {
   if (!scope?.listen || !scope?.add || typeof scope.disposed !== 'boolean') throw new TypeError('Color panel requires a lifecycle scope');
   if (typeof getAnchor !== 'function' || typeof onChange !== 'function') throw new TypeError('Color panel requires getAnchor and onChange callbacks');
@@ -63,6 +70,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
       if (!item || typeof item.id !== 'string' || typeof item.label !== 'string') continue;
       const button = document.createElement('button'); button.type = 'button';
       button.dataset.dceView = item.id; button.textContent = item.label;
+      if (id === 'draw-color-editor' && ['color', 'sound'].includes(item.id)) labelColorAction(button, item.id === 'color' ? 'color-adjust' : 'music', item.label);
       if (viewTabs.compactHeader) button.setAttribute('role', 'tab');
       button.setAttribute('aria-pressed', String(item.id === activeView));
       if (viewTabs.compactHeader) button.setAttribute('aria-selected', String(item.id === activeView));
@@ -75,6 +83,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
       header?.append(viewTabsHost);
       const closeButton = document.createElement('button'); closeButton.type = 'button'; closeButton.id = 'dce-close';
       closeButton.className = 'dce-close'; closeButton.setAttribute('aria-label', '色と音色のパネルを閉じる'); closeButton.textContent = '×';
+      if (id === 'draw-color-editor') labelColorAction(closeButton, 'close', '閉じる');
       header?.append(closeButton);
       listen(closeButton, 'click', closeAndNotify);
     } else element.querySelector('.dce-header')?.after(viewTabsHost);
@@ -86,6 +95,7 @@ export function mountColorPanel({ scope, getAnchor, onChange, onClose, id = 'dra
   (viewTabsHost || element.querySelector('.dce-header'))?.after(contentHost);
   const before = element.querySelector('.dce-before'); const after = element.querySelector('.dce-after');
   const resetButton = element.querySelector('#dce-reset'); const doneButton = element.querySelector('#dce-done');
+  if (id === 'draw-color-editor') labelColorAction(resetButton, 'undo', '元に戻す');
   const input = (axis) => element.querySelector(`[data-dce-axis="${axis}"]`);
   const valueOutput = (axis) => element.querySelector(`[data-dce-value="${axis}"]`);
   const quickHost = element.querySelector('.dce-quick');

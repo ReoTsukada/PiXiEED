@@ -354,3 +354,37 @@
 }
 @media (prefers-reduced-motion: reduce) { .animation-controls * { scroll-behavior: auto !important; transition: none !important; } }
 @media (prefers-reduced-motion: reduce) { .animation-controls__workspace-panel { transition: none; } }
+
+/* Draw opts in to captions; shared Audio controls keep their existing content. */
+.animation-controls__button[data-draw-button-label="true"] {
+  box-sizing: border-box;
+  display: inline-grid;
+  grid-template-rows: 20px 10px;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  padding: 3px 2px;
+}
+.animation-controls__button[data-draw-button-label="true"] > svg { grid-row: 1; width: 20px; height: 20px; }
+.animation-controls__button[data-draw-button-label="true"] > .draw-button-label {
+  grid-row: 2;
+  max-width: 100%;
+  font: 600 10px/10px system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.animation-controls__workspace-launcher[data-draw-button-label="true"] { grid-template-rows: 18px 10px 8px; gap: 0; padding: 1px 2px; }
+.animation-controls__workspace-launcher[data-draw-button-label="true"] > svg { width: 18px; height: 18px; }
+.animation-controls__workspace-launcher[data-draw-button-label="true"] > .animation-controls__workspace-badge {
+  position: static;
+  grid-row: 3;
+  max-width: 100%;
+  padding: 0;
+  font-size: 7px;
+  line-height: 8px;
+  white-space: nowrap;
+}
+
+.animation-controls__wide-button > .animation-controls__wide-label { min-width: 0; line-height: 1.3; }
+.animation-controls__wide-button:has(> .animation-controls__wide-label) > svg { flex: 0 0 20px; width: 20px; height: 20px; }

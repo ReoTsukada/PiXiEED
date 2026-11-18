@@ -1,3 +1,4 @@
+import { createDrawButtonContent } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 /** Searchable keyboard command catalog for the draw editor. No artwork state is owned here. */
 export const DRAW_SHORTCUTS_KEY = 'pixieed:draw:shortcuts:v1';
 const command = (id, label, keywords, shortcut = null, options = {}) => ({ id, label, keywords, shortcut, repeat: false, ...options });
@@ -216,8 +217,8 @@ export function mountDrawShortcuts({ scope, root, onRun, getEnabled = () => true
     const status = doc.createElement('p'); status.dataset.captureStatus = ''; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     if (settings.recovered) status.textContent = '保存データが読めないため、初期設定に戻しました。';
     const list = doc.createElement('div'); list.className = 'draw-shortcuts-list'; list.setAttribute('role', 'list');
-    const reset = doc.createElement('button'); reset.type = 'button'; reset.dataset.shortcutsReset = ''; reset.textContent = 'このOSの設定を初期化';
-    const closeButton = doc.createElement('button'); closeButton.type = 'button'; closeButton.textContent = '×'; closeButton.setAttribute('aria-label', '閉じる');
+    const reset = doc.createElement('button'); reset.type = 'button'; reset.dataset.shortcutsReset = ''; createDrawButtonContent(reset, { icon: 'reset', label: '初期化', doc }); reset.setAttribute('aria-label', 'このOSの設定を初期化');
+    const closeButton = doc.createElement('button'); closeButton.type = 'button'; createDrawButtonContent(closeButton, { icon: 'close', label: '閉じる', doc }); closeButton.setAttribute('aria-label', '閉じる');
     const head = doc.createElement('div'); head.className = 'draw-shortcuts-dialog__header'; head.append(heading, osLabel, os, closeButton);
     modal.append(head, search, status, list, reset); doc.body.append(modal); dialog = modal;
     let captureId = null;
@@ -232,12 +233,12 @@ export function mountDrawShortcuts({ scope, root, onRun, getEnabled = () => true
         if (aliases.length) key.textContent += ` / ${aliases.map(alias => keyLabel(alias, editPlatform)).join(' / ')}`;
 
         key.setAttribute('aria-label', `現在のキー: ${key.textContent}`);
-        const run = doc.createElement('button'); run.type = 'button'; run.dataset.commandRun = item.id; run.textContent = '実行'; run.setAttribute('aria-label', `${item.label}を実行`); run.disabled = !enabled(item);
+        const run = doc.createElement('button'); run.type = 'button'; run.dataset.commandRun = item.id; createDrawButtonContent(run, { icon: 'play', label: '実行', doc }); run.setAttribute('aria-label', `${item.label}を実行`); run.disabled = !enabled(item);
         row.append(label, key, run);
         if (item.fixed || item.launcher) { const fixed = doc.createElement('span'); fixed.textContent = '固定'; row.append(fixed); }
         else {
-          const edit = doc.createElement('button'); edit.type = 'button'; edit.textContent = '変更'; edit.dataset.capture = item.id; edit.setAttribute('aria-label', `${item.label}のキーを変更`);
-          const unset = doc.createElement('button'); unset.type = 'button'; unset.textContent = '解除'; unset.dataset.unset = item.id; unset.setAttribute('aria-label', `${item.label}のキー設定を解除`); row.append(edit, unset);
+          const edit = doc.createElement('button'); edit.type = 'button'; createDrawButtonContent(edit, { icon: 'adjustments', label: '変更', doc }); edit.dataset.capture = item.id; edit.setAttribute('aria-label', `${item.label}のキーを変更`);
+          const unset = doc.createElement('button'); unset.type = 'button'; createDrawButtonContent(unset, { icon: 'close', label: '解除', doc }); unset.dataset.unset = item.id; unset.setAttribute('aria-label', `${item.label}のキー設定を解除`); row.append(edit, unset);
         }
         list.append(row);
       }

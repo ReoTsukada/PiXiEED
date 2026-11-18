@@ -12,6 +12,6 @@ if (sharedEntry) {
 if (params.get('to') === 'draw' || params.has('drawRequest')) {
   await import('./draw-camera-page.mjs?rev=20261117-normal-apply-1');
 } else {
-  await import('./app.mjs?rev=20261118-draw-display-ad-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
+  await import('./app.mjs?rev=20261118-draw-button-label-1').then(({ mountPixelLensMode }) => mountPixelLensMode());
 }
 }

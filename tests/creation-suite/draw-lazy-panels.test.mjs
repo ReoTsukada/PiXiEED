@@ -31,6 +31,11 @@ class FakeNode {
       if (node.tagName !== '#text') this.children.push(node);
     }
   }
+  replaceChildren(...nodes) {
+    for (const child of [...this.children]) this.removeChild(child);
+    for (const child of [...this.childNodes]) if (!this.children.includes(child)) this.removeChild(child);
+    this.append(...nodes);
+  }
   replaceWith(node) {
     const parent = this.parentElement;
     if (!parent) return;
@@ -99,6 +104,9 @@ test('optional panels do not load until activation and replace the stable opener
   const textButton = panels.text.opener;
   assert.deepEqual(counters.loads, { color: 0, text: 0 });
   assert.ok(colorButton.isConnected && textButton.isConnected);
+  assert.equal(colorButton.children[0].getAttribute('src'), '/assets/icons/pixieed/color-adjust.svg');
+  assert.equal(colorButton.children[1].className, 'draw-button-label');
+  assert.equal(colorButton.children[1].textContent, '色調');
 
   await panels.color.open();
   assert.equal(counters.loads.color, 1);
@@ -126,7 +134,8 @@ test('failed import exposes a live retry state and retries with a new attempt', 
   assert.equal(await panels.color.open(), false);
   assert.equal(opener.disabled, false);
   assert.equal(opener.getAttribute('aria-busy'), null);
-  assert.match(opener.childNodes[1].textContent, /再試行/);
+  assert.equal(opener.children[0].getAttribute('src'), '/assets/icons/pixieed/color-adjust.svg');
+  assert.equal(opener.children[1].textContent, '再試行');
   assert.deepEqual(attempts, [0]);
 
   await panels.color.open();

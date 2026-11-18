@@ -1,3 +1,4 @@
+import { createDrawButtonContent } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 import { adjustDrawColorAnimation, adjustDrawColorDocument, getAdjustedAnimationCel, DRAW_COLOR_DEFAULTS, normalizeDrawColorSettings } from './draw-color-adjustments.mjs?rev=20261116-normal-release-2';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -13,12 +14,15 @@ export function mountDrawColorAdjustmentPanel({ scope, host, getState, onBegin, 
   if (!host || typeof getState !== 'function' || typeof onApply !== 'function') throw new TypeError('Color adjustment panel requires host, state, and apply handlers');
   const doc = host.ownerDocument || document;
   const opener = doc.createElement('button'); opener.type = 'button'; opener.className = 'draw-color-adjustment-open';
-  opener.textContent = '色調'; opener.setAttribute('aria-label', '色調を調整'); opener.setAttribute('aria-expanded', 'false');
+  createDrawButtonContent(opener, { icon: 'color-adjust', label: '色調', doc }); opener.setAttribute('aria-label', '色調を調整'); opener.setAttribute('aria-expanded', 'false');
   const toolbar = host.querySelector?.('.draw-fixed-left, .draw-fixed-toolbar') || host;
   toolbar.append(opener);
 
   const panel = doc.createElement('section'); panel.className = 'draw-color-adjustment'; panel.hidden = true; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', '色調調整');
   panel.innerHTML = '<header><h2>色調調整</h2><button type="button" data-close aria-label="色調調整を閉じる">×</button></header><fieldset class="draw-color-adjustment__scope"><legend>適用範囲</legend><label><input type="radio" name="draw-color-scope" value="current" checked> 現在のコマ・レイヤー<span data-selection></span></label><label><input type="radio" name="draw-color-scope" value="whole"> 全コマ・全レイヤー</label></fieldset><figure class="draw-color-adjustment__preview"><figcaption>現在コマのレイヤープレビュー</figcaption><canvas data-color-preview aria-label="色調プレビュー"></canvas></figure><div data-controls></div><fieldset class="draw-color-adjustment__palette"><legend>パレットの扱い</legend><label><input type="radio" name="draw-color-palette-mode" value="exact" checked> 調整色を追加</label><label><input type="radio" name="draw-color-palette-mode" value="nearest"> 既存色に近似</label></fieldset><div class="draw-color-adjustment__curve"><label>RGBトーンカーブ</label><svg viewBox="0 0 255 255" role="group" aria-label="RGBトーンカーブ"><path class="grid" d="M0 0V255H255M0 191H255M0 127H255M0 63H255M63 0V255M127 0V255M191 0V255"/><path data-line d=""/><g data-points></g></svg><small>点を上下に動かして明るさを調整</small></div><p class="draw-color-adjustment__status" aria-live="polite"></p><footer><button type="button" data-cancel>キャンセル</button><button type="button" data-apply disabled>適用</button></footer>';
+  createDrawButtonContent(panel.querySelector('[data-close]'), { icon: 'close', label: '閉じる', doc });
+  createDrawButtonContent(panel.querySelector('[data-cancel]'), { icon: 'close', label: '取消', doc });
+  createDrawButtonContent(panel.querySelector('[data-apply]'), { icon: 'confirm', label: '適用', doc });
   const controls = panel.querySelector('[data-controls]');
   for (const [key, label, min, max, step, value] of sliderSpec) {
     const row = doc.createElement('label'); row.className = 'draw-color-adjustment__slider'; row.append(doc.createTextNode(label));

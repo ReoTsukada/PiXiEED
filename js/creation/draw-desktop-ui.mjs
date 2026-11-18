@@ -1,5 +1,5 @@
 import { createDrawingToolIcon, DRAWING_TOOL_ICON_NAMES } from './drawing-tool-icons.mjs?rev=20261004-canvas-settings-1';
-import { DRAW_SHORTCUT_COMMANDS } from './draw-shortcuts.mjs?rev=20261015-draw-desktop-1';
+import { DRAW_SHORTCUT_COMMANDS } from './draw-shortcuts.mjs?rev=20261118-draw-button-label-1';
 import {
   DRAW_DESKTOP_LAYOUT_DEFAULTS,
   normalizeDrawDesktopPreferences,
@@ -20,6 +20,12 @@ const TOOL_LABELS = {
   rectangle: '四角形', 'rectangle-fill': '塗り四角形', ellipse: '楕円', 'ellipse-fill': '塗り楕円',
   select: '範囲選択'
 };
+const TOOL_CAPTIONS = Object.freeze({
+  pen: 'ペン', eraser: '消しゴム', fill: '塗る', picker: 'スポイト', spray: 'スプレー', line: '直線',
+  rectangle: '四角', 'rectangle-fill': '四角塗り', ellipse: '楕円', 'ellipse-fill': '楕円塗り', select: '選択'
+});
+const SELECTION_CAPTIONS = Object.freeze({ rectangle: '選択', lasso: '投げ縄', color: '同じ色' });
+const toolCaption = (tool, mode, fallback) => (tool === 'select' && SELECTION_CAPTIONS[mode]) || TOOL_CAPTIONS[tool] || fallback;
 const TOGGLE_SOURCE_SELECTORS = Object.freeze({ 'toggle.grid': '#draw-grid-toggle', 'toggle.onion': '#draw-onion-toggle' });
 const SELECTION_MODE_ICONS = Object.freeze({ rectangle: 'rectangle', lasso: 'selection-lasso', color: 'selection-color' });
 const SELECTION_ICON_PATHS = Object.freeze({
@@ -66,7 +72,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   if (!scope || !root || !drawShortcuts || typeof assignDrawInput !== 'function') throw new TypeError('Desktop draw UI requires a scope, root, shortcuts, and input assignment callback');
   const doc = root.ownerDocument, win = doc.defaultView;
   const style = doc.createElement('link');
-  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261117-chat-connect-1'; style.dataset.drawDesktopUi = 'true';
+  style.rel = 'stylesheet'; style.href = '/css/draw-desktop-ui.css?rev=20261118-draw-button-label-1'; style.dataset.drawDesktopUi = 'true';
   doc.head.append(style);
 
   const viewport = root.querySelector('.draw-viewport');
@@ -88,7 +94,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     return marker;
   };
   const move = (node, host) => { if (node && host && node.parentNode !== host) { remember(node); host.append(node); } };
-  const button = (label, key, command, { icon = '', pressed, className = '' } = {}) => {
+  const button = (label, key, command, { icon = '', caption = label, pressed, className = '' } = {}) => {
     const node = doc.createElement('button'); node.type = 'button';
     node.className = `draw-desktop-button ${className}`.trim(); node.dataset.desktopCommand = command || '';
     node.setAttribute('aria-label', label); if (typeof pressed === 'boolean') node.setAttribute('aria-pressed', String(pressed));
@@ -96,7 +102,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     if (icon && DRAWING_TOOL_ICON_NAMES.includes(icon)) iconWrap.append(createDrawingToolIcon(icon, doc));
     else if (SELECTION_ICON_PATHS[icon]) iconWrap.append(createSelectionModeIcon(doc, icon));
     else if (icon) iconWrap.textContent = ({ 'zoom-in': '+', 'zoom-out': '−', 'zoom-reset': '1:1' })[icon] || icon;
-    const text = doc.createElement('span'); text.className = 'draw-desktop-button__label'; text.textContent = label;
+    const text = doc.createElement('span'); text.className = 'draw-desktop-button__label draw-button-label'; text.setAttribute('aria-hidden', 'true'); text.textContent = caption;
     const keyNode = doc.createElement('kbd'); keyNode.className = 'draw-desktop-button__key'; keyNode.textContent = key || '';
     node.append(iconWrap, text, keyNode); return node;
   };
@@ -105,14 +111,14 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     <div class="draw-desktop-tool-scroll" data-desktop-tool-scroll><section class="draw-desktop-group" data-desktop-group="drawing" aria-label="描く"><h2>描く</h2><div class="draw-desktop-group__buttons" data-desktop-drawing></div><div class="draw-desktop-secondary" data-desktop-paint-secondary></div></section>
     <section class="draw-desktop-group" data-desktop-group="shapes" aria-label="図形"><h2>図形</h2><div class="draw-desktop-group__buttons" data-desktop-shapes></div><div class="draw-desktop-secondary" data-desktop-shape-secondary></div></section></div>
     <section class="draw-desktop-group" data-desktop-group="selection" aria-label="選択と変形"><h2>選択と変形</h2><div class="draw-desktop-group__buttons" data-desktop-selection></div><div class="draw-desktop-context" data-desktop-selection-context></div><div class="draw-desktop-features" data-desktop-features></div></section>
-    <section class="draw-desktop-group" data-desktop-group="view" aria-label="表示と補助"><h2>表示・補助</h2><div class="draw-desktop-group__buttons" data-desktop-view></div><div class="draw-desktop-history" data-desktop-history></div><button type="button" class="draw-desktop-button draw-desktop-cell-launcher" data-desktop-cell-launcher aria-label="セル表を開く" title="セル表を開く">▦ <span>セル表</span></button></section>
+    <section class="draw-desktop-group" data-desktop-group="view" aria-label="表示と補助"><h2>表示・補助</h2><div class="draw-desktop-group__buttons" data-desktop-view></div><div class="draw-desktop-history" data-desktop-history></div><button type="button" class="draw-desktop-button draw-desktop-cell-launcher" data-desktop-cell-launcher aria-label="セル表を開く" title="セル表を開く"><span class="draw-desktop-button__icon" aria-hidden="true">▦</span><span class="draw-desktop-button__label draw-button-label">セル表</span></button></section>
   </div>
   <div class="draw-desktop-resizer" data-layout-separator="leftWidth" role="separator" tabindex="0" aria-label="ツール欄の幅を変更" aria-orientation="vertical" aria-controls="draw-desktop-tools"></div>
   <div class="draw-desktop-stage" data-desktop-lane="stage"><div class="draw-desktop-canvas-meta"></div><div class="draw-desktop-canvas-host"></div><div class="draw-desktop-toolbar-context" data-desktop-toolbar-context></div></div>
   <div class="draw-desktop-resizer" data-layout-separator="rightWidth" role="separator" tabindex="0" aria-label="色・レイヤー欄の幅を変更" aria-orientation="vertical" aria-controls="draw-desktop-dock"></div>
   <aside class="draw-desktop-dock" id="draw-desktop-dock" data-desktop-lane="dock"><section class="draw-desktop-palette-panel" id="draw-desktop-palette"><h2>色</h2><div class="draw-desktop-palette-host"></div></section><div class="draw-desktop-resizer draw-desktop-resizer--inside" data-layout-separator="paletteHeight" role="separator" tabindex="0" aria-label="パレットとレイヤーの高さを変更" aria-orientation="horizontal" aria-controls="draw-desktop-palette"></div><section class="draw-desktop-layers-panel"><h2>レイヤー</h2><div class="draw-desktop-layer-host"></div></section></aside>
   <div class="draw-desktop-resizer draw-desktop-resizer--frame" data-layout-separator="frameHeight" role="separator" tabindex="0" aria-label="コマ欄の高さを変更" aria-orientation="horizontal" aria-controls="draw-desktop-frames"></div>
-  <section class="draw-desktop-frame-panel" data-desktop-lane="frames"><div class="draw-desktop-frame-heading"><h2>コマ</h2><button type="button" data-layout-reset aria-label="PCレイアウトを初期値に戻す" title="PCレイアウトを初期値に戻す"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7v5h5M5.5 11A7 7 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>初期レイアウト</span></button></div><div class="draw-desktop-frame-host" id="draw-desktop-frames"></div></section>`;
+  <section class="draw-desktop-frame-panel" data-desktop-lane="frames"><div class="draw-desktop-frame-heading"><h2>コマ</h2><button type="button" data-layout-reset aria-label="PCレイアウトを初期値に戻す" title="PCレイアウトを初期値に戻す"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7v5h5M5.5 11A7 7 0 1 1 6 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="draw-button-label">初期配置</span></button></div><div class="draw-desktop-frame-host" id="draw-desktop-frames"></div></section>`;
   root.append(shell);
   const $ = selector => shell.querySelector(selector);
   const modeNodes = new Map();
@@ -133,7 +139,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
     const key = `${tool}:${mode}`;
     const actual = actualButtons.get(key) || actualButtons.get(`${tool}:`);
     if (!actual) return null;
-    const node = button(label, bindingKey(commandId), commandId, { icon: desktopToolIcon(tool, mode) || actual.dataset.drawingIcon || tool, pressed: actual.getAttribute('aria-pressed') === 'true' });
+    const node = button(label, bindingKey(commandId), commandId, { icon: desktopToolIcon(tool, mode) || actual.dataset.drawingIcon || tool, caption: toolCaption(tool, mode, label), pressed: actual.getAttribute('aria-pressed') === 'true' });
     node.dataset.desktopTool = tool; if (mode) node.dataset.desktopSelectionMode = mode;
     node.title = keyTip(label, bindingKey(commandId)); host.append(node); return node;
   };
@@ -151,7 +157,8 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
   const viewHost = $('[data-desktop-view]');
   for (const [label, command, icon] of [['拡大', 'view.zoomIn', 'zoom-in'], ['縮小', 'view.zoomOut', 'zoom-out'], ['全体表示', 'view.reset', 'zoom-reset'], ['マス目', 'toggle.grid', 'grid'], ['オニオン', 'toggle.onion', 'onion']]) {
     const toggle = command === 'toggle.grid' || command === 'toggle.onion';
-    const node = button(label, bindingKey(command), command, { icon, ...(toggle ? { pressed: false } : {}) }); node.title = keyTip(label, bindingKey(command)); viewHost.append(node);
+    const caption = ({ 'view.reset': '全体', 'toggle.onion': '前後コマ' })[command] || label;
+    const node = button(label, bindingKey(command), command, { icon, caption, ...(toggle ? { pressed: false } : {}) }); node.title = keyTip(label, bindingKey(command)); viewHost.append(node);
   }
 
   const meta = root.querySelector('.draw-meta');
@@ -313,7 +320,7 @@ export function mountDrawDesktopUi({ scope, root, drawShortcuts, animationContro
       const kbd = node.querySelector('kbd'); if (kbd && kbd.textContent !== key) kbd.textContent = key;
       const text = node.querySelector('.draw-desktop-button__label');
       if (text && node.dataset.desktopTool === 'select' && actual) {
-        const label = actual.querySelector('[data-tool-label]')?.textContent || actual.getAttribute('aria-label');
+        const label = toolCaption(tool, mode, actual.querySelector('[data-tool-label]')?.textContent || actual.getAttribute('aria-label'));
         if (text.textContent !== label) text.textContent = label;
       }
       node.title = keyTip(node.getAttribute('aria-label'), key);

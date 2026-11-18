@@ -56,3 +56,15 @@ body[data-page="draw"] #draw-virtual-controls[hidden] { display: none !important
 body[data-page="draw"] .draw-floating-mouse[data-floating-state="fixed"] { border-color: #ffd35a; }
 body[data-page="draw"] .draw-floating-mouse[data-floating-state="moving"] { border-color: #8ecdf0; }
 body[data-page="draw"] .draw-input-settings #draw-mouse-position-reset { width: 100%; min-height: 44px; padding: 6px 8px; border: 1px solid #ffffff35; border-radius: 9px; background: #26333d; color: #edf2f3; font: 600 11px/1.3 system-ui; }
+
+/* Keep the three 44px rows; reveal the active tool name under its glyph. */
+body[data-creation-mode="draw"] .draw-fixed-left #draw-tool-summary {
+  display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+}
+body[data-creation-mode="draw"] .draw-fixed-left #draw-tool-summary [data-draw-tool-name] { display:block; font:700 10px/12px system-ui,sans-serif; letter-spacing:-.2px; white-space:nowrap; }
+body[data-creation-mode="draw"] .draw-fixed-left #draw-tool-summary > svg { width:20px; height:20px; flex:none; }
+body[data-creation-mode="draw"] .draw-fixed-left #draw-tool-summary .draw-tool-picker__chevron { display:none; }
+body[data-creation-mode="draw"] .draw-fixed-left #draw-tool-summary [data-draw-tool-name] {
+  position:static !important; width:auto !important; height:auto !important; margin:0 !important; padding:0 !important;
+  overflow:visible !important; clip:auto !important; clip-path:none !important;
+}

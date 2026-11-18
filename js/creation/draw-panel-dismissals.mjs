@@ -1,3 +1,4 @@
+import { createDrawButtonContent } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 /** Draw-only dismissal chrome and input isolation for its floating editor panels. */
 export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloating, hasFloating }) {
   const doc = root.ownerDocument;
@@ -27,7 +28,7 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
       heading.textContent = title; header.append(heading); panel.prepend(header);
     }
     header.classList.add('draw-panel-header');
-    const close = doc.createElement('button'); close.type = 'button'; close.textContent = '×';
+    const close = doc.createElement('button'); close.type = 'button'; createDrawButtonContent(close, { icon: 'close', label: '閉じる', doc });
     close.dataset.drawPanelClose = ''; close.className = 'draw-panel-close';
     close.setAttribute('aria-label', `${title}を閉じる`); close.title = `${title}を閉じる`;
     header.append(close); scope.listen(close, 'click', () => dismiss(details));
@@ -57,7 +58,7 @@ export function mountDrawPanelDismissals({ scope, root, cancelInput, closeFloati
     // Reuse the color editor's existing completion button at its persistent header.
     const color = doc.querySelector('#draw-color-editor'), done = color?.querySelector('#dce-done');
     if (done && !done.hasAttribute('data-draw-panel-close')) {
-      done.dataset.drawPanelClose = ''; done.classList.add('draw-panel-close'); done.textContent = '×';
+      done.dataset.drawPanelClose = ''; done.classList.add('draw-panel-close'); createDrawButtonContent(done, { icon: 'close', label: '閉じる', doc });
       done.setAttribute('aria-label', '色の調整を閉じる'); done.title = '色の調整を閉じる';
       const header = color.querySelector('.dce-header'); header.classList.add('draw-panel-header'); header.append(done);
     }

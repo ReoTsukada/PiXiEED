@@ -267,6 +267,16 @@ function normalize(source, file) {
     const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261118-draw-display-ad-1') : query + (query ? '&' : '?') + 'rev=20261118-draw-display-ad-1';
     return `${quote}${path}${next}${quote}`;
   });
+  // Keep the Draw caption helper and its bounded importer/style closure on
+  // the current release while preserving nav, attempt, and other query values.
+  const drawButtonLabelTargets = new Set(["css/color-panel.css", "css/creation-animation.css", "css/creation-modes.css", "css/draw-brush-settings.css", "css/draw-color-adjustment-panel.css", "css/draw-compact-controls.css", "css/draw-desktop-ui.css", "css/draw-live-session.css", "css/draw-normal-map.css", "css/draw-selection-features.css", "css/draw-text-panel.css", "css/draw-viewport.css", "css/project-workspace.css", "css/tool-direct.css", "js/creation/animation-controls.mjs", "js/creation/audio-entry.mjs", "js/creation/audio-page.mjs", "js/creation/color-panel.mjs", "js/creation/creation-camera.mjs", "js/creation/creation-modes.mjs", "js/creation/creation-runtime.mjs", "js/creation/draw-brush-settings.mjs", "js/creation/draw-button-content.mjs", "js/creation/draw-color-adjustment-panel.mjs", "js/creation/draw-desktop-ui.mjs", "js/creation/draw-entry.mjs", "js/creation/draw-lazy-panels.mjs", "js/creation/draw-live-session-panel.mjs", "js/creation/draw-music.mjs", "js/creation/draw-normal-map-panel.mjs", "js/creation/draw-page.mjs", "js/creation/draw-panel-dismissals.mjs", "js/creation/draw-selection-panel.mjs", "js/creation/draw-shortcuts.mjs", "js/creation/draw-text-panel.mjs", "js/creation/hidden-object-page.mjs", "js/creation/jigsaw-page.mjs", "js/creation/project-start-picker.mjs", "js/creation/project-workspace.mjs", "js/creation/pxd-ui.mjs", "js/creation/shared-project-settings.mjs", "js/creation/spot-difference-page.mjs", "js/creation/tool-project-import.mjs", "js/pixel-lens/app.mjs", "js/pixel-lens/entry.mjs", "js/tool-direct.mjs", "js/tool-shell.mjs"]);
+  changed = changed.replace(/(["'`])([^"'`\s<>]+\.(?:mjs|js|css))(\?[^"'`\s<>]*)?\1/g, (whole, quote, path, query = '') => {
+    if (!path.startsWith('/') && !path.startsWith('.') || path.startsWith('//')) return whole;
+    const target = path.startsWith('/') ? path.slice(1) : posix.normalize(posix.join(posix.dirname(relative(root, file)), path));
+    if (!drawButtonLabelTargets.has(target)) return whole;
+    const next = /[?&]rev=/.test(query) ? query.replace(/([?&])rev=[^&]*/, '$1rev=20261118-draw-button-label-1') : query + (query ? '&' : '?') + 'rev=20261118-draw-button-label-1';
+    return `${quote}${path}${next}${quote}`;
+  });
   return changed;
 }
 

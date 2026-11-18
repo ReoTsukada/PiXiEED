@@ -1,6 +1,6 @@
 .draw-gpt-slot { flex:0 0 auto; }
-body .px-site-header .draw-gpt-connect, .draw-gpt-connect { position:relative; display:inline-grid; place-items:center; box-sizing:border-box; width:44px; min-width:44px; height:44px; padding:9px; border:1px solid #52606a; border-radius:12px; background:#26323b; color:#f6f5ee; font:inherit; font-size:12px; font-weight:700; white-space:nowrap; }
-.draw-gpt-icon { display:block; width:24px; height:24px; background:currentColor; -webkit-mask:url("/assets/icons/pixieed/chat-pixels.svg?rev=20261117-chat-connect-1") center / contain no-repeat; mask:url("/assets/icons/pixieed/chat-pixels.svg?rev=20261117-chat-connect-1") center / contain no-repeat; }
+body .px-site-header .draw-gpt-connect, .draw-gpt-connect { position:relative; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; box-sizing:border-box; width:44px; min-width:44px; height:44px; padding:2px; border:1px solid #52606a; border-radius:12px; background:#26323b; color:#f6f5ee; font:inherit; font-size:12px; font-weight:700; white-space:nowrap; }
+.draw-gpt-icon { display:block; width:20px; height:20px; background:currentColor; -webkit-mask:url("/assets/icons/pixieed/chat-pixels.svg?rev=20261117-chat-connect-1") center / contain no-repeat; mask:url("/assets/icons/pixieed/chat-pixels.svg?rev=20261117-chat-connect-1") center / contain no-repeat; }
 .draw-gpt-connect[data-connected="true"] { border-color:#91d6b8; color:#baf1d3; }
 .draw-gpt-connect[data-connected="true"]::after { content:""; position:absolute; right:4px; bottom:4px; width:5px; height:5px; border:2px solid #26323b; border-radius:50%; background:#91d6b8; }
 body:not([data-creation-mode="draw"]) .draw-gpt-slot { display:none; }
@@ -54,3 +54,7 @@ body:not([data-creation-mode="draw"]) .draw-gpt-slot { display:none; }
 
 .draw-live-prompt-actions { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; }
 .draw-live-prompt-actions a { display:inline-flex; align-items:center; min-height:44px; box-sizing:border-box; }
+
+.draw-gpt-connect .draw-button-label { display:block; font:700 10px/12px system-ui,sans-serif; }
+.draw-live-dialog .draw-inline-icon { display:inline-block; width:18px; height:18px; margin-inline-end:6px; vertical-align:middle; filter:brightness(0) invert(1); }
+.draw-live-dialog [data-live-start] .draw-inline-icon { filter:none; }

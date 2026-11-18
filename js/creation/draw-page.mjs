@@ -12,7 +12,7 @@ import { NORMAL_MAP_PALETTE, NORMAL_MAP_SWATCHES, ANIMATION_MAX_DIMENSION, estim
 import { composeOutputFrameRgba as composeOutputFrame } from './creation-output-core.mjs?rev=20261116-normal-release-2';
 import { DEFAULT_MUSIC_OUTPUT_PREFERENCES, readMusicOutputPreferences, writeMusicOutputPreferences } from './music-output-preferences.mjs';
 import { readPxdAnimation, writePxdAnimation } from './pxd-animation.mjs?rev=20261116-normal-release-2';
-import { mountAnimationControls } from './animation-controls.mjs?rev=20261117-chat-connect-1';
+import { mountAnimationControls } from './animation-controls.mjs?rev=20261118-draw-button-label-1';
 import { rawPixelCellAt } from './pixel-input.mjs?rev=20261001-connected-editor-1';
 import { createPixelCanvasSurface } from './pixel-canvas-surface.mjs?rev=20261015-alpha-opacity-1';
 import { createAnimationFrameCache, createFrameBatcher, createStrokePaintScheduler, updateOnionImageData } from './draw-render-optimization.mjs?rev=20261029-stroke-paint-1';
@@ -20,7 +20,7 @@ import { DRAW_HANDOFF_KEY, encodeDrawPng, serializeDrawHandoff, validateDrawPixe
 import { navigateToSocialReturn } from '../social/tool-return.mjs?rev=20261021-jigsaw-public-1';
 import { createInteractionEffects } from './interaction-effects.mjs?rev=20260928-touch-motion-1';
 import { createPxdProject, encodePxd, decodePxd, setPxdBytes } from './pxd-codec.mjs';
-import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261118-draw-display-ad-1';
+import { mountProjectWorkspace as mountPxdTools } from './project-workspace.mjs?rev=20261118-draw-button-label-1';
 import { pxdImageRoles, readPxdImage, imageToDrawDocument, readPxdDrawDocument, putPxdDrawDocument, putPxdSharedImage, putPxdImage } from './pxd-project.mjs?rev=20261116-normal-release-2';
 import { evaluateSharedCanvasPolicy } from './shared-canvas-policy.mjs?rev=20261116-normal-release-2';
 import { countSharedImageColors, prepareSharedCanvasImage } from './shared-image.mjs?rev=20261116-normal-release-2';
@@ -34,7 +34,7 @@ import { drawShapePixels, sprayPixels, selectionBounds, moveSelectionPixels } fr
 import { createToolStartTracker } from '../site-analytics.mjs?rev=20261017-analytics-integrity-1';
 import { sendToolOutputAfterSaving } from './output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { prepareCameraTarget } from './draw-camera-core.mjs?rev=20261116-normal-release-2';
-import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261117-chat-connect-1';
+import { mountDrawDesktopUi } from './draw-desktop-ui.mjs?rev=20261118-draw-button-label-1';
 import { createSiteRewardDrawPolicy, getDrawBonusColorKeys, preservesDrawBonusColorPixels } from './site-reward-draw-policy.mjs?rev=20261016-color-capability-1';
 import { REWARD_LIMITS } from '../ads/site-reward-config.mjs?rev=20261016-color-capability-1';
 import { assertDrawAgentPrecondition, normalizeDrawAgentBinding, normalizeDrawAgentOperation } from './draw-agent-operations.mjs?rev=20261117-chat-connect-1';
@@ -42,27 +42,27 @@ import { prepareDrawAgentPlan } from './draw-agent-plan.mjs?rev=20261117-chat-co
 import { normalizeDrawAgentPreferences } from './draw-agent-preferences.mjs?rev=20261117-chat-connect-1';
 
 import { symmetryTransforms, symmetryPoint, symmetryPoints } from './drawing-symmetry.mjs?rev=20261116-normal-release-2';
-import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261011-polish-1';
+import { mountDrawPanelDismissals } from './draw-panel-dismissals.mjs?rev=20261118-draw-button-label-1';
 import { mountDrawCanvasPanel } from './draw-canvas-panel.mjs?rev=20261009-sprite-scale-1';
 import { mountDrawSpriteScalePanel } from './draw-sprite-scale-panel.mjs?rev=20261009-sprite-scale-1';
 import { planSpriteScale, scaleSpriteAnimation } from './draw-sprite-scale.mjs?rev=20261116-normal-release-2';
 import { resizeDrawView } from './draw-resize-view.mjs?rev=20261116-normal-release-2';
-import { mountColorPanel } from './color-panel.mjs?rev=20261016-tool-shell-1';
+import { mountColorPanel } from './color-panel.mjs?rev=20261118-draw-button-label-1';
 import { mountDrawAudioTimbrePanel } from './draw-audio-timbre-panel.mjs?rev=20261106-button-icon-audit-1';
 import { getAudioInstrumentIcon, audioInstrumentIconFilter } from './audio-instrument-icons.mjs?rev=20261005-audio-drums-1';
 import { mountDrawViewportOverlays, shouldShowDrawOnion } from './draw-viewport-overlays.mjs?rev=20261108-gallery-canvas-viewport-1';
 import { mountDrawVirtualCursor } from './draw-virtual-cursor.mjs?rev=20261009-pointer-selection-1';
 import { DRAW_INPUT_SETTINGS_KEY, normalizeDrawInputSettings, serializeDrawInputSettings, readDrawInputSettings } from './draw-input-settings.mjs?rev=20261011-tool-size-1';
 import { mountDrawAssignmentInput } from './draw-assignment-input.mjs?rev=20261006-header-controls-1';
-import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261015-draw-desktop-1';
+import { DRAW_SHORTCUT_COMMANDS, mountDrawShortcuts } from './draw-shortcuts.mjs?rev=20261118-draw-button-label-1';
 import { captureDrawSelection, clearDrawSelection, createDrawSelectionClipboard, getDrawSelectionOtherColors, drawSelectionMask, drawSelectionMaskBounds, selectDrawColorMask } from './draw-selection-operations.mjs?rev=20261116-normal-release-2';
 import { createDrawSelectionTransform } from './draw-selection-session.mjs?rev=20261116-normal-release-2';
-import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261116-normal-release-2';
+import { mountDrawSelectionPanel } from './draw-selection-panel.mjs?rev=20261118-draw-button-label-1';
 import { selectionDefaultPivot, selectionContains, snapSelectionAngle, transformSelectionFromCorner, unwrapSelectionBearing, translateSelectionFrame } from './draw-selection-geometry.mjs?rev=20261116-normal-release-2';
 import { mountDrawSelectionOverlay } from './draw-selection-overlay.mjs?rev=20261116-normal-release-2';
 import { selectionInputOperation, selectionGestureKind, combineDrawInputSelection, combineDrawLassoSelection, lassoDrawSelection } from './draw-selection-input.mjs?rev=20261116-normal-release-2';
-import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261117-chat-connect-1';
-import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261024-context-controls-1';
+import { mountLazyDrawFeaturePanels } from './draw-lazy-panels.mjs?rev=20261118-draw-button-label-1';
+import { mountDrawBrushSettings } from './draw-brush-settings.mjs?rev=20261118-draw-button-label-1';
 
 import { normalizeNormalMapSettings, readNormalMapSettings, writeNormalMapSettings } from './draw-normal-map-settings.mjs?rev=20261117-normal-apply-1';
 
@@ -451,6 +451,7 @@ const panelDismissals = mountDrawPanelDismissals({ scope, root: $('#main'), canc
   closeFloating: () => { closeColorEditor(); animationControls?.close?.(); editorUi.closePanels(); },
   hasFloating: () => Boolean(colorEdit || animationControls?.hasOpenPanels) });
 const selectionControls = mountDrawSelectionOverlay({ scope, board: $('.draw-board'), canvas, getFrame: selectionFrame });
+const TOOL_CAPTIONS = { pen: 'ペン', eraser: '消しゴム', fill: '塗る', line: '直線', rectangle: '四角', 'rectangle-fill': '四角塗り', ellipse: '楕円', 'ellipse-fill': '楕円塗り', spray: 'スプレー', select: '範囲選択', picker: 'スポイト' };
 const TOOL_NAMES = { pen: 'ペン', eraser: '消しゴム', fill: '塗りつぶし', line: '直線', rectangle: '四角形', 'rectangle-fill': '四角塗り', ellipse: '楕円', 'ellipse-fill': '楕円塗り', spray: 'スプレー', select: '範囲選択', picker: 'スポイト' };
 const SHAPE_TOOLS = new Set(['line', 'rectangle', 'rectangle-fill', 'ellipse', 'ellipse-fill']);
 let lastOtherTool = 'fill';
@@ -581,6 +582,8 @@ function syncPlaybackControl() {
   button.setAttribute('aria-pressed', String(playing));
   const label = playing ? 'アニメーションを停止' : frames.length < 2 ? '2コマ以上でアニメーションを再生できます' : 'アニメーションを再生';
   button.setAttribute('aria-label', label); button.title = label;
+  const caption = button.querySelector('.draw-button-label');
+  if (caption) caption.textContent = playing ? '停止' : '再生';
   badge.hidden = !playing;
   if (playing) badge.textContent = `▶ ${frames.findIndex(frame => frame.id === playbackFrame) + 1} / ${frames.length}`;
   animationControls?.showPlaybackFrame?.(playing ? playbackFrame : null);
@@ -747,7 +750,7 @@ function handleAnimationAction(action) {
   if (!guardDrawTransition(next, { lease, target, mutation: 'edit' })) { drawOperationLease = null; return false; }
   installAnimationDocument(animationSession.apply(next, targetSelection)); pxdBridge?.markDirty();
 }
-animationControls = mountAnimationControls({ host: $('#draw-animation-controls'), scope,
+animationControls = mountAnimationControls({ host: $('#draw-animation-controls'), scope, buttonLabels: true,
   getState: () => ({ ...animationSession.animation, frameId: animationSession.frameId, layerId: animationSession.layerId, playing, playbackFrameId: playbackFrame, onion, readOnly: Boolean(readOnlyImage), normalMapAvailable: true }),
   onionControlExternal: true, dismissibleMenus: true,
   onAction: handleAnimationAction,
@@ -801,7 +804,7 @@ function renderPalette() {
     });
   }
   if (!normalPalette && documentData.palette.length < ANIMATION_MAX_PALETTE_ENTRIES) {
-    const add = document.createElement('button'); add.type = 'button'; add.className = 'draw-color'; add.textContent = '+'; add.setAttribute('aria-label', '色を追加する');
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'draw-color'; add.innerHTML = '<span class="draw-add-color-icon" aria-hidden="true">+</span><span class="draw-button-label" aria-hidden="true">追加</span>'; add.dataset.drawColorAdd = ''; add.setAttribute('aria-label', '色を追加する');
     add.addEventListener('click', () => {
       if (!canEdit()) return;
       if (selectionTransform) { toast('✓で確定、×で取消してから色を追加できます。'); return; }
@@ -1523,7 +1526,7 @@ function setSelectionMode(mode, side = 'left') {
   syncInputControls();
   if (side === 'left' && tool === 'select') {
     const summary = $('#draw-tool-summary'), label = summary?.querySelector('[data-draw-tool-name]');
-    if (label) label.textContent = selectionToolLabel(mode);
+    if (label) label.textContent = mode === 'color' ? '同じ色' : mode === 'lasso' ? '投げ縄' : '範囲選択';
     if (summary) { summary.setAttribute('aria-label', `${selectionToolLabel(mode)}：道具を選ぶ`); summary.title = `${selectionToolLabel(mode)}：道具を選ぶ`; }
     document.querySelectorAll('.draw-select-tool-modes [data-selection-mode]').forEach(node => node.setAttribute('aria-pressed', String(node.dataset.selectionMode === mode)));
   }
@@ -1543,7 +1546,7 @@ function setTool(next, side = 'left') {
   const summary = $('#draw-tool-summary');
   if (summary) {
     summary.querySelector('svg')?.replaceWith(createDrawingToolIcon(next));
-    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = next === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[next];
+    const label = summary.querySelector('[data-draw-tool-name]'); if (label) label.textContent = next === 'select' ? selectedMode(side) === 'color' ? '同じ色' : selectedMode(side) === 'lasso' ? '投げ縄' : '範囲選択' : TOOL_CAPTIONS[next];
     summary.dataset.active = 'true';
     summary.setAttribute('aria-label', `${next === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[next]}：道具を選ぶ`);
     summary.title = `${next === 'select' ? selectionToolLabel(selectedMode(side)) : TOOL_NAMES[next]}：道具を選ぶ`;
@@ -2385,7 +2388,7 @@ async function importImage(file, importSource) {
       maxColors: importColors, allowConversion: true });
     const next = imageToDrawDocument(prepared.image);
     if (prepared.changed) {
-      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261118-draw-display-ad-1');
+      const { confirmPxdConversion } = await import('./pxd-ui.mjs?rev=20261118-draw-button-label-1');
       if (scope.disposed || !loadGate.isCurrent(ticket)) return;
       if (!await confirmPxdConversion({ image: original, document: next, title: '読み込む絵を確認', applyLabel: 'この絵を使う', message: `${next.width}×${next.height}px・${prepared.colorCount}色に合わせます。元の画像ファイルは変更しません。` })) return;
     }
@@ -2744,7 +2747,7 @@ const drawProjectOptions = {
     for (const hook of projectHooks) if (hook.prepareOpen) project = await hook.prepareOpen(project);
     // Legacy song-only PXD requires its explicit pixel reconstruction before opening.
     if (project.entries.some(entry => entry.path === 'audio/state.json') && (!pxdImageRoles(project).length || readPxdAudioLink(project)?.legacyEditorRole)) {
-      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261116-normal-release-2');
+      const { prepareSharedMusicProject } = await import('./draw-music.mjs?rev=20261118-draw-button-label-1');
       project = await prepareSharedMusicProject(project);
     }
     const opened = async () => {

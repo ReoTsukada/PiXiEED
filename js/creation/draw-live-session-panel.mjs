@@ -13,10 +13,10 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     } catch { /* Ignore malformed local development overrides. */ }
   }
   const stylesheet = document.createElement('link'); stylesheet.rel = 'stylesheet';
-  stylesheet.href = '/css/draw-live-session.css?rev=20261117-chat-connect-1'; document.head.append(stylesheet);
+  stylesheet.href = '/css/draw-live-session.css?rev=20261118-draw-button-label-1'; document.head.append(stylesheet);
   const button = document.createElement('button'); button.type = 'button'; button.id = 'draw-gpt-connect';
   button.className = 'draw-gpt-connect';
-  button.innerHTML = '<span class="draw-gpt-icon" aria-hidden="true"></span>';
+  button.innerHTML = '<span class="draw-gpt-icon" aria-hidden="true"></span><span class="draw-button-label" aria-hidden="true">GPT</span>';
   button.setAttribute('aria-label', 'ChatGPTとつなぐ'); button.title = 'ChatGPTとつなぐ';
   button.setAttribute('aria-haspopup', 'dialog');
   const slot = document.createElement('div'); slot.className = 'px-tool-header-slot draw-gpt-slot'; slot.append(button);
@@ -58,6 +58,14 @@ export function mountDrawLiveSessionPanel({ draw, scope, isActive }) {
     <div data-live-legacy-prompt hidden><label for="draw-live-prompt">手動接続の依頼文（旧方式用・コードを含みます）</label><textarea id="draw-live-prompt" readonly rows="3" spellcheck="false"></textarea><button type="button" data-live-copy-prompt>旧方式の依頼文をコピー</button></div></div>
     <p class="draw-live-scope">このタブの作品だけを操作します。作品の切り替え・タブを閉じると接続は終了します。保存先はこの端末です。</p>
     <div class="draw-live-actions"><button type="button" data-live-start>接続コードを発行</button><button type="button" data-live-stop hidden>接続を終了</button><button type="button" data-live-close>閉じる</button></div>`;
+  for (const [selector, icon] of [
+    ['[data-live-copy-connect-prompt], [data-live-copy-code], [data-live-copy-prompt]', 'copy'],
+    ['[data-live-start], [data-live-start-legacy]', 'chat-pixels'],
+    ['[data-live-stop], [data-live-close]', 'close']
+  ]) for (const action of dialog.querySelectorAll(selector)) {
+    const image = document.createElement('img'); image.className = 'draw-inline-icon';
+    image.src = `/assets/icons/pixieed/${icon}.svg`; image.alt = ''; action.prepend(image);
+  }
   document.body.append(dialog);
   if (publicPluginUrl) {
     const storeLink = dialog.querySelector('[data-live-store-link]');

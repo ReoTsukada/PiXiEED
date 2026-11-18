@@ -1,5 +1,5 @@
 import { mountToolHeaderControls } from '../tool-header-controls.mjs?rev=20261111-output-offerwall-1&nav=20261016-tool-operations-1';
-import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261116-normal-release-2';
+import { mountSharedProjectSettings } from './shared-project-settings.mjs?rev=20261118-draw-button-label-1';
 import { mountCameraCanvasSettings } from './camera-canvas-settings.mjs?rev=20261116-normal-release-2';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { mountDrawMusicModel } from './draw-music-model.mjs?rev=20261116-normal-release-2';
@@ -34,7 +34,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   let audioLoadAttempt = 0;
   body.classList.add('creation-suite'); body.dataset.creationMode = mode;
   for (const node of main.querySelectorAll('#draw-undo,#draw-redo,#draw-tool-summary')) node.classList.add('creation-control-button');
-  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261116-normal-release-2';
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/css/creation-modes.css?rev=20261118-draw-button-label-1';
   const styled = new Promise((resolve, reject) => {
     const abort = () => finish(new DOMException('制作画面が閉じられました。', 'AbortError'));
     const finish = error => { scope.signal.removeEventListener('abort', abort); error ? reject(error) : resolve(); };
@@ -182,7 +182,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
   const historyActions = [document.querySelector('#draw-undo'), document.querySelector('#draw-redo')];
   for (const [index, button] of historyActions.entries()) {
     const marker = document.createComment('creation-history-position'); button.before(marker);
-    const label = document.createElement('span'); label.className = 'app-tab-label'; label.textContent = index ? 'やり直す' : '戻す';
+    const label = button.querySelector('.draw-button-label') || document.createElement('span'); label.className = 'app-tab-label draw-button-label'; label.textContent = index ? 'やり直す' : '戻す';
     button.append(label); button.dataset.navSlot = index ? '4' : '2'; button.dataset.toolOperation = '';
     button.classList.add('creation-nav-action'); own(button, 'editor'); nav.append(button);
     scope.add(() => { label.remove(); marker.replaceWith(button); delete button.dataset.navSlot; delete button.dataset.toolOperation; });
@@ -413,7 +413,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let candidate;
     try {
-      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261116-normal-release-2&attempt=${audioLoadAttempt++}`);
+      const { mountDrawMusic } = await import(`./draw-music.mjs?rev=20261118-draw-button-label-1&attempt=${audioLoadAttempt++}`);
       if (!currentRequest(version)) throw interrupted();
       candidate = await mountDrawMusic({ draw, musicModel, scope:candidateScope, nav, isActive: () => isActive() && mode === 'audio' && !switching });
       const settingsNode = document.querySelector('#draw-music-settings');
@@ -451,7 +451,7 @@ export async function mountCreationModes({ draw, scope, isActive = () => true, r
     const candidateScope = createModeScope(); initializingScope = candidateScope;
     let accepted = false;
     try {
-      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261118-draw-display-ad-1&attempt=${version}`);
+      const { mountCreationCamera } = await import(`./creation-camera.mjs?rev=20261118-draw-button-label-1&attempt=${version}`);
     if (!currentRequest(version)) throw interrupted();
     const candidate = await mountCreationCamera({ scope:candidateScope, board, dock, nav, draw, onProjectSettings: () => settings.open(), onProjectStatus: receiveCameraProjectStatus, isCurrent: () => isActive() && !candidateScope.disposed && (accepted ? requestedMode === 'camera' : currentRequest(version)), getAudio: () => audio, onReturn: switchMode, onNavigate: navigate, isActive: () => isActive() && mode === 'camera' });
     if (!currentRequest(version)) { candidateScope.dispose(); throw interrupted(); }

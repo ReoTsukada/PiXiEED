@@ -1,5 +1,5 @@
 /** Compact, host-agnostic frame and layer controls shared by Draw and Audio modes. */
-export function mountAnimationControls({ host, scope, getState, onAction, getFramePreview, getCelHasContent: getCelContent, onionControlExternal = false, frameOnly = false, dismissibleMenus = false } = {}) {
+export function mountAnimationControls({ host, scope, getState, onAction, getFramePreview, getCelHasContent: getCelContent, onionControlExternal = false, frameOnly = false, dismissibleMenus = false, buttonLabels = false } = {}) {
   if (!host?.ownerDocument || !scope || typeof getState !== 'function' || typeof onAction !== 'function') throw new TypeError('Animation controls require a host, lifecycle scope, state reader, and action handler');
   const document = host.ownerDocument;
   let disposed = false;
@@ -53,6 +53,27 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     while (parent.children.length > desired.length) parent.removeChild(parent.children[parent.children.length - 1]);
   }
+  const buttonCaptions = {
+    'toggle-frames': 'コマ', 'previous-frame': '前へ', 'next-frame': '次へ', 'add-frame': '複製',
+    'toggle-duration': '速さ', 'toggle-layers': 'レイヤー', play: '再生', onion: '透かし',
+    'export-gif': 'GIF', 'close-layers': '閉じる', 'selected-layer-settings': '設定',
+    'add-layer': '追加', 'close-duration': '閉じる', 'close-opacity-popover': '閉じる',
+    'close-animation': '閉じる', 'close-frame-menu': '閉じる', 'desktop-blank-frame': '空白',
+    'desktop-add-frame': '複製', 'desktop-delete-frame': '削除',
+    'desktop-move-frame-left': '左へ', 'desktop-move-frame-right': '右へ',
+    'move-layer-up': '上へ', 'move-layer-down': '下へ', 'delete-layer': '削除', visibility: '隠す', lock: '固定'
+  };
+  const updateButtonCaption = (element, iconName) => {
+    if (!buttonLabels) return;
+    const action = element.dataset.action;
+    const text = action === 'play' && iconName === 'pause' ? '停止'
+      : action === 'visibility' && iconName === 'eye-hidden' ? '表示'
+      : action === 'lock' && iconName === 'locked' ? '解除' : buttonCaptions[action];
+    if (!text) return;
+    let caption = findChildClass(element, 'draw-button-label');
+    if (!caption) { caption = node('span', 'draw-button-label'); caption.setAttribute('aria-hidden', 'true'); element.append(caption); }
+    setText(caption, text); setData(element, 'drawButtonLabel', 'true');
+  };
   const button = (label, glyph, action, className = '') => {
     const element = node('button', `animation-controls__button ${className}`.trim());
     element.type = 'button'; element.title = label; element.setAttribute('aria-label', label);
@@ -68,7 +89,10 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       'move-layer-up': 'up', 'move-layer-down': 'down', 'delete-layer': 'trash', visibility: 'eye'
     })[action];
     if (iconName) { replaceButtonIcon(element, iconName); element.dataset.iconName = iconName; }
-    else if (glyph) element.textContent = glyph;
+    else if (buttonLabels && action === 'normal-map') {
+      const label = node('span', 'animation-controls__wide-label', glyph); label.setAttribute('aria-hidden', 'true');
+      element.append(icon('adjustments'), label);
+    } else { if (glyph) element.textContent = glyph; updateButtonCaption(element, iconName); }
     return element;
   };
   const icon = (name) => {
@@ -115,6 +139,9 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     } else if (name === 'layer-add') {
       add('path', { ...stroke, d: 'm12 6 8 4-8 4-8-4 8-4ZM4 14l8 4 8-4' });
       add('path', { ...stroke, d: 'M20 1.5v5M17.5 4h5' });
+    } else if (name === 'adjustments') {
+      add('path', { ...stroke, d: 'M3 6h18M3 12h18M3 18h18' });
+      add('path', { ...stroke, 'stroke-width': '3', d: 'M8 3v6M16 9v6M9 15v6' });
     } else if (name === 'download') {
       add('path', { ...stroke, d: 'M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4' });
     } else if (name === 'close') {
@@ -139,7 +166,13 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
     }
     return svg;
   };
-  const replaceButtonIcon = (element, name) => { element.replaceChildren(icon(name)); };
+  const replaceButtonIcon = (element, name) => {
+    const retained = buttonLabels ? Array.from(element.children).filter(child =>
+      ['draw-button-label', 'animation-controls__context-label', 'animation-controls__workspace-badge']
+        .some(className => child.classList.contains(className))) : [];
+    element.replaceChildren(icon(name), ...retained);
+    updateButtonCaption(element, name);
+  };
   const listen = (...args) => { const remove = scope.listen(...args); if (typeof remove === 'function') removeListeners.push(remove); };
   function createDom() {
     root = node('section', 'animation-controls'); root.classList.toggle('is-frame-only', frameOnly); root.setAttribute('aria-label', frameOnly ? 'フレーム操作' : 'アニメーション操作');
@@ -1024,7 +1057,7 @@ export function mountAnimationControls({ host, scope, getState, onAction, getFra
       replaceButtonIcon(visibility, layer.visible === false ? 'eye-hidden' : 'eye');
       const lock = add(layer.locked ? 'ロック解除' : 'ロック', '', 'lock', state.readOnly || pending > 0);
       replaceButtonIcon(lock, layer.locked ? 'unlocked' : 'locked');
-      lock.append(node('span', 'animation-controls__context-label', layer.locked ? 'ロック解除' : 'ロック'));
+      if (!findChildClass(lock, 'animation-controls__context-label')) lock.append(node('span', 'animation-controls__context-label', layer.locked ? 'ロック解除' : 'ロック'));
       const opacityLabel = node('label', 'animation-controls__context-opacity');
       const opacityHeading = node('span', 'animation-controls__context-opacity-heading', '不透明度（全コマ共通）');
       const opacityValue = node('output', 'animation-controls__layer-opacity-value', `${Math.round((Number.isFinite(layer.opacity) ? Math.max(0, Math.min(1, layer.opacity)) : 1) * 100)}%`);

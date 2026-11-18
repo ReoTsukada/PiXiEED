@@ -89,7 +89,7 @@ export function mountProjectStartPicker({ onChoose = () => {}, onCancel = () => 
     galleryAd?.retire?.(reason);
 
   }
-  const cssHref = '/css/project-workspace.css?rev=20261112-creation-guidance-1';
+  const cssHref = '/css/project-workspace.css?rev=20261118-draw-button-label-1';
   let css = [...document.querySelectorAll('link[rel="stylesheet"]')].find(link => link.getAttribute('href') === cssHref);
   const ownsCss = !css;
   let cssPromise = null, cssFailed = false, cancelCss = null;

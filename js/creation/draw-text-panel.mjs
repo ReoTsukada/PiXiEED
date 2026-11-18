@@ -1,3 +1,4 @@
+import { createDrawButtonContent } from './draw-button-content.mjs?rev=20261118-draw-button-label-1';
 import { DRAW_TEXT_FONTS, applyTextMaskToDocument, loadDrawTextFont, rasterizeTextMask } from './draw-text.mjs?rev=20261116-normal-release-2';
 
 const element = (tag, className, text = '') => { const node = document.createElement(tag); if (className) node.className = className; if (text) node.textContent = text; return node; };
@@ -5,13 +6,13 @@ const element = (tag, className, text = '') => { const node = document.createEle
 /** Mount the non-destructive text tool. The host owns editor-specific snapshot/history behavior. */
 export function mountDrawTextPanel({ scope, host, getState, onBegin, onPreview, onApply, onCancel } = {}) {
   if (!scope || !host || typeof getState !== 'function' || typeof onBegin !== 'function' || typeof onPreview !== 'function' || typeof onApply !== 'function' || typeof onCancel !== 'function') throw new TypeError('文字ツールの接続先が不足しています。');
-  const opener = element('button', 'draw-text-opener', '文字'); opener.type = 'button'; opener.setAttribute('aria-label', '文字を入力'); opener.title = '文字を入力';
+  const opener = element('button', 'draw-text-opener'); createDrawButtonContent(opener, { icon: 'text', label: '文字' }); opener.type = 'button'; opener.setAttribute('aria-label', '文字を入力'); opener.title = '文字を入力';
   const toolbar = host.querySelector('.draw-fixed-left') || host.querySelector('.draw-controls');
   if (toolbar) toolbar.append(opener);
   const panel = element('section', 'draw-text-panel'); panel.hidden = true; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', '文字を入力');
   const card = element('div', 'draw-text-panel__card');
   const header = element('header', 'draw-text-panel__header'); header.append(element('h2', '', '文字を入力'));
-  const close = element('button', 'draw-text-panel__close', '閉じる'); close.type = 'button'; close.setAttribute('aria-label', '文字ツールを閉じる'); header.append(close);
+  const close = element('button', 'draw-text-panel__close'); createDrawButtonContent(close, { icon: 'close', label: '閉じる' }); close.type = 'button'; close.setAttribute('aria-label', '文字ツールを閉じる'); header.append(close);
   const form = element('form', 'draw-text-panel__form');
   const textLabel = element('label', '', '文字'); const textInput = element('textarea'); textInput.maxLength = 256; textInput.rows = 2; textInput.value = '文字'; textInput.setAttribute('aria-label', '描画する文字'); textLabel.append(textInput);
   const fontLabel = element('label', '', '書体'); const fontSelect = element('select'); fontSelect.setAttribute('aria-label', '書体');
@@ -24,7 +25,7 @@ export function mountDrawTextPanel({ scope, host, getState, onBegin, onPreview, 
   const colorLabel = element('label', '', '色'); const colorSelect = element('select'); colorSelect.setAttribute('aria-label', '文字の色'); colorLabel.append(colorSelect);
   const preview = element('canvas', 'draw-text-panel__preview'); preview.setAttribute('aria-label', '文字のプレビュー');
   const status = element('p', 'draw-text-panel__status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-  const actions = element('div', 'draw-text-panel__actions'); const cancel = element('button', '', 'キャンセル'); cancel.type = 'button'; const apply = element('button', '', '適用'); apply.type = 'submit'; actions.append(cancel, apply);
+  const actions = element('div', 'draw-text-panel__actions'); const cancel = element('button'); createDrawButtonContent(cancel, { icon: 'close', label: '取消' }); cancel.type = 'button'; const apply = element('button'); createDrawButtonContent(apply, { icon: 'confirm', label: '適用' }); apply.type = 'submit'; actions.append(cancel, apply);
   form.append(textLabel, fontLabel, alignLabel, sizeLabel, xLabel, yLabel, colorLabel, preview, status, actions); card.append(header, form); panel.append(card); host.append(panel);
   let active = false, source = null, state = null, revision = 0;
   let inertNodes = [];

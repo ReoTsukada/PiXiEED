@@ -19,7 +19,7 @@ import { createPxdProject } from '../creation/pxd-codec.mjs';
 import { evaluateSharedCanvasPolicy, SHARED_CANVAS_PREMIUM_MAX_COLORS } from '../creation/shared-canvas-policy.mjs?rev=20261116-normal-release-2';
 import { countSharedImageColors, prepareSharedCanvasImage } from '../creation/shared-image.mjs?rev=20261116-normal-release-2';
 import { putPxdSharedImage, readPxdSharedImage } from '../creation/pxd-project.mjs?rev=20261116-normal-release-2';
-import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261118-draw-display-ad-1';
+import { mountPxdTools } from '../creation/pxd-ui.mjs?rev=20261118-draw-button-label-1';
 import { createToolResultView } from '../tool-result-view.mjs?rev=20261118-draw-display-ad-1';
 import { readToolOutput, sendToolOutput } from '../creation/output-handoff.mjs?rev=20261111-output-offerwall-1';
 import { createPixelLensOutputOptions, preparePixelLensOutputRestore } from './output-handoff.mjs?rev=20261116-normal-release-2';
