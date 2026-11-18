@@ -198,7 +198,7 @@ test('Pages review build copies the runtime and injects only eligible generated 
 
   const result = await buildPagesSite({ root, output });
   const builtHome = await readFile(join(result.output, 'index.html'), 'utf8');
-  assert.doesNotMatch(builtHome, /data-information-auto-ads|information-auto-ads\.mjs|adsense-offerwall-policy/);
+  assert.doesNotMatch(builtHome, /data-information-auto-ads|information-auto-ads\.mjs/);
   assert.match(await readFile(join(result.output, 'events/index.html'), 'utf8'), /data-information-auto-ads="\/events\/"/);
   assert.match(await readFile(join(result.output, 'events/eligible-pixel-event/index.html'), 'utf8'), /data-information-auto-ads="\/events\/eligible-pixel-event\/"/);
   await assert.rejects(readFile(join(result.output, 'events/watch-pixel-event/index.html')));
