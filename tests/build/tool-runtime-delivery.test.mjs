@@ -26,14 +26,19 @@ test('delivery plan preserves runtime identities and bounds minification to star
   // Live Draw adds two graph modules and four edges: editor→adapter, adapter→color/animation, and color→animation.
   // The combined store-link and fast Draw graph adds three shared modules and twelve edges; text and normal generation stay lazy.
   // The adapter is bundled; color adjustment stays external as the canonical module also used by its lazy panel.
-  assert.equal(plan.runtimeGraph.modules.size, 123);
-  assert.equal(plan.runtimeGraph.edges.length, 245);
+  // Desktop ads add two modules/three edges; mobile anchor adds one controller/two edges.
+  assert.equal(plan.runtimeGraph.modules.size, 126);
+  assert.equal(plan.runtimeGraph.edges.length, 250);
   assert.equal(plan.dynamicRoots.length, 26);
   assert.equal(plan.dynamicGraph.modules.size, 122);
   assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-live-session-panel.mjs?rev=20261117-chat-connect-1'), 'Live-session UI is loaded only on demand.');
   assert.equal(plan.externalUrls.size, 70);
-  assert.equal(plan.internalizedUrls.length, 53);
+  assert.equal(plan.internalizedUrls.length, 56);
   const files = [...plan.runtimeGraph.modules.values()].map(module => module.file);
+  assert(files.includes('js/ads/draw-display-ad.mjs'));
+  assert(files.includes('js/ads/draw-mobile-anchor.mjs'));
+  assert(files.includes('data/draw-display-ad-config.mjs'));
+  assert(!files.includes('js/ad-recovery-entry.js'), 'Recovery remains a tool-entry-only classic script.');
   assert(!files.includes('js/creation/draw-agent-extras.mjs'), 'Normal generation and font rendering remain lazy.');
   assert(plan.dynamicRoots.some(item => item.url === '/js/creation/draw-agent-extras.mjs?rev=20261117-chat-connect-1'));
   assert(files.includes('js/creation/draw-agent-operations.mjs'), 'Live Draw adds the allowlisted operation adapter to editor startup.');
@@ -154,7 +159,7 @@ test('optimized owned build carries one fingerprinted bundle and no private sour
     assert.equal(report.addedFiles, 1);
     assert.equal(report.bundlePath, 'js/creation/creation-runtime.bundle.mjs');
     assert.equal(report.externalCount, 70);
-    assert.equal(report.internalizedCount, 53);
+    assert.equal(report.internalizedCount, 56);
     assert(report.startupStandaloneMinifiedCount >= 129);
     assert.match(report.revision, /^20261020-staged-startup-1-[a-f0-9]{12}$/);
 

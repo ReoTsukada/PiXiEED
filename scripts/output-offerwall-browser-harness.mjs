@@ -77,19 +77,19 @@ try {
       const e=await environment(mode);const {page,sdk,requests}=e;
       try {
         const expected=await seed(page,role,kind,age);await page.click('#send');
-        await page.waitForURL(origin+'/output/work/'); await ready(page);await page.waitForFunction(()=>window.__PIXIEED_OFFERWALL_ENTRY__?.isEligible());
-        await page.waitForTimeout(300);assert.equal(sdk.length,1);
+        await page.waitForURL(origin+'/output/work/'); await ready(page);await page.waitForFunction(()=>window.__PIXIEED_OFFERWALL_ENTRY__?.isEligible() === false);
+        await page.waitForTimeout(300);assert.equal(sdk.length,0,'Retired Offerwall must not request its provider');
         const state=await page.evaluate(()=>({pointer:history.state.pixieedOutputRequest,pending:sessionStorage.getItem('pixieed-output-entry-v1'),anchor:JSON.parse(sessionStorage.getItem('test-anchor')),referrer:document.referrer,sentinel:localStorage.getItem('synthetic-editor-sentinel')}));
         assert.equal(state.pending,null);assert.deepEqual(state.anchor,{rel:'noreferrer',policy:'no-referrer'});assert.equal(state.referrer,'');assert.equal(state.sentinel,'preserve-me');assert.equal(state.pointer.key,kind==='pxd'?'file':'id');
-        assert(requests.some(r=>r.path==='/output/work/?entry=1'&&r.referrer===''));assert.equal(sdk[0].referrer,'');
+        assert(requests.some(r=>r.path==='/output/work/?entry=1'&&r.referrer===''));assert.equal(sdk.length,0);
         const original=await stored(page,state.pointer.key,state.pointer.id);
         assert.deepEqual(original.bytes,expected.bytes);assert.equal(original.filename,expected.filename);assert.equal(original.returnUrl,expected.returnUrl);if(kind!=='pxd')assert.deepEqual(original.metadata,expected.metadata);
         if(await page.locator('[data-width]').count()) await page.locator('[data-width]').evaluate(el=>{el.value='3';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
-        await Promise.all([page.waitForEvent('download'),page.locator('#main a[download]').last().evaluate(el=>el.click())]);await page.waitForTimeout(200);assert.equal(sdk.length,1,'Settings/save must not reload provider');
+        await Promise.all([page.waitForEvent('download'),page.locator('#main a[download]').last().evaluate(el=>el.click())]);await page.waitForTimeout(200);assert.equal(sdk.length,0,'Settings/save must not load the retired provider');
         await page.reload();await ready(page);assert.equal(page.url(),origin+'/output/work/');assert.deepEqual((await stored(page,state.pointer.key,state.pointer.id)).bytes,expected.bytes);
         await page.goBack();assert(new URL(page.url()).pathname==='/'+role+'/');assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-editor-sentinel')),'preserve-me');
         await page.goForward();await ready(page);assert.equal(page.url(),origin+'/output/work/');assert.equal(await page.evaluate(()=>history.state.pixieedOutputRequest.id),state.pointer.id);
-        const before=sdk.length;await page.goto(`${origin}/output/work/?${state.pointer.key}=${state.pointer.id}`);await ready(page);await page.waitForTimeout(300);assert.equal(sdk.length,before,'Legacy pointer must deny provider');assert.equal(await page.evaluate(()=>window.__PIXIEED_OFFERWALL_ENTRY__.isEligible()),false);assert.deepEqual((await stored(page,state.pointer.key,state.pointer.id)).bytes,expected.bytes);
+        assert.equal(sdk.length,0,'Reload/history navigation must keep Offerwall disabled');const before=sdk.length;await page.goto(`${origin}/output/work/?${state.pointer.key}=${state.pointer.id}`);await ready(page);await page.waitForTimeout(300);assert.equal(sdk.length,before,'Legacy pointer must deny provider');assert.equal(await page.evaluate(()=>window.__PIXIEED_OFFERWALL_ENTRY__.isEligible()),false);assert.deepEqual((await stored(page,state.pointer.key,state.pointer.id)).bytes,expected.bytes);
       } finally {await e.context.close();}
     });
   }

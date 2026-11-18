@@ -1,6 +1,8 @@
+import { mountDrawMobileAnchorWhenReady } from '../ads/draw-mobile-anchor.mjs?rev=20261118-draw-display-ad-1';
+import { mountDrawDisplayAdWhenReady } from '../ads/draw-display-ad.mjs?rev=20261118-draw-display-ad-1';
 import { createModeScope } from './mode-scope.mjs?rev=20261001-independent-editors-1';
 import { readCreationModePointer } from './mode-entry.mjs?rev=20261016-tool-shell-1';
-import { mountDrawMode } from './draw-page.mjs?rev=20261117-chat-connect-1';
+import { mountDrawMode } from './draw-page.mjs?rev=20261118-draw-display-ad-1';
 import { mountProjectWorkspace } from './project-workspace.mjs?rev=20261116-normal-release-2';
 import { mountCreationModes } from './creation-modes.mjs?rev=20261116-normal-release-2';
 import { getCreationSnapshot } from './creation-snapshot.mjs?rev=20261116-normal-release-2';
@@ -137,5 +139,16 @@ export async function mountCreationRuntime({
       scope.dispose();
     }
   };
+  // The mode must be established before the optional ad reads the Draw layout.
+  if (!disposed && mountedModes.mode === 'draw') {
+    scope.add(mountDrawDisplayAdWhenReady({
+      doc: document, win: window, root: document.querySelector('#main'),
+      onLayout: () => draw.refreshModeLayout()
+    }));
+    scope.add(mountDrawMobileAnchorWhenReady({
+      doc: document, win: window, root: document.querySelector('#main')
+    }));
+  }
+
   return runtime;
 }
